@@ -336,6 +336,7 @@ class SetModes(_FileAction):
 	if type(path) is str:
 	    path = (path,)
 	self.paths = path
+        self.mode = mode
 
     def do(self, macros):
 	files = []
