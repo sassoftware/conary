@@ -8,7 +8,17 @@ class Libhello(PackageRecipe):
     version = '0'
     
     def setup(self):
-	self.addSource('libhello.c')
+	self.Run("""
+cat > libhello.c <<'EOF'
+/* libhello.c - Simple example of a shared library */
+
+#include <stdio.h>
+
+void print_hello(void) {
+    printf("Hello, library.\\n");
+}
+EOF
+	""")
 	self.Run('%(cc)s %(ldflags)s -shared -Wl,-soname,libhello.so.0 -o libhello.so.0.0 libhello.c -lc')
 	self.InstallFiles('libhello.so.0.0', '%(libdir)s/')
 	self.InstallFiles('/sbin/ldconfig', '%(essentialsbindir)s/')
