@@ -242,7 +242,7 @@ class LocalRepository(Repository):
         try:
             self.lockfd = os.open(self.top + '/lock', flags)
         except OSError, e:
-            raise RepositoryError('Unable to open lock file %s for %s: %s' % (
+            raise OpenError('Unable to open lock file %s for %s: %s' % (
                 self.top + '/lock', mode == 'r' and 'read' or 'read/write',
                 e.strerror))
 
@@ -252,7 +252,7 @@ class LocalRepository(Repository):
             else:
                 fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
         except IOError, e:
-            raise RepositoryError('Unable to obtain %s lock: %s' % (
+            raise OpenError('Unable to obtain %s lock: %s' % (
                 mode == 'r' and 'shared' or 'exclusive', e.strerror))
 
 	self.pkgDB = None
@@ -272,7 +272,7 @@ class LocalRepository(Repository):
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_UN)
             os.close(self.lockfd)
             self.lockfd = -1
-            raise RepositoryError('Unable to open repository: %s' % str(e))
+            raise OpenError('Unable to open repository: %s' % str(e))
 
 	self.mode = mode
 
@@ -398,8 +398,12 @@ class LocalRepository(Repository):
 	self.pkgDB = None
 	
 	self.contentsDB = self.top + "/contents"
-	util.mkdirChain(self.contentsDB)
 
+	try:
+	    util.mkdirChain(self.contentsDB)
+	except OSError, e:
+	    raise OpenError(str(e))
+	    
 	self.contentsStore = datastore.DataStore(self.contentsDB)
 
         self.open(mode)
@@ -723,13 +727,11 @@ class ChangeSetUndo:
 class RepositoryError(Exception):
     """Base class for exceptions from the system repository"""
 
+class OpenError(RepositoryError):
+    """Error occured opening the repository"""
+
 class CommitError(RepositoryError):
-
-    def __str__(self):
-	return self.str
-
-    def __init__(self, str):
-	self.str = str
+    """Error occured commiting a package"""
 
 class PackageMissing(RepositoryError):
 
