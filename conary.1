@@ -129,7 +129,10 @@ branch only for that trove.
 .B cook \fI[\fR--prep\fI] [\fR--macros file\fI] [\fR--target-branch \fI<branch>]\fR \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR--resume [<linenum>|policy]] \fI<file>\fP.recipe\fI|<component>...\fP
+.B \ \ \ \ \ [\fR--resume [<linenum>|policy]] [\fR--use-flag "<flag> True|False"] \fP \e
+.PD 0
+.TP
+.B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>...\fP
 .PD
 Build a package.  If \fB--prep\fP is specified, the souce code is
 unpacked, but is not built. if \fB--macros\fP is specified, it
@@ -142,6 +145,12 @@ If \fB--resume policy\fP is specified, the policy will be rechecked
 from the last build.  Note that the \fB--resume\fP option may
 only be used with local recipe files, not source components grabbed
 from a repository.
+.IP 
+The --use-flag option can be used to override the default Use flags 
+and package-specific flags for this instantiaton.   The format for
+<flag> may be Use.<useflag>, where <useflag> is a system-wide Use 
+flag, or Flags.<package>.<pkgflag>, where <pkgflag> is a flag defined
+in <package>.  <package>, <useflag>, <pkgflag> are case sensitive.
 .IP 
 If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the

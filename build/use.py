@@ -98,7 +98,7 @@ class Flag(dict):
             self[key]._set(bool(value))
         else:
             dict.__setitem__(self, key, value)
-            
+
     def __getattr__(self, name):
         if name in self.__dict__:
             return self.__dict__[name]
@@ -362,3 +362,9 @@ def track(arg, localflags=None):
     Use.trackUsed(arg)
     if localflags is not None:
 	localflags.trackUsed(arg)
+
+def applyCfg(config, localflags=None):
+    Use._thaw()
+    for key in config.useKeys():
+	Use[key] = config['Use.' + key]
+    Use._freeze()

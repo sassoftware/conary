@@ -20,6 +20,7 @@ import deps
 import deps.arch
 import deps.deps
 import os
+from build import use
 import versions
 
 STRING, BOOL, LABEL, STRINGDICT, STRINGLIST, CALLBACK = range(6)
@@ -39,19 +40,28 @@ class ConfigFile:
 	elif exception:
 	    raise IOError, file
 
+    def __getitem__(self, name):
+	return self.__dict__[name]
+
     def configLine(self, line, file = "override"):
 	line = line.strip()
 	if not line or line[0] == '#':
 	    return
 	(key, val) = line.split(None, 1)
-        key = key.lower()
-	if not self.lowerCaseMap.has_key(key):
-	    raise ParseError, ("%s:%s: configuration value '%s' unknown" % (file, self.lineno, key))
-	else:
-	    key = self.lowerCaseMap[key]
+	(key, type) = self.checkKey(key)
+	self.setValue(key, val, type, file)
 	
-	type = self.types[key]
+    def checkKey(self, key):
+	lckey = key.lower()
+	if not self.lowerCaseMap.has_key(lckey):
+	   raise ParseError, ("%s:%s: configuration value '%s' unknown" % (file, self.lineno, key))
+	else:
+	    return (self.lowerCaseMap[lckey], None)
+	
 
+    def setValue(self, key, val, type=None, file="override"):
+	if type == None:
+	    type = self.types[key]
 	if type == STRING:
 	    self.__dict__[key] = val
 	elif type == STRINGDICT:
@@ -67,12 +77,14 @@ class ConfigFile:
 	    except versions.ParseError, e:
 		raise versions.ParseError, str(e)
 	elif type == BOOL:
+	    if isinstance(val, bool):
+		self.__dict__[key] = val
 	    if val.lower() in ('0', 'false'):
 		self.__dict__[key] = False
 	    elif val.lower() in ('1', 'true'):
 		self.__dict__[key] = True
 	    else:
-		raise ParseError, ("%s:%s: expected True or False for configuration value '%s'" % (self.file, self.lineno, key))
+		raise ParseError, ("%s:%s: expected True or False for configuration value '%s'" % (file, self.lineno, key))
 
     def display(self):
 	keys = self.defaults.keys()
@@ -131,6 +143,10 @@ class ConaryConfiguration(ConfigFile):
 	'sourceSearchDir'	: '.',
 	'tmpDir'		: '/var/tmp/',
     }
+
+    
+    pkgflags = {}
+    useflags = {}
    
     def __init__(self):
 	ConfigFile.__init__(self)
@@ -143,6 +159,37 @@ class ConaryConfiguration(ConfigFile):
 	if os.environ.has_key("HOME"):
 	    self.read(os.environ["HOME"] + "/" + ".conaryrc")
 	self.read("conaryrc")
+
+    def checkKey(self, key):
+	if key.find('.') != -1:
+	    directive,arg = key.split('.', 1)
+	    directive = directive.lower()
+	    if directive in ('use', 'flags'):
+		return self.checkFlagKey(directive, arg)
+	return ConfigFile.checkKey(self, key)
+	
+    def checkFlagKey(self, directive, key):
+	if directive == 'use':
+	    if key not in use.Use:
+		raise ParseError, ("%s:%s: Unknown Use flag %s" % (file, self.lineno, key))
+	    else:
+		self.useflags[key] = True
+		return ('Use.' + key, BOOL)
+	elif directive == 'flags':
+	    if key.find('.') == -1:
+		raise ParseError, ("%s:%s: Flag %s must be of form package.flag" % (file, self.lineno, key))
+	    else:
+		package, flag = key.split('.', 1)
+		if package not in self.pkgflags:
+		    self.pkgflags[package] = {}
+		self.pkgflags[package][flag] = True
+		return ('Flags.' + key, BOOL)
+
+    def useKeys(self):
+	return self.useflags.keys()
+
+    def pkgKeys(self, pkg):
+	return self.pkgdefaults.get(pkg, {}).keys()
 
 class ConaryCfgError(Exception):
 

@@ -539,6 +539,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
     buildList = []
     changeSetFile = None
     targetLabel = None
+    use.applyCfg(cfg)
 
     if item.endswith('.recipe') and os.path.isfile(item):
 	if emerge:
