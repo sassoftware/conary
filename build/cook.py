@@ -121,13 +121,14 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
 	repos.close()
 	recipeObj.doBuild(builddir)
-	repos.open("w")
 
 	destdir = "/var/tmp/srs/%s-%d" % (recipeObj.name, int(time.time()))
         if os.path.exists(destdir):
             shutil.rmtree(destdir)
         util.mkdirChain(destdir)
 	recipeObj.doInstall(builddir, destdir)
+
+	repos.open("w")
         
         os.chdir(cwd)
         
