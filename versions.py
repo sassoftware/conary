@@ -838,21 +838,22 @@ class Version(VersionSequence):
     def __deepcopy__(self, mem):
 	return Version(copy.deepcopy(self.versions[:]))
 
-    def createBranch(self, branch, withVerRel = False):
+    def createBranch(self, label, withVerRel = False):
 	"""
-	Creates a new branch from this version. 
+	Creates a new label from this version. 
 
-	@param branch: Branch to create for this version
-	@type branch: AbstractLabel
-	@param withVerRel: If set, the new branch is turned into a version
-	on the branch using the same version and release as the original
+	@param label: Branch to create for this version
+	@type label: AbstractLabel
+	@param withVerRel: If set, the new label is turned into a version
+	on the label using the same version and release as the original
 	verison.
 	@type withVerRel: boolean
 	@rtype: Version 
 	"""
-	assert(isinstance(branch, AbstractLabel))
+	assert(isinstance(label, AbstractLabel))
+        assert(self.versions[-2] != label)
 
-	newlist = [ branch ]
+	newlist = [ label ]
 
 	if withVerRel:
 	    newlist.append(self.versions[-1].copy())
@@ -870,6 +871,7 @@ class Version(VersionSequence):
 	@rtype: Version 
 	"""
 	assert(isinstance(label, AbstractLabel))
+        assert(self.versions[-2] != label)
 
         newRelease = self.versions[-1].copy()
 	newRelease.timeStamp = time.time()
