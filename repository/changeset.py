@@ -226,8 +226,8 @@ def CreateFromRepository(repos, packageList):
 
 def ChangeSetCommand(repos, cfg, packageName, outFileName, oldVersionStr, \
 	      newVersionStr):
-    if packageName[0] != "/":
-	packageName = cfg.packagenamespace + "/" + packageName
+    if packageName[0] != ":":
+	packageName = cfg.packagenamespace + ":" + packageName
 
     newVersion = versions.VersionFromString(newVersionStr, cfg.defaultbranch)
 

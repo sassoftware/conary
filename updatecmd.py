@@ -21,8 +21,8 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 
 	cs = changeset.ChangeSetFromFile(pkg)
     else:
-	if pkg and pkg[0] != "/":
-	    pkg = cfg.packagenamespace + "/" + pkg
+	if pkg and pkg[0] != ":":
+	    pkg = cfg.packagenamespace + ":" + pkg
 
 	if versionStr and versionStr[0] != "/":
 	    versionStr = cfg.defaultbranch.asString() + "/" + versionStr

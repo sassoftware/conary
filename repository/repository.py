@@ -88,7 +88,7 @@ class Repository:
 	    for pathInPkg in pathsToArchive:
 		(file, path, pkgName) = filesToArchive[pathInPkg]
 		if isinstance(file, files.SourceFile):
-		    basePkgName = string.split(pkgName, '/')[-2]
+		    basePkgName = string.split(pkgName, ':')[-2]
 		    d = { 'pkgname' : basePkgName }
 		    path = (sourcePathTemplate) % d + "/" + path
 
@@ -133,7 +133,7 @@ class Repository:
 
 	allPackages = self.pkgDB.fileList()
 	list = []
-	groupName = groupName + "/"
+	groupName = groupName + ":"
 
 	for pkgName in allPackages:
 	    if pkgName.startswith(groupName):

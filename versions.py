@@ -12,19 +12,6 @@ class AbstractVersion:
     def __init__(self):
 	pass
 
-class BranchVersion(AbstractVersion):
-
-    def equal(self, version):
-	if type(self) == type(version) and self.value == version.value:
-	    return 1
-	return 0
-
-    def __str__(self):
-	return self.value
-
-    def __init__(self, value):
-	self.value = value
-
 class VersionRelease(AbstractVersion):
 
     def __str__(self):
@@ -59,6 +46,26 @@ class VersionRelease(AbstractVersion):
 	    self.release = int(self.release)
 	except:
 	    raise KeyError, ("release numbers must be all numeric: %s" % value)
+
+class BranchName(AbstractVersion):
+
+    def __str__(self):
+	return self.host + '@' + str(self.branch)
+
+    def equal(self, version):
+	if (type(self) == type(version) and self.host == version.host
+		and self.branch == version.branch):
+	    return 1
+	return 0
+
+    def __init__(self, value):
+	# throws an exception if no @ is found
+	#cut = value.index("@")
+	(self.host, self.branch) = string.split(value, "@", 1)
+	#self.host = value[:cut]
+	#self.branch = value[cut + 1:]
+	if self.branch.find("@") != -1:
+	    raise KeyError, ("branch names may not have @ signs: %s" % value)
 
 class Version:
 
@@ -100,7 +107,7 @@ class Version:
 	return s
 
     def isBranch(self):
-	return (len(self.versions) % 3) == 2
+	return isinstance(self.versions[-1], BranchName)
 
     def onBranch(self, branch):
 	if self.isBranch(): return 0
@@ -111,7 +118,7 @@ class Version:
 	return Version(self.versions[:-1])
 
     def isVersion(self):
-	return (len(self.versions) % 3) == 0
+	return isinstance(self.versions[-1], VersionRelease)
 
     def __init__(self, versionList):
 	self.versions = versionList
@@ -121,23 +128,19 @@ class Version:
 def VersionFromString(str, defaultBranch = None):
     if str[0] != "/":
 	if not defaultBranch:
-	    raise KeyError, "relative verions given without a default branch"
+	    raise KeyError, "relative version given without a default branch"
 	str = defaultBranch.asString() + "/" + str
 
     parts = string.split(str, "/")
     del parts[0]	# absolute versions start with a /
 
-    if (len(parts) % 3) == 1:
-	raise KeyError, ("invalid version string: %s" % str)
-
     v = []
     while parts:
-	v.append(BranchVersion(parts[0]))
-	v.append(BranchVersion(parts[1]))
+	v.append(BranchName(parts[0]))
 
-	if len(parts) >= 3:
-	    v.append(VersionRelease(parts[2]))
-	    parts = parts[3:]
+	if len(parts) >= 2:
+	    v.append(VersionRelease(parts[1]))
+	    parts = parts[2:]
 	else:
 	    parts = None
 

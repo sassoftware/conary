@@ -28,11 +28,11 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
     for (className, recipeClass) in classList.items():
 	print "Building", className
-	fullName = cfg.packagenamespace + "/" + recipeClass.name
+	fullName = cfg.packagenamespace + ":" + recipeClass.name
 
 	lcache = lookaside.RepositoryCache(repos)
 
-	ident = files.IdGen()
+	ident = package.IdGen()
         ident.populate(cfg, repos, lcache, recipeClass.name)
 
         srcdirs = [ os.path.dirname(recipeClass.filename), cfg.sourcepath % {'pkgname': recipeClass.name} ]
@@ -80,13 +80,13 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         
         os.chdir(cwd)
         
-        pkgname = cfg.packagenamespace + "/" + recipeObj.name
+        pkgname = cfg.packagenamespace + ":" + recipeObj.name
 
 	packageList = []
         recipeObj.packages(destdir)
 
 	for (name, buildPkg) in recipeObj.getPackageSet().packageSet():
-	    fullName = pkgname + "/" + name
+	    fullName = pkgname + ":" + name
 	    p = package.createPackage(repos, cfg, destdir,
                                       buildPkg.keys(), fullName,
                                       version, ident, "auto")
@@ -111,7 +111,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	    srcList.append(src)
 	
 	p = package.createPackage(repos, cfg, destdir, srcList, 
-                          pkgname + "/sources", version, ident, 
+                          pkgname + ":sources", version, ident, 
                           "src")
 	packageList.append(p)
 

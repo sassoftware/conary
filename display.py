@@ -10,8 +10,8 @@ _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
 
 def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
-    if pkg and pkg[0] != "/":
-	pkg = cfg.packagenamespace + "/" + pkg
+    if pkg and pkg[0] != ":":
+	pkg = cfg.packagenamespace + ":" + pkg
 
     for pkgName in repos.getPackageList(pkg):
 	pkgSet = repos.getPackageSet(pkgName)
@@ -31,8 +31,8 @@ def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
 		    version.asString(cfg.defaultbranch))
 
 def displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
-    if pkgName[0] != "/":
-	pkgName = cfg.packagenamespace + "/" + pkgName
+    if pkgName[0] != ":":
+	pkgName = cfg.packagenamespace + ":" + pkgName
 
     pkgSet = repos.getPackageSet(pkgName)
 
