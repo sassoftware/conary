@@ -33,6 +33,8 @@ def cook(cfg, srcdirs, recipeFile):
         recp.packages(rootDir)
         pkgSet = recp.getPackageSet()
 
+        pkgname = cfg.packagenamespace + "/" + recp.name
+        
 	for (name, buildPkg) in pkgSet.packageSet():
 	    fileList = []
 
@@ -40,10 +42,8 @@ def cook(cfg, srcdirs, recipeFile):
 		f = files.FileFromFilesystem(recp.name, rootDir, filePath)
 		fileList.append(f)
 
-	    commit.finalCommit(cfg, 
-			   cfg.packagenamespace + "/" + recp.name + "/" + name, 
-			   recp.version, 
-			   rootDir, fileList)
+	    commit.finalCommit(cfg, pkgname + "/" + name, recp.version, 
+                               rootDir, fileList)
 
 	f = files.FileFromFilesystem(recp.name, "/", recipeFile, "src")
 	fileList = [ f ]
@@ -52,8 +52,7 @@ def cook(cfg, srcdirs, recipeFile):
 	    f = files.FileFromFilesystem(recp.name, "/", src, "src")
 	    fileList.append(f)
 
-	commit.finalCommit(cfg, 
-			   cfg.packagenamespace + "/" + recp.name + "/sources",
-			   recp.version, "/", fileList)
+	commit.finalCommit(cfg, pkgname + "/sources", recp.version,
+                           "/", fileList)
 
 	recp.cleanup(ourBuildDir, rootDir)
