@@ -654,7 +654,7 @@ class TroveStore:
         try:
             stream = cu.next()[0]
         except StopIteration:
-            KeyError, (pathId, fileId)
+            raise KeyError, (pathId, fileId)
 
         if stream is not None:
             return files.ThawFile(stream, pathId)
