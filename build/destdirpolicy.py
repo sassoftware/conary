@@ -49,12 +49,25 @@ librarydirs = [
 
 class TestSuiteLinks(policy.Policy):
     """
-    Create symlinks into a 'test build' directory, which mirrors
-    the build directory, except that all executables/configs/etc
-    in the 'test build' directory are symlinks to the installed 
-    versions where possible.
+    Indicate extra files to link into the test directory; 
+    C{r.TestSuiteLinks(I{%(docdir)s/README}) or 
+    C{r.TestSuiteLinks(fileMap={I{<builddir path>} : I{<destdir path>}})}.  
+
+    Files listed in the first filterexp can override standard exclusions;
+    currently, document, man, info, and init directories.  
+    Alternatively, a fileMap can be given.  A fileMap is a dictionary where 
+    each key is a path to a symlink that will be created in the test directory, 
+    and the value pointed to by that key is the path of a file installed 
+    in the destination directory that the symlink should point to.  
+
+    The C{r.TestSuiteLinks()} command is only useful if you have indicated 
+    to conary that you wish to create a test suite.  To create a test suite, 
+    you should run the C{r.TestSuite()} command, documented in
+    conary.build.build.
     """
 
+    # build is an internal interface, used by r.TestSuite to indicate that 
+    # TestSuiteLinks should run
     keywords = { 'build': None,
 		 'fileMap' : {}
 		} 
@@ -71,14 +84,6 @@ class TestSuiteLinks(policy.Policy):
     buildTestSuite = None
 
     def updateArgs(self, *args, **keywords):
-	"""
-	call as C{TestSuiteLinks(<inclusions>, fileMap=<map>, ...)}.
-	@keyword fileMap: each key is a path to a builddir file, each value is
-	path to a destdir file that is equivalent to the builddir file.  Default: {}
-	@type fileMap: Hash builddir path -> destdir path
-	@keyword build: If set to true, will create TestSuiteLinks even if a TestSuite command is not given.  If set to false, will not create TestSuiteLinks even if a TestSuite command is given.  Also turns on/off TestSuiteFiles
-
-	"""
 	# XXX add fileMap param, to map from builddir -> destdir files
 	# could update automatically when we install a file?
 	# but then we remove/move a file after installing,
@@ -252,13 +257,19 @@ class TestSuiteLinks(policy.Policy):
 #XXX this is a builddir policy
 class TestSuiteFiles(policy.Policy):
     """
-    TestSuiteFiles marks those files which are not installed on 
-    the user's system, but are needed for running the testsuite
-    included with the package.  TestSuiteFiles are installed 
-    in the I{:test} component, in a special I{testdir}. 
-    The TestSuiteFiles policy is only activated if a TestSuite
-    build command has been given, or it is explictly activated using 
-    the keyword I{build}.
+    Indicate extra files to copy into the test directory; 
+    C{r.TestSuiteFiles(I{<filterexp>})} - note that this filterexp is relative
+    to the build directory, not the install directory as are the rest of
+    the destdir policies.
+
+    Files included in the filterexp will be copied into the test directory,
+    with their path relative to the build dir retained.  E.g. a file found
+    at %(builddir)s/bin/foo will be copied to %(testdir)s/bin/foo.
+
+    The C{r.TestSuiteFiles()} command is only useful if you have indicated 
+    to conary that you wish to create a test suite.  To create a test suite, 
+    you should run the C{r.TestSuite()} command, documented in
+    conary.build.build.
     """
 
     rootdir = '%(builddir)s'
