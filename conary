@@ -6,8 +6,10 @@ import util
 import importrpm
 import string
 import package
+import update
 
 DBPATH=os.getcwd() + "/srsdb"
+ROOT=os.getcwd() + "/root"
 
 scratch = DBPATH + "/scratch"
 fileDB = DBPATH + "/files"
@@ -36,5 +38,8 @@ elif (sys.argv[1] == "pkglist"):
 	displayPkgs(DBPATH, os.listdir(DBPATH + "/pkgs"))
     else:
 	displayPkgs(DBPATH, sys.argv[2:])
+elif (sys.argv[1] == "update"):
+    for pkg in sys.argv[2:]:
+	update.doUpdate(DBPATH, ROOT, pkg)
 else:
     usage()
