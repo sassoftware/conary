@@ -1,6 +1,8 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
 import package
-import util
-import os
 import files
 import shutil
 import string

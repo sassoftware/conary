@@ -1,8 +1,11 @@
-#!/usr/bin/python2
+#!/usr/bin/python
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
 
 import os
 import sys
-import util
 import importrpm
 import string
 import package
@@ -15,13 +18,14 @@ cfg = srscfg.SrsConfiguration()
 
 fileDB = cfg.reppath + "/files"
 pkgDB = cfg.reppath + "/pkgs"
-util.mkdirChain(fileDB, pkgDB)
+os.makedirs(fileDB, pkgDB)
 
 def usage():
     print "usage: srs import <file.rpm>"
     print "       srs pkglist <pkg>"
     print "       srs update  <pkg>"
     print "       srs commit  <pkg> <version> <root> <filelist>"
+    print "       srs cook    <first.recipe> <second.recipe> ..."
     sys.exit(0)
 
 def displayPkgs(reppath, packageList):

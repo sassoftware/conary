@@ -1,8 +1,12 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
 import recipe
-import util
 import time
 import files
 import commit
+import os
 
 def cook(reppath, srcdir, builddir, recipeFile):
     classList = recipe.RecipeLoader(recipeFile)
@@ -19,7 +23,7 @@ def cook(reppath, srcdir, builddir, recipeFile):
 	recp.doBuild(ourBuildDir)
 
 	rootDir = "/var/tmp/srs/%s-%d" % (recp.name, int(time.time()))
-	util.mkdirChain(rootDir)
+        os.makedirs(rootDir, 0700)
 	recp.doInstall(ourBuildDir, rootDir)
 
 	pkgSet = recp.packages(rootDir)

@@ -1,7 +1,10 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
 import rpm
 import os
 import files
-import util
 import commit
 import stat
 
@@ -81,7 +84,7 @@ def doImport(reppath, rpmFile):
 	f.mtime(mtimes[i])
 	fileList.append(f)
 
-    util.mkdirChain(scratch)
+    os.makedirs(scratch)
 
     if mustExtract:
 	os.system("cd %s; rpm2cpio %s | cpio -iumd --quiet" % 

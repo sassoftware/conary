@@ -1,3 +1,7 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
 
 class Logrotate(recipe.Recipe):
 
@@ -11,11 +15,9 @@ preventing files from growing ad nauseum"""
     version = "2.9.0"
 
     def setup(self):
-	self.addTarball("tmpwatch-2.9.0.tar.gz")
+	self.addTarball("tmpwatch-%s.tar.gz" % self.version)
 	self.build = build.Make()
 	self.install = build.MakeInstall(rootVar = "ROOT")
 
     def packages(self, root):
-	pkgs = package.Auto("tmpwatch", root)
-
-	return pkgs
+	return package.Auto("tmpwatch", root)

@@ -1,3 +1,7 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
 import string
 import os
 import versioned
@@ -5,7 +9,6 @@ import md5sum
 import pwd
 import grp
 import shutil
-import util
 import stat
 import pwd
 import grp
@@ -309,13 +312,13 @@ class RegularFile(File):
 		   self.uniqueName() 
 	target = root + self.path()
 	path = os.path.dirname(target)
-	util.mkdirChain(path)
+	os.makedirs(path)
 	shutil.copyfile(source, target)
 	File.restore(self, reppath, srcpath, root)
 
     def archive(self, reppath, root):
 	dest = reppath + "/files" + self.path() + ".contents"
-	util.mkdirChain(dest)
+	os.makedirs(dest)
 	dest = dest + "/" + self.uniqueName()
 	shutil.copyfile(root + "/" + self.path(), dest)
 
@@ -334,14 +337,14 @@ class SourceFile(RegularFile):
 		+ ".contents/" + self.uniqueName()
 	target = root + srcpath + "/" + os.path.basename(self.path())
 	path = os.path.dirname(target)
-	util.mkdirChain(path)
+	os.makedirs(path)
 	shutil.copyfile(source, target)
 	File.restore(self, reppath, srcpath, root)
 
     def archive(self, reppath, root):
 	dest = reppath + "/sources/" + os.path.basename(self.path()) \
 		+ ".contents"
-	util.mkdirChain(dest)
+	os.makedirs(dest)
 	dest = dest + "/" + self.uniqueName()
 	shutil.copyfile(root + "/" + self.path(), dest)
 
@@ -382,7 +385,7 @@ class FileDB:
 
     def write(self):
 	dir = os.path.split(self.dbfile)[0]
-	util.mkdirChain(dir)
+	os.makedirs(dir)
 
 	f = versioned.open(self.dbfile, "w")
 	for (version, file) in self.versions.items():

@@ -1,5 +1,8 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
 import imp, sys, types
-import util
 import os
 
 class RecipeLoader(types.DictionaryType):
@@ -37,7 +40,7 @@ class Recipe:
 	return self.name + "-" + self.version
 
     def unpackSources(self, srcdir, builddir):
-	util.mkdirChain(builddir)
+	os.makedirs(builddir)
 	for file in self.tarballs:
 	    os.system("tar -C %s -xvzf %s" % (builddir, srcdir + "/" + file))
 

@@ -1,7 +1,9 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
 import package
 import files
-import os.path
-import util
 import shutil
 import pwd
 import grp
