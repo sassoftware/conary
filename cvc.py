@@ -19,6 +19,7 @@ def usage(rc = 1):
     print "       srs source diff"
     print "       srs source newpkg <name>"
     print "       srs source remove"
+    print "       srs source rename <oldfile> <newfile>"
     print "       srs source update"
     sys.exit(rc)
 
@@ -59,6 +60,9 @@ def sourceCommand(cfg, args, argSet):
     elif (args[0] == "remove"):
 	if len(args) != 2: usage()
 	checkin.removeFile(args[1])
+    elif (args[0] == "rename"):
+	if len(args) != 3: usage()
+	checkin.renameFile(args[1], args[2])
     elif (args[0] == "newpkg"):
 	if len(args) != 2: usage()
 	repos = repository.LocalRepository(cfg.reppath, "r")

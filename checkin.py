@@ -15,6 +15,7 @@ import package
 import patch
 import recipe
 import repository
+import sys
 import util
 import versioned
 import versions
@@ -356,7 +357,7 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
     assert(not pkgsNeeded)
     changeSet.newPackage(csPkg)
 
-    if csPkg.getOldFileList():
+    if csPkg.getOldFileList() or csPkg.getChangedFileList():
 	foundDifference = 1
 
     return (foundDifference, state, changeSet, srcPkg)
@@ -375,7 +376,6 @@ def commit(repos):
 	state.write("SRS")
 
 def diff(repos):
-
     result = buildChangeSet(repos)
     if not result: return
 
@@ -393,7 +393,16 @@ def diff(repos):
     for (fileId, path, newVersion) in pkgCs.getChangedFileList():
 	if not path:
 	    path = oldPackage.getFile(fileId)[0]
-	print "%s: changed" % path
+	    sys.stdout.write("%s" % path)
+	else:
+	    oldPath = oldPackage.getFile(fileId)[0]
+	    sys.stdout.write("%s (aka %s)" % (path, oldPath))
+
+	if not newVersion: 
+	    print
+	    continue
+	
+	sys.stdout.write(": changed\n")
 
 	csInfo = changeSet.getFileChange(fileId)
 	print "    %s" % csInfo
@@ -645,3 +654,32 @@ def newPackage(repos, cfg, name):
 	    return
 
     state.write(dir + "/" + "SRS")
+
+def renameFile(oldName, newName):
+    if not os.path.isfile("SRS"):
+	log.error("SRS file must exist in the current directory for source commands")
+	return
+
+    state = SourceState("SRS")
+
+    if not os.path.isfile(oldName):
+	log.error("%s does not exist or is not a regular file" % oldName)
+	return
+
+    try:
+	lstat(newName)
+    except:
+	pass
+    else:
+	log.error("%s already exists" % newName)
+	return
+
+    for (fileId, (path, version)) in state.getFileList():
+	if path == oldName:
+	    log.info("renaming %s to %s", oldName, newName)
+	    os.rename(oldName, newName)
+	    state.addFile(fileId, newName, version)
+	    state.write("SRS")
+	    return
+    
+    log.error("file %s is not under management" % oldName)
