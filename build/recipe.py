@@ -37,7 +37,7 @@ class Recipe:
 
 	return self.theMainDir
 
-    def namever(self):
+    def nameVer(self):
 	return self.name + "-" + self.version
 
     def unpackSources(self, srcdir, builddir):

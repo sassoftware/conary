@@ -4,7 +4,6 @@
 #
 
 class Logrotate(recipe.Recipe):
-
     description = """Logrotate is a genuinally useful piece of code for
 preventing files from growing ad nauseum"""
 
