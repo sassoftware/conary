@@ -27,4 +27,4 @@ if [ -z "$PYTHON" ]; then
     exit 1
 fi
 
-$PYTHON @conarydir@/`basename $0` $*
+$PYTHON @conarydir@/`basename $0` "$@"
