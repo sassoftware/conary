@@ -39,7 +39,8 @@ static PyMethodDef ElfMethods[] = {
     { NULL, NULL, 0, NULL }
 };
 
-static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
+static int doInspect(int fd, Elf * elf, PyObject * reqList,
+		     PyObject * provList) {
     Elf_Scn * sect = NULL;
     GElf_Shdr shdr;
     size_t shstrndx;
@@ -62,6 +63,29 @@ static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
     char * insSet;
     char * class;
 
+    if (elf_kind(elf) == ELF_K_AR) {
+	/* if it's an AR archive, recursively call doInspect for all
+	   its members */
+	Elf *nelf;
+	int rc;
+	Elf_Cmd command = ELF_C_READ_MMAP;
+
+	while ((nelf = elf_begin(fd, command, elf)) != NULL) {
+	    Elf_Kind kind = elf_kind(nelf);
+	    rc = 0;
+	    if (kind == ELF_K_ELF || kind == ELF_K_AR)
+		rc = doInspect(fd, nelf, reqList, provList);
+	    command = elf_next(nelf);
+	    if (elf_end(nelf) != 0) {
+		PyErr_SetString(ElfError, "error freeing Elf structure");
+		return 1;
+	    }
+	    if (rc)
+		return rc;
+	}
+	return 0;
+    }
+    
     if (elf_kind(elf) != ELF_K_ELF) {
 	PyErr_SetString(ElfError, "not a plain elf file");
 	return 1;
@@ -126,8 +150,9 @@ static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
 	return 0;
     }
 
-    PyList_Append(reqList, Py_BuildValue("ss(ss)", "abi", class,
-					 abi, insSet));
+    Py_INCREF(Py_None);
+    PyDict_SetItem(reqList, Py_BuildValue("ss(ss)", "abi", class, abi, insSet),
+		   Py_None);
 
     while ((sect = elf_nextscn(elf, sect))) {
 	if (!gelf_getshdr(sect, &shdr)) {
@@ -144,12 +169,18 @@ static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
 	    entries = shdr.sh_size / shdr.sh_entsize;
 	    for (i = 0; i < entries; i++) {
 		gelf_getdyn(data, i, &sym);
-		if (sym.d_tag == DT_NEEDED) {
-		    PyList_Append(reqList, Py_BuildValue("ss()", "soname", 
-			   elf_strptr(elf, shdr.sh_link, sym.d_un.d_val)));
-		} else if (sym.d_tag == DT_SONAME) {
-		    PyList_Append(provList, Py_BuildValue("ss()", "soname", 
-			   elf_strptr(elf, shdr.sh_link, sym.d_un.d_val)));
+		/* pull out DT_NEEDED for depdendencies and DT_SONAME
+		   for provides.  Both use the same format so build the
+		   value using the same code */
+		if (sym.d_tag == DT_NEEDED || sym.d_tag == DT_SONAME) {
+		    PyObject *val = Py_BuildValue("ss()", "soname", 
+						  elf_strptr(elf, shdr.sh_link,
+							     sym.d_un.d_val));
+		    Py_INCREF(Py_None);
+		    if (sym.d_tag == DT_NEEDED)
+			PyDict_SetItem(reqList, val, Py_None);
+		    else
+			PyDict_SetItem(provList, val, Py_None);
 		}
 
 	    }
@@ -176,15 +207,18 @@ static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
 		listIdx = idx + verneed.vn_aux;
 		j = verneed.vn_cnt;
 		while (j--) {
+		    PyObject *val;
 		    if (!gelf_getvernaux(data, listIdx, &veritem)) {
 			PyErr_SetString(ElfError,
 				        "failed to get version item");
 			return 1;
 		    }
 
-		    PyList_Append(reqList, Py_BuildValue("ss(s)", "soname", 
-			   libName,
-			   elf_strptr(elf, shdr.sh_link, veritem.vna_name)));
+		    val = Py_BuildValue("ss(s)", "soname", libName,
+					elf_strptr(elf, shdr.sh_link,
+						   veritem.vna_name));
+		    Py_INCREF(Py_None);
+		    PyDict_SetItem(reqList, val, Py_None);
 		    listIdx += veritem.vna_next;
 		}
 
@@ -219,9 +253,12 @@ static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
 		    verdBase = elf_strptr(elf, shdr.sh_link, 
 					  verdefItem.vda_name);
 		} else {
-		    PyList_Append(provList, Py_BuildValue("ss(s)", "soname", 
-			   verdBase,
-			   elf_strptr(elf, shdr.sh_link, verdefItem.vda_name)));
+		    PyObject *val;
+		    val = Py_BuildValue("ss(s)", "soname", verdBase,
+					elf_strptr(elf, shdr.sh_link,
+						   verdefItem.vda_name));
+		    Py_INCREF(Py_None);
+		    PyDict_SetItem(provList, val, Py_None);
 		}
 
 		listIdx += verdefItem.vda_next;
@@ -244,13 +281,16 @@ static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
     return 0;
 }
 
+/* returns a tuple of two lists, requires, provides or None
+   if the file is not a valid ELF file or AR archive */
 static PyObject * inspect(PyObject *self, PyObject *args) {
-    PyObject * reqList, * provList;
+    PyObject * reqList, * provList, *robj;
     char * fileName;
     int fd;
     Elf * elf;
     int rc;
     char magic[4];
+    Elf_Kind kind;
 
     if (!PyArg_ParseTuple(args, "s", &fileName))
 	return NULL;
@@ -267,25 +307,24 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
 	return Py_None;
     }
 
-    if (magic[0] != 0x7f || magic[1] != 0x45 || magic[2] != 0x4c ||
-	magic[3] != 0x46) {
+    elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
+    if (!elf) {
 	close(fd);
 	Py_INCREF(Py_None);
 	return Py_None;
     }
 
-    lseek(fd, 0, 0);
-
-    elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
-    if (!elf) {
-	PyErr_SetString(ElfError, "error initializing elf file");
-	return NULL;
+    kind = elf_kind(elf);
+    if (kind != ELF_K_AR && kind != ELF_K_ELF) {
+	elf_end(elf);
+	Py_INCREF(Py_None);
+	return Py_None;
     }
+    
+    reqList = PyDict_New();
+    provList = PyDict_New();
 
-    reqList = PyList_New(0);
-    provList = PyList_New(0);
-
-    rc = doInspect(elf, reqList, provList);
+    rc = doInspect(fd, elf, reqList, provList);
     elf_end(elf);
     close(fd);
 
@@ -297,7 +336,10 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
     }
 
     /* worked */
-    return Py_BuildValue("OO", reqList, provList);
+    robj = Py_BuildValue("OO", PyDict_Keys(reqList), PyDict_Keys(provList));
+    Py_DECREF(provList);
+    Py_DECREF(reqList);
+    return robj;
 }
 
 static int isStripped(Elf * elf) {
