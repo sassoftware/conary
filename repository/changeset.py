@@ -660,7 +660,18 @@ class ReadOnlyChangeSet(ChangeSet):
         else:
             return (tag, cont)
 
-    def rootChangeSet(self, db, keepExisting):
+    def rootChangeSet(self, db, troveMap):
+	"""
+	Converts this (absolute) change set to a realative change
+	set. The second parameter, troveMap, specifies the old trove
+	for each trove listed in this change set. It is a dictionary
+	mapping (troveName, newVersion, newFlavor) tuples to 
+	(oldVersion, oldFlavor) pairs. If troveMap is None, then old
+	versions are preserved (this is used to implement keepExisting),
+	otherwise it is an error if no mapping exists (the mapping
+	can specify (None, None) if their is no previous version available
+	to compare against.
+	"""
 	assert(self.absolute)
 
 	# this has an empty source path template, which is only used to
@@ -671,13 +682,6 @@ class ReadOnlyChangeSet(ChangeSet):
 
 	newFiles = []
 	newPackages = []
-	items = [ (x.getName(), x.getNewVersion(), x.getNewFlavor() )
-			for x in self.iterNewPackageList() ]
-
-	outdated, eraseList = db.outdatedTroves(items)
-        # this ignores eraseList, juts like doUpdate does. we could add
-	# the contents to oldPackages, but it's probably better for this
-	# to match doUpdate
 
 	for troveCs in self.iterNewPackageList():
 	    troveName = troveCs.getName()
@@ -686,16 +690,16 @@ class ReadOnlyChangeSet(ChangeSet):
 	    assert(not troveCs.getOldVersion())
 
 	    key = (troveName, newVersion, newFlavor)
-	    if not outdated.has_key(key):
+	    if not troveMap.has_key(key):
 		log.warning("package %s %s is already installed -- skipping",
 			    troveName, newVersion.asString())
 		continue
 
-            if keepExisting:
+            if troveMap is None:
                 oldVersion = None
                 oldFlavor = None
             else:
-                (oldVersion, oldFlavor) = outdated[key][1:3]
+                (oldVersion, oldFlavor) = troveMap[key]
 
 	    if not oldVersion:
 		# new package; the Package.diff() right after this never

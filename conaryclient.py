@@ -70,6 +70,23 @@ class ConaryClient:
         self.repos = NetworkRepositoryClient(cfg.repositoryMap,
                                              localRepository = self.db)
 
+    def _rootChangeSet(self, cs, keepExisting = False):
+	troveList = [ (x.getName(), x.getNewVersion(), 
+		       x.getNewFlavor()) 
+			    for x in cs.iterNewPackageList() ]
+
+	if keepExisting:
+	    outdated = None
+	else:
+	    # this ignores eraseList, just like we do when trove names
+	    # are specified
+	    outdated, eraseList = self.db.outdatedTroves(troveList)
+
+	    for key, tup in outdated.items():
+		outdated[key] = tup[1:3]
+
+	cs.rootChangeSet(self.db, outdated)
+
     def _resolveDependencies(self, cs, keepExisting = None, recurse = True):
         pathIdx = 0
         foundSuggestions = False
@@ -133,7 +150,7 @@ class ConaryClient:
         for item in itemList:
             if isinstance(item, changeset.ChangeSetFromFile):
                 if item.isAbsolute():
-                    item.rootChangeSet(self.db, keepExisting)
+		    self._rootChangeSet(item, keepExisting = keepExisting)
 
                 finalCs.merge(item, (changeset.ChangeSetFromFile, item))
 
@@ -232,11 +249,10 @@ class ConaryClient:
 
     def applyChangeSet(self, cs, replaceFiles = False, tagScript = None, 
                        keepExisting = None):
+	assert(0)
         assert(isinstance(cs, changeset.ChangeSet))
 
-        if cs.isAbsolute():
-            cs.rootChangeSet(self.db, keepExisting)
-
+	assert(not cs.isAbsolute)
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
                                 keepExisting = keepExisting)
