@@ -98,6 +98,8 @@ class UseClass(dict):
 
 def _addDocs(obj):
     global __doc__
+    if __doc__ is None:
+        return
     keys = obj.keys()
     keys.sort()
     for key in keys:
@@ -116,7 +118,8 @@ def _addDocs(obj):
             __doc__ += 'B{C{'+key+'}}: ' + flag.long + '\n\n'
 
 
-__doc__ += """
+if __doc__ is not None:
+    __doc__ += """
 @sort: Use, Arch
 @type Use: UseClass
 @var Use: Set of flags defined for this build, with their boolean status.
@@ -223,7 +226,8 @@ Use.nptl = False
 Use._freeze()
 _addDocs(Use)
 
-__doc__ += """
+if __doc__ is not None:
+    __doc__ += """
 @type Arch: UseClass
 @var Arch: Set of architectures defined for this build, with their boolean status.
 The Arch flags have the following meanings:
