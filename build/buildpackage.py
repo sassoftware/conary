@@ -18,12 +18,13 @@ into BuildPackages.  These BuildPackages are used to create Packages
 and create changesets from the files created during the build process
 """
 
-import string
-import os
 import files
+import lib.elf
+from lib import log
+import os
+import string
 import time
 import use
-import lib.elf
 
 from deps import deps
 
@@ -106,6 +107,13 @@ class BuildPackage(dict):
 	for (depClass, main, flags) in elfinfo:
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
 	    if depClass == 'soname':
+                if '/' in main:
+                    base = os.path.basename(main)
+                    log.error(
+                        'soname %s contains "/" character, truncating to %s',
+                        main, base
+                    )
+                    main = base
                 assert(abi)
                 curClass = deps.SonameDependencies
                 flags.extend((x, deps.FLAG_SENSE_REQUIRED) for x in abi[1])
