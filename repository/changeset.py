@@ -178,7 +178,7 @@ class ChangeSet:
 	f.write("\n")
 
 	for pkg in self.newPackages.itervalues():
-	    pkg.formatToFile(self, cfg, f)
+	    pkg.formatToFile(self, f)
 	for (pkgName, version) in self.oldPackages:
 	    f.write("removed %s %s\n" %
 		    (pkgName, version.asString()))
