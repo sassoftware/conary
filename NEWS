@@ -2,6 +2,8 @@ Changes in 0.11.5
   * Internals reworked to eliminate flavor of None in favor of empty flavor
   * Added (currently unused) code to parse command line flavor specifications
   * static libraries (.a files) get proper flavors now
+  * Handle attempts to update already installed troves from absolute 
+    change sets
 
 Changes in 0.11.4
   * all components built from a single recipe share a common flavor
