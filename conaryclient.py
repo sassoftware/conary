@@ -126,14 +126,15 @@ class ConaryClient:
                             scoredList = []
                             for choice in choiceList:
                                 try:
-                                    affinityTroves =self.db.findTrove(choice[0])
+                                    affinityTroves = self.db.findTrove(None, 
+                                                                    choice[0])
                                 except repository.TroveNotFound:
                                     affinityTroves = None
 
                                 f = self.cfg.flavor.copy()
 
                                 if affinityTroves:
-                                    f.union(affinityTroves[0].getFlavor(), 
+                                    f.union(affinityTroves[0][2],
                                         mergeType = deps.DEP_MERGE_TYPE_PREFS)
                                 scoredList.append((f.score(choice[2]), choice))
                                 
@@ -433,15 +434,13 @@ class ConaryClient:
 	cs = changeset.ChangeSet()
 
         for (troveName, versionStr, flavor) in troveList:
-            troves = self.db.findTrove(troveName, versionStr)
-
+            troves = self.db.findTrove(None, troveName, flavor, versionStr)
+            troves = self.db.getTroves(troves)
             for outerTrove in troves:
                 for trove in self.db.walkTroveSet(outerTrove, 
                                                  ignoreMissing = True):
-                    if flavor is None or flavor.stronglySatisfies(
-                                                        trove.getFlavor()):
-                        cs.oldPackage(trove.getName(), trove.getVersion(), 
-                                      trove.getFlavor())
+                    cs.oldPackage(trove.getName(), trove.getVersion(), 
+                                  trove.getFlavor())
 
         if depCheck:
             (depList, cannotResolve) = self.db.depCheck(cs)

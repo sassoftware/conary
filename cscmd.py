@@ -117,7 +117,8 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True):
 
 def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     try:
-	pkgList = db.findTrove(pkgName, None)
+	pkgList = db.findTrove(None, pkgName, None)
+        pkgList = db.getTroves(pkgList)
     except repository.TroveNotFound, e:
 	log.error(e)
 	return

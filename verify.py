@@ -46,9 +46,10 @@ def verify(troveNameList, db, cfg, all=False):
 	troveNames.sort()
     for (troveName, versionStr, flavor) in troveNames:
         try:
-            for trove in db.findTrove(troveName, versionStr):
-                if not flavor or trove.getFlavor().satisfies(flavor):
-                    verifyTrove(trove, db, cfg)
+            troves = db.findTrove(None, troveName, flavor, versionStr)
+            troves = db.getTroves(troves)
+            for trove in troves:
+                verifyTrove(trove, db, cfg)
         except repository.TroveNotFound:
             if versionStr:
                 if flavor:

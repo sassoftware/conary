@@ -971,7 +971,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 		    "expected instead of %s" % versionStr
 
         if affinityDatabase and affinityDatabase.hasPackage(name):
-            affinityTroves = affinityDatabase.findTrove(name)
+            affinityTroves = affinityDatabase.findTrove(None, name)
         else:
             affinityTroves = []
 
@@ -979,7 +979,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             query = {}
             if affinityTroves:
                 query[name] = {}
-                for trove in affinityTroves:
+                for afName, afVersion, afFlavor in affinityTroves:
                     # XXX what if multiple troves are on this branch,
                     # but with different flavors?
 
@@ -987,10 +987,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         f = flavor
                     else:
                         f = defaultFlavor.copy()
-                        f.union(trove.getFlavor(), 
+                        f.union(afFlavor,
                                      mergeType = deps.DEP_MERGE_TYPE_PREFS)
 
-                    branch = trove.getVersion().branch()
+                    branch = afVersion.branch()
 
                     if not query[name].has_key(branch):
                         query[name][branch] = [ f ]
@@ -1052,9 +1052,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     finalFlavor = flavor
                 else:
                     flavors = []
-                    for trove in affinityTroves:
-                        if trove.getVersion().branch().label() == label:
-                            flavors.append(trove.getFlavor())
+                    for (afName, afVersion, afFlavor) in affinityTroves:
+                        if afVersion.branch().label() == label:
+                            flavors.append(afFlavor)
 
                     if not flavors:
                         finalFlavor = defaultFlavor
@@ -1090,7 +1090,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             query = {}
             if affinityTroves:
                 query[name] = {}
-                for trove in affinityTroves:
+                for (afName, afVersion, afFlavor) in affinityTroves:
                     # XXX what if multiple troves are on this label,
                     # but with different flavors?
 
@@ -1098,10 +1098,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         f = flavor
                     else:
                         f = defaultFlavor.copy()
-                        f.union(trove.getFlavor(), 
+                        f.union(afFlavor,
                                 mergeType = deps.DEP_MERGE_TYPE_PREFS)
 
-                    query[name][trove.getVersion().branch()] = [ f ]
+                    query[name][afVersion.branch()] = [ f ]
 
             if query:
                 flavorDict = self.getTroveVersionsByBranch(query, 
@@ -1164,7 +1164,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if flavor is not None:
                 finalFlavor = flavor
             elif affinityTroves:
-                flavors = [ x.getFlavor() for x in affinityTroves ]
+                flavors = [ x[2] for x in affinityTroves ]
                 f = flavors[0]
                 for otherFlavor in flavors:
                     if otherFlavor != f:

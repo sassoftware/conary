@@ -222,7 +222,10 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                                   troveVersion.trailingRevision().asString())
 
 	    for (name, ver, flavor) in sorted(trove.iterTroveList()):
-		if fullVersions or ver.branch() != troveVersion.branch():
+                if True:
+                    print _troveFormatWithFlavor % (name, 
+                                  ver.trailingRevision().asString(), flavor)
+		elif fullVersions or ver.branch() != troveVersion.branch():
 		    print _grpFormat % (name, ver.asString())
 		else:
 		    print _grpFormat % (name, 

@@ -222,10 +222,10 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
 
     for (troveName, versionStr, flavor) in troveNames:
         try:
-            for trove in db.findTrove(troveName, versionStr):
-                if not flavor or trove.getFlavor().stronglySatisfies(flavor):
-                    _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, 
-                                      tags, info)
+            for trove in db.findTrove(None, troveName, flavor, versionStr):
+                trove = db.getTrove(*trove)
+                _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, 
+                                  tags, info)
         except repository.TroveNotFound:
             if versionStr:
                 log.error("version %s of trove %s is not installed",

@@ -486,7 +486,8 @@ class PackageRecipe(Recipe):
             (name, versionStr, flavor) = updatecmd.parseTroveSpec(buildReq, 
                                                                      None)
             try:
-                troves = db.findTrove(name)
+                troves = db.findTrove(None, name)
+                troves = db.getTroves(troves)
             except repository.TroveNotFound:
                 missingReqs.append(buildReq)
                 continue
