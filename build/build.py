@@ -347,6 +347,13 @@ class CompilePython(BuildCommand):
 		util.execute(self.command %macros)
 
 
+class Ldconfig(BuildCommand):
+    """
+    Run ldconfig in a directory or directories
+    """
+    template = '%%(essentialsbindir)s/ldconfig -n %%(destdir)s/%(args)s'
+
+
 class _FileAction(BuildAction):
     keywords = {'component': None}
 
@@ -435,6 +442,8 @@ class SetModes(_FileAction):
 
     In addition, of course, it can be used to change arbitrary
     file modes in the destdir.
+
+    Call C{SetModes(file[, file ...], mode)}
     """
     
     def __init__(self, *args, **keywords):

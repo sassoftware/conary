@@ -103,6 +103,53 @@ class DanglingSymlinks(policy.Policy):
 		    %(file, contents))
 
 
+class CheckSonames(policy.Policy):
+    """
+    Make sure that .so -> SONAME -> fullname
+    """
+    invariantinclusions = [ (r'..*\.so', None, stat.S_IFDIR), ]
+    def doFile(self, path):
+	d = self.macros.destdir
+	destlen = len(d)
+	l = util.joinPaths(d, path)
+	if not os.path.islink(l):
+	    m = self.recipe.magic[path]
+	    if m and m.name == 'ELF' and 'soname' in m.contents:
+		log.warning('%s is not a symlink but probably should be'
+			    ' a link to %s', path, m.contents['soname'])
+	    return
+
+	# store initial contents
+	sopath = util.joinPaths(os.path.dirname(l), os.readlink(l))
+	so = util.normpath(sopath)
+	# find final file
+	while os.path.islink(l):
+	    l = util.normpath(util.joinPaths(os.path.dirname(l),
+					     os.readlink(l)))
+
+	p = util.joinPaths(d, path)
+	linkpath = l[destlen:]
+	m = self.recipe.magic[linkpath]
+
+	if m and m.name == 'ELF' and 'soname' in m.contents:
+	    if so == linkpath:
+		log.debug('%s is final path, soname is %s;'
+		    ' soname usually is symlink to specific implementation',
+		    linkpath, m.contents['soname'])
+	    soname = util.normpath(util.joinPaths(
+			os.path.dirname(sopath), m.contents['soname']))
+	    s = soname[destlen:]
+	    try:
+		os.stat(soname)
+		if not os.path.islink(soname):
+		    log.warning('%s has soname %s; therefore should be a symlink',
+			s, m.contents['soname'])
+	    except:
+		log.warning("%s implies %s, which does not exist --"
+			    " use Ldconfig('%s')?", path, s,
+			    os.path.dirname(path))
+
+
 # now the packaging classes
 
 class _filterSpec(policy.Policy):
@@ -559,6 +606,7 @@ def DefaultPolicy():
 	FilesInMandir(),
 	ImproperlyShared(),
 	DanglingSymlinks(),
+	CheckSonames(),
 	ComponentSpec(),
 	PackageSpec(),
 	EtcConfig(),
