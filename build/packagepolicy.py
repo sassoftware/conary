@@ -528,8 +528,13 @@ class TagSpec(policy.Policy):
 
 
     def markTag(self, name, tag, file):
-	log.debug('%s: %s', name, file)
-	self.recipe.autopkg.pathMap[file].tags.set(tag)
+        # commonly, a tagdescription will nominate a file to be
+        # tagged, but it will also be set explicitly in the recipe,
+        # and therefore markTag will be called twice.
+        tags = self.recipe.autopkg.pathMap[file].tags
+        if tag not in tags:
+            log.debug('%s: %s', name, file)
+            tags.set(tag)
 
     def doFile(self, file):
 	fullpath = self.recipe.macros.destdir+file
