@@ -34,6 +34,8 @@ class AbstractDatabase(repository.AbstractRepository):
 
 	l = [ x for x in self.troveDb.iterFindByName(name)
 		 if version.equal(x.getVersion())]
+	if not l:
+	    raise repository.PackageMissing(name, version)
 	assert(len(l) == 1)
 	return l[0]
 
@@ -150,9 +152,10 @@ class AbstractDatabase(repository.AbstractRepository):
 	    old = newPkg.getOldVersion()
 	    if self.stash.hasPackage(name) and old:
 		ver = old.fork(versions.LocalBranch(), sameVerRel = 1)
-		pkg = self.stash.getPackageVersion(name, old)
+		pkg = self.getPackageVersion(name, old)
+		origPkg = self.getPackageVersion(name, old, pristine = 1)
 		assert(pkg)
-		pkgList.append((pkg, pkg, ver))
+		pkgList.append((pkg, origPkg, ver))
 
 	result = update.buildLocalChanges(self.stash, pkgList, 
 					  root = self.root)
@@ -164,7 +167,7 @@ class AbstractDatabase(repository.AbstractRepository):
 	    fsPkgDict[fsPkg.getName()] = fsPkg
 
 	if not isRollback:
-	    inverse = cs.makeRollback(self.stash, configFiles = 1)
+	    inverse = cs.makeRollback(self, configFiles = 1)
             flags |= update.MERGE
 
 	# Build A->B
@@ -209,9 +212,25 @@ class AbstractDatabase(repository.AbstractRepository):
 	for (name, version) in fsJob.getOldPackageList():
 	    self.troveDb.delTrove(name, version)
 
-    # this is called when a Repository wants to store a file; we never
-    # want to do this; we copy files onto the filesystem after we've
-    # created the LocalBranch
+    def removeFile(self, path, multipleMatches = False):
+	if not multipleMatches:
+	    # make sure there aren't too many
+	    count = 0
+	    for trv in self.troveDb.iterFindByPath(path):
+		count += 1
+		if count > 1: 
+		    raise DatabaseError, "multiple troves own %s" % path
+
+	for trv in self.troveDb.iterFindByPath(path):
+	    rmList = []
+	    for (fileId, (trvPath, version)) in trv.iterFileList():
+		if path == trvPath:
+		    rmList.append(fileId)
+
+	    for fileId in rmList:
+		trv.removeFile(fileId)
+
+	    self.troveDb.updateTrove(trv)
 
     def open(self, mode):
 	top = util.joinPaths(self.root, self.dbpath)
