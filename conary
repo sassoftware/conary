@@ -22,7 +22,7 @@ cfg = srscfg.SrsConfiguration()
 
 def usage():
     print "usage: srs changeset <pkg> [<oldver>] <newver> <outfile>"
-    print "       srs cook    [--prep] <first.recipe> <second.recipe> ..."
+    print "       srs cook    [--prep] [--macros file] <first.recipe> <second.recipe> ..."
     print "       srs commit  <file>"
     print "       srs pkglist <pkgname> <version>"
     print "       srs replist <pkgname> <version>"
@@ -53,6 +53,7 @@ cfgMap["root"] = "root"
 argDef["config"] = 2
 argDef["all"] = 0
 argDef["prep"] = 0
+argDef["macros"] = 1
 argDef["ls"] = 0
 
 for arg in cfgMap.keys():
@@ -121,10 +122,19 @@ elif (otherArgs[1] == "commit"):
     for changeSet in otherArgs[2:]:
 	commit.doCommit(repos, cfg, changeSet)
 elif (otherArgs[1] == "cook"):
+    macros = ()
     prep = 0
     if argSet.has_key('prep'):
         del argSet['prep']
         prep = 1
+    if argSet.has_key('macros'):
+        argSet['macros']
+        f = open(argSet['macros'])
+        # XXX sick hack
+        macroSrc = "macros =" + f.read()
+        exec macroSrc
+        del f
+        del argSet['macros']
     if argSet: usage
     for file in otherArgs[2:]:
         if file[0] != '/':
@@ -137,7 +147,7 @@ elif (otherArgs[1] == "cook"):
             os.setpgrp()
             os.tcsetpgrp(0, os.getpgrp())
 	    repos = repository.Repository(cfg.reppath, "r")
-            cook.cook(repos, cfg, file, prep=prep)
+            cook.cook(repos, cfg, file, prep=prep, macros=macros)
             sys.exit(0)
         else:
             while 1:
