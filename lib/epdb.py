@@ -386,6 +386,18 @@ class Epdb(pdb.Pdb):
             self._set_trace(skip=skip+1)
         tc[marker] = [cond, curCount]
 
+    def do_debug(self, arg):
+        sys.settrace(None)
+        globals = self.curframe.f_globals
+        locals = self.curframe.f_locals
+        p = Epdb()
+        p.prompt = "(%s) " % self.prompt.strip()
+        print "ENTERING RECURSIVE DEBUGGER"
+        sys.call_tracing(p.run, (arg, globals, locals))
+        print "LEAVING RECURSIVE DEBUGGER"
+        sys.settrace(self.trace_dispatch)
+        self.lastcmd = p.lastcmd
+
     def _set_trace(self, skip=0):
         """Start debugging from here."""
         frame = sys._getframe().f_back
