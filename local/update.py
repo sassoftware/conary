@@ -396,9 +396,6 @@ class FilesystemJob:
 		    self.errors.append("file contents conflict for %s" % realPath)
 		    contentsOkay = 0
 
-	    if beenRestored and fsFile.isShLib():
-		self.mustRunLdconfig()
-
 	    if attributesChanged and not beenRestored:
 		self._restore(fsFile, realPath, 
 		      "merging changes from repository into %s" % realPath,
