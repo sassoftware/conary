@@ -324,6 +324,7 @@ class FilesystemJob:
 
 	for fileId in pkgCs.getOldFileList():
 	    (path, version) = basePkg.getFile(fileId)
+
 	    if not fsPkg.hasFile(fileId):
 		log.debug("%s has already been removed" % path)
 		continue
@@ -594,9 +595,10 @@ class FilesystemJob:
 	    name = pkgCs.getName()
 	    old = pkgCs.getOldVersion()
 	    if old:
+		localVer = old.fork(versions.LocalBranch(), sameVerRel = 1)
 		basePkg = repos.getTrove(name, old, pkgCs.getFlavor())
 		pkg = self._singlePackage(repos, pkgCs, changeSet, basePkg, 
-					  fsPkgDict[name], root, flags)
+				      fsPkgDict[(name, localVer)], root, flags)
 		self.oldPackages.append((basePkg.getName(), 
 					 basePkg.getVersion(),
 					 basePkg.getFlavor()))

@@ -287,7 +287,7 @@ class Database(SqlDbRepository):
 	(localChanges, retList) = result
 	fsPkgDict = {}
 	for (changed, fsPkg) in retList:
-	    fsPkgDict[fsPkg.getName()] = fsPkg
+	    fsPkgDict[(fsPkg.getName(), fsPkg.getVersion())] = fsPkg
 
 	if not isRollback:
 	    inverse = cs.makeRollback(self, configFiles = 1)
@@ -358,10 +358,10 @@ class Database(SqlDbRepository):
 		# branch of a rollback
 		self.db.eraseTrove(name, version, flavor)
 
-	self.commit()
-
 	# finally, remove old directories. right now this has to be done
-	# after the sqldb has been updated
+	# after the sqldb has been updated (but before the changes are
+	# committted)
+
 	list = directoryCandidates.keys()
 	list.sort()
 	list.reverse()
@@ -379,7 +379,13 @@ class Database(SqlDbRepository):
 		keep[os.path.dirname(path)] = True
 		continue
 
-	    os.rmdir(path)
+	    try:
+		# it would be nice if this was cheaper
+		os.rmdir(path)
+	    except OSError:
+		pass
+
+	self.commit()
 
     def removeFile(self, path, multipleMatches = False):
 	if not multipleMatches:

@@ -341,8 +341,9 @@ def updateSrc(repos, versionStr = None):
     pkgCs = packageChanges.next()
     assert(util.assertIteratorAtEnd(packageChanges))
 
+    localVer = state.getVersion().fork(versions.LocalBranch(), sameVerRel = 1)
     fsJob = update.FilesystemJob(repos, changeSet, 
-				 { state.getName() : state }, "",
+				 { (state.getName(), localVer) : state }, "",
 				 flags = update.IGNOREUGIDS | update.MERGE)
     errList = fsJob.getErrorList()
     if errList:
