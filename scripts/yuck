@@ -111,6 +111,8 @@ def main(argv):
     for pkg in dbpkgs:
         if pkg in updateExceptions:
             continue
+        if pkg.startswith('group-'):
+            continue
         dbVersions = db.getTroveVersionList(pkg, withFlavors=True)
         for v,f in dbVersions:
             branch = v.branch()
