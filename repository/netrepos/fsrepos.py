@@ -81,7 +81,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def getTroveLatestVersion(self, pkgName, branch):
         try:
-            version = self.troveStore.troveLatestVersion(pkgName, branch)
+            return self.troveStore.troveLatestVersion(pkgName, branch)
         except KeyError:
             raise repository.PackageMissing(pkgName, branch)
 
