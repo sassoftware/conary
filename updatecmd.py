@@ -43,6 +43,7 @@ def update(repos, cfg, pkg, versionStr = None):
 	version = None
 
     list = []
+    # XXX ewt: bail doesn't do anything
     bail = 0
     mainPackageName = None
     for pkgName in repos.getPackageList(pkg):
@@ -53,6 +54,7 @@ def update(repos, cfg, pkg, versionStr = None):
 	if not pkgSet.hasVersion(version):
 	    sys.stderr.write("package %s does not contain version %s\n" %
 				 (pkgName, version.asString()))
+            # XXX ewt: bail doesn't do anything
 	    bail = 1
 	else:
 	    pkg = pkgSet.getVersion(version)
