@@ -865,7 +865,6 @@ def CreateFromFilesystem(pkgList):
     cs = ChangeSet()
 
     for (pkg, fileMap) in pkgList:
-        version = pkg.getVersion()
 	(pkgChgSet, filesNeeded, pkgsNeeded) = pkg.diff(None, absolute = 1)
 	cs.newPackage(pkgChgSet)
 
