@@ -63,6 +63,15 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	return d
 
+    def getTroveVersionsByLabel(self, troveNameList, label):
+	d = {}
+	labelStr = label.asString()
+	for troveName in troveNameList:
+	    d[troveName] = [ x for x in 
+		self.troveStore.iterTroveVersionsByLabel(troveName, labelStr) ]
+
+	return d
+
     def getTroveFlavorsLatestVersion(self, troveName, branch):
 	return [ (versions.VersionFromString(x[0], 
 			timeStamps = [ float(z) for z in x[1].split(":")]),

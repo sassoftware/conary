@@ -292,6 +292,20 @@ class IdealRepository(AbstractTroveDatabase):
 	"""
 	raise NotImplementedError
 
+    def getTroveVersionsByLabel(self, troveNameList, label):
+	"""
+	Returns a dictionary indexed by troveNameList. Each item in the
+	dictionary is a list of all of the versions of that trove
+	on the given branch.
+
+	@param troveNameList: trove names
+	@type troveNameList: list of str
+	@param label: label
+	@type label: versions.BranchName
+	@rtype: dict of lists
+	"""
+	raise NotImplementedError
+
     def getTroveLatestVersion(self, troveName, branch):
 	"""
 	Returns the version of the latest version of a trove on a particular
@@ -377,8 +391,7 @@ class IdealRepository(AbstractTroveDatabase):
 	    except versions.ParseError, e:
 		raise PackageNotFound, str(e)
 
-	    # XXX this should restrict to the current label...
-	    versionDict = self.getTroveVersionList([name])
+	    versionDict = self.getTroveVersionsByLabel([name], defaultLabel)
 	    for version in versionDict[name][:]:
 		if version.trailingVersion() != verRel:
 		    versionDict[name].remove(version)

@@ -207,6 +207,29 @@ class TroveStore:
 		    timeStamps = [ float(x) for x in timeStamps.split(":") ] )
 	    yield v
 
+    def iterTroveVersionsByLabel(self, troveName, labelStr):
+	cu = self.db.cursor()
+	# set up a table which lists the branchIds and the latest version
+	# id's for this search. the versionid will be NULL if it's an
+	# empty branch
+	cu.execute("""
+	    SELECT Versions.version, Nodes.timeStamps FROM 
+		(SELECT itemId AS AitemId, branchId as AbranchId FROM labelMap
+		    WHERE itemId=(SELECT itemId from Items 
+				WHERE item=%s)
+		    AND labelId=(SELECT labelId FROM Labels 
+				WHERE label=%s)
+		) JOIN Nodes ON
+		    AitemId=Nodes.itemId AND Nodes.branchId=AbranchId 
+		JOIN Versions ON
+		    Nodes.versionId = versions.versionId
+	""", troveName, labelStr)
+
+	for (versionStr, timeStamps) in cu:
+	    v = versions.VersionFromString(versionStr, 
+		    timeStamps = [ float(x) for x in timeStamps.split(":") ] )
+	    yield v
+
     def getTroveFlavors(self, troveDict):
 	cu = self.db.cursor()
 	vMap = {}
