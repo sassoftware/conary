@@ -195,17 +195,27 @@ class Epdb(pdb.Pdb):
         if not self.__old_stdout is None:
             sys.stdout.flush()
             # now we reset stdout to be the whatever it was before
-            os.dup2(self.__old_stdout, sys.stdout.fileno())
+            sys.stdout = self.__old_stdout
 
     def switch_stdout(self):
-        if not os.isatty(sys.stdout.fileno()):
+        isatty = False
+        try:
+            fileno = sys.stdout.fileno()
+            isatty = os.isatty(fileno)
+        except AttributeError:
+            pass
+            # sys.stdout is not a regular file,
+            # go through some hoops
+            # (this is less desirable because it doesn't redirect
+            # low-level writes to 1 
+              
+        if not isatty:
             sys.stdout.flush()
-            # old_stdout points to whereever stdout was 
-            # when called (maybe to file?)
-            self.__old_stdout = os.dup(sys.stdout.fileno())
-            # now we copy whatever te proxy points to to 1
-            os.dup2(os.open('/dev/tty', os.O_WRONLY), sys.stdout.fileno())
-        return
+            self.__old_stdout = sys.stdout
+            stdout = open('/dev/tty', 'w')
+            sys.stdout = stdout
+        else:
+            self.__old_stdout = None
 
     # override for cases where we want to search a different
     # path for the file
