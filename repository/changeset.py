@@ -478,6 +478,11 @@ class ChangeSet(streams.LargeStreamSet):
 					     ChangedFileTypes.file, cont,
 					     fileObj.flags.isConfig())
 
+        # the primary packages for the rollback should mirror those of the
+        # changeset it is created for
+	for (name, version, flavor) in self.getPrimaryPackageList():
+            rollback.addPrimaryPackage(name, version, flavor)
+
 	return rollback
 
     def setTargetBranch(self, repos, targetBranchLabel):
