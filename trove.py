@@ -1014,10 +1014,16 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	    f.write("\tremoved %s(.*)%s\n" % (pathIdStr[:6], pathIdStr[-6:]))
 
 	for name in self.packages.keys():
-	    list = [ x[0] + x[1].asString() + 
-                     "(%d)" % x[3]
-                            for x in self.packages[name] ]
-	    f.write("\t" + name + " " + " ".join(list) + "\n")
+            l = []
+            for x in self.packages[name]:
+                l.append(x[0] + x[1].asString())
+                if x[3] is None:
+                    l[-1] += ' (None)'
+                elif x[3]:
+                    l[-1] += ' (True)'
+                else:
+                    l[-1] += ' (False)'
+	    f.write("\t" + name + " " + " ".join(l) + "\n")
 
     def setProvides(self, provides):
 	self.provides.set(provides)
