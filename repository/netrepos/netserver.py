@@ -23,7 +23,7 @@ from lib import sha1helper
 import sqlite3
 import tempfile
 from lib import util
-import xmlshims
+from repository import xmlshims
 from repository import repository
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):

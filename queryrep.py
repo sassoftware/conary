@@ -20,7 +20,7 @@ import files
 from lib import log
 import time
 
-from sha1helper import sha1ToString
+from lib.sha1helper import sha1ToString
 
 _troveFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"

@@ -17,7 +17,7 @@ Provides the output for the "conary query" command
 
 import files
 
-from sha1helper import sha1ToString
+from lib.sha1helper import sha1ToString
 
 _troveFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"

@@ -23,7 +23,7 @@ import versions
 import versiontable
 
 # these will go away once we switch internal fileids
-from sha1helper import encodeFileId, decodeFileId, encodeStream, decodeStream
+from lib.sha1helper import encodeFileId, decodeFileId, encodeStream, decodeStream
 
 class Tags(idtable.CachedIdTable):
 

@@ -28,7 +28,7 @@ import versions
 from local import trovetroves
 from local import versiontable
 
-from sha1helper import encodeFileId, decodeFileId, encodeStream, decodeStream
+from lib.sha1helper import encodeFileId, decodeFileId, encodeStream, decodeStream
 
 class LocalRepVersionTable(versiontable.VersionTable):
 

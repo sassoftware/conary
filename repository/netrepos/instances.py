@@ -14,7 +14,7 @@
 
 import sqlite3
 
-from sha1helper import encodeFileId, decodeFileId, encodeStream, decodeStream
+from lib.sha1helper import encodeFileId, decodeFileId, encodeStream, decodeStream
 
 class InstanceTable:
     """
