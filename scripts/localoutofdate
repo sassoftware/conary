@@ -19,7 +19,7 @@
 
 import os
 import sys
-if os.path.dirname(sys.argv[0]):
+if os.path.dirname(sys.argv[0]) != ".":
     if sys.argv[0][0] == "/":
 	fullPath = os.path.dirname(sys.argv[0])
     else:
