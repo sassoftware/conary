@@ -78,19 +78,80 @@ class Package:
 	    (selfPath, selfVersion) = selfMap[id]
 	    (themPath, themVersion) = themMap[id]
 
+	    newPath = "-"
+	    newVersion = "-"
+
 	    if selfPath != themPath:
-		rc = rc + "~%s path %s %s\n" % (id, themPath, selfPath)
+		newPath = selfPath
 
 	    if not selfVersion.equal(themVersion):
-		rc = rc + "~%s version %s %s\n" % \
-		    (id, themVersion.asString(), selfVersion.asString())
-		filesNeeded.append((id, themVersion, selfVersion))
+		newVersion = selfVersion.asString()
+
+	    if newPath != "-" or newVersion != "-":
+		rc = rc + "~%s %s %s\n" % (id, newPath, newVersion)
 
 	return (rc, filesNeeded)
 
     def __init__(self, name):
 	self.files = {}
 	self.name = name
+
+class PackageChangeSet:
+
+    def newFile(self, fileId, path, version):
+	self.newFiles.append((fileId, path, version))
+
+    def oldFile(self, fileId):
+	self.newFiles.append(fileId)
+
+    # path and/or version can be None
+    def changedFile(self, fileId, path, version):
+	self.changedFiles.append((fileId, path, version))
+
+    def parse(self, line):
+	action = line[0]
+
+	if action == "+" or action == "~":
+	    (fileId, path, version) = string.split(line[1:])
+
+	    if version == "-":
+		version = None
+	    else:
+		version = versions.VersionFromString(version)
+
+	    if path == "-":
+		path = None
+
+	    if action == "+":
+		self.newFile(fileId, path, version)
+	    else:
+		self.changedFile(fileId, path, version)
+	elif action == "-":
+	    self.oldfile(line[1:])
+
+    def formatToFile(self, f):
+	f.write("changeset for %s " % self.name)
+	#if self.oldVersion:
+	    #f.write("from %s to " % self.oldVersion.asString())
+	#else:
+	    #f.write("to ")
+	#f.write("%s\n" % self.newVersion.asString())
+	f.write("\n")
+
+	for (fileId, path, version) in self.newFiles:
+	    f.write("\tadded %s\n" % path)
+	for (fileId, path, version) in self.changedFiles:
+	    f.write("\tchanged %s\n" % path)
+	for path in self.oldFiles:
+	    f.write("\tremoved %s\n" % path)
+    
+    def __init__(self, name, oldVersion, newVersion):
+	self.name = name
+	self.oldVersion = oldVersion
+	self.newVersion = newVersion
+	self.newFiles = []
+	self.oldFiles = []
+	self.changedFiles = []
 
 class PackageFromFile(Package):
 
