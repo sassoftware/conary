@@ -450,7 +450,7 @@ class Environment(util.Action):
 	self.value = args[1]
 	util.Action.__init__(self, [], **keywords)
     def doBuild(self, recipe):
-	os.environ[self.variable] = self.value
+	os.environ[self.variable] = self.value % recipe.macros
 
 
 class SetModes(_FileAction):
