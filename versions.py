@@ -137,4 +137,4 @@ def VersionFromString(str):
     return Version(v)
 	
 def versionSort(list):
-    list.sort
+    list.sort()
