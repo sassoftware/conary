@@ -290,7 +290,7 @@ class _FileAction(BuildAction):
 		    (package, component) = self.component.split(':')
 		else:
 		    component = self.component
-	    path = os.path.normpath(path)
+	    path = util.normpath(path)
 	    if component:
 		self.recipe.ComponentSpec(component, path)
 	    if package:
@@ -464,7 +464,7 @@ class InstallSymlinks(_FileAction):
 	    if os.path.exists(to) or os.path.islink(to):
 		os.remove(to)
             log.debug('creating symlink %s -> %s' %(to, source))
-	    os.symlink(os.path.normpath(source), to)
+	    os.symlink(util.normpath(source), to)
 
     def __init__(self, fromFiles, toFile, **keywords):
         """

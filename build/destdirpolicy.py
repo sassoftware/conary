@@ -135,7 +135,7 @@ class NormalizeManPages(policy.Policy):
 			log.debug('replacing %s (%s) with symlink ../%s',
                                   name, match.group(0), match.group(1))
 			os.remove(path)
-			os.symlink(os.path.normpath('../'+match.group(1)), path)
+			os.symlink(util.normpath('../'+match.group(1)), path)
 
     def _gzsymlink(self, dirname, names):
 	for name in names:
@@ -148,7 +148,7 @@ class NormalizeManPages(policy.Policy):
 		    contents = contents + '.gz'
 		if not path.endswith('.gz'):
 		    path = path + '.gz'
-		os.symlink(os.path.normpath(contents), path)
+		os.symlink(util.normpath(contents), path)
 
     def __init__(self, *args, **keywords):
 	policy.Policy.__init__(self, *args, **keywords)
@@ -200,7 +200,7 @@ class RelativeSymlinks(policy.Policy):
 		os.remove(fullpath)
 		dots = "../"
 		dots *= path.count('/') - 1
-		normpath = os.path.normpath(dots + contents)
+		normpath = util.normpath(dots + contents)
 		log.debug('Changing absolute symlink %s to relative symlink %s',
                           path, normpath)
 		os.symlink(normpath, fullpath)
