@@ -4,6 +4,7 @@
 #
 import copy
 import difflib
+import helper
 import log
 import patch
 import versions
@@ -817,44 +818,17 @@ class GroupFromTextFile(Package):
 	    self.simpleVersion = lines[1][1][1]
 
 	for lineNum, (name, versionStr) in lines[2:]:
-	    if name[0] != ":":
-		name = packageNamespace + ":" + name
+	    try:
+		pkgList = helper.findPackage(repos, packageNamespace,
+					 None, name, versionStr)
+	    except helper.PackageNotFound, e:
+		log.error("error parsing group file line %d: %s" 
+			    % (lineNum, str(e)))
+		errors = 1
+		continue
 
-	    if versionStr[0] != "/":
-		try:
-		    nick = versions.BranchName(versionStr)
-		except versions.ParseError:
-		    log.error("invalid version on line %d: %s" % (lineNum, 
-			      versionStr))
-		    errors = 1
-		    continue
-
-		branchList = repos.getPackageNickList(name, nick)
-		if not branchList:
-		    log.error("branch %s does not exist for package %s"
-				% (str(nick), name))
-		    errors = 1
-		else:
-		    versionList = []
-		    for branch in branchList:
-			ver = repos.pkgLatestVersion(name, branch)
-			versionList.append(ver)
-
-		    self.addPackage(name, versionList)
-	    else:
-		try:
-		    version = versions.VersionFromString(versionStr)
-		except versions.ParseError:
-		    log.error("invalid version on line %d: %s" % (lineNum, 
-			      versionStr))
-		    errors = 1
-		    continue
-
-		if not version.isVersion():
-		    log.error("fully qualified branches may not be used " +
-			      "as version on line %d" % lineNum)
-
-		self.addPackage(name, [ version ])
+	    versionList = [ x.getVersion() for x in pkgList ]
+	    self.addPackage(pkgList[0].getName(), versionList)
 
 	if errors:
 	    raise ParseError
