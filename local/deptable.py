@@ -653,7 +653,7 @@ class DependencyTables:
                             None, ("Dependencies", "TmpDependencies"), 
                             multiplier = -1)
 
-        full = """SELECT depNum, Items.item, Versions.version, flavor FROM 
+        full = """SELECT depNum, Items.item, Versions.version FROM 
                         (%s)
                       JOIN Instances ON
                         provInstanceId == Instances.instanceId
@@ -661,8 +661,6 @@ class DependencyTables:
                         Instances.itemId == Items.itemId
                       JOIN Versions ON
                         Instances.versionId == Versions.versionId
-                      JOIN Flavors ON
-                        Instances.flavorId == Flavors.flavorId
                       JOIN Nodes ON
                         Instances.itemId == Nodes.itemId AND
                         Instances.versionId == Nodes.versionId
@@ -673,22 +671,9 @@ class DependencyTables:
                                 providesLabel = label.asString())
                     
         cu.execute(full,start_transaction = False)
-
-        depSolutions = {}
-        for (depId, troveName, versionStr, flavorStr) in cu:
-            depId = -depId
-
-            l = depSolutions.setdefault((troveName, versionStr, flavorStr), [])
-            l.append(depId)
-
         result = {}
         handled = {}
-
-        solutions = [ None ] * len(depList)
-
-        for (depId, troveName, versionStr, flavor) in cu:
-            import lib
-            lib.epdb.st()
+        for (depId, troveName, versionStr) in cu:
             depId = -depId
 
             if handled.has_key(depId):
