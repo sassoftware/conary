@@ -19,7 +19,7 @@ c = FileContainer(f)
 f.close()
 if len(sys.argv) == 2:
     for n in c.fileList():
-	print n, c.getTag(n)
+	print "%s (%s)" % (n, c.getTag(n))
 else:
     for file in sys.argv[2:]:
 	print "--", file
