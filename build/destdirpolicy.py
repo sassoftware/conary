@@ -154,8 +154,6 @@ class NormalizeCompression(policy.Policy):
 	('.*\.(gz|bz2)', None, stat.S_IFDIR),
     ]
     def doFile(self, path):
-	if os.path.islink(path):
-	    return
 	d = self.macros['destdir']
 	m = magic.magic(path, d)
 	if not m:
@@ -184,9 +182,9 @@ class NormalizeManPages(policy.Policy):
     def _uncompress(self, dirname, names):
 	for name in names:
 	    path = dirname + os.sep + name
-	    if name.endswith('.gz') and not os.path.islink(path):
+	    if name.endswith('.gz') and util.isregular(path):
 		util.execute('gunzip ' + dirname + os.sep + name)
-	    if name.endswith('.bz2') and not os.path.islink(path):
+	    if name.endswith('.bz2') and util.isregular(path):
 		util.execute('bunzip2 ' + dirname + os.sep + name)
 
     def _dedestdir(self, dirname, names):
@@ -206,15 +204,12 @@ class NormalizeManPages(policy.Policy):
                 continue
 	    if mode & 0777 != 0644:
 		os.chmod(path, 0644)
-	    if not os.path.isdir(path) and not os.path.islink(path):
-		# no .gz files at this point
-		util.execute("sed -i 's,/*%s,,g' %s" %(self.destdir, path))
+	    util.execute("sed -i 's,/*%s,,g' %s" %(self.destdir, path))
 
     def _sosymlink(self, dirname, names):
 	for name in names:
 	    path = dirname + os.sep + name
-	    if os.path.exists(path) and not os.path.isdir(path) \
-	       and not os.path.islink(path):
+	    if util.isregular(path):
 		# if only .so, change to symlink
 		f = file(path)
 		lines = f.readlines(512) # we really don't need the whole file
@@ -240,7 +235,7 @@ class NormalizeManPages(policy.Policy):
     def _compress(self, dirname, names):
 	for name in names:
 	    path = dirname + os.sep + name
-	    if not os.path.isdir(path) and not os.path.islink(path):
+	    if util.isregular(path):
 		util.execute('gzip -n -9 ' + dirname + os.sep + name)
 
     def _gzsymlink(self, dirname, names):
