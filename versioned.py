@@ -43,13 +43,19 @@ class File:
     def open(self, filename, mode):
 	self.filename = filename
 	self.entries = {}
+	self.readOnly = 0
 
-	if mode == "r+" and not os.path.exists(filename):
+	if (mode == "r"):
+	    self.readOnly = 1
+
+	if (mode == "r+" or mode == "r") and not os.path.exists(filename):
 	    return
-	if mode == "w":
+	elif mode == "w":
 	    f = __builtin__.open(filename, "w")
 	    f.close()
 	    return
+	elif mode != "r+" and mode != "r":
+	    raise IOError, "bad mode for open %s" % mode
 
 	f = __builtin__.open(filename, "r")
 
@@ -70,6 +76,8 @@ class File:
 	    i = i + 1 + lineCount;
 
     def close(self):
+	if self.readOnly: return
+
 	f = __builtin__.open(self.filename, "w")
 	for version in self.entries.keys():
 	    l = self.entries[version].readAllLines()
@@ -102,6 +110,9 @@ class File:
 	return self.currentEntry.readLines()
 
     def write(self, line):
+	if self.readOnly:
+	    raise IOError, "cannot write to a read-only file"
+
 	return self.currentEntry.write(line)
 
     def __init__(self, filename, mode):
