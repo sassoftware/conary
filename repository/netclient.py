@@ -956,7 +956,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     else:
                         self.queryMerge(flavorDict, d)
         elif (versionStr[0] != "/" and (versionStr.find("/") == -1)  \
-             and versionStr.count("@")):
+             and (versionStr.count("@") or versionStr[0] == ':')):
             # a version is a label if
             #   1. it doesn't being with / (it isn't fully qualified)
             #   2. it only has one element (no /)
@@ -964,7 +964,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	    # either the supplied version is a label, or we need to get the
             # branch from the affinity db, or or we're going to use
 	    # the default labelPath
-            if versionStr[0] != "@":
+            if versionStr[0] == ":":
+                repositories = [(x.getHost(), x.getNamespace()) \
+                                                        for x in labelPath ]
+                labelPath = []
+                for serverName, namespace in repositories:
+                    labelPath.append(versions.Label("%s@%s%s" % 
+                                        (serverName, namespace, versionStr)))
+            elif versionStr[0] != "@":
 		try:
 		    label = versions.Label(versionStr)
                     labelPath = [ label ]
@@ -1012,7 +1019,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     break
                 else:
                     self.queryMerge(flavorDict, d)
-	elif versionStr[0] != "/" and versionStr.find("/") == -1:
+        elif versionStr[0] != "/" and versionStr.find("/") == -1:
 	    # version/release was given. look in the affinityDatabase
             # for the branches to look on
 	    try:
