@@ -586,9 +586,6 @@ class TroveStore:
 	    if latest.has_key(flavor):
 		deleteList.append(i)
 
-	    if flavor == "none":
-		flavor = None
-
 	    latest[flavor] = i
 	    fullList.append((version, timeStamps, flavor))
 

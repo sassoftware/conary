@@ -29,7 +29,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     ### Package access functions
 
     def thawFlavor(self, flavor):
-	if flavor:
+	if flavor and flavor != "none":
 	    return deps.ThawDependencySet(flavor)
 
 	return None

@@ -23,7 +23,7 @@ class NetworkConvertors:
 	return versions.VersionFromString(b)
 
     def toFlavor(self, f):
-	if f == 0:
+	if f == 0 or f == "none" or f is None:
 	    return None
 
 	return deps.deps.ThawDependencySet(f)
