@@ -115,6 +115,10 @@ def post(port, isSecure, repos, httpHandler, req):
                 return apache.HTTP_UNAUTHORIZED
         else:
             authToken = (None, None)
+
+        if authToken[0] is not None and authToken[0] != "anonymous" and \
+                    not isSecure and repos.forceSecure:
+            return apache.HTTP_FORBIDDEN
     
         req.content_type = "text/html"
         try:
