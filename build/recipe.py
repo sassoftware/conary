@@ -599,13 +599,13 @@ class PackageRecipe(Recipe):
 class GroupRecipe(Recipe):
     Flags = use.LocalFlags
 
-    def addTrove(self, name, versionStr = None, flavor = None):
+    def addTrove(self, name, versionStr = None, flavor = None, source = None):
         if flavor is not None:
             flavor = flavor.asSet()
-        self.addTroveList.append((name, versionStr, flavor))
+        self.addTroveList.append((name, versionStr, flavor, source))
 
     def findTroves(self):
-        for (name, versionStr, flavor) in self.addTroveList:
+        for (name, versionStr, flavor, source) in self.addTroveList:
             try:
                 # XXX this is where we need to integrate 
                 # flavors into groups - by combining self.flavor 
