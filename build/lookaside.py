@@ -189,7 +189,7 @@ class RepositoryCache:
 
     def cacheFile(self, cfg, fileName, location):
 	cachedname = createCacheName(cfg, fileName, location)
-        if filename in self.cacheMap:
+        if fileName in self.cacheMap:
             # don't check sha1 twice
             return self.cacheMap[fileName]
 	(troveName, troveVersion, pathId, troveFile, fileId,
