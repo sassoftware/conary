@@ -125,10 +125,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 		if fileObj is None:
 		    fileObj = self.repos.getFileVersion(fileId, fileVersion)
 
-		l.append((fileId, filePath, self.fromVersion(fileVersion), 
+		l.append((self.fromFileId(fileId), filePath, 
+			  self.fromVersion(fileVersion), 
 			  self.fromFile(fileObj)))
         else:
-            l = [ (x[0], x[1], self.fromVersion(x[2])) for x in gen ]
+            l = [ (self.fromFileId(x[0]), x[1], self.fromVersion(x[2])) 
+			    for x in gen ]
 
 	return l
 
@@ -339,7 +341,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getFileVersion(self, authToken, fileId, version, withContents = 0):
 	# XXX needs to authentication against the trove the file is part of,
 	# which is unfortunate
-	f = self.repos.troveStore.getFile(fileId, self.toVersion(version))
+	f = self.repos.troveStore.getFile(self.toFileId(fileId), 
+					  self.toVersion(version))
 	return self.fromFile(f)
 
     def checkVersion(self, authToken, clientVersion):
