@@ -191,7 +191,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
     nextVersion = helper.nextVersion(repos, fullName, recipeClass.version, 
 				     None, buildBranch, binary = True)
 
-    grp = package.Package(fullName, nextVersion, None)
+    grpFlavor = deps.deps.DependencySet()
+    grp = package.Package(fullName, nextVersion, grpFlavor)
 
     d = {}
     for (name, versionList) in recipeObj.getTroveList().iteritems():
@@ -201,8 +202,11 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
 
     for (name, subd) in d.iteritems():
 	for (v, flavorList) in subd.iteritems():
-	    # XXX how do we get the right flavor?
-	    grp.addTrove(name, v, flavorList[0])
+	    for flavor in flavorList:
+		if not flavor or cfg.flavor.satisfies(flavor):
+		    grp.addTrove(name, v, flavor)
+		    if flavor:
+			grpFlavor.union(flavor)
 
     grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet = changeset.ChangeSet()
