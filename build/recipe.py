@@ -820,10 +820,7 @@ class GroupRecipe(Recipe):
                 desFlavor = self.cfg.buildFlavor.copy()
                 assert(isinstance(flavor, deps.DependencySet) or flavor is None)
                 if flavor is not None:
-                    if deps.DEP_CLASS_IS in flavor.getDepClasses():
-                       # instruction set deps are overridden completely 
-                       del desFlavor.members[deps.DEP_CLASS_IS]
-                    desFlavor.union(flavor, deps.DEP_MERGE_TYPE_OVERRIDE)
+                    desFlavor = deps.overrideFlavor(desFlavor, flavor)
                 pkgList = self.repos.findTrove(self.label, name, desFlavor,
                                                versionStr = versionStr)
             except repository.TroveNotFound, e:

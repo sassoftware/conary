@@ -246,12 +246,8 @@ def sourceCommand(cfg, args, argSet):
         buildBranch = None
         if argSet.has_key('flavor'):
             buildFlavor = deps.deps.parseFlavor(argSet['flavor'])
-            if deps.deps.DEP_CLASS_IS in buildFlavor.getDepClasses():
-                # instruction set deps are overridden completely -- remove 
-                # any cfg.flavor instruction set info
-                del cfg.buildFlavor.members[deps.deps.DEP_CLASS_IS]
-            cfg.buildFlavor.union(buildFlavor, 
-                          mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
+            cfg.buildFlavor = deps.deps.overrideFlavor(cfg.buildFlavor,
+                                                       buildFlavor)
             del argSet['flavor']
         if argSet.has_key('macro'):
             for macro in argSet['macro']:

@@ -852,16 +852,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
     (name, versionStr, flavor) = parseTroveSpec(item, None)
     if flavor:
-        buildFlavor = cfg.buildFlavor.copy()
-        if deps.deps.DEP_CLASS_IS in flavor.getDepClasses():
-            # instruction set deps are overridden completely -- remove 
-            # any self.flavor instruction set info
-            del buildFlavor.members[deps.deps.DEP_CLASS_IS]
-
-        buildFlavor.union(flavor,
-                          mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
-        cfg.buildFlavor = buildFlavor
-
+        cfg.buildFlavor = deps.deps.overrideFlavor(cfg.buildFlavor, flavor)
     if name.endswith('.recipe') and os.path.isfile(name):
         if versionStr:
             raise Cookerror, \

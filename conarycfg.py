@@ -231,15 +231,8 @@ class ConfigFile:
             self.flavor.union(insSet)
 
         # buildFlavor is installFlavor + overrides
-        buildFlavor = self.flavor.copy()
-        if deps.deps.DEP_CLASS_IS in self.buildFlavor.getDepClasses():
-            # instruction set deps are overridden completely -- remove 
-            # any self.flavor instruction set info
-            del buildFlavor.members[deps.deps.DEP_CLASS_IS]
-
-        buildFlavor.union(self.buildFlavor, 
-                          mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
-        self.buildFlavor = buildFlavor
+        self.buildFlavor = deps.deps.overrideFlavor(self.flavor, 
+                                                    self.buildFlavor)
 	self.flavorConfig.populateBuildFlags()
 
 
