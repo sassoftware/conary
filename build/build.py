@@ -16,6 +16,7 @@ import os
 import util
 import fixedglob
 import log
+import re
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
@@ -301,7 +302,7 @@ class _FileAction(BuildAction):
 		    (package, component) = self.component.split(':')
 		else:
 		    component = self.component
-	    path = util.normpath(path)
+	    path = re.escape(util.normpath(path))
 	    if component:
 		self.recipe.ComponentSpec(component, path)
 	    if package:
