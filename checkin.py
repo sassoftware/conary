@@ -185,7 +185,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
 	fileObj = files.ThawFile(cs.getFileChange(fileId), fileId)
 
 	if not fileObj.hasContents:
-	    fileObj.restore(*tup)
+	    fileObj.restore(None, '/', fullPath, 1)
 	else:
 	    if fileObj.flags.isConfig():
 		earlyRestore.append((fileId, ('/', fullPath, 1)))
