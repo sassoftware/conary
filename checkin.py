@@ -18,6 +18,7 @@ and diffs; creating new packages; adding, removing, and renaming files;
 and committing changes back to the repository.
 """
 
+import difflib
 from build import recipe, lookaside
 from local import update
 from repository import changeset
@@ -317,6 +318,107 @@ def commit(repos, cfg, message):
 
     repos.commitChangeSet(changeSet)
     newState.write("CONARY")
+
+def annotate(repos, filename):
+    try:
+        state = SourceStateFromFile("CONARY")
+    except OSError:
+        return
+    label = state.getVersion().branch().label()
+    troveName = state.getName()
+    # verList is in ascending order (first commit is first in list)
+    verList = repos.getTroveVersionsByLabel([troveName], label)[troveName]
+    
+    # finalLines contains the current version of the file and the 
+    # annotated information about its creation
+    finalLines = []
+
+    # lineMap maps lines in an earlier version of the file to version
+    # in finalLines.  This map allows a diff showing line changes
+    # between two older versions to be mapped to the latest version 
+    # of the file
+    # Linemap has to be a dict because it is potentially a spare array: 
+    # Line 2301 of an older version could be the same as line 10 in the 
+    # newest version.
+    lineMap = {} 
+                 
+    s = difflib.SequenceMatcher(None)
+    fileId = oldV = oldTrove = oldLines = oldFileV = oldContact = None
+    for i in xrange(len(verList), 0, -1):
+        newV = oldV
+        newTrove = oldTrove
+        newLines = oldLines
+        newFileV = oldFileV
+        newContact = oldContact
+
+        oldV = verList[i-1]
+        oldTrove = repos.findTrove(label, troveName, None, versionStr = oldV.asString())[0]
+        if not fileId:
+            # initialization case -- find the file the first time
+            # by filename -- after this we will use the id
+            for (fileId, name, oldFileV) in oldTrove.iterFileList():
+                if name == filename:
+                    break
+        else:
+            for (oldId, name, oldFileV) in oldTrove.iterFileList():
+                if oldId == fileId:
+                    break
+        if oldFileV == newFileV:
+            continue
+        oldFile = repos.getFileContents(troveName, oldV, None, 
+                                        filename, oldFileV)
+        oldLines = oldFile.get().readlines()
+        oldContact = oldTrove.changeLog.getName()
+        if newV == None:
+            # initialization case -- set up finalLines 
+            # and lineMap
+            index = 0
+            for line in oldLines:
+                finalLines.append([line, None])
+                lineMap[index] = index 
+                index = index + 1
+            unmatchedLines = index
+            continue
+        else:
+            s.set_seqs(oldLines, newLines)
+            blocks = s.get_matching_blocks()
+            laststartnew = 0
+            laststartold = 0
+            for (startold, startnew, lines) in blocks:
+                for i in range(laststartnew, startnew):
+                    # for each line where the two versions of the
+                    # file do not match, if that line maps back to
+                    # a line in finalLines, mark is as changed here
+                    if lineMap.get(i,None) is not None:
+                        finalLines[lineMap[i]][1] = (newV, newContact)
+                        lineMap[i] = None
+                        unmatchedLines = unmatchedLines - 1
+                laststartnew = startnew + lines
+
+            if unmatchedLines == 0:
+                break
+
+            # update the linemap for places where the files are
+            # the same.
+            for (startold, startnew, lines) in blocks:
+                if startold == startnew:
+                    continue
+                for i in range(0, lines):
+                    if lineMap.get(startold + i, None) is not None:
+                        lineMap[startold + i] = lineMap[startnew + i]
+
+    if unmatchedLines > 0:
+        # these lines are in the original version of the file
+        for line in finalLines:
+            if line[1] is None:
+                line[1] = (oldV, oldContact)
+
+    for line in finalLines:
+        tv = line[1][0].trailingVersion()
+        name = line[1][1]
+        date = time.strftime('%x', time.localtime(tv.timeStamp))
+        info = ''.join(['(',name,'\t',date,'):'])
+        print tv.asString(), info, line[0],
 
 def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     if not troveName.endswith(":source"):

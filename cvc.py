@@ -160,6 +160,12 @@ def sourceCommand(cfg, args, argSet):
 
 	args[0] = repos
 	checkin.diff(*args)
+    elif (args[0] == "annotate"):
+	if argSet or len(args) != 2: return usage()
+	repos = NetworkRepositoryClient(cfg.repositoryMap)
+	args[0] = repos
+	checkin.annotate(*args)
+
     elif (args[0] == "log"):
 	if argSet or len(args) > 2: return usage()
 
