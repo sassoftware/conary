@@ -4,6 +4,7 @@
 #
 
 python_files = __init__.py	\
+	action.py		\
 	build.py		\
 	buildpackage.py		\
 	destdirpolicy.py	\
