@@ -1,0 +1,51 @@
+#!/bin/bash
+
+repPath=$(srs config | grep repPath | awk '{print $2}')
+# temporary override
+repPath=http://srs:srs@porkloin.rdu.specifixinc.com:8000/
+
+usage ()
+{
+    (echo 'Usage: $0 [--reppath <repPath>] --trove <trove> --version <version>'
+     echo '       $0 [--reppath <repPath>] <trove> <version>'
+     echo "default repPath: ${repPath}"
+    ) 1>&2
+    exit 1
+}
+
+if [ $# -eq 0 ] ; then
+    usage
+fi
+
+while [ $# -gt 0 ] ; do
+    case $1 in
+	--reppath)
+	    shift
+	    repPath=$1
+	    shift
+	    ;;
+	--trove)
+	    shift
+	    trove=$1
+	    shift
+	    ;;
+	--version)
+	    shift
+	    version=$1
+	    shift
+	    ;;
+	*)
+	    if [ -z "$trove" ] ; then
+		trove=$1
+	    elif [ -z "$version" ] ; then
+		version=$1
+	    else
+		usage
+	    fi
+	    shift
+	    ;;
+    esac
+done
+
+srs src rdiff --config "repPath $repPath" $trove 1 $version | \
+    mail -s "$trove $version" johnsonm@lambchop.rdu.specifixinc.com
