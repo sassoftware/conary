@@ -288,7 +288,6 @@ class ChangeSet(streams.LargeStreamSet):
 	try:
 	    outFile = open(outFileName, "w+")
 	    csf = filecontainer.FileContainer(outFile)
-	    outFile.close()
 
 	    str = self.freeze()
 	    csf.addFile("CONARYCHANGESET", filecontents.FromString(str), "")
@@ -811,9 +810,11 @@ class ReadOnlyChangeSet(ChangeSet):
 class ChangeSetFromFile(ReadOnlyChangeSet):
 
     def __init__(self, fileName, skipValidate = 1):
-	f = open(fileName, "r")
-	csf = filecontainer.FileContainer(f)
-	f.close()
+        if type(fileName) is str:
+            f = open(fileName, "r")
+            csf = filecontainer.FileContainer(f)
+        else:
+            csf = filecontainer.FileContainer(fileName)
 
 	(name, tagInfo, control, size) = csf.getNextFile()
         assert(name == "CONARYCHANGESET")
@@ -848,10 +849,10 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
                 break
 
             cont = filecontents.FromFile(f)
-            str = cont.get().read()
-            size = len(str)
-            self.configCache[name] = (tag, str)
-            cont = filecontents.FromString(str)
+            s = cont.get().read()
+            size = len(s)
+            self.configCache[name] = (tag, s)
+            cont = filecontents.FromString(s)
 
             nextFile = csf.getNextFile()
 

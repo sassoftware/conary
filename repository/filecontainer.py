@@ -204,7 +204,7 @@ class FileContainer:
         """
         
 	# make our own copy of this file which nobody can close underneath us
-	self.file = os.fdopen(os.dup(file.fileno()), file.mode)
+	self.file = file
 
 	self.file.seek(0, SEEK_END)
 	if not self.file.tell():

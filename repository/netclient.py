@@ -423,11 +423,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             return changeset.ReadOnlyChangeSet()
 
         cs = None
-        firstPath = target
         scheduledSet = {}
         internalCs = None
-        firstPass = True
+        passCount = 0
         filesNeeded = []
+
+        if target:
+            outFile = open(target, "w+")
+        else:
+            (outFd, tmpName) = tempfile.mkstemp()
+            outFile = os.fdopen(outFd, "w+")
+            os.unlink(tmpName)
+            
 
         # it might a good idea to dedup the job list as we go? the only
         # thing that makes that tricky is the first job, which could be
@@ -450,29 +457,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 for url in urlList:
                     inF = urllib.urlopen(url)
 
-                    if firstPath:
-                        tmpName = firstPath
-                        outF = open(firstPath, "w")
-                    else:
-                        (outFd, tmpName) = tempfile.mkstemp()
-                        outF = os.fdopen(outFd, "w")
-
                     try:
-                        util.copyfileobj(inF, outF)
+                        # seek to the end of the file
+                        outFile.seek(0, 2)
+                        start = outFile.tell()
+                        size = util.copyfileobj(inF, outFile)
+                        f = util.SeekableNestedFile(outFile, size, start)
 
                         inF.close()
-                        outF.close()
 
-                        if not firstPath:
-                            newCs = changeset.ChangeSetFromFile(tmpName)
-                            os.unlink(tmpName)
+                        newCs = changeset.ChangeSetFromFile(f)
 
-                            if not cs:
-                                cs = newCs
-                            else:
-                                cs.merge(newCs)
+                        if not cs:
+                            cs = newCs
                         else:
-                            firstPath = None
+                            cs.merge(newCs)
                     except:
                         if os.path.exists(tmpName):
                             os.unlink(tmpName)
@@ -529,11 +528,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 internalCs.newPackage(pkgChgSet)
 
-                if firstPass:
+                if passCount == 0:
                     internalCs.addPrimaryPackage(troveName, newVersion, 
                                                  newFlavor)
-
-            firstPass = False
+            passCount += 1
 
         if withFiles and filesNeeded:
             need = []
@@ -550,11 +548,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             for (key, fileObj) in zip(need, fileObjs):
                 fileDict[key] = fileObj
             del fileObj, fileObjs, need
-
-            (fd, name) = tempfile.mkstemp()
-            os.unlink(name)
-            tmpF = os.fdopen(fd, "r+")
-            del fd
 
             contentsNeeded = []
             fileJob = []
@@ -589,7 +582,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     contentsNeeded += items
                     fileJob += (items,)
 
-            contentList = self.getFileContents(contentsNeeded, tmpFile = tmpF,
+            contentList = self.getFileContents(contentsNeeded, 
+                                               tmpFile = outFile,
                                                lookInLocal = True)
 
             i = 0
@@ -617,19 +611,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if not cs and internalCs:
             cs = internalCs
             internalCs = None
-
-        if cs and internalCs:
+        elif cs and internalCs:
             cs.merge(internalCs)
 
         if target and cs:
-            if not firstPath:
-                newCs = changeset.ChangeSetFromFile(target)
+            if passCount > 1 or internalCs:
                 os.unlink(target)
-                # doing the merge this way works even if cs is from internalCs
-                newCs.merge(cs)
-                cs = newCs
+                cs.writeToFile(target)
 
-            cs.writeToFile(target)
             cs = None
 
 	return cs
