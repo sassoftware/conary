@@ -65,9 +65,9 @@ class Recipe:
 	# do not search unless a gpg keyid is specified
 	if not keyid:
 	    return
-	gpg = lookaside.searchAll(self.cfg, '%s.sign' %(file), self.name, self.srcdirs)
+	gpg = lookaside.searchAll(self.cfg, '%s.sig' %(file), self.name, self.srcdirs)
 	if not gpg:
-	    gpg = lookaside.searchAll(self.cfg, '%s.sig' %(file), self.name, self.srcdirs)
+	    gpg = lookaside.searchAll(self.cfg, '%s.sign' %(file), self.name, self.srcdirs)
 	if gpg:
 	    if not self.signatures.has_key(file):
 		self.signatures[file] = []
