@@ -171,10 +171,9 @@ class VersionedFile:
 	    return None
 	elif self.branchMap[branchStr]:
 	    return self.branchMap[branchStr]
-	elif branch.hasParent():
-	    return branch.parentNode()
 
-	return None
+	assert(branch.hasParent())
+	return branch.parentNode()
 
     # converts a version to one w/ a timestamp
     def getFullVersion(self, version):
