@@ -18,9 +18,6 @@ Classes from this module are not used directly; instead, they are used
 through eponymous interfaces in recipe.
 """
 
-# bail out as soon as possible if there's an unrecoverable error
-# so put error classes first
-
 class NonBinariesInBindirs(policy.Policy):
     """
     Directories that are specifically for binaries should have only
@@ -79,47 +76,6 @@ class ImproperlyShared(policy.Policy):
 		"Architecture-specific file %s in shared data directory" %file)
 
 
-class DanglingSymlinks(policy.Policy):
-    """
-    Disallow dangling symbolic links (symbolic links which point to
-    files which do not exist).  If you know that a dangling symbolic
-    link created by your package is fulfilled by another package on
-    which your package depends, you may set up an exception for that
-    file for the C{DanglingSymlinks} policy.
-    """
-    targetexceptions = [
-	'.*consolehelper'
-    ]
-    def doProcess(self, recipe):
-	self.targetFilters = []
-	self.macros = recipe.macros # for filterExpression
-	for targetitem in self.targetexceptions:
-	    filterargs = self.filterExpression(targetitem)
-	    self.targetFilters.append(filter.Filter(*filterargs))
-	policy.Policy.doProcess(self, recipe)
-
-    def doFile(self, file):
-	d = self.macros.destdir
-	f = util.joinPaths(d, file)
-	if os.path.islink(f):
-	    contents = os.readlink(f)
-	    if contents[0] == '/':
-		log.warning('Absolute symlink %s points to %s, should probably be relative', file, contents)
-		return
-	    try:
-		os.stat(f)
-	    except OSError:
-		for targetFilter in self.targetFilters:
-		    if targetFilter.match(contents):
-			# contents are an exception
-			log.debug('allowing special dangling symlink %s -> %s',
-				  file, contents)
-			return
-		self.recipe.reportErrors(
-		    "Dangling symlink: %s points to non-existant %s"
-		    %(file, contents))
-
-
 class CheckSonames(policy.Policy):
     """
     Make sure that .so -> SONAME -> fullname
@@ -170,30 +126,6 @@ class CheckSonames(policy.Policy):
 		log.warning("%s implies %s, which does not exist --"
 			    " use Ldconfig('%s')?", path, s,
 			    os.path.dirname(path))
-
-# collect all the packaging errors -- must come after all the other
-# package error classes
-
-class reportErrors(policy.Policy):
-    """
-    This class is used to pull together all package errors in the
-    sanity-checking rules that come above it.  Do not call it
-    directly; it is for internal use only!
-    """
-    def __init__(self, *args, **keywords):
-	self.warnings = []
-	policy.Policy.__init__(self, *args, **keywords)
-    def updateArgs(self, *args, **keywords):
-	"""
-	Called once, with printf-style arguments, for each warning.
-	"""
-	self.warnings.append(args[0] %args[1:])
-    def do(self):
-	if self.warnings:
-	    for warning in self.warnings:
-		log.error(warning)
-	    raise PackagePolicyError, 'Package Policy errors found'
-
 
 # now the packaging classes
 
@@ -504,6 +436,55 @@ class MakeDevices(policy.Policy):
             self.recipe.autopkg.addDevice(*device)
 
 
+class DanglingSymlinks(policy.Policy):
+    # This policy must run after all modifications to the packging
+    # are complete becuase it counts on self.recipe.autopkg.pathMap
+    # being final
+    """
+    Disallow dangling symbolic links (symbolic links which point to
+    files which do not exist).  If you know that a dangling symbolic
+    link created by your package is fulfilled by another package on
+    which your package depends, you may set up an exception for that
+    file for the C{DanglingSymlinks} policy.
+    """
+    targetexceptions = [
+	'.*consolehelper',
+	'/proc/', # provided by the kernel, no package
+    ]
+    # XXX consider automatic file dependencies for dangling symlinks?
+    # XXX if so, then we'll need exceptions for that too, for things
+    # XXX like symlinks into /proc
+    def doProcess(self, recipe):
+	self.targetFilters = []
+	self.macros = recipe.macros # for filterExpression
+	for targetitem in self.targetexceptions:
+	    filterargs = self.filterExpression(targetitem)
+	    self.targetFilters.append(filter.Filter(*filterargs))
+	policy.Policy.doProcess(self, recipe)
+
+    def doFile(self, file):
+	d = self.macros.destdir
+	f = util.joinPaths(d, file)
+	if os.path.islink(f):
+	    contents = os.readlink(f)
+	    if contents[0] == '/':
+		log.warning('Absolute symlink %s points to %s, should probably be relative', file, contents)
+		return
+	    abscontents = util.joinPaths(os.path.dirname(file), contents)
+	    # XXX consider cross-component dangling
+	    # XXX it's OK for libraries; what should we do in general?
+	    if abscontents not in self.recipe.autopkg.pathMap:
+		for targetFilter in self.targetFilters:
+		    if targetFilter.match(abscontents):
+			# contents are an exception
+			log.debug('allowing special dangling symlink %s -> %s',
+				  file, contents)
+			return
+		self.recipe.reportErrors(
+		    "Dangling symlink: %s points to non-existant %s (%s)"
+		    %(file, contents, abscontents))
+
+
 class AddModes(policy.Policy):
     """
     Apply suid/sgid modes -- use SetModes in recipes; this is just the
@@ -554,7 +535,7 @@ class WarnWriteable(policy.Policy):
 			' 0%o for %s %s', mode & 0777, type, file)
 
 
-class WarnIgnoredSetuid(policy.Policy):
+class IgnoredSetuid(policy.Policy):
     """
     Files/directories that are setuid/setgid in the filesystem
     but do not have that mode explicitly set in the recipe will
@@ -641,6 +622,32 @@ class ExcludeDirectories(policy.Policy):
 	del self.recipe.autopkg.pathMap[path]
 
 
+
+class reportErrors(policy.Policy):
+    """
+    This class is used to pull together all package errors in the
+    sanity-checking rules that come above it.  Do not call it
+    directly; it is for internal use only!
+
+    It must come after all the other package classes that report
+    fatal errors, so might as well come last.
+    """
+    def __init__(self, *args, **keywords):
+	self.warnings = []
+	policy.Policy.__init__(self, *args, **keywords)
+    def updateArgs(self, *args, **keywords):
+	"""
+	Called once, with printf-style arguments, for each warning.
+	"""
+	self.warnings.append(args[0] %args[1:])
+    def do(self):
+	if self.warnings:
+	    for warning in self.warnings:
+		log.error(warning)
+	    raise PackagePolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.warnings)
+
+
+
 def DefaultPolicy():
     """
     Return a list of actions that expresses the default policy.
@@ -650,9 +657,7 @@ def DefaultPolicy():
 	NonBinariesInBindirs(),
 	FilesInMandir(),
 	ImproperlyShared(),
-	DanglingSymlinks(),
 	CheckSonames(),
-	reportErrors(),
 	ComponentSpec(),
 	PackageSpec(),
 	EtcConfig(),
@@ -661,11 +666,13 @@ def DefaultPolicy():
 	SharedLibrary(),
 	ParseManifest(),
 	MakeDevices(),
+	DanglingSymlinks(),
 	AddModes(),
 	WarnWriteable(),
-	WarnIgnoredSetuid(),
+	IgnoredSetuid(),
 	Ownership(),
 	ExcludeDirectories(),
+	reportErrors(),
     ]
 
 
