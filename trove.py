@@ -59,11 +59,14 @@ class Package:
 
 	for (fileId, path, fileVersion) in pkgCS.getNewFileList():
 	    self.addFile(fileId, path, fileVersion)
-	    fileMap[fileId] = (path, fileVersion, self.name)
+	    fileMap[fileId] = self.idMap[fileId] + (self.name, )
+	    (path, fileVersion, self.name)
 
 	for (fileId, path, fileVersion) in pkgCS.getChangedFileList():
 	    self.updateFile(fileId, path, fileVersion)
-	    fileMap[fileId] = (path, fileVersion, self.name)
+	    # look up the path/version in self.idMap as the ones here
+	    # could be None
+	    fileMap[fileId] = self.idMap[fileId] + (self.name, )
 
 	for fileId in pkgCS.getOldFileList():
 	    self.removeFile(fileId)
