@@ -817,9 +817,11 @@ class GroupRecipe(Recipe):
         for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
             try:
                 desFlavor = self.cfg.buildFlavor.copy()
+                assert(isinstance(flavor, deps.DependencySet) or flavor is None)
                 if flavor is not None:
-                    assert(isinstance(flavor, deps.DependencySet) or
-                           flavor is None)
+                    if deps.DEP_CLASS_IS in flavor.getDepClasses():
+                       # instruction set deps are overridden completely 
+                       del desFlavor.members[deps.DEP_CLASS_IS]
                     desFlavor.union(flavor, deps.DEP_MERGE_TYPE_OVERRIDE)
                 pkgList = self.repos.findTrove(self.label, name, desFlavor,
                                                versionStr = versionStr)
@@ -827,6 +829,7 @@ class GroupRecipe(Recipe):
                 raise RecipeFileError, str(e)
             assert(len(pkgList) == 1)
             troveList.append((pkgList[0], byDefault))
+            assert(desFlavor.score(pkgList[0][2]) is not False)
 
         troves = self.repos.getTroves([ x[0] for x in troveList ], 
                                       withFiles = False)
