@@ -259,7 +259,7 @@ for embedded targets.
 # temporarily disabled until we build appropriate packages
 Use.tcl = False
 Use.tk = False
-Use.X = False
+Use.X = True
 Use.gtk = False
 Use.gnome = False
 Use.qt = False
