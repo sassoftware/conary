@@ -452,6 +452,14 @@ class VersionSequence(object):
     shadow.
     """
 
+    def __cmp__(self, other):
+        if self.isAfter(other):
+            return 1
+        elif self == other:
+            return 0
+
+        return -1
+
     def compare(first, second):
         if first.isAfter(second):
             return 1
