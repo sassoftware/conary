@@ -426,7 +426,7 @@ class _FileAction(BuildAction):
 	    if isdir and mode != 0755:
 		self.recipe.ExcludeDirectories(exceptions=util.literalRegex(path))
 	    # set explicitly, do not warn
-	    self.recipe.WarnWriteable(exceptions=util.literalRegex(path))
+	    self.recipe.WarnWriteable(exceptions=util.literalRegex(path).replace('%', '%%'))
 
     def setComponents(self, paths):
 	"""
