@@ -41,8 +41,8 @@ class Flavors:
 
 	for depClass in flavor.getDepClasses().itervalues():
 	    for dep in depClass.getDeps():
-		cu.execute("INSERT INTO FlavorMap VALUES (?, ?, NULL, NULL)",
-			   flavorId, dep.name)
+		cu.execute("INSERT INTO FlavorMap VALUES (?, ?, ?, NULL)",
+			   flavorId, dep.name, deps.FLAG_SENSE_REQUIRED)
 		for (flag, sense) in dep.flags.iteritems():
 		    cu.execute("INSERT INTO FlavorMap VALUES (?, ?, ?, ?)",
 			       flavorId, dep.name, sense, flag)
