@@ -1,3 +1,8 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 python_files = __init__.py	\
 	build.py		\
 	destdirpolicy.py	\
