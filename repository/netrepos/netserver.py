@@ -97,7 +97,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	d = {}
 	for (name, leafList) in \
 			self.repos.troveStore.iterAllTroveLeafs(troveNames):
-	    d[name] = leafList
+            if name != None:
+                d[name] = leafList
 	
 	return d
 
