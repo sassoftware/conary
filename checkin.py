@@ -215,6 +215,9 @@ def commit(repos):
 
 def diff(repos, versionStr = None):
     state = SourceStateFromFile("SRS")
+    if state.getVersion().equal(versions.NewVersion()):
+	log.error("no versions have been committed")
+	return
 
     if versionStr:
 	versionStr = state.expandVersionStr(versionStr)
