@@ -711,8 +711,9 @@ def ThawVersion(ver):
     if ver == "@NEW@":
 	return NewVersion()
 
-    if thawedVersionCache.has_key(ver):
-	return thawedVersionCache[ver]
+    v = thawedVersionCache.get(ver, None)
+    if v is not None:
+	return v
 
     v = _VersionFromString(ver, frozen = True)
     thawedVersionCache[ver] = v
@@ -722,7 +723,13 @@ def VersionFromString(ver, defaultBranch = None, timeStamps = []):
     if ver == "@NEW@":
 	return NewVersion()
 
-    return _VersionFromString(ver, defaultBranch, timeStamps = timeStamps)
+    v = stringVersionCache.get(ver, None)
+    if v is not None:
+	return v
+
+    v = _VersionFromString(ver, defaultBranch, timeStamps = timeStamps)
+    stringVersionCache[ver] = v
+    return v
 
 class _VersionFromString(Version):
 
@@ -776,3 +783,4 @@ class ParseError(VersionsError):
 	self.str = str
 
 thawedVersionCache = weakref.WeakValueDictionary()
+stringVersionCache = weakref.WeakValueDictionary()
