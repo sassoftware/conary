@@ -843,7 +843,8 @@ class Requires(_requirements):
 
 class Provides(_requirements):
     """
-    Drives provides mechanism: to avoid marking a file as providing things:
+    Drives provides mechanism: to avoid marking a file as providing things,
+    such as for package-private plugin modules:
     C{r.Provides(exceptions=I{filterexp})}
     """
     def addOne(self, path, pkg, f):
