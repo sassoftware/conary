@@ -149,7 +149,7 @@ class FileContainerFile:
 	else:
 	    self.pos = self.pos + bytes
 	    self.file.seek(self.pos)
-	    return self.file.read(count)
+	    return self.file.read(bytes)
 
     def readlines(self):
 	list = self.read().split('\n')
