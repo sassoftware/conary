@@ -43,10 +43,15 @@ def doImport(dbpath, rpmFile):
     del ts
 
     fileList = []
+
+    # this is a hack for the dev package so we don't need to be root
+    # to import it
+    mustExtract = 0
     for i in range(0, len(list)):
 	if (stat.S_ISREG(modes[i])):
 	    if not (flags[i] & rpm.RPMFILE_GHOST):
 		f = files.RegularFile(list[i])
+		mustExtract = 1
 	    else:
 		continue
 	    f.md5(md5s[i])
@@ -57,6 +62,8 @@ def doImport(dbpath, rpmFile):
 	    f = files.Directory(list[i])
 	elif (stat.S_ISFIFO(modes[i])):
 	    f = files.NamedPipe(list[i])
+	elif (stat.S_ISSOCK(modes[i])):
+	    f = files.Socket(list[i])
 	elif (stat.S_ISBLK(modes[i])):
 	    f = files.DeviceFile(list[i])
 	    f.majorMinor("b", rdevs[i] >> 8, rdevs[i] & 0xff)
@@ -64,7 +71,7 @@ def doImport(dbpath, rpmFile):
 	    f = files.DeviceFile(list[i])
 	    f.majorMinor("c", rdevs[i] >> 8, rdevs[i] & 0xff)
 	else:
-	    raise TypeError, "unsupported file type for %s" % path
+	    raise TypeError, "unsupported file type for %s" % list[i]
 
 	f.perms(modes[i] & 0777)
 	f.owner(owners[i])
@@ -74,7 +81,11 @@ def doImport(dbpath, rpmFile):
 
     util.mkdirChain(scratch)
 
-    os.system("cd %s; rpm2cpio %s | cpio -iumd --quiet" % (scratch, pkgFile))
+    if mustExtract:
+	os.system("cd %s; rpm2cpio %s | cpio -iumd --quiet" % 
+		    (scratch, pkgFile))
     commit.finalCommit(dbpath, pkgName, version, scratch, fileList)
-    os.system("rm -rf %s" % scratch)
+
+    if mustExtract:
+	os.system("rm -rf %s" % scratch)
 
