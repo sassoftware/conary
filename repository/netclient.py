@@ -997,7 +997,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return newVersion
 
     def findTrove(self, labelPath, name, defaultFlavor, versionStr = None,
-                  acrossRepositories = False, withFiles = True,
+                  acrossRepositories = False, 
                   affinityDatabase = None, flavor = None):
 	assert(not defaultFlavor or 
 	       isinstance(defaultFlavor, deps.DependencySet))
@@ -1226,8 +1226,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	if not pkgList:
 	    raise repository.TroveNotFound, "trove %s does not exist" % name
-
-	pkgList = self.getTroves(pkgList, withFiles = withFiles)
 
 	return pkgList
 

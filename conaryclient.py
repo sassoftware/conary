@@ -199,22 +199,18 @@ class ConaryClient:
                 try:
                     l = self.repos.findTrove(None, troveName, 
                                                    self.cfg.flavor, versionStr,
-                                                   withFiles = False,
                                                    affinityDatabase = self.db,
                                                    flavor = flavor)
                 except repository.TroveNotFound, e:
                     raise NoNewTrovesError
-                newItems += [ (x.getName(), x.getVersion(), x.getFlavor())
-                                for x in l ]
+                newItems += l
             else:
                 l = self.repos.findTrove(self.cfg.installLabelPath, 
                                                troveName, 
                                                self.cfg.flavor, versionStr,
-                                               withFiles = False,
                                                affinityDatabase = self.db,
                                                flavor = flavor)
-                newItems += [ (x.getName(), x.getVersion(), x.getFlavor())
-                                for x in l ]
+                newItems += l
                 # XXX where does this go now?                    
                 # updating locally cooked troves needs a label override
                 #if True in [isinstance(x, versions.CookLabel) or

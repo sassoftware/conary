@@ -208,10 +208,10 @@ def checkout(repos, cfg, workDir, name):
     if len(trvList) > 1:
 	log.error("branch %s matches more then one version", versionStr)
 	return
-    trv = trvList[0]
+    trvInfo = trvList[0]
 	
     if not workDir:
-	workDir = trv.getName().split(":")[0]
+	workDir = trvInfo[0].split(":")[0]
 
     if not os.path.isdir(workDir):
 	try:
@@ -221,15 +221,12 @@ def checkout(repos, cfg, workDir, name):
                       workDir, str(err))
 	    return
 
-    branch = fullLabel(cfg.buildLabel, trv.getVersion(), versionStr)
-    state = SourceState(trv.getName(), trv.getVersion(), 
-                        trv.getVersion().branch())
+    branch = fullLabel(cfg.buildLabel, trvInfo[1], versionStr)
+    state =SourceState(trvInfo[0], trvInfo[1], trvInfo[1].branch())
 
-    # it's a shame that findTrove already sent us the trove since we're
-    # just going to request it again
-    cs = repos.createChangeSet([(trv.getName(), 
+    cs = repos.createChangeSet([(trvInfo[0],
                                 (None, None), 
-                                (trv.getVersion(), deps.deps.DependencySet()),
+                                (trvInfo[1], trvInfo[2]),
 			        True)], excludeAutoSource = True)
 
     pkgCs = cs.iterNewPackageList().next()
@@ -644,7 +641,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 	log.error("%s matches multiple versions" % newVersion)
 	return
     new = new[0]
-    newV = new.getVersion()
+    newV = new[1]
 
     try:
 	count = -int(oldVersion)
@@ -666,7 +663,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 	    old = None
 	else:
 	    oldV = branchList[-count]
-	    old = repos.getTrove(troveName, oldV, deps.deps.DependencySet())
+	    old = (troveName, oldV, deps.deps.DependencySet())
     except ValueError:
 	old = repos.findTrove(buildLabel, troveName, None, 
 			      versionStr = oldVersion)
@@ -674,7 +671,12 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 	    log.error("%s matches multiple versions" % oldVersion)
 	    return
 	old = old[0]
-	oldV = old.getVersion()
+	oldV = old[1]
+
+    if old:
+        old, new = repos.getTroves((old, new))
+    else:
+        new = repos.getTrove(*new)
 
     cs = repos.createChangeSet([(troveName, (oldV, deps.deps.DependencySet()),
 					    (newV, deps.deps.DependencySet()), 
@@ -707,7 +709,7 @@ def diff(repos, versionStr = None):
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return
 
-	oldPackage = pkgList[0]
+	oldPackage = repos.getTrove(*pkgList[0])
     else:
 	oldPackage = repos.getTrove(state.getName(), 
                                     state.getVersion().canonicalVersion(), 
@@ -817,8 +819,7 @@ def updateSrc(repos, versionStr = None):
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return
 
-	head = pkgList[0]
-	headVersion = head.getVersion()
+	headVersion = pkgList[0][1]
 	newBranch = fullLabel(None, headVersion, versionStr)
 
     changeSet = repos.createChangeSet([(pkgName, 

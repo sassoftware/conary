@@ -269,7 +269,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
 	    raise RecipeFileError("source component %s has multiple versions "
 				  "with label %s" %(component,
                                                     cfg.buildLabel.asString()))
-	sourceComponent = pkgs[0]
+        sourceComponent = repos.getTrove(*pkgs[0])
     except repository.TroveMissing:
         raise RecipeFileError, 'cannot find source component %s' % component
 
@@ -715,7 +715,7 @@ class _GroupOrRedirectRecipe(Recipe):
             except repository.TroveNotFound, e:
                 raise RecipeFileError, str(e)
             assert(len(pkgList) == 1)
-            trove = pkgList[0]
+            trove = self.repos.getTrove(*pkgList[0])
             v = trove.getVersion()
             f = trove.getFlavor()
             l = self.troveVersionFlavors.get(name, [])
@@ -837,7 +837,7 @@ class FilesetRecipe(Recipe):
 	    raise RecipeFileError, "too many packages match %s" % component
 
 	foundIt = False
-	pkg = pkgList[0]
+	pkg = self.repos.getTrove(*pkgList[0])
 	for sub in self.repos.walkTroveSet(pkg):
 	    foundIt = foundIt or self.addFileFromPackage(pattern, sub, recurse,
 							 remap)

@@ -130,23 +130,26 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
     try:
 	troveList = repos.findTrove(cfg.installLabelPath, troveName, 
 				    flavor, versionStr,
-                                    acrossRepositories = True,
-                                    withFiles = withFiles)
+                                    acrossRepositories = True)
     except repository.TroveNotFound, e:
 	log.error(str(e))
 	return
 
-    for trove in troveList:
+    for (troveName, troveVersion, troveFlavor) in troveList:
+        trove = repos.getTrove(troveName, troveVersion, troveFlavor, 
+                               withFiles = withFiles)
+        
         sourceName = trove.getSourceName()
         if sourceName:
-            sourceTrove = repos.findTrove(cfg.installLabelPath, sourceName,
-                                          cfg.flavor, versionStr,
-                                          acrossRepositories = True,
-                                          withFiles = False)[0]
+            try:
+                sourceTrove = repos.getTrove(sourceName, 
+                        troveVersion.getSourceVersion(), deps.DependencySet(),
+                        withFiles = False)
+            except repository.TroveMissing:
+                sourceTrove = None
         else:
             sourceTrove = None
 
-	version = trove.getVersion()
         if ls or tags or sha1s or ids:
             outerTrove = trove
             for trove in repos.walkTroveSet(outerTrove):
@@ -173,23 +176,28 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		 ("Build time: %s" % buildTime)))
 
 	    if fullVersions:
-		print "Version   :", version.asString()
-		print "Label     : %s" % version.branch().label().asString()
+		print "Version   :", troveVersion.asString()
+		print "Label     : %s" % \
+                            troveVersion.branch().label().asString()
 
 	    else:
 		print "%-30s %s" % \
-		    (("Version   : %s" % version.trailingRevision().asString()),
-		     ("Label     : %s" % version.branch().label().asString()))
+		    (("Version   : %s" % 
+                                troveVersion.trailingRevision().asString()),
+		     ("Label     : %s" % 
+                                troveVersion.branch().label().asString()))
 
             print "Size      : %s" % size
             print "Flavor    : %s" % deps.formatFlavor(trove.getFlavor())
 
             if sourceTrove:
-                metadata.showDetails(repos, cfg, sourceTrove.getName(), version.branch())
+                metadata.showDetails(repos, cfg, sourceTrove.getName(), 
+                                     sourceTrove.getVersion().branch())
 
                 cl = sourceTrove.getChangeLog()
                 if cl:
-                    print "Change log: %s (%s)" % (cl.getName(), cl.getContact())
+                    print "Change log: %s (%s)" % (cl.getName(), 
+                                                   cl.getContact())
                     lines = cl.getMessage().split("\n")[:-1]
                     for l in lines:
                         print "    " + l
@@ -205,23 +213,22 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                         print '    ', l
 	else:
 	    if fullVersions or len(troveList) > 1:
-		print _troveFormat % (trove.getName(), version.asString())
+		print _troveFormat % (trove.getName(), troveVersion.asString())
 	    else:
 		print _troveFormat % (trove.getName(), 
-				      version.trailingRevision().asString())
+                                  troveVersion.trailingRevision().asString())
 
 	    for (troveName, ver, flavor) in trove.iterTroveList():
-		if fullVersions or ver.branch() != version.branch():
+		if fullVersions or ver.branch() != troveVersion.branch():
 		    print _grpFormat % (troveName, ver.asString())
 		else:
 		    print _grpFormat % (troveName, 
 					ver.trailingRevision().asString())
 
-	    iter = repos.iterFilesInTrove(trove.getName(), trove.getVersion(),
-                                          trove.getFlavor(), sortByPath = True, 
-					  withFiles = False)
+	    iter = repos.iterFilesInTrove(troveName, troveVersion, troveFlavor,
+                                          sortByPath = True, withFiles = False)
 	    for (pathId, path, fileId, ver) in iter:
-		if fullVersions or ver.branch() != version.branch():
+		if fullVersions or ver.branch() != troveVersion.branch():
 		    print _fileFormat % (path, ver.asString())
 		else:
 		    print _fileFormat % (path, 

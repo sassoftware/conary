@@ -57,7 +57,7 @@ class AbstractTroveDatabase:
         @type acrossRepositories: boolean
         @param withFiles: File information is only returned if this is True
         @type withFiles: boolean
-	@rtype: list of trove.Trove
+	@rtype: list of (troveName, troveVersion, troveFlavor)
 	"""
 	raise NotImplementedError
 

@@ -40,9 +40,9 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName):
                                                         cfg.flavor)
 
 
-        pkgList = repos.findTrove(cfg.installLabelPath, troveName, newFlavor,
-                                  newVersionStr)
-        if len(pkgList) > 1:
+        troveList = repos.findTrove(cfg.installLabelPath, troveName, newFlavor,
+                                    newVersionStr)
+        if len(troveList) > 1:
             if newVersionStr:
                 log.error("trove %s has multiple branches named %s",
                           troveName, newVersionStr)
@@ -50,18 +50,18 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName):
                 log.error("trove %s has too many branches on installLabelPath",
                           troveName)
 
-        newVersion = pkgList[0].getVersion()
-        newFlavor = pkgList[0].getFlavor()
+        newVersion = troveList[0][1]
+        newFlavor = troveList[0][2]
 
         if oldVersionStr:
-            pkgList = repos.findTrove(cfg.installLabelPath, troveName, 
-                                      oldFlavor, oldVersionStr)
-            if len(pkgList) > 1:
+            troveList = repos.findTrove(cfg.installLabelPath, troveName, 
+                                        oldFlavor, oldVersionStr)
+            if len(troveList) > 1:
                 log.error("trove %s has multiple branches named %s",
                           troveName, oldVersionStr)
 
-            oldVersion = pkgList[0].getVersion()
-            oldFlavor = pkgList[0].getFlavor()
+            oldVersion = troveList[0][1]
+            oldFlavor = troveList[0][2]
         else:
             oldVersion = None
 

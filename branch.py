@@ -32,8 +32,6 @@ def branch(repos, cfg, newLabel, troveSpec, makeShadow = False,
 
     troveList = repos.findTrove(cfg.installLabelPath, troveName, flavor,
                                 versionSpec)
-    troveList = [ ( x.getName(), x.getVersion(), x.getFlavor()) 
-                        for x in troveList ]
 
     if makeShadow:
         dups = client.createShadow(newLabel, troveList,
