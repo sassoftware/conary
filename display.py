@@ -8,7 +8,7 @@ import package
 #import packagename
 import versions
 
-from packagename import PackageName
+#from packagename import PackageName
 
 _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
