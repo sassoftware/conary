@@ -67,13 +67,9 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
                     hostList = allHosts
                     
                 for host in hostList:
-                    if repositories.has_key(host):
-                        if repositories[host].has_key(name):
-                            repositories[host][name].append(flavor)
-                        else:
-                            repositories[host][name] = [ flavor ]
-                    else:
-                        repositories[host] = { name : [ flavor ] }
+                    d = repositories.setdefault(host, {})
+                    l = d.setdefault(name, [])
+                    l.append(flavor)
 
             if all:
                 fn = repos.getTroveVersionList
