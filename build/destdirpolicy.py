@@ -866,6 +866,30 @@ class NormalizeInterpreterPaths(policy.Policy):
                 del self.recipe.magic[path]
 
 
+class NormalizePamConfig(policy.Policy):
+    """
+    Some older PAM configuration files include "/lib/security/$ISA/"
+    as part of the module path; there is no need for this prefix
+    with modern PAM libraries.
+
+    You should never need to run
+    C{r.NormalizePamConfig(exceptions=I{filterexp})}
+    """
+    invariantinclusions = [
+	'%(sysconfdir)s/pam.d/',
+    ]
+
+    def doFile(self, path):
+        d = util.joinPaths(self.recipe.macros.destdir, path)
+        f = file(d, 'r+')
+        l = f.readlines()
+        l = [x.replace('/lib/security/$ISA/', '') for x in l]
+        f.seek(0)
+        f.truncate(0) # we may have shrunk the file, avoid garbage
+        f.writelines(l)
+        f.close()
+
+
 class RelativeSymlinks(policy.Policy):
     """
     Makes all symlinks relative; create absolute symlinks in your
@@ -912,6 +936,7 @@ def DefaultPolicy(recipe):
 	NormalizeInitscriptLocation(recipe),
         NormalizeAppDefaults(recipe),
         NormalizeInterpreterPaths(recipe),
+        NormalizePamConfig(recipe),
 	RelativeSymlinks(recipe),
     ]
 

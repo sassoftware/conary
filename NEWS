@@ -4,6 +4,8 @@ Changes in 0.11.7
   * extra config files (specified with --config-file) were ignored if they
     didn't exist; issue an error message now
   * Added r.ConsoleHelper() for recipes
+  * PAM configuration files shouldn't have paths to modules by default,
+    so we remove what used to be the standard path
 
 Changes in 0.11.6
   * branches are created as changesets now instead of as a protocol call
