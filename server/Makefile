@@ -17,7 +17,7 @@ python_files = apachehooks.py \
                http.py        \
                htmlengine.py
 
-extra_dist = Makefile adduser schema
+extra_dist = Makefile
 
 dist_files = $(python_files) $(extra_dist)
 
