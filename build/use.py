@@ -203,7 +203,7 @@ class Collection(dict):
         if key in self._attrs:
             return self._attrs[key]
         if key[0] == '_':
-            raise AttributeError
+            raise AttributeError, key
         return self._getNonExistantKey(key)
 
     def __getitem__(self, key):
@@ -222,7 +222,7 @@ class Collection(dict):
         """ Method that is called when a nonexistant key is accessed.
             Overridden by subclasses to allow for useful error messages
             or default key values to be supplied """
-        raise AttributeError
+        raise AttributeError, key
 
     def _iterAll(self):
         for child in self.itervalues():
