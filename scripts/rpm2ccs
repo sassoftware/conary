@@ -50,18 +50,26 @@ quotesRe = re.compile(r'[ \t]*"?(.*)"?[ \t]*')
 # remove redirection
 redirectionRe = re.compile(r'2?>.*')
 
+(PRE, POST, PREUN, POSTUN) = range(0,3)
+
+
 class taghandlerBuilder:
     def __init__(self, recipe):
         self.packagename = recipe.packagename
         self.recipe = recipe
         self.userinfo = {}
         self.groupinfo = {}
+        self.scripts_exist = False
+        self.sccripts = {}
 
-        preScript = None
+        self.preScript = None
         if rpmhelper.PREIN in recipe.rpmHeader:
             # we will ignore the contents of preScript, except to try to
             # fetch user/group information from it
-            preScript = self.removeUnConary(recipe.rpmHeader[rpmhelper.PREIN])
+            self.preScript = self.removeUnConary(
+                recipe.rpmHeader[rpmhelper.PREIN])
+
+    def buildScripts(self):
 
         triggers = None
         if rpmhelper.TRIGGERSCRIPTS in recipe.rpmHeader:
@@ -70,17 +78,20 @@ class taghandlerBuilder:
         postScript = None
         if rpmhelper.POSTIN in recipe.rpmHeader:
             if rpmhelper.POSTINPROG in recipe.rpmHeader:
-                if 'ldconfig' in recipe.rpmHeader[rpmhelper.POSTINPROG]:
+                postInProg = recipe.rpmHeader[rpmhelper.POSTINPROG]
+                if 'ldconfig' in postInProg:
                     # ldconfig happens automatically
                     pass
                 else:
-                    print 'unhandled POSTIN interpreter %s' % recipe.rpmHeader[rpmhelper.POSTINPROG]
+                    print 'unhandled POSTIN interpreter %s' % postInProg
             else:
                 postScript = self.removeUnConary(
                     recipe.rpmHeader[rpmhelper.POSTIN])
                 if 'RPM_INSTALL_PREFIX' in postScript:
                     self.warnRelocation('post')
                     postScript = None
+                if 'ld.so.conf' in postScript
+                    self.warnLdSoConf('post')
 
         preUn = None
         if rpmhelper.PREUN in recipe.rpmHeader:
@@ -88,37 +99,59 @@ class taghandlerBuilder:
             if 'RPM_INSTALL_PREFIX' in preUn:
                 self.warnRelocation('preun')
                 preUn = None
+            if 'ld.so.conf' in preUn
+                self.warnLdSoConf('post')
                         
 
         postUn = None
         if rpmhelper.POSTUN in recipe.rpmHeader:
             postUn = self.removeUnConary(recipe.rpmHeader[rpmhelper.POSTUN])
-            if 'RPM_INSTALL_PREFIX' in postUn:
-                self.warnRelocation('postun')
-                postUn = None
+            if rpmhelper.POSTUNPROG in recipe.rpmHeader:
+                postInProg = recipe.rpmHeader[rpmhelper.POSTUNPROG]
+                if 'ldconfig' in postUnProg:
+                    # ldconfig happens automatically
+                    pass
+                else:
+                    print 'unhandled POSTUN interpreter %s' % postUnProg
+            else:
+                if 'RPM_INSTALL_PREFIX' in postUn:
+                    self.warnRelocation('postun')
+                    postUn = None
+                if 'ld.so.conf' in preUn
+                    self.warnLdSoConf('postun')
 
 
-        if preScript:
+        if self.preScript:
             print 'Conary does not implement pre scripts.'
             print 'Most pre scripts add users/groups, which conary does'
             print 'using r.User() and r.Group(); you may need to use the'
             print '--recipe option and manually modify or add r.User()'
             print 'and/or r.Group() lines.'
+        if postUn:
+            print 'Conary handles postuninstall in a way that is not'
+            print 'compatible with RPM postun scripts.'
+            print 'Use the --recipe option and manually modify the'
+            print 'recipe, taghandler, or scripts as necessary.'
+            print 'It is most likely that the postuninstall will be'
+            print 'entirely unnecessary with Conary, since Conary'
+            print 'handles things like ld.so.conf changes itself,'
+            print 'and has tag handlers for system databases like'
+            print 'info/dir, /etc/shells, and scrollkeeper.'
+            print 'Also, be aware that many postuninstall scripts'
+            print 'can really be run as preunistall scripts.'
         if triggers:
             print 'Conary does not implement triggers at all.'
             print 'Most triggers are workarounds for old bugs.'
             print 'The conary taghandler facility provides all the necessary'
             print 'semantics, but we cannot adapt them automatically.'
-            print 'You will have to look at the triggers and implement the'
+            print 'You will have to look at the triggers and implement any'
             print 'necessary semantics differently for Conary, using'
             print 'the --recipe option and manual modification using'
             print 'taghandlers.'
         if postScript:
-            self.postscript(postScript)
+            self.script(POST, postScript)
         if preUn:
-            self.preun(preUn)
-        if postUn:
-            self.postun(postUn)
+            self.script(PREUN, preUn)
 
     def removeUnConary(self, script):
         # make parsing easier by removing \ line continuation
@@ -144,8 +177,8 @@ class taghandlerBuilder:
                 if 'service' in line:
                     print 'removing service from "%s"' %line
                     line = serviceRe.sub(r'\1:', line)
-                if 'lconfig' in line:
-                    print 'removing lconfig from "%s"' %line
+                if 'ldconfig' in line:
+                    print 'removing ldconfig from "%s"' %line
                     line = ldconfigRe.sub(r'\1:', line)
                 if 'useradd' in line:
                     print 'removing useradd from "%s"' %line
@@ -169,6 +202,12 @@ class taghandlerBuilder:
         print '%%%s requires relocation.' %name
         print 'Conary does not implement relocatable packages.'
         print '%%%s will not be run' %name
+
+    def warnLdSoConf(self, name):
+        print '%%%s appears to modify ld.so.conf' %name
+        print 'Conary manages ld.so.conf itself'
+        print 'Please use --recipe and modify the %s script not to' %name
+        print 'modify ld.so.conf'
 
     def recorduser(self, line):
         line = redirectionRe.sub('', line)
@@ -203,6 +242,7 @@ class taghandlerBuilder:
                     # unknown option
                     print 'error parsing "%s"' %line
                     del self.userinfo[user]
+                    return
             print 'storing user information: %s' %str(self.userinfo[user])
         except:
             print 'error parsing "%s"' %line
@@ -228,40 +268,95 @@ class taghandlerBuilder:
                 else:
                     # unknown option
                     print 'error parsing "%s"' %line
-                    del self.userinfo[user]
+                    del self.groupinfo[group]
+                    return
             print 'storing group information: %s' %str(self.groupinfo[group])
         except:
-            del self.userinfo[user]
+            del self.groupinfo[group]
             print 'error parsing "%s"' %line
 
     def getarg(self, data):
-        return commentRe.sub(r'\1', data)
+        return commentRe.sub(r'\1', data[1:])
 
-    def postscript(self, postScript):
-        pass
-    def preun(self, preUn):
-        pass
-    def postun(self, postUn):
-        pass
+    def script(self, type, script):
+        self.scripts_exist = True
+        self.scripts[type] = script
+
     def exists(self):
-        pass
-    def file(self, tagfile):
-        self.tagfile = tagfile
+        return self.scripts_exist
+
     def writefiles(self):
-        # XXX write taghandler and tagdescription
+        # %(libexecdir)s/conary/rpm-scripts/%(name)s/{post,preun}
+        # %(taghandlerdir)s/%(name)s
+        # %(tagdescriptiondir)s/%(name)s
+        if not self.exists():
+            return
+
         self.taghandlername = self.packagename+'.taghandler'
-        self.tagdescriptionname = self.packagename+'foo.tagdescription'
-    def taghandler(self):
-        return self.taghandlername
-    def tagdescription(self):
-        return self.tagdescriptionname
+        self.tagdescriptionname = self.packagename+'.tagdescription'
+        self.postscriptname = self.packagename+'.rpmpost'
+        self.preunname = self.packagename+'.rpmpostun'
+
+        tagdescription = [
+            'file          %(taghandlerdir)s/'+self.packagename,
+            'description   %(name)s RPM script proxy handler',
+            'datasource    args',
+        ]
+
+        taghandler = [
+            '#!/bin/bash',
+            'case $2 in',
+        ]
+
+        if POST in self.scripts:
+            taghandler.extend([
+                '    update)',
+                '        %(libexecdir)s/conary/rpm-scripts/%(name)s/post 1',
+                '        ;;',
+            ])
+            tagdescription.append('implements    files update')
+        if PREUN in self.scripts:
+            taghandler.extend([
+                '    remove)',
+                '        %(libexecdir)s/conary/rpm-scripts/%(name)s/postun 0',
+                '        ;;',
+            ])
+            tagdescription.append('implements    files preremove')
+
+        taghandler.extend([
+            'esac',
+            'exit 0',
+        ])
+
+    def sourcefiles(self):
+        sourcefiles = [self.taghandlername, self.tagdescriptionname]
+        if POST in self.scripts:
+            sourcefiles.append(self.postscriptname)
+        if PREUN in self.scripts:
+            sourcefiles.append(self.preunname)
+        return sourcefiles
 
     def recipelines(self):
-        return [
-            "        r.addSource('"+self.taghandlername+"', dir='%(taghandlerdir)s', dest='%(name)s')",
-            "        r.addSource('"+self.tagdescriptionname+"', dir='%(tagdescriptiondir)s', dest='%(name)s')",
-            "        r.TagSpec('+self.packagename+', '+self.tagfile+')"
+        # note that we cannot do r.TagSpec('%(name)s',... because
+        # tag specs cannot have macros embedded in them
+        recipelines = [
+            "        r.addSource('"+self.taghandlername+"', dest='%(taghandlerdir)s%(name)s', macros=True)",
+            "        r.addSource('"+self.tagdescriptionname+"', dest='%(tagdescriptiondir)s%(name)s', macros=True)",
+            "        # this file needs to have different contents in each build",
+            "        # in order for rpm script update conventions to work",
+            "        # some random data should be good enough",
+            "        r.Run('dd if=/dev/random bs=64 | md5sum > /usr/lib/conary/rpm-scripts/%(name)s/updatefile')",
+            "        r.TagSpec(r.name, '/usr/lib/conary/rpm-scripts/%(name)s/updatefile')"
         ]
+        if POST in self.scripts:
+            recipelines.append(
+                "        r.addSource('"+self.postscriptname+"', dest='%(libexecdir)s/conary/rpm-scripts/%(name)s/post', macros=True)"
+            )
+        if PREUN in self.scripts:
+            recipelines.append(
+                "        r.addSource('"+self.preunname+"', dest='%(libexecdir)s/conary/rpm-scripts/%(name)s/preun', macros=True)"
+            )
+        return recipelines
 
 
 class recipeBuilder:
@@ -331,9 +426,6 @@ class recipeBuilder:
             elif os.path.dirname(path) not in filled_directories:
                 filled_directories.append(os.path.dirname(path))
 
-            if not tagfile:
-                tagfile = path
-
             if stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
                 if stat.S_ISCHR(mode):
                     type='c'
@@ -367,23 +459,23 @@ class recipeBuilder:
                     % util.literalRegex(dir))
 
         
+        # pull user/group definition information, if any, out of the scripts
+        self.tag = taghandlerBuilder(self)
+
         # XXX add any User/Group bits needed for this recipe -- guess from
         # current system first, then by trying to parse any adduser/group
         # lines (or maybe the other way around?)
 
-        self.tag = None
         if packageScripts:
-            self.tag = taghandlerBuilder(self)
+            self.tag.buildScripts()
 
     def name(self):
         return self.recipename
 
     def write(self):
         if self.tag and self.tag.exists():
-            self.tag.file(tagfile)
             self.tag.writefiles()
-            checkin.addFiles((self.tag.taghandler(),
-                              self.tag.tagdescription()), ignoreExisting=True)
+            checkin.addFiles(self.tag.sourcefiles(), ignoreExisting=True)
             self.recipe.extend(self.tag.recipelines())
 
         f = open(self.recipename, 'w')
