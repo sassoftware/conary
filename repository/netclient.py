@@ -331,6 +331,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self._mergeTroveQuery({}, d)
 
     def _getTroveLeavesByLabel(self, troveSpecs, bestFlavor = False):
+        # XXX remove this function once real getTroveLeavesByLabel
+        # has been switched to new-style syntax
         res = {}
         for name, labelDict in troveSpecs.iteritems():
             for label, flavors in labelDict.iteritems():
@@ -349,6 +351,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self._mergeTroveQuery({}, d)
 
     def _getTroveVersionsByLabel(self, troveSpecs, bestFlavor = False):
+        # XXX remove this function once real getTroveVersionsByLabel
+        # has been switched to new-style syntax
         res = {}
         for name, labelDict in troveSpecs.iteritems():
             for label, flavors in labelDict.iteritems():
