@@ -1,0 +1,84 @@
+Changes in 0.8.3:
+ * Man page updates.
+ * The "conary query" command now accepts multiple arguments for
+   troves and paths
+ * Fixed "conary erase" command which was broken in 0.8.2
+
+Changes in 0.8.2:
+ * You can now install multiple troves at once (even a combination of
+   changeset files and troves from repositories), and the entire
+   action is recorded in a single rollback (this required a change in
+   command-line arguments for updating troves). 
+ * The beginnings of support for searching multiple repositories 
+ * Miscellaneous code cleanup and bug fixes.
+
+Changes in 0.8.1:
+ * The source code has been re-arranged for easier maintenance, and
+   conary has been split into two programs: conary and cvc.
+ * Better error messages and debugging tracebacks
+
+Changes in 0.8.0:
+ * A new changeset format supports hard links but requires staged update.
+ * The new changeset format also collapses duplicate contents even
+   when hardlinks are not used.
+ * By default, rc?.d/{K,S}* symlinks are no longer packaged. The
+   chkconfig program is relied on to create them at package
+   install/update time. Init scripts are explicitly required to
+   support the chkconfig protocol by default
+ * Improved error messages
+ * Several bug fixes.
+
+Changes in 0.7.7:
+ * Extended debugger saves and emails
+ * Tracebacks now include arguments and locals
+ * More size optimizations were made when applying changesets
+ * Applying absolute changesets when a trove is already installed is
+   now much more efficient than it was
+ * Self-referential symlinks raise a packaging exception.
+ * Several bugs fixes.
+
+Changes in 0.7.6:
+ * Installation
+   * Hardlink handling
+   * enhanced debugging capabilities (including saving a debugging
+     state file to enable remote debugging)
+
+   * using binary file ids and iterators for significant memory savings
+   * and runtime support for the x86.x86_64 sub-architecture
+ * Cooking
+   * more robust handling of the --resume option
+   * policy normalization of where app-defaults files go.
+
+Changes in 0.7.5:
+ * Hard links are implemented (but not yet enabled, in order to
+   preserve changeset compatibility for now).
+ * Several bugs have been fixed for installing and cooking.
+
+Changes in 0.7.4:
+ * Fileids are now stored and transmitted in binary rather than
+   encoded.
+ * Better handling of multiple versions of packages/troves installed
+   at the same time
+ * Missing file handling improvements
+ * Recipe inheritance is now possible between repositories
+ * Enhanced Interrupted builds
+ * The dynamic tag protocol was slightly modified
+ * Added Arch.x86.amd64 and Arch.x86.em64t
+ * several bugs fixes
+
+Changes in 0.7.0:
+ * sqlite3 is used for the database
+ * better handling of multiple packages with the same name installed at once.
+
+Changes in 0.6.6:
+ * repository protocol update
+ * changeset format update
+ * added the ability to resume halted local builds
+ * added the ability to easily package build-time tests to run at
+   install time to qualify new/changed environments
+ * better handling of packaged .pyc/.pyo files
+ * better shared library handling
+ * improved inline documentation
+ * optimizations for both space and time
+ * numerous bugfixes
+
