@@ -18,7 +18,7 @@ import log
 
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_INITSCRIPT = 1 << 1
-_FILE_FLAG_SHLIB = 1 << 3
+_FILE_FLAG_SHLIB = 1 << 2
 
 class FileMode:
     def merge(self, mode):
