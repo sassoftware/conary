@@ -160,14 +160,14 @@ class ConaryConfiguration(ConfigFile):
     }
 
     
-    pkgflags = {}
-    useflags = {}
-    archflags = {}
-    macroflags = {}
    
     def __init__(self, readConfigFiles=True):
 	ConfigFile.__init__(self)
 
+	self.pkgflags = {}
+	self.useflags = {}
+	self.archflags = {}
+	self.macroflags = {}
 	self.flavor = deps.deps.DependencySet()
 	self.flavor.addDep(deps.deps.InstructionSetDependency, 
 			   self.instructionSet)
