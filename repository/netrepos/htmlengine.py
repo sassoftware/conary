@@ -209,14 +209,15 @@ Choose a branch: %s
            items in a selection."""
         inputId = name + "Select"
 
-        s = self.makeSelect(items, inputId, expand="40%")
+        s = self.makeSelect(items, inputId, expand="40%", blank=True)
         s += """
 <input style="width: 6%%;" type="button" onclick="javascript:append('%s', '%s');" value="Add" />
 <input style="width: 6%%;" type="button" onclick="javascript:removeSelected('%s');" value="Remove" />
 """     % (selectionName, inputId, selectionName)
         return s
 
-    def makeSelect(self, items, name, default=None, size=1, expand=False, multiple=False, onClick=""):
+    def makeSelect(self, items, name, default=None, size=1, expand=False,
+                   multiple=False, onClick="", blank=False):
         """Generate a html <select> dropdown or selection list based on a dictionary or a list.
            If 'items' is a dictionary, use the dictionary value as the option value, and display
            the key to the user. If 'items' is a list, use the list item for both."""
@@ -232,6 +233,8 @@ Choose a branch: %s
             
         s = """<select onclick="javascript:%s;" name="%s" id="%s" %s size="%d" style="%s">\n""" %\
             (onClick, name, name, multiple, size, style)
+        if blank:
+            s += """<option value="">--</option>"""
 
         # generate [(data, friendlyName), ...)] from either a list or a dict
         if isinstance(items, list):
