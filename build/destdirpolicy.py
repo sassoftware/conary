@@ -125,26 +125,26 @@ class Strip(policy.Policy):
 	('%(essentiallibdir)s/', None, stat.S_IFDIR),
     ]
     def doFile(self, path):
-	if not os.path.islink(path):
-	    d = self.macros['destdir']
-	    p = d+path
-	    m = magic.magic(path, d)
-	    if not m:
-		return
-	    # FIXME: should be:
-	    #if (m.name == "ELF" or m.name == "ar") and \
-	    #   not m.contents['stripped']):
-	    # but this has to wait until ewt writes stripped detection
-	    # for archives as well as elf files
-	    if (m.name == "ELF" and not m.contents['stripped']) or \
-	       (m.name == "ar"):
-		util.execute('%(strip)s -g ' %self.macros +p)
+	if os.path.islink(path):
+	    return
+	d = self.macros['destdir']
+	m = magic.magic(path, d)
+	if not m:
+	    return
+	# FIXME: should be:
+	#if (m.name == "ELF" or m.name == "ar") and \
+	#   not m.contents['stripped']):
+	# but this has to wait until ewt writes stripped detection
+	# for archives as well as elf files
+	if (m.name == "ELF" and not m.contents['stripped']) or \
+	   (m.name == "ar"):
+	    util.execute('%(strip)s -g ' %self.macros +d+path)
 
 
-class NormalizeGzip(policy.Policy):
+class NormalizeCompression(policy.Policy):
     """
-    re-gzip .gz files with -9 -n to get maximum compression and
-    avoid meaningless changes overpopulating the database.
+    re-gzip .gz files with -9 -n, and .bz2 files with -9, to get maximum
+    compression and avoid meaningless changes overpopulating the database.
     Ignore man/info pages, we'll get them separately while fixing
     up other things
     """
@@ -153,32 +153,21 @@ class NormalizeGzip(policy.Policy):
 	'%(infodir)s/',
     ]
     invariantinclusions = [
-	'.*\.gz'
+	('.*\.(gz|bz2)', None, stat.S_IFDIR),
     ]
     def doFile(self, path):
-	# XXX read in header and check whether needed
-	# if (byte[3] & 0xC) == 0x8 or byte[8] != 2: recompress
-	util.execute('gunzip %s/%s' %(self.macros['destdir'], path));
-	util.execute('gzip -n -9 %s/%s' %(self.macros['destdir'], path[:-3]))
-
-class NormalizeBzip(policy.Policy):
-    """
-    re-bzip .bz2 files with -9  to get maximum compression.
-    Ignore man/info pages, we'll get them separately while fixing
-    up other things
-    """
-    invariantexceptions = [
-	'%(mandir)s/man.*/',
-	'%(infodir)s/',
-    ]
-    invariantinclusions = [
-	'.*\.bz2'
-    ]
-    def doFile(self, path):
-	# XXX read in header and check whether needed
-	# if byte[3] != 9: recompress
-	util.execute('bunzip2 %s/%s' %(self.macros['destdir'], path));
-	util.execute('bzip2 -9 %s/%s' %(self.macros['destdir'], path[:-3]))
+	if os.path.islink(path):
+	    return
+	d = self.macros['destdir']
+	m = magic.magic(path, d)
+	if not m:
+	    return
+	p = d+path
+	if m.name == 'gzip' and \
+	   (m.contents['compression'] != '9' or 'name' in m.contents):
+	    util.execute('gunzip %s; gzip -n -9 %s', p, p[:-3])
+	if m.name == 'bzip' and m.contents['compression'] != '9':
+	    util.execute('bunzip2 %s; bzip2 -9 %s', p, p[:-4])
 
 class NormalizeManPages(policy.Policy):
     """
@@ -275,7 +264,7 @@ class NormalizeManPages(policy.Policy):
 
 class NormalizeInfoPages(policy.Policy):
     """
-    compress info files and remove dir file
+    properly compress info files and remove dir file
     """
     def do(self):
 	dir = self.macros['infodir']+'/dir'
@@ -289,10 +278,19 @@ class NormalizeInfoPages(policy.Policy):
 		syspath = '%(destdir)s/%(infodir)s/' %self.macros + file
 		path = '%(infodir)s/' %self.macros + file
 		if not self.policyException(path):
-		    if file.endswith('.gz'):
-			util.execute('gunzip %s' %syspath)
-			syspath = syspath[:-3]
-		    util.execute('gzip -n -9 %s' %syspath)
+		    m = magic.magic(syspath)
+		    if not m:
+			# not compressed
+			util.execute('gzip -n -9 %s' %syspath)
+		    if m.name == 'gzip' and \
+		       (m.contents['compression'] != '9' or \
+		        'name' in m.contents):
+			util.execute('gunzip %s; gzip -n -9 %s',
+				     syspath, syspath[:-3])
+		    if m.name == 'bzip':
+			# should use gzip instead
+			util.execute('bunzip2 %s; gzip -n -9 %s',
+				     syspath, syspath[:-4])
 
 
 class NormalizeInitscripts(policy.Policy):
@@ -350,8 +348,7 @@ def DefaultPolicy():
 	FixupMultilibPaths(),
 	RemoveBackupFiles(),
 	Strip(),
-	NormalizeGzip(),
-	NormalizeBzip(),
+	NormalizeCompression(),
 	NormalizeManPages(),
 	NormalizeInfoPages(),
 	NormalizeInitscripts(),
