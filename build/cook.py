@@ -175,8 +175,8 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
         os.chdir(builddir + '/' + recipeObj.mainDir())
 	repos.close()
 
-        util.mkdirChain(cfg.tmppath)
-	destdir = tempfile.mkdtemp("", "srs-%s-" % recipeObj.name, cfg.tmppath)
+        util.mkdirChain(cfg.tmpdir)
+	destdir = tempfile.mkdtemp("", "srs-%s-" % recipeObj.name, cfg.tmpdir)
 	recipeObj.doBuild(builddir, destdir)
 	log.info('Processing %s', className)
         recipeObj.doDestdirProcess() # includes policy
