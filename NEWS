@@ -3,6 +3,7 @@ Changes in 0.50.7:
     /etc/xinetd.d/ files separately, and to make xinetd.d files
     be consistent, making recipe-provided changes less likely to
     conflict with local configuration changes.
+  * groups are no longer allowed to contain redirects
 
 Changes in 0.50.6:
   * conaryclient.updateChangeSet should have recursed by default

@@ -928,6 +928,11 @@ class SingleGroup:
         troves = repos.getTroves([ x[0] for x in troveList ], 
                                       withFiles = False)
         for (((name, v, f), byDefault), trove) in izip(troveList, troves):
+            if trove.isRedirect():
+                raise RecipeFileError, \
+                        "%s is a redirect, which are not allowed in groups" \
+                        % name
+
             l = self.troveVersionFlavors.get(name, [])
             if (v, f) not in l:
                 l.append((v,f, byDefault))
