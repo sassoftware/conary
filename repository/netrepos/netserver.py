@@ -29,7 +29,7 @@ from local import idtable
 from local import sqldb
 from local import versiontable
 
-SERVER_VERSION=5
+SERVER_VERSION=6
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 

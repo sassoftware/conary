@@ -32,7 +32,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=5
+CLIENT_VERSION=6
 
 class _Method(xmlrpclib._Method):
 
