@@ -11,8 +11,10 @@ The hash can be any arbitrary string of at least 5 bytes in length;
 keys are assumed to be unique.
 """
 
+import errno
 import fcntl
 import gzip
+import log
 import os
 import struct
 import util
@@ -23,12 +25,10 @@ class DataStore:
 	if (len(hash) < 5):
 	    raise KeyError, ("invalid hash %s" % hash)
 
-	dir = os.sep.join((self.top, hash[0:2], hash[2:4]))
-	name = os.sep.join((dir, hash[4:]))
-	return (dir, name)
+	return os.sep.join((self.top, hash[0:2], hash[2:4], hash[4:]))
 
     def hasFile(self, hash):
-	path = self.hashToPath(hash)[1]
+	path = self.hashToPath(hash)
 	return os.path.exists(path)
 
     def decrementCount(self, path):
@@ -39,13 +39,22 @@ class DataStore:
         countPath = path + "#"
 
 	# use the count file for locking, *even if it doesn't exist*
+        # first ensure that the directory exists
+        self.makeDir(path)
 	countFile = os.open(countPath, os.O_RDWR | os.O_CREAT)
 	fcntl.lockf(countFile, fcntl.LOCK_EX)
-
+        
 	val = os.read(countFile, 100)
 	if not val:
 	    # no count file, remove the file
-	    os.unlink(path)
+            try:
+                os.unlink(path)
+            except OSError, e:
+                if e.errno == errno.ENOENT:
+                    # the contents have already been erased
+                    log.warning("attempted to remove %s from the data store, but it was missing", path)
+                else:
+                    raise
 	    # someone may try to recreate the file in here, but it should
 	    # work fine. even if multiple processes try to, one will create
 	    # the file and the rest will block on the countFile. once
@@ -70,6 +79,7 @@ class DataStore:
 	"""
         countPath = path + "#"
 
+        self.makeDir(path)
 	if os.path.exists(path):
 	    # if the path exists, it must be correct since we move the
 	    # contents into place atomicly. all we need to do is
@@ -134,27 +144,38 @@ class DataStore:
     # add one to the reference count for a file which already exists
     # in the archive
     def addFileReference(self, hash):
-	(dir, path) = self.hashToPath(hash)
+	path = self.hashToPath(hash)
 	self.incrementCount(path)
-	return
 
+    def makeDir(self, path):
+        d = os.path.dirname(path)
+	shortPath = d[:-3]
+        if not os.path.exists(shortPath):
+            try:
+                os.mkdir(shortPath)
+            except OSError, e:
+                # ignore create race
+                if e.errno != errno.EEXIST:
+                    raise
+            
+	if not os.path.exists(d):
+            try:
+                os.mkdir(d)
+            except OSError, e:
+                # ignore create race
+                if e.errno != errno.EEXIST:
+                    raise
+                    
     # file should be a python file object seek'd to the beginning
     # this messes up the file pointer
     def addFile(self, f, hash):
-	(dir, path) = self.hashToPath(hash)
-
-	shortPath = dir[:-3]
-
-	if not os.path.exists(shortPath):
-	    os.mkdir(shortPath)
-	if not os.path.exists(dir):
-	    os.mkdir(dir)
-
+	path = self.hashToPath(hash)
+        self.makeDir(path)
 	self.incrementCount(path, fileObj = f)
 
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):
-	path = self.hashToPath(hash)[1]
+	path = self.hashToPath(hash)
 	f = open(path, "r")
 
 	# read in the size of the file
@@ -170,11 +191,12 @@ class DataStore:
 	return gzfile
 
     def removeFile(self, hash):
-	(dir, path) = self.hashToPath(hash)
+	path = self.hashToPath(hash)
 	self.decrementCount(path)
 
 	try:
-	    os.rmdir(dir)
+            # XXX remove the next level up as well
+	    os.rmdir(os.path.dirname(path))
 	except OSError:
 	    # if this fails there are probably just other files
 	    # in that directory; just ignore it
