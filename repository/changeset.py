@@ -6,6 +6,8 @@ import versions
 import os
 
 class ChangeSet:
+    def getFileContents(self, fileId):
+	raise NotImplementedError
 
     def addFile(self, fileId, oldVersion, newVersion, csInfo):
 	self.files[fileId] = (oldVersion, newVersion, csInfo)
@@ -176,7 +178,6 @@ def CreateFromFilesystem(pkgList):
 
     for (pkg, fileMap) in pkgList:
         version = pkg.getVersion()
-        packageName = pkg.getName()
 	(pkgChgSet, filesNeeded) = pkg.diff(None, None, version)
 	cs.addPackage(pkgChgSet)
 
