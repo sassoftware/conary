@@ -112,6 +112,7 @@ class FilesystemJob:
 	    tagInfo = tagSet[tag]
 
 	    if "files preremove" in tagInfo.implements:
+		l.sort()
 		cmd = [ tagInfo.file, "files", "preremove"] + \
 			    [ x[rootLen:] for x in l ]
 		tagCommands.append(cmd)
@@ -199,7 +200,8 @@ class FilesystemJob:
 		elif "files update" in tagInfo.implements:
 		    cmd = [ path, "files", "update" ] + \
 			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)]
-		    tagCommands.append(cmd)
+		    if len(cmd) > 3:
+			tagCommands.append(cmd)
 
 		tagSet[tagInfo.tag] = tagInfo
 
@@ -210,6 +212,7 @@ class FilesystemJob:
 	    if tagInfo is None: continue
 
 	    if "files update" in tagInfo.implements:
+		l.sort()
 		cmd = [ tagInfo.file, "files", "update" ] + \
 		    [ x[rootLen:] for x in l ]
 		tagCommands.append(cmd)
@@ -219,6 +222,7 @@ class FilesystemJob:
 	    tagInfo = tagSet[tag]
 
 	    if "files remove" in tagInfo.implements:
+		l.sort()
 		cmd = [ tagInfo.file, "files", "remove"] + \
 			    [ x[rootLen:] for x in l ]
 		tagCommands.append(cmd)
@@ -884,6 +888,7 @@ def runTagCommands(root, cmdList):
 
 	pid = os.fork()
 	if not pid:
+	    os.environ['PATH'] = "/sbin:/bin:/usr/sbin:/usr/bin"
 	    if root != '/':
 		os.chdir(root)
 		os.chroot(root)

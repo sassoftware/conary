@@ -174,7 +174,7 @@ class DBTroveFiles:
 		Tags JOIN DBFileTags ON Tags.tagId = DBFileTags.tagId
 		     JOIN DBTroveFiles ON DBFileTags.streamId = 
 						    DBTroveFiles.streamId
-		WHERE tag=%s
+		WHERE tag=%s ORDER BY DBTroveFiles.path
 	""", tag)
 
 	for path, in cu:
