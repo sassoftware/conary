@@ -12,6 +12,7 @@
 # full details.
 #
 
+import exceptions
 import filecontainer
 import filecontents
 import gzip
@@ -89,16 +90,22 @@ class ServerCache:
 	    try:
 		if server.checkVersion(3) != 3:
 		    raise repository.OpenError('Server version too old')
-	    except OSError, e:
-		raise repository.OpenError('Error occured opening repository '
-			    '%s: %s' % (url, e.strerror))
-	    except socket.error, e:
-		raise repository.OpenError('Error occured opening repository '
-			    '%s: %s' % (url, e[1]))
 	    except Exception, e:
+                if isinstance(e, socket.error):
+                    errmsg = e[1]
+                # includes OS and IO errors
+                elif isinstance(e, exceptions.EnvironmentError):
+                    errmsg = e.strerror
+                    # sometimes there is a socket error hiding 
+                    # inside an IOError!
+                    if isinstance(errmsg, socket.error):
+                        errmsg = errmsg[1]
+                else:
+                    errmsg = str(e)
+                if url.find('@') != -1:
+                    url = 'http://<user>:<pwd>@' + url.split('@')[1]
 		raise repository.OpenError('Error occured opening repository '
-			    '%s: %s' % (url, str(e)))
-
+			    '%s: %s' % (url, errmsg))
 	return server
 		
     def __init__(self, repMap):
