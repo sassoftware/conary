@@ -23,18 +23,16 @@ def createCacheEntry(cfg, name, location, infile):
     # cache needs to be hierarchical to avoid collisions, thus we
     # use location so that files with the same name and different
     # contents in different packages do not collide
-    #print 'Downloading', infile.url
     cachedname = createCacheName(cfg, name, location)
     f = open(cachedname, "w+")
     while 1:
-        buf = infile.read(1024 * 16)
+        buf = infile.read(1024 * 128)
         if not buf:
             break
         f.write(buf)
     f.close()
     infile.close()
     return cachedname
-
 
 def createNegativeCacheEntry(cfg, name, location):
     negativeEntry = createCacheName(name, location, 'NEGATIVE/')
@@ -86,6 +84,8 @@ def searchAll(cfg, name, location, srcdirs):
     if f: return f
 
     if name.startswith("http://") or name.startswith("ftp://"):
+	sys.stdout.write("Downloading %s..." % name)
+	sys.stdout.flush()
         retries = 0
         url = None
         while retries < 5:
@@ -101,7 +101,10 @@ def searchAll(cfg, name, location, srcdirs):
                 return None
         if url is None:
             return None
-	return createCacheEntry(cfg, name[5:], location, url)
+
+	rc = createCacheEntry(cfg, name[5:], location, url)
+	print
+	return rc
 
     return None
 
