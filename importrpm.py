@@ -99,7 +99,7 @@ def doImport(repos, cfg, rpmFile):
     changeSet = changeset.CreateFromFilesystem(packageList)
     changeSet.addPrimaryPackage(buildPkg.getName(), newVersion)
 
-    changeSet.writeToFile("FOO")
+    repos.commitChangeSet(changeSet)
 
     if mustExtract:
 	os.system("rm -rf %s" % scratch)
