@@ -356,11 +356,12 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
 	raise CookError(str(msg))
 
     grpFlavor = deps.deps.DependencySet()
-    grpFlavor.union(buildpackage._getUseDependencySet(recipeObj))
+    grpFlavor.union(buildpackage._getUseDependencySet(recipeObj)) 
 
     for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
         for (version, flavor) in versionFlavorList:
-            grpFlavor.union(flavor)
+            grpFlavor.union(flavor,
+                            mergeType=deps.deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
 
     grp = trove.Trove(fullName, versions.NewVersion(), grpFlavor, None,
                       isRedirect = redirect)

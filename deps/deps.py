@@ -30,9 +30,10 @@ FLAG_SENSE_PREFERRED    = 2
 FLAG_SENSE_PREFERNOT    = 3
 FLAG_SENSE_DISALLOWED   = 4
 
-DEP_MERGE_TYPE_NORMAL   = 1         # conflicts are reported
-DEP_MERGE_TYPE_OVERRIDE = 2         # new data wins
-DEP_MERGE_TYPE_PREFS    = 3         # like override, but !ssl beats out ~!ssl
+DEP_MERGE_TYPE_NORMAL         = 1    # conflicts are reported
+DEP_MERGE_TYPE_OVERRIDE       = 2    # new data wins
+DEP_MERGE_TYPE_PREFS          = 3    # like override, but !ssl beats out ~!ssl
+DEP_MERGE_TYPE_DROP_CONFLICTS = 4    # conflicting flags are removed 
 
 senseMap = { FLAG_SENSE_REQUIRED   : "",
              FLAG_SENSE_PREFERRED  : "~",
@@ -181,6 +182,9 @@ class Dependency(BaseDependency):
                         otherSense == FLAG_SENSE_PREFERNOT) or
                 (thisSense == FLAG_SENSE_PREFERNOT and
                         otherSense == FLAG_SENSE_PREFERRED)):
+                if mergeType == DEP_MERGE_TYPE_DROP_CONFLICTS:
+                    del allFlags[flag]
+                    continue
                 thisFlag = "%s%s" % (senseMap[thisSense], flag)
                 otherFlag = "%s%s" % (senseMap[otherSense], flag)
                 raise RuntimeError, ("Invalid flag combination in merge:"
