@@ -113,6 +113,10 @@ class VersionedFile:
 
 	return self.branchMap[branchStr]
 
+    # converts a version to one w/ a timestamp
+    def getFullVersion(self, version):
+	return self._getVersionInfo(version)[0]
+
     def _getVersionInfo(self, version):
 	s = self.db[_VERSION_INFO % (self.key, version.asString())]
 	l = s.split()
@@ -180,7 +184,7 @@ class VersionedFile:
 	#
 	# next is the item which immediately follows this one; this lets
 	# us add at the head
-	
+
 	# this is (node, newParent, newChild)
 	self._writeVersionInfo(version, curr, next)
 	if curr:
