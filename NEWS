@@ -9,6 +9,8 @@ Changes in 0.50.3:
   * Added the NonMultilibDirectories policy to prevent 32-bit troves from
     utilizing lib64 directories.
   * the NormalizeInterpreterPath policy can now handle unwriteable files
+  * fixed the network client code to return file contents properly when
+    multiple file contents are requested from the server (bz#50)
 
 Changes in 0.50.2:
   * Any %(lib)s-derived path (/%(lib)s, %(libdir)s, %(krbprefix)s/%(lib)s,

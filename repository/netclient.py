@@ -884,16 +884,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             del inF
 
             for (i, item), size in itertools.izip(itemList, sizes):
-                if tmpFile:
-                    outF = util.SeekableNestedFile(tmpFile, size, start)
-                else:
-                    outF.seek(0)
+                nestedF = util.SeekableNestedFile(outF, size, start)
 
                 totalSize -= size
                 start += size
 
-                gzfile = gzip.GzipFile(fileobj = outF)
-                gzfile.fullSize = util.gzipFileSize(outF)
+                gzfile = gzip.GzipFile(fileobj = nestedF)
+                gzfile.fullSize = util.gzipFileSize(nestedF)
 
                 contents[i] = filecontents.FromGzFile(gzfile)
 
