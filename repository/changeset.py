@@ -580,7 +580,6 @@ class ChangeSet(streams.LargeStreamSet):
 	streams.LargeStreamSet.__init__(self, data)
 	self.earlyFileContents = {}
 	self.lateFileContents = {}
-	self.primaryPackageList = []
 	self.absolute = 0
 	self.local = 0
 
