@@ -40,7 +40,7 @@ Use = UseClass({
     'gnat':		False,
     'selinux':		False,
     'pam':		True,
-    'tcl':		True,
+    'tcl':		False,
     'dietlibc':		False,
     'bootstrap':	False,
 })
