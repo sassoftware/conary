@@ -104,8 +104,8 @@ dist: $(dist_files)
 	rm -rf $(DISTDIR)
 
 clean: clean-subdirs default-clean
-	rm -f _sqlite.so
-	rm -rf sqlite
+	rm -f _sqlite.so _sqlite3.so
+	rm -rf sqlite sqlite3
 
 tag:
 	cvs tag conary-`echo $(VERSION) | sed 's/\./_/g'`
