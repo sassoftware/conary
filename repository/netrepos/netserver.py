@@ -111,7 +111,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	else:
 	    return 0
 
-	return self.repos.createBranch(newBranch, location, troveList)
+	ret = self.repos.createBranch(newBranch, location, troveList)
+        ret = [ (x[0], self.fromVersion(x[1])) for x in ret ]
+	return ret
 
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,

@@ -139,7 +139,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	newBranchStr = self.fromLabel(newBranch)
 
-	self.c[newBranch].createBranch(newBranchStr, kind, frz, troveList)
+	r = self.c[newBranch].createBranch(newBranchStr, kind, frz, troveList)
+        r = [ (x[0], self.toVersion(x[1])) for x in r ]
+        return r
 
     def open(self, *args):
         pass
