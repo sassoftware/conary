@@ -12,13 +12,250 @@ import grp
 import util
 import types
 import time
-import lookaside
 import socket
+import struct
 import log
 
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_INITSCRIPT = 1 << 1
 _FILE_FLAG_SHLIB = 1 << 2
+
+class InfoStream:
+
+    def freeze(self):
+	raise NotImplementedError
+
+    def diff(self, them):
+	raise NotImplementedError
+
+    def twm(self, diff, base):
+	"""
+	Performs a three way merge. Base is the original information,
+	diff is one of the changes, and self is the (already changed)
+	object. Returns a boolean saying whether or not the merge was
+	successful.
+	"""
+	raise NotImplementedError
+	
+class NumericStream(InfoStream):
+
+    def freeze(self):
+	return struct.pack(self.format, self.val)
+
+    def diff(self, them):
+	if self.val != them.val:
+	    return struct.pack(self.format, self.val)
+
+	return ""
+
+    def thaw(self, frz):
+	self.val = struct.unpack(self.format, frz)[0]
+
+    def twm(self, diff, base):
+	if not diff: return True
+
+	newSize = struct.unpack(self.format, diff)[0]
+	if self.val == base.val:
+	    self.val = newSize
+	    return True
+	elif base.val != newSize:
+	    return False
+
+    def __eq__(self, other):
+	return other.__class__ == self.__class__ and \
+	       self.val == other.val
+
+    def __init__(self, val):
+	if type(val) == str:
+	    self.thaw(val)
+	else:
+	    self.val = val
+
+class ShortStream(NumericStream):
+
+    format = "!H"
+
+class IntStream(NumericStream):
+
+    format = "!I"
+
+class LongLongStream(NumericStream):
+
+    format = "!Q"
+
+class StringStream(InfoStream):
+    """
+    Stores a simple string; used for the target of symbolic links
+    """
+    def freeze(self):
+	return self.s
+
+    def diff(self, them):
+	if self.s != them.s:
+	    return self.s
+
+	return ""
+
+    def thaw(self, frz):
+	self.s = frz
+
+    def twm(self, diff, base):
+	if not diff: return True
+
+	if self.s == base.s:
+	    self.s = diff
+	    return True
+	elif base.s != diff:
+	    return False
+
+    def __eq__(self, other):
+	return other.__class__ == self.__class__ and \
+	       self.s == other.s
+
+    def __init__(self, s):
+	self.s = s
+
+class TupleStream(InfoStream):
+
+    def __eq__(self, other):
+	return other.__class__ == self.__class__ and \
+	       self.items == other.items
+
+    def freeze(self):
+	rc = []
+	for (i, (itemType, size)) in enumerate(self.makeup):
+	    if type(size) == int or (i + 1 == len(self.makeup)):
+		rc.append(self.items[i].freeze())
+	    else:
+		s = self.items[i].freeze()
+		rc.append(struct.pack(size, len(s)) + s)
+
+	return "".join(rc)
+
+    def diff(self, them):
+
+	code = 0
+	rc = []
+	for (i, (itemType, size)) in enumerate(self.makeup):
+	    d = self.items[i].diff(them.items[i])
+	    if d:
+		if type(size) == int or (i + 1) == len(self.makeup):
+		    rc.append(d)
+		else:
+		    rc.append(struct.pack(size, len(d)) + d)
+		code |= (1 << i)
+		
+	return struct.pack("B", code) + "".join(rc)
+
+    def twm(self, diff, base):
+	what = struct.unpack("B", diff[0])[0]
+	idx = 1
+	worked = True
+
+	for (i, (itemType, size)) in enumerate(self.makeup):
+	    if what & (1 << i):
+		if type(size) == int:
+		    pass
+		elif (i + 1) == len(self.makeup):
+		    size = len(diff) - idx
+		else:
+		    if size == "B":
+			size = struct.unpack("B", diff[idx])[0]
+			idx += 1
+		    elif size == "!H":
+			size = struct.unpack("!H", diff[idx:idx + 2])[0]
+			idx += 2
+		    else:
+			assert(0)
+
+		d = diff[idx:size]
+
+		worked = worked and self.items[i].twm(diff[idx:idx + size], 
+						      base.items[i])
+		idx += size
+
+	return worked
+
+    def thaw(self, s):
+	self.items = []
+	idx = 0
+	for (i, (itemType, size)) in enumerate(self.makeup):
+	    if type(size) == int:
+		self.items.append(itemType(s[idx:idx + size]))
+	    elif (i + 1) == len(self.makeup):
+		self.items.append(itemType(s[idx:]))
+		size = 0
+	    else:
+		if size == "B":
+		    size = struct.unpack("B", s[idx])[0]
+		    idx += 1
+		elif size == "!H":
+		    size = struct.unpack("!H", s[idx:idx + 2])[0]
+		    idx += 2
+		else:
+		    assert(0)
+
+		self.items.append(itemType(s[idx:idx + size]))
+
+	    idx += size
+
+    def __init__(self, first, *rest):
+	if type(first) == str:
+	    self.thaw(first)
+	else:
+	    all = (first, ) + rest
+	    self.items = []
+	    for (i, (itemType, size)) in enumerate(self.makeup):
+		self.items.append(itemType(all[i]))
+
+class DeviceStream(TupleStream):
+
+    makeup = ((IntStream, 4), (IntStream, 4))
+
+class SizeSha1Stream(TupleStream):
+
+    makeup = ((LongLongStream, 8), (StringStream, 20))
+
+class InodeStream(TupleStream):
+
+    """
+    Stores basic inode information on a file: perms, owner, group.
+    """
+
+    makeup = ((ShortStream, 2), (StringStream, "B"), (StringStream, "B"))
+
+    def triplet(self, code, setbit = 0):
+	l = [ "-", "-", "-" ]
+	if code & 4:
+	    l[0] = "r"
+	    
+	if code & 2:
+	    l[1] = "w"
+
+	if setbit:
+	    if code & 1:
+		l[2] = "s"
+	    else:
+		l[2] = "S"
+	elif code & 1:
+	    l[2] = "x"
+	    
+	return l
+
+    def permsString(self):
+	perms = self.items[0].val
+
+	l = self.triplet(perms >> 6, perms & 04000) + \
+	    self.triplet(perms >> 3, perms & 02000) + \
+	    self.triplet(perms >> 0)
+	
+	if perms & 01000:
+	    if l[8] == "x":
+		l[8] = "t"
+	    else:
+		l[8] = "T"
+
+	return "-" + l
 
 class FileMode:
     def merge(self, mode):
