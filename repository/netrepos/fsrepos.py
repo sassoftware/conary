@@ -277,6 +277,8 @@ class FilesystemRepository(AbstractRepository):
 	if newVersion == None then the package is being removed
 	"""
 	cs = changeset.ChangeSetFromRepository(self)
+	for (name, v1, v2, abstract) in packageList:
+	    cs.addPrimaryPackage(name, v2)
 
 	dupFilter = {}
 

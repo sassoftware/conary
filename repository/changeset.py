@@ -61,6 +61,9 @@ class ChangeSet:
 	    for fileId in pkg.getOldFileList():
 		assert(not self.files.has_key(fileId))
 
+    def addPrimaryPackage(self, name, version):
+	self.primaryPackageList.append((name, version))
+
     def newPackage(self, csPkg):
 	old = csPkg.getOldVersion()
 	new = csPkg.getNewVersion()
@@ -136,10 +139,16 @@ class ChangeSet:
 	    pkgCs.remapPaths(map, dict)
 
     def formatToFile(self, cfg, f):
+	f.write("primary packages:\n")
+	for (pkgName, version) in self.primaryPackageList:
+	    f.write("\t%s %s\n" % (pkgName, version.asString()))
+	f.write("\n")
+
 	for pkg in self.newPackages.values():
 	    pkg.formatToFile(self, cfg, f)
 	for (pkgName, version) in self.oldPackages:
-	    print pkgName, "removed", version.asString(cfg.defaultbranch)
+	    f.write(pkgName, "removed\n", 
+		    (pkgName, version.asString(cfg.defaultbranch)))
 
     def dump(self):
 	import srscfg, sys
@@ -157,11 +166,16 @@ class ChangeSet:
 
     def headerAsString(self):
 	rc = []
+
+	rc.append("PRIMARIES %d\n" % len(self.primaryPackageList))
+	for (name, version) in self.primaryPackageList:
+	    rc.append("%s %s\n" % (name, version.asString()))
+
 	for pkg in self.getNewPackageList():
             rc.append(pkg.freeze())
 
 	for (pkgName, version) in self.getOldPackageList():
-	    rc.append("SRS PKG REMOVED %s %s\n" % (pkgName, version.freeze()))
+	    rc.append("PKG RMVD %s %s\n" % (pkgName, version.freeze()))
 	
 	for (fileId, (oldVersion, newVersion, csInfo)) in self.files.iteritems():
 	    if oldVersion:
@@ -169,7 +183,7 @@ class ChangeSet:
 	    else:
 		oldStr = "(none)"
 
-	    rc.append("SRS FILE CHANGESET %s %s %s\n%s\n" %
+	    rc.append("FILE CS %s %s %s\n%s\n" %
                       (fileId, oldStr, newVersion.freeze(), csInfo))
 	
 	return "".join(rc)
@@ -450,6 +464,7 @@ class ChangeSet:
 	self.files = {}
 	self.earlyFileContents = {}
 	self.lateFileContents = {}
+	self.primaryPackageList = []
 	self.abstract = 0
 	self.local = 0
 
@@ -507,24 +522,33 @@ class ChangeSetFromFile(ChangeSet):
 	i = 0
 	while i < len(lines):
 	    header = lines[i][:-1]
-	    i = i + 1
+	    i += 1
 
-	    if header.startswith("SRS PKG REMOVED "):
-		(pkgName, verStr) = header.split()[3:6]
+	    if header.startswith("PRIMARIES "):
+		lineCount = int(header.split()[1])
+		while lineCount:
+		    (name, version) = lines[i].split()
+		    version = versions.VersionFromString(version)
+		    self.primaryPackageList.append((name, version))
+		    i += 1
+		    lineCount -= 1
+
+	    elif header.startswith("PKG RMVD "):
+		(pkgName, verStr) = header.split()[2:5]
 		version = versions.ThawVersion(verStr)
 		self.oldPackage(pkgName, version)
-	    elif header.startswith("SRS PKG "):
+	    elif header.startswith("PKG "):
 		l = header.split()
 
-		pkgType = l[2]
-		pkgName = l[3]
+		pkgType = l[1]
+		pkgName = l[2]
 
-		if pkgType == "CHANGESET":
-		    oldVersion = versions.ThawVersion(l[4])
-		    rest = 5
-		elif pkgType == "NEW" or pkgType == "ABSTRACT":
-		    oldVersion = None
+		if pkgType == "CS":
+		    oldVersion = versions.ThawVersion(l[3])
 		    rest = 4
+		elif pkgType == "NEW" or pkgType == "ABS":
+		    oldVersion = None
+		    rest = 3
 		else:
 		    raise IOError, "invalid line in change set %s" % file
 
@@ -532,7 +556,7 @@ class ChangeSetFromFile(ChangeSet):
 		lineCount = int(l[rest + 1])
 
 		pkg = package.PackageChangeSet(pkgName, oldVersion, newVersion,
-				       abstract = (pkgType == "ABSTRACT"))
+				       abstract = (pkgType == "ABS"))
 
 		end = i + lineCount
 		while i < end:
@@ -540,8 +564,8 @@ class ChangeSetFromFile(ChangeSet):
 		    i = i + 1
 
 		self.newPackage(pkg)
-	    elif header.startswith("SRS FILE CHANGESET "):
-		(fileId, oldVerStr, newVerStr) = header.split()[3:6]
+	    elif header.startswith("FILE CS "):
+		(fileId, oldVerStr, newVerStr) = header.split()[2:5]
 		if oldVerStr == "(none)":
 		    oldVersion = None
 		else:
@@ -670,6 +694,10 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     result = update.buildLocalChanges(db, list, root = cfg.root)
     if not result: return
     cs = result[0]
+
+    for outerPackage in pkgList:
+	cs.addPrimaryPackage(outerPackage.getName(), outerPackage.getVersion())
+
     hasChanges = False
     for (changed, fsPkg) in result[1]:
 	if changed:

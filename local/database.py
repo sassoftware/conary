@@ -85,6 +85,9 @@ class AbstractDatabase(repository.AbstractRepository):
 
 	cs = changeset.ChangeSetFromAbstractChangeSet(absSet)
 
+	for (name, version) in absCs.getPrimaryPackageList():
+	    cs.addPrimaryPackage(name, version)
+
 	for newPkg in job.newPackageList():
 	    # FIXME
 	    #

@@ -358,6 +358,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 	grp.addPackage(pkg.getName(), [ pkg.getVersion() ])
 
     changeSet = changeset.CreateFromFilesystem(packageList)
+    changeSet.addPrimaryPackage(grpName, newVersion)
 
     grpDiff = grp.diff(None, abstract = 1)[0]
     changeSet.newPackage(grpDiff)

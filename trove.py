@@ -638,9 +638,9 @@ class PackageChangeSet:
 	later be parsed by parse(). The representation begins with a
 	header::
 
-         SRS PKG ABSTRACT <name> <newversion> <linecount> <diffcount>
-         SRS PKG CHANGESET <name> <oldversion> <newversion> <linecount> <diffcount>
-         SRS PKG NEW <name> <newversion> <linecount> <diffcount>
+         PKG ABS <name> <newversion> <linecount> <diffcount>
+         PKG CS <name> <oldversion> <newversion> <linecount> <diffcount>
+         PKG NEW <name> <newversion> <linecount> <diffcount>
 
 	It is followed by <linecount> lines, each of which specifies a
 	new file, old file, removed file, or a change to the set of
@@ -683,13 +683,13 @@ class PackageChangeSet:
 	mainLineCount = rc.count("\n")
 
 	if self.abstract:
-	    hdr = "SRS PKG ABSTRACT %s %s %d\n" % \
+	    hdr = "PKG ABS %s %s %d\n" % \
 		      (self.name, self.newVersion.freeze(), mainLineCount)
 	elif not self.oldVersion:
-	    hdr = "SRS PKG NEW %s %s %d\n" % \
+	    hdr = "PKG NEW %s %s %d\n" % \
 		      (self.name, self.newVersion.freeze(), mainLineCount)
 	else:
-	    hdr = "SRS PKG CHANGESET %s %s %s %d\n" % \
+	    hdr = "PKG CS %s %s %s %d\n" % \
 		      (self.name, self.oldVersion.freeze(), 
 		       self.newVersion.freeze(), mainLineCount)
 
