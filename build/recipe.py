@@ -47,8 +47,14 @@ class Recipe:
     def unpackSources(self, srcdir, builddir):
 	util.mkdirChain(builddir)
 	for file in self.tarballs:
-	    os.system("tar -C %s -xvzf %s" % (builddir, srcdir + "/" + file))
-
+            if file.endswith(".bz2"):
+                tarflags = "-jxvf"
+            elif file.endswith(".gz") or file.endswit(".tgz"):
+                tarflags = "-zxvf"
+            else:
+                raise RuntimeError, "unknown archive compression"
+	    os.system("tar -C %s %s %s" % (builddir, tarflags,
+                                           srcdir + "/" + file))
     def doBuild(self, builddir):
 	self.build.doBuild(builddir + "/" + self.mainDir())
 
