@@ -110,12 +110,12 @@ def _addDocs(obj):
         desc = flag.short
         if not desc:
             desc = '%s flag' %key
-        __doc__ += '  - C{%s}: %s%s.\n'% (key, dflt, desc)
+        __doc__ += '  - B{C{%s}}: %s%s.\n'% (key, dflt, desc)
     __doc__ += '\n\nMore details:\n\n'
     for key in keys:
         flag = obj.flags[key]
         if flag.long:
-            __doc__ += 'C{'+key+'}: ' + flag.long + '\n\n'
+            __doc__ += 'B{C{'+key+'}}: ' + flag.long + '\n\n'
 
 
 __doc__ += """
