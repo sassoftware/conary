@@ -650,16 +650,13 @@ class GroupRecipe(Recipe):
         self.addTroveList.append((name, versionStr, flavor, source))
 
     def findTroves(self):
-        # use the current use flag set as the base against
-        # which reqrest for specific trove flavors is taken...
-        baseFlavor  = use.allAsSet()
-        baseFlavorDep = baseFlavor.toDependency()
         for (name, versionStr, flavor, source) in self.addTroveList:
             try:
-                if flavor is None:
-                    desFlavor = baseFlavorDep
-                else:
-                    desFlavor = (baseFlavor + flavor).toDependency()
+                desFlavor = self.cfg.buildFlavor.copy()
+                if flavor is not None:
+                    # specified flavor overrides the default build flavor
+                    desFlavor.union(flavor.toDependency(),
+                                    deps.DEP_MERGE_TYPE_OVERRIDE)
                 pkgList = self.repos.findTrove(self.label, name, desFlavor,
                                                versionStr = versionStr)
             except repository.TroveNotFound, e:
@@ -684,7 +681,7 @@ class GroupRecipe(Recipe):
         self.addTroveList = []
 
 class FilesetRecipe(Recipe):
-
+    # XXX need to work on adding files from different flavors of troves
     def addFileFromPackage(self, pattern, pkg, recurse, remapList):
 	pathMap = {}
 	for (pathId, pkgPath, fileId, version) in pkg.iterFileList():
