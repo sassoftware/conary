@@ -72,12 +72,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	except repository.DuplicateBranch, e:
 	    return (True, ("DuplicateBranch", str(e)))
 	except Exception:
-	    import traceback, pdb,sys, string
+	    import traceback, sys, string
+            import lib.epdb
 	    excInfo = sys.exc_info()
 	    lines = traceback.format_exception(*excInfo)
 	    print string.joinfields(lines, "")
 	    if sys.stdout.isatty() and sys.stdin.isatty():
-		pdb.post_mortem(excInfo[2])
+		lib.epdb.post_mortem(excInfo[2])
 	    raise
 
     def allTroveNames(self, authToken, clientVersion):
