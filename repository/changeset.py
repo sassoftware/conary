@@ -307,7 +307,8 @@ def CreateAgainstLocal(cfg, db, pkgList):
 	dbPkg = db.getPackageVersion(pkgName, allVersions[0])
 	localPkg = db.getPackageVersion(pkgName, allVersions[0])
 
-	localVersion = versions.LocalVersion()
+	localVersion = allVersions[0].fork(versions.LocalBranch(), 
+					   sameVerRel = 1)
 	localPkg.changeVersion(localVersion)
 
 	changedFiles = {}
@@ -317,29 +318,31 @@ def CreateAgainstLocal(cfg, db, pkgList):
 	    if isinstance(dbFile, files.SourceFile):
 		shortName = pkgName.split(':')[-2]
 		srcPath = cfg.sourcepath % {'pkgname': shortName } 
-		localFile = files.FileFromFilesystem(
-					    cfg.root + srcPath + "/" + path, 
-					    fileId, "src")
+		realPath = cfg.root + srcPath + "/" + path
+		localFile = files.FileFromFilesystem(realPath, fileId, "src")
 	    else:
-		localFile = files.FileFromFilesystem(cfg.root + path, fileId)
+		realPath = cfg.root + path
+		localFile = files.FileFromFilesystem(realPath, fileId)
 
 	    localFile.flags(dbFile.flags())
 
 	    if not dbFile.same(localFile):
-		localPkg.updateFile(fileId, path, localVersion)
-		changedFiles[fileId] = (dbFile, localFile)
+		fileVersion = version.fork(versions.LocalBranch(), 
+					   sameVerRel = 1)
+		localPkg.updateFile(fileId, path, fileVersion)
+		changedFiles[fileId] = (dbFile, localFile, realPath)
 
 	(pkgChgSet, filesNeeded) = localPkg.diff(dbPkg, dbPkg.getVersion(),
 						 localPkg.getVersion())
 	cs.addPackage(pkgChgSet)
 
 	for (fileId, oldVersion, newVersion) in filesNeeded:
-	    (dbFile, localFile)  = changedFiles[fileId]
+	    (dbFile, localFile, fullPath)  = changedFiles[fileId]
 	    (filecs, hash) = fileChangeSet(fileId, dbFile, localFile)
 	    cs.addFile(fileId, oldVersion, newVersion, filecs)
 
 	    if hash:
-		cs.addFilePointer(hash, realPath)
+		cs.addFilePointer(hash, fullPath)
 
     return cs
 
