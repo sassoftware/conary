@@ -74,10 +74,7 @@ class XMLOpener(urllib.FancyURLopener):
         if errcode == 200:
             return urllib.addinfourl(fp, headers, "http:" + url)
         else:
-            if data is None:
-                return self.http_error(url, fp, errcode, errmsg, headers)
-            else:
-                return self.http_error(url, fp, errcode, errmsg, headers, data)
+	    raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
 
 
 class Transport(xmlrpclib.Transport):
