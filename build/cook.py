@@ -20,6 +20,7 @@ import repository
 import sha1helper
 import signal
 import sys
+import tempfile
 import time
 import types
 import util
@@ -95,8 +96,8 @@ class _IdGen:
 		f = repos.getFileVersion(fileId, version)
 		lcache.addFileHash(path, f.sha1())
 
-def cookObject(repos, cfg, recipeClass, changeSetFile = None, prep=True, 
-	       macros=()):
+def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None, 
+	       prep=True, macros=()):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -107,6 +108,8 @@ def cookObject(repos, cfg, recipeClass, changeSetFile = None, prep=True,
     @type cfg: srscfg.SrsConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class
+    @param buildBranch: the branch the new build will be committed to
+    @type buildBranch: versions.Version
     @param changeSetFile: if set, the changeset is stored in this file
     instead of committed to a repository
     @type changeSetFile: str
@@ -114,14 +117,13 @@ def cookObject(repos, cfg, recipeClass, changeSetFile = None, prep=True,
     and None is returned instead of a changeset.
     @type prep: boolean
     @param macros: set of macros for the build
-    @type marcros: sequence
-    @rtype: changeset.ChangeSet
+    @type macros: sequence
+    @rtype: list of strings
 
     """
 
     repos.open("r")
 
-    buildBranch = cfg.defaultbranch
     built = []
 
     log.info("Building %s", recipeClass.name)
@@ -171,7 +173,6 @@ def cookObject(repos, cfg, recipeClass, changeSetFile = None, prep=True,
 
     srcName = fullName + ":sources"
     if repos.hasPackage(srcName):
-	print "HERE"
 	pkg = repos.getLatestPackage(srcName, buildBranch)
 	ident.populate(repos, lcache, pkg)
 
@@ -278,7 +279,7 @@ def cookObject(repos, cfg, recipeClass, changeSetFile = None, prep=True,
 	grp.addPackage(pkg.getName(), [ pkg.getVersion() ])
 
     (p, fileMap) = _createPackage(repos, buildBranch, srcBldPkg, ident)
-    packageList.append((p, fileMap))
+    #packageList.append((p, fileMap))
 
     changeSet = changeset.CreateFromFilesystem(packageList)
     grpDiff = grp.diff(None, abstract = 1)[0]
@@ -298,19 +299,83 @@ def cookObject(repos, cfg, recipeClass, changeSetFile = None, prep=True,
 
 # -------------------- public below this line -------------------------
 
-def cookFile(repos, cfg, recipeFile, prep=0, macros=()):
-    if recipeFile[0] != '/':
-	recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
+def cookItem(repos, cfg, item, prep=0, macros=()):
+    """
+    Cooks an item specified on the command line. If the item is a file
+    which can be loaded as a recipe, it's cooked and a change set with
+    the result is saved. If that's not the case, the item is taken to
+    be the name of a package, and the recipe is pulled from the :sources
+    component, built, and committed to the repository.
 
-    try:
-	classList = recipe.RecipeLoader(recipeFile)
-    except recipe.RecipeFileError, msg:
-	raise CookError(str(msg))
+    @param repos: Repository to use for building
+    @type repos: repository.Repository
+    @param cfg: srs configuration
+    @type cfg: srscfg.SrsConfiguration
+    @param item: the item to cook
+    @type item: str
+    @param prep: If true, the build stops after the package is unpacked
+    and None is returned instead of a changeset.
+    @type prep: boolean
+    @param macros: set of macros for the build
+    @type macros: sequence
+    """
+
+    buildList = []
+    changeSetFile = None
+    if os.path.isfile(item):
+	recipeFile = item
+
+	if recipeFile[0] != '/':
+	    recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
+
+	try:
+	    classList = recipe.RecipeLoader(recipeFile)
+	except recipe.RecipeFileError, msg:
+	    raise CookError(str(msg))
+
+	for (className, classObject) in classList.items():
+	    buildList.append((classObject, cfg.defaultbranch,
+			      classObject.name + ".srs"))
+    else:
+	name = item
+	if name[0] != ":":
+	    name = cfg.packagenamespace + ":" + item
+	name += ":sources"
+
+	try:
+	    sourceComponent = repos.getLatestPackage(name, cfg.defaultbranch)
+	except repository.PackageMissing:
+	    raise CookError, "cannot find anything to build for %s" % item
+
+	srcFileInfo = None
+	for (fileId, path, version) in sourceComponent.fileList():
+	    if path == item + ".recipe":
+		srcFileInfo = (fileId, version)
+		break
+	
+	if not srcFileInfo:
+	    raise CookError, "%s does not contain %s.recipe" % (name, item)
+	
+	fileObj = repos.getFileVersion(fileId, version)
+	theFile = repos.pullFileContentsObject(fileObj.sha1())
+	(fd, recipeFile) = tempfile.mkstemp("", "recipe-")
+
+	os.write(fd, theFile.read())
+	os.close(fd)
+
+	try:
+	    classList = recipe.RecipeLoader(recipeFile)
+	except recipe.RecipeFileError, msg:
+	    raise CookError(str(msg))
+
+	for (className, classObject) in classList.items():
+	    buildList.append((classObject, cfg.defaultbranch, None))
 
     built = []
-    for (className, classObject) in classList.iteritems():
+    for (classObject, branch, csFile) in buildList:
 	try:
-	    built += cookObject(repos, cfg, classObject, 
+	    built += cookObject(repos, cfg, classObject, branch,
+				changeSetFile = csFile,
 				prep = prep, macros = macros)
 	except repository.RepositoryError, e:
 	    raise CookError(str(e))
@@ -332,7 +397,7 @@ def cookCommand(cfg, args, prep, macros):
     repos = repository.LocalRepository(cfg.reppath, "c")
     repos.close()
 
-    for file in args:
+    for item in args:
         # we want to fork here to isolate changes the recipe might make
         # in the environment (such as environment variables)
         signal.signal(signal.SIGTTOU, signal.SIG_IGN)
@@ -343,7 +408,7 @@ def cookCommand(cfg, args, prep, macros):
             os.tcsetpgrp(0, os.getpgrp())
 	    repos = repository.LocalRepository(cfg.reppath, "r")
             try:
-                built = cookFile(repos, cfg, file, prep=prep, macros=macros)
+                built = cookItem(repos, cfg, item, prep=prep, macros=macros)
             except CookError, msg:
 		log.error(str(msg))
                 sys.exit(1)
