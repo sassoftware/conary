@@ -128,11 +128,12 @@ class Version:
     def isBranch(self):
 	return isinstance(self.versions[-1], BranchName)
 
-    # true as long as we're either on the local branch or part of the
-    # name of the local branch
+    # true as long when this is the local branch, or is a version on
+    # the local branch
     def isLocal(self):
-	return isinstance(self.versions[-1], LocalBranch) or \
-	       isinstance(self.versions[-2], LocalBranch)
+	return isinstance(self.versions[-1], LocalBranch) or    \
+	    (len(self.versions) > 1 and 
+	     isinstance(self.versions[-2], LocalBranch))
 
     def onBranch(self, branch):
 	if self.isBranch(): return 0
