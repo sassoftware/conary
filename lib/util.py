@@ -15,6 +15,7 @@ import shutil
 import string
 import log
 import errno
+import stat
 
 # build.py and policy.py need some common definitions
 
@@ -148,7 +149,13 @@ def mkdirChain(*paths):
                     os.mkdir(p)
                 except OSError, exc:
                     if exc.errno == errno.EEXIST:
-                        pass
+                        s = os.lstat(p)
+                        if stat.S_ISDIR(s.st_mode):
+                            pass
+                        else:
+                            raise
+                    else:
+                        raise
 
 def _searchVisit(arg, dirname, names):
     file = arg[0]
