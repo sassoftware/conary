@@ -57,7 +57,7 @@ def _createPackage(repos, branch, bldPkg, ident):
 	    p.addFile(f.id(), path, bldPkg.getVersion())
 	else:
 	    oldFile = repos.getFileVersion(f.id(), fileVersion)
-	    if oldFile.same(f):
+	    if oldFile == f:
 		p.addFile(f.id(), path, fileVersion)
 	    else:
 		p.addFile(f.id(), path, bldPkg.getVersion())
