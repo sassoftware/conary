@@ -291,7 +291,7 @@ class TestSuiteFiles(policy.Policy):
 	    return
 	if extension in ('pyo', 'pyc'): # add as needed
 	    return
-	util.execute(("sed -i -e 's|%(builddir)s|%(testdir)s/%(name)s-%(version)s|g' " + path) % self.macros)
+	util.execute(("sed -i -e 's|%%(builddir)s|%%(testdir)s/%%(name)s-%%(version)s|g' '%s'" % path) % self.macros)
 
 	
 class FixDirModes(policy.Policy):
