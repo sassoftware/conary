@@ -118,11 +118,16 @@ class DBTroveFiles:
 	cu.execute("UPDATE DBTroveFiles SET isPresent=0 WHERE path=%s "
 		   "AND instanceId=%d", (path, instanceId))
 
-    def removeFileIds(self, instanceId, fileIdList):
+    def removeFileIds(self, instanceId, fileIdList, forReal = False):
         cu = self.db.cursor()
-	cu.execute("UPDATE DBTroveFiles SET isPresent=0 WHERE instanceId=%d "
-		   "AND fileId in (%s)" % (instanceId,
-			   ",".join(["'%s'" % x for x in fileIdList])))
+	if forReal:
+	    cu.execute("DELETE FROM DBTroveFiles WHERE instanceId=%d "
+		       "AND fileId in (%s)" % (instanceId,
+			       ",".join(["'%s'" % x for x in fileIdList])))
+	else:
+	    cu.execute("UPDATE DBTroveFiles SET isPresent=0 WHERE "
+		       "instanceId=%d AND fileId in (%s)" % (instanceId,
+			       ",".join(["'%s'" % x for x in fileIdList])))
 
 class DBInstanceTable:
     """
@@ -526,7 +531,8 @@ class Database:
 
 	if existingFiles:
 	    self.troveFiles.removeFileIds(troveInstanceId,
-					  existingFiles.iterkeys())
+					  existingFiles.iterkeys(),
+					  forReal = True)
 
 	for (name, version, flavor) in trove.iterTroveList():
 	    versionId = self.getVersionId(version, self.addVersionCache)
