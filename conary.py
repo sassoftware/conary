@@ -6,9 +6,9 @@
 #
 
 import branch
-from repository import changeset
 import commit
 import cook
+import cscmd
 from local import database
 import display
 from repository import fsrepos
@@ -195,7 +195,7 @@ def main():
 
 	repos = openRepository(cfg.reppath, "r")
 
-	changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
+	cscmd.ChangeSetCommand(repos, cfg, name, outFile, old, new)
     elif (otherArgs[1] == "commit"):
 	targetBranch = None
 	if argSet.has_key('target-branch'):
@@ -248,7 +248,7 @@ def main():
 	outFile = otherArgs[3]
 
 	db = database.Database(cfg.root, cfg.dbpath, "r")
-	changeset.LocalChangeSetCommand(db, cfg, name, outFile)
+	cscmd.LocalChangeSetCommand(db, cfg, name, outFile)
     elif (otherArgs[1] == "localcommit"):
 	if len(otherArgs) < 3: return usage()
 	db = database.Database(cfg.root, cfg.dbpath, "c")
