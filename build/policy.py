@@ -154,7 +154,12 @@ class Policy(action.RecipeAction):
 	return expression
 
     def compileFilters(self, expressionList, filterList):
+        seen = []
 	for expression in expressionList:
+            if expression in seen:
+                # only put each expression on the list once
+                continue
+            seen.append(expression)
 	    expression = self.filterExpression(expression)
 	    filterList.append(filter.Filter(*expression))
 

@@ -571,6 +571,10 @@ class Strip(policy.Policy):
 	('%(essentialsbindir)s/', None, stat.S_IFDIR),
 	('%(libdir)s/', None, stat.S_IFDIR),
 	('%(essentiallibdir)s/', None, stat.S_IFDIR),
+        # we need to strip these separately on a multilib system, and
+        # on non-multilib systems the multiple listing will be ignored.
+	('%(prefix)s/lib/', None, stat.S_IFDIR),
+	('/lib', None, stat.S_IFDIR),
     ]
     def doFile(self, path):
 	m = self.recipe.magic[path]
