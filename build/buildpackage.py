@@ -70,13 +70,12 @@ class PackageSpec:
 	return self.regexp.search(string)
 
 class BuildPackageGenerator:
+    """BuildPackageGenerator takes a set of PackageSpec lists
+    and provides facilities for populating new BuildPackage instances
+    with files according to the PackageSpecs.
+    """    
     def __init__(self, namePrefix, version, auto, explicit):
-	"""Storage area for (sub)package definitions; keeps
-	automatic subpackage definitions (like runtime, doc,
-	etc) and explicit subpackage definitions (higher-level
-	subpackages; each automatic subpackage applies to each
-	explicit subpackage.
-
+        """
 	@param namePrefix: the fully qualified name of the main package
 	such as ":srs.specifixinc.com:tmpwatch"
 	@param version: a versionObject specifying the version of the
@@ -119,6 +118,7 @@ class BuildPackageGenerator:
         instance given the explicit/auto spec matches
         @param path: path to add to the BuildPackage
         @type path: str
+        @rtype: None
         """
 	for explicitspec in self.explicit:
 	    if explicitspec.match(path):
@@ -141,6 +141,12 @@ class BuildPackageGenerator:
         return set
             
     def walk(self, root):
+        """traverse the directory tree specified by @C{root}, adding entries
+        to the BuildPackages as we go
+        @param root: root of path to walk
+        @type root: str
+        @rtype: None
+        """
         os.path.walk(root, _autoVisit, (root, self))
 
 def _autoVisit(arg, dir, files):
