@@ -125,8 +125,8 @@ class Configure(BuildCommand):
     # to avoid trailing \ characters on every line
     template = (
 	'cd %%(builddir)s; '
-	'%%(mkObjdir)s '
 	'%%(cdSubDir)s '
+	'%%(mkObjdir)s '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 	' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
 	' %(preConfigure)s %%(configure)s'
@@ -156,7 +156,8 @@ class Configure(BuildCommand):
 
         @keyword objDir: make an object directory before running configure.
         This is useful for applications which do not support running configure
-        from the same directory as the sources (srcdir != objdir)
+        from the same directory as the sources (srcdir != objdir).
+	It can contain macro references.
 	@keyword subDir: relative subdirectory in which to run configure
         @keyword preConfigure: Extra shell script which is inserted in front of
         the configure command.
@@ -166,8 +167,8 @@ class Configure(BuildCommand):
     def do(self, macros):
 	macros = macros.copy()
         if self.objDir:
-            macros['mkObjdir'] = 'mkdir -p %s; cd %s;' \
-	                         %(self.objDir, self.objDir)
+	    objDir = self.objDir %macros
+            macros['mkObjdir'] = 'mkdir -p %s; cd %s;' %(objDir, objDir)
 	    macros['configure'] = '../configure'
         else:
             macros['configure'] = './configure'
@@ -207,14 +208,11 @@ class Make(BuildCommand):
     # Passing environment variables to Make makes them defined if
     # there is no makefile definition; if they are defined in the
     # makefile, then it takes a command-line argument to override
-    # them.  CC we want to set unconditionally, but CFLAGS and such
-    # we want to set as hints only; to set them explicitly you need
-    # to ask for it in the recipe.
+    # them.
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
-		' LDFLAGS="%%(ldflag)s"'
+		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
                 ' %(preMake)s make %%(overrides)s'
-		' CC=%%(cc)s'
 		' %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
                 'subDir': '',
@@ -250,8 +248,8 @@ class MakeParallelSubdir(Make):
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
-		' LDFLAGS="%%(ldflag)s"'
-                ' %(preMake)s make %%(overrides)s CC=%%(cc)s'
+		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
+                ' %(preMake)s make %%(overrides)s'
 		' %%(mflags)s '
                 ' MAKE="make %%(mflags)s %%(parallelmflags)s" %(args)s')
 
@@ -264,8 +262,8 @@ class MakeInstall(Make):
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
-		' LDFLAGS="%%(ldflag)s"'
-                ' %(preMake)s make %%(overrides)s CC=%%(cc)s'
+		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
+                ' %(preMake)s make %%(overrides)s'
 		' %%(mflags)s %%(rootVarArgs)s'
 		' %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
@@ -288,8 +286,8 @@ class MakePathsInstall(Make):
     template = (
 	'cd %%(builddir)s/%(subDir)s; '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
-	' LDFLAGS="%%(ldflag)s"'
-	' %(preMake)s make %%(overrides)s CC=%%(cc)s'
+	' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
+	' %(preMake)s make %%(overrides)s'
 	' %%(mflags)s'
 	' prefix=%%(destdir)s/%%(prefix)s'
 	' exec-prefix=%%(destdir)s/%%(exec_prefix)s'
