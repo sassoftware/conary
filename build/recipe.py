@@ -216,6 +216,13 @@ def loadRecipe(file):
 ##                       'extraConfig'  : extraConfig,
 ##                       'setup'        : setup})
 
+class _recipeHelper:
+    def __init__(self, list, theclass):
+        self.list = list
+        self.theclass = theclass
+    def __call__(self, *args, **keywords):
+        self.list.append(self.theclass(*args, **keywords))
+
 class Recipe:
     buildRequires = []
     runRequires = []
@@ -377,6 +384,8 @@ class Recipe:
 	               ('destdir', root))
         if self.build is None:
             pass
+	if self.build == []:
+	    self.build = self.defaultbuild
         elif isinstance(self.build, str):
             util.execute(self.build %self.macros)
         elif isinstance(self.build, tuple) or isinstance(self.build, list):
@@ -421,13 +430,16 @@ class Recipe:
     def getPackages(self):
         return self.packages
 
-# OK, lambda apparantly can't deal with *foo, dunno why exec does not work
-#    def buildInit(self):
-#	for name in build.__dict__:
-#	    object = build.__dict__[name]
-#	    if type(object) is types.ClassType and not name.startswith('_'):
-#		print name, object
-#		exec 'def %s(self, *a): self.build.append(build.%s(*a))' %(name, name) in self.__dict__
+    def __getattr__(self, name):
+	"""
+	Allows us to dynamically suck in namespace of other modules
+	with modifications.  For now, we make the public namespace
+	of the build module accessible, and put build objects on
+	the build list automatically.
+	"""
+        if not name.startswith('_') and build.__dict__.has_key(name):
+            return _recipeHelper(self.build, build.__dict__[name])
+        return self.__dict__[name]
     
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
         assert(self.__class__ is not Recipe)
@@ -453,7 +465,8 @@ class Recipe:
 	self.srcdirs = srcdirs
 	self.theMainDir = self.name + "-" + self.version
 	# what needs to be done to get from sources to an installed tree
-	self.build = [build.Make(), build.MakeInstall()]
+	self.defaultbuild = [build.Make(), build.MakeInstall()]
+	self.build = []
 	# what needs to be done to massage the installed tree
         self.process = policy.DefaultPolicy()
 	self.macros = Macros()
@@ -468,9 +481,6 @@ class Recipe:
 	for pattern in baseSubFilters:
 	    self.subFilters.append(buildpackage.Filter(*pattern))
 	self.mainFilters = []
-
-	#self.buildInit()
-	#print self.__dict__
 
 class RecipeFileError(Exception):
     def __init__(self, msg):

@@ -26,12 +26,11 @@ only removes empty directories and regular files."""
 	self.addSource("crond-tmpwatch")
 	# self.macros['bugid'] must be set
 	self.addSource("tmpwatch.fakebug.patch")
-	self.build = (
-	    'sed -i "s/@BUGID@/%(bugid)s/" tmpwatch.fakebug.patch',
-	    'cat tmpwatch.fakebug.patch',
-	    'patch -p1 < tmpwatch.fakebug.patch',
-	    build.Make(),
-	    build.MakeInstall(rootVar = "ROOT"),
-	    build.InstallFiles("crond-tmpwatch", 
-			       "/etc/cron.daily/tmpwatch", 0755)
-	)
+
+	self.Run('sed -i "s/@BUGID@/%(bugid)s/" tmpwatch.fakebug.patch')
+	self.Run('cat tmpwatch.fakebug.patch')
+	self.Run('patch -p1 < tmpwatch.fakebug.patch')
+	self.Make()
+	self.MakeInstall(rootVar = "ROOT")
+	self.InstallFiles("crond-tmpwatch", 
+			  "/etc/cron.daily/tmpwatch", 0755)

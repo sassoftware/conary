@@ -72,6 +72,12 @@ class BuildCommand(BuildAction, util.ShellCommand):
         if self.use: util.execute(self.command %macros)
 
 
+class Run(BuildCommand):
+    """
+    Just run a command with simple macro substitution
+    """
+    template = "%(args)s"
+
 
 class Automake(BuildCommand):
     # note: no use of %(args)s -- which command would it apply to?

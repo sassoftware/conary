@@ -24,12 +24,11 @@ only removes empty directories and regular files."""
 	self.addArchiveFromRPM("http://www.gtlib.cc.gatech.edu/pub/fedora.redhat/linux/core/development/SRPMS/tmpwatch-%(version)s-%(rpmrevision)s.src.rpm", 
 	                      "tmpwatch-%(version)s.tar.gz")
 	self.addSource("crond-tmpwatch")
-	self.build = (
-	    build.Make(),
-	    build.MakeInstall(rootVar = "ROOT"),
-	    build.InstallFiles("crond-tmpwatch", 
-			       "/etc/cron.daily/tmpwatch", 0755)
-	)
+
+	self.Make()
+	self.MakeInstall(rootVar = "ROOT")
+	self.InstallFiles("crond-tmpwatch", 
+		           "/etc/cron.daily/tmpwatch", 0755)
 
     def package(self):
         self.setConfig('/etc/cron.daily/tmpwatch')
