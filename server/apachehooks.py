@@ -206,10 +206,21 @@ def handler(req):
 	else:
 	    port = 80
 
+	import lib
+	lib.epdb.st()
+
 	if os.path.basename(req.uri) == "changeset":
 	   rest = os.path.dirname(req.uri) + "/"
 	else:
 	   rest = req.uri
+
+	rest = req.uri
+	# pull out any queryargs
+	if '?' in rest:
+	    rest = req.uri.split("?")[0]
+
+	# and throw away any subdir portion
+	rest = req.uri[:-len(req.path_info)] + '/'
 
 	urlBase = "http://%s:%d" % (req.server.server_hostname, port) + rest
 
