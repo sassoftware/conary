@@ -1,3 +1,8 @@
+Changes in 0.11.0:
+  * massive rework of fileId mechanism to allow better flavor support
+  * added columns to dependency tables to allow erase dependency checks
+    (which are not yet implemented)
+
 Changes in 0.10.12:
   * changed getFileContents() to not need trove name or trove version
   * added cvcdesc and the 'describe' command to cvc to generate
