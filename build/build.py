@@ -313,7 +313,8 @@ class InstallDesktopfile(BuildCommand, _FileAction):
     The InstallDesktopfile class should be used to provide categories
     (and vendor, if necessary) for files in /usr/share/applications/
     """
-    template = ('desktop-file-install --vendor %(vendor)s'
+    template = ('desktop-file-validate %(args)s; '
+		'desktop-file-install --vendor %(vendor)s'
 		' --dir %%(destdir)s/%%(datadir)s/applications'
 		' %%(category)s'
 		' %(args)s')
