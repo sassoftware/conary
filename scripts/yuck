@@ -236,7 +236,8 @@ def main(argv):
         print displayStr % tuple(displayArgs)
         #print "%s  %-*s   %-*s   %-*s    %-*s" % (change, maxP, pkg, maxLV, lvt, maxV, vt, maxL, label.asString())
         if doUpdate:
-            updatecmd.doUpdate(cfg, [ "%s=%s[%s]" %(pkg, v.asString(), f) ])
+            updatecmd.doUpdate(cfg, [ "%s=%s[%s]" %(pkg, v.asString(), f) ],
+                               callback=updatecmd.UpdateCallback())
 
     if listMissing:
         missing = []
