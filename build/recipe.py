@@ -120,8 +120,12 @@ class Recipe:
         if not self.signatures.has_key(file):
             return
 	for signature in self.signatures[file]:
-	    # FIXME: try to fetch key by keyid if necessary
-	    # gpg --keyserver pgp.mit.edu --recv-keys 0x<keyid>
+	    # FIXME: our own keyring
+	    if os.system("gpg --no-secmem-warning --verify %s %s"
+			  %(signature, filepath)):
+		# FIXME: only do this if key missing, this is cheap for now
+		os.system("gpg --keyserver pgp.mit.edu --recv-keys 0x %s"
+		          %(keyid))
 	    if os.system("gpg --no-secmem-warning --verify %s %s"
 			  %(signature, filepath)):
 		raise RuntimeError, "GPG signature %s failed" %(signature)
