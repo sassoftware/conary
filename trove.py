@@ -132,27 +132,6 @@ class PackageSet:
     def getLatestVersion(self, branch):
 	return self.f.findLatestVersion(branch)
 
-    def changeSet(self, oldVersion, newVersion):
-	if oldVersion:
-	    old = self.getVersion(oldVersion)
-	else:
-	    old = None
-
-	new = self.getVersion(newVersion)
-	newStr = newVersion.asString()
-
-	(rc, filesNeeded) = new.diff(old)
-
-	if oldVersion:
-	    oldStr = oldVersion.asString()
-	else:
-	    oldStr = "(none)"
-
-	rc = "SRS PKG CHANGESET %s %s %s %d\n" % (self.name, oldStr, newStr, 
-						  rc.count("\n")) + rc
-	
-	return (rc, filesNeeded)
-	
     def close(self):
 	self.f.close()
 	self.f = None
