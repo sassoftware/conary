@@ -174,7 +174,7 @@ class Archive(_Source):
         if dir == '':
             # default for no dir specified is different from when a 
             # relative dir is specified, 
-            destDir = os.sep.join((self.buildDir, r.recipe.macros.mainDir))
+            destDir = os.sep.join((self.buildDir, self.recipe.macros.mainDir))
         else:
             destDir = action._expandOnePath(self.dir, self.recipe.macros, 
                                                       defaultDir=self.builddir)
