@@ -1,6 +1,11 @@
 Changes in 0.14.3:
-  * Fixed usage message to no longer print 1 at bottom, improved option handling
-    error messages
+  * Fixed usage message to no longer print 1 at bottom; improved option
+    handling error messages
+  * Fixed versions when branching from a shadow
+  * The lookaside cache now fetches from the repository into the right
+    location and with the right permissions, and fetches manually-added
+    as well as automatically-added sources.
+  * In recipes, addSource can now take dest='/path/to/file'
 
 Changes in 0.14.2:
   * contents are now stored as diffs when either the new file or the
