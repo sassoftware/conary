@@ -140,6 +140,11 @@ class Version:
 	assert(not self.isBranch())
 	return Version(self.versions[:-1], 0)
 
+    def parent(self):
+	assert(self.isVersion())
+	assert(len(self.versions) > 3)
+	return Version(self.versions[:-2], 0)
+
     def isBefore(self, other):
 	return self.timeStamp < other.timeStamp
 
