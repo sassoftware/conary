@@ -244,9 +244,8 @@ class NormalizeManPages(policy.Policy):
 		# now see if we have only a .so line to replace
 		if len(lines) == 1:
 		    line = lines[0]
-		    # remove newline if it exists
-		    if line[-1] == '\n':
-			line = line[:-1] # chop-chop
+		    # remove newline and other trailing whitespace if it exists
+		    line = line.rstrip() # chop-chop
 		    match = self.soexp.search(line)
 		    if match:
 			section = os.path.basename(os.path.dirname(path))
