@@ -492,7 +492,10 @@ class _PutFiles(_FileAction):
     keywords = { 'mode': -1 }
 
     def do(self, macros):
-	dest = macros['destdir'] + self.toFile %macros
+	reldest = self.toFile % macros
+	if reldest[0] != '/':
+	    raise TypeError, 'Inappropriately relative destination %s: destination must start with "/"' % reldest
+	dest = macros['destdir'] + reldest
 	self.destlen = len(macros['destdir'])
 	util.mkdirChain(os.path.dirname(dest))
 
