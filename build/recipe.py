@@ -571,6 +571,10 @@ class Recipe:
 	if extraMacros:
 	    self.addMacros(extraMacros)
 
+class PackageRecipe(Recipe):
+
+    pass
+
 class RecipeFileError(Exception):
     def __init__(self, msg):
         self.msg = msg
