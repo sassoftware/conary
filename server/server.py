@@ -16,6 +16,7 @@ from SimpleXMLRPCServer import SimpleXMLRPCServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 from BaseHTTPServer import HTTPServer
 from repository import fsrepos
+from repository import changeset
 import xmlshims
 import select
 
@@ -25,7 +26,8 @@ class SRSServer(SimpleXMLRPCServer):
 
 class HttpRequests(SimpleHTTPRequestHandler):
     
-    files = {}
+    outFiles = {}
+    inFiles = {}
 
     def translate_path(self, path):
         """Translate a /-separated PATH to the local filename syntax.
@@ -45,11 +47,11 @@ class HttpRequests(SimpleHTTPRequestHandler):
             if word in (os.curdir, os.pardir): continue
             path = os.path.join(path, word)
 
-	if not self.files.has_key(path):
+	if not self.outFiles.has_key(path):
 	    # XXX we need to do something smarter here
 	    return "/tmp/ "
 
-	del self.files[path]
+	del self.outFiles[path]
 	self.cleanup = path
         return path
 
@@ -58,6 +60,24 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	SimpleHTTPRequestHandler.do_GET(self)
 	if self.cleanup:
 	    os.unlink(self.cleanup)
+
+    def do_PUT(self):
+	path = "/tmp/" + os.path.basename(self.path)
+	if not self.inFiles.has_key(path):
+	    self.send_response(410, "Gone")
+	    return
+
+	out = open(path, "w")
+
+	contentLength = int(self.headers['Content-Length'])
+	while contentLength:
+	    s = self.rfile.read(contentLength)
+	    contentLength -= len(s)
+	    out.write(s)
+
+	self.send_response(200, 'OK')
+
+	self.inFiles[path] = True
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 			      fsrepos.FilesystemRepository):
@@ -119,9 +139,33 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 	(fd, path) = tempfile.mkstemp()
 	os.close(fd)
 	cs.writeToFile(path)
+	HttpRequests.outFiles[path] = True
 	fileName = os.path.basename(path)
-	HttpRequests.files[path] = True
 	return "http://localhost:8001/%s" % fileName
+
+    def prepareChangeSet(self):
+	(fd, path) = tempfile.mkstemp()
+	os.close(fd)
+	HttpRequests.inFiles[path] = False
+	fileName = os.path.basename(path)
+	return "http://localhost:8001/%s" % fileName
+
+    def commitChangeSet(self, url):
+	assert(url.startswith("http://localhost:8001/"))
+	fileName = url.split("/", 3)[3]
+	path = "/tmp/" + fileName
+	assert(HttpRequests.inFiles[path])
+
+	try:
+	    cs = changeset.ChangeSetFromFile(path)
+	finally:
+	    pass
+	    print "unlink", path
+	    #os.unlink(path)
+
+	fsrepos.FilesystemRepository.commitChangeSet(self, cs)
+
+	return True
 
 netRepos = NetworkRepositoryServer(sys.argv[2], "r")
 
