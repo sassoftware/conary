@@ -73,7 +73,7 @@ def sourceCommand(cfg, args, argSet):
 	repos = repository.LocalRepository(cfg.reppath, "r")
 
 	args[0] = repos
-	checkin.update(*args)
+	checkin.updateSrc(*args)
     elif (args[0] == "usage"):
 	usage(rc = 0)
     else:
