@@ -1309,8 +1309,10 @@ class Provides(policy.Policy):
         mode = os.lstat(fullpath)[stat.ST_MODE]
         m = self.recipe.magic[path]
         if path in pkg.providesMap and m and m.name == 'ELF' and \
-           'soname' in m.contents and not mode & 0111:
-            # libraries must be executable -- see other policy
+           'soname' in m.contents and not mode & 0111 and \
+           not path.endswith('.so'):
+            # libraries must be executable for ldconfig to work --
+            # see ExecutableLibraries policy
             del pkg.providesMap[path]
 
         for (filter, provision) in self.fileFilters:
