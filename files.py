@@ -20,6 +20,7 @@ from deps import filedeps, deps
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_INITSCRIPT = 1 << 1
 _FILE_FLAG_SHLIB = 1 << 2
+_FILE_FLAG_GCONFSCHEMA = 1<< 3
 
 _STREAM_INFO	    = 0
 _STREAM_SHORT	    = 1
@@ -504,6 +505,9 @@ class FlagsStream(IntStream):
 
     def isShLib(self, set = None):
 	return self._isFlag(_FILE_FLAG_SHLIB, set)
+
+    def isGconfSchema(self, set = None):
+	return self._isFlag(_FILE_FLAG_GCONFSCHEMA, set)
 
     def _isFlag(self, flag, set):
 	if set != None:

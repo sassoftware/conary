@@ -45,6 +45,8 @@ class FilesystemJob:
 	self.runLdconfig = self.runLdconfig | fileObj.flags.isShLib()
 	if fileObj.flags.isInitScript() and not os.path.exists(target):
 	    self.initScripts.append(target)
+	if fileObj.flags.isGconfSchema() and not os.path.exists(target):
+	    self.gconfSchema.append(target)
 
     def _remove(self, fileObj, target, msg):
 	if isinstance(fileObj, files.Directory):
@@ -157,6 +159,43 @@ class FilesystemJob:
 		    (id, status) = os.waitpid(pid, 0)
 		    if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
 			log.error("chkconfig failed")
+
+	if self.gconfSchema:
+	    p = "/usr/bin/gconftool-2"
+	    if os.getuid():
+		log.warning("gconftool skipped (insufficient permissions to chroot)")
+	    elif os.access(util.joinPaths(self.root, p), os.X_OK) != True:
+		log.error("/usr/bin/gconftool-2 is not available")
+	    else:
+		# no real need to reset this environment variable after
+		# use; it's very specific and should cause no problems
+		try:
+		    gin = util.popen("gconftool-2 --get-default-source")
+		    os.environ['GCONF_CONFIG_SOURCE'] = gin.read()[:-1] #chop
+		    gin.close()
+		except:
+		    log.error("gconftool-2 --get-default-source failed")
+		    # XXX is it right to use this default in this case?
+		    os.environ['GCONF_CONFIG_SOURCE'] = 'xml::/etc/gconf/gconf.xml.defaults'
+		for path in self.gconfSchema:
+		    name = os.path.basename(path)
+		    log.debug("running gconftool-2 --makefile-install-rule %s", name)
+		    pid = os.fork()
+		    if not pid:
+			os.chdir(self.root)
+			os.chroot(self.root)
+                        try:
+			    # 2>/dev/null
+			    null = os.open('/dev/null', os.O_WRONLY)
+			    os.dup2(null, 2)
+			    os.close(null)
+                            os.execl(p, p, "--makefile-install-rule", name)
+                        except:
+                            os._exit(1)
+		    (id, status) = os.waitpid(pid, 0)
+		    if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
+			log.error("gconftool-2 failed")
+
 
     def getErrorList(self):
 	return self.errors
@@ -508,6 +547,7 @@ class FilesystemJob:
 	self.runLdconfig = False
 	self.root = root
 	self.initScripts = []
+	self.gconfSchema = []
 	self.changeSet = changeSet
 	self.directorySet = {}
 	self.userRemovals = {}

@@ -337,6 +337,24 @@ class InitScript(policy.Policy):
 	    self._markInitScript(file)
 
 
+class GconfSchema(policy.Policy):
+    """
+    Mark gconf schema files as such so that gconftool-2 will be run.
+    By default, every file in %(sysconfdir)s/gconf/schemas/ is marked
+    as a gconf schema file.
+    """
+    invariantinclusions = [ '%(sysconfdir)s/gconf/schemas/[^/]*$' ]
+
+    def _markGconfSchema(self, filename):
+	log.debug('gconf schema: %s', filename)
+	self.recipe.autopkg.pathMap[filename].flags.isGconfSchema(True)
+
+    def doFile(self, file):
+	fullpath = ('%(destdir)s/'+file) %self.macros
+	if os.path.isfile(fullpath) and util.isregular(fullpath):
+	    self._markGconfSchema(file)
+
+
 class SharedLibrary(policy.Policy):
     """
     Mark system shared libaries as such so that ldconfig will be run.
@@ -699,6 +717,7 @@ def DefaultPolicy():
 	EtcConfig(),
 	Config(),
 	InitScript(),
+	GconfSchema(),
 	SharedLibrary(),
 	ParseManifest(),
 	MakeDevices(),
