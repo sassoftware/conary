@@ -321,7 +321,8 @@ class Trove:
 
 	    if not selfVersion == themVersion:
 		newVersion = selfVersion
-		filesNeeded.append((id, themVersion, selfVersion, themPath, selfPath))
+		filesNeeded.append((id, themVersion, selfVersion, themPath, 
+				    selfPath))
 
 	    if newPath or newVersion:
 		chgSet.changedFile(id, newPath, newVersion)

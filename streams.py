@@ -91,7 +91,7 @@ class NumericStream(InfoStream):
 	if self.val == base.val:
 	    self.val = newVal
 	    return False
-	elif base.val != newVal:
+	elif self.val != newVal:
 	    return True
 
 	return False
@@ -169,7 +169,7 @@ class StringStream(InfoStream):
 	if self.s == base.s:
 	    self.s = diff
 	    return False
-	elif base.s != diff:
+	elif self.s != diff:
 	    return True
 
 	return False

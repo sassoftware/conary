@@ -541,14 +541,23 @@ class FilesystemJob:
 		    beenRestored = True
 		elif headFile.contents == baseFile.contents:
 		    # it changed in just the filesystem, so leave that change
-		    log.debug("preserving new contents of %s" % realPath)
+		    log.debug("preserving new contents of %s" % finalPath)
+		elif headFile.flags.isConfig() and \
+					    not baseFile.flags.isConfig():
+		    # it changed in the filesystem and the repository, and
+		    # but it wasn't always a config files. this means we
+		    # don't have a patch available for it, and we just leave
+		    # the old contents in place
+		    if headFile.contents.sha1() != baseFile.contents.sha1():
+			log.warning("preserving contents of %s (now a "
+				    "config file)" % finalPath)
 		elif fsFile.flags.isConfig() or headFile.flags.isConfig():
 		    # it changed in both the filesystem and the repository; our
 		    # only hope is to generate a patch for what changed in the
 		    # repository and try and apply it here
 		    if headFileContType != changeset.ChangedFileTypes.diff:
 			self.errors.append("unexpected content type for %s" % 
-						realPath)
+						finalPath)
 			contentsOkay = 0
 		    else:
 			cur = open(realPath, "r").readlines()

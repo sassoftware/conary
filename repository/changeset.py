@@ -378,7 +378,7 @@ class ChangeSet:
 		# gets applied. We may be able to get away with just reversing
 		# a diff rather then saving the full contents
 		if (origFile.contents.sha1() != newFile.contents.sha1()) and \
-		   (origFile.flags.isConfig() or newFile.flags.isConfig()):
+		   origFile.flags.isConfig():
 		    (contType, cont) = self.getFileContents(newFile.id())
 		    if contType == ChangedFileTypes.diff:
 			f = cont.get()

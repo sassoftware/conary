@@ -655,7 +655,8 @@ class ChangeSetJob:
 		file.twm(diff, oldfile)
 		
 		if file.hasContents and oldfile.hasContents and	    \
-		   file.contents.sha1() == oldfile.contents.sha1():
+		   file.contents.sha1() == oldfile.contents.sha1() and \
+		   not (file.flags.isConfig() and not oldfile.flags.isConfig()):
 		    restoreContents = 0
 	    else:
 		# this is for new files
