@@ -51,10 +51,16 @@ class Policy(action.RecipeAction):
     exception filters that are always applied regardless of what other
     exceptions may be provided by the recipe; these exceptions being
     applied is an invariant condition of the C{doFile} method.
+
+    @cvar recursive: if True, walk entire subtrees; if False,
+    work only on contents of listed directories (C{invariantsubtrees}
+    and C{subtrees}).
+    @type recursive: boolean
     """
     invariantsubtrees = []
     invariantexceptions = []
     invariantinclusions = []
+    recursive = True
 
     keywords = {
         'use': None,
@@ -198,12 +204,18 @@ class Policy(action.RecipeAction):
     def do(self):
 	# calls doFile on all appropriate files -- can be overridden by
 	# subclasses
+	if self.subtrees:
+	    self.invariantsubtrees.extend(self.subtrees)
 	if not self.invariantsubtrees:
 	    self.invariantsubtrees.append('/')
 	for self.currentsubtree in self.invariantsubtrees:
-	    os.path.walk(
-		(self.rootdir+self.currentsubtree) %self.macros,
-		self.walkDir, None)
+	    fullpath = (self.rootdir+self.currentsubtree) %self.macros
+	    if self.recursive:
+		os.path.walk(fullpath, self.walkDir, None)
+	    else:
+		# only one level
+		if os.path.isdir(fullpath):
+		    self.walkDir(None, fullpath, os.listdir(fullpath))
 
     def walkDir(self, ignore, dirname, names):
 	# chop off bit not useful for comparison

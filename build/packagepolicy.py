@@ -30,6 +30,7 @@ import stat
 import tags
 import buildpackage
 import filter
+import destdirpolicy
 
 
 class NonBinariesInBindirs(policy.Policy):
@@ -368,25 +369,24 @@ class SharedLibrary(policy.Policy):
     Mark system shared libaries as such so that ldconfig will be run:
     C{r.SharedLibrary(subtree=I{path})} to mark a path;
     C{r.SharedLibrary(I{filterexp})} to mark a file.
+
+    C{r.SharedLibrary} does B{not} walk entire directory trees.  Every
+    directory that you want to add must be passed in using the
+    C{subtree} keyword.
     """
-    # keep invariants in sync with ExecutableLibraries
-    invariantsubtrees = [
-	'%(libdir)s/',
-	'%(essentiallibdir)s/',
-	'%(krbprefix)s/%(lib)s/',
-	'%(x11prefix)s/%(lib)s/',
-	'%(prefix)s/local/%(lib)s/',
-    ]
+    invariantsubtrees = destdirpolicy.librarydirs
     invariantinclusions = [
 	(r'..*\.so\..*', None, stat.S_IFDIR),
     ]
+    recursive = False
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.isfile(fullpath) and util.isregular(fullpath) and \
-	   self.recipe.magic[file].name == 'ELF':
-	    log.debug('shared library: %s', file)
-	    self.recipe.autopkg.pathMap[file].tags.set("shlib")
+	if os.path.isfile(fullpath) and util.isregular(fullpath):
+	    m = self.recipe.magic[file]
+	    if m.name == 'ELF' and 'soname' in m.contents:
+		log.debug('shared library: %s', file)
+		self.recipe.autopkg.pathMap[file].tags.set("shlib")
 
 
 class TagDescription(policy.Policy):
@@ -844,11 +844,21 @@ class Requires(_requirements):
 class Provides(_requirements):
     """
     Drives provides mechanism: to avoid marking a file as providing things,
-    such as for package-private plugin modules:
-    C{r.Provides(exceptions=I{filterexp})}
+    such as for package-private plugin modules installed in system library
+    directories (unfortunately happens) or example shell scripts outside
+    C{%(docdir)s}: C{r.Provides(exceptions=I{filterexp})}
     """
+    invariantexceptions = (
+	'%(docdir)s/',
+    )
     def addOne(self, path, pkg, f):
-	pkg.provides.union(f.provides.value())
+	m = self.recipe.magic[path]
+	if m and m.name == 'ELF' and 'soname' not in m.contents:
+	    return
+	fullpath = self.recipe.macros.destdir + path
+	mode = os.lstat(fullpath)[stat.ST_MODE]
+	if mode & 0111:
+	    pkg.provides.union(f.provides.value())
 
 class Flavor(_requirements):
     """

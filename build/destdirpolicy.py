@@ -37,6 +37,15 @@ import policy
 import log
 import magic
 
+# used in multiple places, should be maintained in one place
+# probably needs to migrate to some form of configuration
+librarydirs = [
+    '%(libdir)s/',
+    '%(essentiallibdir)s/',
+    '%(krbprefix)s/%(lib)s/',
+    '%(x11prefix)s/%(lib)s/',
+    '%(prefix)s/local/%(lib)s/',
+]
 
 class TestSuiteLinks(policy.Policy):
     """
@@ -414,17 +423,11 @@ class ExecutableLibraries(policy.Policy):
     executable bits set; this policy changes the mode and warns that
     it has done so.
     """
-    # keep invariants in sync with SharedLibrary
-    invariantsubtrees = [
-	'%(libdir)s/',
-	'%(essentiallibdir)s/',
-	'%(krbprefix)s/%(lib)s/',
-	'%(x11prefix)s/%(lib)s/',
-	'%(prefix)s/local/%(lib)s/',
-    ]
+    invariantsubtrees = librarydirs
     invariantinclusions = [
 	(r'..*\.so\..*', None, stat.S_IFDIR),
     ]
+    recursive = False
 
     def doFile(self, path):
 	fullpath = util.joinPaths(self.macros['destdir'], path)
