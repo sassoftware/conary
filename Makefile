@@ -26,8 +26,10 @@ python_files = __init__.py	\
 	filecontents.py		\
 	files.py		\
 	fixedglob.py		\
+	fsrepos.py		\
 	helper.py		\
 	importrpm.py		\
+	localrep.py		\
 	log.py			\
 	lookaside.py		\
 	package.py		\
@@ -42,6 +44,7 @@ python_files = __init__.py	\
 	srcctl.py		\
 	srs.py			\
 	srscfg.py		\
+	trovedb.py		\
 	update.py		\
 	updatecmd.py		\
 	util.py			\
