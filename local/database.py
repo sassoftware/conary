@@ -6,6 +6,7 @@
 from repository import changeset
 from repository import filecontents
 from repository import fsrepos
+import helper
 import log
 import localrep
 import os
@@ -178,30 +179,12 @@ class Database(SqlDbRepository):
 	for (name, version, flavor) in absSet.getPrimaryPackageList():
 	    cs.addPrimaryPackage(name, version, flavor)
 
-	oldVersion = None
-
 	for newPkg in job.newPackageList():
 	    pkgName = newPkg.getName()
-	    oldVersions = self.getPackageVersionList(pkgName)
-	    if len(oldVersions) > 1:
-		# try and pick the one which looks like a good match
-		# for the new version
-		newBranch = newPkg.getNewVersion().branch()
-		for ver in oldVersions:
-		    if ver.branch() == newBranch:
-			# make sure it's the right flavor
-			flavors = self.pkgVersionFlavors(pkgName, ver)
-			if newPkg.getFlavor() in flavors:
-			    oldVersion = ver
-			    break
 
-		if not oldVersion:
-		    raise AmbiguousOperation
-	    elif oldVersions:
-		# make sure it's the right flavor
-		flavors = self.pkgVersionFlavors(pkgName, oldVersions[0])
-		if newPkg.getFlavor() in flavors:
-		    oldVersion = oldVersions[0]
+	    oldVersion = helper.previousVersion(self, pkgName, 
+						newPkg.getVersion(),
+						newPkg.getFlavor())
 
 	    if not oldVersion:
 		# new package; the Package.diff() right after this never
@@ -591,7 +574,3 @@ class SourcePackageInstall(DatabaseError):
 
     def __str__(self):
 	return "cannot install a source package onto the local system"
-
-class AmbigiousOperation(DatabaseError):
-
-    pass

@@ -118,6 +118,44 @@ def nextVersion(repos, troveName, versionStr, troveFlavor, currentBranch,
 
     return newVersion
 
+def previousVersion(repos, troveName, troveVersion, troveFlavor):
+    """
+    Returns the trove version which will be outdated by installing
+    the specified trove. If none will be outdated, None is returned.
+    If we can't tell which version will be outdated, AmbiguousOperation
+    is raised.
+
+    @type repos: repository.Repository
+    @type troveName: str
+    @type troveVersion: versions.Version
+    @type troveFlavor: deps.deps.DependencySet
+    @rtype: versions.Version or None
+    """
+
+    oldVersion = None
+    oldVersions = repos.getPackageVersionList(troveName)
+    if len(oldVersions) > 1:
+	# try and pick the one which looks like a good match
+	# for the new version
+	newBranch = troveVersion.branch()
+	for ver in oldVersions:
+	    if ver.branch() == newBranch:
+		# make sure it's the right flavor
+		flavors = repos.pkgVersionFlavors(troveName, ver)
+		if newPkg.getFlavor() in flavors:
+		    oldVersion = ver
+		    break
+
+	if not oldVersion:
+	    raise AmbiguousOperation
+    elif oldVersions:
+	# make sure it's the right flavor
+	flavors = repos.pkgVersionFlavors(troveName, oldVersions[0])
+	if troveFlavor in flavors:
+	    oldVersion = oldVersions[0]
+
+    return oldVersion
+
 class PackageNotFound(Exception):
 
     def __str__(self):
@@ -125,3 +163,7 @@ class PackageNotFound(Exception):
 
     def __init__(self, str):
 	self.msg = str
+
+class AmbigiousOperation(Exception):
+
+    pass
