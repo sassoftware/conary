@@ -8,6 +8,6 @@ all:
 	$(PYTHON) setup.py install --install-lib=..
 
 install:
-	$(PYTHON) setup.py --root=$(DESTDIR) install
+	$(PYTHON) setup.py install --root=$(DESTDIR)
 
 include ../Make.rules
