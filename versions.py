@@ -606,7 +606,6 @@ class Version(VersionSequence):
         v = self.copy()
         p = v.branch()
 
-        assert(p.isBranch())
         if p.hasParent():
             p = p.parentNode()
             p.trailingVersion().buildCount = None
