@@ -18,6 +18,18 @@ class AbstractVersion:
     def __init__(self):
 	pass
 
+class NewVersion(AbstractVersion):
+
+    """
+    Class used as a marker for new (as yet undefined) versions.
+    """
+
+    def asString(self):
+	return "@NEW@"
+
+    def freeze(self):
+	return "@NEW@"
+
 class AbstractBranch:
 
     """
@@ -480,7 +492,12 @@ class Version:
 	self.versions = versionList
 	self.timeStamp = timeStamp
 	
-class ThawVersion(Version):
+def ThawVersion(ver):
+    if ver == "@NEW@":
+	return NewVersion()
+    return _ThawVersion(ver)
+
+class _ThawVersion(Version):
 
     """
     Provides a version object from a frozen version string.
@@ -500,7 +517,12 @@ class ThawVersion(Version):
 
 	Version.__init__(self, v, timeVal)
 
-class VersionFromString(Version):
+def VersionFromString(ver, defaultBranch = None):
+    if ver == "@NEW@":
+	return NewVersion()
+    return _VersionFromString(ver, defaultBranch)
+
+class _VersionFromString(Version):
 
     """
     Provides a version object from a string representation of a version.
@@ -519,6 +541,9 @@ class VersionFromString(Version):
 	be relative to this branch.
 	@type defaultBranch: Version
 	"""
+	if ver[0] == "@NEW@":
+	    return NewVersion()
+
 	if ver[0] != "/":
 	    ver = defaultBranch.asString() + "/" + ver
 
