@@ -28,7 +28,7 @@ import sys
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
                                   depsRecurse = True, test = False,
-                                  justDatabase = False):
+                                  justDatabase = False, recurse = True):
     client = conaryclient.ConaryClient(cfg)
 
     applyList = []
@@ -55,7 +55,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             client.updateChangeSet(applyList, depsRecurse = depsRecurse,
                                    resolveDeps = depCheck,
                                    keepExisting = keepExisting,
-                                   test = test)
+                                   test = test, recurse = recurse)
 
         if brokenByErase:
             print "Troves being removed create unresolved dependencies:"

@@ -473,6 +473,10 @@ def realMain(cfg, argv=sys.argv):
 	    kwargs['depsRecurse'] = False
 	    del argSet['no-deps-recurse']
 
+	if argSet.has_key('no-recurse'):
+            kwargs['recurse'] = False
+	    del argSet['no-recurse']
+
 	if argSet.has_key('just-db'):
 	    kwargs['justDatabase'] = True
 	    del argSet['just-db']

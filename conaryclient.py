@@ -288,7 +288,7 @@ class ConaryClient:
                 # one either
                 cs.delNewPackage(*item)
             
-    def _updateChangeSet(self, itemList, keepExisting = None, test = False):
+    def _updateChangeSet(self, itemList, keepExisting = None, recurse = True):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -370,7 +370,8 @@ class ConaryClient:
             raise NoNewTrovesError
 
         if changeSetList:
-            cs = self.repos.createChangeSet(changeSetList, withFiles = False)
+            cs = self.repos.createChangeSet(changeSetList, withFiles = False,
+                                            recurse = recurse)
             finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
 
         # we need to iterate here to handle redirects to redirects to...
@@ -386,12 +387,13 @@ class ConaryClient:
 
         return finalCs
 
-    def updateChangeSet(self, itemList, keepExisting = False,
+    def updateChangeSet(self, itemList, keepExisting = False, recurse = False,
                         depsRecurse = True, resolveDeps = True, test = False):
         if not test:
             self._prepareRoot()
 
-        finalCs = self._updateChangeSet(itemList, keepExisting = keepExisting)
+        finalCs = self._updateChangeSet(itemList, keepExisting = keepExisting,
+                                        recurse = recurse)
 
         if not resolveDeps:
             return (finalCs, [], {}, [])
@@ -434,6 +436,9 @@ class ConaryClient:
         newCs = self.repos.createChangeSet(changedTroves.keys(), 
                                            recurse = False)
         cs.merge(newCs)
+
+        import lib
+        lib.epdb.st('f')
 
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
