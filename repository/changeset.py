@@ -580,6 +580,8 @@ class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 	self.absCS = absCS
 	ChangeSet.__init__(self)
 
+class FileIdsConflictError(Exception): pass
+
 class ReadOnlyChangeSet(ChangeSet):
 
     def fileQueueCmp(a, b):
@@ -591,7 +593,7 @@ class ReadOnlyChangeSet(ChangeSet):
         if a[0] < b[0]:
             return -1
         elif a[0] == b[0]:
-            assert(0)
+            raise FileIdsConflictError
         else:
             return 1
 
@@ -793,7 +795,8 @@ class ReadOnlyChangeSet(ChangeSet):
             wrapper.addConfigs(configs)
             entry = wrapper.getNextFile()
             if entry:
-                util.tupleListBsearchInsert(self.fileQueue, entry + (wrapper,), 
+                util.tupleListBsearchInsert(self.fileQueue,
+                                            entry + (wrapper,), 
                                             self.fileQueueCmp)
 
 
