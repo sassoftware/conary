@@ -137,6 +137,16 @@ def _extractSourceFromRPM(rpm, targetfile):
 	raise IOError, 'failed to extract source %s from RPM %s' \
 	               %(filename, os.path.basename(rpm))
 
+def setupRecipeDict(d, filename):
+    exec 'from recipe import PackageRecipe' in d
+    exec 'from recipe import GroupRecipe' in d
+    exec 'from recipe import loadRecipe' in d
+    exec 'import build, os, package, sys, util' in d
+    exec 'from use import Use, Arch' in d
+    if sys.excepthook == util.excepthook:
+	exec 'sys.excepthook = util.excepthook' in d
+    exec 'filename = "%s"' %(filename) in d
+
 class RecipeLoader(types.DictionaryType):
     def __init__(self, filename):
         if filename[0] != "/":
@@ -147,14 +157,7 @@ class RecipeLoader(types.DictionaryType):
         sys.modules[self.file] = self.module
         f = open(filename)
 
-        exec 'from recipe import PackageRecipe' in self.module.__dict__
-        exec 'from recipe import GroupRecipe' in self.module.__dict__
-        exec 'from recipe import loadRecipe' in self.module.__dict__
-        exec 'import build, os, package, sys, util' in self.module.__dict__
-        exec 'from use import Use, Arch' in self.module.__dict__
-        if sys.excepthook == util.excepthook:
-            exec 'sys.excepthook = util.excepthook' in self.module.__dict__
-        exec 'filename = "%s"' %(filename) in self.module.__dict__
+	setupRecipeDict(self.module.__dict__, filename)
         try:
             code = compile(f.read(), filename, 'exec')
         except SyntaxError, err:
