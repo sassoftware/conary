@@ -25,6 +25,9 @@ class VersionRelease(AbstractVersion):
     def __str__(self):
 	return self.version + '-' + str(self.release)
 
+    def getVersion(self):
+	return self.version
+
     def compare(self, version):
 	if (type(self) == type(version) and self.version == version.version
 		and self.release == version.release):
@@ -54,8 +57,19 @@ class VersionRelease(AbstractVersion):
 
 class Version:
 
-    def incrementRelease(self):
+    def appendVersionRelease(self, version, release):
+	assert(self.isBranch)
+	self.versions.append(VersionRelease("%s-%d" % (version, release)))
+
+    def incrementVersionRelease(self):
+	assert(self.isVersion)
+	
 	self.versions[-1].incrementRelease()
+
+    def trailingVersion(self):
+	assert(self.isVersion)
+
+	return self.versions[-1].getVersion()
 
     def compareList(self, list, other):
 	if len(other.versions) != len(list): return 0
@@ -69,6 +83,9 @@ class Version:
 	return self.compareList(self.versions, other)
 
     def __str__(self):
+	return self.asString()
+
+    def asString(self):
 	s = ""
 	for version in self.versions:
 	    s = s + ("/%s" % version)
