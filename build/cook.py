@@ -39,6 +39,7 @@ import types
 import conaryclient
 from lib import util
 import versions
+from updatecmd import parseTroveSpec
 
 # -------------------- private below this line -------------------------
 def _createComponent(repos, bldPkg, newVersion, ident):
@@ -771,20 +772,33 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
     use.track(True)
 
-    if item.endswith('.recipe') and os.path.isfile(item):
+    (name, versionStr, flavor) = parseTroveSpec(item, None)
+    if flavor:
+        buildFlavor = cfg.buildFlavor.copy()
+        if deps.deps.DEP_CLASS_IS in flavor.getDepClasses():
+            # instruction set deps are overridden completely -- remove 
+            # any self.flavor instruction set info
+            del buildFlavor.members[deps.deps.DEP_CLASS_IS]
+
+        buildFlavor.union(flavor,
+                          mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
+        cfg.buildFlavor = buildFlavor
+
+    if name.endswith('.recipe') and os.path.isfile(name):
+        if versionStr:
+            raise Cookerror, \
+                ("Cannot specify version string when cooking recipe file")
 	if emerge:
 	    raise CookError, \
 		("troves must be emerged from directly from a repository")
 
-	recipeFile = item
+	recipeFile = name
 
 	if recipeFile[0] != '/':
 	    recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
 
 	pkgname = recipeFile.split('/')[-1].split('.')[0]
-        # XXX maybe we want to do this w/in RecipeLoader?  
-        # but then we would be loading a slightly different LocalFlag 
-        # set based on pkgname!
+
 	try:
 	    use.setBuildFlagsFromFlavor(pkgname, cfg.buildFlavor)
 	except AttributeError, msg:
@@ -809,13 +823,6 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                                                    recipeClass.version))
         targetLabel = versions.CookLabel()
     else:
-        parts = item.split('=', 1)
-        if len(parts) == 2:
-            name, versionStr = parts
-        else:
-            name = parts[0]
-            versionStr = None
-
 	if resume:
 	    raise CookError('Cannot use --resume argument when cooking in repository')
 

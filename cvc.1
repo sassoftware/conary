@@ -43,10 +43,10 @@ modify, and cook source components:
 .B \ \ \ \ \ [\fR\-\-resume [<linenums>|policy]] \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR\-\-use-flavor <flavor>] \e
+.B \ \ \ \ \ [\fR\-\-flavor <flavor>] \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR\-\-use-macro <macro> <string>] \e
+.B \ \ \ \ \ [\fR\-\-macro <macro> <string>] \e
 .PD 0
 .TP
 .B \ \ \ \ \ [\fR\-\-no-clean] [\fR\-\-unknown-flags] \e
@@ -89,13 +89,13 @@ Note that the \fB\-\-resume\fP option may
 be used only with local recipe files, not source components being
 built directly from a repository.
 .IP 
-The \-\-use-flavor option can be used to override the default Use flags, 
+The \-\-flavor option can be used to override the default Use flags, 
 package-specific flags, and arch Flags  for this instantiaton.   
 The format is exactly as it is shown in conary config flavors.  The 
 flavor specified here overrides flavors specified in the buildFlavor
 config option.
 .IP
-The \-\-use-macro option assigns the given string value to <macro>.  
+The \-\-macro option assigns the given string value to <macro>.  
 The value given overrides any attempt to reset the value later in the 
 recipe.  The macro and its boolean value must be enclosed in quotes.
 .IP 

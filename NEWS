@@ -9,6 +9,9 @@ Changes in 0.14.11:
     order to ensure that the resulting XML-RPC will be UTF-8 clean.
   * localoutofdate renamed to "yuck", a man page added, and the script
     and man page are now installed on the system.
+  * rename --use-macro and --use-flavor options for cook to --macro and --flavor
+  * support new cook syntax: cvc cook <trove>[flavor] to set the troves flavor
+    while cooking
 
 Changes in 0.14.10:
   * FlavorMap sense wasn't set right for base instruction set

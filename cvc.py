@@ -46,9 +46,9 @@ def usage(rc = 1):
     print "       cvc checkout [--dir <dir>] <trove>[=<version>]"
     print "       cvc commit [--message <message>]"
     print '       cvc cook [--prep] [--debug-exceptions] [--macros file] '
-    print '                [--use-flavor  "<flavor>"] '
-    print '                [--use-macro "<macro> <value>"]+ '
-    print '                <file.recipe|troveName=<version>>+'
+    print '                [--flavor  "<flavor>"] '
+    print '                [--macro "<macro> <value>"]+ '
+    print '                <file.recipe|troveName=<version>>[[flavor]]+'
     print '       cvc describe <xml file>'
     print "       cvc diff"
     print "       cvc log [<branch>]"
@@ -71,8 +71,8 @@ def usage(rc = 1):
     print "               --no-clean"
     print '               --unknown-flags'
     print '               --no-deps'
-    print '               --use-flavor  "<flavor>"'
-    print '               --use-macro "<macro> <value>"'
+    print '               --flavor  "<flavor>"'
+    print '               --macro "<macro> <value>"'
     print "               --prep"
     print "               --resume [policy|<linenums>]"
     print "               --debug-exceptions"
@@ -96,6 +96,8 @@ def realMain(cfg, argv=sys.argv):
     argDef["debug"] = NO_PARAM
     argDef["debug-exceptions"] = NO_PARAM
     argDef["dir"] = ONE_PARAM
+    argDef["flavor"] = ONE_PARAM
+    argDef["macro"] = MULT_PARAM
     argDef["macros"] = ONE_PARAM
     argDef["message"] = ONE_PARAM
     argDef["no-clean"] = NO_PARAM
@@ -108,8 +110,6 @@ def realMain(cfg, argv=sys.argv):
     argDef["sources"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
-    argDef["use-macro"] = MULT_PARAM
-    argDef["use-flavor"] = ONE_PARAM
     argDef["unknown-flags"] = NO_PARAM
     argDef["version"] = NO_PARAM
 
@@ -243,19 +243,19 @@ def sourceCommand(cfg, args, argSet):
         prep = 0
         resume = None
         buildBranch = None
-        if argSet.has_key('use-flavor'):
-            buildFlavor = deps.deps.parseFlavor(argSet['use-flavor'])
+        if argSet.has_key('flavor'):
+            buildFlavor = deps.deps.parseFlavor(argSet['flavor'])
             if deps.deps.DEP_CLASS_IS in buildFlavor.getDepClasses():
                 # instruction set deps are overridden completely -- remove 
                 # any cfg.flavor instruction set info
                 del cfg.buildFlavor.members[deps.deps.DEP_CLASS_IS]
             cfg.buildFlavor.union(buildFlavor, 
                           mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
-            del argSet['use-flavor']
-        if argSet.has_key('use-macro'):
-            for macro in argSet['use-macro']:
+            del argSet['flavor']
+        if argSet.has_key('macro'):
+            for macro in argSet['macro']:
                 cfg.configLine('macros.' + macro)
-            del argSet['use-macro']
+            del argSet['macro']
 
         if argSet.has_key('prep'):
             del argSet['prep']
