@@ -115,9 +115,6 @@ def realMain(argv=sys.argv):
     cfgMap = {}
 
     cfgMap["build-label"] = "buildLabel"
-    cfgMap["install-label"] = "installLabel"
-    cfgMap["install-branch"] = "installLabel"
-    cfgMap["repository-path"] = "repositoryPath"
     cfgMap["root"] = "root"
 
     (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
@@ -314,9 +311,9 @@ def realMain(argv=sys.argv):
 
 	if argSet: return usage()
 
-	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	    args = [repos, cfg, all, ls, ids, sha1s, leaves, fullVersions,
-		    info, tags] + otherArgs[2:]
+	if len(otherArgs) >= 2:
+	    args = [repos, cfg, otherArgs[2:], all, ls, ids, sha1s, leaves, 
+                    fullVersions, info, tags] 
 	    try:
 		queryrep.displayTroves(*args)
 	    except IOError, msg:

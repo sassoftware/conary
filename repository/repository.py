@@ -32,24 +32,29 @@ class AbstractTroveDatabase:
     def commitChangeSet(self, cs):
 	raise NotImplementedError
 
-    def findTrove(self, defaultLabel, name, flavor, versionStr = None):
+    def findTrove(self, labelPath, name, flavor, versionStr = None,
+                  acrossRepositories = False):
 	"""
 	Looks up a trove in the repository based on the name and
 	version provided. If any errors occur, PackageNotFound is
 	raised with an appropriate error message. Multiple matches
 	could be found if versionStr refers to a label.
 
-	@param defaultLabel: Label of the branch to use if no branch
+	@param labelPath: Path of labels to look on if no branch
 	is specified. If only a branch name is given (not a complete label),
-	the repository name from this label is used as the repository
+	the repository names from these labels are used as the repository
 	name for the branch name to form a complete label.
-	@type defaultLabel: versions.Label
+	@type defaultLabel: list of versions.Label
 	@param name: Trove name
 	@type name: str
 	@param flavor: only troves compatible with this flavor will be returned
 	@type flavor: deps.DependencySet
 	@param versionStr: Trove version
 	@type versionStr: str
+        @param acrossRepositories: normally findTrove only returns matches
+        from a single repository (the first one with a match). if this is
+        set it continues searching through all repositories
+        @type acrossRepositories: boolean
 	@rtype: list of trove.Trove
 	"""
 	raise NotImplementedError
@@ -325,12 +330,16 @@ class IdealRepository(AbstractTroveDatabase):
 	"""
 	raise NotImplementedError
 
-    def findTrove(self, defaultLabel, name, targetFlavor, versionStr = None):
+    def findTrove(self, labelPath, name, targetFlavor, versionStr = None,
+                  acrossRepositories = False):
 	assert(not targetFlavor or 
 	       isinstance(targetFlavor, deps.deps.DependencySet))
 
-	if not defaultLabel:
-	    # if we don't have a default label, we need a fully qualified
+        if not type(labelPath) == list:
+            labelPath = [ labelPath ]
+
+	if not labelPath:
+	    # if we don't have a label path, we need a fully qualified
 	    # version string; make sure have it
 	    if versionStr[0] != "/" and (versionStr.find("/") != -1 or
 					 versionStr.find("@") == -1):
@@ -346,19 +355,32 @@ class IdealRepository(AbstractTroveDatabase):
 		(versionStr.find("/") == -1) and versionStr.count("@")):
 	    # either the supplied version is a label or we're going to use
 	    # the default
-
-	    if versionStr:
-		if versionStr[0] == "@" and defaultLabel:
-		    versionStr = defaultLabel.getHost() + versionStr
-
+            if versionStr and versionStr[0] != "@":
 		try:
 		    label = versions.Label(versionStr)
+                    labelPath = [ label ]
 		except versions.ParseError:
 		    raise TroveMissing, "invalid version %s" % versionStr
-	    else:
-		label = defaultLabel
+            elif versionStr:
+                # just a branch name was specified
+                repositories = [ x.getHost() for x in labelPath ]
+                labelPath = []
+                for repository in repositories:
+                    labelPath.append(versions.Label("%s%s" % 
+                                                    (repository, versionStr)))
 
-	    versionDict = self.getTroveLeavesByLabel([name], label)
+            versionDict = { name : [] }
+            for label in labelPath:
+                d = self.getTroveLeavesByLabel([name], label)
+                if not d:
+                    continue
+                elif not acrossRepositories:
+                    versionDict = d
+                    break
+                else:
+                    for name, versionList in d.iteritems():
+                        versionDict[name] += versionList
+
 	    if not versionDict[name]:
 		raise PackageNotFound, "branch %s does not exist for " \
                             "package %s" % (label.asString(), name)
@@ -369,15 +391,26 @@ class IdealRepository(AbstractTroveDatabase):
 	    except versions.ParseError, e:
 		raise PackageNotFound, str(e)
 
-	    versionDict = self.getTroveVersionsByLabel([name], defaultLabel)
-	    for version in versionDict[name][:]:
-		if version.trailingVersion() != verRel:
-		    versionDict[name].remove(version)
+            versionDict = { name : [] }
+            for label in labelPath:
+                d = self.getTroveVersionsByLabel([name], label)
+                for version in d[name][:]:
+                    if version.trailingVersion() != verRel:
+                        d[name].remove(version)
 
-	    if not versionDict:
+                if not d[name]:
+                    continue
+                elif not acrossRepositories:
+                    versionDict = d
+                    break
+                else:
+                    for name, versionList in d.iteritems():
+                        versionDict[name] += versionList
+
+	    if not versionDict[name]:
 		raise PackageNotFound, \
-		    "version %s of %s is not on any branch named %s" % \
-		    (versionStr, name, str(defaultLabel))
+		    "version %s of %s is not on found on path %s" % \
+		    (versionStr, name, " ".join([x.asString() for x in labelPath]))
 	elif versionStr[0] != "/":
 	    # partial version string, we don't support this
 	    raise PackageNotFound, \

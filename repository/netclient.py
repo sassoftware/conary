@@ -197,40 +197,40 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	return d
 	
     def getTroveVersionFlavors(self, troveDict):
-	passD = {}
+	requestD = {}
 	versionDict = {}
 
-	serverName = None
-
 	for (troveName, versionList) in troveDict.iteritems():
-	    passD[troveName] = []
 	    for version in versionList:
-		s = version.branch().label().getHost()
-		if serverName is None:
-		    serverName = s
+		serverName = version.branch().label().getHost()
 
-		# XXX 
-		assert(serverName == s)
+                if not requestD.has_key(serverName):
+                    requestD[serverName] = {}
+                if not requestD[serverName].has_key(troveName):
+                    requestD[serverName][troveName] = []
 
 		versionStr = self.fromVersion(version)
 		versionDict[versionStr] = version
-		passD[troveName].append(versionStr)
+		requestD[serverName][troveName].append(versionStr)
 
-	if not serverName:
+	if not requestD:
 	    newD = {}
-	    for troveName in passD:
+	    for troveName in troveDict:
 		newD[troveName] = {}
 
 	    return newD
 
-	result = self.c[serverName].getTroveVersionFlavors(passD)
+        newD = {}
+        for serverName, passD in requestD.iteritems():
+            result = self.c[serverName].getTroveVersionFlavors(passD)
 
-	newD = {}
-	for troveName, troveVersions in result.iteritems():
-	    newD[troveName] = {}
-	    for versionStr, flavors in troveVersions.iteritems():
-		version = versionDict[versionStr]
-		newD[troveName][version] = [ self.toFlavor(x) for x in flavors ]
+            for troveName, troveVersions in result.iteritems():
+                if not newD.has_key(troveName):
+                    newD[troveName] = {}
+                for versionStr, flavors in troveVersions.iteritems():
+                    version = versionDict[versionStr]
+                    newD[troveName][version] = \
+                                [ self.toFlavor(x) for x in flavors ]
 
 	return newD
 
@@ -279,48 +279,57 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
 		      target = None):
-	l = []
-	serverName = None
+        jobList = {}
 	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
+            serverName = new.branch().label().getHost()
+            if not jobList.has_key(serverName):
+                jobList[serverName] = []
+
 	    if old:
-		l.append((name, 
+		jobList[serverName].append((name, 
 			  (self.fromVersion(old), self.fromFlavor(oldFlavor)), 
 			  (self.fromVersion(new), self.fromFlavor(newFlavor)),
 			  absolute))
-		if serverName is None:
-		    serverName = old.branch().label().getHost()
-		assert(serverName == old.branch().label().getHost())
 	    else:
-		l.append((name, 
+		jobList[serverName].append((name, 
 			  (0, 0),
 			  (self.fromVersion(new), self.fromFlavor(newFlavor)),
 			  absolute))
 
-	    if serverName is None:
-		serverName = new.branch().label().getHost()
-	    assert(serverName == new.branch().label().getHost())
+        cs = None
+        if len(jobList) > 1:
+            origTarget = target
+            target = None
 
-	url = self.c[serverName].getChangeSet(l, recurse, withFiles)
+        for serverName, job in jobList.iteritems():
+            url = self.c[serverName].getChangeSet(job, recurse, withFiles)
 
-	# XXX we shouldn't need to copy this locally most of the time
-	inF = urllib.urlopen(url)
-	if not target:
-	    (outFd, name) = tempfile.mkstemp()
-	    outF = os.fdopen(outFd, "w")
-	else:
-	    outF = open(target, "w")
+            inF = urllib.urlopen(url)
+            if not target:
+                (outFd, name) = tempfile.mkstemp()
+                outF = os.fdopen(outFd, "w")
+            else:
+                outF = open(target, "w")
 
-	try:
-	    util.copyfileobj(inF, outF)
-            outF.close()
-	    if not target:
-		cs = repository.changeset.ChangeSetFromFile(name)
-	    else:
-		cs = None
-	finally:
-	    inF.close()
-	    if not target:
-		os.unlink(name)
+            try:
+                util.copyfileobj(inF, outF)
+                outF.close()
+                if not target:
+                    newCs = repository.changeset.ChangeSetFromFile(name)
+                    if not cs:
+                        cs = newCs
+                    else:
+                        cs.merge(newCs)
+                else:
+                    cs = None
+            finally:
+                inF.close()
+                if not target:
+                    os.unlink(name)
+
+        if len(jobList) > 1 and origTarget:
+            cs.writeToFile(origTarget)
+            cs = None
 
 	return cs
 

@@ -26,38 +26,88 @@ _troveFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
-def displayTroves(repos, cfg, all = False, ls = False, ids = False,
-                  sha1s = False, leaves = False, fullVersions = False,
-		  info = False, tags = False, trove = "", versionStr = None):
-    if trove:
-	troves = [ trove ]
+def displayTroves(repos, cfg, troveList = [], all = False, ls = False, 
+                  ids = False, sha1s = False, leaves = False, 
+                  fullVersions = False, info = False, tags = False):
+    hasVersions = False
+
+    if troveList:
+        troves = []
+        for item in troveList:
+            i = item.find("=") 
+            if i == -1:
+                troves.append((item, None))
+            else:
+                hasVersions = True
+                l = item.split("=")
+                if len(l) > 2:
+                    log.error("bad version string: %s", "=".join(l[1:]))
+                    return
+                    
+                troves.append(tuple(l))
     else:
 	# this returns a sorted list
-	troves = [ x for x in 
-		    repos.iterAllTroveNames(cfg.installLabel.getHost()) ]
+        troves = []
+        hosts = {}
+        for label in cfg.installLabelPath:
+            host = label.getHost()
+            if hosts.has_key(host):
+                continue
+            hosts[host] = True
 
-    if versionStr or ls or ids or sha1s or info or tags:
+            troves += [ (x, None) for x in repos.iterAllTroveNames(host) ]
+
+    if hasVersions or ls or ids or sha1s or info or tags:
 	if all:
 	    log.error("--all cannot be used with queries which display file "
 		      "lists")
 	    return
-	for troveName in troves:
+	for troveName, versionStr in troves:
 	    _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 			      info, tags, fullVersions)
 	    continue
     else:
-	if all:
-	    versions = repos.getTroveVersionList(cfg.installLabel.getHost(),
-						 troves)
-	elif leaves:
-            versions = repos.getAllTroveLeafs(cfg.installLabel.getHost(), 
-					      troves)
+	if all or leaves:
+            repositories = {}
+            allHosts = [ x.getHost() for x in cfg.installLabelPath ]
+            for (name, versionStr) in troves:
+                if versionStr and versionStr[0] != '@':
+                    hostList = versions.Label(versionStr).getHost()
+                else:
+                    hostList = allHosts
+                    
+                for host in hostList:
+                    if repositories.has_key(host):
+                        repositories[host].append(name)
+                    else:
+                        repositories[host] = [ name ]
+
+            if all:
+                fn = repos.getTroveVersionList
+            else:
+                fn = repos.getAllTroveLeafs
+
+            versions = {}
+            for host, names in repositories.iteritems():
+                d = fn(host, names)
+                for (name, verList) in d.iteritems():
+                    if not versions.has_key(name):
+                        versions[name] = verList
+                    else:
+                        versions[name] += (verList)
 	else:
-            versions = repos.getTroveLeavesByLabel(troves, cfg.installLabel)
+            versions = {}
+            for label in cfg.installLabelPath:
+                d = repos.getTroveLeavesByLabel([ x[0] for x in troves], label)
+                for (name, verList) in d.iteritems():
+                    if not versions.has_key(name):
+                        versions[name] = verList
+                    else:
+                        versions[name] += (verList)
 
 	flavors = repos.getTroveVersionFlavors(versions)
 
-	for troveName in troves:
+	for troveName, versionStr in troves:
             if not flavors[troveName]:
 		if all or leaves:
 		    log.error('No versions for "%s" were found in the '
@@ -114,8 +164,9 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		      info, tags, fullVersions):
     try:
-	troveList = repos.findTrove(cfg.installLabel, troveName, 
-				    cfg.flavor, versionStr)
+	troveList = repos.findTrove(cfg.installLabelPath, troveName, 
+				    cfg.flavor, versionStr,
+                                    acrossRepositories = True)
     except repository.PackageNotFound, e:
 	log.error(str(e))
 	return
