@@ -62,7 +62,6 @@ class ConcurrencyTests(unittest.TestCase):
         except sqlite.InternalError, e:
             assert(str(e) == "database is locked")
         t2 = time.time()
-        print waiter.count
         assert(waiter.count == 6)
         db2.commit()
         cu1.stmt.step()
