@@ -219,7 +219,8 @@ class ConfigFile:
 
     def initializeFlavors(self):
         import flavorcfg
-        self.flavorConfig = flavorcfg.FlavorConfig(self.useDir, self.archDir)
+        self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
+                                                   self.archDirs)
 
         self.flavor = self.flavorConfig.toDependency(override=self.flavor)
 
@@ -256,8 +257,12 @@ class ConaryConfiguration(ConfigFile):
 	'root'			: '/',
 	'sourceSearchDir'	: '.',
 	'tmpDir'		: '/var/tmp/',
-        'useDir'                : '/etc/conary/use',
-        'archDir'               : '/etc/conary/arch',
+        'useDirs'                : [ STRINGPATH, ('/etc/conary/use', 
+                                                  '/etc/conary/distro/use',
+                                                  '~/.conary/use')],
+        'archDirs'               : [ STRINGPATH, ('/etc/conary/arch', 
+                                                  '/etc/conary/distro/arch',
+                                                  '~/.conary/arch')],
     }
 
     def __init__(self, readConfigFiles=True):

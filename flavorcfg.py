@@ -36,15 +36,8 @@ class SubArchConfig(ConfigFile):
 	'unameArch'	        : [ STRING, None ],
 	'targetArch'	        : [ STRING, None ],
 	'optFlags'	        : [ STRING, None ],
+	'macro'	                : [ STRINGDICT, {} ],
     } 
-
-    def configLine(self, line, file = "override", lineno = '<No line>'):
-        if line.startswith('march '):
-            log.warning('deprecated architecture flag march found -- '
-                        ' upgrade distro-release')
-        else:
-            ConfigFile.configLine(self, line, file, lineno)
-
 
 class ArchConfig(ConfigFile):
 
@@ -69,9 +62,6 @@ class ArchConfig(ConfigFile):
             return
         if self.section:
             self.sections[self.section].configLine(line, file, lineno)
-        elif line.startswith('march '):
-            log.warning('deprecated architecture flag march found -- '
-                        ' upgrade distro-release')
         else:
             ConfigFile.configLine(self, line, file, lineno)
 
@@ -96,19 +86,19 @@ class ArchConfig(ConfigFile):
             self.sections[sectionName] = SubArchConfig()
         self.section = sectionName
 
-    def __init__(self, name, path):
+    def __init__(self, name):
 	ConfigFile.__init__(self)
         self.section = ''
         self.sections = {}
-        filePath = os.path.join(path, name) 
-        self.read(filePath)
         self.name = name
+
+    def read(self, path):
+        ConfigFile.read(self, path)
 	if sorted(self.archProp.iterkeys()) != sorted(self.requiredArchProps):
 	    raise RuntimeError, \
 		    ('Arch %s must specify arch properties %s using the'
 		     ' archProp directive' % (self.name,
 		     ', '.join(sorted(self.requiredArchProps))))
-
 
     def addArchFlags(self):
         if not self.unameArch:
@@ -150,21 +140,22 @@ class UseFlagConfig(ConfigFile):
 	'longDoc'	        : [ STRING, '' ],
     }
 
-    def __init__(self, name, path):
+    def __init__(self, name):
 	ConfigFile.__init__(self)
-        filePath = os.path.join(path, name)
-	# Hack to allow old-style config files to be parsed
-        contents = open(filePath).read().strip()
-        if contents.strip() in ('disallowed', 'preferred', 'prefernot', 
+        self.name = name
+
+    def read(self, path):
+        # Hack to allow old-style config files to be parsed
+        contents = open(path).read().strip()
+        if contents.strip() in ('disallowed', 'preferred', 'prefernot',
                                                            'required'):
-            self.configLine('sense %s' % contents, filePath, 1)
+            self.configLine('sense %s' % contents, path, 1)
         else:
-            self.read(filePath)
-        if self.name is None:
-            self.name = name
-        assert(self.name == name)
+            ConfigFile.read(self, path)
 
     def setValue(self, key, val, type=None, filePath="override"):
+        if key == 'name':
+            assert(val == self.name)
 	if type == None:
 	    type = self.types[key]
         if type == FLAGSENSE:
@@ -210,18 +201,34 @@ class FlavorConfig:
     use and arch paths
     """
 
-    def __init__(self, useDir, archDir):
+    def __init__(self, useDirs, archDirs):
         self.flags = {}
         self.arches = {}
-        if useDir and os.path.exists(useDir):
+
+        if useDirs and not isinstance(useDirs, (list, tuple)):
+            useDirs = [useDirs]
+        if archDirs and not isinstance(archDirs, (list, tuple)):
+            archDirs = [archDirs]
+
+        for useDir in useDirs:
+            useDir = os.path.expanduser(useDir)
+            if not useDir or not os.path.exists(useDir):
+                continue
             for flag in os.listdir(useDir):
-		if os.path.isfile(os.path.join(useDir, flag)):
-		    self.flags[flag] = UseFlagConfig(flag, useDir)
-        if archDir and os.path.exists(archDir):
-            for arch in os.listdir(archDir):
-		if os.path.isfile(os.path.join(archDir, arch)) and \
-                   not arch.startswith('.'):
-		    self.arches[arch] = ArchConfig(arch, archDir)
+                if (os.path.isfile(os.path.join(useDir, flag)) 
+                    and not flag.startswith('.')):
+                    if flag not in self.flags:
+                        self.flags[flag] = UseFlagConfig(flag)
+                    self.flags[flag].read(os.path.join(useDir, flag))
+        for archDir in archDirs:
+            useDir = os.path.expanduser(useDir)
+            if archDir and os.path.exists(archDir):
+                for arch in os.listdir(archDir):
+                    if (os.path.isfile(os.path.join(archDir, arch)) and 
+                       not arch.startswith('.')):
+                       if arch not in self.arches:
+                            self.arches[arch] = ArchConfig(arch)
+                       self.arches[arch].read(os.path.join(archDir, arch))
 
     def toDependency(self, override=None):
         useFlags = deps.deps.DependencySet()
