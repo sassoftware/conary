@@ -13,6 +13,7 @@ import stat
 import pwd
 import grp
 import util
+import types
 
 class FileMode:
 
@@ -37,9 +38,9 @@ class FileMode:
     # new can be an integer file mode or a string (ls style) listing
     def perms(self, new = None):
 	if (new != None):
-	    if type(new) == type(1):
+	    if type(new) == types.IntType:
 		self.thePerms = new
-	    elif type(new) == type("a"):
+	    elif type(new) == types.StringType:
 		a = self.parseTriplet(new[1:4], 6, 04000)
 		b = self.parseTriplet(new[4:7], 3, 02000)
 		c = self.parseTriplet(new[7:10], 0, 01000)

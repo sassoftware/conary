@@ -4,6 +4,7 @@
 #
 import os
 import string
+import types
 
 class SrsConfiguration:
 
@@ -22,7 +23,7 @@ class SrsConfiguration:
 	keys = self.__dict__.keys()
 	keys.sort()
 	for item in keys:
-	    if type(self.__dict__[item]) == type ("a"):
+	    if type(self.__dict__[item]) == types.StringType:
 		print "%-15s %s" % (item, self.__dict__[item])
 
     def __init__(self):
