@@ -60,25 +60,29 @@ class taghandlerBuilder:
         self.userinfo = {}
         self.groupinfo = {}
         self.scripts_exist = False
-        self.sccripts = {}
+        self.scripts = {}
+
+        rpmHeader = recipe.rpmHeader
 
         self.preScript = None
-        if rpmhelper.PREIN in recipe.rpmHeader:
+        if rpmhelper.PREIN in rpmHeader:
             # we will ignore the contents of preScript, except to try to
             # fetch user/group information from it
             self.preScript = self.removeUnConary(
-                recipe.rpmHeader[rpmhelper.PREIN])
+                rpmHeader[rpmhelper.PREIN])
 
     def buildScripts(self):
 
+        rpmHeader = self.recipe.rpmHeader
+
         triggers = None
-        if rpmhelper.TRIGGERSCRIPTS in recipe.rpmHeader:
+        if rpmhelper.TRIGGERSCRIPTS in rpmHeader:
             triggers = True
 
         postScript = None
-        if rpmhelper.POSTIN in recipe.rpmHeader:
-            if rpmhelper.POSTINPROG in recipe.rpmHeader:
-                postInProg = recipe.rpmHeader[rpmhelper.POSTINPROG]
+        if rpmhelper.POSTIN in rpmHeader:
+            if rpmhelper.POSTINPROG in rpmHeader:
+                postInProg = rpmHeader[rpmhelper.POSTINPROG]
                 if 'ldconfig' in postInProg:
                     # ldconfig happens automatically
                     pass
@@ -86,7 +90,7 @@ class taghandlerBuilder:
                     print 'unhandled POSTIN interpreter %s' % postInProg
             else:
                 postScript = self.removeUnConary(
-                    recipe.rpmHeader[rpmhelper.POSTIN])
+                    rpmHeader[rpmhelper.POSTIN])
                 if 'RPM_INSTALL_PREFIX' in postScript:
                     self.warnRelocation('post')
                     postScript = None
@@ -94,8 +98,8 @@ class taghandlerBuilder:
                     self.warnLdSoConf('post')
 
         preUn = None
-        if rpmhelper.PREUN in recipe.rpmHeader:
-            preUn = self.removeUnConary(recipe.rpmHeader[rpmhelper.PREUN])
+        if rpmhelper.PREUN in rpmHeader:
+            preUn = self.removeUnConary(rpmHeader[rpmhelper.PREUN])
             if 'RPM_INSTALL_PREFIX' in preUn:
                 self.warnRelocation('preun')
                 preUn = None
@@ -104,10 +108,10 @@ class taghandlerBuilder:
                         
 
         postUn = None
-        if rpmhelper.POSTUN in recipe.rpmHeader:
-            postUn = self.removeUnConary(recipe.rpmHeader[rpmhelper.POSTUN])
-            if rpmhelper.POSTUNPROG in recipe.rpmHeader:
-                postInProg = recipe.rpmHeader[rpmhelper.POSTUNPROG]
+        if rpmhelper.POSTUN in rpmHeader:
+            postUn = self.removeUnConary(rpmHeader[rpmhelper.POSTUN])
+            if rpmhelper.POSTUNPROG in rpmHeader:
+                postInProg = rpmHeader[rpmhelper.POSTUNPROG]
                 if 'ldconfig' in postUnProg:
                     # ldconfig happens automatically
                     pass
@@ -369,8 +373,8 @@ class recipeBuilder:
         self.rpmdata = {}
         self.rpmdata['packagename'] = self.packagename
         self.rpmdata['version'] = '_'.join((
-            self.rpmHeader(rpmhelper.VERSION),
-            self.rpmHeader(rpmhelper.RELEASE)))
+            self.rpmHeader[rpmhelper.VERSION],
+            self.rpmHeader[rpmhelper.RELEASE]))
         self.rpmdata['rpmname'] = os.path.basename(rpmname)
 
         self.recipe = [
