@@ -9,6 +9,7 @@ Changes in 0.12.2
   * update has flavor affinity now
   * flavors can now be specified on the command line for update
   * unspecified flavor flags got scores of zero, which was wrong
+  * added python code for flavor scoring (useful for the client)
 
 Changes in 0.12.1
   * repquery and query always showed dependency information

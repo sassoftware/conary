@@ -121,18 +121,15 @@ class Dependency(BaseDependency):
         the "system" and the other is the flavor of the trove. In terms
         of dependencies, this set "provides" and the other "requires".
 
-        False is returned if there is no match at all.
+        False is returned if the two dependencies conflict.
         """
 	if self.name != required.name: 
             return False
 
         score = 0
 	for (requiredFlag, requiredSense) in required.flags.iteritems():
-            if not self.flags.has_key(requiredFlag):
-                continue
-
-            thisSense = self.flags[requiredFlag]
-            thisScore = flavorScores.get((thisSense, requiredSense), 0)
+            thisSense = self.flags.get(requiredFlag, FLAG_SENSE_UNSPECIFIED)
+            thisScore = flavorScores[(thisSense, requiredSense)]
             if thisScore is None:
                 return False
             score += thisScore
@@ -146,23 +143,7 @@ class Dependency(BaseDependency):
 
 	@type required: Dependency
 	"""
-        #return self.score(required) is not False
-	if self.name != required.name: 
-	    return False
-	for (requiredFlag, requiredSense) in required.flags.iteritems():
-            # it is fine to not match a flag that is
-            # simply a preference
-            if requiredSense == FLAG_SENSE_PREFERRED or \
-               requiredSense == FLAG_SENSE_PREFERNOT:
-                continue
-
-            present = self.flags.has_key(requiredFlag)
-	    if requiredSense == FLAG_SENSE_REQUIRED and not present:
-		return False
-            elif requiredSense == FLAG_SENSE_DISALLOWED and present:
-                return False
-
-	return True
+        return self.score(required) is not False
 
     def mergeFlags(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
 	"""
@@ -258,16 +239,25 @@ class DependencyClass:
 	self.members[grpDep.name] = grpDep
 	assert(not self.justOne or len(self.members) == 1)
 
-    def satisfies(self, requirements):
+    def score(self, requirements):
 	if self.tag != requirements.tag:
 	    return False
-
+        
+        score = 0
 	for requiredDep in requirements.members.itervalues():
-	    if not self.members.has_key(requiredDep.name) or \
-	       not self.members[requiredDep.name].satisfies(requiredDep):
-		return False
+	    if not self.members.has_key(requiredDep.name):
+                return False
 
-	return True
+            thisScore = self.members[requiredDep.name].score(requiredDep)
+            if thisScore is False:
+                return False
+
+            score += thisScore
+
+        return thisScore
+
+    def satisfies(self, requirements):
+        return self.score(requirements) is not False
 
     def union(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
 	if other is None: return
@@ -420,17 +410,25 @@ class DependencySet:
     def copy(self):
         return copy.deepcopy(self)
 
-    def satisfies(self, other):
+    def score(self,other):
+        score = 0
 	for tag in other.members:
             # XXX might not be the right semantic for exactMatch
             if not other.members[tag].exactMatch:
                 continue
 	    if not self.members.has_key(tag): 
 		return False
-	    if not self.members[tag].satisfies(other.members[tag]): 
+
+	    thisScore = self.members[tag].score(other.members[tag])
+            if thisScore is False:
 		return False
 
-	return True
+            score += thisScore
+
+        return score
+
+    def satisfies(self, other):
+        return self.score(other) is not False
 
     def getDepClasses(self):
         return self.members
@@ -603,6 +601,7 @@ exp = exp.replace('IDENT', ident)
 
 flavorRegexp = re.compile(exp)
 
+# None means disallowed match
 flavorScores = {
       (FLAG_SENSE_UNSPECIFIED, FLAG_SENSE_REQUIRED ) : None,
       (FLAG_SENSE_UNSPECIFIED, FLAG_SENSE_PREFERRED) :   -1,
