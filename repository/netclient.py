@@ -551,6 +551,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             cs = internalCs
             internalCs = None
 
+        if cs and internalCs:
+            cs.merge(internalCs)
+
         if target and cs:
             if not firstPath:
                 newCs = repository.changeset.ChangeSetFromFile(target)
@@ -558,9 +561,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 # doing the merge this way works even if cs is from internalCs
                 newCs.merge(cs)
                 cs = newCs
-
-            if internalCs:
-                cs.merge(internalCs)
 
             cs.writeToFile(target)
             cs = None
