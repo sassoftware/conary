@@ -170,6 +170,8 @@ class FilesystemJob:
             # opportunity to make a hard link instead of actually restoring it.
 	    fileObj = files.ThawFile(fileObj, fileId)
 
+            # this is part of a hard link group, attempt making a
+            # hardlink.
             if override == "" and fileObj.hasContents and fileObj.linkGroup.value():
                 linkGroup = fileObj.linkGroup.value()
                 linkPath = self.linkGroups.get(linkGroup, None)
@@ -185,8 +187,13 @@ class FilesystemJob:
                         os.remove(tmpname)
                         os.link(linkPath, tmpname)
                         os.rename(tmpname, target)
+                        # hard link created, all that's needed, continue
+                        # with the next file to restore
                         continue
                     except OSError, e:
+                        # ignore failure to create a cross-device symlink.
+                        # restore the file as if it's not a hard link
+                        # below
                         if e.errno != errno.EXDEV:
                             raise
 
