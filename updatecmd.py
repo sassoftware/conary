@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import callbacks
 from deps import deps
 from lib import log
 from lib import util
@@ -25,17 +26,7 @@ import sys
 # FIXME client should instantiated once per execution of the command line 
 # conary client
 
-class UpdateCallback:
-
-    def _message(self, msg):
-        assert(0)
-        print "\r",
-        print msg,
-        if len(msg) < self.last:
-            i = self.last - len(msg)
-            print " " * i + "\b" * i,
-        sys.stdout.flush()
-        self.last = len(msg)
+class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
     def preparingChangeSet(self):
         self._message("Preparing changeset...")
@@ -73,13 +64,8 @@ class UpdateCallback:
         self._message("Running posttag scripts...")
 
     def __init__(self):
-        self.last = 0
+        callbacks.LineOutput.__init__(self)
         self.restored = 0
-
-    def __del__(self):
-        if self.last:
-            self._message("")
-            print "\r",
 
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
