@@ -16,40 +16,16 @@ Implements changelog entries for repository commits.
 """
 
 import os
-import streams
 import string
 import tempfile
 
-class AbstractChangeLog(streams.TupleStream):
-
-    __slots__ = [ 'items' ]
-    makeup = ( ("name",    streams.StringStream, "!B"), 
-	       ("contact", streams.StringStream, "!B"),
-	       ("message", streams.StringStream, "!H") )
-
-    def getName(self):
-	return self.items[0].value()
-
-    def setName(self, value):
-	return self.items[0].set(value)
-
-    def getContact(self):
-	return self.items[1].value()
-
-    def setContact(self, value):
-	return self.items[1].set(value)
-
-    def getMessage(self):
-	return self.items[2].value()
-
-    def setMessage(self, value):
-	assert(value[-1] == '\n')
-	return self.items[2].set(value)
+class ChangeLog:
 
     def freeze(self):
-	return streams.TupleStream.freeze(self)
+	assert(self.message[-1] == '\n')
+	return "%s\n%s\n%s" % (self.name, self.contact, self.message)
 
-    def getMessageFromUser(self):
+    def getMessage(self):
 	editor = os.environ.get("EDITOR", "/bin/vi")
 	(fd, name) = tempfile.mkstemp()
 	msg = "\n-----\nEnter your change log message.\n"
@@ -69,30 +45,24 @@ class AbstractChangeLog(streams.TupleStream):
 
 	newMsg = string.strip(newMsg)
 	newMsg += '\n'
-	self.setMessage(newMsg)
+	self.message = newMsg
 	return True
 
     def __eq__(self, other):
-	if not isinstance(other, AbstractChangeLog):
-	    return False
-
-	return self.items == other.items
-
-class ChangeLog(AbstractChangeLog):
-
-    __slots__ = [ 'items' ]
+	return self.__class__ == other.__class__ and \
+	       self.name == other.name		and \
+	       self.contact == other.contact	and \
+	       self.message == other.message
 
     def __init__(self, name, contact, message):
 	assert(not message or message[-1] == '\n')
 
-	AbstractChangeLog.__init__(self)
+	self.name = name
+	self.contact = contact
+	self.message = message
 
-	self.setName(name)
-	self.setContact(contact)
-	self.setMessage(message)
-
-class ThawChangeLog(AbstractChangeLog):
-
-    __slots__ = [ 'items' ]
-
-    pass
+def ThawChangeLog(frzLines):
+    name = frzLines[0]
+    contact = frzLines[1]
+    message = "\n".join(frzLines[2:]) + "\n"
+    return ChangeLog(name, contact, message)

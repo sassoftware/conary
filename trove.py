@@ -18,39 +18,10 @@ Implements troves (packages, components, etc.) for the repository
 import changelog
 import copy
 import files
-import streams
 import versions
 from deps import deps
-from streams import _STREAM_TROVE
 
-_STREAM_TRV_NAME      = _STREAM_TROVE + 1
-_STREAM_TRV_DEPS      = _STREAM_TROVE + 2
-_STREAM_TRV_VERSION   = _STREAM_TROVE + 3
-_STREAM_TRV_CHANGELOG = _STREAM_TROVE + 4
-
-class FullDepsStream(streams.TupleStream):
-
-    __slots__ = [ 'items' ]
-    makeup = ( ("flavor",   streams.DependenciesStream, "!H"), 
-	       ("requires", streams.DependenciesStream, "!H"),
-	       ("provides", streams.DependenciesStream, "!H") )
-
-    def getFlavor(self):
-	return self.items[0].value()
-
-    def setFlavor(self, value):
-	return self.items[0].set(value)
-
-class Trove(streams.StreamSet):
-
-    streamDict = { 
-	_STREAM_TRV_NAME      : (streams.StringStream,	      "name" ),
-	_STREAM_TRV_VERSION   : (streams.FrozenVersionStream, "version" ),
-	_STREAM_TRV_DEPS      : (FullDepsStream,	      "deps" ),
-	#_STREAM_TRV_CHANGELOG : (changelog.ThawChangeLog,     "changelog" ),
-     } 
-    streamList = streams.streamSetDictToList(streamDict)
-
+class Trove:
     """
     Packages are groups of files and other packages, which are included by
     reference. By convention, "package" often refers to a package with
@@ -58,18 +29,20 @@ class Trove(streams.StreamSet):
     packages but no files. While this object allows any mix of file and
     package inclusion, in practice conary doesn't allow it.
     """
+    def copy(self):
+	return copy.deepcopy(self)
 
     def getName(self):
-        return self.name.value()
+        return self.name
     
     def getVersion(self):
-	return self.version.value()
+        return self.version
     
     def changeVersion(self, version):
-	self.version.set(version)
+        self.version = version
 
     def changeFlavor(self, flavor):
-	self.deps.setFlavor(flavor)
+        self.flavor = flavor
 
     def addFile(self, fileId, path, version):
 	self.idMap[fileId] = (path, version)
@@ -118,7 +91,7 @@ class Trove(streams.StreamSet):
 	@type presentOkay: boolean
 	"""
 	if not presentOkay and self.packages.has_key((name, version, flavor)):
-	    raise TroveError, "duplicate trove included in %s" % self.getName()
+	    raise TroveError, "duplicate trove included in %s" % self.name
 	self.packages[(name, version, flavor)] = True
 
     def delTrove(self, name, version, flavor, missingOkay):
@@ -207,20 +180,20 @@ class Trove(streams.StreamSet):
 
 	for (fileId, path, fileVersion) in pkgCS.getNewFileList():
 	    self.addFile(fileId, path, fileVersion)
-	    fileMap[fileId] = self.idMap[fileId] + (self.name.value(), None, None)
+	    fileMap[fileId] = self.idMap[fileId] + (self.name, None, None)
 
 	for (fileId, path, fileVersion) in pkgCS.getChangedFileList():
 	    (oldPath, oldVersion) = self.idMap[fileId]
 	    self.updateFile(fileId, path, fileVersion)
 	    # look up the path/version in self.idMap as the ones here
 	    # could be None
-	    fileMap[fileId] = self.idMap[fileId] + (self.name.value(), oldPath, oldVersion)
+	    fileMap[fileId] = self.idMap[fileId] + (self.name, oldPath, oldVersion)
 
 	for fileId in pkgCS.getOldFileList():
 	    self.removeFile(fileId)
 
 	self.mergeTroveListChanges(pkgCS.iterChangedTroves())
-	self.deps.setFlavor(pkgCS.getNewFlavor())
+	self.flavor = pkgCS.getNewFlavor()
 	self.changeLog = pkgCS.getChangeLog()
 	self.setProvides(pkgCS.getProvides())
 	self.setRequires(pkgCS.getRequires())
@@ -295,20 +268,20 @@ class Trove(streams.StreamSet):
 	@rtype: (TroveChangeSet, fileChangeList, troveChangeList)
 	"""
 
-	assert(not them or self.getName() == them.getName())
+	assert(not them or self.name == them.name)
 
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
 	if them:
 	    themMap = them.idMap
-	    chgSet = TroveChangeSet(self.name.value(), self.changeLog,
+	    chgSet = TroveChangeSet(self.name, self.changeLog,
 				      them.getVersion(),	
 				      self.getVersion(),
 				      them.getFlavor(), self.getFlavor(),
 				      absolute = False)
 	else:
 	    themMap = {}
-	    chgSet = TroveChangeSet(self.name.value(), self.changeLog,
+	    chgSet = TroveChangeSet(self.name, self.changeLog,
 				      None, self.getVersion(),
 				      None, self.getFlavor(),
 				      absolute = absolute)
@@ -559,22 +532,19 @@ class Trove(streams.StreamSet):
         return self.requires
 
     def getFlavor(self):
-        return self.deps.getFlavor()
+        return self.flavor
 
     def getChangeLog(self):
         return self.changeLog
 
     def __init__(self, name, version, flavor, changeLog):
-	streams.StreamSet.__init__(self)
 	self.idMap = {}
-	self.name.set(name)
-	self.version.set(version)
-	self.deps.setFlavor(flavor)
+	self.name = name
+	self.version = version
+	self.flavor = flavor
 	self.packages = {}
         self.provides = None
         self.requires = None
-	assert(not changeLog or 
-		isinstance(changeLog, changelog.AbstractChangeLog))
 	self.changeLog = changeLog
 
 class TroveChangeSet:
@@ -785,7 +755,7 @@ class TroveChangeSet:
             rc.append("FLAVOR - %s\n" % (self.newFlavor.freeze()))
 
 	if self.changeLog:
-	    frz = self.changeLog.freeze() + "\n"
+	    frz = self.changeLog.freeze()
 	    rc.append("CL %d\n" % frz.count("\n"))
 	    rc.append(frz)
 
@@ -961,9 +931,7 @@ class ThawTroveChangeSet(TroveChangeSet):
 	    if l.startswith("CL "):
 		cnt = int(l.split(' ', 1)[1])
 		first = i + 2
-		clLines = lines[first:first + cnt]
-		frozenCl = "\n".join(clLines)
-		changeLog = changelog.ThawChangeLog(frozenCl)
+		changeLog = changelog.ThawChangeLog(lines[first:first + cnt])
 		del lines[i: first + cnt]
                 break
 

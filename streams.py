@@ -17,7 +17,6 @@ Defines the datastreams stored in a changeset
 
 import copy
 import struct
-import versions
 
 from deps import filedeps, deps
 
@@ -30,8 +29,6 @@ _STREAM_PROVIDES    = 6
 _STREAM_REQUIRES    = 7
 _STREAM_TAGS	    = 8
 _STREAM_TARGET	    = 9
-
-_STREAM_TROVE	    = 0x00010000
 
 class InfoStream(object):
 
@@ -189,54 +186,6 @@ class Sha1Stream(StringStream):
 
     def __str__(self):
 	return "%x%x%x%x%x" % struct.unpack("!5I", self.s)
-
-class FrozenVersionStream(InfoStream):
-
-    __slots__ = "v"
-
-    def value(self):
-	return self.v
-
-    def set(self, val):
-	assert(not val or min(val.timeStamps()) > 0)
-	self.v = val
-
-    def merge(self, other):
-	if other.v != None:
-	    self.v = other.v
-
-    def freeze(self):
-	return self.v.freeze()
-
-    def diff(self, them):
-	if self.v != them.v:
-	    return self.v.freeze()
-
-	return ""
-
-    def thaw(self, frz):
-	if frz:
-	    self.v = versions.ThawVersion(frz)
-	else:
-	    self.v = None
-
-    def twm(self, diff, base):
-	if not diff: return False
-
-	if self.v == base.v:
-	    self.v = diff
-	    return False
-	elif self.v != diff:
-	    return True
-
-	return False
-
-    def __eq__(self, other):
-	return other.__class__ == self.__class__ and \
-	       self.v == other.v
-
-    def __init__(self, v = None):
-	self.thaw(v)
 
 class DependenciesStream(InfoStream):
     """
@@ -408,7 +357,6 @@ class TupleStream(InfoStream):
 	items = []
 	makeup = self.makeup
 	idx = 0
-
 	for (i, (name, itemType, size)) in enumerate(makeup):
 	    if type(size) == int:
 		items.append(itemType(s[idx:idx + size]))
@@ -418,9 +366,6 @@ class TupleStream(InfoStream):
 	    else:
 		if size == "B":
 		    size = struct.unpack("B", s[idx])[0]
-		    idx += 1
-		elif size == "!B":
-		    size = struct.unpack("!B", s[idx])[0]
 		    idx += 1
 		elif size == "!H":
 		    size = struct.unpack("!H", s[idx:idx + 2])[0]
