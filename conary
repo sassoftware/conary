@@ -37,18 +37,18 @@ def usage(rc = 1):
     print "usage: srs branch <newbranch> <branchfrom> [<trove>]"
     print "       srs changeset <pkg> [<oldver>] <newver> <outfile>"
     print "       srs cook    [--prep] [--macros file] <first.recipe> <second.recipe> ..."
-    print "       srs commit  <changeset>"
-    print "       srs erase   <pkgname> [<version>]"
-    print "       srs pkglist <pkgname> [<version>]"
-    print "       srs replist <pkgname> [<version>]"
+    print "       srs commit       <changeset>"
+    print "       srs erase        <pkgname> [<version>]"
+    print "       srs localcs      <pkg> <outfile>"
+    print "       srs localcommit  <changeset>"
+    print "       srs pkglist      <pkgname> [<version>]"
+    print "       srs replist      <pkgname> [<version>]"
     print "       srs rblist"
-    print "       srs rollback"
-    print "       srs source [usage]"
-    print "       srs update  <pkgname> <version>"
-    print "           update  <changeset>"
+    print "       srs rollback     <rollback>"
+    print "       srs source       [usage]"
+    print "       srs update	   <pkgname> <version>"
+    print "           update       <changeset>"
     print "       srs usage"
-    print ""
-    print "changeset flags: --fromdb"
     print ""
     print "common flags:  --branch <defaultbranch>"
     print '               --config "<item> <value>"'
@@ -73,7 +73,6 @@ cfgMap["branch"] = "defaultbranch"
 cfgMap["reppath"] = "reppath"
 cfgMap["root"] = "root"
 
-argDef["fromdb"] = 0
 argDef["config"] = 2
 argDef["all"] = 0
 argDef["prep"] = 0
@@ -162,18 +161,14 @@ elif (otherArgs[1] == "changeset"):
 	(old, new) = (None, otherArgs[3])
 	outFile = otherArgs[4]
 
-    if argSet.has_key('fromdb'):
-        del argSet['fromdb']
-	repos = database.Database(cfg.root, cfg.dbpath, "r")
-    else:
-	repos = repository.LocalRepository(cfg.reppath, "r")
+    repos = repository.LocalRepository(cfg.reppath, "r")
 
     changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
 elif (otherArgs[1] == "commit"):
     if len(otherArgs) < 3: usage()
     repos = repository.LocalRepository(cfg.reppath, "c")
     for changeSet in otherArgs[2:]:
-	commit.doCommit(repos, cfg, changeSet)
+	commit.doCommit(repos, changeSet)
 elif (otherArgs[1] == "config"):
     if argSet: usage
     if (len(otherArgs) > 2):
@@ -209,6 +204,20 @@ elif (otherArgs[1] == "erase"):
 	usage()
 elif (otherArgs[1] == "import"):
     print "this is broken"
+elif (otherArgs[1] == "localcs"):
+    if len(otherArgs) != 4 and len(otherArgs) != 4:
+	usage()
+
+    name = otherArgs[2]
+    outFile = otherArgs[3]
+
+    db = database.Database(cfg.root, cfg.dbpath, "r")
+    changeset.LocalChangeSetCommand(db, cfg, name, outFile)
+elif (otherArgs[1] == "localcommit"):
+    if len(otherArgs) < 3: usage()
+    db = database.Database(cfg.root, cfg.dbpath, "c")
+    for changeSet in otherArgs[2:]:
+	commit.doLocalCommit(db, changeSet)
 elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
     all = argSet.has_key('all')
     if all: del argSet['all']
