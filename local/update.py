@@ -365,7 +365,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
 	except OSError:
 	    log.error("%s is missing (use remove if this is intentional)" 
 		% path)
-	    return
+	    return None
 
 	if srcPkg and srcPkg.hasFile(fileId):
 	    srcFileVersion = srcPkg.getFile(fileId)[1]
@@ -444,6 +444,9 @@ def buildLocalChanges(repos, pkgList, root = ""):
     for (curPkg, srcPkg, newVersion) in pkgList:
 	result = _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, 
 			       root)
+        if result is None:
+            # an error occurred
+            return None
 	returnList.append(result)
 
     return (changeSet, returnList)
