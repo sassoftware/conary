@@ -30,7 +30,7 @@ def branch(repos, cfg, newLabel, troveSpec, makeShadow = False,
     if not flavor:
         flavor = cfg.flavor
 
-    troveList = repos.findTrove(cfg.installLabelPath, troveName, flavor,
+    troveList = repos.findTrove(cfg.buildLabel, troveName, flavor,
                                 versionSpec)
 
     if makeShadow:

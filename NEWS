@@ -1,3 +1,6 @@
+Changes in 0.14.12:
+  * shadow command looks at buildLabel instead of following installLabelPath
+
 Changes in 0.14.11:
   * Local systems store config files in sql tables now.  Use
     /usr/share/conary/convertcontents to convert to the new data store.
