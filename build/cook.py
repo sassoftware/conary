@@ -144,7 +144,7 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
                     cfg.sourcepath % {'pkgname': recipeClass.name} ]
 	recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
 
-	if recipeObj.name.startwith("group-"):
+	if recipeObj.name.startswith("group-"):
 	    raise CookError('package names are not allowed to begin ' +
 			    'with "group-"')
 
