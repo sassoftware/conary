@@ -324,12 +324,14 @@ class Source(_Source):
 	if self.applymacros:
 	    log.debug('applying macros to source %s' %f)
 	    pin = file(f)
-	    pout = file(os.sep.join((destDir, self.dest)), "w")
+	    pout = file(os.sep.join((destDir, self.dest %self.recipe.macros)),
+			"w")
 	    pout.write(pin.read()%self.recipe.macros)
 	    pin.close()
 	    pout.close()
 	else:
-	    util.copyfile(f, os.sep.join((destDir, self.dest)))
+	    util.copyfile(f, os.sep.join((destDir,
+					  self.dest %self.recipe.macros)))
 	if self.apply:
 	    util.execute(self.apply %self.recipe.macros, destDir)
 
