@@ -24,6 +24,7 @@ DEP_CLASS_TROVES	= 4
 DEP_CLASS_USE		= 5
 DEP_CLASS_SONAME	= 6
 
+FLAG_SENSE_UNSPECIFIED  = 0         # used FlavorScore indices
 FLAG_SENSE_REQUIRED     = 1
 FLAG_SENSE_PREFERRED    = 2
 FLAG_SENSE_PREFERNOT    = 3
@@ -114,6 +115,30 @@ class Dependency(BaseDependency):
 	else:
 	    return self.name
 
+    def score(self, required):
+        """
+        Returns a flavor matching score. This dependency is considered
+        the "system" and the other is the flavor of the trove. In terms
+        of dependencies, this set "provides" and the other "requires".
+
+        False is returned if there is no match at all.
+        """
+	if self.name != required.name: 
+            return False
+
+        score = 0
+	for (requiredFlag, requiredSense) in required.flags.iteritems():
+            if not self.flags.has_key(requiredFlag):
+                continue
+
+            thisSense = self.flags[requiredFlag]
+            thisScore = flavorScores.get((thisSense, requiredSense), 0)
+            if thisScore is None:
+                return False
+            score += thisScore
+
+        return score
+
     def satisfies(self, required):
 	"""
 	Returns whether or not this dependency satisfies the argument
@@ -121,6 +146,7 @@ class Dependency(BaseDependency):
 
 	@type required: Dependency
 	"""
+        #return self.score(required) is not False
 	if self.name != required.name: 
 	    return False
 	for (requiredFlag, requiredSense) in required.flags.iteritems():
@@ -578,19 +604,23 @@ exp = exp.replace('IDENT', ident)
 flavorRegexp = re.compile(exp)
 
 flavorScores = {
-      (FLAG_SENSE_REQUIRED,   FLAG_SENSE_REQUIRED ) :        2,
-      (FLAG_SENSE_REQUIRED,   FLAG_SENSE_PREFERRED) :        1,
-      (FLAG_SENSE_REQUIRED,   FLAG_SENSE_PREFERNOT) : -1000000,
+      (FLAG_SENSE_UNSPECIFIED, FLAG_SENSE_REQUIRED ) : None,
+      (FLAG_SENSE_UNSPECIFIED, FLAG_SENSE_PREFERRED) :   -1,
+      (FLAG_SENSE_UNSPECIFIED, FLAG_SENSE_PREFERNOT) :    1,
 
-      (FLAG_SENSE_DISALLOWED, FLAG_SENSE_REQUIRED ) : -1000000,
-      (FLAG_SENSE_DISALLOWED, FLAG_SENSE_PREFERRED) : -1000000,
-      (FLAG_SENSE_DISALLOWED, FLAG_SENSE_PREFERNOT) :        1,
+      (FLAG_SENSE_REQUIRED,    FLAG_SENSE_REQUIRED ) :    2,
+      (FLAG_SENSE_REQUIRED,    FLAG_SENSE_PREFERRED) :    1,
+      (FLAG_SENSE_REQUIRED,    FLAG_SENSE_PREFERNOT) : None,
 
-      (FLAG_SENSE_PREFERRED,  FLAG_SENSE_REQUIRED ) :        1,
-      (FLAG_SENSE_PREFERRED,  FLAG_SENSE_PREFERRED) :        2,
-      (FLAG_SENSE_PREFERRED,  FLAG_SENSE_PREFERNOT) :       -1,
+      (FLAG_SENSE_DISALLOWED,  FLAG_SENSE_REQUIRED ) : None,
+      (FLAG_SENSE_DISALLOWED,  FLAG_SENSE_PREFERRED) : None,
+      (FLAG_SENSE_DISALLOWED,  FLAG_SENSE_PREFERNOT) :    1,
 
-      (FLAG_SENSE_PREFERNOT,  FLAG_SENSE_REQUIRED ) :       -2,
-      (FLAG_SENSE_PREFERNOT,  FLAG_SENSE_PREFERRED) :       -1,
-      (FLAG_SENSE_PREFERNOT,  FLAG_SENSE_PREFERNOT) :        1 
+      (FLAG_SENSE_PREFERRED,   FLAG_SENSE_REQUIRED ) :    1,
+      (FLAG_SENSE_PREFERRED,   FLAG_SENSE_PREFERRED) :    2,
+      (FLAG_SENSE_PREFERRED,   FLAG_SENSE_PREFERNOT) :   -1,
+
+      (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_REQUIRED ) :   -2,
+      (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_PREFERRED) :   -1,
+      (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_PREFERNOT) :    1 
 }
