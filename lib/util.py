@@ -14,6 +14,7 @@ import fixedglob
 import shutil
 import string
 import log
+import errno
 
 # build.py and policy.py need some common definitions
 
@@ -126,7 +127,13 @@ def mkdirChain(*paths):
         for n in (range(2,len(paths) + 1)):
             p = string.join(paths[0:n], "/")
             if not os.path.exists(p):
-                os.mkdir(p)
+                # don't die in case of the race condition where someone
+                # made the directory after we stat'ed for it.
+                try:
+                    os.mkdir(p)
+                except OSError, exc:
+                    if exc.errno == errno.EEXISTS:
+                        pass
 
 def _searchVisit(arg, dirname, names):
     file = arg[0]
