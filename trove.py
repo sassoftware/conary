@@ -2,15 +2,8 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-import os
 import string
-import types
-import util
 import versions
-import re
-import files
-import sha1helper
-import time
 
 # this is the repository's idea of a package
 class Package:
@@ -64,13 +57,12 @@ class Package:
 	return str
 
     # returns a dictionary mapping a fileId to a (path, version, pkgName) tuple
-    def applyChangeSet(self, repos, pkgCS):
+    def applyChangeSet(self, pkgCS):
 	fileMap = {}
 
 	for (fileId, path, fileVersion) in pkgCS.getNewFileList():
 	    self.addFile(fileId, path, fileVersion)
 	    fileMap[fileId] = self.idMap[fileId] + (self.name, )
-	    (path, fileVersion, self.name)
 
 	for (fileId, path, fileVersion) in pkgCS.getChangedFileList():
 	    self.updateFile(fileId, path, fileVersion)

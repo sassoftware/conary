@@ -42,7 +42,7 @@ class Repository:
 	    else:
 		newPkg = package.Package(csPkg.name, newVersion)
 
-	    newFileMap = newPkg.applyChangeSet(self, csPkg)
+	    newFileMap = newPkg.applyChangeSet(csPkg)
 	    pkgList.append((csPkg.getName(), newPkg, newVersion))
 	    fileMap.update(newFileMap)
 
