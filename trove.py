@@ -3,6 +3,9 @@
 # All rights reserved
 #
 import copy
+import difflib
+import log
+import patch
 import versions
 
 """
@@ -51,6 +54,12 @@ class Package:
     
     def changeVersion(self, version):
         self.version = version
+
+    def getGroupFile(self):
+	return self.groupFile
+    
+    def setGroupFile(self, contents):
+	self.groupFile = contents
     
     def addFile(self, fileId, path, version):
 	self.idMap[fileId] = (path, version)
@@ -143,6 +152,7 @@ class Package:
 	.
 	.
 	PACKAGEN VERSIONN
+	GROUP FILE
 
 	Group file may be empty, in which case nothing follows the newline
 	for the final file package entry.
@@ -156,6 +166,9 @@ class Package:
 	    rc += pkg + " " +  \
 		   " ".join([v.asString() for v in self.packages[pkg]]) + \
 		   "\n"
+
+	if self.groupFile:
+	    rc += "\n".join(self.groupFile) + "\n"
 
 	return rc
 
@@ -172,6 +185,21 @@ class Package:
 	"""
 
 	fileMap = {}
+
+	diff = pkgCS.getGroupFileDiff()
+	if diff:
+	    if not self.groupFile:
+		oldLines = ""
+	    else:
+		oldLines = self.groupFile
+
+	    (newLines, failedHunks) = patch.patch(oldLines, diff)
+
+	    if failedHunks:
+		# this really should never happen.
+		raise PatchError
+
+	    self.setGroupFile(newLines)
 
 	for (fileId, path, fileVersion) in pkgCS.getNewFileList():
 	    self.addFile(fileId, path, fileVersion)
@@ -224,6 +252,11 @@ class Package:
 	@type abstract: boolean
 	@rtype: (ChangeSetGroup, packageChangeList, fileChangeList)
 	"""
+
+	# logical xor would be nice here, but it's not part of python :-(
+	assert(not them or (not self.groupFile and not them.groupFile) or
+	       (self.groupFile and them.groupFile))
+
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
 	if them:
@@ -292,7 +325,7 @@ class Package:
 	    if self.packages.has_key(name):
 		ourVersions = self.packages[name]
 	    else:
-		ourVersions = None
+		ourVersions = []
 
 	    if them and them.packages.has_key(name):
 		theirVersions = them.packages[name]
@@ -324,6 +357,30 @@ class Package:
 		else:
 		    removed[name] = [ version ]
 
+	# create the diff of the groupFile if both versions have them. note
+	# the assert above makes this test correct
+	if self.groupFile:
+	    if them:
+		oldLines = them.groupFile
+	    else:
+		oldLines = ""
+	    newLines = self.groupFile
+	    diff = difflib.unified_diff(oldLines, newLines, "old", "new",
+					lineterm = "")
+
+	    print oldLines
+	    print newLines
+
+	    # using try/except seems dumb, but I don't know any other
+	    # way
+	    try:
+		diff.next()
+		diff.next()
+	    except StopIteration:
+		pass
+
+	    chgSet.setGroupFileDiff(diff)
+
 	pkgList = []
 
 	if abstract:
@@ -332,8 +389,8 @@ class Package:
 		    pkgList.append((name, None, version))
 	    return (chgSet, filesNeeded, pkgList)
 
-	# use added and removed to assemble a list of diffs which need to
-	# go along with this change set
+	# use added and removed to assemble a list of package diffs which need
+	# to go along with this change set
 	for name in added.keys():
 	    if not removed.has_key(name):
 		for version in added[name]:
@@ -385,6 +442,7 @@ class Package:
 	self.name = name
 	self.version = version
 	self.packages = {}
+	self.groupFile = None
 
 class PackageChangeSet:
 
@@ -459,6 +517,12 @@ class PackageChangeSet:
 	if not self.packages.has_key(name):
 	    self.packages[name] = []
 	self.packages[name].append(('-', version))
+
+    def setGroupFileDiff(self, diff):
+	self.groupFileDiff = diff
+
+    def getGroupFileDiff(self):
+	return self.groupFileDiff
 
     def parse(self, line):
 	action = line[0]
@@ -557,19 +621,22 @@ class PackageChangeSet:
 	later be parsed by parse(). The representation begins with a
 	header:
 
-         SRS PKG ABSTRACT <name> <newversion> <linecount>
+         SRS PKG ABSTRACT <name> <newversion> <linecount> <diffcount>
          SRS PKG CHANGESET <name> <oldversion> <newversion> <linecount>
-         SRS PKG NEW <name> <newversion> <linecount>
+	    <diffcount>
+         SRS PKG NEW <name> <newversion> <linecount> <diffcount>
 
 	It is followed by <linecount> lines, each of which specifies a
 	new file, old file, removed file, or a change to the set of
 	included packages. Each of these lines begins with a "+", "-",
-	"~", or "p" respectively.
+	"~", or "p" respectively. Following that are <diffcount> (possibly
+	0) lines which make up the diff for the group file.
 
 	@rtype: string
 	"""
 
 	rc = ""
+	lines = 0
 
 	for id in self.getOldFileList():
 	    rc += "-%s\n" % id
@@ -596,17 +663,29 @@ class PackageChangeSet:
 
 	if lines:
 	    rc += "\n".join(lines) + "\n"
-    
-	if self.abstract:
-	    hdr = "SRS PKG ABSTRACT %s %s %d\n" % \
-		      (self.name, self.newVersion.freeze(), rc.count("\n"))
-	elif not self.oldVersion:
-	    hdr = "SRS PKG NEW %s %s %d\n" % \
-		      (self.name, self.newVersion.freeze(), rc.count("\n"))
+
+	mainLineCount = rc.count("\n")
+
+	if self.groupFileDiff:
+	    groupLineCount = 0
+	    for diff in self.groupFileDiff:
+		groupLineCount += 1
+		rc += diff + "\n"
 	else:
-	    hdr = "SRS PKG CHANGESET %s %s %s %d\n" % \
+	    groupLineCount = 0
+
+	if self.abstract:
+	    hdr = "SRS PKG ABSTRACT %s %s %d %d\n" % \
+		      (self.name, self.newVersion.freeze(), mainLineCount,
+		       groupLineCount)
+	elif not self.oldVersion:
+	    hdr = "SRS PKG NEW %s %s %d %d\n" % \
+		      (self.name, self.newVersion.freeze(), mainLineCount,
+		       groupLineCount)
+	else:
+	    hdr = "SRS PKG CHANGESET %s %s %s %d %d\n" % \
 		      (self.name, self.oldVersion.freeze(), 
-		       self.newVersion.freeze(), rc.count("\n"))
+		       self.newVersion.freeze(), mainLineCount, groupLineCount)
 
 	return hdr + rc
 
@@ -619,6 +698,7 @@ class PackageChangeSet:
 	self.changedFiles = []
 	self.abstract = abstract
 	self.packages = {}
+	self.groupFileDiff = None
 
 class PackageFromFile(Package):
 
@@ -629,18 +709,26 @@ class PackageFromFile(Package):
 	fileCount = int(fields[0])
 	pkgCount = int(fields[1])
 
-	for line in lines[1:1 + fileCount]:
+	start = 1
+	fileEnd = start + fileCount
+	pkgEnd = fileEnd + pkgCount
+
+	for line in lines[start:fileEnd]:
 	    (fileId, path, version) = line.split()
 	    version = versions.ThawVersion(version)
 	    self.addFile(fileId, path, version)
 
-	for line in lines[1 + fileCount:]:
+	for line in lines[fileEnd:pkgEnd]:
 	    items = line.split()
 	    name = items[0]
 	    self.packages[name] = []
 	    for versionStr in items[1:]:
 		version = versions.VersionFromString(versionStr)
 		self.addPackageVersion(name, version)
+
+	# this strips the newlines off the end
+	groupFileList = [ x[:-1] for x in lines[pkgEnd:] ]
+	self.setGroupFile(groupFileList)
 
     def __init__(self, name, dataFile, version):
 	"""
@@ -657,7 +745,158 @@ class PackageFromFile(Package):
 	Package.__init__(self, name, version)
 	self.read(dataFile)
 
+class GroupFromTextFile(Package):
+
+    def getSimpleVersion(self):
+	"""
+	Returns the version string defined in a group file.
+
+	@rtype: str
+	"""
+	return self.simpleVersion
+
+    def parseFile(self, f, packageNamespace, repos):
+	"""
+	Parses a group file into a group object. Any existing contents
+	of the group object are erased. Any errors which occur are
+	logged, and if the file has not been parsed properly False is
+	return; if parsing is successful the simple version number from
+	the group file is returned as a string.
+	
+	@param f: The file to be parsed
+	@type f: file-like object
+	@param packageNamespace: The name of the repository to prepend
+	to package names which are not fully qualified; this should begin
+	with a colon.
+	@type packageNamespace: str
+	@param repos: Branch nicknames are turned into fully qualified
+	version numbers by looking them up in repos.
+	@type repos: Repository
+	@rtype: str
+	"""
+	self.groupFile = f.read().split("\n")
+	# cut off the empty string added at the end due to the trailing
+	# newline
+	del self.groupFile[-1]
+
+	lines = []
+	errors = 0
+	for i, line in enumerate(self.groupFile):
+	    line = line.strip()
+	    if line and line[0] != '#': 
+		fields = line.split()
+		if len(fields) != 2:
+		    log.error("line %d of group file has too many fields" % i)
+		    errors = 1
+		lines.append((i, fields))
+
+	if lines[0][1][0] != "name":
+	    log.error("group files must contain the group name on the first line")
+	    errors = 1
+	    name = "localhost:unknown"
+	else:
+	    name = lines[0][1][1]
+	    if name[0] != ":":
+		name = packageNamespace + ":" + name
+	    else:
+		name = name
+
+	    if name.count(":") != 2:
+		log.error("group names may not include colons")
+		errors = 1
+		name = "localhost:unknown"
+
+	    last = name.split(":")[-1]
+	    if not last.startswith("group-"):
+		log.error('group names must start with "group-"')
+		errors = 1
+
+	self.name = name
+
+	if lines[1][1][0] != "version":
+	    log.error("group files must contain the version on the first line")
+	    errors = 1
+	else:
+	    self.simpleVersion = lines[1][1][1]
+
+	for lineNum, (name, versionStr) in lines[2:]:
+	    if name[0] != ":":
+		name = packageNamespace + ":" + name
+
+	    if versionStr[0] != "/":
+		try:
+		    nick = versions.BranchName(versionStr)
+		except versions.ParseError:
+		    log.error("invalid version on line %d: %s" % (lineNum, 
+			      versionStr))
+		    errors = 1
+		    continue
+
+		branchList = repos.getPackageNickList(name, nick)
+		if not branchList:
+		    log.error("branch %s does not exist for package %s"
+				% (str(nick), name))
+		    errors = 1
+		else:
+		    versionList = []
+		    for branch in branchList:
+			ver = repos.pkgLatestVersion(name, branch)
+			versionList.append(ver)
+
+		    self.addPackage(name, versionList)
+	    else:
+		try:
+		    version = versions.VersionFromString(versionStr)
+		except versions.ParseError:
+		    log.error("invalid version on line %d: %s" % (lineNum, 
+			      versionStr))
+		    errors = 1
+		    continue
+
+		if not version.isVersion():
+		    log.error("fully qualified branches may not be used " +
+			      "as version on line %d" % lineNum)
+
+		self.addPackage(name, [ version ])
+
+	if errors:
+	    raise ParseError
+
+    def __init__(self, f, packageNamespace, repos):
+	"""
+	Initializes the object; parameters are the same as those
+	to parseFile().
+	"""
+
+	Package.__init__(self, None, None)
+	self.parseFile(f, packageNamespace, repos)
+
 def stripNamespace(namespace, pkgName):
     if pkgName.startswith(namespace + ":"):
 	return pkgName[len(namespace) + 1:]
     return pkgName
+
+class PackageError(Exception):
+
+    """
+    Ancestor for all exceptions raised by the package module.
+    """
+
+    pass
+
+class ParseError(PackageError):
+
+    """
+    Indicates that an error occured parsing a group file.
+    """
+
+    pass
+
+class PatchError(PackageError):
+
+    """
+    Indicates that an error occured parsing a group file.
+    """
+
+    pass
+

@@ -33,6 +33,7 @@ def usage():
     print "usage: srs changeset <pkg> [<oldver>] <newver> <outfile>"
     print "       srs cook    [--prep] [--macros file] <first.recipe> <second.recipe> ..."
     print "       srs checkin <file>"
+    print "       srs checkout <group> <file> <version>"
     print "       srs commit  <file>"
     print "       srs pkglist <pkgname> <version>"
     print "       srs replist <pkgname> <version>"
@@ -255,5 +256,11 @@ elif (otherArgs[1] == "checkin"):
     if len(otherArgs) != 3: usage()
     repos = repository.LocalRepository(cfg.reppath, "c")
     checkin.checkin(repos, cfg, otherArgs[2])
+elif (otherArgs[1] == "checkout"):
+    if len(otherArgs) < 4 or len(otherArgs) > 5: usage()
+    repos = repository.LocalRepository(cfg.reppath, "r")
+
+    args = [repos, cfg] + otherArgs[2:]
+    checkin.checkout(*args)
 else:
     usage()
