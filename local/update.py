@@ -126,8 +126,14 @@ class FilesystemJob:
 	    if not os.path.isdir(sysetc):
 		# normally happens only during testing, but why not be safe?
 		util.mkdirChain(sysetc)
-	    ldso = file(util.joinPaths(self.root, '/etc/ld.so.conf'), 'w+')
-	    ldsolines = ldso.readlines()
+	    ldsopath = util.joinPaths(self.root, '/etc/ld.so.conf')
+	    try:
+		ldso = file(ldsopath, 'r+')
+		ldsolines = ldso.readlines()
+		ldso.close()
+	    except:
+		# bootstrap
+		ldsolines = []
 	    newlines = []
 	    rootlen = len(self.root)
 	    for path in self.sharedLibraries:
@@ -139,9 +145,9 @@ class FilesystemJob:
 	    if newlines:
 		log.debug("adding ld.so.conf entries: %s",
 			  " ".join(newlines))
-		ldso.seek(0)
+		ldso = file(ldsopath, 'w+')
 		ldso.writelines(ldsolines)
-	    ldso.close()
+		ldso.close()
 	    if os.access(util.joinPaths(self.root, p), os.X_OK) != True:
 		log.error("/sbin/ldconfig is not available")
 	    else:
