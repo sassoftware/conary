@@ -257,8 +257,17 @@ class PackageSpec(_filterSpec):
         recipe.autopkg.walk(self.macros['destdir'])
 
 
-def _markConfig(recipe, filename):
+def _markConfig(recipe, filename, fullpath):
     log.debug('config: %s', filename)
+    f = file(fullpath)
+    f.seek(0, 2)
+    if f.tell():
+	# file has contents
+	f.seek(-1, 2)
+	lastchar = f.read(1)
+	f.close()
+	if lastchar != '\n':
+	    recipe.reportErrors("config file %s missing trailing newline" %file)
     recipe.autopkg.pathMap[filename].flags.isConfig(True)
 
 class EtcConfig(policy.Policy):
@@ -270,7 +279,7 @@ class EtcConfig(policy.Policy):
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    _markConfig(self.recipe, file)
+	    _markConfig(self.recipe, file, fullpath)
 
 
 class Config(policy.Policy):
@@ -317,7 +326,7 @@ class Config(policy.Policy):
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    for configFilter in self.configFilters:
 		if configFilter.match(file):
-		    _markConfig(self.recipe, file)
+		    _markConfig(self.recipe, file, fullpath)
 
 
 class InitScript(policy.Policy):
