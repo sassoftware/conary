@@ -46,12 +46,12 @@ _permmap = {
 }
 
 class BuildAction(action.RecipeAction):
-
+    """
+    Pure virtual class which inherits from action.RecipeAction but
+    passes macros to the C{do()} method.
+    """
     def __init__(self, recipe, *args, **keywords):
 	"""
-	Pure virtual class which inherits from action.RecipeAction but
-	passes macros to the C{do()} method.
-
 	@keyword use: Optional argument; Use flag(s) telling whether
 	to actually perform the action.
 	@type use: None, Use flag, or sequence of Use flags
