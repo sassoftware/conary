@@ -17,20 +17,22 @@ import versioned
 
 class Repository:
 
-    def commitChangeSet(self, sourcePathTemplate, cs, eraseOld = 0):
+    # returns (pkgList, fileList, fileMap, oldFileList, oldPackageList) tuple, 
+    # which forms a todo for how to apply the change set; that tuple is used to
+    # either commit the change set or to reroot the change set against
+    # another target
+    def _buildChangeSetJob(self, cs):
 	pkgList = []
+	fileMap = {}
+	fileList = []
 	oldFileList = []
 	oldPackageList = []
-	fileMap = {}
 
 	# build todo set
 	for csPkg in cs.getPackageList():
 	    newVersion = csPkg.getNewVersion()
 	    old = csPkg.getOldVersion()
 
-	    # we can't erase the oldVersion for abstract change sets
-	    assert(old or not eraseOld)
-	
 	    if self.hasPackage(csPkg.getName()):
 		pkgSet = self._getPackageSet(csPkg.getName())
 
@@ -63,7 +65,6 @@ class Repository:
 
 	# Create the file objects we'll need for the commit. This handles
 	# files which were added and files which have changed
-	fileList = []
 	for (fileId, (oldVer, newVer, infoLine)) in cs.getFileList():
 	    if oldVer:
 		fileDB = self._getFileDB(fileId)
@@ -76,6 +77,15 @@ class Repository:
 	    assert(newVer.equal(fileMap[fileId][1]))
 	    fileList.append((fileId, newVer, file))
 
+	return (pkgList, fileList, fileMap, oldFileList, oldPackageList)
+
+    def commitChangeSet(self, sourcePathTemplate, cs, eraseOld = 0):
+	(pkgList, fileList, fileMap, oldFileList, oldPackageList) = \
+	    self._buildChangeSetJob(cs)
+
+	# we can't erase the oldVersion for abstract change sets
+	assert(not(cs.isAbstract() and eraseOld))
+	
 	# commit changes
 	pkgsDone = []
 	filesDone = []
@@ -142,7 +152,6 @@ class Repository:
 
     # packageList is a list of (pkgName, oldVersion, newVersion) tuples
     def createChangeSet(self, packageList):
-
 	cs = changeset.ChangeSetFromRepository(self)
 
 	for (packageName, oldVersion, newVersion) in packageList:
@@ -165,6 +174,55 @@ class Repository:
 		if oldVersion:
 		    oldFile = filedb.getVersion(oldVersion)
 		newFile = filedb.getVersion(newVersion)
+
+		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
+							 newFile)
+
+		cs.addFile(fileId, oldVersion, newVersion, filecs)
+		if hash: cs.addFileContents(hash)
+
+	return cs
+
+    # takes an abstract change set and creates a differential change set 
+    # against a branch of the repository
+    def rootChangeSet(self, absSet, branch):
+	assert(absSet.isAbstract())
+
+	(pkgList, fileList, fileMap, oldFileList, oldPackageList) = \
+	    self._buildChangeSetJob(absSet)
+
+	cs = changeset.ChangeSetFromAbstractChangeSet(absSet)
+
+	# we want to look up file objects by fileId
+	idToFile = {}
+	for (fileId, fileVersion, file) in fileList:
+	    idToFile[fileId] = (fileVersion, file)
+
+	for (pkgName, newPkg, newVersion) in pkgList:
+	    # FIXME
+	    #
+	    # this shouldn't be against branch, it should be against
+	    # the version of the package already installed on the
+	    # system. unfortunately we can't represent that yet. 
+	    oldVersion = self.pkgLatestVersion(pkgName, branch)
+	    if not oldVersion:
+		# FIXME
+		return None
+	    else:
+		old = self.getPackageVersion(pkgName, oldVersion)
+
+	    (pkgChgSet, filesNeeded) = newPkg.diff(old, oldVersion, newVersion)
+	    cs.addPackage(pkgChgSet)
+
+	    for (fileId, oldVersion, newVersion) in filesNeeded:
+		filedb = self._getFileDB(fileId)
+
+		(ver, newFile) = idToFile[fileId]
+		assert(ver.equal(newVersion))
+
+		oldFile = None
+		if oldVersion:
+		    oldFile = filedb.getVersion(oldVersion)
 
 		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
 							 newFile)
