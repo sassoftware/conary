@@ -25,7 +25,6 @@ import fcntl
 import gzip
 from lib import log
 import os
-import struct
 from lib import util
 
 class DataStore:
