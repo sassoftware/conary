@@ -40,21 +40,21 @@ def createPackage(repos, cfg, bldPkg, ident):
     for (path, buildFile) in bldPkg.items():
         realPath = buildFile.getRealPath()
         if isinstance(buildFile, buildpackage.BuildDeviceFile):
-            file = files.FileFromInfoLine(buildFile.infoLine(), ident(path))
+            f = files.FileFromInfoLine(buildFile.infoLine(), ident(path))
         elif realPath:
-            file = files.FileFromFilesystem(realPath, ident(path), 
-                                            type = buildFile.getType())
+            f = files.FileFromFilesystem(realPath, ident(path), 
+                                         type = buildFile.getType())
         else:
             raise RuntimeError, "unable to create file object for package"
 
-	duplicateVersion = checkBranchForDuplicate(repos, file.id(),
-						   cfg.defaultbranch, file)
+	duplicateVersion = checkBranchForDuplicate(repos, f.id(),
+						   cfg.defaultbranch, f)
         if not duplicateVersion:
-	    p.addFile(file.id(), path, bldPkg.getVersion())
+	    p.addFile(f.id(), path, bldPkg.getVersion())
 	else:
-	    p.addFile(file.id(), path, duplicateVersion)
+	    p.addFile(f.id(), path, duplicateVersion)
 
-        fileMap[file.id()] = (file, realPath, path)
+        fileMap[f.id()] = (f, realPath, path)
 
     return (p, fileMap)
 
@@ -199,8 +199,8 @@ class IdGen:
 		    # to enable a build, so we need to find the
 		    # sha1 hash of it since that's how it's indexed
 		    # in the file store
-		    file = repos.getFileVersion(fileId, version)
-		    lcache.addFileHash(path, file.sha1())
+		    f = repos.getFileVersion(fileId, version)
+		    lcache.addFileHash(path, f.sha1())
 
         self.map.update(fileIdMap)
 
