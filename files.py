@@ -533,15 +533,17 @@ class SourceFile(RegularFile):
     def __init__(self, fileId, info = None):
 	RegularFile.__init__(self, fileId, info, infoTag = "src")
 
-def FileFromFilesystem(path, fileId, type = None):
+def FileFromFilesystem(path, fileId, type = None, possibleMatch = None):
     s = os.lstat(path)
+
+    needsSha1 = 0
 
     if type == "src":
 	f = SourceFile(fileId)
-	f.sha1(sha1helper.hashFile(path))
+	needsSha1 = 1
     elif (stat.S_ISREG(s.st_mode)):
 	f = RegularFile(fileId)
-	f.sha1(sha1helper.hashFile(path))
+	needsSha1 = 1
     elif (stat.S_ISLNK(s.st_mode)):
 	f = SymbolicLink(fileId)
 	f.linkTarget(os.readlink(path))
@@ -566,6 +568,16 @@ def FileFromFilesystem(path, fileId, type = None):
     f.mtime(s.st_mtime)
     f.size(s.st_size)
     f.flags(0)
+    
+    # assume we have a match if the FileMode and object type match
+    if possibleMatch and (possibleMatch.__class__ == f.__class__):
+	f.flags(possibleMatch.flags())
+	if FileMode.same(f, possibleMatch):
+	    return possibleMatch
+	f.flags(0)
+
+    if needsSha1:
+	f.sha1(sha1helper.hashFile(path))
 
     return f
 
