@@ -8,11 +8,10 @@ Changes in 0.10.0:
   * Shared library dependency information in changesets is now stored
     in a different format.  This means that repositories that use old
     versions of Conary will be unable to give valid changesets to
-    Conary 0.10.0 or later.  Therefore the protocol version number has
+    Conary 0.10.0 or later.  Therefore, the protocol version number has
     been increased. 
   * --no-deps argument added
   * "cvc co" is now a synonym for "cvc checkout"
-  
 
 Changes in 0.9.6:
   * dependency enforcement infrastructure has been added (the code is
