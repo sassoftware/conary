@@ -392,6 +392,10 @@ class Version(AbstractVersion):
 
 	return self.versions[-1]
 
+    def sameVersion(self, other):
+	return self.versions[-1].getVersion() == \
+		    other.versions[-1].getVersion()
+
     def _listsEqual(self, list, other):
 	if len(other.versions) != len(list): return 0
 

@@ -131,9 +131,28 @@ def nextVersion(repos, troveName, versionStr, troveFlavor, currentBranch,
 	# new package or package uses new upstream version
         newVersion = currentBranch.copy()
         newVersion.appendVersionRelease(versionStr, 1)
+	newVersionBranch = newVersion.branch()
 
-        # append the build number if necessary
-	if binary:
+	# this is a good guess, but it could be wrong since the same version
+	# can appear at discountinuous points in the tree. it would be
+	# better if this search was done on the server (it could be much
+	# more efficient), but this works for now
+	allVersions = repos.getTroveVersionsByLabel([ troveName ],
+					     newVersionBranch.label())
+	lastOnBranch = None
+	for version in allVersions[troveName]:
+	    if version.onBranch(newVersionBranch) and \
+		version.sameVersion(newVersion) and \
+		(not lastOnBranch or version.isAfter(lastOnBranch)):
+		lastOnBranch = newVersion
+
+	if lastOnBranch:
+	    newVersion = lastOnBranch.copy()
+	    if binary:
+		newVersion.incrementBuildCount()
+	    else:
+		newVersion.incrementRelease()
+	elif binary:
 	    newVersion.incrementBuildCount()
     elif latestForFlavor != latest:
 	# this is a flavor that does not exist at the latest
