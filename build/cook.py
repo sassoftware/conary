@@ -402,7 +402,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     recipeObj.populateLcache()
     
     builddir = cfg.buildPath + "/" + recipeObj.name
-    use.track(True)
+    use.track(True, recipeObj.Flags)
 
     try:
 	recipeObj.setup()
@@ -439,7 +439,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	    log.info('Processing %s', recipeClass.name)
 	    recipeObj.doDestdirProcess() # includes policy
 	    bldInfo.stop()
-	    use.track(False)
+	    use.track(False, recipeObj.Flags)
 	finally:
 	    os.chdir(cwd)
     except Exception, e:

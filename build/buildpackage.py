@@ -44,13 +44,16 @@ def BuildDeviceFile(devtype, major, minor, owner, group, perms):
 
     return f
 
-def _getUseDependencySet():
+def _getUseDependencySet(recipe):
     """
     Returns a deps.DependencySet instance that represents the Use flags
     that have been used.
     """
     set = deps.DependencySet()
     flags = use.Use.getUsed()
+    pkgname = recipe.name + '.'
+    for key, value in recipe.Flags.getUsed().iteritems():
+	flags[pkgname + key] = value
     depFlags = []
     names = flags.keys()
     if names:
@@ -105,11 +108,11 @@ class BuildPackage(dict):
         """
 	return self.name
 
-    def __init__(self, name):
+    def __init__(self, name, recipe):
 	self.name = name
         self.requires = deps.DependencySet()
         self.provides = deps.DependencySet()
-        self.flavor = _getUseDependencySet()
+        self.flavor = _getUseDependencySet(recipe)
 	dict.__init__(self)
 
 
@@ -119,7 +122,7 @@ class AutoBuildPackage:
     provides facilities for automatically populating them with files
     according to Filters.
     """
-    def __init__(self, pkgFilters, compFilters):
+    def __init__(self, pkgFilters, compFilters, recipe):
         """
 	@param pkgFilters: Filters used to add files to main packages
 	@type pkgFilters: sequence of Filter instances
@@ -137,7 +140,7 @@ class AutoBuildPackage:
 	    for comp in self.compFilters:
 		name = self._getname(main.name, comp.name)
 		if name not in self.packages:
-		    self.packages[name] = BuildPackage(name)
+		    self.packages[name] = BuildPackage(name, recipe)
 		if main not in self.packageMap:
 		    self.packageMap[main] = {}
 		self.packageMap[main][comp] = self.packages[name]

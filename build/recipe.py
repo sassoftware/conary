@@ -37,6 +37,7 @@ import sys
 import tempfile
 import trove
 import types
+import use
 import util
 
 from fnmatch import fnmatchcase
@@ -305,6 +306,7 @@ class Recipe:
 
 class PackageRecipe(Recipe):
     buildRequires = []
+    Flags = use.Flag(showdefaults=True)
     
     def mainDir(self, new = None):
 	if new:

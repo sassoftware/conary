@@ -354,9 +354,11 @@ Arch.bits64.setShortDoc('True if the current architecture is 64-bit')
 Arch._freeze()
 _addDocs(Arch)
 
-def track(arg):
+def track(arg, localflags=None):
     """
     Turns Use flag tracking on or off.
     """
     Arch.trackUsed(arg)
     Use.trackUsed(arg)
+    if localflags is not None:
+	localflags.trackUsed(arg)
