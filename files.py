@@ -13,7 +13,7 @@ import types
 import time
 import lookaside
 
-_FILE_FLAG_CONFIG = 0x01
+_FILE_FLAG_CONFIG = 1 << 0
 
 class FileMode:
     def merge(self, mode):
