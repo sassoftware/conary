@@ -798,7 +798,7 @@ def VersionFromString(ver, defaultBranch = None, timeStamps = []):
 	return NewVersion()
 
     v = stringVersionCache.get(ver, None)
-    if v is not None and v.timeStamps() == timeStamps:
+    if v is not None and (not timeStamps or v.timeStamps() == timeStamps):
 	return v
 
     v = _VersionFromString(ver, defaultBranch, timeStamps = timeStamps)
