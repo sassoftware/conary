@@ -265,7 +265,9 @@ def handler(req):
 
     port = req.server.port
     if not port:
-	port = 80
+        port = req.parsed_uri[apache.URI_PORT]
+        if not port:
+            port = 80
     secure = (port == 443)
     
     repos = repositories[repName]
