@@ -100,7 +100,10 @@ class ChangeSet:
 
     def remapPaths(self, map):
 	for pkgCs in self.newPackages.values():
-	    pkgCs.remapPaths(map)
+	    dict = { 'pkgname' : pkgCs.getName().split(":")[2],
+		     'branchnick' : 
+			str(pkgCs.getNewVersion().branch().branchNickname()) }
+	    pkgCs.remapPaths(map, dict)
 
     def formatToFile(self, cfg, f):
 	for pkg in self.newPackages.values():

@@ -227,14 +227,14 @@ class PackageChangeSet:
 	for fileId in self.oldFiles:
 	    f.write("\tremoved %s(.*)%s\n" % (fileId[:6], fileId[-6:]))
 
-    def remapSinglePath(self, path, map):
+    def remapSinglePath(self, path, map, dict):
 	# the first item in map remaps source packages, which are present
 	# without a leading /
 	newPath = path
 
 	if path[0] != "/":
 	    shortName = self.name.split(':')[-2]
-	    prefix = map[0][1]% {'pkgname': shortName } 
+	    prefix = map[0][1] % dict
 	    newPath = prefix + path
 	else:
 	    for (prefix, newPrefix) in map[1:]:
@@ -243,11 +243,11 @@ class PackageChangeSet:
 
 	return newPath
 
-    def remapPaths(self, map):
+    def remapPaths(self, map, dict):
 	for list in ( self.changedFiles, self.newFiles ):
 	    for i in range(0,len(list)):
 		if list[i][1]:
-		    newPath = self.remapSinglePath(list[i][1], map)
+		    newPath = self.remapSinglePath(list[i][1], map, dict)
 		    if newPath != list[i][1]:
 			list[i] = (list[i][0], newPath, list[i][2])
 
