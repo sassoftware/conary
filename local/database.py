@@ -28,6 +28,12 @@ class AbstractDatabase(repository.AbstractRepository):
 	return [ x.getVersion().branch() for x in 
 		    self.troveDb.iterFindByName(name)]
 
+    def getPackageVersion(self, name, version):
+	l = [ x for x in self.troveDb.iterFindByName(name)
+		 if version.equal(x.getVersion())]
+	assert(len(l) == 1)
+	return l[0]
+
     def pkgLatestVersion(self, name, branch):
 	return [ x.getVersion() for x in self.troveDb.iterFindByName(name)
 		     if branch.equal(x.getVersion().branch())][0]
@@ -51,8 +57,10 @@ class AbstractDatabase(repository.AbstractRepository):
     def getPackageVersionList(self, name):
 	return [ x.getVersion() for x in self.troveDb.iterFindByName(name) ]
 
-    def getFileVersion(self, fileId, version, path = None):
-	return self.stash.getFileVersion(fileId, version)
+    def getFileVersion(self, fileId, version, path = None, 
+		       withContents = False):
+	return self.stash.getFileVersion(fileId, version, 
+					 withContents = withContents)
 
     # takes an abstract change set and creates a differential change set 
     # against a branch of the repository
