@@ -265,6 +265,11 @@ class _FileAction(BuildAction):
 
     def chmod(self, destdir, path):
 	if self.mode >= 0:
+            # fixup obviously broken permissions
+	    if _permmap.has_key(self.mode):
+                log.warning('odd permission %o, correcting to %o: add initial "0"?' \
+                            %(mode, _permmap[self.mode]))
+		self.mode = _permmap[self.mode]
 	    os.chmod(destdir+os.sep+path, self.mode & 01777)
 	    if self.mode & 06000:
 		self.recipe.AddModes(self.mode, path)
@@ -325,13 +330,12 @@ class SetModes(_FileAction):
     In addition, of course, it can be used to change arbitrary
     file modes in the destdir.
     """
-    def __init__(self, path, mode, use=None, component=None):
-	self.mode = mode
+    
+    def __init__(self, path, mode, **keywords):
+        _FileAction.__init__(self, **keywords) 
 	if type(path) is str:
 	    path = (path,)
 	self.paths = path
-	self.component=component
-	self.use = util.checkUse(use)
 
     def do(self, macros):
 	files = []
@@ -343,6 +347,8 @@ class SetModes(_FileAction):
 	    self.setComponents(f)
 
 class _PutFiles(_FileAction):
+    keywords = { 'mode': -1 }
+
     def do(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 	destlen = len(macros['destdir'])
@@ -363,33 +369,24 @@ class _PutFiles(_FileAction):
 		else:
 		    util.copyfile(source, thisdest)
 		self.setComponents(thisdest[destlen:])
+                self.chmod(macros['destdir'], thisdest[destlen:])
 
-		if self.mode >= 0:
-		    self.chmod(macros['destdir'], thisdest[destlen:])
-
-    def __init__(self, fromFiles, toFile, mode, use, component):
+    def __init__(self, fromFiles, toFile, **keywords):
+        _FileAction.__init__(self, **keywords)
 	self.toFile = toFile
 	if type(fromFiles) is str:
 	    self.fromFiles = (fromFiles,)
 	else:
 	    self.fromFiles = fromFiles
-	self.component = component
-	# notice obviously broken permissions
-	if mode >= 0:
-	    if _permmap.has_key(mode):
-                log.warning('odd permission %o, correcting to %o: add initial "0"?' \
-                            %(mode, _permmap[mode]))
-		mode = _permmap[mode]
-	self.mode = mode
-	self.use = util.checkUse(use)
-    
 
 class InstallFiles(_PutFiles):
     """
     This class installs files from the builddir to the destdir.
     """
-    def __init__(self, fromFiles, toFile, mode = 0644, use=None, component=None):
-	_PutFiles.__init__(self, fromFiles, toFile, mode, use, component)
+
+    def __init__(self, fromFiles, toFile, mode=0644, **keywords):
+	_PutFiles.__init__(self, fromFiles, toFile, **keywords)
+        self.mode = mode
 	self.source = ''
 	self.move = 0
 
@@ -397,8 +394,8 @@ class MoveFiles(_PutFiles):
     """
     This class moves files within the destdir.
     """
-    def __init__(self, fromFiles, toFile, mode = -1, use=None, component=None):
-	_PutFiles.__init__(self, fromFiles, toFile, mode, use, component)
+    def __init__(self, fromFiles, toFile, **keywords):
+	_PutFiles.__init__(self, fromFiles, toFile, **keywords)
 	self.source = '%(destdir)s'
 	self.move = 1
 
@@ -410,6 +407,8 @@ class InstallSymlinks(_FileAction):
     exists or if the path ends with the directory separator character
     ("/" on UNIX systems)
     """
+
+    keywords = { 'allowDangling': False }
     def do(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 
@@ -466,7 +465,7 @@ class InstallSymlinks(_FileAction):
             log.debug('creating symlink %s -> %s' %(to, source))
 	    os.symlink(os.path.normpath(source), to)
 
-    def __init__(self, fromFiles, toFile, use=None, component=None, allowDangling=False):
+    def __init__(self, fromFiles, toFile, **keywords):
         """
         Create a new InstallSymlinks instance
 
@@ -475,27 +474,23 @@ class InstallSymlinks(_FileAction):
         @param toFile: path to create the symlink, or a directory in which
                        to create multiple symlinks
         @type toFile: str
-	@param use: Optional argument; Use flag(s) telling whether
-	to actually perform the action.
-	@type use: None, Use flag, or sequence of Use flags
-        @param allowDangling: Optional argument; set to True to allow the
+        @keyword allowDangling: Optional argument; set to True to allow the
         creation of dangling symlinks
         @type allowDangling: bool
         """
+        _FileAction.__init__(self, fromFiles, toFile, **keywords)
 	# raise error early
 	if type(fromFiles) is not str:
 	    if not toFile.endswith('/') or os.path.isdir(toFile):
 		raise TypeError, 'too many targets for non-directory %s' %toFile
 	self.fromFiles = fromFiles
 	self.toFile = toFile
-	self.use = util.checkUse(use)
-	self.component = component
-        self.allowDangling = allowDangling
 
 class RemoveFiles(BuildAction):
     """
     The RemoveFiles class removes files from within the destdir
     """
+    keywords = { 'recursive': False }
     def do(self, macros):
 	for filespec in self.filespecs:
 	    if self.recursive:
@@ -503,19 +498,21 @@ class RemoveFiles(BuildAction):
 	    else:
 		util.remove("%s/%s" %(macros['destdir'], filespec %macros))
 
-    def __init__(self, filespecs, recursive=0, use=None):
+    def __init__(self, filespecs, **keywords):
+        BuildAction.__init__(self, **keywords)
 	if type(filespecs) is str:
 	    self.filespecs = (filespecs,)
 	else:
 	    self.filespecs = filespecs
-	self.recursive = recursive
-	self.use = util.checkUse(use)
 
 class InstallDocs(_FileAction):
     """
     The InstallDocs class installs documentation files from the builddir
     into the destdir in the appropriate directory.
     """
+    keywords = {'devel' :  False,
+                'subdir':  ''}
+    
     def do(self, macros):
 	macros = macros.copy()
 	destlen = len(macros['destdir'])
@@ -525,17 +522,15 @@ class InstallDocs(_FileAction):
 	dest = '%(destdir)s/'%macros + base
 	util.mkdirChain(os.path.dirname(dest))
 	for path in self.paths:
-	    for newpath in util.copytree(path, dest, True):
+	    for newpath in util.copytree(path %macros, dest, True):
 		self.setComponents(newpath[destlen:])
 
-    def __init__(self, paths, component=None, subdir='', use=None):
-	if type(paths) is str:
-	    self.paths = (paths,)
+    def __init__(self, *args, **keywords):
+        BuildAction.__init__(self, *args, **keywords)
+	if type(args[0]) is tuple:
+	    self.paths = args[0]
 	else:
-	    self.paths = paths
-	self.component = component
-	self.subdir = subdir
-	self.use = util.checkUse(use)
+	    self.paths = args
 
 class MakeDirs(_FileAction):
     """
@@ -554,17 +549,11 @@ class MakeDirs(_FileAction):
                 log.debug('creating directory %s', dest)
 		self.setComponents(d)
                 util.mkdirChain(dest)
-                if self.mode >= 0:
-                    self.chmod(macros['destdir'], d)
+                self.chmod(macros['destdir'], d)
 
-    def __init__(self, paths, **keywords):
-        _FileAction.__init__(self, paths, **keywords)
-	if type(paths) is str:
-	    self.paths = (paths,)
+    def __init__(self, *args, **keywords):
+        _FileAction.__init__(self, *args, **keywords)
+	if type(args[0]) is tuple:
+	    self.paths = args[0]
 	else:
-	    self.paths = paths
-	if self.mode >= 0:
-	    if _permmap.has_key(self.mode):
-		log.warning('odd permission %o, correcting to %o: add initial "0"?' \
-                            %(mode, _permmap[self.mode]))
-		mode = _permmap[self.mode]
+	    self.paths = args
