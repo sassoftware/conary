@@ -51,8 +51,8 @@ class DataStore:
     # add one to the reference count for a file which already exists
     # in the archive
     def addFileReference(self, hash):
-	count = self.readCount(path)
-	self.writeCount(path, count + 1)
+	count = self.readCount(hash)
+	self.writeCount(hash, count + 1)
 	return
 
     # list addFile, but this returns a file pointer which can be used
