@@ -8,20 +8,22 @@ Contains the base Recipe class, default macros, and miscellaneous
 components used by srs .recipe files
 """
 
-import imp, sys
-import os
-import util
 import build
-import destdirpolicy
-import packagepolicy
-import shutil
-import types
-import inspect
-import lookaside
-import rpmhelper
-import gzip
 import buildpackage
+import destdirpolicy
+import gzip
+import helper
+import imp
+import inspect
 import log
+import lookaside
+import os
+import packagepolicy
+import rpmhelper
+import shutil
+import sys
+import types
+import util
 
 baseMacros = (
     # Note that these macros cannot be represented as a dictionary,
@@ -146,6 +148,7 @@ class RecipeLoader(types.DictionaryType):
         f = open(filename)
 
         exec 'from recipe import PackageRecipe' in self.module.__dict__
+        exec 'from recipe import GroupRecipe' in self.module.__dict__
         exec 'from recipe import loadRecipe' in self.module.__dict__
         exec 'import build, os, package, sys, util' in self.module.__dict__
         exec 'from use import Use, Arch' in self.module.__dict__
@@ -174,10 +177,17 @@ class RecipeLoader(types.DictionaryType):
                 continue
             # make sure the class is derived from Recipe
             # and has a name
-            if issubclass(obj, Recipe) and hasattr(obj, 'name'):
+            if issubclass(obj, PackageRecipe) and hasattr(obj, 'name'):
                 if obj.name.startswith('group-'):
                     raise RecipeFileError(
-                        'Error in recipe file "%s": name cannot '
+                        'Error in recipe file "%s": package name cannot '
+                        'begin with "group-"' %os.path.basename(filename))
+                obj.filename = filename
+                self[name] = obj
+	    elif issubclass(obj, GroupRecipe) and hasattr(obj, 'name'):
+                if not obj.name.startswith('group-'):
+                    raise RecipeFileError(
+                        'Error in recipe file "%s": group name must '
                         'begin with "group-"' %os.path.basename(filename))
                 obj.filename = filename
                 self[name] = obj
@@ -575,15 +585,25 @@ class PackageRecipe(Recipe):
 	if extraMacros:
 	    self.addMacros(extraMacros)
 
-class GroupRecipe():
+class GroupRecipe(Recipe):
 
-    def addTrove(self, name, version):
-	self.troveVersions[name] = version
+    def addTrove(self, name, versionStr):
+	try:
+	    pkgList = helper.findPackage(self.repos, self.cfg.packagenamespace,
+				     None, name, versionStr)
+	except helper.PackageNotFound, e:
+	    raise RecipeFileError, str(e)
+
+	versionList = [ x.getVersion() for x in pkgList ]
+	self.troveVersions[pkgList[0].getName()] = versionList
+
+    def getTroveList(self):
+	return self.troveVersions
 
     def __init__(self, repos, cfg):
 	self.repos = repos
 	self.cfg = cfg
-	self.troveVersions = []
+	self.troveVersions = {}
 
 class RecipeFileError(Exception):
     def __init__(self, msg):
