@@ -126,7 +126,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	v = self.s.getTroveLatestVersion(troveName, b)
         if v == 0:
             raise repository.PackageMissing(troveName, branch)
-	return self.toVersion(v)
+	return self.thawVersion(v)
 
     def getTrove(self, troveName, troveVersion, troveFlavor):
 	rc = self.getTroves([(troveName, troveVersion, troveFlavor)])

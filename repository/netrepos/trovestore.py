@@ -167,7 +167,7 @@ class TroveStore:
 	"""
 	cu = self.db.cursor()
 	cu.execute("""
-	    SELECT version FROM 
+	    SELECT version, timeStamps FROM 
 		(SELECT itemId AS AitemId, branchId as AbranchId FROM labelMap
 		    WHERE itemId=(SELECT itemId from Items 
 				WHERE item=%s)
@@ -175,10 +175,15 @@ class TroveStore:
 				WHERE branch=%s)
 		) JOIN Latest ON 
 		    AitemId=Latest.itemId AND AbranchId=Latest.branchId
-		NATURAL JOIN Versions
+		JOIN Nodes ON
+		    AitemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
+		JOIN Versions ON
+		    Nodes.versionId = versions.versionId
 	""", troveName, branch.asString())
         try:
-            return versions.VersionFromString(cu.next()[0])
+	    (verStr, timeStamps) = cu.next()
+            return versions.VersionFromString(verStr,
+		    timeStamps = [ float(x) for x in timeStamps.split(":") ] )
         except StopIteration:
             raise KeyError, (troveName, branch)
 

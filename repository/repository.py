@@ -63,6 +63,9 @@ class AbstractTroveDatabase:
 
 	dupFilter = {}
 
+	# make a copy to remove things from
+	packageList = packageList[:]
+
 	# don't use a for in here since we grow packageList inside of
 	# this loop
 	while packageList:
@@ -282,7 +285,8 @@ class IdealRepository(AbstractTroveDatabase):
 	item in the dictionary is a list of all of the leaf versions for
 	that trove which are on a branch w/ the given label. If a trove
 	does not have any branches for the given label, the version list
-	for that trove name will be empty.
+	for that trove name will be empty. The versions returned include
+	timestamps.
 
 	@param troveNameList: trove names
 	@type troveNameList: list of str
@@ -310,7 +314,7 @@ class IdealRepository(AbstractTroveDatabase):
 	"""
 	Returns the version of the latest version of a trove on a particular
 	branch. If that branch doesn't exist for the trove, PackageMissing
-	is raised.
+	is raised. The version returned includes timestamps.
 
 	@param troveName: package name
 	@type troveName: str

@@ -155,8 +155,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    raise InsufficientPermission
 
         try:
-            return self.fromVersion(self.repos.troveStore.troveLatestVersion(pkgName, 
-					     self.toBranch(branchStr)))
+            return self.freezeVersion(
+			self.repos.troveStore.troveLatestVersion(pkgName, 
+						     self.toBranch(branchStr)))
         except KeyError:
             return 0
 
