@@ -13,6 +13,7 @@ Changes in 0.50.1:
   * getChangeSet() results in a single URL rather than one per primary trove
   * group, fileset, and redirect recipes have macros that contain the
     buildlabel and buildbranch.
+  * fixed a bug with merging absolute change sets which contain config files
 
 Changes in 0.50.0:
   * Redirections work
