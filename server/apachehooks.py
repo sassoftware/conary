@@ -114,7 +114,9 @@ def getFile(repos, req):
     req.content_type = "application/x-conary-change-set"
     req.sendfile(items[0][0])
 
-    if not localName.endswith(".cf-out"):
+    # erase single files
+    if not localName.endswith(".cf-out") and \
+           (req.args[0:6] != "cache-" or not repos.cacheChangeSets()):
         os.unlink(items[0][0])
 
     return apache.OK
