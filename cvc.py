@@ -12,7 +12,8 @@ argDef = {}
 argDef['dir'] = 1
 
 def usage(rc = 1):
-    print "usage: srs source checkin <file>"
+    print "usage: srs source add <file>"
+    print "       srs source checkin <file>"
     print "       srs source checkout [--dir <dir>] <group> <version>"
     print "       srs source commit"
     print "       srs source diff"
@@ -21,8 +22,11 @@ def usage(rc = 1):
 def sourceCommand(cfg, args, argSet):
     if not args:
 	usage()
-    elif (args[0] == "usage"):
-	usage(rc = 0)
+    elif (args[0] == "add"):
+	if len(args) != 2: usage()
+	repos = repository.LocalRepository(cfg.reppath, "c")
+
+	checkin.addFile(repos, args[1])
     elif (args[0] == "checkin"):
 	if argSet or len(args) != 2: usage()
 	repos = repository.LocalRepository(cfg.reppath, "c")
@@ -40,19 +44,24 @@ def sourceCommand(cfg, args, argSet):
 	args = [repos, cfg, dir] + args[1:]
 	checkin.checkout(*args)
     elif (args[0] == "commit"):
+	if len(args) != 1: usage()
 	repos = repository.LocalRepository(cfg.reppath, "w")
 
 	if argSet or len(args) != 1: usage()
-	checkin.commit(repos, cfg)
+	checkin.commit(repos)
     elif (args[0] == "diff"):
+	if len(args) != 1: usage()
 	repos = repository.LocalRepository(cfg.reppath, "r")
 
 	if argSet or len(args) != 1: usage()
-	checkin.diff(repos, cfg)
+	checkin.diff(repos)
     elif (args[0] == "update"):
+	if len(args) != 1: usage()
 	repos = repository.LocalRepository(cfg.reppath, "r")
 
 	if argSet or len(args) != 1: usage()
-	checkin.update(repos, cfg)
+	checkin.update(repos)
+    elif (args[0] == "usage"):
+	usage(rc = 0)
     else:
 	usage()
