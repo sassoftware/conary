@@ -170,11 +170,6 @@ class AbstractDatabase(repository.AbstractRepository):
 	    # add new packages
 	    if toStash: job.commit()
 
-	    for pkg in fsJob.getNewPackageList():
-		self.troveDb.addTrove(pkg)
-	    for (name, version) in fsJob.getOldPackageList():
-		self.troveDb.delTrove(name, version)
-
 	    # remove old packages
 	    errList = fsJob.getErrorList()
 	    if errList:
@@ -196,6 +191,12 @@ class AbstractDatabase(repository.AbstractRepository):
 	    self.addRollback(inverse, localChanges)
 
 	fsJob.apply()
+
+	# it would be nice if this could be undone on failure
+	for pkg in fsJob.getNewPackageList():
+	    self.troveDb.addTrove(pkg)
+	for (name, version) in fsJob.getOldPackageList():
+	    self.troveDb.delTrove(name, version)
 
     # this is called when a Repository wants to store a file; we never
     # want to do this; we copy files onto the filesystem after we've
