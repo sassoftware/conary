@@ -168,7 +168,10 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     state.write(dir + "/SRS")
 
 def commit(repos):
-    state = SourceStateFromFile("SRS")
+    try:
+        state = SourceStateFromFile("SRS")
+    except OSError:
+        return
 
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
@@ -207,7 +210,11 @@ def commit(repos):
 	newState.write("SRS")
 
 def diff(repos, versionStr = None):
-    state = SourceStateFromFile("SRS")
+    try:
+        state = SourceStateFromFile("SRS")
+    except OSError:
+        return
+
     if state.getVersion().equal(versions.NewVersion()):
 	log.error("no versions have been committed")
 	return
@@ -273,7 +280,10 @@ def diff(repos, versionStr = None):
 	print "%s: removed" % path
 	
 def updateSrc(repos, versionStr = None):
-    state = SourceStateFromFile("SRS")
+    try:
+        state = SourceStateFromFile("SRS")
+    except OSError:
+        return
     pkgName = state.getName()
     baseVersion = state.getVersion()
     
@@ -318,7 +328,10 @@ def updateSrc(repos, versionStr = None):
     newState.write("SRS")
 
 def addFile(file):
-    state = SourceStateFromFile("SRS")
+    try:
+        state = SourceStateFromFile("SRS")
+    except OSError:
+        return
 
     try:
 	os.lstat(file)
@@ -337,7 +350,10 @@ def addFile(file):
     state.write("SRS")
 
 def removeFile(file):
-    state = SourceStateFromFile("SRS")
+    try:
+        state = SourceStateFromFile("SRS")
+    except OSError:
+        return
 
     if not state.removeFilePath(file):
 	log.error("file %s is not under management" % file)
@@ -367,7 +383,10 @@ def newPackage(repos, cfg, name):
     state.write(dir + "/" + "SRS")
 
 def renameFile(oldName, newName):
-    state = SourceStateFromFile("SRS")
+    try:
+        state = SourceStateFromFile("SRS")
+    except OSError:
+        return
 
     if not os.path.exists(oldName):
 	log.error("%s does not exist or is not a regular file" % oldName)
