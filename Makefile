@@ -71,7 +71,7 @@ install: all
 		ln -sf srs-wrapper $(bindir)/$$f; \
 	done
 
-dist:
+dist: $(dist_files)
 	rm -rf $(distdir)
 	mkdir $(distdir)
 	for f in $(dist_files); do \
