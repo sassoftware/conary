@@ -135,6 +135,45 @@ class ConfigFile:
         elif type == FLAVOR:
             self.__dict__[key] = deps.deps.parseFlavor(val)
 
+    def displayKey(self, key, value, type, out):
+        if type == STRING:
+            out.write("%-25s %s\n" % (key, self.__dict__[key]))
+        elif type == LABEL:
+            out.write("%-25s %s\n" % (key, self.__dict__[key].asString()))
+        elif type == LABELLIST:
+            out.write("%-25s %s\n" % (key, " ".join([x.asString() for x in self.__dict__[key]])))
+        elif type == STRINGPATH:
+            out.write("%-25s %s\n" % (key, ":".join(self.__dict__[key])))
+        elif type == STRINGDICT:
+            d = self.__dict__[key]
+            idxs = d.keys()
+            idxs.sort()
+            for idx in idxs:
+                out.write("%-25s %-25s %s\n" % (key, idx, d[idx]))
+        elif type == CALLBACK:
+            self.__dict__[key]('display')
+        elif type == FLAVOR:
+            flavorStr = deps.deps.formatFlavor(self.__dict__[key])
+            flavorList = flavorStr.split(",")
+
+            str = ""
+            hdr = key
+            for key in flavorList:
+                if len(str) + len(key) > 40:
+                    out.write("%-25s %s\n" % (hdr, str))
+                    str = ""
+                    hdr = ""
+                str += key + ","
+
+            # chop off the trailing ,
+            str = str[:-1]
+            out.write("%-25s %s\n" % (hdr, str))
+        elif type == BOOL:
+            out.write("%-25s %s\n" % (key, bool(self.__dict__[key])))
+        else:
+            out.write("%-25s (unknown type)\n" % (key))
+
+
     def display(self, out=None):
         if out is None:
             out = sys.stdout
@@ -145,44 +184,7 @@ class ConfigFile:
 		t = self.defaults[item][0]
 	    else:
 		t = STRING
-
-	    if t == STRING:
-		out.write("%-25s %s\n" % (item, self.__dict__[item]))
-	    elif t == LABEL:
-		out.write("%-25s %s\n" % (item, self.__dict__[item].asString()))
-	    elif t == LABELLIST:
-		out.write("%-25s %s\n" % (item, " ".join([x.asString() for x in self.__dict__[item]])))
-	    elif t == STRINGPATH:
-		out.write("%-25s %s\n" % (item, ":".join(self.__dict__[item])))
-	    elif t == STRINGDICT:
-		d = self.__dict__[item]
-		idxs = d.keys()
-		idxs.sort()
-		for idx in idxs:
-		    out.write("%-25s %-25s %s\n" % (item, idx, d[idx]))
-	    elif t == CALLBACK:
-		self.__dict__[item]('display')
-	    elif t == FLAVOR:
-                flavorStr = deps.deps.formatFlavor(self.__dict__[item])
-                flavorList = flavorStr.split(",")
-
-                str = ""
-                hdr = item
-                for item in flavorList:
-                    if len(str) + len(item) > 40:
-                        out.write("%-25s %s\n" % (hdr, str))
-                        str = ""
-                        hdr = ""
-                    str += item + ","
-
-                # chop off the trailing ,
-                str = str[:-1]
-                out.write("%-25s %s\n" % (hdr, str))
-	    elif t == BOOL:
-		out.write("%-25s %s\n" % (item, bool(self.__dict__[item])))
-	    else:
-		out.write("%-25s (unknown type)\n" % (item))
-
+            self.displayKey(item, self[item], t, out)
 
     def __init__(self):
 	self.types = {}
@@ -222,6 +224,7 @@ class ConaryConfiguration(ConfigFile):
 	'sourceSearchDir'	: '.',
 	'tmpDir'		: '/var/tmp/',
         'useDir'                : '/etc/conary/use',
+        'archDir'               : '/etc/conary/arch',
     }
 
     def __init__(self, readConfigFiles=True):
@@ -244,65 +247,14 @@ class ConaryConfiguration(ConfigFile):
 	if key.find('.') != -1:
 	    directive,arg = key.split('.', 1)
 	    directive = directive.lower()
-	    if directive in ('use', 'flags', 'arch', 'macros'):
+	    if directive in ('macros'):
 		return self.checkFlagKey(directive, arg)
 	return ConfigFile.checkKey(self, key, file)
 	
     def checkFlagKey(self, directive, key):
-	if directive == 'use':
-	    if key not in use.Use:
-		raise ParseError, ("%s:%s: Unknown Use flag %s" % (file, self.lineno, key))
-	    else:
-		self.useflags[key] = True
-		return ('Use.' + key, BOOL)
 	if directive == 'macros':
 	    self.macroflags[key] = True
 	    return ('macros.' + key, STRING)
-	elif directive == 'arch':
-	    dicts = key.split('.')
-	    flag = dicts[-1]
-	    dicts = dicts[:-1]
-	    curdict = self.archflags
-	    for subdict in dicts:
-		if not subdict in curdict:
-		    # flag value, subflags
-		    curdict[subdict] = [ None, {} ]
-		curdict = curdict[subdict][1]
-	    if flag in curdict:
-		curdict[flag][0] = True
-	    else:
-		curdict[flag] = [ True, {} ]
-	    return ('Arch.' + key, BOOL)
-	elif directive == 'flags':
-	    if key.find('.') == -1:
-		raise ParseError, ("%s:%s: Flag %s must be of form package.flag" % (file, self.lineno, key))
-	    else:
-		package, flag = key.split('.', 1)
-		if package not in self.pkgflags:
-		    self.pkgflags[package] = {}
-		self.pkgflags[package][flag] = True
-		return ('Flags.' + key, BOOL)
-
-    def _archKeys(self, prefix, curdict):
-	keylist = []
-	for key in curdict.keys():
-	    if curdict[key][0]:
-		keylist.append(prefix + key)
-	    if curdict[key][1]:
-		keylist.extend(self._archKeys(''.join([prefix,key,'.']), curdict[key][1]))
-	return keylist
-
-    def archKeys(self):
-	return self._archKeys('', self.archflags)
-
-    def listPkgs(self):
-	return self.pkgflags.keys()
-
-    def pkgKeys(self, pkg):
-	return self.pkgflags.get(pkg, {}).keys()
-
-    def useKeys(self):
-	return self.useflags.keys()
 
     def macroKeys(self):
 	return self.macroflags.keys()
@@ -311,14 +263,6 @@ class ConaryConfiguration(ConfigFile):
         if out is None:
             out = sys.stdout
         ConfigFile.display(self, out=out)
-        for key in sorted(self.archKeys()):
-            out.write('Arch.%-20s %-25s\n' % (key, self['Arch.' + key]))
-        for key in sorted(self.useKeys()):
-            out.write('Use.%-21s %-25s\n' % (key, self['Use.' + key]))
-        for pkg in sorted(self.listPkgs()):
-            for flag in sorted(self.pkgKeys(pkg)):
-                key = 'Flags.%s.%s' % (pkg, flag)
-                out.write('%-25s %-25s\n' % (key, self[key]))
         for macro in sorted(self.macroflags.keys()):
             key = 'macros.' + macro
             out.write('%-25s %-25s\n' % (key, self[key]))
@@ -343,40 +287,3 @@ class ParseError(ConaryCfgError):
 
     def __init__(self, str):
 	self.str = str
-
-def UseFlagDirectory(path):
-    """
-    Returns a dependency set reflecting the use flags specified by 
-    directory path.
-    """
-
-    flags = []
-    useFlags = deps.deps.DependencySet()
-
-    if not os.path.exists(path):
-	return useFlags
-
-    for flag in os.listdir(path):
-        filePath = os.path.join(path, flag)
-        size = os.stat(filePath).st_size
-        if not size:
-            sense = deps.deps.FLAG_SENSE_PREFERRED
-        else:
-            val = open(filePath).read().strip().lower()
-            if val == "disallowed":
-                sense = deps.deps.FLAG_SENSE_DISALLOWED
-            elif val == "preferred":
-                sense = deps.deps.FLAG_SENSE_PREFERRED
-            elif val == "prefernot":
-                sense = deps.deps.FLAG_SENSE_PREFERNOT
-            elif val == "required":
-                sense = deps.deps.FLAG_SENSE_REQUIRED
-            else:
-		raise ParseError, ("%s: unknown use value %s") % (filePath, val)
-                
-        flags.append((flag, sense))
-
-    useFlags.addDep(deps.deps.UseDependency, 
-                    deps.deps.Dependency("use", flags))
-
-    return useFlags

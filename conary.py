@@ -35,6 +35,7 @@ import constants
 import cscmd
 import deps
 import display
+import flavorcfg
 from lib import log
 from lib import options
 from lib import util
@@ -192,12 +193,9 @@ def realMain(cfg, argv=sys.argv):
     # XXX initialization of lots of this stuff should likely live somewhere
     # else, instead of conary.py, so that other applications do not
     # have to duplicate this code.
-    if cfg.useDir:
-        # the flavor from the rc file wins
-        useFlags = conarycfg.UseFlagDirectory(cfg.useDir)
-        useFlags.union(cfg.flavor, 
-                       mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
-        cfg.flavor = useFlags
+    # the flavor from the rc file wins
+    flavorConfig = flavorcfg.FlavorConfig(cfg.useDir, cfg.archDir)
+    cfg.flavor = flavorConfig.toDependency(override=cfg.flavor)
 
     if not deps.deps.DEP_CLASS_IS in cfg.flavor.getDepClasses():
         insSet = deps.deps.DependencySet()
@@ -205,10 +203,12 @@ def realMain(cfg, argv=sys.argv):
             insSet.addDep(deps.deps.InstructionSetDependency, dep)
         cfg.flavor.union(insSet)
 
-    # default the buildFlavor to be the same as the system flavor, unless
-    # it is specified in the config file
-    if cfg.buildFlavor is None:
-        cfg.buildFlavor = cfg.flavor.copy()
+    # buildFlavor is installFlavor + overrides
+    buildFlavor = cfg.flavor.copy()
+    buildFlavor.union(cfg.buildFlavor, 
+                      mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
+    cfg.buildFlavor = buildFlavor
+                       
 
     profile = False
     if argSet.has_key('profile'):

@@ -50,27 +50,8 @@ def _getUseDependencySet(recipe):
     Returns a deps.DependencySet instance that represents the Use flags
     that have been used.
     """
-    set = deps.DependencySet()
-    flags = use.Use.getUsed()
-    pkgname = recipe.name + '.'
-    for key, value in recipe.Flags.getUsed().iteritems():
-	flags[pkgname + key] = value
-    depFlags = []
-    names = flags.keys()
-    if names:
-        names.sort()
-        for name in names:
-            val = flags[name]
-            if val:
-                if val.getRequired():
-                    depFlags.append((name, deps.FLAG_SENSE_REQUIRED))
-                else:
-                    depFlags.append((name, deps.FLAG_SENSE_PREFERRED))
-            else:
-                depFlags.append((name, deps.FLAG_SENSE_PREFERNOT))
-        dep = deps.Dependency('use', depFlags)
-        set.addDep(deps.UseDependency, dep)
-    return set
+    return use.createFlavor(recipe.name, use.Use._iterUsed(), 
+                                         recipe.Flags._iterUsed())
     
 class BuildPackage(dict):
 

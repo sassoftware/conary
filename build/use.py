@@ -11,113 +11,115 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+# Class hierarchy:
+#
+# Flag
+#  |
+#  +--UseFlag
+#  |
+#  +--SubArchFlag
+#  |
+#  +--LocalFlag
+
+# Collection
+#  | 
+#  +--UseCollection          
+#  | 
+#  +--ArchCollection
+#  | 
+#  +--LocalFlagCollection
+#
+# MajorArch derives from CollectionWithFlag, which is a subclass of Flag and 
+# Collection. (maybe CollectionWithFlag and MajorArch should be collapsed?)
 
 """
 Provides the build configuration as special dictionaries that directly
 export their namespaces.
-
-Should read, or be provided, some sort of configuration information
-relative to the build being done.  For now, we'll intialize a static
-configuration sufficient to build.
-
 """
+
+# document --no-clean
+# document --unknown-flags
+# document --use-flavor
+# XXX left to do:  tests for some new behavior, setArch, 
+# and setBuildFlagsFromFlavor, setStrictMode
+# XXX tests for flavorcfg class
+# adding options for allowing Use.nonExistant to return false but track,
+# check that behavior
+
+import itertools
+
+#conary
 from deps import deps
-from lib import log
 
 class Flag(dict):
-    """
-    Implements a dictionary which also has its own value; used to
-    create hierarchical dictionaries.  It also may contain a
-    short summary (a sentence fragment) and a longer description
-    (can be multiple paragraphs) of documentation.
 
-    Magic is used to make the initialization of the object easy.
-    """
-    def __init__(self, value=None, name=None, showdefaults=True, parent=None, 
-                 createOnAccess=False, required=True, track=False, 
-                 inFlavor=True, flavorName=None, subsumes = None):
-	self._showdefaults = showdefaults
-        assert(isinstance(value, bool) or value is None)
-        self._value = value
-        self._short = ""
-        self._long = ""
-        self._parent = parent
+    def __init__(self, name, parent=None, value=False, 
+                             required=True, track=False):
         self._name = name
-        if flavorName != None:
-            self._flavorName = flavorName
-        else:
-            self._flavorName = name
-	self._frozen = False
-        self._track = track
+        self._value = value
+        self._parent = parent
+        self._required = required
+        self._tracking = track
         self._used = False
-	self._overrides = {}
-	self._deprecated = {}
-        self._createOnAccess = createOnAccess
-        self._required = required
-        if not subsumes:
-            self._subsumes = []
+        self._alias = None
+
+    def __repr__(self):
+        if self._alias: 
+            return "%s (alias %s): %s" % (self._name, self._alias, self._value)
         else:
-            self._subsumes = subsumes
-        self._inFlavor = inFlavor
-        # this must be set last
-        self._initialized = True
+            return "%s: %s" % (self._name, self._value)
 
+    def __str__(self):
+        if self._alias:
+            return "%s (alias %s): %s" % (self._fullName(), self._name(),
+                                                             self._value)
+        else:
+            return "%s: %s" % (self._fullName(), self._value)
 
-    def setShortDoc(self, doc):
-        self._short = doc
-
-    def setLongDoc(self, doc):
-        self._long = doc
-
-    def setRequired(self, required):
-        self._required = required
-
-    def setFlavorName(self, flavorName):
-        """ Set the name of this flag in a trove's flavor.  
-            Flag names must be valid python identifier, while trove flavor
-            indicators do not have the same restriction.
-        """
-        self._flavorName = flavorName
-
-    def setNoFlavor(self):
-        """ Do not include this flag when converting to a flavor """
-        self._inFlavor = False
-
-    def inFlavor(self):
-        """ Returns true if this flag should be part of a trove's flavor """
-        return self._inFlavor
-
-    def setSubsumes(self, *subsumedFlags):
-        """ Indicate that this flag, when true, implies the truth of the 
-            flags passed.  Only affects the creation of trove flavors
-        """
-        self._subsumes.extend(subsumedFlags)
-
-    def getRequired(self):
-        return self._required
-
-    def _set(self, value):
-        assert(isinstance(value, bool) or value is None)
+    def _set(self, value=True):
         self._value = value
 
     def _get(self):
-        # don't track this access to _value
+        """ Grab value without tracking """
+        return self._value 
+
+    def _fullName(self):
+        return ('.'.join(x._name for x in self._reverseParents()) 
+                                                + '.' + self._name)
+
+    def _reverseParents(self):
+        if self._parent:
+            for parent in self._parent._reverseParents():
+                yield parent
+            yield self._parent
+
+    def _getDepSense(self):
+        if self._get():
+            if self._required:
+                return deps.FLAG_SENSE_REQUIRED
+            else: 
+                return deps.FLAG_SENSE_PREFERRED
+        else:
+            return deps.FLAG_SENSE_PREFERNOT
+
+    def _toDependency(self):
+        """ Returns an actual Dependency Set consisting of only this flag """
+        raise NotImplementedError
+
+    def _resetUsed(self):
+        self._used = False
+
+    def _trackUsed(self, value):
+        self._tracking = value
+
+     # --- boolean operations on Flags ---
+
+    def __nonzero__(self):
+        if self._tracking:
+            self._used = True    
         return self._value
 
-    def __repr__(self):
-	if self._value == None:
-	    # top-level flag, no point in printing out None...
-	    return repr(self.copy())
-	if self.values():
-	    return repr(self._value) + ': ' + repr(self.copy())
-	else:
-	    return repr(self._value)
-
     def __eq__(self, other):
-        if not isinstance(other, (Flag, bool)):
-            # if other is not a bool or a flag, don't even try to 
-            # check equivalency
-            return False
         return bool(self) == bool(other)
 
     def __ne__(self, other):
@@ -135,753 +137,567 @@ class Flag(dict):
     def __and__(self, other):
 	return self.__rand__(other)
 
-    def __nonzero__(self):
-        if not isinstance(self._value, bool):
-            raise RuntimeError, ('checking nonzero of %s,'
-                                 ' which is not bool' % self._name)
-        if self._track and self._value is not None:
-            self._used = True
-        return self._value
 
-    def _freeze(self):
-	self._frozen = True
 
-    def _thaw(self):
-	self._frozen = False
+class Collection(dict):
 
-    def _override(self, key, value):
-        if key in self:
-            self[key]._set(bool(value))
-        else:
-            # override flag values that haven't been entered yet
-            self[key] = Flag(value=bool(value), name=key, parent=self,
-                createOnAccess=self._createOnAccess, required=self._required,
-                track=self._track)
-	self._overrides[key] = bool(value)
+    def __init__(self, name, parent=None, track=False):
+        self._name = name
+        self._parent = parent
+        self._strictMode = True
+        self._tracking = track
+        self._attrs = {}
 
-    def _clearOverrides(self):
-        self._overrides = {}
 
-    def __delattr__(self, key):
-        """ Remove a flag from this flag set """
-        if self._frozen:
-	    raise TypeError, 'flags are frozen'
-        del self[key]
-
-    def _addEquivalentFlagSets(self, other, parent=None):
-        """ Add together two sets of flags or flag sets, assuming that 
-            the sets being added have the same name and context,
-            and differ only in value or in child flags.
+    def _addAlias(self, realKey, alias):
+        """ Add a second way to access the given item.
+            Necessary if the actual name for a flag is not a valid
+            python identifier. 
         """
-        assert(other._name == self._name)
-        # RHS value (other) is propogated 
-        # use other's value unless it is not set, in which case
-        # use our value
-        value = other._value
-        if value is None:
-            value = self._value
-        new = Flag(value=value, name=other._name, parent=parent, 
-                    flavorName=self._flavorName, subsumes=self._subsumes,
-                    inFlavor=self._inFlavor)
-        # overrides and usedFlags are combined
-        # from both
-        new._overrides = self._overrides.copy()
-        new._overrides.update(other._overrides)
-        new._used = (self._used or other._used)
-        
-        for key in self.keys():
-            if key in other:
-                # if the flag is in both self and other sets, recurse
-                new[key] = self[key]._addEquivalentFlagSets(other[key], new)
-            else:
-                new[key] = self[key].deepCopy(new)
-        
-        for key in other.keys():
-            if key in self:
-                continue
-            new[key] = other[key].deepCopy(new)
-        return new
-
-    def __add__(self, other):
-        """ Add together two flags or flag sets.  Where a and b are flag sets,
-            if a and b have non-overlapping flags set, a + b is the union 
-            is a set of flags with the union of a and b flag set.
-            For any overlapping flags, b value overrides a. 
-            If a or b is a single flag instead of a set, it is converted
-            to a flag set before addition """
-        # make sure these are equivalent flag sets
-        if self._name != '__GLOBAL__':
-            self = self.asSet()
-        if other._name != '__GLOBAL__':
-            other = other.asSet()
-        # add the flag sets
-        return self._addEquivalentFlagSets(other)
-        
-    def __neg__(self):
-        """ -Flag -- negates all flags in a flag set.  Converts to a
-            flag set if necessary """
-        if self._name != '__GLOBAL__':
-            new = self.asSet()
+        if alias in self or alias in self._attrs:
+            raise RuntimeError, 'alias is already set'
+        elif self[realKey]._alias:
+            raise RuntimeError, 'key %s already has an alias' % key
         else:
-            new = self.deepCopy()
-        flags = new.values()
-        # negate every flag at this level, and add any child values
-        # to the end of the list to convert
-        while flags:
-            flag = flags.pop()
-            if flag._value is not None:
-                flag._value = not flag._value
-            flags.extend(flag.values())
-        return new
+	    self._setAttr(alias, self[realKey])
+            self[realKey]._alias = alias
 
-    def __sub__(self, other):
-        """ FlagA - FlagB: adds a negated version of FlagB to FlagA,
-            converting to  a flag sets first if necessary """
-        new = self + -other
-        return new
+    def _setAttr(self, name, value):
+	""" A generic way to add a temporary attribute to this collection.
+	    Attributes stored in this manner will be removed when the 
+	    collection is cleared, but are not tracked like flags.
+	"""
+	self._attrs[name] = value
 
-    def getUsed(self):
-        d = {}
-        for flagname, flag in self.iteritems():
-            if flag._used:
-                d[flagname] = flag
-            for usedFlag, subflag in flag.getUsed().iteritems():
-                d['.'.join((flagname, usedFlag))] = subflag
-        return d
+    def _delAttr(self, name):
+	del self._attrs[name]
 
-    def getUsedSet(self):
-        """ Create a flag set based on used flags """
-        flagSet = nullSet()
-        for flag in self.getUsed().itervalues():
-            if flag._value is None:
-                continue
-            if flag._value is False:
-                flag = -flag
-            flagSet = flagSet + flag
-        return flagSet
-
-    def setUsed(self, usedDict):
-        for flag, value in usedDict.iteritems():
-            keys = flag.split('.')
-            curflag = self
-            for key in keys[:-1]:
-                curflag = curflag[key]
-            key = keys[-1]
-            if isinstance(value, bool):
-                curflag[key]._value = value
-            else:
-                curflag[key]._value = value._value
-            curflag[key]._used = True
-
-    def fullName(self):
-        """ Return the name a user would use to access this flag """
-        cursor = self
-        namelist = [ ] 
-        while cursor is not None:
-            namelist.append(cursor._name)
-            cursor = cursor._parent
-        namelist.reverse()
-        return '.'.join(namelist)
-
-    def trackUsed(self, val):
-        self._track = val
-        for flag in self.iterkeys():
-            self[flag].trackUsed(val)
-
-    def resetUsed(self):
-        self._used = False
-        for flag in self.itervalues():
-            flag.resetUsed()
-    
-    def deepCopy(self, parent=None):
-        """ Create a copy of a flag set, creating new Flag instances
-            for all children """
-        new = Flag(value=self._value, name=self._name,
-                   showdefaults=self._showdefaults, parent=parent,
-                   createOnAccess=self._createOnAccess,
-                   required=self._required, track=self._track, 
-                   subsumes=self._subsumes, flavorName=self._flavorName,
-                   inFlavor=self._inFlavor)
-        new._overrides = self._overrides.copy()
-        new._used = self._used
-        new._track = self._track
-        for key in self:
-            new[key] = self[key].deepCopy(self)
-        # freeze new copy at end
-        new._frozen = self._frozen
-        return new
-
-    def allAsSet(self):
-        """ Convert self and child flags to a flag set """
-        if self._name == '__GLOBAL__':
-            return self
-        top = parent = Flag(value=None, name=self._name, 
-                            required=self._required, 
-                            flavorName=self._flavorName, 
-                            )
-        cursor = self._parent
-        while cursor is not None:
-            child = parent
-            parent = Flag(value=None, name=cursor._name)
-            parent[child._name] = child
-            child._parent = parent
-            cursor = cursor._parent
-        # Use, Arch, etc Flag instances don't have/need a parent
-        # named __GLOBAL__ but sets containing both Use and Arch
-        # need a higher level to connect them.
-        if parent._name != '__GLOBAL__':
-            child = parent
-            globalFlag = Flag(value=None, name='__GLOBAL__')
-            child._parent = globalFlag
-            globalFlag[child._name] = child
-        else:
-            globalFlag = parent
-
-        childflags = []
-        for flag in self.keys():
-            childflags.append((flag, top, self))
-        while childflags:
-            (flagname, parent, current) = childflags.pop()
-            parent[flagname] = Flag(value=current[flagname]._get(), 
-                             name=flagname,
-                             parent=parent,
-                             required=current[flagname]._required,
-                             flavorName=current[flagname]._flavorName, 
-                             subsumes=current[flagname]._subsumes, 
-                             inFlavor=current[flagname]._inFlavor)
-            for childflag in current[flagname].keys():
-                childflags.append((childflag, parent[flagname], 
-                                              current[flagname]))
-            
-        top._value = self._get()
-        return globalFlag
-
-    def asSet(self, *flags):
-        """ Convert a flag to a flag set, containing only this flag.
-            If any child flags are passed as arguments, a flag set is created
-            containing this flag and the child flags """
-        # a) create a Flag with knowledge about this flag and its
-        # parents (parents all set to none)
-        if self._name == '__GLOBAL__':
-            return self
-        top = parent = Flag(value=None, name=self._name, 
-                            required=self._required, inFlavor=self._inFlavor,
-                            flavorName=self._flavorName, 
-                            subsumes=self._subsumes)
-        cursor = self._parent
-        while cursor is not None:
-            child = parent
-            parent = Flag(value=None, name=cursor._name)
-            parent[child._name] = child
-            child._parent = parent
-            cursor = cursor._parent
-        # Use, Arch, etc Flag instances don't have/need a parent
-        # named __GLOBAL__ but sets containing both Use and Arch
-        # need a higher level to connect them.
-        if parent._name != '__GLOBAL__':
-            child = parent
-            parent = Flag(value=None, name='__GLOBAL__')
-            child._parent = parent
-            parent[child._name] = child
-
-        # b) set the value of any child flags passed in 
-        #    to True
-        if flags:
-            for flag in flags:
-                top[flag] = Flag(value=True, name=flag, parent=top,
-                                 required=self[flag]._required, 
-                                 inFlavor=self[flag]._inFlavor,
-                                 flavorName=self[flag]._flavorName,
-                                 subsumes=self[flag]._subsumes)
-        else:
-            top._value = True
-        return parent
-
-    def toDependency(self, recipename='', modify=True):
-        """ Convert this flag set to a list of dependencies.
-            By default modifies the given flags as needed for 
-            use as a trove flavor by removing flags that were checked
-            but should not show up in trove flavors, and adding 
-            flags that are subsumed by other flags 
-        """
-        # XXX this code should probably disappear with the reworking of 
-        # flavors and their relationship with deps, but for now, 
-        # it is very handy
-        set = deps.DependencySet()
-        if self._name != '__GLOBAL__':
-            self = self.asSet()
-
-        # go through and set to true all child flags that are subsumed 
-        # by flags set in this group.
-        if modify:
-            flagsToCheck = self.values()
-            while flagsToCheck:
-                flag = flagsToCheck.pop()
-                if flag._get() is True:
-                    # add 
-                    for subflag in flag._subsumes:
-                        self = self + subflag
-                flagsToCheck.extend(flag.values())
-        if 'Use' in self or 'Flags' in self:
-            depFlags = []
-            if 'Use' in self and self.Use.keys():
-                for flag in self.Use.iterkeys():
-                    depFlags.extend(self.Use[flag].toDepFlags(topflag=self.Use))
-            if 'Flags' in self and self.Flags.keys():
-                for flag in self.Flags.iterkeys():
-                    depFlags.extend(
-                        self.Flags[flag].toDepFlags(prefix=recipename,
-                                                   topflag=self.Flags))
-            if depFlags:
-                dep = deps.Dependency('use', depFlags)
-                set.addDep(deps.UseDependency, dep)
-        if 'Arch' in self:
-            for arch, topflag in self['Arch'].iteritems():
-                if modify:
-                    if topflag._value is None:
-                        # if we didn't check the top level arch, 
-                        # we can get it's value from Arch.
-                        if not Arch[arch]:
-                            continue
-                    elif not topflag:
-                        # if we checked the arch and it is not our arch
-                        # don't add a dependency
-                        continue
-                    if not topflag.inFlavor():
-                        continue
-                depFlags = []
-                for subarch, flag in topflag.iteritems():
-                    if not flag.inFlavor():
-                        continue
-                    depFlags.extend(flag.toDepFlags(topflag=topflag))
-                dep = deps.Dependency(arch, depFlags)
-                set.addDep(deps.InstructionSetDependency, dep)
-        return set
-
-    def toDepFlags(self, prefix=None, topflag=None):
-        flags = []
-        namelist = []
-        if topflag is None:
-            topflag = self
-        cur = self
-        while cur._name != topflag._name:
-            namelist.insert(0, cur._flavorName)
-            cur = cur._parent
-        name = ".".join(namelist)
-        if prefix:
-            name = '.'.join((prefix, name))
-        if self._value is not None:
-            if self._value:
-                if self._required:
-                    flags.append((name, deps.FLAG_SENSE_REQUIRED))
-                else:
-                    flags.append((name, deps.FLAG_SENSE_PREFERRED))
-            else:
-                flags.append((name, deps.FLAG_SENSE_PREFERNOT))
-        for subflag in self.iterkeys():
-            if not self[subflag].inFlavor():
-                continue
-            flags.extend(self[subflag].toDepFlags(prefix=prefix,
-                                                      topflag=topflag))
-        return flags
-
-    def __setitem__(self, key, value):
-	if self._frozen:
-	    raise TypeError, 'flags are frozen'
-        if key in self:
-            if key not in self._overrides:
-                self[key]._set(bool(value))
-        else:
-            dict.__setitem__(self, key, value)
-
-    def __getattr__(self, name):
-        if name in self.__dict__:
-            return self.__dict__[name]
-        if name in self:
-            flag = self[name]
-            return flag
-        if name in self._deprecated:
-            return self._deprecated[name]
-        elif self._createOnAccess and name[0] != '_':
-            # flag doesn't exist, add it
-            flag =  Flag(value=None, name=name, parent=self,
-                              createOnAccess=True, track=self._track)
-            dict.__setitem__(self, name, flag)
-            # don't check frozen value -- it's okay to create empty flags, 
-            # which is useful for creating flagsets (-Flags.kerenel.smp)
-            # we will catch errors on setting an actual value to this flag
-            return self[name]
-        raise AttributeError, "class %s has no attribute '%s'" % (self.__class__.__name__, name)
-
-    def __setattr__(self, name, value):
-        initialized = self.__dict__.get('_initialized', False)
-        # this allows us to add instance variables during __init__
-        if not initialized:
-            self.__dict__[name] = value
-            return
-        # after init, only set instance variables that already exist
-        if name in self.__dict__:
-            self.__dict__[name] = value
-            return
-        # everything else should be handled as a Use flag
-        if self._frozen:
-            raise TypeError, 'flags are frozen'
-        if name in self:
-            if name in self._overrides:
-                return
-            self[name]._set(value)
-        else:
-            self[name] = Flag(value=value, name=name, parent=self,
-                              createOnAccess=self._createOnAccess,
-                              track=self._track)
-    def addDeprecated(self, name, newFlag=None):
-        self._deprecated[name] = DeprecatedFlag(newFlag, name=name, parent=self)
-
-class DeprecatedFlag(Flag):
-    def __init__(self, newFlag, *args, **kw):
-        self._newFlag = newFlag
-        Flag.__init__(self, *args, **kw)
-
-    def alert(self):
-        if self._newFlag is not None:
-            log.warning("Flag %s is deprecated, use %s instead" % 
-                        (self.fullName(), self._newFlag.fullName()))
-        else:
-            raise RuntimeError, "Flag %s no longer exists" % self.fullName()
-
-    def __nonzero__(self):
-        self.alert()
-        return self._newFlag.__nonzero__()
+    def _addFlag(self, key, *args, **kw):
+	if 'track' not in kw:
+	    kw = kw.copy()
+	    kw['track'] = self._tracking
+        dict.__setitem__(self, key, self._collectionType(key, self, 
+                                                         *args, **kw))
 
     def __repr__(self):
-        self.alert()
-        return self._newFlag.__repr__()
+        return "%s: {%s}" % (self._name,
+                             ', '.join((repr(x) for x in self.values())))
+
+    def _clear(self):
+        for flag in self.keys():
+            del self[flag]
+	for attr in self._attrs.keys():
+            del self._attrs[attr]
+
+    def __getattr__(self, key):
+        if key in self.__dict__:
+            return self.__dict__[key]
+        if key in self:
+            return self[key]
+        if key in self._attrs:
+            return self._attrs[key]
+        if key[0] == '_':
+            raise AttributeError
+        return self._getNonExistantKey(key)
+
+    def __getitem__(self, key):
+        if key in self._attrs:
+            return self._attrs[key]
+        else:
+            return dict.__getitem__(self, key)
+
+    def __setattr__(self, key, value):
+        if key[0] == '_':
+            self.__dict__[key] = value
+        else:
+            raise RuntimeError, "Cannot set value of flags: %s" % key
+
+    def _getNonExistantKey(self, key):
+        """ Method that is called when a nonexistant key is accessed.
+            Overridden by subclasses to allow for useful error messages
+            or default key values to be supplied """
+        raise AttributeError
+
+    def _iterAll(self):
+        for child in self.itervalues():
+            if isinstance(child, Collection):
+                for flag in child._iterAll():
+                    yield flag
+            else:
+                yield child
+
+    def _setStrictMode(self, value=True):
+        """ Strict mode determines whether you receive an error or 
+            an empty flag upon accessing a nonexistant flag
+        """
+        self._strictMode = value
+
+    def _reverseParents(self):
+        """ Traverse through the parents from the topmost parent down. """
+        if self._parent:
+            for parent in self._parent._reverseParents():
+                yield parent
+            yield self._parent
+
+    # -- Tracking Commands -- 
+
+    def _trackUsed(self, value=True):
+        self._tracking = value
+        for child in self.itervalues():
+            child._trackUsed(value)
+
+    def _resetUsed(self):
+        for child in self.itervalues():
+            child._resetUsed()
+
+    def _getUsed(self):
+        return [ x for x in self._iterUsed() ] 
+
+    def _iterUsed(self):
+        for child in self.itervalues():
+            if isinstance(child, Collection):
+                for flag in child._iterUsed():
+                    yield flag
+            else:
+                if child._used:
+                    yield child
 
 
-def nullSet():
-    return Flag(value=None, name='__GLOBAL__')
+class CollectionWithFlag(Flag, Collection):
+    """ CollectionWithFlag.   Currently only has one child class, MajorArch. """
+    def __init__(self, name, parent, track=False):
+        Flag.__init__(self, name, parent, track=track)
+        Collection.__init__(self, name, parent, track=track)
 
-def _addShortDoc(baseobj, obj, keys, level=1):
-    global __doc__
-    for key in keys:
-        flag = obj[key]
-	dflt = ''
-	if baseobj._showdefaults:
-	    dflt = 'Default=C{%s}; ' %str(flag._value)
-        desc = flag._short
-        if not desc:
-            desc = '%s flag' %key
-        __doc__ += ' '*(2*level) + '- B{C{%s}}: %s%s.\n'% (key, dflt, desc)
-	newkeys = flag.keys()
-	if newkeys:
-	    newkeys.sort()
-	    _addShortDoc(baseobj, flag, newkeys, level=level+1)
+    def _trackUsed(self, value=True):
+        Flag._trackUsed(self, value)
+        Collection._trackUsed(self, value)
+        
+    def _resetUsed(self):
+        Flag._resetUsed(self)
+        Collection._resetUsed(self)
 
-def _addLongDoc(baseobj, obj, keys, prefix=''):
-    global __doc__
-    for key in keys:
-        flag = obj[key]
-        if flag._long:
-            __doc__ += 'B{C{'+key+'}}: ' + flag._long + '\n\n'
-	newkeys = flag.keys()
-	if newkeys:
-	    newkeys.sort()
-	    if prefix:
-		newprefix = '%s.%s' %(prefix, key)
-	    else:
-		newprefix = key
-	    _addLongDoc(baseobj, flag, newkeys, newprefix)
+    def _iterUsed(self):
+        if self._used:
+            yield self
+        for child in Collection._iterUsed(self):
+            yield child
 
-def _addDocs(obj):
-    global __doc__
-    if __doc__ is None:
-        return
-    keys = obj.keys()
-    keys.sort()
-    _addShortDoc(obj, obj, keys)
-    __doc__ += '\n\nMore details:\n\n'
-    _addLongDoc(obj, obj, keys)
+    def _iterAll(self):
+        yield self
+        for child in Collection._iterAll(self):
+            yield child
+
+    def __repr__(self):
+        return "%s: %s {%s}" % (self._name, self._value, 
+                                ', '.join((repr(x) for x in self.values())))
+
+class NoSuchUseFlagError(Exception):
+
+    def __init__(self, key):
+        self.key = key
+
+    def __str__(self):
+        return """
 
 
-if __doc__ is not None:
-    __doc__ += """
-@sort: Use, Arch
-@type Use: Flag
-@var Use: Set of flags defined for this build, with their boolean status.
-The Use flags have the following meanings:
-"""
-Use = Flag(showdefaults=True, name='Use')
+An unknown use flag, Use.%s  was accessed.  The default behavior 
+of conary is to complain about the missing flag, since it may be 
+a typo.  You can add the flag /etc/conary/use/%s, or 
+$(HOME)/.conary/use/%s, or use the --unknown-flags option on
+the command line to make conary assume that all unknown flags are
+not relevant to your system.  
 
-Use.pcre = True
-Use.pcre.setShortDoc('Use the Perl-compatible regex library')
-Use.pcre.setLongDoc("""
-The perl-compatible regular expression library can be used by
-several programs to increase the power and uniformity of
-available regular expressions.  It adds a dependency and should
-generally be disabled for embedded builds.
-""")
+""" % (self.key, self.key, self.key)
+             
+class NoSuchArchFlagError(Exception):
 
-Use.tcpwrappers = True
-Use.tcpwrappers.setShortDoc('Use the tcp_wrappers library')
+    def __init__(self, key):
+        self.key = key
 
-Use.gcj = True
-Use.gcj.setShortDoc('Use the gcj implementation of Java')
-Use.gcj.setLongDoc("""
-Include gcj (Java) support in gcc;
-use gcj to enable Java in other applications.
-""")
-
-Use.gnat = False
-Use.gnat.setShortDoc('Enable the gnat implementation of Ada')
-Use.gnat.setLongDoc("""
-Include gnat (Ada) support in gcc;
-use gnat to enable Ada in other applications.
-""")
-
-Use.selinux = False
-Use.selinux.setShortDoc('Enable support for SELinux')
-Use.selinux.setLongDoc("""
-Build support for the Security-Enhanced Linux Role-based Access
-Control system.  Adds dependencies on particular filesystems,
-Linux 2.6 or later kernel, and multiple SELinux tools.  Unlikely
-to be appropriate for deeply embedded systems.
-""")
-
-Use.pam = True
-Use.pam.setShortDoc('Enable support for PAM')
-Use.pam.setLongDoc("""
-Pluggable Authentication Modules (PAM) makes most system authentication
-happen in a unified way, but adds a dependency on PAM libraries, and
-requires shared libraries.  You may want to disable PAM during the
-early stages of bootstrapping a new architecture.
-""")
-
-Use.dietlibc = False
-Use.bootstrap = False
-Use.bootstrap.setRequired(False)
-Use.python = True
-Use.perl = True
-Use.readline = True
-Use.gdbm = True
-
-Use.emacs = True
-Use.emacs.setShortDoc('Enable support for the EMACS editor')
-Use.emacs.setLongDoc("""
-Build the EMACS editor, and include support for the EMACS editor
-in other packages.  If not Use.emacs, packages should not have
-files in the site-lisp directory and should not have an :emacs
-component.
-""")
-
-Use.krb = True
-Use.krb.setShortDoc('Enable support for Kerberos (V5)')
-Use.krb.setLongDoc("""
-Build the Kerberos package, and include support for the Kerberos
-package in other packages.  You may want to disable Kerberos during
-the early stages of bootstrapping a new architecture, or to make
-a smaller installable image where network single sign-on is not
-required.
-""")
-
-# flags to use for special situations
-Use.builddocs = True
-Use.builddocs.setRequired(False)
-Use.builddocs.setShortDoc('Build documentation as well as binaries')
-Use.builddocs.setLongDoc("""
-Some packages have documentation that needs to be built, not just
-installed.  Examples include SGML, TeX, groff documents other than
-man pages, and texinfo (but not precompiled info pages).  This does
-not include man pages, precompiled info pages, and other files
-installed on the system in essentially the same form they are
-provided.  Simple substitution (sed -i 's/@FOO@/foo/) does not
-count as "building documentation".
-
-The purpose of this flag is to disable unnecessary build depedencies
-for embedded targets.
-""")
-
-Use.buildtests = True
-Use.buildtests.setRequired(False)
-Use.buildtests.setShortDoc('Build test suites')
-Use.buildtests.setLongDoc("""
-Conary supports the installation of build-time test suites in a
-manner that allows them to be run later, using the installed
-package.  However, testsuites often require the compilation of
-extra files and extra post processing.  Use this flag to turn
-off building testsuites.
-""")
+    def __str__(self):
+        return """
 
 
-# temporarily disabled until we build appropriate packages
-Use.alternatives = False
-Use.tcl = True
-Use.tk = True
-Use.X = True
-Use.gtk = True
-Use.gnome = True
-Use.qt = True
-Use.kde = False
-Use.xfce = False
-Use.gd = False
-Use.ldap = True
-Use.sasl = False
-Use.sasl.setShortDoc('Build with support for SASL Simple Authenication '
-                     'and Security Layer')
-Use.pie = False
+An unknown architecture, Arch.%s was accessed.  The default 
+behavior of conary is to complain about the missing flag, 
+since it may be a typo.  You can add the architecture 
+/etc/conary/arch/%s or $(HOME)/.conary/arch/%s, or 
+use the --unknown-flags option on the command line to make 
+conary assume that all unknown flags are not relevant to 
+your system.
 
-Use.desktop = Use.gnome | Use.kde | Use.xfce
-Use.desktop.setRequired(False)
-Use.desktop.setShortDoc('Build with support for freedesktop.org specs')
-Use.desktop.setLongDoc("""
-Set if any graphical desktop platform/environment that attempts to conform
-to the freedesktop.org specifications is enabled.  In particular, desktop
-and menu entries and the shared mime database at this time.  This flag
-should mediate dependence on implementation of these capabilities.
-""")
+""" % (self.key, self.key, self.key)
+ 
+class NoSuchSubArchFlagError(Exception):
 
-Use.ssl = True
-Use.slang = False
-Use.netpbm = False
-Use.nptl = False
-Use.ipv6 = True
-Use._freeze()
-_addDocs(Use)
+    def __init__(self, majArch, key):
+        self.majArch = majArch
+        self.key = key
 
-if __doc__ is not None:
-    __doc__ += """
-@type Arch: Flag
-@var Arch: Set of architectures defined for this build, with their boolean status.
-The Arch flags have the following meanings:
-"""
-
-# All Arch flags default to False; deps/arch.py sets any that should be
-# True to True
-Arch = Flag(showdefaults=False, name='Arch')
-# Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686
-Arch.x86 = True
-Arch.x86.setShortDoc('True if any IA32-compatible architecture is set')
-Arch.x86.i486 = False
-Arch.x86.i586 = False
-Arch.x86.i586.setSubsumes(Arch.x86.i486)
-Arch.x86.i686 = True
-Arch.x86.i686.setSubsumes(Arch.x86.i586, Arch.x86.i486)
-Arch.x86.cmov = True
-Arch.x86.sse = False
-Arch.x86.sse2 = False
-Arch.x86.sse2.setSubsumes(Arch.x86.sse)
-Arch.x86.mmx = False
-Arch.x86.mmxext = False
-Arch.x86.threednow = False # '3dnow' is an illegal identifier name
-Arch.x86.threednow.setFlavorName('3dnow')
-Arch.x86.threednowext = False
-Arch.x86.threednowext.setFlavorName('3dnowext')
-Arch.x86.threednowext.setSubsumes(Arch.x86.threednow)
-
-Arch.x86_64 = False
-Arch.x86_64.setShortDoc('x86_64 base 64-bit extensions')
-Arch.x86_64.nx = False
-Arch.x86_64.sse3 = False
-Arch.x86_64.threednow = False # '3dnow' is an illegal identifier name
-Arch.x86_64.threednow.setFlavorName('3dnow')
-Arch.x86_64.threednowext = False
-Arch.x86_64.threednowext.setFlavorName('3dnowext')
-Arch.x86_64.threednowext.setSubsumes(Arch.x86_64.threednow)
-
-# we used to support Arch.x86.x86_64, has been changed to Arch.x86_64
-Arch.x86.addDeprecated('x86_64', Arch.x86_64)
-Arch.x86.x86_64.setShortDoc('Deprecated - Use Arch.x86_64 instead')
+    def __str__(self):
+        return """
 
 
-Arch.sparc = False
-Arch.sparc.sparc64 = False
-Arch.ppc = False
-Arch.ppc.ppc64 = False
-Arch.ia64 = False
-Arch.s390 = False
-Arch.s390.s390x = False
-Arch.alpha = False
-# Arch.LE = Arch.x86 | Arch.ia64
-Arch.LE = True
-Arch.LE.setShortDoc('True if current architecture is little-endian')
-Arch.LE.setNoFlavor() # do not affect flavor
-# Arch.BE = Arch.sparc | Arch.ppc | Arch.s390
-Arch.BE = False
-Arch.BE.setShortDoc('True if current architecture is big-endian')
-Arch.BE.setNoFlavor() 
-Arch.bits32= True
-Arch.bits32.setShortDoc('True if the current architecture is 32-bit')
-Arch.bits32.setNoFlavor() 
-Arch.bits64 = False
-Arch.bits64.setShortDoc('True if the current architecture is 64-bit')
-Arch.bits64.setNoFlavor() 
-Arch._freeze()
-_addDocs(Arch)
+An unknown sub architecture, Arch.%s.%s was accessed.  The default 
+behavior of conary is to complain about the missing flag, since it 
+may be a typo.  You can add the subarchitecture /etc/conary/arch/%s 
+or $(HOME)/.conary/architecture/%s, or use the --unknown-flags 
+option on the command line to make conary assume that all unknown flags are 
+not relevant to your system.  
 
-LocalFlags = Flag(showdefaults=False, name='Flags', createOnAccess=True)
+""" % (self.majArch, self.key, self.majArch, self.majArch)
+ 
+
+
+
+##########ARCH STUFF HERE######################################
+
+class ArchCollection(Collection):
+
+    def __init__(self):
+	self._archProps = []
+        self._collectionType = MajorArch
+        Collection.__init__(self, 'Arch')
+
+    def _getNonExistantKey(self, key):
+        if self._strictMode:
+            raise NoSuchArchFlagError(key)
+        else:
+            self._addFlag(key, track=False)
+            self[key]._setStrictMode(False)
+            return self[key]
+
+    def _setArch(self, majArch, subArches=None):
+        """ Set the current build architecture and subArches.  
+            All other architectures are set to false, and not 
+            tracked. 
+        """
+	found = False
+        for key in self:
+            if key == majArch:
+                self[key]._set(True, subArches)
+		self._setArchPropValues(self[key])
+		found = True
+            else:
+                self[key]._set(False)
+	if not found:
+	    raise RuntimeError, "No Such Arch %s" % majArch
+
+    def _setArchProps(self, *archProps):
+	""" Sets the required arch properties.
+
+	    archProps are flags at the Arch level that describe
+	    cross-architecture features, such as endianess or 
+	    whether the arch is 32 or 64 bit oriented. 
+
+	    For the current definition of required archProps, see flavorCfg.
+	"""
+	for archProp in self._archProps:
+	    try:
+		self._delAttr(archProp)
+	    except KeyError:
+		pass
+	self._archProps = archProps[:]
+
+    def _setArchPropValues(self, majArch):
+	"""
+	    archProps are flags at the Arch level that describe
+	    cross-architecture features, such as endianess or 
+	    whether the arch is 32 or 64 bit oriented. 
+	    
+	    For the current definition of required archProps, see flavorCfg.
+	"""
+	archProps = majArch._archProps.copy()
+	extraKeys = tuple(set(archProps.keys()) - set(self._archProps))
+	missingKeys = tuple(set(self._archProps) - set(archProps.keys()))
+	if extraKeys:
+	    raise RuntimeError, \
+		'Extra arch properties %s provided by %s' % (extraKeys, majArch)
+	if missingKeys:
+	    raise RuntimeError, \
+	        'Missing arch properties %s not provided by %s' % (missingKeys,
+								   majArch)
+	for archProp, value in archProps.iteritems():
+	    self._setAttr(archProp, value)
+
+    def _iterAll(self):
+        """ Only iterate over the current architecture.  This is 
+            almost always what you want, otherwise it's easy enough
+            to manually go through the architectures
+        """
+        for child in self.itervalues():
+            if child._get():
+                for flag in child._iterAll():
+                    yield flag
+
+
+class MajorArch(CollectionWithFlag):
+    
+    def __init__(self, name, parent, track=False, archProps=None):
+        if archProps:
+            self._archProps = archProps.copy()
+        else:
+            self._archProps = {}
+        self._collectionType = SubArch
+        CollectionWithFlag.__init__(self, name, parent, track=track)
+
+    def _getNonExistantKey(self, key):
+        if self._strictMode:
+            raise NoSuchSubArchFlagError(self._parent._name, key)
+        else:
+            self._addFlag(key)
+            return self[key]
+
+    def _set(self, value=True, subArches=None):
+        """ Allows you to set the value of this arch, and also set the 
+            values of the subArches.  
+            XXX hmmm...should there be a difference between subArches=None,
+            and subArches=[]?  Maybe this is too complicated, and you should
+            just have to set the subarches yourself.
+        """
+        if not subArches:
+            subArches = []
+        self._value = value
+        for subArch in self:
+            if subArches and subArch in subArches:
+                continue
+            self[subArch]._set(False)
+        subsumed = {}
+        for subArch in subArches:
+            subsumed.update(dict.fromkeys(self[subArch]._subsumes))
+        for subArch in subArches:
+            if subArch in subsumed:
+                continue
+            self[subArch]._set()
+
+    def _toDependency(self):
+        set = deps.DependencySet() 
+        sense = self._getDepSense()
+        dep = deps.Dependency(self._name, [])
+        set.addDep(deps.InstructionSetDependency, dep)
+        return set
+
+    def _trackUsed(self, value=True):
+        if self._get():
+            CollectionWithFlag._trackUsed(self, value=value)
+
+
+class SubArch(Flag):
+
+    def __init__(self, name, parent, track=False, subsumes=None):
+        if not subsumes:
+            self._subsumes = []
+        else:
+            self._subsumes = subsumes
+        Flag.__init__(self, name, parent, required=True, track=track)
+
+    def _toDependency(self):
+        """ Creates a DependencySet with the subarch in it.
+            Also includes any subsumed subarches if the 
+            value of this subarch is true
+            (better comment about why we do that here) 
+        """
+            
+        set = deps.DependencySet() 
+        sense = self._getDepSense()
+        depFlags = [ (self._name, sense) ]
+        parent = self._parent
+        if self._get():
+            depFlags.extend((parent[x]._name, sense) \
+                                      for x in self._subsumes)
+        dep = deps.Dependency(parent._name, depFlags)
+        set.addDep(deps.InstructionSetDependency, dep)
+        return set
+        
+####################### USE STUFF HERE ###########################
+
+class UseFlag(Flag):
+    def _toDependency(self):
+        set = deps.DependencySet() 
+        sense = self._getDepSense()
+        depFlags = [ (self._name, sense) ]
+        dep = deps.Dependency('use', depFlags)
+        set.addDep(deps.UseDependency, dep)
+        return set
+    
+
+class UseCollection(Collection):
+
+    _collectionType = UseFlag
+
+    def __init__(self):
+        Collection.__init__(self, 'Use')
+
+    def _getNonExistantKey(self, key):
+        if self._strictMode:
+            raise NoSuchUseFlagError(key)
+        else:
+            self._addFlag(key)
+            return self[key]
+
+
+####################### LOCALFLAG STUFF HERE ###########################
+ 
+class LocalFlag(Flag):
+
+    def __init__(self, name, parent, track=False, required=False):
+        Flag.__init__(self, name, parent, track=track, required=required)
+        self._override = False
+
+    def _set(self, value=True, override=False):
+        if self._override and not override:
+            return
+        self._value = value
+        self._override = override
+
+    def _toDependency(self, recipeName):
+        depFlags =  [('.'.join((recipeName, self._name)), 
+                                              self._getDepSense())]
+        set = deps.DependencySet() 
+        dep = deps.Dependency('use', depFlags)
+        set.addDep(deps.UseDependency, dep)
+        return set
+                    
+class LocalFlagCollection(Collection):
+    def __init__(self):
+        self._collectionType = LocalFlag
+        Collection.__init__(self, 'Flags')
+
+    def _override(self, key, value):
+        if key not in self:
+            dict.__setitem__(self, self._getNonExistantKey(key))
+        self[key]._set(value, override=True)
+
+    def _getNonExistantKey(self, key):
+        raise AttributeError, 'No such local flag %s' % key
+
+    def __setattr__(self, key, value):
+        if key[0] == '_':
+            self.__dict__[key] = value
+        else:
+            if key not in self:
+                self._addFlag(key) 
+            self[key]._set(value)
+
+
+def allowUnknownFlags(value=True):
+    Use._setStrictMode(not value)
+    Arch._setStrictMode(not value)
+    for majArch in Arch.values():
+        Arch._setStrictMode(not value)
+
+def setUsed(flagList):
+    for flag in flagList:
+        flag._used = True
 
 def resetUsed():
-    Use.resetUsed()
-    Arch.resetUsed()
-    LocalFlags.resetUsed()
+    Use._resetUsed()
+    Arch._resetUsed()
+    LocalFlags._resetUsed()
 
-def getUsedSet():
-    return Arch.getUsedSet() + Use.getUsedSet() + LocalFlags.getUsedSet()
-     
+def clearFlags():
+    """ Remove all build flags so that the set of flags can 
+        be repopulated 
+    """
+    Use._clear()
+    Arch._clear()
+    LocalFlags._clear()
+
+
+def track(value=True):
+    Arch._trackUsed(value)
+    Use._trackUsed(value)
+    LocalFlags._trackUsed(value)
+
+def iterAll():
+    return itertools.chain(Arch._iterAll(), 
+                           Use._iterAll(), 
+                           LocalFlags._iterAll())
 def getUsed():
-    """
-    A method for retreive the flags used by a recipe in dict form, separated
-    by Flag set.  Can be used to store and restore a set of used flags 
-    to allow for the separation of loading and setting up of a recipe and 
-    cooking that recipe.
-    """
-    used = {}
-    used['Arch'] = Arch.getUsed()
-    used['Use'] = Use.getUsed()
-    used['Flags'] = LocalFlags.getUsed()
-    return used
+    return [ x for x in iterUsed() ]
 
-def setUsed(usedDict):
-    """
-    A method for updating the used flags to include the flags passed in.
-    Can be used to store and restore a set of used flags to allow for the 
-    separation of loading and setting up of a recipe and cooking that recipe.
-    """
-    Arch.setUsed(usedDict['Arch'])
-    Use.setUsed(usedDict['Use'])
-    LocalFlags.setUsed(usedDict['Flags'])
-    
-def track(arg):
-    """
-    Turns Use flag tracking on or off.
-    """
-    Arch.trackUsed(arg)
-    Use.trackUsed(arg)
-    LocalFlags.trackUsed(arg)
+def iterUsed():
+    return itertools.chain(Arch._iterUsed(), 
+                           Use._iterUsed(), 
+                           LocalFlags._iterUsed())
 
-def overrideFlags(config, pkgname):
-    for key in config.useKeys():
-	Use._override(key, config['Use.' + key])
-    for key in config.archKeys():
-	flags = key.split('.')
-	lastflag = flags[-1]
-	flags = flags[:-1]
-	curflag = Arch
-	for flag in flags:
-	    curflag = curflag[flag]
-	curflag._override(lastflag, config['Arch.' + key])
+def usedFlagsToFlavor(recipeName):
+    return createFlavor(recipeName, iterUsed())
 
-    prefix = 'Flags.%s.' % pkgname
-    for key in config.pkgKeys(pkgname):
-	LocalFlags._override(key, config[prefix + key])
+def allFlagsToFlavor(recipeName):
+    return createFlavor(recipeName, iterAll())
 
-def clearOverrides(config, pkgname):
-    Use._clearOverrides()
-    Arch._clearOverrides()
-    for majarch in Arch.keys():
-        Arch[majarch]._clearOverrides()
-    LocalFlags._clearOverrides()
-    for key in LocalFlags.keys():
-        LocalFlags[key]._clearOverrides()
+def createFlavor(recipeName, *flagIterables):
+    """ create a dependency set consisting of all of the flags in the 
+        given flagIterables.  Note that is a broad category that includes
+        lists, iterators, etc. RecipeName is the recipe which local flags
+        should be relative to, can be set to None if there are definitely
+        no local flags in the flagIterables.
+    """
+    majArch = None
+    archFlags = {}
+    subsumed = {}
+    useFlags = []
+    set = deps.DependencySet()
+    for flag in itertools.chain(*flagIterables):
+        flagType = type(flag)
+        if flagType == MajorArch:
+            if not flag._get():
+                continue
+            majArch = flag._name
+        elif flagType ==  SubArch:
+            set.union(flag._toDependency())
+        elif flagType == UseFlag:
+            set.union(flag._toDependency())
+        elif flagType == LocalFlag:
+            assert(recipeName)
+            set.union(flag._toDependency(recipeName))
+    return set
 
-def allAsSet():
-    return Use.allAsSet() + LocalFlags.allAsSet() + Arch.allAsSet()
+def setBuildFlagsFromFlavor(recipeName, flavor):
+    """ Sets the truth of the build Flags based on the build flavor.
+        All the set build flags must already exist.  Flags not mentioned
+        in this flavor will be untouched.
+        XXX should this create flags as well as set them?  Problem with that
+        is that we don't know whether the flag is required or not based
+        on the flavor; we would only be able to do as half-baked job
+    """
+    for depGroup in flavor.getDepClasses().values():
+        if isinstance(depGroup, deps.UseDependency):
+            for dep in depGroup.getDeps():
+                for flag, sense in dep.flags.iteritems():
+                    if sense in (deps.FLAG_SENSE_REQUIRED,
+                                 deps.FLAG_SENSE_PREFERRED):
+                        value = True
+                    else:
+                        value = False
+                    # see if there is a . -- indicating this is a 
+                    # local flag
+                    parts = flag.split('.',1)
+                    if len(parts) == 1:
+                        Use[flag]._set(value)
+                    else:
+                        assert(recipeName)
+                        packageName, flag = parts
+                        if package == recipeName:
+                            # local flag values set from a build flavor
+                            # are overrides -- the recipe should not 
+                            # change these values
+                            Flags._override(flag, value)
+        elif isinstance(depGroup, deps.InstructionSetDependency):
+            # ensure that there is only on major architecture listed
+            # XXX this could be user error -- handle gracefully
+            assert(len([ x for x in depGroup.getDeps()]) == 1)
+            for dep in depGroup.getDeps():
+                majarch = dep.name
+                subarches = []
+                for (flag, sense) in dep.flags.iteritems():
+                    if sense in (deps.FLAG_SENSE_REQUIRED,
+                                 deps.FLAG_SENSE_PREFERRED):
+                        subarches.append(flag)
+                Arch._setArch(majarch, subarches)
+
+Arch = ArchCollection()
+Use = UseCollection()
+LocalFlags = LocalFlagCollection()

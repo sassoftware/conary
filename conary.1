@@ -248,10 +248,13 @@ modify, and cook source components:
 .B \ \ \ \ \ [\fR\-\-resume [<linenums>|policy]] \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR\-\-use-flag "<flag> True|False"] \e
+.B \ \ \ \ \ [\fR\-\-use-flavor <flavor>] \e
 .PD 0
 .TP
 .B \ \ \ \ \ [\fR\-\-use-macro <macro> <string>] \e
+.PD 0
+.TP
+.B \ \ \ \ \ [\fR\-\-no-clean] [\fR\-\-unknown-flags] \e
 .PD 0
 .TP
 .B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>...
@@ -288,18 +291,20 @@ Note that the \fB\-\-resume\fP option may
 be used only with local recipe files, not source components grabbed
 from a repository.
 .IP 
-The \-\-use-flag option can be used to override the default Use flags 
-and package-specific flags for this instantiaton.   The format for
-<flag> may be Use.<useflag>, where <useflag> is a system-wide Use 
-flag, or Flags.<package>.<pkgflag>, where <pkgflag> is a flag defined
-in <package>, or Arch.<archflag>, where <archflag> is a flag defining the 
-current architecture.  <package>, <useflag>, <pkgflag>, and <archflag>
-are case sensitive.  Note that the flag and its boolean value must be 
-enclosed in quotes, e.g. \-\-use-flag "Flags.kernel.smp False"
-
+The \-\-use-flavor option can be used to override the default Use flags, 
+package-specific flags, and arch Flags  for this instantiaton.   
+The format is exactly as it is show in conary config flavors.  The 
+flavor specified here overrides flavors specified in the buildFlavor
+config option.
+.IP
 The \-\-use-macro option assigns the given string value to <macro>.  
 The value given overrides any attempt to reset the value later in the 
 recipe.  The macro and its boolean value must be enclosed in quotes.
+.IP 
+The \-\-no-clean option does not clean up the build directories
+after the build is complete, even if the build is successful.
+This can be useful for rerunning policy for a complete build using 
+\-\-resume, or for examining the completed build directories.
 .IP 
 If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the

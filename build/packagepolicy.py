@@ -1395,7 +1395,7 @@ class Flavor(policy.Policy):
             set.addDep(deps.InstructionSetDependency,
                        deps.Dependency(isnset, []))
         # get the Arch.* dependencies
-        set.union(use.Arch.getUsedSet().toDependency())
+        set.union(use.createFlavor(None, use.Arch._iterUsed()))
         f.flavor.set(set)
         # all troves need to share the same flavor so that we can
         # distinguish them later

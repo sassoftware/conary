@@ -30,6 +30,7 @@ import branch
 import checkin
 import conarycfg
 import constants
+import flavorcfg
 import repository
 import versions
 import xmlrpclib
@@ -45,7 +46,7 @@ def usage(rc = 1):
     print "       cvc checkout [--dir <dir>] <trove>[=<version>]"
     print "       cvc commit [--message <message>]"
     print '       cvc cook [--prep] [--debug-exceptions] [--macros file] '
-    print '                [--use-flag  "<prefix>.<flag> <bool>"]+ '
+    print '                [--use-flavor  "<flavor>"] '
     print '                [--use-macro "<macro> <value>"]+ '
     print '                <file.recipe|troveName>+'
     print '       cvc describe <xml file>'
@@ -65,14 +66,14 @@ def usage(rc = 1):
     print "               --root <root>"
     print ""
     print "cook flags:    --macros"
-    print "               --noclean"
-    print '               --use-flag  "<prefix>.<flag> <bool>"'
+    print "               --no-clean"
+    print '               --unknown-flags'
+    print '               --use-flavor  "<flavor>"'
     print '               --use-macro "<macro> <value>"'
     print "               --prep"
     print "               --resume [policy|<linenums>]"
     print "               --debug-exceptions"
     print "               --target-branch <branch>"
-    print '               --use-flag "<flag> <value>"'
     print ""
     print "commit flags:  --message <msg>"
     print "               --no-source-check"
@@ -104,8 +105,9 @@ def realMain(cfg, argv=sys.argv):
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
     argDef["target-branch"] = ONE_PARAM
-    argDef["use-flag"] = MULT_PARAM
     argDef["use-macro"] = MULT_PARAM
+    argDef["use-flavor"] = ONE_PARAM
+    argDef["unknown-flags"] = NO_PARAM
     argDef["version"] = NO_PARAM
 
     argDef.update(argDef)
@@ -121,15 +123,12 @@ def realMain(cfg, argv=sys.argv):
     if argSet.has_key('version'):
         print constants.version
         sys.exit(0)
+
     # XXX initialization of lots of this stuff should likely live somewhere
     # else, instead of conary.py, so that other applications do not
     # have to duplicate this code.
-    if cfg.useDir:
-        # the flavor from the rc file wins
-        useFlags = conarycfg.UseFlagDirectory(cfg.useDir)
-        useFlags.union(cfg.flavor, 
-                       mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
-        cfg.flavor = useFlags
+    flavorConfig = flavorcfg.FlavorConfig(cfg.useDir, cfg.archDir)
+    cfg.flavor = flavorConfig.toDependency(override=cfg.flavor)
 
     if not deps.deps.DEP_CLASS_IS in cfg.flavor.getDepClasses():
         insSet = deps.deps.DependencySet()
@@ -137,11 +136,12 @@ def realMain(cfg, argv=sys.argv):
             insSet.addDep(deps.deps.InstructionSetDependency, dep)
         cfg.flavor.union(insSet)
 
-    # default the buildFlavor to be the same as the system flavor, unless
-    # it is specified in the config file
-    if not cfg.buildFlavor:
-        cfg.buildFlavor = cfg.flavor.copy()
-
+    # buildFlavor is installFlavor + overrides
+    buildFlavor = cfg.flavor.copy()
+    buildFlavor.union(cfg.buildFlavor, 
+                      mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
+    cfg.buildFlavor = buildFlavor
+    flavorConfig.populateBuildFlags()
     sourceCommand(cfg, otherArgs[1:], argSet)
 
 def sourceCommand(cfg, args, argSet):
@@ -245,11 +245,11 @@ def sourceCommand(cfg, args, argSet):
         prep = 0
         resume = None
         buildBranch = None
-        if argSet.has_key('use-flag'):
-            for flag in argSet['use-flag']:
-                cfg.configLine(flag)
-            del argSet['use-flag']
-
+        if argSet.has_key('use-flavor'):
+            buildFlavor = deps.deps.parseFlavor(argSet['use-flavor'])
+            cfg.buildFlavor.union(buildFlavor, 
+                          mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
+            del argSet['use-flavor']
         if argSet.has_key('use-macro'):
             for macro in argSet['use-macro']:
                 cfg.configLine('macros.' + macro)
@@ -259,14 +259,19 @@ def sourceCommand(cfg, args, argSet):
             del argSet['prep']
             prep = 1
 
-        if argSet.has_key('noclean'):
-            del argSet['noclean']
+        if argSet.has_key('no-clean'):
+            del argSet['no-clean']
             cfg.noClean = True
         else:
             cfg.noClean = False
         if argSet.has_key('resume'):
             resume = argSet['resume']
             del argSet['resume']
+        if argSet.has_key('unknown-flags'):
+            unknownFlags = argSet['unknown-flags']
+            del argSet['unknown-flags']
+        else:
+            unknownFlags = False
         if argSet.has_key('debug-exceptions'):
             del argSet['debug-exceptions']
             cfg.debugRecipeExceptions = True
@@ -285,7 +290,8 @@ def sourceCommand(cfg, args, argSet):
 
         if argSet: return usage()
         
-        cook.cookCommand(cfg, args[1:], prep, macros, resume=resume)
+        cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
+                                              allowUnknownFlags=unknownFlags)
         log.setVerbosity(level)
     elif (args[0] == "describe"):
         level = log.getVerbosity()

@@ -149,19 +149,9 @@ class RecipeLoader:
             else:
                 msg += err.text
             raise RecipeFileError(msg)
-        # We need to track Use flags that might be mentioned only
-        # outside of the setup() function.  
-        if cfg is not None:
-            use.overrideFlags(cfg, pkgname)
-
-        # LocalFlags must be thawed when loading a recipe -- the recipe
-        # may try to set the value
-        use.LocalFlags._thaw()
 
         use.resetUsed()
         exec code in self.module.__dict__
-        if cfg is not None:
-            use.clearOverrides(cfg, pkgname)
 
         # all recipes that could be loaded by loadRecipe are loaded;
         # get rid of our references to cfg and repos
@@ -651,8 +641,11 @@ class _GroupOrRedirectRecipe(Recipe):
         if isinstance(flavor, deps.DependencySet) or flavor is None:
             # nothing needs to be done
             pass
-        elif isinstance(flavor, use.Flag):
-            flavor = flavor.asSet()
+        elif isinstance(flavor, str):
+            flavorStr = flavor
+            flavor = deps.parseFlavor(flavorStr)
+            if flavor is None:
+                raise ValueError, 'invalid flavor %s' % flavorStr
         else:
             raise ValueError, 'invalid flavor'
         self.addTroveList.append((name, versionStr, flavor, source))
