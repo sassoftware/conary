@@ -81,11 +81,11 @@ class NumericStream(InfoStream):
     def twm(self, diff, base):
 	if not diff: return False
 
-	newSize = struct.unpack(self.format, diff)[0]
+	newVal = struct.unpack(self.format, diff)[0]
 	if self.val == base.val:
-	    self.val = newSize
+	    self.val = newVal
 	    return False
-	elif base.val != newSize:
+	elif base.val != newVal:
 	    return True
 
     def __eq__(self, other):
@@ -174,7 +174,7 @@ class StringStream(InfoStream):
 	       self.s == other.s
 
     def __init__(self, s = None):
-	self.s = s
+	self.thaw(s)
 
 class TupleStream(InfoStream):
 
@@ -338,9 +338,11 @@ class InodeStream(TupleStream):
 
 	return "".join(l)
 
-    def timeString(self):
+    def timeString(self, now = None):
+	if not now:
+	    now = time.time()
 	timeSet = time.localtime(self.mtime())
-	nowSet = time.localtime(time.time())
+	nowSet = time.localtime(now)
 
 	# if this file is more then 6 months old, use the year
 	monthDelta = nowSet[1] - timeSet[1]
@@ -438,12 +440,14 @@ class File:
         try:
             uid = pwd.getpwnam(self.inode.owner())[2]
         except KeyError:
-            log.warning('user %s does not exist - using root', self.owner())
+            log.warning('user %s does not exist - using root', 
+			self.inode.owner())
             uid = 0
         try:
             gid = grp.getgrnam(self.inode.group())[2]
         except KeyError:
-            log.warning('group %s does not exist - using root', self.group())
+            log.warning('group %s does not exist - using root', 
+			self.inode.group())
             gid = 0
 
 	os.lchown(target, uid, gid)
@@ -603,7 +607,7 @@ class DeviceFile(File):
     streamList = File.streamList + (("devt", DeviceStream ),)
 
     def sizeString(self):
-	return "%3d, %3d" % (self.major, self.minor)
+	return "%3d, %3d" % (self.devt.major(), self.devt.minor())
 
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
@@ -657,27 +661,21 @@ class RegularFile(File):
 
 	File.restore(self, target, restoreContents)
 
-def FileFromFilesystem(path, fileId, possibleMatch = None,
-                       requireSymbolicOwnership = False):
+def FileFromFilesystem(path, fileId, possibleMatch = None):
+                       
     s = os.lstat(path)
 
     try:
         owner = pwd.getpwuid(s.st_uid)[0]
     except KeyError, msg:
-        if requireSymbolicOwnership:
-            raise FilesError(
-                "Error mapping uid %d to user name: %s" %(s.st_uid, msg))
-        else:
-	    owner = str(s.st_uid)
+	raise FilesError(
+	    "Error mapping uid %d to user name: %s" %(s.st_uid, msg))
 
     try:
         group = grp.getgrgid(s.st_gid)[0]
     except KeyError, msg:
-        if requireSymbolicOwnership:
-            raise FilesError(
-                "Error mapping gid %d to group name: %s" %(s.st_gid, msg))
-        else:
-            group = str(s.st_gid)
+	raise FilesError(
+	    "Error mapping gid %d to group name: %s" %(s.st_gid, msg))
 
     needsSha1 = 0
     inode = InodeStream(s.st_mode & 07777, s.st_mtime, owner, group)
@@ -700,8 +698,8 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
 	f.devt.setMinor(s.st_rdev & 0xff)
     elif (stat.S_ISCHR(s.st_mode)):
 	f = CharacterDevice(fileId)
-	f.devt.major(s.st_rdev >> 8)
-	f.devt.minor(s.st_rdev & 0xff)
+	f.devt.setMajor(s.st_rdev >> 8)
+	f.devt.setMinor(s.st_rdev & 0xff)
     else:
         raise FilesError("unsupported file type for %s" % path)
 

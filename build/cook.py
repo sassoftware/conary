@@ -43,8 +43,7 @@ def _createPackage(repos, branch, bldPkg, ident):
         if isinstance(buildFile, buildpackage._BuildDeviceFile):
             f = files.ThawFile(buildFile.freeze(), fileId)
         elif realPath:
-            f = files.FileFromFilesystem(realPath, fileId,
-                                         requireSymbolicOwnership=True)
+            f = files.FileFromFilesystem(realPath, fileId)
 	    # setuid or setgid must be set explicitly in buildFile
 	    # XXX there must be a better way
 	    f.inode.setPerms(f.inode.perms() & 01777)
