@@ -25,6 +25,7 @@ import re
 from lib import sha1helper
 import sqlite3
 import tempfile
+import trove
 from lib import util
 from repository import xmlshims
 from repository import repository
@@ -35,7 +36,7 @@ from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExi
 import trovestore
 import versions
 
-SERVER_VERSIONS = [ 26 ]
+SERVER_VERSIONS = [ 26, 27 ]
 CACHE_SCHEMA_VERSION = 11
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -1016,6 +1017,41 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	f = self.troveStore.getFile(self.toPathId(pathId), 
                                     self.toFileId(fileId))
 	return self.fromFile(f)
+
+    def getPackageBranchPathIds(self, authToken, clientVersion, sourceName, 
+                                branch):
+	if not self.auth.check(authToken, write = False, 
+                               trove = sourceName,
+			       label = self.toBranch(branch).label()):
+	    raise InsufficientPermission
+
+        cu = self.db.cursor()
+
+        cu.execute("""
+            SELECT DISTINCT pathId, path FROM
+                TroveInfo JOIN Instances ON
+                    TroveInfo.instanceId == Instances.instanceId
+                JOIN Nodes ON
+                    Instances.itemId == Nodes.itemId AND
+                    Instances.versionId == Nodes.versionId
+                JOIN Branches ON
+                    Nodes.branchId = Branches.branchId
+                JOIN TroveFiles ON
+                    Instances.instanceId = TroveFiles.instanceId
+                WHERE
+                    TroveInfo.infoType = ? AND
+                    TroveInfo.data = ? AND
+                    Branches.branch = ?
+                ORDER BY 
+                    Nodes.finalTimestamp DESC
+        """, trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch)
+
+        ids = {}
+        for (pathId, path) in cu:
+            if not ids.has_key(path):
+                ids[path] = self.fromPathId(pathId)
+
+        return ids
 
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):

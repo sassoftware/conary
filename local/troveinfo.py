@@ -10,7 +10,8 @@ class TroveInfoTable:
                                                  infoType INT,
                                                  data BIN)""")
             cu.execute("CREATE INDEX TroveInfoIdx ON TroveInfo(instanceId)")
-
+            cu.execute("""CREATE INDEX TroveInfoIdx2 ON TroveInfo(infoType, 
+                                                                  data)""")
 
     def addInfo(self, cu, trove, idNum):
         for (tag, (streamType, name)) in trove.troveInfo.streamDict.iteritems():

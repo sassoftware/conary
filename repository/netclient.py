@@ -855,6 +855,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return contents
 
+    def getPackageBranchPathIds(self, sourceName, branch):
+        """
+        Searches all of the troves generated from sourceName on the
+        given branch, and returns the latest pathId for each path
+        as a dictionary indexed by path.
+
+        @param sourceName: name of the source trove
+        @type sourceName: str
+        @param branch: branch to restrict the source to
+        @type branch: versions.Branch
+        """
+        ids = self.c[branch].getPackageBranchPathIds(sourceName, 
+                                                     self.fromVersion(branch))
+        return dict((x[0], self.toPathId(x[1])) for x in ids.iteritems())
+
     def commitChangeSetFile(self, fName):
         cs = changeset.ChangeSetFromFile(fName)
         return self._commit(cs, fName)
