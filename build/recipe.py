@@ -11,7 +11,8 @@ import imp, sys
 import os
 import util
 import build
-import policy
+import destdirpolicy
+#import packagepolicy
 import shutil
 import types
 import inspect
@@ -467,14 +468,14 @@ class Recipe:
         if not name.startswith('_'):
 	    if build.__dict__.has_key(name):
 		return _recipeHelper(self.build, build.__dict__[name])
-	    if policy.__dict__.has_key(name):
-		policyClass = policy.__dict__[name]
+	    if destdirpolicy.__dict__.has_key(name):
+		policyClass = destdirpolicy.__dict__[name]
 		for index in range(len(self.process)):
 		    policyObj = self.process[index]
 		    if isinstance(policyObj, policyClass):
 			return _policyUpdater(self.process, index,
 			                      policyObj, policyClass)
-		return _recipeHelper(self.policy, policyClass)
+		return _recipeHelper(self.process, policyClass)
         return self.__dict__[name]
     
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
@@ -504,7 +505,7 @@ class Recipe:
 	self.defaultbuild = [build.Make(), build.MakeInstall()]
 	self.build = []
 	# what needs to be done to massage the installed tree
-        self.process = policy.DefaultPolicy()
+        self.process = destdirpolicy.DefaultPolicy()
 	self.macros = Macros()
 	self.addMacros = self.macros.addMacros
 	self.addMacros(baseMacros)
