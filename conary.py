@@ -106,7 +106,6 @@ def realMain():
     # 1 - arg may occur once, w/ parameter
     # 2 - arg may occur N times, w/ parameter
 
-    cfgMap["reppath"] = "repPath"
     cfgMap["root"] = "root"
 
     argDef["all"] = 0
@@ -194,7 +193,7 @@ def realMain():
     elif (otherArgs[1] == "branch"):
 	if argSet: return usage
 	if len(otherArgs) < 4 or len(otherArgs) > 5: return usage()
-	repos = openRepository(cfg.repositoryMap, cfg.repPath)
+	repos = openRepository(cfg.repositoryMap, None)
 
 	args = [repos, ] + otherArgs[2:]
 	branch.branch(*args)
@@ -211,7 +210,7 @@ def realMain():
 	    (old, new) = (None, otherArgs[3])
 	    outFile = otherArgs[4]
 
-	repos = openRepository(cfg.repositoryMap, cfg.repPath)
+	repos = openRepository(cfg.repositoryMap, None)
 
 	cscmd.ChangeSetCommand(repos, cfg, name, outFile, old, new)
     elif (otherArgs[1] == "commit"):
@@ -220,7 +219,7 @@ def realMain():
 	    targetBranch  = argSet['target-branch']
 	    del argSet['target-branch']
 	if len(otherArgs) < 3: return usage()
-	repos = openRepository(cfg.repositoryMap, cfg.repPath)
+	repos = openRepository(cfg.repositoryMap, None)
 	for changeSet in otherArgs[2:]:
 	    commit.doCommit(repos, changeSet, targetBranch)
     elif (otherArgs[1] == "config"):
@@ -269,7 +268,7 @@ def realMain():
 	if len(otherArgs) != 3 and len(otherArgs) != 3:
 	    return usage()
 
-	repos = openRepository(cfg.repositoryMap, cfg.repPath)
+	repos = openRepository(cfg.repositoryMap, None)
 	importrpm.doImport(repos, cfg, otherArgs[2])
     elif (otherArgs[1] == "localcs"):
 	if len(otherArgs) != 4 and len(otherArgs) != 4:
@@ -333,7 +332,7 @@ def realMain():
 	leaves = argSet.has_key('leaves')
 	if leaves: del argSet['leaves']
 
-	repos = openRepository(cfg.repositoryMap, cfg.repPath)
+	repos = openRepository(cfg.repositoryMap, None)
 
 	if argSet: return usage()
 
@@ -376,7 +375,7 @@ def realMain():
 	    del argSet['replace-files']
 	if argSet: return usage
 	if len(otherArgs) >=3 and len(otherArgs) <= 4:
-	    repos = openRepository(cfg.repositoryMap, cfg.repPath)
+	    repos = openRepository(cfg.repositoryMap, None)
 	    db = openDatabase(cfg.root, cfg.dbPath)
 
 	    args = [repos, db, cfg] + otherArgs[2:]
