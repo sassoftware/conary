@@ -17,13 +17,14 @@
 #include <Python.h>
 #include <netinet/in.h>
 
+#include "cstreams.h"
+
 /* debugging aid */
 #if defined(__i386__) || defined(__x86_64__)
 # define breakpoint do {__asm__ __volatile__ ("int $03");} while (0)
 #endif
 
 staticforward PyTypeObject StreamSetDefType;
-staticforward PyTypeObject StreamSetType;
 
 /* ------------------------------------- */
 /* Object definitions                    */
@@ -493,7 +494,7 @@ static PyMethodDef StreamSetMethods[] = {
     {NULL}  /* Sentinel */
 };
 
-static PyTypeObject StreamSetType = {
+PyTypeObject StreamSetType = {
     PyObject_HEAD_INIT(&PyType_Type)
     0,                              /*ob_size*/
     "cstreams.StreamSet",           /*tp_name*/
@@ -540,10 +541,7 @@ static PyTypeObject StreamSetType = {
     PyModule_AddObject(m, #name, (PyObject *) &name ## Type);
 
 void streamsetinit(PyObject * m) {
-    StreamSetType.tp_new = PyType_GenericNew;
-    REGISTER_TYPE(StreamSet);
-    PyDict_SetItemString(StreamSetType.tp_dict, "__slots__", PyList_New(0));
-
     StreamSetDefType.tp_new = PyType_GenericNew;
     REGISTER_TYPE(StreamSetDef);
+    allStreams[STREAM_SET].pyType  = StreamSetType;
 }

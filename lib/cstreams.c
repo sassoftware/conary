@@ -16,6 +16,14 @@
 
 #include <Python.h>
 #include <netinet/in.h>
+#include <string.h>
+
+#include "cstreams.h"
+
+/* debugging aid */
+#if defined(__i386__) || defined(__x86_64__)
+# define breakpoint do {__asm__ __volatile__ ("int $03");} while (0)
+#endif
 
 /* ------------------------------------- */
 /* Module initialization                 */
@@ -24,25 +32,28 @@ static PyMethodDef CStreamsMethods[] = {
     {NULL}  /* Sentinel */
 };
 
-void numstreaminit(PyObject * m);
-void streamsetinit(PyObject * m);
-void stringstreaminit(PyObject * m);
+struct singleStream allStreams[5];
 
-#ifndef PyMODINIT_FUNC  /* declarations for DLL import/export */
-#define PyMODINIT_FUNC void
-#endif
 PyMODINIT_FUNC
 initcstreams(void) 
 {
     PyObject* m;
+    int i;
 
     m = Py_InitModule3("cstreams", CStreamsMethods, "");
 
-    numstreaminit(m);
     streamsetinit(m);
+    numericstreaminit(m);
     stringstreaminit(m);
-}
 
-/*
-vim:ts=4:sw=4:et
-*/
+    for (i = 0; i < (sizeof(allStreams) / sizeof(*allStreams)); i++) {
+        char * name;
+
+        allStreams[i].pyType.tp_new = PyType_GenericNew;
+        if (PyType_Ready(&allStreams[i].pyType) < 0)
+            return;
+        Py_INCREF(&allStreams[i].pyType);
+        name = strrchr(allStreams[i].pyType.tp_name, '.') + 1;
+        PyModule_AddObject(m, name, (PyObject *) &allStreams[i].pyType);
+    }
+}
