@@ -15,6 +15,8 @@ Group files are parsed into group objects, which resolve the package and
 name as specified above; the original group file is preserved for future
 modification. This also allows a group file to be checked out and back
 in again, and have it updated with new head versions of it's components.
+Some groups (notably ones derived from recipies) exist only in their
+parsed forms; these groups cannot be checked in or out.
 
 Group files can contain comment lines (which begin with #), and the first
 two lines should read::
@@ -26,7 +28,9 @@ Where the name is a simple package name (not fully qualified) and the
 version is just a version/release.
 """
 
+import difflib
 import log
+import patch
 import versions
 
 class Group:
@@ -71,6 +75,20 @@ class Group:
 	"""
 	self.packages[name] = versionList
 
+    def addPackageVersion(self, name, version):
+	"""
+	Adds a single version of a package.
+
+	@param name: name of the package
+	@type name: str
+	@name: version
+	@type: versions.Version
+	"""
+	if self.packages.has_key(name):
+	    self.packages[name].append(version)
+	else:
+	    self.packages[name] = [ version ]
+
     def setName(self, name):
 	"""
 	Sets the name of a group. Group names are of the form :repos:name
@@ -79,6 +97,40 @@ class Group:
 	@type name: str
 	"""
 	self.name = name
+
+    def applyChangeSet(self, cs):
+	"""
+	Updates the group from the changes specified in a change set.
+
+	@param cs: change set
+	@type cs: GroupChangeSet
+	"""
+
+	if cs.getPatch():
+	    if not self.spec:
+		old = []
+	    else:
+		old = string.split(self.spec, '\n')
+
+	    (new, failed) = patch.patch(old, cs.getPatch().split('\n'))
+	    if failed:
+		# FIXME. something smarter needs to happen here, but it's
+		# not clear what as this really shouldn't happen
+		raise IOError
+	
+	    self.spec = "\n".join(new)
+
+	for (name, list) in cs.packages.items():
+	    for (oper, version) in list:
+		if oper == '+':
+		    self.addPackageVersion(name, version)
+		elif oper == "-":
+		    for i, ver in enumerate(self.packages[name]):
+			if ver.equal(version): break
+		    if i == len(self.packages[name]):
+			# FIXME, this isn't the right thing to do
+			raise IOError
+		    del(self.packages[i])
 
     def formatString(self):
 	"""
@@ -94,6 +146,10 @@ class Group:
 	.
 	PACKAGEN VERSIONN
 	GROUP FILE
+
+	Group file may be empty, in which case nothing follows the newline
+	for the final file package entry.
+
 	"""
 	str = "%d\n" % len(self.packages.keys())
 	for pkg in self.packages.keys():
@@ -101,47 +157,56 @@ class Group:
 		   " ".join([v.asString() for v in self.packages[pkg]]) + \
 		   "\n"
 
-	str += "".join(self.spec)
+	if self.spec:
+	    str += "".join(self.spec)
 
 	return str
 
-    def diff(self, them, abstract = 0):
+    def diff(self, them, abstract = False):
 	"""
 	Generates a change set between them (considered the old version)
 	and this instance.
 
 	@param them: object to generate a change set from (may be None)
 	@type them: Group
+	@param abstract: tells if this is a new group or an abstract change
+	when them is None
+	@type abstract: boolean
 	@rtype; ChangeSetGroup
 	"""
-	assert(self.__class__ == them.__class)
 	if them:
-	    cs = GroupChangeSet(them.getVersion(), self.getVersion())
+	    assert(self.__class__ == them.__class)
+	    assert(self.name == them.name)
+	    cs = GroupChangeSet(self.name, them.getVersion(), self.getVersion())
 	else:
-	    cs = GroupChangeSet(them.getVersion(), self.getVersion(),
+	    cs = GroupChangeSet(self.name, None, self.getVersion(), 
 				abstract = abstract)
 
 	if them:
 	    diff = difflib.unified_diff(self.spec, them.spec, "old", "new")
 	else:
-	    diff = difflib.unified_diff(self.spec, them.spec, "", "new")
+	    diff = difflib.unified_diff(self.spec, "", "old", "new")
 
 	cs.setPatch(diff)
 
 	names = {}
-	for name in self.packages.keys() + them.packages.keys():
+	list = self.packages.keys()
+	if them:
+	    list += them.packages.keys()
+
+	for name in list:
 	    names[name] = 1
 
 	for name in names.keys():
-	    if self.package.has_key(name):
+	    if self.packages.has_key(name):
 		ourVersions = self.packages[name]
-	    else;
+	    else:
 		ourVersions = None
 
-	    if them.package.has_key(name):
+	    if them and them.packages.has_key(name):
 		theirVersions = them.packages[name]
-	    else;
-		theirVersions = None
+	    else:
+		theirVersions = []
 
 	    for (i, version) in enumerate(ourVersions):
 		match = 0 
@@ -159,6 +224,8 @@ class Group:
 
 	    for version in theirVersions:
 		cs.oldPackageVersion(name, version)
+
+	return cs
 
     def setVersion(self, ver):
 	"""
@@ -316,8 +383,11 @@ class GroupFromFile(Group):
 	    for versionStr in items[1:]:
 		version = versions.VersionFromString(versionStr)
 		self.packages[name].append(version)
-
-	self.spec = lines[i + 1:]
+	
+	if (i + 1) < len(lines):
+	    self.spec = lines[i + 1:]
+	else:
+	    self.spec = None
 
     def __init__(self, name, f, version):
 	"""
@@ -344,6 +414,30 @@ class GroupChangeSet:
     via patch.
     """
 
+    def getName(self):
+	"""
+	@rtype: string
+	"""
+	return self.name
+
+    def isAbstract(self):
+	"""
+	@rtype: boolean
+	"""
+	return self.isAbstract
+
+    def getOldVersion(self):
+	"""
+	@rtype: versions.Version
+	"""
+	return self.oldVersion
+
+    def getNewVersion(self):
+	"""
+	@rtype: versions.Version
+	"""
+	return self.newVersion
+
     def setPatch(self, patch):
 	"""
 	Adds the patch beween the input files for groups
@@ -353,11 +447,115 @@ class GroupChangeSet:
 	"""
 	self.specPatch = patch
 
-    def newPackageVersion(self, name, version)
-	self.newPackageVersions.append((name, version))
+    def getPatch(self):
+	"""
+	Returns the patch between the input files.
 
-    def oldPackageVersion(self, name, version)
-	self.oldPackageVersions.append((name, version))
+	@rtype: str
+	"""
+
+    def newPackageVersion(self, name, version):
+	"""
+	Adds a version of a package which appeared in newVersion.
+
+	@param name: name of the package
+	@type name: str
+	@param version: new version
+	@type version: versions.Version
+	"""
+
+	if not self.packages.has_key(name):
+	    self.packages[name] = []
+	self.packages[name].append(('+', version))
+
+    def oldPackageVersion(self, name, version):
+	"""
+	Adds a version of a package which appeared in oldVersion.
+
+	@param name: name of the package
+	@type name: str
+	@param version: old version
+	@type version: versions.Version
+	"""
+	if not self.packages.has_key(name):
+	    self.packages[name] = []
+	self.packages[name].append(('-', version))
+
+    def formatToFile(self, cfg, f):
+	"""
+	Writes a human-readable representation of this change set.
+
+	@rtype: str
+	"""
+	f.write("group %s " % self.name)
+	if self.isAbstract():
+	    f.write("abstract ")
+	elif self.oldVersion:
+	    f.write("from %s to " % self.oldVersion.asString(cfg.defaultbranch))
+	else:
+	    f.write("new ")
+	f.write("%s\n" % self.newVersion.asString(cfg.defaultbranch))
+
+	for name in self.packages.keys():
+	    list = [ x[0] + x[1].asString(cfg.defaultbranch) for x in self.packages[name] ]
+	    f.write("\t" + name + ": " + " ".join(list) + "\n")
+
+    def freeze(self):
+	"""
+	Returns a string representation of this change set which can
+	later be parsed by parse(). The representation is formatted
+	as follows:
+
+	HEADER
+	<pkgname> <[+-]version>+
+	<specdiff>
+
+	Header is one of the following:
+	    SRS GRP ABSTRACT <name> <newversion> <pkgcount>
+	    SRS GRP CHANGESET <name> <oldversion> <newversion> <pkgcount>
+	    SRS GRP NEW <name> <newversion> <pkgcount>
+
+	@rtype: string
+	"""
+
+	if self.abstract:
+	    hdr = "SRS GRP ABSTRACT %s %s %d\n" % \
+		      (self.name, self.newVersion.freeze(), 
+		       len(self.packages.keys()))
+	elif not self.oldVersion:
+	    hdr = "SRS GRP NEW %s %s %d\n" % \
+		      (self.name, self.newVersion.freeze(), rc.count("\n"))
+	else:
+	    hdr = "SRS GRP CHANGESET %s %s %s %d\n" % \
+		      (self.name, self.oldVersion.freeze(), 
+		       self.newVersion.freeze(), 
+		       len(self.packages.keys()))
+
+	lines = []
+	for name in self.packages.keys():
+	    list = [ x[0] + x[1].freeze() for x in self.packages[name] ]
+	    lines.append(name + " " + " ".join(list))
+
+	return hdr + "\n".join(lines) + "\n"
+
+    def parse(self, line):
+	"""
+	Parses a single line from the frozen version of a group change
+	set and updates this change set appropriately.
+	
+	@param line: line to parse
+	@type line: str
+	"""
+	print "---", line
+	fields = line.split()
+	name = fields[0]
+	verList = []
+	for item in fields[1:]:
+	    op = item[0]
+	    v = versions.ThawVersion(item[1:])
+	    verList.append((op, v))
+
+	self.packages[name] = verList
 
     def __init__(self, name, oldVersion, newVersion, abstract = False):
 	"""
@@ -377,6 +575,7 @@ class GroupChangeSet:
 	self.oldVersion = oldVersion
 	self.newVersion = newVersion
 	self.abstract = abstract
+	self.packages = {}
 
 class GroupError(Exception):
 
