@@ -59,6 +59,7 @@ def usage(rc = 1):
     print "               --root <root>"
     print ""
     print "pkglist flags: --all"
+    print "               --ids"
     print "               --ls"
     print ""
     print "update flags: --replace-files"
@@ -95,6 +96,7 @@ def main():
 
     argDef["all"] = 0
     argDef["config"] = 2
+    argDef["ids"] = 0
     argDef["ls"] = 0
     argDef["macros"] = 1
     argDef["prep"] = 0
@@ -250,6 +252,9 @@ def main():
 	ls = argSet.has_key('ls')
 	if ls: del argSet['ls']
 
+	ids = argSet.has_key('ids')
+	if ids: del argSet['ids']
+
 	if otherArgs[1] == "replist":
 	    queryRepos = openRepository(cfg.reppath, "r")
 	else:
@@ -258,7 +263,7 @@ def main():
 	if argSet: return usage()
 
 	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	    args = [queryRepos, cfg, all, ls] + otherArgs[2:]
+	    args = [queryRepos, cfg, all, ls, ids] + otherArgs[2:]
 	    try:
 		display.displayPkgs(*args)
 	    except IOError, msg:

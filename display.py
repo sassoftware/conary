@@ -12,7 +12,8 @@ _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
-def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
+def displayPkgs(repos, cfg, all = False, ls = False, ids = False, pkg = "", 
+		versionStr = None):
     if pkg and pkg[0] != ":":
 	pkg = cfg.packagenamespace + ":" + pkg
 
@@ -23,8 +24,8 @@ def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
 	list.sort()
 
     for pkgName in list:
-	if versionStr or ls:
-	    _displayPkgInfo(repos, cfg, pkgName, versionStr, ls)
+	if versionStr or ls or ids:
+	    _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids)
 	    continue
 	else:
 	    if all:
@@ -63,7 +64,7 @@ def _versionList(repos, pkgName):
 
     return l
 
-def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
+def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids):
     try:
 	pkgList = helper.findPackage(repos, cfg.packagenamespace, 
 				     cfg.installbranch, pkgName, versionStr)
@@ -74,7 +75,22 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
     for pkg in pkgList:
 	version = pkg.getVersion()
 
-	if not ls:
+	if ls:
+	    for (fileId, path, version) in pkg.fileList():
+		file = repos.getFileVersion(fileId, version, path = path)
+
+		if isinstance(file, files.SymbolicLink):
+		    name = "%s -> %s" %(path, file.linkTarget())
+		else:
+		    name = path
+
+		print "%s    1 %-8s %-8s %s %s %s" % \
+		    (file.modeString(), file.owner(), file.group(), 
+		     file.sizeString(), file.timeString(), name)
+	elif ids:
+	    for (fileId, path, version) in pkg.fileList():
+		print "%s %s" % (fileId, path)
+	else:
 	    print _pkgFormat % (
 		package.stripNamespace(cfg.packagenamespace, pkgName),
 		version.asString(cfg.defaultbranch))
@@ -88,15 +104,3 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
 
 	    for (fileId, path, version) in pkg.fileList():
 		print _fileFormat % (path, version.asString(cfg.defaultbranch))
-	else:
-	    for (fileId, path, version) in pkg.fileList():
-		file = repos.getFileVersion(fileId, version, path = path)
-
-		if isinstance(file, files.SymbolicLink):
-		    name = "%s -> %s" %(path, file.linkTarget())
-		else:
-		    name = path
-
-		print "%s    1 %-8s %-8s %s %s %s" % \
-		    (file.modeString(), file.owner(), file.group(), 
-		     file.sizeString(), file.timeString(), name)
