@@ -57,7 +57,7 @@ def magic(path, basedir=''):
 	basedir += '/'
 
     n = basedir+path
-    if os.path.isdir(n):
+    if os.path.isdir(n) or os.path.islink(n):
 	return None
 
     f = file(n)
