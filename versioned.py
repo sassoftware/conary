@@ -420,9 +420,6 @@ class VersionedFile:
 	del self.db[_CONTENTS % (self.key, versionStr)]
 	del self.db[_VERSION_INFO % (self.key, versionStr)]
 
-	if (self.key[0] == ":"):
-	    print "%s" % (_VERSION_INFO % (self.key, versionStr))
-
 	#self.db.sync()
 
 	return retValue
@@ -519,7 +516,6 @@ class IndexedVersionedFile(VersionedFile):
     """
     def eraseVersion(self, version):
 	if VersionedFile.eraseVersion(self, version):
-	    print "HERE"
 	    db.eraseFile(self.key)
 
     def __init__(self, db, filename, createBranches, database):
