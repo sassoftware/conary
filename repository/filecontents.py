@@ -86,7 +86,7 @@ class WithFailedHunks(FileContents):
 	return self.hunks
 
     def size(self):
-	return self.fs.size()
+	return self.fc.size()
 
     def __init__(self, fc, hunks):
 	self.fc = fc
