@@ -120,7 +120,7 @@ class Package:
 	@type version: versions.Version
 	@param missingOkay: should we raise an error if the version isn't
 	part of this trove?
-	@boolean missingOkay: boolean
+	@type missingOkay: boolean
 	"""
 	for i, ver in enumerate(self.packages[name]):
 	    if ver.equal(version): break
@@ -244,9 +244,10 @@ class Package:
 	Merges a set of changes to the included package list into this
 	package.
 
-	@param list: A list or generator specifying a set of package changes;
-	this is the same as returned by PackageChangeSet.iterChangedPackages()
-	@type list: (name, list) tuple
+	@param changeList: A list or generator specifying a set of
+	package changes; this is the same as returned by
+	PackageChangeSet.iterChangedPackages()
+	@type changeList: (name, list) tuple
 	@param redundantOkay: Redundant changes are normally considered errors
 	@type redundantOkay: boolean
 	"""

@@ -99,8 +99,8 @@ class TroveDatabase:
 	"""
 	Returns all of the troves containing a particular path.
 
-	@param name: name of the trove
-	@type name: str
+	@param path: path to find in the troves
+	@type path: str
 	@rtype: list of package.Trove
 	"""
 	for trvId in self.pathIdx.iterGetEntries(path):
