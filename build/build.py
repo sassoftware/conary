@@ -398,9 +398,9 @@ class _FileAction(BuildAction):
 		self.recipe.PackageSpec(package, path)
 	
 
-class InstallDesktopfile(BuildCommand, _FileAction):
+class Desktopfile(BuildCommand, _FileAction):
     """
-    The InstallDesktopfile class should be used to provide categories
+    The Desktopfile class should be used to provide categories
     (and vendor, if necessary) for files in /usr/share/applications/,
     if the target has enabled building desktop files.
     """
@@ -514,7 +514,7 @@ class _PutFiles(_FileAction):
 	    if not self.toFile.endswith('/') or os.path.isdir(self.toFile):
 		raise TypeError, 'too many targets for non-directory %s' %self.toFile
 
-class InstallFiles(_PutFiles):
+class Install(_PutFiles):
     """
     This class installs files from the builddir to the destdir.
     """
@@ -525,7 +525,7 @@ class InstallFiles(_PutFiles):
 	self.source = ''
 	self.move = 0
 
-class CopyFiles(_PutFiles):
+class Copy(_PutFiles):
     """
     This class copies files within the destdir.
     """
@@ -534,7 +534,7 @@ class CopyFiles(_PutFiles):
 	self.source = '%(destdir)s'
 	self.move = 0
 
-class MoveFiles(_PutFiles):
+class Move(_PutFiles):
     """
     This class moves files within the destdir.
     """
@@ -543,9 +543,9 @@ class MoveFiles(_PutFiles):
 	self.source = '%(destdir)s'
 	self.move = 1
 
-class InstallSymlinks(_FileAction):
+class Symlink(_FileAction):
     """
-    The InstallSymlinks class create symlinks.  Multiple symlinks
+    The Symlink class create symlinks.  Multiple symlinks
     can be created if the destination path is a directory.  The
     destination path is determined to be a directory if it already
     exists or if the path ends with the directory separator character
@@ -612,7 +612,7 @@ class InstallSymlinks(_FileAction):
 
     def __init__(self, *args, **keywords):
         """
-        Create a new InstallSymlinks instance
+        Create a new Symlink instance
 
         @keyword fromFiles: paths(s) to which symlink(s) will be created
         @type fromFiles: str or sequence of str
@@ -632,7 +632,7 @@ class InstallSymlinks(_FileAction):
 	    if not self.toFile.endswith('/') or os.path.isdir(self.toFile):
 		raise TypeError, 'too many targets for non-directory %s' %self.toFile
 
-class InstallLinks(_FileAction):
+class Link(_FileAction):
     """
     Install a hard link.  Much more limited than a symlink, hard links
     are only permitted within the same directory, you cannot create a
@@ -655,8 +655,8 @@ class InstallLinks(_FileAction):
 
     def __init__(self, *args, **keywords):
         """
-        Create a new InstallLinks instance::
-	    self.InstallLinks(newname, [newname, ...,] existingpath)
+        Create a new Link instance::
+	    self.Link(newname, [newname, ...,] existingpath)
         """
         _FileAction.__init__(self, *args, **keywords)
 	split = len(args) - 1
@@ -668,9 +668,9 @@ class InstallLinks(_FileAction):
 		raise TypeError, 'hardlink %s crosses directories' %name
 	self.basedir = os.path.dirname(self.existingpath)
 
-class RemoveFiles(BuildAction):
+class Remove(BuildAction):
     """
-    The RemoveFiles class removes files from within the destdir
+    The Remove class removes files from within the destdir
     """
     keywords = { 'recursive': False }
 
@@ -689,9 +689,9 @@ class RemoveFiles(BuildAction):
 	else:
 	    self.filespecs = args
 
-class InstallDocs(_FileAction):
+class Doc(_FileAction):
     """
-    The InstallDocs class installs documentation files from the builddir
+    The Doc class installs documentation files from the builddir
     into the destdir in the appropriate directory.
     """
     keywords = {'devel' :  False,
@@ -707,7 +707,7 @@ class InstallDocs(_FileAction):
 	else:
 	    macros['subdir'] = ''
 	base = '%(thisdocdir)s%(subdir)s/' %macros
-	dest = '%(destdir)s'%macros + base
+	dest = macros.destdir + base
 	util.mkdirChain(os.path.dirname(dest))
 	for path in self.paths:
 	    for newpath in util.copytree(path %macros, dest, True,
@@ -722,9 +722,9 @@ class InstallDocs(_FileAction):
 	else:
 	    self.paths = args
 
-class CreateFiles(_FileAction):
+class Create(_FileAction):
     """
-    The CreateFile class puts a file in the destdir.  Without contents
+    The Create class puts a file in the destdir.  Without contents
     specified it is rather like C{touch}; with contents specified it
     is more like C{cat > foo <<EOF ... EOF}
     @keyword contents: The (optional) contents of the file
