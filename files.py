@@ -33,11 +33,7 @@ _STREAM_MTIME	    = 9
 _STREAM_DEPS	    = 10
 
 def _makeTupleSlots(l):
-    return [ "items", ] + [ x[0] for x in l ] + \
-		    [ "set" + x[0].capitalize() x in l ]
-
-def _makeFileSlots(l):
-    return [ "theId" ] + [ x[0] for x in l ]
+    return [ x[0] for x in l ] + [ "set" + x[0].capitalize() for x in l ]
 
 class InfoStream(object):
 
@@ -427,7 +423,7 @@ class File(object):
     lsTag = None
     hasContents = 0
     streamList = ( ("inode", InodeStream), ("flags", FlagsStream) )
-    __slots__ = _makeFileSlots(streamList)
+    __slots__ = [ "theId", "inode", "flags" ]
 
     def modeString(self):
 	l = self.inode.permsString()
@@ -576,7 +572,7 @@ class SymbolicLink(File):
 
     lsTag = "l"
     streamList = File.streamList + (("target", StringStream ),)
-    __slots__ = _makeFileSlots(streamList)
+    __slots__ = "target"
 
     def sizeString(self):
 	return "%8d" % len(self.target.value())
@@ -599,7 +595,7 @@ class SymbolicLink(File):
 class Socket(File):
 
     lsTag = "s"
-    __slots__ = _makeFileSlots(File.streamList)
+    __slots__ = []
 
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
@@ -613,7 +609,7 @@ class Socket(File):
 class NamedPipe(File):
 
     lsTag = "p"
-    __slots__ = _makeFileSlots(File.streamList)
+    __slots__ = []
 
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
@@ -625,7 +621,7 @@ class NamedPipe(File):
 class Directory(File):
 
     lsTag = "d"
-    __slots__ = _makeFileSlots(File.streamList)
+    __slots__ = []
 
     def restore(self, fileContents, target, restoreContents):
 	if not os.path.isdir(target):
@@ -639,7 +635,7 @@ class Directory(File):
 class DeviceFile(File):
 
     streamList = File.streamList + (("devt", DeviceStream ),)
-    __slots__ = _makeFileSlots(streamList)
+    __slots__ = [ 'devt' ]
 
     def sizeString(self):
 	return "%3d, %3d" % (self.devt.major(), self.devt.minor())
@@ -663,17 +659,17 @@ class DeviceFile(File):
 class BlockDevice(DeviceFile):
 
     lsTag = "b"
-    __slots__ = _makeFileSlots(DeviceFile.streamList)
+    __slots__ = []
 
 class CharacterDevice(DeviceFile):
 
     lsTag = "c"
-    __slots__ = _makeFileSlots(DeviceFile.streamList)
+    __slots__ = []
     
 class RegularFile(File):
 
     streamList = File.streamList + (('contents', RegularFileStream ),)
-    __slots__ = _makeFileSlots(DeviceFile.streamList)
+    __slots__ = [ 'contents' ]
 
     lsTag = "-"
     hasContents = 1
