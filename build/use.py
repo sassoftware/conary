@@ -42,7 +42,7 @@ class Flag(dict):
         self._name = name
 	self._frozen = False
         self._track = track
-        self._usedFlags = {}
+        self._used = False
 	self._overrides = {}
         self._createOnAccess = createOnAccess
         self._required = required
@@ -98,6 +98,8 @@ class Flag(dict):
 	return self.__rand__(other)
 
     def __nonzero__(self):
+        if self._track and self._value is not None:
+            self._used = True
         return self._value
 
     def _freeze(self):
@@ -139,8 +141,7 @@ class Flag(dict):
         # from both
         new._overrides = self._overrides.copy()
         new._overrides.update(other._overrides)
-        new._usedFlags = self._usedFlags.copy()
-        new._usedFlags.update(other._usedFlags)
+        new._used = (self._used or other._used)
         
         for key in self.keys():
             if key in other:
@@ -194,8 +195,10 @@ class Flag(dict):
         return new
 
     def getUsed(self):
-        d = self._usedFlags.copy()
+        d = {}
         for flagname, flag in self.iteritems():
+            if flag._used:
+                d[flagname] = flag
             for usedFlag, subflag in flag.getUsed().iteritems():
                 d['.'.join((flagname, usedFlag))] = subflag
         return d
@@ -212,7 +215,17 @@ class Flag(dict):
         return flagSet
 
     def setUsed(self, usedDict):
-        self._usedFlags.update(usedDict)
+        for flag, value in usedDict.iteritems():
+            keys = flag.split('.')
+            curflag = self
+            for key in keys[:-1]:
+                curflag = curflag[key]
+            key = keys[-1]
+            if isinstance(value, bool):
+                curflag[key]._value = value
+            else:
+                curflag[key]._value = value._value
+            curflag[key]._used = True
 
     def trackUsed(self, val):
         self._track = val
@@ -220,7 +233,7 @@ class Flag(dict):
             self[flag].trackUsed(val)
 
     def resetUsed(self):
-        self._usedFlags.clear()
+        self._used = False
         for flag in self.itervalues():
             flag.resetUsed()
     
@@ -232,7 +245,7 @@ class Flag(dict):
                    createOnAccess=self._createOnAccess,
                    required=self._required, track=self._track)
         new._overrides = self._overrides.copy()
-        new._usedFlags = self._usedFlags.copy()
+        new._used = self._used
         new._track = self._track
         for key in self:
             new[key] = self[key].deepCopy(self)
@@ -301,8 +314,14 @@ class Flag(dict):
         if 'Arch' in self:
             excludeFlags = ['bits64', 'bits32', 'BE', 'LE' ] 
             for arch, topflag in self['Arch'].iteritems():
-                # don't include Arch values we don't want
-                if not topflag:
+                if topflag._value is None:
+                    # if we didn't check the top level arch, 
+                    # we can get it's value from Arch.
+                    if not Arch[arch]:
+                        continue
+                elif not topflag:
+                    # if we checked the arch and it is not our arch
+                    # don't add a dependency
                     continue
                 if arch in excludeFlags:
                     continue
@@ -352,15 +371,15 @@ class Flag(dict):
             return self.__dict__[name]
         if name in self:
             flag = self[name]
-            if self._track:
-                self._usedFlags[name] = flag
             return flag
         elif self._createOnAccess:
             # flag doesn't exist, add it
-            self[name] = Flag(value=None, name=name, parent=self,
+            flag =  Flag(value=None, name=name, parent=self,
                               createOnAccess=True, track=self._track)
-            if self._track:
-                self._usedFlags[name] = flag
+            dict.__setitem__(self, name, flag)
+            # don't check frozen value -- it's okay to create empty flags, 
+            # which is useful for creating flagsets (-Flags.kerenel.smp)
+            # we will catch errors on setting an actual value to this flag
             return self[name]
         raise AttributeError, "class %s has no attribute '%s'" % (self.__class__.__name__, name)
 
