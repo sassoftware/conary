@@ -124,19 +124,6 @@ class DBTroveFiles:
 		   newVersionId, sqlite.encode(newStream), fileId, 
 		   oldVersionId, instanceId)
 
-	# there may be better ways of doing this, but I don't know them
-	cu.execute("""DELETE FROM DBFileTags WHERE
-			streamId IN (
-			    SELECT streamId FROM DBTroveFiles 
-			    WHERE instanceId=%d AND
-				  fileId=%s AND
-				  versionId=%d)
-		    """, (instanceId, fileId, newVersionId))
-
-	for tag in tags:
-	    cu.execute("INSERT INTO DBFileTags VALUES (%d, %d)",
-		       streamId, self.tags[tag])
-
     def iterPath(self, path):
         cu = self.db.cursor()
 	cu.execute("SELECT instanceId FROM DBTroveFiles WHERE "
