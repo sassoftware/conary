@@ -3,6 +3,8 @@ Changes in 0.10.9:
   * the web management interface for the repository works now; see
     http://wiki.specifix.com/ConaryConversion for information on how
     to convert existing authdb's to support this
+  * fixed a bug with distributed branches
+  * users can change their passwords through the repository's web api
 
 Changes in 0.10.8:
   * changed iterAllTroves() to troveNames(), which searches a single
