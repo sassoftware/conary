@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ $# -ne 3 ]; then
-    echo "not enough args"
+    echo "Not enough arguments: <username> <password> <authdb filename>"
     exit
 fi
 
@@ -12,6 +12,10 @@ else
 fi
 
 if [ ! -f $authdb ]; then
+    if [ ! -f schema ]; then
+        echo "Missing schema file."
+        exit
+    fi
     sqlite3 $authdb < schema
 fi
 
