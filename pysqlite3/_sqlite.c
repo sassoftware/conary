@@ -1146,7 +1146,7 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 					PyTuple_SetItem(row, i,
 							PyInt_FromLong(lval));
 			}
-			else if (!strcmp(ctype, "BOOL")) {
+			else if (!strncmp(ctype, "BOOL", 4)) {
 				len = sqlite3_column_int(self->p_stmt, i);
 				PyTuple_SetItem(row, i,
 						PyBool_FromLong(len));
