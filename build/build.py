@@ -413,16 +413,26 @@ class _PutFiles(_FileAction):
 		self._do_one(source, dest, destlen, macros)
 
     def _do_one(self, source, dest, destlen, macros):
-	thisdest = dest
+	print source, dest
+	if os.path.isdir(source):
+	    srcbase = os.path.basename(source)
+	    dest = dest+os.sep+srcbase
+	    destlen += len(os.sep) + len(srcbase)
+	    util.mkdirChain(dest)
+	    for sourcefile in os.listdir(source):
+		thissrc = source+os.sep+sourcefile
+		self._do_one(thissrc, dest, destlen, macros)
+	    return
+
 	if os.path.isdir(dest):
-	    thisdest = dest + os.path.basename(source)
+	    dest = dest + os.path.basename(source)
 
 	if self.move:
-	    util.rename(source, thisdest)
+	    util.rename(source, dest)
 	else:
-	    util.copyfile(source, thisdest)
-	self.setComponents(thisdest[destlen:])
-	self.chmod(macros['destdir'], thisdest[destlen:])
+	    util.copyfile(source, dest)
+	self.setComponents(dest[destlen:])
+	self.chmod(macros['destdir'], dest[destlen:])
 	
 
     def __init__(self, *args, **keywords):
