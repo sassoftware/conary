@@ -300,7 +300,7 @@ class IdealRepository(AbstractTroveDatabase):
 	"""
 	Returns a dictionary indexed by troveNameList. Each item in the
 	dictionary is a list of all of the versions of that trove
-	on the given branch.
+	on the given branch, and newer versions appear later in the list.
 
 	@param troveNameList: trove names
 	@type troveNameList: list of str

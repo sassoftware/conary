@@ -198,6 +198,7 @@ class TroveStore:
 		    AitemId=Nodes.itemId AND Nodes.branchId=AbranchId 
 		JOIN Versions ON
 		    Nodes.versionId = versions.versionId
+		ORDER BY Nodes.finalTimeStamp
 	""", troveName, labelStr)
 
 	for (versionStr, timeStamps) in cu:
