@@ -50,6 +50,7 @@ class ConaryClient:
         if repos == None:
             repos = NetworkRepositoryClient(cfg.repositoryMap)
         
+        cfg.installLabel = cfg.installLabelPath[0]
         self.repos = repos
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
