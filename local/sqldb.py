@@ -109,7 +109,8 @@ class DBTroveFiles:
 
     def iterPath(self, path):
         cu = self.db.cursor()
-	cu.execute("SELECT instanceId FROM DBTroveFiles WHERE path=%s", path)
+	cu.execute("SELECT instanceId FROM DBTroveFiles WHERE "
+		   "isPresent=1 AND path=%s", path)
 	for instanceId in cu:
 	    yield instanceId[0]
 
