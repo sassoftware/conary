@@ -113,10 +113,7 @@ class TroveStore:
 	
 	assert(not self.troveTroves.has_key(troveInstanceId))
 	
-	j = 0
 	for (fileId, path, version) in trove.iterFileList():
-	    j += 1
-	    if j % 500 == 0: print j
 	    versionId = self.getVersionId(version, versionCache)
 	    streamId = self.streamIdCache.get((fileId, versionId), None)
 	    if not streamId:

@@ -490,11 +490,7 @@ class ChangeSetJob:
 	# through change set streams in the right order
 	fileIds = self.files.keys()
 	fileIds.sort()
-	i = 0
 	for fileId in fileIds:
-	    i += 1
-	    if i % 500 == 0:
-		print i
 	    newFile = self.files[fileId]
 	    file = newFile.file()
 
