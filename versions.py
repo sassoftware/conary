@@ -165,10 +165,13 @@ class BranchName(AbstractBranch):
 	"""
 	Returns the string representation of a branch name.
 	"""
-	if versus and self.host == versus.host:
-	    return self.branch
+	if versus:
+	    if self.host == versus.host:
+		if self.namespace == versus.namespace:
+		    return self.branch
+		return self.namespace + ":" + self.branch
 
-	return self.host + '@' + self.branch
+	return "%s@%s:%s" % (self.host, self.namespace, self.branch)
 
     def getHost(self):
 	return self.host
@@ -182,8 +185,10 @@ class BranchName(AbstractBranch):
 	@type version: instance
 	@rtype: boolean
 	"""
-	if (self.__class__ == version.__class__
-	     and self.host == version.host and self.branch == version.branch):
+	if (isinstance(version, BranchName)
+	     and self.host == version.host
+	     and self.namespace == version.namespace
+	     and self.branch == version.branch):
 	    return 1
 	return 0
 
@@ -198,19 +203,41 @@ class BranchName(AbstractBranch):
 	if value.find("/") != -1:
 	    raise ParseError, "/ should not appear in a branch name"
 
-	if value.find("@") == -1:
-	    if not template:
-		raise ParseError, "@ expected between hostname and branch name"
+	i = value.count(":")
+	if i > 1:
+	    raise ParseError, "unexpected colon"
+	j = value.count("@")
+	if j and not i:
+	    raise ParseError, "@ sign can only be used with a colon"
+	if j > 1:
+	    raise ParseError, "unexpected @ sign"
 
+	colon = value.find(":")
+	at = value.find("@")
+
+	if at > colon:
+	    raise ParseError, "@ sign must occur before a colon"
+
+	if value.find(":") == -1:
+	    if not template:
+		raise ParseError, "colon expected before branch name"
+	    
 	    self.host = template.host
+	    self.namespace = template.namespace
 	    self.branch = value
 	else:
-	    (self.host, self.branch) = value.split("@", 1)
+	    if value.find("@") == -1:
+		if not template:
+		    raise ParseError, "@ expected before branch namespace"
+	    
+		self.host = template.host
+		(self.namespace, self.branch) = value.split(":")
+	    else:
+		(self.host, rest) = value.split("@", 1)
+		(self.namespace, self.branch) = rest.split(":")
 
 	if not self.branch:
 	    raise ParseError, ("branch names may not be empty: %s" % value)
-	if self.branch.find("@") != -1:
-	    raise ParseError, ("branch names may not have @ signs: %s" % value)
 
 class LocalBranch(BranchName):
 
@@ -219,7 +246,7 @@ class LocalBranch(BranchName):
     """
 
     def __init__(self):
-	BranchName.__init__(self, "localhost@LOCAL")
+	BranchName.__init__(self, "localhost@local:LOCAL")
 
 class Version:
 
@@ -549,7 +576,7 @@ class _ThawVersion(Version):
 	@param fullString: Frozen representation of a Version object.
 	@type fullString: str
 	"""
-	(timeStr, ver) = fullString.split(":")
+	(timeStr, ver) = fullString.split(":", 1)
 
 	timeVal = float(timeStr)
 	v = self.parseVersionString(ver)
