@@ -18,6 +18,7 @@ import filecontents
 import files
 import gzip
 import httplib
+import itertools
 import xml
 from lib import log
 import os
@@ -839,17 +840,25 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 if self.localRep._hasFileContents(sha1):
                     contents[i] = self.localRep.getFileContents([item])[0]
 
+        byServer = {}
+
         for i, item in enumerate(fileList):
             if contents[i] is not None:
                 continue
 
-            (fileId, fileVersion) = item[0:2]
-
             # we try to get the file from the trove which originally contained
             # it since we know that server has the contents; other servers may
             # not
-            url = self.c[fileVersion].getFileContents(self.fromFileId(fileId),
-                                              self.fromVersion(fileVersion))
+            (fileId, fileVersion) = item[0:2]
+            server = fileVersion.branch().label().getHost()
+            l = byServer.setdefault(server, [])
+            l.append((i, (fileId, fileVersion)))
+
+        for server, itemList in byServer.iteritems():
+            fileList = [ (self.fromFileId(x[1][0]), 
+                          self.fromVersion(x[1][1])) for x in itemList ]
+            (url, sizes) = self.c[fileVersion].getFileContents(fileList)
+            assert(len(sizes) == len(fileList))
 
             inF = urllib.urlopen(url)
 
@@ -864,19 +873,26 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 (fd, path) = tempfile.mkstemp()
                 os.unlink(path)
                 outF = os.fdopen(fd, "r+")
+                start = 0
 
-            size = util.copyfileobj(inF, outF)
+            totalSize = util.copyfileobj(inF, outF)
             del inF
 
-            if tmpFile:
-                outF = util.SeekableNestedFile(tmpFile, size, start)
-	    else:
-		outF.seek(0)
+            for (i, item), size in itertools.izip(itemList, sizes):
+                if tmpFile:
+                    outF = util.SeekableNestedFile(tmpFile, size, start)
+                else:
+                    outF.seek(0)
 
-            gzfile = gzip.GzipFile(fileobj = outF)
-            gzfile.fullSize = util.gzipFileSize(outF)
+                totalSize -= size
+                start += size
 
-            contents[i] = filecontents.FromGzFile(gzfile)
+                gzfile = gzip.GzipFile(fileobj = outF)
+                gzfile.fullSize = util.gzipFileSize(outF)
+
+                contents[i] = filecontents.FromGzFile(gzfile)
+
+            assert(totalSize == 0)
 
         return contents
 

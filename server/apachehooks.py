@@ -190,7 +190,8 @@ def get(isSecure, repos, httpHandler, req):
         totalSize = size
 
     req.content_type = "application/x-conary-change-set"
-    req.sendfile(items[0][0])
+    for (path, size) in items:
+        req.sendfile(path)
 
     # erase single files
     if not localName.endswith(".cf-out") and \

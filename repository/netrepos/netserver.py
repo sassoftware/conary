@@ -721,29 +721,35 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   withFlavors = True, 
                                   flavorFilter = flavorSelection)
 
-    def getFileContents(self, authToken, clientVersion, fileId, fileVersion):
-	fileVersion = self.toVersion(fileVersion)
-        fileLabel = fileVersion.branch().label()
-        fileId = self.toFileId(fileId)
-
-	if not self.auth.check(authToken, write = False, 
-                                     label = fileLabel):
-	    raise InsufficientPermission
-
-        fileObj = self.troveStore.findFileVersion(fileId)
-
-        filePath = self.repos.contentsStore.hashToPath(
-                        sha1helper.sha1ToString(fileObj.contents.sha1()))
-        size = os.stat(filePath).st_size
-
+    def getFileContents(self, authToken, clientVersion, fileList):
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
                                       suffix = '.cf-out')
-        os.write(fd, "%s %d\n" % (filePath, size))
+
+        sizeList = []
+
+        for fileId, fileVersion in fileList:
+            fileVersion = self.toVersion(fileVersion)
+            fileLabel = fileVersion.branch().label()
+            fileId = self.toFileId(fileId)
+
+            if not self.auth.check(authToken, write = False, 
+                                         label = fileLabel):
+                raise InsufficientPermission
+
+            fileObj = self.troveStore.findFileVersion(fileId)
+
+            filePath = self.repos.contentsStore.hashToPath(
+                            sha1helper.sha1ToString(fileObj.contents.sha1()))
+            size = os.stat(filePath).st_size
+            sizeList.append(size)
+
+            os.write(fd, "%s %d\n" % (filePath, size))
+
         os.close(fd)
 
         url = os.path.join(self.urlBase(), 
                            "changeset?%s" % os.path.basename(path)[:-4])
-        return url
+        return url, sizeList
 
     def getTroveLatestVersion(self, authToken, clientVersion, pkgName, 
                               branchStr):

@@ -141,8 +141,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(totalSize))
             self.end_headers()
 
-            f = open(items[0][0], "r")
-            util.copyfileobj(f, self.wfile)
+            for path, size in items:
+                f = open(path, "r")
+                util.copyfileobj(f, self.wfile)
+                del f
 
             if not localName.endswith(".cf-out"):
                 os.unlink(items[0][0])
