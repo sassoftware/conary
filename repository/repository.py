@@ -60,7 +60,7 @@ class Repository:
     def hasPackage(self, pkg):
 	return self.pkgDB.hasFile(str(pkg))
 
-    def getFullVersion(self, pkgName, version):
+    def pkgGetFullVersion(self, pkgName, version):
 	return self._getPackageSet(pkgName).getFullVersion(version)
 
     def hasPackageVersion(self, pkgName, version):
@@ -131,6 +131,9 @@ class Repository:
     def hasGroup(self, grp):
 	# XXX this str() is to allow a migration to PackageName
 	return self.groupDB.hasFile(str(grp))
+
+    def grpGetFullVersion(self, grpName, version):
+	return self._getGroupSet(grpName).getFullVersion(version)
 
     def hasGroupVersion(self, grpName, version):
 	return self._getGroupSet(grpName).hasVersion(version)
@@ -236,16 +239,64 @@ class LocalRepository(Repository):
 
 	self.mode = mode
 
-    # packageList is a list of (pkgName, oldVersion, newVersion, abstract) 
-    # tuples
-    #
-    # if oldVersion == None and abstract == 0, then the package is assumed
-    # to be new for the purposes of the change set
-    def createChangeSet(self, packageList):
+    def createChangeSet(self, fullList):
+	"""
+	fullList is a list of (pkgName, oldVersion, newVersion, abstract) 
+	tuples. pkgName must be of type PackageName
+
+	if oldVersion == None and abstract == 0, then the package is assumed
+	to be new for the purposes of the change set
+	"""
 	cs = changeset.ChangeSetFromRepository(self)
 
+	# split fullList into two lists, one for groups and one for
+	# versions
+	packageList = []
+	groupList = []
+	for (packageName, oldVersion, newVersion, abstract) in fullList:
+	    if packageName.isGroup():
+		groupList.append((packageName, oldVersion, newVersion, 
+				  abstract))
+	    else:
+		packageList.append((packageName, oldVersion, newVersion, 
+				    abstract))
+
+	for (groupName, oldVersion, newVersion, abstract) in groupList:
+	    new = self.getGroupVersion(groupName, newVersion)
+
+	    if oldVersion:
+		old = self.getGroupVersion(groupName, oldVersion)
+	    else:
+		old = None
+
+	    (grpChgSet, pkgsReqd) = new.diff(old, abstract = abstract)
+	    cs.newGroup(grpChgSet)
+
+	    # while we're adding packages make sure we aren't adding
+	    for (pkgName, old, new) in pkgsReqd:
+		packageList.append((pkgName, old, new, abstract))
+
+	dupFilter = {}
 	for (packageName, oldVersion, newVersion, abstract) in packageList:
-	    # look up these versions to get versions w/ timestamps
+	    # make sure we haven't already generated this changeset
+	    if dupFilter.has_key(packageName):
+		match = False
+		for (otherOld, otherNew) in dupFilter[packageName]:
+		    if not otherOld and not oldVersion:
+			same = True
+		    elif not otherOld and oldVersion:
+			same = False
+		    elif otherOld and not oldVersion:
+			same = False
+		    else:
+			same = otherOld.equal(newVersion)
+
+		    if same and otherNew.equal(newVersion):
+			match = True
+			break
+		
+		if match: continue
+		    
 	    new = self.getPackageVersion(packageName, newVersion)
 	 
 	    if oldVersion:
@@ -255,7 +306,9 @@ class LocalRepository(Repository):
 
 	    (pkgChgSet, filesNeeded) = new.diff(old, abstract = abstract)
 
-	    # there were no changes
+	    # there were no changes. this is a bad idea right now as
+	    # we depend on these empty change sets to get local branches
+	    # created on update
 	    #if not filesNeeded: continue
 
 	    cs.newPackage(pkgChgSet)
