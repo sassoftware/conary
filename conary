@@ -87,18 +87,18 @@ while i < len(sys.argv):
 	otherArgs.append(sys.argv[i])
     else:
 	arg = sys.argv[i][2:]
-	if not argDef.has_key(arg): usage
+	if not argDef.has_key(arg): usage()
 
 	if not argDef[arg]:
 	    argSet[arg] = 1
 	else:
 	    # the argument takes a parameter
 	    i = i + 1
-	    if i >= len(sys.argv): usage
+	    if i >= len(sys.argv): usage()
 
 	    if argDef[arg] == 1:
 		# exactly one parameter is allowd
-		if argSet.has_key(arg): usage
+		if argSet.has_key(arg): usage()
 		argSet[arg] = sys.argv[i]
 	    else:
 		# multiple parameters may occur
@@ -166,7 +166,7 @@ elif (otherArgs[1] == "cook"):
         exec macroSrc
         del f
         del argSet['macros']
-    if argSet: usage
+    if argSet: usage()
     for file in otherArgs[2:]:
         if file[0] != '/':
             file = "%s/%s" % (os.getcwd(), file)
@@ -224,7 +224,7 @@ elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
     else:
 	queryRepos = database.Database(cfg.root, cfg.dbpath, "r")
 
-    if argSet: usage
+    if argSet: usage()
 
     if len(otherArgs) >= 2 and len(otherArgs) <= 4:
 	args = [queryRepos, cfg, all, ls] + otherArgs[2:]
