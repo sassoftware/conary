@@ -15,16 +15,16 @@ Base class used for destdirpolicy and packagepolicy
 class Policy(util.Action):
     """
     Pure virtual superclass for all policy actions.  Policy actions
-    that operate on the entire %(destdir)s implement the @C{do} method;
+    that operate on the entire %(destdir)s implement the C{do} method;
     Policy actions that operate on a per-file basis implement the
-    @C{doFile} method.  The @C{doFile} function is never called for files
-    that match an exception regexp; @C{do} functions must implement
+    C{doFile} method.  The C{doFile} function is never called for files
+    that match an exception regexp; C{do} functions must implement
     their own exception regexp handling.
 
-    The class variables below apply automatically to the @C{doFile}
-    method; classes implementing the @C{do} method instead may use them as
+    The class variables below apply automatically to the C{doFile}
+    method; classes implementing the C{do} method instead may use them as
     well, but should use the same rules if they do use them.  All of
-    them have @C{self.macros} applied before use.
+    them have C{self.macros} applied before use.
 
     @cvar invariantsubtree: if invariantsubtree is not empty,
     then it is a list of subtrees (relative to %(destdir)s) to
@@ -32,14 +32,14 @@ class Policy(util.Action):
 
     @cvar invariantinclusions: if invariantinclusions is not empty,
     then only files matching a regular expression in it are
-    considered to be passed to to the @C{doFile} method.  Any exclusions
+    considered to be passed to to the C{doFile} method.  Any exclusions
     including invariants, are applied after invariantinclusions
     are applied.
 
     @cvar invariantexceptions: subclasses may set to a list of
     exception regular expressions that are always applied regardless
     of what other exceptions may be provided by the recipe; these
-    exceptions being applied is an invariant condition of the @C{doFile}
+    exceptions being applied is an invariant condition of the C{doFile}
     method.
     """
     invariantsubtree = []

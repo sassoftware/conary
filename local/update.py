@@ -515,7 +515,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     are assumed to be in the current directory)
     @type root: str
     @param flags: IGNOREUGIDS or zero
-    @type param: int
+    @type flags: int
     """
 
     noIds = ((flags & IGNOREUGIDS) != 0)
@@ -609,7 +609,7 @@ def buildLocalChanges(repos, pkgList, root = "", flags = 0):
     are assumed to be in the current directory)
     @type root: str
     @param flags: IGNOREUGIDS or zero
-    @type param: int
+    @type flags: int
     """
 
     changeSet = changeset.ChangeSet()

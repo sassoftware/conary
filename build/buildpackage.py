@@ -60,7 +60,6 @@ class BuildPackage(dict):
         @param realPath: the location of the actual file on the filesystem,
         used to obtain the contents of the file when creating a changeset
         to commit to the repository
-        @param type: type of file.  Use "src" for source files.
         """
 	self[path] = BuildFile(realPath)
 
