@@ -40,7 +40,7 @@ def cook(cfg, srcdirs, recipeFile):
 		f = files.FileFromFilesystem(recp.name, rootDir, filePath)
 		fileList.append(f)
 
-	    commit.finalCommit(cfg.reppath, 
+	    commit.finalCommit(cfg, 
 			   cfg.packagenamespace + "/" + recp.name + "/" + name, 
 			   recp.version, 
 			   rootDir, fileList)
@@ -52,7 +52,7 @@ def cook(cfg, srcdirs, recipeFile):
 	    f = files.FileFromFilesystem(recp.name, "/", src, "src")
 	    fileList.append(f)
 
-	commit.finalCommit(cfg.reppath, 
+	commit.finalCommit(cfg, 
 			   cfg.packagenamespace + "/" + recp.name + "/sources",
 			   recp.version, "/", fileList)
 
