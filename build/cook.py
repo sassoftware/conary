@@ -85,8 +85,12 @@ class _IdGen:
 	# this package on the branch. We also construct an object which
 	# lets us look for source files this build needs inside of the
 	# repository
+        isSource = pkg.getName().endswith(':sources')
 	for (fileId, path, version) in pkg.iterFileList():
-	    self.map[path] = (fileId, version)
+            # don't include fileIds from the :sources component in
+            # the id hash
+            if not isSource:
+                self.map[path] = (fileId, version)
 	    if path[0] != "/":
 		# we might need to retrieve this source file
 		# to enable a build, so we need to find the
@@ -298,17 +302,18 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     # for the source lookaside cache simultaneously
 
     ident = _IdGen()
-    if repos.hasPackage(fullName):
-	pkgList = [ (fullName, 
-		    repos.pkgLatestVersion(fullName, buildBranch)) ]
-	while pkgList:
-	    (name, version) = pkgList[0]
-	    del pkgList[0]
-	    if not version: continue
+    for pkgName in (fullName, fullName + ':sources'):
+        if repos.hasPackage(pkgName):
+            pkgList = [ (pkgName, 
+                        repos.pkgLatestVersion(pkgName, buildBranch)) ]
+            while pkgList:
+                (name, version) = pkgList[0]
+                del pkgList[0]
+                if not version: continue
 
-	    pkg = repos.getPackageVersion(name, version)
-	    pkgList += [ x for x in pkg.iterPackageList() ]
-	    ident.populate(repos, lcache, pkg)
+                pkg = repos.getPackageVersion(name, version)
+                pkgList += [ x for x in pkg.iterPackageList() ]
+                ident.populate(repos, lcache, pkg)
 
     builddir = cfg.buildpath + "/" + recipeObj.name
 
