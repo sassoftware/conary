@@ -54,7 +54,7 @@ class LocalRepVersionTable(versiontable.VersionTable):
 	    (t,) = cu.next()
 	    return [ float(x) for x in t.split(":") ]
 	except StopIteration:
-            raise KeyError, theId
+            raise KeyError, itemId
 
 class TroveStore:
 
