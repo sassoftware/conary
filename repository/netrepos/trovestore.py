@@ -507,7 +507,9 @@ class TroveStore:
                                       urls, licenses, categories, source, language)
 
     def getMetadata(self, troveName, branch, version=None, language="C"):
-        itemId = self.getItemId(troveName)
+        itemId = self.items.get(troveName, None)
+        if not itemId:
+            return None
         branchId = self.branchTable[branch]
         
         if not version:
