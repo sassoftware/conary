@@ -202,6 +202,8 @@ class FilesystemRepository(AbstractRepository):
 		list.append(location)
 	    else:
 		branchList = self.getPackageLabelBranches(troveName, location)
+		if not branchList:
+		    log.error("%s does not have branch %s", troveName, location)
 		for branch in branchList:
 		    v = self.pkgLatestVersion(troveName, branch)
 		    list.append(v)
