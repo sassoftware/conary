@@ -336,6 +336,9 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
 
     # populate the repository source lookaside cache from the :source component
+    # XXXXXXX Ack, this will get the latest version of file that's in a
+    #         :source component -- not the version of the file that comes
+    #         from the same version as the recipe we're currently cooking!
     srcName = fullName + ':source'
     try:
         srcVersion = repos.getTroveLatestVersion(srcName, buildBranch)
