@@ -131,6 +131,12 @@ operation, so take care.  The \fB\-\-target-branch\fP option
 is only appropriate when you commit a \fBlocal changeset\fP
 to a repository.
 .TP
+.B config  
+Shows the configuration that conary will use for any 
+subsequent commands executed, based on the configuration files it has 
+loaded and the configuration-altering command-line options that were 
+supplied.  See the \fIFILES\fP section of this manual for more information.
+.TP
 .B emerge \fI<component>...\fP
 Builds the recipe for the given component (which it finds by searching the
 \fIinstallLabelPath\fP) onto the \fBlocalhost@local:EMERGE\fP branch

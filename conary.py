@@ -54,6 +54,7 @@ sys.excepthook = util.genExcepthook()
 def usage(rc = 1):
     print "usage: conary changeset <pkg>[=[<oldver>--]<newver>]+ <outfile>"
     print "       conary commit       <changeset>"
+    print "       conary config"
     print "       conary emerge       <troveName>+"
     print "       conary erase        <pkgname>[=<version>]+"
     print "       conary localcs      <pkg> <outfile>"

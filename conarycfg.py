@@ -15,11 +15,12 @@
 Provides Conary's generic config file format, and implements conaryrc
 handling.
 """
+import os
+import sys
 
 import deps
 import deps.arch
 import deps.deps
-import os
 from build import use
 from lib import util
 import versions
@@ -62,7 +63,12 @@ class ConfigFile:
 	line = line.strip()
 	if not line or line[0] == '#':
 	    return
-	(key, val) = line.split(None, 1)
+        parts = line.split(None, 1)
+        if len(parts) == 1:
+            key = parts[0]
+            val = ''
+        else:
+            (key, val) = parts
 	(key, type) = self.checkKey(key, file)
 	if key:
 	    if type == EXEC:
@@ -132,7 +138,9 @@ class ConfigFile:
 	    else:
 		raise ParseError, ("%s:%s: expected True or False for configuration value '%s'" % (file, self.lineno, key))
 
-    def display(self):
+    def display(self, out=None):
+        if out is None:
+            out = sys.stdout
 	keys = self.defaults.keys()
 	keys.sort()
 	for item in keys:
@@ -142,27 +150,28 @@ class ConfigFile:
 		t = STRING
 
 	    if t == STRING:
-		print "%-25s %s" % (item, self.__dict__[item])
+		out.write("%-25s %s\n" % (item, self.__dict__[item]))
 	    elif t == LABEL:
-		print "%-25s %s" % (item, self.__dict__[item].asString())
+		out.write("%-25s %s\n" % (item, self.__dict__[item].asString()))
 	    elif t == LABELLIST:
-		print "%-25s %s" % (item, " ".join([x.asString() for x in self.__dict__[item]]))
+		out.write("%-25s %s\n" % (item, " ".join([x.asString() for x in self.__dict__[item]])))
 	    elif t == BRANCHNAME:
-		print "%-25s %s" % (item, self.__dict__[item].asString())
+		out.write("%-25s %s\n" % (item, self.__dict__[item].asString()))
 	    elif t == STRINGPATH:
-		print "%-25s %s" % (item, ":".join(self.__dict__[item]))
+		out.write("%-25s %s\n" % (item, ":".join(self.__dict__[item])))
 	    elif t == STRINGDICT:
 		d = self.__dict__[item]
 		idxs = d.keys()
 		idxs.sort()
 		for idx in idxs:
-		    print "%-25s %-25s %s" % (item, idx, d[idx])
+		    out.write("%-25s %-25s %s\n" % (item, idx, d[idx]))
 	    elif t == CALLBACK:
 		self.__dict__[item]('display')
 	    elif t == BOOL:
-		print "%-25s %s" % (item, bool(self.__dict__[item]))
+		out.write("%-25s %s" % (item, bool(self.__dict__[item])))
 	    else:
-		print "%-25s (unknown type)" % (item)
+		out.write("%-25s (unknown type)" % (item))
+
 
     def __init__(self):
 	self.types = {}
@@ -276,6 +285,9 @@ class ConaryConfiguration(ConfigFile):
     def archKeys(self):
 	return self._archKeys('', self.archflags)
 
+    def listPkgs(self):
+	return self.pkgflags.keys()
+
     def pkgKeys(self, pkg):
 	return self.pkgflags.get(pkg, {}).keys()
 
@@ -284,6 +296,23 @@ class ConaryConfiguration(ConfigFile):
 
     def macroKeys(self):
 	return self.macroflags.keys()
+
+    def display(self, out=None):
+        if out is None:
+            out = sys.stdout
+        ConfigFile.display(self, out=out)
+        for key in sorted(self.archKeys()):
+            out.write('Arch.%-20s %-25s\n' % (key, self['Arch.' + key]))
+        for key in sorted(self.useKeys()):
+            out.write('Use.%-21s %-25s\n' % (key, self['Use.' + key]))
+        for pkg in sorted(self.listPkgs()):
+            for flag in sorted(self.pkgKeys(pkg)):
+                key = 'Flags.%s.%s' % (pkg, flag)
+                out.write('%-25s %-25s\n' % (key, self[key]))
+        for macro in sorted(self.macroflags.keys()):
+            key = 'macros.' + macro
+            out.write('%-25s %-25s\n' % (key, self[key]))
+
 
 class ConaryCfgError(Exception):
 

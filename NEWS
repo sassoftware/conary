@@ -1,3 +1,7 @@
+Changes in 0.11.11
+ * document config command, and display supplied macro/use/arch information 
+   in output
+
 Changes in 0.11.10.1
   * move to python2.4
   * repository caching (which isn't used yet) didn't track the recurse flag
