@@ -68,7 +68,7 @@ def post(repos, req):
         resp = xmlrpclib.dumps((result,), methodresponse=1)
         req.content_type = "text/xml"
         encoding = req.headers_in.get('Accept-encoding', '')
-        if 'zlib' in encoding:
+        if len(resp) > 200 and 'zlib' in encoding:
             req.headers_out['Content-encoding'] = 'zlib'
             resp = zlib.compress(resp, 5)
         req.write(resp) 
