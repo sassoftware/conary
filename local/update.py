@@ -24,6 +24,7 @@ import package
 import patch
 import stat
 import sys
+import tempfile
 import util
 import versions
 
@@ -145,9 +146,13 @@ class FilesystemJob:
 	    if newlines:
 		log.debug("adding ld.so.conf entries: %s",
 			  " ".join(newlines))
-		ldso = file(ldsopath, 'w+')
+		ldsofd, ldsotmpname = tempfile.mkstemp(
+		    '.contmp', 'ld.so.conf.', sysetc)
+		ldso = os.fdopen(ldsofd, 'w')
+		os.chmod(ldsotmpname, 0644)
 		ldso.writelines(ldsolines)
 		ldso.close()
+		os.rename(ldsotmpname, ldsopath)
 	    if os.access(util.joinPaths(self.root, p), os.X_OK) != True:
 		log.error("/sbin/ldconfig is not available")
 	    else:
