@@ -271,65 +271,30 @@ def fetchFreshmeat(troveName):
     except xml.parsers.expat.ExpatError:
         raise NoFreshmeatRecord
 
-def showDetails(repos, cfg, db, troveName, branchStr=None):
-    sourceName = troveName + ":source"
-
-    branch = None
-    if branchStr:
-        if branchStr[0] == '/': # is a branch or version
-            version = versions.VersionFromString(branchStr)
-
-            if version.isVersion():
-                branch = version.branch()
-        else: # is a label
-            label = versions.Label(branchStr)
-
-            # find the first matching trove in branch of label
-            leaves = repos.getTroveLeavesByLabel([sourceName], label)
-            if leaves[sourceName]:
-                branch = leaves[sourceName][0].branch()
-
-        installedVers = None
+def showDetails(repos, cfg, troveName, branch):
+    # FIXME use TroveInfo here
+    if ':' in troveName:
+        package = troveName[:troveName.find(':')]
     else:
-        # search the local database and use the installed trove's branch first
-        versionList = db.getTroveVersionList(troveName)
-        if versionList:
-            installedVers = [x.trailingVersion().asString() for x in versionList]
-            branch = versionList[0].branch()
-        else:
-            # otherwise use the first installpath that has the trove
-            installedVers = ["None"]
-            for label in cfg.installLabelPath:
-                leaves = repos.getTroveLeavesByLabel([sourceName], label)
-                if leaves[sourceName]:
-                    branch = leaves[sourceName][0].branch()
-                    break
-                    
-    if not branch:
-        log.error("trove not found for branch %s: %s", branchStr, troveName)
-        return 0
+        package = troveName
+    sourceName = package + ":source"
 
-    log.info("retrieving package details for %s on %s", troveName, branchStr)
     md = repos.getMetadata([sourceName, branch], branch.label())
 
     if sourceName in md:
         md = md[sourceName]
-        wrapped = textwrap.wrap(md.getLongDesc())
+        
+        wrapper = textwrap.TextWrapper(initial_indent='    ',
+                                       subsequent_indent='    ')
+        wrapped = wrapper.wrap(md.getLongDesc())
         wrappedDesc = "\n".join(wrapped)
 
-        print "Name       : %-25s" % troveName,
-        print "Branch     : %s" % branch.asString()
-        if installedVers and len(installedVers) > 1:
-            print "Versions   : %s" % ", ".join(installedVers)
-        elif installedVers and len(installedVers) == 1:
-            print "Version    : %s" % installedVers[0]
-        print "Size       : %-25s" % str(0),
-        print "Time built : %s" % "N/A"
+        print "Size      : %-25s" % str(0)
         for l in md.getLicenses():
-            print "License    : %s" % l
+            print "License   : %s" % l
         for c in md.getCategories():
-            print "Category   : %s" % c
-        print "Summary    : %s" % md.getShortDesc()
+            print "Category  : %s" % c
+        print "Summary   : %s" % md.getShortDesc()
         print "Description: \n%s" % (wrappedDesc)
     else:
         log.info("no details found for %s", troveName)

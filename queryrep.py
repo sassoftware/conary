@@ -19,6 +19,7 @@ from repository import repository
 import display
 import files
 from lib import log
+import metadata
 import time
 
 from lib.sha1helper import sha1ToString
@@ -161,12 +162,14 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		    (("Version   : %s" % version.trailingVersion().asString()),
 		     ("Label     : %s" % version.branch().label().asString()))
 
+            metadata.showDetails(repos, cfg, trove.getName(), version.branch())
+
 	    cl = trove.getChangeLog()
 	    if cl:
-		print "Change log: %s (%s)" % (cl.getName(), cl.getContact())
+		print "Changelog: %s (%s)" % (cl.getName(), cl.getContact())
 		lines = cl.getMessage().split("\n")[:-1]
 		for l in lines:
-		    print "    ", l
+		    print "    " + l
         elif deps:
             for name, dep in (('Provides', trove.provides),
                               ('Requires', trove.requires)):

@@ -51,7 +51,6 @@ sys.excepthook = util.genExcepthook()
 def usage(rc = 1):
     print "usage: conary changeset <pkg>[=[<oldver>--]<newver>]+ <outfile>"
     print "       conary commit       <changeset>"
-    print "       conary details      <troveName>[=<version|branch|label>]"
     print "       conary emerge       <troveName>+"
     print "       conary erase        <pkgname>[=<version>]+"
     print "       conary localcs      <pkg> <outfile>"
@@ -212,19 +211,6 @@ def realMain(cfg, argv=sys.argv):
 	    return usage()
 	else:
 	    cfg.display()
-    elif (otherArgs[1] == "details"):
-        log.setVerbosity(1)
-        db = database.Database(cfg.root, cfg.dbPath)
-        repos = openRepository(cfg.repositoryMap)
-       
-        if len(otherArgs) != 3:
-            return usage()
-        if '=' in otherArgs[2]:
-            troveName, branch = otherArgs[2].split('=')
-        else:
-            troveName = otherArgs[2]
-            branch = None
-        metadata.showDetails(repos, cfg, db, troveName, branch)
     elif (otherArgs[1] == "emerge"):
 	log.setVerbosity(1)
 
