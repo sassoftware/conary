@@ -12,6 +12,7 @@ bindir = $(prefix)/bin
 python_files = __init__.py	\
 	build.py		\
 	buildpackage.py		\
+	database.py		\
 	changeset.py		\
 	commit.py		\
 	cook.py			\
