@@ -455,10 +455,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             firstPass = False
 
         if withFiles:
+            need = []
             for (troveName, troveVersion, troveFlavor, 
                     (fileId, oldFileVersion, newFileVersion, 
                      oldPath, newPath)) in filesNeeded:
-                fileObj = self.getFileVersion(fileId, newFileVersion)
+                need.append((fileId, newFileVersion))
+
+            fileObjs = self.getFileVersions(need)
+            fileDict = {}
+            for (key, fileObj) in zip(need, fileObjs):
+                fileDict[key] = fileObj
+
+            for (troveName, troveVersion, troveFlavor, 
+                    (fileId, oldFileVersion, newFileVersion, 
+                     oldPath, newPath)) in filesNeeded:
+                fileObj = fileDict[(fileId, newFileVersion)]
 
 		(filecs, hash) = repository.changeset.fileChangeSet(fileId, 
                                                 None, fileObj)
@@ -497,6 +508,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         r = {}
         for (key, val) in d.iteritems():
             r[self.toDepSet(key)] = val
+
+        return r
+
+    def getFileVersions(self, l):
+        r = []
+        for (fileId, version) in l:
+            r.append(self.getFileVersion(fileId, version))
 
         return r
 
