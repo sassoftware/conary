@@ -157,10 +157,10 @@ def find(s, subs, start=0):
 	    found = s[this:this+1]
     return (ret, found)
 
-def literalRegex(str):
-    "escape all regex magic characters in str"
+def literalRegex(s):
+    "escape all regex magic characters in s"
     l = []
-    for character in str:
+    for character in s:
         if character in '+*[].&^$+{}\\':
             l.append('\\')
         l.append(character)
