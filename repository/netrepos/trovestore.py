@@ -45,7 +45,7 @@ class LocalRepVersionTable(versionops.VersionTable):
 class TroveStore:
 
     def __init__(self, path):
-	self.db = sqlite.connect(path)
+	self.db = sqlite.connect(path, timeout = 30000)
 	self.troveTroves = trovecontents.TroveTroves(self.db)
 	self.troveFiles = trovecontents.TroveFiles(self.db)
 	self.fileStreams = instances.FileStreams(self.db)

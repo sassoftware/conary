@@ -163,9 +163,7 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     if changeSetFile:
 	cs.writeToFile(changeSetFile)
     else:
-	repos.open("c")
 	repos.commitChangeSet(cs)
-	repos.open("r")
 
     if cleanup:
 	(fn, args) = cleanup
@@ -299,8 +297,6 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     @rtype: tuple
     """
 
-    repos.open("r")
-
     built = []
     fullName = recipeClass.name
 
@@ -346,7 +342,6 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     util.mkdirChain(builddir + '/' + recipeObj.mainDir())
     try:
 	os.chdir(builddir + '/' + recipeObj.mainDir())
-	repos.close()
 
 	util.mkdirChain(cfg.tmpdir)
 	destdir = tempfile.mkdtemp("", "srs-%s-" % recipeObj.name, cfg.tmpdir)
@@ -355,8 +350,6 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 	recipeObj.doDestdirProcess() # includes policy
 	use.track(False)
 	
-	repos.open("c")
-
     finally:
 	os.chdir(cwd)
     
@@ -453,8 +446,7 @@ class CookError(Exception):
 
 def cookCommand(cfg, args, prep, macros):
     # this ensures the repository exists
-    repos = helper.openRepository(cfg.reppath, "c")
-    repos.close()
+    repos = helper.openRepository(cfg.reppath)
 
     for item in args:
         # we want to fork here to isolate changes the recipe might make
@@ -469,7 +461,6 @@ def cookCommand(cfg, args, prep, macros):
 	    os.umask(0022)
 	    # and if we do not create core files we will not package them
 	    resource.setrlimit(resource.RLIMIT_CORE, (0,0))
-	    repos = helper.openRepository(cfg.reppath, "r")
             try:
                 built = cookItem(repos, cfg, item, prep=prep, macros=macros)
             except CookError, msg:

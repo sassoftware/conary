@@ -14,11 +14,11 @@ import repository.netclient
 import versions
 import sys
 
-def openRepository(path, mode):
+def openRepository(path):
     if path.startswith("http://"):
         repos = repository.netclient.NetworkRepositoryClient(path)
     else:
-        repos = repository.fsrepos.FilesystemRepository(path, mode)
+        repos = repository.fsrepos.FilesystemRepository(path)
 
     return repos
 

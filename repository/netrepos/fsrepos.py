@@ -7,7 +7,6 @@
 
 import changeset
 import copy
-import fcntl
 import filecontents
 import files
 import log
@@ -182,39 +181,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         # commit branch to the repository
         self.commit()
 		    
-    def open(self, mode):
+    def open(self):
 	if self.troveStore is not None:
 	    self.close()
 
-        flags = os.O_RDONLY
-        if mode != 'r':
-            flags |= os.O_CREAT | os.O_RDWR
-        try:
-            self.lockfd = os.open(self.top + '/lock', flags)
-        except OSError, e:
-            raise repository.OpenError('Unable to open lock file %s for '
-		'%s: %s' % (self.top + '/lock', 
-		mode == 'r' and 'read' or 'read/write',
-                e.strerror))
-
-        try:
-            if mode == 'r':
-                fcntl.lockf(self.lockfd, fcntl.LOCK_SH)
-            else:
-                fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
-        except IOError, e:
-            raise repository.OpenError('Unable to obtain %s lock: %s' % (
-                mode == 'r' and 'shared' or 'exclusive', e.strerror))
-
-        try:
-	    self.troveStore = trovestore.TroveStore(self.sqlDB)
-        except Exception, e:
-	    fcntl.lockf(self.lockfd, fcntl.LOCK_UN)
-            os.close(self.lockfd)
-            self.lockfd = -1
-            raise repository.OpenError('Unable to open repository: %s' % str(e))
-
-	self.mode = mode
+	self.troveStore = trovestore.TroveStore(self.sqlDB)
 
     def commitChangeSet(self, cs):
 	job = ChangeSetJob(self, cs)
@@ -224,11 +195,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	if self.troveStore is not None:
 	    self.troveStore.db.close()
 	    self.troveStore = None
-	    os.close(self.lockfd)
-            self.lockfd = -1
 
-    def __init__(self, path, mode = "r"):
-        self.lockfd = -1
+    def __init__(self, path):
 	self.top = path
 	self.troveStore = None
 	
@@ -239,7 +207,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	except OSError, e:
 	    raise repository.OpenError(str(e))
 	    
-        self.open(mode)
+        self.open()
 
 	DataStoreRepository.__init__(self, path)
 	AbstractRepository.__init__(self)

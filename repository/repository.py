@@ -437,12 +437,7 @@ class DataStoreRepository:
 	if file.hasContents:
 	    if restoreContents:
 		f = contents.get()
-		targetFile = self.contentsStore.newFile(file.contents.sha1())
-
-		# if targetFile is None the file is already in the store
-		if targetFile:
-		    util.copyfileobj(f, targetFile)
-		    targetFile.close()
+		self.contentsStore.addFile(f, file.contents.sha1())
 	    else:
 		# the file doesn't have any contents, so it must exist
 		# in the data store already; we still need to increment
