@@ -245,9 +245,9 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
     }
 
     if (read(fd, magic, sizeof(magic)) != 4) {
-	PyErr_SetFromErrno(PyExc_IOError);
 	close(fd);
-	return NULL;
+	Py_INCREF(Py_None);
+	return Py_None;
     }
 
     if (magic[0] != 0x7f || magic[1] != 0x45 || magic[2] != 0x4c ||
