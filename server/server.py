@@ -245,6 +245,9 @@ if __name__ == '__main__':
         p.register(fd, select.POLLIN)
 
     while True:
-        events = p.poll()
-        for (fd, event) in events:
-            fds[fd].handle_request()
+        try:
+            events = p.poll()
+            for (fd, event) in events:
+                fds[fd].handle_request()
+        except select.error:
+            pass
