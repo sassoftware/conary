@@ -30,15 +30,13 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
     
     if not (ls or tags):
         if hasVersions:
-            includeChildTroves(cs, troves)
+            troves = includeChildTroves(cs, troves)
         # create display cache containing appropriate version strings 
         displayC = createDisplayCache(cs, troves, fullVersions)
-        indent = ''
         # with no options, just display basic trove info
-	for (troveName, version, flavor) in troves:
+	for (troveName, version, flavor), indent in troves:
             trove = cs.newPackages[(troveName, version, flavor)]
             displayTroveHeader(trove, indent, displayC, fullVersions)
-            indent = '  ' 
             if info:
                 if trove.getRequires():
                     depformat('Requires', trove.getRequires())
@@ -46,8 +44,8 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                     depformat('Provides', trove.getProvides())
     elif tags:
         # recurse over child troves
-        includeChildTroves(cs, troves)
-        for pkg in troves:
+        troves = includeChildTroves(cs, troves)
+        for pkg, indent in troves:
             trove = cs.newPackages[pkg]
             # XXX do we want to list tags on changed files as well?
             for (fileId, path, version) in trove.newFiles:
@@ -58,11 +56,10 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                 taglist = '[' + ' '.join(fileObj.tags) + ']' 
                 print "%-59s %s" % (path, taglist)
     elif ls:
-        includeChildTroves(cs, troves)
+        troves = includeChildTroves(cs, troves)
         displayC = createDisplayCache(cs, troves, fullVersions)
-        indent = ''
         first = True
-        for pkg in troves:
+        for pkg, indent in troves:
             trove = cs.newPackages[pkg]
             # only print the header if we are going to print some more
             # information or it is a primary trove in the changeset
@@ -71,7 +68,7 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
             else:
                 continue
             printedData = False
-            prefix = indent + 'New  '
+            prefix = indent + ' New  '
             for (fileId, path, version) in trove.newFiles:
                 # whoe file is in changeset, grab it locally
                 change = cs.getFileChange(fileId)
@@ -106,16 +103,16 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                     if showChanges:
                         (oldPath, oldVersion) = oldTrove.getFile(fileId)
                         oldFileObj = troveLoc.getFileVersion(fileId, oldVersion)
-                        printChangedFile(indent, fileObj, path, oldFileObj, 
+                        printChangedFile(indent + ' ', fileObj, path, oldFileObj, 
                                         oldPath)
                     else:
                         if path is None:
                             (oldPath, oldVersion) = oldTrove.getFile(fileId)
                             path = oldPath
                         display.printFile(fileObj, path, 
-                                          prefix=indent + 'Mod  ')
+                                          prefix=indent + ' Mod  ')
                     printedData = True
-                prefix = indent + 'Del  '
+                prefix = indent + ' Del  '
                 for fileId in trove.oldFiles:
                     (oldPath, oldVersion) = oldTrove.getFile(fileId)
                     fileObj = troveLoc.getFileVersion(fileId, oldVersion)
@@ -176,7 +173,7 @@ def displayTroveHeader(trove, indent, displayC, fullVersions):
 
 def createDisplayCache(cs, troves, fullVersions):
     troveDict = {}
-    for (troveName, version, flavor) in troves:
+    for (troveName, version, flavor), indent in troves:
         if troveName not in troveDict:
             troveDict[troveName] = []
         troveDict[troveName].append(version)
@@ -188,16 +185,18 @@ def createDisplayCache(cs, troves, fullVersions):
     return displayC
 
 def includeChildTroves(cs, troves):
-    for pkg in troves:
+    newList = []
+    for pkg, indent in troves:
+        newList.append((pkg, indent))
         trove = cs.newPackages[pkg]
         for subTroveName, changes in  trove.iterChangedTroves():
             (type, version, flavor) = changes[0]
-            if type == '+':
-                troves.append((subTroveName, version, flavor))
+            newList.append(((subTroveName, version, flavor), indent + '  '))
+    return newList
 
 def getTroves(cs, troveList):
     if not troveList:
-        return (cs.getPrimaryPackageList(), False)
+        return ([ (x, '') for x in cs.getPrimaryPackageList()], False)
 
     hasVersions = False
     troveDefs = []
@@ -226,5 +225,4 @@ def getTroves(cs, troveList):
         if not troves:
             print "No such troves %s in changeset" % troveList 
 
-    return (troves, hasVersions)
-
+    return ([ (x, '') for x in troves], hasVersions)
