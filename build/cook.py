@@ -158,6 +158,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     @rtype: list of strings
     """
 
+    use.overrideFlags(cfg, recipeClass.name)
     if not (hasattr(recipeClass, 'name') and hasattr(recipeClass, 'version')):
         raise CookError('recipe class must have name and version defined')
 
@@ -573,7 +574,6 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 	    recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
 
 	pkgname = recipeFile.split('/')[-1].split('.')[0]
-	use.overrideFlags(cfg, pkgname)
 
 	try:
 	    loader = recipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
@@ -588,8 +588,6 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 	versionList = versionDict[srcName]
 	targetLabel = versions.CookBranch()
     else:
-	use.overrideFlags(cfg, item)
-
 	if resume:
 	    raise CookError('Cannot use --resume argument when cooking in repository')
         try:
