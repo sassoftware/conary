@@ -329,12 +329,16 @@ def annotate(repos, filename):
     troveName = state.getName()
     # verList is in ascending order (first commit is first in list)
     verList = repos.getTroveVersionsByLabel([troveName], label)[troveName]
+    verList.reverse()
 
-    for (fileId, name, someFileV) in oldTrove.iterFileList():
+    
+    found = False
+    for (fileId, name, someFileV) in state.iterFileList():
         if name == filename:
+            found = True
             break
 
-    if not fileId:
+    if not found:
         log.error("%s is not a member of this source trove", fileId)
         return
     
@@ -352,24 +356,22 @@ def annotate(repos, filename):
     lineMap = {} 
                  
     s = difflib.SequenceMatcher(None)
-    fileId = oldV = oldTrove = oldLines = oldFileV = oldContact = None
-    for i in xrange(len(verList), 0, -1):
-        newV = oldV
-        newTrove = oldTrove
-        newLines = oldLines
-        newFileV = oldFileV
-        newContact = oldContact
+    newV = newTrove = newLines = newFileV = newContact = None
 
-        oldV = verList[i-1]
-
-        if oldV.getVersion().branch() != branch:
+    for oldV in verList: 
+        if oldV.branch() != branch:
             continue
 
         oldTrove = repos.getTrove(troveName, oldV, None)
 
+        found = False
         for (oldId, name, oldFileV) in oldTrove.iterFileList():
             if oldId == fileId:
+                found = True
                 break
+        # this file doesn't exist from this version forward
+        if not found:
+            break
 
         if oldFileV == newFileV:
             continue
@@ -386,7 +388,6 @@ def annotate(repos, filename):
                 lineMap[index] = index 
                 index = index + 1
             unmatchedLines = index
-            continue
         else:
             s.set_seqs(oldLines, newLines)
             blocks = s.get_matching_blocks()
@@ -412,8 +413,10 @@ def annotate(repos, filename):
                 if startold == startnew:
                     continue
                 for i in range(0, lines):
-                    if lineMap.get(startold + i, None) is not None:
+                    if lineMap.get(startnew + i, None) is not None:
                         lineMap[startold + i] = lineMap[startnew + i]
+        (newV, newTrove, newContact) = (oldV, oldTrove, oldContact)
+        (newFileV, newLines) = (oldFileV, oldLines)
 
     if unmatchedLines > 0:
         # these lines are in the original version of the file
