@@ -42,7 +42,7 @@ def _createComponent(repos, branch, bldPkg, ident):
 
     for (path, (realPath, f)) in bldPkg.iteritems():
         if isinstance(f, files.RegularFile):
-            flavor = f.flavor
+            flavor = f.flavor.deps
         else:
             flavor = None
         (fileId, fileVersion) = ident(path, flavor)
@@ -71,12 +71,11 @@ class _IdGen:
 	if self.map.has_key((path, flavor)):
 	    return self.map[(path, flavor)]
 
-        if flavor is not None:
-            flavor = flavor.freeze()
-	hash = sha1helper.hashString("%s %f %s %s" % (path, time.time(), 
-                                                      self.noise, flavor))
-	self.map[(path, flavor)] = (hash, None)
-	return (hash, None)
+	fileid = sha1helper.hashString("%s %f %s %s" % (path, time.time(), 
+                                                     self.noise,
+                                                     flavor))
+	self.map[(path, flavor)] = (fileid, None)
+	return (fileid, None)
 
     def __init__(self, map=None):
 	# file ids need to be unique. we include the time and path when
@@ -94,7 +93,11 @@ class _IdGen:
         for f in repos.iterFilesInTrove(pkg.getName(), pkg.getVersion(),
                                         pkg.getFlavor(), withFiles=True):
             fileId, path, version, fileObj = f
-            self.map[(path, fileObj.flavor)] = (fileId, version)
+            if isinstance(fileObj, files.RegularFile):
+                flavor = fileObj.flavor.deps
+            else:
+                flavor = None
+            self.map[(path, flavor)] = (fileId, version)
 # -------------------- public below this line -------------------------
 
 def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None, 
