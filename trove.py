@@ -272,6 +272,7 @@ class BuildPackageSet:
 develRE = None
 libRE = None
 manRE = None
+infoRE = None
 docRE = None
 develdocRE = None
 
@@ -280,11 +281,13 @@ def Auto(name, root):
     devel = BuildPackage("devel")
     lib = BuildPackage("lib")
     man = BuildPackage("man")
+    info = BuildPackage("info")
     doc = BuildPackage("doc")
     develdoc = BuildPackage("develdoc")
     global develRE
     global libRE
     global manRE
+    global infoRE
     global docRE
     global develdocRE
     if not develRE:
@@ -299,11 +302,14 @@ def Auto(name, root):
 	libRE= re.compile('.*/lib/.*\.so\.')
     if not manRE:
 	manRE= re.compile('^/usr/share/man/')
+    if not infoRE:
+	infoRE= re.compile('^/usr/share/info/')
     if not docRE:
 	docRE= re.compile('^/usr/share/doc/')
     if not develdocRE:
 	develdocRE= re.compile('^/usr/share/develdoc/')
-    os.path.walk(root, autoVisit, (root, runtime, devel, lib, man, doc, develdoc))
+    os.path.walk(root, autoVisit,
+                 (root, runtime, devel, lib, man, info, doc, develdoc))
 
     set = BuildPackageSet(name)
     set.addPackage(runtime)
@@ -313,6 +319,8 @@ def Auto(name, root):
 	set.addPackage(lib)
     if man.keys():
 	set.addPackage(man)
+    if info.keys():
+	set.addPackage(info)
     if doc.keys():
 	set.addPackage(doc)
     if develdoc.keys():
@@ -321,11 +329,12 @@ def Auto(name, root):
     return set
 
 def autoVisit(arg, dir, files):
-    (root, runtimePkg, develPkg, libPkg, manPkg, docPkg, develdocPkg) = arg
+    (root, runtimePkg, develPkg, libPkg, manPkg, infoPkg, docPkg, develdocPkg) = arg
     dir = dir[len(root):]
     global develRE
     global libRE
     global manRE
+    global infoRE
     global docRE
     global develdocRE
 
@@ -340,6 +349,8 @@ def autoVisit(arg, dir, files):
             libPkg.addFile(path)
         elif manRE.match(path):
             manPkg.addFile(path)
+        elif infoRE.match(path):
+            infoPkg.addFile(path)
         elif docRE.match(path):
             docPkg.addFile(path)
         elif develdocRE.match(path):
