@@ -103,24 +103,45 @@ class MakeInstall(ShellCommand):
 
 class InstallFile:
 
+    # make sure that the decimal value really is unreasonable before
+    # adding a new translation to this file.
+    permmap = {
+	1755: 01755,
+	4755: 04755,
+	755: 0755,
+	750: 0750,
+	644: 0644,
+	640: 0640,
+    }
+
     def doInstall(self, macros):
-	dest = macros['destdir'] + self.toFile
-	if dest[-1:] == '/':
-	    dest = dest + self.fromFile
+	dest = macros['destdir'] + self.toFile %macros
 	util.mkdirChain(os.path.dirname(dest))
 
-	shutil.copyfile(self.fromFile, dest)
-	os.chmod(dest, self.mode)
+	for fromFile in self.fromFiles:
+	    thisdest = dest
+	    if dest[-1:] == '/':
+		thisdest = dest + fromFile
+	    shutil.copyfile(fromFile, thisdest)
+	    os.chmod(thisdest, self.mode)
 
-    def __init__(self, fromFile, toFile, perms = 0644):
+    def __init__(self, fromFiles, toFile, perms = 0644):
 	self.toFile = toFile
-	self.fromFile = fromFile
+	if type(fromFiles) is str:
+	    self.fromFiles = (fromFiles,)
+	else:
+	    self.fromFiles = fromFiles
+	# notice obviously broken permissions
+	if self.permmap.has_key(perms):
+	    print 'odd permission %o, correcting to %o: add initial "0"?' \
+	          %(perms, permmap[perms])
+	    perms = permmap[perms]
 	self.mode = perms
 
 class InstallSymlink:
 
     def doInstall(self, macros):
-	os.symlink(self.fromFile, macros['destdir'] + self.toFile)
+	os.symlink(self.fromFile, macros['destdir'] + self.toFile %macros)
 
     def __init__(self, fromFile, toFile):
 	self.fromFile = fromFile

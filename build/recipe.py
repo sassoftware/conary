@@ -17,6 +17,13 @@ import gzip
 baseMacros = (
     ('prefix'		, '/usr'),
     ('sysconfdir'	, '/etc'),
+    ('exec_prefix'	, '%(prefix)s'),
+    ('bindir'		, '%(exec_prefix)s/bin'),
+    ('sbindir'		, '%(exec_prefix)s/sbin'),
+    ('libdir'		, '%(exec_prefix)s/lib'),
+    ('libexecdir'	, '%(exec_prefix)s/libexec'),
+    ('localstatedir'	, '%(prefix)s/var'),
+    ('includedir'	, '%(prefix)s/include'),
     ('datadir'		, '/usr/share'),
     ('mandir'		, '%(datadir)s/man'),
     ('infodir'		, '%(datadir)s/info')
