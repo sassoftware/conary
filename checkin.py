@@ -417,8 +417,8 @@ def annotate(repos, filename):
                     for i in range(0, lines):
                         if lineMap.get(startnew + i, None) is not None:
                             lineMap[startold + i] = lineMap[startnew + i]
-            (newV, newTrove, newContact) = (oldV, oldTrove, oldContact)
-            (newFileV, newLines) = (oldFileV, oldLines)
+        (newV, newTrove, newContact) = (oldV, oldTrove, oldContact)
+        (newFileV, newLines) = (oldFileV, oldLines)
             
         # there are still unmatched lines, and there is a parent branch,  
         # so search the parent branch for matches
