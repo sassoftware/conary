@@ -101,6 +101,8 @@ class Recipe:
 	shutil.rmtree(rootDir)
 
     def checkSignatures(self, filepath, file):
+        if not self.signatures.has_key(file):
+            return
 	for signature in self.signatures[file]:
 	    if signature.endswith(".md5sum"):
 		if os.system("cat %s | md5sum --check %s"
