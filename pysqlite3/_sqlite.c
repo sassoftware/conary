@@ -86,6 +86,17 @@ typedef struct
     int row_count;
 } pysqlrs;
 
+/** a statement object. */
+typedef struct
+{
+    PyObject_HEAD
+    pysqlc* con;
+    sqlite3_stmt* p_stmt;
+    PyObject* p_col_def_list;
+    int reset;
+} pysqlstmt;
+
+
 /** Exception objects */
 
 static PyObject* _sqlite_Warning;
@@ -142,6 +153,7 @@ int sqlite_decode_binary(const unsigned char *in, unsigned char *out);
 static PyObject* _con_get_attr(pysqlc *self, char *attr);
 static PyObject* _con_close(pysqlc *self, PyObject *args);
 static PyObject* _con_execute(pysqlc *self, PyObject *args);
+static PyObject* _con_prepare(pysqlc *self, PyObject *args);
 static PyObject* _con_register_converter(pysqlc* self, PyObject *args, PyObject* kwargs);
 static PyObject* _con_set_expected_types(pysqlc* self, PyObject *args, PyObject* kwargs);
 static PyObject* _con_create_function(pysqlc *self, PyObject *args, PyObject *kwargs);
@@ -156,6 +168,9 @@ static PyObject* _con_set_command_logfile(pysqlc* self, PyObject *args, PyObject
 /** Result set Object Methods */
 static void _rs_dealloc(pysqlrs* self);
 static PyObject* _rs_get_attr(pysqlrs* self, char *attr);
+
+static void _stmt_dealloc(pysqlstmt* self);
+static PyObject* _stmt_get_attr(pysqlstmt* self, char *attr);
 
 #ifdef _MSC_VER
 #define staticforward extern
@@ -187,6 +202,19 @@ PyTypeObject pysqlrs_Type =
     (destructor) _rs_dealloc,
     0,
     (getattrfunc) _rs_get_attr,
+    (setattrfunc) NULL,
+};
+
+PyTypeObject pysqlstmt_Type =
+{
+    PyObject_HEAD_INIT(NULL)
+    0,
+    "Statement",
+    sizeof(pysqlstmt),
+    0,
+    (destructor) _stmt_dealloc,
+    0,
+    (getattrfunc) _stmt_get_attr,
     (setattrfunc) NULL,
 };
 
@@ -244,88 +272,62 @@ static const char * ctype_to_str(int ctype)
 	break;
     }
 }
-/* this is a function that replaces sqlite3_exec, and always
-   provides type information to the callback function */
-static int pysqlite3_exec(sqlite3 *db, const char *zSql,
-			  sqlite_callback xCallback,
-			  void *pArg, char **pzErrMsg)
-{
-  int rc = SQLITE_OK;
-  const char *zLeftover;
-  sqlite3_stmt *pStmt = 0;
 
-  int nRetry = 0;
-  int nCallback;
+
+static int pysqlite3_execute_statement(sqlite3 *db, sqlite3_stmt *pStmt,
+				       sqlite_callback xCallback,
+				       void *pArg, char **pzErrMsg)
+{
+  int nCallback; 
+  nCallback = 0;
+  int nCol;
   char **azCols = 0;
+  int rc;
   int i;
 
-  if( zSql==0 ) return SQLITE_OK;
-  while( (rc==SQLITE_OK || (rc==SQLITE_SCHEMA && (++nRetry)<2)) && zSql[0] ){
-    int nCol;
-    char **azVals = 0;
-
-    pStmt = 0;
-    rc = sqlite3_prepare(db, zSql, -1, &pStmt, &zLeftover);
-    if( rc!=SQLITE_OK ){
-      if( pStmt ) sqlite3_finalize(pStmt);
-      continue;
-    }
-    if( !pStmt ){
-      /* this happens for a comment or white-space */
-      zSql = zLeftover;
-      continue;
-    }
-
-    nCallback = 0;
-
-    nCol = sqlite3_column_count(pStmt);
-    azCols = malloc(3*nCol*sizeof(const char *));
-    if( nCol && !azCols ){
-      rc = SQLITE_NOMEM;
-      goto exec_out;
-    }
-
-    while( 1 ){
-      rc = sqlite3_step(pStmt);
-      /* Invoke the callback function if required */
-      if( xCallback && SQLITE_ROW==rc) {
-        if( 0==nCallback ){
-          for(i=0; i<nCol; i++){
-	    char *name = (char *) sqlite3_column_name(pStmt, i);
-	    char *ctype = (char *) sqlite3_column_decltype(pStmt, i);
-	    if (ctype == NULL)
-		ctype = (char *) ctype_to_str(sqlite3_column_type(pStmt, i));
-	    azCols[i] = name;
-	    azCols[nCol + i] = ctype;
-	  }
-	  nCallback++;
-        }
-        if( rc==SQLITE_ROW ){
-	  azVals = &azCols[nCol * 2];
-          for(i=0; i<nCol; i++){
-            azVals[i] = (char *)sqlite3_column_text(pStmt, i);
-          }
-        }
-        if( xCallback(pArg, nCol, azVals, azCols)){
-          rc = SQLITE_ABORT;
-          goto exec_out;
-        }
-      }
-
-      if( rc!=SQLITE_ROW ){
-        rc = sqlite3_finalize(pStmt);
-        pStmt = 0;
-        if( rc!=SQLITE_SCHEMA ){
-          nRetry = 0;
-          zSql = zLeftover;
-          while( isspace(zSql[0]) ) zSql++;
-        }
-        break;
-      }
-    }
-    free(azCols);
-    azCols = 0;
+  nCol = sqlite3_column_count(pStmt);
+  azCols = malloc(3*nCol*sizeof(const char *));
+  if( nCol && !azCols ){
+    rc = SQLITE_NOMEM;
+    goto exec_out;
   }
+
+  while( 1 ){
+    char **azVals = 0;
+    rc = sqlite3_step(pStmt);
+    /* Invoke the callback function if required */
+    if( xCallback && SQLITE_ROW==rc) {
+      if( 0==nCallback ){
+        for(i=0; i<nCol; i++){
+	  char *name = (char *) sqlite3_column_name(pStmt, i);
+	  char *ctype = (char *) sqlite3_column_decltype(pStmt, i);
+	  if (ctype == NULL)
+	      ctype = (char *) ctype_to_str(sqlite3_column_type(pStmt, i));
+	  azCols[i] = name;
+	  azCols[nCol + i] = ctype;
+	}
+	nCallback++;
+      }
+      if( rc==SQLITE_ROW ){
+	azVals = &azCols[nCol * 2];
+	for(i=0; i<nCol; i++){
+	  azVals[i] = (char *)sqlite3_column_text(pStmt, i);
+        }
+      }
+      if( xCallback(pArg, nCol, azVals, azCols)){
+        rc = SQLITE_ABORT;
+        goto exec_out;
+      }
+    }
+
+    if( rc!=SQLITE_ROW ){
+      rc = sqlite3_finalize(pStmt);
+      pStmt = 0;
+      break;
+    }
+  }
+  free(azCols);
+  azCols = 0;
 
 exec_out:
   if( pStmt ) sqlite3_finalize(pStmt);
@@ -341,6 +343,44 @@ exec_out:
   }
 
   return rc;
+}
+
+
+/* this is a function that replaces sqlite3_exec, and always
+   provides type information to the callback function */
+static int pysqlite3_exec(sqlite3 *db, const char *zSql,
+			  sqlite_callback xCallback,
+			  void *pArg, char **pzErrMsg)
+{
+  int rc = SQLITE_OK;
+  const char *zLeftover;
+  sqlite3_stmt *pStmt = 0;
+
+  int nRetry = 0;
+  int i;
+
+  if( zSql==0 ) return SQLITE_OK;
+  while( (rc==SQLITE_OK || (rc==SQLITE_SCHEMA && (++nRetry)<2)) && zSql[0] ){
+
+    pStmt = 0;
+    rc = sqlite3_prepare(db, zSql, -1, &pStmt, &zLeftover);
+    if( rc!=SQLITE_OK ){
+      if( pStmt ) sqlite3_finalize(pStmt);
+      continue;
+    }
+    if( !pStmt ){
+      /* this happens for a comment or white-space */
+      zSql = zLeftover;
+      continue;
+    }
+    rc = pysqlite3_execute_statement(db, pStmt, xCallback,
+				     pArg, pzErrMsg);
+    if (rc!=SQLITE_SCHEMA) {
+        nRetry = 0;
+        zSql = zLeftover;
+        while( isspace(zSql[0]) ) zSql++;
+    }
+  }
 }
 
 static char pysqlite_connect_doc[] =
@@ -371,7 +411,7 @@ PyObject* pysqlite_connect(PyObject *self, PyObject *args, PyObject *kwargs)
     /* Open the database */
     ret = sqlite3_open(db_name, &obj->p_db);
 
-    if (ret)
+    if (ret != SQLITE_OK)
     {
         PyObject_Del(obj);
 	PyErr_SetString(_sqlite_DatabaseError, sqlite3_errmsg(obj->p_db));
@@ -1263,6 +1303,84 @@ static PyObject* _con_execute(pysqlc* self, PyObject *args)
     return (PyObject*)p_rset;
 }
 
+static PyObject* _con_prepare(pysqlc* self, PyObject *args)
+{
+    int ret;
+    int record_number;
+    int sql_len;
+    char* sql;
+    pysqlstmt* pystmt;
+    char *errmsg;
+    char* buf;
+    char* iterator;
+    char* token;
+    const char* query_tail;
+    PyObject* logfile_writemethod;
+    PyObject* logfile_writeargs;
+
+    record_number = 0;
+
+    if(!PyArg_ParseTuple(args,"s#:prepare", &sql, &sql_len))
+    {
+        return NULL;
+    }
+    
+    if(self->p_db == 0)
+    {
+        /* There is no open database. */
+        PyErr_SetString(_sqlite_ProgrammingError, "There is no open database.");
+        return NULL;
+    }
+
+    /* Log SQL statement */
+    if (self->command_logfile != Py_None)
+    {
+        logfile_writemethod = PyObject_GetAttrString(self->command_logfile,
+                                                    "write");
+
+        logfile_writeargs = PyTuple_New(1);
+        PyTuple_SetItem(logfile_writeargs, 0, PyString_FromString(sql));
+        PyObject_CallObject(logfile_writemethod, logfile_writeargs);
+        PyTuple_SetItem(logfile_writeargs, 0, PyString_FromString(";\n"));
+        PyObject_CallObject(logfile_writemethod, logfile_writeargs);
+
+        Py_DECREF(logfile_writeargs);
+        Py_DECREF(logfile_writemethod);
+
+        if (PyErr_Occurred())
+        {
+            return NULL;
+        }
+    }
+
+    pystmt = PyObject_New(pysqlstmt, &pysqlstmt_Type);
+    if (pystmt == NULL)
+    {
+        return NULL;
+    }
+    pystmt->p_col_def_list = PyTuple_New(0);
+    pystmt->reset = 1;
+
+    Py_INCREF(self);
+    pystmt->con = self;
+    ret = sqlite3_prepare(self->p_db, sql, sql_len, &pystmt->p_stmt, &query_tail);
+    if (*query_tail != '\0') {
+	PyErr_SetString(_sqlite_ProgrammingError,
+			"SQL must only contain one statement.");
+        Py_DECREF(pystmt);
+        return NULL;
+    }
+    
+    if (ret != SQLITE_OK) {
+	const char *errmsg = sqlite3_errmsg(self->p_db);
+        Py_DECREF(pystmt);
+	PyErr_SetString(_sqlite_DatabaseError, errmsg);
+        return NULL;
+    }
+
+    return (PyObject*)pystmt;
+}
+
 static PyObject *build_col_def_list(int num_fields, char **p_col_names)
 {
     PyObject* p_col_def_list;
@@ -1711,6 +1829,299 @@ static PyObject* sqlite_version_info(PyObject* self, PyObject* args)
 }
 
 /*------------------------------------------------------------------------------
+** Statement Object Implementation
+**------------------------------------------------------------------------------
+*/
+
+static char _stmt_execute_doc [] =
+"execute()\n\
+Executes a statement and returns a result set object.";
+
+static PyObject* _stmt_execute(pysqlstmt *self, PyObject *args)
+{
+    pysqlrs* p_rset;
+    int ret;
+
+    if(self->p_stmt == NULL)
+    {
+        PyErr_SetString(_sqlite_ProgrammingError, "Statement has already been finalized.");
+        return NULL;
+    }
+    
+    p_rset = PyObject_New(pysqlrs, &pysqlrs_Type);
+    if (p_rset == NULL)
+    {
+        return NULL;
+    }
+
+    Py_INCREF(self);
+    p_rset->con = self->con;
+    p_rset->p_row_list = PyList_New(0);
+    p_rset->p_col_def_list = NULL;
+    p_rset->row_count = 0;
+
+    MY_BEGIN_ALLOW_THREADS(self->con->tstate)
+    ret = pysqlite3_execute_statement(self->con->p_db,
+				      self->p_stmt,
+				      process_record,
+				      p_rset, NULL);
+    MY_END_ALLOW_THREADS(self->con->tstate)
+
+    /* Maybe there occurred an error in a user-defined function */
+    if (PyErr_Occurred())
+    {
+        Py_DECREF(p_rset);
+        return NULL;
+    }
+
+    if (p_rset->p_col_def_list == NULL)
+    {
+        p_rset->p_col_def_list = PyTuple_New(0);
+    }
+
+    if(ret != SQLITE_OK)
+    {
+	PyErr_SetString(_sqlite_DatabaseError, sqlite3_errmsg(self->con->p_db));
+        Py_DECREF(p_rset);
+        return NULL;
+    }
+
+    return (PyObject*)p_rset;
+}
+
+static char _stmt_step_doc [] =
+"step()\n\
+Fetch the next row from a the statement.";
+
+static PyObject* _stmt_step(pysqlstmt *self, PyObject *args)
+{
+    int result;
+    int num_fields=0;
+    int i;
+    const char **p_fields=NULL;
+    const char **p_col_names=NULL;
+    sqlite3_stmt *stmt = self->p_stmt;
+
+    num_fields = sqlite3_column_count(self->p_stmt);
+    p_col_names = malloc(3*num_fields*sizeof(const char *));
+    p_fields = p_col_names + (2 * num_fields);
+
+    if (num_fields && !p_fields) {
+        PyErr_SetString(PyExc_MemoryError, "Cannot allocate memory for results.");
+        return NULL;
+    }
+    
+    if(self->p_stmt == NULL)
+    {
+        PyErr_SetString(_sqlite_ProgrammingError, "Statement has already been finalized.");
+        return NULL;
+    }
+    
+    result = sqlite3_step(self->p_stmt);
+
+    if (result == SQLITE_ROW) {
+	if (self->reset) {
+	    for(i=0; i < num_fields; i++){
+		char *name = (char *) sqlite3_column_name(stmt, i);
+		char *ctype = (char *) sqlite3_column_decltype(stmt, i);
+		if (ctype == NULL)
+		    ctype = (char *) ctype_to_str(sqlite3_column_type(stmt, i));
+		p_col_names[i] = name;
+		p_col_names[num_fields + i] = ctype;
+	    }
+	    self->p_col_def_list = build_col_def_list(num_fields,
+						      (char **)p_col_names);
+	    if (self->p_col_def_list == NULL) {
+		return NULL;
+	    }
+	    self->reset = 0;
+	}
+	return build_row(self->con, num_fields, (char **)p_fields,
+			 self->p_col_def_list);
+    } else if (result == SQLITE_DONE) {
+	Py_INCREF(Py_None);
+	return Py_None;
+    } else {
+	PyErr_SetString(_sqlite_DatabaseError, sqlite3_errmsg(self->con->p_db));
+	return NULL;
+    }
+}
+
+static char _stmt_reset_doc [] =
+"step()\n\
+Reset the virtual machine associated with a stmtiled SQL statement.";
+
+static PyObject* _stmt_reset(pysqlstmt *self, PyObject *args)
+{
+    char *errmsg;
+    int result;
+
+    if (!PyArg_ParseTuple(args,""))
+    {
+        return NULL;
+    }
+
+    if(self->p_stmt == NULL)
+    {
+        PyErr_SetString(_sqlite_ProgrammingError, "Statement has already been finalized.");
+        return NULL;
+    }
+    
+    result = sqlite3_reset(self->p_stmt);
+    if (result != SQLITE_OK) {
+	PyErr_SetString(_sqlite_DatabaseError, sqlite3_errmsg(self->con->p_db));
+	return NULL;
+    }
+    
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static char _stmt_finalize_doc [] =
+"step()\n\
+Frees the virtual machine associated with a stmtiled SQL statement.";
+
+static PyObject* _stmt_finalize(pysqlstmt *self, PyObject *args)
+{
+    char *errmsg;
+    int result;
+
+    if (!PyArg_ParseTuple(args,""))
+    {
+        return NULL;
+    }
+
+    if(self->p_stmt == NULL)
+    {
+        PyErr_SetString(_sqlite_ProgrammingError, "Statement has already been finalized.");
+        return NULL;
+    }
+
+    if (self->p_stmt != NULL) {
+	result = sqlite3_finalize(self->p_stmt);
+	if (result != SQLITE_OK) {
+	    PyErr_SetString(_sqlite_DatabaseError, sqlite3_errmsg(self->con->p_db));
+	    return NULL;
+	}
+	self->p_stmt = NULL;
+    }
+    
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static char _stmt_bind_doc [] =
+"step()\n\
+Bind arguments to a SQL statement.";
+
+static PyObject* _stmt_bind(pysqlstmt *self, PyObject *args)
+{
+    int idx, rc;
+    PyObject *obj;
+
+    if (!PyArg_ParseTuple(args, "iO", &idx, &obj))
+    {
+        return NULL;
+    }
+
+    if(self->p_stmt == NULL)
+    {
+        PyErr_SetString(_sqlite_ProgrammingError, "Statement has already been finalized.");
+        return NULL;
+    }
+
+    rc = -1;
+    if (PyInt_Check(obj)) {
+	rc = sqlite3_bind_int(self->p_stmt, idx, PyInt_AsLong(obj));
+    } else if (PyLong_Check(obj)) {
+	rc = sqlite3_bind_int64(self->p_stmt, idx, PyLong_AsLongLong(obj));
+    } else if (PyString_Check(obj)) {
+	char *buf;
+	int len;
+	PyString_AsStringAndSize(obj, &buf, &len);
+	if (memchr(buf, '\0', len))
+	    rc = sqlite3_bind_blob(self->p_stmt, idx, buf, len, SQLITE_TRANSIENT);
+	else
+	    rc = sqlite3_bind_text(self->p_stmt, idx, buf, len, SQLITE_TRANSIENT);
+    } else if (PyFloat_Check(obj)) {
+	rc = sqlite3_bind_double(self->p_stmt, idx, PyFloat_AsDouble(obj));	
+    } else if (obj == Py_None) {
+	rc = sqlite3_bind_null(self->p_stmt, idx);	
+    }
+    if (rc != SQLITE_OK) {
+	if (rc == -1)
+	    PyErr_SetString(_sqlite_ProgrammingError, "unknown type, unable to bind");
+	else
+	    PyErr_SetString(_sqlite_DatabaseError, sqlite3_errmsg(self->con->p_db));
+	return NULL;
+    }
+    
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static struct memberlist _stmt_memberlist[] =
+{
+    {"col_defs", T_OBJECT, offsetof(pysqlstmt, p_col_def_list), RO},
+    {NULL}
+};
+
+static PyMethodDef _stmt_methods[] =
+{
+    {"bind", (PyCFunction) _stmt_bind, METH_VARARGS, _stmt_bind_doc},
+    {"execute", (PyCFunction) _stmt_execute, METH_VARARGS, _stmt_execute_doc},
+    {"finalize", (PyCFunction) _stmt_finalize, METH_VARARGS, _stmt_finalize_doc},
+    {"reset", (PyCFunction) _stmt_reset, METH_VARARGS, _stmt_reset_doc},
+    {"step", (PyCFunction) _stmt_step, METH_VARARGS, _stmt_step_doc},
+    { NULL, NULL}
+};
+
+static void
+_stmt_dealloc(pysqlstmt* self)
+{
+    char *errmsg = NULL;
+    int result, have_error;
+    PyObject *err_type, *err_value, *err_traceback;
+    have_error = PyErr_Occurred() ? 1 : 0;
+    if (have_error)
+	PyErr_Fetch(&err_type, &err_value, &err_traceback);    
+    
+    if(self->p_col_def_list != 0) {
+	Py_DECREF(self->p_col_def_list);
+	self->p_col_def_list = 0;
+    }
+    
+    if (self->p_stmt != NULL) {
+	result = sqlite3_finalize(self->p_stmt);
+	if (result != SQLITE_OK) {
+	    PyErr_SetString(_sqlite_DatabaseError, sqlite3_errmsg(self->con->p_db));
+	    PyErr_WriteUnraisable(PyString_FromString("_sqlite.Statement.__del__"));
+	    if (have_error)
+		PyErr_Restore(err_type, err_value, err_traceback);
+	}
+    }
+    Py_DECREF(self->con);
+    PyObject_Del(self);
+}
+
+static PyObject* _stmt_get_attr(pysqlstmt *self, char *attr)
+{
+    PyObject *res;
+
+    res = Py_FindMethod(_stmt_methods, (PyObject *) self, attr);
+
+    if(NULL != res)
+    {
+        return res;
+    }
+    else
+    {
+        PyErr_Clear();
+        return PyMember_Get((char *) self, _stmt_memberlist, attr);
+    }
+}
+
+/*------------------------------------------------------------------------------
 ** Module Definitions / Initialization
 **------------------------------------------------------------------------------
 */
@@ -1741,6 +2152,7 @@ static PyMethodDef _con_methods[] =
 {
     {"close", (PyCFunction) _con_close, METH_VARARGS, _con_close_doc},
     {"execute",  (PyCFunction)_con_execute, METH_VARARGS},
+    {"prepare",  (PyCFunction)_con_prepare, METH_VARARGS},
     {"register_converter", (PyCFunction)_con_register_converter, METH_VARARGS | METH_KEYWORDS},
     {"set_expected_types", (PyCFunction)_con_set_expected_types, METH_VARARGS | METH_KEYWORDS},
     {"set_command_logfile", (PyCFunction)_con_set_command_logfile, METH_VARARGS | METH_KEYWORDS, _con_set_command_logfile_doc},

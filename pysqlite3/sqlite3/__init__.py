@@ -6,11 +6,11 @@ import _sqlite3 as _sqlite
 # Module Information
 #-------------------------------------------------------------------------------
 
-__revision__ = """$Revision: 1.2 $"""[11:-2]
+__revision__ = """$Revision: 1.3 $"""[11:-2]
 
 threadsafety = 1
 apilevel = "2.0"
-paramstyle = "pyformat"
+paramstyle = "qmark"
 
 # This is the version string for the current PySQLite version.
 version = "0.5.0"

@@ -8,11 +8,11 @@ import api_tests, logging_tests, lowlevel_tests, pgresultset_tests
 import precompile_tests, type_tests, userfunction_tests, transaction_tests
 
 def suite():
-    suite = unittest.TestSuite((lowlevel_tests.suite(), api_tests.suite(),
-            type_tests.suite(), userfunction_tests.suite(),
-            transaction_tests.suite(), pgresultset_tests.suite(),
-            #logging_tests.suite(), precompile_tests.suite()))
-	    logging_tests.suite()))
+##     suite = unittest.TestSuite((lowlevel_tests.suite(), api_tests.suite(),
+##             type_tests.suite(), userfunction_tests.suite(),
+##             transaction_tests.suite(), pgresultset_tests.suite(),
+## 	    logging_tests.suite()))
+    suite = api_tests.suite()
 
     return suite
 

@@ -13,8 +13,8 @@ class DBAPICompliance(unittest.TestCase):
                          'threadsafety is %d, should be 1' % sqlite.threadsafety)
 
     def CheckParamStyle(self):
-        self.assertEqual(sqlite.paramstyle, 'pyformat',
-                         'paramstyle is "%s", should be "pyformat"' %
+        self.assertEqual(sqlite.paramstyle, 'qmark',
+                         'paramstyle is "%s", should be "qmark"' %
                          sqlite.paramstyle)
 
     def CheckWarning(self):
@@ -168,7 +168,7 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
 
         cursor = self.cnx.cursor()
         cursor.execute("create table test(id int)")
-        cursor.executemany("insert into test(id) values (%s)", range(10))
+        cursor.executemany("insert into test(id) values ( ? )", range(10))
         cursor.execute("select id from test")
         res = cursor.fetchmany()
         self.failUnlessEqual(len(res), 1, """fetchmany should have returned a
@@ -243,13 +243,15 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
     def CheckExecuteWithTuple(self):
         """Test execute() with a tuple as the parameter."""
         try:
-            self.cur.execute("select max(%s, %s)", (4, 5))
+            self.cur.execute("select max(?, ?)", (4, 5))
         except StandardError, msg:
             self.fail(msg)
         self.cur.close()
 
     def CheckExecuteWithDictionary(self):
         """Test execute() with a dictionary as the parameter."""
+        # no longer supported
+        return
         try:
             self.cur.execute("select max(%(n1)s, %(n2)s)", {"n1": 5, "n2": 6})
         except StandardError, msg:
@@ -257,10 +259,9 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
         self.cur.close()
 
     def CheckQuotingOfLong(self):
-        """Test wether longs are quoted properly for SQL."""
+        """Test whether longs are quoted properly for SQL."""
         try:
-            self.cur.execute("-- types long")
-            self.cur.execute("select %s + %s as x", (5L, 6L))
+            self.cur.execute("select ? + ? as x", (5L, 6L))
         except StandardError, msg:
             self.fail(msg)
         res = self.cur.fetchone()
@@ -270,9 +271,8 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
 
     def CheckCursorIterator(self):
         self.cur.execute("create table test (id, name)")
-        self.cur.executemany("insert into test (id) values (%s)",
+        self.cur.executemany("insert into test (id) values (?)",
                             [(1,), (2,), (3,)])
-        self.cur.execute("-- types int")
         self.cur.execute("select id from test")
 
         if sys.version_info[:2] >= (2,2):
@@ -316,7 +316,7 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
     def CheckCursorScrollAndRownumber(self):
         self.cur.execute("create table test (id, name)")
         values = [("foo",)] * 20
-        self.cur.executemany("insert into test (name) values (%s)", values)
+        self.cur.executemany("insert into test (name) values (?)", values)
         self.cur.execute("select name from test")
         self.failUnlessEqual(self.cur.rownumber, 0,
             "Directly after execute, rownumber must be 0, is: %i"
@@ -442,7 +442,7 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
     def CheckSelectOfNonPrintableString(self):
         try:
             a = '\x01\x02\x03\x04'
-            self.cur.execute('select %s as a', a)
+            self.cur.execute('select ? as a', a)
             r = self.cur.fetchone()
             self.assertEqual(len(r.a), len(a),
                              "Length of result is %d, it should be %d."  %
@@ -455,42 +455,59 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
     def CheckQuotingIntWithPercentS(self):
         try:
             self.cur.execute("create table test(a number)")
-            self.cur.execute("insert into test(a) values (%s)", (5,))
+            self.cur.execute("insert into test(a) values (?)", (5,))
         except StandardError, msg:
             self.fail(msg)
 
     def CheckQuotingLongWithPercentS(self):
         try:
             self.cur.execute("create table test(a number)")
-            self.cur.execute("insert into test(a) values (%s)", (50000000L,))
+            self.cur.execute("insert into test(a) values (?)", (50000000L,))
         except StandardError, msg:
             self.fail(msg)
 
     def CheckQuotingFloatWithPercentS(self):
         try:
             self.cur.execute("create table test(a number)")
-            self.cur.execute("insert into test(a) values (%s)", (-3.24,))
+            self.cur.execute("insert into test(a) values (?)", (-3.24,))
         except StandardError, msg:
             self.fail(msg)
 
     def CheckQuotingIntWithPyQuoting(self):
         try:
             self.cur.execute("create table test(a number)")
-            self.cur.execute("insert into test(a) values (%i)", (5,))
+            self.cur.execute("insert into test(a) values (?)", (5,))
         except StandardError, msg:
             self.fail(msg)
 
     def CheckQuotingLongWithPyQuoting(self):
         try:
             self.cur.execute("create table test(a number)")
-            self.cur.execute("insert into test(a) values (%i)", (50000000L,))
+            self.cur.execute("insert into test(a) values (?)", (50000000L,))
         except StandardError, msg:
             self.fail(msg)
 
     def CheckQuotingFloatWithPyQuoting(self):
         try:
             self.cur.execute("create table test(a number)")
-            self.cur.execute("insert into test(a) values (%f)", (-3.24,))
+            self.cur.execute("insert into test(a) values (?)", (-3.24,))
+        except StandardError, msg:
+            self.fail(msg)
+
+    def CheckBlob(self):
+        """Test whether blobs work as expected."""
+        a = 'a\0b'
+        try:
+            self.cur.execute("create table test(a blob)")
+            self.cur.execute("insert into test(a) values (?)", a)
+            self.cur.execute('select * from test')
+            r = self.cur.fetchone()
+            print r
+            self.assertEqual(len(r[0]), len(a),
+                             "Length of result is %d, it should be %d."  %
+                             (len(r[0]), len(a)))
+            self.failUnless(r.a == a,
+                             "Result is '%s', it should be '%s'" % (r.a, a))
         except StandardError, msg:
             self.fail(msg)
 

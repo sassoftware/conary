@@ -241,20 +241,20 @@ class Cursor:
 
         SQL = self._unicodeConvert(SQL)
 
+        if len(parms) == 1 and isinstance(parms[0], tuple):
+            parms = parms[0]
+
         if len(parms) == 0:
             # If there are no paramters, just execute the query.
-            self.rs = self.con.db.execute(SQL)
+            #self.rs = self.con.db.execute(SQL)
+            stmt = self.con.db.prepare(SQL)
+            self.rs = stmt.execute()
         else:
-            if len(parms) == 1 and \
-               (type(parms[0]) in (DictType, ListType, TupleType) or \
-                        isinstance(parms[0], PgResultSet)):
-                parms = (self._unicodeConvert(parms[0]),)
-                parms = _quoteall(parms[0])
-            else:
-                parms = self._unicodeConvert(parms)
-                parms = tuple(map(_quote, parms))
-
-            self.rs = self.con.db.execute(SQL % parms)
+            #self.rs = self.con.db.execute(SQL % parms)
+            stmt = self.con.db.prepare(SQL)
+            for i, parm in enumerate(parms):
+                stmt.bind(i + 1, parm)
+            self.rs = stmt.execute()
 
         self.closed = 0
         self.current_recnum = 0
@@ -275,7 +275,10 @@ class Cursor:
             raise _sqlite.ProgrammingError, "connection is closed."
 
         for _i in parm_sequence:
-            self.execute(query, _i)
+            if hasattr(_i, '__getitem__'): 
+                self.execute(query, *_i)
+            else:
+                self.execute(query, _i)
 
     def close(self):
         if self.con and self.con.closed:
