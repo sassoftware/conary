@@ -140,12 +140,6 @@ class ConaryConfiguration(ConfigFile):
 	if os.environ.has_key("HOME"):
 	    self.read(os.environ["HOME"] + "/" + ".conaryrc")
 
-        if self.installLabel is None:
-            raise ConaryCfgError, "installLabel is not set"
-
-        if self.buildLabel is None:
-            self.buildLabel
-
 class ConaryCfgError(Exception):
 
     """

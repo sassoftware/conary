@@ -148,6 +148,10 @@ def realMain():
     except options.OptionError, e:
         sys.exit(e.val)
 
+    if cfg.installLabel is None:
+        print >> sys.stderr, "installLabel is not set"
+        sys.exit(1)
+
     profile = False
     if argSet.has_key('profile'):
 	import hotshot
