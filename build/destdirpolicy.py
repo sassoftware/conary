@@ -12,7 +12,7 @@
 # full details.
 #
 """
-Module used by recipes to modify the state of the installed %(destdir)s;
+Module used by recipes to modify the state of the installed %(destdir)s.
 Classes from this module are not used directly; instead, they are accessed
 through eponymous interfaces in recipe.
 """
