@@ -185,7 +185,7 @@ def main(argv):
             vt = v.trailingRevision()
             if lvt.getVersion() != vt.getVersion():
                 change = 'V'
-            elif lvt.getRelease() != vt.getRelease():
+            elif lvt.getSourceCount() != vt.getSourceCount():
                 change = 'S'
             else:
                 change = 'B'

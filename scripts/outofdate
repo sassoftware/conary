@@ -74,7 +74,7 @@ def getOutOfDate(pkgs, sources, versions):
             sv = versions[sourcepkg][0]
             vt = v.trailingRevision()
             svt = sv.trailingRevision()
-            if (v.branch(),vt.getVersion(),vt.getRelease()) != (v.branch(),svt.getVersion(),svt.getRelease()):
+            if (v.branch(),vt.getVersion(),vt.getSourceCount()) != (v.branch(),svt.getVersion(),svt.getSourceCount()):
                     outofdate.append( (pkg, vt, svt))
     return outofdate
 
