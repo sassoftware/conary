@@ -17,19 +17,23 @@ to allow operations to be reverted.
 
 The file format is::
   - magic
-  - file 1
-  - file 2
-  .
-  .
-  .
-  - file N
+  - file format version
+  - total # of bytes in file tables
   - file table entry 1
   - file table entry 2
   -                  .
   -                  .
   -                  .
   - file table entry N
-  total # of bytes in file tables
+  - file 1
+  - file 2
+  .
+  .
+  .
+  - file N
+
+Everything after the file format version is gzipped (so gzip magic
+appears right after the file version).
 
 Each file table entry looks like::
 
@@ -37,14 +41,11 @@ Each file table entry looks like::
   of entry (4 bytes), not including these 4 bytes
   length of file name (4 bytes)
   file name 
-  file offset (4 bytes)
+  file offset (4 bytes) (in the gzipped data)
   file size (4 bytes)
   length of arbitrary data (4 bytes)
   entries in file table (4 bytes)
   arbitrary file table data
-
-This could, and probably should, be reimplemented using tar as the 
-underlying format and the file table stored as a magic file at the end.
 """
 
 import gzip
@@ -56,6 +57,7 @@ import types
 import util
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
+FILE_CONTAINER_VERSION = 1
 SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
@@ -151,6 +153,13 @@ class FileContainer:
 	if len(magic) != 4 or magic != FILE_CONTAINER_MAGIC:
 	    raise KeyError, "bad file container magic"
 
+	version = self.file.read(2)
+	if len(version) != 2:
+	    raise KeyError, "bad file container version"
+	version = struct.unpack("!H", version)[0]
+	if version != FILE_CONTAINER_VERSION:
+	    raise KeyError, "unknown file container version %d" % version
+
 	self.gzfile = gzip.GzipFile(None, "rb", None, self.file)
 
 	tableLen = self.gzfile.read(8)
@@ -171,6 +180,7 @@ class FileContainer:
 	self.file.seek(SEEK_SET, 0)
 	self.file.truncate()
 	self.file.write(FILE_CONTAINER_MAGIC)
+	self.file.write(struct.pack("!H", FILE_CONTAINER_VERSION))
 
 	rest = gzip.GzipFile(None, "wb", 9, self.file)
 
