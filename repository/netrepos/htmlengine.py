@@ -117,11 +117,17 @@ Choose a branch: %s
     def htmlMetadataEditor(self, troveName, branch, metadata):
         branchStr = branch.asString()
         branchFrz = branch.freeze()
-    
+
+        if "version" in metadata:
+            # the only number that matters in the metadata version is the source revision
+            versionStr = metadata["version"].trailingVersion().asString().split("-")[-2]
+        else:
+            versionStr = "Initial Version"
+
         self.writeFn("""
 <h2>Metadata for %s</h2>
 <h4>Branch: %s</h4>
-<h4>Metadata version: %s</h4>
+<h4>Metadata revision: %s</h4>
 <form method="post" action="updateMetadata">
 <table style="width: 100%%;">
 <tr><td>Short Description:</td><td><input style="width: 50%%;" type="text" name="shortDesc" value="%s" /></td></tr>
@@ -134,7 +140,7 @@ Choose a branch: %s
 <input type="hidden" name="branch" value="%s" />
 <input type="hidden" name="troveName" value="%s" />
 </form>
-""" %   (troveName, branchStr, metadata["version"].trailingVersion().asString(),
+""" %   (troveName, branchStr, versionStr,
          metadata[MDClass.SHORT_DESC][0],
          metadata[MDClass.LONG_DESC][0],
          self._genSelect(metadata[MDClass.URL], "urlList", size=4, expand=True, multiple=True),

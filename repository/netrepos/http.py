@@ -78,9 +78,19 @@ class HttpHandler(HtmlEngine):
 
     def _getMetadata(self, troveName, branch):
         branch = self.repServer.thawVersion(branch)
-        md = self.troveStore.getMetadata(troveName, branch)
+        metadata = self.troveStore.getMetadata(troveName, branch)
 
-        self.htmlMetadataEditor(troveName, branch, md)
+        # fill a stub
+        if not metadata:
+            metadata = {
+                        MDClass.SHORT_DESC: [ "" ],
+                        MDClass.LONG_DESC:  [ "" ],
+                        MDClass.URL:        [],
+                        MDClass.LICENSE:    [],
+                        MDClass.CATEGORY:   [],
+                       }
+
+        self.htmlMetadataEditor(troveName, branch, metadata)
 
     def updateMetadataCmd(self, authToken, fields):
         branch = self.repServer.thawVersion(fields["branch"].value)
