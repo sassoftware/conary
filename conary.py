@@ -199,8 +199,8 @@ def realMain(cfg, argv=sys.argv):
     
     if not deps.deps.DEP_CLASS_IS in cfg.flavor.getDepClasses():
         insSet = deps.deps.DependencySet()
-        insSet.addDep(deps.deps.InstructionSetDependency, 
-                      deps.arch.currentArch)
+        for dep in deps.arch.currentArch:
+            insSet.addDep(deps.deps.InstructionSetDependency, dep)
         cfg.flavor.union(insSet)
 
     profile = False

@@ -15,17 +15,15 @@
 import deps
 import os
 
-def flags_ix86(baseArch):
-    ofInterest = { "cmov"   : True,
-		   "mmx"    : True,
-		   "sse"    : True,
-		   "sse2"   : True,
-		   "3dnow"  : True }
+def x86flags(baseArch, baseFlagMap, ofInterest):
     try:
         lines = open("/proc/cpuinfo").read().split("\n")
     except IOError:
         lines=[]
-    rc = [ (baseArch, deps.FLAG_SENSE_PREFERRED) ]
+
+    i = baseFlagMap.index(baseArch)
+    rc = [ (x, deps.FLAG_SENSE_PREFERRED) for x in baseFlagMap[i:] ]
+
     for line in lines:
 	if not line.startswith("flags"): continue
 	fields = line.split()
@@ -39,6 +37,12 @@ def flags_ix86(baseArch):
 
     return deps.Dependency('x86')
 
+def flags_ix86(baseArch):
+    baseFlagMap = [ 'i686', 'i586', 'i486' ]
+    ofInterest = {}.fromkeys([ '3dnow', '3dnowext', 'mmx', 'mmxext', 'sse', 
+                               'sse2', 'sse3', 'cmov', 'nx'])
+    return [ x86flags(baseArch, baseFlagMap, ofInterest) ]
+
 def flags_i686():
     return flags_ix86(baseArch = 'i686')
 
@@ -49,7 +53,12 @@ def flags_mips64():
     return deps.Dependency('mipseb', [ ('mips64', deps.FLAG_SENSE_REQUIRED) ])
 
 def flags_x86_64():
-    return deps.Dependency('x86_64', [] )
+    baseFlagMap = [ 'x86_64', 'i586', 'i486' ]
+    ofInterest = {}.fromkeys([ '3dnow', '3dnowext', 'nx', 'sse3' ])
+
+    x86 = flags_i686(baseArch)
+    x86_64 = x86flags(baseArch, baseFlagMap, ofInterest)
+    return x86 + x86_64
 
 def current():
     return currentArch
@@ -65,6 +74,6 @@ localNamespace = locals()
 if localNamespace.has_key("flags_" + baseArch):
     currentArch = localNamespace["flags_" + baseArch]()
 else:
-    currentArch = deps.Dependency(baseArch)
+    currentArch = [ deps.Dependency(baseArch) ]
 
 del localNamespace
