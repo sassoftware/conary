@@ -142,13 +142,12 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 	newVersion.appendVersionRelease(recipeClass.version, 1)
 
     if issubclass(recipeClass, recipe.PackageRecipe):
-	(cs, built) = cookPackageObject(repos, cfg, recipeClass, newVersion, 
-					buildBranch,
-					prep = prep, macros = macros)
+	(cs, built, cleanup) = cookPackageObject(repos, cfg, recipeClass, 
+				    newVersion, buildBranch,
+				    prep = prep, macros = macros)
     elif issubclass(recipeClass, recipe.GroupRecipe):
-	(cs, built) = cookGroupObject(repos, cfg, recipeClass, newVersion, 
-				      buildBranch,
-				      macros = macros)
+	(cs, built, cleanup) = cookGroupObject(repos, cfg, recipeClass, 
+				    newVersion, buildBranch, macros = macros)
     else:
 	assert(0)
     
@@ -158,6 +157,10 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 	repos.open("w")
 	repos.commitChangeSet(cs)
 	repos.open("r")
+
+    if cleanup:
+	(fn, args) = cleanup
+	fn(*args)
 
     return built
 
@@ -187,7 +190,7 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     changeSet.newPackage(grpDiff)
 
     built = [ (grp.getName(), grp.getVersion().asString()) ]
-    return (changeSet, built)
+    return (changeSet, built, None)
 
 def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch, 
 		      prep=True, macros=()):
@@ -252,6 +255,8 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     recipeObj.doBuild(builddir, destdir)
     log.info('Processing %s', recipeClass.name)
     recipeObj.doDestdirProcess() # includes policy
+
+    repos.open("w")
 
     os.chdir(cwd)
     
@@ -318,9 +323,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     grpDiff = grp.diff(None, abstract = 1)[0]
     changeSet.newPackage(grpDiff)
 
-    recipeObj.cleanup(builddir, destdir)
-
-    return (changeSet, built)
+    return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
 # -------------------- public below this line -------------------------
 
