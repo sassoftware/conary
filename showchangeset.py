@@ -94,7 +94,7 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
             for (cType, pathId, path, fileId, version) in fileList:
                 if cType == 'New':
                     # when file is in changeset, grab it locally
-                    change = cs.getFileChange(pathId)
+                    change = cs.getFileChange(None, fileId)
                     fileObj = files.ThawFile(change, pathId)
                 elif cType == 'Mod':
                     fileObj = getFileVersion(pathId, fileId, version, db, 
