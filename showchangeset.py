@@ -290,11 +290,18 @@ def getTroves(cs, troveList):
         for trove in cs.iterNewPackageList():
             allTroves[trove.getName(), trove.getNewVersion(), \
                                                 trove.getNewFlavor()] = True
-        ppl =  cs.getPrimaryTroveList()
-        if ppl:
+        ptl =  dict.fromkeys(cs.getPrimaryTroveList())
+        if ptl:
             troveList = []
-            for (name, version, flavor) in ppl:
-                del allTroves[name, version, flavor]
+            for (name, version, flavor) in ptl:
+                try:
+                    # the del could raise a KeyError out if this trove is a 
+                    # subtrove # of a trove in the ptl -- it will have 
+                    # already been removed from alltroves by the del further 
+                    # down
+                    del allTroves[name, version, flavor]
+                except KeyError:
+                    pass
                 troveList.append((name, version, flavor))
                 trove = cs.getNewPackageVersion(name, version, flavor)
                 for subTroveName, changes in  trove.iterChangedTroves():
