@@ -484,7 +484,7 @@ class FilesystemJob:
 	for (name, oldVersion) in changeSet.getOldPackageList():
 	    self.oldPackages.append((name, oldVersion))
 	    oldPkg = repos.getPackageVersion(name, oldVersion)
-	    for (fileId, (path, version)) in oldPkg.iterFileList():
+	    for (fileId, path, version) in oldPkg.iterFileList():
 		fileObj = repos.getFileVersion(fileId, version)
 		self._remove(fileObj, root + path,
 			     "removing %s" % root + path)
@@ -515,7 +515,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
     newPkg = curPkg.copy()
     newPkg.changeVersion(newVersion)
 
-    for (fileId, (path, version)) in newPkg.iterFileList():
+    for (fileId, path, version) in newPkg.iterFileList():
 	if path[0] == '/':
 	    realPath = root + path
 	else:

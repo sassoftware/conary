@@ -21,8 +21,8 @@ class AbstractDatabase(repository.AbstractRepository):
     # to instantiate a full package object to do anything... 
     # FilesystemRepository has the same problem
 
-    def getAllTroveNames(self):
-	return self.troveDb.getAllTroveNames()
+    def iterAllTroveNames(self):
+	return self.troveDb.iterAllTroveNames()
 
     def getPackageBranchList(self, name):
 	return [ x.getVersion().branch() for x in 
@@ -267,7 +267,7 @@ class AbstractDatabase(repository.AbstractRepository):
 
 	for trv in self.troveDb.iterFindByPath(path):
 	    rmList = []
-	    for (fileId, (trvPath, version)) in trv.iterFileList():
+	    for (fileId, trvPath, version) in trv.iterFileList():
 		if path == trvPath:
 		    rmList.append(fileId)
 

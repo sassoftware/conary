@@ -575,13 +575,13 @@ class FileIndexedDatabase(Database):
 	self.db[_FILE_MAP] = map
 	#self.db.sync()
 
-    def fileList(self):
+    def iterFileList(self):
 	"""
         Returns a list of all of the files in the databaes.
 
         @rtype: list of str
 	"""
-	return self.files.keys()
+	return self.files.iterkeys()
 
     def __init__(self, path, createBranches, mode = "r"):
 	Database.__init__(self, path, createBranches, mode)

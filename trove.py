@@ -51,24 +51,13 @@ class Package:
     def removeFile(self, fileId):   
 	del self.idMap[fileId]
 
-    def iterFileList(self):
 	return self.idMap.iteritems()
 
-    def fileList(self):
-	l = []
-	mapping = {}
-
-	for (theId, (path, version)) in self.idMap.items():
-	    mapping[path] = theId
-
-        paths = mapping.keys()
-        paths.sort()
-        for path in paths:
-	    fileId = mapping[path]
-	    version = self.idMap[fileId][1]
-	    l.append((fileId, path, version))
-
-	return l
+    def iterFileList(self):
+	# don't use idMap.iteritems() here; we don't want to exposure
+	# our internal format
+	for (theId, (path, version)) in self.idMap.iteritems():
+	    yield (theId, path, version)
 
     def getFile(self, fileId):
 	return self.idMap[fileId]

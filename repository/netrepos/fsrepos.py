@@ -39,8 +39,8 @@ class FilesystemRepository(AbstractRepository):
 
     ### Package access functions
 
-    def getAllTroveNames(self):
-	return self.pkgDB.fileList()
+    def iterAllTroveNames(self):
+	return self.pkgDB.iterFileList()
 
     def hasPackage(self, pkg):
 	return self.pkgDB.hasFile(pkg)
@@ -177,7 +177,7 @@ class FilesystemRepository(AbstractRepository):
 	@type troveName: str
 	"""
 	if not troveName:
-	    troveList = self.getAllTroveNames()
+	    troveList = self.iterAllTroveNames()
 	else:
 	    troveList = [ troveName ]
 
@@ -211,7 +211,7 @@ class FilesystemRepository(AbstractRepository):
 		branchedVersion = version.fork(newBranch, sameVerRel = 0)
 		self.createTroveBranch(troveName, branchedVersion)
 
-		for (fileId, path, version) in pkg.fileList():
+		for (fileId, path, version) in pkg.iterFileList():
 		    if branchedFiles.has_key(fileId): continue
 		    branchedFiles[fileId] = 1
 
@@ -685,7 +685,7 @@ class ChangeSetJob:
 	    pkg = self.repos.getPackageVersion(pkgName, version)
 	    self.oldPackage(pkg)
 
-	    for (fileId, path, version) in pkg.fileList():
+	    for (fileId, path, version) in pkg.iterFileList():
 		file = self.repos.getFileVersion(fileId, version)
 		self.oldFile(fileId, version, file)
 		

@@ -373,7 +373,7 @@ class ChangeSet:
 	    pkg = db.getPackageVersion(name, version)
 	    pkgDiff = pkg.diff(None)[0]
 	    rollback.newPackage(pkgDiff)
-	    for (fileId, (path, fileVersion)) in pkg.iterFileList():
+	    for (fileId, path, fileVersion) in pkg.iterFileList():
 		fileObj = db.getFileVersion(fileId, fileVersion)
 		rollback.addFile(fileId, None, fileVersion, fileObj.infoLine())
 		if fileObj.hasContents:

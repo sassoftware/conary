@@ -19,7 +19,7 @@ import versions
 class SourceState(package.Package):
 
     def removeFilePath(self, file):
-	for (fileId, (path, version)) in self.iterFileList():
+	for (fileId, path, version) in self.iterFileList():
 	    if path == file: 
 		self.removeFile(fileId)
 		return True
@@ -94,7 +94,7 @@ def _verifyAtHead(repos, headPkg, state):
 
     # make sure the files in this directory are based on the same
     # versions as those in the package at head
-    for (fileId, (path, version)) in state.iterFileList():
+    for (fileId, path, version) in state.iterFileList():
 	if isinstance(version, versions.NewVersion):
 	    assert(not headPkg.hasFile(fileId))
 	    # new file, it shouldn't be in the old package at all
@@ -157,7 +157,7 @@ def checkout(repos, cfg, dir, name, versionStr = None):
 				   versionStr)
     state = SourceState(trv.getName(), trv.getVersion(), branch)
 
-    for (fileId, (path, version)) in trv.iterFileList():
+    for (fileId, path, version) in trv.iterFileList():
 	fullPath = dir + "/" + path
 	(fileObj, contents) = repos.getFileVersion(fileId, version,
 						   withContents = True)
@@ -340,7 +340,7 @@ def addFile(file):
 	log.error("files must be created before they can be added")
 	return
 
-    for (fileId, (path, version)) in state.iterFileList():
+    for (fileId, path, version) in state.iterFileList():
 	if path == file:
 	    log.error("file %s is already part of this source package" % path)
 	    return
@@ -401,7 +401,7 @@ def renameFile(oldName, newName):
 	log.error("%s already exists" % newName)
 	return
 
-    for (fileId, (path, version)) in state.iterFileList():
+    for (fileId, path, version) in state.iterFileList():
 	if path == oldName:
 	    os.rename(oldName, newName)
 	    state.addFile(fileId, newName, version)

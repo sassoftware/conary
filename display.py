@@ -17,7 +17,7 @@ def displayPkgs(repos, cfg, all = False, ls = False, ids = False, pkg = "",
     if pkg:
 	list = [ pkg ]
     else:
-	list = repos.getAllTroveNames()
+	list = [ x for x in repos.iterAllTroveNames() ]
 	list.sort()
 
     for pkgName in list:
@@ -72,7 +72,9 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids):
 	version = pkg.getVersion()
 
 	if ls:
-	    for (fileId, path, version) in pkg.fileList():
+	    fileL = [ (x[1], x[0], x[2]) for x in pkg.iterFileList() ]
+	    fileL.sort()
+	    for (path, fileId, version) in fileL:
 		file = repos.getFileVersion(fileId, version, path = path)
 
 		if isinstance(file, files.SymbolicLink):
@@ -84,7 +86,7 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids):
 		    (file.modeString(), file.owner(), file.group(), 
 		     file.sizeString(), file.timeString(), name)
 	elif ids:
-	    for (fileId, path, version) in pkg.fileList():
+	    for (fileId, path, version) in pkg.iterFileList():
 		print "%s %s" % (fileId, path)
 	else:
 	    print _pkgFormat % (pkgName, version.asString(cfg.defaultbranch))
@@ -93,5 +95,7 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids):
 		for ver in verList:
 		    print _grpFormat % (pkgName, ver.asString(cfg.defaultbranch))
 
-	    for (fileId, path, version) in pkg.fileList():
+	    fileL = [ (x[1], x[0], x[2]) for x in pkg.iterFileList() ]
+	    fileL.sort()
+	    for (path, fileId, version) in fileL:
 		print _fileFormat % (path, version.asString(cfg.defaultbranch))

@@ -261,7 +261,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
         raise RecipeFileError, 'cannot find source component %s' % component
 
     srcFileInfo = None
-    for (fileId, path, version) in sourceComponent.fileList():
+    for (fileId, path, version) in sourceComponent.iterFileList():
         if path == filename:
             srcFileInfo = (fileId, version)
             break
@@ -687,7 +687,7 @@ class FilesetRecipe(Recipe):
 
     def addFileFromPackage(self, pattern, pkg, recurse, remapList):
 	pathMap = {}
-	for (fileId, (pkgPath, version)) in pkg.iterFileList():
+	for (fileId, pkgPath, version) in pkg.iterFileList():
 	    pathMap[pkgPath] = (fileId, version)
 
 	patternList = util.braceExpand(pattern)
@@ -775,7 +775,8 @@ class FilesetRecipe(Recipe):
 		(pattern, pkg.getVersion().asString(), pkg.getName())
 	    
     def iterFileList(self):
-	return self.files.iteritems()
+	for (fileId, (path, version)) in self.files.iteritems():
+	    yield (fileId, path, version)
 	    
     def __init__(self, repos, cfg, branch):
 	self.repos = repos

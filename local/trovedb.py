@@ -22,7 +22,7 @@ class TroveDatabase:
     def _updateIndicies(self, trvId, trv, method):
 	method(self.nameIdx, trvId, trv.getName())
 
-	for (fileId, (path, version)) in trv.iterFileList():
+	for (fileId, path, version) in trv.iterFileList():
 	    method(self.pathIdx, trvId, path)
 
 	for (name, versionList) in trv.iterPackageList():
@@ -80,8 +80,8 @@ class TroveDatabase:
 		self.updateTrove(trv)
 		foundOne = True
 
-    def getAllTroveNames(self):
-	return self.nameIdx.keys()
+    def iterAllTroveNames(self):
+	return self.nameIdx.iterkeys()
 
     def iterFindByName(self, name):
 	"""

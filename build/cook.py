@@ -92,7 +92,7 @@ class _IdGen:
 	# this package on the branch. We also construct an object which
 	# lets us look for source files this build needs inside of the
 	# repository
-	for (fileId, path, version) in pkg.fileList():
+	for (fileId, path, version) in pkg.iterFileList():
 	    self.map[path] = (fileId, version)
 	    if path[0] != "/":
 		# we might need to retrieve this source file
@@ -241,7 +241,7 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
     changeSet = changeset.ChangeSet()
     fileset = package.Package(fullName, newVersion)
 
-    for (fileId, (path, version)) in recipeObj.iterFileList():
+    for (fileId, path, version) in recipeObj.iterFileList():
 	fileset.addFile(fileId, path, version)
 	fileObj = repos.getFileVersion(fileId, version)
 	changeSet.addFile(fileId, None, version, fileObj.infoLine())

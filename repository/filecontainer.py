@@ -248,9 +248,6 @@ class FileContainer:
 	if self.file:
 	    self.close()
 
-    def fileList(self):
-	return self.entries.keys()
-
     def iterFileList(self):
 	return self.entries.iterkeys()
 

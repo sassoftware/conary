@@ -9,7 +9,7 @@ class AbstractRepository:
     #
     ### Package access functions
 
-    def getAllTroveNames(self):
+    def iterAllTroveNames(self):
 	"""
 	Returns a list of all of the troves contained in the repository.
 
