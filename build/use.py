@@ -376,6 +376,15 @@ def overrideFlags(config, pkgname):
     for key in config.useKeys():
 	Use._override(key, config['Use.' + key])
 
+    for key in config.archKeys():
+	flags = key.split('.')
+	lastflag = flags[-1]
+	flags = flags[:-1]
+	curflag = Arch
+	for flag in flags:
+	    curflag = curflag[flag]
+	curflag._override(lastflag, config['Arch.' + key])
+
     prefix = 'Flags.%s.' % pkgname
     for key in config.pkgKeys(pkgname):
 	LocalFlags._override(key, config[prefix + key])

@@ -147,6 +147,7 @@ class ConaryConfiguration(ConfigFile):
     
     pkgflags = {}
     useflags = {}
+    archflags = {}
    
     def __init__(self):
 	ConfigFile.__init__(self)
@@ -164,7 +165,7 @@ class ConaryConfiguration(ConfigFile):
 	if key.find('.') != -1:
 	    directive,arg = key.split('.', 1)
 	    directive = directive.lower()
-	    if directive in ('use', 'flags'):
+	    if directive in ('use', 'flags', 'arch'):
 		return self.checkFlagKey(directive, arg)
 	return ConfigFile.checkKey(self, key)
 	
@@ -175,6 +176,21 @@ class ConaryConfiguration(ConfigFile):
 	    else:
 		self.useflags[key] = True
 		return ('Use.' + key, BOOL)
+	elif directive == 'arch':
+	    dicts = key.split('.')
+	    key = dicts[-1]
+	    dicts = dicts[:-1]
+	    curdict = self.archflags
+	    for subdict in dicts:
+		if not subdict in curdict:
+		    # flag value, subflags
+		    curdict[subdict] = [ None, {} ]
+		curdict = curdict[subdict][1]
+	    if key in curdict:
+		curdict[key][0] = True
+	    else:
+		curdict[key] = [ True, {} ]
+	    return ('Arch.' + key, BOOL)
 	elif directive == 'flags':
 	    if key.find('.') == -1:
 		raise ParseError, ("%s:%s: Flag %s must be of form package.flag" % (file, self.lineno, key))
@@ -184,6 +200,18 @@ class ConaryConfiguration(ConfigFile):
 		    self.pkgflags[package] = {}
 		self.pkgflags[package][flag] = True
 		return ('Flags.' + key, BOOL)
+
+    def _archKeys(self, prefix, curdict):
+	keylist = []
+	for key in curdict.keys():
+	    if curdict[key][0]:
+		keylist.append(prefix + key)
+	    if curdict[key][1]:
+		keylist.extend(self._archKeys(''.join([prefix,key,'.']), curdict[key][1]))
+	return keylist
+
+    def archKeys(self):
+	return self._archKeys('', self.archflags)
 
     def useKeys(self):
 	return self.useflags.keys()
