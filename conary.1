@@ -146,8 +146,33 @@ Arguments include
 .\" FIXME: document
 .RE
 .TP
-.B showchangeset [\fIargs\fP \fI<changeset> [<changeset> ...]\fP
-Lists the contents of the specified changesets. 
+.B showchangeset [\fIargs\fP \fI<changeset> [<trove>=[<version>]]\fP
+The \fBshowchangeset\fP command lists the contents of the provided 
+\fBchangeset\fP.  If a trove is specified, and that trove is within the 
+changeset, only that trove is displayed.
+
+.RS 4
+.TP 4
+.B \-\-full-versions
+Does not attempt to shorten version strings for display
+.\" FIXME: add semantics
+.TP
+.B \-\-info
+Provides extra information about troves in the changeset, including provides
+and requires information.
+.TP
+.B \-\-ls
+Lists the files in the changeset
+.TP
+.B \-\-show-changes
+For files that have been modified, lists the old version of the file above the
+new version of the file for easy comparison.   Only has an effect if --ls
+is specified.  
+.TP
+.B \-\-tags
+Show any files in the changeset that have tags.
+.TP
+
 .\"
 .\"
 .\"
