@@ -4,7 +4,7 @@
 #
 
 """
-Contains the doCook() function which builds a recipe and commits the
+Contains the functions which builds a recipe and commits the
 resulting packages to the repository.
 """
 
@@ -95,146 +95,198 @@ class _IdGen:
 		f = repos.getFileVersion(fileId, version)
 		lcache.addFileHash(path, f.sha1())
 
-def _cook(repos, cfg, recipeFile, prep=0, macros=()):
+def cookObject(repos, cfg, className, recipeClass, prep=0, macros=()):
     repos.open("r")
 
     buildBranch = cfg.defaultbranch
-
-    if type(recipeFile) is types.ClassType:
-        classList = {recipeFile.__name__: recipeFile}
-    else:
-        try:
-            classList = recipe.RecipeLoader(recipeFile)
-        except recipe.RecipeFileError, msg:
-            raise CookError(str(msg))
     built = []
 
-    for (className, recipeClass) in classList.items():
-	log.info("Building %s", className)
-	fullName = cfg.packagenamespace + ":" + recipeClass.name
-	srcName = fullName + ":sources"
+    log.info("Building %s", className)
+    fullName = cfg.packagenamespace + ":" + recipeClass.name
+    srcName = fullName + ":sources"
 
-	lcache = lookaside.RepositoryCache(repos)
+    lcache = lookaside.RepositoryCache(repos)
 
-        srcdirs = [ os.path.dirname(recipeClass.filename),
-                    cfg.sourcepath % {'pkgname': recipeClass.name} ]
-	recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
+    srcdirs = [ os.path.dirname(recipeClass.filename),
+		cfg.sourcepath % {'pkgname': recipeClass.name} ]
+    recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
 
-	newVersion = None
-	if repos.hasPackage(fullName):
-	    # if this package/version exists already, increment the
-	    # existing revision
-	    newVersion = repos.pkgLatestVersion(fullName, buildBranch)
-	    if newVersion and (
-	      recipeObj.version == newVersion.trailingVersion().getVersion()):
-		newVersion = newVersion.copy()
-		newVersion.incrementVersionRelease()
-	    else:
-		newVersion = None
+    newVersion = None
+    if repos.hasPackage(fullName):
+	# if this package/version exists already, increment the
+	# existing revision
+	newVersion = repos.pkgLatestVersion(fullName, buildBranch)
+	if newVersion and (
+	  recipeObj.version == newVersion.trailingVersion().getVersion()):
+	    newVersion = newVersion.copy()
+	    newVersion.incrementVersionRelease()
+	else:
+	    newVersion = None
 
-	# this package/version doesn't exist yet
-	if not newVersion:
-	    newVersion = buildBranch.copy()
-	    newVersion.appendVersionRelease(recipeObj.version, 1)
+    # this package/version doesn't exist yet
+    if not newVersion:
+	newVersion = buildBranch.copy()
+	newVersion.appendVersionRelease(recipeObj.version, 1)
 
-	builddir = cfg.buildpath + "/" + recipeObj.name
+    # build up the name->fileid mapping so we reuse fileids wherever
+    # possible; we do this by looking in the database for a pacakge
+    # with the same name as the recipe and recursing through it's
+    # subpackages; this mechanism continues to work as subpackages
+    # come and go. this has to happen early as we build up the entries
+    # for the source lookaside cache simultaneously
 
-	recipeObj.setup()
-	recipeObj.unpackSources(builddir)
+    ident = _IdGen()
+    if repos.hasPackage(fullName):
+	pkgList = [ (fullName, 
+		    [repos.pkgLatestVersion(fullName, buildBranch)]) ]
+	while pkgList:
+	    (name, versionList) = pkgList[0]
+	    del pkgList[0]
+	    for version in versionList:
+		pkg = repos.getPackageVersion(name, version)
+		pkgList += pkg.getPackageList()
 
-        # if we're only extracting, continue to the next recipe class.
-        if prep:
-            continue
-        
-        cwd = os.getcwd()
-        util.mkdirChain(builddir + '/' + recipeObj.mainDir())
-        os.chdir(builddir + '/' + recipeObj.mainDir())
-	repos.close()
+    srcName = fullName + ":sources"
+    if repos.hasPackage(srcName):
+	print "HERE"
+	pkg = repos.getLatestPackage(srcName, buildBranch)
+	ident.populate(repos, lcache, pkg)
 
-        util.mkdirChain(cfg.tmpdir)
-	destdir = tempfile.mkdtemp("", "srs-%s-" % recipeObj.name, cfg.tmpdir)
-	recipeObj.doBuild(builddir, destdir)
-	log.info('Processing %s', className)
-        recipeObj.doDestdirProcess() # includes policy
+    builddir = cfg.buildpath + "/" + recipeObj.name
 
-	repos.open("w")
-        
-        os.chdir(cwd)
-        
-	packageList = []
+    recipeObj.setup()
+    recipeObj.unpackSources(builddir)
 
-	# build up the name->fileid mapping so we reuse fileids wherever
-	# possible; we do this by looking in the database for a pacakge
-	# with the same name as the recipe and recursing through it's
-	# subpackages; this mechanism continues to work as subpackages
-	# come and go
+    # if we're only extracting, continue to the next recipe class.
+    if prep:
+	return
+    
+    cwd = os.getcwd()
+    util.mkdirChain(builddir + '/' + recipeObj.mainDir())
+    os.chdir(builddir + '/' + recipeObj.mainDir())
+    repos.close()
 
-	ident = _IdGen()
-	if repos.hasPackage(fullName):
-	    pkgList = [ (fullName, 
-			[repos.pkgLatestVersion(fullName, buildBranch)]) ]
-	    while pkgList:
-		(name, versionList) = pkgList[0]
-		del pkgList[0]
-		for version in versionList:
-		    pkg = repos.getPackageVersion(name, version)
-		    pkgList += pkg.getPackageList()
-		    ident.populate(repos, lcache, pkg)
+    util.mkdirChain(cfg.tmpdir)
+    destdir = tempfile.mkdtemp("", "srs-%s-" % recipeObj.name, cfg.tmpdir)
+    recipeObj.doBuild(builddir, destdir)
+    log.info('Processing %s', className)
+    recipeObj.doDestdirProcess() # includes policy
 
-	for buildPkg in recipeObj.getPackages(cfg.packagenamespace, newVersion):
-	    (p, fileMap) = _createPackage(repos, buildBranch, buildPkg, ident)
-            built.append((p.getName(), p.getVersion().asString()))
-	    packageList.append((p, fileMap))
+    repos.open("w")
+    
+    os.chdir(cwd)
+    
+    # build up the name->fileid mapping so we reuse fileids wherever
+    # build up the name->fileid mapping so we reuse fileids wherever
+    # possible; we do this by looking in the database for a pacakge
+    # with the same name as the recipe and recursing through it's
+    # subpackages; this mechanism continues to work as subpackages
+    # come and go
 
-        recipes = [ recipeClass.filename ]
-        # add any recipe that this recipeClass decends from to the sources
-        baseRecipeClasses = list(recipeClass.__bases__)
-        while baseRecipeClasses:
-            parent = baseRecipeClasses.pop()
-            baseRecipeClasses.extend(list(parent.__bases__))
-            if not parent.__dict__.has_key('filename'):
-                continue
-            if not parent.filename in recipes:
-                recipes.append(parent.filename)
+    ident = _IdGen()
+    if repos.hasPackage(fullName):
+	pkgList = [ (fullName, 
+		    [repos.pkgLatestVersion(fullName, buildBranch)]) ]
+	while pkgList:
+	    (name, versionList) = pkgList[0]
+	    del pkgList[0]
+	    for version in versionList:
+		pkg = repos.getPackageVersion(name, version)
+		pkgList += pkg.getPackageList()
 
-	srcBldPkg = buildpackage.BuildPackage(srcName, newVersion)
-	for file in recipeObj.allSources() + recipes:
-            src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
-	    srcBldPkg.addFile(os.path.basename(src), src, type="src")
+    srcName = fullName + ":sources"
+    if repos.hasPackage(srcName):
+	print "HERE"
+	pkg = repos.getLatestPackage(srcName, buildBranch)
+	ident.populate(repos, lcache, pkg)
 
-        for recipeFile in recipes:
-            srcBldPkg[os.path.basename(recipeFile)].isConfig(True)
+    # possible; we do this by looking in the database for a pacakge
+    # with the same name as the recipe and recursing through it's
+    # subpackages; this mechanism continues to work as subpackages
+    # come and go
 
-	# build the group before the source package is added to the 
-	# packageList; the package's group doesn't include sources
-	grpName = cfg.packagenamespace + ":" + recipeClass.name
-	grp = package.Package(grpName, newVersion)
-	for (pkg, map) in packageList:
-	    grp.addPackage(pkg.getName(), [ pkg.getVersion() ])
+    ident = _IdGen()
+    if repos.hasPackage(fullName):
+	pkgList = [ (fullName, 
+		    [repos.pkgLatestVersion(fullName, buildBranch)]) ]
+	while pkgList:
+	    (name, versionList) = pkgList[0]
+	    del pkgList[0]
+	    for version in versionList:
+		pkg = repos.getPackageVersion(name, version)
+		pkgList += pkg.getPackageList()
 
-	(p, fileMap) = _createPackage(repos, buildBranch, srcBldPkg, ident)
+    srcName = fullName + ":sources"
+    if repos.hasPackage(srcName):
+	pkg = repos.getLatestPackage(srcName, buildBranch)
+	ident.populate(repos, lcache, pkg)
+
+    packageList = []
+
+    for buildPkg in recipeObj.getPackages(cfg.packagenamespace, newVersion):
+	(p, fileMap) = _createPackage(repos, buildBranch, buildPkg, ident)
+	built.append((p.getName(), p.getVersion().asString()))
 	packageList.append((p, fileMap))
 
-	changeSet = changeset.CreateFromFilesystem(packageList)
-	grpDiff = grp.diff(None, abstract = 1)[0]
+    recipes = [ recipeClass.filename ]
+    # add any recipe that this recipeClass decends from to the sources
+    baseRecipeClasses = list(recipeClass.__bases__)
+    while baseRecipeClasses:
+	parent = baseRecipeClasses.pop()
+	baseRecipeClasses.extend(list(parent.__bases__))
+	if not parent.__dict__.has_key('filename'):
+	    continue
+	if not parent.filename in recipes:
+	    recipes.append(parent.filename)
 
-	changeSet.newPackage(grpDiff)
+    srcBldPkg = buildpackage.BuildPackage(srcName, newVersion)
+    for file in recipeObj.allSources() + recipes:
+	src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
+	srcBldPkg.addFile(os.path.basename(src), src, type="src")
 
-	repos.commitChangeSet(changeSet)
+    for recipeFile in recipes:
+	srcBldPkg[os.path.basename(recipeFile)].isConfig(True)
 
-	repos.open("r")
+    # build the group before the source package is added to the 
+    # packageList; the package's group doesn't include sources
+    grpName = cfg.packagenamespace + ":" + recipeClass.name
+    grp = package.Package(grpName, newVersion)
+    for (pkg, map) in packageList:
+	grp.addPackage(pkg.getName(), [ pkg.getVersion() ])
 
-	recipeObj.cleanup(builddir, destdir)
+    (p, fileMap) = _createPackage(repos, buildBranch, srcBldPkg, ident)
+    packageList.append((p, fileMap))
+
+    changeSet = changeset.CreateFromFilesystem(packageList)
+    grpDiff = grp.diff(None, abstract = 1)[0]
+
+    changeSet.newPackage(grpDiff)
+
+    repos.commitChangeSet(changeSet)
+
+    repos.open("r")
+
+    recipeObj.cleanup(builddir, destdir)
 
     return built
 
 # -------------------- public below this line -------------------------
 
-def doCook(repos, cfg, recipeFile, prep=0, macros=()):
+def cookFile(repos, cfg, recipeFile, prep=0, macros=()):
     try:
-	return _cook(repos, cfg, recipeFile, prep = prep, macros = macros)
-    except repository.RepositoryError, e:
-	raise CookError(str(e))
+	classList = recipe.RecipeLoader(recipeFile)
+    except recipe.RecipeFileError, msg:
+	raise CookError(str(msg))
+
+    built = []
+    for (className, classObject) in classList.iteritems():
+	try:
+	    built += cookObject(repos, cfg, className, classObject, 
+				prep = prep, macros = macros)
+	except repository.RepositoryError, e:
+	    raise CookError(str(e))
+
+    return built
 
 class CookError(Exception):
     def __init__(self, msg):
@@ -264,7 +316,7 @@ def cookCommand(cfg, args, prep, macros):
             os.tcsetpgrp(0, os.getpgrp())
 	    repos = repository.LocalRepository(cfg.reppath, "r")
             try:
-                built = doCook(repos, cfg, file, prep=prep, macros=macros)
+                built = cookFile(repos, cfg, file, prep=prep, macros=macros)
             except CookError, msg:
 		log.error(str(msg))
                 sys.exit(1)
