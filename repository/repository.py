@@ -57,6 +57,10 @@ class Repository:
 		    version = oldPackage.getFile(fileId)[1]
 		    oldFileList.append((fileId, version))
 
+		for (fileId, path, version) in csPkg.getChangedFileList():
+		    version = oldPackage.getFile(fileId)[1]
+		    oldFileList.append((fileId, version))
+
 	# Create the file objects we'll need for the commit. This handles
 	# files which were added and files which have changed
 	fileList = []
@@ -114,9 +118,11 @@ class Repository:
 		infoFile = self._getFileDB(fileId)
 		(path, fileVersion) = fileMap[fileId][0:2]
 		infoFile.eraseVersion(fileVersion)
+		infoFile.close()
 
 	    for (pkgSet, newVersion) in pkgsDone:
 		pkgSet.eraseVersion(newVersion)
+		pkgSet.close()
 
 	    raise 
 
@@ -127,10 +133,12 @@ class Repository:
 	for (fileId, version) in oldFileList:
 	    filesDB = self._getFileDB(fileId)
 	    filesDB.eraseVersion(version)
+	    filesDB.close()
 
 	for (pkgName, pkgVersion) in oldPackageList:
 	    pkgSet = self._getPackageSet(pkgName)
 	    pkgSet.eraseVersion(pkgVersion)
+	    pkgSet.close()
 
     # packageList is a list of (pkgName, oldVersion, newVersion) tuples
     def createChangeSet(self, packageList):
@@ -301,41 +309,49 @@ class Database(Repository):
 	if not os.path.exists(self.rollbackCache):
 	    os.mkdir(self.rollbackCache)
 	if not os.path.exists(self.rollbackStatus):
-	    f = open(self.rollbackStatus, "w")
-	    f.write("0 -1\n")
-	    f.close()
+	    self.firstRollback = 0
+	    self.lastRollback = -1
+	    self.writeRollbackStatus()
+	else:
+	    self.readRollbackStatus()
 
     def addRollback(self, changeset):
-	if self.mode == "r":
-	    raise IOError, "database is read only"
-
-	f = open(self.rollbackStatus)
-	(first, last) = f.read()[:-1].split()
-	last = int(last)
-
-	fn = self.rollbackCache + ("/r.%d" % (last + 1))
+	fn = self.rollbackCache + ("/r.%d" % (self.lastRollback + 1))
 	changeset.writeToFile(fn)
-	f.close()
 
+	self.lastRollback += 1
+	self.writeRollbackStatus()
+
+    # name looks like "r.%d"
+    def removeRollback(self, name):
+	rollback = int(name[2:])
+	os.unlink(self.rollbackCache + "/" + name)
+	if rollback == self.lastRollback:
+	    self.lastRollback -= 1
+	    self.writeRollbackStatus()
+
+    def writeRollbackStatus(self):
 	newStatus = self.rollbackCache + ".new"
 
 	f = open(newStatus, "w")
-	f.write("%s %d\n" % (first, last + 1))
+	f.write("%s %d\n" % (self.firstRollback, self.lastRollback))
 	f.close()
 
 	os.rename(newStatus, self.rollbackStatus)
 
     def getRollbackList(self):
-	f = open(self.rollbackStatus)
-	(first, last) = f.read()[:-1].split()
-	first = int(first)
-	last = int(last)
-
 	list = []
-	for i in range(first, last + 1):
+	for i in range(self.firstRollback, self.lastRollback + 1):
 	    list.append("r.%d" % i)
 
 	return list
+
+    def readRollbackStatus(self):
+	f = open(self.rollbackStatus)
+	(first, last) = f.read()[:-1].split()
+	self.firstRollback = int(first)
+	self.lastRollback = int(last)
+	f.close()
 
     def getRollback(self, file):
 	return changeset.ChangeSetFromFile(self.rollbackCache + "/" + file)
@@ -372,7 +388,6 @@ class _PackageSet:
 	return self.f.findLatestVersion(branch)
 
     def close(self):
-	self.f.close()
 	self.f = None
 
     def __del__(self):
