@@ -145,7 +145,6 @@ class Database(repository.LocalRepository):
 
 	if not isRollback:
 	    inverse = cs.makeRollback(self, configFiles = 1)
-        else:
             flags |= update.MERGE
 
 	# Build and commit A->B
