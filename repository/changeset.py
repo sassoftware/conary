@@ -181,7 +181,7 @@ class ChangeSet:
 	    pkg.formatToFile(self, cfg, f)
 	for (pkgName, version) in self.oldPackages:
 	    f.write("removed %s %s\n" %
-		    (pkgName, version.asString(cfg.defaultbranch)))
+		    (pkgName, version.asString()))
 
     def dump(self):
 	import srscfg, sys
