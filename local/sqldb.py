@@ -342,6 +342,7 @@ class Database:
 
     def __init__(self, path):
 	self.db = sqlite.connect(path)
+        self.db._begin()
 	self.troveTroves = trovecontents.TroveTroves(self.db)
 	self.troveFiles = DBTroveFiles(self.db)
 	self.instances = DBInstanceTable(self.db)
@@ -349,6 +350,7 @@ class Database:
 	self.targetTable = DBTarget(self.db)
 	self.flavors = DBFlavors(self.db)
 	self.flavorMap = DBFlavorMap(self.db)
+        self.db.commit()
 	self.streamCache = {}
 	self.needsCleanup = False
 	self.addVersionCache = {}
