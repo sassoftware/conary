@@ -122,7 +122,7 @@ class NetworkAuthorization:
             cu.execute("""CREATE TABLE TroveNames (troveNameId INTEGER PRIMARY KEY,
                                                    troveName STRING UNIQUE)""")
         if "Permissions" not in tables:
-            cu.execute("""CREATE TABLE p (userId INTEGER,
+            cu.execute("""CREATE TABLE Permissions (userId INTEGER,
                                                     labelId INTEGER,
                                                     troveNameId INTEGER,
                                                     write INTEGER,
