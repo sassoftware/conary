@@ -2,6 +2,7 @@
 
 if [ $# -ne 3 ]; then
     echo "not enough args"
+    exit
 fi
 
 if [ -n "$3" ]; then
@@ -17,5 +18,5 @@ fi
 pw=`echo -n $2 | md5sum | awk '{print $1}'`
 
 echo "insert into users values (Null, '$1', '${pw}');" | sqlite3 $authdb
-echo "insert into permissions values ((select userId from users where user='$1'),Null,Null,1);" | sqlite3 $authdb
+echo "insert into permissions values ((select userId from users where user='$1'),Null,Null,1,1);" | sqlite3 $authdb
 

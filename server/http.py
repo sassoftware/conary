@@ -24,27 +24,32 @@ class ServerError(Exception):
 class InvalidServerCommand(ServerError):
     str = """Invalid command passed to server."""
 
+class InsufficientPermission(ServerError):
+    str = """Insufficient permission for requested operation."""
+
 class HttpHandler(HtmlEngine):
     def __init__(self, repServer):
         self.repServer = repServer
         self.troveStore = repServer.repos.troveStore
         
-        # "command name": (command handler, page title, requires authentication)
+        # "command name": (command handler, page title, (requires auth, requires write access, requires superuser))
         self.commands = {
                          # metadata commands
-                         "metadata":            (self.metadataCmd, "View Metadata", True),
-                         "chooseBranch":        (self.chooseBranchCmd, "View Metadata", True),
-                         "getMetadata":         (self.getMetadataCmd, "View Metadata", True),
-                         "updateMetadata":      (self.updateMetadataCmd, "Metadata Updated", True),
+                         "":                    (self.mainpage, "Conary Repository",         (True, True, False)),
+                         "metadata":            (self.metadataCmd, "View Metadata",          (True, True, False)),
+                         "chooseBranch":        (self.chooseBranchCmd, "View Metadata",      (True, True, False)),
+                         "getMetadata":         (self.getMetadataCmd, "View Metadata",       (True, True, False)),
+                         "updateMetadata":      (self.updateMetadataCmd, "Metadata Updated", (True, True, False)),
                          # user administration commands
-                         "userlist":            (self.userlistCmd, "User Administration", True),
-        
-                         "test":                (self.test, "Testing", True),
+                         "userlist":            (self.userlistCmd, "User Administration",    (True, True, True)),
+                         "addUserForm":         (self.addUserFormCmd, "Add User",            (True, True, True)),
+                         "addUser":             (self.addUserCmd, "Add User",                (True, True, True)),
+                         "test":                (self.test, "Testing",                       (True, True, False)),
                         }
 
     def requiresAuth(self, cmd):
         if cmd in self.commands:
-            return self.commands[cmd][2]
+            return self.commands[cmd][2][0]
         else:
             return True
 
@@ -60,9 +65,23 @@ class HttpHandler(HtmlEngine):
         else:
             raise InvalidServerCommand
 
+        needWrite = self.commands[cmd][2][1]
+        needSuper = self.commands[cmd][2][2]
+        if not self.repServer.auth.check(authToken, write=needWrite, superUser=needSuper):
+            raise InsufficientPermission
+
+        if cmd == "":
+            alreadyHome = True
+        else:
+            alreadyHome = False
+
         self.htmlHeader(pageTitle)
         handler(authToken, fields)
-        self.htmlFooter()
+        self.htmlFooter(alreadyHome)
+
+    def mainpage(self, authToken, fields):
+        self.htmlPageTitle("Conary Repository")
+        self.htmlMainPage()
 
     def test(self, authToken, fields):
         self.htmlPageTitle("Testing")
@@ -150,3 +169,24 @@ class HttpHandler(HtmlEngine):
         self.htmlPageTitle("User List")
         userlist = list(self.repServer.auth.iterUsers())
         self.htmlUserlist(userlist)
+
+    def addUserFormCmd(self, authToken, fields):
+        self.htmlPageTitle("Add User")
+        self.htmlAddUserForm()
+
+    def addUserCmd(self, authToken, fields):
+        user = fields["user"].value
+        password = fields["password"].value
+       
+        if fields.has_key("write"):
+            write = True
+        else:
+            write = False
+
+        if fields.has_key("super"):
+            superUser = True
+        else:
+            superUser = False
+        self.repServer.auth.add(user, password, write=write, superUser=superUser)
+        self.writeFn("""User added successfully. <a href="userlist">Return</a>""")
+        

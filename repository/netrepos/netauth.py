@@ -16,11 +16,11 @@ import sqlite3
 import re
 
 class NetworkAuthorization:
-    def check(self, authToken, write = False, label = None, trove = None):
+    def check(self, authToken, write = False, superUser = False, label = None, trove = None):
         if label and label.getHost() != self.name:
             raise RepositoryMismatch
 
-        if not write and self.anonReads:
+        if not write and not superUser and self.anonReads:
             return True
 
         if not authToken[0]:
@@ -45,6 +45,9 @@ class NetworkAuthorization:
 
         if write:
             where.append("write=1")
+
+        if superUser:
+            where.append("superUser=1")
 
         if where:
             stmt += "WHERE " + " AND ".join(where)
@@ -79,7 +82,7 @@ class NetworkAuthorization:
         row = cu.fetchone()
         return row[0]
 
-    def add(self, user, password, write=True):
+    def add(self, user, password, write=True, superUser=False):
         cu = self.db.cursor()
         
         m = md5.new()
@@ -87,13 +90,13 @@ class NetworkAuthorization:
         cu.execute("INSERT INTO Users VALUES (Null, ?, ?)", user, m.hexdigest())
         userId = cu.lastrowid
 
-        cu.execute("INSERT INTO Permissions VALUES (?, Null, Null, ?)",
-                   userId, write)
+        cu.execute("INSERT INTO Permissions VALUES (?, Null, Null, ?, ?)",
+                   userId, write, superUser)
         self.db.commit()
 
     def iterUsers(self):
         cu = self.db.cursor()
-        cu.execute("""SELECT Users.user, Users.userId, Permissions.write FROM Users
+        cu.execute("""SELECT Users.user, Users.userId, Permissions.write, Permissions.superUser FROM Users
                       LEFT JOIN Permissions ON Users.userId=Permissions.userId""")
         for row in cu:
             yield row
@@ -122,7 +125,8 @@ class NetworkAuthorization:
             cu.execute("""CREATE TABLE Permissions (userId INTEGER,
                                                     labelId INTEGER,
                                                     troveNameId INTEGER,
-                                                    write INTEGER)""")
+                                                    write INTEGER,
+                                                    superUser INTEGER)""")
             cu.execute("""CREATE INDEX PermissionsIdx
                           ON Permissions(userId, labelId, troveNameId)""")
 

@@ -20,6 +20,8 @@ import xmlrpclib
 import zlib
 
 from repository.netrepos import netserver
+from http import HttpHandler
+from htmlengine import HtmlEngine
 import conarycfg
 
 BUFFER=1024 * 256
@@ -36,10 +38,9 @@ class ServerConfig(conarycfg.ConfigFile):
         'cacheChangeSets'   :  [ conarycfg.BOOLEAN, False ],
     }
 
-def post(repos, req):
+def checkAuth(req, repos):
     if not req.headers_in.has_key('Authorization'):
-	user = None
-	pw = None
+        return None
     else:
 	info = req.headers_in['Authorization'].split()
 	if len(info) != 2 or info[0] != "Basic":
@@ -53,10 +54,23 @@ def post(repos, req):
 	if authString.count(":") != 1:
 	    return apache.HTTP_BAD_REQUEST
 	    
-	(user, pw) = authString.split(":")
+	authToken = authString.split(":")
 
-    authToken = (user, pw)
+        if not repos.auth.checkUserPass(authToken):
+            return None
+            
+    return authToken
 
+def post(repos, httpHandler, req):
+    cmd = os.path.basename(req.uri)
+    if httpHandler.requiresAuth(cmd):
+        authToken = checkAuth(req, repos)
+        if not authToken:
+            req.err_headers_out['WWW-Authenticate'] = 'Basic realm="Conary Repository"'
+            return apache.HTTP_UNAUTHORIZED
+    else:
+        authToken = (None, None)
+    
     if req.headers_in['Content-Type'] == "text/xml":
         (params, method) = xmlrpclib.loads(req.read())
 
@@ -74,15 +88,35 @@ def post(repos, req):
         req.write(resp) 
     else:
         req.content_type = "text/html"
-        repos.handlePost(req.write, authToken, os.path.basename(req.uri), 
-                         util.FieldStorage(req))
+        try:
+            httpHandler.handleCmd(req.write, cmd, authToken,
+                                  util.FieldStorage(req))
+        except:
+            traceback(req)
 
     return apache.OK
 
-def getFile(repos, req):
-    if os.path.basename(req.uri) != "changeset":
+def get(repos, httpHandler, req):
+    uri = req.uri
+    if uri.endswith('/'):
+        uri = uri[:-1]
+    cmd = os.path.basename(uri)
+    fields = util.FieldStorage(req)
+   
+    if cmd != "changeset":
+        if httpHandler.requiresAuth(cmd):
+            authToken = checkAuth(req, repos)
+            if not authToken:
+                req.err_headers_out['WWW-Authenticate'] = 'Basic realm="Conary Repository"'
+                return apache.HTTP_UNAUTHORIZED
+        else:
+            authToken = (None, None)
+
         req.content_type = "text/html"
-        repos.handleGet(req.write, os.path.basename(req.uri))
+        try:
+            httpHandler.handleCmd(req.write, cmd, authToken, fields)
+        except:
+            traceback(req)
         return apache.OK
 
     localName = repos.tmpPath + "/" + req.args + "-out"
@@ -137,6 +171,11 @@ def putFile(repos, req):
 
     return apache.OK
 
+def traceback(wfile):
+    htmlengine = HtmlEngine()
+    htmlengine.setWriter(wfile.write)
+    htmlengine.stackTrace(wfile)
+
 def handler(req):
     repName = os.path.basename(req.filename)
 
@@ -175,15 +214,16 @@ def handler(req):
                                 cfg.repositoryMap,
 				commitAction = cfg.commitAction,
                                 cacheChangeSets = cfg.cacheChangeSets)
-
+    
     repos = repositories[repName]
-
+    httpHandler = HttpHandler(repos)
+    
     method = req.method.upper()
 
     if method == "POST":
-	return post(repos, req)
+	return post(repos, httpHandler, req)
     elif method == "GET":
-	return getFile(repos, req)
+	return get(repos, httpHandler, req)
     elif method == "PUT":
 	return putFile(repos, req)
     else:

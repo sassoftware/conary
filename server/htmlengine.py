@@ -109,10 +109,11 @@ tr.header {
     </head>
 <body>""" % (pageTitle, self.styleSheet))
 
-    def htmlFooter(self):
-        self.writeFn("""
-<hr />
-</body></html>""")
+    def htmlFooter(self, alreadyHome=False):
+        self.writeFn("<hr />")
+        if not alreadyHome:
+            self.writeFn("""<a href="/">Home</a>""")
+        self.writeFn("</body></html>")
 
     def htmlPickTrove(self, troveList=[], action="chooseBranch"):
         troveSelection = self.makeSelect(troveList, "troveNameList", size=12, expand="50%")
@@ -206,14 +207,41 @@ Choose a branch: %s
 <table cellpadding="4">
 <tr class="header"><td>Username</td><td>Write access</td></tr>
 """)
-        for user, id, perm in userlist:
-            if perm:
+        for user, id, write, super in userlist:
+            if write:
                 permStr = "Read/Write"
             else:
                 permStr = "Read-Only"
+            if super:
+                permStr += " (superuser)"
             self.writeFn("<tr><td>%s</td><td>%s</td></tr>\n" % (user, permStr))
 
         self.writeFn("</table>")
+        self.writeFn("""
+<p><a href="addUserForm">Add User</a></p>
+""")
+
+    def htmlMainPage(self):
+        self.writeFn("""
+<p>Welcome to the Conary Repository.</p>
+<ul>
+<li><a href="/metadata">Metadata Management</a></li>
+<li><a href="/userlist">User Administration</a></li>
+</ul>
+""")
+
+    def htmlAddUserForm(self):
+        self.writeFn("""
+<form method="post" action="addUser"
+<table>
+<tr><td>Username:</td><td><input type="text" name="user"></td></tr>
+<tr><td>Password:</td><td><input type="password" name="password"></td></tr>
+<tr><td>Write access:</td><td><input type="checkbox" name="write"></td></tr>
+<tr><td>Superuser:</td><td><input type="checkbox" name="super"></td></tr>
+</table>
+<p><input type="submit"></p>
+</form>
+""")
 
     def makeSelectAppender(self, name, selectionName):
         """Generates an input box and add/remove button pair to manage a list of arbitrary
