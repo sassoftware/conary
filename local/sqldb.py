@@ -399,10 +399,10 @@ class Database:
 
         if not self.versionCheck():
             raise OldDatabaseSchema, \
-                    "The Conary database on this system "           \
-                    "is too old. For information on how to\n"       \
-                    "convert this database, please visit "           \
-                    "http://wiki.specifix.com/ConaryConversion."
+                "The Conary database on this system is too old.\n" \
+                "For information on how to convert this database," \
+                " please visit:\n"                                 \
+                "http://wiki.specifix.com/ConaryConversion"
 
 	self.troveTroves = trovetroves.TroveTroves(self.db)
 	self.troveFiles = DBTroveFiles(self.db)
