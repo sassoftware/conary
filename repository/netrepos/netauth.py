@@ -247,12 +247,25 @@ class NetworkAuthorization:
     def addPermission(self, userGroupId,
                       labelId = None, itemId = None,
                       write = False, capped = False, admin = False):
-
         cu = self.db.cursor()
         cu.execute("INSERT INTO Permissions VALUES(?, ?, ?, ?, ?, ?)",
                    userGroupId, labelId, itemId, write, capped, admin)
         self.db.commit()
 
+    def addGroup(self, userGroupName):
+        cu = self.db.cursor()
+    
+        cu.execute("INSERT INTO UserGroups (userGroup) VALUES (?)", userGroupName)
+        self.db.commit()
+        return cu.lastrowid
+
+    def addGroupMember(self, userGroupId, userId):
+        cu = self.db.cursor()
+
+        cu.execute("INSERT INTO UserGroupMembers VALUES(?, ?)",
+                   userGroupId, userId)
+        self.db.commit()
+    
     def deletePermission(self, userGroupId, labelId, itemId):
         cu = self.db.cursor()
         
