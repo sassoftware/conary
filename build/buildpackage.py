@@ -84,10 +84,17 @@ class BuildPackage(dict):
 	f.inode.setPerms(f.inode.perms() & 01777)
 	self[path] = (realPath, f)
 
-        if linkCount and f.hasContents:
-            l = self.linkGroups.get(inode, [])
-            l.append(path)
-            self.linkGroups[inode] = l
+        if linkCount > 1:
+            if f.hasContents:
+                l = self.linkGroups.get(inode, [])
+                l.append(path)
+                self.linkGroups[inode] = l
+                # add to list to check for config files later
+                self.hardlinks.append(path)
+            else:
+                if not isinstance(f, files.Directory):
+                    # no hardlinks allowed for special files other than dirs
+                    self.badhardlinks.append(path)
 
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
@@ -120,6 +127,8 @@ class BuildPackage(dict):
         self.provides = deps.DependencySet()
         self.flavor = _getUseDependencySet(recipe)
         self.linkGroups = {}
+        self.hardlinks = []
+        self.badhardlinks = []
 	dict.__init__(self)
 
 
