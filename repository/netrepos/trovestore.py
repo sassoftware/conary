@@ -374,7 +374,8 @@ class TroveStore:
                 FROM NewFiles INNER JOIN FileStreams ON
                     NewFiles.fileId = FileStreams.FileId
                 WHERE
-                    FileStreams.stream IS NULL
+                    FileStreams.stream IS NULL AND
+                    NewFiles.stream IS NOT NULL
         """)
 
         cu.execute("""

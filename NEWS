@@ -15,6 +15,9 @@ Changes in 0.50.4:
     information out to the :debuginfo files, which both makes stack
     traces better without :debuginfo installed and makes libraries
     stripped for :debuginfo more likely to work.
+  * When existing fileId's had no streams but the streams are provided
+    by a later commit, those streams weren't always merged properly if
+    there were multiple files for that fileId
 
 Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 
