@@ -1,3 +1,8 @@
+Changes in 0.11.4
+  * all components built from a single recipe share a common flavor
+  * loadRecipe's label= keyword argument can actually take a label
+    as well as a hostname
+
 Changes in 0.11.3:
   * optimized a sqlite update statement to use indexed columns
   * added --test to update and erase
