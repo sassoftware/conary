@@ -168,7 +168,7 @@ class FilesystemJob:
             # a hard link instead of actually restoring it.
 	    fileObj = files.ThawFile(fileObj, fileId)
 
-            if override == "" and fileObj.linkGroup.value():
+            if override == "" and fileObj.hasContent and fileObj.linkGroup.value():
                 linkGroup = fileObj.linkGroup.value()
                 linkPath = self.linkGroups.get(linkGroup, None)
                 if linkPath is None:
