@@ -19,7 +19,6 @@ sys.excepthook = util.excepthook
 cfg = srscfg.SrsConfiguration()
 
 repos = repository.Repository(cfg.reppath)
-del cfg.reppath				    # this should never be used again
 
 def usage():
     print "usage: srs import  <file.rpm>"
