@@ -24,7 +24,7 @@ class BuildInfo(dict):
     def __init__(self, builddir):
 	self.__builddir = builddir
 	self.__infofile = builddir + "/conary-build-info"
-    
+
     def read(self):
 	# don't catch this error
 	self.__fd = open(self.__infofile, "r")
@@ -39,14 +39,14 @@ class BuildInfo(dict):
 	    if len(keys) > 1:
 		subdicts = keys[:-1]
 		key = keys[-1]
-		curdict = self.__dict__
+		curdict = self
 		for subdict in subdicts:
 		    if subdict not in curdict:
 			curdict[subdict] = {}
 		    curdict = curdict[subdict]
-		curdict[key] = value[:-1] 
+		curdict[key] = value[:-1]
 	    else:
-		self.__dict__[key] = value[:-1] 
+		self[key] = value[:-1]
 
     def begin(self):
 	self.__fd = open(self.__infofile, "w")
@@ -65,9 +65,12 @@ class BuildInfo(dict):
 	self.__fd.close()
 
     def __setattr__(self, name, value):
+        # Note that using buildinfo.foo = y
+        # causes foo to be written to file, while using buildinfo['foo'] = y
+        # does not
 	if not name.startswith('_BuildInfo_'):
 	    self.write('%s %s\n' % (name,value))
-	self.__setitem__(name, value)
+	self[name] = value
 
     def __getattr__(self, name):
-	return dict.__getitem__(self, name)
+	return self[name] 
