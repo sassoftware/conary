@@ -58,7 +58,7 @@ class Repository:
 
     def storeFileFromChangeset(self, chgSet, file, pathToFile):
 	if isinstance(file, files.RegularFile):
-	    f = cs.getFileContents(file.sha1())
+	    f = chgSet.getFileContents(file.sha1())
 	    file.archive(self, f)
 	    f.close()
 
