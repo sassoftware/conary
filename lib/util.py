@@ -21,12 +21,15 @@ def mkdirChain(*paths):
             if not os.path.exists(p):
                 os.mkdir(p)
 
-def findFile(file, searchdirs):
+def searchFile(file, searchdirs, error=None):
     for dir in searchdirs:
         s = "%s/%s" %(dir, file)
         if os.path.exists(s):
             return s
-    raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT))
+    if error: raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT))
+
+def findFile(file, searchdirs):
+    s = searchFile(file, searchdirs, error=1)
 
 def excepthook(type, value, tb):
     sys.excepthook = sys.__excepthook__

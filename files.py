@@ -14,7 +14,6 @@ import pwd
 import grp
 import util
 import types
-import zipfile
 import datastore
 
 class FileMode:

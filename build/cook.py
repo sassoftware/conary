@@ -18,12 +18,12 @@ def cook(cfg, srcdirs, recipeFile):
     for (name, theClass) in classList.items():
 	print "Building", name
 
-	recp = theClass()
+	recp = theClass(srcdirs)
 
 	ourBuildDir = cfg.buildpath + "/" + recp.name
 
 	recp.setup()
-	recp.unpackSources(srcdirs, ourBuildDir)
+	recp.unpackSources(ourBuildDir)
 	recp.doBuild(ourBuildDir)
 
 	rootDir = "/var/tmp/srs/%s-%d" % (recp.name, int(time.time()))

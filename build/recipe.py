@@ -11,6 +11,11 @@ import shutil
 import types
 import inspect
 
+def flatten(list):
+    if type(list) != type([]): return [list]
+    if list == []: return list
+    return flatten(list[0]) + flatten(list[1:])
+
 class RecipeLoader(types.DictionaryType):
     def __init__(self, file):
         self.module = imp.new_module(file)
@@ -50,17 +55,37 @@ def loadRecipe(file):
         
 class Recipe:
 
+    def addSignature(self, file):
+	md5 = util.searchFile('%s.md5sum' %(file), self.srcdirs):
+	if md5:
+	    if not self.signatures.has_key(file):
+		self.signatures[file] = []
+	    self.signatures[file].append(md5)
+
+	gpg = util.searchFile('%s.sign' %(file), self.srcdirs):
+	if not gpg:
+	    gpg = util.searchFile('%s.sig' %(file), self.srcdirs):
+	if gpg:
+	    if not self.signatures.has_key(file):
+		self.signatures[file] = []
+	    self.signatures[file].append(gpg)
+
+
     def addTarball(self, file):
 	self.tarballs.append(file)
+	self.addSignature(file)
 
     def addPatch(self, file):
 	self.patches.append(file)
+	self.addSignature(file)
 
     def addSource(self, file):
 	self.sources.append(file)
+	self.addSignature(file)
 
     def allSources(self):
-	return self.sources + self.tarballs + self.patches
+	return self.sources + self.tarballs + self.patches +
+	       flatten(self.signatures)
 
     def mainDir(self, new = None):
 	if new:
@@ -75,12 +100,24 @@ class Recipe:
 	shutil.rmtree(builddir)
 	shutil.rmtree(rootDir)
 
-    def unpackSources(self, srcdirs, builddir):
+    def checkSignatures(self, filepath, file):
+	for signature in self.signatures[file]:
+	    if signature.endswith(".md5sum"):
+		if os.system("cat %s | md5sum --check %s"
+			      %(signature, filepath)):
+		    raise RuntimeError, "md5 signature %s failed" %(signature)
+	    elif signature.endswith(".sign") or signature.endswith(".sig"):
+		if os.system("gpg --no-secmem-warning --verify %s %s"
+			      %(signature, filepath)):
+		    raise RuntimeError, "GPG signature %s failed" %(signature)
+
+    def unpackSources(self, builddir):
 	if os.path.exists(builddir):
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
 	for file in self.tarballs:
-            f = util.findFile(file, srcdirs)
+            f = util.findFile(file, self.srcdirs)
+	    self.checkSignatures(f, file)
             if f.endswith(".bz2"):
                 tarflags = "-jxf"
             elif f.endswith(".gz") or f.endswith(".tgz"):
@@ -90,7 +127,7 @@ class Recipe:
 	    os.system("tar -C %s %s %s" % (builddir, tarflags, f))
 	
 	for file in self.sources:
-            f = util.findFile(file, srcdirs)
+            f = util.findFile(file, self.srcdirs)
 	    destDir = builddir + "/" + self.theMainDir
 	    util.mkdirChain(destDir)
 	    shutil.copyfile(f, destDir + "/" + file)
@@ -119,10 +156,12 @@ class Recipe:
     def getPackageSet(self):
         return self.packageSet
 
-    def __init__(self):
+    def __init__(self, srcdirs):
 	self.tarballs = []
 	self.patches = []
 	self.sources = []
+	self.signatures = {}
+	self.srcdirs = srcdirs
 	self.theMainDir = self.name + "-" + self.version
 	self.build = build.Make()
         self.install = build.MakeInstall()
