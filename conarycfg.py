@@ -23,15 +23,16 @@ class SrsConfiguration:
 	if not line or line[0] == '#':
 	    return
 	(key, val) = line.split()
-	if not self.__dict__.has_key(key):
+        key = key.lower()
+	if not self.lowerCaseMap.has_key(key):
 	    raise ParseError, ("configuration value %s unknown" % key)
 
-	self.__dict__[key] = val
+	self.__dict__[self.lowerCaseMap[key]] = val
 
 	try:
-	    if key == "installLabel":
+	    if key.lower() == "installlabel":
 		self.installLabel = versions.BranchName(self.installLabel)
-	    elif key == "buildLabel":
+	    elif key.lower() == "buildlabel":
 		self.buildLabel = versions.BranchName(self.buildLabel)
 	except versions.ParseError, e:
 	    raise ParseError, str(e)
@@ -64,6 +65,10 @@ class SrsConfiguration:
 	self.dbPath = "/var/lib/srsdb"
         self.tmpDir = "/var/tmp/"
 	self.instructionSet = deps.arch.current()
+
+        self.lowerCaseMap = {}
+        for (key, value) in self.__dict__.items():
+            self.lowerCaseMap[key.lower()] = key
 
 	self.flavor = deps.deps.DependencySet()
 	self.flavor.addDep(deps.deps.InstructionSetDependency, 
