@@ -22,6 +22,15 @@ import trovetroves
 import versions
 import versiontable
 
+# these will go away once we switch internal fileids
+import sha1helper
+
+def encodeFileId(fileId):
+    return sqlite.encode(sha1helper.sha1FromString(fileId))
+
+def decodeFileId(fileId):
+    return sha1helper.sha1ToString(fileId)
+
 class Tags(idtable.CachedIdTable):
 
     def __init__(self, db):
@@ -41,7 +50,7 @@ class DBTroveFiles:
         if "DBTroveFiles" not in tables:
             cu.execute("""CREATE TABLE DBTroveFiles(
 					  streamId INTEGER PRIMARY KEY,
-					  fileId STR,
+					  fileId BINARY,
 					  versionId INTEGER,
 					  path STR,
 					  instanceId INTEGER,
@@ -87,6 +96,7 @@ class DBTroveFiles:
 
     def hasFileId(self, fileId, versionId, pristine):
 	cu = self.db.cursor()
+	fileId = encodeFileId(fileId)
 	if pristine:
 	    cu.execute("SELECT path, stream FROM DBTroveFiles "
 		       "WHERE fileId=%s AND versionId = %d", fileId, versionId)
@@ -98,6 +108,7 @@ class DBTroveFiles:
 
     def getFileByFileId(self, fileId, versionId, justPresent = True):
 	cu = self.db.cursor()
+	fileId = encodeFileId(fileId)
 	if justPresent:
 	    cu.execute("SELECT path, stream FROM DBTroveFiles "
 		       "WHERE fileId=%s AND versionId=%d AND isPresent = 1", 
@@ -113,6 +124,7 @@ class DBTroveFiles:
             raise KeyError, (fileId, versionId)
 
     def addItem(self, fileId, versionId, path, instanceId, stream, tags):
+	fileId = encodeFileId(fileId)
         cu = self.db.cursor()
         cu.execute("""
 	    INSERT INTO DBTroveFiles VALUES (NULL, %s, %d, %s, %d, %d, %s)
@@ -127,6 +139,7 @@ class DBTroveFiles:
 
     def updateItem(self, instanceId, fileId, oldVersionId, newVersionId, 
 		   newStream, tags):
+	fileId = encodeFileId(fileId)
         cu = self.db.cursor()
 	cu.execute("UPDATE DBTroveFiles SET versionId=%d, stream=%s "
 		   "WHERE fileId=%s AND versionId=%d AND instanceId=%d",
@@ -146,7 +159,7 @@ class DBTroveFiles:
 		   "AND instanceId=%d", (path, instanceId))
 
     def removeFileIds(self, instanceId, fileIdList, forReal = False):
-	fileIdListStr = ",".join(["'%s'" % x for x in fileIdList])
+	fileIdListStr = ",".join(["'%s'" % encodeFileId(x) for x in fileIdList])
         cu = self.db.cursor()
 	cu.execute("""DELETE FROM DBFileTags WHERE 
 			streamId IN (
@@ -562,7 +575,7 @@ class Database:
 	    cu.execute("""
 		UPDATE DBTroveFiles SET instanceId=%s WHERE
 		    fileId=%s and versionId=%d""", troveInstanceId,
-		fileId, versionId)
+		encodeFileId(fileId), versionId)
 
     def getFile(self, fileId, fileVersion, pristine = False):
 	versionId = self.versionTable[fileVersion]
@@ -574,7 +587,7 @@ class Database:
 	cu = self.db.cursor()
 
 	cu.execute("""
-	    CREATE TEMPORARY TABLE getFilesTbl(fileId STRING, version STR)
+	    CREATE TEMPORARY TABLE getFilesTbl(fileId BINARY, version STR)
 	""", start_transaction = False)
 
 	versionStrs = {}
@@ -585,7 +598,8 @@ class Database:
 		vs = version.asString()
 		versionStrs[version] = vs
 
-	    cu.execute("INSERT INTO getFilesTbl VALUES (%s, %s)", fileId, vs,
+	    cu.execute("INSERT INTO getFilesTbl VALUES (%s, %s)", 
+		       encodeFileId(fileId), vs,
 		       start_transaction = False)
 	del versionStrs
 
@@ -678,7 +692,7 @@ class Database:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
-	    trv.addFile(fileId, path, version)
+	    trv.addFile(decodeFileId(fileId), path, version)
 
 	return trv
 
@@ -788,6 +802,8 @@ class Database:
 	    if not version:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
+
+	    fileId = decodeFileId(fileId)
 
 	    if withFiles:
 		fileObj = files.ThawFile(stream, fileId)
