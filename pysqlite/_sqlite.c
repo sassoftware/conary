@@ -1148,7 +1148,7 @@ static PyObject* _con_execute(pysqlc* self, PyObject *args)
         Py_DECREF(logfile_writeargs);
 
         logfile_writeargs = PyTuple_New(1);
-        PyTuple_SetItem(logfile_writeargs, 0, PyString_FromString("\n"));
+        PyTuple_SetItem(logfile_writeargs, 0, PyString_FromString(";\n"));
         PyObject_CallObject(logfile_writemethod, logfile_writeargs);
 
         Py_DECREF(logfile_writeargs);

@@ -285,13 +285,14 @@ class Cursor:
         else:
             return obj
 
-    def execute(self, SQL, *parms):
+    def execute(self, SQL, *parms, **kwargs):
+        start_transaction = kwargs.get('start_transaction', True)
         SQL = SQL.strip()
         self._checkNotClosed("execute")
 
         if self.con.autocommit:
             pass
-        else:
+        elif start_transaction:
             if not(self.con.inTransaction or SQL[:6].upper() == "SELECT"):
                 self.con._begin()
                 self.con.inTransaction = 1
