@@ -649,16 +649,17 @@ class ReferencedFileList(list, streams.InfoStream):
 	if data is not None:
 	    self.thaw(data)
 
-_STREAM_TCS_NAME	    = streams._STREAM_TROVE_CHANGE_SET + 0
-_STREAM_TCS_OLD_VERSION	    = streams._STREAM_TROVE_CHANGE_SET + 1
-_STREAM_TCS_NEW_VERSION	    = streams._STREAM_TROVE_CHANGE_SET + 2
-_STREAM_TCS_REQUIRES	    = streams._STREAM_TROVE_CHANGE_SET + 3
-_STREAM_TCS_PROVIDES	    = streams._STREAM_TROVE_CHANGE_SET + 4
-_STREAM_TCS_CHANGE_LOG	    = streams._STREAM_TROVE_CHANGE_SET + 5
-_STREAM_TCS_OLD_FILES	    = streams._STREAM_TROVE_CHANGE_SET + 6
-_STREAM_TCS_TYPE	    = streams._STREAM_TROVE_CHANGE_SET + 7
-_STREAM_TCS_TROVE_CHANGES   = streams._STREAM_TROVE_CHANGE_SET + 8
-_STREAM_TCS_NEW_FILES       = streams._STREAM_TROVE_CHANGE_SET + 9
+_STREAM_TCS_NAME	    = streams._STREAM_TROVE_CHANGE_SET +  0
+_STREAM_TCS_OLD_VERSION	    = streams._STREAM_TROVE_CHANGE_SET +  1
+_STREAM_TCS_NEW_VERSION	    = streams._STREAM_TROVE_CHANGE_SET +  2
+_STREAM_TCS_REQUIRES	    = streams._STREAM_TROVE_CHANGE_SET +  3
+_STREAM_TCS_PROVIDES	    = streams._STREAM_TROVE_CHANGE_SET +  4
+_STREAM_TCS_CHANGE_LOG	    = streams._STREAM_TROVE_CHANGE_SET +  5
+_STREAM_TCS_OLD_FILES	    = streams._STREAM_TROVE_CHANGE_SET +  6
+_STREAM_TCS_TYPE	    = streams._STREAM_TROVE_CHANGE_SET +  7
+_STREAM_TCS_TROVE_CHANGES   = streams._STREAM_TROVE_CHANGE_SET +  8
+_STREAM_TCS_NEW_FILES       = streams._STREAM_TROVE_CHANGE_SET +  9
+_STREAM_TCS_CHG_FILES       = streams._STREAM_TROVE_CHANGE_SET + 10
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
@@ -666,16 +667,17 @@ _TCS_TYPE_RELATIVE = 2
 class AbstractTroveChangeSet(streams.LargeStreamSet):
 
     streamDict = { 
-	_STREAM_TCS_NAME	: (streams.StringStream,        "name"),
-        _STREAM_TCS_OLD_VERSION : (streams.FrozenVersionStream, "oldVersion" ),
-        _STREAM_TCS_NEW_VERSION : (streams.FrozenVersionStream, "newVersion" ),
-        _STREAM_TCS_REQUIRES    : (streams.DependenciesStream,  "requires" ),
-        _STREAM_TCS_PROVIDES    : (streams.DependenciesStream,  "provides" ),
-        _STREAM_TCS_CHANGE_LOG  : (changelog.AbstractChangeLog, "changeLog" ),
-        _STREAM_TCS_OLD_FILES   : (streams.StringsStream,       "oldFiles" ),
-        _STREAM_TCS_TYPE        : (streams.IntStream,           "tcsType" ),
-        _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,          "packages" ),
-        _STREAM_TCS_NEW_FILES   : (ReferencedFileList,          "newFiles" ),
+	_STREAM_TCS_NAME	: (streams.StringStream,       "name"),
+        _STREAM_TCS_OLD_VERSION : (streams.FrozenVersionStream,"oldVersion" ),
+        _STREAM_TCS_NEW_VERSION : (streams.FrozenVersionStream,"newVersion" ),
+        _STREAM_TCS_REQUIRES    : (streams.DependenciesStream, "requires" ),
+        _STREAM_TCS_PROVIDES    : (streams.DependenciesStream, "provides" ),
+        _STREAM_TCS_CHANGE_LOG  : (changelog.AbstractChangeLog,"changeLog" ),
+        _STREAM_TCS_OLD_FILES   : (streams.StringsStream,      "oldFiles" ),
+        _STREAM_TCS_TYPE        : (streams.IntStream,          "tcsType" ),
+        _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,         "packages" ),
+        _STREAM_TCS_NEW_FILES   : (ReferencedFileList,         "newFiles" ),
+        _STREAM_TCS_CHG_FILES   : (ReferencedFileList,         "changedFiles" ),
      }
 
     """
@@ -871,18 +873,6 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	elif not self.oldFlavor and self.newFlavor:
             rc.append("FLAVOR - %s\n" % (self.newFlavor.freeze()))
 
-	for (id, path, version) in self.getChangedFileList():
-	    rc.append("~%s " % id)
-	    if path:
-		rc.append(path)
-	    else:
-		rc.append("-")
-
-	    if version:
-		rc.append(" " + version.asString() + "\n")
-	    else:
-		rc.append(" -\n")
-
 	newStyle = ""
 	rc = "".join(rc)
 
@@ -925,7 +915,6 @@ class TroveChangeSet(AbstractTroveChangeSet):
 	self.newVersion.set(newVersion)
 	if changeLog:
 	    self.changeLog = changeLog
-	self.changedFiles = []
 	if absolute:
 	    self.tcsType.set(_TCS_TYPE_ABSOLUTE)
 	else:
@@ -940,25 +929,7 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
     def parse(self, line):
 	action = line[0]
 
-	if action == "+" or action == "~":
-	    fields = line[1:].split()
-	    fileId = fields.pop(0)
-	    version = fields.pop(-1)
-	    path = " ".join(fields)
-
-	    if version == "-":
-		version = None
-	    else:
-		version = versions.VersionFromString(version)
-
-	    if path == "-":
-		path = None
-
-	    if action == "+":
-		self.newFile(fileId, path, version)
-	    else:
-		self.changedFile(fileId, path, version)
-	elif action == "-":
+	if action == "-":
 	    self.oldFile(line[1:])
 	
 	# this makes our order match the order in the changeset
@@ -992,7 +963,6 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
 		del lines[i]
 		break
 
-	self.changedFiles = []
 	self.oldFlavor = oldFlavor
 	self.newFlavor = newFlavor
         
