@@ -13,7 +13,7 @@ import lookaside
 import shutil
 import types
 
-def cook(repos, cfg, recipeFile):
+def cook(repos, cfg, recipeFile, prep=0):
     if type(recipeFile) is types.ClassType:
         classList = {recipeFile.__name__: recipeFile}
     else:
@@ -43,6 +43,10 @@ def cook(repos, cfg, recipeFile):
 
 	recipeObj.setup()
 	recipeObj.unpackSources(ourBuildDir)
+
+        # if we're only extracting, continue to the next recipe class.
+        if prep:
+            continue
         
         cwd = os.getcwd()
         os.chdir(ourBuildDir + '/' + recipeObj.mainDir())
