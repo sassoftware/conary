@@ -52,14 +52,12 @@ class Strip(policy.Policy):
     XXX system policy on whether to create debuginfo packages
     """
     invariantinclusions = [
-        # XXX temporary - remove ^ when Filter objects are used, since
-        # they will altomatically left anchor by the leading /
-	'^%(bindir)s/.*',
-	'^%(essentialbindir)s/.*',
-	'^%(sbindir)s/.*',
-	'^%(essentialsbindir)s/.*',
-	'^%(libdir)s/.*',
-	'^%(essentiallibdir)s/.*',
+	'%(bindir)s/',
+	'%(essentialbindir)s/',
+	'%(sbindir)s/',
+	'%(essentialsbindir)s/',
+	'%(libdir)s/',
+	'%(essentiallibdir)s/',
     ]
     def doFile(self, path):
 	if not os.path.islink(path):
@@ -82,8 +80,8 @@ class NormalizeGzip(policy.Policy):
     up other things
     """
     invariantexceptions = [
-	'%(mandir)s/man.*/.*',
-	'%(infodir)s/.*',
+	'%(mandir)s/man.*/',
+	'%(infodir)s/',
     ]
     invariantinclusions = [
 	'.*\.gz'
@@ -101,8 +99,8 @@ class NormalizeBzip(policy.Policy):
     up other things
     """
     invariantexceptions = [
-	'%(mandir)s/man.*/.*',
-	'%(infodir)s/.*',
+	'%(mandir)s/man.*/',
+	'%(infodir)s/',
     ]
     invariantinclusions = [
 	'.*\.bz2'
@@ -266,6 +264,7 @@ class RelativeSymlinks(policy.Policy):
 		dots = "../"
 		dots *= path.count('/') - 1
 		normpath = util.normpath(dots + contents)
+		# FIXME: make shortest possible relative symlink
 		log.debug('Changing absolute symlink %s to relative symlink %s',
                           path, normpath)
 		os.symlink(normpath, fullpath)
