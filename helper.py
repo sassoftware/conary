@@ -160,7 +160,7 @@ def fullBranchName(nameSpace, defaultNick, version, versionStr):
 	if not versionStr:
 	    nick = defaultNick
 	elif versionStr[0] == "@":
-	    nick = versions.BranchName(nameSpace, versionStr)
+	    nick = versions.BranchName(nameSpace + versionStr)
 	else:
 	    nick = versions.BranchName(versionStr)
 
