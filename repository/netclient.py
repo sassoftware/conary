@@ -976,18 +976,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 		    "fully qualified version or label " + \
 		    "expected instead of %s" % versionStr
 
+        if affinityDatabase and affinityDatabase.hasPackage(name):
+            affinityTroves = affinityDatabase.findTrove(name)
+        else:
+            affinityTroves = None
+
         if not versionStr:
             query = {}
-            if affinityDatabase and affinityDatabase.hasPackage(name):
-                troves = affinityDatabase.findTrove(name)
-                if troves:
-                    query[name] = {}
-                    for trove in troves:
-                        # XXX what if multiple troves are on this branch,
-                        # but with different flavors?
+            if affinityTroves:
+                query[name] = {}
+                for trove in affinityTroves:
+                    # XXX what if multiple troves are on this branch,
+                    # but with different flavors?
 
-                        query[name][trove.getVersion().branch()] = \
-                            [ defaultFlavor ]
+                    query[name][trove.getVersion().branch()] = \
+                        [ defaultFlavor ]
 
             if query:
                 flavorDict = self.getTroveLeavesByBranch(query, 
@@ -1048,16 +1051,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 		raise repository.TroveNotFound, str(e)
 
             query = {}
-            if affinityDatabase and affinityDatabase.hasPackage(name):
-                troves = affinityDatabase.findTrove(name)
-                if troves:
-                    query[name] = {}
-                    for trove in troves:
-                        # XXX what if multiple troves are on this branch,
-                        # but with different flavors?
+            if affinityTroves:
+                query[name] = {}
+                for trove in affinityTroves:
+                    # XXX what if multiple troves are on this branch,
+                    # but with different flavors?
 
-                        query[name][trove.getVersion().branch()] = \
-                            [ defaultFlavor ]
+                    query[name][trove.getVersion().branch()] = \
+                        [ defaultFlavor ]
 
             if query:
                 flavorDict = self.getTroveVersionsByBranch(query, 
