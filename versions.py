@@ -136,6 +136,7 @@ class Version:
 
     def parseVersionString(self, ver):
 	if ver[0] != "/":
+            # XXX broken code, no defaultBranch in this scope
 	    if not defaultBranch:
 		raise KeyError, "relative version given without a default " \
 			        "branch"
