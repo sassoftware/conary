@@ -38,9 +38,8 @@ class _Source(action.RecipeAction):
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.sourcename = sourcename % recipe.macros
 	self.rpm = self.rpm % recipe.macros
-	self.prep()
 	    
-    def prep(self):
+    def doPrep(self):
 	if self.keyid:
 	    self._addSignature()
 	if self.rpm:
@@ -401,6 +400,9 @@ class Action(action.RecipeAction):
 	    destDir = os.sep.join((destDir, self.dir))
 	    util.mkdirChain(destDir)
 	util.execute(self.action %self.recipe.macros, destDir)
+
+    def doPrep(self):
+	pass
 
     def fetch(self): 
 	return None

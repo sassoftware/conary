@@ -344,6 +344,8 @@ class PackageRecipe(Recipe):
     def unpackSources(self, builddir):
 	self.macros.builddir = builddir
 	for source in self._sources:
+	    source.doPrep()
+	for source in self._sources:
 	    source.doAction()
 
     def extraBuild(self, action):
