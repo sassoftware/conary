@@ -549,7 +549,7 @@ class Trove:
         self.requires = None
 	self.changeLog = changeLog
 
-class ReferencedTroveSet(streams.InfoStream, dict):
+class ReferencedTroveSet(dict, streams.InfoStream):
 
     def freeze(self):
 	l = []
@@ -573,6 +573,8 @@ class ReferencedTroveSet(streams.InfoStream, dict):
 	return "\0".join(l)
 
     def thaw(self, data):
+	if not data: return
+
 	l = data.split("\0")
 	i = 0
 
@@ -601,6 +603,52 @@ class ReferencedTroveSet(streams.InfoStream, dict):
 	if data is not None:
 	    self.thaw(data)
 
+class ReferencedFileList(list, streams.InfoStream):
+
+    def freeze(self):
+	l = []
+	for (fileId, path, version) in self:
+	    l.append(fileId)
+	    if path:
+		l.append(path)
+	    else:
+		l.append("")
+
+	    if version:
+		l.append(version.asString())
+	    else:
+		l.append("")
+
+	return "\0".join(l)
+
+    def thaw(self, data):
+	del self[:]
+	if not data:
+	    return
+
+	l = data.split("\0")
+	i = 0
+	while i < len(l):
+	    fileId = l[i]
+	    if l[i + 1]:
+		path = l[i + 1]
+	    else:
+		path = None
+
+	    if l[i + 2]:
+		version = versions.VersionFromString(l[i + 2])
+	    else:
+		version = None
+
+	    self.append((fileId, path, version))
+
+	    i += 3
+
+    def __init__(self, data = None):
+	list.__init__(self)
+	if data is not None:
+	    self.thaw(data)
+
 _STREAM_TCS_NAME	    = streams._STREAM_TROVE_CHANGE_SET + 0
 _STREAM_TCS_OLD_VERSION	    = streams._STREAM_TROVE_CHANGE_SET + 1
 _STREAM_TCS_NEW_VERSION	    = streams._STREAM_TROVE_CHANGE_SET + 2
@@ -610,11 +658,12 @@ _STREAM_TCS_CHANGE_LOG	    = streams._STREAM_TROVE_CHANGE_SET + 5
 _STREAM_TCS_OLD_FILES	    = streams._STREAM_TROVE_CHANGE_SET + 6
 _STREAM_TCS_TYPE	    = streams._STREAM_TROVE_CHANGE_SET + 7
 _STREAM_TCS_TROVE_CHANGES   = streams._STREAM_TROVE_CHANGE_SET + 8
+_STREAM_TCS_NEW_FILES       = streams._STREAM_TROVE_CHANGE_SET + 9
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
 
-class AbstractTroveChangeSet(streams.StreamSet):
+class AbstractTroveChangeSet(streams.LargeStreamSet):
 
     streamDict = { 
 	_STREAM_TCS_NAME	: (streams.StringStream,        "name"),
@@ -625,7 +674,8 @@ class AbstractTroveChangeSet(streams.StreamSet):
         _STREAM_TCS_CHANGE_LOG  : (changelog.AbstractChangeLog, "changeLog" ),
         _STREAM_TCS_OLD_FILES   : (streams.StringsStream,       "oldFiles" ),
         _STREAM_TCS_TYPE        : (streams.IntStream,           "tcsType" ),
-        _STREAM_TCS_TROVE_CHANGES : (ReferencedTroveSet,        "packages" ),
+        _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,          "packages" ),
+        _STREAM_TCS_NEW_FILES   : (ReferencedFileList,          "newFiles" ),
      }
 
     """
@@ -821,9 +871,6 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	elif not self.oldFlavor and self.newFlavor:
             rc.append("FLAVOR - %s\n" % (self.newFlavor.freeze()))
 
-	for (id, path, version) in self.getNewFileList():
-	    rc.append("+%s %s %s\n" % (id, path, version.asString()))
-
 	for (id, path, version) in self.getChangedFileList():
 	    rc.append("~%s " % id)
 	    if path:
@@ -840,7 +887,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	rc = "".join(rc)
 
 	final = struct.pack("!I", len(rc)) + rc + \
-		    streams.StreamSet.freeze(self)
+		    streams.LargeStreamSet.freeze(self)
 
 	return final
 
@@ -863,7 +910,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         return self.newFlavor
 
     def __init__(self, data = None):
-	streams.StreamSet.__init__(self, data)
+	streams.LargeStreamSet.__init__(self, data)
 
 class TroveChangeSet(AbstractTroveChangeSet):
 
@@ -878,13 +925,11 @@ class TroveChangeSet(AbstractTroveChangeSet):
 	self.newVersion.set(newVersion)
 	if changeLog:
 	    self.changeLog = changeLog
-	self.newFiles = []
 	self.changedFiles = []
 	if absolute:
 	    self.tcsType.set(_TCS_TYPE_ABSOLUTE)
 	else:
 	    self.tcsType.set(_TCS_TYPE_RELATIVE)
-	self.packages = ReferencedTroveSet()
         self.provides.set(None)
         self.requires.set(None)
 	self.oldFlavor = oldFlavor
@@ -947,7 +992,6 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
 		del lines[i]
 		break
 
-	self.newFiles = []
 	self.changedFiles = []
 	self.oldFlavor = oldFlavor
 	self.newFlavor = newFlavor
