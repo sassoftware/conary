@@ -3,13 +3,13 @@
 # All rights reserved
 #
 
-all: subdirs srs-wrapper srs.recipe
+all: subdirs conary-wrapper conary.recipe
 
 export VERSION = 0.1
 export TOPDIR = $(shell pwd)
-export DISTDIR = $(TOPDIR)/srs-$(VERSION)
+export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
-export srsdir = $(prefix)/share/srs
+export conarydir = $(prefix)/share/conary
 export bindir = $(prefix)/bin
 
 SUBDIRS=build local repository test lib pysqlite deps
@@ -37,8 +37,8 @@ python_files = __init__.py	\
 	rpmhelper.py		\
 	sha1helper.py		\
 	srcctl.py		\
-	srscfg.py		\
-	srs.py			\
+	conarycfg.py		\
+	conary.py			\
 	updatecmd.py		\
 	util.py			\
 	magic.py		\
@@ -46,11 +46,11 @@ python_files = __init__.py	\
 	xmlshims.py
 
 example_files = examples/tmpwatch.recipe
-bin_files = srs srs-bootstrap
-extra_files = srs.recipe.in srs.recipe srs-wrapper.in Makefile Make.rules
+bin_files = conary conary-bootstrap
+extra_files = conary.recipe.in conary.recipe conary-wrapper.in Makefile Make.rules
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
-generated_files = srs-wrapper srs.recipe *.pyo *.pyc 
+generated_files = conary-wrapper conary.recipe *.pyo *.pyc 
 
 .PHONY: clean bootstrap deps.dot pychecker dist install test debug-test subdirs
 
@@ -58,22 +58,22 @@ generated_files = srs-wrapper srs.recipe *.pyo *.pyc
 subdirs:
 	for d in $(SUBDIRS); do make -C $$d DIR=$$d || exit 1; done
 
-srs-wrapper: srs-wrapper.in
-	sed s,@srsdir@,$(srsdir),g $< > $@
+conary-wrapper: conary-wrapper.in
+	sed s,@conarydir@,$(conarydir),g $< > $@
 	chmod 755 $@
 
-srs.recipe: srs.recipe.in
+conary.recipe: conary.recipe.in
 	sed s,@VERSION@,$(VERSION),g $< > $@
 
 install-mkdirs:
 	mkdir -p $(DESTDIR)$(bindir)
 
 install: all install-mkdirs install-subdirs pyfiles-install
-	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(srsdir)', ddir='$(srsdir)', quiet=1)"
-	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(srsdir)', ddir='$(srsdir)', quiet=1)"
-	install -m 755 srs-wrapper $(DESTDIR)$(bindir)
+	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
+	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
+	install -m 755 conary-wrapper $(DESTDIR)$(bindir)
 	for f in $(bin_files); do \
-		ln -sf srs-wrapper $(DESTDIR)$(bindir)/$$f; \
+		ln -sf conary-wrapper $(DESTDIR)$(bindir)/$$f; \
 	done
 
 dist: $(dist_files)
@@ -84,14 +84,14 @@ dist: $(dist_files)
 		mkdir -p $(DISTDIR)/`dirname $$f`; \
 		cp -a $$f $(DISTDIR)/$$f; \
 	done
-	tar cjf $(DISTDIR).tar.bz2 srs-$(VERSION)
+	tar cjf $(DISTDIR).tar.bz2 conary-$(VERSION)
 	rm -rf $(DISTDIR)
 
 distcheck: dist
 	d=`mktemp -d`; \
 	cd $$d; \
 	tar jxvf $(DISTDIR).tar.bz2; \
-	cd srs-$(VERSION); \
+	cd conary-$(VERSION); \
 	make; make test; \
 	cd -; \
 	rm -rf $$d
@@ -105,18 +105,18 @@ bootstrap:
 		echo "/opt isn't writable, this won't work"; \
 		exit 1; \
 	fi
-	time $(PYTHON) ./srs-bootstrap --bootstrap group-bootstrap
+	time $(PYTHON) ./conary-bootstrap --bootstrap group-bootstrap
 
 bootstrap-continue:
 	@if ! [ -d /opt/ -a -w /opt/ ]; then \
 		echo "/opt isn't writable, this won't work"; \
 		exit 1; \
 	fi
-	time $(PYTHON) ./srs-bootstrap --bootstrap --onlyunbuilt group-bootstrap
+	time $(PYTHON) ./conary-bootstrap --bootstrap --onlyunbuilt group-bootstrap
 
 
 deps.dot:
-	$(PYTHON) ./srs-bootstrap --dot `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` > deps.dot
+	$(PYTHON) ./conary-bootstrap --dot `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` > deps.dot
 
 pychecker:
 	$(PYTHON) /usr/lib/python2.2/site-packages/pychecker/checker.py *.py
