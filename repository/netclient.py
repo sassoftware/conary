@@ -1277,7 +1277,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                               bestFlavor=False)
             for name in byBranchNoFlavor:
                 if name not in res or not res[name]:
-                    missing.append(byBranchNoFlavorMap[name])
+                    missing.append(byBrancMap[name])
                     continue
                 pkgList = []
                 for version, flavorList in res[name].iteritems():
@@ -1302,7 +1302,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                               bestFlavor=False)
             for name in byVersionNoFlavor:
                 if name not in res or not res[name]:
-                    missing.append(byVersionNoFlavorMap[name])
+                    missing.append(byVersionMap[name])
                     continue
                 pkgList = []
                 for version, flavorList in res[name].iteritems():
