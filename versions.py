@@ -134,6 +134,14 @@ class VersionRelease(AbstractVersion):
 
 	return self.version
 
+    def getRelease(self):
+	"""
+	Returns the release number of a version/release pair.
+
+        @rtype: int
+	"""
+	return self.release
+
     def __eq__(self, version):
 	if (type(self) == type(version) and self.version == version.version
 		and self.release == version.release
