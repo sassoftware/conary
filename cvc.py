@@ -25,6 +25,7 @@ from local import database
 from build import cook
 from repository import netclient
 from repository.netclient import NetworkRepositoryClient
+import branch
 import constants
 import repository
 import checkin
@@ -44,6 +45,13 @@ except conarycfg.ConaryCfgError, e:
 
 # reset the excepthook (using cfg values for exception settings)
 sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
+
+def openRepository(repMap):
+    try:
+        return repository.netclient.NetworkRepositoryClient(repMap)
+    except repository.repository.OpenError, e:
+        log.error('Unable to open repository %s: %s', path, str(e))
+        sys.exit(1)
 
 def usage(rc = 1):
     print "usage: cvc add <file> [<file2> <file3> ...]"
@@ -148,7 +156,7 @@ def sourceCommand(cfg, args, argSet):
 	checkin.checkout(*args)
     elif (args[0] == "branch"):
         if argSet: return usage()
-        if len(args) < 2 or len(args) > 3: return usage()
+        if len(args) != 4: return usage()
         repos = openRepository(cfg.repositoryMap)
 
         args = [repos, ] + args[2:]
