@@ -467,8 +467,9 @@ class ChangeSet(streams.LargeStreamSet):
 	    # what to do about versions for new packages?
 	    assert(oldVer)
 
-	    newVer = oldVer.fork(targetBranchLabel, sameVerRel = 0)
-	    newVer.appendVersionReleaseObject(ver.trailingVersion())
+	    newBr = oldVer.createBranch(targetBranchLabel, withVerRel = 0)
+	    newVer = newBr.createVersion(ver.trailingVersion())
+            del newBr
 
 	    # try and reuse the version number we created; if
 	    # it's already in use we won't be able to though
@@ -477,7 +478,7 @@ class ChangeSet(streams.LargeStreamSet):
 	    except repository.TroveMissing: 
 		pass
 	    else:
-		branch = oldVer.fork(targetBranchLabel, sameVerRel = 0)
+		branch = oldVer.createBranch(targetBranchLabel, withVerRel = 0)
 		newVer = repos.getTroveLatestVersion(name, branch)
 
 	    pkgCs.changeNewVersion(newVer)

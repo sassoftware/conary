@@ -401,8 +401,8 @@ class ConaryClient:
 
 	    for trove in troves:
                 troveName = trove.getName()
-		branchedVersion = trove.getVersion().fork(newBranch, 
-							  sameVerRel = 1)
+		branchedVersion = trove.getVersion().createBranch(newBranch, 
+							         withVerRel = 1)
 
                 branchedTrove = trove.copy()
 		branchedTrove.changeVersion(branchedVersion)
@@ -410,7 +410,8 @@ class ConaryClient:
 		for (name, version, flavor) in trove.iterTroveList():
 		    troveList.append((name, version))
 
-		    branchedVersion = version.fork(newBranch, sameVerRel = 1)
+		    branchedVersion = version.createBranch(newBranch, 
+                                                           withVerRel = 1)
 		    branchedTrove.delTrove(name, version, flavor,
                                            missingOkay = False)
 		    branchedTrove.addTrove(name, branchedVersion, flavor)

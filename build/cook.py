@@ -216,7 +216,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
             # used to only create it if it didn't already exist, but
             # with acls that logic doesn't work anymore; we can't tell
             # if it exists on a branch we're not allowed to see or not)
-            buildBranch = versions.Version([buildLabel])
+            buildBranch = versions.Branch([buildLabel])
 	else:
 	    buildBranch = vers[0].branch()
 
@@ -346,7 +346,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
                                       alwaysBumpCount=alwaysBumpCount)
 
     if targetLabel:
-	targetVersion = targetVersion.fork(targetLabel)
+	targetVersion = targetVersion.createBranch(targetLabel,
+                                                   withVerRel = True)
 	targetVersion.trailingVersion().incrementBuildCount()
 
     grp.changeVersion(targetVersion)
@@ -415,7 +416,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
                                       alwaysBumpCount=False)
 
     if targetLabel:
-	targetVersion = targetVersion.fork(targetLabel)
+	targetVersion = targetVersion.createBranch(targetLabel,
+                                                   withVerRel = True)
 	targetVersion.trailingVersion().incrementBuildCount()
 
     fileset = trove.Trove(fullName, targetVersion, flavor, None)
@@ -546,7 +548,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
                                       alwaysBumpCount=alwaysBumpCount)
 
     if targetLabel:
-	targetVersion = targetVersion.fork(targetLabel)
+	targetVersion = targetVersion.createBranch(targetLabel, 
+                                                   withVerRel = True)
 	targetVersion.trailingVersion().incrementBuildCount()
 
     # build up the name->fileid mapping so we reuse fileids wherever

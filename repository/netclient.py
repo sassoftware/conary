@@ -92,7 +92,7 @@ class ServerCache:
 	elif isinstance(item, str):
 	    serverName = item
 	else:
-	    if item.isBranch():
+            if isinstance(item, versions.Branch):
 		serverName = item.label().getHost()
 	    else:
 		serverName = item.branch().label().getHost()
@@ -939,8 +939,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         if latest is None or latest.trailingVersion().getVersion() != versionStr:
             # new package or package uses new upstream version
-            newVersion = currentBranch.copy()
-            newVersion.appendVersionRelease(versionStr, 1)
+            newVersion = currentBranch.createVersion(
+                        versions.VersionRelease("%s-1" % versionStr))
             newVersionBranch = newVersion.branch()
 
             # this is a good guess, but it could be wrong since the same version
@@ -952,8 +952,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             lastOnBranch = None
             if allVersions.has_key(troveName):
                 for version in allVersions[troveName]:
-                    if version.onBranch(newVersionBranch) and \
-                        version.sameVersion(newVersion) and \
+                    if version.branch() == newVersionBranch and \
+                        (version.trailingVersion() == 
+                                newVersion.trailingVersion()) and \
                         (not lastOnBranch or version.isAfter(lastOnBranch)):
                         lastOnBranch = version
 
@@ -1161,7 +1162,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	    except versions.ParseError, e:
 		raise repository.TroveNotFound, str(e)
 
-            if version.isBranch():
+            if isinstance(version, versions.Branch):
                 fn = self.getTroveLeavesByBranch
             else:
                 fn = self.getTroveVersionFlavors

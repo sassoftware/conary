@@ -661,7 +661,7 @@ class TroveMissing(RepositoryError):
                     (self.troveType, self.troveName,
                      "\n    ".join([x.asString() for x in self.version])))
         elif self.version:
-            if self.version.isBranch():
+            if isinstance(self.version, versions.Branch):
                 return ("%s %s does not exist on branch %s" % \
                     (self.troveType, self.troveName, self.version.asString()))
 

@@ -88,7 +88,7 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
 	    ver = pkg.getVersion()
 	    origPkg = db.getTrove(pkg.getName(), ver, pkg.getFlavor(), 
 				  pristine = True)
-	    ver = ver.fork(versions.LocalBranch(), sameVerRel = 1)
+	    ver = ver.createBranch(versions.LocalBranch(), withVerRel = 1)
 	    list.append((pkg, origPkg, ver, 0))
 	    
     result = update.buildLocalChanges(db, list, root = cfg.root)
@@ -97,8 +97,8 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
 
     for outerPackage in pkgList:
 	cs.addPrimaryPackage(outerPackage.getName(), 
-	    outerPackage.getVersion().fork(
-		versions.LocalBranch(), sameVerRel = 1),
+	    outerPackage.getVersion().createBranch(
+		versions.LocalBranch(), withVerRel = 1),
 	   outerPackage.getFlavor())
 
     for (changed, fsPkg) in result[1]:

@@ -602,9 +602,9 @@ class TroveStore:
 	l = []
 
 	if branch.count("/") > 2:
-	    brVersion = versions.VersionFromString(branch)
-	    parent = brVersion.parentNode()
-	    brVersion.appendVersionReleaseObject(parent.trailingVersion())
+	    branchObj = versions.VersionFromString(branch)
+	    parent = branchObj.parentNode()
+	    brVersion = branchObj.createVersion(parent.trailingVersion())
 
 	    cu.execute("""
 		SELECT DISTINCT Nodes.timeStamps, Flavors.flavor 

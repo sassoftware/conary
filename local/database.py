@@ -287,7 +287,7 @@ class Database(SqlDbRepository):
 	    old = newPkg.getOldVersion()
 	    flavor = newPkg.getOldFlavor()
 	    if self.hasPackage(name) and old:
-		ver = old.fork(versions.LocalBranch(), sameVerRel = 1)
+		ver = old.createBranch(versions.LocalBranch(), withVerRel = 1)
 		pkg = self.getTrove(name, old, flavor)
 		origPkg = self.getTrove(name, old, flavor, pristine = 1)
 		assert(pkg)
@@ -296,8 +296,8 @@ class Database(SqlDbRepository):
 
 	if not keepExisting:
 	    for (name, version, flavor) in cs.getOldPackageList():
-		localVersion = version.fork(versions.LocalBranch(), 
-					    sameVerRel = 1)
+		localVersion = version.createBranch(versions.LocalBranch(), 
+					            withVerRel = 1)
 		pkg = self.getTrove(name, version, flavor)
 		origPkg = self.getTrove(name, version, flavor, pristine = 1)
 		assert(pkg)

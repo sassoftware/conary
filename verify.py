@@ -71,7 +71,7 @@ def verifyTrove(trove, db, cfg):
         ver = pkg.getVersion()
         origPkg = db.getTrove(pkg.getName(), ver, pkg.getFlavor(), 
                               pristine = True)
-        ver = ver.fork(versions.LocalBranch(), sameVerRel = 1)
+        ver = ver.createBranch(versions.LocalBranch(), withVerRel = 1)
         list.append((pkg, origPkg, ver, 0))
 	    
     try:
@@ -82,8 +82,8 @@ def verifyTrove(trove, db, cfg):
         cs = result[0]
 
         cs.addPrimaryPackage(trove.getName(), 
-                trove.getVersion().fork(
-                versions.LocalBranch(), sameVerRel = 1),
+                trove.getVersion().createBranch(
+                    versions.LocalBranch(), withVerRel = 1),
                 trove.getFlavor())
 
         for (changed, fsPkg) in result[1]:

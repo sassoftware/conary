@@ -18,7 +18,7 @@ from repository.repository import DuplicateBranch
 
 class BranchTable(idtable.IdTable):
     def addId(self, branch, parentId):
-        assert(branch.isBranch())
+        assert(isinstance(branch, versions.Branch))
         cu = self.db.cursor()
         cu.execute("INSERT INTO Branches VALUES (NULL, ?, ?)", 
 		   branch.asString(), parentId)
@@ -28,19 +28,19 @@ class BranchTable(idtable.IdTable):
 	return versions.VersionFromString(idtable.IdTable.getId(self, theId))
 
     def __getitem__(self, branch):
-        assert(branch.isBranch())
+        assert(isinstance(branch, versions.Branch))
 	return idtable.IdTable.__getitem__(self, branch.asString())
 
     def get(self, branch, defValue):
-        assert(branch.isBranch())        
+        assert(isinstance(branch, versions.Branch))
 	return idtable.IdTable.get(self, branch.asString(), defValue)
 
     def __delitem__(self, branch):
-        assert(branch.isBranch())        
+        assert(isinstance(branch, versions.Branch))
 	idtable.IdTable.__delitem__(self, branch.asString())
 
     def has_key(self, branch):
-        assert(branch.isBranch())
+        assert(isinstance(branch, versions.Branch))
 	return idtable.IdTable.has_key(self, branch.asString())
 
     def iterkeys(self):

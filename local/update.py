@@ -838,7 +838,8 @@ class FilesystemJob:
 	for pkgCs in changeSet.iterNewPackageList():
             old = pkgCs.getOldVersion()
 	    if old:
-		localVer = old.fork(versions.LocalBranch(), sameVerRel = 1)
+		localVer = old.createBranch(versions.LocalBranch(), 
+                                            withVerRel = 1)
                 newFsPkg = fsPkgDict[(pkgCs.getName(), localVer)].copy()
             else:
                 newFsPkg = trove.Trove(pkgCs.getName(), versions.NewVersion(),

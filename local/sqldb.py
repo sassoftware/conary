@@ -316,27 +316,6 @@ class DBInstanceTable:
 	except StopIteration:
             raise KeyError, instanceId
 
-class DBTarget:
-
-    def __init__(self, db):
-        self.db = db
-        
-        cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
-        tables = [ x[0] for x in cu ]
-        if "DBTarget" not in tables:
-            cu.execute("""CREATE TABLE DBTarget(
-					  base STR,
-					  flags STR)
-		       """)
-	    # this table is small, so we don't create any indicies. we
-	    # may actually need them though?
-
-	    insSet = deps.arch.current()
-	    for flag in insSet.flags:
-		cu.execute("INSERT INTO DBTarget VALUES (?,?)", 
-			   insSet.name, flag)
-
 class DBFlavors(idtable.IdTable):
 
     def addId(self, flavor):
@@ -408,7 +387,6 @@ class Database:
 	self.troveFiles = DBTroveFiles(self.db)
 	self.instances = DBInstanceTable(self.db)
 	self.versionTable = versiontable.VersionTable(self.db)
-	self.targetTable = DBTarget(self.db)
 	self.flavors = DBFlavors(self.db)
 	self.flavorMap = DBFlavorMap(self.db)
 	self.depTables = deptable.DependencyTables(self.db)

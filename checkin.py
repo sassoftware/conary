@@ -303,7 +303,7 @@ def commit(repos, cfg, message, sourceCheck = False):
     recipeVersionStr = recipeClass.version
 
     if isinstance(state.getVersion(), versions.NewVersion):
-	branch = versions.Version([cfg.buildLabel])
+	branch = versions.Branch([cfg.buildLabel])
     else:
 	branch = state.getVersion().branch()
 
@@ -679,7 +679,8 @@ def updateSrc(repos, versionStr = None):
     pkgCs = packageChanges.next()
     assert(util.assertIteratorAtEnd(packageChanges))
 
-    localVer = state.getVersion().fork(versions.LocalBranch(), sameVerRel = 1)
+    localVer = state.getVersion().createBranch(versions.LocalBranch(), 
+                                               withVerRel = 1)
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
 				 flags = update.IGNOREUGIDS | update.MERGE)
@@ -854,7 +855,7 @@ def fullLabel(defaultLabel, version, versionStr):
     (often returned by findPackage()) into the full branch name the
     node is on. This is different from version.branch() when versionStr
     refers to the head of an empty branch, in which case version() will
-    be the version the branch was forked from rather then a version on
+    be the version the branch was created from rather then a version on
     that branch.
 
     @param defaultLabel: default label we're on if versionStr is None
@@ -880,8 +881,8 @@ def fullLabel(defaultLabel, version, versionStr):
 	else:
 	    # this must be the node the branch was created at, otherwise
 	    # we'd be on it
-	    return version.fork(label, sameVerRel = 0)
-    elif version.isBranch():
+	    return version.createBranch(label, withVerRel = 0)
+    elif isinstance(version, versions.Branch):
 	return version
     else:
 	return version.branch()

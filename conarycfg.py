@@ -34,10 +34,9 @@ import versions
     STRINGLIST, 
     CALLBACK, 
     EXEC, 
-    BRANCHNAME,
     STRINGPATH, 
     FLAVOR,
-    INT) = range(12)
+    INT) = range(11)
 
 BOOLEAN=BOOL
 
@@ -112,11 +111,6 @@ class ConfigFile:
 	    self.__dict__[key] = val.split(":")
 	elif type == CALLBACK:
 	    self.__dict__[key]('set', key, val)
-	elif type == BRANCHNAME:
-	    try:
-		self.__dict__[key] = versions.BranchName(val)
-	    except versions.ParseError, e:
-		raise versions.ParseError, str(e)
 	elif type == LABEL:
 	    try:
 		self.__dict__[key] = versions.Label(val)
@@ -158,8 +152,6 @@ class ConfigFile:
 		out.write("%-25s %s\n" % (item, self.__dict__[item].asString()))
 	    elif t == LABELLIST:
 		out.write("%-25s %s\n" % (item, " ".join([x.asString() for x in self.__dict__[item]])))
-	    elif t == BRANCHNAME:
-		out.write("%-25s %s\n" % (item, self.__dict__[item].asString()))
 	    elif t == STRINGPATH:
 		out.write("%-25s %s\n" % (item, ":".join(self.__dict__[item])))
 	    elif t == STRINGDICT:

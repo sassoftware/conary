@@ -24,13 +24,10 @@ import weakref
 class AbstractVersion(object):
 
     """
-    Ancestor class for all versions (as opposed to branches)
+    Ancestor class for all versions (as opposed to labels)
     """
 
     __slots__ = ( "__weakref__" )
-
-    def __init__(self):
-	pass
 
     def __eq__(self, them):
         raise NotImplementedError
@@ -40,35 +37,6 @@ class AbstractVersion(object):
 
     def copy(self):
 	return copy.deepcopy(self)
-
-class NewVersion(AbstractVersion):
-
-    """
-    Class used as a marker for new (as yet undefined) versions.
-    """
-
-    __slots__ = ( )
-
-    def asString(self, frozen = False):
-	return "@NEW@"
-
-    def freeze(self):
-	return "@NEW@"
-
-    def isLocal(self):
-	return False
-
-    def __hash__(self):
-	return hash("@NEW@")
-
-    def __eq__(self, other):
-	return self.__class__ == other.__class__
-
-    def timeStamps(self):
-	return [ time.time() ]
-
-    def branch(self):
-	return None
 
 class AbstractLabel(object):
 
@@ -385,39 +353,14 @@ class CookBranch(Label):
     def __init__(self):
 	Label.__init__(self, "local@local:COOK")
 
-class BranchName:
+class VersionSequence(object):
 
-    def asString(self):
-        return "%s:%s" % (self.namespace, self.branch)
-
-    def __init__(self, value):
-        i = value.count(":")
-	if i == -1:
-            raise ParseError, "colon expected before branch name"
-        elif i > 1:
-            raise ParseError, "unexpected colon in branch name"
-	    
-        if value.find("@") != -1:
-            raise ParseError, "@ is not allowed in a branch name"
-
-        self.namespace, self.branch = value.split(":")
-
-	if not self.namespace:
-	    raise ParseError, ("namespace may not be empty: %s" % value)
-	if not self.branch:
-	    raise ParseError, ("labels may not be empty: %s" % value)
-
-class Version(AbstractVersion):
+    __slots__ = ( "versions", "__weakref__" )
 
     """
-    Class representing a version. Versions are a list of AbstractLabel,
-    AbstractVersion sequences. If the last item is an AbstractLabel (meaning
-    an odd number of objects are in the list, the version represents
-    a branch. A version includes a time stamp, which is used for
-    ordering.
+    Abstract class representing a fully qualified version, branch, or
+    shadow.
     """
-
-    __slots__ = ( "versions" )
 
     def compare(first, second):
         if first.isAfter(second):
@@ -429,66 +372,6 @@ class Version(AbstractVersion):
 
     compare = staticmethod(compare)
 
-    def appendVersionRelease(self, version, release):
-	"""
-	Converts a branch to a version. The version/release passed in
-	are converted to a VersionRelease object and appended to the
-	branch this object represented. The time stamp is reset as
-	a new version has been created.
-
-	@param version: string representing a version
-	@type version: str
-	@param release: release number
-	@type release: int
-	"""
-	assert(self.isBranch())
-	self.appendVersionReleaseObject(VersionRelease("%s-%d" % (version, release)))
-
-    def appendVersionReleaseObject(self, verRel):
-	"""
-	Converts a branch to a version. The version/release passed in
-	are appended to the branch this object represented. The time
-	stamp is reset as a new version has been created.
-
-	@param verRel: object for the version and release
-	@type verRel: VersionRelease
-	"""
-	assert(self.isBranch())
-	verRel.timeStamp = time.time()
-	self.versions.append(verRel)
-
-    def incrementRelease(self):
-	"""
-	The release number for the final element in the version is
-	incremented by one and the time stamp is reset.
-	"""
-	assert(self.isVersion())
-	
-	self.versions[-1].incrementRelease()
-
-    def incrementBuildCount(self):
-	"""
-	The build count number for the final element in the version is
-	incremented by one and the time stamp is reset.
-	"""
-	assert(self.isVersion())
-	
-	self.versions[-1].incrementBuildCount()
-
-    def trailingVersion(self):
-	"""
-	Returns the AbstractVersion object at the end of the version.
-
-	@rtype: AbstactVersion
-	"""
-	assert(self.isVersion())
-
-	return self.versions[-1]
-
-    def sameVersion(self, other):
-	return self.versions[-1].getVersion() == \
-		    other.versions[-1].getVersion()
-
     def _listsEqual(self, list, other):
 	if len(other.versions) != len(list): return 0
 
@@ -498,8 +381,11 @@ class Version(AbstractVersion):
 	return 1
 
     def __eq__(self, other):
-	if not isinstance(other, Version): return False
+        if self.__class__ != other.__class__: return False
 	return self._listsEqual(self.versions, other)
+
+    def __ne__(self, other):
+        return not self == other
 
     def __hash__(self):
 	i = 0
@@ -520,8 +406,10 @@ class Version(AbstractVersion):
 	l = self.versions
 	s = "/"
 
+        assert(defaultBranch is None or isinstance(defaultBranch, Branch))
+
 	if defaultBranch and len(defaultBranch.versions) < len(self.versions):
-	    start = Version(self.versions[0:len(defaultBranch.versions)])
+	    start = Branch(self.versions[0:len(defaultBranch.versions)])
 	    if start == defaultBranch:
 		l = self.versions[len(defaultBranch.versions):]
 		s = ""
@@ -544,90 +432,15 @@ class Version(AbstractVersion):
 	"""
 	return self.asString(frozen = True)
 
-    def isBranch(self):
+    def copy(self):
 	"""
-	Tests whether or not the current object is a branch.
+        Returns an object which is a copy of this object. The result can be
+        modified without affecting this object in any way.
 
-	@rtype: boolean
+	@rtype: VersionSequence
 	"""
-	return isinstance(self.versions[-1], Label)
 
-    def isTrunk(self):
-	"""
-	Tests whether or not the current object is a trunk branch.
-
-	@rtype: boolean
-	"""
-	return len(self.versions) == 1
-
-    def isVersion(self):
-	"""
-	Tests whether or not the current object is a version (not a branch).
-
-	@rtype: boolean
-	"""
-	return isinstance(self.versions[-1], VersionRelease)
-
-    def isLocal(self):
-    	"""
-	Tests whether this is the local branch, or is a version on
-	the local branch
-
-	@rtype: boolean
-	"""
-	return isinstance(self.versions[-1], LocalBranch) or    \
-	    (len(self.versions) > 1 and 
-	     isinstance(self.versions[-2], LocalBranch))
-
-    def onBranch(self, branch):
-	"""
-	Tests whether or not the current object is a version on the
-	specified branch.
-
-	@rtype: boolean
-	"""
-	if self.isBranch(): return 0
-	return self._listsEqual(self.versions[:-1], branch)
-
-    def branch(self):
-	"""
-	Returns the branch this version is part of.
-
-	@rtype: Version
-	"""
-	assert(not self.isBranch())
-	return Version(self.versions[:-1])
-
-    def label(self):
-	"""
-	Returns the Label object at the end of a branch. This is
-	known as a label, as is used in VersionedFiles as an index.
-
-	@rtype: Label
-	"""
-	assert(self.isBranch())
-	return self.versions[-1]
-
-    def parent(self):
-	"""
-	Returns the parent version for this version (the version this
-	object's branch branched from.
-
-	@rtype: Version
-	"""
-	assert(self.isVersion())
-	assert(len(self.versions) > 3)
-	return Version(self.versions[:-2])
-
-    def parentNode(self):
-	"""
-	Returns the parent version of a branch.
-
-	@rtype: Version
-	"""
-	assert(self.isBranch())
-	assert(len(self.versions) >= 3)
-	return Version(self.versions[:-1])
+        return copy.deepcopy(self)
 
     def hasParent(self):
 	"""
@@ -637,51 +450,6 @@ class Version(AbstractVersion):
 	@rtype: boolean
 	"""
 	return(len(self.versions) >= 3)
-
-    def isAfter(self, other):
-	"""
-	Tests whether the parameter is a version later then this object.
-
-	@param other: Object to test against
-	@type other: Version
-	@rtype: boolean
-	"""
-	assert(self.isVersion()            and other.isVersion)
-	assert(self.versions[-1].timeStamp and other.versions[-1].timeStamp)
-	return self.versions[-1].timeStamp  >  other.versions[-1].timeStamp
-
-    def copy(self):
-	"""
-	Returns a Version object which is a copy of this object. The
-	result can be modified without affecting this object in any way.
-
-	@rtype: Version
-	"""
-
-        return copy.deepcopy(self)
-
-    def __deepcopy__(self, mem):
-	return Version(copy.deepcopy(self.versions[:]))
-
-    def fork(self, branch, sameVerRel = True):
-	"""
-	Creates a new branch from this version. 
-
-	@param branch: Branch to create for this version
-	@type branch: AbstractLabel
-	@param sameVerRel: If set, the new branch is turned into a version
-	on the branch using the same version and release as the original
-	verison.
-	@type sameVerRel: boolean
-	@rtype: Version 
-	"""
-	assert(isinstance(branch, AbstractLabel))
-	newlist = [ branch ]
-
-	if sameVerRel:
-	    newlist.append(self.versions[-1].copy())
-
-	return Version(self.versions + newlist)
 
     def timeStamps(self):
 	res = []
@@ -696,48 +464,147 @@ class Version(AbstractVersion):
 	    self.versions[count].timeStamp = stamp
 	    count += 2
 
-    def getSourceBranch(self):
-        """ Takes a binary branch and returns its associated source branch.
-            (any trailing version info is left untouched).
-            If source is branched off of <repo1>-2 into <repo2>, its new
-            version will be <repo1>-2/<repo2>/2.  The corresponding build
-            will be on branch <repo1>-2-0/<repo2>/2-1.
-            getSourceBranch converts from the latter to the former.
-            Always returns a copy of the branch, even when the two are
-            equal.
+    def __init__(self, versionList):
         """
-        v = self.copy()
-        if v.isVersion():
-            p = v.branch()
-        else:
-            p = v
+        Creates a Version object from a list of AbstractLabel and
+        AbstractVersion objects.
+        """
+	self.versions = versionList
 
-        assert(p.isBranch())
-        if p.hasParent():
-            p = p.parentNode()
-            p.trailingVersion().buildCount = None
-            while p.hasParent():
-                p = p.parent()
-                p.trailingVersion().buildCount = None
-        return v
+class NewVersion(VersionSequence):
+
+    """
+    Class used as a marker for new (as yet undefined) versions.
+    """
+
+    __slots__ = ( )
+
+    def asString(self, frozen = False):
+	return "@NEW@"
+
+    def freeze(self):
+	return "@NEW@"
+
+    def isLocal(self):
+	return False
+
+    def __hash__(self):
+	return hash("@NEW@")
+
+    def __eq__(self, other):
+	return self.__class__ == other.__class__
+
+    def timeStamps(self):
+	return [ time.time() ]
+
+    def branch(self):
+	return None
+
+    def __init__(self):
+        pass
+
+class Version(VersionSequence):
+
+    __slots__ = ()
+
+    def incrementRelease(self):
+	"""
+	The release number for the final element in the version is
+	incremented by one and the time stamp is reset.
+	"""
+	self.versions[-1].incrementRelease()
+
+    def incrementBuildCount(self):
+	"""
+	The build count number for the final element in the version is
+	incremented by one and the time stamp is reset.
+	"""
+	self.versions[-1].incrementBuildCount()
+
+    def trailingVersion(self):
+	"""
+	Returns the AbstractVersion object at the end of the version.
+
+	@rtype: AbstactVersion
+	"""
+	return self.versions[-1]
+
+    def isLocal(self):
+    	"""
+	Tests whether this is the local branch, or is a version on
+	the local branch
+
+	@rtype: boolean
+	"""
+	return isinstance(self.versions[-2], LocalBranch)
+
+    def branch(self):
+	"""
+	Returns the branch this version is part of.
+
+	@rtype: Version
+	"""
+	return Branch(self.versions[:-1])
+
+    def parent(self):
+	"""
+	Returns the parent version for this version (the version this
+	object's branch branched from.
+
+	@rtype: Version
+	"""
+	assert(len(self.versions) > 3)
+	return Version(self.versions[:-2])
+
+    def isAfter(self, other):
+	"""
+	Tests whether the parameter is a version later then this object.
+
+	@param other: Object to test against
+	@type other: Version
+	@rtype: boolean
+	"""
+        assert(self.__class__ == other.__class__)
+	assert(self.versions[-1].timeStamp and other.versions[-1].timeStamp)
+	return self.versions[-1].timeStamp  >  other.versions[-1].timeStamp
+
+    def __deepcopy__(self, mem):
+	return Version(copy.deepcopy(self.versions[:]))
+
+    def createBranch(self, branch, withVerRel = False):
+	"""
+	Creates a new branch from this version. 
+
+	@param branch: Branch to create for this version
+	@type branch: AbstractLabel
+	@param withVerRel: If set, the new branch is turned into a version
+	on the branch using the same version and release as the original
+	verison.
+	@type withVerRel: boolean
+	@rtype: Version 
+	"""
+	assert(isinstance(branch, AbstractLabel))
+
+	newlist = [ branch ]
+
+	if withVerRel:
+	    newlist.append(self.versions[-1].copy())
+            return Version(self.versions + newlist)
+
+        return Branch(self.versions + newlist)
 
     def getBinaryBranch(self):
-        """ Takes a source branch and returns its associated binary branch.
-            (any trailing version info is left untouched).
-            If source is branched off of <repo1>-2 into <repo2>, its new
-            version will be <repo1>-2/<repo2>/2.  The corresponding build
-            will be on branch <repo1>-2-0/<repo2>/2-1.
-            getBinaryBranch converts from the former to the latter.
-            Always returns a copy of the branch, even when the two are
-            equal.
+        """ 
+        Takes a source branch and returns its associated binary branch.  (any
+        trailing version info is left untouched).  If source is branched off of
+        <repo1>-2 into <repo2>, its new version will be <repo1>-2/<repo2>/2.
+        The corresponding build will be on branch <repo1>-2-0/<repo2>/2-1.
+        getBinaryBranch converts from the former to the latter.  Always returns
+        a copy of the branch, even when the two are equal.
         """
         v = self.copy()
-        if v.isVersion():
-            p = v.branch()
-        else:
-            p = v
+        p = v.branch()
 
-        assert(p.isBranch())
         if p.hasParent():
             p = p.parentNode()
             p.trailingVersion().buildCount = 0
@@ -746,50 +613,81 @@ class Version(AbstractVersion):
                 p.trailingVersion().buildCount = 0
         return v
 
-    def parseVersionString(self, ver, frozen):
+class Branch(VersionSequence):
+
+    __slots__ = ()
+
+    def __deepcopy__(self, mem):
+	return Branch(copy.deepcopy(self.versions[:]))
+
+    def label(self):
 	"""
-	Converts a string representation of a version into a VersionRelease
-	object.
+	Returns the Label object at the end of a branch. This is
+	known as a label, as is used in VersionedFiles as an index.
 
-	@param ver: version string
-	@type ver: str
+	@rtype: Label
 	"""
-	parts = ver.split("/")
-	del parts[0]	# absolute versions start with a /
+	return self.versions[-1]
 
-	v = []
-	lastVersion = None
-	lastBranch = None
-	while parts:
-	    lastBranch = Label(parts[0], template = lastBranch)
-	    if lastBranch.asString() == "local@local:LOCAL":
-		lastBranch = None
-		v.append(LocalBranch())
-	    elif lastBranch.asString() == "local@local:COOK":
-		lastBranch = None
-		v.append(CookBranch())
-	    elif lastBranch.asString() == "local@local:EMERGE":
-		lastBranch = None
-		v.append(EmergeBranch())
-	    else:
-		v.append(lastBranch)
+    def parentNode(self):
+	"""
+	Returns the parent version of a branch.
 
-	    if len(parts) >= 2:
-		lastVersion = VersionRelease(parts[1], template = lastVersion,
-					     frozen = frozen)
-		v.append(lastVersion)
-		parts = parts[2:]
-	    else:
-		parts = None
+	@rtype: Version
+	"""
+	assert(len(self.versions) >= 3)
+	return Version(self.versions[:-1])
 
-	return v
+    def createVersion(self, verRel):
+	"""
+	Converts a branch to a version. The version/release passed in
+	are appended to the branch this object represented. The time
+	stamp is reset as a new version has been created.
 
+	@param verRel: object for the version and release
+	@type verRel: VersionRelease
+	"""
+
+	verRel.timeStamp = time.time()
+        return Version(self.versions + [ verRel ])
+
+def _parseVersionString(ver, frozen):
     """
-    Creates a Version object from a list of AbstractLabel and AbstractVersion
-    objects.
+    Converts a string representation of a version into a VersionRelease
+    object.
+
+    @param ver: version string
+    @type ver: str
     """
-    def __init__(self, versionList):
-	self.versions = versionList
+    parts = ver.split("/")
+    del parts[0]	# absolute versions start with a /
+
+    v = []
+    lastVersion = None
+    lastBranch = None
+    while parts:
+        lastBranch = Label(parts[0], template = lastBranch)
+        if lastBranch.asString() == "local@local:LOCAL":
+            lastBranch = None
+            v.append(LocalBranch())
+        elif lastBranch.asString() == "local@local:COOK":
+            lastBranch = None
+            v.append(CookBranch())
+        elif lastBranch.asString() == "local@local:EMERGE":
+            lastBranch = None
+            v.append(EmergeBranch())
+        else:
+            v.append(lastBranch)
+
+        if len(parts) >= 2:
+            lastVersion = VersionRelease(parts[1], template = lastVersion,
+                                         frozen = frozen)
+            v.append(lastVersion)
+            parts = parts[2:]
+        else:
+            parts = None
+
+    return v
 	
 def ThawVersion(ver):
     if ver == "@NEW@":
@@ -815,35 +713,34 @@ def VersionFromString(ver, defaultBranch = None, timeStamps = []):
     stringVersionCache[ver] = v
     return v
 
-class _VersionFromString(Version):
+def _VersionFromString(ver, defaultBranch = None, frozen = False, 
+		       timeStamps = []):
 
     """
     Provides a version object from a string representation of a version.
     The time stamp is set to 0, so this object cannot be properly ordered
     with respect to other versions.
+
+    @param ver: string representation of a version
+    @type ver: str
+    @param defaultBranch: if provided and the ver parameter is not
+    fully-qualified (it doesn't begin with a /), ver is taken to
+    be relative to this branch.
+    @type defaultBranch: Version
     """
+    if ver[0] != "/":
+        ver = defaultBranch.asString() + "/" + ver
 
-    __slots__ = ()
+    vList = _parseVersionString(ver, frozen = frozen)
 
-    def __init__(self, ver, defaultBranch = None, frozen = False, 
-		 timeStamps = []):
-	"""
-	Initializes a VersionFromString object. 
+    if len(vList) % 2 == 0:
+        ver = Version(vList)
+    else:
+        ver = Branch(vList)
 
-	@param ver: string representation of a version
-	@type ver: str
-	@param defaultBranch: if provided and the ver parameter is not
-	fully-qualified (it doesn't begin with a /), ver is taken to
-	be relative to this branch.
-	@type defaultBranch: Version
-	"""
-	if ver[0] != "/":
-	    ver = defaultBranch.asString() + "/" + ver
+    ver.setTimeStamps(timeStamps)
 
-	v = self.parseVersionString(ver, frozen = frozen)
-
-	Version.__init__(self, v)
-	self.setTimeStamps(timeStamps)
+    return ver
 
 class VersionsError(Exception):
 
@@ -868,6 +765,3 @@ class ParseError(VersionsError):
 
 thawedVersionCache = weakref.WeakValueDictionary()
 stringVersionCache = weakref.WeakValueDictionary()
-
-ACookBranch = CookBranch()
-AnEmergeBranch = EmergeBranch()
