@@ -42,17 +42,16 @@ def sourceCommand(cfg, args, argSet):
 	args = [repos, cfg, dir] + args[1:]
 	checkin.checkout(*args)
     elif (args[0] == "commit"):
-	if len(args) != 1: usage()
+	if argSet or len(args) != 1: usage()
 	repos = repository.LocalRepository(cfg.reppath, "w")
 
-	if argSet or len(args) != 1: usage()
 	checkin.commit(repos)
     elif (args[0] == "diff"):
-	if len(args) != 1: usage()
+	if argSet or not args or len(args) > 2: usage()
 	repos = repository.LocalRepository(cfg.reppath, "r")
 
-	if argSet or len(args) != 1: usage()
-	checkin.diff(repos)
+	args[0] = repos
+	checkin.diff(*args)
     elif (args[0] == "remove"):
 	if len(args) < 2: usage()
         for f in args[1:]:
