@@ -459,7 +459,8 @@ class FilesystemJob:
 		    if repos.pathIsOwned(headPath):
 			continue
                 elif (not isinstance(headFile, files.Directory)
-                      and stat.S_ISDIR(s.st_mode) and s.st_nlink > 2):
+                      and stat.S_ISDIR(s.st_mode)
+                      and os.listdir(headRealPath)):
                     # this is a non-empty directory that's in the way of
                     # a new file.  Even --replace-files can't help here
                     self.errors.append("non-empty directory %s is in "
