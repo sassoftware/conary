@@ -15,6 +15,7 @@
 Provides the output for the "conary repquery" command
 """
 
+from deps import deps
 from repository import repository
 import display
 import files
@@ -120,7 +121,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
                 
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-		      info, tags, deps, fullVersions, flavor):
+		      info, tags, showDeps, fullVersions, flavor):
     withFiles = ids
 
     if flavor is None:
@@ -186,6 +187,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		     ("Label     : %s" % version.branch().label().asString()))
 
             print "Size      : %s" % size
+            print "Flavor    : %s" % deps.formatFlavor(trove.getFlavor())
 
             if sourceTrove:
                 metadata.showDetails(repos, cfg, sourceTrove.getName(), version.branch())
@@ -196,7 +198,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                     lines = cl.getMessage().split("\n")[:-1]
                     for l in lines:
                         print "    " + l
-        elif deps:
+        elif showDeps:
             for name, dep in (('Provides', trove.provides),
                               ('Requires', trove.requires)):
                 print '%s:' %name
