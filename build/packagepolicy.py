@@ -518,11 +518,15 @@ class _addInfo(policy.Policy):
 	    args = list(args)
 	    info = args.pop(0)
 	    if args:
+                if not self.included:
+                    self.included = {}
 		if info not in self.included:
 		    self.included[info] = []
 		self.included[info].extend(args)
 	    if 'exceptions' in keywords:
 		# not the usual exception handling, this is an exception
+                if not self.excluded:
+                    self.excluded = {}
 		if info not in self.excluded:
 		    self.excluded[info] = []
 		self.excluded[info].append(keywords.pop('exceptions'))
