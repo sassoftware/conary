@@ -110,5 +110,7 @@ pychecker:
 	python2.3 /usr/lib/python2.2/site-packages/pychecker/checker.py *.py
 
 test:
+	make -C test $@
+
 debug-test:
 	make -C test $@
