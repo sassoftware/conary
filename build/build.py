@@ -216,9 +216,9 @@ class InstallSymlink:
     def doInstall(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 	util.mkdirChain(os.path.dirname(dest))
-	if os.path.exists(dest):
+	if os.path.exists(dest) or os.path.islink(dest):
 	    os.remove(dest)
-	os.symlink(self.fromFile, dest)
+	os.symlink(self.fromFile %macros, dest)
 
     def __init__(self, fromFile, toFile):
 	self.fromFile = fromFile
