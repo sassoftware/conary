@@ -85,6 +85,12 @@ class Repository:
 
 	return (pkgList, fileList, fileMap, oldFileList, oldPackageList)
 
+    def _getPackageSet(self, name):
+	return _PackageSet(self.pkgDB, name)
+
+    def _getFileDB(self, fileId):
+	return _FileDB(self.fileDB, fileId)
+
     def commitChangeSet(self, sourcePathTemplate, cs, eraseOld = 0):
 	(pkgList, fileList, fileMap, oldFileList, oldPackageList) = \
 	    self._buildChangeSetJob(cs)
@@ -194,66 +200,6 @@ class Repository:
 
 	return cs
 
-    # takes an abstract change set and creates a differential change set 
-    # against a branch of the repository
-    def rootChangeSet(self, absSet, branch):
-	assert(absSet.isAbstract())
-
-	(pkgList, fileList, fileMap, oldFileList, oldPackageList) = \
-	    self._buildChangeSetJob(absSet)
-
-	cs = changeset.ChangeSetFromAbstractChangeSet(absSet)
-
-	# we want to look up file objects by fileId
-	idToFile = {}
-	for (fileId, fileVersion, file, saveContents) in fileList:
-	    idToFile[fileId] = (fileVersion, file)
-
-	for (pkgName, newPkg, newVersion) in pkgList:
-	    # FIXME
-	    #
-	    # this shouldn't be against branch, it should be against
-	    # the version of the package already installed on the
-	    # system. unfortunately we can't represent that yet. 
-	    oldVersion = self.pkgLatestVersion(pkgName, branch)
-	    if not oldVersion:
-		# FIXME
-		return None
-	    else:
-		old = self.getPackageVersion(pkgName, oldVersion)
-
-	    (pkgChgSet, filesNeeded) = newPkg.diff(old, oldVersion, newVersion)
-	    cs.addPackage(pkgChgSet)
-
-	    for (fileId, oldVersion, newVersion) in filesNeeded:
-		filedb = self._getFileDB(fileId)
-
-		(ver, newFile) = idToFile[fileId]
-		assert(ver.equal(newVersion))
-
-		oldFile = None
-		if oldVersion:
-		    oldFile = filedb.getVersion(oldVersion)
-
-		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
-							 newFile)
-
-		cs.addFile(fileId, oldVersion, newVersion, filecs)
-		if hash: cs.addFileContents(hash)
-
-	return cs
-
-    def _getPackageSet(self, name):
-	return _PackageSet(self.pkgDB, name)
-
-    def _getFileDB(self, fileId):
-	return _FileDB(self.fileDB, fileId)
-
-    def pullFileContents(self, fileId, targetFile):
-	srcFile = self.contentsStore.openFile(fileId)
-	targetFile.write(srcFile.read())
-	srcFile.close()
-
     def pullFileContentsObject(self, fileId):
 	return self.contentsStore.openFile(fileId)
 
@@ -308,6 +254,17 @@ class Repository:
 	return fileDB.getVersion(version)
 
     def storeFileFromChangeset(self, chgSet, file, pathToFile, skipContents):
+	raise NotImplemented
+
+    def __del__(self):
+	self.close()
+
+    def __init__(self):
+	pass
+
+class LocalRepository(Repository):
+
+    def storeFileFromChangeset(self, chgSet, file, pathToFile, skipContents):
 	if not skipContents and isinstance(file, files.RegularFile):
 	    f = chgSet.getFileContents(file.sha1())
 	    file.archive(self, f)
@@ -335,9 +292,6 @@ class Repository:
 	    self.fileDB = None
 	    os.close(self.lockfd)
 
-    def __del__(self):
-	self.close()
-
     def __init__(self, path, mode = "r"):
 	self.top = path
 	self.pkgDB = None
@@ -348,6 +302,9 @@ class Repository:
 	self.contentsStore = datastore.DataStore(self.contentsDB)
 
 	self.open(mode)
+
+	Repository.__init__(self)
+
 
 # this is a set of all of the versions of a single packages 
 class _PackageSet:
@@ -428,3 +385,9 @@ class _FileDB:
     def __init__(self, db, fileId):
 	self.f = db.openFile(fileId)
 	self.fileId = fileId
+
+class RepositoryError(Exception):
+
+    """Base class for exceptions from the system repository"""
+    pass
+

@@ -119,15 +119,15 @@ elif (otherArgs[1] == "changeset"):
 	(old, new) = (None, otherArgs[3])
 	outFile = otherArgs[4]
 
-    repos = repository.Repository(cfg.reppath, "c")
+    repos = repository.LocalRepository(cfg.reppath, "c")
     changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
 elif (otherArgs[1] == "commit"):
-    repos = repository.Repository(cfg.reppath, "c")
+    repos = repository.LocalRepository(cfg.reppath, "c")
     for changeSet in otherArgs[2:]:
 	commit.doCommit(repos, cfg, changeSet)
 elif (otherArgs[1] == "cook"):
     # this ensures the repository exists
-    repos = repository.Repository(cfg.reppath, "c")
+    repos = repository.LocalRepository(cfg.reppath, "c")
     repos.close()
 
     macros = ()
@@ -155,7 +155,7 @@ elif (otherArgs[1] == "cook"):
             # child, set ourself to be the foreground process
             os.setpgrp()
             os.tcsetpgrp(0, os.getpgrp())
-	    repos = repository.Repository(cfg.reppath, "r")
+	    repos = repository.LocalRepository(cfg.reppath, "r")
             try:
                 built = cook.cook(repos, cfg, file, prep=prep, macros=macros)
             except cook.CookError, msg:
@@ -197,7 +197,7 @@ elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
     if ls: del argSet['ls']
 
     if otherArgs[1] == "replist":
-	queryRepos = repository.Repository(cfg.reppath, "r")
+	queryRepos = repository.LocalRepository(cfg.reppath, "r")
     else:
 	queryRepos = database.Database(cfg.root, cfg.dbpath, "r")
 
@@ -215,7 +215,7 @@ elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
 elif (otherArgs[1] == "update"):
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
-	repos = repository.Repository(cfg.reppath, "r")
+	repos = repository.LocalRepository(cfg.reppath, "r")
 	db = database.Database(cfg.root, cfg.dbpath, "c")
 
 	args = [repos, db, cfg] + otherArgs[2:]

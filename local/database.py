@@ -4,7 +4,56 @@ import files
 import os
 import repository
 
-class Database(repository.Repository):
+class Database(repository.LocalRepository):
+
+    # takes an abstract change set and creates a differential change set 
+    # against a branch of the repository
+    def rootChangeSet(self, absSet, branch):
+	assert(absSet.isAbstract())
+
+	(pkgList, fileList, fileMap, oldFileList, oldPackageList) = \
+	    self._buildChangeSetJob(absSet)
+
+	cs = changeset.ChangeSetFromAbstractChangeSet(absSet)
+
+	# we want to look up file objects by fileId
+	idToFile = {}
+	for (fileId, fileVersion, file, saveContents) in fileList:
+	    idToFile[fileId] = (fileVersion, file)
+
+	for (pkgName, newPkg, newVersion) in pkgList:
+	    # FIXME
+	    #
+	    # this shouldn't be against branch, it should be against
+	    # the version of the package already installed on the
+	    # system. unfortunately we can't represent that yet. 
+	    oldVersion = self.pkgLatestVersion(pkgName, branch)
+	    if not oldVersion:
+		# FIXME
+		return None
+	    else:
+		old = self.getPackageVersion(pkgName, oldVersion)
+
+	    (pkgChgSet, filesNeeded) = newPkg.diff(old, oldVersion, newVersion)
+	    cs.addPackage(pkgChgSet)
+
+	    for (fileId, oldVersion, newVersion) in filesNeeded:
+		filedb = self._getFileDB(fileId)
+
+		(ver, newFile) = idToFile[fileId]
+		assert(ver.equal(newVersion))
+
+		oldFile = None
+		if oldVersion:
+		    oldFile = filedb.getVersion(oldVersion)
+
+		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
+							 newFile)
+
+		cs.addFile(fileId, oldVersion, newVersion, filecs)
+		if hash: cs.addFileContents(hash)
+
+	return cs
 
     def storeFileFromChangeset(self, chgSet, file, pathToFile, skipContents):
 	file.restore(chgSet, self.root + pathToFile, skipContents)
@@ -28,10 +77,10 @@ class Database(repository.Repository):
     def close(self):
 	if self.fileIdMap:
 	    self.fileIdMap = None
-	repository.Repository.close(self)
+	repository.LocalRepository.close(self)
 
     def open(self, mode):
-	repository.Repository.open(self, mode)
+	repository.LocalRepository.open(self, mode)
 	self.fileIdMap = dbhash.open(self.top + "/fileid.db", mode)
 	self.rollbackCache = self.top + "/rollbacks"
 	self.rollbackStatus = self.rollbackCache + "/status"
@@ -117,16 +166,11 @@ class Database(repository.Repository):
     def __init__(self, root, path, mode = "r"):
 	self.root = root
 	fullPath = root + "/" + path
-	repository.Repository.__init__(self, fullPath, mode)
+	repository.LocalRepository.__init__(self, fullPath, mode)
 
 # Exception classes
 
-class RepositoryError(Exception):
-
-    """Base class for exceptions from the system repository"""
-    pass
-
-class RollbackError(RepositoryError):
+class RollbackError(repository.RepositoryError):
 
     """Base class for exceptions related to applying rollbacks"""
 
