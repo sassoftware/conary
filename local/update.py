@@ -86,7 +86,7 @@ class FilesystemJob:
 	if not self.userRemovals.has_key((troveName, troveVersion, troveFlavor)):
 	    self.userRemovals[(troveName, troveVersion, troveFlavor)] = [ fileId ]
 	else:
-	    self.userRemovals.append(fileId)
+	    self.userRemovals[(troveName, troveVersion, troveFlavor)].append(fileId)
 
     def iterUserRemovals(self):
 	for ((troveName, troveVersion, troveFlavor), fileIdList) in \
