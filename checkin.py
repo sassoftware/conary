@@ -131,7 +131,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
     # We have to be careful with labels
     name += ":source"
     try:
-        trvList = repos.findTrove(cfg.installbranch, name, None,
+        trvList = repos.findTrove(cfg.installlabel, name, None,
 				  versionStr = versionStr)
     except repository.repository.PackageNotFound, e:
         log.error(str(e))
@@ -152,7 +152,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
                       workDir, str(err))
 	    return
 
-    branch = helper.fullBranchName(cfg.installbranch, trv.getVersion(), 
+    branch = helper.fullBranchName(cfg.installlabel, trv.getVersion(), 
 				   versionStr)
     state = SourceState(trv.getName(), trv.getVersion(), branch)
 

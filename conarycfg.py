@@ -37,8 +37,8 @@ class SrsConfiguration:
 		    sys.stderr.write("The configured default branch %s " +
 			"specifies version, not a branch.\n" % 
 			   self.defaultbranch.asString())
-	    elif key == "installbranch":
-		self.installbranch = versions.BranchName(self.installbranch)
+	    elif key == "installlabel":
+		self.installlabel = versions.BranchName(self.installlabel)
 	except versions.ParseError, e:
 	    raise ParseError, str(e)
 
@@ -65,7 +65,7 @@ class SrsConfiguration:
 	self.sourcepath = "/usr/src/srs/sources"
 	self.buildpath = "/usr/src/srs/builds"
 	self.defaultbranch = None
-	self.installbranch = None
+	self.installlabel = None
 	self.lookaside = "/var/cache/srs"
 	self.dbpath = "/var/lib/srsdb"
         self.tmpdir = "/var/tmp/"
