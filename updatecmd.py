@@ -8,6 +8,11 @@ import grp
 import files
 
 def doUpdate(dbpath, root, pkgName):
+    if root == "/":
+	print "using srs to update to your actual system is dumb."
+	import sys
+	sys.exit(0)
+
     pkgSet = package.PackageSet(dbpath, pkgName)
 
     if (not len(pkgSet.versionList())):
