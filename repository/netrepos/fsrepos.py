@@ -101,6 +101,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def commit(self):
 	self.troveStore.commit()
 
+    def rollback(self):
+	self.troveStore.rollback()
+
     def branchesOfTroveLabel(self, troveName, label):
 	return self.troveStore.branchesOfTroveLabel(troveName, label)
 
@@ -198,8 +201,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	self.troveStore = trovestore.TroveStore(self.sqlDB)
 
     def commitChangeSet(self, cs):
-        job = ChangeSetJob(self, cs)
-        self.commit()
+        self.troveStore.begin()
+        try:
+            # a little odd that creating a class instance has the side
+            # effect of modifying the repository...
+            ChangeSetJob(self, cs)
+        except:
+            self.rollback()
+            raise
+        else:
+            self.commit()
 
     def close(self):
 	if self.troveStore is not None:
