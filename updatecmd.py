@@ -60,12 +60,27 @@ def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
     if not cs:
         # so far no changeset (either the path didn't exist or we could not
         # read it
-	try:
-	    newList = repos.findTrove(cfg.installLabel, pkg, cfg.flavor,
-				      versionStr)
-	except repository.PackageNotFound, e:
-	    log.error(str(e))
-	    return
+
+        # if we have this installed already, look at the same repository
+        # for a new version
+
+        if db.hasPackage(pkg):
+            labels = [ x.getVersion().branch().label()
+                                            for x in db.findTrove(pkg) ]
+            # this removes duplicates
+            labels = {}.fromkeys(labels).keys()
+        else:
+            labels = [ cfg.installLabel ]
+
+        newList = []
+        for label in labels:
+            try:
+                newList += repos.findTrove(label, pkg, cfg.flavor, versionStr)
+            except repository.PackageNotFound, e:
+                pass
+
+        if not newList:
+            raise repository.TroveMissing(pkg, labels)
 
 	list = []
 	if keepExisting:

@@ -704,13 +704,18 @@ class DuplicateBranch(RepositoryError):
 class TroveMissing(RepositoryError):
     troveType = "trove"
     def __str__(self):
-	if self.version:
-	    if self.version.isBranch():
-		return ("%s %s does not exist on branch %s" % \
-		    (self.troveType, self.troveName, self.version.asString()))
+        if type(self.version) == list:
+            return '%s %s does not exist for any of ' \
+                   'the following labels:\n    %s' %  \
+                        (self.troveType, self.troveName,
+                         "    %s\n".join([x.asString() for x in self.version]))
+        elif self.version:
+            if self.version.isBranch():
+                return ("%s %s does not exist on branch %s" % \
+                    (self.troveType, self.troveName, self.version.asString()))
 
-	    return "version %s of %s %s does not exist" % \
-		(self.version.asString(), self.troveType, self.troveName)
+            return "version %s of %s %s does not exist" % \
+                (self.version.asString(), self.troveType, self.troveName)
 	else:
 	    return "%s %s does not exist" % (self.troveType, self.troveName)
 
