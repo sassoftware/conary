@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-all: subdirs conary-wrapper conary.recipe
+all: subdirs conary-wrapper
 
 export VERSION = 0.1
 export TOPDIR = $(shell pwd)
@@ -49,10 +49,10 @@ python_files = __init__.py	\
 
 example_files = examples/tmpwatch.recipe
 bin_files = conary conary-bootstrap
-extra_files = conary.recipe.in conary.recipe conary-wrapper.in Makefile Make.rules
+extra_files = conary-wrapper.in Makefile Make.rules
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
-generated_files = conary-wrapper conary.recipe *.pyo *.pyc 
+generated_files = conary-wrapper *.pyo *.pyc 
 
 .PHONY: clean bootstrap deps.dot pychecker dist install test debug-test subdirs
 
@@ -63,9 +63,6 @@ subdirs:
 conary-wrapper: conary-wrapper.in
 	sed s,@conarydir@,$(conarydir),g $< > $@
 	chmod 755 $@
-
-conary.recipe: conary.recipe.in
-	sed s,@VERSION@,$(VERSION),g $< > $@
 
 install-mkdirs:
 	mkdir -p $(DESTDIR)$(bindir)
