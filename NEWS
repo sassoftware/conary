@@ -16,6 +16,8 @@ Changes in 0.50.8:
     repository when that package had an uninstalled component works
     now.
   * conary now resides in /usr/$LIB/python$PYVERSION/site-packages/conary/
+  * calling r.Replace on a non-regular file results in a warning instead
+    of an unhandled exception
 
 Changes in 0.50.7:
   * Added the XInetdService action to avoid having to include

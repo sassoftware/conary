@@ -933,6 +933,9 @@ class Replace(BuildAction):
         unchanged = []
         min, max = self.min, self.max
         for path in paths:
+            if not util.isregular(path):
+                log.warning("%s is not a regular file, not applying Replace")
+                continue
             fd, tmppath = tempfile.mkstemp(suffix='rep', 
                                            prefix=os.path.basename(path), 
                                            dir=os.path.dirname(path))
