@@ -8,6 +8,13 @@ Changes in 0.10.5:
     from copying files between the content store and /tmp to serve them.
   * Arch flags are now included in flavors
   * Emerge follows the installLabelPath instead of the buildLabel
+  * The extended debugger has been extensively modified
+  * Conary can handle filenames with '%' in them
+  * The showcs command has been significantly updated, and the updates
+    are documented in the conary.1 manpage
+  * New syntax for flags distinguishes requirements from "optimized for"
+    using the "~" character
+  * Arch flags now show up in package flavors
 
 Changes in 0.10.4:
   * Bug fixes for updating from absolute change sets (which basically
