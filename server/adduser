@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if [ $# -ne 3 ]; then
+    echo "not enough args"
+fi
+
 if [ -n "$3" ]; then
     authdb=$3
 else
