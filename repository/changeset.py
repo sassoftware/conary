@@ -458,7 +458,8 @@ class ChangeSet(streams.LargeStreamSet):
 		    fsFile = files.FileFromFilesystem(fullPath, fileId,
 				possibleMatch = origFile)
 
-		    if fsFile.contents.sha1() == origFile.contents.sha1():
+                    if (isinstance(fsFile, files.RegularFile) and
+                        fsFile.contents.sha1() == origFile.contents.sha1()):
 			# the contents in the file system are right
 			cont = filecontents.FromFilesystem(fullPath)
 		    else:
