@@ -106,7 +106,7 @@ class FilesystemJob:
 		    os.chdir(self.root)
 		    os.chroot(self.root)
 		    os.execl(p, p)
-		    sys.exit(1)
+		    os._exit(1)
 		(id, status) = os.waitpid(pid, 0)
 		if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
 		    log.error("ldconfig failed")
@@ -126,7 +126,7 @@ class FilesystemJob:
 			os.chdir(self.root)
 			os.chroot(self.root)
 			os.execl(p, p, "--add", name)
-			sys.exit(1)
+			os._exit(1)
 		    (id, status) = os.waitpid(pid, 0)
 		    if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
 			log.error("chkconfig failed")

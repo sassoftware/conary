@@ -127,7 +127,7 @@ def _extractSourceFromRPM(rpm, targetfile):
 	os.dup2(rpipe, 0)
 	os.chdir(directory)
 	os.execl('/bin/cpio', 'cpio', '-ium', filename)
-	sys.exit(1)
+	os._exit(1)
     while 1:
 	buf = gz.read(4096)
 	if not buf:
