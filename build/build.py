@@ -133,7 +133,7 @@ class Configure(BuildCommand):
 	'%%(mkObjdir)s '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 	' CPPFLAGS="%%(cppflags)s"'
-	' LDFLAGS="%%(ldflags)s" CC=%%(cc)s'
+	' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
 	' %(preConfigure)s %%(configure)s'
 	# XXX host/build/target here
 	' --prefix=%%(prefix)s'
@@ -223,7 +223,7 @@ class Make(BuildCommand):
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 		' CPPFLAGS="%%(cppflags)s"'
-		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s'
+		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
                 ' %(preMake)s make %%(overrides)s'
 		' %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
@@ -264,7 +264,7 @@ class MakeParallelSubdir(Make):
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 		' CPPFLAGS="%%(cppflags)s"'
-		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s'
+		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
                 ' %(preMake)s make %%(overrides)s'
 		' %%(mflags)s '
                 ' MAKE="make %%(mflags)s %%(parallelmflags)s" %(args)s')
@@ -279,7 +279,7 @@ class MakeInstall(Make):
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 		' CPPFLAGS="%%(cppflags)s"'
-		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s'
+		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
                 ' %(preMake)s make %%(overrides)s'
 		' %%(mflags)s %%(rootVarArgs)s'
 		' %(installtarget)s %(args)s')
@@ -306,7 +306,7 @@ class MakePathsInstall(Make):
 	'cd %%(builddir)s/%(subDir)s; '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 	' CPPFLAGS="%%(cppflags)s"'
-	' LDFLAGS="%%(ldflags)s" CC=%%(cc)s'
+	' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
 	' %(preMake)s make %%(overrides)s'
 	' %%(mflags)s'
 	' prefix=%%(destdir)s/%%(prefix)s'

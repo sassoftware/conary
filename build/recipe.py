@@ -59,6 +59,7 @@ baseMacros = {
     'x11prefix'		: '%(exec_prefix)s/X11R6',
     # arguments/flags (empty ones are for documentation; non-existant = empty)
     'cc'		: 'gcc',
+    'cxx'		: 'g++',
     'cflags'            : '-O2', # -g when we have debuginfo
     'cppflags'		: '', # just for providing in recipes
     'ldflags'		: '', # -g when we have debuginfo
