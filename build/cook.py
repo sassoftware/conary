@@ -95,9 +95,9 @@ class _IdGen:
 	if self.map.has_key(path):
 	    return self.map[path]
 
-	fileid = sha1helper.md5String("%s %s" % (path, version.asString()))
-	self.map[(path, flavor)] = (fileid, None, None)
-	return (fileid, None, None)
+	pathid = sha1helper.md5String("%s %s" % (path, version.asString()))
+	self.map[(path, flavor)] = (pathid, None, None)
+	return (pathid, None, None)
 
     def __init__(self, map=None):
         if map is None:
