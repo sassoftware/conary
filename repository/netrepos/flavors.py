@@ -59,7 +59,7 @@ class Flavors:
 	return item[0]
 
     def getId(self, flavorId):
-	if flavorId is 0:
+	if flavorId == 0:
 	    return None
 
 	cu = self.db.cursor()
