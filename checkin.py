@@ -620,7 +620,7 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	    (contType, contents) = changeSet.getFileContents(pathId)
 	    if contType == changeset.ChangedFileTypes.diff:
                 sys.stdout.write('--- %s %s\n+++ %s %s\n'
-                                 %(path, newPackage.getVersion().asString(),
+                                 %(path, oldPackage.getVersion().asString(),
                                    path, newVersion.asString()))
 
 		lines = contents.get().readlines()
