@@ -11,10 +11,6 @@ Should read, or be provided, some sort of configuration information
 relative to the build being done.  For now, we'll intialize a static
 configuration sufficient to build.
 
-@var Use: Set of flags defined for this build, with their boolean status
-@type Use: UseClass
-@var Arch: Set of architectures defined for this build, with their boolean status
-@type Arch: UseClass
 """
 
 class UseClass(dict):
@@ -39,6 +35,13 @@ class UseClass(dict):
     def __getattr__(self, attr):
         return self[attr]
 
+__doc__ += """
+@var Use: Set of flags defined for this build, with their boolean status.
+The Use flags have the following meanings:
+   - C{pcre}: Use the Perl-compatible regex library
+   - C{gcj}: Include gcj (Java) support in gcc; use gcj to enable Java
+@type Use: UseClass
+"""
 Use = UseClass({
     'pcre':		True,
     'gcj':		True,
@@ -67,6 +70,12 @@ Use = UseClass({
 })
 Use._freeze()
 
+__doc__ += """
+@var Arch: Set of architectures defined for this build, with their boolean status
+The Arch flags have the following meanings:
+   - C{i3866}: i386
+@type Arch: UseClass
+"""
 Arch = UseClass({
     'i386':		True,
     'i486':		True,
