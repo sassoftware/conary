@@ -71,38 +71,8 @@ class _Source:
 				  self.recipe.srcdirs)
 	    c = lookaside.createCacheName(self.recipe.cfg, self.sourcename,
 					  self.recipe.name)
-	    self._extractSourceFromRPM(r, c)
+	    _extractFilesFromRPM(r, targetfile=c)
 
-    def _extractSourceFromRPM(self, rpm, targetfile):
-	filename = os.path.basename(targetfile)
-	directory = os.path.dirname(targetfile)
-	r = file(rpm, 'r')
-	rpmhelper.seekToData(r)
-	gz = gzip.GzipFile(fileobj=r)
-	(rpipe, wpipe) = os.pipe()
-	pid = os.fork()
-	if not pid:
-	    os.dup2(rpipe, 0)
-	    os.chdir(directory)
-	    os.execl('/bin/cpio', 'cpio', '-ium', '--quiet', filename)
-	    os._exit(1)
-	while 1:
-	    buf = gz.read(4096)
-	    if not buf:
-		break
-	    os.write(wpipe, buf)
-	os.close(wpipe)
-	(pid, status) = os.waitpid(pid, 0)
-	if not os.WIFEXITED(status):
-	    raise IOError, 'cpio died extracting %s from RPM %s' \
-			   %(filename, os.path.basename(rpm))
-	if os.WEXITSTATUS(status):
-	    raise IOError, \
-		'cpio returned failure %d extracting %s from RPM %s' %(
-		    os.WEXITSTATUS(status), filename, os.path.basename(rpm))
-	if not os.path.exists(targetfile):
-	    raise IOError, 'failed to extract source %s from RPM %s' \
-			   %(filename, os.path.basename(rpm))
 
     def _findSource(self):
 	return lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
@@ -175,6 +145,10 @@ class Archive(_Source):
 
 	if f.endswith(".zip"):
 	    util.execute("unzip -q -o -d %s %s" % (destdir, f))
+	    return
+
+	if f.endswith(".rpm"):
+	    _extractFilesFromRPM(r, directory=destdir)
 	    return
 
 	if f.endswith(".bz2") or f.endswith(".tbz2"):
@@ -375,6 +349,47 @@ class Action(_Source):
 	    destDir = os.sep.join((destDir, self.dir))
 	    util.mkdirChain(destDir)
 	util.execute(self.action %self.recipe.macros, destDir)
+
+
+def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
+    assert targetfile or directory
+    if not directory:
+	directory = os.path.dirname(targetfile)
+    cpioArgs = ['/bin/cpio', 'cpio', '-ium', '--quiet']
+    if targetfile:
+	filename = os.path.basename(targetfile)
+	cpioArgs.append(filename)
+	errorMessage = 'extracting %s from RPM %s' %(
+	    filename, os.path.basename(rpm))
+    else:
+	errorMessage = 'extracting RPM %s' %os.path.basename(rpm)
+
+    r = file(rpm, 'r')
+    rpmhelper.seekToData(r)
+    gz = gzip.GzipFile(fileobj=r)
+    (rpipe, wpipe) = os.pipe()
+    pid = os.fork()
+    if not pid:
+	os.dup2(rpipe, 0)
+	os.chdir(directory)
+	os.execl(*cpioArgs)
+	os._exit(1)
+    while 1:
+	buf = gz.read(4096)
+	if not buf:
+	    break
+	os.write(wpipe, buf)
+    os.close(wpipe)
+    (pid, status) = os.waitpid(pid, 0)
+    if not os.WIFEXITED(status):
+	raise IOError, 'cpio died %s' %errorMessage
+    if os.WEXITSTATUS(status):
+	raise IOError, \
+	    'cpio returned failure %d %s' %(
+		os.WEXITSTATUS(status), errorMessage)
+    if targetfile and not os.path.exists(targetfile):
+	raise IOError, 'failed to extract source %s from RPM %s' \
+		       %(filename, os.path.basename(rpm))
 
 
 
