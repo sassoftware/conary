@@ -40,11 +40,8 @@ from lib import util
 import versions
 
 # -------------------- private below this line -------------------------
-
-# type could be "src"
-#
-# returns a (pkg, fileMap) tuple
 def _createComponent(repos, branch, bldPkg, newVersion, ident):
+    # returns a (trove, fileMap) tuple
     fileMap = {}
     p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
     p.setRequires(bldPkg.requires)
@@ -104,19 +101,46 @@ class _IdGen:
         else:
             self.map = map
 
-    def populate(self, repos, pkg):
-	# Find the files and ids which were owned by the last version of
-	# this package on the branch.
-        for f in repos.iterFilesInTrove(pkg.getName(), pkg.getVersion(),
-                                        pkg.getFlavor(), withFiles=True):
-            pathId, path, fileId, version, fileObj = f
-            if isinstance(fileObj, files.RegularFile):
-                flavor = fileObj.flavor.deps
+    def _processTrove(self, t, cs):
+        for pathId, path, fileId, version in t.iterFileList():
+            fileStream = files.ThawFile(cs.getFileChange(None, fileId),
+                                        pathId)
+            if isinstance(fileStream, files.RegularFile):
+                flavor = fileStream.flavor.deps
             else:
                 flavor = None
             if self.map.has_key(path):
                 assert(self.map[path][0] == pathId)
-            self.map[path] = (pathId, version, fileObj)
+            self.map[path] = (pathId, version, fileStream)
+
+    def populate(self, repos, troveList):
+	# Find the files and ids which were owned by the last version of
+	# this package on the branch.
+        if not troveList:
+            return
+        csList = []
+	for (name, version, flavor) in troveList:
+	    csList.append((name, (None, None), (version, flavor), True))
+            
+        cs = repos.createChangeSet(csList, withFiles=True,
+                                   withFileContents=False)
+	l = []
+        for (name, version, flavor) in troveList:
+            try:
+                pkgCs = cs.getNewPackageVersion(name, version, flavor)
+            except KeyError:
+                l.append(None)
+                continue
+            t = trove.Trove(pkgCs.getName(), pkgCs.getOldVersion(),
+                            pkgCs.getNewFlavor(), pkgCs.getChangeLog())
+            t.applyChangeSet(pkgCs)
+            l.append(t)
+            # recurse over troves contained in the current trove
+            troveList += [ x for x in t.iterTroveList() ]
+            
+        for t in l:
+            self._processTrove(t, cs)
+
 # -------------------- public below this line -------------------------
 
 def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None, 
@@ -553,12 +577,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
                     searchBranch = None
 
         troveList = [ (main, x[0], x[1]) for x in versionList ]
-        while troveList:
-            troves = repos.getTroves(troveList)
-            troveList = []
-            for trv in troves:
-                ident.populate(repos, trv)
-                troveList += [ x for x in trv.iterTroveList() ]
+        ident.populate(repos, troveList)
 
     for buildPkg in bldList:
         compName = buildPkg.getName()
