@@ -254,7 +254,7 @@ class ConaryConfiguration(ConfigFile):
 	'autoResolve'	        : [ BOOL, False ],
         'buildFlavor'           : [ FLAVOR, deps.deps.DependencySet() ],
 	'buildLabel'	        : [ LABEL, versions.Label('localhost@local:trunk') ],
-	'buildPath'		: '/usr/src/conary/builds',
+	'buildPath'		: '/var/tmp/conary-builds',
 	'contact'		: None,
 	'dbPath'		: '/var/lib/conarydb',
 	'debugRecipeExceptions' : [ BOOL, False ], 
