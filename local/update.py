@@ -927,10 +927,12 @@ def runTagCommands(tagScript, root, cmdList, preScript = False):
 	if tagInfo.datasource == 'args':
 	    fullCmd += args
 
-	pid = os.fork()
 	p = os.pipe()
+	pid = os.fork()
 	if not pid:
 	    os.close(p[1])
+            os.dup2(p[0], 0)
+            os.close(p[0])
 	    os.environ['PATH'] = "/sbin:/bin:/usr/sbin:/usr/bin"
 	    if root != '/':
 		os.chdir(root)
@@ -945,8 +947,14 @@ def runTagCommands(tagScript, root, cmdList, preScript = False):
 	os.close(p[0])
 	if tagInfo.datasource == 'stdin':
 	    for arg in args:
-		os.write(p[1], arg + "\n")
-	os.close(p[0])
+                try:
+                    os.write(p[1], arg + "\n")
+                except OSError, e:
+                    if e.errno != errno.EPIPE:
+                        raise
+                    log.error(str(e))
+                    break
+        os.close(p[1])
 
 	(id, status) = os.waitpid(pid, 0)
 	if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
