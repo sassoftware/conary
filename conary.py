@@ -59,7 +59,7 @@ def usage(rc = 1):
     print "       conary repquery     <pkgname>[=<version>]*"
     print "       conary rblist"
     print "       conary rollback     <rollback>"
-    print "       conary showcs       <changeset> [trove[=<version>]]"
+    print "       conary showcs       <changeset> <trove>[=<version>]*"
     print "       conary update       <pkgname>[=<version>]* <changeset>*"
     print "       conary usage"
     print "       conary --version"
@@ -392,7 +392,7 @@ def realMain(cfg, argv=sys.argv):
         changeset = otherArgs[2]
         component = None
         if len(otherArgs) > 3:
-            component = [otherArgs[3]]
+            component = otherArgs[3:]
         cs = repository.changeset.ChangeSetFromFile(changeset)
 	db = database.Database(cfg.root, cfg.dbPath)
 	repos = openRepository(cfg.repositoryMap)

@@ -169,10 +169,12 @@ Arguments include
 .\" FIXME: document
 .RE
 .TP
-.B showchangeset [\fIargs\fP \fI<changeset> [<trove>=[<version>]]\fP
-The \fBshowchangeset\fP command lists the contents of the provided 
+.B showcs [\fIargs\fP \fI<changeset> [<trove/component>=[<version>]*]\fP
+The \fBshowcs\fP command lists the contents of the provided 
 \fBchangeset\fP.  If a trove is specified, and that trove is within the 
-changeset, only that trove is displayed.
+changeset, only that trove is displayed.  A component specifier, such as 
+:runtime, can be given instead of a trove.  In that case, all components 
+within all packages in the changeset will be displayed.
 
 .RS 4
 .TP 4

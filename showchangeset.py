@@ -51,7 +51,7 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
         ls = tags = fullVersions = deps = True
     
     if not (ls or tags or sha1s or ids):
-        if hasVersions:
+        if hasVersions or deps:
             troves = includeChildTroves(cs, troves)
         # create display cache containing appropriate version strings 
         displayC = createDisplayCache(cs, troves, fullVersions)
@@ -226,7 +226,7 @@ def getTroves(cs, troveList):
             troveList = [ x for x in ppl]
         else:
             print "Note: changeset has no primary troves, showing all troves"
-            troveList = [ x for x in cs.newPackages]
+            troveList = [ x for x in cs.newPackages ]
         troveList.sort(lambda a, b: cmp(a[0], b[0]))
         return ([ (x, '') for x in troveList], False)
     hasVersions = False
@@ -243,18 +243,22 @@ def getTroves(cs, troveList):
                 return
             troveDefs.append(tuple(l))
 
-    for (troveName, version, flavor) in cs.newPackages:
-        troves = []
-        for pkg in cs.newPackages:
-            if pkg[0] == troveDefs[0][0]:
-                if not troveDefs[0][1]:
-                    troves = [pkg]
-                    break
-                elif pkg[1].trailingVersion().asString() == troveDefs[0][1]:
-                    troves = [pkg]
-                    break
-        if not troves:
-            print "No such troves %s in changeset" % troveList 
+    troves = {}
+    for reqName, reqVersion in troveDefs:
+        for (troveName, version, flavor) in cs.newPackages:
+            for pkg in cs.newPackages:
+                if (pkg[0] == reqName or
+                     (reqName[0] == ':' and pkg[0].endswith(reqName))):
+                    if not reqVersion:
+                        troves[pkg] = True
+                        break
+                    elif pkg[1].trailingVersion().asString() == reqVersion:
+                        troves[pkg] = True
+                        break
+    if not troves:
+        print "Trove(s) '%s' not found in changeset" % "', '".join(troveList) 
+    troves = troves.keys()
+    troves.sort()
     return ([ (x, '') for x in troves], hasVersions)
 
 def getOldTrove(trove, db, repos):
