@@ -603,7 +603,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     internalCs.addFileContents(fileId, 
                                    changeset.ChangedFileTypes.file, 
                                    contents, 
-                                   newFileObj.flags.isConfig())
+                                   fileObj.flags.isConfig())
                 else:
                     newFileObj = item[0][4]
                     newContents = contentList[i]
