@@ -94,6 +94,7 @@ def excepthook(type, value, tb):
     (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
     output = os.fdopen(tbfd, 'w')
     stackutil.printTraceBack(tb, output, type, value)
+    output.close()
     print "*** Note *** An extended traceback has been saved to %s " % path
     print string.joinfields(lines, "")
     if sys.stdout.isatty() and sys.stdin.isatty():
