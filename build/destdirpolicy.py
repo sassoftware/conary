@@ -252,14 +252,14 @@ class NormalizeInfoPages(policy.Policy):
 	dir = self.macros['infodir']+'/dir'
 	fsdir = self.macros['destdir']+dir
 	if os.path.exists(fsdir):
-	    if not policy.policyException(self, dir):
+	    if not self.policyException(dir):
 		util.remove(fsdir)
 	if os.path.isdir('%(destdir)s/%(infodir)s' %self.macros):
 	    infofiles = os.listdir('%(destdir)s/%(infodir)s' %self.macros)
 	    for file in infofiles:
 		syspath = '%(destdir)s/%(infodir)s/' %self.macros + file
 		path = '%(infodir)s/' %self.macros + file
-		if not policy.policyException(self, path):
+		if not self.policyException(path):
 		    if file.endswith('.gz'):
 			util.execute('gunzip %s' %syspath)
 			syspath = syspath[:-3]

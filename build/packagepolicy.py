@@ -23,14 +23,18 @@ through eponymous interfaces in recipe.
 
 class BinariesInBindirs(policy.Policy):
     """
-    Directories that are specifically for binaries should only have
+    Directories that are specifically for binaries should have only
     files that have some executable bit set.
     """
-    invariantinclusions = [
+    invariantexceptions = [ ('.*', stat.S_IFDIR) ]
+    invariantsubtrees = [
 	'%(bindir)s/',
 	'%(essentialbindir)s/',
 	'%(sbindir)s/',
 	'%(essentialsbindir)s/',
+	'%(initdir)s/',
+	'%(libexecdir)s/',
+	'%(sysconfdir)s/profile.d/',
     ]
 
     def doFile(self, file):
@@ -401,8 +405,6 @@ class Ownership(policy.Policy):
 	for (f, owner, group) in self.fileFilters:
 	    if f.match(path):
 		self._markOwnership(path, owner, group)
-		if os.path.isdir(self.macros['destdir'] + os.sep + path):
-		    self.recipe.ExcludeDirectories(exceptions=path)
 		return
 	self._markOwnership(path, 'root', 'root')
 

@@ -31,16 +31,14 @@ class Policy(util.Action):
     walk INSTEAD of walking the entire C{%(destdir)s} tree.
 
     @cvar invariantinclusions: if invariantinclusions is not empty,
-    then only files matching a regular expression in it are
-    considered to be passed to to the C{doFile} method.  Any exclusions
-    including invariants, are applied after invariantinclusions
-    are applied.
+    then only files matching a filter in it are considered to be passed
+    to to the C{doFile} method.  Any exceptions, including invariants,
+    are applied after invariantinclusions are applied.
 
     @cvar invariantexceptions: subclasses may set to a list of
-    exception regular expressions that are always applied regardless
-    of what other exceptions may be provided by the recipe; these
-    exceptions being applied is an invariant condition of the C{doFile}
-    method.
+    exception filters that are always applied regardless of what other
+    exceptions may be provided by the recipe; these exceptions being
+    applied is an invariant condition of the C{doFile} method.
     """
     invariantsubtrees = []
     invariantexceptions = []
@@ -56,8 +54,8 @@ class Policy(util.Action):
 	@keyword exceptions: Optional argument; regexp(s) specifying
 	files to ignore while taking the policy action.  It will be
 	interpolated against recipe macros before being used.
-	@type exceptions: None, regular expression string, or
-	tuple/list of regular expressions
+	@type exceptions: None, filter string/tuple, or
+	tuple/list of filter strings/tuples
 	@keyword use: Optional argument; Use flag(s) telling whether
 	to actually perform the action.
 	@type use: None, Use flag, or tuple/list of Use flags
@@ -156,10 +154,26 @@ class Policy(util.Action):
 	destdirlen = len(self.macros['destdir'])
 	path=dirname[destdirlen:]
 	for name in names:
-	   thispath = path + os.sep + name
-	   if policyInclusion (self, thispath) and \
-	      not policyException(self, thispath):
-	       self.doFile(util.normpath(thispath))
+	   thispath = util.normpath(path + os.sep + name)
+	   if self.policyInclusion(thispath) and \
+	      not self.policyException(thispath):
+	       self.doFile(thispath)
+
+    def policyInclusion(self, filespec):
+	if not self.inclusionFilters:
+	    # empty list is '.*'
+	    return True
+	for f in self.inclusionFilters:
+	    if f.match(filespec):
+		return True
+	return False
+
+    def policyException(self, filespec):
+	for f in self.exceptionFilters:
+	    if f.match(filespec):
+		return True
+	return False
+
 
 class PolicyError(Exception):
     """
@@ -173,24 +187,3 @@ class PolicyError(Exception):
 
     def __str__(self):
 	return repr(self)
-
-
-# internal helpers
-
-
-# external helpers
-
-def policyException(policyObj, filespec):
-    for f in policyObj.exceptionFilters:
-	if f.match(filespec):
-	    return True
-    return False
-
-def policyInclusion(policyObj, filespec):
-    if not policyObj.inclusionFilters:
-	# empty list is '.*'
-	return True
-    for f in policyObj.inclusionFilters:
-	if f.match(filespec):
-	    return True
-    return False

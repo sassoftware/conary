@@ -53,16 +53,16 @@ class Filter:
 	self.unsetmode = unsetmode
 	tmplist = []
 	if type(regex) is str:
-	    regexp = regex
-	    self.regexp = re.compile(self._anchor(regexp %macros))
+	    self.regexp = self._anchor(regex %macros)
+	    self.re = re.compile(self.regexp)
 	elif type(regex) in (tuple, list):
 	    for subre in regex:
 		subre = self._anchor(subre %macros)
 		tmplist.append('(' + subre + ')')
-	    regexp = '|'.join(tmplist)
-	    self.regexp = re.compile(regexp)
+	    self.regexp = '|'.join(tmplist)
+	    self.re = re.compile(self.regexp)
 	else:
-	    self.regexp = regex
+	    self.re = regex
 
     def _anchor(self, regex):
 	"""
@@ -85,7 +85,7 @@ class Filter:
 	"""
 	# search instead of match in order to not automatically
 	# front-anchor searches
-	match = self.regexp.search(path)
+	match = self.re.search(path)
 	if match:
 	    if self.setmode or self.unsetmode:
 		mode = os.lstat(self.destdir + os.sep + path)[stat.ST_MODE]
