@@ -18,10 +18,10 @@ else:
 
 sys.path.append(os.path.dirname(fullPath))
 from changeset import ChangeSetFromFile
-import srscfg
+import conarycfg
 import repository
 
-cfg = srscfg.SrsConfiguration()
+cfg = conarycfg.ConaryConfiguration()
 
 repos = repository.Repository(cfg.reppath, "r")
 
