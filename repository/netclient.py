@@ -105,10 +105,10 @@ class ServerCache:
 
 	    if url is None:
 		url = "http://%s/conary/" % serverName
-            type, uri = urllib.splittype(url)
-            if type == 'http':
+            protocol, uri = urllib.splittype(url)
+            if protocol == 'http':
                 transporter = transport.Transport(https=False)
-            elif type == 'https':
+            elif protocol == 'https':
                 transporter = transport.Transport(https=True)
             server = ServerProxy(url, transporter)
 	    self.cache[serverName] = server
@@ -128,7 +128,7 @@ class ServerCache:
                 else:
                     errmsg = str(e)
                 if url.find('@') != -1:
-                    url = 'http://<user>:<pwd>@' + url.split('@')[1]
+                    url = protocol + '://<user>:<pwd>@' + url.split('@')[1]
 		raise repository.OpenError('Error occured opening repository '
 			    '%s: %s' % (url, errmsg))
 	return server
@@ -1145,9 +1145,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	self.c[serverName].commitChangeSet(url)
 
     def _putFile(self, url, path):
-	assert(url.startswith("http://"))
+        protocol, uri = urllib.splittype(url)
+        assert(protocol in ('http', 'https'))
 	(host, putPath) = url.split("/", 3)[2:4]
-	c = httplib.HTTPConnection(host)
+        if protocol == 'http':
+            c = httplib.HTTPConnection(host)
+        else:
+            c = httplib.HTTPSConnection(host)
 	f = open(path)
 	c.connect()
 	c.request("PUT", url, f.read())
