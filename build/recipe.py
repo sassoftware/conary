@@ -686,7 +686,7 @@ class GroupRecipe(Recipe):
 
 class FilesetRecipe(Recipe):
 
-    def addFile(self, pattern, component, versionStr, recurse = True):
+    def addFile(self, pattern, component, versionStr = None, recurse = True):
 	"""
 	Adds files which match pattern from version versionStr of component.
 	Pattern is glob-style, with brace expansion. If recurse is set,
@@ -696,7 +696,7 @@ class FilesetRecipe(Recipe):
 
 	try:
 	    pkgList = helper.findPackage(self.repos, self.cfg.packagenamespace,
-				     None, component, versionStr)
+				     self.buildNick, component, versionStr)
 	except helper.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
 
@@ -745,11 +745,12 @@ class FilesetRecipe(Recipe):
     def iterFileList(self):
 	return self.files.iteritems()
 	    
-    def __init__(self, repos, cfg):
+    def __init__(self, repos, cfg, branchNick):
 	self.repos = repos
 	self.cfg = cfg
 	self.files = {}
 	self.paths = {}
+	self.branchNick = branchNick
 	
 
 class RecipeFileError(Exception):
