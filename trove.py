@@ -51,6 +51,9 @@ class Package:
     def removeFile(self, fileId):   
 	del self.idMap[fileId]
 
+    def iterFileList(self):
+	return self.idMap.iteritems()
+
     def fileList(self):
 	l = []
 	mapping = {}
@@ -107,11 +110,34 @@ class Package:
 	"""
 	return self.packages.items()
 
+    def read(self, dataFile):
+	lines = dataFile.readlines()
+
+	fields = lines[0].split()
+	fileCount = int(fields[0])
+	pkgCount = int(fields[1])
+
+	start = 1
+	fileEnd = start + fileCount
+	pkgEnd = fileEnd + pkgCount
+
+	for line in lines[start:fileEnd]:
+	    (fileId, path, version) = line.split()
+	    version = versions.ThawVersion(version)
+	    self.addFile(fileId, path, version)
+
+	for line in lines[fileEnd:pkgEnd]:
+	    items = line.split()
+	    name = items[0]
+	    self.packages[name] = []
+	    for versionStr in items[1:]:
+		version = versions.VersionFromString(versionStr)
+		self.addPackageVersion(name, version)
+
     def formatString(self):
 	"""
-	Returns a string representing everything about this package, which
-	can later be read by the PackageFromFile object. The format of
-	the string is:
+	Returns a string representing everything about this package, which can
+	later be read by the read() method. The format of the string is:
 
 	<file count> <group count>
 	FILEID1 PATH1 VERSION1
@@ -607,30 +633,6 @@ class PackageChangeSet:
 	self.packages = {}
 
 class PackageFromFile(Package):
-
-    def read(self, dataFile):
-	lines = dataFile.readlines()
-
-	fields = lines[0].split()
-	fileCount = int(fields[0])
-	pkgCount = int(fields[1])
-
-	start = 1
-	fileEnd = start + fileCount
-	pkgEnd = fileEnd + pkgCount
-
-	for line in lines[start:fileEnd]:
-	    (fileId, path, version) = line.split()
-	    version = versions.ThawVersion(version)
-	    self.addFile(fileId, path, version)
-
-	for line in lines[fileEnd:pkgEnd]:
-	    items = line.split()
-	    name = items[0]
-	    self.packages[name] = []
-	    for versionStr in items[1:]:
-		version = versions.VersionFromString(versionStr)
-		self.addPackageVersion(name, version)
 
     def __init__(self, name, dataFile, version):
 	"""
