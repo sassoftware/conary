@@ -115,42 +115,9 @@ class TroveStore:
 	timeStamps = cu.fetchone()[0]
 	version.setTimeStamps([float(x) for x in timeStamps.split(":")])
 
-
-    def createParentReference(self, itemId, branch):
-	if branch.hasParent():
-	    headVersion = branch.copy()
-	    headVersion.appendVersionReleaseObject(
-			    headVersion.parentNode().trailingVersion())
-
-	    parentVersion = branch.parentNode()
-	    parentVersionId = self.versionTable.get(parentVersion, None)
-	    if parentVersionId is None:
-		return None
-
-	    # we need the timestamp for the parent version; this is the
-	    # easiest way to get it
-	    parentVersion = self.versionTable.getId(parentVersionId, itemId)
-	    headVersion.setTimeStamps(parentVersion.timeStamps())
-	    headVersionId = self.getVersionId(headVersion, {})
-
-	    if parentVersionId is not None:
-		self.instances.addRedirect(itemId, headVersionId, 
-					   parentVersionId)
-
-	    return (headVersionId, headVersion.timeStamps())
-	else:
-	    return (None, None)
-
     def createTroveBranch(self, troveName, branch):
-	# there's no doubt that this could be more efficient.
 	itemId = self.getItemId(troveName)
-
-	(headVersionId, headVersionTimestamps) = \
-			    self.createParentReference(itemId, branch)
-	if headVersionId:
-	    branchId = self.versionOps.createBranch(itemId, branch, 
-				topVersionId = headVersionId,
-				topVersionTimestamps = headVersionTimestamps)
+	branchId = self.versionOps.createBranch(itemId, branch)
 
     def iterTroveVersions(self, troveName):
 	cu = self.db.cursor()
@@ -250,13 +217,12 @@ class TroveStore:
             outD[troveName] = {}
 	    for version in troveDict[troveName]:
                 outD[troveName][version] = []
-		canonStr = version.canon().asString()
 		versionStr = version.asString()
 		vMap[versionStr] = version
 		cu.execute("""
 		    INSERT INTO itf VALUES (%s, %s, %s)
 		""", 
-		(troveName, canonStr, versionStr), start_transaction = False)
+		(troveName, versionStr, versionStr), start_transaction = False)
 
 	cu.execute("""
 	    SELECT aItem, fullVersion, Flavors.flavor FROM
@@ -432,25 +398,6 @@ class TroveStore:
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId)
 	    self.troveTroves.addItem(troveInstanceId, instanceId)
 
-	# we could have just added a version which something else
-	# branches from, which means that branch also needs to include
-	# the node we just added
-	if not newVersion: return
-	
-	cu.execute("""
-	    SELECT branch, Branches.branchId FROM Branches NATURAL JOIN Latest 
-		WHERE parentNode=%d AND itemId=%d
-	""", troveVersionId, troveItemId)
-
-	for (branchStr, branchId) in cu:
-	    branch = versions.VersionFromString(branchStr)
-	    (headVersionId, headVersionTimestamp) = \
-			self.createParentReference(troveItemId, branch)
-
-	    self.versionOps.nodes.addRow(troveItemId, branchId, headVersionId,
-					 headVersionTimestamp)
-
-
     def eraseTrove(self, troveName, troveVersion, troveFlavor):
 	assert(0)
 	# the garbage collection isn't right
@@ -487,7 +434,7 @@ class TroveStore:
 	if troveItemId is None:
 	    return False
 
-	troveVersionId = self.versionTable.get(troveVersion.canon(), None)
+	troveVersionId = self.versionTable.get(troveVersion, None)
 	if troveVersionId is None:
             # there is no version in the versionId for this version
             # in the table, so we can't have a trove with that version
@@ -543,15 +490,15 @@ class TroveStore:
 	if not troveVersion:
 	    troveVersion = self.versionTable.getId(troveVersionId, troveNameId)
 	if not troveVersionId:
-	    troveVersionId = self.versionTable[troveVersion.canon()]
+	    troveVersionId = self.versionTable[troveVersion]
 	if troveFlavor is 0:
 	    troveFlavor = self.flavors.getId(troveFlavorId)
 	if troveFlavorId is None:
 	    troveFlavorId = self.flavors[troveFlavor]
 
 	if min(troveVersion.timeStamps()) == 0:
-	    # don't use troveVersionId here as it could have come from
-	    # troveVersion.canon(), which won't have all of the timestamps
+	    # XXX this would be more efficient if it used troveVersionId
+	    # for the lookup
 	    troveVersion.setTimeStamps(
 		self.versionTable.getTimeStamps(troveVersion, troveNameId))
 
@@ -591,7 +538,7 @@ class TroveStore:
 	cu = self.db.cursor()
 
 	troveItemId = self.items[troveName]
-	troveVersionId = self.versionTable[troveVersion.canon()]
+	troveVersionId = self.versionTable[troveVersion]
 	troveFlavorId = self.flavors[troveFlavor]
 	troveInstanceId = self.instances[(troveItemId, troveVersionId, 
 					  troveFlavorId)]

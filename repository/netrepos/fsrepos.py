@@ -24,8 +24,6 @@ from repository import DataStoreRepository
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
-    createBranches = 1
-
     ### Package access functions
 
     def thawFlavor(self, flavor):
@@ -111,6 +109,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def eraseTrove(self, pkgName, version, flavor):
 	self.troveStore.eraseTrove(pkgName, version, flavor)
 
+    def addTrove(self, pkg):
+	self.troveStore.addTrove(pkg)
+
     def addPackage(self, pkg):
 	self.troveStore.addTrove(pkg)
 
@@ -182,30 +183,37 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		log.warning("package %s does not exist" % troveName)
 		continue
 
-	    list = []
 	    if isinstance(location, versions.Version):
-		if min(location.timeStamps()) == 0:
-		    self.troveStore.getFullVersion(troveName, location)
-		list.append(location)
+		verDict = { troveName : [ location ] }
 	    else:
-		branchList = self.branchesOfTroveLabel(troveName, location)
-		if not branchList:
-		    log.error("%s does not have branch %s", troveName, location)
-		for branch in branchList:
-		    v = self.getTroveLatestVersion(troveName, branch)
-		    list.append(v)
+		verDict = self.getTroveLeavesByLabel([troveName], location)
 
 	    # XXX this probably doesn't get flavors right
 
-	    d = self.getTroveVersionFlavors({troveName: list})
+	    d = self.getTroveVersionFlavors(verDict)
+	    fullList = []
 	    for (version, flavors) in d[troveName].iteritems():
 		for flavor in flavors:
-		    pkg = self.getTrove(troveName, version, flavor)
-		    branchedVersion = version.fork(newBranch, sameVerRel = 0)
-		    self.createTroveBranch(troveName, branchedVersion)
+		    fullList.append((troveName, version, flavor))
 
-		    for (name, version, flavor) in pkg.iterTroveList():
-			troveList.append((name, version))
+	    troves = self.getTroves(fullList)
+
+	    for trove in troves:
+		branchedVersion = trove.getVersion().fork(newBranch, 
+							  sameVerRel = 1)
+		self.createTroveBranch(troveName, branchedVersion.branch())
+		trove.changeVersion(branchedVersion)
+
+		# make a copy of this list since we're going to update it
+		l = [ x for x in trove.iterTroveList() ]
+		for (name, version, flavor) in l:
+		    troveList.append((name, version))
+
+		    branchedVersion = version.fork(newBranch, sameVerRel = 1)
+		    trove.delTrove(name, version, flavor, False)
+		    trove.addTrove(name, branchedVersion, flavor)
+
+		self.addTrove(trove)
 
         # commit branch to the repository
         self.commit()

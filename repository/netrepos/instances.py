@@ -22,7 +22,6 @@ class InstanceTable:
 				itemId INT, 
 				versionId INT, 
 				flavorId INT,
-				silentRedirect INT,
 				isPresent INT);
 			  CREATE UNIQUE INDEX InstancesIdx ON 
 		               Instances(itemId, versionId, flavorId);
@@ -30,7 +29,7 @@ class InstanceTable:
 
     def addId(self, itemId, versionId, flavorId):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Instances VALUES (NULL, %d, %d, %d, 0, 1)",
+        cu.execute("INSERT INTO Instances VALUES (NULL, %d, %d, %d, 1)",
                    (itemId, versionId, flavorId))
 	return cu.lastrowid
 

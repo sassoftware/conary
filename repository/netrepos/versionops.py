@@ -364,11 +364,9 @@ class SqlVersioning:
 
 	self.needsCleanup = True
 	
-    def createBranch(self, itemId, branch, topVersionId = None,
-		     topVersionTimestamps = None):
+    def createBranch(self, itemId, branch):
 	"""
-	Creates a new branch for the given node. If topVersionId is
-	not None, that node is considered the only node on the branch.
+	Creates a new branch for the given node. 
 	"""
 	assert(not branch.hasParent() or 
 	       min(branch.parentNode().timeStamps()) > 0)
@@ -392,11 +390,6 @@ class SqlVersioning:
 	assert(not self.labelMap.has_key((itemId, labelId)) or
 	       branchId not in self.labelMap[(itemId, labelId)])
 	self.labelMap.addItem((itemId, labelId), branchId)
-
-	if topVersionId is not None:
-	    self.latest[(itemId, branchId)] = topVersionId
-	    self.nodes.addRow(itemId, branchId, topVersionId,
-				       topVersionTimestamps)
 
 	return branchId
 
