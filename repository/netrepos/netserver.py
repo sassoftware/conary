@@ -55,14 +55,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	return d
 
-    def getFilesInTrove(self, authToken, troveName, version, flavor,
+    def getFilesInTrove(self, authToken, troveName, versionStr, flavor,
                         sortByPath = False, withFiles = False):
+        version = self.toVersion(versionStr)
 	if not self.auth.check(authToken, write = False, trove = troveName,
-			       label = troveName.branch().label()):
+			       label = version.branch().label()):
 	    raise InsufficientPermission
 
         gen = self.repos.troveStore.iterFilesInTrove(troveName,
-                                               self.toVersion(version),
+					       version,
                                                self.toFlavor(flavor),
                                                sortByPath, 
                                                withFiles) 
@@ -74,10 +75,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getFileContents(self, authToken, sha1list):
 	# XXX X this isn't properly checked!
-	if not self.auth.check(authToken, write = False, trove = troveName,
-			       label = troveName.branch().label()):
-	    raise InsufficientPermission
-
 	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.cfc-out')
 	f = os.fdopen(fd, "w")
 
