@@ -894,8 +894,9 @@ def runTagCommands(root, cmdList):
 		os.chroot(root)
 
 	    try:
-		os.execl(cmd[0], cmd)
-	    except:
+		os.execv(cmd[0], cmd)
+	    except Exception, e:
+		sys.stderr.write('%s\n' %e)
 		pass
 	    os._exit(1)
 
