@@ -231,7 +231,9 @@ class VersionedFile:
 	    while curr and curr.isAfter(version):
 		next = curr
 		curr = self._getVersionInfo(curr)[1]
-	elif not self.createBranches:
+	elif not self.createBranches and len(self.branchMap.keys()):
+	    # the branch doesn't exist, but other branches do, and
+	    # we're not supposed to create branches automatically
 	    raise VersionedFileMissingBranchError, version.branch()
 	else:
 	    curr = None
