@@ -46,14 +46,13 @@ def _createComponent(repos, branch, bldPkg, newVersion, ident):
             flavor = f.flavor.deps
         else:
             flavor = None
-        (fileId, fileVersion) = ident(path, flavor)
+        (fileId, fileVersion, oldFile) = ident(path, flavor)
 	f.id(fileId)
 
         if not fileVersion:
             # no existing versions for this path
 	    p.addFile(f.id(), path, newVersion)
 	else:
-	    oldFile = repos.getFileVersion(f.id(), fileVersion)
             # check to see if the file we have now is the same as the
             # file in the previous version of the file (modes, contents, etc)
 	    if oldFile == f:
@@ -75,8 +74,8 @@ class _IdGen:
 	fileid = sha1helper.hashString("%s %f %s %s" % (path, time.time(), 
                                                      self.noise,
                                                      flavor))
-	self.map[(path, flavor)] = (fileid, None)
-	return (fileid, None)
+	self.map[(path, flavor)] = (fileid, None, None)
+	return (fileid, None, None)
 
     def __init__(self, map=None):
 	# file ids need to be unique. we include the time and path when
@@ -98,7 +97,7 @@ class _IdGen:
                 flavor = fileObj.flavor.deps
             else:
                 flavor = None
-            self.map[(path, flavor)] = (fileId, version)
+            self.map[(path, flavor)] = (fileId, version, fileObj)
 # -------------------- public below this line -------------------------
 
 def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None, 
