@@ -1029,7 +1029,7 @@ exit $failed
 		if os.path.isdir(fullpath) and os.path.exists(fullpath + '/Makefile'):
 		    self.subdirs.append(fullpath[baselen:])
 		    self.buildMakeDependencies(fullpath, command)
-	util.execute(r"sed -i -e 's/^%s\s*:\s*\(.*\)/conary-pre-%s: \1\n\n%s:/'  %s" % (makeTarget, makeTarget, makeTarget, makefile))
+	util.execute(r"sed -i 's/^%s\s*:\(:\?\)\s*\(.*\)/conary-pre-%s:\1 \2\n\n%s:\1/' %s" % (makeTarget, makeTarget, makeTarget, makefile))
 	util.execute('cd %s; make %s conary-pre-%s' % (dir, ' '.join(self.makeArgs), makeTarget))
 
     def do(self, macros):
