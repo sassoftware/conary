@@ -121,26 +121,30 @@ class FilesystemJob:
 	    p = "/sbin/ldconfig"
 	    if os.getuid():
 		log.warning("ldconfig skipped (insufficient permissions)")
-	    elif os.access(util.joinPaths(self.root, p), os.X_OK) != True:
+	    # write any needed entries in ld.so.conf before running ldconfig
+	    sysetc = util.joinPaths(self.root, '/etc')
+	    if not os.path.isdir(sysetc):
+		# normally happens only during testing, but why not be safe?
+		util.mkdirChain(sysetc)
+	    ldso = file(util.joinPaths(self.root, '/etc/ld.so.conf'), 'w+')
+	    ldsolines = ldso.readlines()
+	    newlines = []
+	    rootlen = len(self.root)
+	    for path in self.sharedLibraries:
+		dirname = os.path.dirname(path)[rootlen:]
+		dirline = dirname+'\n'
+		if dirline not in ldsolines:
+		    ldsolines.append(dirline)
+		    newlines.append(dirname)
+	    if newlines:
+		log.debug("adding ld.so.conf entries: %s",
+			  " ".join(newlines))
+		ldso.seek(0)
+		ldso.writelines(ldsolines)
+	    ldso.close()
+	    if os.access(util.joinPaths(self.root, p), os.X_OK) != True:
 		log.error("/sbin/ldconfig is not available")
 	    else:
-		# write any needed entries in ld.so.conf, then run ldconfig
-		ldso = file(util.joinPaths(self.root, '/etc/ld.so.conf'), 'w+')
-		ldsolines = ldso.readlines()
-		newlines = []
-		rootlen = len(self.root)
-		for path in self.sharedLibraries:
-		    dirname = os.path.dirname(path)[rootlen:]
-		    dirline = dirname+'\n'
-		    if dirline not in ldsolines:
-			ldsolines.append(dirline)
-			newlines.append(dirname)
-		if newlines:
-		    log.debug("adding ld.so.conf entries: %s",
-			      " ".join(newlines))
-		    ldso.seek(0)
-		    ldso.writelines(ldsolines)
-		ldso.close()
 		log.debug("running ldconfig")
 		pid = os.fork()
 		if not pid:
