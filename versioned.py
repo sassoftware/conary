@@ -137,20 +137,25 @@ class VersionedFile:
 
     def findLatestVersion(self, branch):
 	"""
-        Finds the version of the head of a branch.
+	Finds the version at the head of a branch.  If no versions exist on
+	that branch, return the node where the version was created.
 	
         @param branch: The verison to find the head of
         @type branch: versions.Version
         @return: The version at the head of the branch
         @rtype: versions.Version
 	"""
-	self._readBranchMap()
+	assert(branch.isBranch())
 
+	self._readBranchMap()
 	branchStr = branch.asString()
 
-	if not self.branchMap.has_key(branchStr): return None
+	if self.branchMap.has_key(branchStr):
+	    return self.branchMap[branchStr]
+	elif branch.hasParent():
+	    return branch.parentNode()
 
-	return self.branchMap[branchStr]
+	return None
 
     # converts a version to one w/ a timestamp
     def getFullVersion(self, version):
@@ -234,7 +239,7 @@ class VersionedFile:
 	elif not self.createBranches and len(self.branchMap.keys()):
 	    # the branch doesn't exist, but other branches do, and
 	    # we're not supposed to create branches automatically
-	    raise VersionedFileMissingBranchError, version.branch()
+	    raise VersionedFileMissingBranchError(self.key, version.branch())
 	else:
 	    curr = None
 	    next = None
@@ -311,7 +316,7 @@ class VersionedFile:
 
     def versionList(self, branch):
 	"""
-        Finds all of the versions of a file on a particular branch.
+        Finds all of the versions of a file on a particular branch. 
 
         @param branch: The branch whose versions will be found
         @type branch: versions.Version
@@ -321,7 +326,11 @@ class VersionedFile:
 	"""
 	self._readBranchMap()
 
-	curr = self.branchMap[branch.asString()]
+	try:
+	    curr = self.branchMap[branch.asString()]
+	except KeyError:
+	    raise VersionedFileMissingBranchError(self.key, branch)
+
 	list = []
 	while curr:
 	    list.append(curr)
@@ -438,13 +447,12 @@ class VersionedFileError(Exception):
 
 class VersionedFileMissingBranchError(VersionedFileError):
 
-    def __repr(self):
-	return str(self)
-
     def __str__(self):
-	return self.branch.asString()
+	return "file %s does not contain branch %s" % (self.name, 
+						       self.branch.asString())
 
-    def __init__(self, branch):
+    def __init__(self, name, branch):
 	VersionedFileError.__init__(self)
 	self.branch = branch
+	self.name = name
 
