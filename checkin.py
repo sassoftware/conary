@@ -56,6 +56,8 @@ class SourceState(package.Package):
 	    # branch
 	    return self.getBranch().asString() + "/" + versionStr
 
+	return versionStr
+
     def __init__(self, name, version, branch):
 	package.Package.__init__(self, name, version)
 	self.branch = branch
@@ -299,14 +301,14 @@ def updateSrc(repos, versionStr = None):
     else:
 	versionStr = state.expandVersionStr(versionStr)
 
-	pkgList = helper.findPackage(repos, None, None, pkgName, versionStr)
+	pkgList = helper.findPackage(repos, None, pkgName, versionStr)
 	if len(pkgList) > 1:
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return
 
 	head = pkgList[0]
 	headVersion = head.getVersion()
-	newBranch = helper.fullBranchName(None, None, headVersion, versionStr)
+	newBranch = helper.fullBranchName(None, headVersion, versionStr)
 
     changeSet = repos.createChangeSet([(pkgName, baseVersion, headVersion, 0)])
 
