@@ -22,14 +22,17 @@ class UseClass(dict):
     Immutable dictionary
     """
     def __init__(self, d):
-	self.freeze = 0
+	self.frozen = 0
 	self.update(d)
 
     def _freeze(self):
-	self.freeze = 1
+	self.frozen = True
+
+    def _thaw(self):
+	self.frozen = False
 
     def __setitem__(self, key, value):
-	if self.freeze:
+	if self.frozen:
 	    raise TypeError, 'cannot modify immutable dictionary FIXME reference'
 	dict.__setitem__(self, key, value)
 
