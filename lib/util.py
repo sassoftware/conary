@@ -13,15 +13,16 @@
 #
 
 from build import fixedglob
+import epdb
 import errno
 import log
 import os
-import pdb
 import shutil
 import stat
 import string
 import struct
 import sys
+import tempfile
 import traceback
 import weakref
 
@@ -89,9 +90,13 @@ def findFile(file, searchdirs):
 def excepthook(type, value, tb):
     sys.excepthook = sys.__excepthook__
     lines = traceback.format_exception(type, value, tb)
+    (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
+    output = os.fdopen(tbfd, 'w')
+    saveTraceBack(tb, output)
+    print "*** Note *** An extended traceback has been saved to %s " % path
     print string.joinfields(lines, "")
     if sys.stdout.isatty() and sys.stdin.isatty():
-        pdb.post_mortem(tb)
+        epdb.post_mortem(tb)
     else:
         sys.exit(1)
 

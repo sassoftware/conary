@@ -12,11 +12,15 @@
 # full details.
 #
 
-import pdb
+import epdb
+import log
+import os
 import util
 import sys
 import string
+import tempfile
 import traceback
+import stackutil
 
 # build.py and policy.py need some common definitions
 
@@ -67,8 +71,7 @@ class Action:
 
     def doAction(self):
 	if self.debug:
-	    import pdb
-	    pdb.set_trace()
+	    epdb.set_trace()
 	self.do()
 
     def do(self):
@@ -123,9 +126,13 @@ def excepthook(type, exc_msg, tb):
     buildinfo.lastline = self.linenum
     buildinfo.stop()
 
+    (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
+    output = os.fdopen(tbfd, 'w')
+    stackutil.printTraceBack(tb, output)
+    log.info("** NOTE ** Extended traceback written to %s\n" % path)
     if actionobject.recipe.cfg.debugRecipeExceptions and sys.stdout.isatty() \
 					         and sys.stdin.isatty():
-	pdb.post_mortem(tb)
+        epdb.post_mortem(tb)
     else:
 	sys.exit(1)
 
@@ -154,8 +161,7 @@ class RecipeAction(Action):
     def doAction(self):
 	global actionobject
 	if self.debug:
-	    import pdb
-	    pdb.set_trace()
+	    epdb.set_trace()
 	if self.use:
 	    if self.linenum is None:
 		self.do()

@@ -63,8 +63,8 @@ class BuildAction(action.RecipeAction):
 
     def doAction(self):
 	if self.debug:
-	    import pdb
-	    pdb.set_trace()
+	    import epdb
+	    epdb.set_trace()
 	if self.use:
 	    if self.linenum is None:
 		self.do(self.recipe.macros)
