@@ -423,7 +423,8 @@ class Trove:
 		del removed[name]
 	    
 	for name in added.keys():
-	    if len(added[name]) == 1 and len(removed[name]) == 1:
+	    if len(added[name]) == 1 and removed.has_key(name) and \
+                        len(removed[name]) == 1:
 		# one of each? they *must* be a good match...
 		newFlavor = added[name].keys()[0]
 		oldFlavor = removed[name].keys()[0]
@@ -447,6 +448,7 @@ class Trove:
 		for newVersion in newVersionList:
 		    pkgList.append((name, None, newVersion, 
 					  None, newFlavor))
+                continue
 
 	    # for each new version of a package, try and generate the diff
 	    # between that package and the version of the package which was
