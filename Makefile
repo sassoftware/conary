@@ -13,4 +13,4 @@ bootstrap:
 		echo "/opt isn't writable, this won't work"; \
 		exit 1; \
 	fi
-	./srs-bootstrap `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"`
+	time ./srs-bootstrap `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"`
