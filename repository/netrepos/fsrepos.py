@@ -17,9 +17,10 @@ import repository
 import util
 import versions
 
-from repository import DataStoreRepository
-from repository import AbstractRepository
+from deps import deps
 from localrep import trovestore
+from repository import AbstractRepository
+from repository import DataStoreRepository
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
@@ -56,8 +57,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	return d
 
     def getTroveFlavorsLatestVersion(self, troveName, branch):
-	return [ (versions.VersionFromString(x[0]),
-		  deps.ThawDependencySet([1])) for x in 
+	return [ (versions.VersionFromString(x[1]),
+		  deps.ThawDependencySet(x[0])) for x in 
 		    self.troveStore.iterTrovePerFlavorLeafs(troveName, 
 							    branch.asString()) ]
 	
