@@ -71,7 +71,7 @@ def main(argv):
     db = database.Database(cfg.root, cfg.dbPath)
     dbpkgs = [ x for x in db.iterAllTroveNames() if x.find(':') == -1 ]
     dbpkgs.sort()
-    versionList = repos.getTroveLeavesByLabel(dbpkgs, cfg.installLabel)
+    versionList = repos.getTroveLeavesByLabel(dbpkgs, cfg.installLabelPath[0])
 
     for pkg in dbpkgs:
         if pkg in updateExceptions:
