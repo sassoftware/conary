@@ -222,6 +222,8 @@ class Trove:
 	    return False
 	if self.getFlavor() != them.getFlavor():
 	    return False
+	if self.isRedirect() != them.isRedirect():
+	    return False
 
 	(csg, pcl, fcl) = self.diff(them)
 	return (not pcl) and (not fcl) and (not csg.getOldFileList()) \

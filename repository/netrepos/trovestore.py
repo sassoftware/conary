@@ -101,11 +101,12 @@ class TroveStore:
 
 	return theId
 
-    def getInstanceId(self, itemId, versionId, flavorId, isPresent = True):
+    def getInstanceId(self, itemId, versionId, flavorId, isRedirect,
+                      isPresent = True):
 	theId = self.instances.get((itemId, versionId, flavorId), None)
 	if theId == None:
 	    theId = self.instances.addId(itemId, versionId, flavorId,
-					 isPresent = isPresent)
+					 isRedirect, isPresent = isPresent)
 	elif isPresent:
 	    # XXX we shouldn't have to do this unconditionally
 	    self.instances.setPresent(theId, 1)
@@ -323,7 +324,9 @@ class TroveStore:
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId, 
-					     troveFlavorId, isPresent = True)
+					     troveFlavorId, 
+                                             trove.isRedirect(),
+                                             isPresent = True)
 	assert(not self.troveTroves.has_key(troveInstanceId))
 
         if updateLatest:
@@ -396,6 +399,7 @@ class TroveStore:
                                                 updateLatest = False)
 
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
+                                            trove.isRedirect(),
 					    isPresent = False)
 	    self.troveTroves.addItem(troveInstanceId, instanceId)
 
@@ -514,7 +518,8 @@ class TroveStore:
 		self.versionTable.getTimeStamps(troveVersion, troveNameId))
 
 	cu = self.db.cursor()
-	cu.execute("""SELECT instances.instanceId, ChangeLogs.name, 
+	cu.execute("""SELECT instances.instanceId, 
+                             instances.isRedirect, ChangeLogs.name, 
 			     ChangeLogs.contact,
 			     ChangeLogs.message FROM
 		      Instances JOIN Nodes ON 
@@ -529,15 +534,16 @@ class TroveStore:
 
 	result = cu.fetchone()
 	troveInstanceId = result[0]
-	if result[1] is not None:
-	    changeLog = changelog.ChangeLog(*result[1:4])
+        isRedirect = result[1]
+	if result[2] is not None:
+	    changeLog = changelog.ChangeLog(*result[2:5])
 	else:
 	    changeLog = None
 
         assert(troveFlavor is not None)
 
 	trv = trove.Trove(troveName, troveVersion, troveFlavor,
-			      changeLog)
+			      changeLog, isRedirect = isRedirect)
 	for instanceId in self.troveTroves[troveInstanceId]:
 	    (itemId, versionId, flavorId, isPresent) = \
 		    self.instances.getId(instanceId)

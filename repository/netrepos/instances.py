@@ -30,19 +30,25 @@ class InstanceTable:
 				itemId INT, 
 				versionId INT, 
 				flavorId INT,
+				isRedirect INT,
 				isPresent INT)""")
             cu.execute("""CREATE UNIQUE INDEX InstancesIdx ON 
 		               Instances(itemId, versionId, flavorId)""")
 
-    def addId(self, itemId, versionId, flavorId, isPresent = True):
+    def addId(self, itemId, versionId, flavorId, isRedirect, isPresent = True):
 	if isPresent:
 	    isPresent = 1
 	else:
 	    isPresent = 0
 
+	if isRedirect:
+	    isRedirect = 1
+	else:
+	    isRedirect = 0
+
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Instances VALUES (NULL, ?, ?, ?, ?)",
-                   (itemId, versionId, flavorId, isPresent))
+        cu.execute("INSERT INTO Instances VALUES (NULL, ?, ?, ?, ?, ?)",
+                   (itemId, versionId, flavorId, isRedirect, isPresent))
 	return cu.lastrowid
 
     def getId(self, theId):
