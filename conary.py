@@ -98,6 +98,7 @@ def main():
 
     argDef["all"] = 0
     argDef["config"] = 2
+    argDef["debug"] = 0
     argDef["ids"] = 0
     argDef["ls"] = 0
     argDef["macros"] = 1
@@ -145,6 +146,11 @@ def main():
 	log.setVerbosity(1)
     else:
 	log.setVerbosity(0)
+
+    if argSet.has_key('debug'):
+	del argSet['debug']
+	import pdb
+	pdb.set_trace()
 
     profile = False
     if argSet.has_key('profile'):
