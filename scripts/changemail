@@ -4,7 +4,7 @@
 # temporary override
 #repPath=http://conary:conary@lambchop/distro/
 
-if [ $0 = "chanagemail" ]; then
+if [ $0 = "changemail" ]; then
     CONARY=../conary
 else
     CONARY=$(echo $0 | sed 's|/[^/]*$||')/../conary
