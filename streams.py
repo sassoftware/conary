@@ -90,6 +90,10 @@ class NumericStream(InfoStream):
 	else:
 	    self.val = val
 
+class ByteStream(NumericStream):
+
+    format = "!B"
+
 class ShortStream(NumericStream):
 
     format = "!H"
