@@ -69,6 +69,7 @@ class BuildAction(action.RecipeAction):
 	    if self.linenum is None:
 		self.do(self.recipe.macros)
 	    else:
+                self.recipe.buildinfo.lastline = self.linenum
 		oldexcepthook = sys.excepthook
 		sys.excepthook = action.excepthook
 		action.actionobject = self

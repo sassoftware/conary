@@ -169,6 +169,7 @@ class RecipeAction(Action):
 		oldexcepthook = sys.excepthook
 		sys.excepthook = excepthook
 		actionobject = self
+                self.recipe.buildinfo.lastline = self.linenum
 		self.do()
 		sys.excepthook = oldexcepthook
 

@@ -424,7 +424,10 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
     else:
-	bldInfo.read()
+        try:
+            bldInfo.read()
+        except:
+            pass
 
     bldInfo.begin()
     if resume is True:
