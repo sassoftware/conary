@@ -28,10 +28,10 @@ else:
 
 sys.path.append(os.path.dirname(fullPath))
 from repository.changeset import ChangeSetFromFile
+from repository import netclient
 from local import database
 import conarycfg
 from lib import util
-import helper
 import queryrep
 import checkin
 import versions
@@ -39,7 +39,7 @@ import versions
 sys.excepthook = util.genExcepthook()
 
 cfg = conarycfg.ConaryConfiguration()
-repos = helper.openRepository(cfg.repositoryMap)
+repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
 
 if len(sys.argv) != 2:
     print "Usage: graphbranch <trovename>"

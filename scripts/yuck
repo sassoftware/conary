@@ -31,9 +31,8 @@ sys.path.append(os.path.dirname(fullPath))
 
 import conarycfg
 from local import database
-import helper
 from lib import util
-
+from repository import netclient
 
 def usage():
     print "Usage: localoutofdate [--missing]"
@@ -53,7 +52,7 @@ def main(argv):
         args.remove(arg)
 
     cfg = conarycfg.ConaryConfiguration()
-    repos = helper.openRepository(cfg.repositoryMap)
+    repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
     db = database.Database(cfg.root, cfg.dbPath)
     dbpkgs = [ x for x in db.iterAllTroveNames() if x.find(':') == -1 ]
     dbpkgs.sort()
