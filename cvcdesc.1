@@ -1,0 +1,40 @@
+.\" Copyright (c) 2004 Specifix, Inc.
+.TH CVCDESC 1 "2 November 2004" "Specifix, Inc."
+.SH NAME
+cvcdesc \- Conary trove metadata XML generator
+.SH SYNOPSIS
+.B cvcdesc \fI<options> \fR[\fIoutput-file-name\fR]
+.SH DESCRIPTION
+\fBcvcdesc\fR generates an XML file containing metadata information
+suitable for \fBcvc describe\fR. It can retrieve metadata from several
+sources using \fI--source\fP or manually from options specified on the
+command line.
+.SH OPTIONS 
+.TP
+.B \-\-source \fIfreshmeat|...\fP
+Specify an external source. 'freshmeat' is the only currently supported source.
+.TP
+.B \-\-pkg-name \fIpackage-name\fP
+Query the external source for \fIpackage-name\fP.
+.TP
+.B \-\-short-desc \fI<string>\fP and \-\-long-desc \fI<string>\fP
+Specify the package's short description and long description, respectively.
+Short description is required, long description, and all other tags, are
+optional.
+.TP
+.B \-\-url <string>
+Specify a package URL. More that one URL may be specified on the command line.
+.TP
+.B \-\-category <string>
+Specify a package category. More than one category may be specified.
+.TP
+.B \-\-license <string>
+Specify a package license. More than one license may be specified.
+.\"
+.SH EXAMPLES
+cvcdesc --source=freshmeat --pkg-name a2ps a2ps.xml
+
+cvcdesc --short-desc "A short description" simple.xml
+.\"
+.SH "SEE ALSO"
+cvc(1), conary(1)

@@ -34,6 +34,7 @@ python_files = __init__.py	\
 	conaryclient.py		\
 	constants.py		\
 	cvc.py			\
+        cvcdesc.py              \
 	cscmd.py		\
 	datastore.py		\
 	display.py		\
@@ -50,7 +51,7 @@ python_files = __init__.py	\
 	updatecmd.py		\
 	versions.py
 
-bin_files = conary cvc
+bin_files = conary cvc cvcdesc
 extra_files = \
 	LICENSE			\
 	Make.rules 		\
