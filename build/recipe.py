@@ -404,6 +404,16 @@ class Recipe:
 	else:
 	    self.install.doInstall(self.macros)
 
+    def addPostProcess(self, post):
+        self.post.append(post)
+
+    def doPostProcess(self):
+        for post in self.post:
+            post.doPost(self)
+
+    def addDevice(self, target, devtype, major, minor, owner, group, perms):
+        self._devices.append((target, devtype, major, minor, owner, group, perms))
+
     def packages(self, namePrefix, version, root):
         # by default, everything that hasn't matched a pattern in the
         # main package filter goes in the package named self.name
@@ -412,7 +422,8 @@ class Recipe:
                                                 self.mainFilters,
                                                 self.subFilters)
         autopkg.walk(root)
-        #autopkg.addDevice('/dev/null', 'c', 1, 3, perms=0666)
+        for device in self._devices:
+            autopkg.addDevice(*device)
         self.packages = autopkg.getPackages()
 
     def getPackages(self):
@@ -436,6 +447,8 @@ class Recipe:
 	#   source: (apply)
 	#     - apply is None or command to util.execute(apply)
 	self.signatures = {}
+        self.post = []
+        self._devices = []
         self.cfg = cfg
 	self.laReposCache = laReposCache
 	self.srcdirs = srcdirs

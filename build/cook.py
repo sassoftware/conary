@@ -119,6 +119,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         util.mkdirChain(destdir)
 	recipeObj.doBuild(builddir, destdir)
 	recipeObj.doInstall(builddir, destdir)
+        recipeObj.doPostProcess()
 
 	repos.open("w")
         
