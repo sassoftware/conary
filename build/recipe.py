@@ -21,7 +21,7 @@ import lookaside
 import os
 import package
 import packagepolicy
-import repository
+from repository import repository
 import rpmhelper
 import shutil
 import sys
