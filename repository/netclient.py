@@ -391,7 +391,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	# it since we know that server has the contents; other servers may
 	# not
 	url = self.c[fileVersion].getFileContents(troveName, 
-		    self.fromVersion(troveVersion), 
+		    self.fromVersion(fileVersion), 
 		    self.fromFlavor(troveFlavor),
 		    self.fromFileId(fileId), self.fromVersion(fileVersion))
 
