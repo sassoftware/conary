@@ -912,6 +912,21 @@ class ExcludeDirectories(policy.Policy):
 	self.recipe.autopkg.delFile(path)
 
 
+class LinkCount(policy.Policy):
+    """
+    Only regular, non-config files may have hardlinks; no exceptions.
+    """
+    def do(self):
+        for package in self.recipe.autopkg.packages.values():
+            for path in package.hardlinks:
+                if self.recipe.autopkg.pathMap[path].flags.isConfig():
+                    self.recipe.reportErrors(
+                        "Config file %s has illegal hard links" %path)
+            for path in package.badhardlinks:
+                self.recipe.reportErrors(
+                    "Special file %s has illegal hard links" %path)
+
+
 class _requirements(policy.Policy):
     """
     Pure virtual base class for Requires/Provides/Flavor
@@ -1018,6 +1033,7 @@ def DefaultPolicy(recipe):
 	IgnoredSetuid(recipe),
 	Ownership(recipe),
 	ExcludeDirectories(recipe),
+	LinkCount(recipe),
 	Requires(recipe),
 	Provides(recipe),
 	Flavor(recipe),
