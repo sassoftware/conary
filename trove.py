@@ -680,7 +680,6 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
     def formatToFile(self, changeSet, f):
 	f.write("%s " % self.getName())
-	f.write("KIND %d\n" % self.tcsType.value())
 
 	if self.isAbsolute():
 	    f.write("absolute ")
