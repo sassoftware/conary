@@ -82,7 +82,6 @@ class BuildPackageGenerator:
 	package, which is used as the version of each subpackage
 	@param auto: automatic subpackage list
 	@type auto: sequence of PackageSpec instances
-	regex)) tuples
 	@param explicit: explicit subpackage list
 	@type explicit: sequence of PackageSpec instances
 	"""
