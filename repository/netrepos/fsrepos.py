@@ -454,8 +454,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 oldVersion.branch().label().getHost() != self.name):
                 # don't try to make changesets between repositories; the
                 # client can do that itself
-                externalTroveList = (troveName, (oldVersion, oldFlavor),
-                                     (newVersion, newFlavor), absolute)
+                externalTroveList.append((troveName, (oldVersion, oldFlavor),
+                                     (newVersion, newFlavor), absolute))
                 continue
 
             new = self.getTrove(troveName, newVersion, newFlavor, 
