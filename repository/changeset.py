@@ -6,12 +6,15 @@ import versions
 
 class ChangeSet:
 
-    def readFile(self, file):
+    def getFileContents(self, hash):
+	return self.csf.getFile(hash)
+
+    def useFile(self, file):
 	f = open(file, "r")
-	csf = filecontainer.FileContainer(f)
+	self.csf = filecontainer.FileContainer(f)
 	f.close()
 
-	control = csf.getFile("SRSCHANGESET")
+	control = self.csf.getFile("SRSCHANGESET")
 
 	lines = control.readLines()
 	i = 0
@@ -24,6 +27,7 @@ class ChangeSet:
 			string.split(header)[3:7]
 
 		if oldVerStr == "(none)":
+		    # abstract change set
 		    oldVersion = None
 		else:
 		    oldVersion = versions.VersionFromString(oldVerStr)
@@ -48,9 +52,15 @@ class ChangeSet:
 
 	    header = control.read()
 
+    def getPackageList(self):
+	return self.packages
+
     def formatToFile(self, f):
 	for pkg in self.packages:
 	    pkg.formatToFile(f)
+
+    def getFileChange(self, fileId):
+	return self.files[fileId]
 
     def __init__(self):
 	self.packages = []
