@@ -11,6 +11,8 @@ Changes in 0.11.10
     repository
   * didn't handle file types changing on update
   * fixed problem assigning depNums
+  * components disappearing from troves caused problems in relative changesets
+  * files moving from removed troves in changesets caused update to fail
 
 Changes in 0.11.9
   * change the order of permissions setting (chmod after chown)
