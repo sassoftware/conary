@@ -3,6 +3,14 @@ Changes in 0.14.0
     (making changesets somewhat less brittle)
   * fixed bug in source handling with non-recipe files in the local directory
   * added framework for generic trove information
+  * used new trove info framework to store the source trove, build time,
+    total file size, and version of conary used when building binary
+    troves.
+  * lib/elf.c no longer uses mmap to read elf files.  Some architectures
+    may have elf structures on disk that are not naturally aligned, and
+    using mmap to read them won't work.
+  * the repository code now uses a 30 second timeout when attempting to
+    access the database
 
 Changes in 0.13.3
   * added ability for a contents log file (makes syncing much easier)
