@@ -403,9 +403,7 @@ class Recipe:
     def packages(self, namePrefix, version, root):
 	# "None" will be replaced by explicit subpackage list
 	generator = buildpackage.BuildPackageGenerator(
-            namePrefix + ":" + self.name,
-            version,
-            self.autoSpecList, None)
+            namePrefix + ":" + self.name, version, self.autoSpecList, None)
         generator.walk(root)
         self.packageSet = generator.packageSet()
 
