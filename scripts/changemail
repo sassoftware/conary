@@ -15,9 +15,9 @@
 #
 
 if [ $0 = "changemail" ]; then
-    CONARY=../conary
+    CVC=../cvc
 else
-    CONARY=$(echo $0 | sed 's|/[^/]*$||')/../conary
+    CVC=$(echo $0 | sed 's|/[^/]*$||')/../cvc
 fi
 
 usage ()
@@ -25,7 +25,7 @@ usage ()
     (echo "Usage: changemail --repmap <repmap> --trove <trove> --version <version> "
      echo "                  --email <email> [--email <email>...]"
      echo "       changemail --repmap <repmap> <trove> <version> <email(s)>"
-     echo "(using command $CONARY)"
+     echo "(using command $CVC)"
     ) 1>&2
     exit 1
 }
@@ -74,7 +74,7 @@ TMP=$(mktemp /tmp/changemail.XXXXXX) || exit 1
 
 
 if [ $(echo -n $trove | tail -c7) == ":source" ]; then
-    $CONARY src rdiff $repMapArg "$repMap" $trove -1 $version > $TMP
+    $CVC rdiff $repMapArg "$repMap" $trove -1 $version > $TMP
 elif ! echo $trove | grep -s : > /dev/null; then
     echo "${trove} ($version) has been built into the repository" > $TMP
 fi
