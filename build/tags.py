@@ -27,6 +27,7 @@ class TagFile(conarycfg.ConfigFile):
 
     # lists all legal options for "implements"
     implementsCheck = {'files': ('update', 'preremove', 'remove'),
+		       'self':  ('update', 'preremove'),
 		       'description':  ('update', 'preremove'),
 		       'handler':  ('update', 'preremove'),
                       }
@@ -61,9 +62,9 @@ class TagFile(conarycfg.ConfigFile):
                         # at cook time
                         log.warning('change "implements self" to'
                                     ' "implements handler" in %s' %filename)
+                        # XXX change to an error later
                         #raise conarycfg.ParseError, \
                         #    'change "implements self" to "implements handler" in %s' %filename
-                    key = 'handler'
 		if key not in self.implementsCheck:
 		    raise conarycfg.ParseError, \
 			'unknown type %s in "implements %s"' %(key, item)
