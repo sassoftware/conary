@@ -365,12 +365,10 @@ def annotate(repos, filename):
         oldTrove = repos.getTrove(troveName, oldV, None)
 
         found = False
-        for (oldId, name, oldFileV) in oldTrove.iterFileList():
-            if oldId == fileId:
-                found = True
-                break
-        # this file doesn't exist from this version forward
-        if not found:
+        try:
+            name, oldFileV = oldTrove.getFile(fileId)
+        except KeyError:
+            # this file doesn't exist from this version forward
             break
 
         if oldFileV == newFileV:
