@@ -11,53 +11,35 @@ from packagename import PackageName
 
 _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
-_grpFormat  = "%-39s %s"
+_grpFormat  = "  %-37s %s"
 
 def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
     if pkg and pkg[0] != ":":
-	pkg = PackageName(cfg.packagenamespace + ":" + pkg)
+	pkg = cfg.packagenamespace + ":" + pkg
     elif not pkg:
-	pkg = PackageName(cfg.packagenamespace)
+	pkg = cfg.packagenamespace
     else:
-	pkg = PackageName(pkg)
+	pkg = pkg
 
-    if pkg.isGroup():
-	if not repos.hasGroup(pkg):
-	    log.error("group %s can not be found" % 
-			pkg.getName(cfg.packagenamespace))
-	    return
+    list = repos.getPackageList(str(pkg))
+    if not list:
+	log.warning("object %s does not exist" % pkg)
+	return
 
-	if versionStr:
-	    version = versions.VersionFromString(versionStr, cfg.defaultbranch)
+    for pkgName in list:
+	if versionStr or ls:
+	    _displayPkgInfo(repos, cfg, pkgName, versionStr, ls)
+	    continue
 	else:
-	    version = repos.grpLatestVersion(pkg, cfg.defaultbranch)
-	grp = repos.getGroupVersion(pkg, version)
-
-	for (pkg, verList) in grp.getPackageList():
-	    for ver in verList:
-		print _grpFormat % (
-			    package.stripNamespace(cfg.packagenamespace, pkg),
-			    ver.asString(cfg.defaultbranch))
-    else:
-	list = repos.getPackageList(str(pkg))
-	if not list:
-	    log.warning("object %s does not exist" % pkg)
-	    return
-
-	for pkgName in list:
-	    if versionStr or ls:
-		_displayPkgInfo(repos, cfg, pkgName, versionStr, ls)
-		continue
+	    if all:
+		l = repos.getPackageVersionList(pkgName)
 	    else:
-		if all:
-		    l = repos.getPackageVersionList(pkgName)
-		else:
-		    l = _versionList(repos, pkgName)
+		l = _versionList(repos, pkgName)
 
-		for version in l:
-		    print _pkgFormat % (
-			package.stripNamespace(cfg.packagenamespace, pkgName),
-			version.asString(cfg.defaultbranch))
+	    for version in l:
+		print _pkgFormat % (
+		    package.stripNamespace(cfg.packagenamespace, pkgName),
+		    version.asString(cfg.defaultbranch))
 
 def _versionList(repos, pkgName):
     """
@@ -95,6 +77,12 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
 	print _pkgFormat % (
 	    package.stripNamespace(cfg.packagenamespace, pkgName),
 	    version.asString(cfg.defaultbranch))
+
+	for (pkgName, verList) in pkg.getPackageList():
+	    for ver in verList:
+		print _grpFormat % (
+			package.stripNamespace(cfg.packagenamespace, pkgName),
+			ver.asString(cfg.defaultbranch))
 
 	for (fileId, path, version) in pkg.fileList():
 	    print _fileFormat % (path, version.asString(cfg.defaultbranch))
