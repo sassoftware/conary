@@ -90,6 +90,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
     def allTroveNames(self):
 	return [ x for x in self.iterAllTroveNames() ]
 
+    def hasPackage(self, pkgName):
+	return self.troveStore.hasTrove(pkgName)
+
+    def hasTrove(self, pkgName, version, flavor):
+	return self.troveStore.hasTrove(pkgName, troveVersion = version,
+					troveFlavor = flavor)
+
     def getTroveVersionList(self, troveNameList):
 	d = {}
 	for troveName in troveNameList:
@@ -127,8 +134,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 	return newD
 
     def getTroveLatestVersion(self, pkgName, branchStr):
-	return self.troveStore.troveLatestVersion(pkgName, 
-						  self.fromVersion(branchStr))
+	return self.fromVersion(self.troveStore.troveLatestVersion(pkgName, 
+						  self.toBranch(branchStr)))
 
     def getChangeSet(self, chgSetList, recurse, withFiles):
 	l = []
