@@ -336,13 +336,9 @@ class Trove:
 	    (name, version, flavor) = key
 	    chgSet.newTroveVersion(name, version, flavor)
 
-	    if not added.has_key(name):
-		added[name] = {}
-
-	    if added[name].has_key(flavor):
-		added[name][flavor].append(version)
-	    else:
-		added[name][flavor] = [ version ]
+            d = added.setdefault(name, {})
+            l = d.setdefault(flavor, [])
+            l.append(version)
 
 	if them:
 	    for key in them.packages.iterkeys():
@@ -350,13 +346,9 @@ class Trove:
 
 		(name, version, flavor) = key
 		chgSet.oldTroveVersion(name, version, flavor)
-		if not removed.has_key(name):
-		    removed[name] = {}
-
-		if removed[name].has_key(flavor):
-		    removed[name][flavor].append(version)
-		else:
-		    removed[name][flavor] = [ version ]
+                d = removed.setdefault(name, {})
+                l = d.setdefault(flavor, [])
+                l.append(version)
 
 	pkgList = []
 
@@ -818,9 +810,8 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	@type flavor: deps.deps.DependencySet
 	"""
 
-	if not self.packages.has_key(name):
-	    self.packages[name] = []
-	self.packages[name].append(('+', version, flavor))
+        l = self.packages.setdefault(name, [])
+	l.append(('+', version, flavor))
 
     def updateChangedPackage(self, name, flavor, old, new):
 	"""
@@ -855,9 +846,8 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	@param flavor: old flavor
 	@type flavor: deps.deps.DependencySet
 	"""
-	if not self.packages.has_key(name):
-	    self.packages[name] = []
-	self.packages[name].append(('-', version, flavor))
+        l = self.packages.setdefault(name, [])
+        l.append(('-', version, flavor))
 
     def formatToFile(self, changeSet, f):
 	f.write("%s " % self.getName())
