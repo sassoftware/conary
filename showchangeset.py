@@ -272,6 +272,11 @@ def includeChildTroves(cs, troves):
         trove = cs.newPackages[pkg]
         for subTroveName, changes in  trove.iterChangedTroves():
             (type, version, flavor, byDefault) = changes[0]
+            if (subTroveName, version, flavor) not in cs.newPackages:
+                # the trove lists this subtrove as one of its potential
+                # components, but it's not actually in the changeset
+                # XXX do we want to indicate this somehow?
+                continue
             newList.append(((subTroveName, version, flavor), indent + ' '))
     return newList
 
@@ -294,7 +299,10 @@ def getTroves(cs, troveList):
                 trove = cs.getNewPackageVersion(name, version, flavor)
                 for subTroveName, changes in  trove.iterChangedTroves():
                     (type, version, flavor, byDefault) = changes[0]
-                    del allTroves[subTroveName, version, flavor]
+                    try:
+                        del allTroves[subTroveName, version, flavor]
+                    except KeyError:
+                        pass
             troveList.extend(allTroves.keys())
         else:
             print "Note: changeset has no primary troves, showing all troves"
