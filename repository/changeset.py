@@ -14,7 +14,8 @@
 
 from deps import deps
 import difflib
-import lib.enum
+from lib import enum
+from lib import log
 import errno
 import filecontainer
 import filecontents
@@ -31,7 +32,7 @@ import versions
 
 from StringIO import StringIO
 
-ChangedFileTypes = lib.enum.EnumeratedType("cft", "file", "diff", "ptr")
+ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff", "ptr")
 
 class FileInfo(streams.TupleStream):
 
