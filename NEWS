@@ -4,8 +4,8 @@ Changes in 0.9.0:
  * changeset command now generates changesets for multiple troves spread
    across multiple repositories
  * change sets are transferred as a set of independent change sets now
-   (laying the groundwork for repository change set caching, which will
-   this version will work just fine with)
+   (laying the groundwork for repository change set caching, with which
+   this version will work just fine)
 
 Changes in 0.8.3:
  * Man page updates.
