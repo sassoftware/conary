@@ -7,6 +7,14 @@ import shutil
 import util
 import string
 
+# Note: when creating templates, be aware that they are evaulated
+# twice, in the context of two different dictionaries.
+#  o  keys from keywords should have a # single %, as should "args".
+#  o  keys passed in through the macros argument will need %% to
+#     escape them for delayed evaluation.  This will include at
+#     least %%(builddir)s for all, and doInstall will also get
+#     %%(destdir)s
+
 class ShellCommand:
     def __init__(self, *args, **keywords):
         # initialize initialize our keywords to the defaults
@@ -31,57 +39,72 @@ class ShellCommand:
 
 
 class Automake(ShellCommand):
-    template = ('cd %%s; aclocal %%s ; %(preAutoconf)s autoconf %(autoConfArgs)s; automake %(autoMakeArgs)s %(args)s')
+    # note: no use of %(args)s -- which command would it apply to?
+    template = ('cd %%(builddir)s; '
+                'aclocal %%(m4DirArgs)s %(acLocalArgs)s; '
+		'%(preAutoconf)s autoconf %(autoConfArgs)s; '
+		'automake %(autoMakeArgs)s')
     keywords = {'autoConfArgs': '--force',
                 'autoMakeArgs': '--copy --force',
+		'acLocalArgs': '',
 		'preAutoconf': '',
                 'm4Dir': ''}
     
-    def doBuild(self, dir):
-	m4DirArgs = ''
+    def doBuild(self, macros):
+	macros = macros.copy()
         if self.m4Dir:
-	    m4DirArgs = '-I %s' %(self.m4Dir)
-        self.execute(self.command % (dir, m4DirArgs))
+	    macros.update({'m4DirArgs': '-I %s' %(self.m4Dir)})
+        self.execute(self.command %macros)
 
 
 class Configure(ShellCommand):
-    template = ('cd %%s; %%s %(preConfigure)s %%s --prefix=/usr '
-                '--sysconfdir=/etc --mandir=/usr/share/man '
-                '--infodir=/usr/share/info %(args)s')
+    template = ('cd %%(builddir)s; '
+                '%%(mkObjdir)s '
+		'%(preConfigure)s %%(configure)s '
+		'  --prefix=%%(prefix)s '
+                '  --sysconfdir=%%(sysconfdir)s '
+		'  --datadir=%%(datadir)s '
+		'  --mandir=%%(mandir)s --infodir=%%(infodir)s '
+		'  %(args)s')
     keywords = {'preConfigure': '',
                 'objDir': ''}
     
-    def doBuild(self, dir):
+    def doBuild(self, macros):
+	macros = macros.copy()
         if self.objDir:
-            configure = '../configure'
-            mkObjdir = 'mkdir -p %s; cd %s;' %(self.objDir, self.objDir)
+            macros['mkObjdir'] = 'mkdir -p %s; cd %s;' \
+	                         %(self.objDir, self.objDir)
+	    macros['configure'] = '../configure'
         else:
-            configure = './configure'
-            mkObjdir = ''
-        self.execute(self.command % (dir, mkObjdir, configure))
+            macros['configure'] = './configure'
+        self.execute(self.command %macros)
 
 class ManualConfigure(Configure):
-    template = 'cd %%s; %%s %(preConfigure)s %%s %(args)s'
+    template = ('cd %%(builddir)s; '
+                '%%(mkObjdir)s '
+	        '%(preConfigure)s %%(configure)s %(args)s')
 
 class Make(ShellCommand):
-    template = 'cd %%s; %(preMake)s make %(args)s'
+    template = 'cd %%(builddir)s; %(preMake)s make %(args)s'
     keywords = {'preMake': ''}
     
-    def doBuild(self, dir):
-        self.execute(self.command % (dir))
+    def doBuild(self, macros):
+	macros = macros.copy()
+        self.execute(self.command %macros)
 
 class MakeInstall(ShellCommand):
-    template = "cd %%s; %(preMake)s make %(rootVar)s=%%s install %(args)s"
+    template = ('cd %%(builddir)s; '
+                '%(preMake)s make %(rootVar)s=%%(destdir)s install %(args)s')
     keywords = {'rootVar': 'DESTDIR',
                 'preMake': ''}
 
-    def doInstall(self, dir, root):
-	self.execute(self.command % (dir, root))
+    def doInstall(self, macros):
+	self.execute(self.command %macros)
 
 class InstallFile:
 
-    def doInstall(self, dir, root):
-	dest = root + self.toFile
+    def doInstall(self, macros):
+	dest = macros['destdir'] + self.toFile
 	if dest[-1:] == '/':
 	    dest = dest + self.fromFile
 	util.mkdirChain(os.path.dirname(dest))
@@ -96,8 +119,8 @@ class InstallFile:
 
 class InstallSymlink:
 
-    def doInstall(self, dir, root):
-	os.symlink(self.fromFile, root + self.toFile)
+    def doInstall(self, macros):
+	os.symlink(self.fromFile, macros['destdir'] + self.toFile)
 
     def __init__(self, fromFile, toFile):
 	self.fromFile = fromFile
@@ -105,11 +128,11 @@ class InstallSymlink:
 
 class RemoveFiles:
 
-    def doInstall(self, dir, root):
+    def doInstall(self, macros):
 	if self.recursive:
-	    os.system("rm -rf %s/%s" %(dir, self.filespec))
+	    os.system("rm -rf %s/%s" %(macros['destdir'], self.filespec))
 	else:
-	    os.system("rm -f %s/%s" %(dir, self.filespec))
+	    os.system("rm -f %s/%s" %(macros['destdir'], self.filespec))
 
     def __init__(self, filespec, recursive=0):
 	self.filespec = filespec

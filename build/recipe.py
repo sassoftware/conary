@@ -14,6 +14,49 @@ import lookaside
 import rpmhelper
 import gzip
 
+baseMacros = (
+    ('prefix'		, '/usr'),
+    ('sysconfdir'	, '/etc'),
+    ('datadir'		, '/usr/share'),
+    ('mandir'		, '%(datadir)s/man'),
+    ('infodir'		, '%(datadir)s/info')
+)
+
+crossMacros = (
+    # set crossdir from cook, directly or indirectly, before adding the rest
+    #('crossdir'	, 'cross-target'),
+    ('prefix'		, '/opt/%(crossdir)s'),
+    ('sysroot'		, '%(prefix)s/sys-root'),
+    ('headerpath'	, '%(sysroot)s/usr/include')
+)
+
+class Macros(dict):
+    def __setitem__(self, name, value):
+	dict.__setitem__(self, name, value % self)
+
+    # we want keys that don't exist to default to empty strings
+    def __getitem__(self, name):
+	if self.has_key(name):
+	    return dict.__getitem__(self, name)
+	return ''
+    
+    def addMacros(self, *macroSet):
+	# must be in order; later macros in the set can depend on
+	# earlier ones
+	# for ease of use, we allow passing in a tuple of tuples, or
+	# a simple set of tuples
+	if len(macroSet) == 1 and type(macroSet[0]) is tuple:
+	    # we were passed a tuple of tuples (like baseMacros)
+	    macroSet = macroSet[0]
+	for key, value in macroSet:
+	    self[key] = value
+    
+    def copy(self):
+	new = Macros()
+	new.update(self)
+	return new
+
+
 def flatten(list):
     if type(list) != types.ListType: return [list]
     if list == []: return list
@@ -97,7 +140,20 @@ def loadRecipe(file):
         # stash a reference to the module in the namespace
         # of the recipe that loaded it, or else it will be destroyed
         callerGlobals[os.path.basename(file).replace('.', '-')] = recipes
+
+#def bootstrapRecipe(file, class, buildRequires):
+#    loadRecipe(file) # XXX not necessary if we put boostraps in main files
+#    exec """class Bootstrap%s(%s):
+#	buildRequires = %s
+#	name = "bootstrap-%s"
+#	def setup(self):
+#	    FIXMEcrossmacros(self.recipeCfg)
+#	    FIXMEcrossenv
+#	    FIXMEself.mainDir(class, self.version)
+#	    %s.setup(self)
+#    """ %(class, class, buildRequires.repr(), class, class)
         
+
 class Recipe:
     buildRequires = []
     runRequires = []
@@ -219,33 +275,36 @@ class Recipe:
 
     def doBuild(self, buildpath):
         builddir = buildpath + "/" + self.mainDir()
+	self.macros['builddir'] = builddir
         if self.build is None:
             pass
         elif type(self.build) is str:
-            os.system(self.build % {'builddir':builddir})
+            os.system(self.build %self.macros)
         elif type(self.build) is tuple:
 	    for bld in self.build:
                 if type(bld) is str:
-                    os.system(bld % {'builddir':builddir})
+                    os.system(bld %self.macros)
                 else:
-                    bld.doBuild(builddir)
+                    bld.doBuild(self.macros)
 	else:
-	    self.build.doBuild(builddir)
+	    self.build.doBuild(self.macros)
 
     def doInstall(self, buildpath, root):
         builddir = buildpath + "/" + self.mainDir()
+	self.addMacros(('builddir', builddir),
+	               ('destdir', root))
         if self.install is None:
             pass
         elif type(self.install) is str:
-            os.system(self.install % {'builddir':builddir, 'destdir':root})
+            os.system(self.install %self.macros)
 	elif type(self.install) is tuple:
 	    for inst in self.install:
                 if type(inst) is str:
-                    os.system(inst % {'builddir':builddir, 'destdir':root})
+                    os.system(inst %self.macros)
                 else:
-                    inst.doInstall(builddir, root)
+                    inst.doInstall(self.macros)
 	else:
-	    self.install.doInstall(builddir, root)
+	    self.install.doInstall(self.macros)
 
     def packages(self, root):
         self.packageSet = package.Auto(self.name, root)
@@ -264,3 +323,6 @@ class Recipe:
 	self.theMainDir = self.name + "-" + self.version
 	self.build = build.Make()
         self.install = build.MakeInstall()
+	self.macros = Macros()
+	self.addMacros = self.macros.addMacros
+	self.addMacros(baseMacros)
