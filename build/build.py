@@ -181,7 +181,7 @@ class Configure(BuildCommand):
     keywords = {'preConfigure': '',
 		'configureName': 'configure',
                 'objDir': '',
-                'bootstrapFlags': '--target=%(target)s --host=%(target)s --build=%(build)s',
+                'bootstrapFlags': '--target=%(target)s --host=%(host)s --build=%(build)s',
 		'subDir': ''}
 
     def __init__(self, recipe, *args, **keywords):
