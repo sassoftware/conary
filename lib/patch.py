@@ -40,9 +40,12 @@ class Hunk:
 
     def countConflicts(self, src, srcLine):
 	conflicts = 0
+	srcLen = len(src)
 	for line in self.lines:
 	    if line[0] == " " or line[0] == "-":
-		if src[srcLine] != line[1:]: 
+		if srcLine >= srcLen:
+		    conflicts += 1
+		elif src[srcLine] != line[1:]: 
 		    conflicts += 1
 		srcLine += 1
 
@@ -80,11 +83,10 @@ def patch(oldLines, unifiedDiff):
     i = 0
 
     if type(unifiedDiff) == types.GeneratorType:
-	list = []
-	for l in unifiedDiff:
-	    list.append(l)
-	unifiedDiff = list
+	# convert to a proper list
+	unifiedDiff = [ l for l in unifiedDiff ]
 
+    # split the diff up into a set of hunks
     last = len(unifiedDiff)
     hunks = []
     while i < last:
@@ -129,7 +131,6 @@ def patch(oldLines, unifiedDiff):
 			  contextCount))
 
     i = 0
-    last = len(unifiedDiff)
     result = []
     failedHunks = FailedHunkList()
 
