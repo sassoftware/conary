@@ -167,7 +167,6 @@ class Repository:
 	    eraseFiles.reverse()
 
 	    for (path, fileId, version) in eraseFiles:
-		print path
 		infoFile = self._getFileDB(fileId)
 		file = infoFile.getVersion(version)
 		self.removeFile(file, path)
