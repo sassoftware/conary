@@ -298,9 +298,17 @@ class ChangeSet(streams.LargeStreamSet):
 	else:
 	    tag = "0 "
 
+        # diffs come first, followed by plain files
+
 	for hash in idList:
 	    (contType, f) = contents[hash]
-	    csf.addFile(hash, f, tag + contType[4:])
+            if contType == ChangedFileTypes.diff:
+                csf.addFile(hash, f, tag + contType[4:])
+
+	for hash in idList:
+	    (contType, f) = contents[hash]
+            if contType != ChangedFileTypes.diff:
+                csf.addFile(hash, f, tag + contType[4:])
 
     def writeAllContents(self, csf):
 	self.writeContents(csf, self.earlyFileContents, True)
