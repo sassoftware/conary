@@ -19,11 +19,9 @@ import package
 import recipe
 import repository
 import sha1helper
-import shutil
 import time
 import types
 import util
-import log
 import tempfile
 
 # -------------------- private below this line -------------------------

@@ -1,5 +1,9 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 import group
-import versions
 
 def checkin(repos, cfg, file):
     f = open(file, "r")

@@ -5,7 +5,6 @@
 import files
 import log
 import package
-import packagename
 import versions
 
 from packagename import PackageName
