@@ -3,7 +3,6 @@
 # All rights reserved
 #
 
-import os
 import package
 
 def listRollbacks(db, cfg):
