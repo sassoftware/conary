@@ -8,11 +8,24 @@ class Package:
     def addFile(self, path, version):
 	self.files["/files" + path] = version
 
+    def addSource(self, path, version):
+	self.files["/sources" + path] = version
+
     def fileList(self):
 	l = []
 	# rip off the /files prefix
 	for (path, file) in self.files.items():
-	    l.append((path[6:], file))
+	    if path[:6] == "/files":
+		l.append((path[6:], file))
+
+	return l
+
+    def sourceList(self):
+	l = []
+	# rip off the /files prefix
+	for (path, file) in self.files.items():
+	    if path[:8] == "/sources":
+		l.append((path[8:], file))
 
 	return l
 
@@ -29,8 +42,10 @@ class PackageFromFile(Package):
     def read(self, dataFile):
 	for line in dataFile.readLines():
 	    (path, version) = string.split(line)
-	    # remove the "files/" bit
-	    self.addFile(path[6:], version)
+	    if path[:8] == "/sources":
+		self.addSource(path[8:], version)
+	    else:
+		self.addFile(path[6:], version)
 
     def __init__(self, name, dataFile):
 	Package.__init__(self, name)

@@ -42,12 +42,14 @@ elif (sys.argv[1] == "pkglist"):
 	displayPkgs(cfg.reppath, sys.argv[2:])
 elif (sys.argv[1] == "update"):
     for pkg in sys.argv[2:]:
-	update.doUpdate(cfg.reppath, cfg.root, pkg)
+	update.doUpdate(cfg.reppath, cfg.root, cfg.sourcepath, pkg, 
+			binaries = 1, sources = 1)
 elif (sys.argv[1] == "commit"):
     if (len(sys.argv) != 6 or sys.argv[3][0] != "/"):
 	print "usage: srs commit <pkg> <version> <root> <filelist>"
 	sys.exit(1)
 
-    commit.doCommit(cfg.reppath, sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+    commit.doCommit(cfg.reppath, sys.argv[2], sys.argv[3], sys.argv[4], \
+		    sys.argv[5])
 else:
     usage()

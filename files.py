@@ -147,7 +147,7 @@ class File(FileMode):
 	os.chown(root + self.path(), uid, gid)
 
     # copies a files contents into the repository, if necessary
-    def archive(self, reppath, path):
+    def archive(self, reppath, root):
 	# most file types don't need to do this
 	pass
 
@@ -308,14 +308,16 @@ class RegularFile(File):
 	source = reppath + "/files" + self.path() + ".contents/" + \
 		   self.uniqueName() 
 	target = root + self.path()
+	path = os.path.dirname(target)
+	util.mkdirChain(path)
 	shutil.copyfile(source, target)
 	File.restore(self, reppath, srcpath, root)
 
-    def archive(self, reppath):
+    def archive(self, reppath, root):
 	dest = reppath + "/files" + self.path() + ".contents"
 	util.mkdirChain(dest)
 	dest = dest + "/" + self.uniqueName()
-	shutil.copyfile(root + "/" + file.path(), dest)
+	shutil.copyfile(root + "/" + self.path(), dest)
 
     def __init__(self, path, version = None, info = None):
 	if (info):
@@ -324,6 +326,27 @@ class RegularFile(File):
 	    self.themd5 = None
 
 	File.__init__(self, path, version, info)
+
+class SourceFile(RegularFile):
+
+    def restore(self, reppath, srcpath, root):
+	source = reppath + "/sources/" + os.path.basename(self.path()) \
+		+ ".contents/" + self.uniqueName()
+	target = root + srcpath + "/" + os.path.basename(self.path())
+	path = os.path.dirname(target)
+	util.mkdirChain(path)
+	shutil.copyfile(source, target)
+	File.restore(self, reppath, srcpath, root)
+
+    def archive(self, reppath, root):
+	dest = reppath + "/sources/" + os.path.basename(self.path()) \
+		+ ".contents"
+	util.mkdirChain(dest)
+	dest = dest + "/" + self.uniqueName()
+	shutil.copyfile(root + "/" + self.path(), dest)
+
+    def infoLine(self):
+	return "src %s %s" % (self.themd5, File.infoLine(self))
 
 class FileDB:
 
@@ -368,16 +391,24 @@ class FileDB:
 
 	f.close()
 
-    def __init__(self, reppath, path):
+    def __init__(self, reppath, isSource, path):
 	self.reppath = reppath
 	self.path = path
-	self.dbfile = reppath + '/files' + path + '.info'
+
+	if isSource:
+	    self.dbfile = reppath + '/sources' + path + '.info'
+	else:
+	    self.dbfile = reppath + '/files' + path + '.info'
+
 	self.read()
 
-def FileFromFilesystem(root, path):
+def FileFromFilesystem(root, path, type = "auto"):
     s = os.lstat(root + path)
 
-    if (stat.S_ISREG(s.st_mode)):
+    if (type == "src"):
+	f = SourceFile(path)
+	f.md5(md5sum.md5sum(root + path))
+    elif (stat.S_ISREG(s.st_mode)):
 	f = RegularFile(path)
 	f.md5(md5sum.md5sum(root + path))
     elif (stat.S_ISLNK(s.st_mode)):
@@ -419,5 +450,7 @@ def FileFromInfoLine(path, version, infoLine):
 	return DeviceFile(path, version, infoLine)
     elif type == "s":
 	return Socket(path, version, infoLine)
+    elif type == "src":
+	return SourceFile(path, version, infoLine)
     else:
 	raise KeyError, "bad infoLine %s" % infoLine

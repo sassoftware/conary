@@ -7,7 +7,7 @@ import pwd
 import grp
 import files
 
-def doUpdate(reppath, root, pkgName):
+def doUpdate(reppath, root, srcPath, pkgName, binaries = 1, sources = 0):
     if root == "/":
 	print "using srs to update to your actual system is dumb."
 	import sys
@@ -20,14 +20,18 @@ def doUpdate(reppath, root, pkgName):
 
     (version, pkg) = pkgSet.getLatest()
 
-    for (fileName, version) in pkg.fileList():
-	infoFile = files.FileDB(reppath, fileName)
+    fileList = []
+
+    if binaries:
+	for (fileName, version) in pkg.fileList():
+	    infoFile = files.FileDB(reppath, 0, fileName)
+	    fileList.append(infoFile)
+
+    if sources:
+	for (fileName, version) in pkg.sourceList():
+	    infoFile = files.FileDB(reppath, 1, fileName)
+	    fileList.append(infoFile)
+
+    for infoFile in fileList:
 	f = infoFile.getVersion(version)
-
-	source = "%s/files/%s.contents/%s" % (reppath, fileName, f.uniqueName())
-
-	target = "%s/%s" % (root, fileName)
-	dir = os.path.split(target)[0]
-	util.mkdirChain(dir)
-
-	f.restore(reppath, None, root)
+	f.restore(reppath, srcPath, root)

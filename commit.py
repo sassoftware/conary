@@ -3,6 +3,7 @@ import util
 import os
 import files
 import shutil
+import string
 
 def finalCommit(reppath, pkgName, version, root, fileList):
     pkgSet = package.PackageSet(reppath, pkgName)
@@ -14,23 +15,27 @@ def finalCommit(reppath, pkgName, version, root, fileList):
     fileDB = reppath + "/files"
 
     for file in fileList:
-	infoFile = files.FileDB(reppath, file.path())
+	infoFile = files.FileDB(reppath, file.__class__ == files.SourceFile, \
+				file.path())
 
 	existing = infoFile.findVersion(file)
 	if not existing:
 	    file.version(version)
 	    infoFile.addVersion(version, file)
-	    p.addFile(file.path(), file.version())
+
+	    if file.__class__ == files.SourceFile:
+		p.addSource(file.path(), file.version())
+	    else:
+		p.addFile(file.path(), file.version())
+
 	    infoFile.write()
 	else:
-	    p.addFile(file.path(), existing[0])
+	    if file.__class__ == files.SourceFile:
+		p.addSource(file.path(), existing[0])
+	    else:
+		p.addFile(file.path(), existing[0])
 
-	if file.__class__ == files.RegularFile:
-	    dest = fileDB + "/" + file.dir() + "/" + file.name() + ".contents" 
-
-	    util.mkdirChain(dest)
-	    dest = dest + "/" + file.uniqueName()
-	    shutil.copyfile(root + "/" + file.path(), dest)
+	file.archive(reppath, root)
 
     pkgSet.write()
 
@@ -45,7 +50,16 @@ def doCommit(reppath, pkgName, version, root, fileNameFile):
 
     fileList = []
     for i in range(0, len(list)):
-	f = files.FileFromFilesystem(root, list[i])
+	frags = string.split(list[i])
+	path = frags[0]
+	flags = frags[1:]
+
+	type = "auto"
+	for flag in flags:
+	    if flag == "src":
+		type = "src"
+
+	f = files.FileFromFilesystem(root, path, type)
 	fileList.append(f)
 
     finalCommit(reppath, pkgName, version, root, fileList)
