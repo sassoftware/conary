@@ -156,9 +156,10 @@ def _formatFlavor(flavor):
     return '\n   ' + '\n   '.join(str(flavor).split('\n'))
 
 
-def _printOneTrove(db, troveName, fullVersions):
+def _printOneTrove(db, troveName, troveVersions, fullVersions):
     displayC = DisplayCache()
-    troveVersions = db.getTroveVersionList(troveName)
+    if troveVersions is None:
+        troveVersions = db.getTroveVersionList(troveName)
     if not troveVersions:
         log.error("%s is not installed", troveName)
         return
@@ -193,10 +194,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
                 troveNames.append((trove.getName(), [ trove.getVersion() ]))
 
         for troveName, versionList in troveNames:
-            # we should never have a version list, since we check
-            # "not hasVersions" above
-            assert(versionList is None)
-            _printOneTrove(db, troveName, fullVersions)
+            _printOneTrove(db, troveName, versionList, fullVersions)
         return
 
     for path in pathList:
