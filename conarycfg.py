@@ -9,27 +9,12 @@ import deps.deps
 import os
 import versions
 
-STRING, BOOL, LABEL, STRINGDICT = range(4)
+STRING, BOOL, LABEL, STRINGDICT, STRINGLIST = range(5)
 
-class ConaryConfiguration:
+class ConfigFile:
 
-    defaults = {
-	'buildLabel'	        : [ LABEL,	 None ],
-	'buildPath'		: '/usr/src/conary/builds',
-	'cookNewBranches'	: [ BOOL, False ], 
-	'contact'		: None,
-	'dbPath'		: '/var/lib/conarydb',
-	'debugRecipeExceptions' : [ BOOL, False ], 
-	'installLabel'		: [ LABEL,	 None ],
-	'instructionSet'	: deps.arch.current(),
-	'lookaside'		: '/var/cache/conary',
-	'name'			: None,
-	'repositoryMap'	        : [ STRINGDICT, {} ],
-	'root'			: '/',
-	'sourcePath'		: '/usr/src/conary/sources',
-	'tmpDir'		: '/var/tmp/',
-    }
-   
+    defaults = {}
+
     def read(self, file):
 	if os.path.exists(file):
 	    f = open(file, "r")
@@ -57,6 +42,8 @@ class ConaryConfiguration:
 	elif type == STRINGDICT:
 	    (idx, val) = val.split(None, 1)
 	    self.__dict__[key][idx] = val
+	elif type == STRINGLIST:
+	    self.__dict__[key].append(val)
 	elif type == LABEL:
 	    try:
 		self.__dict__[key] = versions.BranchName(val)
@@ -108,6 +95,28 @@ class ConaryConfiguration:
         for (key, value) in self.__dict__.items():
             self.lowerCaseMap[key.lower()] = key
 
+class ConaryConfiguration(ConfigFile):
+
+    defaults = {
+	'buildLabel'	        : [ LABEL,	 None ],
+	'buildPath'		: '/usr/src/conary/builds',
+	'cookNewBranches'	: [ BOOL, False ], 
+	'contact'		: None,
+	'dbPath'		: '/var/lib/conarydb',
+	'debugRecipeExceptions' : [ BOOL, False ], 
+	'installLabel'		: [ LABEL,	 None ],
+	'instructionSet'	: deps.arch.current(),
+	'lookaside'		: '/var/cache/conary',
+	'name'			: None,
+	'repositoryMap'	        : [ STRINGDICT, {} ],
+	'root'			: '/',
+	'sourcePath'		: '/usr/src/conary/sources',
+	'tmpDir'		: '/var/tmp/',
+    }
+   
+    def __init__(self):
+	ConfigFile.__init__(self)
+
 	self.flavor = deps.deps.DependencySet()
 	self.flavor.addDep(deps.deps.InstructionSetDependency, 
 			   self.instructionSet)
@@ -115,6 +124,7 @@ class ConaryConfiguration:
 	self.read("/etc/conaryrc")
 	if os.environ.has_key("HOME"):
 	    self.read(os.environ["HOME"] + "/" + ".conaryrc")
+
 
 class ConaryCfgError(Exception):
 
