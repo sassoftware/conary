@@ -168,17 +168,18 @@ class FileMode:
 	else:
 	    return self.infoLine()
 
-    def same(self, other):
+    def same(self, other, ignoreOwner = False):
 	if self.__class__ != other.__class__: return 0
 
 	if (self.thePerms == other.thePerms and
-            self.theOwner == other.theOwner and
-            self.theGroup == other.theGroup and
-            self.theFlags == other.theFlags and
-            self.theSize == other.theSize):
-	    return 1
+		self.theFlags == other.theFlags and
+		self.theSize == other.theSize):
+	    if ignoreOwner: return True
 
-	return 0
+	    return (self.theOwner == other.theOwner and
+		    self.theGroup == other.theGroup)
+
+	return False
 
     def _applyChangeLine(self, line):
 	(p, o, g, s, m, f) = line.split()
@@ -297,15 +298,12 @@ class SymbolicLink(File):
     def infoLine(self):
 	return "l %s %s" % (self.theLinkTarget, FileMode.infoLine(self))
 
-    def same(self, other):
+    def same(self, other, ignoreOwner = False):
 	if self.__class__ != other.__class__: return 0
 
-	if self.theLinkTarget == other.theLinkTarget:
-	    # recursing does a permission check, which doens't apply 
-	    # to symlinks under Linux
-	    return 1
-
-	return 0
+	# recursing does a permission check, which doens't apply 
+	# to symlinks under Linux
+	return self.theLinkTarget == other.theLinkTarget
 
     def chmod(self, target):
 	# chmod() on a symlink follows the symlink
@@ -338,8 +336,8 @@ class Socket(File):
 
     lsTag = "s"
 
-    def same(self, other):
-	return File.same(self, other)
+    def same(self, other, ignoreOwner = False):
+	return File.same(self, other, ignoreOwner)
 
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
@@ -356,8 +354,8 @@ class NamedPipe(File):
 
     lsTag = "p"
 
-    def same(self, other):
-	return File.same(self, other)
+    def same(self, other, ignoreOwner = False):
+	return File.same(self, other, ignoreOwner)
 
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
@@ -372,7 +370,7 @@ class Directory(File):
 
     lsTag = "d"
 
-    def same(self, other):
+    def same(self, other, ignoreOwner = False):
 	return File.same(self, other)
 
     def restore(self, fileContents, target, restoreContents):
@@ -400,12 +398,12 @@ class DeviceFile(File):
 	return "%c %d %d %s" % (self.infoTag, self.major, self.minor,
 				  FileMode.infoLine(self))
 
-    def same(self, other):
+    def same(self, other, ignoreOwner = False):
 	if self.__class__ != other.__class__: return 0
 
 	if (self.infoTag == other.infoTag and self.major == other.major and
             self.minor == other.minor):
-	    return File.same(self, other)
+	    return File.same(self, other, ignoreOwner)
 	
 	return 0
 
@@ -484,11 +482,11 @@ class RegularFile(File):
 	return "%s %s %s" % (self.infoTag, self.thesha1, 
 			     FileMode.infoLine(self))
 
-    def same(self, other):
+    def same(self, other, ignoreOwner = False):
 	if self.__class__ != other.__class__: return 0
 
 	if self.thesha1 == other.thesha1:
-	    return File.same(self, other)
+	    return File.same(self, other, ignoreOwner)
 
 	return 0
 
