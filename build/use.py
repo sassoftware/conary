@@ -529,6 +529,7 @@ def getUsed():
     used['Arch'] = Arch.getUsed()
     used['Use'] = Use.getUsed()
     used['Flags'] = LocalFlags.getUsed()
+    return used
 
 def setUsed(usedDict):
     """
