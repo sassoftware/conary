@@ -21,6 +21,7 @@ import files
 from lib import log
 import metadata
 import time
+import versions
 
 from lib.sha1helper import sha1ToString
 
@@ -101,8 +102,11 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
                 continue
 
             displayc.cache(troveName, flavors[troveName], fullVersions)
+
+            versionList = flavors[troveName].keys()
+            versionList.sort(versions.Version.compare)
             
-	    for version in flavors[troveName].keys():
+	    for version in reversed(versionList):
 		for flavor in flavors[troveName][version]:
 		    if all:
 			print _troveFormatWithFlavor %(
