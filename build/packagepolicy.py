@@ -8,6 +8,7 @@ import re
 import os
 import policy
 import log
+import stat
 import buildpackage
 
 """
@@ -24,10 +25,13 @@ class _filterSpec(policy.Policy):
 
     def updateArgs(self, *args, **keywords):
 	"""
-	ThisClass('<name>', 'regex1', 'regex2'...)
+	ThisClass('<name>', 'regex1', 'regex2', [setmodes=stat.??] [unsetmodes=stat.???])
 	"""
 	if args:
-	    self.extraFilters.append((args[0], args[1:]))
+	    # pull setmodes and unsetmodes out of **keywords
+	    setmodes = keywords.pop('setmodes', None)
+	    unsetmodes = keywords.pop('unsetmodes', None)
+	    self.extraFilters.append((args[0], args[1:], setmodes, unsetmodes))
 	policy.Policy.updateArgs(self, [], **keywords)
 
 
@@ -39,13 +43,13 @@ class ComponentSpec(_filterSpec):
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
 	('python',    ('%(libdir)s/python.*/site-packages/')),
+	('devel',     ('\.so',), stat.S_IFLNK),
 	('devel',     ('\.a',
-		       '\.so',
 		       '.*/include/.*\.h',
 		       '%(includedir)s/',
 		       '%(mandir)s/man(2|3)/',
 		       '%(datadir)s/aclocal/')),
-	('lib',       ('.*/lib/.*\.so\..*')),
+	('lib',       ('.*/lib/.*\.so.*')),
 	# note that gtk-doc is not well-named; it is a shared system, like info,
 	# and is used by unassociated tools (devhelp)
 	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info)/')),
@@ -60,13 +64,16 @@ class ComponentSpec(_filterSpec):
 
 	# the extras need to come first in order to override decisions
 	# in the base subfilters
-	for (name, patterns) in self.extraFilters:
+	for (filteritem) in self.extraFilters + list(self.baseFilters):
+	    filteritem = list(filteritem)
+	    while len(filteritem) < 4:
+		filteritem.append(None)
+	    name, patterns, setmode, unsetmode = filteritem
 	    name = name %macros
 	    assert(name != 'sources')
-	    compFilters.append(buildpackage.Filter(name, patterns, macros))
-	for (name, patterns) in self.baseFilters:
-	    assert(name != 'sources')
-	    compFilters.append(buildpackage.Filter(name, patterns, macros))
+	    compFilters.append(
+		buildpackage.Filter(name, patterns, macros,
+				    setmode=setmode, unsetmode=unsetmode))
 
 	# pass these down to PackageSpec for building the package
 	recipe.PackageSpec(compFilters=compFilters)
@@ -78,8 +85,14 @@ class PackageSpec(_filterSpec):
 	pkgFilters = []
 	macros = recipe.macros
 
-	for (name, patterns) in self.extraFilters:
-	    pkgFilters.append(buildpackage.Filter(name %macros, patterns, macros))
+	for (filteritem) in self.extraFilters:
+	    filteritem = list(filteritem)
+	    while len(filteritem) < 4:
+		filteritem.append(None)
+	    name, patterns, setmode, unsetmode = filteritem
+	    pkgFilters.append(
+		buildpackage.Filter(name %macros, patterns, macros,
+				    setmode=setmode, unsetmode=unsetmode))
 	# by default, everything that hasn't matched a pattern in the
 	# main package filter goes in the package named recipe.name
 	pkgFilters.append(buildpackage.Filter(recipe.name, '.*', macros))
