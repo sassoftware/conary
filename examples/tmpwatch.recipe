@@ -9,7 +9,7 @@ class Logrotate(recipe.Recipe):
 preventing files from growing ad nauseum"""
 
     buildRequires = [ "glibc" ]
-    installRequires = [ "cron" ]
+    runRequires = [ "cron" ]
 
     name = "tmpwatch"
     version = "2.9.0"

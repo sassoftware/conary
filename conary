@@ -18,7 +18,8 @@ cfg = srscfg.SrsConfiguration()
 
 fileDB = cfg.reppath + "/files"
 pkgDB = cfg.reppath + "/pkgs"
-os.makedirs(fileDB, pkgDB)
+os.makedirs(fileDB)
+os.makedirs(pkgDB)
 
 def usage():
     print "usage: srs import <file.rpm>"
