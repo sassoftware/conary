@@ -1,5 +1,5 @@
 .\" Copyright (c) 2004-2005 Specifix, Inc.
-.TH CONARY 1 "11 February 2005" "Specifix, Inc."
+.TH CONARY 1 "21 February 2005" "Specifix, Inc."
 .SH NAME
 conary \- repository-based software configuration manager
 .SH SYNOPSIS
@@ -22,11 +22,11 @@ cvc(1).
 The following \fBcommands\fP are used to install, update, erase, and
 otherwise manage software installed on a local system.
 .TP 4
-.B query \fItrovename\fP[=\fIversion\fP][[flavor]]*\fP [\fI\-\-path <path>\fP]*
+.B query \fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]*\fP [\fI\-\-path <path>\fP]*
 Lists troves installed on the local system. Any number of trove names or
 absolute paths may be given.
 .TP
-.B update [\fIargs\fP] <\fItrovename\fP[=\fIversion\fP][[flavor]]>* <\fIchangeset-file\fP>*
+.B update [\fIargs\fP] <\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]>* <\fIchangeset-file\fP>*
 Updates the trove \fItrovename\fR from the appropriate repository to 
 match the optional \fIversion\fP (otherwise the most recent version which 
 matches the \fBinstall-label\fP) and applies the changesets contained in any
@@ -80,7 +80,7 @@ to provide the \-\-replace-files option.
 Perform all actions up to the point of writing to the filesystem.
 .RE
 .TP
-.B erase \fItrovename\fP[=\fRversion][[flavor]]\fP+
+.B erase \fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
 Erase all instances of \fItrovename\fP (or only a specified \fIversion\fP)
 from the local system.
 .RS 4
@@ -149,7 +149,7 @@ Lists available rollbacks.
 Applies rollback \fIrollback\fP.  (Syntax may change in future versions
 of Conary.)
 .TP
-.B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][[flavor]]]*
+.B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
 Lists troves in the repository.
 Arguments include
 .RS 4
@@ -285,11 +285,37 @@ has the special property of being able to apply to more than one
 branch at once.  Therefore, \fBconary.example.com@local:foo\fP might
 refer to \fIboth\fP of the following at once:
 .br
-/conary.example.com@local:bar/conary.example.com@local:foo
+.B /conary.example.com@local:bar/conary.example.com@local:foo
 .br
-/conary.example.com@local:foo
+.B /conary.example.com@local:foo
 .br
 A label applies to any branch whose name ends with the label.
+.RE
+.TP
+.B Flavors
+A single version of a source component can be built many times
+with different configurations and for different architectures.
+Each of these different builds is called a flavor.  The flavor
+is determined by the base instruction set (e.g. \fBx86\fP,
+\fBx86_64\fP, \fBppc\fP, \fBppc64\fP, etc.), any extra instruction
+set features (e.g. \fBmmx\fP, \fBcmov\fP, \fBsse\fP, \fB3dnow\fP),
+and the flags that the recipe was cooked with, both sytem-wide
+flags (e.g. \fBnptl\fR, \fBbuilddocs\fP, \fBpam\fP) and package-specific
+flags (e.g. \fBkernel.smp\fP, \fBglibc.tls\fP).
+.IP
+Flavors are
+specified within literal \fB[\fP and \fB]\fP characters, first
+the flags (if any), optionally prefixed by a literal \fB!\fP character
+to invert their sense, then the instruction set specified as a
+literal \fBis:\fP followed by the base instruction set, and then
+any extra instruction set features within literal \fB(\fP and \fB)\fP
+characters.  Examples include
+.br
+.B [nptl,!builddocs is:x86(sse)]
+.br
+.B [!kernel.smp]
+.br
+.B [is: x86_64]
 .RE
 .TP
 .B Changesets
@@ -308,11 +334,14 @@ and can also live independently as files.
 .I /etc/conaryrc
 .TP
 .I $HOME/.conaryrc
-The configuration files for Conary; entries in \fI$HOME/.conaryrc\fR
-override entries in \fI/etc/conaryrc,\fR and command-line options
+.TP
+.I ./conaryrc
+The configuration files for Conary; entries in \fI./conaryrc\fP
+override entries in \fI$HOME/.conaryrc\fR, which override entries
+in \fI/etc/conaryrc\fR.  Command-line options
 (including the \fB\-\-config\fR option, which allows you to override
 one line in the config file, and the \-\-config-file option, which 
-reads in an additional, supplied config file) override both 
+reads in an additional, supplied config file) override all 
 configuration files.  Conary configuration items can be strings,
 booleans (\fBTrue\fP or \fBFalse\fP), or mappings (\f(BIto from\fP) and
 can include:
