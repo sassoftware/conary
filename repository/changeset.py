@@ -595,6 +595,23 @@ class ChangeSetFromFile(ChangeSet):
         (tag, str) = self.configCache.get(fileId, (None, None))
         return tag == ChangedFileTypes.diff
 
+    def _nextFile(self):
+        if self.lastCsf:
+            next = self.lastCsf.getNextFile()
+            if next:
+                util.tupleListBsearchInsert(self.fileQueue, 
+                                            next + (self.lastCsf,),
+                                            self.fileQueueCmp)
+            self.lastCsf = None
+
+        if not self.fileQueue:
+            return None
+
+        rc = self.fileQueue[0]
+        self.lastCsf = rc[4]
+        del self.fileQueue[0]
+        return rc
+
     def getFileContents(self, fileId, withSize = False):
 	if self.configCache.has_key(fileId):
             name = fileId
@@ -604,18 +621,8 @@ class ChangeSetFromFile(ChangeSet):
 	else:
             self.filesRead = True
 
-            if self.lastCsf:
-                next = self.lastCsf.getNextFile()
-                if next:
-                    util.tupleListBsearchInsert(self.fileQueue, 
-                                                next + (self.lastCsf,),
-                                                self.fileQueueCmp)
-                self.lastCsf = None
-
-            while self.fileQueue:
-                rc = self.fileQueue[0]
-                del self.fileQueue[0]
-
+            rc = self._nextFile()
+            while rc:
                 name, tagInfo, f, size, csf = rc
                 
                 # if we found the fileId we're looking for, or the fileId
@@ -630,10 +637,7 @@ class ChangeSetFromFile(ChangeSet):
                         self.lastCsf = csf
                         break
 
-                next = csf.getNextFile()
-                if next:
-                    util.tupleListBsearchInsert(self.fileQueue, next + (csf,),
-                                                self.fileQueueCmp)
+                rc = self._nextFile()
 
         if name != fileId:
             raise KeyError, 'fileId %s is not in the changeset' % \
@@ -732,9 +736,6 @@ class ChangeSetFromFile(ChangeSet):
         assert(not self.filesRead)
         self.filesRead = True
 
-        # XXX this needs fixing
-        assert(0)
-
         idList = self.configCache.keys()
         idList.sort()
 
@@ -742,29 +743,22 @@ class ChangeSetFromFile(ChangeSet):
 	    (tag, str) = self.configCache[hash]
             csf.addFile(hash, filecontents.FromString(str), "1 diff")
 
-        while True:
-            if self.fileQueue:
-                rc = self.fileQueue[0]
-                del self.fileQueue[0]
-            else:
-                rc = self.csf.getNextFile()
-
-            if not rc:
-                break
-
-            name, tagInfo, f, size = rc
-            csf.addFile(name, filecontents.Fromfile(f, size = size), tagInfo)
+        next = self._nextFile()
+        while next:
+            name, tagInfo, f, size, otherCsf = next
+            csf.addFile(name, filecontents.FromFile(f, size = size), tagInfo)
+            next = self._nextFile()
 
     def merge(self, otherCs):
         assert(self.__class__ == otherCs.__class__)
         assert(not self.lastCsf)
-        assert(not other.lastCsf)
+        assert(not otherCs.lastCsf)
 
-        self.configCache.merge(otherCs.configCache)
-        self.files.merge(otherCs.files)
+        self.configCache.update(otherCs.configCache)
+        self.files.update(otherCs.files)
         self.primaryTroveList += otherCs.primaryTroveList
-        self.newPackages.merge(otherCs.newPackages)
-        self.oldPackages.merge(otherCs.oldPackages)
+        self.newPackages.update(otherCs.newPackages)
+        self.oldPackages += otherCs.oldPackages
 
         for entry in otherCs.fileQueue:
             util.tupleListBsearchInsert(self.fileQueue, entry, 
