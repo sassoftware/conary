@@ -722,6 +722,58 @@ class WarnWriteable(policy.Policy):
 			' 0%o for %s %s', mode & 0777, type, file)
 
 
+class FilesForDirectories(policy.Policy):
+    """
+    Warn about files where we expect directories, commonly caused
+    by bad C{r.Install()} invocations.  Does not honor exceptions!
+    """
+    # This list represents an attempt to pick the most likely directories
+    # to make these mistakes with: directories potentially inhabited by
+    # files from multiple packages, with reasonable possibility that they
+    # will have files installed by hand rather than by a "make install".
+    candidates = (
+	'/bin',
+	'/sbin',
+	'/etc',
+	'/etc/X11',
+	'/etc/init.d',
+	'/etc/sysconfig',
+	'/etc/xinetd.d',
+	'/lib',
+	'/mnt',
+	'/opt',
+	'/usr',
+	'/usr/bin',
+	'/usr/sbin',
+	'/usr/lib',
+	'/usr/libexec',
+	'/usr/include',
+	'/usr/share',
+	'/usr/share/info',
+	'/usr/share/man',
+	'/usr/share/man/man1',
+	'/usr/share/man/man2',
+	'/usr/share/man/man3',
+	'/usr/share/man/man4',
+	'/usr/share/man/man5',
+	'/usr/share/man/man6',
+	'/usr/share/man/man7',
+	'/usr/share/man/man8',
+	'/usr/share/man/man9',
+	'/usr/share/man/mann',
+	'/var/lib',
+	'/var/spool',
+    )
+    def do(self):
+	d = self.recipe.macros.destdir
+	for path in self.candidates:
+	    fullpath = util.joinPaths(d, path)
+	    if os.path.exists(fullpath):
+		if not os.path.isdir(fullpath):
+		    self.recipe.reportErrors(
+			'File %s should be a directory; bad r.Install()?' %file)
+
+
 class IgnoredSetuid(policy.Policy):
     """
     Files/directories that are setuid/setgid in the filesystem
@@ -926,6 +978,7 @@ def DefaultPolicy(recipe):
 	DanglingSymlinks(recipe),
 	AddModes(recipe),
 	WarnWriteable(recipe),
+	FilesForDirectories(recipe),
 	IgnoredSetuid(recipe),
 	Ownership(recipe),
 	ExcludeDirectories(recipe),
