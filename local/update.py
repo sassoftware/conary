@@ -510,7 +510,8 @@ class FilesystemJob:
 		    headFileContType = None
 
 		if (flags & REPLACEFILES) or (not flags & MERGE) or \
-				fsFile.contents == baseFile.contents:
+			headFile.flags.isTransient() or \
+			fsFile.contents == baseFile.contents:
 		    # the contents changed in just the repository, so take
 		    # those changes
 		    if headFileContType == changeset.ChangedFileTypes.diff:
