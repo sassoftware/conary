@@ -206,7 +206,9 @@ class Flag(dict):
         """ Create a flag set based on used flags """
         flagSet = nullSet()
         for flag in self.getUsed().itervalues():
-            if not flag:
+            if flag._value is None:
+                continue
+            if flag._value is False:
                 flag = -flag
             flagSet = flagSet + flag
         return flagSet
@@ -274,24 +276,24 @@ class Flag(dict):
             top._value = True
         return parent
 
-    def toDependency(self):
+    def toDependency(self, recipename=''):
         """ Convert this flag set to a list of dependencies """
         # XXX this code should probably disappear with the reworking of 
         # flavors and their relationship with deps, but for now, 
         # it is very handy
         set = deps.DependencySet()
-        useflagsets = []
         if self._name != '__GLOBAL__':
             self = self.asSet()
-        if 'Use' in self:
-            useflagsets.append(self['Use'])
-        if 'Flags' in self:
-            useflagsets.append(self['Flags'])
-        if useflagsets:
+        if 'Use' in self or 'Flags' in self:
             stringDeps = []
-            for flagset in useflagsets:
-                for flag in flagset.iterkeys():
-                    stringDeps.extend(flagset[flag].toDepStrings())
+            if 'Use' in self:
+                for flag in self.Use.iterkeys():
+                    stringDeps.extend(self.Use[flag].toDepStrings(topflag=self.Use))
+            if 'Flags' in self:
+                for flag in self.Flags.iterkeys():
+                    stringDeps.extend(
+                        self.Flags[flag].toDepStrings(prefix=recipename,
+                                                   topflag=self.Flags))
             dep = deps.Dependency('use', stringDeps)
             set.addDep(deps.UseDependency, dep)
         if 'Arch' in self:
@@ -324,8 +326,8 @@ class Flag(dict):
             else:
                 strings.append('~!' + name)
         for subflag in self.iterkeys():
-            strings.extend(
-                self[subflag].toDepStrings(prefix=prefix, topflag=topflag))
+            strings.extend(self[subflag].toDepStrings(prefix=prefix,
+                                                      topflag=topflag))
         return strings
 
     def __setitem__(self, key, value):
