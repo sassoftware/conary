@@ -145,6 +145,9 @@ class Database(repository.LocalRepository):
     def commitChangeSet(self, cs, localRollback = None):
 	assert(not cs.isAbstract())
 
+	for pkg in cs.getNewPackageList():
+	    if pkg.name.endswith(":sources"): raise SourcePackageInstall
+
 	if not localRollback:
 	    # create the change set from A->A.local
 	    list = []
@@ -557,7 +560,16 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 		
 # Exception classes
 
-class RollbackError(repository.RepositoryError):
+class DatabaseError(Exception):
+    """Base class for exceptions from the system database"""
+
+    def __str__(self):
+	return self.str
+
+    def __init__(self, str = None):
+	self.str = str
+
+class RollbackError(Database):
 
     """Base class for exceptions related to applying rollbacks"""
 
@@ -594,3 +606,9 @@ class RollbackDoesNotExist(RollbackError):
 	@param rollbackName: string represeting the name of the rollback
 	which does not exist"""
 	self.name = rollbackName
+
+class SourcePackageInstall(DatabaseError):
+
+    def __str__(self):
+	return "cannot install a source package onto the local system"
+
