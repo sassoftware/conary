@@ -28,7 +28,11 @@ if sys.version_info < (2, 3):
 
 sys.excepthook = util.excepthook
 
-cfg = srscfg.SrsConfiguration()
+try:
+    cfg = srscfg.SrsConfiguration()
+except srscfg.ParseError, e:
+    log.error(str(e))
+    sys.exit(1)
 
 def usage():
     print "usage: srs branch <newbranch> <branchfrom> [<trove>]"
