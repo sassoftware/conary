@@ -276,7 +276,7 @@ class ConaryClient:
             for outerTrove in troves:
                 for trove in self.db.walkTroveSet(outerTrove, 
                                                  ignoreMissing = True):
-                    if flavor is None or trove.getFlavor().satisfies(flavor):
+                    if flavor is None or flavor.satisfies(trove.getFlavor()):
                         cs.oldPackage(trove.getName(), trove.getVersion(), 
                                       trove.getFlavor())
 
