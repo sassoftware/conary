@@ -271,7 +271,7 @@ def fetchFreshmeat(troveName):
     except xml.parsers.expat.ExpatError:
         raise NoFreshmeatRecord
 
-def showDetails(repos, cfg, troveName, branch):
+def showDetails(repos, cfg, troveName, branch, sourceTrove):
     md = repos.getMetadata([troveName, branch], branch.label())
     while not md and branch.hasParentBranch():
         lastHost = branch.label().getHost()
@@ -281,7 +281,13 @@ def showDetails(repos, cfg, troveName, branch):
 
         if branch.label().getHost() != lastHost:
             md = repos.getMetadata([troveName, branch], branch.label())
-
+    
+    # check source trove for metadata
+    if not md and sourceTrove:
+        troveName = sourceTrove.getName()
+        md = repos.getMetadata([troveName, sourceTrove.getVersion().branch()],
+                               sourceTrove.getVersion().branch().label())
+   
     if troveName in md:
         md = md[troveName]
         

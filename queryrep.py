@@ -152,6 +152,8 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                         withFiles = False)
             except repository.TroveMissing:
                 sourceTrove = None
+        elif troveName.endswith(':source'):
+            sourceTrove = trove
         else:
             sourceTrove = None
 
@@ -195,10 +197,11 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
             print "Size      : %s" % size
             print "Flavor    : %s" % deps.formatFlavor(trove.getFlavor())
 
+            metadata.showDetails(repos, cfg, trove.getName(),
+                                 troveVersion.branch(),
+                                 sourceTrove)
+            
             if sourceTrove:
-                metadata.showDetails(repos, cfg, sourceTrove.getName(), 
-                                     sourceTrove.getVersion().branch())
-
                 cl = sourceTrove.getChangeLog()
                 if cl:
                     print "Change log: %s (%s)" % (cl.getName(), 
