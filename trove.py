@@ -577,26 +577,26 @@ class PackageChangeSet:
 	@rtype: string
 	"""
 
-	rc = ""
+	rc = []
 	lines = 0
 
 	for id in self.getOldFileList():
-	    rc += "-%s\n" % id
+	    rc.append("-%s\n" % id)
 
 	for (id, path, version) in self.getNewFileList():
-	    rc += "+%s %s %s\n" % (id, path, version.freeze())
+	    rc.append("+%s %s %s\n" % (id, path, version.freeze()))
 
 	for (id, path, version) in self.getChangedFileList():
-	    rc += "~%s " % id
+	    rc.append("~%s " % id)
 	    if path:
-		rc += path
+		rc.append(path)
 	    else:
-		rc += "-"
+		rc.append("-")
 
 	    if version:
-		rc += " " + version.freeze() + "\n"
+		rc.append(" " + version.freeze() + "\n")
 	    else:
-		rc += " -\n"
+		rc.append(" -\n")
 
 	lines = []
 	for name in self.packages.keys():
@@ -604,8 +604,8 @@ class PackageChangeSet:
 	    lines.append("p " + name + " " + " ".join(list))
 
 	if lines:
-	    rc += "\n".join(lines) + "\n"
-
+	    rc.append("\n".join(lines) + "\n")
+        rc = "".join(rc)
 	mainLineCount = rc.count("\n")
 
 	if self.abstract:
