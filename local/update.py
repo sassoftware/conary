@@ -147,7 +147,7 @@ class FilesystemJob:
 	    oldFile = repos.getFileVersion(fileId, version)
 
 	    if not oldFile.same(localFile, ignoreOwner = True):
-		self.errors.append("%s has changed but has been removed " +
+		self.errors.append("%s has changed but has been removed "
 				   "on head" % path)
 		continue
 
@@ -202,7 +202,7 @@ class FilesystemJob:
 		    # a file which was not in the base package was created
 		    # on both the head of the branch and in the filesystem;
 		    # this can happen during source management
-		    self.errors.append("new file %s conflicts with file on " +
+		    self.errors.append("new file %s conflicts with file on "
 				    "head of branch" % realPath)
 		    contentsOkay = 0
 		else:
@@ -261,7 +261,7 @@ class FilesystemJob:
 			if failedHunks:
 			    self._createFile(realPath + ".conflicts", 
 				     failedHunks.asString(),
-			             "conflicts from merging changes from " +
+			             "conflicts from merging changes from " 
 				     "head into %s saved as %s.conflicts" % 
 				     (realPath, realPath))
 
