@@ -96,11 +96,6 @@ class Database(repository.LocalRepository):
 		file.archive(self, f)
 		f.close()
 
-    def pullFileContents(self, fileId, targetFile):
-	srcFile = self.pullFileContentsObject(fileId)
-	targetFile.write(srcFile.read())
-	srcFile.close()
-
     def pullFileContentsObject(self, fileId):
 	# just pick the first path; we don't care which one we use
 	path = self.fileIdMap[fileId].split('\n')[0]
