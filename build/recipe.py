@@ -289,8 +289,9 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     
     if not inF:
 	raise RecipeFileError("version %s of %s does not contain %s" %
-		  (sourceComponent.getName(), sourceComponent.getVersion(),
-	 	  filename))
+		  (sourceComponent.getName(), 
+                   sourceComponent.getVersion().asString(),
+	 	   filename))
 
     util.copyfileobj(inF, outF)
 
