@@ -584,17 +584,49 @@ class Database:
 	
 	assert(not self.troveTroves.has_key(troveInstanceId))
 
+        cu.execute("""CREATE TEMPORARY TABLE IncludedTroves(
+                                troveName STRING,
+                                versionId INT,
+                                flavorId INT,
+                                timeStamps STRING,
+                                byDefault BOOLEAN)
+                   """)
+
 	for (name, version, flavor) in trove.iterTroveList():
 	    versionId = self.getVersionId(version, self.addVersionCache)
 	    if flavor:
 		flavorId = flavorMap[flavor.freeze()]
 	    else:
 		flavorId = 0
-	    instanceId = self.getInstanceId(name, versionId, flavorId,
-					    version.timeStamps(),
-					    isPresent = False)
-	    self.troveTroves.addItem(troveInstanceId, instanceId,
-                         trove.includeTroveByDefault(name, version, flavor))
+            cu.execute("INSERT INTO IncludedTroves VALUES(?, ?, ?, ?, ?)",
+                       name, versionId, flavorId, 
+                        ":".join([ "%.3f" % x for x in version.timeStamps()]), 
+                       trove.includeTroveByDefault(name, version, flavor))
+
+        # make sure every trove we include has an instanceid
+        cu.execute("""
+            INSERT INTO DBInstances SELECT NULL, IncludedTroves.troveName, 
+                                           IncludedTroves.versionId, 
+                                           IncludedTroves.flavorId,
+                                           IncludedTroves.timeStamps, 0
+                FROM IncludedTroves LEFT OUTER JOIN DBInstances ON
+                    IncludedTroves.troveName == DBInstances.troveName AND
+                    IncludedTroves.versionId == DBInstances.versionId AND
+                    IncludedTroves.flavorId == DBInstances.flavorId 
+                WHERE
+                    instanceId is NULL
+            """)
+
+        # now include the troves in this one
+        cu.execute("""
+            INSERT INTO TroveTroves SELECT ?, instanceId, byDefault
+                FROM IncludedTroves JOIN DBInstances ON
+                    IncludedTroves.troveName == DBInstances.troveName AND
+                    IncludedTroves.versionId == DBInstances.versionId AND
+                    IncludedTroves.flavorId == DBInstances.flavorId 
+            """, troveInstanceId)
+
+        cu.execute("DROP TABLE IncludedTroves")
 
         self.depTables.add(cu, trove, troveInstanceId)
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)

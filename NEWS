@@ -1,6 +1,9 @@
 Changes in 0.50.6:
   * conaryclient.updateChangeSet should have recursed by default
   * Metadata retrieval now works along distributed branches and shadows.
+  * reworked troves being added to database to handle missing parts
+    of packages and groups properly (and make things faster and more
+    elegant)
 
 Changes in 0.50.5:
   * Streams return their value through __call__ instead of value()
