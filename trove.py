@@ -368,9 +368,6 @@ class Package:
 	    diff = difflib.unified_diff(oldLines, newLines, "old", "new",
 					lineterm = "")
 
-	    print oldLines
-	    print newLines
-
 	    # using try/except seems dumb, but I don't know any other
 	    # way
 	    try:
