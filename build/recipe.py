@@ -172,7 +172,7 @@ class Recipe:
 	if c:
 	    if not self.signatures.has_key(file):
 		self.signatures[file] = []
-	    self.signatures[file].append((gpg, c))
+	    self.signatures[file].append((gpg, c, keyid))
 
     def addTarball(self, file, extractDir='', keyid=None):
 	self.tarballs.append((file, extractDir))
@@ -206,7 +206,7 @@ class Recipe:
         for (patch, level, backup) in self.patches:
             sources.append(patch)
 	for signaturelist in self.signatures.values():
-            for (gpg, cached) in signaturelist:
+            for (gpg, cached, keyid) in signaturelist:
                 sources.append(gpg)
 	return sources + self.sources
 
@@ -226,7 +226,7 @@ class Recipe:
     def checkSignatures(self, filepath, file):
         if not self.signatures.has_key(file):
             return
-	for (gpg, signature) in self.signatures[file]:
+	for (gpg, signature, keyid) in self.signatures[file]:
 	    # FIXME: our own keyring
 	    if os.system("gpg --no-secmem-warning --verify %s %s"
 			  %(signature, filepath)):
