@@ -71,16 +71,49 @@ class Action:
             # keep a dictionary of all of the keywords (including the parent
             # keywords)
             if key not in self.__dict__.keys():
-                raise TypeError, ("%s.__init__() got an unexpected keyword argument "
+                self.error(TypeError, "%s.__init__() got an unexpected keyword argument "
                                   "'%s'" % (self.__class__.__name__, key))
         # copy the keywords into our dict, overwriting the defaults
         self.__dict__.update(keywords)
-        
+
+    def _getLineNum(self):
+	"""Gets the line number and file name of the place where the 
+	   Action is instantiated, which is important for returning
+	   useful error messages"""
+
+	# Moves up the frame stack to outside of Action class --
+	# also passes by __call__ function, used by helper functions
+	# internally to instantiate Actions.  
+	#
+	# Another alternative would be to look at filepath until we 
+	# reach outside of conary source tree
+	f = sys._getframe(1) # get frame above this one
+
+	while f != None:
+	    if f.f_code.co_argcount == 0:  # break if non-class fn
+		break
+
+	    firstargname = f.f_code.co_varnames[0]
+	    firstarg = f.f_locals[firstargname]
+	    if not isinstance(firstarg, Action): 
+	       if f.f_code.co_name != '__call__':  
+		   break			 
+	    f = f.f_back # go up a frame
+
+	assert f is not None 
+	self.file = f.f_code.co_filename
+	self.linenum = f.f_lineno
+
+    def error(self, type, msg):
+	raise type, "%s:%s: %s: %s" % (self.file, self.linenum, type.__name__,
+				      msg)
+
     def __init__(self, *args, **keywords):
         assert(self.__class__ is not Action)
 	# keywords will be in the class object, not the instance
 	if not hasattr(self.__class__, 'keywords'):
 	    self.keywords = {}
+	self._getLineNum()
         self._applyDefaults()
 	self.addArgs(*args, **keywords)
         # verify that there are not broken format strings
