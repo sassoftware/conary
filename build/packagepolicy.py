@@ -153,10 +153,8 @@ class PackageSpec(_filterSpec):
 
 
 def _markConfig(recipe, filename):
-    map = recipe.autopkg.pathMap
-    if filename in map:
-	log.debug('config: %s', filename)
-	map[filename].flags.isConfig(True)
+    log.debug('config: %s', filename)
+    recipe.autopkg.pathMap[filename].flags.isConfig(True)
 
 class EtcConfig(policy.Policy):
     """
@@ -225,10 +223,8 @@ class InitScript(policy.Policy):
     invariantinclusions = [ '%(initdir)s/.[^/]*$' ]
 
     def _markInitScript(self, filename):
-	map = self.recipe.autopkg.pathMap
-	if filename in map:
-	    log.debug('initscript: %s', filename)
-	    map[filename].flags.isInitScript(True)
+	log.debug('initscript: %s', filename)
+	self.recipe.autopkg.pathMap[filename].flags.isInitScript(True)
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
@@ -368,11 +364,9 @@ class AddModes(policy.Policy):
 
     def doFile(self, path):
 	if path in self.fixmodes:
+	    log.debug('suid/sgid: %s', path)
 	    mode = self.fixmodes[path]
-	    map = self.recipe.autopkg.pathMap
-	    if path in map:
-		log.debug('suid/sgid: %s', path)
-		map[path].inode.setPerms(mode)
+	    self.recipe.autopkg.pathMap[path].inode.setPerms(mode)
 
 
 class Ownership(policy.Policy):
@@ -413,13 +407,11 @@ class Ownership(policy.Policy):
 	self._markOwnership(path, 'root', 'root')
 
     def _markOwnership(self, filename, owner, group):
-	map = self.recipe.autopkg.pathMap
-	if filename in map:
-	    pkgfile = map[filename]
-	    if owner:
-		pkgfile.inode.setOwner(owner)
-	    if group:
-		pkgfile.inode.setGroup(group)
+	pkgfile = self.recipe.autopkg.pathMap[filename]
+	if owner:
+	    pkgfile.inode.setOwner(owner)
+	if group:
+	    pkgfile.inode.setGroup(group)
 
 
 class ExcludeDirectories(policy.Policy):
