@@ -11,6 +11,11 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Module used by recipes to modify the state of the installed %(destdir)s;
+Classes from this module are not used directly; instead, they are accessed
+through eponymous interfaces in recipe.
+"""
 
 import util
 import re
@@ -20,11 +25,6 @@ import policy
 import log
 import magic
 
-"""
-Module used by recipes to modify the state of the installed %(destdir)s
-Classes from this module are not used directly; instead, they are used
-through eponymous interfaces in recipe.
-"""
 
 class TestSuiteLinks(policy.Policy):
 

@@ -11,6 +11,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Filters are slightly extended regular expressions with mode bit masking.
+The extended regular expressions are applied to filenames, and the
+mode bit masks (positive and negative) are applied to the mode of the
+file as it appears in the filesystem.
+"""
 
 import stat
 import re

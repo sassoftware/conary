@@ -11,15 +11,15 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Base classes used for destdirpolicy and packagepolicy.
+"""
 
 import util
 import filter
 import os
 import action
 
-"""
-Base class used for destdirpolicy and packagepolicy
-"""
 
 
 class Policy(action.RecipeAction):

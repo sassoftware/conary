@@ -11,6 +11,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Module used by recipes to effect packaging policy; things like setting
+flags, tags, and dependencies.
+Classes from this module are not used directly; instead, they are accessed
+through eponymous interfaces in recipe.
+"""
 
 import util
 import os
@@ -21,12 +27,6 @@ import tags
 import buildpackage
 import filter
 
-"""
-Module used by recipes to effect packaging policy; things like setting
-hints, flags, and dependencies.
-Classes from this module are not used directly; instead, they are used
-through eponymous interfaces in recipe.
-"""
 
 class NonBinariesInBindirs(policy.Policy):
     """
