@@ -206,7 +206,7 @@ class TroveStore:
 	    v = versions.VersionFromString(versionStr, 
 		    timeStamps = [ float(x) for x in timeStamps.split(":") ] )
 	    if d.has_key(troveName):
-		d.append(v)
+		d[troveName].append(v)
 	    else:
 		d[troveName] = [ v ]
 
