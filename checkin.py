@@ -272,28 +272,28 @@ def diff(repos, versionStr = None):
 	print "%s: new" % path
 
     for (fileId, path, newVersion) in pkgCs.getChangedFileList():
-	if not path:
-	    path = oldPackage.getFile(fileId)[0]
-	    sys.stdout.write("%s" % path)
-	else:
+	if path:
 	    oldPath = oldPackage.getFile(fileId)[0]
-	    sys.stdout.write("%s (aka %s)" % (path, oldPath))
-
-	if not newVersion: 
-	    print
-	    continue
+	    dispStr = "%s (aka %s)" % (path, oldPath)
+	else:
+	    path = oldPackage.getFile(fileId)[0]
+	    dispStr = path
 	
-	sys.stdout.write(": changed\n")
+	if not newVersion:
+	    sys.stdout.write(dispStr + '\n')
+	    continue
+	    
+	sys.stdout.write(dispStr + ": changed\n")
+	sys.stdout.write("Index: %s\n%s\n" %(path, '=' * 68))
 
 	csInfo = changeSet.getFileChange(fileId)
-	for item in files.fieldsChanged(csInfo):
-	    print "    %s" % item
+	sys.stdout.write('\n'.join(files.fieldsChanged(csInfo)))
 
 	if files.contentsChanged(csInfo):
 	    (contType, contents) = changeSet.getFileContents(fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
 		lines = contents.get().readlines()
-		str = "    " + "    ".join(lines)
+		str = "".join(lines)
 		print
 		print str
 		print
