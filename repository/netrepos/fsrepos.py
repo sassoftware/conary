@@ -280,19 +280,24 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	return d
 
-    def _getLocalOrRemoteFileContents(self, troveName, troveVersion, troveFlavor, 
-				      path, fileVersion, sha1, size):
+    def getFileContents(self, troveName, troveVersion, troveFlavor, 
+		        path, fileVersion, fileObj):
 	# the get trove netclient provides doesn't work with a 
 	# FilesystemRepository (it needs to create a change set which gets 
 	# passed)
 	if fileVersion.branch().label().getHost() == self.name:
-	    return filecontents.FromDataStore(self.contentsStore, sha1, size)
+	    return filecontents.FromDataStore(self.contentsStore, 
+					      fileObj.contents.sha1(), 
+					      fileObj.contents.size())
 	else:
 	    # a bit of sleight of hand here... we look for this file in
 	    # the trove it was first built in
-	    f = self.reposSet.getFileContents(troveName, fileVersion, 
+	    #
+	    # this could cause us to run out of file descriptors on large
+	    # troves. it might be better to close the file and return
+	    # a filecontents object?
+	    return self.reposSet.getFileContents(troveName, fileVersion, 
 					      troveFlavor, path, fileVersion)
-	    return filecontents.FromGzFile(f)
 
     def createChangeSet(self, troveList, recurse = True, withFiles = True):
 	"""
@@ -415,17 +420,14 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 		if hash and withFiles:
 		    if oldFileVersion :
-			oldCont = self._getLocalOrRemoteFileContents(troveName, 
-						oldVersion, flavor, oldPath,
-						oldFileVersion,
-						oldFile.contents.sha1(),
-						oldFile.contents.size())
+			oldCont = self.getFileContents(troveName, oldVersion, 
+				    flavor, oldPath, oldFileVersion, 
+				    fileObj = oldFile)
 
-		    newCont = self._getLocalOrRemoteFileContents(troveName, 
-						newVersion, flavor, newPath,
-						newFileVersion,
-						newFile.contents.sha1(),
-						newFile.contents.size())
+		    newCont = self.getFileContents(troveName, newVersion, 
+				    flavor, newPath, newFileVersion, 
+				    fileObj = newFile)
+
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
 
