@@ -6,6 +6,7 @@ import os
 import string
 import types
 import versions
+import sys
 
 class SrsConfiguration:
 
@@ -46,5 +47,5 @@ class SrsConfiguration:
 	    self.defaultbranch = versions.VersionFromString("/localhost/local")
 
 	if self.defaultbranch.isVersion():
-	    sys.write.stderr("The configured default branch %s specifies " +
+	    sys.stderr.write("The configured default branch %s specifies " +
 		 "version, not a branch.\n" % self.defaultbranch.asString())
