@@ -319,6 +319,9 @@ class Recipe:
     def __init__(self):
         assert(self.__class__ is not Recipe)
 
+    def __repr__(self):
+        return "<%s Object>" % self.__class__
+
 class PackageRecipe(Recipe):
     buildRequires = []
     Flags = use.LocalFlags
