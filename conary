@@ -131,7 +131,7 @@ elif (otherArgs[1] == "cook"):
         pid = os.fork()
         if not pid:
             os.setpgrp()
-            os.tcsetpgrp(0, os.getpid())
+            os.tcsetpgrp(0, os.getpgrp())
             cook.cook(repos, cfg, file, prep=prep)
             sys.exit(0)
         else:
@@ -139,6 +139,7 @@ elif (otherArgs[1] == "cook"):
                 (id, status) = os.waitpid(pid, 0);
             except KeyboardInterrupt:
                 os.kill(-pid, signal.SIGINT)
+        os.tcsetpgrp(0, os.getpgrp())
                 
 elif (otherArgs[1] == "pkglist"):
     all = argSet.has_key('all')
