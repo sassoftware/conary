@@ -80,7 +80,8 @@ class SourceState:
 	    if fields[0] == "name":
 		self.setTroveName(fields[1])
 	    elif fields[0] == "version":
-		self.setTroveVersion(versions.VersionFromString(fields[1]))
+		if fields[1] != "@NEW@":
+		    self.setTroveVersion(versions.VersionFromString(fields[1]))
 	    elif fields[0] == "branch":
 		self.setTroveBranch(versions.VersionFromString(fields[1]))
 	    elif fields[0] == "file":
@@ -94,7 +95,12 @@ class SourceState:
     def write(self, filename):
 	f = open(filename, "w")
 	f.write("name %s\n" % self.troveName)
-	f.write("version %s\n" % self.troveVersion.asString())
+
+	if self.troveVersion:
+	    f.write("version %s\n" % self.troveVersion.asString())
+	else:
+	    f.write("version %s\n" % "@NEW@")
+
 	f.write("branch %s\n" % self.troveBranch.asString())
 
 	for (fileId, (path, version)) in self.files.iteritems():
@@ -105,6 +111,7 @@ class SourceState:
 
     def __init__(self, filename = None):
 	self.files = {}
+	self.troveVersion = None
 	if filename: self.parseFile(filename)
 
 def checkin(repos, cfg, file):
@@ -223,34 +230,45 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 
     state = SourceState("SRS")
 
-    if not srcVersion:
-	srcVersion = repos.pkgLatestVersion(state.getTroveName(), 
-					    state.getTroveBranch())
+    if not state.getTroveVersion():
+	# new package, so it shouldn't exist yet
+	if needsHead:
+	    if repos.hasPackage(state.getTroveName()):
+		log.error("%s is marked as a new package but it " 
+			  "already exists" % state.getTroveName())
+		return
+	srcVersion = None
+	srcPkg = None
+    else:
+	if not srcVersion:
+	    srcVersion = repos.pkgLatestVersion(state.getTroveName(), 
+						state.getTroveBranch())
 
-    srcPkg = repos.getPackageVersion(state.getTroveName(), srcVersion)
+	srcPkg = repos.getPackageVersion(state.getTroveName(), srcVersion)
 
-    if needsHead:
-	if not srcVersion.equal(state.getTroveVersion()):
-	    log.error("working version (%s) is different from the head of " +
-		      "the branch (%s); use update", 
-		      state.getTroveVersion().asString(), 
-		      srcVersion.asString())
-	    return
+	if needsHead:
+	    # existing package
+	    if not srcVersion.equal(state.getTroveVersion()):
+		log.error("working version (%s) is different from the head " +
+			  "of the branch (%s); use update", 
+			  state.getTroveVersion().asString(), 
+			  srcVersion.asString())
+		return
 
-	# make sure the files in this directory are based on the same
-	# versions as those in the package at head
-	bail = 0
-	for (fileId, (path, version)) in state.getFileList():
-	    if not version:
-		assert(not srcPkg.hasFile(fileId))
-		# new file, it shouldn't be in the old package at all
-	    else:
-		srcFileVersion = srcPkg.getFile(fileId)[1]
-		if not version.equal(srcFileVersion):
-		    log.error("%s is not at head; use update" % path)
-		    bail = 1
-    
-	if bail: return
+	    # make sure the files in this directory are based on the same
+	    # versions as those in the package at head
+	    bail = 0
+	    for (fileId, (path, version)) in state.getFileList():
+		if not version:
+		    assert(not srcPkg.hasFile(fileId))
+		    # new file, it shouldn't be in the old package at all
+		else:
+		    srcFileVersion = srcPkg.getFile(fileId)[1]
+		    if not version.equal(srcFileVersion):
+			log.error("%s is not at head; use update" % path)
+			bail = 1
+	
+	    if bail: return
 
     # load the recipe; we need this to figure out what version we're building
     try:
@@ -274,7 +292,11 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 	    log.error("all recipes must have the same version")
 	    return
 
-    if srcVersion.trailingVersion().getVersion() == recipeVersionStr:
+    if not srcVersion:
+	# new package
+	newVersion = state.getTroveBranch().copy()
+	newVersion.appendVersionRelease(recipeVersionStr, 1)
+    elif srcVersion.trailingVersion().getVersion() == recipeVersionStr:
 	newVersion = srcVersion.copy()
 	newVersion.incrementVersionRelease()
     else:
@@ -580,7 +602,7 @@ def addFile(file):
 	    log.error("file %s is already part of this source package" % path)
 	    return
 
-    fileId = cook.makeFileId(os.getcwd(), path)
+    fileId = cook.makeFileId(os.getcwd(), file)
 
     state.addFile(fileId, file, None)
     state.write("SRS")
@@ -600,3 +622,26 @@ def removeFile(file):
 	log.error("file %s is not under management" % file)
 
     state.write("SRS")
+
+def newPackage(repos, cfg, name):
+    state = SourceState()
+    if name[0] != ":":
+	name = cfg.packagenamespace + ":" + name
+    name += ":sources"
+
+    if repos.hasPackage(name):
+	log.error("package %s already exists" % name)
+	return
+
+    state.setTroveName(name)
+    state.setTroveBranch(cfg.defaultbranch)
+
+    dir = name.split(":")[-2]
+    if not os.path.isdir(dir):
+	try:
+	    os.mkdir(dir)
+	except:
+	    log.error("cannot create directory %s/%s", os.getcwd(), dir)
+	    return
+
+    state.write(dir + "/" + "SRS")

@@ -17,6 +17,9 @@ def usage(rc = 1):
     print "       srs source checkout [--dir <dir>] <group> <version>"
     print "       srs source commit"
     print "       srs source diff"
+    print "       srs source newpkg <name>"
+    print "       srs source remove"
+    print "       srs source update"
     sys.exit(rc)
 
 def sourceCommand(cfg, args, argSet):
@@ -56,6 +59,11 @@ def sourceCommand(cfg, args, argSet):
     elif (args[0] == "remove"):
 	if len(args) != 2: usage()
 	checkin.removeFile(args[1])
+    elif (args[0] == "newpkg"):
+	if len(args) != 2: usage()
+	repos = repository.LocalRepository(cfg.reppath, "r")
+
+	checkin.newPackage(repos, cfg, args[1])
     elif (args[0] == "update"):
 	if len(args) != 1: usage()
 	repos = repository.LocalRepository(cfg.reppath, "r")
