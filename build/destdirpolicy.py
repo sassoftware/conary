@@ -51,7 +51,9 @@ class Strip(policy.Policy):
 	    f = os.popen('file '+p, 'r')
 	    filetext = f.read()
 	    f.close()
-	    if filetext.find('ELF') != -1 and filetext.find('not stripped') != 1:
+	    if (filetext.find('current ar archive') != -1) or \
+	       (filetext.find('ELF') != -1 and
+	        filetext.find('not stripped') != -1):
 		util.execute('strip '+p)
 
 
