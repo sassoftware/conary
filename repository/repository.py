@@ -84,7 +84,7 @@ class Repository:
 	fileDB = self._getFileDB(fileId)
 	file = fileDB.getVersion(version)
 	if withContents:
-	    if isinstance(file, files.RegularFile): 
+	    if file.hasContents:
 		cont = filecontents.FromRepository(self, file.sha1())
 	    else:
 		cont = None
@@ -475,8 +475,7 @@ class ChangeSetJob:
 		file = repos.getFileVersion(fileId, oldVer)
 		file.applyChange(infoLine)
 		
-		if isinstance(file, files.RegularFile) and \
-		   isinstance(oldfile, files.RegularFile) and \
+		if file.hasContents and oldfile.hasContents and	    \
 		   file.sha1() == oldfile.sha1():
 		    restoreContents = 0
 	    else:
@@ -487,7 +486,7 @@ class ChangeSetJob:
 	    # of the file
 	    assert(newVer.equal(fileMap[fileId][1]))
 
-	    if file.hasContents:
+	    if file.hasContents and restoreContents:
 		(contType, fileContents) = cs.getFileContents(file.sha1())
 		if contType == changeset.ChangedFileTypes.diff:
 		    # the content for this file is in the form of a diff,
