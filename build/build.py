@@ -62,6 +62,7 @@ class Configure(ShellCommand):
                 '%%(mkObjdir)s '
 		'%(preConfigure)s %%(configure)s '
 		'  --prefix=%%(prefix)s '
+		'  --bindir=%%(bindir)s '
                 '  --sysconfdir=%%(sysconfdir)s '
 		'  --datadir=%%(datadir)s '
 		'  --mandir=%%(mandir)s --infodir=%%(infodir)s '
