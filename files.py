@@ -41,6 +41,7 @@ _FILE_FLAG_SHLIB = 1 << 2
 _FILE_FLAG_GCONFSCHEMA = 1 << 3
 # transient contents that may have modified contents overwritten
 _FILE_FLAG_TRANSIENT = 1 << 4
+_FILE_FLAG_SOURCEFILE = 1 << 5
 
 class DeviceStream(streams.TupleStream):
 
@@ -196,19 +197,25 @@ class FlagsStream(streams.IntStream):
     def isConfig(self, set = None):
 	return self._isFlag(_FILE_FLAG_CONFIG, set)
 
+    def isSource(self, set = None):
+	return self._isFlag(_FILE_FLAG_CONFIG, set)
+
     def isTransient(self, set = None):
 	return self._isFlag(_FILE_FLAG_TRANSIENT, set)
 
     def isInitScript(self, set = None):
 	'legacy, not used for new packages'
+	assert(0)
 	return self._isFlag(_FILE_FLAG_INITSCRIPT, set)
 
     def isShLib(self, set = None):
 	'legacy, not used for new packages'
+	assert(0)
 	return self._isFlag(_FILE_FLAG_SHLIB, set)
 
     def isGconfSchema(self, set = None):
 	'legacy, not used for new packages'
+	assert(0)
 	return self._isFlag(_FILE_FLAG_GCONFSCHEMA, set)
 
     def _isFlag(self, flag, set):

@@ -742,6 +742,9 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 	f = files.FileFromFilesystem(realPath, fileId,
 				     possibleMatch = srcFile)
+
+	if isSrcPkg:
+	    f.flags.isSource(set = True)
 	
 	extension = path.split(".")[-1]
 	if isSrcPkg and extension not in nonCfgExt:
