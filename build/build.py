@@ -128,7 +128,7 @@ class Make(ShellCommand):
 
 class MakeInstall(ShellCommand):
     template = ('cd %%(builddir)s; '
-                '%(preMake)s make %%(mflags)s %%(rootVarArg)s %(installtarget)s %(args)s')
+                '%(preMake)s make %%(mflags)s %%(rootVarArgs)s %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
                 'preMake': '',
 		'installtarget': 'install'}
