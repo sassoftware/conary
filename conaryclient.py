@@ -15,6 +15,7 @@ import os
 from lib import util
 
 import conarycfg
+import versions
 from local import database
 from repository import repository
 from repository import changeset
@@ -62,8 +63,13 @@ class ConaryClient:
         if self.db.hasPackage(pkg):
             labels = [ x.getVersion().branch().label()
                        for x in self.db.findTrove(pkg) ]
+
             # this removes duplicates
             labels = {}.fromkeys(labels).keys()
+            
+            # check for locally-cooked troves
+            if True in [isinstance(x, versions.CookBranch) for x in labels]:
+                raise UpdateError, "package %s cooked locally, not updating" % pkg
         else:
             labels = [ self.cfg.installLabel ]
 
