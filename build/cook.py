@@ -513,19 +513,12 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 		    %recipeClass.name)
 	return
 
-    flavorMap = {}
-    for buildPkg in bldList:
-        compName = buildPkg.getName()
-        main, comp = compName.split(':')
-        if main not in flavorMap:
-            flavorMap[main] = deps.deps.DependencySet()
-        flavorMap[main].union(buildPkg.flavor)
-    for pkg, flavor in flavorMap.iteritems():
-        if not flavor:
-            flavorMap[pkg] = None
+    # Every component has the same flavor, just use the first one
+    flavor = deps.deps.DependencySet()
+    flavor.union(bldList[0].flavor)
 
     targetVersion = repos.nextVersion(grpName, recipeClass.version, 
-				      flavorMap.values(), buildBranch, 
+				      flavor, buildBranch, 
                                       binary = True, 
                                       sourceVersion=sourceVersion, 
                                       alwaysBumpCount=alwaysBumpCount)
@@ -546,8 +539,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
         compName = buildPkg.getName()
         main, comp = compName.split(':')
         if main not in grpMap:
-            grpMap[main] = trove.Trove(main, targetVersion, flavorMap[main], 
-                                                                        None)
+            grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
 
         searchBranch = buildBranch
         versionList = []
@@ -591,8 +583,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 
     changeSet = changeset.CreateFromFilesystem(packageList)
     for packageName in grpMap:
-        changeSet.addPrimaryPackage(packageName, targetVersion, 
-                                                        flavorMap[packageName])
+        changeSet.addPrimaryPackage(packageName, targetVersion, flavor)
 
     for grp in grpMap.values():
         grpDiff = grp.diff(None, absolute = 1)[0]

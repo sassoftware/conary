@@ -1390,7 +1390,10 @@ class Flavor(policy.Policy):
         # get the Arch.* dependencies
         set.union(use.Arch.getUsedSet().toDependency())
         f.flavor.set(set)
-	pkg.flavor.union(f.flavor.value())
+        # all troves need to share the same flavor so that we can
+        # distinguish them later
+        for pkg in pkgMap.values():
+            pkg.flavor.union(f.flavor.value())
 
 
 
