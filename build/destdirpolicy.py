@@ -236,19 +236,21 @@ class NormalizeInitscripts(policy.Policy):
     """
     invariantinclusions = [ '/etc/rc.d/init.d/' ]
 
+    def test(self):
+	return self.macros['initdir'] != '/etc/rc.d/init.d'
+
     def doFile(self, path):
-	if self.macros['initdir'] != '/etc/rc.d/init.d':
-	    basename = os.path.basename(path)
-	    target = util.joinPaths(self.macros['initdir'], basename)
-	    if os.path.exists(self.macros['destdir'] + os.sep + target):
-		raise DestdirPolicyError(
-		    "Conflicting initscripts %s and %s installed" %(
-			path, target))
-	    util.mkdirChain(self.macros['destdir'] + os.sep +
-			    self.macros['initdir'])
-	    util.copytree(self.macros['destdir'] + path,
-	                  self.macros['destdir'] + target)
-	    os.remove(self.macros['destdir'] + path)
+	basename = os.path.basename(path)
+	target = util.joinPaths(self.macros['initdir'], basename)
+	if os.path.exists(self.macros['destdir'] + os.sep + target):
+	    raise DestdirPolicyError(
+		"Conflicting initscripts %s and %s installed" %(
+		    path, target))
+	util.mkdirChain(self.macros['destdir'] + os.sep +
+			self.macros['initdir'])
+	util.copytree(self.macros['destdir'] + path,
+	              self.macros['destdir'] + target)
+	os.remove(self.macros['destdir'] + path)
 
 
 class RelativeSymlinks(policy.Policy):

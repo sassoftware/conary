@@ -110,6 +110,11 @@ class Policy(util.Action):
 	self.recipe = recipe
 	self.macros = recipe.macros
 
+	# is runtime check implemented?
+	if hasattr(self.__class__, 'test'):
+	    if not self.test():
+		return
+
 	# change self.use to be a simple flag
 	self.use = util.checkUse(self.use)
 
