@@ -285,7 +285,7 @@ class _FileAction(BuildAction):
 	if self.mode >= 0:
 	    os.chmod(destdir+os.sep+path, self.mode & 01777)
 	    if self.mode & 06000:
-		self.recipe.fixmodes[path] = self.mode
+		self.recipe.AddModes(self.mode, path)
 	
 class SetModes(_FileAction):
     """

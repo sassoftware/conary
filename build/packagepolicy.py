@@ -40,25 +40,26 @@ class ComponentSpec(_filterSpec):
     baseFilters = (
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
-	('devel', ('\.a',
-		   '\.so',
-		   '.*/include/.*\.h',
-		   '%(includedir)s/',
-		   '%(includedir)s',
-		   '%(mandir)s/man(2|3)/',
-		   '%(mandir)s/man(2|3)',
-		   '%(datadir)s/develdoc/',
-		   '%(datadir)s/develdoc',
-		   '%(datadir)s/aclocal/',
-		   '%(datadir)s/aclocal')),
-	('lib', ('.*/lib/.*\.so\..*')),
-	# note that gtk-doc is not well-named; it is a shared system, like info
+	('python',    ('%(libdir)s/python*/site-packages/.*')),
+	('devel',     ('\.a',
+		       '\.so',
+		       '.*/include/.*\.h',
+		       '%(includedir)s/',
+		       '%(includedir)s',
+		       '%(mandir)s/man(2|3)/',
+		       '%(mandir)s/man(2|3)',
+		       '%(datadir)s/develdoc/',
+		       '%(datadir)s/develdoc',
+		       '%(datadir)s/aclocal/',
+		       '%(datadir)s/aclocal')),
+	('lib',       ('.*/lib/.*\.so\..*')),
+	# note that gtk-doc is not well-named; it is a shared system, like info,
 	# and is used by unassociated tools (devhelp)
-	('doc', ('%(datadir)s/(gtk-doc|doc|man|info)/',
-		 '%(datadir)s/(gtk-doc|doc|man|info)')),
-	('locale', ('%(datadir)s/locale/',
-		    '%(datadir)s/locale')),
-	('runtime', ('.*',)),
+	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info)/',
+		       '%(datadir)s/(gtk-doc|doc|man|info)')),
+	('locale',    ('%(datadir)s/locale/',
+		       '%(datadir)s/locale')),
+	('runtime',   ('.*',)),
     )
 
     def doProcess(self, recipe):
@@ -102,7 +103,7 @@ class PackageSpec(_filterSpec):
 def _markConfig(recipe, filename):
     packages = recipe.autopkg.packages
     for package in packages.keys():
-	if packages[package].has_key(filename):
+	if filename in packages[package]:
             log.debug('config: %s', filename)
 	    packages[package][filename].isConfig(True)
 
@@ -159,18 +160,34 @@ class ParseManifest(policy.Policy):
     information that can't be represented by pure filesystem status
     with a non-root built: device files (%dev), directory responsibility
     (%dir), and ownership (%attr).  It translates these into the
-    related SRS construct for each.
+    related SRS construct for each.  There is no equivalent to
+    %defattr -- our default ownership is root:root, and permissions
+    (except for setuid and setgid files) are collected from the filesystem.
+
+    XXX I think this parsing may not be sufficient for all manifests,
+    tested only with MAKEDEV output so far.
     """
-    keywords = {
-	'path': None
-    }
+
+    def __init__(self, *args, **keywords):
+	self.paths = []
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+	"""
+	ParseManifest(path(s)...)
+	"""
+	if args:
+	    self.paths.extend(args)
+	policy.Policy.updateArgs(self, [], **keywords)
 
     def do(self):
-	if not self.path:
-	    return
-	if not self.path.startswith('/'):
-	    self.path = self.macros['builddir'] + os.sep + self.path
-        f = open(self.path)
+	for path in self.paths:
+	    self.processPath(path)
+
+    def processPath(self, path):
+	if not path.startswith('/'):
+	    path = self.macros['builddir'] + os.sep + path
+        f = open(path)
         for line in f:
             line = line.strip()
             fields = line.split(')')
@@ -187,35 +204,74 @@ class ParseManifest(policy.Policy):
                 major = dev[1]
                 minor = dev[2]
                 target = fields[2].strip()
-                self.recipe.addDevice(target, devtype, int(major), int(minor),
-                                      owner, group, int(perms, 0))
+                self.recipe.MakeDevices(target, devtype, int(major), int(minor),
+                                        owner, group, int(perms, 0))
             elif fields[1].startswith('%dir '):
                 target = fields[1][5:]
 		# XXX not sure what we should do here...
                 dironly = 1
             else:
+		# XXX is this right?
                 target = fields[1].strip()
+		if int(perms, 0) & 06000:
+		    self.recipe.AddModes(int(perms, 0), target)
+		if owner != 'root' or group != 'root':
+		    self.recipe.Ownership(owner, group, target)
+
 
 class MakeDevices(policy.Policy):
     """
     Make device nodes
     """
+    def __init__(self, *args, **keywords):
+	self.devices = []
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+	"""
+	MakeDevices(path, devtype, major, minor, owner, group, perms=0400)
+	"""
+	if args:
+	    l = len(args)
+	    # perms is optional, all other arguments must be there
+	    assert((l > 5) and (l < 8))
+	    if l == 6:
+		args.append(0400)
+	    self.devices.append(args)
+	policy.Policy.updateArgs(self, [], **keywords)
+
     def do(self):
-        for device in self.recipe.getDevices():
+        for device in self.devices:
             self.recipe.autopkg.addDevice(*device)
+
 
 class AddModes(policy.Policy):
     """
-    Apply suid/sgid modes
+    Apply suid/sgid modes -- use SetModes in recipes; this is just the
+    combined back end to SetModes and ParseManifest.
     """
+    def __init__(self, *args, **keywords):
+	self.fixmodes = {}
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+	"""
+	AddModes(mode, path(s)...)
+	"""
+	if args:
+	    for path in args[1:]:
+		self.fixmodes[path] = args[0]
+	policy.Policy.updateArgs(self, [], **keywords)
+
     def doFile(self, path):
-	if path in self.recipe.fixmodes:
-	    mode = self.recipe.fixmodes[path]
+	if path in self.fixmodes:
+	    mode = self.fixmodes[path]
 	    packages = self.recipe.autopkg.packages
 	    for package in packages.keys():
-		if packages[package].has_key(path):
+		if path in packages[package]:
 		    log.debug('suid/sgid: %s', path)
 		    packages[package][path].perms(mode)
+
 
 class Ownership(policy.Policy):
     """
@@ -240,7 +296,8 @@ class Ownership(policy.Policy):
 	assert(not self.exceptions)
 	self.fileREs = []
 	for (filespec, user, group) in self.filespecs:
-	    self.fileREs = (re.compile(filespec %recipe.macros), user, group)
+	    self.fileREs.append((re.compile(filespec %recipe.macros),
+	                        user, group))
 	del self.filespecs
 	policy.Policy.doProcess(self, recipe)
 

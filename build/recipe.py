@@ -459,12 +459,6 @@ class Recipe:
 	for post in self.destdirPolicy:
             post.doProcess(self)
 
-    def addDevice(self, target, devtype, major, minor, owner, group, perms=0400):
-        self._devices.append((target, devtype, major, minor, owner, group, perms))
-
-    def getDevices(self):
-        return self._devices
-
     def getPackages(self, namePrefix, fullVersion):
 	# policies look at the recipe instance for all information
 	self.namePrefix = namePrefix
@@ -556,8 +550,6 @@ class Recipe:
 	#   action: (action)
 	#     - action is the command to execute, in builddir
 	self.signatures = {}
-        self._devices = []
-        self.fixmodes = {}
         self.cfg = cfg
 	self.laReposCache = laReposCache
 	self.srcdirs = srcdirs
