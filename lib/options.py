@@ -69,7 +69,12 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 		if i >= len(argv): 
 		    argSet[arg] = True
                 else:
-                    next_arg = argv[i+1]
+                    if i + 1 < len(argv):
+                        next_arg = argv[i+1]
+                    else:
+                        # option was last on the command line,
+                        # and no optional paramater was given
+                        next_arg = ''
                     if next_arg == '':
                         argSet[arg] = True
                         i = i + 1
