@@ -79,8 +79,6 @@ def doErase(db, cfg, pkg, versionStr = None):
 
     list = []
     for pkg in pkgList:
-	list.append((pkg.getName(), pkg.getFlavor(), pkg.getVersion(), None, 
-		     False))
+	list.append((pkg.getName(), pkg.getFlavor(), pkg.getVersion()))
 
-    cs = db.createChangeSet(list)
-    db.commitChangeSet(cs)
+    db.eraseTroves(list)

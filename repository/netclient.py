@@ -35,6 +35,9 @@ class ServerCache:
 	server = self.cache.get(serverName, None)
 	if server is None:
 	    url = self.map.get(serverName, None)
+	    if isinstance(url, repository.AbstractTroveDatabase):
+		return url
+
 	    if url is None:
 		url = "http://%s/conary/" % serverName
 	    server = xmlrpclib.Server(url)

@@ -675,15 +675,11 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     us iterate right over the changeset we get from the repository.
     """
     if srcPkg:
-	cs = repos.createChangeSet([(srcPkg.getName(), srcPkg.getFlavor(),
-                                     None, srcPkg.getVersion(), True)])
-	pkgCs = cs.iterNewPackageList().next()
-	fileList = pkgCs.getNewFileList()
+	fileList = [ x for x in srcPkg.iterFileList() ]
+	# need to walk changesets in order of fileid
+	fileList.sort()
     else:
 	fileList = []
-
-    # need to walk changesets in order of fileid
-    fileList.sort()
 
     # Used in the loops to determine whether to mark files as config
     # would be nice to have a better list...
@@ -710,10 +706,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 		% path)
 	    return None
 
-	srcFile = files.ThawFile(cs.getFileChange(fileId), fileId)
-
-	if srcFile.hasContents:
-	    srcCont = cs.getFileContents(fileId)[1]
+	srcFile = repos.getFileVersion(fileId, srcFileVersion)
 
 	f = files.FileFromFilesystem(realPath, fileId,
 				     possibleMatch = srcFile)
@@ -739,6 +732,12 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	    changeSet.addFile(fileId, srcFileVersion, newVersion, filecs)
 	    if hash:
 		newCont = filecontents.FromFilesystem(realPath)
+
+		if srcFile.hasContents:
+		    theFile = repos.getFileContents(srcPkg.getName(),
+				srcPkg.getVersion(), srcPkg.getFlavor(), srcPath)
+		    srcCont = filecontents.FromFile(theFile)
+
 		(contType, cont) = changeset.fileContentsDiff(srcFile, srcCont,
                                                               f, newCont)
 						

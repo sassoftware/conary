@@ -141,6 +141,13 @@ class SqlDbRepository(repository.DataStoreRepository,
 	# files get removed with their troves
 	pass
 
+    def eraseTroves(self, list):
+	cs = changeset.ChangeSet()
+	for (name, flavor, version) in list:
+	    cs.oldPackage(name, version, flavor)
+	    
+	self.commitChangeSet(cs)
+
     def __init__(self, path):
 	repository.DataStoreRepository.__init__(self, path)
 	repository.AbstractRepository.__init__(self)
