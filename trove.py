@@ -779,6 +779,7 @@ class ThawTroveChangeSet(TroveChangeSet):
 		first = i + 2
 		changeLog = changelog.ThawChangeLog(lines[first:first + cnt])
 		del lines[i: first + cnt]
+                break
 
 	TroveChangeSet.__init__(self, pkgName, flavor, changeLog, oldVersion, 
 				  newVersion, absolute = (pkgType == "ABS"))
