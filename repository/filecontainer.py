@@ -81,8 +81,8 @@ class FileTableEntry:
         rc += struct.pack("!i", self.offset)
         rc += struct.pack("!i", self.size)
 	rc += struct.pack("!i", len(self.data)) + self.data
-	l = len(str)
-	rc += struct.pack("!i", l) + rc
+	l = len(rc)
+	rc = struct.pack("!i", l) + rc
 	return file.write(rc)
 
     def __init__(self, name, offset, size, data):
