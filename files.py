@@ -6,15 +6,11 @@ import string
 import os
 import versioned
 import sha1helper
-import pwd
-import grp
-import shutil
 import stat
 import pwd
 import grp
 import util
 import types
-import datastore
 from datastore import DataStore
 
 class FileMode:
@@ -76,7 +72,7 @@ class FileMode:
 	self.owner(info[2])
 	self.group(info[3])
 
-	date = info[5:7]
+	#date = info[5:7]
 
 	return info[8]
 
@@ -125,6 +121,7 @@ class File(FileMode):
 	if os.getuid(): return
 
 	# root should set the file ownerships properly
+        # XXX ewt: no 'f' variable
 	uid = pwd.getpwnam(f.owner())[2]
 	gid = grp.getgrnam(f.group())[2]
 
