@@ -219,7 +219,8 @@ class FlavorConfig:
 		    self.flags[flag] = UseFlagConfig(flag, useDir)
         if archDir and os.path.exists(archDir):
             for arch in os.listdir(archDir):
-		if os.path.isfile(os.path.join(archDir, arch)):
+		if os.path.isfile(os.path.join(archDir, arch)) and \
+                   not arch.startswith('.'):
 		    self.arches[arch] = ArchConfig(arch, archDir)
 
     def toDependency(self, override=None):
