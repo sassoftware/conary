@@ -200,6 +200,7 @@ class StatWindow(gtk.Window):
         model, iter = selection.get_selected()
         if not iter:
             return
+        selection.unselect_all()
         caller = model.get_value(iter, 0)
         iter = self.funcstore.get_iter_first()
         while iter:
