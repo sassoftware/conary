@@ -16,14 +16,16 @@ import urllib
 from BaseHTTPServer import HTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
-if len(sys.argv) != 5:
-    print "needs path to conary, the repository, and authorization database, and the name of this repository"
+if not os.environ.has_key('CONARY_PATH'):
+    print "CONARY_PATH needs to be set"
     sys.exit(1)
 
-sys.path.append(sys.argv[1])
+sys.path.append(os.environ['CONARY_PATH'])
 
-import netserver
 from netserver import NetworkRepositoryServer
+from conarycfg import ConfigFile
+from conarycfg import STRINGDICT
+import options
 
 FILE_PATH="/tmp/conary-server"
 BASE_URL="http://%s:8000/" % os.uname()[1]
@@ -133,17 +135,48 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
 	self.send_response(200, 'OK')
 
+class ServerConfig(ConfigFile):
+
+    defaults = {
+	'port'			:   '8000',
+	'repositoryMap'         : [ STRINGDICT, {} ],
+    }
+
+    def __init__(self):
+	ConfigFile.__init__(self)
+	self.read("serverrc")
+
+def usage():
+    print "usage message goes here"
+    sys.exit(1)
+
 if __name__ == '__main__':
+    cfg = ServerConfig()
+
+    argDef = {}
+    cfgMap = {
+	'port'	: 'port',
+	'map'	: 'repositoryMap',
+    }
+
+    argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
+
+    if len(otherArgs) != 4:
+	print "needs path to the repository, and authorization database, and the name of this repository"
+	sys.exit(1)
+
     profile = 0
     if profile:
         import hotshot
         prof = hotshot.Profile('server.prof')
         prof.start()
 
-    netRepos = NetworkRepositoryServer(sys.argv[2], FILE_PATH, BASE_URL,
-				       sys.argv[3], sys.argv[4])
+    netRepos = NetworkRepositoryServer(otherArgs[1], FILE_PATH, BASE_URL,
+				       otherArgs[2], otherArgs[3],
+				       cfg.repositoryMap)
 
-    httpServer = HTTPServer(("", 8000), HttpRequests)
+    port = int(cfg.port)
+    httpServer = HTTPServer(("", port), HttpRequests)
 
     fds = {}
     fds[httpServer.fileno()] = httpServer

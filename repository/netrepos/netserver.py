@@ -288,8 +288,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return 0
 
     def __init__(self, path, tmpPath, urlBase, authDbPath, name,
-		 commitAction = None):
-	self.repos = fsrepos.FilesystemRepository(name, path)
+		 repositoryMap, commitAction = None):
+	self.repos = fsrepos.FilesystemRepository(name, path, repositoryMap)
 	self.repPath = path
 	self.tmpPath = tmpPath
 	self.urlBase = urlBase

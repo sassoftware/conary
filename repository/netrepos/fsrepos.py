@@ -423,11 +423,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    self.troveStore.db.close()
 	    self.troveStore = None
 
-    def __init__(self, name, path):
+    def __init__(self, name, path, repositoryMap):
 	self.top = path
 	self.troveStore = None
 	self.name = name
-	self.reposSet = repository.netclient.NetworkRepositoryClient({ name : self })
+	map = dict(repositoryMap)
+	map[name] = self
+	self.reposSet = repository.netclient.NetworkRepositoryClient(map)
 	
 	self.sqlDB = self.top + "/sqldb"
 
