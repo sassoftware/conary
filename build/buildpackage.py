@@ -12,6 +12,7 @@ and create changesets from the files created during the build process
 import string
 import os
 import files
+import time
 
 from deps import deps
 
@@ -28,7 +29,7 @@ def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     f.inode.setOwner(owner)
     f.inode.setGroup(group)
     f.inode.setPerms(perms)
-    f.inode.setMtime(0)
+    f.inode.setMtime(time.time())
     f.flags.set(0)
 
     return f
