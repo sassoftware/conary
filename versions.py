@@ -593,6 +593,29 @@ class Version(VersionSequence):
 
         return Branch(self.versions + newlist)
 
+    def getSourceBranch(self):
+        """ Takes a binary branch and returns its associated source branch.
+            (any trailing version info is left untouched).
+            If source is branched off of <repo1>-2 into <repo2>, its new
+            version will be <repo1>-2/<repo2>/2.  The corresponding build
+            will be on branch <repo1>-2-0/<repo2>/2-1.
+            getSourceBranch converts from the latter to the former.
+            Always returns a copy of the branch, even when the two are
+            equal.
+        """
+        v = self.copy()
+        p = v.branch()
+
+        assert(p.isBranch())
+        if p.hasParent():
+            p = p.parentNode()
+            p.trailingVersion().buildCount = None
+            while p.hasParent():
+                p = p.parent()
+                p.trailingVersion().buildCount = None
+
+        return v
+
     def getBinaryBranch(self):
         """ 
         Takes a source branch and returns its associated binary branch.  (any
