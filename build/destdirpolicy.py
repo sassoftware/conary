@@ -228,6 +228,7 @@ class TestSuiteFiles(policy.Policy):
     
     invariantinclusions = [ '.*[tT][eE][sS][tT].*',
 			    'Makefile.*',
+			    '.*\.exp', #used by dejagnu
 			    '.*/config.*',
 			    '.*/shconfig',
 			    '.*/acconfig.*',
