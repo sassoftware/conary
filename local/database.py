@@ -312,25 +312,6 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
     def createChangeSet(self, packageList):
 	raise NotImplemented
 
-    def oldPackage(self, pkg):
-	self.oldPackages.append(pkg)
-
-    def oldPackageList(self):
-	return self.oldPackages
-
-    def oldFile(self, fileId, fileVersion, fileObj):
-	self.oldFiles.append((fileId, fileVersion, fileObj))
-
-    def oldFileList(self):
-	return self.oldFiles
-
-    def addStaleFile(self, path, fileObj):
-	self.staleFiles.append((path, fileObj))
-
-    def staleFileList(self):
-	self.staleFiles.sort()
-	return self.staleFiles
-
     def commit(self, undo, root):
 	repository.ChangeSetJob.commit(self, undo)
 
@@ -384,11 +365,6 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
     def __init__(self, repos, localCs, origJob, retargetLocal = 1):
-	# list of packages which need to be removed
-	self.oldPackages = []
-	self.oldFiles = []
-	self.staleFiles = []
-
 	assert(not origJob.cs.isAbstract())
 
 	if retargetLocal:
@@ -519,7 +495,13 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 
 	    self.oldFile(f.fileId(), oldVersion, 
 			 repos.getFileVersion(f.fileId(), oldVersion))
-
+	
+	# handle removals; the origJob records what removals are requested,
+	# but that object won't peform any removals
+	self.staleFiles += origJob.staleFiles
+	self.oldPackages += origJob.oldPackages
+	self.oldFiles += origJob.oldFiles
+		
 # Exception classes
 
 class RollbackError(repository.RepositoryError):
