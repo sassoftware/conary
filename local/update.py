@@ -883,7 +883,8 @@ class FilesystemJob:
 		fileObj = repos.getFileVersion(pathId, fileId, version)
 		self._remove(fileObj, root + path, "removing %s")
 
-def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
+def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
+                  withFileContents=True):
     """
     Populates a change set against the files in the filesystem and builds
     a package object which describes the files installed.  The return
@@ -993,7 +994,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 	    (filecs, hash) = changeset.fileChangeSet(pathId, srcFile, f)
 	    changeSet.addFile(srcFileId, f.fileId(), filecs)
-	    if hash:
+	    if hash and withFileContents:
 		newCont = filecontents.FromFilesystem(realPath)
 
 		if srcFile.hasContents:
@@ -1032,7 +1033,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	changeSet.addFile(None, f.fileId(), f.freeze())
 	newPkg.addFile(pathId, path, newVersion, f.fileId())
 
-	if f.hasContents:
+	if f.hasContents and withFileContents:
 	    newCont = filecontents.FromFilesystem(realPath)
 	    changeSet.addFileContents(pathId,
 				      changeset.ChangedFileTypes.file,
@@ -1050,7 +1051,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
     return (foundDifference, newPkg)
 
-def buildLocalChanges(repos, pkgList, root = ""):
+def buildLocalChanges(repos, pkgList, root = "", withFileContents=True):
     """
     Builds a change set against a set of files currently installed and
     builds a package object which describes the files installed.  The
@@ -1072,7 +1073,7 @@ def buildLocalChanges(repos, pkgList, root = ""):
     returnList = []
     for (curPkg, srcPkg, newVersion, flags) in pkgList:
 	result = _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, 
-			       root, flags)
+			       root, flags, withFileContents=withFileContents)
         if result is None:
             # an error occurred
             return None
