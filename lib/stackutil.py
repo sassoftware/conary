@@ -87,15 +87,18 @@ def _printFrame(f, output=sys.stderr):
             output.write("    %s = %s\n" % (key, val))
 
 def _getStringValue(val):
-    if hasattr(val, 'asString'):
-      rval = val.asString()
-    elif inspect.isclass(val):
-        rval = '<Class %s.%s>' % (val.__module__, val.__name__)
-    elif not hasattr(val, '__str__'):
-        if hasattr(val, '__class__'):
-            rval = '<unprintable of class %s>' % val.__class__
+    try:
+        if hasattr(val, 'asString'):
+            rval = val.asString()
+        elif inspect.isclass(val):
+            rval = '<Class %s.%s>' % (val.__module__, val.__name__)
+        elif not hasattr(val, '__str__'):
+            if hasattr(val, '__class__'):
+                rval = '<unprintable of class %s>' % val.__class__
+            else:
+                rval = '<unprintable>'
         else:
-            rval = '<unprintable>'
-    else:
-        rval = val
-    return rval
+            rval = val
+        return rval
+    except Exception, e:
+        return '<Exception occured while converting %s to string: %s' %(repr(val), e)
