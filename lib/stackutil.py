@@ -22,6 +22,11 @@ import tempfile
 import traceback
 import xmlrpclib
 
+from repr import Repr
+_repr = Repr()
+_repr.maxstring = 3000
+_saferepr = _repr.repr
+
 def printTraceBack(tb=None, output=sys.stderr, exc_type=None, exc_msg=None):
     if isinstance(output, str):
         output = open(output, 'w')
@@ -107,7 +112,7 @@ def _printFrame(f, output=sys.stderr):
             else:
                 val = '<Unknown>'
 
-            output.write("    %s = %s\n" % (var, val))
+            output.write("    %s = %s\n" % (var, _saferepr(val)))
     for hidden in ('__file__', '__name__', '__doc__'):
         if hidden in localkeys:
             localkeys.remove(hidden)
@@ -120,7 +125,7 @@ def _printFrame(f, output=sys.stderr):
                 val = _getStringValue(val)
             else:
                 val = '<Unknown>'
-            output.write("    %s = %s\n" % (key, val))
+            output.write("    %s = %r\n" % (key, _saferepr(val)))
 
 def _getStringValue(val):
     try:
