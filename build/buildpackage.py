@@ -70,10 +70,10 @@ class PackageSpec:
 	return self.regexp.search(string)
 
 class BuildPackageGenerator:
-    """BuildPackageGenerator takes a set of PackageSpec lists
-    and provides facilities for populating new BuildPackage instances
-    with files according to the PackageSpecs.
-    """    
+    """BuildPackageGenerator creates a set of BuildPackage instances
+    and provides facilities for populating them with files according
+    to PackageSpecs.
+    """
     def __init__(self, namePrefix, version, auto, explicit):
         """
 	@param namePrefix: the fully qualified name of the main package
@@ -115,6 +115,7 @@ class BuildPackageGenerator:
     def addPath(self, path):
         """Add a path to the correct BuildPackage instance by matching
         the file name against the the explicit and auto specs
+
         @param path: path to add to the BuildPackage
         @type path: str
         @rtype: None
@@ -129,8 +130,10 @@ class BuildPackageGenerator:
 		break
 
     def packageSet(self):
-        """examine the packages created by the generator and
-        only return those which have files in them
+        """examine the BuildPackage instances created by the generator
+        return a new BuildPackageSet instance that includes only those
+        which have files
+        
         @return: list of BuildPackages instances
         @rtype: list
         """
