@@ -4,7 +4,7 @@
 #
 
 """
-The Specifix Repository System
+The Conary Repository System
 
 @group Package Building: build, buildpackage, recipe, cook, policy,
                          destdirpolicy, packagepolicy
