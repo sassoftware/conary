@@ -30,9 +30,6 @@ class BuildPackage(types.DictionaryType):
     def getVersion(self):
 	return self.version
 
-    def addDirectory(self, path):
-	self[path] = BuildFile()
-
     def __init__(self, name, version):
 	self.name = name
 	self.version = version
