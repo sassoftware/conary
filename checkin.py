@@ -16,6 +16,7 @@ import os
 import package
 import repository
 import sys
+import time
 import util
 import versions
 
@@ -515,3 +516,47 @@ def renameFile(oldName, newName):
 	    return
     
     log.error("file %s is not under management" % oldName)
+
+def showLog(repos, branch = None):
+    try:
+        state = SourceStateFromFile("SRS")
+    except OSError:
+        return
+
+    if not branch:
+	branch = state.getVersion().branch()
+    else:
+	if branch[0] != '/':
+	    log.error("branch name expected instead of %s" % branch)
+	    return
+	branch = versions.VersionFromString(branch)
+
+    troveName = state.getName()
+
+    verList = repos.getTroveVersionsByLabel([troveName], branch.label())
+    verList = verList[troveName]
+    verList.reverse()
+    l = []
+    for version in verList:
+	if version.branch() != branch: return
+	l.append((troveName, version, None))
+
+    print "Name  :", troveName
+    print "Branch:", branch.asString()
+    print
+
+    troves = repos.getTroves(l)
+
+    for trove in troves:
+	v = trove.getVersion()
+	cl = trove.getChangeLog()
+	when = time.strftime("%c", time.localtime(v.timeStamps()[-1]))
+	if cl:
+	    print "%s %s (%s) %s" % \
+		(trove.getVersion().trailingVersion().asString(),
+		 cl.name, cl.contact, when)
+	    lines = cl.message.split("\n")
+	    for l in lines:
+		print "    %s" % l
+	else:
+	    print "%s %s (no log message)" % when
