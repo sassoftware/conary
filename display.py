@@ -143,7 +143,7 @@ def parseTroveStrings(troveNameList, defaultFlavor):
     hasVersions = False
     hasFlavors = False
     for item in troveNameList:
-        (name, version, flavor) = updatecmd.parseTroveSpec(item, None)
+        (name, version, flavor) = updatecmd.parseTroveSpec(item, defaultFlavor)
 
         if version is not None:
             hasVersions = True
@@ -178,7 +178,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
                   ids = False, sha1s = False, fullVersions = False, 
                   tags = False, defaultFlavor = None):
     (troveNames, hasVersions, hasFlavors) = \
-        parseTroveStrings(troveNameList, defaultFlavor)
+        parseTroveStrings(troveNameList, None)
 
     pathList = [os.path.abspath(util.normpath(x)) for x in pathList]
     
