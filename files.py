@@ -164,7 +164,7 @@ class SymbolicLink(File):
 	pass
 
     def restore(self, repos, target):
-	if os.path.exists(target):
+	if os.path.islink(target):
 	    os.unlink(target)
 	os.symlink(self.theLinkTarget, target)
 	File.restore(self, target)
