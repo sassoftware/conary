@@ -128,10 +128,10 @@ static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
 	    for (i = 0; i < entries; i++) {
 		gelf_getdyn(data, i, &sym);
 		if (sym.d_tag == DT_NEEDED) {
-		    PyList_Append(reqList, Py_BuildValue("ss", "soname", 
+		    PyList_Append(reqList, Py_BuildValue("ss()", "soname", 
 			   elf_strptr(elf, shdr.sh_link, sym.d_un.d_val)));
 		} else if (sym.d_tag == DT_SONAME) {
-		    PyList_Append(provList, Py_BuildValue("ss", "soname", 
+		    PyList_Append(provList, Py_BuildValue("ss()", "soname", 
 			   elf_strptr(elf, shdr.sh_link, sym.d_un.d_val)));
 		}
 
@@ -167,7 +167,7 @@ static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
 
 		    PyList_Append(reqList, Py_BuildValue("ss(s)", "soname", 
 			   libName,
-			   elf_strptr(elf, shdr.sh_link, sym.d_un.d_val)));
+			   elf_strptr(elf, shdr.sh_link, veritem.vna_name)));
 		    listIdx += veritem.vna_next;
 		}
 
@@ -235,7 +235,7 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
     int rc;
 
     if (!PyArg_ParseTuple(args, "s", &fileName))
-            return NULL;
+	return NULL;
 
     fd = open(fileName, O_RDONLY);
     if (fd < 0) {
@@ -245,8 +245,8 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
 
     elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
     if (!elf) {
-	PyErr_SetString(ElfError, "failed to open elf object\n");
-	return NULL;
+	Py_INCREF(Py_None);
+	return Py_None;
     }
 
     reqList = PyList_New(0);
