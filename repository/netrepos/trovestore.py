@@ -205,6 +205,7 @@ class TroveStore:
     def getTroveFlavors(self, troveDict):
 	cu = self.db.cursor()
 	vMap = {}
+	outD = {}
 	# I think we might be better of intersecting subqueries rather
 	# then using all of the and's in this join
 	cu.execute("""
@@ -212,7 +213,9 @@ class TroveStore:
 	""", start_transaction = False)
 
 	for troveName in troveDict.keys():
+            outD[troveName] = {}
 	    for version in troveDict[troveName]:
+                outD[troveName][version] = []
 		s = version.canon().asString()
 		vMap[s] = version
 		cu.execute("""
@@ -235,13 +238,8 @@ class TroveStore:
 		ORDER BY aItem, aVersion
 	""")
 
-	outD = {}
 	for (item, verString, flavor) in cu:
-	    if not outD.has_key(item):
-		outD[item] = {}
 	    ver = vMap[verString]
-	    if not outD[item].has_key(ver):
-		outD[item][ver] = []
 	    outD[item][ver].append(flavor)
 
 	cu.execute("DROP TABLE itf", start_transaction = False)
