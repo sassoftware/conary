@@ -44,6 +44,7 @@ MERGE = 1 << 0
 REPLACEFILES = 1 << 1
 IGNOREUGIDS = 1 << 2
 MISSINGFILESOKAY = 1 << 3
+KEEPEXISTING = 1 << 4
         
 class FilesystemJob:
     """
@@ -650,6 +651,9 @@ class FilesystemJob:
 					  None, root, flags)
 
 	    self.newPackages.append(pkg)
+
+	if flags & KEEPEXISTING:
+	    return
 
 	for (name, oldVersion, oldFlavor) in changeSet.getOldPackageList():
 	    self.oldPackages.append((name, oldVersion, oldFlavor))

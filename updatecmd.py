@@ -67,19 +67,25 @@ def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
 	    log.error(str(e))
 	    return
 
-	newItems = []
-	for newTrove in newList:
-	    newItems.append((newTrove.getName(), newTrove.getVersion(),
-			     newTrove.getFlavor()))
-
-	# everything which needs to be installed is in this list; if it's
-	# not here, it's a duplicate
-	outdated, eraseList = helper.outdatedTroves(db, newItems)
 	list = []
-	for (name, newVersion, newFlavor), (oldName, oldVersion, oldFlavor) in \
-		outdated.iteritems():
-	    list.append((name, (oldVersion, oldFlavor),
-			       (newVersion, newFlavor), 0))
+	if keepExisting:
+	    for newTrove in newList:
+		list.append((newTrove.getName(), (None, None),
+			   (newTrove.getVersion(), newTrove.getFlavor()), 0))
+	    eraseList = []
+	else:
+	    newItems = []
+	    for newTrove in newList:
+		newItems.append((newTrove.getName(), newTrove.getVersion(),
+				 newTrove.getFlavor()))
+
+	    # everything which needs to be installed is in this list; if it's
+	    # not here, it's a duplicate
+	    outdated, eraseList = helper.outdatedTroves(db, newItems)
+	    for (name, newVersion, newFlavor), \
+		    (oldName, oldVersion, oldFlavor) in outdated.iteritems():
+		list.append((name, (oldVersion, oldFlavor),
+				   (newVersion, newFlavor), 0))
 
         if not list:
             log.warning("no new troves were found")

@@ -296,7 +296,7 @@ class Database(SqlDbRepository):
     # transaction
     def commitChangeSet(self, cs, isRollback = False, toStash = True,
                         replaceFiles = False, tagScript = None,
-			keepExisting = True):
+			keepExisting = False):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -350,13 +350,15 @@ class Database(SqlDbRepository):
 		assert(pkg)
 		pkgList.append((pkg, origPkg, ver, 0))
 
-	for (name, version, flavor) in cs.getOldPackageList():
-	    localVersion = version.fork(versions.LocalBranch(), sameVerRel = 1)
-	    pkg = self.getTrove(name, version, flavor)
-	    origPkg = self.getTrove(name, version, flavor, pristine = 1)
-	    assert(pkg)
-	    pkgList.append((pkg, origPkg, localVersion, 
-			    update.MISSINGFILESOKAY))
+	if not keepExisting:
+	    for (name, version, flavor) in cs.getOldPackageList():
+		localVersion = version.fork(versions.LocalBranch(), 
+					    sameVerRel = 1)
+		pkg = self.getTrove(name, version, flavor)
+		origPkg = self.getTrove(name, version, flavor, pristine = 1)
+		assert(pkg)
+		pkgList.append((pkg, origPkg, localVersion, 
+				update.MISSINGFILESOKAY))
 
 	result = update.buildLocalChanges(self, pkgList, root = self.root)
 	if not result: return
@@ -369,6 +371,8 @@ class Database(SqlDbRepository):
 	if not isRollback:
 	    inverse = cs.makeRollback(self, configFiles = 1)
             flags |= update.MERGE
+	if keepExisting:
+	    flags |= update.KEEPEXISTING
 
 	fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root, 
 				     flags = flags)
