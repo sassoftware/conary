@@ -43,7 +43,7 @@ def findFileFlavor(path):
             abi, isnset = flags
             if isnset == 'x86':
                 set.addDep(deps.InstructionSetDependency,
-                           deps.Dependency('i386', []))
+                           deps.Dependency('x86', []))
             else:
                 set.addDep(deps.InstructionSetDependency,
                            deps.Dependency(isnset, []))
