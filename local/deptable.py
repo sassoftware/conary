@@ -295,7 +295,7 @@ class DependencyTables:
             if depInfo is not None:
                 (troveIndex, classId, dep) = depInfo
 
-                if classId in [ deps.DEP_CLASS_ABI, deps.DEP_CLASS_FILES ]:
+                if classId in [ deps.DEP_CLASS_ABI ]:
                     continue
 
                 missingDeps = True
