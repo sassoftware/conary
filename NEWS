@@ -1,3 +1,7 @@
+Changes in 0.14.3:
+  * Fixed usage message to no longer print 1 at bottom, improved option handling
+    error messages
+
 Changes in 0.14.2:
   * contents are now stored as diffs when either the new file or the
     old file is empty

@@ -55,17 +55,26 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
                 arg = arg_parts[0]
                 # don't allow --foo=bar arg if foo doesn't exist
                 # or doesn't take an arg.
-                if not argDef.has_key(arg) and argDef[arg] != NO_PARAM:
-                    raise OptionError(usage())
+                if not argDef.has_key(arg):
+                    usage()
+                    raise OptionError("Unknown Flag '%s'r" % arg)
+                elif argDef[arg] == NO_PARAM:
+                    usage()
+                    raise OptionError(
+                                "Flag '%s' does not take a parameter" % arg)
                 argv[i] = arg
                 argv.insert(i+1, arg_parts[1])
-	    if not argDef.has_key(arg): raise OptionError(usage())
+	    if not argDef.has_key(arg): 
+                usage()
+                raise OptionError("Unknown flag '%s'" % arg)
 
 	    if argDef[arg] == NO_PARAM:
 		argSet[arg] = True
 	    elif argDef[arg] == OPT_PARAM:
 		# max one setting
-		if argSet.has_key(arg): raise OptionError(usage())
+		if argSet.has_key(arg): 
+                    raise OptionError(
+                            "Flag '%s' takes at most one parameter" % arg)
 		if i >= len(argv): 
 		    argSet[arg] = True
                 else:
@@ -86,11 +95,16 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 	    else:
 		# the argument takes a parameter
 		i = i + 1
-		if i >= len(argv): raise OptionError(usage())
+		if i >= len(argv): 
+                    usage()
+                    raise OptionError("Flag '%s' requires a parameter" % arg)
 
 		if argDef[arg] == ONE_PARAM:
 		    # exactly one parameter is allowd
-		    if argSet.has_key(arg): raise OptionError(usage())
+		    if argSet.has_key(arg): 
+                        usage()
+                        raise OptionError(
+                            "Flag '%s' requires exactly one parameter" % arg)
 		    argSet[arg] = argv[i]
 		else:
 		    # multiple parameters may occur
