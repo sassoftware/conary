@@ -12,6 +12,7 @@
 # full details.
 #
 import md5
+import os
 import re
 import sqlite3
 import sys
@@ -163,7 +164,7 @@ class NetworkAuthorization:
                             
     def addUser(self, user, password):
         cu = self.db.cursor()
-        salt = "AAAA"
+        salt = os.urandom(4)
         
         m = md5.new()
         m.update(salt)

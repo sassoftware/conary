@@ -7,6 +7,7 @@ Changes in 0.14.9:
   * apache repository server allows mixed ssl and normal requests
   * Added forceSSL to apache repository server configuration
   * The network client code now supports accessing servers over https
+  * Use proper salt for user passwords
 
 Changes in 0.14.8:
   * Fixed bug where streams for commits on distributed branches didn't always
