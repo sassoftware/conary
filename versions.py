@@ -105,10 +105,15 @@ class SerialNumber(object):
     def shadowCount(self):
         return len(self.numList) - 1
 
-    def truncateShadowCount(self, count):
+    def truncateShadowCount(self, count, fromEnd = False):
         count += 1
 
-        if len(self.numList) > count:
+        if len(self.numList) <= count:
+            return
+
+        if fromEnd:
+            self.numList = self.numList[-count:]
+        else:
             self.numList = self.numList[:count]
 
     def increment(self, listLen):
@@ -206,6 +211,14 @@ class Revision(AbstractRevision):
         @rtype: SerialNumber
 	"""
 	return self.buildCount
+
+    def freshlyBranched(self):
+        """
+        Resets the build and source counts to reflect this version/release
+        as being freshly branched.
+        """
+        self.sourceCount.truncateShadowCount(0, fromEnd = True)
+        self.buildCount.truncateShadowCount(0, fromEnd = True)
 
     def shadowCount(self):
         i = self.sourceCount.shadowCount()
@@ -786,6 +799,7 @@ class Version(VersionSequence):
 
 	if withVerRel:
 	    newlist.append(self.versions[-1].copy())
+            newlist[-1].freshlyBranched()
             return Version(copy.deepcopy(self.versions + newlist))
 
         return Branch(copy.deepcopy(self.versions + newlist))
