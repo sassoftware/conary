@@ -216,11 +216,21 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
 
     (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name)
     outF = os.fdopen(fd, "w")
-    # XXX the version is wrong here. I'm sure I'll be sorry.
-    inF = repos.getFileContents(sourceComponent.getName(),
-				sourceComponent.getVersion(),
-				sourceComponent.getFlavor(), filename,
-				sourceComponent.getVersion()).get()
+
+    inF = None
+    for (fileId, filePath, fileVersion) in sourceComponent.iterFileList():
+	if filePath == filename:
+	    inF = repos.getFileContents(sourceComponent.getName(),
+					sourceComponent.getVersion(),
+					sourceComponent.getFlavor(), filename,
+					fileVersion)
+	    break
+    
+    if not inF:
+	raise RecipeFileError("version %s of %s does not contain %s" %
+		  (sourceComponent.getName(), sourceComponent.getVersion(),
+	 	  filename))
+
     util.copyfileobj(inF, outF)
 
     del inF
