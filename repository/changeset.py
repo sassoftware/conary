@@ -580,7 +580,6 @@ class ChangeSetFromFile(ChangeSet):
 		    newVersion = versions.ThawVersion(info.newVersion())
 		    self.addFile(info.fileId(), oldVersion, newVersion, 
 				 info.csInfo())
-
 	    else:
 		print header
 		raise IOError, "invalid line in change set %s" % file
@@ -614,6 +613,7 @@ def fileChangeSet(fileId, old, new):
     hash = None
 
     if old and old.__class__ == new.__class__:
+	assert(0)
 	diff = new.diff(old)
 	if isinstance(new, files.RegularFile) and      \
 		  isinstance(old, files.RegularFile)   \
@@ -622,9 +622,9 @@ def fileChangeSet(fileId, old, new):
     else:
 	# different classes; these are always written as abstract changes
 	old = None
-	diff = new.infoLine()
+	diff = new.freeze()
 	if isinstance(new, files.RegularFile):
-	    hash = new.sha1()
+	    hash = new.contents.sha1()
 
     return (diff, hash)
 

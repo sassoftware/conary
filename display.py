@@ -83,7 +83,7 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids):
 		    name = path
 
 		print "%s    1 %-8s %-8s %s %s %s" % \
-		    (file.modeString(), file.owner(), file.group(), 
+		    (file.modeString(), file.inode.owner(), file.inode.group(), 
 		     file.sizeString(), file.timeString(), name)
 	elif ids:
 	    for (fileId, path, version) in pkg.iterFileList():

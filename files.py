@@ -207,7 +207,6 @@ class TupleStream(InfoStream):
 	idx = 0
 	for (i, (name, itemType, size)) in enumerate(self.makeup):
 	    if type(size) == int:
-		print "created", name
 		self.items.append(itemType(s[idx:idx + size]))
 	    elif (i + 1) == len(self.makeup):
 		self.items.append(itemType(s[idx:]))
@@ -279,7 +278,7 @@ class InodeStream(TupleStream):
 	return l
 
     def permsString(self):
-	perms = self.items[0].val
+	perms = self.perms()
 
 	l = self.triplet(perms >> 6, perms & 04000) + \
 	    self.triplet(perms >> 3, perms & 02000) + \
@@ -291,7 +290,29 @@ class InodeStream(TupleStream):
 	    else:
 		l[8] = "T"
 
-	return "-" + l
+	return "".join(l)
+
+    def timeString(self):
+	timeSet = time.localtime(self.mtime())
+	nowSet = time.localtime(time.time())
+
+	# if this file is more then 6 months old, use the year
+	monthDelta = nowSet[1] - timeSet[1]
+	yearDelta = nowSet[0] - timeSet[0]
+
+	if monthDelta < 0:
+	    yearDelta = yearDelta - 1
+	    monthDelta = monthDelta + 12
+
+	monthDelta = monthDelta + 12 * yearDelta
+
+	if nowSet[2] < timeSet[2]:
+	    monthDelta = monthDelta - 1
+
+	if monthDelta < 6:
+	    return time.strftime("%b %e %H:%M", timeSet)
+	else:
+	    return time.strftime("%b %e  %Y", timeSet)
 
 class FileMode:
     def merge(self, mode):
@@ -329,36 +350,9 @@ class FileMode:
 	    
 	return l
 
-    def sizeString(self):
-	return "%8d" % self.theSize
-
-    def timeString(self):
-	timeSet = time.localtime(int(self.theMtime))
-
-	nowSet = time.localtime(time.time())
-
-	# if this file is more then 6 months old, use the year
-	monthDelta = nowSet[1] - timeSet[1]
-	yearDelta = nowSet[0] - timeSet[0]
-
-	if monthDelta < 0:
-	    yearDelta = yearDelta - 1
-	    monthDelta = monthDelta + 12
-
-	monthDelta = monthDelta + 12 * yearDelta
-
-	if nowSet[2] < timeSet[2]:
-	    monthDelta = monthDelta - 1
-
-	if monthDelta < 6:
-	    return time.strftime("%b %e %H:%M", timeSet)
-	else:
-	    return time.strftime("%b %e  %Y", timeSet)
-
     def perms(self, new = None):
 	if (new != None and new != "-"):
 	    self.thePerms = new
-	self.update()
 
 	return self.thePerms
 
@@ -373,14 +367,12 @@ class FileMode:
     def owner(self, new = None):
 	if (new != None and new != "-"):
 	    self.theOwner = new
-	self.update()
 
 	return self.theOwner
 
     def group(self, new = None):
 	if (new != None and new != "-"):
 	    self.theGroup = new
-	self.update()
 
 	return self.theGroup
 
@@ -399,13 +391,8 @@ class FileMode:
 		self.theMtime = new
 	    else:
 		self.theMtime = int(new)
-	self.update()
 
 	return self.theMtime
-
-    def update(self):
-	self.inode = InodeStream(self.thePerms, self.theMtime, self.theOwner, 
-			         self.theGroup)
 
     def flags(self, new = None):
 	if (new != None and new != "-"):
@@ -428,12 +415,15 @@ class FileMode:
 	return (self.theFlags and self.theFlags & flag)
 
     def isConfig(self, set = None):
+	return False
 	return self._isFlag(_FILE_FLAG_CONFIG, set)
 
     def isInitScript(self, set = None):
+	return False
 	return self._isFlag(_FILE_FLAG_INITSCRIPT, set)
 
     def isShLib(self, set = None):
+	return False
 	return self._isFlag(_FILE_FLAG_SHLIB, set)
 
     def infoLine(self):
@@ -510,17 +500,14 @@ class File(FileMode):
     streamList = ( ("inode", InodeStream), )
 
     def modeString(self):
-	l = self.triplet(self.thePerms >> 6, self.thePerms & 04000)
-	l = l + self.triplet(self.thePerms >> 3, self.thePerms & 02000)
-	l = l + self.triplet(self.thePerms >> 0)
-	
-	if self.thePerms & 01000:
-	    if l[8] == "x":
-		l[8] = "t"
-	    else:
-		l[8] = "T"
-
+	l = self.inode.permsString()
 	return self.lsTag + string.join(l, "")
+
+    def timeString(self):
+	return self.inode.timeString()
+
+    def sizeString(self):
+	return "       0"
 
     def copy(self):
 	return copy.deepcopy(self)
@@ -542,10 +529,10 @@ class File(FileMode):
 	self.chmod(target)
 
 	if not skipMtime:
-	    os.utime(target, (self.theMtime, self.theMtime))
+	    os.utime(target, (self.inode.mtime(), self.inode.mtime()))
 
     def chmod(self, target):
-	os.chmod(target, self.thePerms)
+	os.chmod(target, self.inode.perms())
 
     def setOwnerGroup(self, target):
 	if os.getuid(): return
@@ -583,16 +570,13 @@ class File(FileMode):
     def initializeStreams(self, data):
 	if not data: return
 
-	self.streams = {}
 	# skip over the file type for now
 	i = 1
 	for (name, streamType) in self.streamList:
 	    (streamId, size) = struct.unpack("!BH", data[i:i+3])
-	    print name, streamId, size, streamType
 	    assert(streamId == streamType.streamId)
 	    i += 3
-	    self.streams[name] = streamType(data[i:i + size])
-	    self.__dict__[name] = self.streams[name]
+	    self.__dict__[name] = streamType(data[i:i + size])
 	    i += size
 
 	#assert(i == len(data))
@@ -622,6 +606,9 @@ class SymbolicLink(File):
 	    self.target = StringStream(newLinkTarget)
 
 	return self.theLinkTarget
+
+    def sizeString(self):
+	return "%8d" % len(self.target.value())
 
     def infoLine(self):
 	return "l %s %s" % (self.theLinkTarget, FileMode.infoLine(self))
@@ -717,8 +704,9 @@ class Directory(File):
             # XXX
             log.warning('rmdir %s failed: %s', target, str(err))
 
-    def __init__(self, fileId, info = None):
-	File.__init__(self, fileId, info, infoTag = "d")
+    def __init__(self, fileId, info = None, streamData = None):
+	File.__init__(self, fileId, info, infoTag = "d", 
+		      streamData = streamData)
 
 class DeviceFile(File):
 
@@ -813,10 +801,11 @@ class RegularFile(File):
     def sha1(self, sha1 = None):
 	if sha1 and sha1 != "-":
 	    self.thesha1 = sha1
-	self.contents = RegularFileStream(self.theSize, self.theFlags,
-					  self.thesha1)
 
 	return self.thesha1
+
+    def sizeString(self):
+	return "%8d" % self.contents.size()
 
     def applyChange(self, line, ignoreContents = 0):
 	if ignoreContents:
@@ -862,7 +851,7 @@ class RegularFile(File):
 	self.sha1(sha)
 	File._applyChangeLine(self, line)
 
-    def __init__(self, fileId, info = None, infoTag = "f"):
+    def __init__(self, fileId, info = None, infoTag = "f", streamData = None):
 	if (info):
 	    self._applyChangeLine(info)
 	else:
@@ -870,13 +859,33 @@ class RegularFile(File):
 
 	self.infoTag = infoTag
 
-	File.__init__(self, fileId, info, infoTag = self.infoTag)
+	File.__init__(self, fileId, info, infoTag = self.infoTag,
+		      streamData = streamData)
 
 def FileFromFilesystem(path, fileId, possibleMatch = None,
                        requireSymbolicOwnership = False):
     s = os.lstat(path)
 
+    try:
+        owner = pwd.getpwuid(s.st_uid)[0]
+    except KeyError, msg:
+        if requireSymbolicOwnership:
+            raise FilesError(
+                "Error mapping uid %d to user name: %s" %(s.st_uid, msg))
+        else:
+	    owner = str(s.st_uid)
+
+    try:
+        group = grp.getgrgid(s.st_gid)[0]
+    except KeyError, msg:
+        if requireSymbolicOwnership:
+            raise FilesError(
+                "Error mapping gid %d to group name: %s" %(s.st_gid, msg))
+        else:
+            group = str(s.st_gid)
+
     needsSha1 = 0
+    inode = InodeStream(s.st_mode & 07777, s.st_mtime, owner, group)
 
     if (stat.S_ISREG(s.st_mode)):
 	f = RegularFile(fileId)
@@ -899,23 +908,12 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
     else:
         raise FilesError("unsupported file type for %s" % path)
 
+    f.inode = inode
+
     f.perms(s.st_mode & 07777)
-    try:
-        f.owner(pwd.getpwuid(s.st_uid)[0])
-    except KeyError, msg:
-        if requireSymbolicOwnership:
-            raise FilesError(
-                "Error mapping uid %d to user name: %s" %(s.st_uid, msg))
-        else:
-            f.owner(str(s.st_uid))
-    try:
-        f.group(grp.getgrgid(s.st_gid)[0])
-    except KeyError, msg:
-        if requireSymbolicOwnership:
-            raise FilesError(
-                "Error mapping gid %d to group name: %s" %(s.st_gid, msg))
-        else:
-            f.group(str(s.st_gid))
+    f.owner(owner)
+    f.group(group)
+
     f.mtime(s.st_mtime)
     f.size(s.st_size)
     f.flags(0)
@@ -928,7 +926,9 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
 	f.flags(0)
 
     if needsSha1:
-	f.sha1(sha1helper.hashFile(path))
+	sha1 = sha1helper.hashFile(path)
+	f.contents = RegularFileStream(s.st_size, f.flags(), sha1)
+	f.sha1(sha1)
 
     return f
 
@@ -952,7 +952,12 @@ def FileFromInfoLine(infoLine, fileId):
 	raise FilesError("bad infoLine %s" % infoLine)
 
 def ThawFile(frz, fileId):
-    return File(fileId, streamData = frz)
+    if frz[0] == "-":
+	return RegularFile(fileId, streamData = frz)
+    elif frz[0] == "d":
+	return Directory(fileId, streamData = frz)
+
+    assert(0)
 
 class FilesError(Exception):
     def __init__(self, msg):

@@ -449,11 +449,11 @@ class _FileDBClass(VersionedFile):
 	    if file.id() != self.fileId:
 		raise KeyError, "file id mismatch for file database"
 	
-	VersionedFile.addVersion(self, version, "%s\n" % file.infoLine())
+	VersionedFile.addVersion(self, version, "%s\n" % file.freeze())
 
     def getVersion(self, version):
 	f1 = VersionedFile.getVersion(self, version)
-	file = files.FileFromInfoLine(f1.read(), self.fileId)
+	file = files.ThawFile(f1.read(), self.fileId)
 	f1.close()
 	return file
 
@@ -648,7 +648,7 @@ class ChangeSetJob:
 		    restoreContents = 0
 	    else:
 		# this is for new files
-		file = files.FileFromInfoLine(infoLine, fileId)
+		file = files.ThawFile(infoLine, fileId)
 
 	    # we should have had a package which requires this (new) version
 	    # of the file

@@ -185,8 +185,7 @@ class FilesystemJob:
 	    else:
 		headRealPath = cwd + "/" + headPath
 
-	    headFile = files.FileFromInfoLine(changeSet.getFileChange(fileId),
-					      fileId)
+	    headFile = files.ThawFile(changeSet.getFileChange(fileId), fileId)
 
             try:
                 s = os.lstat(headRealPath)
