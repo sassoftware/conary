@@ -165,7 +165,10 @@ class Package:
 		    if i == len(self.packages[name]):
 			# FIXME, this isn't the right thing to do
 			raise IOError
-		    del(self.packages[i])
+
+		    del(self.packages[name][i])
+		    if not self.packages[name]:
+			del self.packages[name]
 
 	return fileMap
 
@@ -450,22 +453,30 @@ class PackageChangeSet:
 	    for item in fields[1:]:
 		op = item[0]
 		v = versions.ThawVersion(item[1:])
-		verList.append((op, v))
 
-	    self.addPackage(name, verList)
+		assert(op == "+" or op == "-")
+
+		if op == "+":
+		    self.newPackageVersion(name, v)
+		else: # op == "-"
+		    self.oldPackageVersion(name, v)
+
 
     def formatToFile(self, changeSet, cfg, f):
 	f.write("%s " % self.name)
+
 	if self.isAbstract():
 	    f.write("abstract ")
 	elif self.oldVersion:
 	    f.write("from %s to " % self.oldVersion.asString(cfg.defaultbranch))
 	else:
 	    f.write("new ")
+
 	f.write("%s\n" % self.newVersion.asString(cfg.defaultbranch))
 
 	for (fileId, path, version) in self.newFiles:
 	    f.write("\tadded %s (%s(.*)%s)\n" % (path, fileId[:6], fileId[-6:]))
+
 	for (fileId, path, version) in self.changedFiles:
 	    if path:
 		f.write("\tchanged %s (%s(.*)%s)\n" % 
@@ -474,8 +485,13 @@ class PackageChangeSet:
 		f.write("\tchanged %s\n" % fileId)
 	    change = changeSet.getFileChange(fileId)
 	    print "\t\t%s" % change
+
 	for fileId in self.oldFiles:
 	    f.write("\tremoved %s(.*)%s\n" % (fileId[:6], fileId[-6:]))
+
+	for name in self.packages.keys():
+	    list = [ x[0] + x[1].asString(cfg.defaultbranch) for x in self.packages[name] ]
+	    f.write("\t" + stripNamespace(cfg.packagenamespace, name) + " " + " ".join(list) + "\n")
 
     def remapSinglePath(self, path, map, dict):
 	# the first item in map remaps source packages, which are present
@@ -541,10 +557,11 @@ class PackageChangeSet:
 
 	lines = []
 	for name in self.packages.keys():
-	    list = [ "p " + x[0] + x[1].freeze() for x in self.packages[name] ]
-	    lines.append(name + " " + " ".join(list))
+	    list = [ x[0] + x[1].freeze() for x in self.packages[name] ]
+	    lines.append("p " + name + " " + " ".join(list))
 
-	rc += "\n".join(lines) + "\n"
+	if lines:
+	    rc += "\n".join(lines) + "\n"
     
 	if self.abstract:
 	    hdr = "SRS PKG ABSTRACT %s %s %d\n" % \
