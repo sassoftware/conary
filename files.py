@@ -560,7 +560,7 @@ def FileFromFilesystem(path, fileId, type = None, possibleMatch = None,
             raise FilesError(
                 "Error mapping uid %d to user name: %s" %(s.st_uid, msg))
         else:
-            s.owner(str(s.st_uid))
+            f.owner(str(s.st_uid))
     try:
         f.group(grp.getgrgid(s.st_gid)[0])
     except KeyError, msg:
