@@ -273,7 +273,7 @@ class Version:
 	@rtype: boolean
 	"""
 	if self.isBranch(): return 0
-	return self.listsEqual(self.versions[:-1], branch)
+	return self._listsEqual(self.versions[:-1], branch)
 
     def branch(self):
 	"""
