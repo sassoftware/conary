@@ -132,19 +132,22 @@ def remove(paths):
 	print '+ deleting [file] %s' %path
 	os.remove(path)
 
-def copyfile(source, dest):
-    print '+ copying %s to %s' %(source, dest)
-    shutil.copy2(source, dest)
-
-def rename(source, dest):
-    print '+ renaming %s to %s' %(source, dest)
-    os.rename(source, dest)
-
-def copytree(source, dest, symlinks=False):
-    if os.path.isdir(source):
-	dest = '%s/%s' %(dest, os.path.basename(source))
-	print '+ copying [tree] %s to %s' %(source, dest)
-	shutil.copytree(source, dest, symlinks)
-    else:
-	print '+ copying [file] %s to %s' %(source, dest)
+def copyfile(sources, dest):
+    for source in braceGlob(sources):
+	print '+ copying %s to %s' %(source, dest)
 	shutil.copy2(source, dest)
+
+def rename(sources, dest):
+    for source in braceGlob(sources):
+	print '+ renaming %s to %s' %(source, dest)
+	os.rename(source, dest)
+
+def copytree(sources, dest, symlinks=False):
+    for source in braceGlob(sources):
+	if os.path.isdir(source):
+	    dest = '%s/%s' %(dest, os.path.basename(source))
+	    print '+ copying [tree] %s to %s' %(source, dest)
+	    shutil.copytree(source, dest, symlinks)
+	else:
+	    print '+ copying [file] %s to %s' %(source, dest)
+	    shutil.copy2(source, dest)

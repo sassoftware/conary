@@ -227,17 +227,21 @@ class RemoveFiles:
 class InstallDoc:
 
     def doInstall(self, macros):
+	macros = macros.copy()
+	if self.subdir:
+	    macros['subdir'] = '/%s' % self.subdir
 	if self.devel:
-	    dest = '%(destdir)s/%(develdocdir)s/%(name)s-%(version)s/' %macros
+	    dest = '%(destdir)s/%(develdocdir)s/%(name)s-%(version)s/%(subdir)s/' %macros
 	else:
-	    dest = '%(destdir)s/%(docdir)s/%(name)s-%(version)s/' %macros
+	    dest = '%(destdir)s/%(docdir)s/%(name)s-%(version)s/%(subdir)s/' %macros
 	util.mkdirChain(os.path.dirname(dest))
 	for path in self.paths:
 	    util.copytree(path, dest, True)
 
-    def __init__(self, paths, devel=False):
+    def __init__(self, paths, devel=False, subdir=''):
 	if type(paths) is str:
 	    self.paths = (paths,)
 	else:
 	    self.paths = paths
 	self.devel = devel
+	self.subdir = subdir
