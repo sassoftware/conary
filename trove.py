@@ -18,20 +18,18 @@ class Package:
 	self.files["/sources" + path] = version
 
     def fileList(self):
-	l = []
-	# rip off the /files prefix
+	return self.files.items()
 	for (path, file) in self.files.items():
 	    if path[:6] == "/files":
-		l.append((path[6:], file))
+		l.append((path, file))
 
 	return l
 
     def sourceList(self):
 	l = []
-	# rip off the /files prefix
 	for (path, file) in self.files.items():
 	    if path[:8] == "/sources":
-		l.append((path[8:], file))
+		l.append((path, file))
 
 	return l
 

@@ -17,8 +17,7 @@ def finalCommit(reppath, pkgName, version, root, fileList):
     fileDB = reppath + "/files"
 
     for file in fileList:
-	infoFile = files.FileDB(reppath, file.__class__ == files.SourceFile, \
-				file.path())
+	infoFile = files.FileDB(reppath, file.pathInRep(reppath))
 
 	existing = infoFile.findVersion(file)
 	if not existing:
@@ -26,7 +25,8 @@ def finalCommit(reppath, pkgName, version, root, fileList):
 	    infoFile.addVersion(version, file)
 
 	    if file.__class__ == files.SourceFile:
-		p.addSource(file.path(), file.version())
+		p.addSource("/" + pkgName + "/" + file.fileName(), 
+			    file.version())
 	    else:
 		p.addFile(file.path(), file.version())
 

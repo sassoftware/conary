@@ -23,16 +23,16 @@ def doUpdate(reppath, root, srcPath, pkgName, binaries = 1, sources = 0):
     (version, pkg) = pkgSet.getLatest()
 
     fileList = []
+    packageFiles = []
 
     if binaries:
-	for (fileName, version) in pkg.fileList():
-	    infoFile = files.FileDB(reppath, 0, fileName)
-	    fileList.append(infoFile)
-
+	packageFiles = packageFiles + pkg.fileList()
     if sources:
-	for (fileName, version) in pkg.sourceList():
-	    infoFile = files.FileDB(reppath, 1, fileName)
-	    fileList.append(infoFile)
+	packageFiles = packageFiles + pkg.sourceList()
+
+    for (fileName, version) in packageFiles:
+	infoFile = files.FileDB(reppath, reppath + fileName)
+	fileList.append(infoFile)
 
     for infoFile in fileList:
 	f = infoFile.getVersion(version)

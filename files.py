@@ -109,6 +109,10 @@ class File(FileMode):
 	
 	return self.dir() + '/' + self.name()
 
+    # path to the file in the repository
+    def pathInRep(self, reppath):
+	return reppath + "/files" + self.path()
+
     def name(self, new = None):
 	if (new != None):
 	    self.theName = new
@@ -309,8 +313,7 @@ class RegularFile(File):
 	return 0
 
     def restore(self, reppath, srcpath, root):
-	source = reppath + "/files" + self.path() + ".contents/" + \
-		   self.uniqueName() 
+	source = self.pathInRep(reppath) + ".contents/" + self.uniqueName() 
 	target = root + self.path()
 	path = os.path.dirname(target)
 	util.mkdirChain(path)
@@ -318,7 +321,7 @@ class RegularFile(File):
 	File.restore(self, reppath, srcpath, root)
 
     def archive(self, reppath, root):
-	dest = reppath + "/files" + self.path() + ".contents"
+	dest = self.pathInRep(reppath) + '.contents'
 	util.mkdirChain(dest)
 	dest = dest + "/" + self.uniqueName()
 	shutil.copyfile(root + "/" + self.path(), dest)
@@ -334,23 +337,25 @@ class RegularFile(File):
 class SourceFile(RegularFile):
 
     def restore(self, reppath, srcpath, root):
-	source = reppath + "/sources/" + os.path.basename(self.path()) \
-		+ ".contents/" + self.uniqueName()
-	target = root + srcpath + "/" + os.path.basename(self.path())
+	source = self.pathInRep(reppath) + ".contents/" + self.uniqueName()
+	target = root + srcpath + "/" + self.fileName()
 	path = os.path.dirname(target)
 	util.mkdirChain(path)
 	shutil.copyfile(source, target)
 	File.restore(self, reppath, srcpath, root)
 
-    def archive(self, reppath, root):
-	dest = reppath + "/sources/" + os.path.basename(self.path()) \
-		+ ".contents"
-	util.mkdirChain(dest)
-	dest = dest + "/" + self.uniqueName()
-	shutil.copyfile(root + "/" + self.path(), dest)
+    def fileName(self):
+	return self.pkgName + "/" + os.path.basename(self.path())
+
+    def pathInRep(self, reppath):
+	return reppath + "/sources/" + self.fileName()
 
     def infoLine(self):
 	return "src %s %s" % (self.themd5, File.infoLine(self))
+
+    def __init__(self, pkgName, path, version = None, info = None):
+	self.pkgName = pkgName
+	RegularFile.__init__(self, path, version, info)
 
 class FileDB:
 
@@ -376,7 +381,7 @@ class FileDB:
 	if self.versions.has_key(version):
 	    raise KeyError, "duplicate version for database"
 	else:
-	    if file.path() != self.path:
+	    if file.pathInRep(self.reppath) + ".info" != self.dbfile:
 		raise KeyError, "path mismatch for file database"
 	
 	self.versions[version] = file
@@ -395,22 +400,22 @@ class FileDB:
 
 	f.close()
 
-    def __init__(self, reppath, isSource, path):
+    # path is the *full* *absolute* path to the file in the repository
+    def __init__(self, reppath, path):
 	self.reppath = reppath
-	self.path = path
 
-	if isSource:
-	    self.dbfile = reppath + '/sources' + path + '.info'
-	else:
-	    self.dbfile = reppath + '/files' + path + '.info'
+	# strip off the leading /reppath/files or /reppath/sources
+	parts = string.split(path[len(reppath):], "/")
+	self.path = "/" + string.join(parts[2:], "/")
 
+	self.dbfile = path + ".info"
 	self.read()
 
-def FileFromFilesystem(root, path, type = "auto"):
+def FileFromFilesystem(pkgName, root, path, type = "auto"):
     s = os.lstat(root + path)
 
     if (type == "src"):
-	f = SourceFile(path)
+	f = SourceFile(pkgName, path)
 	f.md5(md5sum.md5sum(root + path))
     elif (stat.S_ISREG(s.st_mode)):
 	f = RegularFile(path)

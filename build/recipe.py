@@ -7,6 +7,8 @@ import os
 import util
 import build
 import package
+import shutil
+import types
 
 class RecipeLoader(types.DictionaryType):
     def __init__(self, file):
@@ -32,8 +34,11 @@ class Recipe:
     def addPatch(self, file):
 	self.patches.append(file)
 
+    def addSource(self, file):
+	self.sources.append(file)
+
     def allSources(self):
-	return self.tarballs + self.patches
+	return self.sources + self.tarballs + self.patches
 
     def mainDir(self, new = None):
 	if new:
@@ -55,11 +60,25 @@ class Recipe:
                 raise RuntimeError, "unknown archive compression"
 	    os.system("tar -C %s %s %s" % (builddir, tarflags,
                                            srcdir + "/" + file))
+	
+	for file in self.sources:
+	    destDir = builddir + "/" + self.theMainDir
+	    util.mkdirChain(destDir)
+	    shutil.copyfile(srcdir + "/" + file, destDir + "/" + file)
+
     def doBuild(self, builddir):
-	self.build.doBuild(builddir + "/" + self.mainDir())
+	if type(self.build) == types.TupleType:
+	    for bld in self.build:
+		bld(builddir + "/" + self.mainDir())
+	else:
+	    self.build.doBuild(builddir + "/" + self.mainDir())
 
     def doInstall(self, builddir, root):
-	self.install.doInstall(builddir + "/" + self.mainDir(), root)
+	if type(self.install) == types.TupleType:
+	    for inst in self.install:
+		inst.doInstall(builddir + "/" + self.mainDir(), root)
+	else:
+	    self.install.doInstall(builddir + "/" + self.mainDir(), root)
 
     def packages(self, root):
         self.packageSet = package.Auto(self.name, root)
@@ -70,5 +89,6 @@ class Recipe:
     def __init__(self):
 	self.tarballs = []
 	self.patches = []
+	self.sources = []
 	self.theMainDir = self.name + "-" + self.version
 	self.build = build.Make()

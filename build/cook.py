@@ -12,6 +12,9 @@ import util
 def cook(reppath, srcdir, builddir, recipeFile):
     classList = recipe.RecipeLoader(recipeFile)
 
+    if recipeFile[0] != "/":
+	raise IOError, "recipe file names must be absolute paths"
+
     for (name, theClass) in classList.items():
 	print "Building", name
 
@@ -34,16 +37,18 @@ def cook(reppath, srcdir, builddir, recipeFile):
 	    fileList = []
 
 	    for filePath in buildPkg.keys():
-		f = files.FileFromFilesystem(rootDir, filePath)
+		f = files.FileFromFilesystem(recp.name, rootDir, filePath)
 		fileList.append(f)
 
 	    commit.finalCommit(reppath, recp.name + "/" + name, recp.version, 
 			       rootDir, fileList)
 
-	fileList = []
+	f = files.FileFromFilesystem(recp.name, "/", recipeFile, "src")
+	fileList = [ f ]
 	for file in recp.allSources():
-	    f = files.FileFromFilesystem(srcdir, "/" + file)
+	    f = files.FileFromFilesystem(recp.name, "/", srcdir + "/" + file, 
+					 "src")
 	    fileList.append(f)
 
 	commit.finalCommit(reppath, recp.name + "/sources", recp.version,
-			    srcdir, fileList)
+			    "/", fileList)

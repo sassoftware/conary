@@ -3,6 +3,8 @@
 # All rights reserved
 #
 import os
+import shutil
+import util
 
 class Make:
 
@@ -17,3 +19,16 @@ class MakeInstall:
     def __init__(self, rootVar = "DESTDIR"):
 	self.rootVar = rootVar
 
+class InstallFile:
+
+    def doInstall(self, dir, root):
+	dest = root + self.toFile
+	util.mkdirChain(os.path.dirname(dest))
+
+	shutil.copyfile(self.toFile, dest)
+	os.chmod(dest, self.mode)
+
+    def __init__(self, fromFile, toFile, perms = 0644):
+	self.toFile = toFile
+	self.file = fromFile
+	self.mode = perms
