@@ -14,9 +14,7 @@
 # full details.
 #
 
-#repPath=$(conary config | grep repPath | awk '{print $2}')
-# temporary override
-#repPath=http://conary:conary@lambchop/distro/
+echo $* > /tmp/EWT
 
 if [ $0 = "changemail" ]; then
     CONARY=../conary
@@ -26,11 +24,10 @@ fi
 
 usage ()
 {
-    (echo "Usage: changemail --reppath <repPath> --trove <trove> --version <version> "
+    (echo "Usage: changemail --repmap <repmap> --trove <trove> --version <version> "
      echo "                 --email <email>"
-     echo "       changemail --reppath <repPath> <trove> <version> <email>"
+     echo "       changemail --repmap <repmap> <trove> <version> <email>"
      echo "(using command $CONARY)"
-     #echo "default repPath: ${repPath}"
     ) 1>&2
     exit 1
 }
@@ -41,9 +38,10 @@ fi
 
 while [ $# -gt 0 ] ; do
     case $1 in
-	--reppath)
+	--repmap)
 	    shift
-	    repPath=$1
+	    repMapArg="--config"
+	    repMap="repositorymap $1"
 	    shift
 	    ;;
 	--trove)
@@ -76,11 +74,5 @@ while [ $# -gt 0 ] ; do
     esac
 done
 
-if [ -z "$repPath" ]; then
-    echo "reppath must be set" >&2
-    exit 1
-fi
-
-$CONARY src rdiff --reppath $repPath $trove -1 $version 
-$CONARY src rdiff --reppath $repPath $trove -1 $version | \
-    mail -s "$trove $version" $email
+$CONARY src rdiff $repMapArg "$repMap" $trove -1 $version | \
+	mail -s "$trove $version" $email
