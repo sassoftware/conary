@@ -78,7 +78,7 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids, sha1s):
 		file = repos.getFileVersion(fileId, version, path = path)
 
 		if isinstance(file, files.SymbolicLink):
-		    name = "%s -> %s" %(path, file.target.val())
+		    name = "%s -> %s" %(path, file.target.value())
 		else:
 		    name = path
 
