@@ -30,6 +30,12 @@ crossMacros = (
     ('headerpath'	, '%(sysroot)s/usr/include')
 )
 
+def system(cmd):
+    print '+', cmd
+    rc = os.system(cmd)
+    if rc != 0:
+        raise RuntimeError, 'Shell command "' + cmd + '" returned non-zero status'
+
 class Macros(dict):
     def __setitem__(self, name, value):
 	dict.__setitem__(self, name, value % self)
@@ -106,7 +112,8 @@ class RecipeLoader(types.DictionaryType):
         exec 'from recipe import Recipe' in self.module.__dict__
         exec 'from recipe import loadRecipe' in self.module.__dict__
         exec 'import build, os, package, sys, util' in self.module.__dict__
-	exec 'sys.excepthook = util.excepthook' in self.module.__dict__
+        if sys.excepthook == util.excepthook:
+            exec 'sys.excepthook = util.excepthook' in self.module.__dict__
         exec 'filename = "%s"' %(file) in self.module.__dict__
         code = compile(f.read(), file, 'exec')
         exec code in self.module.__dict__
@@ -253,10 +260,10 @@ class Recipe:
                 raise RuntimeError, "unknown archive compression"
             if extractdir:
                 destdir = '%s/%s' % (builddir, extractdir)
-                os.system("mkdir -p %s" % destdir)
+                system("mkdir -p %s" % destdir)
             else:
                 destdir = builddir
-	    os.system("tar -C %s %s %s" % (destdir, tarflags, f))
+	    system("tar -C %s %s %s" % (destdir, tarflags, f))
 	
 	for file in self.sources:
             f = lookaside.findAll(self.cfg, self.laReposCache, file, 
@@ -271,7 +278,7 @@ class Recipe:
 	    destDir = builddir + "/" + self.theMainDir
             if backup:
                 backup = '-b -z %s' % backup
-            os.system('patch -d %s -p%s %s < %s' %(destDir, level, backup, f))
+            system('patch -d %s -p%s %s < %s' %(destDir, level, backup, f))
 
     def doBuild(self, buildpath):
         builddir = buildpath + "/" + self.mainDir()
@@ -279,11 +286,11 @@ class Recipe:
         if self.build is None:
             pass
         elif type(self.build) is str:
-            os.system(self.build %self.macros)
+            system(self.build %self.macros)
         elif type(self.build) is tuple:
 	    for bld in self.build:
                 if type(bld) is str:
-                    os.system(bld %self.macros)
+                    system(bld %self.macros)
                 else:
                     bld.doBuild(self.macros)
 	else:
@@ -296,11 +303,11 @@ class Recipe:
         if self.install is None:
             pass
         elif type(self.install) is str:
-            os.system(self.install %self.macros)
+            system(self.install %self.macros)
 	elif type(self.install) is tuple:
 	    for inst in self.install:
                 if type(inst) is str:
-                    os.system(inst %self.macros)
+                    system(inst %self.macros)
                 else:
                     inst.doInstall(self.macros)
 	else:
