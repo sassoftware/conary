@@ -458,10 +458,14 @@ def addFiles(fileList):
 	    log.error("file %s does not exist", file)
 	    continue
 
+	found = False
 	for (fileId, path, version) in state.iterFileList():
 	    if path == file:
 		log.error("file %s is already part of this source component" % path)
-		continue
+		found = True
+
+	if found: 
+	    continue
 
 	fileMagic = magic.magic(file)
 	if fileMagic and fileMagic.name == "changeset":
