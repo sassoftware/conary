@@ -272,17 +272,10 @@ def fetchFreshmeat(troveName):
         raise NoFreshmeatRecord
 
 def showDetails(repos, cfg, troveName, branch):
-    # FIXME use TroveInfo here
-    if ':' in troveName:
-        package = troveName[:troveName.find(':')]
-    else:
-        package = troveName
-    sourceName = package + ":source"
+    md = repos.getMetadata([troveName, branch], branch.label())
 
-    md = repos.getMetadata([sourceName, branch], branch.label())
-
-    if sourceName in md:
-        md = md[sourceName]
+    if troveName in md:
+        md = md[troveName]
         
         wrapper = textwrap.TextWrapper(initial_indent='    ',
                                        subsequent_indent='    ')

@@ -135,6 +135,20 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 	log.error(str(e))
 	return
 
+    # FIXME use TroveInfo here
+    if ':' in troveName:
+        package = troveName[:troveName.find(':')]
+    else:
+        package = troveName
+    sourceName = package + ":source"
+    try:
+        sourceTrove = repos.findTrove(cfg.installLabelPath, sourceName,
+                                      cfg.flavor, versionStr,
+                                      acrossRepositories = True,
+                                      withFiles = False)[0]
+    except repository.PackageNotFound, e:
+        sourceTrove = None
+
     for trove in troveList:
 	version = trove.getVersion()
         if ls or tags or sha1s or ids:
@@ -162,14 +176,15 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		    (("Version   : %s" % version.trailingVersion().asString()),
 		     ("Label     : %s" % version.branch().label().asString()))
 
-            metadata.showDetails(repos, cfg, trove.getName(), version.branch())
+            if sourceTrove:
+                metadata.showDetails(repos, cfg, sourceTrove.getName(), version.branch())
 
-	    cl = trove.getChangeLog()
-	    if cl:
-		print "Changelog: %s (%s)" % (cl.getName(), cl.getContact())
-		lines = cl.getMessage().split("\n")[:-1]
-		for l in lines:
-		    print "    " + l
+                cl = sourceTrove.getChangeLog()
+                if cl:
+                    print "Changelog: %s (%s)" % (cl.getName(), cl.getContact())
+                    lines = cl.getMessage().split("\n")[:-1]
+                    for l in lines:
+                        print "    " + l
         elif deps:
             for name, dep in (('Provides', trove.provides),
                               ('Requires', trove.requires)):
