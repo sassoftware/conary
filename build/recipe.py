@@ -211,8 +211,6 @@ def loadRecipe(file):
 ##                       'setup'        : setup})
 
 class Recipe:
-    name = None
-    version = None
     buildRequires = []
     runRequires = []
 
