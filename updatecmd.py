@@ -75,8 +75,4 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	# permute the list into a list of just package names
 	list = map(lambda x: x[0], list)
 
-    # create a change set between what is in the database and what is
-    # on the disk
-    #localChanges = changeset.CreateAgainstLocal(cfg, db, list)
-
     db.commitChangeSet(cs, sourcePath = cfg.sourcepath)
