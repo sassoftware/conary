@@ -24,8 +24,9 @@ def usage():
     print "usage: srs changeset <pkg> [<oldver>] <newver> <outfile>"
     print "       srs cook    [--prep] <first.recipe> <second.recipe> ..."
     print "       srs commit  <file>"
-    print "       srs pkglist <pkg> <version>"
-    print "       srs update  <pkg> <version>"
+    print "       srs pkglist <pkgname> <version>"
+    print "       srs update  <pkgname> <version>"
+    print "                   <pkgfile>"
     print ""
     print "common flags:  --branch <defaultbranch>"
     print '               --config "<item> <value>"'

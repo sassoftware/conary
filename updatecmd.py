@@ -13,41 +13,49 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
     if not os.path.exists(cfg.root):
         util.mkdirChain(cfg.root)
     
-    if pkg and pkg[0] != "/":
-	pkg = cfg.packagenamespace + "/" + pkg
+    if os.path.exists(pkg):
+	if versionStr:
+	    sys.stderr.write("Verison should not be specified when a SRS "
+			     "change set is being installed.\n")
+	    return 1
 
-    if versionStr and versionStr[0] != "/":
-	versionStr = cfg.defaultbranch.asString() + "/" + versionStr
-
-    if versionStr:
-	newVersion = versions.VersionFromString(versionStr)
+	cs = changeset.ChangeSetFromFile(pkg)
     else:
-	newVersion = None
+	if pkg and pkg[0] != "/":
+	    pkg = cfg.packagenamespace + "/" + pkg
 
-    list = []
-    bail = 0
-    mainPackageName = None
-    for pkgName in repos.getPackageList(pkg):
-	reposPkgSet = repos.getPackageSet(pkgName)
+	if versionStr and versionStr[0] != "/":
+	    versionStr = cfg.defaultbranch.asString() + "/" + versionStr
 
-	if not newVersion:
-	    newVersion = reposPkgSet.getLatestVersion(cfg.defaultbranch)
-
-	if not reposPkgSet.hasVersion(newVersion):
-	    sys.stderr.write("package %s does not contain version %s\n" %
-				 (pkgName, version.asString()))
-	    bail = 1
+	if versionStr:
+	    newVersion = versions.VersionFromString(versionStr)
 	else:
-	    if db.hasPackage(pkgName):
-		dbPkgSet = db.getPackageSet(pkgName)
-		currentVersion = dbPkgSet.getLatestVersion(newVersion.branch())
+	    newVersion = None
+
+	list = []
+	bail = 0
+	mainPackageName = None
+	for pkgName in repos.getPackageList(pkg):
+	    reposPkgSet = repos.getPackageSet(pkgName)
+
+	    if not newVersion:
+		newVersion = reposPkgSet.getLatestVersion(cfg.defaultbranch)
+
+	    if not reposPkgSet.hasVersion(newVersion):
+		sys.stderr.write("package %s does not contain version %s\n" %
+				     (pkgName, version.asString()))
+		bail = 1
 	    else:
-		currentVersion = None
+		if db.hasPackage(pkgName):
+		    dbPkgSet = db.getPackageSet(pkgName)
+		    currentVersion = dbPkgSet.getLatestVersion(newVersion.branch())
+		else:
+		    currentVersion = None
 
-	    list.append((pkgName, currentVersion, newVersion))
+		list.append((pkgName, currentVersion, newVersion))
+	if bail:
+	    return
 
-    if bail:
-	return
+	cs = changeset.CreateFromRepository(repos, list)
 
-    cs = changeset.CreateFromRepository(repos, list)
     commit.commitChangeSet(db, cfg, cs)
