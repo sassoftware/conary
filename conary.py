@@ -1,4 +1,4 @@
-#!/usr/bin/python2.3
+#l!/usr/bin/python2.3
 # -*- mode: python -*-
 #
 # Copyright (c) 2004 Specifix, Inc.
@@ -57,7 +57,7 @@ def usage(rc = 1):
     print ""
     print "commit flags:  --target-branch <branch>"
     print ""
-    print "common flags:  --config "<item> <value>"'
+    print 'common flags:  --config "<item> <value>"'
     print "               --reppath <repository-path>"
     print "               --root <root>"
     print ""
