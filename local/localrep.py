@@ -3,12 +3,9 @@
 # All rights reserved
 #
 
-from repository import fsrepos
 from repository import repository
 
-from repository.fsrepos import FilesystemRepository
-
-class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
+class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
     """
     Removals have to be batched (for now at least); if we do them too
@@ -35,7 +32,7 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 	return self.oldFiles
 
     def addFile(self, fileObject):
-	fsrepos.ChangeSetJob.addFile(self, fileObject, 
+	repository.ChangeSetJob.addFile(self, fileObject, 
 			 storeContents = fileObject.file().flags.isConfig())
 
 	fileId = fileObject.fileId()
@@ -89,7 +86,7 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 		(oldPath, oldFileVersion) = oldPkg.getFile(fileId)
 		self.removeFile(fileId, oldFileVersion)
 
-	fsrepos.ChangeSetJob.__init__(self, repos, cs)
+	repository.ChangeSetJob.__init__(self, repos, cs)
 
 	for pkg in self.oldPackageList():
 	    self.repos.eraseTrove(pkg.getName(), pkg.getVersion(),

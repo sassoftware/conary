@@ -8,9 +8,14 @@
 import changeset
 import datastore
 import deps.deps
+import files
+import package
+import patch
 import tempfile
 import util
 import versions
+
+import filecontents
 
 class AbstractTroveDatabase:
 
@@ -551,3 +556,191 @@ class PackageMissing(RepositoryError):
 	self.packageName = packageName
 	self.version = version
 	self.type = "package"
+
+class ChangeSetJobFile(object):
+
+    __slots__ = [ "theVersion" , "theFile", "theRestoreContents",
+		  "fileContents", "changeSet", "thePath", "theFileId" ]
+
+    def version(self):
+	return self.theVersion
+
+    def changeVersion(self, ver):
+	self.theVersion = ver
+
+    def restoreContents(self):
+	return self.theRestoreContents
+
+    def file(self):
+	return self.theFile
+
+    def changeFile(self, fileObj):
+	self.theFile = fileObj
+
+    def path(self):
+	return self.thePath
+
+    def fileId(self):
+	return self.theFileId
+
+    def copy(self):
+	return copy.deepcopy(self)
+
+    def getContents(self):
+	if self.fileContents == "":
+	    return None
+	elif self.fileContents:
+	    return self.fileContents
+	
+	return self.changeSet.getFileContents(self.theFileId)[1]
+
+    # overrideContents = None means use contents from changeset
+    # overrideContents = "" means there are no contents
+    def __init__(self, changeSet, fileId, file, version, path, 
+		 overrideContents, restoreContents):
+	self.theVersion = version
+	self.theFile = file
+	self.theRestoreContents = restoreContents
+	self.fileContents = overrideContents
+	self.changeSet = changeSet
+	self.thePath = path
+	self.theFileId = fileId
+class ChangeSetJob:
+    """
+    ChangeSetJob provides a to-do list for applying a change set; file
+    remappings should have been applied to the change set before it gets
+    this far. Derivative classes can override these methods to change the
+    behavior; for example, if addPackage is overridden no pacakges will
+    make it to the database. The same holds for oldFile.
+    """
+
+    def addPackage(self, pkg):
+	self.repos.addPackage(pkg)
+
+    def oldPackage(self, pkg):
+	pass
+
+    def oldFile(self, fileId, fileVersion, fileObj):
+	pass
+
+    def addFile(self, newFile, storeContents = True):
+	file = newFile.file()
+	fileId = newFile.fileId()
+
+	# duplicates are filtered out (as necessary) by addFileVersion
+	self.repos.addFileVersion(fileId, newFile.version(), file)
+
+	# Note that the order doesn't matter, we're just copying
+	# files into the repository. Restore the file pointer to
+	# the beginning of the file as we may want to commit this
+	# file to multiple locations.
+	if storeContents:
+	    self.repos.storeFileFromContents(newFile.getContents(), file, 
+					     newFile.restoreContents())
+
+    def __init__(self, repos, cs):
+	self.repos = repos
+	self.cs = cs
+
+	self.packagesToCommit = []
+
+	fileMap = {}
+
+	# create the package objects which need to be installed; the
+	# file objects which map up with them are created later, but
+	# we do need a map from fileId to the path and version of the
+	# file we need, so build up a dictionary with that information
+	for csPkg in cs.iterNewPackageList():
+	    newVersion = csPkg.getNewVersion()
+	    old = csPkg.getOldVersion()
+	    pkgName = csPkg.getName()
+
+	    if repos.hasTrove(pkgName, newVersion, csPkg.getFlavor()):
+		raise repository.CommitError, \
+		       "version %s for %s is already installed" % \
+			(newVersion.asString(), csPkg.getName())
+
+	    if old:
+		newPkg = repos.getTrove(pkgName, old, csPkg.getFlavor(),
+					pristine = True)
+		newPkg.changeVersion(newVersion)
+	    else:
+		newPkg = package.Trove(csPkg.getName(), newVersion,
+				     csPkg.getFlavor(), csPkg.getChangeLog())
+
+	    newFileMap = newPkg.applyChangeSet(csPkg)
+
+	    self.packagesToCommit.append(newPkg)
+	    fileMap.update(newFileMap)
+
+	# Create the file objects we'll need for the commit. This handles
+	# files which were added and files which have changed
+	list = cs.getFileList()
+	# sort this by fileid to ensure we pull files from the change
+	# set in the right order
+	list.sort()
+	for (fileId, (oldVer, newVer, diff)) in list:
+	    restoreContents = 1
+	    if oldVer:
+		oldfile = repos.getFileVersion(fileId, oldVer)
+		file = oldfile.copy()
+		file.twm(diff, oldfile)
+		
+		if file.hasContents and oldfile.hasContents and	    \
+		   file.contents.sha1() == oldfile.contents.sha1():
+		    restoreContents = 0
+	    else:
+		# this is for new files
+		file = files.ThawFile(diff, fileId)
+
+	    # we should have had a package which requires this (new) version
+	    # of the file
+	    assert(newVer == fileMap[fileId][1])
+
+	    if file.hasContents and restoreContents:
+		fileContents = None
+
+		if repos.hasFileContents(file.contents.sha1()):
+		    # if we already have the file in the data store we can
+		    # get the contents from there
+		    fileContents = filecontents.FromRepository(repos,
+				    file.contents.sha1(), file.contents.size())
+		    contType = changeset.ChangedFileTypes.file
+		else:
+		    contType = cs.getFileContentsType(fileId)
+		    if contType == changeset.ChangedFileTypes.diff:
+			# the content for this file is in the form of a diff,
+			# which we need to apply against the file in the
+			# repository
+			assert(oldVer)
+			(contType, fileContents) = cs.getFileContents(fileId)
+			sha1 = oldfile.contents.sha1()
+			f = repos.getFileContents((sha1,))[sha1]
+			oldLines = f.readlines()
+			del f
+			diff = fileContents.get().readlines()
+			(newLines, failedHunks) = patch.patch(oldLines, diff)
+			fileContents = filecontents.FromString("".join(newLines))
+
+			if failedHunks:
+			    fileContents = filecontents.WithFailedHunks(
+						fileContents, failedHunks)
+	    else:
+		# this means there are no contents to restore (None
+		# means get the contents from the change set)
+		fileContents = ""
+
+	    path = fileMap[fileId][0]
+	    self.addFile(ChangeSetJobFile(cs, fileId, file, newVer, path, 
+					  fileContents, restoreContents))
+
+	for (pkgName, version, flavor) in cs.getOldPackageList():
+	    pkg = self.repos.getTrove(pkgName, version, flavor)
+	    self.oldPackage(pkg)
+
+	    for (fileId, path, version) in pkg.iterFileList():
+		file = self.repos.getFileVersion(fileId, version)
+		self.oldFile(fileId, version, file)
+
+	for newPkg in self.packagesToCommit:
+	    self.addPackage(newPkg)

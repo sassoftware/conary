@@ -5,7 +5,6 @@
 
 from repository import changeset
 from repository import filecontents
-from repository import fsrepos
 import helper
 import log
 import localrep
@@ -16,7 +15,7 @@ import update
 import util
 import versions
 
-class RootChangeSetJob(fsrepos.ChangeSetJob):
+class RootChangeSetJob(repository.ChangeSetJob):
 
     def addPackage(self, pkg):
 	self.packages.append(pkg)
@@ -50,7 +49,7 @@ class RootChangeSetJob(fsrepos.ChangeSetJob):
 	self.oldPackages = []
 	self.oldFiles = []
 	self.files = {}
-	fsrepos.ChangeSetJob.__init__(self, repos, absCs)
+	repository.ChangeSetJob.__init__(self, repos, absCs)
 
 class SqlDbRepository(repository.DataStoreRepository,
 		      repository.AbstractRepository):

@@ -3,10 +3,9 @@
 # All rights reserved
 #
 
-from repository.localrep import idtable
-from repository.localrep import instructionsets
-from repository.localrep import trovecontents
-from repository.localrep import versionops
+import trovetroves
+import versiontable
+import idtable
 import sqlite
 import package
 import files
@@ -349,10 +348,10 @@ class Database:
     def __init__(self, path):
 	self.db = sqlite.connect(path)
         self.db._begin()
-	self.troveTroves = trovecontents.TroveTroves(self.db)
+	self.troveTroves = trovetroves.TroveTroves(self.db)
 	self.troveFiles = DBTroveFiles(self.db)
 	self.instances = DBInstanceTable(self.db)
-	self.versionTable = versionops.VersionTable(self.db)
+	self.versionTable = versiontable.VersionTable(self.db)
 	self.targetTable = DBTarget(self.db)
 	self.flavors = DBFlavors(self.db)
 	self.flavorMap = DBFlavorMap(self.db)

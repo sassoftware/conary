@@ -8,7 +8,6 @@ Simple functions used throughout conary.
 """
 
 import repository
-import repository.fsrepos
 import repository.netclient
 import versions
 
@@ -16,7 +15,9 @@ def openRepository(path):
     if path.startswith("http://"):
         repos = repository.netclient.NetworkRepositoryClient(path)
     else:
-        repos = repository.fsrepos.FilesystemRepository(path)
+	import log, sys
+	log.error("only networked repositories are supported")
+	sys.exit(1)
 
     return repos
 

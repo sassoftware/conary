@@ -5,8 +5,8 @@
 # All rights reserved
 #
 
-import srs
+import conary
 import sys
 
 if __name__ == "__main__":
-    sys.exit(srs.main())
+    sys.exit(conary.main())
