@@ -21,6 +21,7 @@ import fixedglob
 # adding a new translation to this file.
 _permmap = {
     1755: 01755,
+    2755: 02755,
     4755: 04755,
     755: 0755,
     750: 0750,
