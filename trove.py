@@ -122,7 +122,7 @@ class Package:
 	    version = fields.pop(-1)
 	    path = " ".join(fields)
 
-	    version = versions.ThawVersion(version)
+	    version = versions.VersionFromString(version)
 	    self.addFile(fileId, path, version)
 
     def freezeFileList(self):
@@ -144,7 +144,7 @@ class Package:
         assert(len(self.packages) == 0)
         rc = []
 	rc.append("%d\n" % (len(self.idMap)))
-        rc += [ "%s %s %s\n" % (x[0], x[1][0], x[1][1].freeze())
+        rc += [ "%s %s %s\n" % (x[0], x[1][0], x[1][1].asString())
                 for x in self.idMap.iteritems() ]
 	return "".join(rc)
 
@@ -611,7 +611,7 @@ class TroveChangeSet:
 	    rc.append("-%s\n" % id)
 
 	for (id, path, version) in self.getNewFileList():
-	    rc.append("+%s %s %s\n" % (id, path, version.freeze()))
+	    rc.append("+%s %s %s\n" % (id, path, version.asString()))
 
 	for (id, path, version) in self.getChangedFileList():
 	    rc.append("~%s " % id)
@@ -621,7 +621,7 @@ class TroveChangeSet:
 		rc.append("-")
 
 	    if version:
-		rc.append(" " + version.freeze() + "\n")
+		rc.append(" " + version.asString() + "\n")
 	    else:
 		rc.append(" -\n")
 
@@ -697,7 +697,7 @@ class ThawTroveChangeSet(TroveChangeSet):
 	    if version == "-":
 		version = None
 	    else:
-		version = versions.ThawVersion(version)
+		version = versions.VersionFromString(version)
 
 	    if path == "-":
 		path = None

@@ -48,7 +48,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def getTroveLeavesByLabel(self, troveNameList, label):
 	d = {}
-	labelStr = str(label)
+	labelStr = label.asString()
 	for troveName in troveNameList:
 	    d[troveName] = [ versions.VersionFromString(x) for x in
 			     self.troveStore.iterTroveLeafsByLabel(troveName,
@@ -156,6 +156,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	    list = []
 	    if isinstance(location, versions.Version):
+		if min(location.timeStamps()) == 0:
+		    self.troveStore.getFullVersion(troveName, location)
 		list.append(location)
 	    else:
 		branchList = self.branchesOfTroveLabel(troveName, location)

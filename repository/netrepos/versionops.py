@@ -19,25 +19,15 @@ class VersionTable:
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if 'Versions' not in tables:
-            cu.execute("CREATE TABLE Versions(versionId integer primary key,"
-		       "version str UNIQUE, timeStamp integer)")
-	    cu.execute("INSERT INTO Versions VALUES (%d, NULL, 0)", 
+            cu.execute("CREATE TABLE Versions(versionId INTEGER PRIMARY KEY,"
+		       "version str UNIQUE)")
+	    cu.execute("INSERT INTO Versions VALUES (%d, NULL)", 
 			self.noVersion)
-
-    def getTimestamp(self, versionId):
-        cu = self.db.cursor()
-        cu.execute("SELECT timeStamp FROM Versions WHERE versionId=%d", 
-		   versionId)
-
-	try:
-	    return cu.next()[0]
-	except StopIteration:
-            raise KeyError, versionId
 
     def addId(self, version):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Versions VALUES (NULL, %s, %d)",
-		   (version.asString(), version.timeStamp))
+        cu.execute("INSERT INTO Versions VALUES (NULL, %s)",
+		   version.asString())
 	return cu.lastrowid
 
     def delId(self, theId):
@@ -45,19 +35,21 @@ class VersionTable:
         cu = self.db.cursor()
         cu.execute("DELETE FROM Versions WHERE versionId=%d", theId)
 
-    def _makeVersion(self, str, stamp):
+    def _makeVersion(self, str, timeStamps):
 	v = versions.VersionFromString(str)
-	v.timeStamp = stamp
+	v.setTimeStamps([ float(x) for x in timeStamps.split(":")])
 	return v
 
-    def getId(self, theId):
+    def getBareId(self, theId):
+	"""
+	Gets a version object w/o setting any timestamps.
+	"""
         cu = self.db.cursor()
-        cu.execute("SELECT version, timeStamp FROM Versions "
-		   "WHERE versionId=%d", theId)
+        cu.execute("""SELECT version FROM Versions
+		      WHERE Versions.versionId=%d""", theId)
 	try:
-	    (s, t) = cu.next()
-	    v = self._makeVersion(s, t)
-	    return v
+	    (s, ) = cu.next()
+	    return versions.VersionFromString(s)
 	except StopIteration:
             raise KeyError, theId
 
@@ -167,19 +159,19 @@ class BranchTable(idtable.IdTable):
 class LabelTable(idtable.IdTable):
 
     def addId(self, label):
-	idtable.IdTable.addId(self, str(label))
+	idtable.IdTable.addId(self, label.asString())
 
     def __getitem__(self, label):
-	return idtable.IdTable.__getitem__(self, str(label))
+	return idtable.IdTable.__getitem__(self, label.asString())
 
     def get(self, label, defValue):
-	return idtable.IdTable.get(self, str(label), defValue)
+	return idtable.IdTable.get(self, label.asString(), defValue)
 
     def __delitem__(self, label):
-	idtable.IdTable.__delitem__(self, str(label))
+	idtable.IdTable.__delitem__(self, label.asString())
 
     def has_key(self, label):
-	return idtable.IdTable.has_key(self, str(label))
+	return idtable.IdTable.has_key(self, label.asString())
 
     def iterkeys(self):
 	raise NotImplementedError
@@ -228,39 +220,43 @@ class ParentTable(idtable.IdPairMapping):
 	    cu.execute("CREATE INDEX ParentVersionIdx on Parent(versionId)")
 	    cu.execute("INSERT INTO Parent VALUES (0,0,0)")
 
-class BranchContents:
+class Nodes:
 
     def __init__(self, db):
 	self.db = db
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
-        if 'BranchContents' not in tables:
+        if 'Nodes' not in tables:
 	    cu.execute("""
-		CREATE TABLE BranchContents(itemId INT,
+		CREATE TABLE Nodes(nodeId INTEGER PRIMARY KEY,
+					    itemId INT,
 					    branchId INT,
 					    versionId INT,
-					    timeStamp INT);
-		CREATE INDEX BranchContentsIdx ON 
-			BranchContents(itemId, branchId);
-		CREATE INDEX BranchContentsIdx2 ON 
-			BranchContents(itemId, versionId);
+					    timeStamps STR,
+					    finalTimeStamp FLOAT);
+		CREATE INDEX NodesIdx ON 
+			Nodes(itemId, branchId);
+		CREATE INDEX NodesIdx2 ON 
+			Nodes(itemId, versionId);
 	    """)
 
-    def addRow(self, itemId, branchId, versionId, timeStamp):
+    def addRow(self, itemId, branchId, versionId, timeStamps):
         cu = self.db.cursor()
-	cu.execute("INSERT INTO BranchContents VALUES (%d, %d, %d, %d)",
-		   itemId, branchId, versionId, timeStamp)
-
+	cu.execute("INSERT INTO Nodes VALUES (NULL, %d, %d, %d, %s, %.3f)",
+		   itemId, branchId, versionId, 
+		   ":".join(["%.3f" % x for x in timeStamps]),
+		   timeStamps[-1],)
+		    
     def hasItemId(self, itemId):
         cu = self.db.cursor()
-        cu.execute("SELECT itemId FROM BranchContents WHERE itemId=%d",
+        cu.execute("SELECT itemId FROM Nodes WHERE itemId=%d",
 		   itemId)
 	return not(cu.fetchone() == None)
 
     def hasRow(self, itemId, versionId):
         cu = self.db.cursor()
-        cu.execute("SELECT itemId FROM BranchContents "
+        cu.execute("SELECT itemId FROM Nodes "
 			"WHERE itemId=%d AND versionId=%d", itemId, versionId)
 	return not(cu.fetchone() == None)
 
@@ -269,8 +265,8 @@ class SqlVersioning:
     def versionsOnBranch(self, itemId, branchId):
 	cu = self.db.cursor()
 	cu.execute("""
-	    SELECT versionId FROM BranchContents WHERE
-		itemId=%d AND branchId=%d ORDER BY timeStamp DESC
+	    SELECT versionId FROM Nodes WHERE
+		itemId=%d AND branchId=%d ORDER BY finalTimeStamp DESC
 	""", itemId, branchId)
 	
 	for (versionId,) in cu:
@@ -296,7 +292,7 @@ class SqlVersioning:
         return versionId
 
     def hasVersion(self, itemId, versionId):
-	return self.branchContents.hasItemId(itemId)
+	return self.nodes.hasItemId(itemId)
 
     def createVersion(self, itemId, version):
 	"""
@@ -322,7 +318,7 @@ class SqlVersioning:
 	    self.versionTable.addId(version)
 	    versionId = self.versionTable.get(version, None)
 
-	if self.branchContents.hasRow(itemId, versionId):
+	if self.nodes.hasRow(itemId, versionId):
 	    raise DuplicateVersionError(itemId, version)
 
 	latestId = self.latest.get((itemId, branchId), None)
@@ -330,13 +326,12 @@ class SqlVersioning:
 	    # this must be the first thing on the branch
 	    self.latest[(itemId, branchId)] = versionId
 	else:
-	    currVer = self.versionTable.getId(latestId)
+	    currVer = self.versionTable.getId(latestId, itemId)
 	    if not currVer.isAfter(version):
 		del self.latest[(itemId, branchId)]
 		self.latest[(itemId, branchId)] = versionId
 
-	self.branchContents.addRow(itemId, branchId, versionId,
-				   version.timeStamp)
+	self.nodes.addRow(itemId, branchId, versionId, version.timeStamps())
 
 	return versionId
 
@@ -344,7 +339,7 @@ class SqlVersioning:
 	# should we make them pass in the version as well to save the
 	# lookup?
 	assert(0)
-	version = self.versionTable.getId(versionId)
+	version = self.versionTable.getId(versionId, itemId)
 	branch = version.branch()
 	branchId = self.branchTable[branch]
 	latestId = self.latest[(itemId, branchId)]
@@ -370,11 +365,13 @@ class SqlVersioning:
 	self.needsCleanup = True
 	
     def createBranch(self, itemId, branch, topVersionId = None,
-		     topVersionTimestamp = None):
+		     topVersionTimestamps = None):
 	"""
 	Creates a new branch for the given node. If topVersionId is
 	not None, that node is considered the only node on the branch.
 	"""
+	assert(not branch.hasParent() or 
+	       min(branch.parentNode().timeStamps()) > 0)
 	label = branch.label()
 	branchId = self.branchTable.get(branch, None)
 	if not branchId:
@@ -398,8 +395,8 @@ class SqlVersioning:
 
 	if topVersionId is not None:
 	    self.latest[(itemId, branchId)] = topVersionId
-	    self.branchContents.addRow(itemId, branchId, topVersionId,
-				       topVersionTimestamp)
+	    self.nodes.addRow(itemId, branchId, topVersionId,
+				       topVersionTimestamps)
 
 	return branchId
 
@@ -410,7 +407,7 @@ class SqlVersioning:
 	self.versionTable = versionTable
         self.branchTable = branchTable
 	self.needsCleanup = False
-	self.branchContents = BranchContents(db)
+	self.nodes = Nodes(db)
 	self.db = db
 
 class SqlVersionsError(Exception):

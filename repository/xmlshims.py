@@ -43,7 +43,7 @@ class NetworkConvertors:
         return f.id() + s
 
     def fromLabel(self, l):
-	return str(l)
+	return l.asString()
 
     def toLabel(self, l):
 	return versions.BranchName(l)

@@ -220,7 +220,7 @@ class AbstractTroveDatabase:
 	for item in troveList:
 	    try:
 		rc.append(self.getTrove(*item))
-	    except repository.PackageMissing:
+	    except PackageMissing:
 		rc.append(None)
 
 	return rc

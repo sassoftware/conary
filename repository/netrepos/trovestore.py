@@ -14,6 +14,34 @@ import trovecontents
 import versionops
 import versions
 
+class LocalRepVersionTable(versionops.VersionTable):
+
+    def getId(self, theId, itemId):
+        cu = self.db.cursor()
+        cu.execute("""SELECT version, timeStamps FROM Versions
+		      JOIN Nodes ON Versions.versionId = Nodes.versionId
+		      WHERE Versions.versionId=%d AND Nodes.itemId=%s""", 
+		   theId, itemId)
+	try:
+	    (s, t) = cu.next()
+	    v = self._makeVersion(s, t)
+	    return v
+	except StopIteration:
+            raise KeyError, theId
+
+    def getTimeStamps(self, version, itemId):
+        cu = self.db.cursor()
+        cu.execute("""SELECT timeStamps FROM Nodes
+		      WHERE versionId=(
+			SELECT versionId from Versions WHERE version=%s
+		      )
+		      AND itemId=%s""", version.asString(), itemId)
+	try:
+	    (t,) = cu.next()
+	    return [ float(x) for x in t.split(":") ]
+	except StopIteration:
+            raise KeyError, theId
+
 class TroveStore:
 
     def __init__(self, path):
@@ -23,7 +51,7 @@ class TroveStore:
 	self.fileStreams = instances.FileStreams(self.db)
 	self.items = items.Items(self.db)
 	self.instances = instances.InstanceTable(self.db)
-	self.versionTable = versionops.VersionTable(self.db)
+	self.versionTable = LocalRepVersionTable(self.db)
         self.branchTable = versionops.BranchTable(self.db)
 	self.versionOps = versionops.SqlVersioning(self.db, self.versionTable,
                                                    self.branchTable)
@@ -66,6 +94,21 @@ class TroveStore:
 
 	return theId
 
+    def getFullVersion(self, item, version):
+	"""
+	Updates version with full timestamp information.
+	"""
+	cu = self.db.cursor()
+	cu.execute("""
+	    SELECT timeStamps FROM Nodes WHERE
+		itemId=(SELECT itemId FROM Items WHERE item=%s) AND
+		versionId=(SELECT versionId FROM Versions WHERE version=%s);
+	""", item, version.asString())
+
+	timeStamps = cu.fetchone()[0]
+	version.setTimeStamps([float(x) for x in timeStamps.split(":")])
+
+
     def createParentReference(self, itemId, branch):
 	if branch.hasParent():
 	    headVersion = branch.copy()
@@ -79,15 +122,15 @@ class TroveStore:
 
 	    # we need the timestamp for the parent version; this is the
 	    # easiest way to get it
-	    parentVersion = self.versionTable.getId(parentVersionId)
-	    headVersion.timeStamp = parentVersion.timeStamp
+	    parentVersion = self.versionTable.getId(parentVersionId, itemId)
+	    headVersion.setTimeStamps(parentVersion.timeStamps())
 	    headVersionId = self.getVersionId(headVersion, {})
 
 	    if parentVersionId is not None:
 		self.instances.addRedirect(itemId, headVersionId, 
 					   parentVersionId)
 
-	    return (headVersionId, headVersion.timeStamp)
+	    return (headVersionId, headVersion.timeStamps())
 	else:
 	    return (None, None)
 
@@ -95,18 +138,18 @@ class TroveStore:
 	# there's no doubt that this could be more efficient.
 	itemId = self.getItemId(troveName)
 
-	(headVersionId, headVersionTimestamp) = \
+	(headVersionId, headVersionTimestamps) = \
 			    self.createParentReference(itemId, branch)
 	if headVersionId:
 	    branchId = self.versionOps.createBranch(itemId, branch, 
-				    topVersionId = headVersionId,
-				    topVersionTimestamp = headVersionTimestamp)
+				topVersionId = headVersionId,
+				topVersionTimestamps = headVersionTimestamps)
 
     def iterTroveVersions(self, troveName):
 	cu = self.db.cursor()
 	cu.execute("""
-	    SELECT version FROM Items JOIN BranchContents 
-		    ON Items.itemId = BranchContents.itemId NATURAL
+	    SELECT version FROM Items JOIN Nodes 
+		    ON Items.itemId = Nodes.itemId NATURAL
 		JOIN Versions WHERE item=%s""", troveName)
 	for (versionStr, ) in cu:
 	    yield versionStr
@@ -183,7 +226,7 @@ class TroveStore:
 	newVersion = False
 	troveVersionId = self.versionTable.get(troveVersion, None)
 	if troveVersionId is not None:
-	    versionExists = self.versionOps.branchContents.hasRow(troveItemId, 
+	    versionExists = self.versionOps.nodes.hasRow(troveItemId, 
 							      troveVersionId)
 	if troveVersionId is None or not versionExists:
 	    troveVersionId = self.versionOps.createVersion(troveItemId, 
@@ -335,9 +378,8 @@ class TroveStore:
 	    (headVersionId, headVersionTimestamp) = \
 			self.createParentReference(troveItemId, branch)
 
-	    self.versionOps.branchContents.addRow(troveItemId,
-						  branchId, headVersionId,
-						  headVersionTimestamp)
+	    self.versionOps.nodes.addRow(troveItemId, branchId, headVersionId,
+					 headVersionTimestamp)
 
 
     def eraseTrove(self, troveName, troveVersion, troveFlavor):
@@ -416,7 +458,7 @@ class TroveStore:
 	if not troveName:
 	    troveName = self.items.getId(troveNameId)
 	if not troveVersion:
-	    troveVersion = self.versionTable.getId(troveVersionId)
+	    troveVersion = self.versionTable.getId(troveVersionId, troveNameId)
 	if not troveVersionId:
 	    troveVersionId = self.versionTable[troveVersion.canon()]
 	if troveFlavor is 0:
@@ -424,26 +466,25 @@ class TroveStore:
 	if troveFlavorId is None:
 	    troveFlavorId = self.flavors[troveFlavor]
 
-	if not troveVersion.timeStamp:
-	    troveVersion.timeStamp = \
-		    self.versionTable.getTimestamp(troveVersionId)
+	if min(troveVersion.timeStamps()) == 0:
+	    # don't use troveVersionId here as it could have come from
+	    # troveVersion.canon(), which won't have all of the timestamps
+	    troveVersion.setTimeStamps(
+		self.versionTable.getTimeStamps(troveVersion, troveNameId))
 
 	troveInstanceId = self.instances[(troveNameId, troveVersionId, 
 					  troveFlavorId)]
 	trove = package.Trove(troveName, troveVersion, troveFlavor)
-	versionCache = {}
 	for instanceId in self.troveTroves[troveInstanceId]:
 	    (itemId, versionId, flavorId, isPresent) = \
 		    self.instances.getId(instanceId)
 	    name = self.items.getId(itemId)
 	    flavor = self.flavors.getId(flavorId)
-	    version = versionCache.get(versionId, None)
-	    if not version:
-		version = self.versionTable.getId(versionId)
-		versionCache[versionId] = version
+	    version = self.versionTable.getId(versionId, itemId)
 
 	    trove.addTrove(name, version, flavor)
 
+	versionCache = {}
 	cu = self.db.cursor()
 	cu.execute("SELECT fileId, path, versionId FROM "
 		   "TroveFiles NATURAL JOIN FileStreams WHERE instanceId = %d", 
@@ -451,7 +492,7 @@ class TroveStore:
 	for (fileId, path, versionId) in cu:
 	    version = versionCache.get(versionId, None)
 	    if not version:
-		version = self.versionTable.getId(versionId)
+		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
 	    trove.addFile(fileId, path, version)
@@ -482,7 +523,7 @@ class TroveStore:
 	for (fileId, path, versionId, stream) in cu:
 	    version = versionCache.get(versionId, None)
 	    if not version:
-		version = self.versionTable.getId(versionId)
+		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
 	    if withFiles:

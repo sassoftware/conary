@@ -13,6 +13,7 @@ import files
 import time
 import deps.arch
 import deps.deps
+import versions
 
 class DBTroveFiles:
     """
@@ -30,7 +31,6 @@ class DBTroveFiles:
 					  versionId INTEGER,
 					  path STR,
 					  instanceId INTEGER,
-					  flavorId INTEGER,
 					  isPresent INTEGER,
 					  stream BINARY)
 		       """)
@@ -80,25 +80,25 @@ class DBTroveFiles:
     def getFileByFileId(self, fileId, versionId, justPresent = True):
 	cu = self.db.cursor()
 	if justPresent:
-	    cu.execute("SELECT path, stream, flavorId FROM DBTroveFiles "
+	    cu.execute("SELECT path, stream FROM DBTroveFiles "
 		       "WHERE fileId=%s AND versionId=%d AND isPresent = 1", 
 		       fileId, versionId)
 	else:
-	    cu.execute("SELECT path, stream, flavorId FROM DBTroveFiles "
-		       "WHERE fileId=%s AND versionId=%d", fileId, versionId)
+	    cu.execute("SELECT path, stream FROM DBTroveFiles "
+		       "WHERE fileId=%s AND versionId=%d",
+		       fileId, versionId)
 	# there could be multiple matches, but they should all be redundant
 	try:
 	    return cu.next()
 	except StopIteration:
             raise KeyError, (fileId, versionId)
 
-    def addItem(self, fileId, versionId, path, instanceId, flavorId, stream):
+    def addItem(self, fileId, versionId, path, instanceId, stream):
         cu = self.db.cursor()
         cu.execute("""
-	    INSERT INTO DBTroveFiles VALUES (%s, %d, %s, %d, %d, %d, %s)
+	    INSERT INTO DBTroveFiles VALUES (%s, %d, %s, %d, %d, %s)
 	""",
-	   (fileId, versionId, path, instanceId, flavorId, 1, 
-	    sqlite.encode(stream)))
+	   (fileId, versionId, path, instanceId, 1, sqlite.encode(stream)))
 
     def updateItem(self, instanceId, fileId, oldVersionId, newVersionId, 
 		   newStream):
@@ -142,6 +142,7 @@ class DBInstanceTable:
 				troveName STR, 
 				versionId INT, 
 				flavorId INT,
+				timeStamps STR,
 				isPresent INT)""")
 	    cu.execute("CREATE INDEX InstancesNameIdx ON "
 		       "DBInstances(troveName)")
@@ -169,10 +170,13 @@ class DBInstanceTable:
  	for match in cu:
 	    yield match
 
-    def addId(self, troveName, versionId, flavorId):
+    def addId(self, troveName, versionId, flavorId, timeStamps):
+	assert(min(timeStamps) > 0)
         cu = self.db.cursor()
-        cu.execute("INSERT INTO DBInstances VALUES (NULL, %s, %d, %d, %d)",
-                   (troveName, versionId, flavorId, 1))
+        cu.execute("INSERT INTO DBInstances VALUES (NULL, %s, %d, %d, "
+						   "%s, %d)",
+                   (troveName, versionId, flavorId, 
+		    ":".join([ "%.3f" % x for x in timeStamps]), 1))
 	return cu.lastrowid
 
     def delId(self, theId):
@@ -256,6 +260,20 @@ class DBInstanceTable:
 	    return defValue
 	return item[0]
 
+    def getVersion(self, instanceId):
+        cu = self.db.cursor()
+        cu.execute("""SELECT version, timeStamps FROM DBInstances
+		      JOIN Versions ON 
+			    DBInstances.versionId = Versions.versionId
+		      WHERE instanceId=%d""", instanceId)
+	try:
+	    (s, t) = cu.next()
+	    v = versions.VersionFromString(s)
+	    v.setTimeStamps([ float(x) for x in t.split(":") ])
+	    return v
+	except StopIteration:
+            raise KeyError, theId
+
 class DBTarget:
 
     def __init__(self, db):
@@ -283,6 +301,8 @@ class DBFlavors(idtable.IdTable):
 	idtable.IdTable.addId(self, flavor.freeze())
 
     def __getitem__(self, flavor):
+        if flavor is None:
+            return 0
 	return idtable.IdTable.__getitem__(self, flavor.freeze())
 
     def getId(self, flavorId):
@@ -290,9 +310,12 @@ class DBFlavors(idtable.IdTable):
 								 flavorId))
 
     def get(self, flavor, defValue):
+        if flavor is None:
+            return 0
 	return idtable.IdTable.get(self, flavor.freeze(), defValue)
 
     def __delitem__(self, flavor):
+        assert(flavor is not None)
 	idtable.IdTable.__delitem__(self, flavor.freeze())
 
     def getItemDict(self, itemSeq):
@@ -363,11 +386,13 @@ class Database:
 
 	return theId
 
-    def getInstanceId(self, troveName, versionId, flavorId):
+    def getInstanceId(self, troveName, versionId, flavorId,
+		      timeStamps):
 	theId = self.instances.get((troveName, versionId, flavorId), 
 				   None)
 	if theId is None:
-	    theId = self.instances.addId(troveName, versionId, flavorId)
+	    theId = self.instances.addId(troveName, versionId, flavorId,
+					 timeStamps)
 
 	return theId
 
@@ -437,8 +462,9 @@ class Database:
 	if troveInstanceId:
 	    self.instances.setPresent(troveInstanceId, 1)
 	else:
+	    assert(min(troveVersion.timeStamps()) > 0)
 	    troveInstanceId = self.instances.addId(troveName, troveVersionId, 
-						   troveFlavorId)
+				       troveFlavorId, troveVersion.timeStamps())
 	
 	assert(not self.troveTroves.has_key(troveInstanceId))
 
@@ -495,7 +521,7 @@ class Database:
 		    flavorId = flavorMap[flavor.freeze()]
 
 		self.troveFiles.addItem(fileId, versionId, path, 
-				       troveInstanceId, flavorId, stream)
+				        troveInstanceId, stream)
 
 	if existingFiles:
 	    self.troveFiles.removeFileIds(troveInstanceId,
@@ -507,7 +533,8 @@ class Database:
 		flavorId = flavorMap[flavor.freeze()]
 	    else:
 		flavorId = 0
-	    instanceId = self.getInstanceId(name, versionId, flavorId)
+	    instanceId = self.getInstanceId(name, versionId, flavorId,
+					    version.timeStamps())
 	    self.troveTroves.addItem(troveInstanceId, instanceId)
 
     def addFile(self, fileObj, fileVersion):
@@ -543,15 +570,8 @@ class Database:
 	    (troveName, troveVersionId, troveFlavorId) = \
 		    self.instances.getId(troveInstanceId)[0:3]
 
-	if not troveVersion:
-	    troveVersion = self.versionTable.getId(troveVersionId)
-
 	if not troveVersionId:
 	    troveVersionId = self.versionTable[troveVersion]
-
-	if not troveVersion.timeStamp:
-	    troveVersion.timeStamp = \
-		    self.versionTable.getTimestamp(troveVersionId)
 
 	if troveFlavorId is None:
 	    if troveFlavor is None:
@@ -571,6 +591,9 @@ class Database:
 	    if troveInstanceId is None:
 		raise KeyError, troveName
 
+	if not troveVersion or min(troveVersion.timeStamps()) == 0:
+	    troveVersion = self.instances.getVersion(troveInstanceId)
+
 	trove = package.Trove(troveName, troveVersion, troveFlavor)
 
 	flavorCache = {}
@@ -579,7 +602,7 @@ class Database:
 	# flavor cache is already complete
 	cu = self.db.cursor()
 	cu.execute("""
-	    SELECT troveName, versionId, DBFlavors.flavorId, flavor FROM 
+	    SELECT troveName, versionId, timeStamps, DBFlavors.flavorId, flavor FROM 
 		TroveTroves JOIN DBInstances JOIN DBFlavors ON 
 		    TroveTroves.includedId = DBInstances.instanceId AND
 		    DBFlavors.flavorId = DBInstances.flavorId 
@@ -587,12 +610,9 @@ class Database:
 	""", troveInstanceId)
 
 	versionCache = {}
-	for (name, versionId, flavorId, flavorStr) in cu:
-	    version = versionCache.get(versionId, None)
-
-	    if not version:
-		version = self.versionTable.getId(versionId)
-		versionCache[versionId] = version
+	for (name, versionId, timeStamps, flavorId, flavorStr) in cu:
+	    version = self.versionTable.getBareId(versionId)
+	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
 	    if not flavorId:
 		flavor = None
@@ -612,7 +632,7 @@ class Database:
 		continue
 	    version = versionCache.get(versionId, None)
 	    if not version:
-		version = self.versionTable.getId(versionId)
+		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
 	    trove.addFile(fileId, path, version)
@@ -677,6 +697,7 @@ class Database:
 
     def removeFileFromTrove(self, trove, path):
 	versionId = self.versionTable[trove.getVersion()]
+        flavor = trove.getFlavor()
         flavorId = self.flavors[trove.getFlavor()]
 	instanceId = self.instances[(trove.getName(), versionId, flavorId)]
 	self.troveFiles.removePath(instanceId, path)

@@ -32,9 +32,9 @@ class NewVersion(AbstractVersion):
     Class used as a marker for new (as yet undefined) versions.
     """
 
-    __slots__ = ( "timeStamp" )
+    __slots__ = ( )
 
-    def asString(self):
+    def asString(self, frozen = False):
 	return "@NEW@"
 
     def freeze(self):
@@ -49,8 +49,8 @@ class NewVersion(AbstractVersion):
     def __eq__(self, other):
 	return self.__class__ == other.__class__
 
-    def __init__(self):
-	self.timeStamp = 1
+    def timeStamps(self):
+	return [ time.time() ]
 
 class AbstractBranch(object):
 
@@ -75,9 +75,9 @@ class VersionRelease(AbstractVersion):
     decimal point.
     """
 
-    __slots__ = ( "version", "release", "buildCount" )
+    __slots__ = ( "version", "release", "buildCount", "timeStamp" )
 
-    def __str__(self, versus = None):
+    def asString(self, versus = None, frozen = False):
 	"""
 	Returns a string representation of a version/release pair.
 	"""
@@ -89,7 +89,34 @@ class VersionRelease(AbstractVersion):
 	if self.buildCount != None:
 	    rc += ".%d" % self.buildCount
 
+	if frozen:
+	    rc = self.freezeTimestamp() + ":" + rc
+
 	return rc
+
+    def freeze(self):
+	return self.asString(frozen = True)
+
+    def freezeTimestamp(self):
+	"""
+	Returns a binary representation of the files timestamp, which can
+	be later used to restore the timestamp to the string'ified version
+	of a version object.
+
+	@rtype: str
+	"""
+	assert(self.timeStamp)
+	return "%.3f" % self.timeStamp
+
+    def thawTimestamp(self, str):
+	"""
+	Parses a frozen timestamp (from freezeTimestamp), and makes it
+	the timestamp for this version.
+
+	@param str: The frozen timestamp
+	@type str: string
+	"""
+	self.timeStamp = float(str)
 
     def getVersion(self):
 	"""
@@ -113,6 +140,7 @@ class VersionRelease(AbstractVersion):
 	Incremements the release number.
 	"""
 	self.release += 1
+	self.timeStamp = time.time()
 
     def incrementBuildCount(self):
 	"""
@@ -123,7 +151,9 @@ class VersionRelease(AbstractVersion):
 	else:
 	    self.buildCount = 1
 
-    def __init__(self, value, template = None):
+	self.timeStamp = time.time()
+
+    def __init__(self, value, template = None, frozen = False):
 	"""
 	Initialize a VersionRelease object from a string representation
 	of a version release. ParseError exceptions are thrown if the
@@ -132,6 +162,15 @@ class VersionRelease(AbstractVersion):
 	@param value: String representation of a VersionRelease
 	@type value: string
 	"""
+	self.timeStamp = 0
+
+	if frozen:
+	    (t, value) = value.split(':', 1)
+	    self.thawTimestamp(t)
+
+	if value.find(":") != -1:
+	    raise ParseError, "version/release pairs may not contain colons"
+
 	if value.find("@") != -1:
 	    raise ParseError, "version/release pairs may not contain @ signs"
 	cut = value.find("-")
@@ -180,7 +219,7 @@ class BranchName(AbstractBranch):
 
     __slots__ = ( "host", "namespace", "branch" )
 
-    def __str__(self, versus = None):
+    def asString(self, versus = None, frozen = False):
 	"""
 	Returns the string representation of a branch name.
 	"""
@@ -191,6 +230,9 @@ class BranchName(AbstractBranch):
 		return self.namespace + ":" + self.branch
 
 	return "%s@%s:%s" % (self.host, self.namespace, self.branch)
+
+    def freeze(self):
+	return self.asString()
 
     def getHost(self):
 	return self.host
@@ -275,7 +317,7 @@ class Version(AbstractVersion):
     ordering.
     """
 
-    __slots__ = ( "versions", "timeStamp" )
+    __slots__ = ( "versions" )
 
     def appendVersionRelease(self, version, release):
 	"""
@@ -290,8 +332,7 @@ class Version(AbstractVersion):
 	@type release: int
 	"""
 	assert(self.isBranch())
-	self.versions.append(VersionRelease("%s-%d" % (version, release)))
-	self.timeStamp = time.time()
+	self.appendVersionReleaseObject(VersionRelease("%s-%d" % (version, release)))
 
     def appendVersionReleaseObject(self, verRel):
 	"""
@@ -303,8 +344,8 @@ class Version(AbstractVersion):
 	@type verRel: VersionRelease
 	"""
 	assert(self.isBranch())
+	verRel.timeStamp = time.time()
 	self.versions.append(verRel)
-	self.timeStamp = time.time()
 
     def incrementRelease(self):
 	"""
@@ -314,7 +355,6 @@ class Version(AbstractVersion):
 	assert(self.isVersion())
 	
 	self.versions[-1].incrementRelease()
-	self.timeStamp = time.time()
 
     def incrementBuildCount(self):
 	"""
@@ -324,7 +364,6 @@ class Version(AbstractVersion):
 	assert(self.isVersion())
 	
 	self.versions[-1].incrementBuildCount()
-	self.timeStamp = time.time()
 
     def trailingVersion(self):
 	"""
@@ -355,7 +394,7 @@ class Version(AbstractVersion):
 
 	return i
 	    
-    def asString(self, defaultBranch = None):
+    def asString(self, defaultBranch = None, frozen = False):
 	"""
 	Returns a string representation of the version.
 
@@ -368,7 +407,7 @@ class Version(AbstractVersion):
 	s = "/"
 
 	if defaultBranch and len(defaultBranch.versions) < len(self.versions):
-	    start = Version(self.versions[0:len(defaultBranch.versions)], 0)
+	    start = Version(self.versions[0:len(defaultBranch.versions)])
 	    if start == defaultBranch:
 		list = self.versions[len(defaultBranch.versions):]
 		s = ""
@@ -376,41 +415,20 @@ class Version(AbstractVersion):
 	oneAgo = None
 	twoAgo = None
 	for version in list:
-	    s = s + ("%s/" % version.__str__(twoAgo))
+	    s = s + ("%s/" % version.asString(twoAgo, frozen = frozen))
 	    twoAgo = oneAgo
 	    oneAgo = version
 
 	return s[:-1]
 
-    def freeze(self, defaultBranch = None):
+    def freeze(self):
 	"""
 	Returns a complete string representation of the version, including
 	the time stamp.
 
 	@rtype: str
 	"""
-	return ("%.3f:" % self.timeStamp) + self.asString(defaultBranch)
-
-    def freezeTimestamp(self):
-	"""
-	Returns a binary representation of the files timestamp, which can
-	be later used to restore the timestamp to the string'ified version
-	of a version object.
-
-	@rtype: str
-	"""
-	assert(self.timeStamp)
-	return "%.3f" % self.timeStamp
-
-    def thawTimestamp(self, str):
-	"""
-	Parses a frozen timesamp (from freezeTimestamp), and makes it
-	the timestamp for this version.
-
-	@param str: The frozen timestamp
-	@type str: string
-	"""
-	self.timeStamp = float(str)
+	return self.asString(frozen = True)
 
     def isBranch(self):
 	"""
@@ -464,7 +482,7 @@ class Version(AbstractVersion):
 	@rtype: Version
 	"""
 	assert(not self.isBranch())
-	return Version(self.versions[:-1], 0)
+	return Version(self.versions[:-1])
 
     def label(self):
 	"""
@@ -485,7 +503,7 @@ class Version(AbstractVersion):
 	"""
 	assert(self.isVersion())
 	assert(len(self.versions) > 3)
-	return Version(self.versions[:-2], 0)
+	return Version(self.versions[:-2])
 
     def parentNode(self):
 	"""
@@ -495,7 +513,7 @@ class Version(AbstractVersion):
 	"""
 	assert(self.isBranch())
 	assert(len(self.versions) >= 3)
-	return Version(self.versions[:-1], 0)
+	return Version(self.versions[:-1])
 
     def hasParent(self):
 	"""
@@ -514,7 +532,9 @@ class Version(AbstractVersion):
 	@type other: Version
 	@rtype: boolean
 	"""
-	return self.timeStamp > other.timeStamp
+	assert(self.isVersion()            and other.isVersion)
+	assert(self.versions[-1].timeStamp and other.versions[-1].timeStamp)
+	return self.versions[-1].timeStamp  >  other.versions[-1].timeStamp
 
     def copy(self):
 	"""
@@ -525,6 +545,9 @@ class Version(AbstractVersion):
 	"""
 
         return copy.deepcopy(self)
+
+    def __deepcopy__(self, mem):
+	return Version(copy.deepcopy(self.versions[:]))
 
     def canon(self):
 	"""
@@ -556,9 +579,22 @@ class Version(AbstractVersion):
 	if sameVerRel:
 	    newlist.append(self.versions[-1])
 
-	return Version(self.versions + newlist, time.time())
+	return Version(self.versions + newlist)
 
-    def parseVersionString(self, ver):
+    def timeStamps(self):
+	res = []
+	for verRel in self.versions[1::2]:
+	    res.append(verRel.timeStamp)
+
+	return res
+
+    def setTimeStamps(self, timeStamps):
+	count = 1
+	for stamp in timeStamps:
+	    self.versions[count].timeStamp = stamp
+	    count += 2
+
+    def parseVersionString(self, ver, frozen):
 	"""
 	Converts a string representation of a version into a VersionRelease
 	object.
@@ -581,7 +617,8 @@ class Version(AbstractVersion):
 		v.append(lastBranch)
 
 	    if len(parts) >= 2:
-		lastVersion = VersionRelease(parts[1], template = lastVersion)
+		lastVersion = VersionRelease(parts[1], template = lastVersion,
+					     frozen = frozen)
 		v.append(lastVersion)
 		parts = parts[2:]
 	    else:
@@ -593,9 +630,8 @@ class Version(AbstractVersion):
     Creates a Version object from a list of AbstractBranch and AbstractVersion
     objects.
     """
-    def __init__(self, versionList, timeStamp):
+    def __init__(self, versionList):
 	self.versions = versionList
-	self.timeStamp = timeStamp
 	
 def ThawVersion(ver):
     if ver == "@NEW@":
@@ -604,37 +640,15 @@ def ThawVersion(ver):
     if thawedVersionCache.has_key(ver):
 	return thawedVersionCache[ver]
 
-    v = _ThawVersion(ver)
+    v = _VersionFromString(ver, frozen = True)
     thawedVersionCache[ver] = v
     return v
 
-class _ThawVersion(Version):
-
-    __slots__ = ()
-
-    """
-    Provides a version object from a frozen version string.
-    """
-
-    def __init__(self, fullString):
-	"""
-	Initializes a ThawVersion object. 
-
-	@param fullString: Frozen representation of a Version object.
-	@type fullString: str
-	"""
-	(timeStr, ver) = fullString.split(":", 1)
-
-	timeVal = float(timeStr)
-	v = self.parseVersionString(ver)
-
-	Version.__init__(self, v, timeVal)
-
-def VersionFromString(ver, defaultBranch = None):
+def VersionFromString(ver, defaultBranch = None, timeStamps = []):
     if ver == "@NEW@":
 	return NewVersion()
 
-    return _VersionFromString(ver, defaultBranch)
+    return _VersionFromString(ver, defaultBranch, timeStamps = timeStamps)
 
 class _VersionFromString(Version):
 
@@ -646,7 +660,8 @@ class _VersionFromString(Version):
 
     __slots__ = ()
 
-    def __init__(self, ver, defaultBranch = None):
+    def __init__(self, ver, defaultBranch = None, frozen = False, 
+		 timeStamps = []):
 	"""
 	Initializes a VersionFromString object. 
 
@@ -660,9 +675,10 @@ class _VersionFromString(Version):
 	if ver[0] != "/":
 	    ver = defaultBranch.asString() + "/" + ver
 
-	v = self.parseVersionString(ver)
+	v = self.parseVersionString(ver, frozen = frozen)
 
-	Version.__init__(self, v, 0)
+	Version.__init__(self, v)
+	self.setTimeStamps(timeStamps)
 
 class VersionsError(Exception):
 

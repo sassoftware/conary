@@ -104,8 +104,8 @@ class ChangeSet:
     def newPackage(self, csPkg):
 	old = csPkg.getOldVersion()
 	new = csPkg.getNewVersion()
-	assert(not old or old.timeStamp)
-	assert(new.timeStamp)
+	assert(not old or min(old.timeStamps()) > 0)
+	assert(min(new.timeStamps()) > 0)
 
 	self.newPackages[(csPkg.getName(), csPkg.getNewVersion(),
 		          csPkg.getFlavor())] = csPkg
@@ -119,7 +119,7 @@ class ChangeSet:
 	del self.newPackages[(name, version, flavor)]
 
     def oldPackage(self, name, version, flavor):
-	assert(version.timeStamp)
+	assert(min(version.timeStamps()) > 0)
 	self.oldPackages.append((name, version, flavor))
 
     def iterNewPackageList(self):
@@ -151,8 +151,6 @@ class ChangeSet:
 	        self.lateFileContents.has_key(hash)
 
     def addFile(self, fileId, oldVersion, newVersion, csInfo):
-	assert(not oldVersion or oldVersion.timeStamp)
-	assert(newVersion.timeStamp)
 	self.files[fileId] = (oldVersion, newVersion, csInfo)
 
 	if oldVersion and oldVersion.isLocal():
@@ -229,11 +227,11 @@ class ChangeSet:
 	totalLen = 0
 	for (fileId, (oldVersion, newVersion, csInfo)) in self.files.iteritems():
 	    if oldVersion:
-		oldStr = oldVersion.freeze()
+		oldStr = oldVersion.asString()
 	    else:
 		oldStr = "(none)"
 
-	    s = FileInfo(fileId, oldStr, newVersion.freeze(), csInfo).freeze()
+	    s = FileInfo(fileId, oldStr, newVersion.asString(), csInfo).freeze()
 	    fileList.append(struct.pack("!I", len(s)) + s)
 	    totalLen += len(fileList[-1])
 
@@ -523,8 +521,8 @@ class ChangeSetFromRepository(ChangeSet):
     def newPackage(self, pkg):
 	# add the time stamps to the package version numbers
 	if pkg.getOldVersion():
-	    assert(pkg.getOldVersion().timeStamp)
-	assert(pkg.getNewVersion().timeStamp)
+	    assert(min(pkg.getOldVersion().timeStamps()) > 0)
+	assert(min(pkg.getNewVersion().timeStamps()) > 0)
 	ChangeSet.newPackage(self, pkg)
 
     def __init__(self, repos):
@@ -622,8 +620,8 @@ class ChangeSetFromFile(ChangeSet):
 		    if oldVerStr == "(none)":
 			oldVersion = None
 		    else:
-			oldVersion = versions.ThawVersion(oldVerStr)
-		    newVersion = versions.ThawVersion(info.newVersion())
+			oldVersion = versions.VersionFromString(oldVerStr)
+		    newVersion = versions.VersionFromString(info.newVersion())
 		    self.addFile(info.fileId(), oldVersion, newVersion, 
 				 info.csInfo())
 	    else:
