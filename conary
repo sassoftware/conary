@@ -76,6 +76,7 @@ argDef["all"] = 0
 argDef["prep"] = 0
 argDef["macros"] = 1
 argDef["ls"] = 0
+argDef["profile"] = 0
 
 argDef.update(srcctl.argDef)
 
@@ -109,6 +110,14 @@ while i < len(sys.argv):
 		    argSet[arg] = [sys.argv[i]]
 
     i = i + 1
+
+profile = False
+if argSet.has_key('profile'):
+    import hotshot
+    prof = hotshot.Profile('srs.prof')
+    prof.start()
+    profile = True
+    del argSet['profile']
 
 if argSet.has_key('config'):
     for param in argSet['config']:
@@ -228,5 +237,9 @@ elif (otherArgs[1] == "usage"):
     usage(rc = 0)
 else:
     usage()
+
+if profile:
+    prof.stop()
+
 if log.errorOccurred():
     sys.exit(1)

@@ -1,0 +1,18 @@
+#!/usr/bin/python2.3
+# -*- python -*-
+
+import hotshot.stats
+import sys
+
+def progress(msg):
+    sys.stderr.write(msg + '\n')
+    sys.stderr.flush()
+
+filename = sys.argv[1]
+progress('loading %s' %filename)
+stats = hotshot.stats.load(filename)
+progress('strip dirs')
+#stats.strip_dirs()
+progress('sort stats')
+stats.sort_stats('time', 'calls')
+stats.print_stats()
