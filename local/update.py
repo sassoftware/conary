@@ -41,6 +41,8 @@ class FilesystemJob:
     def _restore(self, fileObj, target, contents, msg):
 	self.restores.append((fileObj, target, contents, msg))
 	self.runLdconfig = self.runLdconfig | fileObj.isShLib()
+	if fileObj.isInitScript() and not os.path.exists(target):
+	    self.initScripts.append(target)
 
     def _remove(self, fileObj, target, msg):
 	self.removes[target] = (fileObj, msg)
@@ -77,7 +79,7 @@ class FilesystemJob:
 	    if os.getuid():
 		log.warning("ldconfig skipped (insufficient permissions)")
 	    elif not os.access(os.path.join(self.root, p), os.X_OK):
-		log.warning("/sbin/ldconfig is not available")
+		log.error("/sbin/ldconfig is not available")
 	    else:
 		log.debug("running ldconfig")
 		pid = os.fork()
@@ -89,6 +91,25 @@ class FilesystemJob:
 		(id, status) = os.waitpid(pid, 0)
 		if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
 		    log.error("ldconfig failed")
+
+	p = "/sbin/chkconfig"
+	if os.getuid():
+	    log.warning("chkconfig skipped (insufficient permissions)")
+	elif not os.access(os.path.join(self.root, p), os.X_OK):
+	    log.error("/sbin/chkconfig is not available")
+	else:
+	    for path in self.initScripts:
+		name = os.path.basename(path)
+		log.debug("running chkconfig --add %s", name)
+		pid = os.fork()
+		if not pid:
+		    os.chdir(self.root)
+		    os.chroot(self.root)
+		    os.execl(p, p, "--add", name)
+		    sys.exit(1)
+		(id, status) = os.waitpid(pid, 0)
+		if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
+		    log.error("chkconfig failed")
 
     def getErrorList(self):
 	return self.errors
@@ -411,6 +432,7 @@ class FilesystemJob:
 	self.newFiles = []
 	self.runLdconfig = False
 	self.root = root
+	self.initScripts = []
 
 	for pkgCs in changeSet.getNewPackageList():
 	    # skip over empty change sets
