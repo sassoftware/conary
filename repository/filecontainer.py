@@ -327,7 +327,7 @@ class FileContainer:
 	    self.file.write(struct.pack("!I", FILE_CONTAINER_VERSION))
 
 	    self.mutable = True
-	    self.rest = gzip.GzipFile(None, "wb", 9, self.file)
+	    self.rest = gzip.GzipFile(None, "wb", 6, self.file)
 	else:
 	    self.file.seek(0, SEEK_SET)
 	    try:
