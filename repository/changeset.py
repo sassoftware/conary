@@ -388,7 +388,7 @@ class ChangeSet:
 		    fsFile = files.FileFromFilesystem(fullPath, fileId,
 				possibleMatch = fileObj)
 
-		    if fsFile.sha1() == fileObj.sha1():
+		    if fsFile.contents.sha1() == fileObj.contents.sha1():
 			# the contents in the file system are right
 			cont = filecontents.FromFilesystem(fullPath)
 		    else:
