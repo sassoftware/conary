@@ -49,6 +49,11 @@ class bzip(Magic):
 	self.contents['compression'] = buffer[3]
 
 
+class ltwrapper(Magic):
+    def __init__(self, path, basedir='', buffer=''):
+	Magic.__init__(self, path, basedir)
+
+
 def magic(path, basedir=''):
     """
     Returns a magic class with information about the file mentioned
@@ -71,6 +76,10 @@ def magic(path, basedir=''):
 	return gzip(path, basedir, b)
     elif len(b) > 3 and b[0:3] == "BZh":
 	return bzip(path, basedir, b)
+    elif b.find(
+	'# This wrapper script should never be moved out of the build directory.\n'
+	'# If it is, it will not operate correctly.') > 0:
+	return ltwrapper(path, basedir, b)
 
     return None
 

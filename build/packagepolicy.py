@@ -41,11 +41,16 @@ class NonBinariesInBindirs(policy.Policy):
     ]
 
     def doFile(self, file):
-	mode = os.lstat(self.macros['destdir'] + os.sep + file)[stat.ST_MODE]
+	d = self.macros['destdir']
+	mode = os.lstat(d + os.sep + file)[stat.ST_MODE]
 	if not mode & 0111:
 	    raise PackagePolicyError(
 		"%s has mode 0%o with no executable permission in bindir"
 		%(file, mode))
+	m = magic.magic(file, d)
+	if m and m.name == 'ltwrapper':
+	    raise PackagePolicyError(
+		"%s is a build-only libtool wrapper script" %file)
 
 
 class FilesInMandir(policy.Policy):
