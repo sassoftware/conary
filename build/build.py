@@ -433,7 +433,7 @@ class Desktopfile(BuildCommand, _FileAction):
 	    self.setComponents('%(datadir)s/applications'+file)
 
 
-class Environment(action.RecipeAction):
+class Environment(BuildAction):
     """
     Set an environment variable after all macros are available.
 
