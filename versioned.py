@@ -347,7 +347,7 @@ class Database:
 
     def openFile(self, file):
 	"""
-        Returns a paricular VersionedFile object.
+        Returns a particular VersionedFile object.
 
         @param file: File name
         @type file: str
@@ -373,7 +373,7 @@ class FileIndexedDatabase(Database):
     """
     def openFile(self, file):
 	"""
-        Returns a paricular VersionedFile object.
+        Returns a particular VersionedFile object.
 
         @param file: File name
         @type file: str
