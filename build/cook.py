@@ -43,6 +43,8 @@ def cook(repos, cfg, recipeFile):
 	recipeObj.doBuild(ourBuildDir)
 
 	rootDir = "/var/tmp/srs/%s-%d" % (recipeObj.name, int(time.time()))
+        if os.path.exists(rootDir):
+            shutil.rmtree(rootDir)
         util.mkdirChain(rootDir)
 	recipeObj.doInstall(ourBuildDir, rootDir)
 
