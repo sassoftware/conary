@@ -155,8 +155,9 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     if not os.path.isdir(dir):
 	try:
 	    os.mkdir(dir)
-	except:
-	    log.error("cannot create directory %s/%s", os.getcwd(), dir)
+	except OSError, err:
+	    log.error("cannot create directory %s/%s: %s", os.getcwd(), dir,
+                      str(err))
 	    return
 
     state = SourceState()
