@@ -94,6 +94,7 @@ for (arg, name) in cfgMap.items():
 	del argSet[arg]
 
 repos = repository.Repository(cfg.reppath)
+db = repository.Database(cfg.root, cfg.dbpath)
 
 if (len(otherArgs) < 2):
     usage()
@@ -162,7 +163,7 @@ elif (otherArgs[1] == "pkglist"):
 elif (otherArgs[1] == "update"):
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
-	args = [repos, cfg] + otherArgs[2:]
+	args = [repos, db, cfg] + otherArgs[2:]
 	update.doUpdate(*args)
     else:
 	usage()
