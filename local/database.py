@@ -156,11 +156,11 @@ class Database(repository.LocalRepository):
 
 	localChanges = self.createChangeSet(list)
 
-	#if not localRollback:
-	#    # rollbacks have two pieces, B->A and A->A.local; applying
-	#    # both of them gets us back where we started
-	#    inverse = cs.invert(self, availableFiles = 1)
-	#    self.addRollback(inverse, localChanges)
+	if not localRollback:
+	    # rollbacks have two pieces, B->A and A->A.local; applying
+	    # both of them gets us back where we started
+	    inverse = cs.makeRollback(self, configFiles = 1)
+	    self.addRollback(inverse, localChanges)
 	#else:
 	#    localChanges = localRollback
 
