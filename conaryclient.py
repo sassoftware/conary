@@ -171,8 +171,47 @@ class ConaryClient:
 
         return (cs, depList, suggMap, cannotResolve)
 
+    def _processRedirects(self, cs):
+        # Looks for redirects in the change set, and returns a list of
+        # troves which need to be included in the update. Troves we
+        # redirect to don't show up as primary troves (ever), which keeps
+        # _mergeGroupChanges() from interacting with troves which are the
+        # targets of redirections.
+        troveList = []
+        delDict = {}
+
+        for troveCs in cs.iterNewPackageList():
+            if not troveCs.getIsRedirect():
+                continue
+
+            item = (troveCs.getName(), troveCs.getNewVersion(),
+                    troveCs.getNewFlavor())
+
+            # don't install the redirection itself
+            delDict[item] = True
+
+            # but do remove the trove this redirection replaces. if it
+            # isn't installed, we don't want this redirection or the
+            # item it points to
+            if troveCs.getOldVersion():
+                oldItem = (troveCs.getName(), troveCs.getOldVersion(),
+                           troveCs.getOldFlavor())
+
+                if self.db.hasTrove(*oldItem):
+                    cs.oldPackage(*oldItem)
+                else:
+                    # erase the target(s) of the redirection
+                    for (name, changeList) in troveCs.iterChangedTroves():
+                        for (changeType, version, flavor) in changeList:
+                            delDict[(name, version, flavor)] = True
+
+        for item in delDict.iterkeys():
+            cs.delNewPackage(*item)
+
+        return troveList
+
     def _mergeGroupChanges(self, cs):
-        # updates a change set by removing troves which don't need
+        # Updates a change set by removing troves which don't need
         # to be updated do to local state
         assert(not cs.isAbsolute())
 
@@ -238,8 +277,6 @@ class ConaryClient:
                 versionStr = item[1]
                 flavor = item[2]
 
-            #if isinstance(versionStr, versions.Version):
-
             if isinstance(versionStr, versions.Version):
                 assert(isinstance(flavor, deps.DependencySet))
                 newItems.append((troveName, versionStr, flavor))
@@ -295,6 +332,12 @@ class ConaryClient:
             cs = self.repos.createChangeSet(changeSetList, withFiles = False)
             finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
 
+        redirectTroves = self._processRedirects(finalCs)
+        # this is done recursively (only because if fits the code a bit better),
+        if redirectTroves:
+            redirectCs = self._updateChangeSet(redirectTroves, 
+                                  keepExisting = keepExisting, test = test)
+            finalCs.merge(redirectCs)
         self._mergeGroupChanges(finalCs)
 
         return finalCs

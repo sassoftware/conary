@@ -1,3 +1,6 @@
+Changes in 0.14.13:
+  * Redirections work
+
 Changes in 0.14.12:
   * The shadow command looks at buildLabel instead of following
     installLabelPath

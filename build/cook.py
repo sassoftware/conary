@@ -253,10 +253,9 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                                 alwaysBumpCount = alwaysBumpCount, 
                                 ignoreDeps = ignoreDeps)
     elif issubclass(recipeClass, recipe.RedirectRecipe):
-	ret = cookGroupObject(repos, cfg, recipeClass,  sourceVersion,
+	ret = cookRedirectObject(repos, cfg, recipeClass,  sourceVersion,
 			      macros = macros, targetLabel = targetLabel,
-                              alwaysBumpCount = alwaysBumpCount,
-                              redirect = True)
+                              alwaysBumpCount = alwaysBumpCount)
     elif issubclass(recipeClass, recipe.GroupRecipe):
 	ret = cookGroupObject(repos, cfg, recipeClass, sourceVersion, 
 			      macros = macros, targetLabel = targetLabel,
@@ -284,9 +283,89 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
     return built
 
+def cookRedirectObject(repos, cfg, recipeClass, sourceVersion, macros={},
+		    targetLabel = None, alwaysBumpCount=False):
+    """
+    Turns a redirect recipe object into a change set. Returns the absolute
+    changeset created, a list of the names of the packages built, and
+    and None (for compatibility with cookPackageObject).
+
+    @param repos: Repository to both look for source files and file id's in.
+    @type repos: repository.Repository
+    @param cfg: conary configuration
+    @type cfg: conarycfg.ConaryConfiguration
+    @param recipeClass: class which will be instantiated into a recipe
+    @type recipeClass: class descended from recipe.Recipe
+    @param macros: set of macros for the build
+    @type macros: dict
+    @rtype: tuple
+    @param targetLabel: label to use for the cooked troves; it is used
+    as a new branch from whatever version was previously built
+    default), the label from sourceVersion is used
+    @type targetLabel: versions.Label
+    @param alwaysBumpCount: if True, the cooked troves will not share a 
+    full version with any other existing troves with the same name, 
+    even if their flavors would differentiate them.  
+    @type alwaysBumpCount: bool
+    @param redirect: if True, a redirect trove is built instead of a
+    normal trove.
+    """
+
+    fullName = recipeClass.name
+
+    recipeObj = recipeClass(repos, cfg, 
+                            sourceVersion.branch().label(), cfg.flavor)
+
+    try:
+        use.track(True)
+	recipeObj.setup()
+        recipeObj.findTroves()
+	use.track(False)
+    except recipe.RecipeFileError, msg:
+	raise CookError(str(msg))
+
+    redirects = recipeObj.getRedirections()
+    redirectFlavor = deps.deps.DependencySet()
+
+    for (topName, troveList) in redirects.iteritems():
+        for (name, version, flavor) in troveList:
+            redirectFlavor.union(flavor, 
+                                 mergeType=deps.deps.DEP_MERGE_TYPE_NORMAL)
+
+    targetVersion = nextVersion(repos, fullName, sourceVersion, redirectFlavor,
+                                targetLabel, alwaysBumpCount=alwaysBumpCount)
+
+    redirSet = {}
+    for topName, troveList in redirects.iteritems():
+        redir = trove.Trove(topName, versions.NewVersion(), redirectFlavor, 
+                            None, isRedirect = True)
+        redirSet[topName] = redir
+
+        for (name, version, flavor) in troveList:
+            if version is None:
+                version = targetVersion
+            if flavor is None:
+                flavor = redirectFlavor
+
+            redir.addTrove(name, version, flavor)
+
+    changeSet = changeset.ChangeSet()
+    built = []
+    for trv in redirSet.itervalues():
+        trv.changeVersion(targetVersion)
+        trv.setBuildTime(time.time())
+        trv.setSourceName(fullName + ':source')
+        trv.setConaryVersion(constants.version)
+
+        trvDiff = trv.diff(None, absolute = 1)[0]
+        changeSet.newPackage(trvDiff)
+        built.append((trv.getName(), trv.getVersion().asString(), 
+                      trv.getFlavor()) )
+
+    return (changeSet, built, None)
+
 def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
-		    targetLabel = None, alwaysBumpCount=False, 
-                    redirect = False):
+		    targetLabel = None, alwaysBumpCount=False):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -335,7 +414,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
                             mergeType=deps.deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
 
     grp = trove.Trove(fullName, versions.NewVersion(), grpFlavor, None,
-                      isRedirect = redirect)
+                      isRedirect = False)
 
     for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
         for (version, flavor) in versionFlavorList:

@@ -779,7 +779,7 @@ class PackageRecipe(Recipe):
         self.sourcePathMap = {}
         self.pathConflicts = {}
 
-class _GroupOrRedirectRecipe(Recipe):
+class GroupRecipe(Recipe):
     Flags = use.LocalFlags
 
     def addTrove(self, name, versionStr = None, flavor = None, source = None):
@@ -805,12 +805,8 @@ class _GroupOrRedirectRecipe(Recipe):
             try:
                 desFlavor = self.cfg.buildFlavor.copy()
                 if flavor is not None:
-                    if (isinstance(flavor, deps.DependencySet) or
-                          flavor is None):
-                        # nothing needs to be done
-                        pass
-                    else:
-                        raise AssertionError
+                    assert(isinstance(flavor, deps.DependencySet) or
+                           flavor is None)
                     desFlavor.union(flavor, deps.DEP_MERGE_TYPE_OVERRIDE)
                 pkgList = self.repos.findTrove(self.label, name, desFlavor,
                                                versionStr = versionStr)
@@ -849,13 +845,88 @@ class _GroupOrRedirectRecipe(Recipe):
 	self.flavor = flavor
         self.addTroveList = []
 
-class GroupRecipe(_GroupOrRedirectRecipe):
+class RedirectRecipe(Recipe):
+    Flags = use.LocalFlags
 
-    pass
+    def addRedirect(self, name, versionStr = None, flavorStr = None,
+                    fromTrove = None):
+        if flavorStr is not None:
+            flavor = deps.parseFlavor(flavorStr)
+            if flavor is None:
+                raise ValueError, 'invalid flavor %s' % flavorStr
+        else:
+            flavor = None
 
-class RedirectRecipe(_GroupOrRedirectRecipe):
+        if fromTrove is None:
+            fromTrove = self.name
+        elif fromTrove.find(":") != -1:
+            raise ValueError, 'components cannot be individually redirected'
 
-    pass
+        self.addTroveList.append((name, versionStr, flavor, fromTrove))
+
+    def findTroves(self):
+        self.size = 0
+
+        validSize = True
+        troveList = []
+
+        packageSet = {}
+
+        for (name, versionStr, flavor, fromName) in self.addTroveList:
+            try:
+                desFlavor = self.cfg.buildFlavor.copy()
+                if flavor is not None:
+                    desFlavor.union(flavor, deps.DEP_MERGE_TYPE_OVERRIDE)
+                pkgList = self.repos.findTrove(self.label, name, desFlavor,
+                                               versionStr = versionStr)
+            except repository.TroveNotFound, e:
+                raise RecipeFileError, str(e)
+
+            assert(len(pkgList) == 1)
+            packageSet[pkgList[0]] = fromName
+            troveList.append(pkgList[0])
+
+        troves = self.repos.getTroves(troveList, withFiles = False)
+        redirections = {}
+        for topLevelTrove in troves:
+            topName = topLevelTrove.getName()
+            topVersion = topLevelTrove.getVersion()
+            topFlavor = topLevelTrove.getFlavor()
+            fromName = packageSet[(topName, topVersion, topFlavor)]
+
+            d = self.redirections.setdefault(fromName, {})
+
+            # this redirects from oldPackage -> newPackage
+            d[(topName, topVersion, topFlavor)] = True
+
+            for (name, version, flavor) in topLevelTrove.iterTroveList():
+                # redirect from oldPackage -> referencedPackage
+                d[(name, version, flavor)] = True
+
+                if name.find(":") != -1:
+                    compName = fromName + ":" + name.split(":")[1]
+                    # redirect from oldPackage -> oldPackage:component. we
+                    # leave version/flavor alone; they get filled in later
+                    d[(compName, None, None)] = True
+
+                    # redirect from oldPackage:component -> newPackage:component
+                    d2 = self.redirections.setdefault(compName, {})
+                    d2[(name, version, flavor)] = True
+
+        for name,d  in redirections.iteritems():
+            self.redirections[name] = [ (x[0], x[1], x[2]) for x in d ]
+
+    def getRedirections(self):
+	return self.redirections
+
+    def __init__(self, repos, cfg, label, flavor):
+	self.repos = repos
+	self.cfg = cfg
+        self.redirections = {}
+	self.label = label
+	self.flavor = flavor
+        self.addTroveList = []
+
 
 class FilesetRecipe(Recipe):
     # XXX need to work on adding files from different flavors of troves

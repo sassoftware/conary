@@ -166,6 +166,8 @@ class ChangeSet(streams.LargeStreamSet):
 
     def delNewPackage(self, name, version, flavor):
 	del self.newPackages[(name, version, flavor)]
+        if (name, version, flavor) in self.primaryTroveList:
+            self.primaryTroveList.remove((name, version, flavor))
 
     def oldPackage(self, name, version, flavor):
 	assert(min(version.timeStamps()) > 0)
@@ -179,6 +181,9 @@ class ChangeSet(streams.LargeStreamSet):
 
     def getNewPackageVersion(self, name, version, flavor):
 	return self.newPackages[(name, version, flavor)]
+
+    def hasNewPackage(self, name, version, flavor):
+	return self.newPackages.has_key((name, version, flavor))
 
     def getOldPackageList(self):
 	return self.oldPackages
