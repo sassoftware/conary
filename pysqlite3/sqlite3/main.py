@@ -241,7 +241,8 @@ class Cursor:
 
         SQL = self._unicodeConvert(SQL)
 
-        if len(parms) == 1 and isinstance(parms[0], tuple):
+        if len(parms) == 1 and (isinstance(parms[0], tuple) or
+                                isinstance(parms[0], list)):
             parms = parms[0]
 
         if len(parms) == 0:
