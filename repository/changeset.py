@@ -64,12 +64,42 @@ class FileInfo(streams.TupleStream):
     def setCsInfo(self, value):
         return self.items[3].set(value)
 
+class ChangeSetNewPackageList(dict, streams.InfoStream):
+
+    def freeze(self):
+	l = []
+	for pkg in self.itervalues():
+	    s = pkg.freeze()
+	    l.append(struct.pack("!I", len(s)))
+	    l.append(s)
+	
+	return "".join(l)
+
+    def thaw(self, data):
+	i = 0
+	while i < len(data):
+	    size = struct.unpack("!I", data[i : i + 4])[0]
+	    i += 4
+	    s = data[i: i + size]
+	    i += size
+	    trvCs = trove.ThawTroveChangeSet(s)
+	    
+	    self[(trvCs.getName(), trvCs.getNewVersion(),
+					  trvCs.getNewFlavor())] = trvCs
+
+    def __init__(self, data = None):
+	if data:
+	    self.thaw(data)
+	    
+
 _STREAM_CS_PRIMARY = 1
+_STREAM_CS_PKGS    = 2
 
 class ChangeSet(streams.LargeStreamSet):
 
     streamDict = { 
-        _STREAM_CS_PRIMARY  :(streams.ReferencedTroveList, "primaryTroveList" ),
+        _STREAM_CS_PRIMARY :(streams.ReferencedTroveList, "primaryTroveList" ),
+        _STREAM_CS_PKGS    :(ChangeSetNewPackageList,     "newPackages"      ),
     }
 
     def isAbsolute(self):
@@ -526,7 +556,6 @@ class ChangeSet(streams.LargeStreamSet):
 
     def __init__(self, data = None):
 	streams.LargeStreamSet.__init__(self, data)
-	self.newPackages = {}
 	self.oldPackages = []
 	self.files = {}
 	self.earlyFileContents = {}
@@ -604,6 +633,16 @@ class ChangeSetFromFile(ChangeSet):
 	startSize = struct.unpack("!I", startSize)[0]
 	start = control.read(startSize)
 	ChangeSet.__init__(self, data = start)
+
+	for trvCs in self.newPackages.itervalues():
+	    if trvCs.isAbsolute():
+		self.absolute = 1
+
+	    old = trvCs.getOldVersion()
+	    new = trvCs.getNewVersion()
+
+	    if (old and old.isLocal()) or new.isLocal():
+		self.local = 1
 
 	line = control.readline()
 	while line:
