@@ -8,7 +8,8 @@ Contains the functions which builds a recipe and commits the
 resulting packages to the repository.
 """
 
-import buildpackage
+from build import *
+
 import changeset
 import filecontents
 import files
@@ -18,7 +19,6 @@ import log
 import lookaside
 import os
 import package
-import recipe
 import repository
 import sha1helper
 import signal

@@ -3,6 +3,8 @@
 # All rights reserved
 #
 
+from build import recipe
+
 import changeset
 import cook
 import files
@@ -10,7 +12,6 @@ import helper
 import log
 import os
 import package
-import recipe
 import sys
 import update
 import util
