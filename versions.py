@@ -18,15 +18,6 @@ class AbstractVersion:
     Ancestor class for all versions (as opposed to branches)
     """
 
-    def __eq__(self, version):
-	"""
-	Compares two version-type objects and tells if they are the same
-	or not.
-
-	@rtype: boolean
-	"""
-	return self.__class__ == version.__class__
-
     def __init__(self):
 	pass
 
@@ -244,6 +235,8 @@ class BranchName(AbstractBranch):
 		(self.host, rest) = value.split("@", 1)
 		(self.namespace, self.branch) = rest.split(":")
 
+	if not self.namespace:
+	    raise ParseError, ("namespace may not be empty: %s" % value)
 	if not self.branch:
 	    raise ParseError, ("branch names may not be empty: %s" % value)
 
@@ -543,7 +536,7 @@ class Version:
 	lastVersion = None
 	lastBranch = None
 	while parts:
-	    if parts[0] == "localhost@LOCAL":
+	    if parts[0] == "localhost@local:LOCAL":
 		lastBranch = None
 		v.append(LocalBranch())
 	    else:
