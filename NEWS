@@ -1,3 +1,10 @@
+Changes in 0.10.7:
+  * dependency sql code reworked to use temporary tables
+  * new macro called "servicedir" that defines the location for
+    service data (%(servicedir)s{ftp,http,etc})
+  * added busy wait to sqlite3 python binding when executing SQL
+    statements on a busy database
+
 Changes in 0.10.6:
   * Lots of bug fixes for distributed branching
   * Some code rearrangement
