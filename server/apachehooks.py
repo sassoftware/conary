@@ -72,8 +72,14 @@ def handler(req):
 	codeStr = open(req.filename, "r").read()
 	d = {}
 	exec codeStr in d
-	urlBase = "http://%s:%d" % (req.hostname, 
-				      req.parsed_uri[apache.URI_PORT])
+
+	if req.parsed_uri[apache.URI_PORT]:
+	    port = req.parsed_uri[apache.URI_PORT]
+	else:
+	    port = 80
+
+	urlBase = "http://%s:%d" % (req.hostname, port)
+	
 	urlBase += req.uri
 
 	repositories[repName] = netserver.NetworkRepositoryServer(
