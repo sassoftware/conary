@@ -1,3 +1,7 @@
+Changes in 0.14.0
+  * added ability for changesets to ignore unknown fields in some places
+    (making changesets somewhat less brittle)
+
 Changes in 0.13.3
   * added ability for a contents log file (makes syncing much easier)
   * file tags weren't used on updates
