@@ -115,8 +115,8 @@ tr.header {
             self.writeFn('<a href="%s">Home</a>' % home)
         self.writeFn("</body></html>")
 
-    def htmlPickTrove(self, troveList=[], action="chooseBranch"):
-        troveSelection = self.makeSelect(troveList, "troveNameList", size=12, expand="50%")
+    def htmlPickTrove(self, troveList=[], action="chooseBranch", troveName=None):
+        troveSelection = self.makeSelect(troveList, "troveNameList", size=12, expand="50%", default=troveName)
 
         self.writeFn("""
 <form action="%s" method="post">
@@ -153,6 +153,8 @@ Choose a branch: %s
             versionStr = metadata["version"].split("-")[-1]
         else:
             versionStr = "Initial Version"
+        if not metadata["source"]:
+            metadata["source"].append("")
 
         licenses = [x for x in LicenseCategories.values() if "::" in x]
         licenses.sort()
@@ -173,6 +175,7 @@ Choose a branch: %s
 <p><button id="submitButton" onclick="javascript:updateMetadata();">Save Changes</button></p>
 <input type="hidden" name="branch" value="%s" />
 <input type="hidden" name="troveName" value="%s" />
+<input type="hidden" name="source" value="%s" />
 </form>
 """     % (branchStr, versionStr,
            metadata["shortDesc"][0],
@@ -185,7 +188,7 @@ Choose a branch: %s
            self.makeSelectAppenderList("newLicense", "licenseList", licenses),
            self.makeSelect(metadata["category"], "categoryList", size=4, expand="53%", multiple=True),
            self.makeSelectAppenderList("newCategory", "categoryList", categories), 
-           branchFrz, troveName)
+           branchFrz, troveName, metadata["source"][0])
           )
 
         self.writeFn("""
@@ -195,8 +198,15 @@ Choose a branch: %s
 <input type="hidden" name="source" value="freshmeat" />
 <input type="submit" value="Fetch from Freshmeat" />
 </form>
-"""     % (branchFrz, troveName)
-        )
+"""     % (branchFrz, troveName))
+
+        self.writeFn("""
+<form method="post" action="metadata">
+<input type="hidden" name="troveName" value="%s" />
+<input type="submit" value="Cancel" />
+</form>
+"""     % (troveName))
+ 
  
     def htmlUpdateSuccessful(self, troveName, branchStr):
         self.writeFn("""Successfully updated %s's metadata on branch %s.""" 
@@ -314,7 +324,11 @@ Choose a branch: %s
             items = items.items()
 
         for key, item in items:
-            s += """<option value="%s">%s</option>\n""" % (key, item)
+            if key == default:
+                selected = 'selected="selected"'
+            else:
+                selected = ''
+            s += """<option value="%s" %s>%s</option>\n""" % (key, selected, item)
         s += """</select>"""
 
         return s

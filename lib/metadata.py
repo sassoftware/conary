@@ -32,13 +32,15 @@ class MDClass:
     URL = 2
     LICENSE = 3
     CATEGORY = 4
+    SOURCE = 5
 
     # mapping from enum id to real name
     className = {SHORT_DESC: "shortDesc",
                  LONG_DESC:  "longDesc",
                  URL:        "url",
                  LICENSE:    "license",
-                 CATEGORY:   "category"}
+                 CATEGORY:   "category",
+                 SOURCE:     "source"}
                   
 class MetadataTable:
     def __init__(self, db):
@@ -63,7 +65,7 @@ class MetadataTable:
                                            language STR)""")
 
     def add(self, itemId, versionId, branchId, shortDesc, longDesc,
-            urls, licenses, categories, language="C"):
+            urls, licenses, categories, source="", language="C"):
         cu = self.db.cursor()
 
         if language == "C":
@@ -82,7 +84,8 @@ class MetadataTable:
                              (MDClass.LONG_DESC, [longDesc]),\
                              (MDClass.URL, urls),\
                              (MDClass.LICENSE, licenses),\
-                             (MDClass.CATEGORY, categories):
+                             (MDClass.CATEGORY, categories),\
+                             (MDClass.SOURCE, [source]):
             for d in data:
                 cu.execute("""
                     INSERT INTO MetadataItems (metadataId, class, data, language)
@@ -117,7 +120,7 @@ class MetadataTable:
         items = {}
         for className in MDClass.className.values():
             items[className] = []
-            
+        
         for mdClass, data in cu:
             className = MDClass.className[mdClass]
             items[className].append(data)
@@ -183,4 +186,5 @@ def fetchFreshmeat(troveName):
             if name.startswith('Topic ::'):
                 metadata["category"].append(name)
 
+    metadata["source"] = ["freshmeat"]
     return metadata

@@ -103,12 +103,21 @@ class HttpHandler(HtmlEngine):
         self.writeFn("<pre>Authentication token: " + str(authToken))
         self.writeFn("\n\nFields: " + str(fields) + "</pre>")
 
-    def metadataCmd(self, authToken, fields):
+    def metadataCmd(self, authToken, fields, troveName=None):
         troveList = [x for x in self.repServer.repos.iterAllTroveNames() if x.endswith(':source')]
         troveList.sort()
 
+        # pick the next trove in the list
+        # or stay on the previous trove if canceled
+        if "troveName" in fields:
+            troveName = fields["troveName"].value
+        elif troveName in troveList:
+            loc = troveList.index(troveName)
+            if loc < len(troveList):
+                troveName = troveList[loc+1]
+
         self.htmlPageTitle("Metadata")
-        self.htmlPickTrove(troveList)
+        self.htmlPickTrove(troveList, troveName=troveName)
 
     def chooseBranchCmd(self, authToken, fields):
         if fields.has_key('troveName'):
@@ -161,8 +170,9 @@ class HttpHandler(HtmlEngine):
                     "url":        [],
                     "license":    [],
                     "category":   [],
+                    "source":     [ "" ],
                  }
-
+        
         self.htmlMetadataEditor(troveName, branch, md)
   
     def updateMetadataCmd(self, authToken, fields):
@@ -175,12 +185,12 @@ class HttpHandler(HtmlEngine):
             fields.getlist("urlList"),
             fields.getlist("licenseList"),
             fields.getlist("categoryList"),
+            fields["source"].value,
             "C"
         )
 
-        self.htmlPageTitle("Update Successful")
-        self.htmlUpdateSuccessful(troveName, branch.asString().split("/")[-1])
-       
+        self.metadataCmd(authToken, fields, troveName)
+        
     def userlistCmd(self, authToken, fields):
         self.htmlPageTitle("User List")
         userlist = list(self.repServer.auth.iterUsers())

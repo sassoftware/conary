@@ -477,7 +477,7 @@ class TroveStore:
 	del self.fileVersionCache 
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc,
-                    urls, licenses, categories, language):
+                    urls, licenses, categories, source, language):
         cu = self.db.cursor()
        
         itemId = self.getItemId(troveName)
@@ -504,7 +504,7 @@ class TroveStore:
         
         versionId = self.versionTable.get(version, None)
         return self.metadataTable.add(itemId, versionId, branchId, shortDesc, longDesc,
-                                      urls, licenses, categories, language)
+                                      urls, licenses, categories, source, language)
 
     def getMetadata(self, troveName, branch, version=None, language="C"):
         itemId = self.getItemId(troveName)
