@@ -478,7 +478,7 @@ class ChangeSetJob:
 
 	    if repos.hasPackage(pkgName):
 		if repos.hasPackageVersion(pkgName, newVersion):
-		    raise CommitError, "version %s for %s exists" % \
+		    raise CommitError, "version %s for %s is already installed" % \
 			    (newVersion.asString(), csPkg.getName())
 
 	    if old:
@@ -598,9 +598,14 @@ class ChangeSetUndo:
 class RepositoryError(Exception):
     """Base class for exceptions from the system repository"""
 
-    def __init__(self):
-        Exception.__init__(self)
-
 class CommitError(RepositoryError):
 
-    pass
+    def __repr__(self):
+	return self.str
+
+    def __str__(self):
+	return repr(self)
+
+    def __init__(self, str):
+	self.str = str
+

@@ -6,4 +6,9 @@ import changeset
 
 def doCommit(repos, cfg, changeSetFile):
     cs = changeset.ChangeSetFromFile(changeSetFile)
-    repos.commitChangeSet(cs)
+
+    try:
+	repos.commitChangeSet(cs)
+    except CommitError, e:
+	print e
+	

@@ -3,7 +3,9 @@
 # All rights reserved
 #
 import changeset
+import log
 import os
+import repository
 import sys
 import util
 import versions
@@ -63,6 +65,11 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 		    currentVersion = None
 
 		list.append((pkgName, currentVersion, newVersion, 0))
+
+	if not list:
+	    log.error("package %s was not found", pkg)
+	    return
+
 	if bail:
 	    return
 
@@ -75,4 +82,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	# permute the list into a list of just package names
 	list = map(lambda x: x[0], list)
 
-    db.commitChangeSet(cs, sourcePath = cfg.sourcepath)
+    try:
+	db.commitChangeSet(cs, sourcePath = cfg.sourcepath)
+    except repository.CommitError, e:
+	print e
