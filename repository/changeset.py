@@ -272,7 +272,7 @@ def fileChangeSet(fileId, old, new):
 
     return (diff, hash)
 
-# this creates the changeset against None
+# this creates an abstract changeset
 #
 # expects a list of (pkg, fileMap) tuples
 #
@@ -287,6 +287,55 @@ def CreateFromFilesystem(pkgList):
 	for (fileId, oldVersion, newVersion) in filesNeeded:
 	    (file, realPath, filePath) = fileMap[fileId]
 	    (filecs, hash) = fileChangeSet(fileId, None, file)
+	    cs.addFile(fileId, oldVersion, newVersion, filecs)
+
+	    if hash:
+		cs.addFilePointer(hash, realPath)
+
+    return cs
+
+# creates a change set from the version of a package installed in the
+# database against the files installed on the local system
+def CreateAgainstLocal(cfg, db, pkgList):
+    cs = ChangeSetFromFilesystem()
+
+    for pkgName in pkgList:
+	allVersions = db.getPackageVersionList(pkgName)
+	if not allVersions: continue
+
+	assert(len(allVersions) == 1)
+	dbPkg = db.getPackageVersion(pkgName, allVersions[0])
+	localPkg = db.getPackageVersion(pkgName, allVersions[0])
+
+	localVersion = versions.LocalVersion()
+	localPkg.changeVersion(localVersion)
+
+	changedFiles = {}
+	for (fileId, path, version) in localPkg.fileList():
+	    dbFile = db.getFileVersion(fileId, version)
+
+	    if isinstance(dbFile, files.SourceFile):
+		shortName = pkgName.split(':')[-2]
+		srcPath = cfg.sourcepath % {'pkgname': shortName } 
+		localFile = files.FileFromFilesystem(
+					    cfg.root + srcPath + "/" + path, 
+					    fileId, "src")
+	    else:
+		localFile = files.FileFromFilesystem(cfg.root + path, fileId)
+
+	    localFile.flags(dbFile.flags())
+
+	    if not dbFile.same(localFile):
+		localPkg.updateFile(fileId, path, localVersion)
+		changedFiles[fileId] = (dbFile, localFile)
+
+	(pkgChgSet, filesNeeded) = localPkg.diff(dbPkg, dbPkg.getVersion(),
+						 localPkg.getVersion())
+	cs.addPackage(pkgChgSet)
+
+	for (fileId, oldVersion, newVersion) in filesNeeded:
+	    (dbFile, localFile)  = changedFiles[fileId]
+	    (filecs, hash) = fileChangeSet(fileId, dbFile, localFile)
 	    cs.addFile(fileId, oldVersion, newVersion, filecs)
 
 	    if hash:
