@@ -11,7 +11,7 @@ import repository
 import versions
 
 def findPackage(repos, packageNamespace, defaultNick, name, 
-		versionStr = None, forceGroup = 0, oneMatch = 1):
+		versionStr = None, forceGroup = 0):
     """
     Looks up a package in the given repository based on the name and
     version provided. If any errors are occured, PackageNotFound is
@@ -65,10 +65,11 @@ def findPackage(repos, packageNamespace, defaultNick, name,
     if not versionStr or (versionStr[0] != "/" and  \
 	# branch nickname was given
 	    (versionStr.find("/") == -1) and versionStr.count("@")):
-	if versionStr[0] == "@":
-	    versionStr = packageNamespace[1:] + versionStr
 
 	if versionStr:
+	    if versionStr[0] == "@":
+		versionStr = packageNamespace[1:] + versionStr
+
 	    try:
 		nick = versions.BranchName(versionStr)
 	    except versions.ParseError:
