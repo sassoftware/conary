@@ -14,6 +14,8 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
     cs = None
     if not os.path.exists(cfg.root):
         util.mkdirChain(cfg.root)
+
+    map = ( ( None, cfg.sourcepath + "/" ), )
     
     if os.path.exists(pkg):
         # there is a file, try to read it as a changeset file
@@ -28,6 +30,8 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
             # invalid changeset file
             pass
         else:
+	    cs.remapPaths(map)
+
             if cs.isAbstract():
                 cs = db.rootChangeSet(cs, cfg.defaultbranch)
 
@@ -78,11 +82,12 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
             return
 
 	cs = repos.createChangeSet(list)
+	cs.remapPaths(map)
 
 	# permute the list into a list of just package names
 	list = map(lambda x: x[0], list)
 
     try:
-	db.commitChangeSet(cs, sourcePath = cfg.sourcepath)
+	db.commitChangeSet(cs)
     except repository.CommitError, e:
 	print e
