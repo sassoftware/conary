@@ -33,17 +33,27 @@ class RemoveExtraLibs(policy.Policy):
 
 class Strip(policy.Policy):
     """
-    strip executables without creating debuginfo subpackage
+    strip executables
+    XXX system policy on whether to create debuginfo packages
     """
-    def do(self):
-	pass
+    invariantinclusions = [
+	'%(bindir)s/.*',
+	'%(essentialbindir)s/.*',
+	'%(sbindir)s/.*',
+	'%(essentialsbindir)s/.*',
+	'%(libdir)s/.*',
+	'%(essentiallibdir)s/.*',
+    ]
+    def doFile(self, path):
+	if not os.path.islink(path):
+	    p = self.macros['destdir']+path
+	    # XXX do magic internally instead
+	    f = os.popen('file '+p, 'r')
+	    filetext = f.read()
+	    f.close()
+	    if filetext.find('ELF') != -1 and filetext.find('not stripped') != 1:
+		util.execute('strip '+p)
 
-class StripToDebug(policy.Policy):
-    """
-    move debugging information out of binaries into debuginfo subpackage
-    """
-    def do(self):
-	pass
 
 class NormalizeGzip(policy.Policy):
     """
@@ -214,7 +224,7 @@ def DefaultPolicy():
     return [
 	SanitizeSonames(),
 	RemoveExtraLibs(),
-	StripToDebug(),
+	Strip(),
 	NormalizeGzip(),
 	NormalizeBzip(),
 	NormalizeManPages(),
