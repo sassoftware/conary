@@ -100,30 +100,30 @@ class FilesystemJob:
 	rootLen = len(self.root)
 	tagCommands = []
 
-        for path in self.tagRemoves.get('tagdescription', []):
+        for path in self.tagRemoves.get('taghandler', []):
             path = path[rootLen:]
-            tagInfo = None	
+            tagInfo = None
             for ti in tagSet.itervalues():
-                if ti.tagFile[:rootLen] == self.root and \
-                   ti.tagFile[rootLen:] == path: 
+                if ti.file == path:
                     tagInfo = ti
                     break
 
-            if tagInfo:
-                # this prevents us from trying to run "files add"
-                del tagSet[tagInfo.tag]
+            if not tagInfo:
+                continue
 
-                if self.tagRemoves.has_key(tagInfo.tag):
-                    # we're running "description preremove"; we don't need 
-                    # to run "files preremove" as well, and we won't be
-                    # able to run "files remove"
-                    del self.tagRemoves[tagInfo.tag]
+            # this prevents us from trying to run "files add" for this tag
+            del tagSet[tagInfo.tag]
 
-                if "description preremove" in tagInfo.implements:
-                    tagCommands.append([ tagInfo, ("description", 
-                                                   "preremove"), 
-                       [x for x in 
-                            self.repos.iterFilesWithTag(tagInfo.tag) ] ] )
+            # we're running "handler preremove"; we don't need to run
+            # "files preremove" as well, and we won't be able to run "files
+            # remove" (since the taghandler would have disappeared)
+            if self.tagRemoves.has_key(tagInfo.tag):
+                del self.tagRemoves[tagInfo.tag]
+
+            if "handler preremove" in tagInfo.implements:
+                tagCommands.append([ tagInfo, ("handler", "preremove"), 
+                   [x for x in 
+                        self.repos.iterFilesWithTag(tagInfo.tag) ] ] )
 
 	for tag, l in self.tagRemoves.iteritems():
 	    if tag == 'tagdescription':
@@ -327,24 +327,62 @@ class FilesystemJob:
 	    # override to force ldconfig to run on shlib removal
 	    shlibAction(self.root, [])
 
+        # build a set of the new tag descriptions. we index them two ways
+        # to make the rest of this a bit easier
+        newTagSetByHandler = {}
+        newTagSetByDescFile = {}
+
+        for path in self.tagUpdates.get('tagdescription', []):
+            tagInfo = tags.TagFile(path, {})
+            newTagSetByHandler[tagInfo.file] = tagInfo
+            newTagSetByDescFile[path] = tagInfo
+
+        for path in self.tagUpdates.get('taghandler', []):
+            # make these look like tagdescription changes, which then
+            # get run with "handler update". 
+
+            tagInfo = newTagSetByHandler.get(path, None)
+            if tagInfo is None:
+                path = path[rootLen:]
+                tagInfo = None	
+                for ti in tagSet.itervalues():
+                    if ti.file == path: 
+                        tagInfo = ti
+                        break
+
+            if not tagInfo:
+                # one place this happens if is the taghandler was just
+                # installed, but we catch that case by checking if
+                # tagdescription has run
+                continue
+
+            l = self.tagUpdates.setdefault('tagdescription', [])
+            if tagInfo.tagFile not in l:
+                l.append(tagInfo.tagFile)
+                newTagSetByDescFile[tagInfo.tagFile] = tagInfo
+
         for path in self.tagUpdates.get('tagdescription', []):
             # these are new tag action files which we need to run for
             # the first time. we run them against everything in the database
             # which has this tag, which includes the files we've just
             # installed
 
-            tagInfo = tags.TagFile(path, {})
+            tagInfo = newTagSetByDescFile[path]
             path = path[len(self.root):]
             
             # don't run these twice
             if self.tagUpdates.has_key(tagInfo.tag):
                 del self.tagUpdates[tagInfo.tag]
 
-            if "description update" in tagInfo.implements:
-                cmd = [ tagInfo, ("description", "update"),
+            if "handler update" in tagInfo.implements:
+                cmd = [ tagInfo, ("handler", "update"),
                     [x for x in self.repos.iterFilesWithTag(tagInfo.tag)] ]
                 tagCommands.append(cmd)
             elif "files update" in tagInfo.implements:
+                # if "handler update" isn't implemented, see if "files
+                # update" is implemented. if so, we need to call this
+                # for all of those items files (otherwise the handler will
+                # never be called for files which are already installed)
                 fileList = [x for x in 
                             self.repos.iterFilesWithTag(tagInfo.tag) ] 
                 if fileList:
@@ -610,6 +648,7 @@ class FilesystemJob:
                 
             fsFile.flags.isConfig(headFile.flags.isConfig())
             fsFile.flags.isSource(headFile.flags.isSource())
+            fsFile.tags.thaw(headFile.tags.freeze())
 
             # this is changed to true when the file attributes have changed;
             # this helps us know if we need a restore event

@@ -1,5 +1,10 @@
 Changes in 0.13.3
   * added ability for a contents log file (makes syncing much easier)
+  * file tags got lost when files were updated (!)
+  * "description update" tag action replaced with "handler update"
+    (which gets called when either the tag description or the tag handler gets
+    updated)
+  * "description preremove" tag action replaced with "handler preremove"
 
 Changes in 0.13.2
   * reworked use.py code almost entirely.
