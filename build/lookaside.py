@@ -143,10 +143,10 @@ class RepositoryCache:
 
     def moveFileToCache(self, cfg, fileName, location):
 	cachedname = createCacheName(cfg, fileName, location)
-	(troveName, troveVersion, troveFile) = self.map[fileName]
-	f = self.repos.getNewFileContents(troveName, troveVersion, troveFlavor,
-				          troveFile)
-	util.copyfileobj(f, f.open(cachedname, "w"))
+	(troveName, troveVersion, troveFlavor, troveFile) = self.map[fileName]
+	f = self.repos.getFileContents(troveName, troveVersion, troveFlavor,
+                                       troveFile)
+	util.copyfileobj(f, open(cachedname, "w"))
 
 	return cachedname
 
