@@ -142,14 +142,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         except KeyError:
             return 0
 
-    def getTroveFlavorsLatestVersion(self, authToken, troveName, branch):
-	branchVer = self.toBranch(branchStr)
+    def getTroveFlavorsLatestVersion(self, authToken, troveName, branchStr):
+	branch = self.toBranch(branchStr)
 
 	if not self.auth.check(authToken, write = False, trove = pkgName,
-			       label = branchVer.label()):
+			       label = branch.label()):
 	    raise InsufficientPermission
 
-	return self.repos.troveStore.iterTrovePerFlavorLeafs(troveName, branch)
+	return self.repos.troveStore.iterTrovePerFlavorLeafs(troveName, branchStr)
 
     def getChangeSet(self, authToken, chgSetList, recurse, withFiles):
 	l = []
