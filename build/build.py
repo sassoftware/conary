@@ -773,6 +773,9 @@ class Doc(_FileAction):
     """
     Installs documentation files from the C{%(builddir)s}
     into C{%(destdir)s/%(thisdocdir)s}: C{r.Doc(I{file(s)})}
+
+    The C{subdir=I{path}} keyword argument creates a subdirectory
+    under C{%(thisdocdir)s} to put the files in.
     """
     keywords = {'subdir':  '',
 		'mode': 0644,
