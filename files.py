@@ -615,6 +615,7 @@ def FileFromInfoLine(infoLine, fileId):
 
 class FilesError(Exception):
     def __init__(self, msg):
+        Exception.__init__(self)
         self.msg = msg
 
     def __repr__(self):
