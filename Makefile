@@ -31,6 +31,7 @@ python_files = __init__.py	\
 	helper.py		\
 	importrpm.py		\
 	log.py			\
+	options.py		\
 	package.py		\
 	patch.py		\
 	queryrep.py		\
