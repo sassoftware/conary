@@ -276,8 +276,9 @@ class ConaryClient:
             for outerTrove in troves:
                 for trove in self.db.walkTroveSet(outerTrove, 
                                                  ignoreMissing = True):
-                    cs.oldPackage(trove.getName(), trove.getVersion(), 
-                                  trove.getFlavor())
+                    if trove.getFlavor().satisfies(flavor):
+                        cs.oldPackage(trove.getName(), trove.getVersion(), 
+                                      trove.getFlavor())
 
         if depCheck:
             (depList, cannotResolve) = self.db.depCheck(cs)

@@ -20,6 +20,7 @@ import os
 from lib import util
 from lib import log
 
+from deps import deps
 from lib.sha1helper import sha1ToString, md5ToString
 from repository import repository
 
@@ -154,7 +155,7 @@ def parseTroveStrings(troveNameList):
 
 def _formatFlavor(flavor):
     if flavor:
-        return '\n   ' + '\n   '.join(str(flavor).split('\n'))
+        return '\n   ' + deps.formatFlavor(flavor)
     else:
         return '\n   None'
 

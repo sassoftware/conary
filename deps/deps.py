@@ -536,9 +536,14 @@ def formatFlavor(flavor):
 
     return ""
 
-def parseFlavor(s):
+def parseFlavor(s, mergeBase = None):
     # return a DependencySet for the string passed. format is
     # [arch[(flag,[flag]*)]] [use:flag[,flag]*]
+    #
+    # if mergeBase is set, the parsed flavor is merged into it. The
+    # rules for the merge are different than those for union() though;
+    # the parsed flavor is assumed to set the is:, use:, or both. If
+    # either class is unset, it's taken from mergeBase.
 
     def _fixup(flag):
         flag = flag.strip()
@@ -555,6 +560,9 @@ def parseFlavor(s):
 
     s = s.strip()
 
+    needsInsSet = True
+    needsUse = True
+
     match = flavorRegexp.match(s)
     if not match:
         return None
@@ -565,6 +573,7 @@ def parseFlavor(s):
 
     baseInsSet = groups[0]
     if baseInsSet:
+        needsInsSet = False
         if groups[1]:
             insSetFlags = groups[1].split(",")
             for i, flag in enumerate(insSetFlags):
@@ -576,11 +585,24 @@ def parseFlavor(s):
                                                         insSetFlags))
 
     if groups[2]:
+        needsUse = False
         useFlags = groups[2].split(",")
         for i, flag in enumerate(useFlags):
             useFlags[i] = _fixup(flag)
 
         set.addDep(UseDependency, Dependency("use", useFlags))
+
+    if needsInsSet and mergeBase:
+        insSet = mergeBase.getDepClasses().get(DEP_CLASS_IS, None)
+        if insSet is not None:
+            insSet = insSet.getDeps().next()
+            set.addDep(InstructionSetDependency, insSet)
+
+    if needsUse and mergeBase:
+        useSet = mergeBase.getDepClasses().get(DEP_CLASS_USE, None)
+        if useSet is not None:
+            useSet = useSet.getDeps().next()
+            set.addDep(UseDependency, useSet)
 
     return set
 
