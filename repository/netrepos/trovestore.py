@@ -45,7 +45,6 @@ class LocalRepVersionTable(versionops.VersionTable):
 class TroveStore:
 
     def __init__(self, path):
-	import sys
 	self.db = sqlite.connect(path, timeout = 30000)
 	self.troveTroves = trovecontents.TroveTroves(self.db)
 	self.troveFiles = trovecontents.TroveFiles(self.db)
@@ -536,13 +535,21 @@ class TroveStore:
     def iterTrovePerFlavorLeafs(troveName, branch):
 	cu = db.cursor()
 	cu.execute("""
-	   SELECT Instances.versionId, Instances.flavorId, finalTimeStamp FROM 
+	   SELECT Versions.version, Flavors.flavor FROM 
 		Nodes JOIN Instances ON Nodes.itemId=Instances.itemId AND 
 				        Nodes.versionId=Instances.versionId 
+		      JOIN Versions ON Instances.versionId=Versions.versionId
+		      JOIN Flavors ON Instances.flavorId = Flavors.flavorId
 	   WHERE Nodes.itemId=(SELECT itemId from Items WHERE item=%s)
 	     AND branchId=(SELECT branchId from Branch WHERE branch=%s)
 	   ORDER BY finalTimeStamp;
 	""", troveName, branch)
+
+	latest = {}	
+	for (version, flavor) in cu:
+	    latest[flavor] = version
+
+	return latest.iteritems()
 	    
     def addFile(self, fileObj, fileVersion):
 	self.filesToAdd[(fileObj.id(), fileVersion)] = fileObj
