@@ -397,8 +397,13 @@ class Flag(dict):
             top._value = True
         return parent
 
-    def toDependency(self, recipename=''):
-        """ Convert this flag set to a list of dependencies """
+    def toDependency(self, recipename='', modify=True):
+        """ Convert this flag set to a list of dependencies.
+            By default modifies the given flags as needed for 
+            use as a trove flavor by removing flags that were checked
+            but should not show up in trove flavors, and adding 
+            flags that are subsumed by other flags 
+        """
         # XXX this code should probably disappear with the reworking of 
         # flavors and their relationship with deps, but for now, 
         # it is very handy
@@ -408,14 +413,15 @@ class Flag(dict):
 
         # go through and set to true all child flags that are subsumed 
         # by flags set in this group.
-        flagsToCheck = self.values()
-        while flagsToCheck:
-            flag = flagsToCheck.pop()
-            if flag._get() is True:
-                # add 
-                for subflag in flag._subsumes:
-                    self = self + subflag
-            flagsToCheck.extend(flag.values())
+        if modify:
+            flagsToCheck = self.values()
+            while flagsToCheck:
+                flag = flagsToCheck.pop()
+                if flag._get() is True:
+                    # add 
+                    for subflag in flag._subsumes:
+                        self = self + subflag
+                flagsToCheck.extend(flag.values())
         if 'Use' in self or 'Flags' in self:
             depFlags = []
             if 'Use' in self and self.Use.keys():
@@ -431,17 +437,18 @@ class Flag(dict):
                 set.addDep(deps.UseDependency, dep)
         if 'Arch' in self:
             for arch, topflag in self['Arch'].iteritems():
-                if topflag._value is None:
-                    # if we didn't check the top level arch, 
-                    # we can get it's value from Arch.
-                    if not Arch[arch]:
+                if modify:
+                    if topflag._value is None:
+                        # if we didn't check the top level arch, 
+                        # we can get it's value from Arch.
+                        if not Arch[arch]:
+                            continue
+                    elif not topflag:
+                        # if we checked the arch and it is not our arch
+                        # don't add a dependency
                         continue
-                elif not topflag:
-                    # if we checked the arch and it is not our arch
-                    # don't add a dependency
-                    continue
-                if not topflag.inFlavor():
-                    continue
+                    if not topflag.inFlavor():
+                        continue
                 depFlags = []
                 for subarch, flag in topflag.iteritems():
                     if not flag.inFlavor():
