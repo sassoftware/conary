@@ -225,6 +225,10 @@ class ChangeSet(streams.LargeStreamSet):
     def getOldPackageList(self):
 	return self.oldPackages
 
+    def configFileIsDiff(self, fileId):
+        (tag, cont) = self.earlyFileContents.get(fileId, (None, None))
+        return tag == ChangedFileTypes.diff
+
     def addFileContents(self, fileId, contType, contents, sortEarly):
 	if sortEarly:
 	    self.earlyFileContents[fileId] = (contType, contents)
@@ -609,6 +613,10 @@ class ChangeSetFromFile(ChangeSet):
 
     def getFileSize(self, fileId):
 	return self.csf.getSize(fileId)
+
+    def configFileIsDiff(self, fileId):
+        (tag, str) = self.configCache.get(fileId, (None, None))
+        return tag == ChangedFileTypes.diff
 
     def getFileContents(self, fileId, withSize = False):
 	if self.configCache.has_key(fileId):

@@ -594,15 +594,13 @@ class FilesystemJob:
 			headFile.flags.isTransient() or \
 			fsFile.contents == baseFile.contents:
 
-		    if headFile.flags.isConfig():
-			(headFileContType,
-			 headFileContents) = changeSet.getFileContents(fileId)
-		    else:
-			headFileContType =changeset.ChangedFileTypes.file
-
 		    # the contents changed in just the repository, so take
 		    # those changes
-		    if headFileContType == changeset.ChangedFileTypes.diff:
+                    if headFile.flags.isConfig and \
+                                changeSet.configFileIsDiff(fileId):
+			(headFileContType,
+			 headFileContents) = changeSet.getFileContents(fileId)
+
 			sha1 = baseFile.contents.sha1()
 			baseLineF = repos.getFileContents(pkgCs.getName(),
 					pkgCs.getOldVersion(), 
@@ -641,17 +639,17 @@ class FilesystemJob:
 			log.warning("preserving contents of %s (now a "
 				    "config file)" % finalPath)
 		elif headFile.flags.isConfig():
-		    (headFileContType,
-		     headFileContents) = changeSet.getFileContents(fileId)
-
 		    # it changed in both the filesystem and the repository; our
 		    # only hope is to generate a patch for what changed in the
 		    # repository and try and apply it here
-		    if headFileContType != changeset.ChangedFileTypes.diff:
+                    if not changeSet.configFileIsDiff(fileId):
 			self.errors.append("unexpected content type for %s" % 
 						finalPath)
 			contentsOkay = False
 		    else:
+                        (headFileContType,
+                         headFileContents) = changeSet.getFileContents(fileId)
+
 			cur = open(realPath, "r").readlines()
 			diff = headFileContents.get().readlines()
 			(newLines, failedHunks) = patch.patch(cur, diff)
