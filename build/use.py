@@ -35,6 +35,7 @@ class UseClass(dict):
         return self[attr]
 
 Use = UseClass({
+    'pcre':		True,
     'gcj':		True,
     'gnat':		False,
     'selinux':		False,
