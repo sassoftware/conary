@@ -57,7 +57,9 @@ def usage(rc = 1):
     print ""
     print "commit flags:  --target-branch <branch>"
     print ""
-    print 'common flags:  --config "<item> <value>"'
+    print 'common flags:  --build-label <label>'
+    print '               --config "<item> <value>"'
+    print '               --install-label <label>'
     print "               --reppath <repository-path>"
     print "               --root <root>"
     print ""
@@ -106,6 +108,8 @@ def realMain():
     # 1 - arg may occur once, w/ parameter
     # 2 - arg may occur N times, w/ parameter
 
+    cfgMap["build-label"] = "buildLabel"
+    cfgMap["install-label"] = "installLabel"
     cfgMap["root"] = "root"
 
     argDef["all"] = 0
