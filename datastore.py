@@ -141,7 +141,8 @@ class DataStore:
             f = os.fdopen(fd)
 	    # cut off the trailing \n
 	    count = int(f.read()[:-1])
-            os.close(fd)
+            # this closes fd as well
+            f.close()
 	elif os.path.exists(path):
 	    count = 1
 	else:
