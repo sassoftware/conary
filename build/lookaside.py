@@ -92,6 +92,10 @@ def searchAll(cfg, repCache, name, location, srcdirs):
             try:
                 url = urllib2.urlopen(name)
                 break
+            except urllib2.HTTPError, msg:
+                if msg.code == 404:
+                    createNegativeCacheEntry(cfg, name[5:], location)
+                    return None
             except IOError, msg:
                 print 'Error retreiving', name + '.', msg, ' Retrying in 10 seconds.'
                 time.sleep(10)
