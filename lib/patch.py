@@ -100,21 +100,26 @@ def patch(oldLines, unifiedDiff):
 	conflicts = hunk.countConflicts(oldLines, start)
 
 	i = 0
-	before = 1000
-	after = 1000
 	while conflicts:
 	    i = i + 1
+	    tried = 0
 	    if (start - abs(i) >= 0):
-		before = hunk.countConflicts(oldLines, start - abs(i))
-	    if (start + abs(i) < (len(oldLines) - hunk.fromLen)):
-		after = hunk.countConflicts(oldLines, start + abs(i))
+		tried = 1
+		conflicts = hunk.countConflicts(oldLines, start - i)
+		if not conflicts:
+		    i = -i
+		    break
 
-	    if before < after:
-		conflicts = before
-		i = -(abs(i))
-	    else:
-		conflicts = after
-		i = abs(i)
+	    if (start + i < (len(oldLines) - hunk.fromLen)):
+		tried = 1
+		conflicts = hunk.countConflicts(oldLines, start + i)
+		if not conflicts:
+		    break
+
+	    if not tried:
+		break
+
+	if conflicts: raise Conflict()
 
 	offset = i
 	start += i
