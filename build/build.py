@@ -733,9 +733,11 @@ class Doc(_FileAction):
 
 class Create(_FileAction):
     """
-    The Create class puts a file in the destdir.  Without contents
-    specified it is rather like C{touch}; with contents specified it
-    is more like C{cat > foo <<EOF ... EOF}
+    The Create class puts a file in the destdir.  Without C{contents}
+    specified it is rather like C{touch}; with C{contents} specified it
+    is more like C{cat > foo <<EOF ... EOF}.  If C{contents} is not
+    empty, then a newline will be implicitly appended unless C{contents}
+    already ends in a newline.
     """
     keywords = {'contents': '',
 		'macros': True,
@@ -745,6 +747,8 @@ class Create(_FileAction):
 	    contents = self.contents %macros
 	else:
 	    contents = self.contents
+	if contents and contents[-1] != '\n':
+	    contents += '\n'
 	for bracepath in self.paths:
 	    for path in util.braceExpand(bracepath %macros):
 		fullpath = util.joinPaths(macros['destdir'], path)
