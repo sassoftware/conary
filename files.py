@@ -26,8 +26,9 @@ _STREAM_STRING	    = 4
 _STREAM_DEVICE	    = 5
 _STREAM_SIZESHA1    = 6
 _STREAM_INODE	    = 7
-_STREAM_FLAGS	    = 7
-_STREAM_MTIME	    = 7
+_STREAM_FLAGS	    = 8
+_STREAM_MTIME	    = 9
+_STREAM_DEPS	    = 10
 
 class InfoStream:
 
@@ -53,7 +54,10 @@ class InfoStream:
 	successful.
 	"""
 	raise NotImplementedError
-	
+
+    def __eq__(self):
+	raise NotImplementedError
+
 class NumericStream(InfoStream):
 
     def value(self):
