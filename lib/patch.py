@@ -30,6 +30,12 @@ class Hunk:
 
 	return conflicts
 
+    def write(self, f):
+	f.write("@@ -%d,%s +%d,%d @@\n" % (self.fromStart, self.fromLen, 
+		self.toStart, self.toLen))
+	for line in self.lines:
+	    f.write(line)
+
     def __init__(self, fromStart, fromLen, toStart, toLen, lines, contextCount):
 	self.fromStart = fromStart
 	self.toStart = toStart
@@ -124,7 +130,7 @@ def patch(oldLines, unifiedDiff):
 		break
 
 	conflictCount = best[0]
-	if (hunk.contextCount - conflictCount) < 1:
+	if (hunk.contextCount - conflictCount) < 2:
 	    failedHunks.append(hunk)
 	    continue
 
