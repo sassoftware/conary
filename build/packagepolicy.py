@@ -402,17 +402,32 @@ class SharedLibrary(policy.Policy):
 
 class TagDescription(policy.Policy):
     """
-    Mark tag description files as such so that conary handles the
-    correctly.  By default, every file in %(sysconfdir)s/conary/tags/
+    Mark tag description files as such so that conary handles them
+    correctly.  By default, every file in %(tagdescriptiondir)s/
     is marked as a tag description file.
     """
-    invariantinclusions = [ '%(sysconfdir)s/conary/tags/.[^/]*$' ]
+    invariantinclusions = [ '%(tagdescriptiondir)s/' ]
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    log.debug('conary tag file: %s', file)
 	    self.recipe.autopkg.pathMap[file].tags.set("tagdescription")
+
+
+class TagHandler(policy.Policy):
+    """
+    Mark tag handler files as such so that conary handles them
+    correctly.  By default, every file in %(taghandlerdir)s/
+    is marked as a tag handler file.
+    """
+    invariantinclusions = [ '%(taghandlerdir)s/' ]
+
+    def doFile(self, file):
+	fullpath = ('%(destdir)s/'+file) %self.macros
+	if os.path.isfile(fullpath) and util.isregular(fullpath):
+	    log.debug('conary tag handler: %s', file)
+	    self.recipe.autopkg.pathMap[file].tags.set("taghandler")
 
 
 class TagSpec(policy.Policy):
@@ -991,6 +1006,7 @@ def DefaultPolicy(recipe):
 	Transient(recipe),
 	SharedLibrary(recipe),
 	TagDescription(recipe),
+	TagHandler(recipe),
 	TagSpec(recipe),
 	ParseManifest(recipe),
 	MakeDevices(recipe),
