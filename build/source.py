@@ -401,9 +401,6 @@ class Action(action.RecipeAction):
 	    util.mkdirChain(destDir)
 	util.execute(self.action %self.recipe.macros, destDir)
 
-    def doPrep(self):
-	pass
-
     def fetch(self): 
 	return None
 

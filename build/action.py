@@ -167,6 +167,9 @@ class RecipeAction(Action):
 		sys.excepthook = oldexcepthook
 
 
+    def doPrep(self):
+	pass
+
     def do(self):
 	pass
 
