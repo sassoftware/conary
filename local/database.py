@@ -4,7 +4,6 @@
 #
 
 import changeset
-import dbhash
 import files
 import os
 import repository
