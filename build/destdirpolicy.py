@@ -200,7 +200,7 @@ class RelativeSymlinks(policy.Policy):
 		dots = "../"
 		dots *= path.count('/') - 1
 		normpath = os.path.normpath(dots + contents)
-		print 'Fixing absolute symlink %s to relative symlink %s' \
+		print 'Changing absolute symlink %s to relative symlink %s' \
 		    %(path, normpath)
 		os.symlink(normpath, fullpath)
 
