@@ -223,9 +223,7 @@ def realMain(argv=sys.argv):
 	if argSet: return usage()
 
 	if len(otherArgs) >= 3 and len(otherArgs) <=4:
-	    db = openDatabase(cfg.root, cfg.dbPath)
-
-	    args = [db, cfg] + otherArgs[2:]
+	    args = [cfg] + otherArgs[2:]
 	    updatecmd.doErase(*args, **kwargs)
 	else:
 	    return usage()
