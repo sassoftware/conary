@@ -218,24 +218,33 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def __init__(self, path, mode):
 	self.repos = fsrepos.FilesystemRepository(path, mode)
 
-netRepos = NetworkRepositoryServer(sys.argv[2], "r")
+def handler(req):
+    req.content_type = "text/xml"
+    req.send_http_header()
+    data = req.read()
+    try:
+        params, method = xmlrpclib.loads(data)
+    except xmlrpclib.ResponseError, e:
+        req.write ( xmlrpclib.dumps(e))
+    return apache.OK
 
-xmlServer = SRSServer(("localhost", 8000))
-xmlServer.register_instance(netRepos)
-xmlServer.register_introspection_functions()
+if __name__ == '__main__':
+    netRepos = NetworkRepositoryServer(sys.argv[2], "c")
+    xmlServer = SRSServer(("localhost", 8000))
+    xmlServer.register_instance(netRepos)
+    xmlServer.register_introspection_functions()
 
-httpServer = HTTPServer(("localhost", 8001), HttpRequests)
+    httpServer = HTTPServer(("localhost", 8001), HttpRequests)
 
-fds = {}
-fds[xmlServer.fileno()] = xmlServer
-fds[httpServer.fileno()] = httpServer
+    fds = {}
+    fds[xmlServer.fileno()] = xmlServer
+    fds[httpServer.fileno()] = httpServer
 
-p = select.poll()
-for fd in fds.iterkeys():
-    p.register(fd, select.POLLIN)
+    p = select.poll()
+    for fd in fds.iterkeys():
+        p.register(fd, select.POLLIN)
 
-while True:
-    events = p.poll()
-    for (fd, event) in events:
-	fds[fd].handle_request()
-
+    while True:
+        events = p.poll()
+        for (fd, event) in events:
+            fds[fd].handle_request()
