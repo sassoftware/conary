@@ -23,8 +23,6 @@ class ELF(Magic):
 	provides = lib.elf.inspect(basedir+path)[1]
 	if provides:
 	    self.contents['soname'] = provides[0][1]
-	else:
-	    self.contents['soname'] = ''
 
 
 class ar(Magic):
