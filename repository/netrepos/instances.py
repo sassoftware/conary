@@ -128,7 +128,9 @@ class FileStreams:
 						   versionId INT,
 						   flavorId INT,
                                                    stream BINARY);""")
-	    cu.execute("""CREATE UNIQUE INDEX FileStreamsIdx ON
+	    # in sqlite 2.8.15, a unique here seems to cause problems
+	    # (as the versionId isn't unique, apparently)
+	    cu.execute("""CREATE INDEX FileStreamsIdx ON
 			  FileStreams(fileId, versionId)""")
 	    cu.execute("""CREATE INDEX FileStreamsVersionIdx ON
 			  FileStreams(versionId)""")

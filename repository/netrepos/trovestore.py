@@ -80,7 +80,6 @@ class TroveStore:
         
 	self.streamIdCache = {}
 	self.needsCleanup = False
-	self.filesToAdd = {}
 
     def __del__(self):
         try:
@@ -358,13 +357,6 @@ class TroveStore:
 	flavorsNeeded = {}
 	if troveFlavor:
 	    flavorsNeeded[troveFlavor] = True
-
-	for (fileId, path, version) in trove.iterFileList():
-	    fileObj = self.filesToAdd.get((fileId, version), None)
-	    if not fileObj or not fileObj.hasContents: continue
-	    flavor = fileObj.flavor.value()
-	    if flavor and not flavorsNeeded.has_key(flavor):
-		flavorsNeeded[flavor] = True
 
 	for (name, version, flavor) in trove.iterTroveList():
 	    if flavor:
@@ -740,6 +732,7 @@ class TroveStore:
 
     def commit(self):
 	if self.needsCleanup:
+	    assert(0)
 	    self.instances.removeUnused()
 	    self.fileStreams.removeUnusedStreams()
 	    self.items.removeUnused()
@@ -751,5 +744,4 @@ class TroveStore:
 	    self.versionOps.labelMap.removeUnused()
 	    self.versionOps.needsCleanup = False
 
-	self.filesToAdd = {}
 	self.db.commit()
