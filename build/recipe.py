@@ -220,7 +220,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     inF = repos.getFileContents(sourceComponent.getName(),
 				sourceComponent.getVersion(),
 				sourceComponent.getFlavor(), filename,
-				sourceComponent.getVersion())
+				sourceComponent.getVersion()).get()
     util.copyfileobj(inF, outF)
 
     del inF

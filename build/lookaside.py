@@ -156,7 +156,7 @@ class RepositoryCache:
 	(troveName, troveVersion, troveFlavor, troveFile,
 	 troveFileVersion) = self.map[fileName]
 	f = self.repos.getFileContents(troveName, troveVersion, troveFlavor,
-                                       troveFile, troveFileVersion)
+                                       troveFile, troveFileVersion).get()
 	util.copyfileobj(f, open(cachedname, "w"))
 
 	return cachedname

@@ -13,6 +13,7 @@
 #
 
 import filecontainer
+import filecontents
 import gzip
 import httplib
 import log
@@ -87,13 +88,13 @@ class ServerCache:
 		    raise repository.OpenError('Server version too old')
 	    except OSError, e:
 		raise repository.OpenError('Error occured opening repository '
-			    '%s: %s' % (server, e.strerror))
+			    '%s: %s' % (url, e.strerror))
 	    except socket.error, e:
 		raise repository.OpenError('Error occured opening repository '
-			    '%s: %s' % (server, e[1]))
+			    '%s: %s' % (url, e[1]))
 	    except Exception, e:
 		raise repository.OpenError('Error occured opening repository '
-			    '%s: %s' % (server, str(e)))
+			    '%s: %s' % (url, str(e)))
 
 	return server
 		
@@ -304,12 +305,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                                  self.fromVersion(version)))
 
     def getFileContents(self, troveName, troveVersion, troveFlavor, path,
-		        fileVersion):
+		        fileVersion, fileObj = None):
 	# we try to get the file from the trove which originally contained
 	# it since we know that server has the contents; other servers may
 	# not
 	url = self.c[fileVersion].getFileContents(troveName, 
-		    self.fromVersion(troveVersion), 
+		    self.fromVersion(fileVersion), 
 		    self.fromFlavor(troveFlavor),
 		    path, self.fromVersion(fileVersion))
 
@@ -325,7 +326,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	gzfile = gzip.GzipFile(fileobj = outF)
 	gzfile.fullSize = util.gzipFileSize(outF)
 
-	return gzfile
+	return filecontents.FromGzFile(gzfile)
 
     def commitChangeSet(self, chgSet):
 	serverName = None

@@ -59,7 +59,8 @@ class AbstractTroveDatabase:
 	"""
 	raise NotImplementedError
 
-    def getFileContents(self, troveName, troveVersion, troveFlavor, path):
+    def getFileContents(self, troveName, troveVersion, troveFlavor, path,
+			fileObj = None):
 	"""
 	Retrieves the files specified by the fileDict. The dictionary is
 	indexed by (troveName, troveVersion, troveFlavor) tuples, and each
@@ -452,7 +453,12 @@ class DataStoreRepository:
 	return self.contentsStore.hasFile(fileId)
 
     def getFileContents(self, troveName, troveVersion, troveFlavor, path,
-			fileVersion):
+			fileVersion, fileObj = None):
+	if fileObj:
+	    return filecontents.FromDataStore(self.contentsStore,
+					      fileObj.contents.sha1(),
+					      fileObj.contents.size())
+
 	# this could be much more efficient; iterating over the files is
 	# just silly
 	for (fileId, tpath, tversion, fileObj) in \
@@ -460,8 +466,9 @@ class DataStoreRepository:
 					    troveFlavor, withFiles = True):
 	    if tpath != path or tversion != fileVersion: continue
 
-	    inF = self.contentsStore.openFile(fileObj.contents.sha1())
-	    return inF
+	    return filecontents.FromDataStore(self.contentsStore,
+					      fileObj.contents.sha1(),
+					      fileObj.contents.size())
 
     def __init__(self, path):
 	fullPath = path + "/contents"
@@ -679,18 +686,9 @@ class ChangeSetJob:
 			(contType, fileContents) = cs.getFileContents(fileId)
 			sha1 = oldfile.contents.sha1()
 
-			# ugh. we could use getFileContents() directly,
-			# but that's slow since it has to look up the sha1....
-			if oldVer.branch().label().getHost() == self.repos.name:
-			    f = repos._getFileObject(sha1)
-			else:
-			    import pdb
-			    pdb.set_trace()
-			    f = self.repos._getLocalOrRemoteFileContents(
-					pkgName, oldTroveVersion, troveFlavor, 
-					oldPath, oldVer, 
-					oldfile.contents.sha1(),
-					oldfile.contents.size()).get()
+			f = self.repos.getFileContents(pkgName, 
+				    oldTroveVersion, troveFlavor, oldPath, 
+				    oldVer, fileObj = oldfile).get()
 
 			oldLines = f.readlines()
 			del f
