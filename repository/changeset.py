@@ -15,7 +15,7 @@ class ChangeSet:
 	return self.abstract
 
     def validate(self):
-	for pkg in self.getPackageList():
+	for pkg in self.getNewPackageList():
 	    # if this is abstract, we can't have any removed or changed files
 	    if not pkg.getOldVersion():
 		assert(not pkg.getChangedFileList())
@@ -48,13 +48,19 @@ class ChangeSet:
     def addFile(self, fileId, oldVersion, newVersion, csInfo):
 	self.files[fileId] = (oldVersion, newVersion, csInfo)
     
-    def addPackage(self, pkg):
-	self.packages.append(pkg)
-	if not pkg.getOldVersion():
+    def newPackage(self, pkg):
+	self.newPackages.append(pkg)
+	if pkg.isAbstract():
 	    self.abstract = 1
 
-    def getPackageList(self):
-	return self.packages
+    def oldPackage(self, name, version):
+	self.oldPackages.append((name, version))
+
+    def getNewPackageList(self):
+	return self.newPackages
+
+    def getOldPackageList(self):
+	return self.oldPackages
 
     def addFileContents(self, hash):
 	self.fileContents.append(hash)
@@ -63,7 +69,7 @@ class ChangeSet:
 	return self.files.items()
 
     def formatToFile(self, cfg, f):
-	for pkg in self.packages:
+	for pkg in self.newPackages:
 	    pkg.formatToFile(self, cfg, f)
 
     def getFileChange(self, fileId):
@@ -71,8 +77,11 @@ class ChangeSet:
 
     def headerAsString(self):
 	rc = ""
-	for pkg in self.getPackageList():
+	for pkg in self.getNewPackageList():
             rc += pkg.freeze()
+
+	for (pkgName, version) in self.getOldPackageList():
+	    rc += "SRS PKG REMOVED %s %s" % (pkgName, version.freeze())
 	
 	for (fileId, (oldVersion, newVersion, csInfo)) in self.getFileList():
 	    if oldVersion:
@@ -108,7 +117,7 @@ class ChangeSet:
 
 	inversion = ChangeSetFromRepository(repos)
 
-	for pkgCs in self.getPackageList():
+	for pkgCs in self.getNewPackageList():
 	    pkg = repos.getPackageVersion(pkgCs.getName(), 
 					  pkgCs.getOldVersion())
 
@@ -143,13 +152,14 @@ class ChangeSet:
 		if origFile.sha1() != newFile.sha1():
 		    inversion.addFileContents(origFile.sha1())
 
-	    inversion.addPackage(invertedPkg)
+	    inversion.newPackage(invertedPkg)
 
 	return inversion
 
     def __init__(self):
 	assert(self.__class__ != ChangeSet)
-	self.packages = []
+	self.newPackages = []
+	self.oldPackages = []
 	self.files = {}
 	self.fileContents = []
 	self.abstract = 0
@@ -214,26 +224,37 @@ class ChangeSetFromFile(ChangeSet):
 	    header = lines[i][:-1]
 	    i = i + 1
 
-	    if header.startswith("SRS PKG CHANGESET "):
-		(pkgName, oldVerStr, newVerStr, lineCount) = header.split()[3:7]
+	    if header.startswith("SRS PKG REMOVED "):
+		(pkgName, verStr) = header.split()[3:6]
+		version = versions.ThawVersion(verStr)
+		self.oldPackage(pkgName, verStr)
+	    elif header.startswith("SRS PKG "):
+		l = header.split()
 
-		if oldVerStr == "(none)":
-		    # abstract change set
+		pkgType = l[2]
+		pkgName = l[3]
+
+		if pkgType == "CHANGESET":
+		    oldVersion = versions.ThawVersion(l[4])
+		    rest = 5
+		elif pkgType == "NEW" or pkgType == "ABSTRACT":
 		    oldVersion = None
+		    rest = 4
 		else:
-		    oldVersion = versions.ThawVersion(oldVerStr)
+		    raise IOError, "invalid line in change set %s" % file
 
-		newVersion = versions.ThawVersion(newVerStr)
-		lineCount = int(lineCount)
+		newVersion = versions.ThawVersion(l[rest])
+		lineCount = int(l[rest + 1])
 
-		pkg = package.PackageChangeSet(pkgName, oldVersion, newVersion)
+		pkg = package.PackageChangeSet(pkgName, oldVersion, newVersion,
+				       abstract = (pkgType == "ABSTRACT"))
 
 		end = i + lineCount
 		while i < end:
 		    pkg.parse(lines[i][:-1])
 		    i = i + 1
 
-		self.addPackage(pkg)
+		self.newPackage(pkg)
 	    elif header.startswith("SRS FILE CHANGESET "):
 		(fileId, oldVerStr, newVerStr) = header.split()[3:6]
 		if oldVerStr == "(none)":
@@ -244,6 +265,7 @@ class ChangeSetFromFile(ChangeSet):
 		self.addFile(fileId, oldVersion, newVersion, lines[i][:-1])
 		i = i + 1
 	    else:
+		print header
 		raise IOError, "invalid line in change set %s" % file
 
 	    header = control.read()
@@ -281,8 +303,8 @@ def CreateFromFilesystem(pkgList):
 
     for (pkg, fileMap) in pkgList:
         version = pkg.getVersion()
-	(pkgChgSet, filesNeeded) = pkg.diff(None, None, version)
-	cs.addPackage(pkgChgSet)
+	(pkgChgSet, filesNeeded) = pkg.diff(None, abstract = 1)
+	cs.newPackage(pkgChgSet)
 
 	for (fileId, oldVersion, newVersion) in filesNeeded:
 	    (file, realPath, filePath) = fileMap[fileId]
@@ -332,9 +354,8 @@ def CreateAgainstLocal(cfg, db, pkgList):
 		localPkg.updateFile(fileId, path, fileVersion)
 		changedFiles[fileId] = (dbFile, localFile, realPath)
 
-	(pkgChgSet, filesNeeded) = localPkg.diff(dbPkg, dbPkg.getVersion(),
-						 localPkg.getVersion())
-	cs.addPackage(pkgChgSet)
+	(pkgChgSet, filesNeeded) = localPkg.diff(dbPkg)
+	cs.newPackage(pkgChgSet)
 
 	for (fileId, oldVersion, newVersion) in filesNeeded:
 	    (dbFile, localFile, fullPath)  = changedFiles[fileId]
