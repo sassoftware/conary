@@ -147,10 +147,15 @@ elif (otherArgs[1] == "cook"):
         signal.signal(signal.SIGTTOU, signal.SIG_IGN)
         pid = os.fork()
         if not pid:
+            # child, set ourself to be the foreground process
             os.setpgrp()
             os.tcsetpgrp(0, os.getpgrp())
 	    repos = repository.Repository(cfg.reppath, "r")
-            built = cook.cook(repos, cfg, file, prep=prep, macros=macros)
+            try:
+                built = cook.cook(repos, cfg, file, prep=prep, macros=macros)
+            except cook.CookError, msg:
+                sys.stderr.write(str(msg))
+                sys.exit(1)
             for (pkg, version) in built:
                 print "Committed", pkg, version, "to the repository"
             sys.exit(0)
@@ -160,13 +165,23 @@ elif (otherArgs[1] == "cook"):
                     # XXX replace 2 with os.WUNTRACED in python 2.3
                     (id, status) = os.waitpid(pid, 2)
                     if os.WIFSTOPPED(status):
+                        # if our child has been stopped (Ctrl+Z or similar)
+                        # stop ourself
                         os.kill(os.getpid(), os.WSTOPSIG(status))
+                        # when we continue, place our child back
+                        # in the foreground process group
                         os.tcsetpgrp(0, pid)
+                        # tell the child to continue
                         os.kill(-pid, signal.SIGCONT)
                     else:
+                        # if our child exited with a non-0 status, exit
+                        # with that status
+                        if os.WEXITSTATUS(status):
+                            sys.exit(os.WEXITSTATUS(status))
                         break
                 except KeyboardInterrupt:
                     os.kill(-pid, signal.SIGINT)
+        # make sure that we are the foreground process again
         os.tcsetpgrp(0, os.getpgrp())
                 
 elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):

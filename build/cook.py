@@ -64,7 +64,10 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
     if type(recipeFile) is types.ClassType:
         classList = {recipeFile.__name__: recipeFile}
     else:
-        classList = recipe.RecipeLoader(recipeFile)
+        try:
+            classList = recipe.RecipeLoader(recipeFile)
+        except recipe.RecipeFileError, msg:
+            raise CookError(str(msg))
     built = []
 
     for (className, recipeClass) in classList.items():
@@ -199,3 +202,13 @@ class IdGen:
 		    lcache.addFileHash(path, file.sha1())
 
         self.map.update(fileIdMap)
+
+class CookError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __repr__(self):
+	return self.msg
+
+    def __str__(self):
+	return repr(self)

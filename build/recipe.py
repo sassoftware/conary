@@ -142,14 +142,14 @@ def extractSourceFromRPM(rpm, targetfile):
 	               %(filename, os.path.basename(rpm))
 
 class RecipeLoader(types.DictionaryType):
-    def __init__(self, file):
-        if file[0] != "/":
+    def __init__(self, filename):
+        if filename[0] != "/":
             raise IOError, "recipe file names must be absolute paths"
 
-        self.file = os.path.basename(file).replace('.', '-')
+        self.file = os.path.basename(filename).replace('.', '-')
         self.module = imp.new_module(self.file)
         sys.modules[self.file] = self.module
-        f = open(file)
+        f = open(filename)
 
         exec 'from recipe import Recipe' in self.module.__dict__
         exec 'from recipe import loadRecipe' in self.module.__dict__
@@ -157,8 +157,14 @@ class RecipeLoader(types.DictionaryType):
         exec 'from use import Use, Arch' in self.module.__dict__
         if sys.excepthook == util.excepthook:
             exec 'sys.excepthook = util.excepthook' in self.module.__dict__
-        exec 'filename = "%s"' %(file) in self.module.__dict__
-        code = compile(f.read(), file, 'exec')
+        exec 'filename = "%s"' %(filename) in self.module.__dict__
+        try:
+            code = compile(f.read(), filename, 'exec')
+        except SyntaxError, err:
+            msg = ('Error in recipe file "%s": '
+                   '%s\n' %(os.path.basename(filename), err))
+            msg += '%s%s^\n' %(err.text, ' ' * (err.offset-1))
+            raise RecipeFileError(msg)
         exec code in self.module.__dict__
         for (name, obj) in  self.module.__dict__.items():
             if type(obj) == types.ClassType:
@@ -448,3 +454,13 @@ class Recipe:
 	for pattern in baseSubFilters:
 	    self.subFilters.append(buildpackage.Filter(*pattern))
 	self.mainFilters = []
+
+class RecipeFileError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __repr__(self):
+	return self.msg
+
+    def __str__(self):
+	return repr(self)
