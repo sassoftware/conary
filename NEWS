@@ -4,6 +4,7 @@ Changes in 0.10.11:
   * chained dependency resolution caused duplicate troves in the final
     changeset (and a lot of extra work)
   * added --config to stand alone repository
+  * source flag wasn't set properly for newly added non-text files
 
 Changes in 0.10.10:
   * changesets get downloaded into a single (meta) file instead of lots

@@ -1025,9 +1025,10 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	f = files.FileFromFilesystem(realPath, fileId)
 
 	extension = path.split(".")[-1]
-	if isSrcPkg and extension not in nonCfgExt:
-	    f.flags.isConfig(set = True)
-	    f.flags.isSource(set = True)
+	if isSrcPkg:
+            f.flags.isSource(set = True)
+            if extension not in nonCfgExt:
+                f.flags.isConfig(set = True)
 
 	# new file, so this part is easy
 	changeSet.addFile(fileId, None, newVersion, f.freeze())
