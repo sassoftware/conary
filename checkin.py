@@ -143,7 +143,8 @@ def checkout(repos, cfg, dir, name, versionStr = None):
 
     state = SourceState()
     state.setTroveName(trv.getName())
-    state.setTroveVersion(trv.getVersion())
+    version = trv.getVersion()
+    state.setTroveVersion(version)
 
     # if a branch nickname was specified, we need to look up the full branch
     # name that we're on; the version from the package doesn't tell us this
@@ -159,10 +160,8 @@ def checkout(repos, cfg, dir, name, versionStr = None):
 	else:
 	    nick = versions.BranchName(versionStr)
 
-	version = trv.getVersion()
-
 	if version.branch().branchNickname().equal(nick):
-	    state.setTroveBranch(version)
+	    state.setTroveBranch(version.branch())
 	else:
 	    # this must be the node the branch was created at, otherwise
 	    # we'd be on it
