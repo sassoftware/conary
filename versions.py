@@ -621,6 +621,12 @@ class NewVersion(AbstractVersion):
     def isLocal(self):
 	return False
 
+    def isEmerge(self):
+	return False
+
+    def isLocalCook(self):
+	return False
+
     def __hash__(self):
 	return hash("@NEW@")
 
@@ -787,6 +793,24 @@ class Version(VersionSequence):
 	@rtype: boolean
 	"""
 	return isinstance(self.versions[-2], LocalLabel)
+
+    def isEmerge(self):
+    	"""
+	Tests whether this is the emerge branch, or is a version on
+	the emerge branch
+
+	@rtype: boolean
+	"""
+	return isinstance(self.versions[-2], EmergeLabel)
+
+    def isLocalCook(self):
+    	"""
+	Tests whether this is the local cook branch, or is a version on
+	the local cook branch
+
+	@rtype: boolean
+	"""
+	return isinstance(self.versions[-2], CookLabel)
 
     def branch(self):
 	"""
