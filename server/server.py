@@ -38,6 +38,7 @@ mainPath = os.path.realpath(mainPath)
 sys.path.append(mainPath)
 
 from repository.netrepos import netserver
+from repository.netrepos import netauth
 from repository.netrepos.netserver import NetworkRepositoryServer
 from conarycfg import ConfigFile
 from conarycfg import STRINGDICT
@@ -289,17 +290,20 @@ def addUser(userName, otherArgs):
     if len(otherArgs) != 2:
         usage()
 
-    from repository.netrepos import netauth
-    from getpass import getpass
+    if os.isatty(0):
+        from getpass import getpass
+
+        pw1 = getpass('Password:')
+        pw2 = getpass('Reenter password :')
+
+        if pw1 != pw2:
+            print "Passwords do not match."
+            return 1
+    else:
+        # chop off the trailing newline
+        pw1 = sys.stdin.readline()[:-1]
 
     na = netauth.NetworkAuthorization(otherArgs[1], None)
-
-    pw1 = getpass('Password:')
-    pw2 = getpass('Reenter password :')
-
-    if pw1 != pw2:
-        print "Passwords do not match."
-        return 1
 
     na.add(userName, pw1, admin = True)
 
