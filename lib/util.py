@@ -321,3 +321,10 @@ def gzipFileSize(f):
 def xzip(l1, l2):
     for x in l1:
 	yield (x, l2.next())
+
+def memsize():
+    import os
+    pfn = "/proc/%d/status" % os.getpid()
+    lines = open(pfn).readlines()
+    f = lines[10].split()
+    return f[1]

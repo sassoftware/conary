@@ -28,6 +28,8 @@ from build import tags
 
 class RootChangeSetJob(repository.ChangeSetJob):
 
+    storeOnlyConfigFiles = True
+
     def addPackage(self, pkg):
 	self.packages.append(pkg)
 
@@ -46,9 +48,12 @@ class RootChangeSetJob(repository.ChangeSetJob):
     def oldFileList(self):
 	return self.oldFiles
 
-    def addFile(self, cs, fileObj, newVer, path, fileContents, 
-		restoreContents):
+    def addFile(self, fileObj, newVer):
 	self.files[fileObj.id()] = (fileObj, newVer)
+
+    def addFileContents(self, fileObj, newVer, fileContents, restoreContents,
+			isConfig):
+	pass
 
     def getFile(self, fileId):
 	return self.files[fileId]

@@ -85,6 +85,7 @@ class _IdGen:
 	fileid = sha1helper.hashString("%s %f %s %s" % (path, time.time(), 
                                                      self.noise,
                                                      flavor))
+	fileid = sha1helper.hashString(path)
 	self.map[(path, flavor)] = (fileid, None, None)
 	return (fileid, None, None)
 

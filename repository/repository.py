@@ -448,19 +448,16 @@ class DataStoreRepository:
     network repositories.
     """
 
-    def _storeFileFromContents(self, contents, file, restoreContents):
-	if file.hasContents:
-	    if restoreContents:
-		self.contentsStore.addFile(contents.get(), file.contents.sha1())
-	    else:
-		# the file doesn't have any contents, so it must exist
-		# in the data store already; we still need to increment
-		# the reference count for it
-		self.contentsStore.addFileReference(file.contents.sha1())
+    def _storeFileFromContents(self, contents, sha1, restoreContents):
+	if restoreContents:
+	    self.contentsStore.addFile(contents.get(), sha1)
+	else:
+	    # the file doesn't have any contents, so it must exist
+	    # in the data store already; we still need to increment
+	    # the reference count for it
+	    self.contentsStore.addFileReference(file.contents.sha1())
 
-	    return 1
-	
-	return 0
+	return 1
 
     def _removeFileContents(self, sha1):
 	self.contentsStore.removeFile(sha1)
@@ -550,6 +547,8 @@ class ChangeSetJob:
     make it to the database. The same holds for oldFile.
     """
 
+    storeOnlyConfigFiles = False
+
     def addPackage(self, pkg):
 	self.repos.addPackage(pkg)
 
@@ -559,23 +558,16 @@ class ChangeSetJob:
     def oldFile(self, fileId, fileVersion, fileObj):
 	pass
 
-    def addFile(self, cs, fileObj, fileVersion, path, fileContents, 
-		restoreContents, storeContents = True):
-	# duplicates are filtered out (as necessary) by addFileVersion
+    def addFile(self, fileObj, fileVersion):
 	self.repos.addFileVersion(fileObj.id(), fileVersion, fileObj)
 
+    def addFileContents(self, sha1, fileVersion, fileContents, 
+		restoreContents, isConfig):
 	# Note that the order doesn't matter, we're just copying
 	# files into the repository. Restore the file pointer to
 	# the beginning of the file as we may want to commit this
 	# file to multiple locations.
-	if storeContents:
-	    if fileContents == "":
-		fileContents = None
-	    elif not fileContents:
-		fileContents = cs.getFileContents(fileObj.id())[1]
-
-	    self.repos._storeFileFromContents(fileContents, fileObj, 
-					      restoreContents)
+	self.repos._storeFileFromContents(fileContents, sha1, restoreContents)
 
     def __init__(self, repos, cs):
 	self.repos = repos
@@ -583,7 +575,7 @@ class ChangeSetJob:
 
 	self.packagesToCommit = []
 
-	fileMap = {}
+	restoreList = []
 
 	# create the package objects which need to be installed; the
 	# file objects which map up with them are created later, but
@@ -596,10 +588,10 @@ class ChangeSetJob:
 	    pkgName = csPkg.getName()
 	    troveFlavor = csPkg.getFlavor()
 
-	    if repos.hasTrove(pkgName, newVersion, csPkg.getFlavor()):
-		raise CommitError, \
-		       "version %s for %s is already installed" % \
-			(newVersion.asString(), csPkg.getName())
+	    #if repos.hasTrove(pkgName, newVersion, csPkg.getFlavor()):
+	#	raise CommitError, \
+	#	       "version %s of %s is already installed" % \
+	#		(newVersion.asString(), csPkg.getName())
 
 	    if old:
 		newPkg = repos.getTrove(pkgName, old, csPkg.getFlavor(),
@@ -612,58 +604,72 @@ class ChangeSetJob:
 	    newFileMap = newPkg.applyChangeSet(csPkg)
 
 	    self.packagesToCommit.append(newPkg)
-	    fileMap.update(newFileMap)
 
-	# Create the file objects we'll need for the commit. This handles
-	# files which were added and files which have changed
-	list = cs.getFileList()
-	# sort this by fileid to ensure we pull files from the change
-	# set in the right order
-	list.sort()
+	    for (fileId, path, version) in newPkg.iterFileList():
+		if not newFileMap.has_key(fileId):
+		    # the file didn't change between versions; we can just
+		    # ignore it
+		    continue
 
-	for (fileId, (oldVer, newVer, diff)) in list:
-	    restoreContents = 1
-	    if oldVer:
-		oldfile = repos.getFileVersion(fileId, oldVer)
-		file = oldfile.copy()
-		file.twm(diff, oldfile)
-		
-		if file.hasContents and oldfile.hasContents and	    \
-		   file.contents.sha1() == oldfile.contents.sha1() and \
-		   not (file.flags.isConfig() and not oldfile.flags.isConfig()):
-		    restoreContents = 0
-	    else:
-		# this is for new files
-		file = files.ThawFile(diff, fileId)
+		oldPath, oldVersion = newFileMap[fileId][-2:]
 
-	    # we should have had a package which requires this (new) version
-	    # of the file
-	    assert(newVer == fileMap[fileId][1])
+		if oldVersion == version:
+		    # just the path changed. we don't need to bother.
+		    continue
 
-	    if file.hasContents and restoreContents:
+		diff = cs.getFileChange(fileId)
+		restoreContents = 1
+		if oldVersion:
+		    oldfile = repos.getFileVersion(fileId, oldVersion)
+		    fileObj = oldfile.copy()
+		    fileObj.twm(diff, oldfile)
+
+		    if fileObj.hasContents and oldfile.hasContents and	    \
+		       fileObj.contents.sha1() == oldfile.contents.sha1() and \
+		       not (fileObj.flags.isConfig() and not 
+						oldfile.flags.isConfig()):
+			restoreContents = 0
+		else:
+		    fileObj = files.ThawFile(diff, fileId)
+
+		self.addFile(fileObj, version)
+
+		# we can restore config files and files with no contents
+		# here; other files need to wait so we can do them in the
+		# right order based on the sha1 since they may be getting
+		# read from a gzip'd arghice
+		if not fileObj.hasContents or not restoreContents:
+		    # this means there are no contents to restore (None
+		    # means get the contents from the change set)
+		    continue
+		if self.storeOnlyConfigFiles and not fileObj.flags.isConfig():
+		    continue
+
 		fileContents = None
 
-		if repos._hasFileContents(file.contents.sha1()):
+		if repos._hasFileContents(fileObj.contents.sha1()):
 		    # if we already have the file in the data store we can
 		    # get the contents from there
 		    fileContents = filecontents.FromDataStore(
-				     repos.contentsStore, file.contents.sha1(), 
-				     file.contents.size())
+				     repos.contentsStore, 
+				     fileObj.contents.sha1(), 
+				     fileObj.contents.size())
 		    contType = changeset.ChangedFileTypes.file
 		else:
-		    oldPath = fileMap[fileId][3]
+		    oldPath = newFileMap[fileId][3]
 		    contType = cs.getFileContentsType(fileId)
 		    if contType == changeset.ChangedFileTypes.diff:
+			assert(fileObj.flags.isConfig())
 			# the content for this file is in the form of a diff,
 			# which we need to apply against the file in the
 			# repository
-			assert(oldVer)
+			assert(oldVersion)
 			(contType, fileContents) = cs.getFileContents(fileId)
 			sha1 = oldfile.contents.sha1()
 
 			f = self.repos.getFileContents(pkgName, 
 				    oldTroveVersion, troveFlavor, oldPath, 
-				    oldVer, fileObj = oldfile).get()
+				    oldVersion, fileObj = oldfile).get()
 
 			oldLines = f.readlines()
 			del f
@@ -674,13 +680,29 @@ class ChangeSetJob:
 			if failedHunks:
 			    fileContents = filecontents.WithFailedHunks(
 						fileContents, failedHunks)
-	    else:
-		# this means there are no contents to restore (None
-		# means get the contents from the change set)
-		fileContents = ""
+		    elif fileObj.flags.isConfig():
+			fileContents = filecontents.FromChangeSet(cs, fileId)
 
-	    path = fileMap[fileId][0]
-	    self.addFile(cs, file, newVer, path, fileContents, restoreContents)
+		if fileContents is not None:
+		    self.addFileContents(fileObj.contents.sha1(), version, 
+					 fileContents, restoreContents,
+					 fileObj.flags.isConfig())
+		else:
+		    tup = (fileObj.contents.sha1(), version, restoreContents,
+			   fileObj.flags.isConfig())
+		    restoreList.append((fileId, tup))
+
+	    del newFileMap
+
+	    self.addPackage(newPkg)
+
+	restoreList.sort()
+	for fileId, (sha1, version, restoreContents, isConfig) in restoreList:
+	    fileContents = cs.getFileContents(fileId)[1]
+	    self.addFileContents(sha1, version, fileContents, restoreContents,
+				 isConfig)
+
+	del restoreList
 
 	for (pkgName, version, flavor) in cs.getOldPackageList():
 	    pkg = self.repos.getTrove(pkgName, version, flavor)
@@ -689,6 +711,3 @@ class ChangeSetJob:
 	    for (fileId, path, version) in pkg.iterFileList():
 		file = self.repos.getFileVersion(fileId, version)
 		self.oldFile(fileId, version, file)
-
-	for newPkg in self.packagesToCommit:
-	    self.addPackage(newPkg)

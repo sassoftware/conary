@@ -217,7 +217,7 @@ class DBInstanceTable:
     def iterByName(self, name):
 	cu = self.db.cursor()
 	cu.execute("SELECT instanceId, versionId, troveName, flavorId FROM "
-		   "DBInstances WHERE troveName=%s AND isPresent = 1", name)
+		   "DBInstances WHERE troveName=%s AND isPresent=1", name)
  	for match in cu:
 	    yield match
 
@@ -426,7 +426,7 @@ class Database:
     def iterVersionByName(self, name):
 	cu = self.db.cursor()
 	cu.execute("SELECT version FROM DBInstances NATURAL JOIN Versions "
-		   "WHERE troveName=%s AND isPresent = 1", name)
+		   "WHERE troveName=%s AND isPresent=1", name)
  	for (match,) in cu:
 	    yield versions.VersionFromString(match)
 
@@ -506,6 +506,7 @@ class Database:
 	    result = self.streamCache.get((fileId, versionId), None)
 	    if result and result[1]:
 		flavors[result[1]] = True
+
 	flavorMap = self.flavors.getItemDict(flavors.iterkeys())
 	del flavors
 
@@ -528,13 +529,11 @@ class Database:
 	
 	assert(not self.troveTroves.has_key(troveInstanceId))
 
-	# we're updating from a previous version; there are a number of ways
-	# to make this faster; this takes the (easy, simplistic, and slower) 
-	# approach of prepopulating the streamCache with the streams for all 
-	# of the files in the old version; the smarter methods would tend
-	# to reuse the same rows in DBTroveFiles that the old version did,
-	# but that's a pretty big semantic change (in particular, update.py
-	# expects those to stick around a while longer)
+	# we're updating from a previous version of the trove, which will
+	# later be erased. it'll be a lot faster to reuse streams from that
+	# trove (as long as the file versions haven't changed) then create new
+	# ones. just move all of them to the new trove's instanceid and
+	# clean it up a later (existingFiles will tell us how)
 	existingFiles = {}
 	if oldVersion:
 	    cu = self.db.cursor()

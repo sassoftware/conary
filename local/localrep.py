@@ -16,6 +16,8 @@ from repository import repository
 
 class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
+    storeOnlyConfigFiles = True
+
     """
     Removals have to be batched (for now at least); if we do them too
     soon the code which merges into the filesystem won't be able to get
@@ -40,15 +42,18 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     def oldFileList(self):
 	return self.oldFiles
 
-    def addFile(self, cs, fileObj, newVer, path, fileContents, 
-		restoreContents):
-	repository.ChangeSetJob.addFile(self, cs, fileObj, newVer, path,
-			 fileContents, restoreContents,
-			 storeContents = fileObj.flags.isConfig())
+    def addFile(self, fileObj, newVer):
+	repository.ChangeSetJob.addFile(self, fileObj, newVer)
 
 	oldVersion = self.cs.getFileOldVersion(fileObj.id())
 	if oldVersion:
 	    self.removeFile(fileObj.id(), oldVersion)
+
+    def addFileContents(self, sha1, newVer, fileContents, restoreContents,
+			isConfig):
+	if isConfig:
+	    repository.ChangeSetJob.addFileContents(self, sha1, newVer, 
+			     fileContents, restoreContents, isConfig)
 
     # remove the specified file 
     def removeFile(self, fileId, version):
