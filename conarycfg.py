@@ -16,12 +16,15 @@ class _SrsConfiguration:
 	if os.path.exists(file):
 	    f = open(file, "r")
 	    for line in f.readlines():
-		(key, val) = string.split(line)
-		if not self.__dict__.has_key(key):
-		    raise KeyError, ("configuration value %s unknown" % key)
-
-		self.__dict__[key] = val
+		self.configLine(line)
 	    f.close()
+
+    def configLine(self, line):
+	(key, val) = string.split(line)
+	if not self.__dict__.has_key(key):
+	    raise KeyError, ("configuration value %s unknown" % key)
+
+	self.__dict__[key] = val
 
     def display(self):
 	keys = self.__dict__.keys()
