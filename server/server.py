@@ -178,6 +178,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 
 	return True
 
+    def checkVersion(self, clientVersion):
+        if clientVersion < 0:
+            raise RuntimeError, "client is too old"
+        return 0
+
 netRepos = NetworkRepositoryServer(sys.argv[2], "r")
 
 xmlServer = SRSServer(("localhost", 8000))
