@@ -45,7 +45,7 @@ sys.excepthook = util.excepthook
 
 try:
     cfg = conarycfg.ConaryConfiguration()
-except conarycfg.ParseError, e:
+except conarycfg.ConaryCfgError, e:
     log.error(str(e))
     sys.exit(1)
 

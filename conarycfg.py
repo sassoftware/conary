@@ -113,7 +113,7 @@ class ConfigFile:
 class ConaryConfiguration(ConfigFile):
 
     defaults = {
-	'buildLabel'	        : [ LABEL,	 None ],
+	'buildLabel'	        : [ LABEL, versions.BranchName('localhost@local:trunk') ],
 	'buildPath'		: '/usr/src/conary/builds',
 	'cookNewBranches'	: [ BOOL, False ], 
 	'contact'		: None,
@@ -140,6 +140,11 @@ class ConaryConfiguration(ConfigFile):
 	if os.environ.has_key("HOME"):
 	    self.read(os.environ["HOME"] + "/" + ".conaryrc")
 
+        if self.installLabel is None:
+            raise ConaryCfgError, "installLabel is not set"
+
+        if self.buildLabel is None:
+            self.buildLabel
 
 class ConaryCfgError(Exception):
 
