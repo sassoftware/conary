@@ -173,6 +173,10 @@ class ConfigFile:
 	    else:
 		self.types[key] = STRING
 		self.__dict__[key] = value
+            if isinstance(self.__dict__[key], (list, tuple)):
+                self.__dict__[key] = self.__dict__[key][:]
+            if isinstance(self.__dict__[key], dict):
+                self.__dict__[key] = self.__dict__[key].copy()
 
         self.lowerCaseMap = {}
         for (key, value) in self.__dict__.items():
