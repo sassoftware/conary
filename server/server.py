@@ -10,10 +10,10 @@ import posixpath
 import select
 import sys
 import tempfile
+import xmlrpclib
 import urllib
 from BaseHTTPServer import HTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
-from SimpleXMLRPCServer import SimpleXMLRPCServer
 
 if len(sys.argv) != 3:
     print "needs path to srs and to the repository"
@@ -24,11 +24,11 @@ sys.path.append(sys.argv[1])
 from netserver import NetworkRepositoryServer
 
 FILE_PATH="/tmp/conary-server"
-BASE_URL="http://%s:8001/" % os.uname()[1]
+BASE_URL="http://%s:8000/" % os.uname()[1]
 
-class SRSServer(SimpleXMLRPCServer):
+#class SRSServer(SimpleXMLRPCServer):
 
-    allow_reuse_address = 1
+    #allow_reuse_address = 1
 
 class HttpRequests(SimpleHTTPRequestHandler):
     
@@ -64,6 +64,26 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	if self.cleanup:
 	    os.unlink(self.cleanup)
 
+    def do_POST(self):
+	contentLength = int(self.headers['Content-Length'])
+	(params, method) = xmlrpclib.loads(self.rfile.read(contentLength))
+	
+	try:
+	    result = netRepos.__class__.__dict__[method](netRepos, *params)
+	except:
+	    self.send_response(500)
+	    return
+
+	resp = xmlrpclib.dumps((result,), methodresponse=1)
+
+	self.send_response(200)
+	self.send_header("Content-type", "text/xml")
+	self.send_header("Content-length", str(len(resp)))
+	self.end_headers()
+	self.wfile.write(resp)
+
+	return resp
+
     def do_PUT(self):
 	path = FILE_PATH + '/' + os.path.basename(self.path) + "-in"
 
@@ -84,14 +104,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
 if __name__ == '__main__':
     netRepos = NetworkRepositoryServer(sys.argv[2], FILE_PATH, BASE_URL)
-    xmlServer = SRSServer(("", 8000))
-    xmlServer.register_instance(netRepos)
-    xmlServer.register_introspection_functions()
 
-    httpServer = HTTPServer(("", 8001), HttpRequests)
+    httpServer = HTTPServer(("", 8000), HttpRequests)
 
     fds = {}
-    fds[xmlServer.fileno()] = xmlServer
     fds[httpServer.fileno()] = httpServer
 
     p = select.poll()
