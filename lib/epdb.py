@@ -89,6 +89,7 @@ class Epdb(pdb.Pdb):
                 lineno = self.lineno
             lineno += reldist - 5
             pdb.Pdb.do_list(self, str(lineno))
+            self.lastcmd = 'list ' + arg
         else:
             pdb.Pdb.do_list(self, arg)
 
