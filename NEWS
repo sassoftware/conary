@@ -1,4 +1,8 @@
 Changes in 0.14.11:
+  * Local systems store config files in sql tables now.  Use
+    /usr/share/conary/convertcontents to convert to the new data store.
+    Note that this means that any *config file* managed by conary can be
+    read through the main SQL database file in /var/lib/conarydb/conarydb.
   * Actually check build requirements before building, use --no-deps to 
     ignore the check.
   * make conary q and conary update convert all flavors to  strong flavors
@@ -17,8 +21,9 @@ Changes in 0.14.11:
   * TroveNotFound exceptions are handled gracefully in cvc.  'conary cook
     foo' will no longer traceback when foo:souce could not be found in
     the repository.
-  * Local systems store config files in sql tables now
   * Unsynchronized updates work for packages and groups
+  * The database is now opened with a 30 second timeout.  This should allow
+    better concurrency.
   * added --exclude-troves and excludeTroves conaryrc entry
   * repository .cnr file's commitAction configuration item now has a
     flavor provided to it as %(flavor)s and the default changemail
