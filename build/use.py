@@ -37,15 +37,6 @@ Provides the build configuration as special dictionaries that directly
 export their namespaces.
 """
 
-# document --no-clean
-# document --unknown-flags
-# document --use-flavor
-# XXX left to do:  tests for some new behavior, setArch, 
-# and setBuildFlagsFromFlavor, setStrictMode
-# XXX tests for flavorcfg class
-# adding options for allowing Use.nonExistant to return false but track,
-# check that behavior
-
 import itertools
 
 #conary
@@ -388,7 +379,7 @@ class ArchCollection(Collection):
             else:
                 self[key]._set(False)
 	if not found:
-	    raise RuntimeError, "No Such Arch %s" % majArch
+	    raise AttributeError, "No Such Arch %s" % majArch
 
     def _setArchProps(self, *archProps):
 	""" Sets the required arch properties.

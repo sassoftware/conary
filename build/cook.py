@@ -195,7 +195,17 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
             "Version string %s has illegal '-' character" %recipeClass.version)
 
     log.info("Building %s", recipeClass.name)
-    use.setBuildFlagsFromFlavor(recipeClass.name, cfg.buildFlavor)
+    if not use.Arch.keys():
+	log.error('No architectures have been defined in %s -- '
+		  'cooking is not possible' % cfg.archDir) 
+	sys.exit(1)
+    try:
+	use.setBuildFlagsFromFlavor(recipeClass.name, cfg.buildFlavor)
+    except AttributeError, msg:
+	log.error('Error setting build flags from flavor %s: %s' % (
+							    cfg.buildFlavor, 
+							    msg))
+	sys.exit(1)
     use.allowUnknownFlags(allowUnknownFlags)
     fullName = recipeClass.name
 
@@ -668,8 +678,11 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
         # XXX maybe we want to do this w/in RecipeLoader?  
         # but then we would be loading a slightly different LocalFlag 
         # set based on pkgname!
-        use.setBuildFlagsFromFlavor(pkgname, cfg.buildFlavor)
-
+	try:
+	    use.setBuildFlagsFromFlavor(pkgname, cfg.buildFlavor)
+	except AttributeError, msg:
+	    log.error('Error setting build flag values: %s' % msg)
+	    sys.exit(1)
 	try:
 	    loader = recipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
             version = None

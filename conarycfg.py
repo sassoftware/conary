@@ -22,7 +22,7 @@ import deps
 import deps.arch
 import deps.deps
 from build import use
-from lib import util
+from lib import log,util
 import versions
 
 
@@ -226,10 +226,8 @@ class ConfigFile:
         buildFlavor.union(self.buildFlavor, 
                           mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
         self.buildFlavor = buildFlavor
-        # create the build flags 
-        self.flavorConfig.populateBuildFlags()
-        # set their values
-        use.setBuildFlagsFromFlavor(None, self.buildFlavor, error=False)
+	self.flavorConfig.populateBuildFlags()
+
 
 class ConaryConfiguration(ConfigFile):
 

@@ -84,7 +84,15 @@ class ArchConfig(ConfigFile):
         for subArchName in self.sections:
             subArch = self.sections[subArchName]
             subArch.name = subArchName
-            subArch.subsumes = [x.strip() for x in subArch.subsumes.split(',')]
+            newSubsumes = []
+            for item in subArch.subsumes.split(','):
+                item = item.strip()
+                # skip past empty items, say because of a trailing comma
+                if not item:
+                    continue
+                newSubsumes.append(item)
+            subArch.subsumes = newSubsumes
+
             use.Arch[self.name]._addFlag(subArch.name,
                                          subsumes=subArch.subsumes)
             if subArch.buildName and subArch.buildName != subArch.name:
