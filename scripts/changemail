@@ -47,5 +47,5 @@ while [ $# -gt 0 ] ; do
     esac
 done
 
-srs src rdiff --config "repPath $repPath" $trove 1 $version | \
+srs src rdiff --config "repPath $repPath" $trove -1 $version | \
     mail -s "$trove $version" johnsonm@lambchop.rdu.specifixinc.com
