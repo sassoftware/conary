@@ -39,6 +39,7 @@ import trove
 import types
 import use
 import util
+import versions
 
 from fnmatch import fnmatchcase
 
@@ -212,7 +213,8 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     else:
 	if '@' not in label:
 	    # copy namespace and branchname
-	    label = '%s@%s' %(label, cfg.buildLabel.split('@')[1])
+	    l = cfg.buildLabel
+	    label = versions.BranchName('%s@%s:%s' %(label, l.getNamespace(), l.getBranchName()))
 
     try:
 	pkgs = repos.findTrove(label, component, None, versionStr)

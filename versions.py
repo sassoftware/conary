@@ -295,6 +295,9 @@ class BranchName(AbstractBranch):
     def getNamespace(self):
 	return self.namespace
 
+    def getBranchName(self):
+	return self.branch
+
     def __eq__(self, version):
 	if (isinstance(version, BranchName)
 	     and self.host == version.host
