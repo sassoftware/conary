@@ -14,15 +14,12 @@ _grpFormat  = "  %-37s %s"
 def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
     if pkg and pkg[0] != ":":
 	pkg = cfg.packagenamespace + ":" + pkg
-    elif not pkg:
-	pkg = cfg.packagenamespace
-    else:
-	pkg = pkg
 
-    list = repos.getPackageList(str(pkg))
-    if not list:
-	log.warning("object %s does not exist" % pkg)
-	return
+    if pkg:
+	list = [ pkg ]
+    else:
+	list = repos.getAllPackageNames()
+	list.sort()
 
     for pkgName in list:
 	if versionStr or ls:
