@@ -645,16 +645,16 @@ class ReadOnlyChangeSet(ChangeSet):
 	newFiles = []
 	newPackages = []
 
-	for troveCs in self.iterNewPackageList():
+	for (key, troveCs) in self.newPackages.items():
 	    troveName = troveCs.getName()
 	    newVersion = troveCs.getNewVersion()
 	    newFlavor = troveCs.getNewFlavor()
 	    assert(not troveCs.getOldVersion())
 
-	    key = (troveName, newVersion, newFlavor)
 	    if troveMap is not None and not troveMap.has_key(key):
 		log.warning("package %s %s is already installed -- skipping",
 			    troveName, newVersion.asString())
+                del self.newPackages[key]
 		continue
 
             if troveMap is None:
