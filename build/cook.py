@@ -11,6 +11,7 @@ import util
 
 def cook(cfg, srcdirs, recipeFile):
     classList = recipe.RecipeLoader(recipeFile)
+    built = []
 
     if recipeFile[0] != "/":
 	raise IOError, "recipe file names must be absolute paths"
@@ -36,6 +37,7 @@ def cook(cfg, srcdirs, recipeFile):
         pkgname = cfg.packagenamespace + "/" + recp.name
         
 	for (name, buildPkg) in pkgSet.packageSet():
+            built.append(pkgname + "/" + name)
 	    fileList = []
 
 	    for filePath in buildPkg.keys():
@@ -56,3 +58,4 @@ def cook(cfg, srcdirs, recipeFile):
                            "/", fileList)
 
 	recp.cleanup(ourBuildDir, rootDir)
+    return built
