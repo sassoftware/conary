@@ -45,7 +45,7 @@ class HttpHandler(HtmlEngine):
         self.htmlFooter()
 
     def metadataCmd(self, authToken, fields):
-        troveList = [x for x in self.repServer.repos.iterAllTroveNames() if ':' not in x]
+        troveList = [x for x in self.repServer.repos.iterAllTroveNames() if x.endswith(':source')]
 
         self.htmlPageTitle("Metadata")
         self.htmlPickTrove(troveList)
@@ -80,11 +80,11 @@ class HttpHandler(HtmlEngine):
 
         self._getMetadata(troveName, branch, source)
 
-    def _getMetadata(self, troveName, branch, source):
+    def _getMetadata(self, troveName, branch, source=None):
         branch = self.repServer.thawVersion(branch)
 
         if source == "freshmeat":
-            metadata = self.fetchFreshmeat(troveName)
+            metadata = self.fetchFreshmeat(troveName[:-7])
         else:
             metadata = self.troveStore.getMetadata(troveName, branch)
 

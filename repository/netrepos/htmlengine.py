@@ -133,7 +133,7 @@ Choose a branch: %s
 <tr><td>Short Description:</td><td><input style="width: 50%%;" type="text" name="shortDesc" value="%s" /></td></tr>
 <tr><td>Long Description:</td><td><textarea style="width: 50%%;" name="longDesc" rows="4" cols="60">%s</textarea></td></tr>
 <tr><td>URLs:</td><td>%s<br />%s</td></tr>
-<tr><td>Licenses:</td><td>%s<br /> %s</td></tr>
+<tr><td>Licenses:</td><td>%s<br />%s</td></tr>
 <tr><td>Categories:</td><td>%s<br />%s</td></tr>
 </table>
 <p><button id="submitButton" onClick="javascript:updateMetadata();">Save Changes</button></p>
