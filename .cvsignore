@@ -1,2 +1,7 @@
 *.pyc
 *.pyo
+deps.dot
+*.log
+*.tar.bz2
+conary-wrapper
+conary.recipe
