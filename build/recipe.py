@@ -223,7 +223,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
 	    inF = repos.getFileContents(sourceComponent.getName(),
 					sourceComponent.getVersion(),
 					sourceComponent.getFlavor(), filename,
-					fileVersion)
+					fileVersion).get()
 	    break
     
     if not inF:
