@@ -274,8 +274,6 @@ class ConaryClient:
                                 keepExisting = keepExisting)
 
     def eraseTrove(self, troveList, depCheck = True, tagScript = None):
-        list = []
-
 	cs = changeset.ChangeSet()
 
         for (troveName, versionStr) in troveList:
