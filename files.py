@@ -176,13 +176,13 @@ class SymbolicLink(File):
 	self.linkTarget(target)
 	File.applyChangeLine(self, line)
 
-    def __init__(self, fileId, info = None):
-	if (info):
+    def __init__(self, fileId, line = None):
+	if (line):
 	    self.applyChangeLine(line)
 	else:
 	    self.theLinkTarget = None
 
-	File.__init__(self, fileId, info, infoTag = "l")
+	File.__init__(self, fileId, line, infoTag = "l")
 
 class Socket(File):
 
