@@ -182,7 +182,7 @@ class InitScript(policy.Policy):
 	for package in packages.keys():
 	    if filename in packages[package]:
 		log.debug('initscript: %s', filename)
-		packages[package][filename].isInitScript(True)
+		packages[package][filename].flags.isInitScript(True)
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
@@ -206,7 +206,7 @@ class SharedLibrary(policy.Policy):
 	for package in packages.keys():
 	    if filename in packages[package]:
 		log.debug('shared library: %s', filename)
-		packages[package][filename].isShLib(True)
+		packages[package][filename].flags.isShLib(True)
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
