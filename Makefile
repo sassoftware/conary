@@ -17,6 +17,7 @@ python_files = __init__.py	\
 	commit.py		\
 	cook.py			\
 	datastore.py		\
+	destdirpolicy.py	\
 	display.py		\
 	filecontainer.py	\
 	files.py		\
