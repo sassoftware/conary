@@ -17,6 +17,7 @@ class SrsConfiguration:
     def __init__(self):
 	self.reppath = "/var/lib/srsrep"
 	self.root = "/"
+	self.sourcepath = "/usr/src/srs"
 
 	self.read(os.environ["HOME"] + "/" + ".srsrc")
 	self.read("/etc/srsrc")
