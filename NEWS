@@ -5,6 +5,7 @@ Changes in 0.10.10:
   * add a freshmeat project page URL to the metadata by default
   * add a "source" item to metadata
   * the server implementation of troveNames() was horrible
+  * enabled file dependencies
 
 Changes in 0.10.9:
   * fixed some authorization issues with the xml-rpc repository interface
