@@ -16,6 +16,7 @@ Provides the output for the "conary repquery" command
 """
 
 from repository import repository
+import display
 import files
 from lib import log
 import time
@@ -108,6 +109,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 
 	flavors = repos.getTroveVersionFlavors(versiondict)
 
+        displayc = display.DisplayCache()
 	for troveName, versionStr in troves:
             if not flavors[troveName]:
 		if all or leaves:
@@ -121,48 +123,19 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
                               troveName)
                 continue
 
-	    versionStrs = {}
-	    if not fullVersions:
-		# find the version strings to display for this trove; first
-		# choice is just the version/release pair, if there are
-		# conflicts try label/verrel, and if that doesn't work
-		# conflicts display everything
-		short = {}
-		for version in flavors[troveName]:
-		    v = version.trailingVersion().asString()
-		    versionStrs[version] = v
-		    if short.has_key(v):
-			versionStrs = {}
-			break
-		    short[v] = True
+            displayc.cache(troveName, flavors[troveName], fullVersions)
 
-		if not versionStrs:
-		    short = {}
-		    for version in flavors[troveName]:
-			if version.hasParent():
-			    v = version.branch().label().asString() + '/' + \
-				version.trailingVersion().asString()
-			else:
-			    v = version.asString()
-
-			versionStrs[version] = v
-			if short.has_key(v):
-			    versionStrs = {}
-			    break
-			short[v] = True
-
-	    if not versionStrs:
-		for version in flavors[troveName]:
-		    versionStrs[version] = version.asString()
-
-	    for version in flavors[troveName]:
+	    for version in flavors[troveName].keys():
 		for flavor in flavors[troveName][version]:
 		    if all:
 			print "%-30s %-15s %s" % (troveName, flavor,
-						  versionStrs[version])
+						  displayc[troveName, version])
 		    elif not all and (flavor is None or cfg.flavor.satisfies(flavor)):
 			print _troveFormat % (troveName, 
-					      versionStrs[version])
+					      displayc[troveName, version])
+            displayc.clearCache(troveName)
+
+                
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		      info, tags, deps, fullVersions):
@@ -185,15 +158,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 				trove.getVersion(), trove.getFlavor(), 
 				sortByPath = True, withFiles = True)
 		for (fileId, path, version, file) in iter:
-		    if isinstance(file, files.SymbolicLink):
-			name = "%s -> %s" %(path, file.target.value())
-		    else:
-			name = path
-
-		    print "%s    1 %-8s %-8s %s %s %s" % \
-			(file.modeString(), file.inode.owner(), 
-			 file.inode.group(), 
-			 file.sizeString(), file.timeString(), name)
+                    display.printFile(file, path)
 	elif ids:
 	    for (fileId, path, version) in trove.iterFileList():
 		print "%s %s" % (sha1ToString(fileId), path)

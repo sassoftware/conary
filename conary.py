@@ -41,6 +41,7 @@ import conarycfg
 import updatecmd
 from lib import util
 import versions
+import showchangeset
 import xmlrpclib
 from repository import netclient
 
@@ -86,6 +87,11 @@ def usage(rc = 1):
     print "                --leaves"
     print "                --ls"
     print "                --sha1s"
+    print "                --tags"
+    print "showcs flags:   --full-versions"
+    print "                --info"
+    print "                --ls"
+    print "                --show-changes"
     print "                --tags"
     print ""
     print "update flags: --keep-existing"
@@ -136,6 +142,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["profile"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
     argDef["sha1s"] = NO_PARAM
+    argDef["show-changes"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
     argDef["target-branch"] = ONE_PARAM
@@ -338,10 +345,25 @@ def realMain(cfg, argv=sys.argv):
 	args = [db, cfg] + otherArgs[2:]
 	rollbacks.apply(*args)
     elif (otherArgs[1] == "showcs" or otherArgs[1] == "scs"):
-	changesets = otherArgs[2:]
-	for changeset in changesets:
-	    cs = repository.changeset.ChangeSetFromFile(changeset)
-	    cs.formatToFile(cfg, sys.stdout)
+        ls = argSet.has_key('ls')
+	if ls: del argSet['ls']
+        tags = argSet.has_key('tags')
+	if tags: del argSet['tags']
+        info = argSet.has_key('info')
+	if info: del argSet['info']
+        showChanges = argSet.has_key('show-changes')
+	if showChanges: del argSet['show-changes']
+        fullVersions = argSet.has_key('full-versions')
+	if fullVersions: del argSet['full-versions']
+        changeset = otherArgs[2]
+        component = None
+        if len(otherArgs) > 3:
+            component = [otherArgs[3]]
+        cs = repository.changeset.ChangeSetFromFile(changeset)
+	db = database.Database(cfg.root, cfg.dbPath)
+	repos = openRepository(cfg.repositoryMap)
+        showchangeset.displayChangeSet(db, repos, cs, component, cfg, ls, 
+                                        tags, info, fullVersions, showChanges)
     elif (otherArgs[1] == "update"):
 	kwargs = {}
 
