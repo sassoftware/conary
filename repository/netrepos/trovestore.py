@@ -347,7 +347,7 @@ class TroveStore:
 					    troveItemId, troveVersion)
 	    newVersion = True
 
-	    if trove.getChangeLog():
+	    if trove.getChangeLog() and trove.getChangeLog().getName():
 		self.changeLogs.add(nodeId, trove.getChangeLog())
 
 	troveFlavor = trove.getFlavor()
