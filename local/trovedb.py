@@ -4,12 +4,15 @@
 #
 
 import dbhash
+import sqlite
 import log
 import os
 import package
 import struct
-import versioned
 import versions
+import sys
+
+from StringIO import StringIO
 
 class TroveDatabase:
 
@@ -18,31 +21,29 @@ class TroveDatabase:
     could be much more efficient; they instantiate a complete package object
     when quite often we just need the version or name.
     """
-
-    def _updateIndicies(self, trvId, trv, method):
-	method(self.nameIdx, trvId, trv.getName())
-
-	for (fileId, path, version) in trv.iterFileList():
-	    method(self.pathIdx, trvId, path)
-
-	done = {}
-	for (name, version) in trv.iterPackageList():
-	    if done.has_key(name): return
-	    done[name] = True
-	    method(self.partofIdx, trvId, name)
-
     def addTrove(self, trv):
 	"""
 	Add a trove to the database, along with the appropriate index
 	entries.
 	"""
-	trvId = self.trvs['COUNTER']
-	numericId = struct.unpack('!i', trvId)[0]
-	self.trvs['COUNTER'] = struct.pack('!i', numericId + 1)
+	trvKey = self.trvs['COUNTER']
+	trvId = struct.unpack('!i', trvKey)[0]
+	self.trvs['COUNTER'] = struct.pack('!i', trvId + 1)
 	str = "\0".join([trv.getName(), trv.getVersion().freeze(), 
 			 trv.freeze()])
-	self.trvs[trvId] = str
-	self._updateIndicies(trvId, trv, Index.addEntry)
+	self.trvs[trvKey] = str
+
+        # update the SQL indexes
+        cu = self.db.cursor()
+        cu.execute("INSERT INTO TroveNames(id, name) VALUES (%d, %s)",
+                   (trvId, trv.getName()))
+	for (fileId, path, version) in trv.iterFileList():
+            cu.execute("INSERT INTO TrovePaths(id, path) VALUES (%d, %s)",
+                       (trvId, path))
+	for (name, version) in trv.iterPackageList():
+            cu.execute("INSERT INTO TrovePartOf(id, name) VALUES (%d, %s)",
+                       (trvId, name))
+        self.db.commit()
 
     def updateTrove(self, trv):
 	"""
@@ -54,31 +55,46 @@ class TroveDatabase:
 	self.addTrove(trv)
 
     def delTrove(self, name, version, forUpdate = False):
-	for trvId in self.nameIdx.iterGetEntries(name):
+        cu = self.db.cursor()
+        cu.execute("SELECT id from TroveNames WHERE name=%s", (name,))
+        for row in cu:
+            trvId = row[0]
+            trvKey = struct.pack('!i', trvId)
 	    trv = self._getPackage(trvId)
 
 	    if not trv.getVersion() == version:
 		continue
 
-	    del self.trvs[trvId]
-	    self._updateIndicies(trvId, trv, Index.delEntry)
+	    del self.trvs[trvKey]
+            cu = self.db.cursor()
+            cu.execute("DELETE FROM TroveNames WHERE id=%d AND name=%s",
+                       (trvId, trv.getName()))
+            for (fileId, path, version) in trv.iterFileList():
+                cu.execute("DELETE FROM TrovePaths WHERE id=%d AND path=%s",
+                           (trvId, path))
+            for (name, version) in trv.iterPackageList():
+                cu.execute("DELETE FROM TrovePartOf WHERE id=%d AND name=%s",
+                           (trvId, name))
+            self.db.commit()
 
 	if forUpdate:
 	    return
 
-	for trvId in self.partofIdx.iterGetEntries(name):
-	    trv = self._getPackage(trvId)
+        cu.execute("SELECT id FROM TrovePartOf WHERE name=%s", (name,))
+        for row in cu:
+            trv = self._getPackage(row[0])
 	    updateTrove = False
 
 	    if trv.hasPackageVersion(name, version):
 		updateTrove = True
-		trv.delPackageVersion(name, version, 
-				      missingOkay = False)
+		trv.delPackageVersion(name, version, missingOkay = False)
 		self.updateTrove(trv)
 
     def iterAllTroveNames(self):
-	for name in self.nameIdx.keys():
-	    yield name
+        cu = self.db.cursor()
+        cu.execute("SELECT name FROM TroveNames")
+        for row in cu:
+            yield row[0]
 
     def iterFindByName(self, name):
 	"""
@@ -88,9 +104,10 @@ class TroveDatabase:
 	@type name: str
 	@rtype: list of package.Trove
 	"""
-	for trvId in self.nameIdx.iterGetEntries(name):
-	    trv = self._getPackage(trvId)
-	    yield trv
+        cu = self.db.cursor()
+        cu.execute("SELECT id FROM TroveNames WHERE name=%s", (name,))
+        for row in cu:
+	    yield self._getPackage(row[0])
 
     def iterFindByPath(self, path):
 	"""
@@ -100,20 +117,26 @@ class TroveDatabase:
 	@type path: str
 	@rtype: list of package.Trove
 	"""
-	for trvId in self.pathIdx.iterGetEntries(path):
-	    trv = self._getPackage(trvId)
-	    yield trv
+        cu = self.db.cursor()
+        cu.execute("SELECT id FROM TrovePaths WHERE path=%s", (path,))
+        for row in cu:
+	    yield self._getPackage(row[0])
 
     def pathIsOwned(self, path):
-	return self.pathIdx.has_key(path)
+        cu = self.db.cursor()
+        cu.execute("SELECT COUNT(*) FROM TrovePaths WHERE path=%s", (path,))
+        return cu.fetchone()[0] > 0
 
     def hasByName(self, name):
-	return self.nameIdx.has_key(name)
+        cu = self.db.cursor()
+        cu.execute("SELECT COUNT(*) FROM TroveNames WHERE name=%s", (name,))
+        return cu.fetchone()[0] > 0
 
     def _getPackage(self, trvId):
-	(name, version, str) = self.trvs[trvId].split("\0", 2)
+        trvKey = struct.pack('!i', trvId)
+	(name, version, str) = self.trvs[trvKey].split("\0", 2)
 	version = versions.ThawVersion(version)
-	return package.TroveFromFile(name, versioned.FalseFile(str), version)
+	return package.TroveFromFile(name, StringIO(str), version)
 
     def __init__(self, top, mode):
 	"""
@@ -132,65 +155,18 @@ class TroveDatabase:
 	else:
 	    self.trvs = dbhash.open(p, mode)
 
-	self.nameIdx = Index("name", top + "/name.idx", mode)
-	self.pathIdx = Index("path", top + "/path.idx", mode)
-	self.partofIdx = Index("partof", top + "/partof.idx", mode)
-
-class Index:
-
-    def iterGetEntries(self, item):
-	if not self.db.has_key(item):
-	    return
-
-	idList = self.db[item]
-	l = len(idList)
-	i = 0
-	while (i < len(idList)):
-	    yield idList[i:i+4]
-	    i += 4
-
-    def addEntry(self, trvId, item):
-	if self.db.has_key(item):
-	    self.db[item] = self.db[item] + trvId
-	else:
-	    self.db[item] = trvId
-
-    def delEntry(self, trvId, item):
-	if not self.db.has_key(item):
-	    log.warning("%s index missing entry for %s", self.name, item)
-	    return
-
-	idList = self.db[item]
-	next = idList.find(trvId)
-	last = -1
-	foundOne = False
-	while next != -1:
-	    if next % 4 == 0:
-		if foundOne:
-		    log.warning("%s index has duplicate entry for %s", 
-				self.name, item)
-		idList = idList[:next] + idList[next + 4:]
-		foundOne = True
-	    else:
-		last = next
-
-	    next = idList.find(trvId, last + 1)
-		
-	if not foundOne:
-	    log.warning("%s index missing entry for %s", self.name, item)
-
-	if (not idList):
-	    del self.db[item]
-	else:
-	    self.db[item] = idList
-
-    def keys(self):
-	return self.db.keys()
-
-    def has_key(self, name):
-	return self.db.has_key(name)
-
-    def __init__(self, name, path, mode):
-	self.name = name
-	self.db = dbhash.open(path, mode)
-	
+        p = top + "/troves.sql"
+        self.db = sqlite.connect(p)
+        cu = self.db.cursor()
+        cu.execute("SELECT tbl_name FROM sqlite_master "
+                   "WHERE type='table' ORDER BY tbl_name")
+        tables = [ x[0] for x in cu.fetchall() ]
+        if len(tables) == 0:
+            cu.execute("CREATE TABLE TroveNames(id int, name string)")
+            cu.execute("CREATE TABLE TrovePaths(id int, path string)")
+            cu.execute("CREATE TABLE TrovePartof(id int, name string)")
+	    cu.execute("CREATE INDEX TroveNamesIdx on TroveNames(name)")
+	    cu.execute("CREATE INDEX TrovePathsIdx on TrovePaths(path)")
+            self.db.commit()
+        elif tables != ['TroveNames', 'TrovePartof', 'TrovePaths']:
+            raise RuntimeError, 'database has unknown table layout'

@@ -17,77 +17,70 @@ import package
 import patch
 import repository
 import util
-import versioned
 import versions
 import bsddb
 
 from repository import AbstractRepository
-from versioned import VersionedFile
-from versioned import IndexedVersionedFile
+from localrep import trovestore
+
 class FilesystemRepository(AbstractRepository):
 
     createBranches = 1
 
-    def _getPackageSet(self, name):
-        try:
-            return _PackageSet(self.pkgDB, name)
-        except versioned.MissingFileError, e:
-            raise repository.PackageMissing(e.name)
-
-    def _getFileDB(self, fileId):
-	return _FileDB(self.fileDB, fileId)
-
     ### Package access functions
 
     def iterAllTroveNames(self):
-	return self.pkgDB.iterFileList()
+	return self.troveStore.iterTroveNames()
 
-    def hasPackage(self, pkg):
-	return self.pkgDB.hasFile(pkg)
+    def hasPackage(self, pkgName):
+	return self.troveStore.hasTrove(pkgName)
 
     def hasPackageVersion(self, pkgName, version):
-	return self._getPackageSet(pkgName).hasVersion(version)
+	return self.troveStore.hasTrove(pkgName, troveVersion = version)
 
     def pkgLatestVersion(self, pkgName, branch):
-	return self._getPackageSet(pkgName).findLatestVersion(branch)
+	return self.troveStore.troveLatestVersion(pkgName, branch)
 
     def getLatestPackage(self, pkgName, branch):
-	return self._getPackageSet(pkgName).getLatestPackage(branch)
+	return self.troveStore.getLatestTrove(pkgName, branch)
 
     def getPackageVersion(self, pkgName, version):
 	try:
-	    return self._getPackageSet(pkgName).getVersion(version)
+	    return self.troveStore.getTrove(pkgName, version)
 	except KeyError:
 	    raise repository.PackageMissing(pkgName, version)
 
     def erasePackageVersion(self, pkgName, version):
-	ps = self._getPackageSet(pkgName)
-	ps.eraseVersion(version)
+	self.troveStore.eraseTrove(pkgName, version)
 
     def addPackage(self, pkg):
-	ps = self._getPackageSet(pkg.getName())
-	ps.addVersion(pkg.getVersion(), pkg)
+	self.troveStore.addTrove(pkg)
 
-    def getPackageLabelBranches(self, pkgName, label):
-	return self._getPackageSet(pkgName).mapLabel(label)
+    def commit(self):
+	self.troveStore.commit()
 
-    def getPackageVersionList(self, pkgName):
-	return self._getPackageSet(pkgName).fullVersionList()
+    def branchesOfTroveLabel(self, troveName, label):
+	return self.troveStore.branchesOfTroveLabel(troveName, label)
+
+    def getPackageVersionList(self, troveName):
+	return self.troveStore.iterTroveVersions(troveName)
 
     def getPackageBranchList(self, pkgName):
-	return self._getPackageSet(pkgName).branchList()
+	return self.troveStore.iterTroveBranches(pkgName)
 
     def createTroveBranch(self, pkgName, branch):
 	log.debug("creating branch %s for %s", branch.asString(), pkgName)
 	if not self.hasPackage(pkgName):
 	    raise repository.PackageMissing, pkgName
-	return self._getPackageSet(pkgName).createBranch(branch)
+        return self.troveStore.createTroveBranch(pkgName, branch)
+
+    def iterFilesInTrove(self, trove, sortByPath = False, withFiles = False):
+	return self.troveStore.iterFilesInTrove(trove, sortByPath, withFiles)
 
     ### File functions
 
     def getFileVersion(self, fileId, version, path = None, withContents = 0):
-	fileDB = self._getFileDB(fileId)
-	file = fileDB.getVersion(version)
+	file = self.troveStore.getFile(fileId, version)
 	if withContents:
 	    if file.hasContents:
 		cont = filecontents.FromRepository(self, file.contents.sha1(), 
@@ -100,20 +93,13 @@ class FilesystemRepository(AbstractRepository):
 	return file
 
     def addFileVersion(self, fileId, version, file):
-	fileDB = self._getFileDB(fileId)
-	fileDB.addVersion(version, file)
+	self.troveStore.addFile(file, version)
 
     def hasFileVersion(self, fileId, version):
-	fileDB = self._getFileDB(fileId)
-	return fileDB.hasVersion(version)
+	self.troveStore.hasFile(fileId, version)
 
     def eraseFileVersion(self, fileId, version):
-	fileDB = self._getFileDB(fileId)
-	fileDB.eraseVersion(version)
-
-    def createFileBranch(self, fileId, branch):
-	log.debug("creating branch %s for %s" % (branch.asString(), fileId))
-	return self._getFileDB(fileId).createBranch(branch)
+	self.troveStore.eraseFile(fileId, version)
 
     ###
 
@@ -201,7 +187,7 @@ class FilesystemRepository(AbstractRepository):
 	    if isinstance(location, versions.Version):
 		list.append(location)
 	    else:
-		branchList = self.getPackageLabelBranches(troveName, location)
+		branchList = self.branchesOfTroveLabel(troveName, location)
 		if not branchList:
 		    log.error("%s does not have branch %s", troveName, location)
 		for branch in branchList:
@@ -213,18 +199,14 @@ class FilesystemRepository(AbstractRepository):
 		branchedVersion = version.fork(newBranch, sameVerRel = 0)
 		self.createTroveBranch(troveName, branchedVersion)
 
-		for (fileId, path, version) in pkg.iterFileList():
-		    if branchedFiles.has_key(fileId): continue
-		    branchedFiles[fileId] = 1
-
-		    branchedVersion = version.fork(newBranch, sameVerRel = 0)
-		    self.createFileBranch(fileId, branchedVersion)
-
 		for (name, version) in pkg.iterPackageList():
 		    troveList.append((name, version))
+
+        # commit branch to the repository
+        self.commit()
 		    
     def open(self, mode):
-	if self.pkgDB:
+	if self.troveStore is not None:
 	    self.close()
 
         flags = os.O_RDONLY
@@ -247,20 +229,9 @@ class FilesystemRepository(AbstractRepository):
             raise repository.OpenError('Unable to obtain %s lock: %s' % (
                 mode == 'r' and 'shared' or 'exclusive', e.strerror))
 
-	self.pkgDB = None
-
         try:
-            self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", 
-						   self.createBranches, mode)
-            self.fileDB = versioned.Database(self.top + "/files.db", 
-					     self.createBranches, mode)
-        # XXX this should be translated into a generic versioned.DatabaseError
+	    self.troveStore = trovestore.TroveStore(self.sqlDB)
         except Exception, e:
-            # an error occured, close our databases and relinquish the lock
-            if self.pkgDB is not None:
-                self.pkgDB.close()
-                self.pkgDB = None
-
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_UN)
             os.close(self.lockfd)
             self.lockfd = -1
@@ -346,7 +317,6 @@ class FilesystemRepository(AbstractRepository):
 
 	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
 		if oldVersion:
-		    oldFile = self.getFileVersion(fileId, oldVersion)
 		    (oldFile, oldCont) = self.getFileVersion(fileId, 
 				oldVersion, path = newPath, withContents = 1)
 		else:
@@ -378,6 +348,9 @@ class FilesystemRepository(AbstractRepository):
 
     def commitChangeSet(self, cs):
 	job = self.buildJob(cs)
+	job.commit()
+	self.commit()
+	return
 
 	try:
 	    job.commit()
@@ -385,21 +358,22 @@ class FilesystemRepository(AbstractRepository):
 	    job.undo()
 	    raise
 
+	self.commit()
+
     def close(self):
-	if self.pkgDB is not None:
-            self.pkgDB.close()
-            self.fileDB.close()
-	    self.pkgDB = None
-	    self.fileDB = None
+	if self.troveStore is not None:
+	    self.troveStore.db.close()
+	    self.troveStore = None
 	    os.close(self.lockfd)
             self.lockfd = -1
 
     def __init__(self, path, mode = "r"):
         self.lockfd = -1
 	self.top = path
-	self.pkgDB = None
+	self.troveStore = None
 	
 	self.contentsDB = self.top + "/contents"
+	self.sqlDB = self.top + "/sqldb"
 
 	try:
 	    util.mkdirChain(self.contentsDB)
@@ -411,63 +385,6 @@ class FilesystemRepository(AbstractRepository):
         self.open(mode)
 
 	AbstractRepository.__init__(self)
-
-# this is a set of all of the versions of a single packages 
-class _PackageSetClass(IndexedVersionedFile):
-    def getVersion(self, version):
-	f1 = IndexedVersionedFile.getVersion(self, version)
-	p = package.PackageFromFile(self.name, f1, version)
-	f1.close()
-	return p
-
-    def addVersion(self, version, package):
-	IndexedVersionedFile.addVersion(self, version, package.freeze())
-
-    def fullVersionList(self):
-	branches = self.branchList()
-	rc = []
-	for branch in branches:
-	    rc += self.versionList(branch)
-
-	return rc
-
-    def getLatestPackage(self, branch):
-	ver = self.findLatestVersion(branch)
-	if not ver:
-	    raise repository.PackageMissing(self.name, branch)
-
-	return self.getVersion(ver)
-
-    def __init__(self, db, name, createBranches, dbFile):
-	IndexedVersionedFile.__init__(self, db, name, createBranches, dbFile)
-	self.name = name
-
-def _PackageSet(db, name):
-    return db.openFile(name, fileClass = _PackageSetClass)
-
-class _FileDBClass(VersionedFile):
-
-    def addVersion(self, version, file):
-	if self.hasVersion(version):
-	    raise KeyError, "duplicate version for database"
-	else:
-	    if file.id() != self.fileId:
-		raise KeyError, "file id mismatch for file database"
-	
-	VersionedFile.addVersion(self, version, "%s\n" % file.freeze())
-
-    def getVersion(self, version):
-	f1 = VersionedFile.getVersion(self, version)
-	file = files.ThawFile(f1.read(), self.fileId)
-	f1.close()
-	return file
-
-    def __init__(self, db, fileId, createBranches):
-	VersionedFile.__init__(self, db, fileId, createBranches)
-	self.fileId = fileId
-
-def _FileDB(db, fileId):
-    return db.openFile(fileId, fileClass = _FileDBClass)
 
 class ChangeSetJobFile(object):
 
@@ -569,15 +486,15 @@ class ChangeSetJob:
 	# commit changes
 	filesToArchive = []
 
-	for newPkg in self.newPackageList():
-	    self.repos.addPackage(newPkg)
-	    self.undoObj.addedPackage(newPkg)
-
 	# we need to do this in order of fileids to make sure we walk
 	# through change set streams in the right order
 	fileIds = self.files.keys()
 	fileIds.sort()
+	i = 0
 	for fileId in fileIds:
+	    i += 1
+	    if i % 500 == 0:
+		print i
 	    newFile = self.files[fileId]
 	    file = newFile.file()
 
@@ -594,6 +511,10 @@ class ChangeSetJob:
 	    if self.repos.storeFileFromContents(newFile.getContents(), file, 
 						 newFile.restoreContents()):
 		self.undoObj.addedFileContents(file.contents.sha1())
+
+	for newPkg in self.newPackageList():
+	    self.repos.addPackage(newPkg)
+	    self.undoObj.addedPackage(newPkg)
 
 	# This doesn't actually remove anything! we never allow bits
 	# to get erased from repositories. The database, which is a child

@@ -46,7 +46,7 @@ class AbstractDatabase(repository.AbstractRepository):
     def hasPackage(self, name):
 	return self.troveDb.hasByName(name)
 
-    def getPackageLabelBranches(self, name, label):
+    def branchesOfTroveLabel(self, name, label):
 	rc = []
 	for x in self.troveDb.iterFindByName(name):
 	    b = x.getVersion().branch()
@@ -267,6 +267,8 @@ class AbstractDatabase(repository.AbstractRepository):
 	    self.addRollback(inverse, localChanges)
 
 	fsJob.apply()
+
+	self.stash.commit()
 
 	# it would be nice if this could be undone on failure
 	for pkg in fsJob.iterNewPackageList():

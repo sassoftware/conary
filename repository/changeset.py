@@ -13,8 +13,9 @@ import package
 import patch
 import repository
 import struct
-import versioned
 import versions
+
+from StringIO import StringIO
 
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff")
 
@@ -233,7 +234,7 @@ class ChangeSet:
 
 	    str = self.headerAsString()
 	    csf.addFile("SRSCHANGESET", 
-			versioned.FalseFile(str), "", len(str))
+			StringIO(str), "", len(str))
 
 	    self.writeContents(csf, self.earlyFileContents, True)
 	    self.writeContents(csf, self.lateFileContents, False)

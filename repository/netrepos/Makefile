@@ -3,16 +3,13 @@
 # All rights reserved
 #
 
-SUBDIRS=localrep
-
-python_files = __init__.py	\
+python_files =  __init__.py	\
 		filecontents.py	\
 		fsrepos.py	\
 		changeset.py	\
 		repository.py	\
 
 extra_dist = Makefile
-
 dist_files = $(python_files) $(extra_dist)
 
 all: default-all
@@ -23,5 +20,5 @@ dist: default-dist
 
 clean: default-clean
 
-include ../Make.rules
+include ../../Make.rules
 

@@ -52,11 +52,10 @@ def _versionList(repos, pkgName):
     branches = repos.getPackageBranchList(pkgName)
     l = []
     for branch in branches:
-	if not branch.isLocal():
-	    version = repos.pkgLatestVersion(pkgName, branch)
-	    # filter out empty branches 
-	    if version and version.onBranch(branch):
-		l.append(version)
+	version = repos.pkgLatestVersion(pkgName, branch)
+	# filter out empty branches 
+	if version and version.onBranch(branch):
+	    l.append(version)
 
     return l
 
@@ -74,9 +73,9 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids, sha1s):
 	if ls:
 	    fileL = [ (x[1], x[0], x[2]) for x in pkg.iterFileList() ]
 	    fileL.sort()
-	    for (path, fileId, version) in fileL:
-		file = repos.getFileVersion(fileId, version, path = path)
-
+	    iter = repos.iterFilesInTrove(pkg, sortByPath = True, 
+					  withFiles = True)
+	    for (fileId, path, version, file) in iter:
 		if isinstance(file, files.SymbolicLink):
 		    name = "%s -> %s" %(path, file.target.value())
 		else:

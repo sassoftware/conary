@@ -77,7 +77,7 @@ class AbstractRepository:
 	"""
 	raise NotImplementedError
 
-    def getPackageLabelBranches(self, troveName, label):
+    def branchesOfTroveLabel(self, troveName, label):
 	"""
 	Returns the full branch names which matcha  given label name
 	for a trove.

@@ -4,9 +4,9 @@
 #
 
 import os
-import versioned
+from StringIO import StringIO
 
-SEEK_SET=0
+SEEK_SET=-1
 SEEK_CUR=1
 SEEK_END=2
 
@@ -65,7 +65,7 @@ class FromString(FileContents):
     __slots__ = "str"
 
     def get(self):
-	return versioned.FalseFile(self.str)
+	return StringIO(self.str)
 
     def size(self):
 	return len(self.str)

@@ -1,1 +1,3 @@
 include port/strsep.h
+include test/*py
+include examples/*py

@@ -12,7 +12,7 @@ export prefix = /usr
 export srsdir = $(prefix)/share/srs
 export bindir = $(prefix)/bin
 
-SUBDIRS=build local repository test lib pysqlite
+SUBDIRS=build local repository test lib pysqlite deps
 
 subdirs_rule=
 
@@ -67,9 +67,6 @@ srs.recipe: srs.recipe.in
 install-mkdirs:
 	mkdir -p $(DESTDIR)$(bindir)
 
-install-subdirs:
-	for d in $(SUBDIRS); do make -C $$d DIR=$$d install || exit 1; done
-
 install: all install-mkdirs install-subdirs pyfiles-install
 	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(srsdir)', ddir='$(srsdir)', quiet=1)"
 	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(srsdir)', ddir='$(srsdir)', quiet=1)"
@@ -93,9 +90,7 @@ distcheck:
 	@echo Possible missing files:
 	@(ls *py; for f in $(python_files); do echo $$f; done) | sort | uniq -u
 
-clean:
-	for d in $(SUBDIRS); do make -C $$d DIR=$$d clean || exit 1; done
-	rm -f *~ .#* $(generated_files)
+clean: clean-subdirs default-clean
 
 bootstrap:
 	@if ! [ -d /opt/ -a -w /opt/ ]; then \

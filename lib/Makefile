@@ -9,6 +9,7 @@ python_files=__init__.py
 python_modules=elfmodule.so
 elfmodule_objs=elf.o
 generated_files=$(elfmodule_objs) $(python_modules)
+dist_files = $(python_files) elf.c Makefile
 
 all: $(python_modules)
 
@@ -20,5 +21,7 @@ install: pyfiles-install
 	install -m 755 $(python_modules) $(DESTDIR)$(srsdir)/$(DIR)
 
 clean: default-clean
+
+dist: default-dist
 
 include ../Make.rules

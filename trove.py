@@ -211,6 +211,20 @@ class Package:
 		elif oper == "-":
 		    self.delPackageVersion(name, version, 
 					   missingOkay = redundantOkay)
+    
+    def __eq__(self, them):
+	"""
+	Compare two troves for equality. This is an expensive operation,
+	and shouldn't really be done. It's handy for testing the database
+	though.
+	"""
+	if self.getName() != them.getName():
+	    return False
+	if self.getVersion() != them.getVersion():
+	    return False
+
+	(csg, pcl, fcl) = self.diff(them)
+	return (not pcl) and (not fcl)
 
     def diff(self, them, absolute = 0):
 	"""

@@ -161,7 +161,7 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     if changeSetFile:
 	cs.writeToFile(changeSetFile)
     else:
-	repos.open("w")
+	repos.open("c")
 	repos.commitChangeSet(cs)
 	repos.open("r")
 
@@ -335,7 +335,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     log.info('Processing %s', recipeClass.name)
     recipeObj.doDestdirProcess() # includes policy
 
-    repos.open("w")
+    repos.open("c")
 
     os.chdir(cwd)
     

@@ -71,7 +71,7 @@ def findPackage(repos, defaultLabel, name, versionStr = None, forceGroup = 0):
 	else:
 	    label = defaultLabel
 
-	branchList = repos.getPackageLabelBranches(name, label)
+	branchList = repos.branchesOfTroveLabel(name, label)
 	if not branchList:
 	    raise PackageNotFound, "branch %s does not exist for package %s" \
 			% (str(label), name)
@@ -81,7 +81,7 @@ def findPackage(repos, defaultLabel, name, versionStr = None, forceGroup = 0):
 	    pkgList.append(repos.getLatestPackage(name, branch))
     elif versionStr[0] != "/" and versionStr.find("/") == -1:
 	# version/release was given
-	branchList = repos.getPackageLabelBranches(name, defaultLabel)
+	branchList = repos.branchesOfTroveLabel(name, defaultLabel)
 	if not branchList:
 	    raise PackageNotFound, \
 			"branch %s does not exist for package %s" \
