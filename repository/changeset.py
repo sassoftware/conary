@@ -378,14 +378,16 @@ class ChangeSet:
 
 	    # files on the local branch get remapped; others don't
 	    if self.isLocal(): 
-		for (fileId, path, fileVersion) in \
-			    pkgCs.getChangedFileList():
-		    if fileVersion != "-" and fileVersion.isLocal():
-			pkgCs.newFile(fileId, path, newVer)
-			oldVer = self.getFileOldVersion(fileId)
-			csInfo = self.getFileChange(fileId)
-			# this replaces the existing file 
-			self.addFile(fileId, oldVersion, newVer, csInfo)
+		for (listMethod, addMethod) in [
+			(pkgCs.getChangedFileList, pkgCs.changedFile),
+			(pkgCs.getNewFileList, pkgCs.newFile) ]:
+		    for (fileId, path, fileVersion) in listMethod():
+			if fileVersion != "-" and fileVersion.isLocal():
+			    addMethod(fileId, path, newVer)
+			    oldVer = self.getFileOldVersion(fileId)
+			    csInfo = self.getFileChange(fileId)
+			    # this replaces the existing file 
+			    self.addFile(fileId, oldVer, newVer, csInfo)
 
 	for pkgCs in self.getNewPackageList():
 	    # the implemented of updateChangedPackage makes this whole thing
