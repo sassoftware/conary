@@ -16,6 +16,8 @@
 
 import gzip
 import os
+import re
+import stat
 import sys
 import tempfile
 
@@ -34,50 +36,67 @@ from build import cook
 from lib import util
 from repository.netclient import NetworkRepositoryClient
 
-class recipeBuilder:
-    def __init__(self, packagename, rpmfile, rpmname):
-        self.recipename = packagename + '.recipe'
-        # get information from RPM
-        self.rpmdata = {}
-        self.rpmdata['packagename'] = packagename
-        self.rpmdata['version'] = '1.2.3_1' # XXX we will want to include RPM revision info
-        self.rpmdata['rpmname'] = os.path.basename(rpmname)
 
-        # XXX write recipe, any needed taghandlers
-        self.recipe = '''
-class %(packagename)s(PackageRecipe):
-    name = '%(packagename)s'
-    version = '%(version)s'
-    def setup(r):
-        r.addArchive('%(rpmname)s', dir='/')
-        r.ComponentSpec('runtime', '.*')
-''' % self.rpmdata
+chkconfigRe = re.compile(r'([ \t]*)(/sbin/)?chkconfig.*')
+serviceRe = re.compile(r'([ \t]*)(/sbin/)?service.*')
+ldconfigRe = re.compile(r'([ \t]*)(/sbin/)?ldconfig.*')
+userRe = re.compile(r'([ \t]*)(/usr/sbin/)?user(add|del).*')
+groupRe = re.compile(r'([ \t]*)(/usr/sbin/)?group(add|del).*')
+# a few duplicate install-info invocations shouldn't hurt anything
+#installinfoRe = re.compile(r'([ \t]*)(/sbin/)?install-info.*')
 
-        # XXX add any User/Group bits needed for this recipe -- guess from
-        # current system first, then by trying to parse any adduser/group
-        # lines
-
-    def name(self):
-        return self.recipename
-
-    def append(self, data):
-        self.recipe += data
-    
-    def write(self):
-        f = open(self.recipename, 'w')
-        f.write(self.recipe)
-        f.close()
+# remove surrounding whitespace and quotes from a string
+quotesRe = re.compile(r'[ \t]*"?(.*)"?[ \t]*')
+# remove redirection
+redirectionRe = re.compile(r'2?>.*')
 
 class taghandlerBuilder:
-    def __init__(self, packagename, recipe):
-        self.packagename = packagename
+    def __init__(self, recipe):
+        self.packagename = recipe.packagename
         self.recipe = recipe
-        # XXX these should come from recipe info
+        self.userinfo = {}
+        self.groupinfo = {}
+
         preScript = None
+        if rpmhelper.PREIN in recipe.rpmHeader:
+            # we will ignore the contents of preScript, except to try to
+            # fetch user/group information from it
+            preScript = self.removeUnConary(recipe.rpmHeader[rpmhelper.PREIN])
+
         triggers = None
+        if rpmhelper.TRIGGERSCRIPTS in recipe.rpmHeader:
+            triggers = True
+
         postScript = None
+        if rpmhelper.POSTIN in recipe.rpmHeader:
+            if rpmhelper.POSTINPROG in recipe.rpmHeader:
+                if 'ldconfig' in recipe.rpmHeader[rpmhelper.POSTINPROG]:
+                    # ldconfig happens automatically
+                    pass
+                else:
+                    print 'unhandled POSTIN interpreter %s' % recipe.rpmHeader[rpmhelper.POSTINPROG]
+            else:
+                postScript = self.removeUnConary(
+                    recipe.rpmHeader[rpmhelper.POSTIN])
+                if 'RPM_INSTALL_PREFIX' in postScript:
+                    self.warnRelocation('post')
+                    postScript = None
+
         preUn = None
+        if rpmhelper.PREUN in recipe.rpmHeader:
+            preUn = self.removeUnConary(recipe.rpmHeader[rpmhelper.PREUN])
+            if 'RPM_INSTALL_PREFIX' in preUn:
+                self.warnRelocation('preun')
+                preUn = None
+                        
+
         postUn = None
+        if rpmhelper.POSTUN in recipe.rpmHeader:
+            postUn = self.removeUnConary(recipe.rpmHeader[rpmhelper.POSTUN])
+            if 'RPM_INSTALL_PREFIX' in postUn:
+                self.warnRelocation('postun')
+                postUn = None
+
 
         if preScript:
             print 'Conary does not implement pre scripts.'
@@ -88,14 +107,135 @@ class taghandlerBuilder:
         if triggers:
             print 'Conary does not implement triggers at all.'
             print 'Most triggers are workarounds for old bugs.'
+            print 'The conary taghandler facility provides all the necessary'
+            print 'semantics, but we cannot adapt them automatically.'
             print 'You will have to look at the triggers and implement the'
-            print 'necessary semantics differently for Conary.'
+            print 'necessary semantics differently for Conary, using'
+            print 'the --recipe option and manual modification using'
+            print 'taghandlers.'
         if postScript:
             self.postscript(postScript)
         if preUn:
             self.preun(preUn)
         if postUn:
             self.postun(postUn)
+
+    def removeUnConary(self, script):
+        # make parsing easier by removing \ line continuation
+        script = ''.join(script.split('\\\n'))
+        # conary will deal with chkconfig automatically,
+        # and we do not want to run it twice
+        # adding users and groups should be done through Conary
+        # removing users and groups should not be done, ever; it
+        # is a security risk
+        if 'chkconfig' in script or \
+           'service' in script or \
+           'ldconfig' in script or \
+           'useradd' in script or \
+           'userdel' in script or \
+           'groupadd' in script or \
+           'groupdel' in script:
+            scriptLines = script.split('\n')
+            lines = []
+            for line in scriptLines:
+                if 'chkconfig' in line:
+                    print 'removing chkconfig from "%s"' %line
+                    line = chkconfigRe.sub(r'\1:', line)
+                if 'service' in line:
+                    print 'removing service from "%s"' %line
+                    line = serviceRe.sub(r'\1:', line)
+                if 'lconfig' in line:
+                    print 'removing lconfig from "%s"' %line
+                    line = ldconfigRe.sub(r'\1:', line)
+                if 'useradd' in line:
+                    print 'removing useradd from "%s"' %line
+                    self.recorduser(line)
+                    line = userRe.sub(r'\1:', line)
+                if 'groupadd' in line:
+                    print 'removing groupadd from "%s"' %line
+                    self.recordgroup(line)
+                    line = userRe.sub(r'\1:', line)
+                if 'userdel' in line:
+                    print 'removing userdel from "%s"' %line
+                    line = userRe.sub(r'\1:', line)
+                if 'groupdel' in line:
+                    print 'removing groupdel from "%s"' %line
+                    line = userRe.sub(r'\1:', line)
+                lines.append(line)
+            script = '\n'.join(lines)
+        return script
+
+    def warnRelocation(self, name):
+        print '%%%s requires relocation.' %name
+        print 'Conary does not implement relocatable packages.'
+        print '%%%s will not be run' %name
+
+    def recorduser(self, line):
+        line = redirectionRe.sub('', line)
+        user = line.split(" ")[-1]
+        self.userinfo[user] = {}
+        rest = " ".join(line.split(" ")[:-1])
+        # we hope that there are no comments or homedirs with an embedded
+        # "-" character.  If there are, maybe the default case saves us.
+        # This is all heuristics anyway...
+        args = rest.split("-")
+        try:
+            for index in range(0,len(args)):
+                if 'useradd' in args[index]:
+                    # skip program name, hope no one puts user name there
+                    pass
+                elif args[index][0] == in 'refmMknop':
+                    # we ignore these options
+                    pass
+                elif args[index][0] == 'c':
+                    self.userinfo[user]['comment'] = self.getarg(args[index])            
+                elif args[index][0] == 'd':
+                    self.userinfo[user]['homedir'] = self.getarg(args[index])
+                elif args[index][0] == 'u':
+                    self.userinfo[user]['preferred_uid'] = self.getarg(args[index])
+                elif args[index][0] == 's':
+                    self.userinfo[user]['shell'] = self.getarg(args[index])
+                elif args[index][0] == 'g':
+                    self.userinfo[user]['group'] = self.getarg(args[index])
+                    # XXX if this is a number, we'll have to later fill group
+                    # name in from groupinfo, thanks to lots of broken RPM specs
+                else:
+                    # unknown option
+                    print 'error parsing "%s"' %line
+                    del self.userinfo[user]
+            print 'storing user information: %s' %str(self.userinfo[user])
+        except:
+            print 'error parsing "%s"' %line
+            del self.userinfo[user]
+                
+    def recordgroup(self, line):
+        line = redirectionRe.sub('', line)
+        group = line.split(" ")[-1]
+        self.groupinfo[group] = {}
+        rest = " ".join(line.split(" ")[:-1])
+        args = rest.split("-")
+        try:
+            for index in range(0,len(args)):
+                if 'groupadd' in args[index]:
+                    # skip program name, hope no one puts group name there
+                    pass
+                elif args[index][0] == in 'rof':
+                    # we ignore these options
+                    pass
+                elif args[index][0] == 'g':
+                    group = self.getarg(args[index])
+                    self.groupinfo[group]['gid'] = self.getarg(args[index])
+                else:
+                    # unknown option
+                    print 'error parsing "%s"' %line
+                    del self.userinfo[user]
+            print 'storing group information: %s' %str(self.groupinfo[group])
+        except:
+            del self.userinfo[user]
+            print 'error parsing "%s"' %line
+
+    def getarg(self, data):
+        return commentRe.sub(r'\1', data)
 
     def postscript(self, postScript):
         pass
@@ -105,6 +245,8 @@ class taghandlerBuilder:
         pass
     def exists(self):
         pass
+    def file(self, tagfile):
+        self.tagfile = tagfile
     def writefiles(self):
         # XXX write taghandler and tagdescription
         self.taghandlername = self.packagename+'.taghandler'
@@ -113,11 +255,141 @@ class taghandlerBuilder:
         return self.taghandlername
     def tagdescription(self):
         return self.tagdescriptionname
+
     def recipelines(self):
-        return """
-        r.addSource('"""+self.taghandlername+"""', dir='%(taghandlerdir)s', dest='%(name)s')
-        r.addSource('"""+self.tagdescriptionname+"""', dir='%(tagdescriptiondir)s', dest='%(name)s')
-"""
+        return [
+            "        r.addSource('"+self.taghandlername+"', dir='%(taghandlerdir)s', dest='%(name)s')",
+            "        r.addSource('"+self.tagdescriptionname+"', dir='%(tagdescriptiondir)s', dest='%(name)s')",
+            "        r.TagSpec('+self.packagename+', '+self.tagfile+')"
+        ]
+
+
+class recipeBuilder:
+    def __init__(self, rpmfile, rpmname, packageScripts):
+        self.rpmHeader = rpmhelper.readHeader(rpmfile)
+        self.packagebasename = self.rpmHeader[rpmhelper.NAME]
+        self.packagename = 'rpm_'+self.packagebasename
+        self.recipename = self.packagename + '.recipe'
+        # get information from RPM
+        self.rpmdata = {}
+        self.rpmdata['packagename'] = self.packagename
+        self.rpmdata['version'] = '_'.join((
+            self.rpmHeader(rpmhelper.VERSION),
+            self.rpmHeader(rpmhelper.RELEASE)))
+        self.rpmdata['rpmname'] = os.path.basename(rpmname)
+
+        self.recipe = [
+            "class %(packagename)s(PackageRecipe):",
+            "    name = '%(packagename)s'",
+            "    version = '%(version)s'",
+            "    def setup(r):",
+            "        r.addArchive('%(rpmname)s', dir='/')",
+            "        # by default, we do not split RPMs up into components",
+            "        r.ComponentSpec('runtime', '.*')",
+            "        # RPMs may not follow conary rules for config files for",
+            "        # each file in /etc, so we'll stick to only files marked",
+            "        # as config files in the RPM proper",
+            "        r.EtcConfig(exceptions='.*'",
+        ]
+
+        users = {}
+        groups = {}
+        directories = []
+        filled_directories = []
+        included_directories = []
+        info_directories = {}
+        tagfile = None
+        for path, mode, rdev, flags, username, groupname in zip(
+            self.rpmHeader.paths(),
+            self.rpmHeader[rpmhelper.FILEMODES],
+            self.rpmHeader[rpmhelper.FILERDEVS],
+            self.rpmHeader[rpmhelper.FILEFLAGS],
+            self.rpmHeader[rpmhelper.FILEUSERNAME],
+            self.rpmHeader[rpmhelper.FILEGROUPNAME]):
+            escaped_path = util.literalRegex(path)
+            if username != 'root' or groupname != 'root':
+                self.recipe.append(
+                    "        r.Ownership('%s', '%s', '%s')"
+                    %(username, groupname, escaped_path))
+                if username != 'root':
+                    if username not in users:
+                        users[username] = True
+                if groupname != 'root':
+                    if groupname not in groups:
+                        groups[groupname] = True
+
+            if stat.S_ISDIR(mode):
+                directories.append(path)
+                if mode & 7777 != 0755 or username != 'root' \
+                   or groupname != 'root':
+                    info_directories[path] = (mode, username, groupname)
+                    self.recipe.append(
+                        "        r.ExcludeDirectories(exceptions='%s')"
+                        %escaped_path)
+                    included_directories.append(path)
+                    continue
+            elif os.path.dirname(path) not in filled_directories:
+                filled_directories.append(os.path.dirname(path))
+
+            if not tagfile:
+                tagfile = path
+
+            if stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
+                if stat.S_ISCHR(mode):
+                    type='c'
+                else
+                    type='b'
+                # this is correct for 32-bit device number
+                # RPM does not provide 64-bit device number
+                minor = rdev & 0xff | (rdev >> 12) & 0xffffff00
+                major = (rdev >> 8) & 0xfff
+                self.recipe.append(
+                    "        r.MakeDevices('%s', '%s', '%d', '%d', '%s', '%s', '0%o')"%
+                    (escaped_path, type, major, minor, username, groupname,
+                     mode&0777))
+                continue
+            
+            if mode & 7000:
+                self.recipe.append(
+                    "        r.SetModes('%s', 0%o)"%(escaped_path, mode))
+
+            if flags & 1:
+                # config file
+                self.recipe.append(
+                    "        r.Config('%s')" %escaped_path)
+
+
+        for dir in directories:
+            if dir not in filled_directories and \
+               dir not in included_directories:
+                self.recipe.append(
+                    "        r.ExcludeDirectories(exceptions='%s')"
+                    % util.literalRegex(dir))
+
+        
+        # XXX add any User/Group bits needed for this recipe -- guess from
+        # current system first, then by trying to parse any adduser/group
+        # lines (or maybe the other way around?)
+
+        self.tag = None
+        if packageScripts:
+            self.tag = taghandlerBuilder(self)
+
+    def name(self):
+        return self.recipename
+
+    def write(self):
+        if self.tag and self.tag.exists():
+            self.tag.file(tagfile)
+            self.tag.writefiles()
+            checkin.addFiles((self.tag.taghandler(),
+                              self.tag.tagdescription()), ignoreExisting=True)
+            self.recipe.extend(self.tag.recipelines())
+
+        f = open(self.recipename, 'w')
+        f.write('\n'.join(self.recipe) % self.rpmdata)
+        f.close()
+
 
 
 def usage():
@@ -173,40 +445,29 @@ def main(argv):
 
     sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
 
-    # XXX get packagename from RPM
-    packagebasename = 'moin'
-    packagename = 'rpm_'+packagebasename
+    recipe = recipeBuilder(rpmfile, rpmname, packageScripts)
 
-    dir = tempfile.mkdtemp('', ''.join(('rpm2ccs-', packagebasename, '-')))
+    dir = tempfile.mkdtemp('',
+                           ''.join(('rpm2ccs-', recipe.packagebasename, '-')))
     os.chdir(dir)
 
-    packagedir = util.joinPaths(dir, packagename)
+    packagedir = util.joinPaths(dir, recipe.packagename)
 
     try:
         # if it is already in the repository, pull it out
-        repos.findTrove(cfg.buildLabel, packagename+':source', None, None)
-        checkin.checkout(repos, cfg, packagedir, packagename)
+        repos.findTrove(cfg.buildLabel, recipe.packagename+':source',
+                        None, None)
+        checkin.checkout(repos, cfg, packagedir, recipe.packagename)
     except repository.repository.TroveNotFound:
-        checkin.newPackage(repos, cfg, packagename)
+        checkin.newPackage(repos, cfg, recipe.packagename)
 
     os.chdir(packagedir)
 
-    recipe = recipeBuilder(packagename, rpmfile, rpmname)
-
-    if packageScripts:
-        tag = taghandlerBuilder(packagename, recipe)
-        if tag.exists():
-            tag.writefiles()
-            checkin.addFiles(tag.taghandler())
-            checkin.addFiles(tag.tagdescription())
-            recipe.append(tag.recipelines())
-
     recipe.write()
-    checkin.addFiles((recipe.name(),))
+    checkin.addFiles((recipe.name(),), ignoreExisting=True)
     util.copyfile(rpmname,
                   util.joinPaths(packagedir, os.path.basename(rpmname)))
-    checkin.addFiles((rpmname,))
-
+    checkin.addFiles((rpmname,), ignoreExisting=True)
 
 
     if create == RECIPE:
@@ -216,7 +477,7 @@ def main(argv):
 
     if commitWork:
         checkin.commit(repos, cfg, None, True)
-        cook.cookCommand(cfg, (packagename,), False, {}, resume=False)
+        cook.cookCommand(cfg, (recipe.packagename,), False, {}, resume=False)
         if cfg.noClean:
             print 'Not deleting working directory %s' % dir
         else:
