@@ -369,16 +369,24 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 
     showOneLog(pkgCs.getNewVersion(), pkgCs.getChangeLog())
 
-    for (fileId, path, newVersion) in pkgCs.getNewFileList():
-	print "%s: new" % path
-	chg = changeSet.getFileChange(fileId)
-	f = files.ThawFile(chg, fileId)
+    fileList = [ (x[0], x[1], True, x[2]) for x in pkgCs.getNewFileList() ]
+    fileList += [ (x[0], x[1], False, x[2]) for x in 
+			    pkgCs.getChangedFileList() ]
 
-	if f.hasContents and f.flags.isConfig():
-	    (contType, contents) = changeSet.getFileContents(fileId)
-	    print contents.get().read()
+    # sort by fileId to match the changeset order
+    fileList.sort()
+    for (fileId, path, isNew, newVersion) in fileList:
+	if isNew:
+	    print "%s: new" % path
+	    chg = changeSet.getFileChange(fileId)
+	    f = files.ThawFile(chg, fileId)
 
-    for (fileId, path, newVersion) in pkgCs.getChangedFileList():
+	    if f.hasContents and f.flags.isConfig():
+		(contType, contents) = changeSet.getFileContents(fileId)
+		print contents.get().read()
+	    continue
+
+	# changed file
 	if path:
 	    dispStr = path
 	    if oldPackage:
