@@ -18,9 +18,9 @@ class DataStore:
 	path = self.hashToPath(hash)[1]
 	return os.path.exists(path)
 
-    # file should be a python file object seek'd to the beginning
-    # this messes up the file pointer
-    def addFile(self, file, hash):
+    # list addFile, but this returns a file pointer which can be used
+    # to write the contents into the file
+    def newFile(self, hash):
 	(dir, path) = self.hashToPath(hash)
 	if os.path.exists(path):
 	    raise KeyError, "duplicate hash"
@@ -31,13 +31,21 @@ class DataStore:
 	    os.mkdir(dir)
 
 	dest = open(path, "w")
-	dest.write(file.read())
-	dest.close()
+	return dest
+
+    # file should be a python file object seek'd to the beginning
+    # this messes up the file pointer
+    def addFile(self, file, hash):
+	dest = self.newFile(hash)
+	try:
+	    dest.write(file.read())
+	finally:
+	    dest.close()
 
     # returns a python file object for the file requested
     def openFile(self, hash):
 	path = self.hashToPath(hash)[1]
-	return open(path)
+	return open(path, "r+")
 
     def removeFile(self, hash):
 	(dir, path) = self.hashToPath(hash)
