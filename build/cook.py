@@ -27,21 +27,6 @@ import tempfile
 
 # -------------------- private below this line -------------------------
 
-# see if the head of the specified branch is a duplicate
-# of the file object passed; it so return the version object
-# for that duplicate
-def _checkBranchForDuplicate(repos, fileId, branch, file):
-    version = repos.fileLatestVersion(fileId, branch)
-    if not version:
-	return None
-
-    lastFile = repos.getFileVersion(fileId, version)
-
-    if file.same(lastFile):
-	return version
-
-    return None
-
 # type could be "src"
 #
 # returns a (pkg, fileMap) tuple
@@ -65,7 +50,7 @@ def _createPackage(repos, branch, bldPkg, ident):
         # set ownership, flags, etc
         f.merge(buildFile)
         
-	duplicateVersion = _checkBranchForDuplicate(repos, f.id(), branch, f)
+	duplicateVersion = checkBranchForDuplicate(repos, branch, f)
         if not duplicateVersion:
 	    p.addFile(f.id(), path, bldPkg.getVersion())
 	else:
@@ -310,3 +295,20 @@ def cookCommand(cfg, args, prep, macros):
                     os.kill(-pid, signal.SIGINT)
         # make sure that we are the foreground process again
         os.tcsetpgrp(0, os.getpgrp())
+
+#
+# see if the head of the specified branch is a duplicate
+# of the file object passed; it so return the version object
+# for that duplicate
+def checkBranchForDuplicate(repos, branch, file):
+    version = repos.fileLatestVersion(file.id(), branch)
+    if not version:
+	return None
+
+    lastFile = repos.getFileVersion(file.id(), version)
+
+    if file.same(lastFile):
+	return version
+
+    return None
+
