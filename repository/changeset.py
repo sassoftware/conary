@@ -23,6 +23,9 @@ class ChangeSet:
     def isAbstract(self):
 	return self.abstract
 
+    def isLocal(self):
+	return self.local
+
     def validate(self, justContentsForConfig = 0):
 	for pkg in self.getNewPackageList():
 	    # if this is abstract, we can't have any removed or changed files
@@ -62,13 +65,23 @@ class ChangeSet:
 	assert(newVersion.timeStamp)
 	self.files[fileId] = (oldVersion, newVersion, csInfo)
 
+	if oldVersion and oldVersion.isLocal():
+	    self.local = 1
+	if newVersion.isLocal():
+	    self.local = 1
+
     def newPackage(self, csPkg):
-	assert(not csPkg.getOldVersion() or csPkg.getOldVersion().timeStamp)
-	assert(csPkg.getNewVersion().timeStamp)
+	old = csPkg.getOldVersion()
+	new = csPkg.getNewVersion()
+	assert(not old or old.timeStamp)
+	assert(new.timeStamp)
 
 	self.newPackages[csPkg.getName()] = csPkg
+
 	if csPkg.isAbstract():
 	    self.abstract = 1
+	if (old and old.isLocal()) or new.isLocal():
+	    self.local = 1
 
     def oldPackage(self, name, version):
 	assert(version.timeStamp)
@@ -330,6 +343,7 @@ class ChangeSet:
 	self.files = {}
 	self.fileContents = {}
 	self.abstract = 0
+	self.local = 0
 
 class ChangeSetFromRepository(ChangeSet):
 
