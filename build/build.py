@@ -196,9 +196,10 @@ class Make(BuildCommand):
     then you can modify parallelmflags as necessary in your recipe.
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
-	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+                '%(preMake)s make '
+	        ' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
-                ' %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s')
+		' %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
                 'subDir': ''}
 
@@ -221,9 +222,10 @@ class MakeParallelSubdir(Make):
     parallelmflags only applied to sub-make processes.
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
-	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+                '%(preMake)s make'
+	        ' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
-                ' %(preMake)s make %%(mflags)s '
+		' %%(mflags)s '
                 ' MAKE="make %%(mflags)s %%(parallelmflags)s" %(args)s')
 
 class MakeInstall(Make):
@@ -234,9 +236,10 @@ class MakeInstall(Make):
     or as a last option, the Make class.
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
-	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+                '%(preMake)s make'
+	        ' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
-                ' %(preMake)s make %%(mflags)s %%(rootVarArgs)s'
+		' %%(mflags)s %%(rootVarArgs)s'
 		' %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
 		'installtarget': 'install'}
@@ -257,9 +260,10 @@ class MakePathsInstall(Make):
     """
     template = (
 	'cd %%(builddir)s/%(subDir)s; '
-	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	'%(preMake)s make'
+	' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 	' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
-	' %(preMake)s make %%(mflags)s'
+	' %%(mflags)s'
 	' prefix=%%(destdir)s/%%(prefix)s'
 	' exec-prefix=%%(destdir)s/%%(exec_prefix)s'
 	' bindir=%%(destdir)s/%%(bindir)s'
