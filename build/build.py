@@ -1003,8 +1003,9 @@ exit $failed
 	    self.chmod(self.macros.destdir, path)
     
     def mungeMakeCommand(self):
-        """ Munge the make command to ignore files
-            that do not need to be rebuilt """
+        """
+        Munge the make command to ignore files that do not need to be rebuilt.
+        """
 	if self.ignore is not None:
 	    ignoreFiles = [ 'Makefile', 'config.status' ]
 	    ignoreFiles.extend(self.ignore)
@@ -1014,10 +1015,12 @@ exit $failed
 	    self.macros.command = self.command
 
     def buildMakeDependencies(self, dir, command):
-        """ build and remove make dependencies so that 
-            when the test suite is run, the makefile does 
-            spuriously require the capability to build any 
-            already built test executables """
+        """
+        Build, and remove from Makefiles, appropriate make dependencies,
+        so that when the test suite is run, the makefile does not
+        spuriously require the capability to build any 
+        already-built test executables.
+        """
 	makefile = dir + '/Makefile'
         makeTarget = self.makeTarget
 	if self.recursive:
