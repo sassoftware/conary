@@ -152,7 +152,7 @@ def setupRecipeDict(d, filename):
     exec 'from build.recipe import FilesetRecipe' in d
     exec 'from build.recipe import loadRecipe' in d
     exec 'import build, os, package, sys, stat, util' in d
-    exec 'from use import Use, Arch' in d
+    exec 'from build.use import Use, Arch' in d
     if sys.excepthook == util.excepthook:
 	exec 'sys.excepthook = util.excepthook' in d
     d['filename'] = filename

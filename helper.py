@@ -7,7 +7,7 @@
 Simple functions used throughout srs.
 """
 
-import repository
+from repository import repository
 import versions
 
 def findPackage(repos, defaultNick, name, versionStr = None, forceGroup = 0):

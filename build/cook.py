@@ -10,10 +10,10 @@ resulting packages to the repository.
 
 from build import *
 
-import changeset
-import filecontents
+from repository import changeset
+from repository import filecontents
 import files
-import fsrepos
+from repository import fsrepos
 import helper
 import log
 import lookaside

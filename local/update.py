@@ -14,9 +14,9 @@ the way of a newly created file will be overwritten.  Otherwise an error
 is produced.
 """
 
-import changeset
+from repository import changeset
 import errno
-import filecontents
+from repository import filecontents
 import files
 import log
 import os

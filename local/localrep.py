@@ -3,10 +3,10 @@
 # All rights reserved
 #
 
-import fsrepos
-import repository
+from repository import fsrepos
+from repository import repository
 
-from fsrepos import FilesystemRepository
+from repository.fsrepos import FilesystemRepository
 
 # This builds a job which applies both a change set and the local changes
 # which are needed.

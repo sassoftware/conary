@@ -2,12 +2,12 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-import changeset
+from repository import changeset
 import database
 import helper
 import log
 import os
-import repository
+from repository import repository
 import sys
 import util
 

@@ -6,12 +6,12 @@
 #
 
 import branch
-import changeset
+from repository import changeset
 import commit
 import cook
 import database
 import display
-import fsrepos
+from repository import fsrepos
 import log
 import os
 import repository

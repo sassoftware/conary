@@ -5,7 +5,7 @@
 
 from build import recipe
 
-import changeset
+from repository import changeset
 import cook
 import files
 import helper

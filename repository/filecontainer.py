@@ -49,7 +49,7 @@ Each file table entry looks like::
 """
 
 import gzip
-import filecontents
+from repository import filecontents
 import os
 import string
 import struct

@@ -2,9 +2,9 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-import changeset
+from repository import changeset
+from repository import repository
 import log
-import repository
 import versions
 
 def doCommit(repos, changeSetFile, targetBranch):

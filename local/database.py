@@ -3,14 +3,14 @@
 # All rights reserved
 #
 
-import changeset
-import filecontents
-import fsrepos
+from repository import changeset
+from repository import filecontents
+from repository import fsrepos
 import log
 import localrep
 import os
 import trovedb
-import repository
+from repository import repository
 import update
 import util
 import versions

@@ -5,8 +5,8 @@
 #
 
 import checkin
-import fsrepos
-import repository
+from repository import fsrepos
+from repository import repository
 import sys
 
 argDef = {}
