@@ -931,6 +931,7 @@ exit $failed
     testsuite_path = '%(thistestdir)s/conary-testsuite-%(identifier)s'
     keywords = {'ignore'    : [],
 		'recursive' : False,
+		'mungeMake' : True,
 		'subdirs'   : [] } 
 
 
@@ -1015,16 +1016,17 @@ exit $failed
 	self.writeCommandScript()
 	command = self.command % macros
 	if command[:4] == 'make':
-	    self.mungeMakeCommand()
-            self.makeArgs = []
-            potentialTargets  = command[5:].split()
-            targets = []
-            for t in potentialTargets:
-                if t.find('=') == -1:
-                    targets.append(t)
-                else:
-                    self.makeArgs.append(t)
-            for t in targets:
-                self.makeTarget = t
-	        self.mungeMakefiles(util.normpath(self.macros.builddir + os.sep + self.dir), self.command)
+            if self.mungeMake:
+                self.mungeMakeCommand()
+                self.makeArgs = []
+                potentialTargets  = command[5:].split()
+                targets = []
+                for t in potentialTargets:
+                    if t.find('=') == -1:
+                        targets.append(t)
+                    else:
+                        self.makeArgs.append(t)
+                for t in targets:
+                    self.makeTarget = t
+                    self.mungeMakefiles(util.normpath(self.macros.builddir + os.sep + self.dir), self.command)
 	self.writeTestSuiteScript()
