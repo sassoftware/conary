@@ -323,6 +323,7 @@ def commit(repos, cfg, message):
         for fullPath in srcFiles:
             # the loader makes sure the basenames are unique
             base = os.path.basename(fullPath)
+            path = None
             for (pathId, path, fileId, version) in state.iterFileList():
                 if path == base: break
 
@@ -337,7 +338,8 @@ def commit(repos, cfg, message):
                 pathId = cook.makeFileId(os.getcwd(), base)
                 state.addFile(pathId, base, versions.NewVersion(), "0" * 20)
 
-            srcMap[base] = fullPath
+            if os.path.dirname(fullPath) != cwd:
+                srcMap[base] = fullPath
 
     # now remove old files. this is done separately in case the recipe type
     # changed (a package changing to a redirect, for example)

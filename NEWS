@@ -1,6 +1,7 @@
 Changes in 0.14.0
   * added ability for changesets to ignore unknown fields in some places
     (making changesets somewhat less brittle)
+  * fixed bug in source handling with non-recipe files in the local directory
 
 Changes in 0.13.3
   * added ability for a contents log file (makes syncing much easier)
