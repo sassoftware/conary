@@ -11,6 +11,7 @@ components used by srs .recipe files
 import build
 import buildpackage
 import destdirpolicy
+import errno
 import gzip
 import helper
 import imp
@@ -19,9 +20,11 @@ import log
 import lookaside
 import os
 import packagepolicy
+import repository
 import rpmhelper
 import shutil
 import sys
+import tempfile
 import types
 import util
 
@@ -146,10 +149,10 @@ def setupRecipeDict(d, filename):
     exec 'from use import Use, Arch' in d
     if sys.excepthook == util.excepthook:
 	exec 'sys.excepthook = util.excepthook' in d
-    exec 'filename = "%s"' %(filename) in d
+    d['filename'] = filename
 
 class RecipeLoader(types.DictionaryType):
-    def __init__(self, filename):
+    def __init__(self, filename, cfg=None, repos=None, component=None):
         if filename[0] != "/":
             raise IOError, "recipe file names must be absolute paths"
 
@@ -159,6 +162,14 @@ class RecipeLoader(types.DictionaryType):
         f = open(filename)
 
 	setupRecipeDict(self.module.__dict__, filename)
+
+        # store cfg and repos, so that the recipe can load
+        # recipes out of the repository
+        self.module.__dict__['cfg'] = cfg
+        self.module.__dict__['repos'] = repos
+        self.module.__dict__['component'] = component
+
+        # create the recipe class by executing the code in the recipe
         try:
             code = compile(f.read(), filename, 'exec')
         except SyntaxError, err:
@@ -170,6 +181,13 @@ class RecipeLoader(types.DictionaryType):
                 msg += err.text
             raise RecipeFileError(msg)
         exec code in self.module.__dict__
+
+        # all recipes that could be loaded by loadRecipe are loaded;
+        # get rid of our references to cfg and repos
+        del self.module.__dict__['cfg']
+        del self.module.__dict__['repos']
+        del self.module.__dict__['component']
+        
         for (name, obj) in  self.module.__dict__.items():
             if type(obj) is not types.ClassType:
                 continue
@@ -202,13 +220,56 @@ class RecipeLoader(types.DictionaryType):
         except:
             pass
 
-# XXX this should be extended to load a recipe from srs
+def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
+    if component[0] != ":":
+        component = cfg.packagenamespace + ":" + component
+    if not component.endswith(':sources'):
+        component += ":sources"
+    name = filename[:-len('.recipe')]
+
+    try:
+        sourceComponent = repos.getLatestPackage(component, cfg.defaultbranch)
+    except repository.PackageMissing:
+        raise RecipeFileError, 'cannot find source component %s' % component
+
+    srcFileInfo = None
+    for (fileId, path, version) in sourceComponent.fileList():
+        if path == filename:
+            srcFileInfo = (fileId, version)
+            break
+
+    if not srcFileInfo:
+        raise RecipeFileError, '%s does not contain %s' % (component, filename)
+
+    fileObj = repos.getFileVersion(fileId, version)
+    theFile = repos.pullFileContentsObject(fileObj.sha1())
+    (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name)
+
+    os.write(fd, theFile.read())
+    os.close(fd)
+
+    try:
+        classList = RecipeLoader(recipeFile, cfg, repos, component)
+    finally:
+        os.unlink(recipeFile)
+    
+    return classList
+
 def loadRecipe(file):
     callerGlobals = inspect.stack()[1][0].f_globals
+    cfg = callerGlobals['cfg']
+    repos = callerGlobals['repos']
     if file[0] != '/':
         recipepath = os.path.dirname(callerGlobals['filename'])
-        file = recipepath + '/' + file
-    recipes = RecipeLoader(file)
+        localfile = recipepath + '/' + file
+    try:
+        recipes = RecipeLoader(localfile)
+    except IOError, err:
+        if err.errno == errno.ENOENT:
+            recipes = recipeLoaderFromSourceComponent(callerGlobals['component'],
+                                                      file,
+                                                      cfg,
+                                                      repos)
     for name, recipe in recipes.items():
         # XXX hack to hide parent recipes
         recipe.ignore = 1
@@ -216,24 +277,6 @@ def loadRecipe(file):
         # stash a reference to the module in the namespace
         # of the recipe that loaded it, or else it will be destroyed
         callerGlobals[os.path.basename(file).replace('.', '-')] = recipes
-
-## def bootstrapRecipe(recipeClass, buildRequires, file=None):
-##     if file:
-##         loadRecipe(file)
-
-##     buildRequires = [ 'cross-gcc', 'bootstrap-glibc' ]
-##     name = 'bootstrap-' + recipeClass.name
-##     extraConfig = '--target=%(target)s --host=%(target)s'
-##     def setup(self):
-##         self.mainDir('diffutils-%s' % self.version)
-##         Diffutils.setup(self)
-        
-##     bootstrap = type('Bootstrap' + recipeClass.__name__,
-##                      (recipeCLass,),
-##                      {'buildRequires': buildRequires,
-##                       'name'         : name,
-##                       'extraConfig'  : extraConfig,
-##                       'setup'        : setup})
 
 class _recipeHelper:
     def __init__(self, list, theclass):
@@ -249,8 +292,9 @@ class _policyUpdater:
 	self.theobject.updateArgs(*args, **keywords)
 
 class Recipe:
-
-    pass
+    """Virtual base class for all Recipes"""
+    def __init__(self):
+        assert(self.__class__ is not Recipe)
 
 class PackageRecipe(Recipe):
     buildRequires = []

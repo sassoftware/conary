@@ -97,14 +97,14 @@ bootstrap:
 		echo "/opt isn't writable, this won't work"; \
 		exit 1; \
 	fi
-	time python2.3 ./srs-bootstrap `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"`
+	time python2.3 ./srs-bootstrap --bootstrap
 
 bootstrap-continue:
 	@if ! [ -d /opt/ -a -w /opt/ ]; then \
 		echo "/opt isn't writable, this won't work"; \
 		exit 1; \
 	fi
-	time python2.3 ./srs-bootstrap `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` --onlyunbuilt
+	time python2.3 ./srs-bootstrap --bootstrap --onlyunbuilt
 
 
 deps.dot:

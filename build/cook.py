@@ -341,7 +341,7 @@ def cookItem(repos, cfg, item, prep=0, macros=()):
 	    recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
 
 	try:
-	    classList = recipe.RecipeLoader(recipeFile)
+	    classList = recipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
 	except recipe.RecipeFileError, msg:
 	    raise CookError(str(msg))
 
@@ -349,41 +349,16 @@ def cookItem(repos, cfg, item, prep=0, macros=()):
 	    buildList.append((classObject, cfg.defaultbranch,
 			      classObject.name + ".srs"))
     else:
-	name = item
-	if name[0] != ":":
-	    name = cfg.packagenamespace + ":" + item
-	name += ":sources"
-
-	try:
-	    sourceComponent = repos.getLatestPackage(name, cfg.defaultbranch)
-	except repository.PackageMissing:
-	    raise CookError, "cannot find anything to build for %s" % item
-
-	srcFileInfo = None
-	for (fileId, path, version) in sourceComponent.fileList():
-	    if path == item + ".recipe":
-		srcFileInfo = (fileId, version)
-		break
-	
-	if not srcFileInfo:
-	    raise CookError, "%s does not contain %s.recipe" % (name, item)
-	
-	fileObj = repos.getFileVersion(fileId, version)
-	theFile = repos.pullFileContentsObject(fileObj.sha1())
-	(fd, recipeFile) = tempfile.mkstemp("", "recipe-")
-
-	os.write(fd, theFile.read())
-	os.close(fd)
-
-	try:
-	    classList = recipe.RecipeLoader(recipeFile)
-	except recipe.RecipeFileError, msg:
-	    raise CookError(str(msg))
+        try:
+            classList = \
+                      recipe.recipeLoaderFromSourceComponent(item,
+                                                             item + '.recipe',
+                                                             cfg, repos)
+        except recipe.RecipeFileError, msg:
+            raise CookError(str(msg))
 
 	for (className, classObject) in classList.items():
 	    buildList.append((classObject, cfg.defaultbranch, None))
-
-	os.unlink(recipeFile)
 
     built = []
     for (classObject, branch, csFile) in buildList:
