@@ -27,7 +27,7 @@ import traceback
 class Epdb(pdb.Pdb):
     # epdb will print to here instead of to sys.stdout,
     # and restore stdout when done
-    _stdout_proxy = None
+    __old_stdout = None
 
     def __init__(self):
         self._exc_type = None
@@ -134,19 +134,19 @@ class Epdb(pdb.Pdb):
 
     def interaction(self, frame, traceback):
         pdb.Pdb.interaction(self, frame, traceback)
-        if not self._stdout_proxy is None:
+        if not self.__old_stdout is None:
             sys.stdout.flush()
             # now we reset stdout to be the whatever it was before
             os.dup2(self.__old_stdout, sys.stdout.fileno())
 
     def switch_stdout(self):
-        if not self._stdout_proxy is None:
+        if not os.isatty(sys.stdout.fileno()):
             sys.stdout.flush()
             # old_stdout points to whereever stdout was 
             # when called (maybe to file?)
             self.__old_stdout = os.dup(sys.stdout.fileno())
             # now we copy whatever te proxy points to to 1
-            os.dup2(self._stdout_proxy, sys.stdout.fileno())
+            os.dup2(os.open('/dev/tty', os.O_WRONLY), sys.stdout.fileno())
         return
 
     # bdb hooks
@@ -183,9 +183,6 @@ def beingTraced():
 
 def set_trace():
     Epdb().set_trace()
-
-def set_stdout_proxy(fdno):
-    Epdb._stdout_proxy = fdno
 
 def post_mortem(t, exc_type=None, exc_msg=None):
     p = Epdb()
