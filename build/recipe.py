@@ -216,13 +216,6 @@ def loadRecipe(file):
 ##                       'extraConfig'  : extraConfig,
 ##                       'setup'        : setup})
 
-class PrependList(list):
-    def __init__(self, *args):
-        list.__init__(self, args)
-
-    def prepend(self, item):
-        self.insert(0, item)
-
 class Recipe:
     buildRequires = []
     runRequires = []
@@ -428,6 +421,14 @@ class Recipe:
     def getPackages(self):
         return self.packages
 
+# OK, lambda apparantly can't deal with *foo, dunno why exec does not work
+#    def buildInit(self):
+#	for name in build.__dict__:
+#	    object = build.__dict__[name]
+#	    if type(object) is types.ClassType and not name.startswith('_'):
+#		print name, object
+#		exec 'def %s(self, *a): self.build.append(build.%s(*a))' %(name, name) in self.__dict__
+    
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
         assert(self.__class__ is not Recipe)
 	self.sources = []
@@ -452,7 +453,7 @@ class Recipe:
 	self.srcdirs = srcdirs
 	self.theMainDir = self.name + "-" + self.version
 	# what needs to be done to get from sources to an installed tree
-	self.build = PrependList(build.Make(), build.MakeInstall())
+	self.build = [build.Make(), build.MakeInstall()]
 	# what needs to be done to massage the installed tree
         self.process = policy.DefaultPolicy()
 	self.macros = Macros()
@@ -467,6 +468,9 @@ class Recipe:
 	for pattern in baseSubFilters:
 	    self.subFilters.append(buildpackage.Filter(*pattern))
 	self.mainFilters = []
+
+	#self.buildInit()
+	#print self.__dict__
 
 class RecipeFileError(Exception):
     def __init__(self, msg):
