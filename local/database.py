@@ -138,8 +138,20 @@ class Database(repository.LocalRepository):
 	map = ( ( None, sourcePath + "/" ), )
 	cs.remapPaths(map)
 
-	job = DatabaseChangeSetJob(self, cs)
+	# create the change set from the version originally installed
+	# to the one installed on this system
+	list = []
+	for pkg in cs.getNewPackageList():
+	    name = pkg.getName()
+	    old = pkg.getOldVersion()
+	    if self.hasPackage(name) and old:
+		branch = old.fork(versions.LocalBranch(), sameVerRel = 0)
+		new = self.pkgLatestVersion(name, branch)
+		list.append((name, old, new, 0))
 
+	localChanges = self.createChangeSet(list)
+
+	job = DatabaseChangeSetJob(self, cs)
 	undo = DatabaseChangeSetUndo(self)
 
 	if makeRollback:
@@ -254,6 +266,8 @@ class Database(repository.LocalRepository):
 	fullPath = root + "/" + path
 	repository.LocalRepository.__init__(self, fullPath, mode)
 
+# This builds a job which applies both a change set and the local changes
+# which are needed.
 class DatabaseChangeSetJob(repository.ChangeSetJob):
 
     def createChangeSet(self, packageList):
