@@ -1,22 +1,18 @@
 
 class Hunk:
 
-    # the new lines which result from this hunk are returned
+    # The new lines which result from this hunk are returned. This does
+    # not check for conflicts; countConflicts() should be used for that
     def apply(self, src, srcLine):
 	result = []
 	fromLine = srcLine
 	for line in self.lines:
 	    if line[0] == " ":
-		if src[fromLine] != line[1:]:
-		    raise Conflict()
 		result.append(src[fromLine])
 		fromLine = fromLine + 1
 	    elif line[0] == "+":
 		result.append(line[1:])
 	    elif line[0] == "-":
-		if src[fromLine] != line[1:]:
-		    raise Conflict()
-
 		fromLine = fromLine + 1
 
 	assert(fromLine == self.fromLen + srcLine)
@@ -34,13 +30,13 @@ class Hunk:
 
 	return conflicts
 
-    def __init__(self, fromStart, fromLen, toStart, toLen, lines):
+    def __init__(self, fromStart, fromLen, toStart, toLen, lines, contextCount):
 	self.fromStart = fromStart
 	self.toStart = toStart
 	self.fromLen = fromLen
 	self.toLen = toLen
 	self.lines = lines
-
+	self.contextCount = contextCount
 
 # this just applies hunks, not files... in other words, the --- and +++
 # lines should be omitted, and only a single file can be patched
@@ -64,6 +60,7 @@ def patch(oldLines, unifiedDiff):
 
 	fromCount = 0
 	toCount = 0
+	contextCount = 0
 	lines = []
 	i += 1
 	while i < last and unifiedDiff[i][0] != '@':
@@ -72,6 +69,7 @@ def patch(oldLines, unifiedDiff):
 	    if ch == " ":
 		fromCount += 1
 		toCount += 1
+		contextCount += 1
 	    elif ch == "-":
 		fromCount += 1
 	    elif ch == "+":
@@ -82,11 +80,10 @@ def patch(oldLines, unifiedDiff):
 	    i += 1
 
 	if toCount != toLen or fromCount != fromLen:
-	    print toCount, toLen
 	    raise BadHunk()
 
-	hunks.append(Hunk(fromStart, fromLen, toStart, toLen, lines))
-
+	hunks.append(Hunk(fromStart, fromLen, toStart, toLen, lines, 
+			  contextCount))
 
     i = 0
     last = len(unifiedDiff)
@@ -98,31 +95,39 @@ def patch(oldLines, unifiedDiff):
     for hunk in hunks:
 	start = hunk.fromStart + offset
 	conflicts = hunk.countConflicts(oldLines, start)
+	best = (conflicts, 0)
 
 	i = 0
-	while conflicts:
+	while best[0]:
 	    i = i + 1
 	    tried = 0
 	    if (start - abs(i) >= 0):
 		tried = 1
 		conflicts = hunk.countConflicts(oldLines, start - i)
+		if conflicts < best[0]:
+		    best = (conflicts, -i)
+
 		if not conflicts:
 		    i = -i
 		    break
 
-	    if (start + i < (len(oldLines) - hunk.fromLen)):
+	    if ((start + i) <= (len(oldLines) - hunk.fromLen)):
 		tried = 1
 		conflicts = hunk.countConflicts(oldLines, start + i)
+		if conflicts < best[0]:
+		    best = (conflicts, i)
 		if not conflicts:
 		    break
 
 	    if not tried:
 		break
 
-	if conflicts: raise Conflict()
+	conflictCount = best[0]
+	if (hunk.contextCount - conflictCount) < 1:
+	    raise Conflict()
 
-	offset = i
-	start += i
+	offset = best[1]
+	start += offset
 
 	while (fromLine < start):
 	    result.append(oldLines[fromLine])
