@@ -25,7 +25,7 @@ class RemoveExtraLibs(policy.Policy):
     """
     Kill .la files and any other similar garbage
     """
-    invariantinclusion = ['\.la$']
+    invariantinclusions = ['\.la$']
 
     def doFile(self, path):
 	util.remove(self.macros['destdir']+path)
