@@ -180,7 +180,11 @@ elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
 
     if len(otherArgs) >= 2 and len(otherArgs) <= 4:
 	args = [queryRepos, cfg, all, ls] + otherArgs[2:]
-	display.displayPkgs(*args)
+        try:
+            display.displayPkgs(*args)
+        except IOError, msg:
+            sys.stderr.write(msg.strerror + '\n')
+            sys.exit(1)
     else:
 	usage()
 elif (otherArgs[1] == "update"):
