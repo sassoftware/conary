@@ -267,11 +267,16 @@ class SharedLibrary(policy.Policy):
     """
     Mark system shared libaries as such so that ldconfig will be run.
     """
+    # keep invariants in sync with ExecutableLibraries
+    invariantsubtrees = [
+	'%(libdir)s/',
+	'%(essentiallibdir)s/',
+	'%(krbprefix)s/%(lib)s/',
+	'%(x11prefix)s/%(lib)s/',
+	'%(prefix)s/local/%(lib)s/',
+    ]
     invariantinclusions = [
-	'(%(essentiallibdir)s|%(libdir)s|%(prefix)s/X11R6/%(lib)s|'
-	'%(prefix)s/kerberos/%(lib)s|'
-	'%(prefix)s/local/%(lib)s|%(libdir)s/qt.*/lib|'
-	'%(libdir)s/(mysql|sane))/..*\.so\..*'
+	(r'..*\.so\..*', None, stat.S_IFDIR),
     ]
 
     def _markSharedLibrary(self, filename):

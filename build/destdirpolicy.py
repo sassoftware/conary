@@ -99,6 +99,34 @@ class FixupMultilibPaths(policy.Policy):
 	util.mkdirChain(destdir + targetdir)
 	util.rename(destdir + path, destdir + target)
 
+class ExecutableLibraries(policy.Policy):
+    """
+    The ldconfig program will complain if libraries do not have have
+    executable bits set.  Let's avoid that.
+    """
+    # keep invariants in sync with SharedLibrary
+    invariantsubtrees = [
+	'%(libdir)s/',
+	'%(essentiallibdir)s/',
+	'%(krbprefix)s/%(lib)s/',
+	'%(x11prefix)s/%(lib)s/',
+	'%(prefix)s/local/%(lib)s/',
+    ]
+    invariantinclusions = [
+	(r'..*\.so\..*', None, stat.S_IFDIR),
+    ]
+
+    def doFile(self, path):
+	fullpath = util.joinPaths(self.macros['destdir'], path)
+	if not util.isregular(fullpath):
+	    return
+	mode = os.lstat(fullpath)[stat.ST_MODE]
+	if mode & 0111:
+	    # has some executable bit set
+	    return
+	log.warning('non-executable library %s, changing to mode 0755' %path)
+	os.chmod(fullpath, 0755)
+
 class RemoveBackupFiles(policy.Policy):
     """
     Kill editor and patch backup files
@@ -358,6 +386,7 @@ def DefaultPolicy():
 	SanitizeSonames(),
 	RemoveExtraLibs(),
 	FixupMultilibPaths(),
+	ExecutableLibraries(),
 	RemoveBackupFiles(),
 	Strip(),
 	NormalizeCompression(),
