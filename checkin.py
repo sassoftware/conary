@@ -5,17 +5,13 @@
 
 import changeset
 import cook
-import errno
 import helper
 import log
 import os
 import package
-import patch
 import recipe
-import repository
 import sys
 import update
-import util
 import versioned
 import versions
 
