@@ -10,37 +10,110 @@ class AbstractRepository:
     ### Package access functions
 
     def getAllTroveNames(self):
+	"""
+	Returns a list of all of the troves contained in the repository.
+
+	@rtype: list of str
+	"""
+
 	raise NotImplemented
 
-    def hasPackage(self, pkg):
+    def hasPackage(self, troveName):
+	"""
+	Tests to see if the repository contains any version of the named
+	trove.
+
+	@param troveName: trove name
+	@type troveName: str
+	@rtype: boolean
+	"""
 	raise NotImplemented
 
-    def hasPackageVersion(self, pkgName, version):
+    def hasPackageVersion(self, troveName, version):
+	"""
+	Tests if the repository contains a particular version of a trove.
+
+	@param troveName: package name
+	@type troveName: str
+	@rtype: boolean
+	"""
 	raise NotImplemented
 
-    def pkgLatestVersion(self, pkgName, branch):
+    def pkgLatestVersion(self, troveName, branch):
+	"""
+	Returns the version of the latest version of a trove on a particular
+	branch.
+
+	@param troveName: package name
+	@type troveName: str
+	@param branch: branch
+	@type branch: versions.Version
+	@rtype: versions.Version
+	"""
+
 	raise NotImplemented
 
-    def getLatestPackage(self, pkgName, branch):
+    def getLatestPackage(self, troveName, branch):
+	"""
+	Returns the latest trove from a given branch.
+
+	@param troveName: package name
+	@type troveName: str
+	@param branch: branch
+	@type branch: versions.Version
+	@rtype: package.Package
+	"""
 	raise NotImplemented
 
-    def getPackageVersion(self, pkgName, version):
+    def getPackageVersion(self, troveName, version):
+	"""
+	Returns a particular version of a trove.
+
+	@param troveName: package name
+	@type troveName: str
+	@param branch: branch
+	@type branch: versions.Version
+	@rtype: package.Package
+	"""
 	raise NotImplemented
 
-    def getPackageNickList(self, pkgName, nick):
+    def getPackageLabelBranches(self, troveName, label):
+	"""
+	Returns the full branch names which matcha  given label name
+	for a trove.
+
+	@param troveName: package name
+	@type troveName: str
+	@param label: label
+	@type label: versions.BranchName
+	@rtype: package.Package
+	"""
 	raise NotImplemented
 
-    def getPackageVersionList(self, pkgName):
+    def getPackageVersionList(self, troveName):
+	"""
+	Returns a list of all of the versions of a trove available
+	in the repository.
+
+	@param troveName: trove
+	@type troveName: str
+	@rtype: list of versions.Version
+	"""
+
 	raise NotImplemented
 
-    def getPackageBranchList(self, pkgName):
+    def getPackageBranchList(self, troveName):
+	"""
+	Returns a list of all of the branches for a particular trove.
+
+	@param troveName: trove
+	@type troveName: str
+	@rtype: list of versions.Version
+	"""
 	raise NotImplemented
 
     ### File functions
 
-    def fileLatestVersion(self, fileId, branch):
-	raise NotImplemented
-	
     def getFileVersion(self, fileId, version, path = None, withContents = 0):
 	raise NotImplemented
 
