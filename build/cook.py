@@ -95,7 +95,7 @@ def cook(repos, cfg, recipeFile, prep=0):
 	fileList = [ (f, recipeClass.filename, recipeName) ]
 
 	for file in recipeObj.allSources():
-            src = lookaside.findAll(cfg, file, recipeObj.name, srcdirs)
+            src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
 	    srcName = os.path.basename(src)
 	    f = files.FileFromFilesystem(src, ident(srcName), type = "src")
 	    fileList.append((f, src, srcName))
