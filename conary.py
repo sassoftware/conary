@@ -393,6 +393,8 @@ def main(argv=sys.argv):
 	print >> sys.stderr, str(e)
     except repository.repository.DuplicateBranch, e:
 	print >> sys.stderr, str(e)
+    except repository.repository.PackageNotFound, e:
+	print >> sys.stderr, str(e)
     except KeyboardInterrupt:
 	pass
 	    
