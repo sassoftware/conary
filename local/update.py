@@ -451,11 +451,6 @@ class FilesystemJob:
 	self.changeSet = changeSet
 
 	for pkgCs in changeSet.getNewPackageList():
-	    # skip over empty change sets
-	    if (not pkgCs.getNewFileList() and not pkgCs.getOldFileList()
-                and not pkgCs.getChangedFileList()):
-		continue
-
 	    name = pkgCs.getName()
 	    old = pkgCs.getOldVersion()
 	    if old:

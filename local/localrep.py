@@ -29,7 +29,7 @@ class LocalRepository(FilesystemRepository):
     def __init__(self, root, path, mode = "r"):
 	self.root = root
 	self.dbpath = path
-	fullPath = root + "/" + path + "/repcache"
+	fullPath = root + "/" + path + "/stash"
 	FilesystemRepository.__init__(self, fullPath, mode)
 
 class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):

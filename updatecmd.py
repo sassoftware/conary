@@ -51,9 +51,9 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 
 	list = []
 	for pkg in pkgList:
-	    if db.repcache.hasPackage(pkg.getName()):
+	    if db.stash.hasPackage(pkg.getName()):
 		# currentVersion could be None
-		currentVersionList = db.repcache.getPackageVersionList(pkg.getName())
+		currentVersionList = db.stash.getPackageVersionList(pkg.getName())
 		if len(currentVersionList) == 1:
 		    currentVersion = currentVersionList[0]
 		elif len(currentVersionList) == 0:
@@ -63,7 +63,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 		    # upgrade all of them look for one on the same branch
 		    # as the one we're installing. if there's a match, great;
 		    # if not, bail
-		    currentVersion = db.repcache.pkgLatestVersion(pkg.getName(), 
+		    currentVersion = db.stash.pkgLatestVersion(pkg.getName(), 
 						     pkg.getVersion().branch())
 		    if not currentVersion:
 			log.error("multiple versions of %s are installed and "
@@ -88,7 +88,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 
 def doErase(db, cfg, pkg, versionStr = None):
     try:
-	pkgList = helper.findPackage(db.repcache, cfg.installbranch, pkg, 
+	pkgList = helper.findPackage(db.stash, cfg.installbranch, pkg, 
 				     versionStr)
     except helper.PackageNotFound, e:
 	log.error(str(e))
@@ -98,5 +98,5 @@ def doErase(db, cfg, pkg, versionStr = None):
     for pkg in pkgList:
 	list.append((pkg.getName(), pkg.getVersion(), None, False))
 
-    cs = db.repcache.createChangeSet(list)
+    cs = db.stash.createChangeSet(list)
     db.commitChangeSet(cs)

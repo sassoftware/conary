@@ -9,6 +9,7 @@ import fsrepos
 import log
 import localrep
 import os
+import trovedb
 import repository
 import update
 import util
@@ -16,7 +17,42 @@ import versions
 
 class AbstractDatabase(repository.AbstractRepository):
 
-    createBranches = 1
+    # XXX some of these interfaces are horribly inefficient as we have
+    # to instantiate a full package object to do anything... 
+    # FilesystemRepository has the same problem
+
+    def getAllTroveNames(self):
+	return self.troveDb.getAllTroveNames()
+
+    def getPackageBranchList(self, name):
+	return [ x.getVersion().branch() for x in 
+		    self.troveDb.iterFindByName(name)]
+
+    def pkgLatestVersion(self, name, branch):
+	return [ x.getVersion() for x in self.troveDb.iterFindByName(name)
+		     if branch.equal(x.getVersion().branch())][0]
+
+    def hasPackage(self, name):
+	return self.troveDb.hasByName(name)
+
+    def getPackageLabelBranches(self, name, nick):
+	rc = []
+	for x in self.troveDb.iterFindByName(name):
+	    b = x.getVersion().branch()
+	    if b.branchNickname().equal(nick):
+		rc.append(b)
+
+	return rc
+
+    def getLatestPackage(self, name, branch):
+	return [ x for x in self.troveDb.iterFindByName(name)
+		     if branch.equal(x.getVersion().branch())][0]
+
+    def getPackageVersionList(self, name):
+	return [ x.getVersion() for x in self.troveDb.iterFindByName(name) ]
+
+    def getFileVersion(self, fileId, version, path = None):
+	return self.stash.getFileVersion(fileId, version)
 
     # takes an abstract change set and creates a differential change set 
     # against a branch of the repository
@@ -134,6 +170,11 @@ class AbstractDatabase(repository.AbstractRepository):
 	    # add new packages
 	    if toStash: job.commit()
 
+	    for pkg in fsJob.getNewPackageList():
+		self.troveDb.addTrove(pkg)
+	    for (name, version) in fsJob.getOldPackageList():
+		self.troveDb.delTrove(name, version)
+
 	    # remove old packages
 	    errList = fsJob.getErrorList()
 	    if errList:
@@ -174,8 +215,10 @@ class AbstractDatabase(repository.AbstractRepository):
 	else:
 	    self.readRollbackStatus()
 
+	self.troveDb = trovedb.TroveDatabase(top, mode)
+
     def close(self):
-	pass
+	self.troveDb = None
 
     def addRollback(self, reposChangeset, localChangeset):
 	rpFn = self.rollbackCache + ("/rb.r.%d" % (self.lastRollback + 1))

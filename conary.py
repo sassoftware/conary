@@ -258,7 +258,7 @@ def main():
 	if otherArgs[1] == "replist":
 	    queryRepos = openRepository(cfg.reppath, "r")
 	else:
-	    queryRepos = openDatabase(cfg.root, cfg.dbpath, "r").repcache
+	    queryRepos = openDatabase(cfg.root, cfg.dbpath, "r")
 
 	if argSet: return usage()
 

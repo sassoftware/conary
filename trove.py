@@ -404,6 +404,10 @@ class Package:
 	self.version = version
 	self.packages = {}
 
+class Trove(Package):
+
+    pass
+
 class PackageChangeSet:
 
     """
@@ -678,6 +682,10 @@ class PackageFromFile(Package):
 
 	Package.__init__(self, name, version)
 	self.read(dataFile)
+
+class TroveFromFile(PackageFromFile):
+
+    pass
 
 def walkPackageSet(repos, pkg):
     """
