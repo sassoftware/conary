@@ -58,7 +58,7 @@ class ArchConfig(ConfigFile):
         'archProp'              : [ BOOLDICT, {} ],
 	'unameArch'	        : [ STRING, None ],
 	'targetArch'	        : [ STRING, None ],
-	'optFlags'	        : [ STRING, '' ],
+	'optFlags'	        : [ STRING, None ],
     } 
 
 

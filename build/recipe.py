@@ -665,7 +665,8 @@ class PackageRecipe(Recipe):
         optFlags = use.Arch._getOptFlags()
         if optFlags is not None:
             self.macros.optflags = optFlags
-
+        else:
+            self.macros.optflags = '-O2'
 	for key in cfg.macroKeys():
 	    self.macros._override(key, cfg['macros.' + key])
 	self.macros.name = self.name

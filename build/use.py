@@ -469,7 +469,7 @@ class ArchCollection(Collection):
 class MajorArch(CollectionWithFlag):
     
     def __init__(self, name, parent, track=False, archProps=None, 
-                 unameArch=None, targetArch=None, optFlags=''):
+                 unameArch=None, targetArch=None, optFlags=None):
         if archProps:
             self._archProps = archProps.copy()
         else:
