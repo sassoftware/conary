@@ -44,8 +44,7 @@ class BuildPackageSet:
     def packageSet(self):
 	return self.pkgs.items()
 
-    def __init__(self, name):
-	self.name = name
+    def __init__(self):
 	self.pkgs = {}
 
 class PackageSpec:
@@ -70,16 +69,7 @@ class PackageSpec:
 	# front-anchor searches
 	return self.regexp.search(string)
 
-class PackageSpecInstance:
-    """An instance of a spec formed by the conjugation of an explicitspec and
-    an autospec"""
-    def __init__(self, instance, explicitspec, autospec):
-	self.instance = instance
-	self.explicitspec  = explicitspec
-	self.autospec = autospec
-
-class PackageSpecSet(dict):
-    """An "ordered dictionary" containing PackageSpecInstances"""
+class BuildPackageGenerator:
     def __init__(self, namePrefix, version, auto, explicit):
 	"""Storage area for (sub)package definitions; keeps
 	automatic subpackage definitions (like runtime, doc,
@@ -92,29 +82,30 @@ class PackageSpecSet(dict):
 	@param version: a versionObject specifying the version of the
 	package, which is used as the version of each subpackage
 	@param auto: automatic subpackage list
-	@type auto: tuple of (name, regex) or (name, (tuple, of
+	@type auto: sequence of PackageSpec instances
 	regex)) tuples
 	@param explicit: explicit subpackage list
-	@type explicit: tuple of (name, regex) or (name, (tuple, of
-	regex)) tuples
+	@type explicit: sequence of PackageSpec instances
 	"""
 	self.auto = auto
 	if explicit:
 	    self.explicit = explicit
 	else:
 	    self.explicit = (PackageSpec('', '.*'), )
-	self.packageList = []
+        # dictionary of all the build packages
+        self.packages = {}
+        # reverse map from the explicitspec/autospec combination to
+        # the correct build package
 	self.packageMap = {}
 	for explicitspec in self.explicit:
 	    for autospec in self.auto:
-		name = self._getname(namePrefix, explicitspec.name, 
-				     autospec.name)
-		self[name] = PackageSpecInstance(BuildPackage(name, version),
-                                                 explicitspec, autospec)
-		self.packageList.append(name)
+		name = self._getname(namePrefix, explicitspec.name,
+                                     autospec.name)
+                package = BuildPackage(name, version)
+		self.packages[name] = package
 		if not self.packageMap.has_key(explicitspec.name):
 		    self.packageMap[explicitspec.name] = {}
-		self.packageMap[explicitspec.name][autospec.name] = self[name]
+		self.packageMap[explicitspec.name][autospec.name] = package
 
     def _getname(self, prefix, subname, autoname):
         """Returns the full name of the package when subname could be None"""
@@ -123,21 +114,39 @@ class PackageSpecSet(dict):
 	else:
 	    return string.join((prefix, autoname), ':')
     
-    def add(self, path, autospec, explicitspec):
-	self.packageMap[explicitspec.name][autospec.name].instance.addFile(path)
+    def addPath(self, path):
+        """addPath takes a pathname and adds it to the correct BuildPackage
+        instance given the explicit/auto spec matches
+        @param path: path to add to the BuildPackage
+        @type path: str
+        """
+	for explicitspec in self.explicit:
+	    if explicitspec.match(path):
+		for autospec in self.auto:
+		    if autospec.match(path):
+			self.packageMap[explicitspec.name][autospec.name].addFile(path)
+			break
+		break
 
+    def packageSet(self):
+        """packageSet examines the packages created by the generator and
+        only returns those which have files in them
+        @return: list of BuildPackages instances
+        @rtype: list
+        """
+        set = BuildPackageSet()
+        for name in self.packages.keys():
+            if self.packages[name].keys():
+                set.addPackage(self.packages[name])
+        return set
+            
+    def walk(self, root):
+        os.path.walk(root, _autoVisit, (root, self))
 
-def Auto(name, root, specSet):
-    os.path.walk(root, autoVisit, (root, specSet))
-
-    set = BuildPackageSet(name)
-    for name in specSet.packageList:
-	if specSet[name].instance.keys():
-	    set.addPackage(specSet[name].instance)
-    return set
-
-def autoVisit(arg, dir, files):
-    (root, specSet) = arg
+def _autoVisit(arg, dir, files):
+    """Helper function called by os.path.walk() when
+    BuildPackageGenerator.walk() is called"""
+    (root, generator) = arg
     dir = dir[len(root):]
 
     for file in files:
@@ -145,11 +154,5 @@ def autoVisit(arg, dir, files):
             path = dir + '/' + file
         else:
             path = '/' + file
-	
-	for explicitspec in specSet.explicit:
-	    if explicitspec.match(path):
-		for autospec in specSet.auto:
-		    if autospec.match(path):
-			specSet.add(path, autospec, explicitspec)
-			break
-		break
+
+        generator.addPath(path)

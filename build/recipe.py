@@ -402,12 +402,12 @@ class Recipe:
 
     def packages(self, namePrefix, version, root):
 	# "None" will be replaced by explicit subpackage list
-	self.packageSpecSet = buildpackage.PackageSpecSet(
-					namePrefix + ":" + self.name,
-					version,
-					self.autoSpecList, None)
-        self.packageSet = buildpackage.Auto(self.name, root,
-                                            self.packageSpecSet)
+	generator = buildpackage.BuildPackageGenerator(
+            namePrefix + ":" + self.name,
+            version,
+            self.autoSpecList, None)
+        generator.walk(root)
+        self.packageSet = generator.packageSet()
 
     def getPackageSet(self):
         return self.packageSet
