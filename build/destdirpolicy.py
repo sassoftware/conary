@@ -434,7 +434,6 @@ class FixupMultilibPaths(policy.Policy):
                 # that properly contains both lib and lib64 items,
                 # and we shouldn't try to fix them.
                 return
-	if os.path.exists(util.joinPaths(destdir, target)):
 	    raise DestdirPolicyError(
 		"Conflicting library files %s and %s installed" %(
 		    path, target))
@@ -442,7 +441,7 @@ class FixupMultilibPaths(policy.Policy):
 		    ' attempting to fix...' %path)
         util.mkdirChain(destdir + targetdir)
         if stat.S_ISREG(mode):
-            util.rename(destdir + path, destdir + target)
+            util.rename(destdir + path, fulltarget)
         else:
             # we should have a symlink that may need the contents changed
             contents = os.readlink(fullpath)
