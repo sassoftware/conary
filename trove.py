@@ -912,7 +912,16 @@ class ThawTroveChangeSet(TroveChangeSet):
 	newFlavor = None
 	for i, l in enumerate(lines[1:4]):
 	    if l.startswith("FLAVOR "):
-		oldFlavorStr, newFlavorStr = l.split(' ', 2)[1:3]
+		lst = l.split(' ')
+
+		### for backwards compatibility
+		if len(lst) == 2:
+		    oldFlavorStr = lst[1]
+		    newFlavorStr = oldFlavorStr
+		elif len(lst) == 3:
+		    oldFlavorStr, newFlavorStr = lst[1:3]
+		else:
+		    assert(0)
 
 		if oldFlavorStr != "-":
 		    oldFlavor = deps.ThawDependencySet(oldFlavorStr)
