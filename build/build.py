@@ -62,6 +62,9 @@ class BuildAction(action.RecipeAction):
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 
     def doAction(self):
+	if self.debug:
+	    import pdb
+	    pdb.set_trace()
 	if self.use:
 	    if self.linenum is None:
 		self.do(self.recipe.macros)

@@ -50,6 +50,8 @@ class Action:
     @cvar keywords: The keywords and default values accepted by the class
     """
 
+    keywords = { 'debug' : False } 
+
     def __init__(self, *args, **keywords):
         assert(self.__class__ is not Action)
 	# keywords will be in the class object, not the instance
@@ -64,6 +66,9 @@ class Action:
                 arg % d
 
     def doAction(self):
+	if self.debug:
+	    import pdb
+	    pdb.set_trace()
 	self.do()
 
     def do(self):
@@ -148,6 +153,9 @@ class RecipeAction(Action):
     # virtual method for actually executing the action
     def doAction(self):
 	global actionobject
+	if self.debug:
+	    import pdb
+	    pdb.set_trace()
 	if self.use:
 	    if self.linenum is None:
 		self.do()
