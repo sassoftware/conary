@@ -199,7 +199,7 @@ def _applyPackageChangeSet(repos, pkgCs, basePkg, fsPkg, root):
 
     return fsPkg
 
-def buildLocalChanges(repos, state, srcPkg, newVersion):
+def buildLocalChanges(repos, state, srcPkg, newVersion, root = ""):
     """
     Builds a change set against the sources in the current directory and
     builds an in-core package object reflecting those local changes.
@@ -214,6 +214,9 @@ def buildLocalChanges(repos, state, srcPkg, newVersion):
     @type srcPkg: package.Package
     @param newVersion: version to use for the newly created package
     @type newVersion
+    @param root: root directory the files are in (ignored for sources, which
+    are assumed to be in the current directory)
+    @type root: str
     """
 
     newState = state.copy()
@@ -221,7 +224,10 @@ def buildLocalChanges(repos, state, srcPkg, newVersion):
     changeSet = changeset.ChangeSet()
 
     for (fileId, (path, version)) in newState.iterFileList():
-	realPath = os.getcwd() + "/" + path
+	if path[0] == '/':
+	    realPath = root + path
+	else:
+	    realPath = os.getcwd() + "/" + path
 
 	try:
 	    os.lstat(realPath)
