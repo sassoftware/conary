@@ -14,7 +14,7 @@
 
 all: subdirs conary-wrapper constants.py
 
-export VERSION = 0.8.2
+export VERSION = 0.8.3
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
@@ -83,6 +83,10 @@ install: all install-mkdirs install-subdirs pyfiles-install
 	ln -sf conary.1 $(DESTDIR)$(mandir)/man1/cvc.1
 
 dist: $(dist_files)
+	if ! grep "^Changes in $(VERSION)" NEWS > /dev/null 2>&1; then \
+		echo "no NEWS entry"; \
+		exit 1; \
+	fi
 	rm -rf $(DISTDIR)
 	mkdir $(DISTDIR)
 	for d in $(SUBDIRS); do make -C $$d DIR=$$d dist || exit 1; done
