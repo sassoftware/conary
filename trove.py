@@ -347,7 +347,7 @@ class PackageSpec:
 	    for subre in relist:
 		if subre[:1] == '/':
 		    subre = '^' + subre
-		if subre[-1:] != /:
+		if subre[-1:] != '/':
 		    subre = subre + '$'
 		tmplist.append('(' + subre + ')')
 	    regexp = string.join(tmplist, '|')
