@@ -132,15 +132,6 @@ class DBTroveFiles:
 	    cu.execute("INSERT INTO DBFileTags VALUES (?, ?)",
 		       streamId, self.tags[tag])
 
-    def updateItem(self, instanceId, fileId, oldVersionId, newVersionId, 
-		   newStream, tags):
-	fileId = encodeFileId(fileId)
-        cu = self.db.cursor()
-	cu.execute("UPDATE DBTroveFiles SET versionId=?, stream=? "
-		   "WHERE fileId=? AND versionId=? AND instanceId=?",
-		   newVersionId, encodeStream(newStream), fileId, 
-		   oldVersionId, instanceId)
-
     def iterPath(self, path):
         cu = self.db.cursor()
 	cu.execute("SELECT instanceId FROM DBTroveFiles WHERE "
