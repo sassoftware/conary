@@ -145,7 +145,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getTroveFlavorsLatestVersion(self, authToken, troveName, branchStr):
 	branch = self.toBranch(branchStr)
 
-	if not self.auth.check(authToken, write = False, trove = pkgName,
+	if not self.auth.check(authToken, write = False, trove = troveName,
 			       label = branch.label()):
 	    raise InsufficientPermission
 
