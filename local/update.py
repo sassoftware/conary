@@ -624,7 +624,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     """
     Populates a change set against the files in the filesystem and builds
     a package object which describes the files installed.  The return
-    is a tuple with a boolean saying if anything changes and a package
+    is a tuple with a boolean saying if anything changed and a package
     reflecting what's in the filesystem; the changeSet is updated as a
     side effect.
 
