@@ -25,7 +25,7 @@ def flags_ix86(baseArch):
         lines = open("/proc/cpuinfo").read().split("\n")
     except IOError:
         lines=[]
-    rc = [ (baseArch, deps.FLAG_SENSE_REQUIRED) ]
+    rc = [ (baseArch, deps.FLAG_SENSE_PREFERRED) ]
     for line in lines:
 	if not line.startswith("flags"): continue
 	fields = line.split()
@@ -33,7 +33,7 @@ def flags_ix86(baseArch):
 
 	for flag in fields[2:]:
 	    if ofInterest.has_key(flag): 
-                rc.append((flag, deps.FLAG_SENSE_REQUIRED))
+                rc.append((flag, deps.FLAG_SENSE_PREFERRED))
 
 	return deps.Dependency('x86', rc)
 
