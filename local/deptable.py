@@ -265,10 +265,6 @@ class DependencyTables:
 
         cu.execute("DROP TABLE suspectDeps")
 
-    #def _resolveStmt(self, providesTable = "Provides", 
-    #                 depTable = "Dependencies",
-    #                 requiresTable = "Requires",
-    #                 includeUnresolved = False):
     def _resolveStmt(self, tableList):
         """
         tableList is a list of (requiresTable, providesTable, depTable)
@@ -303,7 +299,8 @@ class DependencyTables:
 
         return """
                 SELECT depCheck.depNum as depNum,
-                       Matched.provInstId as rsvInstanceId
+                       Matched.reqInstId as reqInstanceId,
+                       Matched.provInstId as provInstanceId
                     FROM (
 %s                       ) AS Matched
                     JOIN DepCheck ON
@@ -484,9 +481,14 @@ class DependencyTables:
         # in the repository, but that something is being explicitly removed
         # and adding it back would be a bit rude!)
         cu.execute("""
-                SELECT depNum, rsvInstanceId, RemovedTroveIds.troveId FROM
-                    (%s) LEFT OUTER JOIN RemovedTroveIds ON
-                        rsvInstanceId == RemovedTroveIds.troveId
+                SELECT depNum, provInstanceId, RemovedTroveIds.troveId FROM
+                    (%s) 
+                    LEFT OUTER JOIN RemovedTroveIds ON
+                        provInstanceId == RemovedTroveIds.troveId
+                    LEFT OUTER JOIN RemovedTroveIds AS Removed ON
+                        reqInstanceId == Removed.troveId
+                    WHERE 
+                        Removed.troveId IS NULL
                 """ % self._resolveStmt([ 
                             ("TmpRequires", "Provides",    "Dependencies"),
                             ("TmpRequires", "TmpProvides", "TmpDependencies") ])
@@ -592,7 +594,7 @@ class DependencyTables:
         cu.execute("""SELECT depNum, Items.item, Versions.version FROM 
                         (%s)
                       JOIN Instances ON
-                        rsvInstanceId == Instances.instanceId
+                        provInstanceId == Instances.instanceId
                       JOIN Items ON
                         Instances.itemId == Items.itemId
                       JOIN Versions ON
