@@ -717,7 +717,7 @@ def fileContentsDiff(oldFile, oldCont, newFile, newCont):
 	    cont = filecontents.FromString("".join(diff))
 	    contType = ChangedFileTypes.diff
 	else:
-	    cont = filecontents.FromString("\n".join(second))
+	    cont = filecontents.FromString("".join(second))
 	    contType = ChangedFileTypes.file
     else:
 	cont = newCont
