@@ -2,12 +2,12 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+
 import deps
 import deps.arch
 import deps.deps
 import os
 import versions
-import sys
 
 class SrsConfiguration:
 

@@ -4,7 +4,6 @@
 #
 
 import files
-import versions
 
 _troveFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"

@@ -7,8 +7,6 @@
 Module implementing the "macro" dictionary class
 """
 
-import log
-
 class Macros(dict):
     def update(self, other):
         for key, item in other.iteritems():
