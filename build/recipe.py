@@ -94,12 +94,19 @@ baseSubFilters = (
 
 class Macros(dict):
     def __setitem__(self, name, value):
-	dict.__setitem__(self, name, value % self)
-
+        # only expand references to ourself
+        d = {name: self.get(name)}
+        # escape any macros in the new value
+        value = value.replace('%', '%%')
+        # unescape refrences to ourself
+        value = value.replace('%%%%(%s)s' %name, '%%(%s)s'%name)
+        # expand our old value when defining the new value
+ 	dict.__setitem__(self, name, value % d)
+        
     # we want keys that don't exist to default to empty strings
     def __getitem__(self, name):
 	if self.has_key(name):
-	    return dict.__getitem__(self, name)
+	    return dict.__getitem__(self, name) %self
 	return ''
     
     def addMacros(self, *macroSet):
