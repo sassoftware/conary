@@ -931,7 +931,7 @@ exit $failed
     testsuite_path = '%(thistestdir)s/conary-testsuite-%(identifier)s'
     keywords = {'ignore'    : [],
 		'recursive' : False,
-		'mungeMake' : True,
+		'autoBuildMakeDependencies' : True,
 		'subdirs'   : [] } 
 
 
@@ -985,6 +985,8 @@ exit $failed
 	    self.chmod(self.macros.destdir, path)
     
     def mungeMakeCommand(self):
+        """ Munge the make command to ignore files
+            that do not need to be rebuilt """
 	if self.ignore is not None:
 	    ignoreFiles = [ 'Makefile', 'config.status' ]
 	    ignoreFiles.extend(self.ignore)
@@ -993,8 +995,11 @@ exit $failed
 	    self.command = makeCmd + '$MAKE' + self.command[4:]
 	    self.macros.command = self.command
 
-    def mungeMakefiles(self, dir, command):
-	# special processing on automake test suites
+    def buildMakeDependencies(self, dir, command):
+        """ build and remove make dependencies so that 
+            when the test suite is run, the makefile does 
+            spuriously require the capability to build any 
+            already built test executables """
 	makefile = dir + '/Makefile'
         makeTarget = self.makeTarget
 	if self.recursive:
@@ -1005,7 +1010,7 @@ exit $failed
 		fullpath = '/'.join([dir,file])
 		if os.path.isdir(fullpath) and os.path.exists(fullpath + '/Makefile'):
 		    self.subdirs.append(fullpath[baselen:])
-		    self.mungeMakefiles(fullpath, command)
+		    self.buildMakeDependencies(fullpath, command)
 	util.execute(r"sed -i -e 's/^%s\s*:\s*\(.*\)/conary-pre-%s: \1\n\n%s:/'  %s" % (makeTarget, makeTarget, makeTarget, makefile))
 	util.execute('cd %s; make %s conary-pre-%s' % (dir, ' '.join(self.makeArgs), makeTarget))
 
@@ -1016,8 +1021,8 @@ exit $failed
 	self.writeCommandScript()
 	command = self.command % macros
 	if command[:4] == 'make':
-            if self.mungeMake:
-                self.mungeMakeCommand()
+            self.mungeMakeCommand()
+            if self.autoBuildMakeDependencies:
                 self.makeArgs = []
                 potentialTargets  = command[5:].split()
                 targets = []
@@ -1028,5 +1033,5 @@ exit $failed
                         self.makeArgs.append(t)
                 for t in targets:
                     self.makeTarget = t
-                    self.mungeMakefiles(util.normpath(self.macros.builddir + os.sep + self.dir), self.command)
+                    self.buildMakeDependencies(util.normpath(self.macros.builddir + os.sep + self.dir), self.command)
 	self.writeTestSuiteScript()
