@@ -29,6 +29,10 @@ FLAG_SENSE_PREFERRED    = 2
 FLAG_SENSE_PREFERNOT    = 3
 FLAG_SENSE_DISALLOWED   = 4
 
+DEP_MERGE_TYPE_NORMAL   = 1         # conflicts are reported
+DEP_MERGE_TYPE_OVERRIDE = 2         # new data wins
+DEP_MERGE_TYPE_PREFS    = 3         # like override, but !ssl beats out ~!ssl
+
 senseMap = { FLAG_SENSE_REQUIRED   : "",
              FLAG_SENSE_PREFERRED  : "~",
              FLAG_SENSE_PREFERNOT  : "~!",
@@ -134,7 +138,7 @@ class Dependency(BaseDependency):
 
 	return True
 
-    def mergeFlags(self, other, override = False):
+    def mergeFlags(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
 	"""
 	Returns a new Dependency which merges the flags from the two
 	existing dependencies. We don't want to merge in place as this
@@ -145,7 +149,14 @@ class Dependency(BaseDependency):
 	"""
 	allFlags = self.flags.copy()
         for (flag, otherSense) in other.flags.iteritems():
-            if override or not allFlags.has_key(flag):
+            if mergeType == DEP_MERGE_TYPE_PREFS and allFlags.has_key(flag) \
+                    and otherSense == FLAG_SENSE_PREFERNOT \
+                    and allFlags[flag] == FLAG_SENSE_DISALLOWED:
+                allFlags[flag] = FLAG_SENSE_DISALLOWED
+                continue
+            elif mergeType == DEP_MERGE_TYPE_OVERRIDE or \
+                 mergeType == DEP_MERGE_TYPE_PREFS    or \
+                        not allFlags.has_key(flag):
                 allFlags[flag] = otherSense
                 continue
 
@@ -199,7 +210,7 @@ class Dependency(BaseDependency):
 
 class DependencyClass:
 
-    def addDep(self, dep, override = False):
+    def addDep(self, dep, mergeType = DEP_MERGE_TYPE_NORMAL):
         assert(dep.__class__ == self.depClass)
 
 	if self.members.has_key(dep.name):
@@ -209,7 +220,7 @@ class DependencyClass:
 
 	    # merge the flags, and add the newly created dependency
 	    # into the class
-	    dep = self.members[dep.name].mergeFlags(dep, override = override)
+	    dep = self.members[dep.name].mergeFlags(dep, mergeType = mergeType)
 	    del self.members[dep.name]
 
 	if not dependencyCache.has_key(dep):
@@ -232,11 +243,11 @@ class DependencyClass:
 
 	return True
 
-    def union(self, other, override = False):
+    def union(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
 	if other is None: return
 	for otherdep in other.members.itervalues():
 	    # calling this for duplicates is a noop
-	    self.addDep(otherdep, override = override)
+	    self.addDep(otherdep, mergeType = mergeType)
 
     def getDeps(self):
         l = self.members.items()
@@ -380,6 +391,9 @@ class DependencySet:
 
 	self.members[tag].addDep(dep)
 
+    def copy(self):
+        return copy.deepcopy(self)
+
     def satisfies(self, other):
 	for tag in other.members:
             # XXX might not be the right semantic for exactMatch
@@ -395,14 +409,14 @@ class DependencySet:
     def getDepClasses(self):
         return self.members
 
-    def union(self, other, override = False):
+    def union(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
         if not other:
             return
 
 	for tag in other.members:
 	    if self.members.has_key(tag):
 		self.members[tag].union(other.members[tag],
-                                        override = override)
+                                        mergeType = mergeType)
 	    else:
 		self.members[tag] = copy.deepcopy(other.members[tag])
 

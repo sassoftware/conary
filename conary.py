@@ -193,7 +193,8 @@ def realMain(cfg, argv=sys.argv):
     if cfg.useDir:
         # the flavor from the rc file wins
         useFlags = conarycfg.UseFlagDirectory(cfg.useDir)
-        useFlags.union(cfg.flavor, override = True)
+        useFlags.union(cfg.flavor, 
+                       mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
         cfg.flavor = useFlags
     
     if not deps.deps.DEP_CLASS_IS in cfg.flavor.getDepClasses():
