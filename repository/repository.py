@@ -366,6 +366,25 @@ class ChangeSetJob:
     def newPackageList(self):
 	return self.packages
 
+    def oldPackage(self, pkg):
+	self.oldPackages.append(pkg)
+
+    def oldPackageList(self):
+	return self.oldPackages
+
+    def oldFile(self, fileId, fileVersion, fileObj):
+	self.oldFiles.append((fileId, fileVersion, fileObj))
+
+    def oldFileList(self):
+	return self.oldFiles
+
+    def addStaleFile(self, path, fileObj):
+	self.staleFiles.append((path, fileObj))
+
+    def staleFileList(self):
+	self.staleFiles.sort()
+	return self.staleFiles
+
     def addFile(self, fileObject):
 	self.files[fileObject.fileId()] = fileObject
 	self.filePaths[fileObject.path] = 1
@@ -407,6 +426,10 @@ class ChangeSetJob:
 						 newFile.restoreContents()):
 		undo.addedFileContents(file.sha1())
 
+	# This doesn't actually remove anything! we never allow bits
+	# to get erased from repositories. The database, which is a child
+	# of this object, does allow removals.
+
     def __init__(self, repos, cs):
 	self.repos = repos
 	self.cs = cs
@@ -414,6 +437,9 @@ class ChangeSetJob:
 	self.packages = []
 	self.files = {}
 	self.filePaths = {}
+	self.oldPackages = []
+	self.oldFiles = []
+	self.staleFiles = []
 
 	fileMap = {}
 
@@ -465,6 +491,17 @@ class ChangeSetJob:
 	    path = fileMap[fileId][0]
 	    self.addFile(ChangeSetJobFile(fileId, file, newVer, path, 
 					  restoreContents))
+
+	for (pkgName, version) in cs.getOldPackageList():
+	    pkg = self.repos.getPackageVersion(pkgName, version)
+	    self.oldPackage(pkg)
+
+	    for (fileId, path, version) in pkg.fileList():
+		file = self.repos.getFileVersion(fileId, version)
+		self.oldFile(fileId, version, file)
+		
+		if not self.containsFilePath(path):
+		    self.addStaleFile(path, file)
 
 class ChangeSetUndo:
 
