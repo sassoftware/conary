@@ -218,13 +218,15 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
         for recipeFile in recipes:
             srcBldPkg[os.path.basename(recipeFile)].isConfig(True)
 
-	(p, fileMap) = _createPackage(repos, buildBranch, srcBldPkg, ident)
-	packageList.append((p, fileMap))
-
+	# build the group before the source package is added to the 
+	# packageList; the package's group doesn't include sources
 	grpName = cfg.packagenamespace + ":" + recipeClass.name
 	grp = package.Package(grpName, newVersion)
 	for (pkg, map) in packageList:
 	    grp.addPackage(pkg.getName(), [ pkg.getVersion() ])
+
+	(p, fileMap) = _createPackage(repos, buildBranch, srcBldPkg, ident)
+	packageList.append((p, fileMap))
 
 	changeSet = changeset.CreateFromFilesystem(packageList)
 	grpDiff = grp.diff(None, abstract = 1)[0]
