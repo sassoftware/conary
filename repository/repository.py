@@ -137,15 +137,6 @@ class AbstractTroveDatabase:
 	"""
 	raise NotImplementedError
 
-    def iterFilesInTroveAncestry(self, troveName, version, flavor):
-	"""
-        Returns a generator for (pathId, path, version, fileObj) tuples
-        for all of the unique file paths ever contained in a trove
-        throughout history. Only one tuple will be return per file
-        path.  The newest version of each file will be returned.
-        """
-	raise NotImplementedError
-
     def walkTroveSet(self, trove, ignoreMissing = True):
 	"""
 	Generator returns all of the troves included by trove, including
