@@ -26,6 +26,7 @@ from lib import sha1helper
 import streams
 import struct
 import trove
+from lib import util
 import versions
 
 from StringIO import StringIO
@@ -575,6 +576,21 @@ class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 
 class ChangeSetFromFile(ChangeSet):
 
+    def fileQueueCmp(a, b):
+        if a[1][0] == "1" and b[1][0] == "0":
+            return -1
+        elif a[1][0] == "0" and b[1][0] == "1":
+            return 1
+
+        if a[0] < b[0]:
+            return -1
+        elif a[0] == b[0]:
+            assert(0)
+        else:
+            return 1
+
+    fileQueueCmp = staticmethod(fileQueueCmp)
+
     def configFileIsDiff(self, fileId):
         (tag, str) = self.configCache.get(fileId, (None, None))
         return tag == ChangedFileTypes.diff
@@ -591,7 +607,9 @@ class ChangeSetFromFile(ChangeSet):
             if self.lastCsf:
                 next = self.lastCsf.getNextFile()
                 if next:
-                    self.fileQueue.append(next + (self.lastCsf,))
+                    util.tupleListBsearchInsert(self.fileQueue, 
+                                                next + (self.lastCsf,),
+                                                self.fileQueueCmp)
                 self.lastCsf = None
 
             while self.fileQueue:
@@ -614,7 +632,8 @@ class ChangeSetFromFile(ChangeSet):
 
                 next = csf.getNextFile()
                 if next:
-                    self.fileQueue.append(next + (csf,))
+                    util.tupleListBsearchInsert(self.fileQueue, next + (csf,),
+                                                self.fileQueueCmp)
 
         if name != fileId:
             raise KeyError, 'fileId %s is not in the changeset' % \
@@ -735,6 +754,21 @@ class ChangeSetFromFile(ChangeSet):
 
             name, tagInfo, f, size = rc
             csf.addFile(name, filecontents.Fromfile(f, size = size), tagInfo)
+
+    def merge(self, otherCs):
+        assert(self.__class__ == otherCs.__class__)
+        assert(not self.lastCsf)
+        assert(not other.lastCsf)
+
+        self.configCache.merge(otherCs.configCache)
+        self.files.merge(otherCs.files)
+        self.primaryTroveList += otherCs.primaryTroveList
+        self.newPackages.merge(otherCs.newPackages)
+        self.oldPackages.merge(otherCs.oldPackages)
+
+        for entry in otherCs.fileQueue:
+            util.tupleListBsearchInsert(self.fileQueue, entry, 
+                                        self.fileQueueCmp)
 
     def __init__(self, file, skipValidate = 1):
 	f = open(file, "r")
