@@ -99,9 +99,9 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	except netserver.InsufficientPermission:
 	    self.send_response(403)
 	    return
-	except:
-	    self.send_response(500)
-	    return
+	#except:
+	#    self.send_response(500)
+	#    return
 
 	resp = xmlrpclib.dumps((result,), methodresponse=1)
 
