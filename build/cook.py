@@ -123,7 +123,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         util.mkdirChain(destdir)
 	recipeObj.doBuild(builddir, destdir)
 	print 'Processing', className
-        recipeObj.doProcess()
+        recipeObj.doDestdirProcess() # includes policy
 
 	repos.open("w")
         
@@ -131,7 +131,8 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         
 	packageList = []
         recipeObj.packages(cfg.packagenamespace, version, destdir)
-        recipeObj.package()
+        recipeObj.doPackagePolicy() # XXX or one line lower?
+        recipeObj.package() # XXX what is this supposed to do?
 
 	for buildPkg in recipeObj.getPackages():
 	    (p, fileMap) = createPackage(repos, cfg, buildPkg, ident)

@@ -12,7 +12,7 @@ import os
 import util
 import build
 import destdirpolicy
-#import packagepolicy
+import packagepolicy
 import shutil
 import types
 import inspect
@@ -408,6 +408,9 @@ class Recipe:
         if self.build is None:
             pass
 	if self.build == []:
+	    print '\n\n\n'
+	    print ' +++ default build rules DEPRECATED, please set build rules explicitly! +++'
+	    print '\n\n\n'
 	    self.build = self.defaultbuild
         elif isinstance(self.build, str):
             util.execute(self.build %self.macros)
@@ -421,16 +424,17 @@ class Recipe:
 	    self.build.doBuild(self.macros)
 
     def addProcess(self, post):
-        self.process.append(post)
+	self.process[:0] = [post] # prepend so that policy is done last
 
-    def doProcess(self):
+    def doDestdirProcess(self):
         for post in self.process:
             post.doProcess(self)
+	for post in self.destdirPolicy:
+            post.doProcess(self)
 
-    def setConfig(self, path):
-        for package in self.packages:
-            if package.has_key(path):
-                package[path].isConfig(True)
+    def doPackagePolicy(self):
+	for policy in self.packagePolicy:
+	    policy.doProcess(self)
 
     def addDevice(self, target, devtype, major, minor, owner, group, perms):
         self._devices.append((target, devtype, major, minor, owner, group, perms))
@@ -460,22 +464,30 @@ class Recipe:
 	 - The public namespace of the build module is accessible,
 	   and build objects are created and put on the build list
 	   automatically when they are referenced.
-	 - The public namespace of the policy module is accessible;
-	   build objects that are already on the process list are returned,
-	   build objects that are not on the process list are added to
-	   it like build objects are added to the build list.
+	 - The public namespaces of the policy modules are accessible;
+	   policy objects already on their respective lists are returned,
+	   policy objects not on ther respective lists are added to
+	   them like build objects are added to the build list.
 	"""
         if not name.startswith('_'):
 	    if build.__dict__.has_key(name):
 		return _recipeHelper(self.build, build.__dict__[name])
 	    if destdirpolicy.__dict__.has_key(name):
 		policyClass = destdirpolicy.__dict__[name]
-		for index in range(len(self.process)):
-		    policyObj = self.process[index]
+		for index in range(len(self.destdirPolicy)):
+		    policyObj = self.destdirPolicy[index]
 		    if isinstance(policyObj, policyClass):
-			return _policyUpdater(self.process, index,
+			return _policyUpdater(self.destdirPolicy, index,
 			                      policyObj, policyClass)
-		return _recipeHelper(self.process, policyClass)
+		return _recipeHelper(self.destdirPolicy, policyClass)
+	    if packagepolicy.__dict__.has_key(name):
+		policyClass = packagepolicy.__dict__[name]
+		for index in range(len(self.packagePolicy)):
+		    policyObj = self.packagePolicy[index]
+		    if isinstance(policyObj, policyClass):
+			return _policyUpdater(self.packagePolicy, index,
+			                      policyObj, policyClass)
+		return _recipeHelper(self.packagePolicy, policyClass)
         return self.__dict__[name]
     
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
@@ -505,7 +517,9 @@ class Recipe:
 	self.defaultbuild = [build.Make(), build.MakeInstall()]
 	self.build = []
 	# what needs to be done to massage the installed tree
-        self.process = destdirpolicy.DefaultPolicy()
+        self.process = []
+        self.destdirPolicy = destdirpolicy.DefaultPolicy()
+        self.packagePolicy = packagepolicy.DefaultPolicy()
 	self.macros = Macros()
 	self.addMacros = self.macros.addMacros
 	self.addMacros(baseMacros)

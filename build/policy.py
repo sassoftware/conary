@@ -104,7 +104,7 @@ class Policy(util.Action):
 		if not self.invariantsubtree:
 		    self.invariantsubtree.append('/')
 		for subtree in self.invariantsubtree:
-		    os.path.walk('%(destdir)s/'+subtree %self.macros,
+		    os.path.walk(('%(destdir)s'+subtree) %self.macros,
 				 _walkFile, self)
 
 
@@ -112,11 +112,12 @@ class Policy(util.Action):
 
 def _walkFile(policyObj, dirname, names):
     # chop off bit not useful for comparison
-    path=dirname[len(policyObj.macros['destdir'])-1:]
+    destdirlen = len(policyObj.macros['destdir'])
+    path=dirname[destdirlen:]
     for name in names:
-       thispath = path + name
-       if _policyInclusion (policyObj, thispath) and \
-          not _policyException(policyObj, thispath):
+       thispath = path + os.sep + name
+       if policyInclusion (policyObj, thispath) and \
+          not policyException(policyObj, thispath):
            policyObj.doFile(thispath)
 
 # external helpers
