@@ -97,7 +97,9 @@ class ImproperlyShared(policy.Policy):
 
 class CheckSonames(policy.Policy):
     """
-    Warns about various possible shared library packaging errors.
+    Warns about various possible shared library packaging errors:
+    C{r.CheckSonames(exceptions=I{filterexp})} for things like directories
+    full of plugins.
     """
     invariantinclusions = [ (r'..*\.so', None, stat.S_IFDIR), ]
     def doFile(self, path):
