@@ -16,14 +16,14 @@ from local import idtable
 import versions
 import time
 
+class MDClass:
+    SHORT_DESC = 0
+    LONG_DESC = 1
+    URL = 2
+    LICENSE = 3
+    CATEGORY = 4
+
 class MetadataTable:
-
-    METADATA_CLASS_SHORT_DESC = 0
-    METADATA_CLASS_LONG_DESC = 1
-    METADATA_CLASS_URL = 2
-    METADATA_CLASS_LICENSE = 3
-    METADATA_CLASS_CATEGORY = 4
-
     def __init__(self, db):
         self.db = db
 
@@ -61,11 +61,11 @@ class MetadataTable:
                 itemId, versionId, branchId)
             mdId = cu.fetchone()[0]
 
-        for mdClass, data in (self.METADATA_CLASS_SHORT_DESC, [shortDesc]),\
-                             (self.METADATA_CLASS_LONG_DESC, [longDesc]),\
-                             (self.METADATA_CLASS_URL, urls),\
-                             (self.METADATA_CLASS_LICENSE, licenses),\
-                             (self.METADATA_CLASS_CATEGORY, categories):
+        for mdClass, data in (MDClass.SHORT_DESC, [shortDesc]),\
+                             (MDClass.LONG_DESC, [longDesc]),\
+                             (MDClass.URL, urls),\
+                             (MDClass.LICENSE, licenses),\
+                             (MDClass.CATEGORY, categories):
             for d in data:
                 cu.execute("""
                     INSERT INTO MetadataItems (metadataId, class, data, language)
@@ -86,9 +86,9 @@ class MetadataTable:
         cu.execute("""SELECT class, data FROM MetadataItems
                       WHERE metadataId=? and (language=?
                             OR class IN (?, ?, ?))""",
-                   metadataId, language, self.METADATA_CLASS_URL,
-                                         self.METADATA_CLASS_LICENSE,
-                                         self.METADATA_CLASS_CATEGORY)
+                   metadataId, language, MDClass.URL,
+                                         MDClass.LICENSE,
+                                         MDClass.CATEGORY)
 
         # create a dictionary of metadata classes
         # each key points to a list of metadata items
