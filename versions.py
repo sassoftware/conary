@@ -293,7 +293,7 @@ class BranchName(AbstractBranch):
 	return self.host
 
     def getNamespace(self):
-	return self.namespce
+	return self.namespace
 
     def __eq__(self, version):
 	if (isinstance(version, BranchName)
