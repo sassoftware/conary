@@ -334,8 +334,16 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	for path in paths:
 	    newFile = self.paths[path]
 	    fileObj = newFile.file()
-	    fileObj.restore(newFile.getContents(), root + path, 
-			    newFile.restoreContents())
+	    cont = newFile.getContents()
+	    fileObj.restore(cont, root + path, newFile.restoreContents())
+
+	    if isinstance(cont, filecontents.WithFailedHunks):
+		f = open(root + path + ".conflicts", "w")
+		f.write("--- current file\n")
+		f.write("+++ missing patches\n")
+		for hunk in cont.getHunks():
+		    hunk.write(f)
+		f.close()
 
 	# remove paths which are no longer valid
 	list = self.staleFileList()
