@@ -501,6 +501,7 @@ class Config(policy.Policy):
     C{r.Config(I{filterexp})}
     """
 
+    # change inclusions to default to none, instead of all files
     keywords = policy.Policy.keywords.copy()
     keywords['inclusions'] = []
 
@@ -566,9 +567,10 @@ class TagDescription(policy.Policy):
     """
     Mark tag description files as such so that conary handles them
     correctly.  By default, every file in %(tagdescriptiondir)s/
-    is marked as a tag description file.
+    is marked as a tag description file.  No file outside of
+    %(tagdescriptiondir)s/ will be considered by this policy.
     """
-    invariantinclusions = [ '%(tagdescriptiondir)s/' ]
+    invariantsubtrees = [ '%(tagdescriptiondir)s/' ]
 
     def doFile(self, file):
 	fullpath = self.macros.destdir + file
@@ -581,9 +583,10 @@ class TagHandler(policy.Policy):
     """
     Mark tag handler files as such so that conary handles them
     correctly.  By default, every file in %(taghandlerdir)s/
-    is marked as a tag handler file.
+    is marked as a tag handler file.  No file outside of
+    %(taghandlerdir)s/ will be considered by this policy.
     """
-    invariantinclusions = [ '%(taghandlerdir)s/' ]
+    invariantsubtrees = [ '%(taghandlerdir)s/' ]
 
     def doFile(self, file):
 	fullpath = self.macros.destdir + file
@@ -1016,6 +1019,9 @@ class FilesForDirectories(policy.Policy):
 	    fullpath = util.joinPaths(d, path)
 	    if os.path.exists(fullpath):
 		if not os.path.isdir(fullpath):
+                    # XXX only report error if directory is included in
+                    # the package; if it is merely in the filesystem
+                    # only log a warning.  Needs to follow ExcludeDirectories...
 		    self.recipe.reportErrors(
 			'File %s should be a directory; bad r.Install()?' %path)
 
@@ -1035,6 +1041,9 @@ class ObsoletePaths(policy.Policy):
 	for path in self.candidates.keys():
 	    fullpath = util.joinPaths(d, path)
 	    if os.path.exists(fullpath):
+                # XXX only report error if directory is included in
+                # the package; if it is merely in the filesystem
+                # only log a warning.  Needs to follow ExcludeDirectories...
 		self.recipe.reportErrors(
 		    'Path %s should not exist, use %s instead'
                     %(path, self.candidates[path]))

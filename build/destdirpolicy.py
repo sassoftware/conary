@@ -602,7 +602,8 @@ class Strip(policy.Policy):
 	self.tryDebuginfo = keywords.pop('debuginfo', True)
 	policy.Policy.updateArgs(self, *args, **keywords)
 
-    def test(self):
+    def preProcess(self):
+        self.invariantsubtrees = [x[0] for x in self.invariantinclusions]
         # see if we can do debuginfo
         self.debuginfo = False
         # we need this for the debuginfo case
@@ -623,7 +624,6 @@ class Strip(policy.Policy):
             self.debuginfo = True
             self.debugfiles = set()
             self.dm.topbuilddir = topbuilddir
-        return True
 
     def doFile(self, path):
 	m = self.recipe.magic[path]
@@ -897,7 +897,7 @@ class NormalizeInitscriptLocation(policy.Policy):
     (if, as is true for the default settings, /etc/rc.d/init.d isn't their
     official location, that is).
     """
-    invariantinclusions = [ '/etc/rc.d/init.d/' ]
+    invariantsubtrees = [ '/etc/rc.d/init.d/' ]
 
     def test(self):
 	return self.macros['initdir'] != '/etc/rc.d/init.d'
@@ -995,7 +995,7 @@ class NormalizePamConfig(policy.Policy):
     You should never need to run
     C{r.NormalizePamConfig(exceptions=I{filterexp})}
     """
-    invariantinclusions = [
+    invariantsubtrees = [
 	'%(sysconfdir)s/pam.d/',
     ]
 

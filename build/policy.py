@@ -176,6 +176,9 @@ class Policy(action.RecipeAction):
 
 	self.rootdir = self.rootdir % self.macros
 
+	if hasattr(self.__class__, 'preProcess'):
+	    self.preProcess()
+
 	# is runtime check implemented?
 	if hasattr(self.__class__, 'test'):
 	    if not self.test():
