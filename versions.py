@@ -130,6 +130,8 @@ class BranchName(AbstractBranch):
 	"""
 	if value.find("@") == -1:
 	    raise ParseError, "@ expected between hostname and branch name"
+	if value.find("/") != -1:
+	    raise ParseError, "/ should not appear in a branch name"
 
 	(self.host, self.branch) = value.split("@", 1)
 	if self.branch.find("@") != -1:
