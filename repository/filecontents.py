@@ -142,7 +142,6 @@ class FromGzFile(FileContents):
     __slots__ = "f"
 
     def copy(self):
-        # XXX dup the file?
         return self.__class__(self.f)
 
     def size(self):
