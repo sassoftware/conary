@@ -108,7 +108,8 @@ class ComponentSpec(_filterSpec):
 		       '.*/include/.*\.h',
 		       '%(includedir)s/',
 		       '%(mandir)s/man(2|3)/',
-		       '%(datadir)s/aclocal/')),
+		       '%(datadir)s/aclocal/',
+		       '%(libdir)s/pkgconfig/')),
 	('lib',       ('.*/lib/.*\.so.*')),
 	# note that gtk-doc is not well-named; it is a shared system, like info,
 	# and is used by unassociated tools (devhelp)
