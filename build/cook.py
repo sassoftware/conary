@@ -104,7 +104,7 @@ class _IdGen:
                 # it only makes sense to fetch regular files, skip
                 # anything that isn't
                 if isinstance(f, files.RegularFile):
-                    lcache.addFileHash(path, f.sha1())
+                    lcache.addFileHash(path, f.contents.sha1())
 
 def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None, 
 	       prep=True, macros=()):
