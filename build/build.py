@@ -558,7 +558,8 @@ class RemoveFiles(BuildAction):
     def do(self, macros):
 	for filespec in self.filespecs:
 	    if self.recursive:
-		util.rmtree("%s/%s" %(macros['destdir'], filespec %macros))
+		util.rmtree("%s/%s" %(macros['destdir'], filespec %macros),
+                            ignore_errors=True)
 	    else:
 		util.remove("%s/%s" %(macros['destdir'], filespec %macros))
 
