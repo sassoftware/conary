@@ -35,6 +35,7 @@ def usage():
     print "               --root <root>"
     print ""
     print "pkglist flags: --all"
+    print "               --ls"
     sys.exit(0)
 
 otherArgs = [ sys.argv[0] ]
@@ -52,6 +53,7 @@ cfgMap["root"] = "root"
 argDef["config"] = 2
 argDef["all"] = 0
 argDef["prep"] = 0
+argDef["ls"] = 0
 
 for arg in cfgMap.keys():
     argDef[arg] = 1
@@ -156,6 +158,9 @@ elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
     all = argSet.has_key('all')
     if all: del argSet['all']
 
+    ls = argSet.has_key('ls')
+    if ls: del argSet['ls']
+
     if otherArgs[1] == "replist":
 	queryRepos = repository.Repository(cfg.reppath, "r")
     else:
@@ -164,7 +169,7 @@ elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
     if argSet: usage
 
     if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	args = [queryRepos, cfg, all] + otherArgs[2:]
+	args = [queryRepos, cfg, all, ls] + otherArgs[2:]
 	display.displayPkgs(*args)
     else:
 	usage()

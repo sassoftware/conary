@@ -11,9 +11,67 @@ import pwd
 import grp
 import util
 import types
+import time
 from datastore import DataStore
 
 class FileMode:
+
+    def triplet(self, code, setbit = 0):
+	list = [ "-", "-", "-" ]
+	if code & 4:
+	    list[0] = "r"
+	    
+	if code & 2:
+	    list[1] = "w"
+
+	if setbit:
+	    if code & 1:
+		list[2] = "s"
+	    else:
+		list[2] = "S"
+	elif code & 1:
+	    list[2] = "x"
+	    
+	return list
+
+    def modeString(self):
+	list = self.triplet(self.thePerms >> 6, self.thePerms & 04000)
+	list = list + self.triplet(self.thePerms >> 3, self.thePerms & 02000)
+	list = list + self.triplet(self.thePerms >> 0)
+	
+	if self.thePerms & 01000:
+	    if list[8] == "x":
+		list[8] = "t"
+	    else:
+		list[8] = "T"
+
+	return self.lsTag + string.join(list, "")
+
+    def sizeString(self):
+	return "%8d" % self.theSize
+
+    def timeString(self):
+	timeSet = time.localtime(int(self.theMtime))
+
+	nowSet = time.localtime(time.time())
+
+	# if this file is more then 6 months old, use the year
+	monthDelta = nowSet[1] - timeSet[1]
+	yearDelta = nowSet[0] - timeSet[0]
+
+	if monthDelta < 0:
+	    yearDelta = yearDelta - 1
+	    monthDelta = monthDelta + 12
+
+	monthDelta = monthDelta + 12 * yearDelta
+
+	if nowSet[2] < timeSet[2]:
+	    monthDelta = monthDelta - 1
+
+	if monthDelta < 6:
+	    return time.strftime("%b %e %H:%M", timeSet)
+	else:
+	    return time.strftime("%b %e  %Y", timeSet)
 
     def perms(self, new = None):
 	if (new != None and new != "-"):
@@ -33,6 +91,12 @@ class FileMode:
 
 	return self.theGroup
 
+    def size(self, new = None):
+	if (new != None and new != "-"):
+	    self.theSize = new
+
+	return self.theSize
+
     def mtime(self, new = None):
 	if (new != None and new != "-"):
 	    self.theMtime = new
@@ -40,8 +104,9 @@ class FileMode:
 	return self.theMtime
 
     def infoLine(self):
-	return "0%o %s %s %s" % (self.thePerms, self.theOwner, self.theGroup,
-				 self.theMtime)
+	return "0%o %s %s %s %s" % (self.thePerms, self.theOwner, 
+				    self.theGroup, self.theSize,
+				    self.theMtime)
 
     def diff(self, them):
 	if not them:
@@ -65,13 +130,14 @@ class FileMode:
     def same(self, other):
 	if self.thePerms == other.thePerms and \
 	   self.theOwner == other.theOwner and \
-	   self.theGroup == other.theGroup:
+	   self.theGroup == other.theGroup and \
+	   self.theSize == other.theSize:
 	    return 1
 
 	return 0
 
     def applyChangeLine(self, line):
-	(p, o, g, m) = string.split(line)
+	(p, o, g, s, m) = string.split(line)
 	if p == "-": 
 	    p = None
 	else:
@@ -81,6 +147,7 @@ class FileMode:
 	self.owner(o)
 	self.group(g)
 	self.mtime(m)
+	self.size(int(s))
 
     def __init__(self, info = None):
 	if info:
@@ -90,6 +157,7 @@ class FileMode:
 	    self.theOwner = None
 	    self.theGroup = None
 	    self.theMtime = None
+	    self.theSize = None
 	
 class File(FileMode):
 
@@ -140,6 +208,8 @@ class File(FileMode):
 
 class SymbolicLink(File):
 
+    lsTag = "l"
+
     def linkTarget(self, newLinkTarget = None):
 	if (newLinkTarget and newLinkTarget != "-"):
 	    self.theLinkTarget = newLinkTarget
@@ -186,6 +256,8 @@ class SymbolicLink(File):
 
 class Socket(File):
 
+    lsTag = "s"
+
     def same(self, other):
 	return File.same(self, other)
 
@@ -196,6 +268,8 @@ class Socket(File):
 	File.__init__(self, fileId, info, infoTag = "s")
 
 class NamedPipe(File):
+
+    lsTag = "p"
 
     def same(self, other):
 	return File.same(self, other)
@@ -211,6 +285,8 @@ class NamedPipe(File):
 
 class Directory(File):
 
+    lsTag = "d"
+
     def same(self, other):
 	return File.same(self, other)
 
@@ -225,8 +301,11 @@ class Directory(File):
 
 class DeviceFile(File):
 
+    def sizeString(self):
+	return "%3d, %3d" % (self.theMajor, self.theMinor)
+
     def infoLine(self):
-	return "v %c %d %d %s" % (self.type, self.major, self.minor,
+	return "%c %d %d %s" % (self.infoTag, self.major, self.minor,
 				  FileMode.infoLine(self))
 
     def same(self, other):
@@ -246,9 +325,7 @@ class DeviceFile(File):
 
 	File.restore(self, target)
 
-    def majorMinor(self, type = None, major = None, minor = None):
-	if type and type != "-":
-	    self.type = type
+    def majorMinor(self, major = None, minor = None):
 	if major:
 	    self.major = major
 	if minor:
@@ -257,7 +334,7 @@ class DeviceFile(File):
 	return (self.type, self.major, self.minor)
 
     def applyChangeLine(self, line):
-	(t, ma, mi, line) = string.split(line, None, 3)
+	(ma, mi, line) = string.split(line, None, 2)
 
 	if ma == "-":
 	    ma = None
@@ -269,16 +346,34 @@ class DeviceFile(File):
 	else:
 	    mi = int(mi)
 
-	self.majorMinor(t, ma, mi)
+	self.majorMinor(ma, mi)
 	File.applyChangeLine(self, line)
 
     def __init__(self, fileId, info = None):
 	if (info):
 	    self.applyChangeLine(info)
 
-	File.__init__(self, fileId, info, infoTag = "v")
+	File.__init__(self, fileId, info, infoTag = self.infoTag)
+
+class BlockDevice(DeviceFile):
+
+    lsTag = "b"
+
+    def __init__(self, fileId, info = None):
+	self.infoTag = "b"
+	DeviceFile.__init__(self, fileId, info)
+
+class CharacterDevice(DeviceFile):
+
+    lsTag = "c"
+
+    def __init__(self, fileId, info = None):
+	self.infoTag = "b"
+	DeviceFile.__init__(self, fileId, info)
 
 class RegularFile(File):
+
+    lsTag = "-"
 
     def sha1(self, sha1 = None):
 	if sha1 and sha1 != "-":
@@ -405,11 +500,11 @@ def FileFromFilesystem(path, fileId, type = None):
     elif (stat.S_ISFIFO(s.st_mode)):
 	f = NamedPipe(fileId)
     elif (stat.S_ISBLK(s.st_mode)):
-	f = DeviceFile(fileId)
-	f.majorMinor("b", s.st_rdev >> 8, s.st_rdev & 0xff)
+	f = BlockDevice(fileId)
+	f.majorMinor(s.st_rdev >> 8, s.st_rdev & 0xff)
     elif (stat.S_ISCHR(s.st_mode)):
-	f = DeviceFile(fileId)
-	f.majorMinor("c", s.st_rdev >> 8, s.st_rdev & 0xff)
+	f = CharacterDevice(fileId)
+	f.majorMinor(s.st_rdev >> 8, s.st_rdev & 0xff)
     else:
 	raise TypeError, "unsupported file type for %s" % path
 
@@ -417,6 +512,7 @@ def FileFromFilesystem(path, fileId, type = None):
     f.owner(pwd.getpwuid(s.st_uid)[0])
     f.group(grp.getgrgid(s.st_gid)[0])
     f.mtime(s.st_mtime)
+    f.size(s.st_size)
 
     return f
 
