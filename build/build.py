@@ -128,6 +128,7 @@ class Configure(BuildCommand):
 	'%%(mkObjdir)s '
 	'%%(cdSubDir)s '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	' LDFLAGS="%%(ldflag)s"'
 	' %(preConfigure)s %%(configure)s'
 	# XXX host/build/target here
 	' --prefix=%%(prefix)s'
@@ -196,6 +197,7 @@ class Make(BuildCommand):
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+		' LDFLAGS="%%(ldflag)s"'
                 ' %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
                 'subDir': ''}
@@ -220,6 +222,7 @@ class MakeParallelSubdir(Make):
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+		' LDFLAGS="%%(ldflag)s"'
                 ' %(preMake)s make %%(mflags)s '
                 ' MAKE="make %%(mflags)s %%(parallelmflags)s" %(args)s')
 
@@ -232,6 +235,7 @@ class MakeInstall(Make):
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+		' LDFLAGS="%%(ldflag)s"'
                 ' %(preMake)s make %%(mflags)s %%(rootVarArgs)s'
 		' %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
@@ -254,6 +258,7 @@ class MakePathsInstall(Make):
     template = (
 	'cd %%(builddir)s/%(subDir)s; '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	' LDFLAGS="%%(ldflag)s"'
 	' %(preMake)s make %%(mflags)s'
 	' prefix=%%(destdir)s/%%(prefix)s'
 	' exec-prefix=%%(destdir)s/%%(exec_prefix)s'

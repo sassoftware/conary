@@ -33,7 +33,7 @@ baseMacros = (
     # paths
     ('prefix'		, '/usr'),
     ('sysconfdir'	, '/etc'),
-    ('initdir'		, '%(sysconfdir)s/rc.d/init.d'), # XXX fixme?
+    ('initdir'		, '%(sysconfdir)s/init.d'),
     ('lib'              , 'lib'),  # may be overridden with 'lib64'
     ('exec_prefix'	, '%(prefix)s'),
     ('bindir'		, '%(exec_prefix)s/bin'),
@@ -53,7 +53,8 @@ baseMacros = (
     ('thisdocdir'       , '%(docdir)s/%(name)s-%(version)s'),
     # arguments/flags (empty ones are for documentation; non-existant = empty)
     ('cc'		, 'gcc'),
-    ('cflags'           , '-O2'),
+    ('cflags'           , '-O2'), # -g when we have debuginfo
+    ('ldflags'		, ''), # -g when we have debuginfo
     ('mflags'		, ''),
     ('parallelmflags'   , ''),
     ('sysroot'		, ''),
