@@ -14,16 +14,15 @@ def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
 	pkg = cfg.packagenamespace + ":" + pkg
 
     for pkgName in repos.getPackageList(pkg):
-	pkgSet = repos.getPackageSet(pkgName)
 	if versionStr or ls:
             displayPkgInfo(repos, cfg, pkgName, versionStr, ls)
             continue
 	else:
 	    if all:
-		l = pkgSet.versionList()
+		l = repos.getPackageVersionList(pkgName)
 		versions.versionSort(l)
 	    else:
-		l = ( pkgSet.getLatestVersion(cfg.defaultbranch), )
+		l = ( repos.pkgLatestVersion(pkgName, cfg.defaultbranch), )
 	    
 	    for version in l:
 		print _pkgFormat % (
@@ -31,9 +30,6 @@ def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
 		    version.asString(cfg.defaultbranch))
 
 def displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
-    if pkgName[0] != ":":
-	pkgName = cfg.packagenamespace + ":" + pkgName
-
     pkgSet = repos.getPackageSet(pkgName)
 
     if versionStr:
@@ -42,12 +38,12 @@ def displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
 	version = versions.VersionFromString(versionStr)
 
 	if version.isBranch():
-	    pkg = pkgSet.getLatestPackage(version)
+	    pkg = repos.getLatestPackage(pkgName, version)
 	else:
-	    pkg = pkgSet.getVersion(version)
+	    pkg = repos.getPackageVersion(pkgName, version)
     else:
-	version = pkgSet.getLatestVersion(cfg.defaultbranch)
-	pkg = pkgSet.getVersion(version)
+	version = repos.pkgLatestVersion(pkgName, cfg.defaultbranch)
+	pkg = repos.getPackageVersion(pkgName, version)
 
     if not ls:
 	print _pkgFormat % (
