@@ -372,20 +372,6 @@ class SharedLibrary(policy.Policy):
 	    self.recipe.autopkg.pathMap[file].tags.set("shlib")
 
 
-class InitScript(policy.Policy):
-    """
-    Mark initscripts as such so that chkconfig will be run.
-    By default, every file in %(initdir)s is marked as an initscript.
-    """
-    invariantinclusions = [ '%(initdir)s/.[^/]*$' ]
-
-    def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    log.debug('initscript: %s', file)
-	    self.recipe.autopkg.pathMap[file].tags.set("initscript")
-
-
 class TagDescription(policy.Policy):
     """
     Mark tag description files as such so that conary handles the
@@ -827,7 +813,6 @@ def DefaultPolicy():
 	EtcConfig(),
 	Config(),
 	SharedLibrary(),
-	InitScript(),
 	TagDescription(),
 	TagSpec(),
 	ParseManifest(),
