@@ -214,6 +214,8 @@ Arch.i386 = True
 Arch.i486 = True
 Arch.i586 = True
 Arch.i686 = True
+Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686
+Arch.x86.setShortDoc('True if any IA32 architecture is set')
 Arch.x86_64 = False
 Arch.sparc = False
 Arch.sparc64 = False
@@ -221,8 +223,8 @@ Arch.ppc64 = False
 Arch.ia64 = False
 Arch.s390 = False
 Arch.s390x = False
-Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686
-Arch.x86.setShortDoc('True if any IA32 architecture is set')
+Arch.s390_all = Arch.s390 | Arch.s390x
+Arch.s390_all.setShortDoc('True if s390 or s390x is set')
 Arch._freeze()
 _addDocs(Arch)
 
