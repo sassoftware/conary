@@ -10,6 +10,11 @@ import os
 import repository
 import versions
 
+# Many comments in this file only make sense if you consider the case
+# where something is being updated from version A to B, and the local
+# branches are called A.local and B.local; this terminology is used throughout
+# the comments in this file
+
 # Every item which is inserted into the database really goes in twice;
 # once as is, and then a LocalBranch is immediately created which reflects
 # what's in the file system. The "as is" copy doesn't include data for
@@ -47,17 +52,22 @@ class Database(repository.LocalRepository):
     # versions which are at the head of our local branch; this means that
     # we require the path to get information on some versions
     def getFileVersion(self, fileId, version, path = None, withContents = 0):
-	(file, contents) = repository.LocalRepository.getFileVersion(
-				    self, fileId, version, withContents = 1)
 	head = self.fileLatestVersion(fileId, version.branch())
+	if not version.isLocal() or (head and not version.equal(head)):
+	    (file, contents) = repository.LocalRepository.getFileVersion(
+					self, fileId, version, withContents = 1)
 
-	if not version.isLocal() or not version.equal(head):
 	    if withContents:
 		return (file, contents)
 	    return file
 
 	assert(path)
 
+	# we can't get the file flags or know if it's a source file by looking
+	# in the filesystem; we don't let the user change those for the local
+	# branch either
+	parentV = version.parent()
+	file = repository.LocalRepository.getFileVersion(self, fileId, parentV)
 	if isinstance(file, files.SourceFile):
 	    localFile = files.FileFromFilesystem(self.root + path, fileId,
 						 type = "src")
@@ -138,8 +148,8 @@ class Database(repository.LocalRepository):
 	map = ( ( None, sourcePath + "/" ), )
 	cs.remapPaths(map)
 
-	# create the change set from the version originally installed
-	# to the one installed on this system
+	# create the change set from A->A.local; this forms part of the
+	# rollback
 	list = []
 	for pkg in cs.getNewPackageList():
 	    name = pkg.getName()
@@ -151,18 +161,32 @@ class Database(repository.LocalRepository):
 
 	localChanges = self.createChangeSet(list)
 
-	job = DatabaseChangeSetJob(self, cs, localChanges)
-	undo = DatabaseChangeSetUndo(self)
-
 	#if makeRollback:
 	#    inverse = cs.invert(self, availableFiles = 1)
 	#    self.addRollback(inverse)
 
+	# Build and commit A->B
+	job = repository.ChangeSetJob(self, cs)
+	undo = repository.ChangeSetUndo(self)
+
 	try:
-	    job.commit(undo, self.root)
+	    job.commit(undo)
 	except:
 	    # this won't work it things got too far, but it won't hurt
 	    # anything either
+	    undo.undo()
+	    raise
+
+	# Create B->B.local. This starts by retargeting A->A.local at
+	# B (which exists in the database thanks to the commit above),
+	# and is filled out by ensuring that every package has a branch
+	# in the local tree
+	try:
+	    dbUndo = DatabaseChangeSetUndo(self)
+	    dbJob = DatabaseChangeSetJob(self, localChanges, job)
+	    dbJob.commit(dbUndo, self.root)
+	except:
+	    dbUndo.undo()
 	    undo.undo()
 	    raise
 
@@ -308,9 +332,15 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	undo.reset()
 
 	# write files to the filesystem, finally
-	for (path, newFile) in self.pathList:
+	paths = self.paths.keys()
+	paths.sort()
+	for path in paths:
+	    (newFile, csWithContents) = self.paths[path]
 	    fileObj = newFile.file()
-	    fileObj.restore(self.cs, root + path, newFile.restoreContents())
+	    fileObj.restore(csWithContents, root + path, 
+			    newFile.restoreContents())
+
+	return 0
 
 	# remove paths which are no longer valid
 	for (path, file) in self.staleFileList():
@@ -334,35 +364,62 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	if not self.containsFilePath(path):
 	    self.addStaleFile(path, fileObj)
 
-    def __init__(self, repos, cs, localCs):
-	repository.ChangeSetJob.__init__(self, repos, cs)
-
+    def __init__(self, repos, localCs, origJob):
 	# list of packages which need to be removed
 	self.oldPackages = []
 	self.oldFiles = []
 	self.staleFiles = []
 
-	# Make sure each package has a local branch; some may have been
-	# created in localCs, and we'd prefer to use that one. Each
-	# local branch uses exclusively local files; the magic in
-	# Database.getFileVersion() makes that work out fine
-	#
-	# iterate over a copy of this list as the real list keeps
-	# growing throughout the loop
-	list = self.newPackageList()[:]
-	for newPkg in list:
-	    if localCs.hasNewPackage(newPkg.getName()):
-		branchPkg = localCs.getNewPackage(newPkg.getName())
-	    branchPkg = newPkg.copy()
-	    ver = branchPkg.getVersion().fork(versions.LocalBranch(), 
-					      sameVerRel = 1)
-	    branchPkg.changeVersion(ver)
+	# Make sure every package in the original change set has a local
+	# branch with the right versions. The target of things in localCS
+	# needs to be the new local branch, and the source is the same
+	# as the target of the original CS (this is creating B->B.local
+	# from A->A.local when origJob is A->B; A, A.local, and B are all
+	# available)
+	for newPkg in origJob.newPackageList():
+	    name = newPkg.getName()
+	    Bver = newPkg.getVersion()
+	    Bloc = Bver.fork(versions.LocalBranch(), sameVerRel = 1)
+	    if not localCs.hasNewPackage(name):
+		Bpkg = repos.getPackageVersion(name, Bver)
+		BlocPkg = Bpkg.copy()
+		BlocPkg.changeVersion(Bloc)
+		BlocCs = BlocPkg.diff(Bpkg)[0]
+	    else:
+		BlocCs = localCs.getNewPackage(name)
+		BlocCs.changeOldVersion(Bver)
+		BlocCs.changeNewVersion(Bloc)
+	    # this overwrites the package if it already exists in the
+	    # change set
+	    localCs.newPackage(BlocCs)
 
+	repository.ChangeSetJob.__init__(self, repos, localCs)
+
+	# walk through every package we're about to commit, and update
+	# the file list to reflect that the files are on the local branch
+	for branchPkg in self.newPackageList():
 	    for (fileId, path, version) in branchPkg.fileList():
 		ver = version.fork(versions.LocalBranch(), sameVerRel = 1)
 		branchPkg.updateFile(fileId, path, ver)
 
-	    self.addPackage(branchPkg)
+	# get the list of files which need to be created; this includes
+	# all of the files mentioned on this job's newFileList as well
+	# as any files which we need to create from the original change
+	# set (as it was committed just to the database, not to the live
+	# filesystem)
+	self.paths = {}
+	for f in origJob.newFileList():
+	    self.paths[f.path()] = (f, origJob.cs)
+
+	for f in self.newFileList():
+	    self.paths[f.path()] = (f, localCs)
+
+	return
+
+	#import sys
+	#import srscfg
+	#localCs.formatToFile(srscfg.SrsConfiguration(), sys.stdout)
+	#sys.exit(0)
 
 	# remove old versions of the packages which are being added; make sure
 	# we get both the version being replaced and the local branch for that
