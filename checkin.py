@@ -129,11 +129,12 @@ class CONARYFileMissing(Exception):
 
 class SourceStateFromFile(SourceState):
 
-    def readFileList(self, dataFile):
-        line = dataFile.next()
-	fileCount = int(line)
+    def readFileList(self, lines):
+	fileCount = int(lines[0][:-1])
 
-        for line in dataFile:
+        for line in lines[1:]:
+            # chop
+            line = line[:-1]
 	    fields = line.split()
 	    pathId = sha1helper.md5FromString(fields.pop(0))
 	    version = fields.pop(-1)
@@ -145,20 +146,26 @@ class SourceStateFromFile(SourceState):
 
     def parseFile(self, filename):
 	f = open(filename)
-	rc = [self]
+        lines = f.readlines()
+        kwargs = {}
+
         for (what, isVer) in [ ('name', 0), ('version', 1), ('branch', 1) ]:
-	    line = f.readline()
+	    line = lines[0][:-1]
+            del lines[0]
 	    fields = line.split()
 	    assert(len(fields) == 2)
 	    assert(fields[0] == what)
 	    if isVer:
-		rc.append(versions.ThawVersion(fields[1]))
+                kwargs[what] = versions.ThawVersion(fields[1])
 	    else:
-		rc.append(fields[1])
+                kwargs[what] = fields[1]
 
-	SourceState.__init__(*rc)
+        required = set(('name', 'version', 'branch'))
+        assert((set(kwargs.keys()) & required) == required)
 
-	self.readFileList(f)
+	SourceState.__init__(self, **kwargs)
+
+	self.readFileList(lines)
 
     def __init__(self, file):
 	if not os.path.isfile(file):
@@ -699,8 +706,6 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     _showChangeSet(repos, cs, old, new)
 
 def diff(repos, versionStr = None):
-    state = SourceStateFromFile("CONARY")
-
     if state.getVersion() == versions.NewVersion():
 	log.error("no versions have been committed")
 	return
