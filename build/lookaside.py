@@ -99,6 +99,48 @@ def _searchRepository(cfg, repCache, name, location):
     return None
 
 
+def fetchURL(cfg, name, location):
+    log.info('Downloading %s...', name)
+    retries = 0
+    url = None
+    while retries < 5:
+        try:
+            url = urllib2.urlopen(name)
+            break
+        except urllib2.HTTPError, msg:
+            if msg.code == 404:
+                _createNegativeCacheEntry(cfg, name[5:], location)
+                return None
+        except urllib2.URLError:
+            _createNegativeCacheEntry(cfg, name[5:], location)
+            return None
+        except socket.error, err:
+            num, msg = err
+            if num == errno.ECONNRESET:
+                log.info('Connection Reset by FTP server'
+                         'while retrieving %s.'
+                         '  Retrying in 10 seconds.', name, msg)
+                time.sleep(10)
+                retries += 1
+            else:
+                _createNegativeCacheEntry(cfg, name[5:], location)
+                return None
+        except IOError, msg:
+            # only retry for server busy.
+            if 'ftp error] 421' in msg:
+                log.info('FTP server busy when retrieving %s.'
+                         '  Retrying in 10 seconds.', name, msg)
+                time.sleep(10)
+                retries += 1
+            else:
+                _createNegativeCacheEntry(cfg, name[5:], location)
+                return None
+    if url is None:
+        return None
+
+    rc = _createCacheEntry(cfg, name, location, url)
+    return rc
+
 def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False):
     """
     searches all locations, including populating the cache if the
@@ -106,67 +148,28 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False):
     autoSource should be True when the file has been pulled from an RPM,
     and so has no path associated but is still auto-added
     """
-    if '/' in name or autoSource:
-        # this needs to come absolutely first to preserve reproducability
-        f = _searchRepository(cfg, repCache, name, location)
-        if f: return f
-
-        # OK, now look in the lookaside cache
-        # this is for sources that will later be auto-added
-        # one way or another
-        f = _searchCache(cfg, name, location)
-        if f and f != -1: return f
-
-        # Need to fetch a file that will be auto-added to the repository
-        # on commit
-        if (name.startswith("http://") or name.startswith("ftp://")) and f != -1:
-            log.info('Downloading %s...', name)
-            retries = 0
-            url = None
-            while retries < 5:
-                try:
-                    url = urllib2.urlopen(name)
-                    break
-                except urllib2.HTTPError, msg:
-                    if msg.code == 404:
-                        _createNegativeCacheEntry(cfg, name[5:], location)
-                        return None
-                except urllib2.URLError:
-                    _createNegativeCacheEntry(cfg, name[5:], location)
-                    return None
-                except socket.error, err:
-                    num, msg = err
-                    if num == errno.ECONNRESET:
-                        log.info('Connection Reset by FTP server'
-                                 'while retrieving %s.'
-                                 '  Retrying in 10 seconds.', name, msg)
-                        time.sleep(10)
-                        retries += 1
-                    else:
-                        _createNegativeCacheEntry(cfg, name[5:], location)
-                        return None
-                except IOError, msg:
-                    # only retry for server busy.
-                    if 'ftp error] 421' in msg:
-                        log.info('FTP server busy when retrieving %s.'
-                                 '  Retrying in 10 seconds.', name, msg)
-                        time.sleep(10)
-                        retries += 1
-                    else:
-                        _createNegativeCacheEntry(cfg, name[5:], location)
-                        return None
-            if url is None:
-                return None
-
-            rc = _createCacheEntry(cfg, name, location, url)
-            return rc
-
-    else:
+    if '/' not in name and not autoSource:
         # these are files that do not have / in the name and are not
         # indirectly fetched via RPMs, so we look in the local directory
         f = util.searchFile(name, srcdirs)
         if f: return f
 
+    # this needs to come as soon as possible to preserve reproducability
+    f = _searchRepository(cfg, repCache, name, location)
+    if f: return f
+
+    # OK, now look in the lookaside cache
+    # this is for sources that will later be auto-added
+    # one way or another
+    f = _searchCache(cfg, name, location)
+    if f and f != -1: return f
+
+    # Need to fetch a file that will be auto-added to the repository
+    # on commit
+    if (name.startswith("http://") or name.startswith("ftp://")) and f != -1:
+        return self.fetchURL(cfg, name, location)
+
+    # could not find it anywhere
     return None
 
 
@@ -198,9 +201,11 @@ class RepositoryCache:
 	if os.path.exists(cachedname):
             sha1Cached = sha1helper.sha1FileBin(cachedname)
         if sha1Cached != sha1:
-            f = self.repos.getFileContents(
-                [ (fileId, troveFileVersion) ])[0].get()
+            fileObj = self.repos.getFileVersion(
+                pathId, fileId, troveFileVersion)
+            f = fileObj.get()
             util.copyfileobj(f, open(cachedname, "w"))
+            fileObj.chmod(cachedname)
         self.cacheMap[fileName] = cachedname
 	return cachedname
 
