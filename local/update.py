@@ -288,7 +288,8 @@ class FilesystemJob:
 		else:
 		    headFileContents = None
 
-		if (not flags & MERGE) or fsFile.same(baseFile, ignoreOwner = True):
+		if (flags & REPLACEFILES) or (not flags & MERGE) or \
+				fsFile.same(baseFile, ignoreOwner = True):
 		    # the contents changed in just the repository, so take
 		    # those changes
 		    if headFileContType == changeset.ChangedFileTypes.diff:
