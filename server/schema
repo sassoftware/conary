@@ -1,0 +1,15 @@
+BEGIN;
+
+CREATE TABLE Users (userId INTERGER PRIMARY KEY,
+		    user STRING UNIQUE,
+		    password STRING);
+CREATE TABLE Branches (branchId INTEGER PRIMARY KEY,
+		       branch STRING UNIQUE);
+CREATE TABLE TroveNames (troveNameId INTEGER PRIMARY KEY,
+		         troveName STRING UNIQUE);
+CREATE TABLE Permissions (userId INTEGER,
+		          branchId INTEGER,
+		          troveId INTEGER);
+CREATE INDEX PermissionsIdx ON Permissions(userId, branchId, troveId);
+
+COMMIT;
