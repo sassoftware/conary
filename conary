@@ -156,14 +156,14 @@ elif (otherArgs[1] == "pkglist"):
 
     if len(otherArgs) >= 2 and len(otherArgs) <= 4:
 	args = [repos, cfg, all] + otherArgs[2:]
-	apply(display.displayPkgs, args)
+	display.displayPkgs(*args)
     else:
 	usage()
 elif (otherArgs[1] == "update"):
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	args = [repos, cfg] + otherArgs[2:]
-	apply(update.doUpdate, args)
+	update.doUpdate(*args)
     else:
 	usage()
 elif (otherArgs[1] == "config"):
