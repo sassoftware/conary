@@ -25,7 +25,14 @@ from lib import util
 import versions
 
 
-STRING, BOOL, LABEL, STRINGDICT, STRINGLIST, CALLBACK, EXEC = range(7)
+(STRING, 
+    BOOL, 
+    LABEL, 
+    STRINGDICT, 
+    STRINGLIST, 
+    CALLBACK, 
+    EXEC, 
+    STRINGPATH) = range(8)
 
 class ConfigFile:
 
@@ -83,6 +90,8 @@ class ConfigFile:
 	    self.__dict__[key][idx] = val
 	elif type == STRINGLIST:
 	    self.__dict__[key].append(val)
+	elif type == STRINGPATH:
+	    self.__dict__[key] = val.split(":")
 	elif type == CALLBACK:
 	    self.__dict__[key]('set', key, val)
 	elif type == LABEL:
@@ -113,6 +122,8 @@ class ConfigFile:
 		print "%-25s %s" % (item, self.__dict__[item])
 	    elif t == LABEL:
 		print "%-25s %s" % (item, self.__dict__[item].asString())
+	    elif t == STRINGPATH:
+		print "%-25s %s" % (item, ":".join(self.__dict__[item]))
 	    elif t == STRINGDICT:
 		d = self.__dict__[item]
 		idxs = d.keys()
@@ -149,7 +160,7 @@ class ConaryConfiguration(ConfigFile):
 	'dbPath'		: '/var/lib/conarydb',
 	'debugRecipeExceptions' : [ BOOL, False ], 
 	'dumpStackOnError'      : [ BOOL, True ], 
-	'installLabel'		: [ LABEL,	 None ],
+	'installLabel'		: [ LABEL, None ],
 	'instructionSet'	: deps.arch.current(),
 	'lookaside'		: '/var/cache/conary',
 	'name'			: None,
