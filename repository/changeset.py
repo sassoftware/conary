@@ -620,8 +620,8 @@ class ReadOnlyChangeSet(ChangeSet):
 	    (tag, contents) = self.configCache[fileId]
 
             if type(contents) == str:
-                cont = filecontents.FromString(str)
-                size = len(str)
+                cont = filecontents.FromString(contents)
+                size = len(contents)
             else:
                 cont = contents
                 size = contents.size()
