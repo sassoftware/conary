@@ -26,7 +26,7 @@ import sys
 import tempfile
 import time
 import types
-import util
+from lib import util
 
 from deps import filedeps, deps
 

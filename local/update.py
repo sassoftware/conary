@@ -35,7 +35,7 @@ import stat
 import sys
 import tempfile
 import trove
-import util
+from lib import util
 import versions
 
 from build import tags

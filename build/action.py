@@ -15,7 +15,7 @@
 from lib import epdb
 from lib import log
 import os
-import util
+from lib import util
 import sys
 import string
 import tempfile

@@ -21,7 +21,7 @@ import deps.arch
 import deps.deps
 import os
 from build import use
-import util
+from lib import util
 import versions
 
 

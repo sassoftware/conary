@@ -61,7 +61,7 @@ from repository import filecontents
 import gzip
 import os
 import struct
-import util
+from lib import util
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
 FILE_CONTAINER_VERSION = 2004082601

@@ -15,7 +15,7 @@
 Base classes used for destdirpolicy and packagepolicy.
 """
 
-import util
+from lib import util
 import filter
 import os
 import action

@@ -36,7 +36,7 @@ import time
 import trove
 import types
 import updatecmd
-import util
+from lib import util
 import versions
 
 # -------------------- private below this line -------------------------

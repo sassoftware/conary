@@ -22,7 +22,7 @@ from repository import repository
 import sqldb
 import trove
 import update
-import util
+from lib import util
 import versions
 from build import tags
 

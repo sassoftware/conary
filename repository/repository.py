@@ -22,7 +22,7 @@ from lib import patch
 import sha1helper
 import tempfile
 import trove
-import util
+from lib import util
 import versions
 
 import filecontents

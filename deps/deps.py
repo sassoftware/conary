@@ -13,7 +13,7 @@
 #
 
 import copy
-import util
+from lib import util
 
 DEP_CLASS_ABI		= 0
 DEP_CLASS_IS		= 1

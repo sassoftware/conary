@@ -26,7 +26,7 @@ import gzip
 from lib import log
 import os
 import struct
-import util
+from lib import util
 
 class DataStore:
 

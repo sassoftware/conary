@@ -29,7 +29,7 @@ a file as explicitly included.  Most policies default to all the files
 they would need to apply to, so C{exceptions} is the most common.
 """
 
-import util
+from lib import util
 import re
 import os
 import stat

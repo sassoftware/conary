@@ -18,7 +18,7 @@ from lib import log
 import os
 import repository
 import repository.netclient
-import util
+from lib import util
 import versions
 
 from deps import deps

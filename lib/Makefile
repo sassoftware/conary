@@ -20,7 +20,8 @@ python_files=	    __init__.py		\
 		    log.py		\
 		    options.py		\
 		    patch.py		\
-		    stackutil.py
+		    stackutil.py	\
+		    util.py
 
 python_modules=elfmodule.so miscmodule.so
 elfmodule_objs=elf.o

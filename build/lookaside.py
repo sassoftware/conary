@@ -13,7 +13,7 @@
 #
 import errno
 import os
-import util
+from lib import util
 import urllib2
 import time
 from lib import log

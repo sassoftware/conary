@@ -12,7 +12,7 @@
 # full details.
 #
 import os
-import util
+from lib import util
 
 import conarycfg
 from local import database

@@ -13,12 +13,12 @@
 #
 
 from build import fixedglob
-from lib import epdb
+import epdb
 import errno
-from lib import log
+import log
 import os
 import shutil
-from lib import stackutil
+import stackutil
 import stat
 import string
 import struct

@@ -18,7 +18,7 @@ import os
 from repository import repository
 import sys
 import trove
-import util
+from lib import util
 import versions
 import conaryclient
 

@@ -32,7 +32,7 @@ import sha1helper
 import sys
 import time
 import trove
-import util
+from lib import util
 import versions
 
 class SourceState(trove.Trove):

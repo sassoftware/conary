@@ -24,7 +24,7 @@ import tempfile
 import transport
 import trove
 import urllib
-import util
+from lib import util
 import versions
 import xmlrpclib
 import xmlshims

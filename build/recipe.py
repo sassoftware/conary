@@ -37,7 +37,7 @@ import tempfile
 import trove
 import types
 import use
-import util
+from lib import util
 import versions
 
 from fnmatch import fnmatchcase
@@ -102,7 +102,8 @@ def setupRecipeDict(d, filename):
     exec 'from build.recipe import GroupRecipe' in d
     exec 'from build.recipe import FilesetRecipe' in d
     exec 'from build.recipe import loadRecipe' in d
-    exec 'import os, re, sys, stat, util' in d
+    exec 'from lib import util' in d
+    exec 'import os, re, sys, stat' in d
     exec 'from build.use import Use, Arch' in d
     d['filename'] = filename
 

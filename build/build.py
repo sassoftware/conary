@@ -24,7 +24,7 @@ the permissions on files in classes derived from _PutFile.
 """
 
 import os
-import util
+from lib import util
 import fixedglob
 from lib import log
 import re

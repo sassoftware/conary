@@ -15,7 +15,7 @@
 import lib.elf
 import os
 import string
-import util
+from lib import util
 
 class Magic:
     def __init__(self, path, basedir):

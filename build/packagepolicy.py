@@ -22,7 +22,7 @@ through eponymous interfaces in recipe.  Most of these policies are rarely
 expected to be invoked in some recipes.
 """
 
-import util
+from lib import util
 import os
 import policy
 from lib import log

@@ -22,7 +22,7 @@ import re
 import sha1helper
 import sqlite3
 import tempfile
-import util
+from lib import util
 import xmlshims
 from repository import repository
 

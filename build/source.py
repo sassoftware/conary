@@ -23,7 +23,7 @@ from lib import log
 import lookaside
 import os
 import rpmhelper
-import util
+from lib import util
 import action
 import string
 

@@ -18,7 +18,7 @@ import commit
 from build import cook
 import os
 import stat
-import util
+from lib import util
 
 from build import buildpackage
 from build import lookaside

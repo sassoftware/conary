@@ -40,7 +40,7 @@ import rollbacks
 import conarycfg
 import srcctl
 import updatecmd
-import util
+from lib import util
 import versions
 import xmlrpclib
 from repository import netclient
