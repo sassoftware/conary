@@ -494,6 +494,29 @@ class ExecutableLibraries(policy.Policy):
 	log.warning('non-executable library %s, changing to mode 0755' %path)
 	os.chmod(fullpath, 0755)
 
+class ReadableDocs(policy.Policy):
+    """
+    Documentation should always be world readable
+    C{r.ReadableDocs(exceptions=I{filterexp})}
+    """
+    invariantsubtrees = [
+	'%(thisdocdir)s/',
+    ]
+
+    def doFile(self, path):
+	d = self.macros['destdir']
+        fullpath = util.joinPaths(d, path)
+	mode = os.lstat(fullpath)[stat.ST_MODE]
+	if not mode & 0004:
+            mode |= 0044
+            isExec = mode & 0111
+            if isExec:
+                mode |= 0011
+            log.warning('non group and world documentation file %s, changing'
+                        ' to mode 0%o' %(path, mode & 07777))
+            os.chmod(fullpath, mode)
+
+
 class Strip(policy.Policy):
     """
     Strips executables and libraries of debugging information.
@@ -870,6 +893,7 @@ def DefaultPolicy(recipe):
 	RemoveNonPackageFiles(recipe),
 	FixupMultilibPaths(recipe),
 	ExecutableLibraries(recipe),
+	ReadableDocs(recipe),
 	Strip(recipe),
 	NormalizeCompression(recipe),
 	NormalizeManPages(recipe),
