@@ -15,8 +15,14 @@ class AbstractVersion:
     Ancestor class for all versions (as opposed to branches)
     """
 
-    def equal(self, other):
-	return self.__class__ == other.__class__
+    def equal(self, version):
+	"""
+	Compares two version-type objects and tells if they are the same
+	or not.
+
+	@rtype: boolean
+	"""
+	return self.__class__ == version.__class__
 
     def __init__(self):
 	pass
@@ -74,12 +80,6 @@ class VersionRelease(AbstractVersion):
 	return self.version
 
     def equal(self, version):
-	"""
-	Compares two version-type objects and tells if they are the same
-	or not.
-
-	@rtype: boolean
-	"""
 	if (type(self) == type(version) and self.version == version.version
 		and self.release == version.release
 		and self.buildCount == version.buildCount):
