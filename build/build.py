@@ -31,10 +31,11 @@ class ShellCommand:
 
 
 class Automake(ShellCommand):
-    template = ('cd %%s; aclocal %%s ; autoconf %(autoConfArgs); automake %(autoMakeArgs)'
+    template = ('cd %%s; aclocal %%s ; %(preAutoconf) autoconf %(autoConfArgs); automake %(autoMakeArgs)'
                 ' %(args)s')
     keywords = {'autoConfArgs': '--force',
                 'autoMakeArgs': '--copy --force',
+		'preAutoconf': '',
                 'm4Dir': ''}
     
     def doBuild(self, dir):
@@ -91,10 +92,23 @@ class InstallFile:
 	self.file = fromFile
 	self.mode = perms
 
-class RemoveFile:
+class InstallSymlink:
 
     def doInstall(self, dir, root):
-	os.remove(root + self.file)
+	os.link(root + self.fromFile, root + self.toFile)
 
-    def __init__(self, file):
-	self.file = file
+    def __init__(self, fromFile, toFile):
+	self.fromFile = fromFile
+	self.toFile = toFile
+
+class RemoveFiles:
+
+    def doInstall(self, dir, root):
+	if self.recursive:
+	    os.system("rm -rf %s/%s" %(dir, self.filespec))
+	else:
+	    os.system("rm -f %s/%s" %(dir, self.filespec))
+
+    def __init__(self, filespec, recursive=0):
+	self.filespec = filespec
+	self.recursive = recursive
