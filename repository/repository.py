@@ -56,6 +56,12 @@ class Repository:
 
 	return list
 
+    def storeFileFromChangeset(self, chgSet, file, pathToFile):
+	if isinstance(file, files.RegularFile):
+	    f = cs.getFileContents(file.sha1())
+	    file.archive(self, f)
+	    f.close()
+
     def __init__(self, path):
 	self.top = path
 
@@ -71,6 +77,10 @@ class Repository:
 # often pointers to the actual file in the file system
 class Database(Repository):
 
+    def storeFileFromChangeset(self, chgSet, file, pathToFile):
+	file.restore(chgSet, self.root + pathToFile)
+
     def __init__(self, root, path):
+	self.root = root
 	fullPath = root + "/" + path
 	Repository.__init__(self, fullPath)
