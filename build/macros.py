@@ -10,6 +10,10 @@ Module implementing the "macro" dictionary class
 import log
 
 class Macros(dict):
+    def update(self, other):
+        for key, item in other.iteritems():
+            self[key] = item
+    
     def __setitem__(self, name, value):
         # only expand references to ourself
         d = {name: self.get(name)}
