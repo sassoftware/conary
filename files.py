@@ -9,7 +9,6 @@ import stat
 import pwd
 import grp
 import util
-import types
 import time
 import socket
 import struct
@@ -230,9 +229,7 @@ class TupleStream(InfoStream):
 			size = struct.unpack("!H", diff[idx:idx + 2])[0]
 			idx += 2
 		    else:
-			assert(0)
-
-		d = diff[idx:size]
+			raise AssertionError
 
 		conflicts = conflicts or \
 		    self.items[i].twm(diff[idx:idx + size], base.items[i])
@@ -257,7 +254,7 @@ class TupleStream(InfoStream):
 		    size = struct.unpack("!H", s[idx:idx + 2])[0]
 		    idx += 2
 		else:
-		    assert(0)
+		    raise AssertionError
 
 		self.items.append(itemType(s[idx:idx + size]))
 
@@ -484,7 +481,7 @@ class File:
 	sameType = struct.unpack("B", diff[0])
 	if not sameType: 
 	    # XXX file type changed -- we don't support this yet
-	    assert(0)
+	    raise AssertionError
 	assert(self.lsTag == base.lsTag)
 	assert(self.lsTag == diff[1])
 	i = 2
@@ -729,8 +726,6 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
     return f
 
 def ThawFile(frz, fileId):
-    type = frz[0]
-
     if frz[0] == "-":
 	return RegularFile(fileId, streamData = frz)
     elif frz[0] == "d":
@@ -746,7 +741,7 @@ def ThawFile(frz, fileId):
     elif frz[0] == "c":
 	return CharacterDevice(fileId, streamData = frz)
 
-    assert(0)
+    raise AssertionError
 
 class FilesError(Exception):
     def __init__(self, msg):
@@ -800,7 +795,7 @@ def fieldsChanged(diff):
     elif type == "p":
 	cl = NamedPipe
     else:
-	assert(0)
+	raise AssertionError
 
     rc = []
 

@@ -48,7 +48,7 @@ def BuildDeviceFile(devtype, major, minor, owner, group, perms):
 	return BuildBlockDeviceFile(major, minor, owner, group, perms)
     elif devtype == "c":
 	return BuildCharacterDeviceFile(major, minor, owner, group, perms)
-    assert(0)
+    raise AssertionError
 
 class BuildPackage(dict):
 

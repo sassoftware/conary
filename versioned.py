@@ -29,11 +29,8 @@ module. The frozen version is written into the database along with the
 file itself (the objects are newline separated).
 """
 
-import __builtin__
-import time
 import string
 import versions
-import types
 import dbhash
 
 _FILE_MAP = "FILEMAP"

@@ -3,11 +3,7 @@
 # All rights reserved
 #
 import copy
-import difflib
 import files
-import helper
-import log
-import patch
 import versions
 
 """
@@ -575,7 +571,6 @@ class PackageChangeSet:
 	if lines:
 	    rc.append("\n".join(lines) + "\n")
         rc = "".join(rc)
-	mainLineCount = rc.count("\n")
 
 	if self.absolute:
 	    hdr = "ABS %s %s\n" % \

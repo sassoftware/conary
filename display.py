@@ -2,11 +2,11 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+
+from repository import repository
 import files
 import helper
 import log
-import package
-import repository
 
 _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"

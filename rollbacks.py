@@ -5,8 +5,6 @@
 
 from local import database
 import log
-import package
-import sys
 
 def listRollbacks(db, cfg):
     for rollbackName in db.getRollbackList():

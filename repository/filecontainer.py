@@ -48,12 +48,10 @@ Each file table entry looks like::
   arbitrary file table data
 """
 
-import gzip
 from repository import filecontents
+import gzip
 import os
-import string
 import struct
-import sys
 import types
 import util
 

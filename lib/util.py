@@ -3,19 +3,16 @@
 # All rights reserved
 #
 
-import os
-import string
+from build import fixedglob
 import errno
+import log
+import os
+import pdb
+import shutil
+import stat
+import string
 import sys
 import traceback
-import pdb
-import exceptions
-from build import fixedglob
-import shutil
-import string
-import log
-import errno
-import stat
 
 # build.py and policy.py need some common definitions
 
@@ -184,9 +181,6 @@ def findFile(file, searchdirs):
     return searchFile(file, searchdirs, error=1)
 
 def excepthook(type, value, tb):
-    #if type is exceptions.IOError:
-        #sys.stderr.write('%s\n' % value)
-        #sys.exit(1)
     sys.excepthook = sys.__excepthook__
     lines = traceback.format_exception(type, value, tb)
     print string.joinfields(lines, "")
@@ -352,7 +346,7 @@ def joinPaths(*args):
 def assertIteratorAtEnd(iter):
     try:
 	iter.next()
-	assert(0)
+	raise AssertionError
     except StopIteration:
 	return True
 

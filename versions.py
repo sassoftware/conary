@@ -10,7 +10,6 @@ ones) are hashable and implement __eq__().
 
 import copy
 import time
-import string
 
 class AbstractVersion:
 

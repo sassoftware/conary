@@ -4,10 +4,9 @@
 # All rights reserved
 #
 
-import checkin
 from repository import fsrepos
 from repository import repository
-import sys
+import checkin
 
 argDef = {}
 argDef['dir'] = 1

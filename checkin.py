@@ -4,7 +4,7 @@
 #
 
 from build import recipe
-
+from local import update
 from repository import changeset
 import cook
 import files
@@ -13,9 +13,7 @@ import log
 import os
 import package
 import sys
-from local import update
 import util
-import versioned
 import versions
 
 class SourceState(package.Package):
