@@ -20,3 +20,11 @@ def listRollbacks(db, cfg):
 
 	print
 
+def apply(db, cfg, *names):
+    list = []
+    for name in names:
+	list.append((db.getRollback(name), name))
+
+    for (rb, name) in list:
+	db.commitChangeSet(cfg.sourcepath, rb, eraseOld = 1)
+	db.removeRollback(name)
