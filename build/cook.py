@@ -438,6 +438,9 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     try:
 	if resume and 'destdir' in bldInfo:
 	    destdir = bldInfo.destdir
+            # this writes destdir back out to the file
+            # in case we need it again
+            bldInfo.destdir = destdir
 	else:
 	    util.mkdirChain(builddir + '/' + recipeObj.mainDir())
 	    util.mkdirChain(cfg.tmpDir)
