@@ -19,7 +19,10 @@ from templates import library
             </tr>
         </thead>
         <tbody>
-            <tr py:for="i, row in enumerate(rows)"
+        <?python #
+        rows = list(enumerate(rows))
+        ?>
+            <tr py:for="i, row in rows"
                 class="{i % 2 and 'even' or 'odd'}">
                 <?python #
                 if row[1]:
@@ -37,6 +40,9 @@ from templates import library
                 <td py:content="row[5] and 'yes' or 'no'"/>
                 <td py:content="row[6] and 'yes' or 'no'"/>
                 <td><a href="deletePerm?groupId={groupId}&amp;labelId={row[0]}&amp;itemId={row[2]}" title="Delete Permission">X</a></td>
+            </tr>
+            <tr py:if="not rows">
+                <td>Group has no permissions.</td>
             </tr>
         </tbody>
     </table>
@@ -79,7 +85,7 @@ from templates import library
                 <tr py:for="i, group in enumerate(netAuth.iterGroups())"
                     class="{i % 2 and 'even' or 'odd'}">
                     <td><b>{group[1]}</b></td>
-                    <td>{permTable(group[0], netAuth.iterPermsByGroupId(group[0]))}</td>
+                    <td py:content="permTable(group[0], netAuth.iterPermsByGroupId(group[0]))"/>
                 </tr>
             </tbody>
         </table>

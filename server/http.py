@@ -227,8 +227,8 @@ class HttpHandler:
    
     def deletePermCmd(self, authToken, fields):
         groupId = str(fields.getfirst("groupId", ""))
-        labelId = str(fields.getfirst("labelId", ""))
-        itemId = str(fields.getfirst("itemId", ""))
+        labelId = fields.getfirst("labelId", None)
+        itemId = fields.getfirst("itemId", None)
 
         self.repServer.auth.deletePermission(groupId, labelId, itemId)
         self.kid_write("notice", message = "Permission deleted.",
