@@ -16,7 +16,7 @@ import grp
 from lib import log
 import os
 import pwd
-import sha1helper
+from lib import sha1helper
 import socket
 import stat
 import streams

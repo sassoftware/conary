@@ -16,7 +16,7 @@ import deps.deps
 import versions
 import files
 import base64
-import sha1helper
+from lib import sha1helper
 
 class NetworkConvertors(object):
 

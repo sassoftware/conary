@@ -28,7 +28,7 @@ from lib import log
 from lib import magic
 import os
 import repository
-import sha1helper
+from lib import sha1helper
 import sys
 import time
 import trove

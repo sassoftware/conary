@@ -19,7 +19,7 @@ import datastore
 import deps.deps
 import files
 from lib import patch
-import sha1helper
+from lib import sha1helper
 import tempfile
 import trove
 from lib import util

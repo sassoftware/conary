@@ -22,7 +22,7 @@ import files
 import os
 from lib import patch
 import repository
-import sha1helper
+from lib import sha1helper
 import streams
 import struct
 import trove

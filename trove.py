@@ -18,7 +18,7 @@ Implements troves (packages, components, etc.) for the repository
 import changelog
 import copy
 import files
-import sha1helper
+from lib import sha1helper
 import streams
 import struct
 import versions

@@ -27,7 +27,7 @@ from lib import log
 import buildinfo, lookaside, use, recipe
 import os
 import resource
-import sha1helper
+from lib import sha1helper
 import shutil
 import signal
 import sys
