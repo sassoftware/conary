@@ -31,7 +31,7 @@ from local import idtable
 from local import sqldb
 from local import versiontable
 
-SERVER_VERSIONS=[6,7,8,9]
+SERVER_VERSIONS=[6,7,8,9,10]
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -456,10 +456,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	return True
 
+    def getFileVersions(self, authToken, clientVersion, fileList):
+	# XXX needs to authentication against the trove the file is part of,
+	# which is unfortunate, though you have to wonder what could be so
+        # special in an inode...
+        r = []
+        for (fileId, version) in fileList:
+            f = self.repos.troveStore.getFile(self.toFileId(fileId), 
+                                              self.toVersion(version))
+            r.append(self.fromFile(f))
+
+        return r
+
     def getFileVersion(self, authToken, clientVersion, fileId, version, 
                        withContents = 0):
 	# XXX needs to authentication against the trove the file is part of,
-	# which is unfortunate
+	# which is unfortunate, though you have to wonder what could be so
+        # special in an inode...
 	f = self.repos.troveStore.getFile(self.toFileId(fileId), 
 					  self.toVersion(version))
 	return self.fromFile(f)
