@@ -115,7 +115,9 @@ class Database(repository.LocalRepository):
 	    else:
 		old = self.getPackageVersion(pkgName, oldVersion)
 
-	    (pkgChgSet, filesNeeded) = newPkg.diff(old, abstract = 0)
+	    # we ignore pkgsNeeded; it doesn't mean much in this case
+	    (pkgChgSet, filesNeeded, pkgsNeeded) =	    \
+		    newPkg.diff(old, abstract = 0)
 	    cs.newPackage(pkgChgSet)
 
 	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
