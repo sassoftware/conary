@@ -21,7 +21,9 @@ def listRollbacks(db, cfg):
 		 pkg.getOldVersion().asString(cfg.defaultbranch))
 
 	for (pkg, version) in rb.getOldPackageList():
-	    print "\t%s %s added" % (pkg, version.asString(cfg.defaultbranch))
+	    print "\t%s %s added" %  \
+			    (package.stripNamespace(cfg.packagenamespace, pkg), 
+			     version.asString(cfg.defaultbranch))
 
 	print
 
