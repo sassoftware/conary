@@ -85,7 +85,7 @@ baseMacros = {
     'sysroot'		: '',
     'march'		: 'i386', # "machine arch"
     'os'		: 'linux',
-    'target'		: 'i386-unknown-linux',
+    'target'		: '%(march)s-unknown-linux',
     'strip'		: 'strip',
     'buildbranch'       : '',
     'buildlabel'        : '',
@@ -648,6 +648,11 @@ class PackageRecipe(Recipe):
 	self.srcdirs = srcdirs
 	self.macros = macros.Macros()
 	self.macros.update(baseMacros)
+        # allow for architecture not to be set -- this could happen 
+        # when storing the recipe e.g. 
+        march = use.Arch._getMarch()
+        if march:
+            self.macros.march = march
 	for key in cfg.macroKeys():
 	    self.macros._override(key, cfg['macros.' + key])
 	self.macros.name = self.name

@@ -123,6 +123,9 @@ def realMain(cfg, argv=sys.argv):
         sys.exit(0)
 
     cfg.initializeFlavors()
+    # set the build flavor here, just to set architecture information 
+    # which is used when initializing a recipe class
+    use.setBuildFlagsFromFlavor(None, cfg.flavor, error=False)
     sourceCommand(cfg, otherArgs[1:], argSet)
 
 def sourceCommand(cfg, args, argSet):

@@ -71,6 +71,9 @@ class Flag(dict):
         # XXX we don't do anything with this documentation currently.
         self._shortDoc = doc
 
+    def setRequired(self, value=True):
+        self._required = value 
+
     def _set(self, value=True):
         self._value = value
 
@@ -106,6 +109,7 @@ class Flag(dict):
 
     def _trackUsed(self, value):
         self._tracking = value
+
 
      # --- boolean operations on Flags ---
 
@@ -428,16 +432,35 @@ class ArchCollection(Collection):
                 for flag in child._iterAll():
                     yield flag
 
+    def _getMarch(self):
+        """ return the appropriate march flag for the currently set 
+            build flags.
+        """
+        for majarch in self.itervalues():
+            if majarch._get():
+                return majarch._getMarch()
+
+    def getCurrentArch(self):
+        for majarch in self.itervalues():
+            if majarch._get():
+                return majarch
 
 class MajorArch(CollectionWithFlag):
     
-    def __init__(self, name, parent, track=False, archProps=None):
+    def __init__(self, name, parent, track=False, archProps=None, march=None):
         if archProps:
             self._archProps = archProps.copy()
         else:
             self._archProps = {}
+        self._march = march
         self._collectionType = SubArch
         CollectionWithFlag.__init__(self, name, parent, track=track)
+
+    def _getMarch(self):
+        for subArch in self.itervalues():
+            if subArch._get() and subArch._march:
+                return subArch._march
+        return self._march
 
     def _getNonExistantKey(self, key):
         if self._strictMode:
@@ -482,11 +505,12 @@ class MajorArch(CollectionWithFlag):
 
 class SubArch(Flag):
 
-    def __init__(self, name, parent, track=False, subsumes=None):
+    def __init__(self, name, parent, track=False, subsumes=None, march=None):
         if not subsumes:
             self._subsumes = []
         else:
             self._subsumes = subsumes
+        self._march = march
         Flag.__init__(self, name, parent, required=True, track=track)
 
     def _toDependency(self):
@@ -495,6 +519,9 @@ class SubArch(Flag):
             value of this subarch is true
             (better comment about why we do that here) 
         """
+        if self._name == '3dnow':
+            from lib import epdb
+            epdb.set_trace('foo')
             
         set = deps.DependencySet() 
         sense = self._getDepSense()

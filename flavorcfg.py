@@ -16,7 +16,8 @@ class SubArchConfig(ConfigFile):
         'subsumes'              : [ STRING, ''   ],
 	'buildRequired'	        : [ BOOL,   True ],
 	'shortDoc'	        : [ STRING, '' ],
-	'longDoc'	        : [ STRING, '' ] 
+	'longDoc'	        : [ STRING, '' ],
+	'march'	                : [ STRING, None ],
     } 
 
 
@@ -26,6 +27,7 @@ class ArchConfig(ConfigFile):
 
     defaults = {
 	'name'	                : [ STRING, None ],
+	'march'	                : [ STRING, None ],
 	'buildName'	        : [ STRING, None ],
 	'shortDoc'	        : [ STRING, '' ],
 	'longDoc'	        : [ STRING, '' ],
@@ -79,7 +81,10 @@ class ArchConfig(ConfigFile):
 
 
     def addArchFlags(self):
-        use.Arch._addFlag(self.name, archProps = self.archProp)
+        if not self.march:
+            self.march = self.name
+        use.Arch._addFlag(self.name, archProps = self.archProp, 
+                                            march=self.march)
                                      
         for subArchName in self.sections:
             subArch = self.sections[subArchName]
@@ -94,7 +99,8 @@ class ArchConfig(ConfigFile):
             subArch.subsumes = newSubsumes
 
             use.Arch[self.name]._addFlag(subArch.name,
-                                         subsumes=subArch.subsumes)
+                                         subsumes=subArch.subsumes, 
+                                         march=subArch.march)
             if subArch.buildName and subArch.buildName != subArch.name:
                 use.Arch[self.name]._addAlias(subArch.name, subArch.buildName)
 
