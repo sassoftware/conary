@@ -358,13 +358,31 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     # build the group before the source package is added to the 
     # packageList; the package's group doesn't include :source
     grpName = recipeClass.name
-    grp = package.Package(grpName, newVersion, None)
+
+    requires = deps.deps.DependencySet()
+    provides = deps.deps.DependencySet()
+    flavor = deps.deps.DependencySet()
+
+    pkgList = []
 
     for buildPkg in recipeObj.getPackages(newVersion):
 	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, ident)
+
+	pkgList.append((p, fileMap))
+
+	requires.union(p.getRequires())
+	provides.union(p.getProvides())
+	flavor.union(p.getFlavor())
+
+    grp = package.Package(grpName, newVersion, flavor)
+    grp.setRequires(requires)
+    grp.setProvides(provides)
+
+    for (p, fileMap) in pkgList:
 	built.append((p.getName(), p.getVersion().asString()))
 	packageList.append((p, fileMap))
 	grp.addTrove(p.getName(), p.getVersion(), p.getFlavor())
+
 
     changeSet = changeset.CreateFromFilesystem(packageList)
     changeSet.addPrimaryPackage(grpName, newVersion, None)
