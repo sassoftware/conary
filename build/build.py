@@ -705,6 +705,39 @@ class InstallDocs(_FileAction):
 	else:
 	    self.paths = args
 
+class CreateFiles(_FileAction):
+    """
+    The CreateFile class puts a file in the destdir.  Without contents
+    specified it is rather like C{touch}; with contents specified it
+    is more like C{cat > foo <<EOF ... EOF}
+    @keyword contents: The (optional) contents of the file
+    @keyword macros: Whether or not to interpolate macros into the contents
+    @keyword mode: The mode of the file (defaults to 0644)
+    """
+    keywords = {'contents': '',
+		'macros': True,
+		'mode': 0644}
+    def do(self, macros):
+	if self.macros:
+	    contents = self.contents %macros
+	else:
+	    contents = self.contents
+	for bracepath in self.paths:
+	    for path in util.braceExpand(bracepath %macros):
+		fullpath = util.joinPaths(macros['destdir'], path)
+		util.mkdirChain(os.path.dirname(fullpath))
+		f = file(fullpath, 'w')
+		f.write(contents)
+		f.close()
+		self.setComponents(path)
+		self.chmod(macros['destdir'], path)
+    def __init__(self, *args, **keywords):
+        _FileAction.__init__(self, *args, **keywords)
+	if type(args[0]) is tuple:
+	    self.paths = args[0]
+	else:
+	    self.paths = args
+
 class MakeDirs(_FileAction):
     """
     The MakeDirs class creates directories in destdir
