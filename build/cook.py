@@ -139,18 +139,23 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 				    buildBranch, binary = True)
 
     if issubclass(recipeClass, recipe.PackageRecipe):
-	(cs, built, cleanup) = cookPackageObject(repos, cfg, recipeClass, 
-				    newVersion, buildBranch,
-				    prep = prep, macros = macros)
+	ret = cookPackageObject(repos, cfg, recipeClass, 
+                                newVersion, buildBranch,
+                                prep = prep, macros = macros)
     elif issubclass(recipeClass, recipe.GroupRecipe):
-	(cs, built, cleanup) = cookGroupObject(repos, cfg, recipeClass, 
-				    newVersion, buildBranch, macros = macros)
+	ret = cookGroupObject(repos, cfg, recipeClass, 
+                              newVersion, buildBranch, macros = macros)
     elif issubclass(recipeClass, recipe.FilesetRecipe):
-	(cs, built, cleanup) = cookFilesetObject(repos, cfg, recipeClass, 
-				    newVersion, buildBranch, macros = macros)
+	ret = cookFilesetObject(repos, cfg, recipeClass, 
+                                newVersion, buildBranch, macros = macros)
     else:
 	assert(0)
+
+    # cook*Object returns None if using prep
+    if ret is None:
+        return []
     
+    (cs, built, cleanup) = ret
     if changeSetFile:
 	cs.writeToFile(changeSetFile)
     else:
