@@ -526,12 +526,15 @@ class ConaryClient:
                                            recurse = False)
         cs.merge(newCs)
 
-        self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
-                                tagScript = tagScript, 
-                                keepExisting = keepExisting,
-                                test = test, justDatabase = justDatabase,
-                                journal = journal,
-                                localRollbacks = localRollbacks)
+        try:
+            self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
+                                    tagScript = tagScript, 
+                                    keepExisting = keepExisting,
+                                    test = test, justDatabase = justDatabase,
+                                    journal = journal,
+                                    localRollbacks = localRollbacks)
+        except database.CommitError, e:
+            raise UpdateError, "changeset cannot be applied"
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):

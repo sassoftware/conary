@@ -57,9 +57,10 @@ def listRollbacks(db, cfg):
 
 	print
 
-def apply(db, repos, cfg, *names):
+def apply(db, repos, cfg, *names, **kwargs):
+    replaceFiles = kwargs.get('replaceFiles', False)
     try:
-	db.applyRollbackList(repos, names)
+	db.applyRollbackList(repos, names, replaceFiles=replaceFiles)
     except database.RollbackError, e:
 	log.error("%s", e)
 	return 1

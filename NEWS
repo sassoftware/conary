@@ -9,6 +9,9 @@ Changes in 0.50.8:
   * --no-recurse works on the erase path
   * fix to walkTroveSet (which was horribly broken)
   * enable (optional) dependency checking when building groups
+  * 'cvc cook' error output when there are unresolved build
+    requirements is more user friendly
+  * filesystem conflicts are handled properly when applying a rollback
 
 Changes in 0.50.7:
   * Added the XInetdService action to avoid having to include

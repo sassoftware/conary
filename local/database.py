@@ -394,9 +394,7 @@ class Database(SqlDbRepository):
         errList = fsJob.getErrorList()
         if errList:
             for err in errList: log.error(err)
-            # FIXME need a --force for this
-            return
-
+            raise CommitError, 'file system job contains errors'
         if test:
             return
 
@@ -524,7 +522,7 @@ class Database(SqlDbRepository):
 
 	return rc
 
-    def applyRollbackList(self, repos, names):
+    def applyRollbackList(self, repos, names, replaceFiles=False):
 	last = self.lastRollback
 	for name in names:
 	    if not self.hasRollback(name):
@@ -545,9 +543,15 @@ class Database(SqlDbRepository):
                                 for x in reposCs.oldPackages ]
                 reposCs = repos.createChangeSet(jobList, recurse = False)
 
-	    self.commitChangeSet(reposCs, isRollback = True)
-	    self.commitChangeSet(localCs, isRollback = True, toStash = False)
-	    self.removeRollback(name)
+            try:
+                self.commitChangeSet(reposCs, isRollback = True,
+                                     replaceFiles = replaceFiles)
+                self.commitChangeSet(localCs, isRollback = True,
+                                     toStash = False,
+                                     replaceFiles = replaceFiles)
+                self.removeRollback(name)
+            except CommitError:
+                raise RollbackError(name)
     
     def findTrove(self, labelPath, troveName, reqFlavor=None, 
                                               versionStr = None):
@@ -685,19 +689,29 @@ class RollbackError(Exception):
 
     """Base class for exceptions related to applying rollbacks"""
 
+    def __init__(self, rollbackName):
+	"""
+        Create new new RollbackrError
+	@param rollbackName: string represeting the name of the rollback
+        """
+	self.name = rollbackName
+
+    def __str__(self):
+	return "rollback %s cannot be applied" % self.name
+
 class RollbackOrderError(RollbackError):
 
     """Raised when an attempt is made to apply rollbacks in the
        wrong order"""
 
     def __str__(self):
-	return "rollback %s can not be applied out of order" % self.name
+	return "rollback %s cannot be applied out of order" % self.name
 
     def __init__(self, rollbackName):
 	"""Create new new RollbackOrderError
 	@param rollbackName: string represeting the name of the rollback
 	which was trying to be applied out of order"""
-	self.name = rollbackName
+        RollbackError.__init__(self, rollbackName)
 
 class RollbackDoesNotExist(RollbackError):
 
@@ -711,7 +725,7 @@ class RollbackDoesNotExist(RollbackError):
 	"""Create new new RollbackOrderError
 	@param rollbackName: string represeting the name of the rollback
 	which does not exist"""
-	self.name = rollbackName
+        RollbackError.__init__(self, rollbackName)
 
 class SourcePackageInstall(DatabaseError):
 
@@ -739,3 +753,7 @@ class MissingDependencies(Exception):
 
     def __init__(self, depList):
         self.depList = depList
+
+class CommitError(repository.CommitError):
+    pass
+

@@ -100,7 +100,9 @@ def usage(rc = 1):
     print "                 --ls"
     print "                 --sha1s"
     print "                 --tags"
-    print " "
+    print
+    print "rollback flags:  --replace-files"
+    print
     print "showcs flags:    --full-versions"
     print "                 --info"
     print "                 --ls"
@@ -379,11 +381,15 @@ def realMain(cfg, argv=sys.argv):
 	    log.warning("%s has already been removed", fullPath)
 	db.removeFile(otherArgs[2])
     elif (otherArgs[1] == "rollback"):
+        kwargs = {}
+	if argSet.has_key('replace-files'):
+	    kwargs['replaceFiles'] = True
+	    del argSet['replace-files']
 	if argSet: return usage()
 	repos = openRepository(cfg.repositoryMap)
 	db = openDatabase(cfg.root, cfg.dbPath)
 	args = [db, repos, cfg] + otherArgs[2:]
-	rollbacks.apply(*args)
+	rollbacks.apply(*args, **kwargs)
     elif (otherArgs[1] == "verify"):
 	db = openDatabase(cfg.root, cfg.dbPath)
         all = argSet.has_key('all')

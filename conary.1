@@ -164,9 +164,15 @@ not performed.
 .B rblist
 Lists available rollbacks.
 .TP
-.B rollback \fIrollback\fP
+.B rollback \fIrollback\fP [\fIargs\fP] 
 Applies rollback \fIrollback\fP.  (Syntax may change in future versions
 of Conary.)
+Arguments include
+.RS 4
+.TP 4
+.B \-\-replace-files
+See \-\-replace-files description from \fBconary update\fP
+.RE
 .TP
 .B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
 Lists troves in the repository.
