@@ -674,8 +674,6 @@ class _GroupOrRedirectRecipe(Recipe):
                     else:
                         raise AssertionError
                     desFlavor.union(flavor, deps.DEP_MERGE_TYPE_OVERRIDE)
-                sys.stderr.write('findtrove: %s %s %s\n' %(name, desFlavor, versionStr))
-                sys.stderr.flush()
                 pkgList = self.repos.findTrove(self.label, name, desFlavor,
                                                versionStr = versionStr)
             except repository.TroveNotFound, e:
