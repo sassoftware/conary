@@ -4,10 +4,9 @@
 #
 
 """
-The buildpackage module contains classes used during the build process
-to collect files into BuildPackages.  These BuildPackages are used to
-create Packages and create changesets from the files created during the
-build process
+Contains classes used during the build process to collect files
+into BuildPackages.  These BuildPackages are used to create Packages
+and create changesets from the files created during the build process
 """
 
 import string

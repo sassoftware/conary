@@ -2,9 +2,10 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+
 """
-The recipe module contains the base Recipe class, default macros,
-and miscellaneous components used by srs .recipe files
+Contains the base Recipe class, default macros, and miscellaneous
+components used by srs .recipe files
 """
 
 import imp, sys

@@ -2,9 +2,9 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+
 """
-The rpmhelper module contains functions to assist in dealing with rpm
-files.
+Contains functions to assist in dealing with rpm files.
 """
 
 import struct
