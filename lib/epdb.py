@@ -37,7 +37,7 @@ class Epdb(pdb.Pdb):
     # and restore stdout when done
     __old_stdout = None
     # used to track the number of times a set_trace has been seen
-    trace_counts = {}
+    trace_counts = {'default' = [ True, 0 ]}
 
     def __init__(self):
         self._exc_type = None
@@ -367,9 +367,9 @@ class Epdb(pdb.Pdb):
             curCount += 1
         except KeyError:
             (cond, curCount) = None, 1
-        if cond is None or cond is True:
+        if cond is True:
             rv = True
-        elif cond is False:
+        elif cond is None or cond is False:
             rv = False
         else:
             try:
