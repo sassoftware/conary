@@ -158,7 +158,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 	# need to get the timestamps (and the branch has to exist)
 	try:
 	    ver = repos.getTroveLatestVersion(fullName, buildBranch)
-	except repository.PackageMissing:
+	except repository.TroveMissing:
 	    raise CookError('Branch %s does not exist for trove %s'
 			    % (buildBranch.asString(), fullName))
 
@@ -341,7 +341,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     srcName = fullName + ':source'
     try:
         srcVersion = repos.getTroveLatestVersion(srcName, buildBranch)
-    except repository.PackageMissing:
+    except repository.TroveMissing:
         srcVersion = None
     if srcVersion:
         for f in repos.iterFilesInTrove(srcName, srcVersion, None,

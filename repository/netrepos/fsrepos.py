@@ -16,7 +16,7 @@ import trovestore
 from repository.repository import AbstractRepository
 from repository.repository import DataStoreRepository
 from repository.repository import ChangeSetJob
-from repository.repository import PackageMissing
+from repository.repository import TroveMissing
 from repository import changeset
 from repository import filecontents
 
@@ -97,13 +97,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         try:
             return self.troveStore.troveLatestVersion(pkgName, branch)
         except KeyError:
-            raise PackageMissing(pkgName, branch)
+            raise TroveMissing(pkgName, branch)
 
     def getTrove(self, pkgName, version, flavor, pristine = True):
 	try:
 	    return self.troveStore.getTrove(pkgName, version, flavor)
 	except KeyError:
-	    raise PackageMissing(pkgName, version)
+	    raise TroveMissing(pkgName, version)
 
     def eraseTrove(self, pkgName, version, flavor):
 	self.troveStore.eraseTrove(pkgName, version, flavor)

@@ -75,7 +75,7 @@ class AbstractTroveDatabase:
     def getTrove(self, troveName, version, flavor):
 	"""
 	Returns the trove which matches (troveName, version, flavor). If
-	the trove does not exist, PackageMissing is raised.
+	the trove does not exist, TroveMissing is raised.
 
 	@param troveName: package name
 	@type troveName: str
@@ -160,7 +160,7 @@ class AbstractTroveDatabase:
 
 		for (trove, version, flavor) in trove.iterTroveList():
 		    troveList += [ x for x in trove.iterTroveList() ]
-	    except PackageMissing:
+	    except TroveMissing:
 		if not ignoreMissing:
 		    raise
 
@@ -256,7 +256,7 @@ class IdealRepository(AbstractTroveDatabase):
     def getTroveLatestVersion(self, troveName, branch):
 	"""
 	Returns the version of the latest version of a trove on a particular
-	branch. If that branch doesn't exist for the trove, PackageMissing
+	branch. If that branch doesn't exist for the trove, TroveMissing
 	is raised. The version returned includes timestamps.
 
 	@param troveName: trove name
@@ -323,7 +323,7 @@ class IdealRepository(AbstractTroveDatabase):
 		try:
 		    label = versions.BranchName(versionStr)
 		except versions.ParseError:
-		    raise PackageMissing, "invalid version %s" % versionStr
+		    raise TroveMissing, "invalid version %s" % versionStr
 	    else:
 		label = defaultLabel
 
@@ -363,7 +363,7 @@ class IdealRepository(AbstractTroveDatabase):
 		    version = self.getTroveLatestVersion(name, version)
 
 		versionDict = { name : [ version] }
-	    except PackageMissing, e:  
+	    except TroveMissing, e:  
 		raise PackageNotFound, str(e)
 
 	flavorDict = self.getTroveVersionFlavors(versionDict)
@@ -504,9 +504,6 @@ class TroveMissing(RepositoryError):
             self.type = 'component'
         else:
             self.type = 'package'
-
-class PackageMissing(TroveMissing):
-    troveType = "package"
 
 class ChangeSetJobFile(object):
 

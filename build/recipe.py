@@ -200,7 +200,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
 				  cfg.buildLabel.asString())
 
 	sourceComponent = pkgs[0]
-    except repository.PackageMissing:
+    except repository.TroveMissing:
         raise RecipeFileError, 'cannot find source component %s' % component
 
     (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name)

@@ -63,7 +63,7 @@ class SqlDbRepository(repository.DataStoreRepository,
 	l = [ x for x in self.db.iterFindByName(name, pristine = pristine)
 		 if version == x.getVersion() and flavor == x.getFlavor()]
 	if not l:
-	    raise repository.PackageMissing(name, version)
+	    raise repository.TroveMissing(name, version)
 	assert(len(l) == 1)
 	return l[0]
 

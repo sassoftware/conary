@@ -461,7 +461,7 @@ class ChangeSet:
 	    # it's already in use we won't be able to though
 	    try:
 		repos.getTrove(name, newVer, pkgCs.getFlavor())
-	    except repository.PackageMissing: 
+	    except repository.TroveMissing: 
 		pass
 	    else:
 		branch = oldVer.fork(targetBranchLabel, sameVerRel = 0)

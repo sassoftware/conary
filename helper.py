@@ -84,7 +84,7 @@ def nextVersion(repos, troveName, versionStr, troveFlavor, currentBranch,
         try:
             sourceVersion = repos.getTroveLatestVersion(sourceName, 
                                                         currentBranch)
-        except repository.repository.PackageMissing:
+        except repository.repository.TroveMissing:
             sourceVersion = None
     else:
         sourceVersion = None
