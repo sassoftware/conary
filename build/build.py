@@ -31,8 +31,7 @@ class ShellCommand:
 
 
 class Automake(ShellCommand):
-    template = ('cd %%s; aclocal %%s ; %(preAutoconf) autoconf %(autoConfArgs); automake %(autoMakeArgs)'
-                ' %(args)s')
+    template = ('cd %%s; aclocal %%s ; %(preAutoconf)s autoconf %(autoConfArgs)s; automake %(autoMakeArgs)s %(args)s')
     keywords = {'autoConfArgs': '--force',
                 'autoMakeArgs': '--copy --force',
 		'preAutoconf': '',
