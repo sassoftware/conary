@@ -70,7 +70,7 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
             return
         elif suggMap:
             print "Including extra troves to resolve dependencies:"
-            print "    ",
+            print "   ",
             for suggList in suggMap.itervalues():
                 print "%s" % (" ".join([x[0] for x in suggList])),
             print
