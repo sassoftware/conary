@@ -723,9 +723,9 @@ class FilesetRecipe(Recipe):
 		    i = n.count("/")
 		    if i > dirCount:
 			dirName = "/".join(n.split("/")[:dirCount + 1])
-			match = fnmatchcase(pattern, dirName)
+			match = fnmatchcase(dirName, pattern)
 		    elif i == dirCount:
-			match = fnmatchcase(pattern, n)
+			match = fnmatchcase(n, pattern)
 		    else:
 			match = False
 
