@@ -2,6 +2,10 @@ Changes in 0.50.1:
   * Add support for trove=<troveVersion> in rq, cvc co, and other places that 
     use findTrove
   * Add conary q --info option to display flavors
+  * changeset command uses system flavor if no flavor is specified, skips
+    troves which are not included in packages and groups by default,
+    takes a --no-recurse option, and filters based on the excludeTroves
+    configuration setting
 
 Changes in 0.50.0:
   * Redirections work

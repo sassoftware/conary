@@ -70,50 +70,53 @@ def usage(rc = 1):
     print "       conary verify       <pkgname>[=<version>][[flavor]]*"
     print "       conary --version"
     print ""
-    print "commit flags:   --target-branch <branch>"
+    print "changeset flags: --exclude-troves <patterns>"
+    print "                 --no-recurse"
     print ""
-    print 'common flags:   --build-label <label>'
-    print '                --config-file <path>'
-    print '                --config "<item> <value>"'
-    print '                --install-label <label>'
-    print "                --root <root>"
+    print "commit flags:    --target-branch <branch>"
     print ""
-    print "erase flags:    --just-db"
-    print "                --test"
+    print 'common flags:    --build-label <label>'
+    print '                 --config-file <path>'
+    print '                 --config "<item> <value>"'
+    print '                 --install-label <label>'
+    print "                 --root <root>"
     print ""
-    print "query flags:    --full-versions"
-    print "                --ids"
-    print "                --info"
-    print "                --path <file>"
-    print "                --ls"
-    print "                --sha1s"
-    print "                --tags"
+    print "erase flags:     --just-db"
+    print "                 --test"
     print ""
-    print "repquery flags: --all"
-    print "                --deps"    
-    print "                --full-versions"
-    print "                --ids"
-    print "                --info"
-    print "                --leaves"
-    print "                --ls"
-    print "                --sha1s"
-    print "                --tags"
+    print "query flags:     --full-versions"
+    print "                 --ids"
+    print "                 --info"
+    print "                 --path <file>"
+    print "                 --ls"
+    print "                 --sha1s"
+    print "                 --tags"
     print ""
-    print "showcs flags:   --full-versions"
-    print "                --info"
-    print "                --ls"
-    print "                --show-changes"
-    print "                --tags"
+    print "repquery flags:  --all"
+    print "                 --deps"    
+    print "                 --full-versions"
+    print "                 --ids"
+    print "                 --info"
+    print "                 --leaves"
+    print "                 --ls"
+    print "                 --sha1s"
+    print "                 --tags"
+    print " "
+    print "showcs flags:    --full-versions"
+    print "                 --info"
+    print "                 --ls"
+    print "                 --show-changes"
+    print "                 --tags"
     print ""
-    print "update flags:   --exclude-troves <patterns>"
-    print "                --just-db"
-    print "                --keep-existing"
-    print "                --no-deps"
-    print "                --no-deps-recurse"
-    print "                --no-resolve"
-    print "                --replace-files"
-    print "                --resolve"
-    print "                --test"
+    print "update flags:    --exclude-troves <patterns>"
+    print "                 --just-db"
+    print "                 --keep-existing"
+    print "                 --no-deps"
+    print "                 --no-deps-recurse"
+    print "                 --no-resolve"
+    print "                 --replace-files"
+    print "                 --resolve"
+    print "                 --test"
     return rc
 
 def openRepository(repMap):
@@ -151,6 +154,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["no-deps"] = NO_PARAM
     argDef["no-deps-recurse"] = NO_PARAM
     argDef["resolve"] = NO_PARAM
+    argDef["no-recurse"] = NO_PARAM
     argDef["no-resolve"] = NO_PARAM
     argDef["leaves"] = NO_PARAM
     argDef["path"] = MULT_PARAM
@@ -205,7 +209,12 @@ def realMain(cfg, argv=sys.argv):
     if (len(otherArgs) < 2):
 	return usage()
     elif (otherArgs[1] == "changeset"):
-	if len(otherArgs) < 4:
+        kwargs = {}
+        kwargs['recurse'] = not(argSet.has_key('no-recurse'))
+        if not kwargs['recurse']:
+            del argSet['no-recurse']
+            
+	if len(otherArgs) < 4 or argSet:
 	    return usage()
 
         outFile = otherArgs[-1]
@@ -213,7 +222,7 @@ def realMain(cfg, argv=sys.argv):
 
 	repos = openRepository(cfg.repositoryMap)
 
-	cscmd.ChangeSetCommand(repos, cfg, otherArgs[2:], outFile)
+	cscmd.ChangeSetCommand(repos, cfg, otherArgs[2:], outFile, **kwargs)
     elif (otherArgs[1] == "commit"):
 	targetBranch = None
 	if argSet.has_key('target-branch'):

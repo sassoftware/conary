@@ -18,8 +18,8 @@ from repository import repository
 from updatecmd import parseTroveSpec
 import versions
 
-def ChangeSetCommand(repos, cfg, troveList, outFileName):
-    list = []
+def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True):
+    primaryCsList = []
 
     for item in troveList:
         l = item.split("--")
@@ -39,6 +39,8 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName):
             (troveName, newVersionStr, newFlavor) = parseTroveSpec(l[1],
                                                         cfg.flavor)
 
+        if newFlavor is None:
+            newFlavor = cfg.flavor
 
         troveList = repos.findTrove(cfg.installLabelPath, troveName, newFlavor,
                                     newVersionStr)
@@ -47,13 +49,16 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName):
                 log.error("trove %s has multiple branches named %s",
                           troveName, newVersionStr)
             else:
-                log.error("trove %s has too many branches on installLabelPath",
+                log.error("trove %s has multple matches on installLabelPath",
                           troveName)
 
         newVersion = troveList[0][1]
         newFlavor = troveList[0][2]
 
         if oldVersionStr:
+            if oldFlavor is None:
+                oldFlavor = cfg.flavor
+
             troveList = repos.findTrove(cfg.installLabelPath, troveName, 
                                         oldFlavor, oldVersionStr)
             if len(troveList) > 1:
@@ -65,11 +70,50 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName):
         else:
             oldVersion = None
 
-        list.append((troveName, (oldVersion, oldFlavor), 
-                                (newVersion, newFlavor),
-                    not oldVersion))
+        primaryCsList.append((troveName, (oldVersion, oldFlavor), 
+                                         (newVersion, newFlavor),
+                              not oldVersion))
 
-    repos.createChangeSetFile(list, outFileName)
+    cs = repos.createChangeSet(primaryCsList, recurse = recurse, 
+                               withFiles = False)
+    primaryList = [ (x[0], x[2][0], x[2][1]) for x in primaryCsList ]
+
+    # filter out non-defaults
+    for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), abstract) \
+                                                            in primaryCsList:
+        primaryTroveCs = cs.getNewPackageVersion(name, newVersion, newFlavor)
+
+        for (name, changeList) in primaryTroveCs.iterChangedTroves():
+            for (changeType, version, flavor, byDef) in changeList:
+                if changeType == '+' and not byDef and \
+                   (name, version, flavor) not in primaryList:
+                    # it won't be here if recurse is False
+                    if cs.hasNewPackage(name, version, flavor):
+                        cs.delNewPackage(name, version, flavor)
+        
+    # now filter the excludeTroves list
+    fullCsList = []
+    for troveCs in cs.iterNewPackageList():
+        name = troveCs.getName()
+        newVersion = troveCs.getNewVersion()
+        newFlavor = troveCs.getNewFlavor()
+
+        skip = False
+
+        # troves explicitly listed should never be excluded
+        if (name, newVersion, newFlavor) not in primaryList:
+            for reStr, regExp in cfg.excludeTroves:
+                if regExp.match(name):
+                    skip = True
+    
+        if not skip:
+            fullCsList.append((name, 
+                       (troveCs.getOldVersion(), troveCs.getOldFlavor()),
+                       (newVersion,              newFlavor),
+                   not troveCs.getOldVersion()))
+
+    repos.createChangeSetFile(fullCsList, outFileName, recurse = False,
+                              primaryTroveList = primaryList)
 
 def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     try:

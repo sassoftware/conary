@@ -111,10 +111,17 @@ the component that now contains \fI/foo/blah\fP instead of
 \fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
 as a new file.)
 .TP
-.B changeset \fItrovename\fP[=[\fIoldver\fP--]\fInewver\fP]+ \fIoutfile\fP
+.B changeset <\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]>+ \fIoutfile\fP
 Creates an absolute changeset for \fItrovename newver\fP, or a relative
 changeset between \fItrovename oldver\fP and \fItrovename newver\fP, and stores
 it in outfile.
+.RS 4
+.TP
+.B \-\-no-recurse
+Don't recursively include troves referenced by the groups and packages
+listed.  Normally referenced troves which do not match troves in the
+\fBexcludeList\fR are included in the changeset.
+.RE
 .TP
 .B localcs \fItrovename outfile\fP
 Creates a local changeset, which represents the changes made on the

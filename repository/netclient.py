@@ -440,18 +440,22 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	return l
 
     def createChangeSet(self, list, withFiles = True, withFileContents = True,
-                        excludeAutoSource = False, recurse = True):
+                        excludeAutoSource = False, recurse = True,
+                        primaryTroveList = None):
 	return self._getChangeSet(list, withFiles = withFiles, 
                                   withFileContents = withFileContents,
                                   excludeAutoSource = excludeAutoSource,
-                                  recurse = recurse)
+                                  recurse = recurse, 
+                                  primaryTroveList = primaryTroveList)
 
-    def createChangeSetFile(self, list, fName, recurse = True):
-	self._getChangeSet(list, target = fName, recurse = recurse)
+    def createChangeSetFile(self, list, fName, recurse = True,
+                            primaryTroveList = None):
+	self._getChangeSet(list, target = fName, recurse = recurse,
+                           primaryTroveList = primaryTroveList)
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
 		      withFileContents = True, target = None,
-                      excludeAutoSource = False):
+                      excludeAutoSource = False, primaryTroveList = None):
         # This is a bit complicated due to servers not wanting to talk
         # to other servers. To make this work, we do this:
         #
@@ -566,7 +570,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         cs = None
         scheduledSet = {}
         internalCs = None
-        passCount = 0
+        urlsFetched = 0
         filesNeeded = []
 
         if target:
@@ -576,10 +580,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             outFile = os.fdopen(outFd, "w+")
             os.unlink(tmpName)
             
-
-        # (name, version, release) list. removed troves aren't primary
-        primaryTroves = [ (x[0], x[2][0], x[2][1]) for x in chgSetList 
-                                    if x[2][0] is not None ]
+        if primaryTroveList is None:
+            # (name, version, release) list. removed troves aren't primary
+            primaryTroveList = [ (x[0], x[2][0], x[2][1]) for x in chgSetList 
+                                        if x[2][0] is not None ]
 
         while chgSetList:
             (serverJobs, ourJobList) = _separateJobList(chgSetList)
@@ -594,6 +598,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 chgSetList += _cvtTroveList(extraTroveList)
                 filesNeeded += _cvtFileList(extraFileList)
+
+                urlsFetched += len(urlList)
 
                 for url in urlList:
                     inF = urllib.urlopen(url)
@@ -683,8 +689,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 internalCs.newPackage(pkgChgSet)
 
-            passCount += 1
-
         if withFiles and filesNeeded:
             need = []
             for (pathId, troveName, 
@@ -771,12 +775,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         # convert the versions in here to ones w/ timestamps
         cs.setPrimaryTroveList([])
-        for (name, version, flavor) in primaryTroves:
+        for (name, version, flavor) in primaryTroveList:
             trove = cs.getNewPackageVersion(name, version, flavor)
             cs.addPrimaryTrove(name, trove.getNewVersion(), flavor)
 
         if target and cs:
-            if passCount > 1 or internalCs:
+            if urlsFetched > 1 or internalCs:
                 os.unlink(target)
                 cs.writeToFile(target)
 
