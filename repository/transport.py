@@ -14,7 +14,7 @@
 
 """ XMLRPC transport class that uses urllib to allow for proxies
     Unfortunately, urllib needs some touching up to allow 
-    XMLRPM commands to be sent, hence the XMLOpener class """
+    XMLRPC commands to be sent, hence the XMLOpener class """
 
 import xmlrpclib
 import urllib
@@ -57,12 +57,14 @@ class XMLOpener(urllib.FancyURLopener):
         else:
             auth = None
         h = httplib.HTTP(host)
+	# SPX: use the full URL here, not just the selector or name
+	# based virtual hosts don't work
         if data is not None:
-            h.putrequest('POST', selector)
+            h.putrequest('POST', "http:" + url)
             h.putheader('Content-type', 'text/xml')
             h.putheader('Content-length', '%d' % len(data))
         else:
-            h.putrequest('GET', selector)
+            h.putrequest('GET', "http:" + url)
         if auth: h.putheader('Authorization', 'Basic %s' % auth)
         if realhost: h.putheader('Host', realhost)
         for args in self.addheaders: h.putheader(*args)
@@ -89,7 +91,7 @@ def getrealhost(host):
 class Transport(xmlrpclib.Transport):
 
     # override?
-    user_agent =  "xmlrpclib.py/%s (by www.pythonware.com)" % xmlrpclib.__version__
+    user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by specifixinc.com)" % xmlrpclib.__version__
 
     def request(self, host, handler, request_body, verbose=0):
 	self.verbose = verbose
