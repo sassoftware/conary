@@ -142,6 +142,7 @@ class Package:
     def __init__(self, name, version):
 	self.idMap = {}
 	self.name = name
+	assert(name.count(":") > 2)
 	self.version = version
 
 class PackageChangeSet:

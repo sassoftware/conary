@@ -60,6 +60,15 @@ class Group:
 	"""
 	return self.packages.items()
 
+    def setName(self, name):
+	"""
+	Sets the name of a group. Group names are of the form :repos:name
+
+	@param name: The new name
+	@type name: str
+	"""
+	self.name = name
+
     def formatString(self):
 	"""
 	Returns a string representing everything about this group, which
@@ -143,15 +152,21 @@ class GroupFromTextFile(Group):
 	if lines[0][1][0] != "name":
 	    log.error("group files must contain the group name on the first line")
 	    errors = 1
-	    self.name = "unknown"
+	    name = "localhost:unknown"
 	else:
-	    self.name = lines[0][1][1]
-	    if not self.name.startswith("group-"):
-		log.error('group names must begin with "group-"')
+	    name = lines[0][1][1]
+	    if name[0] != ":":
+		name = packageNamespace + ":" + name
+	    else:
+		name = name
+
+	    if name.count(":") != 2:
+		print "--", parts
+		log.error("group names may not include colons")
 		errors = 1
-	    self.name = self.name[6:]
-	    if self.name[0] != ":":
-		self.name = packageNamespace + ":" + self.name
+		name = "localhost:unknown"
+
+	self.setName(name)
 
 	if lines[1][1][0] != "version":
 	    log.error("group files must contain the version on the first line")
@@ -242,7 +257,7 @@ class GroupFromFile(Group):
 	"""
 	Initializes a GroupFromFile() object.
 
-	@param name: Fully qualified name of the group (w/o the group- bit)
+	@param name: Fully qualified name of the group 
 	@type name: str
 	@param f: File representation of a group
 	@type f: file-type object
@@ -252,7 +267,7 @@ class GroupFromFile(Group):
 
 	Group.__init__(self)
 	self.version = version
-	self.name = name
+	self.setName(name)
 	self.parseGroup(f)
 
 class GroupError(Exception):

@@ -26,11 +26,14 @@ class Repository:
 
     createBranches = 1
 
+    # XXX these str() are hacks to allow PackageName objects to be used
+    # interchangeably with strings for the time being
+
     def _getPackageSet(self, name):
-	return _PackageSet(self.pkgDB, name)
+	return _PackageSet(self.pkgDB, str(name))
 
     def _getGroupSet(self, name):
-	return _GroupSet(self.groupDB, name)
+	return _GroupSet(self.groupDB, str(name))
 
     def _getFileDB(self, fileId):
 	return _FileDB(self.fileDB, fileId)
@@ -53,8 +56,9 @@ class Repository:
 
 	return list
 
+    # XXX this str() is to allow a migration to PackageName
     def hasPackage(self, pkg):
-	return self.pkgDB.hasFile(pkg)
+	return self.pkgDB.hasFile(str(pkg))
 
     def getFullVersion(self, pkgName, version):
 	return self._getPackageSet(pkgName).getFullVersion(version)
@@ -125,7 +129,8 @@ class Repository:
     ### Group functions
 
     def hasGroup(self, grp):
-	return self.grpDB.hasFile(grp)
+	# XXX this str() is to allow a migration to PackageName
+	return self.groupDB.hasFile(str(grp))
 
     def hasGroupVersion(self, grpName, version):
 	return self._getGroupSet(grpName).hasVersion(version)
@@ -205,7 +210,6 @@ class LocalRepository(Repository):
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
 
 	self.pkgDB = None
-	self.groupDB = None
 
         try:
             self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", 

@@ -5,7 +5,10 @@
 import files
 import log
 import package
+import packagename
 import versions
+
+from packagename import PackageName
 
 _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
@@ -13,14 +16,19 @@ _grpFormat  = "%-39s %s"
 
 def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
     if pkg and pkg[0] != ":":
-	pkg = cfg.packagenamespace + ":" + pkg
+	pkg = PackageName(cfg.packagenamespace + ":" + pkg)
+    else:
+	pkg = PackageName(pkg)
 
-    if pkg and pkg.split(":")[2].startswith("group-"):
-	nameList = pkg.split(":")
-	nameList[2] = nameList[2][6:]
-	name = ":".join(nameList)
-	version = repos.grpLatestVersion(name, cfg.defaultbranch)
-	grp = repos.getGroupVersion(name, version)
+    if pkg.isGroup():
+	if not repos.hasGroup(pkg):
+	    log.error("group %s can not be found" % 
+			pkg.getName())
+			#pkg.getName(cfg.packagenamespace))
+	    return
+
+	version = repos.grpLatestVersion(pkg, cfg.defaultbranch)
+	grp = repos.getGroupVersion(pkg, version)
 
 	for (pkg, verList) in grp.getPackageList():
 	    for ver in verList:
