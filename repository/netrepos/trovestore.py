@@ -188,7 +188,7 @@ class TroveStore:
 	# id's for this search. the versionid will be NULL if it's an
 	# empty branch
 	cu.execute("""
-	    SELECT version FROM 
+	    SELECT Versions.version, Nodes.timeStamps FROM 
 		(SELECT itemId AS AitemId, branchId as AbranchId FROM labelMap
 		    WHERE itemId=(SELECT itemId from Items 
 				WHERE item=%s)
@@ -196,11 +196,16 @@ class TroveStore:
 				WHERE label=%s)
 		) JOIN Latest ON 
 		    AitemId=Latest.itemId AND AbranchId=Latest.branchId
-		NATURAL JOIN Versions
+		JOIN Nodes ON
+		    AitemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
+		JOIN Versions ON
+		    Nodes.versionId = versions.versionId
 	""", troveName, labelStr)
 
-	for (versionStr,) in cu:
-	    yield versionStr
+	for (versionStr, timeStamps) in cu:
+	    v = versions.VersionFromString(versionStr, 
+		    timeStamps = [ float(x) for x in timeStamps.split(":") ] )
+	    yield v
 
     def getTroveFlavors(self, troveDict):
 	cu = self.db.cursor()

@@ -108,7 +108,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    if not self.auth.check(authToken, write = False, trove = troveName):
 		raise InsufficientPermission
 
-	    d[troveName] = [ x for x in
+	    d[troveName] = [ self.freezeVersion(x) for x in
 			self.repos.troveStore.iterTroveLeafsByLabel(troveName,
 								   labelStr) ]
 

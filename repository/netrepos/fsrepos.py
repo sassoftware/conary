@@ -58,9 +58,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	d = {}
 	labelStr = label.asString()
 	for troveName in troveNameList:
-	    d[troveName] = [ versions.VersionFromString(x) for x in
-			     self.troveStore.iterTroveLeafsByLabel(troveName,
-								   labelStr) ]
+	    d[troveName] = [ x for x in 
+		self.troveStore.iterTroveLeafsByLabel(troveName, labelStr) ]
 
 	return d
 

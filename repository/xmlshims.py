@@ -10,6 +10,12 @@ import base64
 
 class NetworkConvertors:
 
+    def freezeVersion(self, v):
+	return v.freeze()
+
+    def thawVersion(self, v):
+	return versions.ThawVersion(v)
+
     def fromVersion(self, v):
 	return v.asString()
 
