@@ -8,7 +8,6 @@
 import changeset
 import copy
 import datastore
-import difflib
 import fcntl
 import filecontents
 import files
@@ -321,11 +320,14 @@ class LocalRepository(Repository):
 	    cs.newPackage(pkgChgSet)
 
 	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
-		oldFile = None
 		if oldVersion:
 		    oldFile = self.getFileVersion(fileId, oldVersion)
 		    (oldFile, oldCont) = self.getFileVersion(fileId, 
 				oldVersion, path = newPath, withContents = 1)
+		else:
+		    oldFile = None
+		    oldCont = None
+
 		(newFile, newCont) = self.getFileVersion(fileId, newVersion,
 					    path = newPath, withContents = 1)
 
@@ -335,18 +337,10 @@ class LocalRepository(Repository):
 		cs.addFile(fileId, oldVersion, newVersion, filecs)
 
 		if hash:
-		    if oldFile and oldFile.isConfig() and newFile.isConfig():
-			diff = difflib.unified_diff(oldCont.get().readlines(),
-						    newCont.get().readlines(),
-						    "old", "new")
-			diff.next()
-			diff.next()
-			cont = filecontents.FromString("".join(diff))
-			cs.addFileContents(hash, 
-				    changeset.ChangedFileTypes.diff, cont)
-		    else:
-			cs.addFileContents(hash, 
-				changeset.ChangedFileTypes.file, newCont)
+		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
+						oldCont, newFile, newCont)
+
+		    cs.addFileContents(hash, contType, cont)
 
 	return cs
 
