@@ -671,6 +671,13 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     # need to walk changesets in order of fileid
     fileList.sort()
 
+    # Used in the loops to determine whether to mark files as config
+    # would be nice to have a better list...
+    nonCfgExt = ('ps', 'eps', 'gif', 'png', 'tiff', 'jpeg', 'jpg',
+	'ico', 'rpm', 'ccs', 'gz', 'bz2', 'tgz', 'tbz', 'tbz2')
+    isSrcPkg = curPkg.getName().endswith(':source')
+
+
     for (fileId, srcPath, srcFileVersion) in fileList:
 	# file disappeared
 	if not fileIds.has_key(fileId): continue
@@ -697,8 +704,9 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 	f = files.FileFromFilesystem(realPath, fileId,
 				     possibleMatch = srcFile)
-
-	if path.endswith(".recipe"):
+	
+	extension = path.split(".")[-1]
+	if isSrcPkg and extension not in nonCfgExt:
 	    f.flags.isConfig(set = True)
 
 	if not f.metadataEqual(srcFile, ignoreOwnerGroup = noIds):
@@ -729,7 +737,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 	f = files.FileFromFilesystem(realPath, fileId)
 
-	if path.endswith(".recipe"):
+	extension = path.split(".")[-1]
+	if isSrcPkg and extension not in nonCfgExt:
 	    f.flags.isConfig(set = True)
 
 	# new file, so this part is easy
