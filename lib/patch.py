@@ -1,6 +1,27 @@
 
 class Hunk:
 
+    # src is assumed to be positioned at the right place to start
+    # applying the patch, and the new lines are returned
+    def apply(self, src):
+	result = []
+	fromLine = 0
+	for line in self.lines:
+	    if line[0] == " ":
+		if src[fromLine] != line[1:]:
+		    raise Conflict()
+		result.append(src[fromLine])
+		fromLine = fromLine + 1
+	    elif line[0] == "+":
+		result.append(line[1:])
+	    elif line[0] == "-":
+		fromLine = fromLine + 1
+
+	assert(fromLine == self.fromLen)
+	assert(len(result) == self.toLen)
+
+	return result
+
     def __init__(self, fromStart, fromLen, toStart, toLen, lines):
 	self.fromStart = fromStart
 	self.toStart = toStart
@@ -68,16 +89,8 @@ def patch(oldLines, unifiedDiff):
 
 	assert(hunk.toStart == len(result))
 
-	for line in hunk.lines:
-	    if line[0] == " ":
-		if oldLines[fromLine] != line[1:]:
-		    raise Conflict()
-		result.append(oldLines[fromLine])
-		fromLine = fromLine + 1
-	    elif line[0] == "+":
-		result.append(line[1:])
-	    elif line[0] == "-":
-		fromLine = fromLine + 1
+	result += hunk.apply(oldLines[fromLine:])
+	fromLine += hunk.fromLen
 
     while (fromLine < len(oldLines)):
 	result.append(oldLines[fromLine])
