@@ -347,7 +347,11 @@ class Database(SqlDbRepository):
 	while (list):
 	    path = list[0]
 	    del list[0]
-	    entries = len(os.listdir(path))
+            try:
+                entries = len(os.listdir(path))
+            except OSError:
+                continue
+            
 	    entries -= set[path]
 
 	    # listdir excludes . and ..
