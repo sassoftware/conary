@@ -503,6 +503,9 @@ class Recipe:
     def getPackages(self):
         return self.packages
 
+    def disableParallelMake(self):
+        self.macros['parallelmflags'] = ''
+
     def __getattr__(self, name):
 	"""
 	Allows us to dynamically suck in namespace of other modules
