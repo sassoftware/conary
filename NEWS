@@ -8,6 +8,13 @@ Changes in 0.11.0:
   * getMetadata follows the branch structure up until it finds metadata
     for the trove.
   * changed getFileContents() to not need trove name or trove version
+  * byte-compiled emacs lisp files are transient, like python
+    byte-compiled files
+  * addSource recipe action now can take a mode= keyword argument
+  * cook now enforces having no dash characters in version numbers
+  * files are explicitly disallowed from depending on groups, packages,
+    or filesets; the only trove dependency that a file or component
+    can have is on a component.  Only filesets can depend on filesets.
  
 Changes in 0.10.11:
   * reworked how absolute change sets get converted to relative change
