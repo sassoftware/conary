@@ -9,13 +9,18 @@ import deps.deps
 import os
 import versions
 
-class ConaryConfiguration:
+STRING, BOOL, LABEL = range(3)
 
+class ConaryConfiguration:
+   
     def read(self, file):
 	if os.path.exists(file):
 	    f = open(file, "r")
+	    self.file = file
+	    self.lineno = 1
 	    for line in f:
 		self.configLine(line)
+		self.lineno = self.lineno + 1
 	    f.close()
 
     def configLine(self, line):
@@ -25,17 +30,27 @@ class ConaryConfiguration:
 	(key, val) = line.split(None, 1)
         key = key.lower()
 	if not self.lowerCaseMap.has_key(key):
-	    raise ParseError, ("configuration value %s unknown" % key)
+	    raise ParseError, ("%s:%s: configuration value '%s' unknown" % (self.file, self.lineno, key))
+	else:
+	    key = self.lowerCaseMap[key]
+	
+	type = self.types[key]
 
-	self.__dict__[self.lowerCaseMap[key]] = val
+	if type == STRING:
+	    self.__dict__[key] = val
+	elif type == LABEL:
+	    try:
+		self.__dict__[key] = versions.BranchName(val)
+	    except versions.ParseError, e:
+		raise ParseError, str(e)
 
-	try:
-	    if key.lower() == "installlabel":
-		self.installLabel = versions.BranchName(self.installLabel)
-	    elif key.lower() == "buildlabel":
-		self.buildLabel = versions.BranchName(self.buildLabel)
-	except versions.ParseError, e:
-	    raise ParseError, str(e)
+	elif type == BOOL:
+	    if val.lower() in ('0', 'false'):
+		self.__dict__[key] = False
+	    elif val.lower() in ('1', 'true'):
+		self.__dict__[key] = True
+	    else:
+		raise ParseError, ("%s:%s: expected True or False for configuration value '%s'" % (self.file, self.lineno, key))
 
     def display(self):
 	keys = self.__dict__.keys()
@@ -57,18 +72,30 @@ class ConaryConfiguration:
 		print "%-20s (unknown type)" % (item)
 
     def __init__(self):
-	self.repPath = "/var/lib/conary-rep"
-	self.root = "/"
-	self.sourcePath = "/usr/src/conary/sources"
-	self.buildPath = "/usr/src/conary/builds"
-	self.installLabel = None
-	self.buildLabel = None
-	self.lookaside = "/var/cache/conary"
-	self.dbPath = "/var/lib/conarydb"
-        self.tmpDir = "/var/tmp/"
-	self.name = None
-	self.contact = None
-	self.instructionSet = deps.arch.current()
+	
+	defaults = {
+	    'repPath'	     : '/var/lib/conary-rep',
+	    'root'	     : '/',
+	    'sourcePath'     : '/usr/src/conary/sources',
+	    'buildPath'	     : '/usr/src/conary/builds',
+	    'installLabel'   : [ LABEL,	 None ],
+	    'buildLabel'     : [ LABEL,	 None ],
+	    'lookaside'	     : '/var/cache/conary',
+	    'dbPath'	     : '/var/lib/conarydb',
+	    'tmpDir'	     : '/var/tmp/',
+	    'name'	     : None,
+	    'contact'	     : None,
+	    'instructionSet' : deps.arch.current(),
+	    'debugRecipeExceptions' : [ BOOL, False ] }
+	
+	self.types = {}
+	for (key, value) in defaults.items():
+	    if isinstance(value, (list, tuple)):
+		self.types[key] = value[0]
+		self.__dict__[key] = value[1]
+	    else:
+		self.types[key] = STRING
+		self.__dict__[key] = value
 
         self.lowerCaseMap = {}
         for (key, value) in self.__dict__.items():

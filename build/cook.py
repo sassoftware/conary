@@ -356,9 +356,16 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
                 lcache.addFileHash(path, fileObj.contents.sha1())
 
     builddir = cfg.buildPath + "/" + recipeObj.name
-
     use.track(True)
-    recipeObj.setup()
+
+    try:
+	recipeObj.setup()
+    except Exception, e:
+	if cfg.debugRecipeExceptions:
+	    raise #allow debugger to handle it
+	else: 
+	    print e # XXX maybe print out some nicer, warmer info?
+	    sys.exit(1)
     recipeObj.unpackSources(builddir)
 
     # if we're only extracting, continue to the next recipe class.

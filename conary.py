@@ -40,7 +40,7 @@ except conarycfg.ParseError, e:
 def usage(rc = 1):
     print "usage: conary branch <newbranch> <branchfrom> [<trove>]"
     print "       conary changeset <pkg> [<oldver>] <newver> <outfile>"
-    print "       conary cook    [--prep] [--macros file] <file.recipe>+"
+    print "       conary cook [--prep] [--debug-exceptions] [--macros file] <file.recipe>+"
     print "       conary commit       <changeset>"
     print "       conary erase        <pkgname> [<version>]"
     print "       conary localcs      <pkg> <outfile>"
@@ -63,6 +63,7 @@ def usage(rc = 1):
     print ""
     print "cook flags:    --macros"
     print "               --prep"
+    print "		  --debug-exceptions"
     print "               --target-branch <branch>"
     print ""
     print "pkglist flags: --full-versions"
@@ -119,6 +120,7 @@ def realMain():
     argDef["macros"] = 1
     argDef["message"] = 1
     argDef["prep"] = 0
+    argDef["debug-exceptions"] = 0
     argDef["profile"] = 0
     argDef["replace-files"] = 0
     argDef["sha1s"] = 0
@@ -235,6 +237,9 @@ def realMain():
 	if argSet.has_key('prep'):
 	    del argSet['prep']
 	    prep = 1
+	if argSet.has_key('debug-exceptions'):
+	    del argSet['debug-exceptions']
+	    cfg.debugRecipeExceptions = True
 	if argSet.has_key('macros'):
 	    argSet['macros']
 	    f = open(argSet['macros'])
