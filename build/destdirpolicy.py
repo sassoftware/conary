@@ -125,9 +125,9 @@ class Strip(policy.Policy):
 	('%(essentiallibdir)s/', None, stat.S_IFDIR),
     ]
     def doFile(self, path):
-	if os.path.islink(path):
-	    return
 	d = self.macros['destdir']
+	if os.path.islink(util.joinPaths(d, path)):
+	    return
 	m = magic.magic(path, d)
 	if not m:
 	    return
