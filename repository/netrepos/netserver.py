@@ -1037,7 +1037,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if self.troveStore is not None:
 	    self.close()
 
-        self.db = sqlite3.connect(self.sqlDbPath)
+        self.db = sqlite3.connect(self.sqlDbPath, timeout=30000)
 	self.troveStore = trovestore.TroveStore(self.db)
 	sb = os.stat(self.sqlDbPath)
 	self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
