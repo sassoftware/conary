@@ -382,7 +382,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
 
     grp.changeVersion(targetVersion)
     grp.setBuildTime(time.time())
-    grp.setSourceName(fullName + ':recipe')
+    grp.setSourceName(fullName + ':source')
     grp.setSize(recipeObj.size)
     grp.setConaryVersion(constants.version)
 
@@ -464,7 +464,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 	fileset.addFile(pathId, path, version, fileId)
 
     fileset.setBuildTime(time.time())
-    fileset.setSourceName(fullName + ':recipe')
+    fileset.setSourceName(fullName + ':source')
     fileset.setSize(size)
     fileset.setConaryVersion(constants.version)
     
