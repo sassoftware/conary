@@ -39,7 +39,7 @@ class ServerConfig(conarycfg.ConfigFile):
 
 def getAuth(req, repos):
     if not 'Authorization' in req.headers_in:
-        return (None, None)
+        return ('anonymous', 'anonymous')
 
     info = req.headers_in['Authorization'].split()
     if len(info) != 2 or info[0] != "Basic":

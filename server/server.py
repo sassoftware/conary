@@ -174,7 +174,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
     def getAuth(self):
         info = self.headers.get('Authorization', None)
         if info is None:
-            return (None, None)
+            return ('anonymous', 'anonymous')
         info = info.split()
 
         try:
