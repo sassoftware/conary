@@ -1,4 +1,17 @@
 Changes in 0.13.2
+  * reworked use.py code almost entirely.
+  * added /etc/conary/arch directory to contain architecture definition files;
+    changed /etc/conary/use files to contain more information about how 
+    flags are used when building.  Flag definitions are no longer in use.py.
+  * fixed buildFlavor so that it affects cooking packages as well as 
+    determining troves to include when cooking a group
+  * changed --noclean to --no-clean to be in line with the rest of the 
+    options; documented it
+  * removed Use.foo and Flags.foo options from conary config files.  Macros.foo
+    is still there.  Added --use-flavor option to cvc cook which takes a flavor 
+    and overrides the build flavor while cooking.  
+  * groups now take flavor strings to determine the flavor of a trove to 
+    include, not flag sets.
   * dependencies resolution is flavor sensitive now (and uses flavor
     affinity)
   * added trove version/release number to dependency messages
