@@ -49,21 +49,6 @@ class BranchTable(idtable.IdTable):
     def iteritems(self):
 	raise NotImplementedError
 
-    def removeUnused(self):
-	# removes versions which don't have parents and aren't used
-	# by any FileStreams
-        cu = self.db.cursor()
-	cu.execute("""
-            DELETE FROM LabelMap WHERE LabelMap.LabelId IN
-                (SELECT LabelMap.LabelId FROM LabelMap LEFT OUTER JOIN
-                    Latest ON LabelMap.branchId = Latest.branchId
-                    WHERE Latest.versionId IS NULL)""")
-        cu.execute("""
-            DELETE FROM Branches WHERE branchId IN 
-		(SELECT branchId from Branches LEFT OUTER JOIN 
-		    (SELECT branchId AS fooId from LabelMap)
-		ON Branches.branchId = fooId WHERE fooId is NULL)""")
-
     def __init__(self, db):
         self.db = db
 	self.tableName = 'branches'
@@ -122,15 +107,6 @@ class LabelMap(idtable.IdPairSet):
 
     def branchesByItem(self, itemId):
 	return self.getByFirst(itemId)
-
-    def removeUnused(self):
-        cu = self.db.cursor()
-	cu.execute("""
-	    DELETE FROM Labels WHERE Labels.LabelId IN 
-		(SELECT Labels.labelId from Labels LEFT OUTER JOIN 
-			LabelMap ON Labels.labelId = LabelMap.labelId 
-		 WHERE LabelMap.labelId is NULL)
-	""")
 
 class ParentTable(idtable.IdPairMapping):
     def __init__(self, db):
@@ -274,35 +250,6 @@ class SqlVersioning:
 
 	return (nodeId, versionId)
 
-    def eraseVersion(self, itemId, versionId):
-	# should we make them pass in the version as well to save the
-	# lookup?
-	assert(0)
-	version = self.versionTable.getId(versionId, itemId)
-	branch = version.branch()
-	branchId = self.branchTable[branch]
-	latestId = self.latest[(itemId, branchId)]
-	if versionId == latestId:
-	    parentId = self.parents.get((itemId, versionId), None)
-	    del self.latest[(itemId, branchId)]
-	    del self.parents[(itemId, versionId)]
-	    if parentId != self.versionTable.noVersion:
-		self.latest[(itemId, branchId)] = parentId
-
-	else:
-	    currId = latestId
-	    while versionId != currId:
-		childId = currId
-		currId = self.parents[(itemId, currId)]
-
-	    parentId = self.parents.get((itemId, versionId), None)
-
-	    del self.parents[(itemId, childId)]
-	    del self.parents[(itemId, versionId)]
-	    self.parents[(itemId, childId)] = parentId
-
-	self.needsCleanup = True
-	
     def createBranch(self, itemId, branch):
 	"""
 	Creates a new branch for the given node. 

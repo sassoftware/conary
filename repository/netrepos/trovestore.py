@@ -317,7 +317,7 @@ class TroveStore:
     def iterTroveNames(self):
         cu = self.db.cursor()
         cu.execute("SELECT DISTINCT item FROM Instances NATURAL JOIN "
-                   "Items WHERE isPresent=1");
+                   "Items WHERE isPresent=1 ORDER BY item");
 
         for (item,) in cu:
             yield item
@@ -827,11 +827,6 @@ class TroveStore:
 
     def resolveRequirements(self, label, depSetList):
         return self.depTables.resolve(label, depSetList)
-
-    def eraseFile(Self, pathId, fileVersion):
-	# we automatically remove files when no troves reference them. 
-	# cool, huh?
-	assert(0)
 
     def begin(self):
 	"""

@@ -520,17 +520,17 @@ class ChangeSetJob:
     ChangeSetJob provides a to-do list for applying a change set; file
     remappings should have been applied to the change set before it gets
     this far. Derivative classes can override these methods to change the
-    behavior; for example, if addPackage is overridden no pacakges will
+    behavior; for example, if addTrove is overridden no pacakges will
     make it to the database. The same holds for oldFile.
     """
 
     storeOnlyConfigFiles = False
 
-    def addPackage(self, pkg):
-	return self.repos.addPackage(pkg)
+    def addTrove(self, pkg):
+	return self.repos.addTrove(pkg)
 
-    def addPackageDone(self, pkgId):
-	self.repos.addPackageDone(pkgId)
+    def addTroveDone(self, pkgId):
+	self.repos.addTroveDone(pkgId)
 
     def oldPackage(self, pkg):
 	pass
@@ -579,7 +579,7 @@ class ChangeSetJob:
 
 	    newFileMap = newPkg.applyChangeSet(csPkg)
 
-	    troveInfo = self.addPackage(newPkg)
+	    troveInfo = self.addTrove(newPkg)
 
 	    for (pathId, path, fileId, newVersion) in newPkg.iterFileList():
 		tuple = newFileMap.get(pathId, None)
@@ -664,7 +664,7 @@ class ChangeSetJob:
 		    normalRestoreList.append(tup)
 
 	    del newFileMap
-	    self.addPackageDone(troveInfo)
+	    self.addTroveDone(troveInfo)
 
 	configRestoreList.sort()
 	normalRestoreList.sort()

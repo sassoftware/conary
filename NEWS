@@ -6,6 +6,11 @@ Changes in 0.11.7
   * Added r.ConsoleHelper() for recipes
   * PAM configuration files shouldn't have paths to modules by default,
     so we remove what used to be the standard path
+  * changed repository user authentication to use user groups (currently 
+    one per user)
+  * added password salt
+  * restructured repository a bit
+  * removed lots of unused code from FilesystemRepository 
 
 Changes in 0.11.6
   * branches are created as changesets now instead of as a protocol call

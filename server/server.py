@@ -319,7 +319,7 @@ def addUser(userName, otherArgs):
     authdb = sqlite3.connect(otherArgs[1] + '/sqldb')
     na = netauth.NetworkAuthorization(authdb, None)
 
-    na.add(userName, pw1, admin = True)
+    na.addUser(userName, pw1, admin = True)
 
 if __name__ == '__main__':
     argDef = {}

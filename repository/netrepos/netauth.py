@@ -27,15 +27,17 @@ class NetworkAuthorization:
             return False
 
         stmt = """
-            SELECT item FROM
-               (SELECT userId as uuserId FROM Users WHERE user=? AND
-                    password=?)
-            JOIN Permissions ON uuserId=Permissions.userId
-            LEFT OUTER JOIN Items ON Permissions.itemId = Items.itemId
+            SELECT item, salt, password FROM
+               (SELECT * FROM Users WHERE user=?) AS Users
+            JOIN UserGroupMembers ON
+                UserGroupMembers.userId = Users.userId
+            JOIN Permissions ON 
+                UserGroupMembers.userGroupId = Permissions.userGroupId
+            LEFT OUTER JOIN Items ON 
+                Permissions.itemId = Items.itemId
         """
-        m = md5.new()
-        m.update(authToken[1])
-        params = [authToken[0], m.hexdigest()]
+
+        params = [ authToken[0] ]
 
         where = []
         if label:
@@ -55,17 +57,21 @@ class NetworkAuthorization:
         cu = self.db.cursor()
         cu.execute(stmt, params)
 
-        for (troveName, ) in cu:
+        for (troveName, salt, password) in cu:
             if not troveName or not trove:
-                return True
+                regExp = None
+            else:
+                regExp = self.reCache.get(troveName, None)
+                if regExp is None:
+                    regExp = re.compile(troveName)
+                    self.reCache[troveName] = regExp
 
-            regExp = self.reCache.get(troveName, None)
-            if regExp is None:
-                regExp = re.compile(troveName)
-                self.reCache[troveName] = regExp
-
-            if regExp.match(trove):
-                return True
+            if not regExp or regExp.match(trove):
+                m = md5.new()
+                m.update(salt)
+                m.update(authToken[1])
+                if m.hexdigest() == password:
+                    return True
 
         return False
         
@@ -73,35 +79,52 @@ class NetworkAuthorization:
         if label and label.getHost() != self.name:
             raise RepositoryMismatch
 
-        stmt = "SELECT COUNT(userId) FROM Users WHERE user=? AND password=?"
-        m = md5.new()
-        m.update(authToken[1])
         cu = self.db.cursor()
-        cu.execute(stmt, authToken[0], m.hexdigest())
 
-        row = cu.fetchone()
-        return row[0]
+        stmt = "SELECT salt, password FROM Users WHERE user=?"
+        cu.execute(stmt, authToken[0])
 
-    def add(self, user, password, write=True, admin=False):
+        for (salt, password) in cu:
+            m = md5.new()
+            m.update(salt)
+            m.update(authToken[1])
+            if m.hexdigest() == password:
+                return True
+
+        return False
+
+    def addUser(self, user, password, write=True, admin=False):
         cu = self.db.cursor()
+
+        salt = "AAAA"
         
         m = md5.new()
+        m.update(salt)
         m.update(password)
-        cu.execute("INSERT INTO Users VALUES (Null, ?, ?)", user, m.hexdigest())
+        cu.execute("INSERT INTO Users VALUES (NULL, ?, ?, ?)", user, 
+                   salt, m.hexdigest())
         userId = cu.lastrowid
-
-        cu.execute("INSERT INTO Permissions VALUES (?, Null, Null, ?, ?)",
-                   userId, write, admin)
+        cu.execute("INSERT INTO UserGroups VALUES (NULL, ?)", user)
+        userGroupId = cu.lastrowid
+        cu.execute("INSERT INTO UserGroupMembers VALUES (?, ?)", 
+                   userGroupId, userId)
+        userGroupId = cu.lastrowid
+        cu.execute("INSERT INTO Permissions VALUES (?, Null, Null, ?, ?, ?)",
+                   userGroupId, write, True, admin)
         self.db.commit()
 
     def changePassword(self, user, newPassword):
         cu = self.db.cursor()
+
+        salt = "AAAA"
         
         m = md5.new()
+        m.update(salt)
         m.update(newPassword)
         password = m.hexdigest()
 
-        cu.execute("UPDATE Users SET password=? WHERE user=?", password, user)
+        cu.execute("UPDATE Users SET password=?, salt=? WHERE user=?", 
+                   password, salt, user)
         self.db.commit()
 
     def iterUsers(self):
@@ -126,16 +149,35 @@ class NetworkAuthorization:
         if "Users" not in tables:
             cu.execute("""CREATE TABLE Users (userId INTEGER PRIMARY KEY,
                                               user STRING UNIQUE,
+                                              salt BINARY,
                                               password STRING)""")
             commit = True
+
+        if "UserGroups" not in tables:
+            cu.execute("""CREATE TABLE UserGroups (
+                                           userGroupId INTEGER PRIMARY KEY,
+                                           userGroup STRING UNIQUE)""")
+            commit = True
+
+        if "UserGroupMembers" not in tables:
+            cu.execute("""CREATE TABLE UserGroupMembers (
+                                            userGroupId INTEGER,
+                                            userId INTEGER)""")
+            cu.execute("""CREATE INDEX UserGroupMembersIdx ON
+                                            UserGroupMembers(userGroupId)""")
+            cu.execute("""CREATE INDEX UserGroupMembersIdx2 ON
+                                            UserGroupMembers(userId)""")
+            commit = True
+
         if "Permissions" not in tables:
-            cu.execute("""CREATE TABLE Permissions (userId INTEGER,
+            cu.execute("""CREATE TABLE Permissions (userGroupId INTEGER,
                                                     labelId INTEGER,
                                                     itemId INTEGER,
                                                     write INTEGER,
+                                                    capped INTEGER,
                                                     admin INTEGER)""")
             cu.execute("""CREATE INDEX PermissionsIdx
-                          ON Permissions(userId, labelId, itemId)""")
+                          ON Permissions(userGroupId, labelId, itemId)""")
             commit = True
 
         if commit:

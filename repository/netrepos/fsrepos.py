@@ -43,70 +43,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	return deps.DependencySet()
 
-    def iterAllTroveNames(self):
-	a = self.troveStore.iterTroveNames()
-	return a
-
-    def troveNames(self, label):
-	a = self.troveStore.troveNames(label)
-	return a
-
-    def getAllTroveLeafs(self, troveNameList):
-	d = {}
-	for (troveName, troveLeafList) in \
-		self.troveStore.iterAllTroveLeafs(troveNameList):
-	    d[troveName] = [ versions.VersionFromString(x) for x in
-				troveLeafList ]
-	return d
-
-    def getTroveLeavesByLabel(self, troveNameList, label):
-	d = {}
-	labelStr = label.asString()
-	for troveName in troveNameList:
-	    d[troveName] = [ x for x in 
-		self.troveStore.iterTroveLeafsByLabel(troveName, labelStr) ]
-
-	return d
-
-    def getTroveVersionsByLabel(self, troveNameList, label):
-	d = {}
-	labelStr = label.asString()
-	for troveName in troveNameList:
-	    d[troveName] = [ x for x in 
-		self.troveStore.iterTroveVersionsByLabel(troveName, labelStr) ]
-
-	return d
-
-    def getTroveFlavorsLatestVersion(self, troveName, branch):
-	return [ (versions.VersionFromString(x[0], 
-			timeStamps = [ float(z) for z in x[1].split(":")]),
-		  self.thawFlavor(x[2])) for x in 
-		    self.troveStore.iterTrovePerFlavorLeafs(troveName, 
-							    branch.asString()) ]
-	
-    def getTroveVersionFlavors(self, troveDict):
-	newD = self.troveStore.getTroveFlavors(troveDict)
-
-	for troveName in newD.iterkeys():
-	    for version in newD[troveName].iterkeys():
-		newD[troveName][version] = \
-		    [ self.thawFlavor(x) for x in newD[troveName][version] ]
-
-	return newD
-
-    def hasPackage(self, serverName, pkgName):
-	assert(serverName == self.name)
-	return self.troveStore.hasTrove(pkgName)
-
     def hasTrove(self, pkgName, version, flavor):
 	return self.troveStore.hasTrove(pkgName, troveVersion = version,
 					troveFlavor = flavor)
-
-    def getTroveLatestVersion(self, pkgName, branch):
-        try:
-            return self.troveStore.troveLatestVersion(pkgName, branch)
-        except KeyError:
-            raise TroveMissing(pkgName, branch)
 
     def getTrove(self, pkgName, version, flavor, pristine = True,
                  withFiles = True):
@@ -116,51 +55,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	except KeyError:
 	    raise TroveMissing(pkgName, version)
 
-    def eraseTrove(self, pkgName, version, flavor):
-	self.troveStore.eraseTrove(pkgName, version, flavor)
-
     def addTrove(self, pkg):
 	return self.troveStore.addTrove(pkg)
 
     def addTroveDone(self, pkg):
 	self.troveStore.addTroveDone(pkg)
-
-    def addPackage(self, pkg):
-	return self.troveStore.addTrove(pkg)
-
-    def addPackageDone(self, pkgId):
-	self.troveStore.addTroveDone(pkgId)
-
-    def commit(self):
-	self.troveStore.commit()
-
-    def rollback(self):
-	self.troveStore.rollback()
-
-    def branchesOfTroveLabel(self, troveName, label):
-	return self.troveStore.branchesOfTroveLabel(troveName, label)
-
-    def createTroveBranch(self, pkgName, branch):
-	log.debug("creating branch %s for %s", branch.asString(), pkgName)
-        return self.troveStore.createTroveBranch(pkgName, branch)
-
-    def findFileVersion(self, fileId):
-        return self.troveStore.findFileVersion(fileId)
-
-    def iterFilesInTrove(self, troveName, version, flavor,
-                         sortByPath = False, withFiles = False):
-	gen = self.troveStore.iterFilesInTrove(troveName, version, flavor,
-						    sortByPath, withFiles)
-
-	for (pathId, path, fileId, version, fileObj) in gen:
-	    if fileObj:
-		yield pathId, path, version, fileObj
-
-	    # if fileObj is None, we need to get the fileObj from a remote
-	    # repository
-
-	    fileObj = self.getFileVersion(pathId, fileId, version)
-	    yield pathId, path, version, fileObj
 
     ### File functions
 
@@ -185,16 +84,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	return file
 
-    def getFileVersions(self, l):
-	return self.troveStore.getFiles(l)
-
     def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId, fileVersion):
 	# don't add duplicates to this repository
 	#if not self.troveStore.hasFile(fileObj.pathId(), fileVersion):
 	self.troveStore.addFile(troveInfo, pathId, fileObj, path, fileId, fileVersion)
-
-    def eraseFileVersion(self, pathId, version):
-	self.troveStore.eraseFile(pathId, version)
 
     ###
 
@@ -251,13 +144,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             print >> sys.stderr, "exception occurred while committing change set"
             stackutil.printTraceBack()
             print >> sys.stderr, "attempting rollback"
-            self.rollback()
+            self.troveStore.rollback()
             raise
         else:
-            self.commit()
-
-    def resolveRequirements(self, label, depSetList):
-        return self.troveStore.resolveRequirements(label, depSetList)
+            self.troveStore.commit()
 
     def getFileContents(self, itemList):
         contents = []
@@ -410,7 +300,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
             filesNeeded = newFilesNeeded
             del newFilesNeeded
-            idIdx = self.getFileVersions(getList)
+            idIdx = self.troveStore.getFiles(getList)
 
             # Walk this in reverse order. This may seem odd, but the
             # order in the final changeset is set by sorting that happens

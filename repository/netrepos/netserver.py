@@ -89,11 +89,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	#	lib.epdb.post_mortem(excInfo[2])
 	#    raise
 
-    def allTroveNames(self, authToken, clientVersion):
+    def allTroveNames(self):
 	if not self.repos.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
-        return [ x for x in self.repos.iterAllTroveNames() ]
+	return [x for x in self.repos.troveStore.iterTroveNames() ]
 
     def troveNames(self, authToken, clientVersion, label):
         label = self.toLabel(label)
@@ -101,7 +101,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.repos.auth.check(authToken, write = False, label = label):
 	    raise InsufficientPermission
 
-        return [ x for x in self.repos.troveNames(label) ]
+        # XXX this should filter based on the label
+
+        return [ x for x in self.repos.troveStore.iterTroveNames() ]
 
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,
@@ -216,7 +218,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                      label = fileLabel):
 	    raise InsufficientPermission
 
-        fileObj = self.repos.findFileVersion(fileId)
+        fileObj = self.repos.troveStore.findFileVersion(fileId)
 
         filePath = self.repos.contentsStore.hashToPath(
                         sha1helper.sha1ToString(fileObj.contents.sha1()))
@@ -442,7 +444,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         label = self.toLabel(label)
 
-	sugDict = self.repos.resolveRequirements(label, requires.keys())
+	sugDict = self.repos.troveStore.resolveRequirements(label, 
+                                                            requires.keys())
 
 	result = {}
 	for (key, val) in sugDict.iteritems():
