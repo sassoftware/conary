@@ -135,6 +135,10 @@ class NonMultilibComponent(policy.Policy):
         '.*/python[^/]*/site-packages/.*',
         '.*/perl[^/]*/vendor-perl/.*',
     ]
+    invariantexceptions = [
+        '%(debuglibdir)s/',
+    ]
+
     def __init__(self, *args, **keywords):
         self.foundlib = {'python': False, 'perl': False}
         self.foundlib64 = {'python': False, 'perl': False}
