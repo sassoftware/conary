@@ -957,11 +957,12 @@ class SingleGroup:
 class GroupRecipe(Recipe):
     Flags = use.LocalFlags
 
-    def Requires(self, requirement):
+    def Requires(self, requirement, groupName = None):
         if requirement[0] == '/':
             raise RecipeFileError, 'file requirements not allowed in groups'
+        if groupName is None: groupName = self.name
 
-        self.groupObj.Requires(requirement)
+        self.groups[groupName].Requires(requirement)
 
     def addTrove(self, name, versionStr = None, flavor = None, source = None,
                  byDefault = True, groupName = None):
