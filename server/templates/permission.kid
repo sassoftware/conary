@@ -18,7 +18,7 @@ from templates import library
         <h2>{pageTitle}</h2>
 
         <form method="post" action="addPerm">
-            <table class="add-perm">
+            <table class="add-form">
                 <tr>
                     <td id="header">Group:</td>
                     <td py:content="makeSelect('group', groups)"/>

@@ -65,7 +65,10 @@ class HttpHandler:
                                (True, False, True)),
              "addUser":        (self.addUser, "Add User",                
                                (True, False, True)),
-             
+             "addGroupForm":   (self.addGroupForm, "Add Group",
+                               (True, False, True)),
+             "addGroup":       (self.addGroup, "Add Group",
+                               (True, False, True)),
              # change password commands
              "chPassForm":     (self.chPassForm, "Change Password",
                                (True, False, False)),
@@ -230,6 +233,24 @@ class HttpHandler:
                                  link = "User Administration",
                                  url = "userlist")
    
+    def addGroupForm(self, authToken, fields):
+        users = dict(self.repServer.auth.iterUsers())
+    
+        self.kid_write("add_group", users = users)
+   
+    def addGroup(self, authToken, fields):
+        groupName = fields["userGroupName"].value
+        initialUserIds = fields.getlist("initialUserIds")
+
+        newGroupId = self.repServer.auth.addGroup(groupName)
+
+        for userId in initialUserIds:
+            self.repServer.auth.addGroupMember(newGroupId, userId)
+
+        self.kid_write("notice", message = "Group successfully created.",
+                                 link = "User Administration",
+                                 url = "userlist")
+   
     def deletePerm(self, authToken, fields):
         groupId = str(fields.getfirst("groupId", ""))
         labelId = fields.getfirst("labelId", None)
@@ -262,7 +283,7 @@ class HttpHandler:
         self.kid_write("notice", message = "User successfully added.",
                                  link = "User Administration",
                                  url = "userlist")
-        
+       
     def chPassForm(self, authToken, fields):
         if fields.has_key("username"):
             username = fields["username"].value

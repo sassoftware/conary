@@ -69,17 +69,17 @@ table.user-admin#permissions thead {
     background: #eeeeff;
 }
 
-table.add-perm {
+table.add-form {
     width: 40%;
     background-color: #eeeeff;
     border: 1px solid black;
 }
 
-table.add-perm td {
+table.add-form td {
     padding: 4px;
 }
 
-table.add-perm td#header {
+table.add-form td#header {
     font-size: 105%;
     font-weight: bold;
 }
