@@ -36,6 +36,13 @@ class _Source:
 				    self.recipe.laReposCache, self.gpg, 
                                     self.recipe.name, self.recipe.srcdirs)
 	    if self.localgpgfile:
+                # do a quick, simple test to see if it looks like a signature
+                f = open(self.localgpgfile)
+                line = f.readline()
+                f.close()
+                if line.find('BEGIN ') == -1:
+                    self.localgpgfile = None
+                    continue
 		return
 	if not self.localgpgfile:
 	    log.warning('No GPG signature file found for %s', self.sourcename)
