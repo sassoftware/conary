@@ -12,6 +12,7 @@ import difflib
 import fcntl
 import filecontents
 import files
+import group
 import os
 import package
 import patch
@@ -388,6 +389,13 @@ class _GroupSetClass(VersionedFile):
     def addVersion(self, version, group):
 	VersionedFile.addVersion(self, version, group.formatString())
 
+    def getLatestGroup(self, branch):
+	ver = self.findLatestVersion(branch)
+	if not ver:
+	    raise GroupMissing(self.name, branch)
+
+	return self.getVersion(ver)
+
     def __init__(self, db, name, createBranches):
 	VersionedFile.__init__(self, db, name, createBranches)
 	self.name = name
@@ -673,4 +681,18 @@ class PackageMissing(RepositoryError):
 
     def __init__(self, packageName, version):
 	self.packageName = packageName
+	self.version = version
+
+class GroupMissing(RepositoryError):
+
+    def __str__(self):
+	if self.version.isBranch():
+	    return ("group %s does not exist on branch %s" % \
+		(self.groupName, self.version.asString()))
+
+	return "version %s of group %s does not exist" % \
+	    (self.version.asString(), self.groupName)
+
+    def __init__(self, groupName, version):
+	self.groupName = groupName
 	self.version = version
