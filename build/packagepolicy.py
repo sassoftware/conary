@@ -90,7 +90,7 @@ class DanglingSymlinks(policy.Policy):
     def doFile(self, file):
 	d = self.macros.destdir
 	f = util.joinPaths(d, file)
-	if stat.S_ISLNK(os.lstat(f).st_mode):
+	if os.path.islink(f):
 	    contents = os.readlink(f)
 	    if contents[0] == '/':
 		log.warning('Absolute symlink %s points to %s, should probably be relative', file, contents)
