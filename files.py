@@ -379,25 +379,25 @@ def FileFromFilesystem(path, fileId, type = None):
     s = os.lstat(path)
 
     if type == "src":
-	f = SourceFile(id)
+	f = SourceFile(fileId)
 	f.sha1(sha1helper.hashFile(path))
     elif (stat.S_ISREG(s.st_mode)):
-	f = RegularFile(id)
+	f = RegularFile(fileId)
 	f.sha1(sha1helper.hashFile(path))
     elif (stat.S_ISLNK(s.st_mode)):
-	f = SymbolicLink(id)
+	f = SymbolicLink(fileId)
 	f.linkTarget(os.readlink(path))
     elif (stat.S_ISDIR(s.st_mode)):
-	f = Directory(id)
+	f = Directory(fileId)
     elif (stat.S_ISSOCK(s.st_mode)):
-	f = Socket(id)
+	f = Socket(fileId)
     elif (stat.S_ISFIFO(s.st_mode)):
-	f = NamedPipe(id)
+	f = NamedPipe(fileId)
     elif (stat.S_ISBLK(s.st_mode)):
-	f = DeviceFile(id)
+	f = DeviceFile(fileId)
 	f.majorMinor("b", s.st_rdev >> 8, s.st_rdev & 0xff)
     elif (stat.S_ISCHR(s.st_mode)):
-	f = DeviceFile(id)
+	f = DeviceFile(fileId)
 	f.majorMinor("c", s.st_rdev >> 8, s.st_rdev & 0xff)
     else:
 	raise TypeError, "unsupported file type for %s" % path
