@@ -9,10 +9,12 @@ on the filesystem except by this module!
 
 import changeset
 import errno
+import filecontents
 import files
 import log
 import os
 import patch
+import versions
 
 def applyChangeSet(changeSet, root):
     """
@@ -196,3 +198,89 @@ def _applyPackageChangeSet(repos, pkgCs, basePkg, fsPkg, root):
 	fsPkg.changeVersion(pkgCs.getNewVersion())
 
     return fsPkg
+
+def buildLocalChanges(repos, state, srcPkg, newVersion):
+    """
+    Builds a change set against the sources in the current directory and
+    builds an in-core package object reflecting those local changes.
+    The return is a tuple with a boolean saying if anything changes, the
+    new state, the changeset, and the new package object.
+
+    @param repos: Repository this directory is against.
+    @type repos: repository.Repository
+    @param state: Current state object
+    @type state: SourceState
+    @param srcPkg: Package to generate the change set against
+    @type srcPkg: package.Package
+    @param newVersion: version to use for the newly created package
+    @type newVersion
+    """
+
+    newState = state.copy()
+    newState.changeVersion(newVersion)
+    changeSet = changeset.ChangeSet()
+
+    for (fileId, (path, version)) in newState.iterFileList():
+	realPath = os.getcwd() + "/" + path
+
+	try:
+	    os.lstat(realPath)
+	except OSError:
+	    log.error("%s is missing (use remove if this is intentional)" 
+		% path)
+	    return
+
+	if srcPkg and srcPkg.hasFile(fileId):
+	    srcFileVersion = srcPkg.getFile(fileId)[1]
+	    srcFile = repos.getFileVersion(fileId, srcFileVersion)
+	    f = files.FileFromFilesystem(realPath, fileId,
+					 possibleMatch = fileId)
+	else:
+	    f = files.FileFromFilesystem(realPath, fileId)
+
+	if path.endswith(".recipe"):
+	    f.isConfig(set = True)
+
+	if not srcPkg or not srcPkg.hasFile(fileId):
+	    # if we're committing against head, this better be a new file.
+	    # if we're generating a diff against someplace else, it might not 
+	    # be.
+	    assert(srcPkg or isinstance(version, versions.NewVersion))
+	    # new file, so this is easy
+	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
+	    newState.addFile(fileId, path, newVersion)
+
+	    if f.hasContents:
+		newCont = filecontents.FromFilesystem(realPath)
+		changeSet.addFileContents(fileId,
+					  changeset.ChangedFileTypes.file,
+					  newCont)
+	    continue
+
+	oldVersion = srcPkg.getFile(fileId)[1]	
+	(oldFile, oldCont) = repos.getFileVersion(fileId, oldVersion,
+						  withContents = 1)
+        if not f.same(oldFile, ignoreOwner = True):
+	    newState.addFile(fileId, path, newVersion)
+
+	    (filecs, hash) = changeset.fileChangeSet(fileId, oldFile, f)
+	    changeSet.addFile(fileId, oldVersion, newVersion, filecs)
+	    if hash:
+		newCont = filecontents.FromFilesystem(realPath)
+		(contType, cont) = changeset.fileContentsDiff(oldFile, oldCont,
+					f, newCont)
+						
+		changeSet.addFileContents(fileId, contType, cont)
+
+    (csPkg, filesNeeded, pkgsNeeded) = newState.diff(srcPkg)
+    assert(not pkgsNeeded)
+    changeSet.newPackage(csPkg)
+
+    if csPkg.getOldFileList() or csPkg.getChangedFileList() or \
+       csPkg.getNewFileList():
+	foundDifference = 1
+    else:
+	foundDifference = 0
+
+    return (foundDifference, newState, changeSet)
+

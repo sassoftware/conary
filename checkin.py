@@ -6,8 +6,6 @@
 import changeset
 import cook
 import errno
-import filecontents
-import files
 import helper
 import log
 import os
@@ -131,6 +129,7 @@ def _getRecipeVersion(recipeFile):
 
     return recipeClass.version
 
+
 def checkout(repos, cfg, dir, name, versionStr = None):
     # We have to be careful with branch nicknames.  First, we could get
     # multiple matches for a single package. Two, when a nickname uniquely
@@ -176,98 +175,6 @@ def checkout(repos, cfg, dir, name, versionStr = None):
 
     state.write(dir + "/SRS")
 
-def _buildChangeSet(repos, state, srcPkg):
-    """
-    Builds a change set against the sources in the current directory and
-    builds an in-core package object reflecting those local changes.
-    The return is a tuple with a boolean saying if anything changes, the
-    new state, the changeset, and the new package object.
-
-    @param repos: Repository this directory is against.
-    @type repos: repository.Repository
-    @param state: Current state object
-    @type state: SourceState
-    @param srcPkg: Package to generate the change set against
-    @type srcPkg: package.Package
-    """
-
-    recipeVersionStr = _getRecipeVersion(state.getRecipeFileName())
-    if not recipeVersionStr: return
-
-    if srcPkg:
-	newVersion = helper.nextVersion(recipeVersionStr, srcPkg.getVersion(),
-					state.getBranch(), binary = False)
-    else:
-	newVersion = helper.nextVersion(recipeVersionStr, None,
-					state.getBranch(), binary = False)
-    newState = state.copy()
-    newState.changeVersion(newVersion)
-    changeSet = changeset.ChangeSet()
-
-    for (fileId, (path, version)) in newState.iterFileList():
-	realPath = os.getcwd() + "/" + path
-
-	try:
-	    os.lstat(realPath)
-	except OSError:
-	    log.error("%s is missing (use remove if this is intentional)" 
-		% path)
-	    return
-
-	if srcPkg and srcPkg.hasFile(fileId):
-	    srcFileVersion = srcPkg.getFile(fileId)[1]
-	    srcFile = repos.getFileVersion(fileId, srcFileVersion)
-	    f = files.FileFromFilesystem(realPath, fileId,
-					 possibleMatch = fileId)
-	else:
-	    f = files.FileFromFilesystem(realPath, fileId)
-
-	if path.endswith(".recipe"):
-	    f.isConfig(set = True)
-
-	if not srcPkg or not srcPkg.hasFile(fileId):
-	    # if we're committing against head, this better be a new file.
-	    # if we're generating a diff against someplace else, it might not 
-	    # be.
-	    assert(srcPkg or isinstance(version, versions.NewVersion))
-	    # new file, so this is easy
-	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
-	    newState.addFile(fileId, path, newVersion)
-
-	    if f.hasContents:
-		newCont = filecontents.FromFilesystem(realPath)
-		changeSet.addFileContents(fileId,
-					  changeset.ChangedFileTypes.file,
-					  newCont)
-	    continue
-
-	oldVersion = srcPkg.getFile(fileId)[1]	
-	(oldFile, oldCont) = repos.getFileVersion(fileId, oldVersion,
-						  withContents = 1)
-        if not f.same(oldFile, ignoreOwner = True):
-	    newState.addFile(fileId, path, newVersion)
-
-	    (filecs, hash) = changeset.fileChangeSet(fileId, oldFile, f)
-	    changeSet.addFile(fileId, oldVersion, newVersion, filecs)
-	    if hash:
-		newCont = filecontents.FromFilesystem(realPath)
-		(contType, cont) = changeset.fileContentsDiff(oldFile, oldCont,
-					f, newCont)
-						
-		changeSet.addFileContents(fileId, contType, cont)
-
-    (csPkg, filesNeeded, pkgsNeeded) = newState.diff(srcPkg)
-    assert(not pkgsNeeded)
-    changeSet.newPackage(csPkg)
-
-    if csPkg.getOldFileList() or csPkg.getChangedFileList() or \
-       csPkg.getNewFileList():
-	foundDifference = 1
-    else:
-	foundDifference = 0
-
-    return (foundDifference, newState, changeSet)
-
 def commit(repos):
     state = SourceStateFromFile("SRS")
 
@@ -289,8 +196,17 @@ def commit(repos):
 		      "from the head of the branch; use update")
 	    return
 
-    # we need to commit based on changes to the head of a branch
-    result = _buildChangeSet(repos, state, srcPkg)
+    recipeVersionStr = _getRecipeVersion(state.getRecipeFileName())
+    if not recipeVersionStr: return
+
+    if srcPkg:
+	newVersion = helper.nextVersion(recipeVersionStr, srcPkg.getVersion(),
+					state.getBranch(), binary = False)
+    else:
+	newVersion = helper.nextVersion(recipeVersionStr, None,
+					state.getBranch(), binary = False)
+
+    result = update.buildLocalChanges(repos, state, srcPkg, newVersion)
     if not result: return
 
     (isDifferent, newState, changeSet) = result
@@ -322,7 +238,8 @@ def diff(repos, versionStr = None):
     oldPackage.changeVersion(repos.pkgGetFullVersion(state.getName(), 
 			     oldPackage.getVersion()))
 
-    result = _buildChangeSet(repos, state, oldPackage)
+    result = update.buildLocalChanges(repos, state, oldPackage,
+				      versions.NewVersion())
     if not result: return
 
     (changed, newState, changeSet) = result
