@@ -402,3 +402,21 @@ class InstallDocs(BuildAction):
 	self.devel = devel
 	self.subdir = subdir
 	self.use = util.checkUse(use)
+
+class MakeDirs(BuildAction):
+
+    def do(self, macros):
+        for path in self.paths:
+            path = path %macros
+            dirs = util.braceExpand(path)
+            for d in dirs:
+                dest = macros['destdir'] + d %macros
+                print '+ creating directory', dest
+                util.mkdirChain(dest)
+
+    def __init__(self, paths, **keywords):
+        BuildAction.__init__(self, paths, **keywords)
+	if type(paths) is str:
+	    self.paths = (paths,)
+	else:
+	    self.paths = paths
