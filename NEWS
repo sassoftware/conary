@@ -1,3 +1,7 @@
+Changes in 0.13.1
+  * repquery wasn't filtering by flavor properly (exposed by a bug fix 
+    in 0.13.0)
+
 Changes in 0.13.0
   * removed importrpm.py
   * diffs between a file object that has a non-empty provides or requires
