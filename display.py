@@ -15,35 +15,49 @@ def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
 
     for pkgName in repos.getPackageList(pkg):
 	if versionStr or ls:
-            displayPkgInfo(repos, cfg, pkgName, versionStr, ls)
+            _displayPkgInfo(repos, cfg, pkgName, versionStr, ls)
             continue
 	else:
 	    if all:
 		l = repos.getPackageVersionList(pkgName)
 	    else:
-                version = repos.pkgLatestVersion(pkgName, cfg.defaultbranch)
-                if version:
-                    l = ( version, )
-                else:
-                    l = ()
-	    
+		l = _versionList(repos, pkgName)
+
 	    for version in l:
 		print _pkgFormat % (
 		    package.stripNamespace(cfg.packagenamespace, pkgName),
 		    version.asString(cfg.defaultbranch))
 
-def displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
-    if versionStr:
-	if versionStr[0] != "/":
-	    versionStr = cfg.defaultbranch.asString() + "/" + versionStr
-	version = versions.VersionFromString(versionStr)
+def _versionList(repos, pkgName):
+    """
+    Returns a list of the head of all non-empty branches for a pakage.
 
-	if version.isBranch():
-	    pkg = repos.getLatestPackage(pkgName, version)
-	else:
-	    pkg = repos.getPackageVersion(pkgName, version)
+    @param repos: Repository to look for branches in
+    @type repos: repository.Repository
+    @param: pkgName: Name of a package
+    @type pkgName: str
+    @rtype: list of str
+    """
+
+    branches = repos.getPackageBranchList(pkgName)
+    l = []
+    for branch in branches:
+	if not branch.isLocal():
+	    version = repos.pkgLatestVersion(pkgName, branch)
+	    # filter out empty branches 
+	    if version.onBranch(branch):
+		l.append(version)
+
+    return l
+
+def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
+    if versionStr[0] != "/":
+	versionStr = cfg.defaultbranch.asString() + "/" + versionStr
+    version = versions.VersionFromString(versionStr)
+
+    if version.isBranch():
+	pkg = repos.getLatestPackage(pkgName, version)
     else:
-	version = repos.pkgLatestVersion(pkgName, cfg.defaultbranch)
 	pkg = repos.getPackageVersion(pkgName, version)
 
     if not ls:
