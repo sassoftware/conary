@@ -12,16 +12,16 @@ argDef = {}
 argDef['dir'] = 1
 
 def usage(rc = 1):
-    print "usage: srs source add <file> [<file2> <file3> ...]"
-    print "       srs source checkout [--dir <dir>] <group> <version>"
-    print "       srs source commit"
-    print "       srs source diff"
-    print "       srs source log [<branch>]"
-    print "       srs source newpkg <name>"
-    print "       srs source rdiff <name> <oldver> <newver>"
-    print "       srs source remove <file> [<file2> <file3> ...]"
-    print "       srs source rename <oldfile> <newfile>"
-    print "       srs source update <version>"
+    print "usage: conary source add <file> [<file2> <file3> ...]"
+    print "       conary source checkout [--dir <dir>] <group> <version>"
+    print "       conary source commit"
+    print "       conary source diff"
+    print "       conary source log [<branch>]"
+    print "       conary source newpkg <name>"
+    print "       conary source rdiff <name> <oldver> <newver>"
+    print "       conary source remove <file> [<file2> <file3> ...]"
+    print "       conary source rename <oldfile> <newfile>"
+    print "       conary source update <version>"
     print 
     print "commit flags:   --message <msg>"
     return rc

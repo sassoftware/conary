@@ -38,22 +38,22 @@ except conarycfg.ParseError, e:
     sys.exit(1)
 
 def usage(rc = 1):
-    print "usage: srs branch <newbranch> <branchfrom> [<trove>]"
-    print "       srs changeset <pkg> [<oldver>] <newver> <outfile>"
-    print "       srs cook    [--prep] [--macros file] <first.recipe> <second.recipe> ..."
-    print "       srs commit       <changeset>"
-    print "       srs erase        <pkgname> [<version>]"
-    print "       srs localcs      <pkg> <outfile>"
-    print "       srs localcommit  <changeset>"
-    print "       srs pkglist      <pkgname> [<version>]"
-    print "       srs remove       <path>"
-    print "       srs replist      <pkgname> [<version>]"
-    print "       srs rblist"
-    print "       srs rollback     <rollback>"
-    print "       srs source       [usage]"
-    print "       srs update	   <pkgname> <version>"
+    print "usage: conary branch <newbranch> <branchfrom> [<trove>]"
+    print "       conary changeset <pkg> [<oldver>] <newver> <outfile>"
+    print "       conary cook    [--prep] [--macros file] <file.recipe>+"
+    print "       conary commit       <changeset>"
+    print "       conary erase        <pkgname> [<version>]"
+    print "       conary localcs      <pkg> <outfile>"
+    print "       conary localcommit  <changeset>"
+    print "       conary pkglist      <pkgname> [<version>]"
+    print "       conary remove       <path>"
+    print "       conary replist      <pkgname> [<version>]"
+    print "       conary rblist"
+    print "       conary rollback     <rollback>"
+    print "       conary source       [usage]"
+    print "       conary update	   <pkgname> <version>"
     print "           update       <changeset>"
-    print "       srs usage"
+    print "       conary usage"
     print ""
     print "commit flags:  --target-branch <branch>"
     print ""
@@ -171,7 +171,7 @@ def realMain():
     profile = False
     if argSet.has_key('profile'):
 	import hotshot
-	prof = hotshot.Profile('srs.prof')
+	prof = hotshot.Profile('conary.prof')
 	prof.start()
 	profile = True
 	del argSet['profile']
