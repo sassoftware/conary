@@ -221,7 +221,7 @@ def _applyPackageChangeSet(repos, pkgCs, changeSet, basePkg, fsPkg, root):
 		# those changes
 		log.debug("replacing %s with contents from repository" % 
 				realPath)
-		assert(headFileContents == changeset.ChangedFileTypes.file)
+		assert(headFileContType == changeset.ChangedFileTypes.file)
 		headFile.restore(headFileContents, realPath, 1)
 	    elif fsFile.isConfig() or headFile.isConfig():
 		# it changed in both the filesystem and the repository; our
