@@ -307,6 +307,9 @@ class ChangeSet(streams.LargeStreamSet):
 
 	for hash in idList:
 	    (contType, f) = contents[hash]
+	    # XXX this can go away once we track fileids as binary
+	    import sha1helper
+	    hash = sha1helper.sha1FromString(hash)
 	    csf.addFile(hash, f, tag + contType[4:])
 
     def writeAllContents(self, csf):
@@ -610,7 +613,10 @@ class ChangeSetFromFile(ChangeSet):
 	    cont = filecontents.FromString(str)
 	    size = len(str)
 	else:
-	    (tagInfo, f, size) = self.csf.getFile(fileId)
+	    # XXX this can go away once we track fileids as binary
+	    import sha1helper
+	    hash = sha1helper.sha1FromString(fileId)
+	    (tagInfo, f, size) = self.csf.getFile(hash)
 	    tag = "cft-" + tagInfo.split()[1]
 	    cont = filecontents.FromFile(f)
 

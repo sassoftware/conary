@@ -46,3 +46,9 @@ def hashString(buf):
 def sha1ToString(buf):
     assert(len(buf) == 20)
     return "%08x%08x%08x%08x%08x" % struct.unpack("!5I", buf)
+
+def sha1FromString(val):
+    assert(len(val) == 40)
+    return struct.pack("!5I", int(val[ 0: 8], 16), 
+			int(val[ 8:16], 16), int(val[16:24], 16), 
+			int(val[24:32], 16), int(val[32:40], 16))

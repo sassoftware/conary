@@ -28,6 +28,7 @@ else:
 
 sys.path.append(os.path.dirname(fullPath))
 from filecontainer import FileContainer
+import sha1helper
 
 f = open(sys.argv[1], "r")
 c = FileContainer(f)
@@ -36,12 +37,19 @@ if len(sys.argv) == 2:
     rc = c.getNextFile()
     while rc:
 	(name, tag, f, size) = rc
+	if len(name) == 20:
+	    name = sha1helper.sha1ToString(name)
+
 	print "%s (%s)" % (name, tag)
 	rc = c.getNextFile()
 elif len(sys.argv) == 3:
-    f = c.getFile(sys.argv[2])
+    name = sys.argv[2]
+    if len(name) == 40:
+	name = sha1helper.sha1FromString(name)
+
+    f = c.getFile(name)[1]
     sys.stdout.write(f.read())
-    f.close
+    f.close()
 else:
     for file in sys.argv[2:]:
 	print "--", file
