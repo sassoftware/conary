@@ -143,10 +143,10 @@ class Repository:
 	return cs
 
     def _getPackageSet(self, name):
-	return package.PackageSet(self.pkgDB, name)
+	return _PackageSet(self.pkgDB, name)
 
     def _getFileDB(self, fileId):
-	return files.FileDB(self.fileDB, fileId)
+	return _FileDB(self.fileDB, fileId)
 
     def pullFileContents(self, fileId, targetFile):
 	srcFile = self.contentsStore.openFile(fileId)
@@ -256,3 +256,77 @@ class Database(Repository):
 	self.root = root
 	fullPath = root + "/" + path
 	Repository.__init__(self, fullPath, mode)
+
+# this is a set of all of the versions of a single packages 
+class _PackageSet:
+    def getVersion(self, version):
+	f1 = self.f.getVersion(version)
+	p = package.PackageFromFile(self.name, f1, version)
+	f1.close()
+	return p
+
+    def hasVersion(self, version):
+	return self.f.hasVersion(version)
+
+    def eraseVersion(self, version):
+	self.f.eraseVersion(version)
+
+    def addVersion(self, version, package):
+	self.f.addVersion(version, package.formatString())
+
+    def versionList(self):
+	return self.f.versionList()
+
+    def getLatestPackage(self, branch):
+	return self.getVersion(self.f.findLatestVersion(branch))
+
+    def getLatestVersion(self, branch):
+	return self.f.findLatestVersion(branch)
+
+    def close(self):
+	self.f.close()
+	self.f = None
+
+    def __del__(self):
+	self.f = None
+
+    def __init__(self, db, name):
+	self.name = name
+	self.f = db.openFile(name)
+
+class _FileDB:
+
+    def getLatestVersion(self, branch):
+	return self.f.findLatestVersion(branch)
+
+    def addVersion(self, version, file):
+	if self.f.hasVersion(version):
+	    raise KeyError, "duplicate version for database"
+	else:
+	    if file.id() != self.fileId:
+		raise KeyError, "file id mismatch for file database"
+	
+	self.f.addVersion(version, "%s\n" % file.infoLine())
+
+    def getVersion(self, version):
+	f1 = self.f.getVersion(version)
+	file = files.FileFromInfoLine(f1.read(), self.fileId)
+	f1.close()
+	return file
+
+    def hasVersion(self, version):
+	return self.f.hasVersion(version)
+
+    def eraseVersion(self, version):
+	self.f.eraseVersion(version)
+
+    def close(self):
+	self.f = None
+
+    def __del__(self):
+	self.close()
+
+    def __init__(self, db, fileId):
+	self.f = db.openFile(fileId)
+	self.fileId = fileId
+

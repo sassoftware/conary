@@ -4,7 +4,6 @@
 #
 import string
 import os
-import versioned
 import sha1helper
 import stat
 import pwd
@@ -448,42 +447,6 @@ class SourceFile(RegularFile):
 
     def __init__(self, fileId, info = None):
 	RegularFile.__init__(self, fileId, info, infoTag = "src")
-
-class FileDB:
-
-    def getLatestVersion(self, branch):
-	return self.f.findLatestVersion(branch)
-
-    def addVersion(self, version, file):
-	if self.f.hasVersion(version):
-	    raise KeyError, "duplicate version for database"
-	else:
-	    if file.id() != self.fileId:
-		raise KeyError, "file id mismatch for file database"
-	
-	self.f.addVersion(version, "%s\n" % file.infoLine())
-
-    def getVersion(self, version):
-	f1 = self.f.getVersion(version)
-	file = FileFromInfoLine(f1.read(), self.fileId)
-	f1.close()
-	return file
-
-    def hasVersion(self, version):
-	return self.f.hasVersion(version)
-
-    def eraseVersion(self, version):
-	self.f.eraseVersion(version)
-
-    def close(self):
-	self.f = None
-
-    def __del__(self):
-	self.close()
-
-    def __init__(self, db, fileId):
-	self.f = db.openFile(fileId)
-	self.fileId = fileId
 
 def FileFromFilesystem(path, fileId, type = None):
     s = os.lstat(path)

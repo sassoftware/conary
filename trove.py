@@ -3,7 +3,6 @@
 # All rights reserved
 #
 import os
-import versioned
 import string
 import types
 import util
@@ -266,40 +265,3 @@ def stripNamespace(namespace, pkgName):
     if pkgName.startswith(namespace + ":"):
 	return pkgName[len(namespace) + 1:]
     return pkgName
-
-# this is a set of all of the versions of a single packages 
-class PackageSet:
-    def getVersion(self, version):
-	f1 = self.f.getVersion(version)
-	p = PackageFromFile(self.name, f1, version)
-	f1.close()
-	return p
-
-    def hasVersion(self, version):
-	return self.f.hasVersion(version)
-
-    def eraseVersion(self, version):
-	self.f.eraseVersion(version)
-
-    def addVersion(self, version, package):
-	self.f.addVersion(version, package.formatString())
-
-    def versionList(self):
-	return self.f.versionList()
-
-    def getLatestPackage(self, branch):
-	return self.getVersion(self.f.findLatestVersion(branch))
-
-    def getLatestVersion(self, branch):
-	return self.f.findLatestVersion(branch)
-
-    def close(self):
-	self.f.close()
-	self.f = None
-
-    def __del__(self):
-	self.f = None
-
-    def __init__(self, db, name):
-	self.name = name
-	self.f = db.openFile(name)
