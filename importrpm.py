@@ -85,7 +85,7 @@ def doImport(repos, cfg, rpmFile):
 			       modes[i] & 07777)
 	elif  (stat.S_ISCHR(modes[i])):
 	    buildPkg.addDevice(list[i], "c", (rdevs[i] & 0xff00) >> 8,
-			       rdeves[i] & 0xff, owners[i], groups[i],
+			       rdevs[i] & 0xff, owners[i], groups[i],
 			       modes[i] & 07777)
 	else:
 	    buildPkg.addFile(list[i], scratch + list[i])
