@@ -1224,6 +1224,14 @@ class Requires(_addInfo):
             if info[0] == "/":
                 depClass = deps.FileDependencies
             else: # by process of elimination, must be a trove
+                if info.startswith('group-'):
+                    self.recipe.reportErrors(
+                        'group dependency %s no allowed' %info)
+                    return
+                if ':' not in info:
+                    self.recipe.reportErrors(
+                        'package dependency %s no allowed' %info)
+                    return
                 depClass = deps.TroveDependencies
             self._addRequirement(path, info, pkg, depClass)
 
