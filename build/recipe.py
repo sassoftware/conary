@@ -18,7 +18,6 @@ import inspect
 import lookaside
 import rpmhelper
 import gzip
-import warnings
 
 baseMacros = (
     # Note that these macros cannot be represented as a dictionary,
@@ -225,14 +224,9 @@ class Recipe:
 	    self.signatures[file].append((gpg, c, keyid))
 
     def addArchive(self, file, extractDir='', keyid=None):
-	self.tarballs.append((file, extractDir))
+	self.sources.append((file, 'tarball', extractDir, ()))
 	self.addSignature(file, keyid)
 
-    def addTarball(self, file, extractDir='', keyid=None):
-        warnings.warn("recipe.addTarball is deprecated - use recipe.addArchive",
-                      DeprecationWarning, stacklevel=2)
-        self.addArchive(file, extractDir, keyid)
-        
     def addArchiveFromRPM(self, rpm, file, extractDir='', keyid=None):
 	f = lookaside.searchAll(self.cfg, self.laReposCache, 
 			     os.path.basename(file), self.name, self.srcdirs)
@@ -243,32 +237,25 @@ class Recipe:
 	    extractSourceFromRPM(r, c)
 	    f = lookaside.findAll(self.cfg, self.laReposCache, file, 
 				  self.name, self.srcdirs)
-	self.tarballs.append((file, extractDir))
+	self.sources.append((file, 'tarball', extractDir, ()))
 	self.addSignature(f, keyid)
 
-    def addTarballFromRPM(self, rpm, file, extractDir='', keyid=None):
-        warnings.warn("recipe.addTarballFromRPM is deprecated - use recipe.addArchiveFromRPM",
-                      DeprecationWarning, stacklevel=2)
-        self.addArchiveFromRPM(rpm, file, extractDir, keyid)
-
     def addPatch(self, file, level='1', backup='', keyid=None):
-	self.patches.append((file, level, backup))
+	self.sources.append((file, 'patch', '', (level, backup)))
 	self.addSignature(file, keyid)
 
-    def addSource(self, file, keyid=None):
-	self.sources.append(file)
+    def addSource(self, file, keyid=None, extractDir='', apply=None):
+	self.sources.append((file, 'source', extractDir, (apply)))
 	self.addSignature(file, keyid)
 
     def allSources(self):
         sources = []
-        for (tarball, extractdir) in self.tarballs:
-            sources.append(tarball)
-        for (patch, level, backup) in self.patches:
-            sources.append(patch)
+        for (file, filetype, extractDir, args) in self.sources:
+            sources.append(file)
 	for signaturelist in self.signatures.values():
             for (gpg, cached, keyid) in signaturelist:
                 sources.append(gpg)
-	return sources + self.sources
+	return sources
 
     def mainDir(self, new = None):
 	if new:
@@ -301,37 +288,49 @@ class Recipe:
 	if os.path.exists(builddir):
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
-	for (file, extractdir) in self.tarballs:
-            f = lookaside.findAll(self.cfg, self.laReposCache, file, 
-				  self.name, self.srcdirs)
-	    self.checkSignatures(f, file)
-            if f.endswith(".bz2"):
-                tarflags = "-jxf"
-            elif f.endswith(".gz") or f.endswith(".tgz"):
-                tarflags = "-zxf"
-            else:
-                raise RuntimeError, "unknown archive compression"
-            if extractdir:
-                destdir = '%s/%s' % (builddir, extractdir)
-                util.execute("mkdir -p %s" % destdir)
-            else:
-                destdir = builddir
-            util.execute("tar -C %s %s %s" % (destdir, tarflags, f))
-	
-	destDir = builddir + "/" + self.theMainDir
-	util.mkdirChain(destDir)
 
-	for file in self.sources:
-            f = lookaside.findAll(self.cfg, self.laReposCache, file, 
-				  self.name, self.srcdirs)
-	    shutil.copyfile(f, destDir + "/" + os.path.basename(file))
+	for (file, filetype, targetdir, args) in self.sources:
+	    if filetype == 'tarball':
+		f = lookaside.findAll(self.cfg, self.laReposCache, file, 
+			      self.name, self.srcdirs)
+		self.checkSignatures(f, file)
+		if f.endswith(".bz2"):
+		    tarflags = "-jxf"
+		elif f.endswith(".gz") or f.endswith(".tgz"):
+		    tarflags = "-zxf"
+		else:
+		    raise RuntimeError, "unknown archive compression"
+		if targetdir:
+		    destdir = '%s/%s' % (builddir, targetdir)
+		    util.mkdirChain(destdir)
+		else:
+		    destdir = builddir
+		util.execute("tar -C %s %s %s" % (destdir, tarflags, f))
+		continue
 
-	for (file, level, backup) in self.patches:
-            # XXX handle .gz/.bz2 patch files
-            f = util.findFile(file, self.srcdirs)
-            if backup:
-                backup = '-b -z %s' % backup
-            util.execute('patch -d %s -p%s %s < %s' %(destDir, level, backup, f))
+	    # Not a tarball, so different assumption about where to operate
+	    destDir = builddir + "/" + self.theMainDir
+	    util.mkdirChain(destDir)
+
+	    if filetype == 'patch':
+		(level, backup) = args
+		# XXX handle .gz/.bz2 patch files
+		f = util.findFile(file, self.srcdirs)
+		if backup:
+		    backup = '-b -z %s' % backup
+		util.execute('patch -d %s -p%s %s < %s' %(destDir, level, backup, f))
+		continue
+
+	    if filetype == 'source':
+		(apply) = args
+		print 'FOUND: src ', file, apply
+		f = lookaside.findAll(self.cfg, self.laReposCache, file, 
+				      self.name, self.srcdirs)
+		if apply:
+		    util.execute(apply)
+		else:
+		    shutil.copyfile(f, destDir + "/" + os.path.basename(file))
+		continue
 
     def doBuild(self, buildpath):
         builddir = buildpath + "/" + self.mainDir()
@@ -378,9 +377,18 @@ class Recipe:
         return self.packageSet
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
-	self.tarballs = []
-	self.patches = []
 	self.sources = []
+	# XXX fixme: convert to proper documentation string
+	# sources is list of (file, filetype, targetdir, (args)) tuples, where
+	# - file is the name of the file
+	# - filetype is 'tarball', 'patch', 'source'
+	# - targetdir is subdirectory to work in
+	# - args is filetype-specific:
+	#   patch: (level, backup)
+	#     - level is -p<level>
+	#     - backup is .backupname suffix
+	#   source: (apply)
+	#     - apply is None or command to util.execute(apply)
 	self.signatures = {}
         self.cfg = cfg
 	self.laReposCache = laReposCache
