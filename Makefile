@@ -39,6 +39,7 @@ python_files = __init__.py	\
 	datastore.py		\
 	display.py		\
 	files.py		\
+	flavorcfg.py		\
         fmtroves.py             \
         metadata.py             \
 	queryrep.py		\
