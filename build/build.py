@@ -324,9 +324,15 @@ class MakePathsInstall(Make):
 
 
 class CompilePython(BuildCommand):
+    """
+    Build compiled and optimized compiled python files.
+    """
     template = (
 	"""python -c 'from compileall import *; compile_dir("""
-	""""%%(destdir)s/%%(dir)s", 10, "%%(dir)s")'""")
+	""""%%(destdir)s/%%(dir)s", 10, "%%(dir)s")'; """
+	"""python -O -c 'from compileall import *; compile_dir("""
+	""""%%(destdir)s/%%(dir)s", 10, "%%(dir)s")'"""
+	)
 
     def do(self, macros):
 	macros = macros.copy()
