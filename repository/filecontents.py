@@ -36,7 +36,7 @@ class FromDataStore(FileContents):
     __slots__ = ( "store", "theSize", "sha1" )
 
     def copy(self):
-        return self.__class__(self.repos, self.sha1, self.theSize)
+        return self.__class__(self.store, self.sha1, self.theSize)
 
     def get(self):
 	return self.store.openFile(sha1helper.sha1ToString(self.sha1))
