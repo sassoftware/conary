@@ -656,7 +656,7 @@ class ChangeSetJob:
 	    pkgName = csPkg.getName()
 
 	    if repos.hasTrove(pkgName, newVersion, csPkg.getFlavor()):
-		raise repository.CommitError, \
+		raise CommitError, \
 		       "version %s for %s is already installed" % \
 			(newVersion.asString(), csPkg.getName())
 
