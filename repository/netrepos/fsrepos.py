@@ -592,7 +592,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	try:
 	    util.mkdirChain(self.top)
 	except OSError, e:
-	    raise repository.OpenError(str(e))
+	    raise repository.repository.OpenError(str(e))
 
         self.open()
 
