@@ -418,6 +418,7 @@ class Recipe:
 				      self.name, self.srcdirs)
 		if targetdir:
 		    destDir = "/".join((destDir, targetdir))
+		    util.mkdirChain(destDir)
 		if macros:
 		    log.debug('applying macros to source %s' %f)
 		    pin = file(f)
