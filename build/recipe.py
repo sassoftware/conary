@@ -635,6 +635,17 @@ class PackageRecipe(Recipe):
         # someday, this will probably be per-branch policy
         return ('test', 'debuginfo')
 
+    def trackLibMacro(self, track=True):
+        # when the recipe accesses the lib macro, it implicitly asserts
+        # that the recipe is architecture dependent
+        # we explicitly turn on the architecture flag in this case
+        if track:
+            def makeArchUsed(macroName):
+                if use.Arch.getCurrentArch():
+                    pass
+            self.macros.setCallback('lib', makeArchUsed)
+        else:
+            self.macros.unsetCallback('lib')
 
     def disableParallelMake(self):
         self.macros.parallelmflags = ''

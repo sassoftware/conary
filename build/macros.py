@@ -43,6 +43,9 @@ class Macros(dict):
             name as an argument 
         """
         self.__callbacks[name] = callback
+
+    def unsetCallback(self, name):
+        del self.__callbacks[name]
     
     def __setitem__(self, name, value):
 	if name.startswith('_Macros'):
