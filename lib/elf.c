@@ -14,15 +14,15 @@
 #include <unistd.h>
 
 static PyObject * inspect(PyObject *self, PyObject *args);
-static PyObject * info(PyObject *self, PyObject *args);
+static PyObject * stripped(PyObject *self, PyObject *args);
 
 static PyObject * ElfError;
 
 static PyMethodDef ElfMethods[] = {
     { "inspect", inspect, METH_VARARGS, 
 	"inspect an ELF file for dependency information" },
-    { "info", info, METH_VARARGS, 
-	"return basic information about an ELF file" },
+    { "stripped", stripped, METH_VARARGS, 
+	"returns whether or not an ELF file has been stripped" },
     { NULL, NULL, 0, NULL }
 };
 
@@ -286,40 +286,29 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
     return Py_BuildValue("OO", reqList, provList);
 }
 
-static int doInfo(Elf * elf) {
+static int isStripped(Elf * elf) {
     Elf_Scn * sect = NULL;
     GElf_Shdr shdr;
-    size_t shstrndx;
-    char * name;
-
-    if (elf_kind(elf) != ELF_K_ELF) {
-	PyErr_SetString(ElfError, "not a plain elf file");
-	return 1;
-    }
-
     
     while ((sect = elf_nextscn(elf, sect))) {
 	if (!gelf_getshdr(sect, &shdr)) {
 	    PyErr_SetString(ElfError, "error getting section header!");
-	    return 1;
+	    return -1;
 	}
 
-	elf_getshstrndx (elf, &shstrndx);
-	name = elf_strptr (elf, shstrndx, shdr.sh_name);
-	printf("section %s\n", name);
-
+	if (shdr.sh_type == SHT_SYMTAB) {
+	    return 0;
+	}
     }
 
-    return 0;
+    return 1;
 }
 
-static PyObject * info(PyObject *self, PyObject *args) {
-    PyObject * reqList, * provList;
+static PyObject * stripped(PyObject *self, PyObject *args) {
     char * fileName;
     int fd;
     Elf * elf;
     int rc;
-    char magic[4];
 
     if (!PyArg_ParseTuple(args, "s", &fileName))
 	return NULL;
@@ -330,19 +319,6 @@ static PyObject * info(PyObject *self, PyObject *args) {
 	return NULL;
     }
 
-    if (read(fd, magic, sizeof(magic)) != 4) {
-	close(fd);
-	Py_INCREF(Py_None);
-	return Py_None;
-    }
-
-    if (magic[0] != 0x7f || magic[1] != 0x45 || magic[2] != 0x4c ||
-	magic[3] != 0x46) {
-	close(fd);
-	Py_INCREF(Py_None);
-	return Py_None;
-    }
-
     lseek(fd, 0, 0);
 
     elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
@@ -351,23 +327,19 @@ static PyObject * info(PyObject *self, PyObject *args) {
 	return NULL;
     }
 
-    reqList = PyList_New(0);
-    provList = PyList_New(0);
-
-    rc = doInfo(elf);
+    rc = isStripped(elf);
     elf_end(elf);
     close(fd);
 
-    if (rc) {
-	/* didn't work */
-	Py_DECREF(provList);
-	Py_DECREF(reqList);
+    if (rc == -1) {
 	return NULL;
+    } else if (rc) {
+	Py_INCREF(Py_True);
+	return Py_True;
     }
 
-    /* worked */
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_INCREF(Py_False);
+    return Py_False;
 }
 
 PyMODINIT_FUNC
