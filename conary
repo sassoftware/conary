@@ -40,7 +40,7 @@ def displayPkgs(reppath, packageList):
 	    pkgSet = package.PackageSet(reppath, pkgName)
 	    l = pkgSet.versionList()
 	    for version in l:
-		print "%-24s %s" % (pkgName, version)
+		print "/%-24s %s" % (pkgName, version)
 
 if (len(sys.argv) < 2):
     usage()
@@ -51,8 +51,7 @@ elif (sys.argv[1] == "cook"):
     for file in sys.argv[2:]:
         if file[0] != '/':
             file = "%s/%s" % (os.getcwd(), file)
-	cook.cook(cfg.reppath, [os.path.dirname(file), cfg.sourcepath],
-                  cfg.buildpath, file)
+	cook.cook(cfg, [os.path.dirname(file), cfg.sourcepath], file)
 elif (sys.argv[1] == "pkglist"):
     if (len(sys.argv) == 2):
 	displayPkgs(cfg.reppath, os.listdir(cfg.reppath + "/pkgs"))
@@ -60,8 +59,7 @@ elif (sys.argv[1] == "pkglist"):
 	displayPkgs(cfg.reppath, sys.argv[2:])
 elif (sys.argv[1] == "update"):
     for pkg in sys.argv[2:]:
-	update.doUpdate(cfg.reppath, cfg.root, cfg.sourcepath, pkg, 
-			binaries = 1, sources = 1)
+	update.doUpdate(cfg, cfg.root, pkg, binaries = 1, sources = 1)
 elif (sys.argv[1] == "config"):
     if (len(sys.argv) > 2):
 	usage()
