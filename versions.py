@@ -15,6 +15,9 @@ class AbstractVersion:
     Ancestor class for all versions (as opposed to branches)
     """
 
+    def equal(self, other):
+	return self.__class__ == other.__class__
+
     def __init__(self):
 	pass
 
@@ -277,6 +280,7 @@ class Version:
 
 	@rtype: boolean
 	"""
+	if not isinstance(other, Version): return False
 	return self._listsEqual(self.versions, other)
 
     def asString(self, defaultBranch = None):
