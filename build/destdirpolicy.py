@@ -422,7 +422,12 @@ class FixupMultilibPaths(policy.Policy):
 	    log.warning("non-object file with library name %s", path)
 	    return
 	basename = os.path.basename(path)
-	targetdir = self.dirmap[self.currentsubtree %self.macros]
+        currentsubtree = self.currentsubtree % self.macros
+	targetdir = self.dirmap[currentsubtree]
+        # we want to append whatever path came after the currentsubtree -
+        # e.g. if the original path is /usr/lib/subdir/libfoo.a, 
+        # we still need to add the /subdir/
+        targetdir += os.path.dirname(path[len(currentsubtree):])
 	target = util.joinPaths(targetdir, basename)
         fulltarget = util.joinPaths(destdir, target)
         if os.path.exists(fulltarget):
