@@ -27,6 +27,7 @@ class Macros(dict):
 	    self.__macros = {}
 	    self.update(macros)
 
+            
     def update(self, other):
         for key, item in other.iteritems():
             self[key] = item
@@ -83,3 +84,36 @@ class Macros(dict):
     def copy(self, shadow=True):
 	# shadow saves initial copying cost for a higher search cost
 	return Macros(self, shadow)
+
+    
+    # occasionally it may be desirable to switch from shadowing
+    # to a flattened representation
+    def _flatten(self):
+        if self.__macros:
+            # just accessing the element will copy it to this
+            # macro
+            for key in self.__macros.keys():
+                dummy = self[key]
+            self.__macros = {}
+
+    def __iter__(self):
+        # since we are accessing every element in the parent anyway
+        # just flatten hierarchy first, which greatly simplifies iterating 
+        self._flatten()
+        # iter over self and parents
+        for key in dict.__iter__(self):
+            if not key.startswith('_Macros'):
+                yield key
+
+    def iterkeys(self):
+        for key in self.__iter__():
+            yield key
+
+    def iteritems(self):
+        for key in self.__iter__():
+            yield (key, self[key])
+
+    def keys(self):
+        return [ x for x in self.__iter__() ]
+
+   
