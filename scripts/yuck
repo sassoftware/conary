@@ -18,6 +18,7 @@
     lists those that are out of date """
 
 import os
+import re
 import sys
 
 binPath = os.path.dirname(sys.argv[0])
@@ -50,7 +51,7 @@ sys.excepthook = util.genExcepthook()
 def main(argv):
     listMissing = False
     doUpdate = False
-    updateExceptions = ['kernel']
+    updateExceptions = [ re.compile('kernel$')]
     display = {}
     displayOrder = ['change', 'name', 'local', 'version', 'flavor', 'repo']
     for param in displayOrder:
@@ -64,7 +65,7 @@ def main(argv):
         if arg == '--except':
             arg = args[0]
             args = args[1:]
-            updateExceptions.extend(arg.split(','))
+            updateExceptions.extend([re.compile(x) for x in arg.split(',')])
             lastArg = ''
             continue
         elif arg == '--missing':
@@ -109,7 +110,7 @@ def main(argv):
     dbpkgs = dbpkgs.keys() + dbComps
     branchPkgs = {}
     for pkg in dbpkgs:
-        if pkg in updateExceptions:
+        if [x for x in updateExceptions if x.match(pkg)]:
             continue
         if pkg.startswith('group-'):
             continue

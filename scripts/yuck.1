@@ -22,7 +22,9 @@ Tell what parameters (columns) to display.  Choices are:
 .TP
 .PD
 --except \fIexception[,exception...]
-Ignore troves named as exceptions.   The kernel trove is excepted 
+Ignore troves named as exceptions, which are specified as
+regular expressions (use \fBtrovename$\fP to avoid unintentional
+matches).   The kernel trove is excepted 
 automatically, and must be updated by hand.
 .TP
 .PD
