@@ -35,6 +35,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
                   fullVersions = False, info = False, tags = False,
                   deps = False):
     hasVersions = False
+    hasFlavors = False
 
     if troveList:
         (troves, hasVersions, hasFlavors) = \
@@ -43,7 +44,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 	# this returns a sorted list
         troves = []
         for label in cfg.installLabelPath:
-            troves += [ (x, None) for x in repos.troveNames(label) ]
+            troves += [ (x, None, None) for x in repos.troveNames(label) ]
             troves.sort()
 
     if hasVersions or hasFlavors or ls or ids or sha1s or info or tags or deps:
@@ -67,8 +68,10 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
                     
                 for host in hostList:
                     if repositories.has_key(host):
-                        if repositries[host].has_key(name):
+                        if repositories[host].has_key(name):
                             repositories[host][name].append(flavor)
+                        else:
+                            repositories[host][name] = [ flavor ]
                     else:
                         repositories[host] = { name : [ flavor ] }
 
