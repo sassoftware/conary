@@ -15,6 +15,7 @@
 
 static PyObject * inspect(PyObject *self, PyObject *args);
 static PyObject * stripped(PyObject *self, PyObject *args);
+static PyObject * hasDebug(PyObject *self, PyObject *args);
 
 static PyObject * ElfError;
 
@@ -23,6 +24,8 @@ static PyMethodDef ElfMethods[] = {
 	"inspect an ELF file for dependency information" },
     { "stripped", stripped, METH_VARARGS, 
 	"returns whether or not an ELF file has been stripped" },
+    { "hasDebug", hasDebug, METH_VARARGS, 
+	"returns whether or not an ELF file has debugging info" },
     { NULL, NULL, 0, NULL }
 };
 
@@ -328,6 +331,77 @@ static PyObject * stripped(PyObject *self, PyObject *args) {
     }
 
     rc = isStripped(elf);
+    elf_end(elf);
+    close(fd);
+
+    if (rc == -1) {
+	return NULL;
+    } else if (rc) {
+	Py_INCREF(Py_True);
+	return Py_True;
+    }
+
+    Py_INCREF(Py_False);
+    return Py_False;
+}
+
+static int doHasDebug(Elf * elf) {
+    Elf_Scn * sect = NULL;
+    GElf_Shdr shdr;
+    size_t shstrndx;
+    char * name;
+    
+    if (-1 == elf_getshstrndx (elf, &shstrndx)) {
+	PyErr_SetString(ElfError, "error getting string table index!");
+	return -1;
+    }
+    
+    while ((sect = elf_nextscn(elf, sect))) {
+	if (!gelf_getshdr(sect, &shdr)) {
+	    PyErr_SetString(ElfError, "error getting section header!");
+	    return -1;
+	}
+
+	if (shdr.sh_type == SHT_PROGBITS) {
+	    if (!gelf_getshdr(sect, &shdr)) {
+		PyErr_SetString(ElfError, "error getting section header!");
+		return 1;
+	    }
+
+	    name = elf_strptr (elf, shstrndx, shdr.sh_name);
+	    if (!strncmp(name, ".debug", 6)) {
+		return 1;
+	    }
+	}
+    }
+
+    return 0;
+}
+
+static PyObject * hasDebug(PyObject *self, PyObject *args) {
+    char * fileName;
+    int fd;
+    Elf * elf;
+    int rc;
+
+    if (!PyArg_ParseTuple(args, "s", &fileName))
+	return NULL;
+
+    fd = open(fileName, O_RDONLY);
+    if (fd < 0) {
+	PyErr_SetFromErrno(PyExc_IOError);
+	return NULL;
+    }
+
+    lseek(fd, 0, 0);
+
+    elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
+    if (!elf) {
+	PyErr_SetString(ElfError, "error initializing elf file");
+	return NULL;
+    }
+
+    rc = doHasDebug(elf);
     elf_end(elf);
     close(fd);
 
