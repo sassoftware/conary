@@ -124,10 +124,11 @@ Show the version, date, and author of each of the lines in \fI<file>.
 \fI<file> must be a file in a conary source dir.
 .TP
 .B branch \fInewbranch [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
-Creates a new branch in the repository, relative to branch
-\fIbranchfrom\fP. The \fBtrovename\fR, and any troves it references 
+Creates a new branch (identified by the label \fInewshadow\fP) in the
+repository, relative to the branch specified in \fIversion\fP.
+The \fBtrovename\fR, and any troves it references 
 are recursively branched. If \fB-\-sources\fR is specified, the source
-troves for each binary trove is branched instead of the binary trove.
+trove for each binary trove is branched, instead of the binary trove.
 .TP
 .B checkout [\-\-dir \fI<dir>\fP] \fI<trove\fP[=\fIversion\fP]>\fP
 Check the \fI<trove>\fB:source\fR component out of the repository
@@ -174,6 +175,15 @@ Renames the file \fI<oldname>\fP to \fI<newname>\fP on the filesystem,
 and marks it to be removed from the repository at the next
 \fBcvc commit\fP.
 .TP
+.B shadow \fInewshadow [\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]]*
+Creates a new shadow (identified by the label \fInewshadow\fP) in the
+repository, relative to the branch specified in \fIversion\fP.
+The \fBtrovename\fR, and any troves it references 
+are recursively shadowed. If \fB-\-sources\fR is specified, the source
+trove for each binary trove is shadowed, instead of the binary trove.
+The shadow command works just like the branch command, except that
+it creates a shadow instead of a branch.
+.TP
 .B update [\fI<version>\fP]
 Updates the current source directory to the latest version, or to
 \fI<version>\fP if specified.  Merges changes when possible.
@@ -184,7 +194,7 @@ Updates the current source directory to the latest version, or to
 .SH EXAMPLES
 .TP 4
 .B Branching
-cvc branch conary.example.com@spx:example-foo conary.specifix.com@spx:devel foo:source
+cvc branch conary.example.com@spx:example-foo foo:source=conary.specifix.com@spx:devel
 .br
 This creates a branch in the conary.example.com repository of the
 foo:source trove, based on the version of foo in the main specifix repository.
