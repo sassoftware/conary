@@ -311,7 +311,7 @@ class Source(_Source):
 	    # make sure that user did not pass subdirectory in
 	    self.dest = os.path.basename(dest)
 	else:
-	    self.dest = os.path.basename(sourcename)
+	    self.dest = os.path.basename(self.sourcename)
 
     def doUnpack(self):
 	destDir = os.sep.join((self.builddir, self.recipe.theMainDir))
