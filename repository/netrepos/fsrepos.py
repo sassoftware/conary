@@ -14,23 +14,22 @@
 
 # implements a db-based repository
 
-from lib import log
+from deps import deps
 import os
+from lib import util, stackutil, log
 import repository
 import repository.netclient
-from lib import util
-import versions
-
-from deps import deps
-import trovestore
 from repository.repository import AbstractRepository
-from repository.repository import DataStoreRepository
 from repository.repository import ChangeSetJob
-from repository.repository import TroveMissing
-from repository.repository import RepositoryError
+from repository.repository import DataStoreRepository
 from repository.repository import DuplicateBranch
+from repository.repository import RepositoryError
+from repository.repository import TroveMissing
 from repository import changeset
 from repository import filecontents
+import sys
+import trovestore
+import versions
 
 class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
@@ -302,7 +301,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             # a little odd that creating a class instance has the side
             # effect of modifying the repository...
             ChangeSetJob(self, cs)
-        except:
+        except e, value:
+            print >> sys.stderr, "exception occurred while committing change set"
+            stackutil.printTraceBack()
+            print >> sys.stderr, "attempting rollback"
             self.rollback()
             raise
         else:
