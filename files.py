@@ -74,6 +74,10 @@ class LinkGroupStream(streams.Sha1Stream):
 
     def diff(self, other):
         if self != other:
+            # return the special value of '\0' for when the difference
+            # is a change between having a link group set and not having
+            # one set.  This is used in twm to clear out a link group
+            # upon merge.
             if self.s is None:
                 return "\0"
             else:
@@ -97,8 +101,11 @@ class LinkGroupStream(streams.Sha1Stream):
 
     def twm(self, diff, base):
 	if not diff: return False
-        if diff == "\x01":
-            diff = ""
+        # if the diff is the special value of "\0", that means that
+        # the link group is no longer set.  Clear the link group value
+        # on merge.
+        if diff == "\0":
+            diff = None
 
 	if self.s == base.s:
 	    self.s = diff
