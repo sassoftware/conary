@@ -147,7 +147,7 @@ class FilesystemJob:
 		log.debug("adding ld.so.conf entries: %s",
 			  " ".join(newlines))
 		ldsofd, ldsotmpname = tempfile.mkstemp(
-		    '.contmp', 'ld.so.conf.', sysetc)
+		    'ld.so.conf', '.ct', sysetc)
 		ldso = os.fdopen(ldsofd, 'w')
 		os.chmod(ldsotmpname, 0644)
 		ldso.writelines(ldsolines)
