@@ -55,7 +55,7 @@ class FilesystemJob:
 	self.renames.append((oldPath, newPath, msg))
 
     def _restore(self, fileObj, target, msg, contentsOverride = ""):
-	self.restores.append((fileObj.id(), fileObj, target, contentsOverride, 
+	self.restores.append((fileObj.id(), fileObj.freeze(), target, contentsOverride, 
 			      msg))
 
 	for tag in fileObj.tags:
@@ -158,12 +158,13 @@ class FilesystemJob:
 	for (fileId, fileObj, target, override, msg) in self.restores:
 	    # None means "don't restore contents"; "" means "take the
 	    # contents from the change set"
+	    fileObj = files.ThawFile(fileObj, fileId)
 	    if override != "":
 		contents = override
 	    elif fileObj.hasContents:
 		contents = self.changeSet.getFileContents(fileId)[1]
 	    fileObj.restore(contents, self.root, target, contents != None)
-	    log.debug(msg)
+	    log.debug(msg, target)
 
 	paths = self.removes.keys()
 	paths.sort()
@@ -185,7 +186,7 @@ class FilesystemJob:
 	    else:
 		fileObj.remove(target)
 
-	    log.debug(msg)
+	    log.debug(msg, target)
 
 	for (target, str, msg) in self.newFiles:
             try:
@@ -224,9 +225,9 @@ class FilesystemJob:
 			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)] ]
 		    tagCommands.append(cmd)
 		elif "files update" in tagInfo.implements:
-		    files = [x for x in 
+		    fileList = [x for x in 
 				self.repos.iterFilesWithTag(tagInfo.tag) ] 
-		    if files:
+		    if fileList:
 			cmd = [ tagInfo, ("files", "update"), files ]
 			tagCommands.append(cmd)
 
@@ -343,8 +344,7 @@ class FilesystemJob:
                 # the path doesn't exist, carry on with the restore
                 pass
 
-	    self._restore(headFile, headRealPath, "creating %s" % headRealPath)
-
+	    self._restore(headFile, headRealPath, "creating %s")
 	    fsPkg.addFile(fileId, headPath, headFileVersion)
 
 	for fileId in pkgCs.getOldFileList():
@@ -386,7 +386,7 @@ class FilesystemJob:
 				   "on head" % path)
 		continue
 
-	    self._remove(oldFile, realPath, "removing %s" % path)	
+	    self._remove(oldFile, realPath, "removing %s")
 	    fsPkg.removeFile(fileId)
 
 	for (fileId, headPath, headFileVersion) in pkgCs.getChangedFileList():
@@ -532,12 +532,12 @@ class FilesystemJob:
 
 			self._restore(fsFile, realPath, 
 				      "replacing %s with contents "
-				      "from repository" % realPath,
+				      "from repository",
 				      contentsOverride = headFileContents)
 		    else:
 			self._restore(fsFile, realPath, 
 				      "replacing %s with contents "
-				      "from repository" % realPath)
+				      "from repository")
 
 		    beenRestored = True
 		elif headFile.contents == baseFile.contents:
@@ -568,8 +568,7 @@ class FilesystemJob:
 
 			cont = filecontents.FromString("".join(newLines))
 			self._restore(fsFile, realPath, 
-			      "merging changes from repository into %s" % 
-			      realPath,
+			      "merging changes from repository into %s",
 			      contentsOverride = cont)
 			beenRestored = True
 
@@ -588,7 +587,7 @@ class FilesystemJob:
 
 	    if attributesChanged and not beenRestored:
 		self._restore(fsFile, realPath, 
-		      "merging changes from repository into %s" % realPath,
+		      "merging changes from repository into %s",
 		      contentsOverride = None)
 
 	    if pathOkay and contentsOkay:
@@ -662,8 +661,7 @@ class FilesystemJob:
 	    oldPkg = repos.getTrove(name, oldVersion, oldFlavor)
 	    for (fileId, path, version) in oldPkg.iterFileList():
 		fileObj = repos.getFileVersion(fileId, version)
-		self._remove(fileObj, root + path,
-			     "removing %s" % root + path)
+		self._remove(fileObj, root + path, "removing %s")
 
 def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     """

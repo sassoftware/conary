@@ -281,9 +281,6 @@ class Database(SqlDbRepository):
         if replaceFiles:
             flags |= update.REPLACEFILES
 
-	import time
-	start = time.time()
-
 	for pkg in cs.iterNewPackageList():
 	    if pkg.getName().endswith(":source"): raise SourcePackageInstall
 

@@ -327,4 +327,4 @@ def memsize():
     pfn = "/proc/%d/status" % os.getpid()
     lines = open(pfn).readlines()
     f = lines[10].split()
-    return f[1]
+    return int(f[1])
