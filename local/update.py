@@ -167,6 +167,9 @@ class FilesystemJob:
 	else:
 	    fsPkg = package.Package(pkgCs.getName(), versions.NewVersion())
 
+	fsPkg.mergePackageListChanges(pkgCs.iterChangedPackages(),
+				      redundantOkay = True)
+
 	for (fileId, headPath, headFileVersion) in pkgCs.getNewFileList():
 	    if headPath[0] == '/':
 		headRealPath = root + headPath
