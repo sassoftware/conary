@@ -53,6 +53,13 @@ hr {
     color: black;
     background-color: black;
 }
+
+tr.header {
+    background-color: #dddddd;
+    font-weight: bold;
+    font-size: 105%;
+}
+
 """
 
     def htmlHeader(self, pageTitle=""):
@@ -193,6 +200,20 @@ Choose a branch: %s
     def htmlUpdateSuccessful(self, troveName, branchStr):
         self.writeFn("""Successfully updated %s's metadata on branch %s.""" 
             % (troveName, branchStr))
+
+    def htmlUserlist(self, userlist):
+        self.writeFn("""
+<table cellpadding="4">
+<tr class="header"><td>Username</td><td>Write access</td></tr>
+""")
+        for user, id, perm in userlist:
+            if perm:
+                permStr = "Read/Write"
+            else:
+                permStr = "Read-Only"
+            self.writeFn("<tr><td>%s</td><td>%s</td></tr>\n" % (user, permStr))
+
+        self.writeFn("</table>")
 
     def makeSelectAppender(self, name, selectionName):
         """Generates an input box and add/remove button pair to manage a list of arbitrary

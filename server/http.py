@@ -29,11 +29,16 @@ class HttpHandler(HtmlEngine):
         self.repServer = repServer
         self.troveStore = repServer.repos.troveStore
         
+        # "command name": (command handler, page title, requires authentication)
         self.commands = {
+                         # metadata commands
                          "metadata":            (self.metadataCmd, "View Metadata", False),
                          "chooseBranch":        (self.chooseBranchCmd, "View Metadata", True),
                          "getMetadata":         (self.getMetadataCmd, "View Metadata", True),
                          "updateMetadata":      (self.updateMetadataCmd, "Metadata Updated", True),
+                         # user administration commands
+                         "userlist":            (self.userlistCmd, "User Administration", True),
+        
                          "test":                (self.test, "Testing", True),
                         }
 
@@ -140,8 +145,8 @@ class HttpHandler(HtmlEngine):
 
         self.htmlPageTitle("Update Successful")
         self.htmlUpdateSuccessful(troveName, branch.asString().split("/")[-1])
-        
-    def invalidCmd(self, authToken, fields):
-        # XXX this is a fake server error, we should raise an exception
-        # and handle it upstream instead of calling this
-        self.writeFn("Server Error")
+       
+    def userlistCmd(self, authToken, fields):
+        self.htmlPageTitle("User List")
+        userlist = list(self.repServer.auth.iterUsers())
+        self.htmlUserlist(userlist)
