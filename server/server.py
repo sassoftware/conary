@@ -341,7 +341,7 @@ if __name__ == '__main__':
     if len(otherArgs) == 5:
         cfg.read(otherArgs.pop())
 
-    if len(otherArgs) != 4 or otherArgs:
+    if len(otherArgs) != 4 or argSet:
 	usage()
 
     profile = 0
