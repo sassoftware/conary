@@ -120,6 +120,7 @@ class LocalRepository(Repository):
 		# if targetFile is None the file is already in the store
 		if targetFile:
 		    targetFile.write(f.read())
+		    f.seek(0)
 		    targetFile.close()
 	    else:
 		# the file doesn't have any contents, so it must exist
@@ -440,8 +441,10 @@ class ChangeSetJob:
 
 		path = newFile.path()
 
-	    # note that the order doesn't matter; we're just copying
-	    # files into the repository
+	    # Note that the order doesn't matter, we're just copying
+	    # files into the repository. Restore the file pointer to
+	    # the beginning of the file as we may want to commit this
+	    # file to multiple locations.
 	    if self.repos.storeFileFromContents(newFile.getContents(), file, 
 						 newFile.restoreContents()):
 		undo.addedFileContents(file.sha1())
@@ -517,7 +520,6 @@ class ChangeSetJob:
 		    assert(oldVer)
 		    f = repos.pullFileContentsObject(oldfile.sha1())
 		    oldLines = f.readlines()
-		    f.close()
 		    diff = fileContents.get().readlines()
 		    newLines = patch.patch(oldLines, diff)
 		    fileContents = FileContentsFromString("".join(newLines))
