@@ -309,7 +309,7 @@ def _markConfig(recipe, filename, fullpath):
 class EtcConfig(policy.Policy):
     """
     Mark all files below /etc as config files:
-    C{r.EtcConfig(exceptions=I{filterexp}}
+    C{r.EtcConfig(exceptions=I{filterexp})}
     """
     invariantsubtrees = [ '%(sysconfdir)s', '%(taghandlerdir)s']
 
@@ -331,7 +331,7 @@ class EtcConfig(policy.Policy):
 class Config(policy.Policy):
     """
     Mark only explicit inclusions as config files:
-    C{r.Config(I{filterexp}}
+    C{r.Config(I{filterexp})}
     """
 
     keywords = policy.Policy.keywords.copy()
@@ -570,7 +570,7 @@ class ParseManifest(policy.Policy):
 class MakeDevices(policy.Policy):
     """
     Makes device nodes:
-    C{r.MakeDevices(I{path}, I{type}, I{major}, I{minor}, I{owner}, I{group}, I{perms}=0400)}, where C{I{type}} is C{b} or C{c},.
+    C{r.MakeDevices(I{path}, I{type}, I{major}, I{minor}, I{owner}, I{group}, I{perms}=0400)}, where C{I{type}} is C{b} or C{c}.
 
     These nodes are only in the package, not in the filesystem, in order
     to enable Conary's policy of non-root builds (only root can actually
