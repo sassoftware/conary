@@ -90,3 +90,11 @@ class InstallFile:
 	self.toFile = toFile
 	self.file = fromFile
 	self.mode = perms
+
+class RemoveFile:
+
+    def doInstall(self, dir, root):
+	os.remove(root + self.file)
+
+    def __init__(self, file):
+	self.file = file
