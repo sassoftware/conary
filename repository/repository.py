@@ -168,8 +168,7 @@ class AbstractTroveDatabase:
 
 		yield trove
 
-		for (trove, version, flavor) in trove.iterTroveList():
-		    troveList += [ x for x in trove.iterTroveList() ]
+		troveList += [ x for x in trove.iterTroveList() ]
 	    except TroveMissing:
 		if not ignoreMissing:
 		    raise

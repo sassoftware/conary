@@ -4,6 +4,8 @@ Changes in 0.50.8:
     resolve #!/usr/bin/env scripts.
   * groupName argument to addTrove() can now be a list of group names as
     well as a single group name.
+  * --no-recurse works on the erase path
+  * fix to walkTroveSet (which was horribly broken)
 
 Changes in 0.50.7:
   * Added the XInetdService action to avoid having to include

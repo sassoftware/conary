@@ -283,7 +283,7 @@ class ConaryClient:
                     # check the exclude list
                     skipped = False
                     for reStr, regExp in self.cfg.excludeTroves:
-                        if regExp.match(item[0]):
+                        if regExp.match(name):
                             cs.delNewPackage(*item)
                             skipped = True
                             break
@@ -379,11 +379,16 @@ class ConaryClient:
                                            reqFlavor = flavor)
                 troves = self.db.getTroves(troves)
                 for outerTrove in troves:
-                    for trove in self.db.walkTroveSet(outerTrove, 
-                                                     ignoreMissing = True):
-                        changeSetList.append((trove.getName(), 
-                            (trove.getVersion(), trove.getFlavor()),
-                            (None, None), False))
+		    if recurse:
+			 for trove in self.db.walkTroveSet(outerTrove, 
+							  ignoreMissing = True):
+			     changeSetList.append((trove.getName(), 
+				 (trove.getVersion(), trove.getFlavor()),
+				 (None, None), False))
+		    else:
+			changeSetList.append((outerTrove.getName(), 
+			    (outerTrove.getVersion(), outerTrove.getFlavor()),
+			    (None, None), False))
                 # skip ahead to the next itemList
                 continue                    
 
