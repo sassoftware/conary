@@ -12,6 +12,7 @@ import cscmd
 from local import database
 import display
 from repository import fsrepos
+import importrpm
 import log
 import os
 import repository
@@ -239,7 +240,11 @@ def main():
 	else:
 	    return usage()
     elif (otherArgs[1] == "import"):
-	print "this is broken"
+	if len(otherArgs) != 3 and len(otherArgs) != 3:
+	    return usage()
+
+	repos = openRepository(cfg.reppath, "c")
+	importrpm.doImport(repos, cfg, otherArgs[2])
     elif (otherArgs[1] == "localcs"):
 	if len(otherArgs) != 4 and len(otherArgs) != 4:
 	    return usage()
