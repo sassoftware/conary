@@ -541,13 +541,15 @@ class _addInfo(policy.Policy):
 		if info not in self.included:
 		    self.included[info] = []
 		self.included[info].extend(args)
-	    if 'exceptions' in keywords:
+	    elif 'exceptions' in keywords:
 		# not the usual exception handling, this is an exception
                 if not self.excluded:
                     self.excluded = {}
 		if info not in self.excluded:
 		    self.excluded[info] = []
 		self.excluded[info].append(keywords.pop('exceptions'))
+            else:
+                raise TypeError, 'no paths provided'
 	policy.Policy.updateArgs(self, **keywords)
 
     def doProcess(self, recipe):
