@@ -93,7 +93,7 @@ def nextVersion(repos, troveName, versionStr, troveFlavor, currentBranch,
         # get the current source component (if any)
         try:
             sourceVersion = repos.getTroveLatestVersion(sourceName, 
-                                                        currentBranch)
+                                    currentBranch.getSourceBranch())
         except repository.repository.TroveMissing:
             sourceVersion = None
     else:
@@ -124,7 +124,7 @@ def nextVersion(repos, troveName, versionStr, troveFlavor, currentBranch,
             # if there isn't a latest, we can just use the source version
             # number after incrementing the build count
             if latest is None:
-                latest = sourceVersion.copy()
+                latest = sourceVersion.getBinaryBranch()
                 latest.incrementBuildCount()
                 return latest
 
@@ -133,7 +133,7 @@ def nextVersion(repos, troveName, versionStr, troveFlavor, currentBranch,
             # be used below and the build count will be incremented.
             latestTrailing = latest.trailingVersion()
             if latestTrailing.getRelease() < sourceTrailing.getRelease():
-                latest = sourceVersion.copy()
+                latest = sourceVersion.getBinaryBranch()
                 latest.incrementBuildCount()
                 return latest
 

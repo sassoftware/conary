@@ -622,7 +622,7 @@ class Version(AbstractVersion):
     def copy(self):
 	"""
 	Returns a Version object which is a copy of this object. The
-	result can be modified without affecting this object in any way.j
+	result can be modified without affecting this object in any way.
 
 	@rtype: Version
 	"""
@@ -664,6 +664,56 @@ class Version(AbstractVersion):
 	for stamp in timeStamps:
 	    self.versions[count].timeStamp = stamp
 	    count += 2
+
+    def getSourceBranch(version):
+        """ Takes a binary branch and returns its associated source branch.
+            (any trailing version info is left untouched).
+            If source is branched off of <repo1>-2 into <repo2>, its new
+            version will be <repo1>-2/<repo2>/2.  The corresponding build
+            will be on branch <repo1>-2-0/<repo2>/2-1.
+            getSourceBranch converts from the latter to the former.
+            Always returns a copy of the branch, even when the two are
+            equal.
+        """
+        v = version.copy()
+        if v.isVersion():
+            p = v.branch()
+        else:
+            p = v
+
+        assert(p.isBranch())
+        if p.hasParent():
+            p = p.parentNode()
+            p.trailingVersion().buildCount = None
+            while p.hasParent():
+                p = p.parent()
+                p.trailingVersion().buildCount = None
+        return v
+
+    def getBinaryBranch(version):
+        """ Takes a source branch and returns its associated binary branch.
+            (any trailing version info is left untouched).
+            If source is branched off of <repo1>-2 into <repo2>, its new
+            version will be <repo1>-2/<repo2>/2.  The corresponding build
+            will be on branch <repo1>-2-0/<repo2>/2-1.
+            getBinaryBranch converts from the former to the latter.
+            Always returns a copy of the branch, even when the two are
+            equal.
+        """
+        v = version.copy()
+        if v.isVersion():
+            p = v.branch()
+        else:
+            p = v
+
+        assert(p.isBranch())
+        if p.hasParent():
+            p = p.parentNode()
+            p.trailingVersion().buildCount = 0
+            while p.hasParent():
+                p = p.parent()
+                p.trailingVersion().buildCount = 0
+        return v
 
     def parseVersionString(self, ver, frozen):
 	"""
