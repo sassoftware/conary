@@ -10,6 +10,7 @@ import policy
 import log
 import stat
 import buildpackage
+import filter
 
 """
 Module used by recipes to effect packaging policy; things like setting
@@ -72,8 +73,8 @@ class ComponentSpec(_filterSpec):
 	    name = name %macros
 	    assert(name != 'sources')
 	    compFilters.append(
-		buildpackage.Filter(name, patterns, macros,
-				    setmode=setmode, unsetmode=unsetmode))
+		filter.Filter(name, patterns, macros,
+			      setmode=setmode, unsetmode=unsetmode))
 
 	# pass these down to PackageSpec for building the package
 	recipe.PackageSpec(compFilters=compFilters)
@@ -91,11 +92,11 @@ class PackageSpec(_filterSpec):
 		filteritem.append(None)
 	    name, patterns, setmode, unsetmode = filteritem
 	    pkgFilters.append(
-		buildpackage.Filter(name %macros, patterns, macros,
-				    setmode=setmode, unsetmode=unsetmode))
+		filter.Filter(name %macros, patterns, macros,
+			      setmode=setmode, unsetmode=unsetmode))
 	# by default, everything that hasn't matched a pattern in the
 	# main package filter goes in the package named recipe.name
-	pkgFilters.append(buildpackage.Filter(recipe.name, '.*', macros))
+	pkgFilters.append(filter.Filter(recipe.name, '.*', macros))
 
 	# OK, all the filters exist, build an autopackage object that
 	# knows about them
