@@ -5,6 +5,9 @@
 
 import os
 import string
+import errno
+import sys
+import traceback
 
 def mkdirChain(*paths):
     for path in paths:
@@ -18,3 +21,16 @@ def mkdirChain(*paths):
             if not os.path.exists(p):
                 os.mkdir(p)
 
+def findFile(file, searchdirs):
+    for dir in searchdirs:
+        s = "%s/%s" %(dir, file)
+        if os.path.exists(s):
+            return s
+    raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT))
+
+def excepthook(type, value, tb):
+    sys.excepthook = sys.__excepthook__
+    lines = traceback.format_exception(type, value, tb)
+    print string.joinfields(lines, "")
+    import pdb
+    pdb.post_mortem(tb)

@@ -424,7 +424,7 @@ class FileDB:
 	self.dbfile = path + ".info"
 	self.read()
 
-def FileFromFilesystem(root, path, type = "auto"):
+def FileFromFilesystem(pkgName, root, path, type = "auto"):
     s = os.lstat(root + path)
 
     if (type == "src"):

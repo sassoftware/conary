@@ -14,10 +14,10 @@ class RecipeLoader(types.DictionaryType):
     def __init__(self, file):
         self.module = imp.new_module(file)
         f = open(file)
+        
         exec 'from recipe import Recipe' in self.module.__dict__
-        exec 'import build' in self.module.__dict__
-        exec 'import os' in self.module.__dict__
-        exec 'import package' in self.module.__dict__
+        exec 'import build, os, package, sys, util' in self.module.__dict__
+        exec 'sys.excepthook = util.excepthook' in self.module.__dict__ 
         code = compile(f.read(), file, 'exec')
         exec code in self.module.__dict__
         for (key, value) in  self.module.__dict__.items():
@@ -51,25 +51,28 @@ class Recipe:
     def nameVer(self):
 	return self.name + "-" + self.version
 
-    def unpackSources(self, srcdir, builddir):
+    def unpackSources(self, srcdirs, builddir):
 	util.mkdirChain(builddir)
 	for file in self.tarballs:
-            if file.endswith(".bz2"):
+            f = util.findFile(file, srcdirs)
+            if f.endswith(".bz2"):
                 tarflags = "-jxf"
-            elif file.endswith(".gz") or file.endswit(".tgz"):
+            elif f.endswith(".gz") or f.endswith(".tgz"):
                 tarflags = "-zxf"
             else:
                 raise RuntimeError, "unknown archive compression"
-	    os.system("tar -C %s %s %s" % (builddir, tarflags,
-                                           srcdir + "/" + file))
+	    os.system("tar -C %s %s %s" % (builddir, tarflags, f))
 	
 	for file in self.sources:
+            f = util.findFile(file, srcdirs)
 	    destDir = builddir + "/" + self.theMainDir
 	    util.mkdirChain(destDir)
-	    shutil.copyfile(srcdir + "/" + file, destDir + "/" + file)
+	    shutil.copyfile(f, destDir + "/" + file)
 
     def doBuild(self, builddir):
-	if type(self.build) == types.TupleType:
+        if self.build is None:
+            pass
+        elif type(self.build) == types.TupleType:
 	    for bld in self.build:
 		bld(builddir + "/" + self.mainDir())
 	else:
