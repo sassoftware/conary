@@ -18,9 +18,11 @@ def flatten(list):
 
 class RecipeLoader(types.DictionaryType):
     def __init__(self, file):
-        self.module = imp.new_module(file)
+        self.file = os.path.basename(file).replace('.', '-')
+        self.module = imp.new_module(self.file)
+        sys.modules[self.file] = self.module
         f = open(file)
-        
+
         exec 'from recipe import Recipe' in self.module.__dict__
         exec 'from recipe import loadRecipe' in self.module.__dict__
         exec 'import build, os, package, sys, util' in self.module.__dict__
@@ -38,6 +40,9 @@ class RecipeLoader(types.DictionaryType):
                 if len(value.__bases__) > 0 and 'name' in dir(value):
                     self[key] = value
 
+    def __del__(self):
+        del sys.modules[self.file]
+
 # XXX this should be extended to load a recipe from srs
 def loadRecipe(file):
     callerGlobals = inspect.stack()[1][0].f_globals
@@ -51,7 +56,7 @@ def loadRecipe(file):
         callerGlobals[name] = recipe
         # stash a reference to the module in the namespace
         # of the recipe that loaded it, or else it will be destroyed
-        callerGlobals[file] = recipes
+        callerGlobals[os.path.basename(file).replace('.', '-')] = recipes
         
 class Recipe:
 
