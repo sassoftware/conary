@@ -155,6 +155,10 @@ class RpmHeader:
 
             self.entries[tag] = (dataType, offset, count)
 
+        place = f.tell()
+        if place % 8:
+            f.seek(8 - (place % 8), 1)
+
 def readHeader(f):
     lead = f.read(96)
     leadMagic = struct.unpack("!i", lead[0:4])[0]
