@@ -27,6 +27,7 @@ SUBDIRS=build local repository server lib pysqlite3 deps scripts config
 
 python_files = __init__.py	\
 	branch.py		\
+	callback.py		\
 	changelog.py		\
 	checkin.py		\
 	commit.py		\
