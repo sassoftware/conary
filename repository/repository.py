@@ -340,7 +340,7 @@ class IdealRepository(AbstractTroveDatabase):
 		try:
 		    label = versions.BranchName(versionStr)
 		except versions.ParseError:
-		    raise self.PackageMissing, "invalid version %s" % versionStr
+		    raise PackageMissing, "invalid version %s" % versionStr
 	    else:
 		label = defaultLabel
 
@@ -381,7 +381,7 @@ class IdealRepository(AbstractTroveDatabase):
 		    version = self.getTroveLatestVersion(name, version)
 
 		versionDict = { name : [ version] }
-	    except self.PackageMissing, e:  
+	    except PackageMissing, e:  
 		raise PackageNotFound, str(e)
 
 	flavorDict = self.getTroveVersionFlavors(versionDict)
