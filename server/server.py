@@ -17,7 +17,7 @@ from BaseHTTPServer import HTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
 if len(sys.argv) != 4:
-    print "needs path to srs, the repository, and the authorization database"
+    print "needs path to conary, the repository, and the authorization database"
     sys.exit(1)
 
 sys.path.append(sys.argv[1])
