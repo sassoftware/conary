@@ -18,7 +18,7 @@ class Waiter:
         self.count = 0
 
 class ConcurrencyTests(unittest.TestCase):
-    def CheckSingleProcessTimeouts(self):
+    def CheckSingleProcessTimeoutsDeferred(self):
         fd, dbfile = tempfile.mkstemp()
         os.close(fd)
 
@@ -31,9 +31,11 @@ class ConcurrencyTests(unittest.TestCase):
         cu1.execute('CREATE TABLE foo (bar)')
         db1.commit()
 
+        cu2.execute('BEGIN DEFERRED')
         cu2.execute('INSERT INTO foo VALUES(1)')
         t1 = time.time()
         try:
+            cu1.execute('BEGIN DEFERRED')            
             cu1.execute('INSERT INTO foo VALUES(2)')
         except sqlite.InternalError, e:
             assert(str(e) == "database is locked")
@@ -44,7 +46,33 @@ class ConcurrencyTests(unittest.TestCase):
         cu1.stmt.step()
         assert [ x for x in cu1.execute('select * from foo') ] == [(1,), (2,)] 
 
-    def CheckSingleProcessCallbacks(self):
+    def CheckSingleProcessTimeoutsOnBeginImmediate(self):
+        fd, dbfile = tempfile.mkstemp()
+        os.close(fd)
+
+        # 2 second timeout
+        db1 = sqlite.connect(dbfile, timeout=2000)
+        db2 = sqlite.connect(dbfile)
+
+        cu1 = db1.cursor()
+        cu2 = db2.cursor()
+
+        cu2.execute('BEGIN IMMEDIATE')
+        t1 = time.time()
+        try:
+            cu1.execute('BEGIN IMMEDIATE')
+        except sqlite.InternalError, e:
+            assert(str(e) == "database is locked")
+        t2 = time.time()
+        # make sure we slept 2 seconds
+        assert(t2 - t1 >= 2)
+        # unlock the database
+        db2.rollback()
+        # make sure that re-trying the BEGIN works
+        cu1.stmt.step()
+        db1.rollback()
+        
+    def CheckSingleProcessCallbacksDeferred(self):
         fd, dbfile = tempfile.mkstemp()
         os.close(fd)
 
@@ -58,9 +86,11 @@ class ConcurrencyTests(unittest.TestCase):
         cu1.execute('CREATE TABLE foo (bar)')
         db1.commit()
 
+        cu2.execute('BEGIN DEFERRED')
         cu2.execute('INSERT INTO foo VALUES(1)')
         t1 = time.time()
         try:
+            cu1.execute('BEGIN DEFERRED')            
             cu1.execute('INSERT INTO foo VALUES(2)')
         except sqlite.InternalError, e:
             assert(str(e) == "database is locked")
