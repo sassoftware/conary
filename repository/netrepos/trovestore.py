@@ -330,9 +330,11 @@ class TroveStore:
                             JOIN Branches ON
                                 LabelMap.branchId = Branches.branchId
                             JOIN Nodes ON
-                                Branches.branchId = Nodes.branchId
+				Branches.branchId = Nodes.branchId AND
+				LabelMap.itemId = Nodes.itemId
                             JOIN Instances ON
-                                Nodes.versionId = Instances.versionId
+				Nodes.versionId = Instances.versionId AND
+				Nodes.itemId = Instances.itemId
                             JOIN Items ON
                                 Instances.itemId = Items.itemId
                             WHERE
