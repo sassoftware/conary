@@ -363,32 +363,30 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
 
     try:
 	recipeObj.setup()
+	recipeObj.unpackSources(builddir)
+	# if we're only extracting, continue to the next recipe class.
+	if prep:
+	    return
+	
+	cwd = os.getcwd()
+	util.mkdirChain(builddir + '/' + recipeObj.mainDir())
+
+	try:
+	    os.chdir(builddir + '/' + recipeObj.mainDir())
+	    util.mkdirChain(cfg.tmpDir)
+	    destdir = tempfile.mkdtemp("", "conary-%s-" % recipeObj.name, cfg.tmpDir)
+	    recipeObj.doBuild(builddir, destdir)
+	    log.info('Processing %s', recipeClass.name)
+	    recipeObj.doDestdirProcess() # includes policy
+	    use.track(False)
+	finally:
+	    os.chdir(cwd)
     except Exception, e:
 	if cfg.debugRecipeExceptions:
-	    raise #allow debugger to handle it
+	    raise 
 	else: 
-	    print e # XXX maybe print out some nicer, warmer info?
+	    print e 
 	    sys.exit(1)
-    recipeObj.unpackSources(builddir)
-
-    # if we're only extracting, continue to the next recipe class.
-    if prep:
-	return
-    
-    cwd = os.getcwd()
-    util.mkdirChain(builddir + '/' + recipeObj.mainDir())
-    try:
-	os.chdir(builddir + '/' + recipeObj.mainDir())
-
-	util.mkdirChain(cfg.tmpDir)
-	destdir = tempfile.mkdtemp("", "conary-%s-" % recipeObj.name, cfg.tmpDir)
-	recipeObj.doBuild(builddir, destdir)
-	log.info('Processing %s', recipeClass.name)
-	recipeObj.doDestdirProcess() # includes policy
-	use.track(False)
-	
-    finally:
-	os.chdir(cwd)
     
     grpName = recipeClass.name
 
