@@ -337,6 +337,7 @@ class TroveStore:
                                 Instances.itemId = Items.itemId
                             WHERE
                                 Labels.label=? AND isPresent=1
+                            ORDER BY item
                     """, label.asString())
 
         for (item,) in cu:
