@@ -4,6 +4,9 @@ Changes in 0.14.12:
   * In some cases, troves with an incompatible flavor were chosen when
     --resolve was used. The proper flavor is now used, or the
     dependency is reported as unsatisfiable.
+  * more multilib fixes: several more instancese of %(lib)s were moved
+    out of the default specification for generic components like
+    :runtime and :devel.
 
 Changes in 0.14.11:
   * Local systems store config files in sql tables now.  Use
