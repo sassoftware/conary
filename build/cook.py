@@ -65,6 +65,7 @@ def cook(repos, cfg, recipeFile):
 	    commit.finalCommit(repos, cfg, pkgname + "/" + name, recipeObj.version,
 			       fileList)
 
+        # XXX include recipe files loaded by a recipe to derive
 	recipeName = os.path.basename(recipeFile)
 	f = files.FileFromFilesystem(recipeFile, ident(recipeName), type = "src")
 	fileList = [ (f, recipeFile, recipeName) ]
