@@ -42,6 +42,12 @@ class ShellCommand:
         # pre-fill in the preMake and arguments
         self.command = self.template % self.__dict__
 
+    def doInstall(self, macros):
+        util.execute(self.command %macros)
+
+    def doBuild(self, macros):
+        util.execute(self.command %macros)
+
 
 
 class Automake(ShellCommand):
@@ -49,12 +55,13 @@ class Automake(ShellCommand):
     template = ('cd %%(builddir)s; '
                 'aclocal %%(m4DirArgs)s %(acLocalArgs)s; '
 		'%(preAutoconf)s autoconf %(autoConfArgs)s; '
-		'automake %(autoMakeArgs)s')
-    keywords = {'autoConfArgs': '--force',
-                'autoMakeArgs': '--copy --force',
+		'automake%(automakeVer)s %(autoMakeArgs)s')
+    keywords = {'autoConfArgs': '',
+                'autoMakeArgs': '',
 		'acLocalArgs': '',
 		'preAutoconf': '',
-                'm4Dir': ''}
+                'm4Dir': '',
+		'automakeVer': ''}
     
     def doBuild(self, macros):
 	macros = macros.copy()
@@ -91,23 +98,68 @@ class ManualConfigure(Configure):
                 '%%(mkObjdir)s '
 	        '%(preConfigure)s %%(configure)s %(args)s')
 
+class GNUConfigure(Configure):
+    template = (
+	'cd %%(builddir)s; '
+	'CFLAGS=%%(cflags)s CXXFLAGS=%%(cflags)s'
+	' %%(mkObjdir)s'
+	' %(preConfigure)s %%(configure)s'
+	# XXX host/build/target here
+	' --prefix=%%(prefix)s'
+	' --exec-prefix=%%(exec_prefix)s'
+	' --bindir=%%(bindir)s'
+	' --sbindir=%%(sbindir)s'
+	' --sysconfdir=%%(sysconfdir)s'
+	' --datadir=%%(datadir)s'
+	' --includedir=%%(includedir)s'
+	' --libdir=%%(libdir)s'
+	' --libexecdir=%%(libexecdir)s'
+	' --localstatedir=%%(localstatedir)s'
+	' --sharedstatedir=%%(sharedstatedir)s'
+	' --mandir=%%(mandir)s'
+	' --infodir=%%(infodir)s'
+	'  %(args)s')
+    keywords = {'preConfigure': '',
+                'objDir': ''}
+
 class Make(ShellCommand):
     template = 'cd %%(builddir)s; %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s'
     keywords = {'preMake': ''}
-    
-    def doBuild(self, macros):
-	macros = macros.copy()
-        util.execute(self.command %macros)
 
 class MakeInstall(ShellCommand):
     template = ('cd %%(builddir)s; '
-                '%(preMake)s make %%(mflags)s %(rootVar)s=%%(destdir)s %(installtarget)s %(args)s')
+                '%(preMake)s make %%(mflags)s %%(rootVarArg)s %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
                 'preMake': '',
 		'installtarget': 'install'}
 
     def doInstall(self, macros):
+	macros = macros.copy()
+        if self.rootVar:
+	    macros.update({'rootVarArgs': '%s=%s'
+	                  %(self.rootVar, macros['destdir'])})
 	util.execute(self.command %macros)
+
+class GNUMakeInstall(ShellCommand):
+    template = (
+	'cd %%(builddir)s; '
+	'%(preMake)s make %%(mflags)s'
+	' prefix=%%(destdir)s/%%(prefix)s'
+	' exec-prefix=%%(destdir)s/%%(exec_prefix)s'
+	' bindir=%%(destdir)s/%%(bindir)s'
+	' sbindir=%%(destdir)s/%%(sbindir)s'
+	' sysconfdir=%%(destdir)s/%%(sysconfdir)s'
+	' datadir=%%(destdir)s/%%(datadir)s'
+	' includedir=%%(destdir)s/%%(includedir)s'
+	' libdir=%%(destdir)s/%%(libdir)s'
+	' libexecdir=%%(destdir)s/%%(libexecdir)s'
+	' localstatedir=%%(destdir)s/%%(localstatedir)s'
+	' sharedstatedir=%%(destdir)s/%%(sharedstatedir)s'
+	' mandir=%%(destdir)s/%%(mandir)s'
+	' infodir=%%(destdir)s/%%(infodir)s'
+	' %(installtarget)s %(args)s')
+    keywords = {'preMake': '',
+		'installtarget': 'install'}
 
 class _PutFile:
     def doInstall(self, macros):

@@ -62,5 +62,10 @@ def execute(cmd):
     print '+', cmd
     rc = os.system(cmd)
     if rc:
-	raise RuntimeError, ('Shell command "%s" returned '
-	                     'non-zero status %d' % (cmd, rc))
+	if not os.WIFEXITED(rc):
+	    info = 'Shell command "%s" killed with signal %d' \
+		    %(cmd, os.WTERMSIG(rc))
+	if os.WEXITSTATUS(rc):
+	    info = 'Shell command "%s" exited with exit code %d' \
+		    %(cmd, os.WEXITSTATUS(rc))
+	raise RuntimeError, info

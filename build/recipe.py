@@ -25,6 +25,7 @@ baseMacros = (
     ('libdir'		, '%(exec_prefix)s/%(lib)s'),
     ('libexecdir'	, '%(exec_prefix)s/libexec'),
     ('localstatedir'	, '%(prefix)s/var'),
+    ('sharedstatedir'	, '%(prefix)s/com'),
     ('includedir'	, '%(prefix)s/include'),
     ('datadir'		, '/usr/share'),
     ('mandir'		, '%(datadir)s/man'),
