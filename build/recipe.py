@@ -5,7 +5,7 @@
 
 """
 Contains the base Recipe class, default macros, and miscellaneous
-components used by srs .recipe files
+components used by conary .recipe files
 """
 
 import build

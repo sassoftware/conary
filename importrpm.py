@@ -14,7 +14,7 @@ from build import lookaside
 from repository import changeset
 
 def doImport(repos, cfg, rpmFile):
-    # this is just to avoid a warning for all srs invocations when an
+    # this is just to avoid a warning for all conary invocations when an
     # old rpm module is being used
     import rpm
 

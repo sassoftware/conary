@@ -109,7 +109,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 
     @param repos: Repository to both look for source files and file id's in.
     @type repos: repository.Repository
-    @param cfg: srs configuration
+    @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
@@ -202,7 +202,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
 
     @param repos: Repository to both look for source files and file id's in.
     @type repos: repository.Repository
-    @param cfg: srs configuration
+    @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
@@ -254,7 +254,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={}):
 
     @param repos: Repository to both look for source files and file id's in.
     @type repos: repository.Repository
-    @param cfg: srs configuration
+    @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
@@ -312,7 +312,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
 
     @param repos: Repository to both look for source files and file id's in.
     @type repos: repository.Repository
-    @param cfg: srs configuration
+    @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
@@ -371,7 +371,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
 	os.chdir(builddir + '/' + recipeObj.mainDir())
 
 	util.mkdirChain(cfg.tmpDir)
-	destdir = tempfile.mkdtemp("", "srs-%s-" % recipeObj.name, cfg.tmpDir)
+	destdir = tempfile.mkdtemp("", "conary-%s-" % recipeObj.name, cfg.tmpDir)
 	recipeObj.doBuild(builddir, destdir)
 	log.info('Processing %s', recipeClass.name)
 	recipeObj.doDestdirProcess() # includes policy
@@ -447,7 +447,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None):
 
     @param repos: Repository to use for building
     @type repos: repository.Repository
-    @param cfg: srs configuration
+    @param cfg: conary configuration
     @type cfg: conarycfg.ConaryConfiguration
     @param item: the item to cook
     @type item: str

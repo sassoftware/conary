@@ -15,7 +15,7 @@ class Trove:
     reference. By convention, "package" often refers to a package with
     files but no other packages, while a "group" means a package with other
     packages but no files. While this object allows any mix of file and
-    package inclusion, in practice srs doesn't allow it.
+    package inclusion, in practice conary doesn't allow it.
     """
     def copy(self):
 	return copy.deepcopy(self)

@@ -4,7 +4,7 @@
 #
 
 """
-Simple functions used throughout srs.
+Simple functions used throughout conary.
 """
 
 import repository

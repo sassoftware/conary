@@ -4,7 +4,7 @@
 #
 
 """
-Implements the logging facility for srs.
+Implements the logging facility for conary.
 
 Similar to the C printf function, the functions in this module take a
 format string that specifies how the subsequent variables should be
@@ -59,7 +59,7 @@ if not globals().has_key("logger"):
     logging.addLevelName(logging.ERROR, "error:")
     logging.addLevelName(logging.INFO, "info:")
     logging.addLevelName(logging.DEBUG, "+")
-    logger = logging.getLogger('srs')
+    logger = logging.getLogger('conary')
     hdlr = ErrorCheckingHandler(sys.stderr)
     formatter = logging.Formatter('%(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
