@@ -827,6 +827,14 @@ class FilesystemJob:
         self.linkGroups = {}
 	self.repos = repos
 
+	if not(flags & KEEPEXISTING):
+            for (name, oldVersion, oldFlavor) in changeSet.getOldPackageList():
+                self.oldPackages.append((name, oldVersion, oldFlavor))
+                oldPkg = repos.getTrove(name, oldVersion, oldFlavor)
+                for (pathId, path, fileId, version) in oldPkg.iterFileList():
+                    fileObj = repos.getFileVersion(pathId, fileId, version)
+                    self._remove(fileObj, root + path, "removing %s")
+
         pkgList = []
 
 	for pkgCs in changeSet.iterNewPackageList():
@@ -872,16 +880,6 @@ class FilesystemJob:
 
         pkgList = [ x[1] for x in pkgList ]
         self.newPackages = pkgList
-
-	if flags & KEEPEXISTING:
-	    return
-
-	for (name, oldVersion, oldFlavor) in changeSet.getOldPackageList():
-	    self.oldPackages.append((name, oldVersion, oldFlavor))
-	    oldPkg = repos.getTrove(name, oldVersion, oldFlavor)
-	    for (pathId, path, fileId, version) in oldPkg.iterFileList():
-		fileObj = repos.getFileVersion(pathId, fileId, version)
-		self._remove(fileObj, root + path, "removing %s")
 
 def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
                   withFileContents=True, forceSha1=False, 
