@@ -4,6 +4,7 @@ Changes in 0.50.2:
     entire package and all components to be flavored with the base
     instruction set flavor, so that architecture-sensitive but non-code
     files in (say) /usr/lib64 do not show up on 32-bit platforms.
+  * Sped up dependency resolution on the client
 
 Changes in 0.50.1:
   * Add support for trove=<troveVersion> in rq, cvc co, and other places that 

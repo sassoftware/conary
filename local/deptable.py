@@ -92,20 +92,22 @@ class DepProvides:
 
 class DependencyTables:
 
-    def _createTmpTable(self, cu, name):
-        cu.execute("""CREATE TEMPORARY TABLE %s(
-                                              troveId INT,
-                                              depNum INT,
-                                              flagCount INT,
-                                              isProvides BOOL,
-                                              class INTEGER,
-                                              name STRING,
-                                              flag STRING)""" % name,
-                   start_transaction = False)
-        cu.execute("CREATE INDEX %sIdx ON %s(troveId, class, name, flag)"
-                        % (name, name), start_transaction = False)
+    def _createTmpTable(self, cu, name, makeTable = True, makeIndex = True):
+	if makeTable:
+	    cu.execute("""CREATE TEMPORARY TABLE %s(
+						  troveId INT,
+						  depNum INT,
+						  flagCount INT,
+						  isProvides BOOL,
+						  class INTEGER,
+						  name STRING,
+						  flag STRING)""" % name,
+		       start_transaction = False)
+	if makeIndex:
+	    cu.execute("CREATE INDEX %sIdx ON %s(troveId, class, name, flag)"
+			    % (name, name), start_transaction = False)
 
-    def _populateTmpTable(self, cu, name, depList, troveNum, requires, 
+    def _populateTmpTable(self, cu, stmt, name, depList, troveNum, requires, 
                           provides, multiplier = 1):
         allDeps = []
         if requires:
@@ -124,19 +126,15 @@ class DependencyTables:
                             # prevents them from making it into any repository
                             assert("'" not in flag)
                             assert(sense == deps.FLAG_SENSE_REQUIRED)
-                            cu.execute("INSERT INTO %s VALUES(?, ?, ?, ?, "
-                                                "?, ?, ?)" % name,
-                                       (troveNum, multiplier * len(depList), 
+                            cu.execstmt(stmt,
+                                        troveNum, multiplier * len(depList), 
                                         len(flags), isProvides, classId, 
-                                        depName, flag),
-                                       start_transaction = False)
+                                        depName, flag)
                     else:
-                        cu.execute(    "INSERT INTO %s VALUES(?, ?, ?, ?, "
-                                                "?, ?, ?)" % name,
-                                       (troveNum, multiplier * len(depList), 
+			cu.execstmt(stmt,
+                                       troveNum, multiplier * len(depList), 
                                         1, isProvides, classId, 
-                                        depName, NO_FLAG_MAGIC),
-                                       start_transaction = False)
+                                        depName, NO_FLAG_MAGIC)
 
                 if not isProvides:
                     depList.append((troveNum, classId, dep))
@@ -259,7 +257,8 @@ class DependencyTables:
 
         prov = trove.getProvides()
 
-        self._populateTmpTable(cu, "NeededDeps", [], troveId, 
+	stmt = cu.compile("INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)")
+        self._populateTmpTable(cu, stmt, "NeededDeps", [], troveId, 
                                trove.getRequires(), prov)
 
         cu.execute("INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)",
@@ -450,7 +449,16 @@ class DependencyTables:
         # this works against a database, not a repository
         cu = self.db.cursor()
 
-        self._createTmpTable(cu, "DepCheck")
+	# this begins a transaction. we do this explicitly to keep from
+	# grabbing any exclusive locks (when the python binding autostarts
+	# a transaction, it uses "begin immediate" to grab an exclusive
+	# lock right away. since we're only updating tmp tables, we don't
+	# need a lock at all, but we'll live with a reserved lock since that's
+	# the best we can do with sqlite and still get the performance benefits
+	# of being in a transaction)
+	cu.execute("BEGIN")
+
+        self._createTmpTable(cu, "DepCheck", makeIndex = False)
         createDepTable(cu, 'TmpDependencies', isTemp = True)
         createProvidesTable(cu, 'TmpProvides', isTemp = True)
         createRequiresTable(cu, 'TmpRequires', isTemp = True)
@@ -459,9 +467,12 @@ class DependencyTables:
         depList = [ None ]
         oldTroves = []
         troveNames = []
+
+	stmt = cu.compile("INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)")
+
         for i, trvCs in enumerate(changeSet.iterNewPackageList()):
             troveNames.append((trvCs.getName()))
-            self._populateTmpTable(cu, "DepCheck", depList, -i - 1, 
+            self._populateTmpTable(cu, stmt, "DepCheck", depList, -i - 1, 
                                    trvCs.getRequires(), trvCs.getProvides(),
                                    multiplier = -1)
 
@@ -471,10 +482,11 @@ class DependencyTables:
 
             # using depNum 0 is a hack, but it's just on a provides so
             # it shouldn't matter
-            cu.execute("INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)",
-                       (-i - 1, 0, 1, True, deps.DEP_CLASS_TROVES, 
-                        trvCs.getName(), NO_FLAG_MAGIC), 
-                       start_transaction = False)
+            cu.execstmt(stmt,
+                        -i - 1, 0, 1, True, deps.DEP_CLASS_TROVES, 
+                        trvCs.getName(), NO_FLAG_MAGIC)
+
+        self._createTmpTable(cu, "DepCheck", makeTable = False)
 
         # now build a table of all the troves which are being erased
         cu.execute("""CREATE TEMPORARY TABLE RemovedTroveIds 
@@ -527,7 +539,7 @@ class DependencyTables:
                     RemovedTroveIds.troveId == Provides.instanceId
                 INNER JOIN Requires ON
                     Provides.depId = Requires.depId
-        """, start_transaction = False)
+        """)
 
         cu.execute("""
                 INSERT INTO DepCheck SELECT
@@ -540,7 +552,7 @@ class DependencyTables:
                     Provides.depId = Requires.depId
                 INNER JOIN Dependencies ON
                     Dependencies.depId == Requires.depId
-        """, start_transaction = False)
+        """)
 
         # dependencies which could have been resolved by something in
         # RemovedIds, but instead weren't resolved at all are considered
@@ -558,8 +570,7 @@ class DependencyTables:
                         Removed.troveId IS NULL
                 """ % self._resolveStmt("TmpRequires",
                                         ("Provides", "TmpProvides"),
-                                        ("Dependencies", "TmpDependencies"))
-                , start_transaction = False)
+                                        ("Dependencies", "TmpDependencies")))
 
         # None in depList means the dependency got resolved; we track
         # would have been resolved by something which has been removed as
@@ -627,13 +638,7 @@ class DependencyTables:
 
         # no need to drop the DepCheck table since we're rolling this whole
         # transaction back anyway
-        cu.execute("DROP TABLE TmpDependencies", start_transaction= False)
-        cu.execute("DROP TABLE TmpRequires", start_transaction= False)
-        cu.execute("DROP TABLE TmpProvides", start_transaction= False)
-        cu.execute("DROP TABLE DepCheck", start_transaction = False)
-        cu.execute("DROP TABLE RemovedTroveIds", start_transaction = False)
-
-        assert(not self.db.inTransaction)
+	self.db.rollback()
 
         return (failedList, unresolveableList)
 
@@ -645,8 +650,9 @@ class DependencyTables:
         createRequiresTable(cu, 'TmpRequires', isTemp = True)
 
         depList = [ None ]
+	stmt = cu.compile("INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)")
         for i, depSet in enumerate(depSetList):
-            self._populateTmpTable(cu, "DepCheck", depList, -i - 1, 
+            self._populateTmpTable(cu, stmt, "DepCheck", depList, -i - 1, 
                                    depSet, None, multiplier = -1)
 
 
