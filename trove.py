@@ -874,19 +874,19 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	    else:
 		name = path
 	    
-	    print "\t%s    1 %-8s %-8s %s %s %s" % \
-                  (fileobj.modeString(), fileobj.inode.owner(),
-                   fileobj.inode.group(), fileobj.sizeString(),
-                   fileobj.timeString(), name)
+            f.write("\t%s    1 %-8s %-8s %s %s %s\n" % 
+                    (fileobj.modeString(), fileobj.inode.owner(),
+                     fileobj.inode.group(), fileobj.sizeString(),
+                     fileobj.timeString(), name))
 
 	for (pathId, path, fileId, version) in self.changedFiles:
-	    pathIdStr = sha1helper.sha1ToString(pathId)
+	    pathIdStr = sha1helper.md5ToString(pathId)
 	    if path:
 		f.write("\tchanged %s (%s(.*)%s)\n" % 
 			(path, pathIdStr[:6], pathIdStr[-6:]))
 	    else:
 		f.write("\tchanged %s\n" % pathIdStr)
-	    change = changeSet.getFileChange(pathId)
+	    oldFileId, change = changeSet._findFileChange(fileId)
 	    f.write("\t\t%s\n" % " ".join(files.fieldsChanged(change)))
 
 	for pathId in self.oldFiles:

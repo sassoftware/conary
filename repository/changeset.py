@@ -217,6 +217,13 @@ class ChangeSet(streams.LargeStreamSet):
     def getFileChange(self, oldFileId, newFileId):
 	return self.files.get((oldFileId, newFileId), None)
 
+    def _findFileChange(self, fileId):
+        # XXX this is a linear search - do not use this method!
+        # this only exists for AbstractTroveChangeSet.formatToFile()
+        for oldFileId, newFileId in self.files.iterkeys():
+            if newFileId == fileId:
+                return oldFileId, self.files[(oldFileId, newFileId)]
+
     def writeContents(self, csf, contents, early):
 	# these are kept sorted so we know which one comes next
 	idList = contents.keys()
