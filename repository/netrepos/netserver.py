@@ -968,8 +968,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         self.repos = fsrepos.FilesystemRepository(self.name, self.troveStore,
                                                   self.repPath, self.map)
-	self.auth = NetworkAuthorization(self.db, self.name, 
-                                         anonymousReads = True)
+	self.auth = NetworkAuthorization(self.db, self.name)
 
     def reopen(self):
 	sb = os.stat(self.sqlDbPath)
@@ -990,8 +989,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.repos = fsrepos.FilesystemRepository(self.name, 
                                                       self.troveStore,
                                                       self.repPath, self.map)
-            self.auth = NetworkAuthorization(self.db, self.name, 
-                                             anonymousReads = True)
+            self.auth = NetworkAuthorization(self.db, self.name)
 
     def __init__(self, path, tmpPath, urlBase, name,
 		 repositoryMap, commitAction = None, cacheChangeSets = False):

@@ -22,9 +22,6 @@ class NetworkAuthorization:
         if label and label.getHost() != self.name:
             raise RepositoryMismatch
 
-        if not write and not admin and self.anonReads:
-            return True
-
         if not authToken[0]:
             return False
 
@@ -214,10 +211,9 @@ class NetworkAuthorization:
         for row in cu:
             yield row
 
-    def __init__(self, db, name, anonymousReads = False):
+    def __init__(self, db, name):
         self.name = name
         self.db = db
-        self.anonReads = anonymousReads
         self.reCache = {}
 
         cu = self.db.cursor()
