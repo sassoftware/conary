@@ -13,6 +13,7 @@ import types
 import time
 import lookaside
 import socket
+import sys
 
 _FILE_FLAG_CONFIG = 1 << 0
 
@@ -369,10 +370,16 @@ class DeviceFile(File):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 
-	# FIXME os.mknod is in 2.3
-	os.system("mknod %s %c %d %d" % (target, self.infoTag, self.major,
-					self.minor))
-
+	if sys.hexversion >= 0x20300f0
+            if self.infoTag == 'c':
+                flags = stat.S_IFCHR
+            else:
+                flags = stat.S_IFBLK
+            os.mknod(target, flags, os.makedev(self.major, self.minor))
+        else:
+            os.system("mknod %s %c %d %d" % (target, self.infoTag, self.major,
+                                             self.minor))
+            
 	File.restore(self, target)
 
     def majorMinor(self, major = None, minor = None):
