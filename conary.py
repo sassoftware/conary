@@ -72,7 +72,6 @@ def usage(rc = 1):
     print 'common flags:  --build-label <label>'
     print '               --config "<item> <value>"'
     print '               --install-label <label>'
-    print "               --reppath <repository-path>"
     print "               --root <root>"
     print ""
     print "cook flags:    --macros"
