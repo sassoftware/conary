@@ -115,16 +115,28 @@ class BuildCommand(BuildAction, action.ShellCommand):
 class Run(BuildCommand):
     """
     Run a shell command with simple macro substitution: C{r.Run('echo foo')}
-    """
-    template = "%(args)s"
 
+    @keyword dir: directory in which to run the command.  Relative dirs
+                  are relative to the build dir, absolute dirs are relative
+                  to the destdir.
+    """
+    keywords = {'dir': ''}
+    template = "%%(cdcmd)s%(args)s"
+
+    def do(self, macros):
+	macros = macros.copy()
+        if self.dir:
+            macros.cdcmd = 'cd %s; ' % (action._expandOnePath(self.dir, macros))
+	else:
+	    macros.cdcmd = ''
+        util.execute(self.command %macros)
 
 class Automake(BuildCommand):
     """
     Re-runs aclocal, autoconf, and automake: C{r.Automake()}
     """
     # note: no use of %(args)s -- to which command would it apply?
-    template = ('cd %%(builddir)s/%(subDir)s; '
+    template = ('cd %%(actionDir)s; '
                 'aclocal %%(m4DirArgs)s %(aclocalArgs)s; '
 		'%(preAutoconf)s autoconf %(autoConfArgs)s; '
 		'automake%(automakeVer)s %(autoMakeArgs)s')
@@ -138,6 +150,8 @@ class Automake(BuildCommand):
     
     def do(self, macros):
 	macros = macros.copy()
+        macros.actionDir = action._expandOnePath(self.subDir, macros, 
+                                                 macros.builddir)
         if self.m4Dir:
 	    macros.m4DirArgs = '-I %s' %(self.m4Dir)
 	else:
@@ -156,7 +170,7 @@ class Configure(BuildCommand):
     # note that template is NOT a tuple, () is used merely to group strings
     # to avoid trailing \ characters on every line
     template = (
-	'cd %%(builddir)s/%%(subDir)s; '
+	'cd %%(actionDir)s; '
 	'%%(mkObjdir)s '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 	' CPPFLAGS="%%(cppflags)s"'
@@ -193,7 +207,7 @@ class Configure(BuildCommand):
         This is useful for applications which do not support running configure
         from the same directory as the sources (srcdir != objdir).
 	It can contain macro references.
-	@keyword subDir: relative subdirectory in which to run configure
+	@keyword subDir: directory in which to run configure
         @keyword preConfigure: Extra shell script which is inserted in front of
         the configure command.
 	@keyword configureName: the name of the configure command; normally
@@ -203,6 +217,8 @@ class Configure(BuildCommand):
          
     def do(self, macros):
 	macros = macros.copy()
+        macros.actionDir = action._expandOnePath(self.subDir, macros, 
+                                                 macros.builddir)
         if self.objDir:
 	    objDir = self.objDir %macros
             macros.mkObjdir = 'mkdir -p %s; cd %s;' %(objDir, objDir)
@@ -216,10 +232,6 @@ class Configure(BuildCommand):
             macros.bootstrapFlags = self.bootstrapFlags
         else:
             macros.bootstrapFlags = ''
-	if self.subDir:
-	    macros.subDir = self.subDir
-	else:
-	    macros.subDir = ''
         util.execute(self.command %macros)
 
 class ManualConfigure(Configure):
@@ -230,7 +242,7 @@ class ManualConfigure(Configure):
 
     No arguments are given beyond those explicitly provided.
     """
-    template = ('cd %%(builddir)s/%%(subDir)s; '
+    template = ('cd %%(actionDir)s; '
                 '%%(mkObjdir)s '
 	        '%(preConfigure)s %%(configure)s %(args)s')
 
@@ -259,7 +271,7 @@ class Make(BuildCommand):
     # there is no makefile definition; if they are defined in the
     # makefile, then it takes a command-line argument to override
     # them.
-    template = ('cd %%(builddir)s/%(subDir)s; '
+    template = ('cd %%(actionDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s"'
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -274,7 +286,7 @@ class Make(BuildCommand):
         @keyword preMake: string to be inserted before the "make" command.
         Use preMake if you need to set an environment variable.  The
         preMake keyword cannot contain a ;
-        @keyword subDir: the subdirectory to enter before running "make"
+        @keyword subDir: the directory to enter before running "make"
 	@keyword forceFlags: boolean; if set, unconditionally override
 	the Makefile definitions of *FLAGS (i.e. CFLAGS, CXXFLAGS, LDFLAGS)
         """
@@ -293,6 +305,8 @@ class Make(BuildCommand):
 	                           ' LDFLAGS="%(ldflags)s"')
 	else:
 	    macros['overrides'] = ''
+        macros.actionDir = action._expandOnePath(self.subDir, macros, 
+                                                 macros.builddir)
 	BuildCommand.do(self, macros)
 
 class MakeParallelSubdir(Make):
@@ -301,7 +315,7 @@ class MakeParallelSubdir(Make):
     parallelmflags only applied to sub-make processes:
     C{r.MakeParallelSubdir(I{makeargs})}
     """
-    template = ('cd %%(builddir)s/%(subDir)s; '
+    template = ('cd %%(actionDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s"'
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -317,7 +331,7 @@ class MakeInstall(Make):
     If your package does not have C{DESTDIR} or an analog, use 
     C{MakePathsInstall} instead, or as a last option, C{Make}.
     """
-    template = ('cd %%(builddir)s/%(subDir)s; '
+    template = ('cd %%(actionDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s"'
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -344,7 +358,7 @@ class MakePathsInstall(Make):
     C{r.MakePathsInstall(I{makeargs})}
     """
     template = (
-	'cd %%(builddir)s/%(subDir)s; '
+	'cd %%(actionDir)s; '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 	' CPPFLAGS="%%(cppflags)s"'
 	' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
@@ -416,6 +430,7 @@ class _FileAction(BuildAction):
                 recipe.packages[package] = True
 
     def chmod(self, destdir, path, mode=None):
+        isDestFile =  path.startswith(destdir)
 	if not mode:
 	    mode=self.mode
 	if mode >= 0:
@@ -424,44 +439,55 @@ class _FileAction(BuildAction):
                 log.warning('odd permission %o, correcting to %o: add initial "0"?' \
                             %(mode, _permmap[mode]))
 		mode = _permmap[mode]
-	    isdir = os.path.isdir(destdir+os.sep+path)
-	    if isdir and (mode & 0700) != 0700:
-		# regardless of what permissions go into the package,
-		# we need to be able to traverse this directory as
-		# the non-root build user
-		os.chmod(destdir+os.sep+path, (mode & 01777) | 0700)
-		self.recipe.AddModes(mode, util.literalRegex(path))
-	    else:
-		os.chmod(destdir+os.sep+path, mode & 01777)
-		if mode & 06000:
-		    self.recipe.AddModes(mode, util.literalRegex(path))
-	    if isdir and mode != 0755:
-		self.recipe.ExcludeDirectories(exceptions=util.literalRegex(path).replace('%', '%%'))
-	    # set explicitly, do not warn
-	    self.recipe.WarnWriteable(exceptions=util.literalRegex(path).replace('%', '%%'))
+	    isdir = os.path.isdir(path)
+            if isDestFile:
+                destPath = path[len(destdir):]
+                if isdir and (mode & 0700) != 0700:
+                    # regardless of what permissions go into the package,
+                    # we need to be able to traverse this directory as
+                    # the non-root build user
+                    os.chmod(path, (mode & 01777) | 0700)
+                    self.recipe.AddModes(mode, util.literalRegex(destPath))
+                else:
+                    os.chmod(path, mode & 01777)
+                    if mode & 06000:
+                        self.recipe.AddModes(mode, util.literalRegex(destPath))
+                if isdir and mode != 0755:
+                    self.recipe.ExcludeDirectories(exceptions=util.literalRegex(destPath).replace('%', '%%'))
+                # set explicitly, do not warn
+                self.recipe.WarnWriteable(exceptions=util.literalRegex(destPath).replace('%', '%%'))
+            else:
+                if mode & 06000:
+                    raise RuntimeError, \
+                    "Cannot set setuid/gid file mode %o on %s" % (mode, path)
+                os.chmod(path, mode & 01777)
 
-    def setComponents(self, paths):
+    def setComponents(self, destdir, paths):
 	"""
 	XXX fixme
 	A component without a : or with a leading : is relative to the main package name.
 	A component with a trailing : is a package name
 	"""
+        if not self.component:
+            return
+
+        package = None
+        component = None
 	if type(paths) is str:
 	    paths = (paths,)
+        if self.component.find(':') != -1:
+            (package, component) = self.component.split(':')
+        else:
+            component = self.component
 	for path in paths:
-	    package = None
-	    component = None
-	    if self.component:
-		if self.component.find(':') != -1:
-		    (package, component) = self.component.split(':')
-		else:
-		    component = self.component
-	    path = re.escape(util.normpath(path))
+            if not path.startswith(destdir):
+                raise RuntimeError, ('can only set component for paths in '
+                                     'destdir, "%s" is not.' % path)
+	    path = re.escape(util.normpath(path[len(destdir):]))
 	    if component:
 		self.recipe.ComponentSpec(component, path)
 	    if package:
 		self.recipe.PackageSpec(package, path)
-
 
 class Desktopfile(BuildCommand, _FileAction):
     """
@@ -494,7 +520,8 @@ class Desktopfile(BuildCommand, _FileAction):
             macros['category'] = ''
 	BuildCommand.do(self, macros)
 	for file in self.arglist:
-	    self.setComponents('%(datadir)s/applications'+file)
+	    self.setComponents(macros.destdir, 
+                           macros.destdir + '%(datadir)s/applications'+file)
 
 
 class Environment(BuildAction):
@@ -539,33 +566,24 @@ class SetModes(_FileAction):
 
     def do(self, macros):
 	files = []
-	dest = macros['destdir']
-	for path in self.paths:
-	    files.extend(util.braceGlob(dest+os.sep+path %macros))
+        files = action._expandPaths(self.paths, macros, error=True)
 	for f in files:
-	    f = util.normpath(f[len(dest):])
 	    log.debug('changing mode for %s to %o' %(f, self.mode))
-	    self.chmod(dest, f)
-	    self.setComponents(f)
+	    self.chmod(macros.destdir, f)
+	    self.setComponents(macros.destdir, f)
 
 class _PutFiles(_FileAction):
     keywords = { 'mode': -1 }
 
     def do(self, macros):
-	reldest = self.toFile % macros
-	if reldest[0] != '/':
-	    raise TypeError, 'Inappropriately relative destination %s: destination must start with "/"' % reldest
-	dest = macros['destdir'] + reldest
-	self.destlen = len(macros['destdir'])
+        dest = action._expandOnePath(self.toFile, macros)
 	util.mkdirChain(os.path.dirname(dest))
 
-	for fromFile in self.fromFiles:
-	    sources = (self.source + fromFile) %macros
-	    sourcelist = util.braceGlob(sources)
-	    if not os.path.isdir(dest) and len(sourcelist) > 1:
-		raise TypeError, 'multiple files specified, but destination "%s" is not a directory' %dest
-	    for source in sourcelist:
-		self._do_one(source, dest, macros)
+        fromFiles = action._expandPaths(self.fromFiles, macros)
+        if not os.path.isdir(dest) and len(fromFiles) > 1:
+            raise TypeError, 'multiple files specified, but destination "%s" is not a directory' %dest
+        for source in fromFiles:
+            self._do_one(source, dest, macros)
 
     def _do_one(self, source, dest, macros):
 	if os.path.isdir(source) and not self.move:
@@ -594,15 +612,14 @@ class _PutFiles(_FileAction):
 	    util.rename(source, dest)
 	else:
 	    util.copyfile(source, dest)
-	self.setComponents(dest[self.destlen:])
-	self.chmod(macros['destdir'], dest[self.destlen:], mode=mode)
+	self.setComponents(macros.destdir, dest)
+	self.chmod(macros.destdir, dest, mode=mode)
 	
 
     def __init__(self, recipe, *args, **keywords):
         _FileAction.__init__(self, recipe, *args, **keywords)
-	split = len(args) - 1
-	self.fromFiles = args[:split]
-	self.toFile = args[split]
+	self.fromFiles = args[:-1]
+	self.toFile = args[-1]
 	# raise error while we can still tell what is wrong...
 	if len(self.fromFiles) > 1:
 	    if not self.toFile.endswith('/') or os.path.isdir(self.toFile):
@@ -665,7 +682,7 @@ class Symlink(_FileAction):
     keywords = { 'allowDangling': False }
 
     def do(self, macros):
-	dest = macros['destdir'] + self.toFile %macros
+	dest = action._expandOnePath(self.toFile, macros)
 
         if dest.endswith(os.sep):
             util.mkdirChain(dest)
@@ -684,12 +701,18 @@ class Symlink(_FileAction):
 
         # do glob expansion and path verification on all of the source paths
         expandedSources = []
+        if destdir.startswith(macros.destdir):
+            baseDir = macros.destdir
+        else:
+            baseDir = macros.builddir
+            
         for source in sources:
             # if the symlink contains a /, concatenate in order to glob
-            if source.startswith(os.sep):
-                expand = macros['destdir'] + source
+            if source[0] == '/':
+                expand = baseDir + source
             else:
-                expand = util.joinPaths(destdir, source)
+                expand = util.joinPaths(baseDir, source)
+
             sources = fixedglob.glob(expand)
             if not sources and not self.allowDangling:
                 raise TypeError, 'symlink to "%s" would be dangling' %source
@@ -708,12 +731,9 @@ class Symlink(_FileAction):
         for source in sources:
             if targetIsDir:
                 to = util.joinPaths(dest, os.path.basename(source))
-		self.setComponents(
-		    util.joinPaths(self.toFile %macros,
-			           os.path.basename(source)))
             else:
                 to = dest
-		self.setComponents(self.toFile %macros)
+            self.setComponents(macros.destdir, to)
 	    if os.path.exists(to) or os.path.islink(to):
 		os.remove(to)
             log.debug('creating symlink %s -> %s' %(to, source))
@@ -756,13 +776,17 @@ class Link(_FileAction):
     """
     def do(self, macros):
 	d = macros['destdir']
+        self.existingpath = self.existingpath % macros
+        if self.existingpath and self.existingpath[0] != '/':
+            self.init_error(TypeError, 
+                'hardlink %s must be located in destdir' %self.existingpath)
 	e = util.joinPaths(d, self.existingpath)
 	if not os.path.exists(e):
 	    raise TypeError, 'hardlink target %s does not exist' %self.existingpath
 	for name in self.newnames:
 	    newpath = util.joinPaths(self.basedir, name)
 	    n = util.joinPaths(d, newpath)
-	    self.setComponents(newpath)
+	    self.setComponents(d, n)
 	    if os.path.exists(n) or os.path.islink(n):
 		os.remove(n)
 	    os.link(e, n)
@@ -773,9 +797,9 @@ class Link(_FileAction):
 	    self.Link(newname, [newname, ...,] existingpath)
         """
         _FileAction.__init__(self, recipe, *args, **keywords)
-	split = len(args) - 1
-	self.newnames = args[:split]
-	self.existingpath = args[split]
+	self.newnames = args[:-1]
+	self.existingpath = args[-1]
+
 	# raise error while we can still tell what is wrong...
 	for name in self.newnames:
 	    if name.find('/') != -1:
@@ -789,12 +813,12 @@ class Remove(BuildAction):
     keywords = { 'recursive': False }
 
     def do(self, macros):
-	for filespec in self.filespecs:
+	for path in action._expandPaths(self.filespecs, 
+                                        macros, braceGlob=False):
 	    if self.recursive:
-		util.rmtree("%s/%s" %(macros['destdir'], filespec %macros),
-                            ignore_errors=True)
+		util.rmtree(path, ignore_errors=True)
 	    else:
-		util.remove("%s/%s" %(macros['destdir'], filespec %macros))
+		util.remove(path)
 
     def __init__(self, recipe, *args, **keywords):
         BuildAction.__init__(self, recipe, **keywords)
@@ -947,11 +971,11 @@ class Doc(_FileAction):
 	base = '%(thisdocdir)s%(subdir)s/' %macros
 	dest = macros.destdir + base
 	util.mkdirChain(os.path.dirname(dest))
-	for path in self.paths:
+	for path in action._expandPaths(self.paths, macros, error=True):
 	    for newpath in util.copytree(path %macros, dest, True,
 					 filemode=self.mode,
 					 dirmode=self.dirmode):
-		self.setComponents(newpath[destlen:])
+		self.setComponents(macros.destdir, newpath)
 
     def __init__(self, recipe, *args, **keywords):
         _FileAction.__init__(self, recipe, *args, **keywords)
@@ -979,15 +1003,16 @@ class Create(_FileAction):
 	    contents = self.contents
 	if contents and contents[-1] != '\n':
 	    contents += '\n'
-	for bracepath in self.paths:
-	    for path in util.braceExpand(bracepath %macros):
-		fullpath = util.joinPaths(macros['destdir'], path)
+	for bracepath in action._expandPaths(self.paths, macros, 
+                                                         braceGlob=False):
+	    for fullpath in util.braceExpand(bracepath):
 		util.mkdirChain(os.path.dirname(fullpath))
 		f = file(fullpath, 'w')
 		f.write(contents)
 		f.close()
-		self.setComponents(path)
-		self.chmod(macros['destdir'], path)
+		self.setComponents(macros.destdir, fullpath)
+		self.chmod(macros.destdir, fullpath)
+
     def __init__(self, recipe, *args, **keywords):
         """
         @keyword contents: The (optional) contents of the file
@@ -1010,17 +1035,13 @@ class MakeDirs(_FileAction):
     keywords = { 'mode': 0755 }
 
     def do(self, macros):
-        for path in self.paths:
-            path = path %macros
+        for path in action._expandPaths(self.paths, macros, braceGlob=False):
             dirs = util.braceExpand(path)
             for d in dirs:
-		if d[0] != '/':
-		    raise TypeError, 'Inappropriately relative directory %s: directories must start with "/"' %d
-                dest = macros['destdir'] + d
                 log.debug('creating directory %s', d)
-		self.setComponents(d.replace('%', '%%'))
-                util.mkdirChain(dest)
-                self.chmod(macros['destdir'], d)
+		self.setComponents(macros.destdir, d.replace('%', '%%'))
+                util.mkdirChain(d)
+                self.chmod(macros.destdir, d)
 
     def __init__(self, recipe, *args, **keywords):
         _FileAction.__init__(self, recipe, *args, **keywords)
@@ -1105,14 +1126,15 @@ exit $failed
 	recipe.TestSuiteLinks(build=True)
 
     def writeCommandScript(self):
+        destdir = self.macros.destdir
 	path = self.command_path % self.macros
-	fullpath = self.macros.destdir + path
+	fullpath = destdir + path
 	if not os.path.exists(fullpath):
 	    util.mkdirChain(os.path.dirname(fullpath))
 	    f = open(fullpath, 'w')
 	    f.write(self.commandScript)
-	    self.chmod(self.macros.destdir, path)
-	    self.setComponents(path)
+	    self.chmod(destdir, fullpath)
+	    self.setComponents(destdir, fullpath)
 
     def writeTestSuiteScript(self):
 	idnum = TestSuite.idnum 
@@ -1124,7 +1146,7 @@ exit $failed
 	if not os.path.exists(fullpath):
 	    f = open(fullpath, 'w')
 	    f.write(self.testSuiteScript % self.macros)
-	    self.chmod(self.macros.destdir, path)
+	    self.chmod(self.macros.destdir, self.macros.destdir + path)
     
     def mungeMakeCommand(self):
         """

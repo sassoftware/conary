@@ -286,9 +286,12 @@ class ShellCommand(RecipeAction):
 	RecipeAction.addArgs(self, *args, **keywords)
 
 
-def _expandOnePath(path, macros, defaultDir, braceGlob=False, error=False):
+def _expandOnePath(path, macros, defaultDir=None, braceGlob=False, error=False):
     if braceGlob:
         return _expandPaths([path], macros, defaultDir, True, error)
+    if defaultDir is None:
+        defaultDir = macros.builddir
+
     path = path % macros
     if path and path[0] == '/':
         if path.startswith(macros.destdir):
@@ -306,7 +309,7 @@ def _expandOnePath(path, macros, defaultDir, braceGlob=False, error=False):
             raise RuntimeError, "No such file '%s'" % path
     return path
 
-def _expandPaths(paths, macros, defaultPath=None, braceGlob=True, error=False):
+def _expandPaths(paths, macros, defaultDir=None, braceGlob=True, error=False):
     """
     Expand braces, globs, and macros in path names, and root all path names
     to either the build dir or dest dir.  Relative paths (not starting with
@@ -314,8 +317,8 @@ def _expandPaths(paths, macros, defaultPath=None, braceGlob=True, error=False):
     destdir.  
     """
     destdir = macros.destdir
-    if defaultPath is None:
-        defaultPath = macros.builddir
+    if defaultDir is None:
+        defaultDir = macros.builddir
     expPaths = []
     for path in paths:
         path = path % macros
@@ -328,7 +331,7 @@ def _expandPaths(paths, macros, defaultPath=None, braceGlob=True, error=False):
             else:
                 path = destdir + path
         else:
-            path = defaultPath + os.sep + path
+            path = defaultDir + os.sep + path
         if braceGlob:
             expPaths.extend(util.braceGlob(path))
         else:

@@ -1,10 +1,14 @@
 Changes in 0.12.5
   * reworked dependency resolution a bit for a big speedup in the server
-  * moved destdir to %(builddir)s/root
+  * moved destdir to %(builddir)s/_ROOT_
   * made macros.destdir available during the unpacking of sources 
   * source commands (r.addAction, etc.), if given absolute directories for 
     their dir keywords, will perform their actions in the destdir instead
     of the builddir
+  * most build commands (r.Make, r.Create, etc.), will work in either builddir
+    or destdir, depending on whether they are given relative or absolute 
+    directories
+  * add dir keyword for r.Run
   * include /usr/bin/rpm2cpio
 
 Changes in 0.12.4
