@@ -287,12 +287,13 @@ class TroveStore:
 	del flavorIndex
 	cu.execute("DROP TABLE NeededFlavors")
 
-	# the instance may already exist (it could be referenced by a package
-	# which has already been added)
 	if troveFlavor:
 	    troveFlavorId = flavors[troveFlavor]
 	else:
 	    troveFlavorId = 0
+	#
+	# the instance may already exist (it could be referenced by a package
+	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId, 
 					     troveFlavorId)
 	assert(not self.troveTroves.has_key(troveInstanceId))
@@ -538,7 +539,34 @@ class TroveStore:
     def iterTrovePerFlavorLeafs(self, troveName, branch):
 	# this needs to return a list sorted by version, from oldest to
 	# newest
+
+	# find out what flavors are provided by the head of the branch
+	# found yet
 	cu = self.db.cursor()
+	l = []
+
+	if branch.count("/") > 2:
+	    brVersion = versions.VersionFromString(branch)
+	    parent = brVersion.parentNode()
+	    brVersion.appendVersionReleaseObject(parent.trailingVersion())
+
+	    cu.execute("""
+		SELECT DISTINCT Nodes.timeStamps, Flavors.flavor 
+		    FROM Items JOIN Instances 
+		JOIN Flavors JOIN versions ON 
+		    items.itemId = instances.itemId AND 
+		    versions.versionId = instances.versionId AND 
+		    flavors.flavorId = instances.flavorId 
+		JOIN Nodes ON
+		    Nodes.itemId = instances.itemId AND
+		    Nodes.versionId = instances.versionId
+		WHERE item=%s AND version=%s""", troveName, parent.asString())
+
+	    l = [ (brVersion.asString(), x[0], x[1]) for x in cu ]
+
+	    del parent
+	    del brVersion
+
 	cu.execute("""
 	   SELECT Versions.version, Nodes.timeStamps, Flavors.flavor FROM 
 		Nodes JOIN Instances ON Nodes.itemId=Instances.itemId AND 
@@ -553,7 +581,8 @@ class TroveStore:
 	latest = {}	
 	deleteList = []
 	fullList = []
-	for i, (version, timeStamps, flavor) in enumerate(cu):
+	l += [ x for x in cu ]
+	for i, (version, timeStamps, flavor) in enumerate(l):
 	    if latest.has_key(flavor):
 		deleteList.append(i)
 
