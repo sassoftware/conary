@@ -2,6 +2,7 @@ import package
 import files
 import os.path
 import util
+import shutil
 
 def doUpdate(DBPATH, root, pkgName):
     pkgSet = package.PackageSet(DBPATH, pkgName)
@@ -21,5 +22,5 @@ def doUpdate(DBPATH, root, pkgName):
 
 	source = "%s/files/%s.contents/%s" % (DBPATH, fileName, f.md5())
 
-	os.system("cp %s %s" % (source, target))
+	shutil.copyfile(source, target)
 	os.chmod(target, f.perms())
