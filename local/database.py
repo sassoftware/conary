@@ -5,6 +5,7 @@
 
 import changeset
 import filecontents
+import fsrepos
 import log
 import localrep
 import os
@@ -24,7 +25,7 @@ class Database:
 
 	# this has an empty source path template, which is only used to
 	# construct the eraseFiles list anyway
-	job = repository.ChangeSetJob(self.repcache, absSet)
+	job = fsrepos.ChangeSetJob(self.repcache, absSet)
 
 	# abstract change sets cannot have eraseLists
 	#assert(not eraseList)
@@ -119,7 +120,7 @@ class Database:
 	# Build and commit A->B
 	if toDatabase:
 	    job = localrep.LocalRepositoryChangeSetJob(self.repcache, cs)
-	    undo = repository.ChangeSetUndo(self.repcache)
+	    undo = fsrepos.ChangeSetUndo(self.repcache)
 
 	try:
 	    # add new packages

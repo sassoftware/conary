@@ -11,6 +11,7 @@ import commit
 import cook
 import database
 import display
+import fsrepos
 import log
 import os
 import repository
@@ -65,7 +66,7 @@ def usage(rc = 1):
 
 def openRepository(path, mode):
     try:
-        repos = repository.FilesystemRepository(path, mode)
+        repos = fsrepos.FilesystemRepository(path, mode)
     except repository.OpenError, e:
         log.error('Unable to open repository %s: %s', path, str(e))
         sys.exit(1)

@@ -3,9 +3,10 @@
 # All rights reserved
 #
 
+import fsrepos
 import repository
 
-from repository import FilesystemRepository
+from fsrepos import FilesystemRepository
 
 # This builds a job which applies both a change set and the local changes
 # which are needed.
@@ -27,7 +28,7 @@ class LocalRepository(FilesystemRepository):
 	fullPath = root + "/" + path + "/repcache"
 	FilesystemRepository.__init__(self, fullPath, mode)
 
-class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
+class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 
     def removals(self, undo):
 	for pkg in self.oldPackageList():
@@ -56,7 +57,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     def __init__(self, repos, cs):
 	assert(not cs.isAbstract())
 	
-	repository.ChangeSetJob.__init__(self, repos, cs)
+	fsrepos.ChangeSetJob.__init__(self, repos, cs)
 
 	# remove old versions of the packages which are being added
 	# 
