@@ -296,7 +296,8 @@ class RecipeLoader:
             pass
 
 def recipeLoaderFromSourceComponent(name, cfg, repos,
-                                    versionStr=None, labelPath=None):
+                                    versionStr=None, labelPath=None,
+                                    ignoreInstalled=False):
     name = name.split(':')[0]
     component = name + ":source"
     filename = name + '.recipe'
@@ -335,7 +336,8 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
 
     try:
         loader = RecipeLoader(recipeFile, cfg, repos, component, 
-                              sourceComponent.getVersion().branch())
+                              sourceComponent.getVersion().branch(),
+                              ignoreInstalled=ignoreInstalled)
     finally:
         os.unlink(recipeFile)
     recipe = loader.getRecipe()
@@ -437,7 +439,8 @@ def loadRecipe(troveSpec, label=None):
                 oldBuildFlavor = cfg.buildFlavor
                 cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
                 use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
-            loader = RecipeLoader(localfile, cfg)
+            loader = RecipeLoader(localfile, cfg, 
+                                  ignoreInstalled=ignoreInstalled)
 
     if not loader:
         if label:
@@ -473,7 +476,8 @@ def loadRecipe(troveSpec, label=None):
             use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
         loader = recipeLoaderFromSourceComponent(name, cfg, repos, 
                                                  labelPath=labelPath, 
-                                                 versionStr=versionStr)[0]
+                                                 versionStr=versionStr,
+                                             ignoreInstalled=ignoreInstalled)[0]
     if flavor:
         cfg.buildFlavor = oldBuildFlavor
         use.setBuildFlagsFromFlavor(parentPackageName, cfg.buildFlavor)
