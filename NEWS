@@ -1,3 +1,6 @@
+Changes in 0.11.1:
+  * erasing troves enforces dependencies
+
 Changes in 0.11.0:
   * massive rework of fileId mechanism to allow better flavor support
   * added columns to dependency tables to allow erase dependency checks
