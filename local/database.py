@@ -14,7 +14,7 @@ import update
 import util
 import versions
 
-class Database:
+class AbstractDatabase(repository.AbstractRepository):
 
     createBranches = 1
 
@@ -155,13 +155,12 @@ class Database:
     # created the LocalBranch
 
     def open(self, mode):
-	self.repcache = localrep.LocalRepository(self.root, self.dbpath, mode)
 	top = util.joinPaths(self.root, self.dbpath)
 
 	self.rollbackCache = top + "/rollbacks"
 	self.rollbackStatus = self.rollbackCache + "/status"
-	if not os.path.exists(self.rollbackCache):
-	    os.mkdir(self.rollbackCache)
+	if not os.path.exists(self.rollbackCache) and mode == "c":
+	    util.mkdirChain(self.rollbackCache)
 	if not os.path.exists(self.rollbackStatus):
 	    self.firstRollback = 0
 	    self.lastRollback = -1
@@ -170,7 +169,7 @@ class Database:
 	    self.readRollbackStatus()
 
     def close(self):
-	self.repcache = None
+	pass
 
     def addRollback(self, reposChangeset, localChangeset):
 	rpFn = self.rollbackCache + ("/rb.r.%d" % (self.lastRollback + 1))
@@ -256,9 +255,24 @@ class Database:
 	    self.removeRollback(name)
 
     def __init__(self, root, path, mode = "r"):
+	assert(self.__class__ != AbstractDatabase)
 	self.root = root
 	self.dbpath = path
 	self.open(mode)
+	repository.AbstractRepository.__init__(self)
+
+class Database(AbstractDatabase):
+
+    def open(self, mode):
+	AbstractDatabase.open(self, mode)
+	self.repcache = localrep.LocalRepository(self.root, self.dbpath, mode)
+
+    def close(self):
+	AbstractDatabase.close(self)
+	self.repcache = None
+
+    def __init__(self, root, path, mode = "r"):
+	AbstractDatabase.__init__(self, root, path, mode)
 
 # Exception classes
 
