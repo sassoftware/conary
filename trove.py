@@ -77,15 +77,18 @@ class Package:
 
 	return fileMap
 
-    def diff(self, them, themVersion, ourVersion):
+    # (them == None, abstract == 0) means the package is new
+    def diff(self, them, abstract = 0):
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
 	if them:
 	    themMap = them.idMap
-	    chgSet = PackageChangeSet(self.name, themVersion, ourVersion)
+	    chgSet = PackageChangeSet(self.name, them.getVersion(),	
+				      self.getVersion())
 	else:
 	    themMap = {}
-	    chgSet = PackageChangeSet(self.name, None, ourVersion)
+	    chgSet = PackageChangeSet(self.name, None, self.getVersion(),
+				      abstract = abstract)
 
 	removedIds = []
 	addedIds = []
@@ -137,6 +140,9 @@ class Package:
 	self.version = version
 
 class PackageChangeSet:
+
+    def isAbstract(self):
+	return self.abstract
 
     def newFile(self, fileId, path, version):
 	self.newFiles.append((fileId, path, version))
@@ -225,23 +231,27 @@ class PackageChangeSet:
 	    else:
 		rc += " -\n"
 
-	if self.oldVersion:
-	    oldVerStr = self.oldVersion.freeze()
+	if self.abstract:
+	    hdr = "SRS PKG ABSTRACT %s %s %d\n" % \
+		      (self.name, self.newVersion.freeze(), rc.count("\n"))
+	elif not self.oldVersion:
+	    hdr = "SRS PKG NEW %s %s %d\n" % \
+		      (self.name, self.newVersion.freeze(), rc.count("\n"))
 	else:
-	    oldVerStr = "(none)"
+	    hdr = "SRS PKG CHANGESET %s %s %s %d\n" % \
+		      (self.name, self.oldVersion.freeze(), 
+		       self.newVersion.freeze(), rc.count("\n"))
 
-	hdr = "SRS PKG CHANGESET %s %s %s %d\n" % \
-		  (self.name, oldVerStr, self.newVersion.freeze(), 
-		   rc.count("\n"))
 	return hdr + rc	
     
-    def __init__(self, name, oldVersion, newVersion):
+    def __init__(self, name, oldVersion, newVersion, abstract = 0):
 	self.name = name
 	self.oldVersion = oldVersion
 	self.newVersion = newVersion
 	self.newFiles = []
 	self.oldFiles = []
 	self.changedFiles = []
+	self.abstract = abstract
 
 class PackageFromFile(Package):
 
