@@ -17,6 +17,7 @@ import pickle
 
 import conarycfg
 import versions
+import metadata
 from local import database
 from repository import repository
 from repository import changeset
@@ -295,7 +296,7 @@ class ConaryClient:
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):
-        metadata = {}
+        md = {}
         if cacheFile and not saveOnly:
             try:
                 cacheFp = open(cacheFile, "r")
@@ -314,13 +315,13 @@ class ConaryClient:
                     if lStr in cache and\
                        bStr in cache[lStr] and\
                        troveName in cache[lStr][bStr]:
-                        metadata[troveName] = metadata.Metadata(cache[lStr][bStr][troveName])
+                        md[troveName] = metadata.Metadata(cache[lStr][bStr][troveName])
                         troveList.remove((troveName, branch))
 
         # if the cache missed any, grab from the repos
         if not cacheOnly and troveList:
-            metadata.update(self.repos.getMetadata(troveList, label))
-            if metadata and cacheFile:
+            md .update(self.repos.getMetadata(troveList, label))
+            if md and cacheFile:
                 try:
                     cacheFp = open(cacheFile, "rw")
                     cache = pickle.load(cacheFp)
@@ -331,7 +332,7 @@ class ConaryClient:
                 cacheFp = open(cacheFile, "w")
 
                 # filter down troveList to only contain items for which we found metadata
-                cacheTroves = [x for x in troveList if x[0] in metadata]
+                cacheTroves = [x for x in troveList if x[0] in md]
 
                 lStr = label.asString()
                 for troveName, branch in cacheTroves:
@@ -342,12 +343,12 @@ class ConaryClient:
                     if bStr not in cache[lStr]:
                         cache[lStr][bStr] = {}
 
-                    cache[lStr][bStr][troveName] = metadata[troveName].freeze()
+                    cache[lStr][bStr][troveName] = md[troveName].freeze()
 
                 pickle.dump(cache, cacheFp)
                 cacheFp.close()
 
-        return metadata
+        return md
 
 
     def _prepareRoot(self):
