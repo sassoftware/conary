@@ -14,34 +14,69 @@
 from metadata import MDClass
 
 class HtmlEngine:
+
+    styleSheet = """
+div.formHeader {
+    float: left;
+    font-weight: bold;
+    width: 16%;
+}
+
+h2 {
+    font-size: 150%;
+    color: white;
+    background-color: #333399;
+    font-weight: bold;
+}
+
+td {
+    vertical-align: top;
+}
+
+hr {
+    border: 0px;
+    height: 2px;
+    color: black;
+    background-color: black;
+}
+"""
+
     def htmlHeader(self, pageTitle=""):
         self.writeFn("""
 <html>
     <head>
         <title>%s</title>
+        <style>
+            %s
+        </style>
+        <script language="javascript">
+            function append(selId, inputId) {
+                sel = document.getElementById(selId)
+                text = document.getElementById(inputId).value;
+                sel.options[sel.length] = new Option(text, text);
+                document.getElementById(inputId).value="";
+            }
+
+            function removeSelected(selId) {
+                sel = document.getElementById(selId);
+                sel.remove(sel.selectedIndex);
+            }
+        </script> 
     </head>
-<body>""" % pageTitle)
+<body>""" % (pageTitle, self.styleSheet))
 
     def htmlFooter(self):
-        self.writeFn("""</body></html>""")
+        self.writeFn("""
+<hr />
+</body></html>""")
 
     def htmlPickTrove(self, troveList=[], action="chooseBranch"):
         troveSelection = self._genSelect(troveList, "troveNameList", size=12, expand=True)
 
         self.writeFn("""
-<h2>Metadata</h2>
 <form action="/%s" method="post">
-<table>
-    <tr>
-        <td valign="top">Pick a trove:</td>
-        <td>%s</td>
-    </tr>
-    <tr>
-        <td>Or enter a trove name:</td>
-        <td><input type="text" name="troveName"></td>
-    </tr>
- </table>
-
+<p><div class="formHeader">Pick a trove:</div>%s</p>
+<p><div class="formHeader">Or enter a trove name:</div><input type="text" name="troveName"></p>
 <p><input type="submit"></p>
 </form>
         """ % (action, troveSelection))
@@ -64,31 +99,43 @@ Choose a branch: %s
     def htmlMetadataEditor(self, troveName, branchStr, metadata):
         self.writeFn("""
 <h2>Metadata for %s</h2>
-<h3>Branch: %s</h3>
-<table>
-<tr><td><b>Short Description:</b></td><td><input type="text" name="shortDesc" value="%s" /></td></tr>
-<tr><td><b>Long Description:</b></td><td><input type="text" name="longDesc" value="%s" /></td></tr>
-<tr><td><b>URLs:</b></td><td>%s</td></tr>
-<tr><td><b>Licenses:</b></td><td>%s</td></tr>
-<tr><td><b>Categories:</b></td><td>%s</td></tr>
+<h4>Branch: %s</h4>
+<h4>Metadata version: %s</h4>
+<table style="width: 100%%;">
+<tr><td>Short Description:</td><td><input style="width: 50%%;" type="text" name="shortDesc" value="%s" /></td></tr>
+<tr><td>Long Description:</td><td><textarea style="width: 50%%;" name="longDesc" rows="4" cols="60">%s</textarea></td></tr>
+<tr><td>URLs:</td><td>%s<br />%s</td></tr>
+<tr><td>Licenses:</td><td>%s<br /> %s</td></tr>
+<tr><td>Categories:</td><td>%s<br />%s</td></tr>
 </table>
-""" %   (troveName, branchStr,
+""" %   (troveName, branchStr, metadata["version"].trailingVersion().asString(),
          metadata[MDClass.SHORT_DESC][0],
          metadata[MDClass.LONG_DESC][0],
-         ", ".join(metadata[MDClass.URL]),
-         ", ".join(metadata[MDClass.LICENSE]),
-         ", ".join(metadata[MDClass.CATEGORY]) ))
+         self._genSelect(metadata[MDClass.URL], "urlList", size=4, expand=True),
+         self._genSelectAppender("newUrl", "urlList"),
+         self._genSelect(metadata[MDClass.LICENSE], "licenseList", size=4, expand=True),
+         self._genSelectAppender("newLicense", "licenseList"),
+         self._genSelect(metadata[MDClass.CATEGORY], "categoryList", size=4, expand=True),
+         self._genSelectAppender("newCategory", "categoryList")))
 
+    def _genSelectAppender(self, name, selectionName):
+        inputId = name + "Input"
+        s = """
+<input type="text" name="%s" id="%s" />
+<button onClick="javascript:append('%s', '%s');">Add</button>
+<button onClick="javascript:removeSelected('%s');">Remove</button>""" %\
+            (name, inputId, selectionName, inputId, selectionName)
+        return s
 
     def _genSelect(self, items, name, default=None, size=1, expand=False):
         """Generate a html <select> dropdown or selection list based on a dictionary or a list.
            If 'items' is a dictionary, use the dictionary value as the option value, and display
            the key to the user. If 'items' is a list, use the list item for both."""
         if expand:
-            style = """width: 100%;"""
+            style = """width: 50%;"""
         else:
             style = ""
-        s = """<select name="%s" size="%d" style="%s">\n""" % (name, size, style)
+        s = """<select name="%s" id="%s" size="%d" style="%s">\n""" % (name, name, size, style)
 
         # generate [(data, friendlyName), ...)] from either a list or a dict
         if isinstance(items, list):

@@ -494,6 +494,7 @@ class TroveStore:
             return None
        
         metadata = self.metadataTable.get(itemId, versionId, branchId, language)
+        metadata["version"] = versions.VersionFromString(latestVersion)
         return metadata
 
     def hasTrove(self, troveName, troveVersion = None, troveFlavor = 0):

@@ -81,7 +81,7 @@ class HttpHandler(HtmlEngine):
 
         self.htmlMetadataEditor(troveName, branch.asString(), md)
 
-    def invalidCmd(self, writeFn, authToken, fields):
+    def invalidCmd(self, authToken, fields):
         # XXX this is a fake server error, we should raise an exception
         # and handle it upstream instead of calling this
-        writeFn("Server Error")
+        self.writeFn("Server Error")
