@@ -106,12 +106,6 @@ class Macros(dict):
 	return new
 
 
-def flatten(list):
-    if type(list) != types.ListType: return [list]
-    if list == []: return list
-    return flatten(list[0]) + flatten(list[1:])
-
-
 def extractSourceFromRPM(rpm, targetfile):
     filename = os.path.basename(targetfile)
     directory = os.path.dirname(targetfile)
