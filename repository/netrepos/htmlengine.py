@@ -84,7 +84,6 @@ hr {
             }
 
             function updateMetadata() {
-                alert("updating");
                 selectAll('urlList');
                 selectAll('licenseList');
                 selectAll('categoryList');
