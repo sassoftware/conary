@@ -315,6 +315,10 @@ class TroveStore:
 	return outD
 
     def iterTroveNames(self):
+        cu = self.db.cursor()
+        cu.execute("SELECT DISTINCT item FROM Instances NATURAL JOIN "
+                   "Items WHERE isPresent=1");
+
 	return self.items.iterkeys()
 
     def addTrove(self, trove):
