@@ -371,6 +371,8 @@ def cookItem(repos, cfg, item, prep=0, macros=()):
 	for (className, classObject) in classList.items():
 	    buildList.append((classObject, cfg.defaultbranch, None))
 
+	os.unlink(recipeFile)
+
     built = []
     for (classObject, branch, csFile) in buildList:
 	try:
