@@ -2,6 +2,8 @@ Changes in 0.50.8:
   * NormalizeInterpreterPaths() policy now looks in the package currently
     being built, as well as on the installed system, to determine how to
     resolve #!/usr/bin/env scripts.
+  * groupName argument to addTrove() can now be a list of group names as
+    well as a single group name.
 
 Changes in 0.50.7:
   * Added the XInetdService action to avoid having to include

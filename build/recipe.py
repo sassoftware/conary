@@ -982,10 +982,15 @@ class GroupRecipe(Recipe):
 
     def addTrove(self, name, versionStr = None, flavor = None, source = None,
                  byDefault = True, groupName = None):
-        if groupName is None: groupName = self.name
-        self.groups[groupName].addTrove(name, versionStr = versionStr,
-                                        flavor = flavor, source = source,
-                                        byDefault = byDefault)
+        if groupName is None:
+            groupName = [self.name]
+        if not isinstance(groupName, (list, tuple)):
+            groupName = [groupName]
+        for thisGroupName in groupName:
+            self.groups[thisGroupName].addTrove(name, versionStr = versionStr,
+                                                flavor = flavor,
+                                                source = source,
+                                                byDefault = byDefault)
 
     def findTroves(self, groupName = None):
         if groupName is None: groupName = self.name
