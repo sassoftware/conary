@@ -18,6 +18,7 @@ import errno
 import log
 import os
 import shutil
+import stackutil
 import stat
 import string
 import struct
@@ -92,7 +93,7 @@ def excepthook(type, value, tb):
     lines = traceback.format_exception(type, value, tb)
     (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
     output = os.fdopen(tbfd, 'w')
-    saveTraceBack(tb, output)
+    stackutil.printTraceBack(tb, output)
     print "*** Note *** An extended traceback has been saved to %s " % path
     print string.joinfields(lines, "")
     if sys.stdout.isatty() and sys.stdin.isatty():
