@@ -422,7 +422,7 @@ def cookItem(repos, cfg, item, prep=0, macros=()):
                             prep = prep, macros = macros)
         if troves:
             built = (tuple(troves), changeSetFile)
-    except repository.RepositoryError, e:
+    except repository.repository.RepositoryError, e:
         raise CookError(str(e))
 
     return built
