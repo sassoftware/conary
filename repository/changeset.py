@@ -228,7 +228,7 @@ class ChangeSet:
 	    invertedPkg = package.PackageChangeSet(pkgCs.getName(), 
 			       pkgCs.getNewVersion(), pkgCs.getOldVersion())
 
-	    for (name, list) in pkgCs.getChangedPackages():
+	    for (name, list) in pkgCs.iterChangedPackages():
 		for (oper, version) in list:
 		    if oper == '+':
 			invertedPkg.oldPackageVersion(name, version)
@@ -428,7 +428,7 @@ class ChangeSet:
 	    # O(n^2) (n is the number of packages changed in pkgCs), which is
 	    # just silly. if large groups are added like this the effect could
 	    # become noticeable
-	    for (name, list) in pkgCs.getChangedPackages():
+	    for (name, list) in pkgCs.iterChangedPackages():
 		if not packageVersions.has_key(name): continue
 		for (change, version) in list:
 		    if change != '+': continue
