@@ -1,3 +1,8 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 DEP_CLASS_ABI	    = 0
 DEP_CLASS_IS	    = 1
 DEP_CLASS_SONAME    = 2
