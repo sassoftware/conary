@@ -483,6 +483,8 @@ class RegularFile(File):
 		f = os.fdopen(tmpfd, 'w')
 		util.copyfileobj(src, f)
 		f.close()
+                if os.path.isdir(target):
+                    os.rmdir(target)
 		os.rename(tmpname, target)
 		self.setMtime(target)
 	    except:
