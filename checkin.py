@@ -252,22 +252,45 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     if not troveName.endswith(":source"):
 	troveName += ":source"
 
-    old = repos.findTrove(buildLabel, troveName, None, versionStr = oldVersion)
-    if len(old) > 1:
-	log.error("%s matches multiple versions" % oldVersion)
-	return
-    old = old[0]
-
     new = repos.findTrove(buildLabel, troveName, None, versionStr = newVersion)
     if len(new) > 1:
 	log.error("%s matches multiple versions" % newVersion)
 	return
     new = new[0]
+    newV = new.getVersion()
 
-    cs = repos.createChangeSet([(troveName, None, old.getVersion(), 
-				 new.getVersion(), False)])
+    try:
+	count = -int(oldVersion)
+	vers = repos.getTroveVersionsByLabel([troveName],
+					     newV.branch().label())
+	vers = vers[troveName]
+	# erase everything later then us
+	i = vers.index(newV)
+	del vers[i:]
 
-    _showChangeSet(cs, old, new)
+	branchList = []
+	for v in vers:
+	    if v.branch() == newV.branch():
+		branchList.append(v)
+
+	if len(branchList) < count:
+	    oldV = None
+	    old = None
+	else:
+	    oldV = branchList[-count]
+	    old = repos.getTrove(troveName, oldV, None)
+    except ValueError:
+	old = repos.findTrove(buildLabel, troveName, None, 
+			      versionStr = oldVersion)
+	if len(old) > 1:
+	    log.error("%s matches multiple versions" % oldVersion)
+	    return
+	old = old[0]
+	oldV = old.getVersion()
+
+    cs = repos.createChangeSet([(troveName, None, oldV, newV, False)])
+
+    _showChangeSet(repos, cs, old, new)
 
 def diff(repos, versionStr = None):
     try:
@@ -299,20 +322,28 @@ def diff(repos, versionStr = None):
 
     (changeSet, ((isDifferent, newState),)) = result
     if not isDifferent: return
-    _showChangeSet(changeSet, oldPackage, state)
+    _showChangeSet(repos, changeSet, oldPackage, state)
 
-def _showChangeSet(changeSet, oldPackage, newPackage):
+def _showChangeSet(repos, changeSet, oldPackage, newPackage):
     packageChanges = changeSet.iterNewPackageList()
     pkgCs = packageChanges.next()
     assert(util.assertIteratorAtEnd(packageChanges))
 
     for (fileId, path, newVersion) in pkgCs.getNewFileList():
 	print "%s: new" % path
+	chg = changeSet.getFileChange(fileId)
+	f = files.ThawFile(chg, fileId)
+
+	if f.hasContents:
+	    (contType, contents) = changeSet.getFileContents(fileId)
+	    print contents.get().read()
 
     for (fileId, path, newVersion) in pkgCs.getChangedFileList():
 	if path:
-	    oldPath = oldPackage.getFile(fileId)[0]
-	    dispStr = "%s (aka %s)" % (path, oldPath)
+	    dispStr = path
+	    if oldPackage:
+		oldPath = oldPackage.getFile(fileId)[0]
+		dispStr += " (aka %s)" % oldPath
 	else:
 	    path = oldPackage.getFile(fileId)[0]
 	    dispStr = path
