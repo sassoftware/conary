@@ -212,7 +212,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	return authToken
       
     def requestAuth(self):
-        self.send_error(401)
+        self.send_response(401)
         self.send_header("WWW-Authenticate", 'Basic realm="Conary Repository"')
         self.end_headers()
         return None
