@@ -68,7 +68,7 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
 	   its members */
 	Elf *nelf;
 	int rc;
-	Elf_Cmd command = ELF_C_READ_MMAP;
+	Elf_Cmd command = ELF_C_READ;
 
 	while ((nelf = elf_begin(fd, command, elf)) != NULL) {
 	    Elf_Kind kind = elf_kind(nelf);
@@ -300,7 +300,7 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
 	return NULL;
     }
 
-    elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
+    elf = elf_begin(fd, ELF_C_READ, NULL);
     if (!elf) {
 	close(fd);
 	Py_INCREF(Py_None);
@@ -371,7 +371,7 @@ static PyObject * stripped(PyObject *self, PyObject *args) {
 
     lseek(fd, 0, 0);
 
-    elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
+    elf = elf_begin(fd, ELF_C_READ, NULL);
     if (!elf) {
 	PyErr_SetString(ElfError, "error initializing elf file");
 	return NULL;
@@ -442,7 +442,7 @@ static PyObject * hasDebug(PyObject *self, PyObject *args) {
 
     lseek(fd, 0, 0);
 
-    elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
+    elf = elf_begin(fd, ELF_C_READ, NULL);
     if (!elf) {
 	PyErr_SetString(ElfError, "error initializing elf file");
 	return NULL;
