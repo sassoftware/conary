@@ -568,9 +568,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 if withFileContents and hash:
                     # pull the contents from the trove it was originall
                     # built in
-                    cont = self.getFileContents(troveName, newFileVersion,
-                                        fileId, newFileVersion,
-                                        tmpFile = tmpF)
+                    cont = self.getFileContents([ (troveName, newFileVersion,
+                                                   fileId, newFileVersion) ],
+                                                tmpFile = tmpF)[0]
                     internalCs.addFileContents(fileId, 
                                    repository.changeset.ChangedFileTypes.file, 
                                    cont, 
@@ -631,37 +631,43 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 				   self.fromFileId(fileId), 
 				   self.fromVersion(version)))
 
-    def getFileContents(self, troveName, troveVersion, fileId,
-		        fileVersion, fileObj = None, tmpFile = None):
-	# we try to get the file from the trove which originally contained
-	# it since we know that server has the contents; other servers may
-	# not
-	url = self.c[fileVersion].getFileContents(troveName, 
-		    self.fromVersion(fileVersion), 
-		    self.fromFileId(fileId), self.fromVersion(fileVersion))
+    def getFileContents(self, fileList, tmpFile = None):
+        contents = []
 
-	inF = urllib.urlopen(url)
+        for item in fileList:
+            (troveName, troveVersion, fileId, fileVersion) = item[0:4]
 
-        if tmpFile:
-            start = tmpFile.tell()
-            outF = tmpFile
-        else:
-            (fd, path) = tempfile.mkstemp()
-            os.unlink(path)
-            outF = os.fdopen(fd, "r+")
+            # we try to get the file from the trove which originally contained
+            # it since we know that server has the contents; other servers may
+            # not
+            url = self.c[fileVersion].getFileContents(troveName, 
+                        self.fromVersion(fileVersion), 
+                        self.fromFileId(fileId), self.fromVersion(fileVersion))
 
-	size = util.copyfileobj(inF, outF)
-	del inF
+            inF = urllib.urlopen(url)
 
-	outF.seek(0)
+            if tmpFile:
+                start = tmpFile.tell()
+                outF = tmpFile
+            else:
+                (fd, path) = tempfile.mkstemp()
+                os.unlink(path)
+                outF = os.fdopen(fd, "r+")
 
-        if tmpFile:
-            outF = util.SeekableNestedFile(tmpFile, size, start)
+            size = util.copyfileobj(inF, outF)
+            del inF
 
-	gzfile = gzip.GzipFile(fileobj = outF)
-	gzfile.fullSize = util.gzipFileSize(outF)
+            outF.seek(0)
 
-	return filecontents.FromGzFile(gzfile)
+            if tmpFile:
+                outF = util.SeekableNestedFile(tmpFile, size, start)
+
+            gzfile = gzip.GzipFile(fileobj = outF)
+            gzfile.fullSize = util.gzipFileSize(outF)
+
+            contents.append(filecontents.FromGzFile(gzfile))
+
+        return contents
 
     def commitChangeSetFile(self, fName):
         cs = repository.changeset.ChangeSetFromFile(fName)

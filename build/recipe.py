@@ -235,9 +235,9 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     inF = None
     for (fileId, filePath, fileVersion) in sourceComponent.iterFileList():
 	if filePath == filename:
-	    inF = repos.getFileContents(sourceComponent.getName(),
+	    inF = repos.getFileContents([ (sourceComponent.getName(),
 					sourceComponent.getVersion(),
-                                        fileId, fileVersion).get()
+                                        fileId, fileVersion) ])[0].get()
 	    break
     
     if not inF:

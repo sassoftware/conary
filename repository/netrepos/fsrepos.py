@@ -340,7 +340,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    if isinstance(label, versions.CookBranch):
 		raise repository.repository.CommitError, \
 		    "can not commit items on localhost@local:COOK"
-	    
+
         self.troveStore.begin()
         try:
             # a little odd that creating a class instance has the side
@@ -358,24 +358,32 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def resolveRequirements(self, label, depSetList):
         return self.troveStore.resolveRequirements(label, depSetList)
 
-    def getFileContents(self, troveName, troveVersion, 
-		        fileId, fileVersion, fileObj):
-	# the get trove netclient provides doesn't work with a 
-	# FilesystemRepository (it needs to create a change set which gets 
-	# passed)
-	if fileVersion.branch().label().getHost() == self.name:
-	    return filecontents.FromDataStore(self.contentsStore, 
-					      fileObj.contents.sha1(), 
-					      fileObj.contents.size())
-	else:
-	    # a bit of sleight of hand here... we look for this file in
-	    # the trove it was first built in
-	    #
-	    # this could cause us to run out of file descriptors on large
-	    # troves. it might be better to close the file and return
-	    # a filecontents object?
-	    return self.reposSet.getFileContents(troveName, fileVersion, 
-                                      fileId, fileVersion)
+    def getFileContents(self, itemList):
+        contents = []
+        
+        for item in itemList:
+            (troveName, troveVersion, fileId, fileVersion) = item[0:4]
+    
+            # the get trove netclient provides doesn't work with a 
+            # FilesystemRepository (it needs to create a change set which gets 
+            # passed)
+            if fileVersion.branch().label().getHost() == self.name:
+                fileObj = item[4]
+                cont = filecontents.FromDataStore(self.contentsStore, 
+                                                  fileObj.contents.sha1(), 
+                                                  fileObj.contents.size())
+            else:
+                # a bit of sleight of hand here... we look for this file in
+                # the trove it was first built in
+                #
+                # this could cause us to run out of file descriptors on large
+                # troves. it might be better to close the file and return
+                # a filecontents object?
+                cont = self.reposSet.getFileContents([ item ])[0]
+
+            contents.append(cont)
+
+        return contents
 
     def createChangeSet(self, troveList, recurse = True, withFiles = True,
                         withFileContents = True):
@@ -535,13 +543,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     (hash or (oldFile and newFile.flags.isConfig() 
                                       and not oldFile.flags.isConfig())):
 		    if oldFileVersion :
-			oldCont = self.getFileContents(troveName, oldVersion, 
-				    fileId, oldFileVersion, 
-				    fileObj = oldFile)
+			oldCont = self.getFileContents(
+                            [ (troveName, oldVersion, 
+                               fileId, oldFileVersion, oldFile) ])[0]
 
-		    newCont = self.getFileContents(troveName, newVersion, 
-				    fileId, newFileVersion, 
-				    fileObj = newFile)
+		    newCont = self.getFileContents(
+                            [ (troveName, newVersion, 
+                               fileId, newFileVersion, newFile) ])[0]
 
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
