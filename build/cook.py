@@ -387,7 +387,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     lcache = lookaside.RepositoryCache(repos)
 
     srcdirs = [ os.path.dirname(recipeClass.filename),
-		cfg.sourcePath % {'pkgname': recipeClass.name} ]
+		cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
 
     # build a list containing this recipe class and any ancestor class

@@ -219,7 +219,7 @@ def commit(repos, cfg, message):
     if issubclass(recipeClass, recipe.PackageRecipe):
         lcache = lookaside.RepositoryCache(repos)
         srcdirs = [ os.path.dirname(recipeClass.filename),
-                    cfg.sourcePath % {'pkgname': recipeClass.name} ]
+                    cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
         recipeObj = recipeClass(cfg, lcache, srcdirs)
         recipeObj.setup()
         files = recipeObj.fetchAllSources()

@@ -124,7 +124,7 @@ class ConaryConfiguration(ConfigFile):
 	'name'			: None,
 	'repositoryMap'	        : [ STRINGDICT, {} ],
 	'root'			: '/',
-	'sourcePath'		: '/usr/src/conary/sources',
+	'sourceSearchDir'	: '.',
 	'tmpDir'		: '/var/tmp/',
     }
    
