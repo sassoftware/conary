@@ -60,6 +60,7 @@ class TestSuiteLinks(policy.Policy):
 		} 
     invariantexceptions = [ 
 #			    [ '.*', stat.S_IFDIR ],
+			    [ '.*', stat.S_IFLNK ],
 			    '%(mandir)s/',
 			    '%(infodir)s/',
 			    '%(docdir)s/',
