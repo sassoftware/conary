@@ -84,7 +84,11 @@ Creates a new branch in the repository, relative to branch
 \fIbranchfrom\fP.  If \fItrove\fP is listed, create the
 branch only for that trove.
 .TP
-.B cook \fI[\fP--prep\fI] [\fP--macros file\fI] <file>\fP.recipe|\fI<component>...\fP
+.B cook \fI[\fR--prep\fI] [\fR--macros file\fI] [\fR--target-branch \fI<branch>]\fR \e
+.PD 0
+.TP
+.B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>...\fP
+.PD
 Build a package.  If \fB--prep\fP is specified, the souce code is
 unpacked, but is not built. if \fB--macros\fP is specified, it
 names a file containing macro definitions to apply to the recipe
@@ -92,6 +96,10 @@ macro set.  If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the
 filesystem.  Otherwise, it must name a repository component and
 the package will be cooked from the repository.
+.IP
+Conary will build a changeset that is relative to the current
+\fBbuildLabel\fP unless the \fB--target-branch\fP option is
+specified.
 .TP
 .B commit \fIchangeset\fP [--target-branch \fI<branch>\fP]
 Commits a changeset to the repository.  This is not a reversible
