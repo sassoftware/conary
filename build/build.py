@@ -6,6 +6,7 @@ import os
 import shutil
 import util
 import string
+import glob
 
 # Note: when creating templates, be aware that they are evaulated
 # twice, in the context of two different dictionaries.
@@ -14,6 +15,17 @@ import string
 #     escape them for delayed evaluation.  This will include at
 #     least %%(builddir)s for all, and doInstall will also get
 #     %%(destdir)s
+
+# make sure that the decimal value really is unreasonable before
+# adding a new translation to this file.
+permmap = {
+    1755: 01755,
+    4755: 04755,
+    755: 0755,
+    750: 0750,
+    644: 0644,
+    640: 0640,
+}
 
 class ShellCommand:
     def __init__(self, *args, **keywords):
@@ -97,49 +109,58 @@ class MakeInstall(ShellCommand):
     def doInstall(self, macros):
 	util.execute(self.command %macros)
 
-class InstallFile:
-
-    # make sure that the decimal value really is unreasonable before
-    # adding a new translation to this file.
-    permmap = {
-	1755: 01755,
-	4755: 04755,
-	755: 0755,
-	750: 0750,
-	644: 0644,
-	640: 0640,
-    }
-
+class _PutFile:
     def doInstall(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 	util.mkdirChain(os.path.dirname(dest))
 
 	for fromFile in self.fromFiles:
+	    sources = (self.source + fromFile) %macros
+	    # XXX add {} expansion -- util.braceglob?
+	    sourcelist = glob.glob(sources)
 	    thisdest = dest
 	    if dest[-1:] == '/':
-		thisdest = dest + os.path.basename(fromFile)
-	    shutil.copyfile(fromFile, thisdest)
-	    os.chmod(thisdest, self.mode)
+		thisdest = dest + os.path.basename(sources)
+	    elif len(sourcelist) > 1:
+		raise TypeError, 'singleton destination %s requires singleton source'
+	    for source in sourcelist:
+		shutil.copyfile(source, thisdest)
+		if self.mode >= 0:
+		    os.chmod(thisdest, self.mode)
 
-    def __init__(self, fromFiles, toFile, perms = 0644):
+    def __init__(self, fromFiles, toFile, mode):
 	self.toFile = toFile
 	if type(fromFiles) is str:
 	    self.fromFiles = (fromFiles,)
 	else:
 	    self.fromFiles = fromFiles
 	# notice obviously broken permissions
-	if self.permmap.has_key(perms):
-	    print 'odd permission %o, correcting to %o: add initial "0"?' \
-	          %(perms, permmap[perms])
-	    perms = permmap[perms]
-	self.mode = perms
+	if mode >= 0:
+	    if permmap.has_key(mode):
+		print 'odd permission %o, correcting to %o: add initial "0"?' \
+		      %(mode, permmap[mode])
+		mode = permmap[mode]
+	self.mode = mode
+    
+
+class InstallFile(_PutFile):
+    def __init__(self, fromFiles, toFile, perms = 0644):
+	_PutFile.__init__(self, fromFiles, toFile, perms)
+	self.source = ''
+
+class MoveFile(_PutFile):
+    def __init__(self, fromFiles, toFile, perms = -1):
+	_PutFile.__init__(self, fromFiles, toFile, perms)
+	self.source = '%(destdir)s'
 
 class InstallSymlink:
 
     def doInstall(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 	util.mkdirChain(os.path.dirname(dest))
-	os.symlink(self.fromFile, macros['destdir'] + self.toFile %macros)
+	if os.path.exists(dest):
+	    os.remove(dest)
+	os.symlink(self.fromFile, dest)
 
     def __init__(self, fromFile, toFile):
 	self.fromFile = fromFile
@@ -157,14 +178,3 @@ class RemoveFiles:
 	self.filespec = filespec
 	self.recursive = recursive
 
-class MoveFile:
-
-    def doInstall(self, macros):
-	dest = macros['destdir'] + self.toFile %macros
-	util.mkdirChain(os.path.dirname(dest))
-	os.rename(macros['destdir'] + self.fromFile %macros,
-	          macros['destdir'] + self.toFile %macros)
-
-    def __init__(self, fromFile, toFile):
-	self.fromFile = fromFile
-	self.toFile = toFile
