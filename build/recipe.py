@@ -82,7 +82,7 @@ class Recipe:
 	if not f:
 	    r = lookaside.findAll(self.cfg, rpm, self.name, self.srcdirs)
 	    c = lookaside.createCacheName(self.cfg, file, self.name)
-	    os.system("cd %s; rpm2cpio %s | cpio -ium %s" %(os.path.dirname(c), rpm, file))
+	    os.system("cd %s; rpm2cpio %s | cpio -ium %s" %(os.path.dirname(c), r, file))
 	    f = lookaside.findAll(self.cfg, file, self.name, self.srcdirs)
 	self.tarballs.append((file, extractDir))
 	self.addSignature(f, fingerprint)

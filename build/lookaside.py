@@ -13,6 +13,11 @@ import time
 
 def createCacheName(cfg, name, location, negative=''):
     cachedname = '%s/%s%s/%s' %(cfg.lookaside, negative, location, name)
+    try:
+	os.makedirs(os.path.dirname(cachedname))
+    except:
+	pass
+    return cachedname
 
 def createCacheEntry(cfg, name, location, infile):
     # cache needs to be hierarchical to avoid collisions, thus we
@@ -37,14 +42,14 @@ def searchCache(cfg, name, location):
     if name.startswith("http://") or name.startswith("ftp://"):
 	# check for negative cache entries to avoid spamming servers
 	negativeName = '%s/NEGATIVE/%s' %(cfg.lookaside, location)
-	f = util.searchFile(basename, negativeName)
+	f = util.searchFile(basename, [negativeName])
 	if f:
 	    if time.time() > 60*60*24*7 + os.path.getmtime(f):
 		os.remove(negativeName)
 		return searchCache(name, location)
 	    return None
 
-    return util.searchFile(basename, '%s/%s' %(cfg.lookaside, location))
+    return util.searchFile(basename, ['%s/%s' %(cfg.lookaside, location)])
 
 
 def searchRepository(cfg, name, location):
@@ -57,13 +62,15 @@ def searchRepository(cfg, name, location):
 def searchAll(cfg, name, location, srcdirs):
     """searches all locations, including populating the cache if the
     file can't be found in srcdirs, and returns the name of the file"""
-    f = util.searchFile(name, srcdirs)
+    f = util.searchFile(os.path.basename(name), srcdirs)
+    if f: return f
+
+    # this needs to come before searching the cache, with the expense
+    # of repopulating the cache "unnecessarily", to preserve reproducability
+    f = searchRepository(cfg, name, location)
     if f: return f
 
     f = searchCache(cfg, name, location)
-    if f: return f
-
-    f = searchRepository(cfg, name, location)
     if f: return f
 
     if name.startswith("http://") or name.startswith("ftp://"):
