@@ -416,7 +416,7 @@ class IdealRepository(AbstractTroveDatabase):
 	else:
 	    try:
 		version = versions.VersionFromString(versionStr)
-	    except versions.ParseError:
+	    except versions.ParseError, e:
 		raise PackageNotFound, str(e)
 
 	    try:
