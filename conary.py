@@ -61,15 +61,21 @@ def usage(rc = 1):
     print "               --reppath <repository-path>"
     print "               --root <root>"
     print ""
-    print "pkglist flags: --sha1s"
+    print "cook flags:    --macros"
+    print "               --prep"
+    print "               --target-branch <branch>"
+    print ""
+    print "pkglist flags: --full-versions"
     print "               --ids"
     print "               --ls"
+    print "               --sha1s"
     print ""
     print "replist flags: --all"
-    print "               --sha1s"
+    print "               --full-versions"
     print "               --ids"
     print "               --leaves"
     print "               --ls"
+    print "               --sha1s"
     print ""
     print "update flags: --replace-files"
     return rc
@@ -104,6 +110,7 @@ def realMain():
     argDef["all"] = 0
     argDef["config"] = 2
     argDef["debug"] = 0
+    argDef["full-versions"] = 0
     argDef["ids"] = 0
     argDef["leaves"] = 0
     argDef["ls"] = 0
@@ -221,6 +228,7 @@ def realMain():
 	log.setVerbosity(1)
 	macros = {}
 	prep = 0
+	buildBranch = None
 	if argSet.has_key('prep'):
 	    del argSet['prep']
 	    prep = 1
@@ -232,6 +240,11 @@ def realMain():
 	    exec macroSrc
 	    del f
 	    del argSet['macros']
+
+	if argSet.has_key('target-branch'):
+	    buildBranch = argSet['target-branch']
+	    del argSet['target-branch']
+
 	if argSet: return usage()
 
 	cook.cookCommand(cfg, otherArgs[2:], prep, macros)                
@@ -274,12 +287,15 @@ def realMain():
 	sha1s = argSet.has_key('sha1s')
 	if sha1s: del argSet['sha1s']
 
+	fullVersions = argSet.has_key('full-versions')
+	if fullVersions: del argSet['full-versions']
+
 	db = openDatabase(cfg.root, cfg.dbPath)
 
 	if argSet: return usage()
 
 	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	    args = [db, cfg, ls, ids, sha1s] + otherArgs[2:]
+	    args = [db, cfg, ls, ids, sha1s, fullVersions] + otherArgs[2:]
 	    try:
 		display.displayTroves(*args)
 	    except IOError, msg:
@@ -293,6 +309,9 @@ def realMain():
 
 	ls = argSet.has_key('ls')
 	if ls: del argSet['ls']
+
+	fullVersions = argSet.has_key('full-versions')
+	if fullVersions: del argSet['full-versions']
 
 	ids = argSet.has_key('ids')
 	if ids: del argSet['ids']
@@ -308,7 +327,8 @@ def realMain():
 	if argSet: return usage()
 
 	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	    args = [repos, cfg, all, ls, ids, sha1s, leaves] + otherArgs[2:]
+	    args = [repos, cfg, all, ls, ids, sha1s, leaves, fullVersions] + \
+			otherArgs[2:]
 	    try:
 		queryrep.displayTroves(*args)
 	    except IOError, msg:

@@ -11,7 +11,7 @@ _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
 def displayTroves(db, cfg, ls = False, ids = False, sha1s = False,
-                  trove = "", versionStr = None):
+                  fullVersions = False, trove = "", versionStr = None):
     if trove:
 	troves = [ trove ]
     else:
@@ -20,16 +20,21 @@ def displayTroves(db, cfg, ls = False, ids = False, sha1s = False,
 
     for troveName in troves:
 	if versionStr or ls or ids or sha1s:
-	    _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s)
+	    _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s,
+			      fullVersions)
 	    continue
 	else:
 	    l = db.getPackageVersionList(troveName)
 
 	    for version in l:
-		print _troveFormat % (troveName, 
-				    version.trailingVersion().asString())
+		if fullVersions:
+		    print _troveFormat % (troveName, version.asString())
+		else:
+		    print _troveFormat % (troveName, 
+					version.trailingVersion().asString())
 
-def _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s):
+def _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s, 
+		      fullVersions):
     troveList = db.findTrove(troveName, versionStr)
 
     for trove in troveList:
@@ -57,15 +62,24 @@ def _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s):
 		if file.hasContents:
 		    print "%s %s" % (file.contents.sha1(), path)
 	else:
-	    print _troveFormat % (troveName, 
-				  version.trailingVersion().asString())
+	    if fullVersions:
+		print _troveFormat % (troveName, version.asString())
+	    else:
+		print _troveFormat % (troveName, 
+				      version.trailingVersion().asString())
 
 	    for (troveName, ver, flavor) in trove.iterTroveList():
-		print _grpFormat % (troveName, 
-				    ver.trailingVersion().asString())
+		if fullVersions:
+		    print _grpFormat % (troveName, ver.asString())
+		else:
+		    print _grpFormat % (troveName, 
+					ver.trailingVersion().asString())
 
 	    fileL = [ (x[1], x[0], x[2]) for x in trove.iterFileList() ]
 	    fileL.sort()
 	    for (path, fileId, version) in fileL:
-		print _fileFormat % (path, 
-				     version.trailingVersion().asString())
+		if fullVersions:
+		    print _fileFormat % (path, version.asString())
+		else:
+		    print _fileFormat % (path, 
+					 version.trailingVersion().asString())

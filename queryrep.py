@@ -12,7 +12,8 @@ _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
 def displayTroves(repos, cfg, all = False, ls = False, ids = False,
-                  sha1s = False, leaves = False, trove = "", versionStr = None):
+                  sha1s = False, leaves = False, fullVersions = False,
+		  trove = "", versionStr = None):
     if trove:
 	troves = [ trove ]
     else:
@@ -25,7 +26,8 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 		      "lists")
 	    return
 	for troveName in troves:
-	    _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s)
+	    _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
+			      fullVersions)
 	    continue
     else:
 	if all:
@@ -43,34 +45,35 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
                           troveName)
                 continue
 
-	    # find the version strings to display for this trove; first
-	    # choice is just the version/release pair, if there are conflicts
-	    # try label/verrel, and if that doesn't work conflicts display 
-	    # everything
 	    versionStrs = {}
-	    short = {}
-	    for version in flavors[troveName]:
-		v = version.trailingVersion().asString()
-		versionStrs[version] = v
-		if short.has_key(v):
-		    versionStrs = {}
-		    break
-		short[v] = True
-
-	    if not versionStrs:
+	    if not fullVersions:
+		# find the version strings to display for this trove; first
+		# choice is just the version/release pair, if there are
+		# conflicts try label/verrel, and if that doesn't work
+		# conflicts display everything
 		short = {}
 		for version in flavors[troveName]:
-		    if version.hasParent():
-			v = version.branch().label().asString() + '/' + \
-			    version.trailingVersion().asString()
-		    else:
-			v = version.asString()
-
+		    v = version.trailingVersion().asString()
 		    versionStrs[version] = v
 		    if short.has_key(v):
 			versionStrs = {}
 			break
 		    short[v] = True
+
+		if not versionStrs:
+		    short = {}
+		    for version in flavors[troveName]:
+			if version.hasParent():
+			    v = version.branch().label().asString() + '/' + \
+				version.trailingVersion().asString()
+			else:
+			    v = version.asString()
+
+			versionStrs[version] = v
+			if short.has_key(v):
+			    versionStrs = {}
+			    break
+			short[v] = True
 
 	    if not versionStrs:
 		for version in flavors[troveName]:
@@ -85,7 +88,8 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 			print _troveFormat % (troveName, 
 					      versionStrs[version])
 
-def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s):
+def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
+		      fullVersions):
     try:
 	troveList = repos.findTrove(cfg.installLabel, troveName, 
 				    cfg.flavor, versionStr)
@@ -120,24 +124,24 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s):
 		if file.hasContents:
 		    print "%s %s" % (file.contents.sha1(), path)
 	else:
-	    if len(troveList) > 1:
+	    if fullVersions or len(troveList) > 1:
 		print _troveFormat % (troveName, version.asString())
 	    else:
 		print _troveFormat % (troveName, 
 				      version.trailingVersion().asString())
 
 	    for (troveName, ver, flavor) in trove.iterTroveList():
-		if ver.branch() == version.branch():
+		if fullVersions or ver.branch() != version.branch():
+		    print _grpFormat % (troveName, ver.asString())
+		else:
 		    print _grpFormat % (troveName, 
 					ver.trailingVersion().asString())
-		else:
-		    print _grpFormat % (troveName, ver.asString())
 
 	    fileL = [ (x[1], x[0], x[2]) for x in trove.iterFileList() ]
 	    fileL.sort()
 	    for (path, fileId, ver) in fileL:
-		if ver.branch() == version.branch():
+		if fullVersions or ver.branch() != version.branch():
+		    print _fileFormat % (path, ver.asString())
+		else:
 		    print _fileFormat % (path, 
 					 ver.trailingVersion().asString())
-		else:
-		    print _fileFormat % (path, ver.asString())
