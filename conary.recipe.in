@@ -1,0 +1,15 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
+class Srs(Recipe):
+    description = "The Specifix Repository System"
+
+    runRequires = [ "python" ]
+
+    name = "srs"
+    version = "@VERSION@"
+
+    def setup(self):
+	self.addArchive("srs-%(version)s.tar.bz2")
