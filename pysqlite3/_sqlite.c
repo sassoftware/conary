@@ -1187,8 +1187,19 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 		Py_INCREF(Py_None);
 		return Py_None;
 	}
+	else if (result == SQLITE_ERROR) {
+		/* a run-time error has occurred.  We need to
+		   reset the statement in order to get a useful
+		   error message */
+		result = sqlite3_reset(self->p_stmt);
+		PyErr_SetString(_sqlite_ProgrammingError,
+				sqlite3_errmsg(self->con->p_db));
+		return NULL;
+	}
 	else {
-		PyErr_SetString(_sqlite_DatabaseError,
+		/* this statement is bad, better not touch it anymore,
+		 just reutn what we have */
+		PyErr_SetString(_sqlite_InternalError,
 				sqlite3_errmsg(self->con->p_db));
 		return NULL;
 	}
