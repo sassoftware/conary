@@ -57,6 +57,9 @@ class Macros(dict):
 	if len(macroSet) == 1 and type(macroSet[0]) is tuple:
 	    # we were passed a tuple of tuples (like baseMacros)
 	    macroSet = macroSet[0]
+        if len(macroSet) > 0 and type(macroSet[0]) is not tuple:
+            # we were passed something like ('foo', 'bar')
+            macroSet = (macroSet,)
 	for key, value in macroSet:
 	    self[key] = value
     
