@@ -282,7 +282,11 @@ class _PackageSetClass(VersionedFile):
 	return rc
 
     def getLatestPackage(self, branch):
-	return self.getVersion(self.findLatestVersion(branch))
+	ver = self.findLatestVersion(branch)
+	if not ver:
+	    raise PackageMissing(self.name, branch)
+
+	return self.getVersion(ver)
 
     def __init__(self, db, name, createBranches):
 	VersionedFile.__init__(self, db, name, createBranches)
@@ -575,12 +579,22 @@ class RepositoryError(Exception):
 
 class CommitError(RepositoryError):
 
-    def __repr__(self):
-	return self.str
-
     def __str__(self):
-	return repr(self)
+	return self.str
 
     def __init__(self, str):
 	self.str = str
 
+class PackageMissing(RepositoryError):
+
+    def __str__(self):
+	if self.version.isBranch():
+	    return ("package %s does not exist on branch %s" % \
+		(self.packageName, self.version.asString()))
+
+	return "version %s of package %s does not exist" % \
+	    (self.version.asString(), self.packageName)
+
+    def __init__(self, packageName, version):
+	self.packageName = packageName
+	self.version = version
