@@ -20,6 +20,10 @@ def seekToData(f):
 
     f.seek(size + entries * 16, 1)
 
+    place = f.tell()
+    if place % 8:
+	f.seek(8 - (place % 8), 1)
+
     # headers
     sigs = f.read(16)
     (mag1, mag2, mag3, ver, reserverd, entries, size) = \
