@@ -41,7 +41,6 @@ python_files = __init__.py	\
 	updatecmd.py		\
 	util.py			\
 	magic.py		\
-	versioned.py		\
 	versions.py
 
 example_files = examples/tmpwatch.recipe
