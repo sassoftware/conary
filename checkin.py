@@ -338,8 +338,14 @@ def diff(repos, versionStr = None):
     if versionStr:
 	versionStr = state.expandVersionStr(versionStr)
 
-	pkgList = repos.findTrove(None, state.getName(), None, None, 
-				  versionStr = versionStr)
+        try:
+            pkgList = repos.findTrove(None, state.getName(), None,
+                                      versionStr = versionStr)
+        except repository.repository.PackageNotFound, e:
+            log.error("Unable to find source component %s with version %s: %s",
+                      state.getName(), versionStr, str(e))
+            return
+        
 	if len(pkgList) > 1:
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return
