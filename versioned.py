@@ -69,7 +69,9 @@ class FalseFile:
 
 class VersionedFile:
 
-    def read(self):
+    def readVersionMap(self):
+	if self.versionMap: return
+
 	self.versionMap = {}
 
 	if not self.db.has_key(_VERSION_MAP % self.key):
@@ -94,8 +96,7 @@ class VersionedFile:
 
     def findLatestVersion(self, branch):
 	matchesByTime = {}
-	if not self.versionMap:
-	    self.read()
+	self.readVersionMap()
 
 	for (verString, (version, time)) in self.versionMap.items():
 	    if version.onBranch(branch):
@@ -110,8 +111,7 @@ class VersionedFile:
     # data can be a string, which is written into the new version, or
     # a file-type object, whose contents are copied into the new version
     def addVersion(self, version, data):
-	if not self.versionMap:
-	    self.read()
+	self.readVersionMap()
 
 	versionStr = version.asString()
 
@@ -124,8 +124,7 @@ class VersionedFile:
 	self.db.sync()
 
     def eraseVersion(self, version):
-	if not self.versionMap:
-	    self.read()
+	self.readVersionMap()
 	    
 	versionStr = version.asString()
 	del self.db[_CONTENTS % (self.key, versionStr)]
@@ -134,15 +133,12 @@ class VersionedFile:
 	self.db.sync()
 
     def hasVersion(self, version):
-	if not self.versionMap:
-	    self.read()
-	    
+	self.readVersionMap()
 	return self.versionMap.has_key(version.asString())
 
     # returns a list of version objects
     def versionList(self):
-	if not self.versionMap:
-	    self.read()
+	self.readVersionMap()
 	    
 	list = []
 	for (version, time) in self.versionMap.values():
@@ -153,7 +149,7 @@ class VersionedFile:
     def __init__(self, db, filename):
 	self.db = db
 	self.key = filename
-	self.read()
+	self.versionMap = None
 
 class Database:
 
