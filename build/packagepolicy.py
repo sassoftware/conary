@@ -1042,37 +1042,55 @@ class Requires(_addInfo):
 	for info in self.included:
 	    for filt in self.included[info]:
 		if filt.match(path):
-                    if info[0] == "/":
-                        depClass = deps.FileDependencies
-                    else: # by process of elimination, must be a trove
-                        depClass = deps.TroveDependencies
-                    self.addRequirement(path, info, pkg, depClass)
+                    self._markRequirement(info, path)
 
         # now check for automatic dependencies besides ELF
         if f.inode.perms() & 0111:
             m = self.recipe.magic[path]
             if m and m.name == 'script':
                 interp = m.contents['interpreter']
-                if not os.path.exists(interp):
-                    # I do not see this interpreter on the system, at least warn
-                    log.warning('%s (referenced in %s) missing', interp, path)
-                    # N.B. no special handling for env here; if there has been
-                    # an exception to NormalizeInterpreterPaths then it is a
-                    # real dependency on env
-                self.addRequirement(path, interp, pkg, deps.FileDependencies)
+                if self._checkInclusion(interp, path):
+                    if not os.path.exists(interp):
+                        # this interpreter not on system, at least warn
+                        log.warning('%s (referenced in %s) missing',
+                                    interp, path)
+                        # N.B. no special handling for /{,usr/}bin/env here;
+                        # if there has been an exception to
+                        # NormalizeInterpreterPaths, then it is a
+                        # real dependency on the env binary
+                    self._addRequirement(path, interp, pkg, deps.FileDependencies)
 
         # finally, package the dependencies up
         if path not in pkg.requiresMap:
             return
         f.requires.set(pkg.requiresMap[path])
         pkg.requires.union(f.requires.value())
+    
+    def _markManualRequirement(self, info, path):
+        if self._checkInclusion(info, path):
+            if info[0] == "/":
+                depClass = deps.FileDependencies
+            else: # by process of elimination, must be a trove
+                depClass = deps.TroveDependencies
+            self._addRequirement(path, info, pkg, depClass)
 
-    def addRequirement(self, path, file, pkg, depClass):
+    def _checkInclusion(self, info, path):
+        if info in self.excluded:
+            for filt in self.excluded[info]:
+                # exception handling is per-requirement,
+                # so handled specially
+                if filt.match(path):
+                    log.debug('ignoring requirement match for %s: %s',
+                              path, info)
+                    return False
+        return True
+
+    def _addRequirement(self, path, info, pkg, depClass):
         if path not in pkg.requiresMap:
             # BuildPackage only fills in requiresMap for ELF files; we may
             # need to create a few more DependencySets.
             pkg.requiresMap[path] = deps.DependencySet()
-        pkg.requiresMap[path].addDep(depClass, deps.Dependency(file))
+        pkg.requiresMap[path].addDep(depClass, deps.Dependency(info))
 
 
 class Provides(policy.Policy):
