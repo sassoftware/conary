@@ -31,15 +31,19 @@ class Flag(dict):
 
     Magic is used to make the initialization of the object easy.
     """
-    def __init__(self, value=None, showdefaults=True):
+    def __init__(self, value=None, name=None, showdefaults=True, ref=None, 
+                createOnAccess=False):
 	self._showdefaults = showdefaults
         self._value = value
         self._short = ""
         self._long = ""
+        self._ref = ref
+        self._name = name
 	self._frozen = False
         self._track = False
         self._usedFlags = {}
 	self._overrides = {}
+        self._createOnAccess = createOnAccess
         # this must be set last
         self._initialized = True
 
@@ -99,8 +103,80 @@ class Flag(dict):
             self[key]._set(bool(value))
         else:
             # override flag values that haven't been entered yet
-            self[key] = Flag(value)
+            self[key] = Flag(value, name=key, ref=self, createOnAccess=self._createOnAccess)
 	self._overrides[key] = value
+
+    def __delattr__(self, key):
+        """ Remove a flag from this flag set """
+        if self._frozen:
+	    raise TypeError, 'flags are frozen'
+        del self[key]
+
+    def _addEquivalentFlagSets(self, other):
+        """ Add together two sets of flags or flag sets, assuming that 
+            the sets being added have the same name and context,
+            and differ only in value or in child flags.
+        """
+        assert(other._name == self._name)
+        # RHS value (other) is propogated 
+        new = Flag(other._value, other._name)
+        # overrides and usedFlags are combined
+        # from both
+        new._overrides = self._overrides.copy()
+        new._overrides.update(other._overrides)
+        new._usedFlags = self._usedFlags.copy()
+        new._usedFlags.update(other._usedFlags)
+        
+        for key in self.keys():
+            if key in other:
+                # if the flag is in both self and other sets, recurse
+                new[key] = self[key]._addEquivalentFlagSets(other[key])
+            else:
+                new[key] = self[key].deepCopy()
+        
+        for key in other.keys():
+            if key in self:
+                continue
+            new[key] = other[key].deepCopy()
+        return new
+
+    def __add__(self, other):
+        """ Add together two flags or flag sets.  Where a and b are flag sets,
+            if a and b have non-overlapping flags set, a + b is the union 
+            is a set of flags with the union of a and b flag set.
+            For any overlapping flags, b value overrides a. 
+            If a or b is a single flag instead of a set, it is converted
+            to a flag set before addition """
+        # make sure these are equivalent flag sets
+        if self._name != '__GLOBAL__':
+            self = self.asSet()
+        if other._name != '__GLOBAL__':
+            other = other.asSet()
+        # add the flag sets
+        return self._addEquivalentFlagSets(other)
+        
+    def __neg__(self):
+        """ -Flag -- negates all flags in a flag set.  Converts to a
+            flag set if necessary """
+        if self._name != '__GLOBAL__':
+            new = self.asSet()
+        else:
+            new = self.deepCopy()
+        flags = new.values()
+        # negate every flag at this level, and add any child values
+        # to the end of the list to convert
+        while flags:
+            flag = flags.pop()
+            if flag._value is not None:
+                flag._value = not flag._value
+            flags.extend(flag.values())
+        return new
+
+    def __sub__(self, other):
+        """ FlagA - FlagB: adds a negated version of FlagB to FlagA,
+            converting to  a flag sets first if necessary """
+        new = self + -other
+        return new
 
     def getUsed(self):
         return self._usedFlags
@@ -110,7 +186,54 @@ class Flag(dict):
 
     def resetUsed(self):
         self._usedFlags.clear()
-        
+
+    
+    def deepCopy(self, ref=None):
+        """ Create a copy of a flag set, creating new Flag instances
+            for all children """
+        new = Flag(self._value, self._name, self._showdefaults, 
+                ref, self._createOnAccess)
+        new._overrides = self._overrides.copy()
+        new._usedFlags = self._usedFlags.copy()
+        new._track = self._track
+        for key in self:
+            new[key] = self[key].deepCopy(self)
+        # freeze new copy at end
+        new._frozen = self._frozen
+        return new
+
+    def asSet(self, *flags, **kw):
+        """ Convert a flag to a flag set, containing only this flag.
+            If any child flags are passed as arguments, a flag set is created
+            containing this flag and the child flags """
+        # a) create a Flag with knowledge about this flag and its
+        # parents (parents all set to none)
+        top = parent = Flag(None, self._name)
+        cursor = self._ref
+        while cursor is not None:
+            child = parent
+            parent = Flag(None, cursor._name)
+            parent[child._name] = child
+            child._ref = parent
+            cursor = cursor._ref
+        # Use, Arch, etc Flag instances don't have/need a parent
+        # named __GLOBAL__ but sets containing both Use and Arch
+        # need a higher level to connect them.
+        if parent._name != '__GLOBAL__':
+            child = parent
+            parent = Flag(None, '__GLOBAL__')
+            child._ref = parent
+            parent[child._name] = child
+
+        # b) set the value of any child flags passed in 
+        #    to True
+        if flags:
+            for flag in flags:
+                top[flag] = Flag(True, flag, ref=top)
+        else:
+            top._value = True
+        return parent
+
     def __setitem__(self, key, value):
 	if self._frozen:
 	    raise TypeError, 'flags are frozen'
@@ -128,6 +251,10 @@ class Flag(dict):
             if self._track:
                 self._usedFlags[name] = flag
             return flag
+        elif self._createOnAccess:
+            # flag doesn't exist, add it
+            self[name] = Flag(None, name=name, ref=self, createOnAccess=True)
+            return self[name]
         raise AttributeError, "class %s has no attribute '%s'" % (self.__class__.__name__, name)
 
     def __setattr__(self, name, value):
@@ -148,8 +275,7 @@ class Flag(dict):
                 return
             self[name]._set(value)
         else:
-            self[name] = Flag(value)
-
+            self[name] = Flag(value, name=name, ref=self, createOnAccess=self._createOnAccess)
 
 def _addShortDoc(baseobj, obj, keys, level=1):
     global __doc__
@@ -200,7 +326,7 @@ if __doc__ is not None:
 @var Use: Set of flags defined for this build, with their boolean status.
 The Use flags have the following meanings:
 """
-Use = Flag(showdefaults=True)
+Use = Flag(showdefaults=True, name='Use')
 
 Use.pcre = True
 Use.pcre.setShortDoc('Use the Perl-compatible regex library')
@@ -342,7 +468,7 @@ The Arch flags have the following meanings:
 
 # All Arch flags default to False; deps/arch.py sets any that should be
 # True to True
-Arch = Flag(showdefaults=False)
+Arch = Flag(showdefaults=False, name='Arch')
 # Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686 | Arch.x86_64
 Arch.x86 = True
 Arch.x86.setShortDoc('True if any IA32-compatible architecture is set')
@@ -382,7 +508,7 @@ Arch.bits64.setShortDoc('True if the current architecture is 64-bit')
 Arch._freeze()
 _addDocs(Arch)
 
-LocalFlags = Flag(showdefaults=False)
+LocalFlags = Flag(showdefaults=False, name='Flags', createOnAccess=True)
 
 def resetUsed():
     Use.resetUsed()
