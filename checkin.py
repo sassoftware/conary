@@ -10,6 +10,7 @@ import cook
 import files
 import helper
 import log
+import magic
 import os
 import package
 import repository
@@ -372,6 +373,11 @@ def addFile(file):
 	if path == file:
 	    log.error("file %s is already part of this source component" % path)
 	    return
+
+    fileMagic = magic.magic(file)
+    if fileMagic and fileMagic.name == "changeset":
+	log.error("do not add changesets to source components")
+	return
 
     fileId = cook.makeFileId(os.getcwd(), file)
 
