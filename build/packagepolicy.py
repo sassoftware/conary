@@ -96,7 +96,7 @@ class BadInterpreterPaths(policy.Policy):
     Interpreters must not use relative paths.  There should be no
     exceptions outside of %(thisdocdir)s.
     """
-    invariantexceptions = [ '%(thisdocdir)s/', ]
+    invariantexceptions = [ '%(thisdocdir.literalRegex)s/', ]
 
     def doFile(self, path):
 	d = self.macros['destdir']
@@ -694,9 +694,11 @@ class ParseManifest(policy.Policy):
 		# XXX is this right?
                 target = fields[1].strip()
 		if int(perms, 0) & 06000:
-		    self.recipe.AddModes(int(perms, 0), target)
+		    self.recipe.AddModes(int(perms, 0),
+                                         util.literalRegex(target))
 		if owner != 'root' or group != 'root':
-		    self.recipe.Ownership(owner, group, target)
+		    self.recipe.Ownership(owner, group,
+                                          util.literalRegex(target))
 
 
 class MakeDevices(policy.Policy):

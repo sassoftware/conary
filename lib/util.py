@@ -157,6 +157,15 @@ def find(s, subs, start=0):
 	    found = s[this:this+1]
     return (ret, found)
 
+def literalRegex(str):
+    "escape all regex magic characters in str"
+    l = []
+    for character in str:
+        if character in '+*[].&^$+{}\\':
+            l.append('\\')
+        l.append(character)
+    return ''.join(l)
+
 
 # shutil module extensions, with {}-expansion and globbing
 
@@ -314,8 +323,8 @@ def assertIteratorAtEnd(iter):
 
 class ObjectCache(weakref.WeakKeyDictionary):
     """
-    Implements a cache of arbitrary (hashable objects) where an object
-    can be looked up and have it's cached value retrieved. This allows
+    Implements a cache of arbitrary (hashable) objects where an object
+    can be looked up and have its cached value retrieved. This allows
     a single copy of immutable objects to be kept in memory.
     """
     def __setitem__(self, key, value):

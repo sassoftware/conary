@@ -417,15 +417,15 @@ class _FileAction(BuildAction):
 		# we need to be able to traverse this directory as
 		# the non-root build user
 		os.chmod(destdir+os.sep+path, (mode & 01777) | 0700)
-		self.recipe.AddModes(mode, path)
+		self.recipe.AddModes(mode, util.literalRegex(path))
 	    else:
 		os.chmod(destdir+os.sep+path, mode & 01777)
 		if mode & 06000:
-		    self.recipe.AddModes(mode, path)
+		    self.recipe.AddModes(mode, util.literalRegex(path))
 	    if isdir and mode != 0755:
-		self.recipe.ExcludeDirectories(exceptions=path)
+		self.recipe.ExcludeDirectories(exceptions=util.literalRegex(path))
 	    # set explicitly, do not warn
-	    self.recipe.WarnWriteable(exceptions=path)
+	    self.recipe.WarnWriteable(exceptions=util.literalRegex(path))
 
     def setComponents(self, paths):
 	"""

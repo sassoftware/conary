@@ -16,6 +16,8 @@
 Module implementing the "macro" dictionary class
 """
 
+from lib import util
+
 class Macros(dict):
     def __init__(self, macros={}, shadow=False):
 	self.__tracked = {}
@@ -36,6 +38,9 @@ class Macros(dict):
 	if name[:7] == '_Macros':
 	    dict.__setitem__(self, name, value)
 	    return
+        # '.' in name reserved for getting alternative representations
+        if '.' in name:
+            raise MacroError, 'name "%s" contains illegal character: "."' % name
 	if self.__track:
 	    self.__tracked[name] = 1 
         # only expand references to ourself
@@ -60,17 +65,30 @@ class Macros(dict):
     def __getitem__(self, name):
 	if name[:7] == '_Macros':
 	    return dict.__getitem__(self, name)
+        repmethod = None
+        dot = name.find('.')
+        if dot != -1:
+            repmethod = name[dot+1:]
+            name = name[:dot]
 	if name in self.__overrides:
-	    return self.__overrides[name]
+	    return self.__repmethod(self.__overrides[name], repmethod)
 	if not name in self:
 	    # update on access
 	    # okay for this to fail bc of no __macros
 	    # -- equivalent to missing dict value
 	    value = self.__macros[name]
 	    self[name] = value
-	    return value
+	    return self.__repmethod(value, repmethod)
 	else:
-	    return dict.__getitem__(self, name) % self
+	    return self.__repmethod(dict.__getitem__(self, name) % self, repmethod)
+
+    def __repmethod(self, name, repmethod):
+        if repmethod is None:
+            return name
+        if repmethod == 'literalRegex':
+            return util.literalRegex(name)
+        # should not be reached
+        raise MacroError, 'unknown representation method %s for %s' %(repmethod, name)
     
     def __getattr__(self, name):
 	return self.__getitem__(name)
@@ -116,4 +134,13 @@ class Macros(dict):
     def keys(self):
         return [ x for x in self.__iter__() ]
 
-   
+
+class MacroError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __repr__(self):
+	return self.msg
+
+    def __str__(self):
+	return repr(self)
