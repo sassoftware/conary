@@ -58,7 +58,7 @@ install: all
 	done
 	install -m 755 srs-wrapper $(bindir)
 	for f in $(bin_files); do \
-		ln -s srs-wrapper $(bindir)/$$f; \
+		ln -sf srs-wrapper $(bindir)/$$f; \
 	done
 
 dist:
