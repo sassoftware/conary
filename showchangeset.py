@@ -111,10 +111,10 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                 elif cType == 'Mod':
                     (oldPath, oldFileId, oldVersion) = oldTrove.getFile(pathId)
                     filecs = cs.getFileChange(oldFileId, fileId)
-                    if not path:
-                        path = oldPath
                     fileList[pathId] = (cType, pathId, path, fileId, version,
                                         oldPath, oldFileId, filecs)
+                    if not path:
+                        path = oldPath
                 elif cType == 'Del':
                     (path, fileId, version) = oldTrove.getFile(pathId)
                     fileList[pathId] = (cType, pathId, path, fileId, version)
@@ -157,6 +157,8 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                                 oldFileObj, oldPath, tags=tags, sha1s=sha1s, 
                                 pathId=pathId, pathIds=ids)
                             continue
+                        if path is None:
+                            path = oldPath
                     elif cType == 'New':
                         (cType, pathId, path, 
                              fileId, version, change) = fileList[pathId]
