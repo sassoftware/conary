@@ -84,8 +84,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	cs = repos.createChangeSet(list)
 	cs.remapPaths(map)
 
-	# permute the list into a list of just package names
-	list = map(lambda x: x[0], list)
+	list = [ x[0] for x in list ]
 
     try:
 	db.commitChangeSet(cs)
