@@ -28,7 +28,10 @@ class AbstractDatabase(repository.AbstractRepository):
 	return [ x.getVersion().branch() for x in 
 		    self.troveDb.iterFindByName(name)]
 
-    def getPackageVersion(self, name, version):
+    def getPackageVersion(self, name, version, pristine = False):
+	if pristine:
+	    return self.stash.getPackageVersion(name, version)
+
 	l = [ x for x in self.troveDb.iterFindByName(name)
 		 if version.equal(x.getVersion())]
 	assert(len(l) == 1)
