@@ -16,7 +16,7 @@ def hashFile(path):
 
     return m.hexdigest()
 
-def hashString(str):
+def hashString(buf):
     m = sha.new()
-    m.update(str)
+    m.update(buf)
     return m.hexdigest()
