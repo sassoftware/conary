@@ -318,8 +318,9 @@ class Database(SqlDbRepository):
 	    oldVersion = pkgCs.getOldVersion()
 	    if not oldVersion: continue
 
-	    pristine = self.getTrove(name, oldVersion, flavor, pristine = True)
-	    changed = self.getTrove(name, oldVersion, flavor)
+            oldFlavor = pkgCs.getOldFlavor()
+	    pristine = self.getTrove(name, oldVersion, oldFlavor, pristine = True)
+	    changed = self.getTrove(name, oldVersion, oldFlavor)
 
 	    for (subName, subVersion, subFlavor) in pristine.iterTroveList():
 		if not changed.hasTrove(subName, subVersion, subFlavor):
