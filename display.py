@@ -34,7 +34,7 @@ def _versionList(repos, pkgName):
 
     @param repos: Repository to look for branches in
     @type repos: repository.Repository
-    @param: pkgName: Name of a package
+    @param pkgName: Name of a package
     @type pkgName: str
     @rtype: list of str
     """
