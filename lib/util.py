@@ -113,6 +113,7 @@ class ShellCommand(Action):
         """
 	# enforce pure virtual status
         assert(self.__class__ is not ShellCommand)
+	self.arglist = args
         self.args = string.join(args)
         # pre-fill in the preMake and arguments
         self.command = self.template % self.__dict__
@@ -272,15 +273,35 @@ def rename(sources, dest):
 	log.debug('renaming %s to %s', source, dest)
 	os.rename(source, dest)
 
+def _copyVisit(arg, dirname, names):
+    sourcelist = arg[0]
+    sourcelen = arg[1]
+    dest = arg[2]
+    for name in names:
+	sourcelist.append(os.path.normpath(
+	    dest + os.sep + dirname[sourcelen:] + os.sep + name))
+
 def copytree(sources, dest, symlinks=False):
+    """
+    Copies tree(s) from sources to dest, returning a list of
+    the filenames that it has written.
+    """
+    sourcelist = []
     for source in braceGlob(sources):
 	if os.path.isdir(source):
 	    dest = '%s/%s' %(dest, os.path.basename(source))
 	    log.debug('copying [tree] %s to %s', source, dest)
 	    shutil.copytree(source, dest, symlinks)
+	    os.path.walk(source, _copyVisit,
+			 (sourcelist, len(source), dest))
 	else:
 	    log.debug('copying [file] %s to %s', source, dest)
 	    shutil.copy2(source, dest)
+	    if dest.endswith('/'):
+		sourcelist.append(dest + os.sep + os.path.basename(source))
+	    else:
+		sourcelist.append(dest)
+    return sourcelist
 
 def checkPath(binary):
     """

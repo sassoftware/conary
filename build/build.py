@@ -260,8 +260,39 @@ class MakePathsInstall(Make):
     keywords = {'installtarget': 'install'}
 
 
+class _FileAction(BuildAction):
+    keywords = {'component': None}
 
-class InstallDesktopfile(BuildCommand):
+    def chmod(self, destdir, path):
+	if self.mode >= 0:
+	    os.chmod(destdir+os.sep+path, self.mode & 01777)
+	    if self.mode & 06000:
+		self.recipe.AddModes(self.mode, path)
+
+    def setComponents(self, paths):
+	"""
+	XXX fixme
+	A component without a : or with a leading : is relative to the main package name.
+	A component with a trailing : is equivalent to having appended 'doc'
+	"""
+	if type(paths) is str:
+	    paths = (paths,)
+	for path in paths:
+	    package = None
+	    component = None
+	    if self.component:
+		if self.component.find(':') != -1:
+		    (package, component) = self.component.split(':')
+		else:
+		    component = self.component
+	    path = os.path.normpath(path)
+	    if component:
+		self.recipe.ComponentSpec(component, path)
+	    if package:
+		self.recipe.PackageSpec(package, path)
+	
+
+class InstallDesktopfile(_FileAction):
     """
     The InstallDesktopfile class should be used to provide categories
     (and vendor, if necessary) for files in /usr/share/applications/
@@ -278,15 +309,10 @@ class InstallDesktopfile(BuildCommand):
         if self.categories:
 	    macros['category'] = '--add-category %s' %self.categories
 	BuildCommand.doBuild(self, macros)
+	for file in self.arglist:
+	    self.setComponents('%(datadir)s/applications'+file)
 
 
-class _FileAction(BuildAction):
-    def chmod(self, destdir, path):
-	if self.mode >= 0:
-	    os.chmod(destdir+os.sep+path, self.mode & 01777)
-	    if self.mode & 06000:
-		self.recipe.AddModes(self.mode, path)
-	
 class SetModes(_FileAction):
     """
     In order for a file to be setuid in the repository, it needs to
@@ -299,11 +325,12 @@ class SetModes(_FileAction):
     In addition, of course, it can be used to change arbitrary
     file modes in the destdir.
     """
-    def __init__(self, path, mode, use=None):
+    def __init__(self, path, mode, use=None, component=None):
 	self.mode = mode
 	if type(path) is str:
 	    path = (path,)
 	self.paths = path
+	self.component=component
 	self.use = util.checkUse(use)
 
     def do(self, macros):
@@ -313,6 +340,7 @@ class SetModes(_FileAction):
 	for f in files:
 	    log.debug('changing mode for %s to %o' %(f, self.mode))
 	    self.chmod(macros['destdir'], f)
+	    self.setComponents(f)
 
 class _PutFiles(_FileAction):
     def do(self, macros):
@@ -334,16 +362,18 @@ class _PutFiles(_FileAction):
 		    util.rename(source, thisdest)
 		else:
 		    util.copyfile(source, thisdest)
+		self.setComponents(thisdest[destlen:])
 
 		if self.mode >= 0:
 		    self.chmod(macros['destdir'], thisdest[destlen:])
 
-    def __init__(self, fromFiles, toFile, mode, use):
+    def __init__(self, fromFiles, toFile, mode, use, component):
 	self.toFile = toFile
 	if type(fromFiles) is str:
 	    self.fromFiles = (fromFiles,)
 	else:
 	    self.fromFiles = fromFiles
+	self.component = component
 	# notice obviously broken permissions
 	if mode >= 0:
 	    if _permmap.has_key(mode):
@@ -358,8 +388,8 @@ class InstallFiles(_PutFiles):
     """
     This class installs files from the builddir to the destdir.
     """
-    def __init__(self, fromFiles, toFile, mode = 0644, use=None):
-	_PutFiles.__init__(self, fromFiles, toFile, mode, use)
+    def __init__(self, fromFiles, toFile, mode = 0644, use=None, component=None):
+	_PutFiles.__init__(self, fromFiles, toFile, mode, use, component)
 	self.source = ''
 	self.move = 0
 
@@ -367,12 +397,12 @@ class MoveFiles(_PutFiles):
     """
     This class moves files within the destdir.
     """
-    def __init__(self, fromFiles, toFile, mode = -1, use=None):
-	_PutFiles.__init__(self, fromFiles, toFile, mode, use)
+    def __init__(self, fromFiles, toFile, mode = -1, use=None, component=None):
+	_PutFiles.__init__(self, fromFiles, toFile, mode, use, component)
 	self.source = '%(destdir)s'
 	self.move = 1
 
-class InstallSymlinks(BuildAction):
+class InstallSymlinks(_FileAction):
     """
     The InstallSymlinks class create symlinks.  Multiple symlinks
     can be created if the destination path is a directory.  The
@@ -426,14 +456,17 @@ class InstallSymlinks(BuildAction):
         for source in sources:
             if targetIsDir:
                 to = dest + os.sep + os.path.basename(source)
+		setComponents(toFile %macros + os.sep +
+			      os.path.basename(source))
             else:
                 to = dest
+		setComponents(toFile %macros)
 	    if os.path.exists(to) or os.path.islink(to):
 		os.remove(to)
             log.debug('creating symlink %s -> %s' %(to, source))
 	    os.symlink(os.path.normpath(source), to)
 
-    def __init__(self, fromFiles, toFile, use=None, allowDangling=False):
+    def __init__(self, fromFiles, toFile, use=None, component=None, allowDangling=False):
         """
         Create a new InstallSymlinks instance
 
@@ -456,6 +489,7 @@ class InstallSymlinks(BuildAction):
 	self.fromFiles = fromFiles
 	self.toFile = toFile
 	self.use = util.checkUse(use)
+	self.component = component
         self.allowDangling = allowDangling
 
 class RemoveFiles(BuildAction):
@@ -477,35 +511,36 @@ class RemoveFiles(BuildAction):
 	self.recursive = recursive
 	self.use = util.checkUse(use)
 
-class InstallDocs(BuildAction):
+class InstallDocs(_FileAction):
     """
     The InstallDocs class installs documentation files from the builddir
     into the destdir in the appropriate directory.
     """
     def do(self, macros):
 	macros = macros.copy()
+	destlen = len(macros['destdir'])
 	if self.subdir:
 	    macros['subdir'] = '/%s' % self.subdir
-	if self.devel:
-	    dest = '%(destdir)s/%(develdocdir)s/%(name)s-%(version)s/%(subdir)s/' %macros
-	else:
-	    dest = '%(destdir)s/%(docdir)s/%(name)s-%(version)s/%(subdir)s/' %macros
+	base = '%(docdir)s/%(name)s-%(version)s/%(subdir)s/' %macros
+	dest = '%(destdir)s/'%macros + base
 	util.mkdirChain(os.path.dirname(dest))
 	for path in self.paths:
-	    util.copytree(path, dest, True)
+	    for newpath in util.copytree(path, dest, True):
+		self.setComponents(newpath[destlen:])
 
-    def __init__(self, paths, devel=False, subdir='', use=None):
+    def __init__(self, paths, component=None, subdir='', use=None):
 	if type(paths) is str:
 	    self.paths = (paths,)
 	else:
 	    self.paths = paths
-	self.devel = devel
+	self.component = component
 	self.subdir = subdir
 	self.use = util.checkUse(use)
 
 class MakeDirs(_FileAction):
     """
     The MakeDirs class creates directories in destdir
+    Set component only if the package should be responsible for the directory
     """
     keywords = { 'mode': 0755 }
 
@@ -517,6 +552,7 @@ class MakeDirs(_FileAction):
                 d = d %macros
                 dest = macros['destdir'] + d
                 log.debug('creating directory %s', dest)
+		self.setComponents(d)
                 util.mkdirChain(dest)
                 if self.mode >= 0:
                     self.chmod(macros['destdir'], d)
