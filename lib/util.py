@@ -149,6 +149,9 @@ def normpath(path):
 	return s[1:]
     return s
 
+def isregular(path):
+    return stat.S_ISREG(os.lstat(path)[stat.ST_MODE])
+
 def mkdirChain(*paths):
     for path in paths:
         if path[0] != os.sep:
