@@ -320,7 +320,7 @@ class IdealRepository(AbstractTroveDatabase):
     def getTroveVersionFlavors(self, troveDict):
 	"""
 	Converts a dictionary of the format retured by getAllTroveLeafs()
-	to contains dicts of { version : flavorList } sets instead of 
+	to contain dicts of { version : flavorList } sets instead of 
 	containing lists of versions.
 
 	@type troveDict: dict
