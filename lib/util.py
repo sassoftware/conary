@@ -106,7 +106,7 @@ def genExcepthook(dumpStack=True, debugCtrlC=False):
                 print "*** Note *** An extended traceback has been saved to %s " % path
             except Exception, msg:
                 log.warning("Could not write extended traceback: %s" % msg)
-        print string.joinfields(lines, "")
+        sys.stderr.write(string.joinfields(lines, ""))
         if sys.stdout.isatty() and sys.stdin.isatty():
             epdb.post_mortem(tb, type, value)
         else:
