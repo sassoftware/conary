@@ -51,7 +51,7 @@ class CommandLoggingTests(unittest.TestCase, testsupport.TestSupport):
         logger = StringIO.StringIO()
 
         expected_output = ";\n".join([
-            "BEGIN", "CREATE TABLE TEST(FOO INTEGER)",
+            sqlite.main._BEGIN, "CREATE TABLE TEST(FOO INTEGER)",
             "INSERT INTO TEST(FOO) VALUES (?)",
             "ROLLBACK"]) + ";\n"
 
