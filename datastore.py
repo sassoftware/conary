@@ -23,12 +23,42 @@ class DataStore:
 	path = self.hashToPath(hash)[1]
 	return os.path.exists(path)
 
+    def writeCount(self, path, newCount):
+	path = path + "#"
+
+	if newCount <= 1:
+	    os.unlink(path)
+	    return
+	    
+	f = open(path + ".new", "w")
+	f.write("%d\n" % newCount)
+	f.close()
+	os.rename(path + ".new", path)
+
+    def readCount(self, path):
+	if os.path.exists(path + "#"):
+	    f = open(path + "#")
+	    # cut off the trailing \n
+	    count = int(f.read()[:-1])
+	    f.close()
+	elif os.path.exists(path):
+	    count = 1
+	else:
+	    count = 0
+
+	return count
+
     # list addFile, but this returns a file pointer which can be used
-    # to write the contents into the file
+    # to write the contents into the file; if it returns None the file
+    # is already in the archive
     def newFile(self, hash):
 	(dir, path) = self.hashToPath(hash)
-	if os.path.exists(path):
-	    raise KeyError, "duplicate hash"
+
+	count = self.readCount(path)
+	if count:
+	    self.writeCount(path, count + 1)
+	    return
+
 	shortPath = dir[:-3]
 	if not os.path.exists(shortPath):
 	    os.mkdir(shortPath)
@@ -42,10 +72,9 @@ class DataStore:
     # this messes up the file pointer
     def addFile(self, file, hash):
 	dest = self.newFile(hash)
-	try:
-	    dest.write(file.read())
-	finally:
-	    dest.close()
+
+	if not dest: return		# it already exits
+	dest.write(file.read())
 
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):
@@ -54,10 +83,17 @@ class DataStore:
 
     def removeFile(self, hash):
 	(dir, path) = self.hashToPath(hash)
+
+	count = self.readCount(path)
+	if count > 1:
+	    self.writeCount(path, count - 1)
+	    return
+
 	os.unlink(path)
+
 	try:
 	    os.rmdir(dir)
-	except IOError:
+	except OSError:
 	    # if this fails there are probably just other files
 	    # in that directory; just ignore it
 	    pass
