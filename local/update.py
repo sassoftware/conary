@@ -184,9 +184,9 @@ class FilesystemJob:
 			os.chdir(self.root)
 			os.chroot(self.root)
                         try:
-			    # 2>/dev/null
+			    # >/dev/null
 			    null = os.open('/dev/null', os.O_WRONLY)
-			    os.dup2(null, 2)
+			    os.dup2(null, sys.stdout.fileno())
 			    os.close(null)
                             os.execl(p, p, "--makefile-install-rule", path)
                         except:
