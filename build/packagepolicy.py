@@ -292,16 +292,19 @@ class ComponentSpec(_filterSpec):
 		       r'%(libdir)s/perl./vendor_perl/', # modules, not shlibs
 		       '%(datadir)s/gnome/help/.*/C/')), # help menu stuff
 	('python',    ('%(libdir)s/python.*/site-packages/')),
-	('devel',     (r'\.so',), stat.S_IFLNK),
-	('devel',     (r'\.a',
-		       r'.*/include/.*\.h',
+        # devellib is architecture-specific
+        ('devellib',  (r'\.so',), stat.S_IFLNK),
+	('devellib',  (r'\.a')),
+        # devel is architecture-generic
+        ('devel',     (r'.*/include/.*\.h',
 		       '%(includedir)s/',
 		       '%(mandir)s/man(2|3)/',
 		       '%(datadir)s/aclocal/',
 		       '%(libdir)s/pkgconfig/',
 		       '%(bindir)s/..*-config')),
-	('lib',       (r'.*/lib/.*\.so.*',
-                       r'.*/%(lib)s/.*\.so.*')),
+        # Anything in {,/usr}/lib{,64} is architecture-specific
+	('lib',       (r'.*/lib/',
+                       r'.*/%(lib)s/')),
 	# note that gtk-doc is not well-named; it is a shared system, like info,
 	# and is used by unassociated tools (devhelp)
 	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info)/')),
