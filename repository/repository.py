@@ -493,53 +493,6 @@ class DataStoreRepository:
 	util.mkdirChain(fullPath)
 	self.contentsStore = datastore.DataStore(fullPath)
 
-class RepositoryError(Exception):
-    """Base class for exceptions from the system repository"""
-
-class TroveNotFound(Exception):
-    """Raised when findTrove failes"""
-
-class PackageNotFound(TroveNotFound): pass
-
-class OpenError(RepositoryError):
-    """Error occured opening the repository"""
-
-class CommitError(RepositoryError):
-    """Error occured commiting a trove"""
-
-class TroveMissing(RepositoryError):
-    troveType = "trove"
-    def __str__(self):
-	if self.version:
-	    if self.version.isBranch():
-		return ("%s %s does not exist on branch %s" % \
-		    (self.troveType, self.troveName, self.version.asString()))
-
-	    return "version %s of %s %s does not exist" % \
-		(self.version.asString(), self.troveType, self.troveName)
-	else:
-	    return "%s %s does not exist" % (self.troveType, self.troveName)
-
-    def __init__(self, troveName, version = None):
-	"""
-	Initializes a TroveMissing exception.
-
-	@param troveName: trove which could not be found
-	@type troveName: str
-	@param version: version of the trove which does not exist
-	@type version: versions.Version
-	"""
-	self.troveName = troveName
-	self.version = version
-        if troveName.startswith('group-'):
-            self.type = 'group'
-        elif troveName.startswith('fileset-'):
-            self.type = 'fileset'
-        elif troveName.find(':') != -1:
-            self.type = 'component'
-        else:
-            self.type = 'package'
-
 class ChangeSetJob:
     """
     ChangeSetJob provides a to-do list for applying a change set; file
@@ -730,3 +683,54 @@ class ChangeSetJob:
 	    for (fileId, path, version) in pkg.iterFileList():
 		file = self.repos.getFileVersion(fileId, version)
 		self.oldFile(fileId, version, file)
+
+class RepositoryError(Exception):
+    """Base class for exceptions from the system repository"""
+
+class TroveNotFound(Exception):
+    """Raised when findTrove failes"""
+
+class PackageNotFound(TroveNotFound): pass
+
+class OpenError(RepositoryError):
+    """Error occured opening the repository"""
+
+class CommitError(RepositoryError):
+    """Error occured commiting a trove"""
+
+class DuplicateBranch(RepositoryError):
+    """Error occured commiting a trove"""
+
+class TroveMissing(RepositoryError):
+    troveType = "trove"
+    def __str__(self):
+	if self.version:
+	    if self.version.isBranch():
+		return ("%s %s does not exist on branch %s" % \
+		    (self.troveType, self.troveName, self.version.asString()))
+
+	    return "version %s of %s %s does not exist" % \
+		(self.version.asString(), self.troveType, self.troveName)
+	else:
+	    return "%s %s does not exist" % (self.troveType, self.troveName)
+
+    def __init__(self, troveName, version = None):
+	"""
+	Initializes a TroveMissing exception.
+
+	@param troveName: trove which could not be found
+	@type troveName: str
+	@param version: version of the trove which does not exist
+	@type version: versions.Version
+	"""
+	self.troveName = troveName
+	self.version = version
+        if troveName.startswith('group-'):
+            self.type = 'group'
+        elif troveName.startswith('fileset-'):
+            self.type = 'fileset'
+        elif troveName.find(':') != -1:
+            self.type = 'component'
+        else:
+            self.type = 'package'
+

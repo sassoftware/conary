@@ -52,6 +52,8 @@ class _Method(xmlrpclib._Method):
 	    raise repository.TroveMissing(name, version)
 	elif exceptionName == "CommitError":
 	    raise repository.CommitError(exceptionArgs[0])
+	elif exceptionName == "DuplicateBranch":
+	    raise repository.DuplicateBranch(exceptionArgs[0])
 	else:
 	    raise UnknownException(exceptionName, exceptionArgs)
 
