@@ -43,16 +43,16 @@ class ConfigFile:
 
     defaults = {}
 
-    def read(self, file, exception=False):
-	if os.path.exists(file):
-	    f = open(file, "r")
+    def read(self, path, exception=False):
+	if os.path.exists(path):
+	    f = open(path, "r")
 	    lineno = 1
 	    for line in f:
-		self.configLine(line, file, lineno)
+		self.configLine(line, path, lineno)
 		lineno = lineno + 1
 	    f.close()
 	elif exception:
-	    raise IOError, file
+	    raise IOError, "No such file or directory: '%s'" % path
 
     def __getitem__(self, name):
 	return self.__dict__[name]

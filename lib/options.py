@@ -28,8 +28,8 @@ import sys
  ) = range(0,4)
 
 class OptionError(Exception):
-    def __init__(self, val):
-        self.val = val
+    
+    val = 1
 
 def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
     otherArgs = [ argv[0] ]
@@ -101,7 +101,10 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 	i = i + 1
 
     if 'config-file' in argSet:
-	cfg.read(argSet['config-file'])
+        try:
+            cfg.read(argSet['config-file'], exception = True)
+        except IOError, msg:
+            raise OptionError(msg)
 	del argSet['config-file']
 	
     if argSet.has_key('config'):

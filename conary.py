@@ -155,6 +155,7 @@ def realMain(cfg, argv=sys.argv):
         argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
                                                 argv=argv)
     except options.OptionError, e:
+        print >> sys.stderr, e
         sys.exit(e.val)
     except versions.ParseError, e:
 	print >> sys.stderr, e
