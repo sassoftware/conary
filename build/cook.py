@@ -303,6 +303,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 	while pkgList:
 	    (name, version) = pkgList[0]
 	    del pkgList[0]
+	    if not version: continue
 
 	    pkg = repos.getPackageVersion(name, version)
 	    pkgList += [ x for x in pkg.iterPackageList() ]
