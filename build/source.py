@@ -60,7 +60,8 @@ class _Source:
 				self.recipe.name, self.recipe.srcdirs)
 	if not f:
 	    r = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
-				  rpm, self.recipe.name, self.recipe.srcdirs)
+				  self.rpm, self.recipe.name,
+				  self.recipe.srcdirs)
 	    c = lookaside.createCacheName(self.recipe.cfg, self.sourcename,
 					  self.recipe.name)
 	    self._extractSourceFromRPM(r, c)
