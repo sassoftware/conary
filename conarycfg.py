@@ -167,20 +167,22 @@ class ConfigFile:
             self.__dict__[key]('display')
         elif type == FLAVOR:
             flavorStr = deps.deps.formatFlavor(value)
-            flavorList = flavorStr.split(",")
+            if self.getDisplayOption('prettyPrint'):
+                flavorList = flavorStr.split(",")
 
-            str = ""
-            hdr = key
-            for key in flavorList:
-                if len(str) + len(key) > 40:
-                    out.write("%-25s %s\n" % (hdr, str))
-                    str = ""
-                    hdr = ""
-                str += key + ","
-
-            # chop off the trailing ,
-            str = str[:-1]
-            out.write("%-25s %s\n" % (hdr, str))
+                str = ""
+                hdr = key
+                for key in flavorList:
+                    if len(str) + len(key) > 40:
+                        out.write("%-25s %s\n" % (hdr, str))
+                        str = ""
+                        hdr = ""
+                    str += key + ","
+                # chop off the trailing ,
+                str = str[:-1]
+                out.write("%-25s %s\n" % (hdr, str))
+            else:
+                out.write('%-25s %s\n' % (key, flavorStr))
         elif type == BOOL:
             out.write("%-25s %s\n" % (key, bool(value)))
         else:
@@ -200,6 +202,7 @@ class ConfigFile:
             self.displayKey(item, self[item], t, out)
 
     def __init__(self):
+        self.initDisplayOptions()
 	self.types = {}
 	for (key, value) in self.defaults.items():
 	    if isinstance(value, (list, tuple)):
@@ -216,6 +219,15 @@ class ConfigFile:
         self.lowerCaseMap = {}
         for (key, value) in self.__dict__.items():
             self.lowerCaseMap[key.lower()] = key
+
+    def initDisplayOptions(self):
+        self._displayOptions = dict(prettyPrint=False)
+
+    def setDisplayOptions(self, **kw):
+        self._displayOptions.update(kw)
+
+    def getDisplayOption(self, key):
+        return self._displayOptions[key]
 
     def initializeFlavors(self):
         import flavorcfg
@@ -297,6 +309,10 @@ class ConaryConfiguration(ConfigFile):
     def macroKeys(self):
 	return self.macroflags.keys()
 
+    def initDisplayOptions(self):
+        ConfigFile.initDisplayOptions(self)
+        self.setDisplayOptions(hidePasswords=False)
+
     def display(self, out=None):
         if out is None:
             out = sys.stdout
@@ -308,12 +324,13 @@ class ConaryConfiguration(ConfigFile):
     def displayKey(self, key, value, type, out):
         # mask out username and password in repository map entries
         if key == 'repositoryMap':
-            maskedMap = {}
-            for host, map in value.iteritems():
-                maskedMap[host] = re.sub('(https?://)[^:]*:[^@]*@(.*)', 
-                                         r'\1<user>:<password>@\2',
-                                         map)
-            value = maskedMap
+            if self.getDisplayOption('hidePasswords'):
+                maskedMap = {}
+                for host, map in value.iteritems():
+                    maskedMap[host] = re.sub('(https?://)[^:]*:[^@]*@(.*)', 
+                                             r'\1<user>:<password>@\2',
+                                             map)
+                value = maskedMap
 
         ConfigFile.displayKey(self, key, value, type, out)
 

@@ -75,6 +75,8 @@ def usage(rc = 1):
     print ""
     print "commit flags:    --target-branch <branch>"
     print ""
+    print "config flags:    --show-passwords"
+    print ""
     print 'common flags:    --build-label <label>'
     print '                 --config-file <path>'
     print '                 --config "<item> <value>"'
@@ -169,6 +171,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["target-branch"] = ONE_PARAM
     argDef["test"] = NO_PARAM
     argDef["version"] = NO_PARAM
+    argDef["show-passwords"] = NO_PARAM
 
     try:
         argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
@@ -234,6 +237,15 @@ def realMain(cfg, argv=sys.argv):
 	for changeSet in otherArgs[2:]:
 	    commit.doCommit(repos, changeSet, targetBranch)
     elif (otherArgs[1] == "config"):
+	showPasswords = 'show-passwords' in argSet
+        if showPasswords:
+	    del argSet['show-passwords']
+        try:
+            prettyPrint = sys.stdout.isatty()
+        except AttributeError:
+            prettyPrint = False
+        cfg.setDisplayOptions(hidePasswords=not showPasswords,
+                              prettyPrint=prettyPrint)
 	if argSet: return usage()
 	if (len(otherArgs) > 2):
 	    return usage()

@@ -154,6 +154,13 @@ Shows the configuration that conary will use for any
 subsequent commands executed, based on the configuration files it has 
 loaded and the configuration-altering command-line options that were 
 supplied.  See the \fIFILES\fP section of this manual for more information.
+Arguments include
+.RS 4
+.TP 4
+.B \-\-show-passwords
+Normally, conary config will mask paswords in repository maps, to avoid their
+accidental display.  You can override this masking with --show-passwords.  
+.RE
 .TP
 .B emerge \fI<component>...\fP
 Builds the recipe for the given component (which it finds by searching the

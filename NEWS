@@ -1,6 +1,9 @@
 Changes in 0.50.5:
   * Streams return their value through __call__ instead of value()
   * Reimplemented ShortStream and IntStream in C
+  * conary config now takes --show-passwords option, and does not pretty
+    print config file values when not printing to screen.  This means that 
+    conary config > <file> will result in a valid configuration file.
 
 Changes in 0.50.4:
   * Most rollback information is stored as a reference to a repository
