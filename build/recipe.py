@@ -131,7 +131,7 @@ class Macros(dict):
 	return new
 
 
-def extractSourceFromRPM(rpm, targetfile):
+def _extractSourceFromRPM(rpm, targetfile):
     filename = os.path.basename(targetfile)
     directory = os.path.dirname(targetfile)
     r = file(rpm, 'r')
@@ -284,36 +284,52 @@ class Recipe:
 
     def _appendSource(self, filename, keyid, type, extractDir, use, args):
 	filename = filename % self.macros
-	extractDir = extractDir % self.macros
 	self.sources.append((filename, type, extractDir, use, args))
 	self._addSignature(filename, keyid)
 
     def addArchive(self, filename, extractDir='', keyid=None, use=None):
 	self._appendSource(filename, keyid, 'tarball', extractDir, use, ())
 
-    def addArchiveFromRPM(self, rpm, filename, extractDir='', use=None):
-	# no keyid -- what would it apply to?
-	# may choose to check key in RPM package instead?
+    def addPatch(self, filename, level='1', backup='', extractDir='',
+                 keyid=None, use=None, macros=False, extraArgs=''):
+	self._appendSource(filename, keyid, 'patch', extractDir, use,
+                           (level, backup, macros, extraArgs))
+
+    def addSource(self, filename, keyid=None, extractDir='',
+                  apply=None, use=None, macros=False):
+	self._appendSource(filename, keyid, 'source', extractDir, use,
+                           (apply, macros))
+
+    def _extractFromRPM(self, rpm, filename):
+        """
+        Extracts filename from rpm file and creates an entry in the
+        source lookaside cache for the extracted file
+        """
+	# check signature in RPM package?
 	rpm = rpm % self.macros
 	filename = filename % self.macros
 	f = lookaside.searchAll(self.cfg, self.laReposCache, 
-			     os.path.basename(filename), self.name, self.srcdirs)
+                                os.path.basename(filename), self.name,
+                                self.srcdirs)
 	if not f:
 	    r = lookaside.findAll(self.cfg, self.laReposCache, rpm, 
 				  self.name, self.srcdirs)
 	    c = lookaside.createCacheName(self.cfg, filename, self.name)
-	    extractSourceFromRPM(r, c)
+	    _extractSourceFromRPM(r, c)
 	    f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
 				  self.name, self.srcdirs)
-	# filename already expanded, and no key can be supplied
-	extractDir = extractDir % self.macros
-	self.sources.append((filename, 'tarball', extractDir, use, ()))
 
-    def addPatch(self, filename, level='1', backup='', extractDir='', keyid=None, use=None, macros=False, extraArgs=''):
-	self._appendSource(filename, keyid, 'patch', extractDir, use, (level, backup, macros, extraArgs))
+    def addArchiveFromRPM(self, rpm, filename, **keywords):
+        self._extractFromRPM(rpm, filename)
+        self.addArchive(filename, **keywords)
 
-    def addSource(self, filename, keyid=None, extractDir='', apply=None, use=None, macros=False):
-	self._appendSource(filename, keyid, 'source', extractDir, use, (apply, macros))
+    def addPatchFromRPM(self, rpm, filename, **keywords):
+        self._extractFromRPM(rpm, filename)
+        self.addPatch(filename, **keywords)
+
+    def addSourceFromRPM(self, rpm, filename, **keywords):
+        self._extractFromRPM(rpm, filename)
+        self.addSource(filename, **keywords)
 
     def addAction(self, action, targetdir='', use=None):
 	self._appendSource('', '', 'action', targetdir, use, (action))
@@ -358,7 +374,8 @@ class Recipe:
 		    raise RuntimeError, "GPG signature %s failed" %(signature)
 
     def unpackSources(self, builddir):
-	if os.path.exists(builddir):
+        self.addMacros('maindir', self.theMainDir)
+        if os.path.exists(builddir):
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
 
@@ -377,7 +394,7 @@ class Recipe:
 
 	    if filetype == 'tarball':
 		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
-			      self.name, self.srcdirs)
+                                      self.name, self.srcdirs)
 		self.checkSignatures(f, filename)
 		if f.endswith(".bz2") or f.endswith(".tbz2"):
 		    tarflags = "-jxf"
@@ -386,6 +403,7 @@ class Recipe:
 		else:
 		    raise RuntimeError, "unknown archive compression"
 		if targetdir:
+                    targetdir = targetdir % self.macros
 		    destdir = '%s/%s' % (builddir, targetdir)
 		    util.mkdirChain(destdir)
 		else:
@@ -450,7 +468,8 @@ class Recipe:
     def doBuild(self, buildpath, root):
         builddir = buildpath + "/" + self.mainDir()
 	self.addMacros(('builddir', builddir),
-	               ('destdir', root))
+                       ('destdir', root))
+        
         if self.build is None:
             pass
         elif isinstance(self.build, str):
