@@ -100,6 +100,9 @@ class Package:
     def getFile(self, fileId):
 	return self.idMap[fileId]
 
+    def hasFile(self, fileId):
+	return self.idMap.has_key(fileId)
+
     def addPackageVersion(self, name, version):
 	"""
 	Adds a single version of a package.
