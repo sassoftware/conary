@@ -103,7 +103,7 @@ class HttpHandler(HtmlEngine):
         self.writeFn("\n\nFields: " + str(fields) + "</pre>")
 
     def metadataCmd(self, authToken, fields, troveName=None):
-        troveList = [x for x in self.repServer.repos.iterAllTroveNames('') if x.endswith(':source')]
+        troveList = [x for x in self.repServer.repos.troveStore.iterTroveNames() if x.endswith(':source')]
         troveList.sort()
 
         # pick the next trove in the list
