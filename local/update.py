@@ -742,7 +742,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 	    (filecs, hash) = changeset.fileChangeSet(fileId, srcFile, f)
 	    changeSet.addFile(fileId, srcFileVersion, newVersion, filecs)
-	    if hash:
+	    if hash and srcFile.flags.isConfig():
 		newCont = filecontents.FromFilesystem(realPath)
 
 		if srcFile.hasContents:
