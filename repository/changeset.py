@@ -7,6 +7,7 @@ import enum
 import filecontainer
 import filecontents
 import files
+import group
 import package
 import patch
 import versions
@@ -58,7 +59,25 @@ class ChangeSet:
 	assert(not oldVersion or oldVersion.timeStamp)
 	assert(newVersion.timeStamp)
 	self.files[fileId] = (oldVersion, newVersion, csInfo)
+
+    def newGroup(self, csGrp):
+	assert(not csGrp.getOldVersion() or csGrp.getOldVersion().timeStamp)
+	assert(csGrp.getNewVersion().timeStamp)
     
+	self.newGroups[csGrp.getName()] = csGrp
+	if csGrp.isAbstract():
+	    self.abstract = 1
+
+    def oldGroup(self, name, version):
+	assert(version.timeStamp)
+	self.oldGroups.append((name, version))
+
+    def getNewGroupList(self):
+	return self.newGroups.values()
+
+    def getOldGroupList(self):
+	return self.oldGroups
+
     def newPackage(self, csPkg):
 	assert(not csPkg.getOldVersion() or csPkg.getOldVersion().timeStamp)
 	assert(csPkg.getNewVersion().timeStamp)
@@ -111,6 +130,11 @@ class ChangeSet:
 	for (pkgName, version) in self.oldPackages:
 	    print pkgName, "removed", version.asString(cfg.defaultbranch)
 
+	for grp in self.newGroups.values():
+	    grp.formatToFile(cfg, f)
+	for (grpName, version) in self.oldGroups:
+	    print grpName, "removed", version.asString(cfg.defaultbranch)
+
     def dump(self):
 	import srscfg, sys
 	cfg = srscfg.SrsConfiguration()
@@ -132,6 +156,12 @@ class ChangeSet:
 
 	for (pkgName, version) in self.getOldPackageList():
 	    rc += "SRS PKG REMOVED %s %s\n" % (pkgName, version.freeze())
+	
+	for grp in self.getNewGroupList():
+            rc += grp.freeze()
+
+	for (grpName, version) in self.getOldGroupList():
+	    rc += "SRS GRP REMOVED %s %s\n" % (grpName, version.freeze())
 	
 	for (fileId, (oldVersion, newVersion, csInfo)) in self.getFileList():
 	    if oldVersion:
@@ -291,6 +321,8 @@ class ChangeSet:
     def __init__(self):
 	self.newPackages = {}
 	self.oldPackages = []
+	self.newGroups = {}
+	self.oldGroups = []
 	self.files = {}
 	self.fileContents = {}
 	self.abstract = 0
@@ -351,6 +383,33 @@ class ChangeSetFromFile(ChangeSet):
 		(pkgName, verStr) = header.split()[3:6]
 		version = versions.ThawVersion(verStr)
 		self.oldPackage(pkgName, version)
+	    elif header.startswith("SRS GRP "):
+		l = header.split()
+
+		grpType = l[2]
+		grpName = l[3]
+
+		if grpType == "CHANGESET":
+		    oldVersion = versions.ThawVersion(l[4])
+		    rest = 5
+		elif grpType == "NEW" or grpType == "ABSTRACT":
+		    oldVersion = None
+		    rest = 4
+		else:
+		    raise IOError, "invalid line in change set %s" % file
+
+		newVersion = versions.ThawVersion(l[rest])
+		lineCount = int(l[rest + 1])
+
+		grp = group.GroupChangeSet(grpName, oldVersion, newVersion,
+				       abstract = (pkgType == "ABSTRACT"))
+
+		end = i + lineCount
+		while i < end:
+		    grp.parse(lines[i][:-1])
+		    i = i + 1
+
+		self.newGroup(grp)
 	    elif header.startswith("SRS PKG "):
 		l = header.split()
 
