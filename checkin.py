@@ -5,6 +5,7 @@
 
 import changeset
 import cook
+import files
 import helper
 import log
 import os
@@ -265,11 +266,10 @@ def diff(repos, versionStr = None):
 	sys.stdout.write(": changed\n")
 
 	csInfo = changeSet.getFileChange(fileId)
-	print "    %s" % csInfo
+	for item in files.fieldsChanged(csInfo):
+	    print "    %s" % item
 
-	fileType = csInfo.split()[0]
-	sha1 = csInfo.split()[1]
-	if fileType == "f" and sha1 != "-":
+	if files.contentsChanged(csInfo):
 	    (contType, contents) = changeSet.getFileContents(fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
 		lines = contents.get().readlines()
