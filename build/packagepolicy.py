@@ -1042,7 +1042,7 @@ class Requires(_addInfo):
 	for info in self.included:
 	    for filt in self.included[info]:
 		if filt.match(path):
-                    self._markRequirement(info, path)
+                    self._markManualRequirement(info, path, pkg)
 
         # now check for automatic dependencies besides ELF
         if f.inode.perms() & 0111:
@@ -1066,7 +1066,7 @@ class Requires(_addInfo):
         f.requires.set(pkg.requiresMap[path])
         pkg.requires.union(f.requires.value())
     
-    def _markManualRequirement(self, info, path):
+    def _markManualRequirement(self, info, path, pkg):
         if self._checkInclusion(info, path):
             if info[0] == "/":
                 depClass = deps.FileDependencies
