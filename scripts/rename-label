@@ -1,0 +1,48 @@
+#!/usr/bin/python
+
+import sys
+
+sys.path.append("/usr/share/conary")
+import sqlite3
+
+def rename(cu, old, new):
+    cu.execute("select versionid, version from versions")
+    for (versionId, version) in [ x for x in cu]:
+        if not versionId: continue
+        version = version.replace(old, new)
+        cu.execute("update versions set version=? where versionid=?", 
+                   version, versionId)
+
+    cu.execute("select name from sqlite_master where name='Branches'")
+    if cu.fetchone() is not None:
+        cu.execute("select branchid, branch from branches")
+        for (branchId, branch) in [ x for x in cu]:
+            if not branchId: continue
+            branch = branch.replace(old, new)
+            cu.execute("update branches set branch=? where branchid=?", 
+                       branch, branchId)
+
+        cu.execute("select labelid, label from labels")
+        for (labelId, label) in [ x for x in cu]:
+            if not labelId: continue
+            label = label.replace(old, new)
+            cu.execute("update labels set label=? where labelId=?", 
+                       label, labelId)
+
+if len(sys.argv) == 2:
+    db = sqlite3.connect(sys.argv[1])
+elif len(sys.argv) > 1:
+    print "ACK"
+    sys.exit(1)
+else:
+    db = sqlite3.connect("/var/lib/conarydb/conarydb")
+
+cu = db.cursor()
+
+rename(cu, "conary.specifix.com@spx:devel", 
+           "conary.specifix.com@spx:olddevelshadow")
+
+rename(cu, "conary.specifix.com@spx:linux", 
+           "conary.specifix.com@spx:devel")
+
+db.commit()
