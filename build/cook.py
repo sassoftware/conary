@@ -124,7 +124,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	packageList = []
         recipeObj.packages(cfg.packagenamespace, version, destdir)
 
-	for (name, buildPkg) in recipeObj.getPackageSet().packageSet():
+	for buildPkg in recipeObj.getPackages():
 	    (p, fileMap) = createPackage(repos, cfg, buildPkg, ident)
             built.append((p.getName(), p.getVersion().asString()))
 	    packageList.append((p, fileMap))

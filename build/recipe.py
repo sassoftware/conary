@@ -408,10 +408,10 @@ class Recipe:
                                                 self.subFilters)
         autopkg.walk(root)
         #autopkg.addDevice('/dev/null', 'c', 1, 3, perms=0666)
-        self.packageSet = autopkg.packageSet()
+        self.packages = autopkg.getPackages()
 
-    def getPackageSet(self):
-        return self.packageSet
+    def getPackages(self):
+        return self.packages
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
         assert(self.__class__ is not Recipe)

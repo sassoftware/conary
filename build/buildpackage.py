@@ -70,18 +70,6 @@ class BuildPackage(dict):
 	self.version = version
 	dict.__init__(self)
 
-class BuildPackageSet:
-
-    def addPackage(self, pkg):
-	self.__dict__[pkg.name] = pkg
-	self.pkgs[pkg.name] = pkg
-
-    def packageSet(self):
-	return self.pkgs.items()
-
-    def __init__(self):
-	self.pkgs = {}
-
 class Filter:
     def __init__(self, name, relist):
 	self.name = name
@@ -169,20 +157,19 @@ class AutoBuildPackage:
         pkg = self.findPackage(path)
         pkg.addDevice(path, devtype, major, minor, user, group, perms)
 
-    def packageSet(self):
+    def getPackages(self):
         """
         Examine the BuildPackage instances that have been created and
-        return a new BuildPackageSet instance that includes only those
-        which have files
+        return a list that includes only those which have files
         
         @return: list of BuildPackages instances
         @rtype: list
         """
-        set = BuildPackageSet()
+        l = []
         for name in self.packages.keys():
             if self.packages[name].keys():
-                set.addPackage(self.packages[name])
-        return set
+                l.append(self.packages[name])
+        return l
             
     def walk(self, root):
         """
