@@ -411,8 +411,37 @@ class Database(Repository):
 	self.lastRollback = int(last)
 	f.close()
 
-    def getRollback(self, file):
-	return changeset.ChangeSetFromFile(self.rollbackCache + "/" + file)
+    def hasRollback(self, name):
+	try:
+	    num = int(name[2:])
+	except ValueError:
+	    return False
+
+	if (num >= self.firstRollback and num <= self.lastRollback):
+	    return True
+	
+	return False
+
+    def getRollback(self, name):
+	if not self.hasRollback(name): return None
+
+	return changeset.ChangeSetFromFile(self.rollbackCache + "/" + name)
+
+    def applyRollbackList(self, sourcepath, names):
+	last = self.lastRollback
+	for name in names:
+	    if not self.hasRollback(name):
+		return KeyError, name
+
+	    num = int(name[2:])
+	    if num != last:
+		raise RollbackOrderError(name)
+	    last -= 1
+
+	for name in names:
+	    cs = self.getRollback(name)
+	    self.commitChangeSet(sourcepath, cs, eraseOld = 1)
+	    self.removeRollback(name)
 
     def __init__(self, root, path, mode = "c"):
 	self.root = root
@@ -491,3 +520,30 @@ class _FileDB:
 	self.f = db.openFile(fileId)
 	self.fileId = fileId
 
+# Exception classes
+
+class RepositoryError(Exception):
+
+    """Base class for exceptions from the system repository"""
+    pass
+
+class RollbackError(RepositoryError):
+
+    """Base class for exceptions related to applying rollbacks"""
+
+class RollbackOrderError(RollbackError):
+
+    """Raised when an attempt is made to apply rollbacks in the
+       wrong order"""
+
+    def __repr__(self):
+	return "rollback %s can not be applied out of order" % self.name
+
+    def __str__(self):
+	return repr(self)
+
+    def __init__(self, rollbackName):
+	"""Create new new RollbackOrderError
+	@param rollbackName: string represeting the name of the rollback
+	which was trying to be applied out of order"""
+	self.name = rollbackName
