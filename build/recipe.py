@@ -388,6 +388,7 @@ class Recipe:
         return self.packageSet
 
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
+        assert(self.__class__ is not Recipe)
 	self.sources = []
 	# XXX fixme: convert to proper documentation string
 	# sources is list of (file, filetype, targetdir, (args)) tuples, where
