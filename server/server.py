@@ -126,7 +126,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 
 	return newD
 
-    def pkgLatestVersion(self, pkgName, branchStr):
+    def getTroveLatestVersion(self, pkgName, branchStr):
 	return self.troveStore.troveLatestVersion(pkgName, 
 						  self.fromVersion(branchStr))
 
