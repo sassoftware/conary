@@ -384,9 +384,8 @@ class FilesystemJob:
 	    # don't worry about metadata changes, just content changes
 	    if oldFile.hasContents and localFile and localFile.hasContents and \
 			oldFile.contents != localFile.contents:
-		self.errors.append("%s has changed but has been removed "
-				   "on head" % path)
-		continue
+		log.warning("%s has changed but has been removed "
+				   "on head", path)
 
 	    self._remove(oldFile, realPath, "removing %s")
 	    fsPkg.removeFile(fileId)
