@@ -208,48 +208,86 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	branchedTroves = {}
 	branchedFiles = {}
+        dupList = []
 
 	while troveList:
-	    troveName = troveList[0][0]
-	    location = troveList[0][1]
-	    del troveList[0]
+            leavesByLabelOps = {}
 
-	    if branchedTroves.has_key(troveName): continue
-	    branchedTroves[troveName] = 1
+            for (troveName, location) in troveList:
+                if branchedTroves.has_key(troveName): continue
+                branchedTroves[troveName] = 1
 
-	    if isinstance(location, versions.Version):
-		verDict = { troveName : [ location ] }
-		serverName = location.branch().label().getHost()
-	    else:
-		serverName = location.getHost()
+                l = leavesByLabelOps.get(location, None)
+                if l is None:
+                    l = []
+                    leavesByLabelOps[location] = l
+                l.append(troveName)
 
-		if serverName == self.name:
-		    verDict = self.getTroveLeavesByLabel([troveName], location)
-		else:
-		    verDict = self.reposSet.getTroveLeavesByLabel([troveName], location)
+            # reset for the next pass
+            troveList = []
 
-	    if serverName == self.name:
-		d = self.getTroveVersionFlavors(verDict)
-	    else:
-		d = self.reposSet.getTroveVersionFlavors(verDict)
+            troves = []
+            verDict = {}
+            localVerDict = {}
 
-	    fullList = []
-	    for (version, flavors) in d[troveName].iteritems():
-		fullList += [ (troveName, version, x) for x in flavors ]
+            for (location, l) in leavesByLabelOps.iteritems():
+                if isinstance(location, versions.Version):
+                    serverName = location.branch().label().getHost()
+                    if serverName == self.name:
+                        d = localVerDict
+                    else:
+                        d = verDict
 
-	    if serverName == self.name:
-		troves = self.getTroves(fullList)
-	    else:
-		troves = self.reposSet.getTroves(fullList)
+                    for name in l:
+                        l = d.get(name, None)
+                        if l is None:
+                            l = [ location ]
+                            d[name] = l
+                        else:
+                            d[name].append(location)
+                else:
+                    serverName = location.getHost()
+
+                    if serverName == self.name:
+                        localVerDict.update(
+                            self.getTroveLeavesByLabel(l, location))
+                    else:
+                        verDict.update(self.reposSet.getTroveLeavesByLabel(l, 
+                                                                    location))
+
+            del leavesByLabelOps
+
+            flavors = self.reposSet.getTroveVersionFlavors(verDict)
+            localFlavors = self.getTroveVersionFlavors(localVerDict)
+            del verDict
+            del localVerDict
+
+            fullList = []
+            for troveName in flavors.iterkeys():
+                for (version, theFlavors) in flavors[troveName].iteritems():
+                    fullList += [ (troveName, version, x) for x in theFlavors ]
+            del flavors
+        
+            localFullList = []
+            for troveName in localFlavors.iterkeys():
+                for (version, theFlavors) in \
+                                localFlavors[troveName].iteritems():
+                    localFullList += [ (troveName, version, x) for x in 
+                                            theFlavors ]
+            del localFlavors
+        
+            troves += self.reposSet.getTroves(fullList)
+            troves += self.getTroves(localFullList)
 
 	    for trove in troves:
+                troveName = trove.getName()
 		branchedVersion = trove.getVersion().fork(newBranch, 
 							  sameVerRel = 1)
                 try:
                     self.createTroveBranch(troveName, branchedVersion.branch())
                 except DuplicateBranch:
-                    raise DuplicateBranch("%s already has branch %s"
-                            % (troveName, branchedVersion.branch().asString()))
+                    dupList.append((troveName, branchedVersion.branch()))
+                    continue
 
 		trove.changeVersion(branchedVersion)
 
@@ -270,7 +308,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         # commit branch to the repository
         self.commit()
 
-	return True
+	return dupList
 		    
     def open(self):
 	if self.troveStore is not None:
