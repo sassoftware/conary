@@ -94,8 +94,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	
     def getTroveVersionFlavors(self, troveDict):
 	passD = {}
+	versoinDict = {}
 	for (troveName, versionList) in troveDict.iteritems():
-	    passD[troveName] = [ self.fromVersion(x) for x in versionList ]
+	    passD[troveName] = []
+	    for version in versionList:
+		versionStr = self.fromVersion(version)
+		versionDict[versionStr] = version
+		passD[troveName].append(versionStr)
 
 	result = self.s.getTroveVersionFlavors(passD)
 
@@ -103,7 +108,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	for troveName, troveVersions in result.iteritems():
 	    newD[troveName] = {}
 	    for versionStr, flavors in troveVersions.iteritems():
-		version = self.toVersion(versionStr)
+		version = versionDict[versionStr]
 		newD[troveName][version] = [ self.toFlavor(x) for x in flavors ]
 
 	return newD
