@@ -319,7 +319,8 @@ class TroveStore:
         cu.execute("SELECT DISTINCT item FROM Instances NATURAL JOIN "
                    "Items WHERE isPresent=1");
 
-	return self.items.iterkeys()
+        for (item,) in cu:
+            return item
 
     def addTrove(self, trove):
 	cu = self.db.cursor()
