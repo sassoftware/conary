@@ -356,7 +356,7 @@ class Database(SqlDbRepository):
 	# XXX we have to do this before files get removed from the database,
 	# which is a bit unfortunate since this rollback isn't actually
 	# valid until a bit later
-	if not isRollback:
+	if not isRollback and not test:
 	    self.addRollback(inverse, localChanges)
 	    del inverse
 	    del localChanges
