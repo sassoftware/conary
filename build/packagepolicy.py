@@ -68,6 +68,9 @@ class ComponentSpec(_filterSpec):
 
 	# the extras need to come first in order to override decisions
 	# in the base subfilters
+        # reverse the order of the extraFilters so that the last filter
+        # added wins
+        self.extraFilters.reverse()
 	for (name, patterns) in self.extraFilters:
 	    name = name %macros
 	    assert(name != 'sources')
@@ -86,6 +89,9 @@ class PackageSpec(_filterSpec):
 	pkgFilters = []
 	macros = recipe.macros
 
+        # reverse the order of the extraFilters so that the last filter
+        # added wins
+        self.extraFilters.reverse()
 	for (name, patterns) in self.extraFilters:
 	    pkgFilters.append(buildpackage.Filter(name %macros, patterns, macros))
 	# by default, everything that hasn't matched a pattern in the
