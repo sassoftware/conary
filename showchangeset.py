@@ -93,10 +93,10 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                                                   trove.getOldFlavor())
                         troveLoc = repos
                     except repository.TroveMissing:
-                        log.warning("cannot find changeset trove %s on "
+                        log.warning("cannot find changeset trove %s on " 
                               "local system, or in repository list;"
-                              "not printing information about this "
-                              "trove", % trove.getName())
+                              "not printing information about this " 
+                              "trove" % trove.getName())
                         continue
                 for (fileId, path, version) in trove.changedFiles:
                     # XXX we don't know where to actually get the new file
@@ -197,7 +197,7 @@ def includeChildTroves(cs, troves):
 
 def getTroves(cs, troveList):
     if not troveList:
-        return (cs.getPrimaryPackagList(), False)
+        return (cs.getPrimaryPackageList(), False)
 
     hasVersions = False
     troveDefs = []
