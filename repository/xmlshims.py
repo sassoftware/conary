@@ -56,14 +56,16 @@ class NetworkConvertors(object):
 
     def toFlavor(self, f):
         assert(f is not None)
-	if f == 0 or f == "none":
+        if f is 0:
+            return None
+	elif f == "none":
 	    return deps.deps.DependencySet()
 
 	return deps.deps.ThawDependencySet(f)
 
     def fromFlavor(self, f):
-        assert(f is not None)
-
+        if f is None:
+            return 0
 	return f.freeze()
 
     def toFile(self, f):

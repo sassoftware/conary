@@ -419,6 +419,16 @@ class Version(AbstractVersion):
 
     __slots__ = ( "versions" )
 
+    def compare(first, second):
+        if first.isAfter(second):
+            return 1
+        elif first == second:
+            return 0
+
+        return -1
+
+    compare = staticmethod(compare)
+
     def appendVersionRelease(self, version, release):
 	"""
 	Converts a branch to a version. The version/release passed in

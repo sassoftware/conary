@@ -91,37 +91,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     ###
 
-    def __del__(self):
-	self.close()
-
-    def open(self):
-	if self.troveStore is not None:
-	    self.close()
-
-        db = sqlite3.connect(self.sqlDbPath)
-	self.troveStore = trovestore.TroveStore(db)
-	sb = os.stat(self.sqlDbPath)
-	self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
-
-	self.auth = NetworkAuthorization(db, self.name, 
-                                         anonymousReads = True)
-
-    def reopen(self):
-	sb = os.stat(self.sqlDbPath)
-
-	sqlDeviceInode = (sb.st_dev, sb.st_ino)
-	if self.sqlDeviceInode != sqlDeviceInode:
-	    del self.troveStore
-            del self.auth
-
-            db = sqlite3.connect(self.sqlDbPath)
-	    self.troveStore = trovestore.TroveStore(db)
-            self.auth = NetworkAuthorization(db, self.name, 
-                                             anonymousReads = True)
-
-	    sb = os.stat(self.sqlDbPath)
-	    self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
-
     def commitChangeSet(self, cs, serverName):
 	# let's make sure commiting this change set is a sane thing to attempt
 	for pkg in cs.iterNewPackageList():
@@ -368,22 +337,19 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    self.troveStore.db.close()
 	    self.troveStore = None
 
-    def __init__(self, name, path, repositoryMap):
+    def __del__(self):
+	self.close()
+
+    def __init__(self, name, troveStore, path, repositoryMap):
 	self.top = path
-	self.troveStore = None
 	self.name = name
 	map = dict(repositoryMap)
 	map[name] = self
 	self.reposSet = repository.netclient.NetworkRepositoryClient(map)
 	
+	self.troveStore = troveStore
+
 	self.sqlDbPath = self.top + "/sqldb"
-
-	try:
-	    util.mkdirChain(self.top)
-	except OSError, e:
-	    raise repository.repository.OpenError(str(e))
-
-        self.open()
 
 	DataStoreRepository.__init__(self, path)
 	AbstractRepository.__init__(self)

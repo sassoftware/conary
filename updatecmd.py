@@ -116,7 +116,7 @@ def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False,
         brokenByErase = client.eraseTrove(troveList, tagScript = tagScript, 
                                           depCheck = depCheck, test = test,
                                           justDatabase = justDatabase)
-    except repository.PackageNotFound, e:
+    except repository.TroveNotFound, e:
         log.error(str(e))
 
     if brokenByErase:

@@ -1349,6 +1349,7 @@ class Provides(policy.Policy):
             op = abistring.index('(')
             abi = abistring[:op]
             flags = abistring[op+1:-1].split()
+            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
             pkg.providesMap[path].addDep(deps.AbiDependency,
                 deps.Dependency(abi, flags))
             return
@@ -1360,8 +1361,9 @@ class Provides(policy.Policy):
                 # but programs linked against them require a soname
                 main = provision[7:].strip()
                 abi = m.contents['abi']
+                flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in abi[1] ]
                 pkg.providesMap[path].addDep(deps.SonameDependencies,
-                    deps.Dependency('/'.join((abi[0], main)), abi[1]))
+                    deps.Dependency('/'.join((abi[0], main)), flags))
             return
 
 

@@ -42,6 +42,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
         troves = []
         for label in cfg.installLabelPath:
             troves += [ (x, None) for x in repos.troveNames(label) ]
+            troves.sort()
 
     if hasVersions or ls or ids or sha1s or info or tags or deps:
 	if all:
@@ -71,27 +72,17 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
             if all:
                 fn = repos.getTroveVersionList
             else:
-                fn = repos.getAllTroveLeafs
+                fn = repos.getAllTroveLeaves
 
-            versiondict = {}
+            flavors = {}
             for host, names in repositories.iteritems():
                 d = fn(host, names)
-                for (name, verList) in d.iteritems():
-                    if not versiondict.has_key(name):
-                        versiondict[name] = verList
-                    else:
-                        versiondict[name] += (verList)
+                repos.queryMerge(flavors, d)
 	else:
-            versiondict = {}
+            flavors = {}
             for label in cfg.installLabelPath:
                 d = repos.getTroveLeavesByLabel([ x[0] for x in troves], label)
-                for (name, verList) in d.iteritems():
-                    if not versiondict.has_key(name):
-                        versiondict[name] = verList
-                    else:
-                        versiondict[name] += (verList)
-
-	flavors = repos.getTroveVersionFlavors(versiondict)
+                repos.queryMerge(flavors, d)
 
         displayc = display.DisplayCache()
 	for troveName, versionStr in troves:
@@ -131,7 +122,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 				    cfg.flavor, versionStr,
                                     acrossRepositories = True,
                                     withFiles = withFiles)
-    except repository.PackageNotFound, e:
+    except repository.TroveNotFound, e:
 	log.error(str(e))
 	return
 
@@ -146,7 +137,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                                       cfg.flavor, versionStr,
                                       acrossRepositories = True,
                                       withFiles = False)[0]
-    except repository.PackageNotFound, e:
+    except repository.TroveNotFound, e:
         sourceTrove = None
 
     for trove in troveList:

@@ -12,7 +12,7 @@
 # full details.
 # 
 
-import deps.deps
+from deps import deps
 
 class Flavors:
 
@@ -29,6 +29,7 @@ class Flavors:
 					       flavor STR UNIQUE)""")
             cu.execute("""CREATE TABLE FlavorMap(flavorId INT,
 						 base STR,
+						 sense INT,
 						 flag STR)""")
             cu.execute("""CREATE INDEX FlavorMapIndex ON FlavorMap(flavorId)""")
             cu.execute("""INSERT INTO Flavors VALUES (0, 'none')""")
@@ -40,11 +41,11 @@ class Flavors:
 
 	for depClass in flavor.getDepClasses().itervalues():
 	    for dep in depClass.getDeps():
-		cu.execute("INSERT INTO FlavorMap VALUES (?, ?, NULL)",
+		cu.execute("INSERT INTO FlavorMap VALUES (?, ?, NULL, NULL)",
 			   flavorId, dep.name)
-		for flag in dep.flags.iterkeys():
-		    cu.execute("INSERT INTO FlavorMap VALUES (?, ?, ?)",
-			       flavorId, dep.name, flag)
+		for (flag, sense) in dep.flags.iteritems():
+		    cu.execute("INSERT INTO FlavorMap VALUES (?, ?, ?, ?)",
+			       flavorId, dep.name, sense, flag)
 
     def __getitem__(self, flavor):
 	val = self.get(flavor, 0)
@@ -68,12 +69,47 @@ class Flavors:
 
     def getId(self, flavorId):
 	if flavorId == 0:
-	    return deps.deps.DependencySet()
+	    return deps.DependencySet()
 
 	cu = self.db.cursor()
 	cu.execute("SELECT flavor FROM Flavors WHERE flavorId = ?", 
 		   flavorId)
 	try:
-	    return deps.deps.ThawDependencySet(cu.next()[0])
+	    return deps.ThawDependencySet(cu.next()[0])
 	except StopIteration:
             raise KeyError, flavorId
+
+class FlavorScores:
+
+    table = ( 
+          (deps.FLAG_SENSE_REQUIRED,   deps.FLAG_SENSE_REQUIRED,         2),
+          (deps.FLAG_SENSE_REQUIRED,   deps.FLAG_SENSE_PREFERRED,        1),
+          (deps.FLAG_SENSE_REQUIRED,   deps.FLAG_SENSE_PREFERNOT, -1000000),
+
+          (deps.FLAG_SENSE_DISALLOWED, deps.FLAG_SENSE_REQUIRED,  -1000000),
+          (deps.FLAG_SENSE_DISALLOWED, deps.FLAG_SENSE_PREFERRED, -1000000),
+          (deps.FLAG_SENSE_DISALLOWED, deps.FLAG_SENSE_PREFERNOT,        1),
+
+          (deps.FLAG_SENSE_PREFERRED,  deps.FLAG_SENSE_REQUIRED,         1),
+          (deps.FLAG_SENSE_PREFERRED,  deps.FLAG_SENSE_PREFERRED,        2),
+          (deps.FLAG_SENSE_PREFERRED,  deps.FLAG_SENSE_PREFERNOT,       -1),
+
+          (deps.FLAG_SENSE_PREFERNOT,  deps.FLAG_SENSE_REQUIRED,        -2),
+          (deps.FLAG_SENSE_PREFERNOT,  deps.FLAG_SENSE_PREFERRED,       -1),
+          (deps.FLAG_SENSE_PREFERNOT,  deps.FLAG_SENSE_PREFERNOT,        1) 
+        )
+
+    def __init__(self, db):
+        cu = db.cursor()
+        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+        tables = [ x[0] for x in cu ]
+        if "FlavorScores" not in tables:
+            cu.execute("""CREATE TABLE FlavorScores(request INT,
+                                                    present INT,
+                                                    value INT)""")
+            cu.execute("""CREATE INDEX FlavorScoresIdx ON 
+                                    FlavorScores(request, present)""")
+
+            for tup in self.table:
+                cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)", tup)
+                            

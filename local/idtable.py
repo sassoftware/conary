@@ -230,14 +230,6 @@ class IdPairMapping:
 	item = cu.fetchone()	
 	return item != None
 
-    def tup2InTable(self, val):
-        cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=?"
-                   % (self.item, self.tableName, self.tup2),
-		   (val))
-	item = cu.fetchone()	
-	return item != None
-	    
     def __delitem__(self, key):
 	(first, second) = key
 
@@ -376,3 +368,83 @@ class IdPairSet(IdPairMapping):
         cu.execute("DELETE FROM %s WHERE %s=? AND %s=? AND %s=?"
                    % (self.tableName, self.tup1, self.tup2, self.item),
 		   (first, second, val))
+
+class IdTripletMapping:
+    """
+    Maps an id tuple onto another id. The tuple can only map onto a single
+    id.
+    """
+    def __init__(self, db, tableName, tup1, tup2, tup3, item):
+        self.db = db
+	self.tup1 = tup1
+	self.tup2 = tup2
+	self.tup3 = tup3
+	self.item = item
+	self.tableName = tableName
+        
+        cu = self.db.cursor()
+        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+        tables = [ x[0] for x in cu ]
+        if self.tableName not in tables:
+            cu.execute("CREATE TABLE %s(%s integer, "
+				       "%s integer, "
+				       "%s integer, "
+				       "%s integer)" 
+			% (tableName, tup1, tup2, tup3, item))
+
+    def __setitem__(self, key, val):
+	(first, second, third) = key
+
+        cu = self.db.cursor()
+        cu.execute("INSERT INTO %s VALUES (?, ?, ?, ?)"
+		   % (self.tableName),
+                   (first, second, third, val))
+
+    def __getitem__(self, key):
+	(first, second, third) = key
+
+        cu = self.db.cursor()
+	
+        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=? AND %s=?"
+                   % (self.item, self.tableName, self.tup1, self.tup2, 
+                      self.tup3),
+		   (first, second, third))
+	try:
+	    return cu.next()[0]
+	except StopIteration:
+            raise KeyError, key
+
+    def get(self, key, defValue):
+	(first, second, third) = key
+
+        cu = self.db.cursor()
+	
+        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=? AND %s=?"
+                   % (self.item, self.tableName, self.tup1, self.tup2, 
+                      self.tup3),
+		   (first, second, third))
+	item = cu.fetchone()	
+	if not item:
+	    return defValue
+	return item[0]
+	    
+    def has_key(self, key):
+	(first, second, third) = key
+
+        cu = self.db.cursor()
+	
+        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=? AND %s=?"
+                   % (self.item, self.tableName, self.tup1, self.tup2,
+                      self.tup3),
+		   (first, second, third))
+	item = cu.fetchone()	
+	return item != None
+
+    def __delitem__(self, key):
+	(first, second, third) = key
+
+        cu = self.db.cursor()
+	
+        cu.execute("DELETE FROM %s WHERE %s=? AND %s=? AND %s=?"
+                   % (self.tableName, self.tup1, self.tup2, self.tup3),
+		   (first, second, third))

@@ -90,10 +90,10 @@ class LabelTable(idtable.IdTable):
     def __init__(self, db):
         idtable.IdTable.__init__(self, db, 'Labels', 'labelId', 'label')
 
-class LatestTable(idtable.IdPairMapping):
+class LatestTable(idtable.IdTripletMapping):
     def __init__(self, db):
-	idtable.IdPairMapping.__init__(self, db, 'Latest',
-				       'itemId', 'branchId', 'versionId')
+	idtable.IdTripletMapping.__init__(self, db, 'Latest',
+                               'itemId', 'branchId', 'flavorId', 'versionId')
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
@@ -107,17 +107,6 @@ class LabelMap(idtable.IdPairSet):
 
     def branchesByItem(self, itemId):
 	return self.getByFirst(itemId)
-
-class ParentTable(idtable.IdPairMapping):
-    def __init__(self, db):
-	idtable.IdPairMapping.__init__(self, db, 'Parent',
-		                       'itemId', 'versionId', 'parentId')
-	cu = db.cursor()
-        cu.execute("SELECT name FROM sqlite_master WHERE type='index'")
-        tables = [ x[0] for x in cu ]
-        if "ParentVersionIdx" not in tables:
-	    cu.execute("CREATE INDEX ParentVersionIdx on Parent(versionId)")
-	    cu.execute("INSERT INTO Parent VALUES (0,0,0)")
 
 class Nodes:
 
@@ -193,8 +182,8 @@ class SqlVersioning:
     def branchesOfItem(self, itemId):
 	return self.labelMap.branchesByItem(itemId)
 
-    def latestOnBranch(self, itemId, branchId):
-	versionId = self.latest.get((itemId, branchId), None)
+    def latestOnBranch(self, itemId, branchId, flavorId):
+	versionId = self.latest.get((itemId, branchId, flavorId), None)
         if versionId is None:
             branch = self.branchTable.getId(branchId)
             return self.versionTable[branch.parentNode()]
@@ -203,7 +192,7 @@ class SqlVersioning:
     def hasVersion(self, itemId, versionId):
 	return self.nodes.hasItemId(itemId)
 
-    def createVersion(self, itemId, version):
+    def createVersion(self, itemId, version, flavorId):
 	"""
 	Creates a new versionId for itemId. The branch must already exist
 	for the given itemId.
@@ -235,15 +224,15 @@ class SqlVersioning:
 	if self.nodes.hasRow(itemId, versionId):
 	    raise DuplicateVersionError(itemId, version)
 
-	latestId = self.latest.get((itemId, branchId), None)
+	latestId = self.latest.get((itemId, branchId, flavorId), None)
 	if latestId == None:
 	    # this must be the first thing on the branch
-	    self.latest[(itemId, branchId)] = versionId
+	    self.latest[(itemId, branchId, flavorId)] = versionId
 	else:
 	    currVer = self.versionTable.getId(latestId, itemId)
 	    if not currVer.isAfter(version):
-		del self.latest[(itemId, branchId)]
-		self.latest[(itemId, branchId)] = versionId
+		del self.latest[(itemId, branchId, flavorId)]
+		self.latest[(itemId, branchId, flavorId)] = versionId
 
 	nodeId = self.nodes.addRow(itemId, branchId, versionId, 
 				   version.timeStamps())

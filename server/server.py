@@ -201,7 +201,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 return
             
             # verify that the user/password actually exists in the database
-            if not netRepos.repos.auth.checkUserPass(authToken):
+            if not netRepos.auth.checkUserPass(authToken):
                 self.send_response(403)
                 return None
 
@@ -273,7 +273,7 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
         # the file with a zero byte one (to change the inode) and reopen
         open(self.repPath + '/sqldb.new', "w")
         os.rename(self.repPath + '/sqldb.new', self.repPath + '/sqldb')
-        self.repos.reopen()
+        self.reopen()
 
         return 0
 
@@ -317,9 +317,13 @@ def addUser(userName, otherArgs):
 
     import sqlite3
     authdb = sqlite3.connect(otherArgs[1] + '/sqldb')
-    na = netauth.NetworkAuthorization(authdb, None)
 
-    na.addUser(userName, pw1, admin = True)
+    netRepos = ResetableNetworkRepositoryServer(otherArgs[1], None, None,
+			                        None, {})
+
+
+    netRepos.auth.addUser(userName, pw1)
+    netRepos.auth.addAcl(userName, None, None, True, False, True)
 
 if __name__ == '__main__':
     argDef = {}

@@ -199,24 +199,24 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     fullName = recipeClass.name
 
     if not buildBranch:
-	vers = repos.getTroveLeavesByLabel([fullName], buildLabel)[fullName]
+	vers = repos.getTroveLeavesByLabel([fullName], 
+                                  buildLabel).get(fullName, {}).keys()
 
 	if not vers:
 	    # try looking for :source
 	    srcName = fullName + ":source"
-	    vers = repos.getTroveLeavesByLabel([srcName], buildLabel)[srcName]
+	    vers = repos.getTroveLeavesByLabel([srcName], 
+                                  buildLabel).get(srcName, {}).keys()
 
 	if len(vers) > 1:
 	    raise CookError('Multiple branches labeled %s exist for '
 			    'trove %s' % (fullName, buildLabel.asString))
 	elif not len(vers):
-	    if not repos.hasPackage(buildLabel.getHost(), fullName):
-		# for the first build, we're willing to create the branch for
-		# them 
-		buildBranch = versions.Version([buildLabel])
-	    else:
-		raise CookError('No branches labeled %s exist for trove %s'
-				% (buildLabel.asString(), fullName))
+            # create the label. not crazy about always doing this (we 
+            # used to only create it if it didn't already exist, but
+            # with acls that logic doesn't work anymore; we can't tell
+            # if it exists on a branch we're not allowed to see or not)
+            buildBranch = versions.Version([buildLabel])
 	else:
 	    buildBranch = vers[0].branch()
 
@@ -569,7 +569,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
             try:
                 versionList = repos.getTroveFlavorsLatestVersion(main, 
                                                                  searchBranch)
-            except repository.PackageNotFound:
+            except repository.TroveNotFound:
                 pass
 
             if not versionList:
@@ -658,7 +658,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 
 	srcName = recipeClass.name + ":source"
 	versionDict = repos.getTroveLeavesByLabel([srcName], cfg.buildLabel)
-	versionList = versionDict[srcName]
+	versionList = versionDict.get(srcName, [])
         sourceVersion = None
         if versionList:
             maxVersion = versionList[0]

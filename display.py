@@ -167,7 +167,7 @@ def _printOneTrove(db, troveName, troveVersions, fullVersions):
         log.error("%s is not installed", troveName)
         return
     versionDict = {}.fromkeys(troveVersions)
-    troveDict = db.getTroveVersionFlavors({troveName: troveVersions})
+    troveDict = db.getAllTroveFlavors({troveName: troveVersions})
     displayC.cache(troveName, troveVersions, fullVersions)
 
     for version in troveVersions:
@@ -208,7 +208,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
         try:
             for trove in db.findTrove(troveName, versionStr):
                 _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags)
-        except repository.PackageNotFound:
+        except repository.TroveNotFound:
             if versionStr:
                 log.error("version %s of trove %s is not installed",
                           versionStr, troveName)

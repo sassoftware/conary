@@ -29,7 +29,7 @@ class InsufficientPermission(ServerError):
 class HttpHandler(HtmlEngine):
     def __init__(self, repServer):
         self.repServer = repServer
-        self.troveStore = repServer.repos.troveStore
+        self.troveStore = repServer.troveStore
         
         # "command name": (command handler, page title, 
         #       (requires auth, requires write access, requires admin))
@@ -81,7 +81,7 @@ class HttpHandler(HtmlEngine):
 
         needWrite = self.commands[cmd][2][1]
         needAdmin = self.commands[cmd][2][2]
-        if not self.repServer.repos.auth.check(authToken, write=needWrite, admin=needAdmin):
+        if not self.repServer.auth.check(authToken, write=needWrite, admin=needAdmin):
             raise InsufficientPermission
 
         if cmd == "":
@@ -103,7 +103,7 @@ class HttpHandler(HtmlEngine):
         self.writeFn("\n\nFields: " + str(fields) + "</pre>")
 
     def metadataCmd(self, authToken, fields, troveName=None):
-        troveList = [x for x in self.repServer.repos.troveStore.iterTroveNames() if x.endswith(':source')]
+        troveList = [x for x in self.repServer.troveStore.iterTroveNames() if x.endswith(':source')]
         troveList.sort()
 
         # pick the next trove in the list
@@ -192,7 +192,7 @@ class HttpHandler(HtmlEngine):
         
     def userlistCmd(self, authToken, fields):
         self.htmlPageTitle("User List")
-        userlist = list(self.repServer.repos.auth.iterUsers())
+        userlist = list(self.repServer.auth.iterUsers())
         self.htmlUserlist(userlist)
 
     def addUserFormCmd(self, authToken, fields):
@@ -212,7 +212,9 @@ class HttpHandler(HtmlEngine):
             admin = True
         else:
             admin = False
-        self.repServer.repos.auth.addUser(user, password, write=write, admin=admin)
+        self.repServer.addUser(authToken, 0, user, password)
+        self.repServer.addAcl(authToken, 0, user, "", "", write, True, admin)
+
         self.writeFn("""User added successfully. <a href="userlist">Return</a>""")
         
     def chPassFormCmd(self, authToken, fields):
@@ -229,7 +231,7 @@ class HttpHandler(HtmlEngine):
         
     def chPassCmd(self, authToken, fields):
         username = fields["username"].value
-        admin = self.repServer.repos.auth.check(authToken, admin=True)
+        admin = self.repServer.auth.check(authToken, admin=True)
         
         if username != authToken[0]:
             if not admin:
@@ -250,5 +252,5 @@ class HttpHandler(HtmlEngine):
         elif oldPassword == p1:
             self.writeFn("""<div class="warning">Error: old and new passwords identical, not changing.</div>""")
         else:
-            self.repServer.repos.auth.changePassword(username, p1)
+            self.repServer.auth.changePassword(username, p1)
             self.writeFn("""<div>Password successfully changed.</div>""")

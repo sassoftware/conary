@@ -229,7 +229,7 @@ class IdealRepository(AbstractTroveDatabase):
 	"""
 	raise NotImplementedError
 
-    def getAllTroveLeafs(self, troveNameList):
+    def getAllTroveLeaves(self, troveNameList):
 	"""
 	Returns a dictionary indexed by the items in troveNameList. Each
 	item in the dictionary is a list of all of the leaf versions for
@@ -303,133 +303,32 @@ class IdealRepository(AbstractTroveDatabase):
 	"""
 	raise NotImplementedError
 
-    def getTroveVersionFlavors(self, troveDict):
+    def getAllTroveFlavors(self, troveDict):
 	"""
-	Converts a dictionary of the format retured by getAllTroveLeafs()
+	Converts a dictionary of the format retured by getAllTroveLeaves()
 	to contain dicts of { version : flavorList } sets instead of 
-	containing lists of versions.
+	containing lists of versions. The flavorList lists all of the
+        flavors available for that vesrion of the trove.
 
 	@type troveDict: dict
 	@rtype: dict
 	"""
 	raise NotImplementedError
 
-    def findTrove(self, labelPath, name, targetFlavor, versionStr = None,
-                  acrossRepositories = False, withFiles = True):
-	assert(not targetFlavor or 
-	       isinstance(targetFlavor, deps.deps.DependencySet))
-
-        if not type(labelPath) == list:
-            labelPath = [ labelPath ]
-
-	if not labelPath:
-	    # if we don't have a label path, we need a fully qualified
-	    # version string; make sure have it
-	    if versionStr[0] != "/" and (versionStr.find("/") != -1 or
-					 versionStr.find("@") == -1):
-		raise TroveNotFound, \
-		    "fully qualified version or label " + \
-		    "expected instead of %s" % versionStr
-
-	# a version is a label if
-	#   1. it doesn't being with / (it isn't fully qualified)
-	#   2. it only has one element (no /)
-	#   3. it contains an @ sign
-	if not versionStr or (versionStr[0] != "/" and  \
-		(versionStr.find("/") == -1) and versionStr.count("@")):
-	    # either the supplied version is a label or we're going to use
-	    # the default
-            if versionStr and versionStr[0] != "@":
-		try:
-		    label = versions.Label(versionStr)
-                    labelPath = [ label ]
-		except versions.ParseError:
-		    raise TroveMissing, "invalid version %s" % versionStr
-            elif versionStr:
-                # just a branch name was specified
-                repositories = [ x.getHost() for x in labelPath ]
-                labelPath = []
-                for repository in repositories:
-                    labelPath.append(versions.Label("%s%s" % 
-                                                    (repository, versionStr)))
-
-            versionDict = { name : [] }
-            for label in labelPath:
-                d = self.getTroveLeavesByLabel([name], label)
-                if not d[name]:
-                    continue
-                elif not acrossRepositories:
-                    versionDict = d
-                    break
-                else:
-                    for name, versionList in d.iteritems():
-                        versionDict[name] += versionList
-
-	    if not versionDict[name]:
-		raise TroveNotFound, \
-                      ('"%s" was not found in the search path (%s)'
-                       %(name, " ".join([ x.asString() for x in labelPath ])))
-
-	elif versionStr[0] != "/" and versionStr.find("/") == -1:
-	    # version/release was given
-	    try:
-		verRel = versions.VersionRelease(versionStr)
-	    except versions.ParseError, e:
-		raise TroveNotFound, str(e)
-
-            versionDict = { name : [] }
-            for label in labelPath:
-                d = self.getTroveVersionsByLabel([name], label)
-                for version in d[name][:]:
-                    if version.trailingVersion() != verRel:
-                        d[name].remove(version)
-
-                if not d[name]:
-                    continue
-                elif not acrossRepositories:
-                    versionDict = d
-                    break
-                else:
-                    for name, versionList in d.iteritems():
-                        versionDict[name] += versionList
-
-	    if not versionDict[name]:
-		raise TroveNotFound, \
-		    "version %s of %s is not on found on path %s" % \
-		    (versionStr, name, " ".join([x.asString() for x in labelPath]))
-	elif versionStr[0] != "/":
-	    # partial version string, we don't support this
-	    raise TroveNotFound, \
-		"incomplete version string %s not allowed" % versionStr
-	else:
-	    try:
-		version = versions.VersionFromString(versionStr)
-	    except versions.ParseError, e:
-		raise TroveNotFound, str(e)
-
-	    try:
-		# XXX
-		if version.isBranch():
-		    version = self.getTroveLatestVersion(name, version)
-
-		versionDict = { name : [ version ] }
-	    except TroveMissing, e:  
-		raise TroveNotFound, str(e)
-
-	flavorDict = self.getTroveVersionFlavors(versionDict)
-	pkgList = []
-	for version in flavorDict[name].iterkeys():
-	    for flavor in flavorDict[name][version]:
-		if not flavor or (targetFlavor and 
-				  targetFlavor.satisfies(flavor)):
-		    pkgList.append((name, version, flavor))
-
-	if not pkgList:
-	    raise TroveNotFound, "trove %s does not exist" % name
-
-	pkgList = self.getTroves(pkgList, withFiles = withFiles)
-
-	return pkgList
+    def queryMerge(self, target, source):
+        """
+        Merges the result of getTroveLatestVersions (and friends) into
+        target.
+        """
+        for (name, verDict) in source.iteritems():
+            if not target.has_key(name):
+                target[name] = verDict
+            else:
+                for (version, flavorList) in verDict.iteritems():
+                    if not target[name].has_key(version):
+                        target[name][version] = flavorList
+                    else:
+                        target[name][version] += flavorList
 
 class AbstractRepository(IdealRepository):
     ### Package access functions
@@ -742,9 +641,6 @@ class MethodNotSupported(RepositoryError):
 
 class TroveNotFound(Exception):
     """Raised when findTrove failes"""
-
-# XXX deprecated exception name
-PackageNotFound = TroveNotFound
 
 class OpenError(RepositoryError):
     """Error occured opening the repository"""

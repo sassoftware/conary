@@ -169,7 +169,7 @@ class ConaryClient:
                     newList = self.repos.findTrove(None, troveName, 
                                                    self.cfg.flavor, versionStr,
                                                    withFiles = False)
-                except repository.PackageNotFound, e:
+                except repository.TroveNotFound, e:
                     # we give an error for this later on
                     newList = []
             else:
@@ -205,7 +205,7 @@ class ConaryClient:
                                                         versionStr,
                                                         withFiles = False)
                         if justFirst and newList: break
-                    except repository.PackageNotFound, e:
+                    except repository.TroveNotFound, e:
                         pass
 
                 if not newList:
@@ -400,7 +400,7 @@ class ConaryClient:
 
             del leavesByLabelOps
 
-            flavors = self.repos.getTroveVersionFlavors(verDict)
+            flavors = self.repos.getAllTroveFlavors(verDict)
             del verDict
 
             fullList = []
@@ -440,7 +440,7 @@ class ConaryClient:
                 else:
                     queryDict[name] = [ version ]
 
-            matches = self.repos.getTroveVersionFlavors(queryDict)
+            matches = self.repos.getAllTroveFlavors(queryDict)
 
             for (name, version, flavor), troveCs in branchedTroves.iteritems():
                 if matches.has_key(name) and matches[name].has_key(version) \

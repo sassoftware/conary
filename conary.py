@@ -33,6 +33,7 @@ import commit
 import conarycfg
 import constants
 import cscmd
+import deps
 import display
 import importrpm
 from lib import log
@@ -189,6 +190,18 @@ def realMain(cfg, argv=sys.argv):
 
     cfg.installLabel = cfg.installLabelPath[0]
 
+    if cfg.useDir:
+        # the flavor from the rc file wins
+        useFlags = conarycfg.UseFlagDirectory(cfg.useDir)
+        useFlags.union(cfg.flavor, override = True)
+        cfg.flavor = useFlags
+    
+    if not deps.deps.DEP_CLASS_IS in cfg.flavor.getDepClasses():
+        insSet = deps.deps.DependencySet()
+        insSet.addDep(deps.deps.InstructionSetDependency, 
+                      deps.arch.currentArch)
+        cfg.flavor.union(insSet)
+
     profile = False
     if argSet.has_key('profile'):
 	import hotshot
@@ -335,8 +348,8 @@ def realMain(cfg, argv=sys.argv):
 	leaves = argSet.has_key('leaves')
 	if leaves: del argSet['leaves']
 
-	deps = argSet.has_key('deps')
-	if deps: del argSet['deps']
+	showDeps = argSet.has_key('deps')
+	if showDeps: del argSet['deps']
 
 	repos = openRepository(cfg.repositoryMap)
 
@@ -398,8 +411,8 @@ def realMain(cfg, argv=sys.argv):
         info = argSet.has_key('info')
 	if info: del argSet['info']
 
-        deps = argSet.has_key('deps')
-	if deps: del argSet['deps']
+        showDeps = argSet.has_key('deps')
+	if showDeps: del argSet['deps']
 
         showChanges = argSet.has_key('show-changes')
 	if showChanges: del argSet['show-changes']
@@ -512,7 +525,7 @@ def main(argv=sys.argv):
 	print >> sys.stderr, str(e)
     except repository.repository.DuplicateBranch, e:
 	print >> sys.stderr, str(e)
-    except repository.repository.PackageNotFound, e:
+    except repository.repository.TroveNotFound, e:
 	print >> sys.stderr, str(e)
 	    
 if __name__ == "__main__":

@@ -36,7 +36,8 @@ import versions
     EXEC, 
     BRANCHNAME,
     STRINGPATH, 
-    INT) = range(11)
+    FLAVOR,
+    INT) = range(12)
 
 BOOLEAN=BOOL
 
@@ -137,6 +138,8 @@ class ConfigFile:
 		self.__dict__[key] = True
 	    else:
 		raise ParseError, ("%s:%s: expected True or False for configuration value '%s'" % (file, self.lineno, key))
+        elif type == FLAVOR:
+            self.__dict__[key] = deps.deps.parseFlavor(val)
 
     def display(self, out=None):
         if out is None:
@@ -167,6 +170,22 @@ class ConfigFile:
 		    out.write("%-25s %-25s %s\n" % (item, idx, d[idx]))
 	    elif t == CALLBACK:
 		self.__dict__[item]('display')
+	    elif t == FLAVOR:
+                flavorStr = deps.deps.formatFlavor(self.__dict__[item])
+                flavorList = flavorStr.split(",")
+
+                str = ""
+                hdr = item
+                for item in flavorList:
+                    if len(str) + len(item) > 40:
+                        print "%-25s %s" % (hdr, str)
+                        str = ""
+                        hdr = ""
+                    str += item + ","
+
+                # chop off the trailing ,
+                str = str[:-1]
+                print "%-25s %s" % (hdr, str)
 	    elif t == BOOL:
 		out.write("%-25s %s\n" % (item, bool(self.__dict__[item])))
 	    else:
@@ -201,14 +220,15 @@ class ConaryConfiguration(ConfigFile):
 	'dbPath'		: '/var/lib/conarydb',
 	'debugRecipeExceptions' : [ BOOL, False ], 
 	'dumpStackOnError'      : [ BOOL, True ], 
+        'flavor'                : [ FLAVOR, deps.deps.DependencySet() ],
 	'installLabelPath'	: [ LABELLIST, [] ],
-	'instructionSet'	: deps.arch.current(),
 	'lookaside'		: '/var/cache/conary',
 	'name'			: None,
 	'repositoryMap'	        : [ STRINGDICT, {} ],
 	'root'			: '/',
 	'sourceSearchDir'	: '.',
 	'tmpDir'		: '/var/tmp/',
+        'useDir'                : '/etc/conary/use',
     }
 
     def __init__(self, readConfigFiles=True):
@@ -218,9 +238,6 @@ class ConaryConfiguration(ConfigFile):
 	self.useflags = {}
 	self.archflags = {}
 	self.macroflags = {}
-	self.flavor = deps.deps.DependencySet()
-	self.flavor.addDep(deps.deps.InstructionSetDependency, 
-			   self.instructionSet)
 	if readConfigFiles:
 	    self.readFiles()
 
@@ -333,3 +350,40 @@ class ParseError(ConaryCfgError):
 
     def __init__(self, str):
 	self.str = str
+
+def UseFlagDirectory(path):
+    """
+    Returns a dependency set reflecting the use flags specified by 
+    directory path.
+    """
+
+    flags = []
+    useFlags = deps.deps.DependencySet()
+
+    if not os.path.exists(path):
+	return useFlags
+
+    for flag in os.listdir(path):
+        filePath = os.path.join(path, flag)
+        size = os.stat(filePath).st_size
+        if not size:
+            sense = deps.deps.FLAG_SENSE_PREFERRED
+        else:
+            val = open(filePath).read().strip().lower()
+            if val == "disallowed":
+                sense = deps.deps.FLAG_SENSE_DISALLOWED
+            elif val == "preferred":
+                sense = deps.deps.FLAG_SENSE_PREFERRED
+            elif val == "prefernot":
+                sense = deps.deps.FLAG_SENSE_PREFERNOT
+            elif val == "required":
+                sense = deps.deps.FLAG_SENSE_REQUIRED
+            else:
+		raise ParseError, ("%s: unknown use value %s") % (filePath, val)
+                
+        flags.append((flag, sense))
+
+    useFlags.addDep(deps.deps.UseDependency, 
+                    deps.deps.Dependency("use", flags))
+
+    return useFlags

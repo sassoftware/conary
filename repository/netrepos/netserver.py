@@ -29,9 +29,11 @@ from repository import repository
 from local import idtable
 from local import sqldb
 from local import versiontable
-from netauth import InsufficientPermission
+from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExists
+import trovestore
+import versions
 
-SERVER_VERSIONS = [ 20 ]
+SERVER_VERSIONS = [ 21 ]
 CACHE_SCHEMA_VERSION = 11
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -41,14 +43,46 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     # 1. Internal server error (unknown exception)
     # 2. netserver.InsufficientPermission
 
+    # version filtering happens first. that's important for these flags
+    # to make sense. it means that:
+    #
+    # _GET_TROVE_VERY_LATEST/_GET_TROVE_ALLOWED_FLAVOR
+    #      returns all allowed flavors for the latest version of the trove
+    #      which has any allowed flavor
+    # _GET_TROVE_VERY_LATEST/_GET_TROVE_ALL_FLAVORS
+    #      returns all flavors available for the latest version of the
+    #      trove which has an allowed flavor (UNSUPPORTED)
+    # _GET_TROVE_VERY_LATEST/_GET_TROVE_BEST_FLAVOR
+    #      returns the best flavor for the latest version of the trove
+    #      which has at least one allowed flavor
+    #
+    # _GET_TROVE_ALL_LATEST/_GET_TROVE_ALLOWED_FLAVOR
+    #      returns all the allowed flavors for each version of the trove
+    #      which is a leaf for at least one allowed flavor. this is probably
+    #      not useful (UNSUPPORTED)
+    # _GET_TROVE_ALL_LATEST/_GET_TROVE_ALL_FLAVORS
+    #      returns all the flavors for each version of the trove
+    #      which is a leaf for at least one allowed flavor. this is probably
+    #      not useful (UNSUPPORTED)
+    # _GET_TROVE_ALL_LATEST/_GET_TROVE_BEST_FLAVORS
+    #      returns all of the flavors available for all versions
+    _GET_TROVE_ALL_VERSIONS = 1
+    _GET_TROVE_ALL_LATEST   = 2         # latest of each flavor
+    _GET_TROVE_VERY_LATEST  = 3         # latest of any flavor
+
+    _GET_TROVE_NO_FLAVOR        = 1     # no flavor info is returned
+    _GET_TROVE_ALL_FLAVORS      = 2     # all flavors (no scoring)
+    _GET_TROVE_BEST_FLAVOR      = 3     # the best flavor for flavorFilter
+    _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
+
     def callWrapper(self, methodname, authToken, args):
 
         def condRollback():
-            if self.repos.troveStore.db.inTransaction:
-                self.repos.rollback()
+            if self.db.inTransaction:
+                self.db.rollback()
 
 	# reopens the sqlite db if it's changed
-	self.repos.reopen()
+	self.reopen()
 
         try:
             # try and get the method to see if it exists
@@ -78,6 +112,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	except repository.DuplicateBranch, e:
             condRollback()
 	    return (True, ("DuplicateBranch", str(e)))
+	except UserAlreadyExists, e:
+            condRollback()
+	    return (True, ("UserAlreadyExists", str(e)))
+	#except Exception, e:
+        #    condRollback()
+	#    return (True, ("Unknown Exception", str(e)))
 	#except Exception:
 	#    import traceback, sys, string
         #    import lib.epdb
@@ -89,29 +129,39 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	#	lib.epdb.post_mortem(excInfo[2])
 	#    raise
 
-    def allTroveNames(self):
-	if not self.repos.auth.check(authToken, write = False):
-	    raise InsufficientPermission
+    def addUser(self, authToken, clientVersion, user, newPassword):
+        # adds a new user, with no acls. for now it requires full admin
+        # rights
+        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+            raise InsufficientPermissions
 
-	return [x for x in self.repos.troveStore.iterTroveNames() ]
+        self.auth.addUser(user, newPassword)
 
-    def troveNames(self, authToken, clientVersion, label):
-        label = self.toLabel(label)
+        return True
 
-	if not self.repos.auth.check(authToken, write = False, label = label):
-	    raise InsufficientPermission
+    def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
+               label, write, capped, admin):
+        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+            raise InsufficientPermissions
 
-        # XXX this should filter based on the label
+        if trovePattern == "":
+            trovePattern = None
 
-        return [ x for x in self.repos.troveStore.iterTroveNames() ]
+        if label == "":
+            label = None
+
+        self.auth.addAcl(userGroup, trovePattern, label, write, capped,
+                         admin)
+
+        return True
 
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,
                        urls, categories, licenses, source, language):
         branch = self.toBranch(branch)
-        retval = self.repos.troveStore.updateMetadata(troveName, branch, shortDesc, longDesc,
+        retval = self.troveStore.updateMetadata(troveName, branch, shortDesc, longDesc,
                                                       urls, categories, licenses, source, language)
-        self.repos.troveStore.commit()
+        self.troveStore.commit()
         return retval
 
     def getMetadata(self, authToken, clientVersion,
@@ -125,47 +175,502 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 version = self.toVersion(version)
             else:
                 version = None
-            md = self.repos.troveStore.getMetadata(troveName, branch, version, language)
+            md = self.troveStore.getMetadata(troveName, branch, version, language)
             if md:
                 metadata[troveName] = md.freeze() 
 
         return metadata
     
     def hasPackage(self, authToken, clientVersion, pkgName):
-	if not self.repos.auth.check(authToken, write = False, trove = pkgName):
+        # XXX left for compatibility with protocol 20
+        assert(clientVersion == 20)
+	if not self.auth.check(authToken, write = False, trove = pkgName):
 	    raise InsufficientPermission
 
-	return self.repos.troveStore.hasTrove(pkgName)
+	return self.troveStore.hasTrove(pkgName)
 
-    def hasTrove(self, authToken, clientVersion, pkgName, version, flavor):
-	if not self.repos.auth.check(authToken, write = False, trove = pkgName):
-	    raise InsufficientPermission
+    def _setupFlavorFilter(self, cu, flavorSet):
+        cu.execute("""CREATE TEMPORARY TABLE ffFlavor(flavorId INTEGER,
+                                                    base STRING,
+                                                    sense INTEGER, 
+                                                    flag STRING)""",
+                   start_transaction = False)
+        for i, flavor in enumerate(flavorSet.iterkeys()):
+            flavorId = i + 1
+            flavorSet[flavor] = flavorId
+            for depClass in self.toFlavor(flavor).getDepClasses().itervalues():
+                for dep in depClass.getDeps():
+                    cu.execute("INSERT INTO ffFlavor VALUES (?, ?, NULL, NULL)",
+                               flavorId, dep.name, start_transaction = False)
+                    for (flag, sense) in dep.flags.iteritems():
+                        cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, ?)",
+                                   flavorId, dep.name, sense, flag, 
+                                   start_transaction = False)
 
-	return self.repos.troveStore.hasTrove(pkgName, troveVersion = version,
-					troveFlavor = flavor)
+    _GTL_VERSION_TYPE_NONE = 0
+    _GTL_VERSION_TYPE_LABEL = 1
+    _GTL_VERSION_TYPE_VERSION = 2
+    _GTL_VERSION_TYPE_BRANCH = 3
 
-    def getTroveVersionList(self, authToken, clientVersion, troveNameList):
-	d = {}
-	for troveName in troveNameList:
-	    if not self.repos.auth.check(authToken, write = False, 
-                                         trove = troveName):
-		raise InsufficientPermission
+    def _getTroveList(self, authToken, clientVersion, troveSpecs,
+                      versionType = _GTL_VERSION_TYPE_NONE,
+                      latestFilter = _GET_TROVE_ALL_VERSIONS, 
+                      flavorFilter = _GET_TROVE_ALL_FLAVORS,
+                      withVersions = True, 
+                      withFlavors = False):
+        cu = self.db.cursor()
+        singleVersionSpec = None
+        dropTroveTable = False
 
-	    d[troveName] = [ self.freezeVersion(x) for x in
-		    self.repos.troveStore.iterTroveVersions(troveName) ]
+        assert(versionType == self._GTL_VERSION_TYPE_NONE or
+               versionType == self._GTL_VERSION_TYPE_BRANCH or
+               versionType == self._GTL_VERSION_TYPE_VERSION or
+               versionType == self._GTL_VERSION_TYPE_LABEL)
+        assert(latestFilter != self._GET_TROVE_ALL_LATEST)
 
-	return d
+        if troveSpecs:
+            # populate flavorIndices with all of the flavor lookups we
+            # need. a flavor of 0 (numeric) means "None"
+            flavorIndices = {}
+            for versionDict in troveSpecs.itervalues():
+                for flavorList in versionDict.itervalues():
+                    if flavorList is not None:
+                        flavorIndices.update({}.fromkeys(flavorList))
+            if flavorIndices.has_key(0):
+                del flavorIndices[0]
+        else:
+            flavorIndices = {}
+
+        if flavorIndices:
+            self._setupFlavorFilter(cu, flavorIndices)
+
+        if not troveSpecs or (len(troveSpecs) == 1 and 
+                                 troveSpecs.has_key(None) and
+                                 len(troveSpecs[None]) == 1 and
+                                 troveSpecs[None].has_key(None)):
+            # no trove names, and/or no version spec
+            troveNameClause = "Items\n"
+            assert(versionType == self._GTL_VERSION_TYPE_NONE)
+        elif len(troveSpecs) == 1 and troveSpecs.has_key(None):
+            # no trove names, and a single version spec (multiple ones
+            # are disallowed)
+            assert(len(troveSpecs[None]) == 1)
+            troveNameClause = "Items\n"
+            singleVersionSpec = troveSpecs[None].keys()[0]
+        else:
+            dropTroveTable = True
+            cu.execute("""CREATE TEMPORARY TABLE gtvlTbl(item STRING,
+                                                       versionSpec STRING,
+                                                       flavorId INT)""",
+                       start_transaction = False)
+            for troveName, versionDict in troveSpecs.iteritems():
+                if type(versionDict) is list:
+                    versionDict = dict.fromkeys(versionDict, [ None ])
+
+                for versionSpec, flavorList in versionDict.iteritems():
+                    if flavorList is None:
+                        cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, NULL)", 
+                                   troveName, versionSpec, 
+                                   start_transaction = False)
+                    else:
+                        for flavorSpec in flavorList:
+                            if flavorSpec:
+                                flavorId = flavorIndices[flavorSpec]
+                            else:
+                                flavorId = None
+
+                            cu.execute("INSERT INTO gtvlTbl VALUES (?, ?, ?)", 
+                                       troveName, versionSpec, flavorId, 
+                                       start_transaction = False)
+
+            cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)", 
+                       start_transaction = False)
+            troveNameClause = """gtvlTbl 
+                    JOIN Items ON
+                        gtvlTbl.item = Items.item
+            """
+
+        getList = [ 'Items.item', 'permittedTrove', 'salt', 'password' ]
+        argList = [ authToken[0] ]
+
+        if withVersions:
+            getList += [ 'Versions.version', 'timeStamps', 'Nodes.branchId',
+                         'finalTimestamp' ]
+            versionClause = """JOIN versions ON
+                        Nodes.versionId = versions.versionId
+            """
+        else:
+            getList += [ "NULL", "NULL", "NULL", "NULL" ]
+            versionClause = ""
+
+        if versionType == self._GTL_VERSION_TYPE_LABEL:
+            if singleVersionSpec:
+                labelClause = """JOIN Labels ON
+                            Labels.labelId = NodeLabelMap.labelId AND
+                            Labels.label = '%s'
+                """ % singleVersionSpec
+            else:
+                labelClause = """JOIN Labels ON
+                            Labels.labelId = NodeLabelMap.labelId AND
+                            Labels.label = gtvlTbl.versionSpec
+                """
+        elif versionType == self._GTL_VERSION_TYPE_BRANCH:
+            if singleVersionSpec:
+                labelClause = """JOIN Branches ON
+                            Branches.branchId = NodeLabelMap.branchId AND
+                            Branches.branch = '%s'
+                """ % singleVersionSpec
+            else:
+                labelClause = """JOIN Branches ON
+                            Branches.branchId = NodeLabelMap.branchId AND
+                            Branches.branch = gtvlTbl.versionSpec
+                """
+        elif versionType == self._GTL_VERSION_TYPE_VERSION:
+            if singleVersionSpec:
+                labelClause = """JOIN Versions AS VrsnFilter ON
+                            VrsnFilter.versionId = Instances.versionId AND
+                            VrsnFilter.version = '%s'
+                """ % singleVersionSpec
+            else:
+                labelClause = """JOIN Versions AS VrsnFilter ON
+                            VrsnFilter.versionId = Instances.versionId AND
+                            VrsnFilter.version = gtvlTbl.versionSpec
+                """
+        else:
+            assert(versionType == self._GTL_VERSION_TYPE_NONE)
+            labelClause = ""
+
+        # this forces us to go through the instances table, even though
+        # the nodes table is often sufficient; perhaps we should optimize
+        # that a bit?
+        if latestFilter != self._GET_TROVE_ALL_VERSIONS:
+            assert(withVersions)
+            instanceClause = """JOIN Latest ON
+                        Latest.itemId = Items.itemId
+                    JOIN Instances ON
+                        Instances.itemId = Items.itemId 
+                      AND
+                        Instances.versionId = Latest.versionId
+                      AND
+                        Instances.flavorId = Latest.flavorId
+            """
+        else:
+            instanceClause = """JOIN Instances ON 
+                        Instances.itemId = Items.itemId
+            """
+
+        if withFlavors:
+            assert(withVersions)
+            getList.append("InstFlavor.flavor")
+            flavorClause = """JOIN Flavors AS InstFlavor ON
+                        InstFlavor.flavorId = Instances.flavorId
+            """
+        else:
+            getList.append("NULL")
+            flavorClause = ""
+
+        if flavorIndices:
+            assert(withFlavors)
+            if len(flavorIndices) > 1:
+                # if ther eis only one flavor we don't need to join based on
+                # the gtvlTbl.flavorId (which is good, since it may not exist)
+                extraJoin = """ffFlavor.flavorId = gtvlTbl.flavorId
+                      AND
+                """
+            else:
+                extraJoin = ""
+
+            flavorScoringClause = """LEFT OUTER JOIN FlavorMap ON
+                        FlavorMap.flavorId = InstFlavor.flavorId
+                    LEFT OUTER JOIN ffFlavor ON
+                        %s
+                        ffFlavor.base = FlavorMap.base AND
+                        (ffFlavor.flag = FlavorMap.flag OR
+                            (ffFlavor.flag is NULL AND
+                             FlavorMap.flag is NULL))
+                    LEFT OUTER JOIN FlavorScores ON
+                        FlavorScores.request = ffFlavor.sense AND
+                        FlavorScores.present = FlavorMap.sense
+            """ % extraJoin
+            grouping = "GROUP BY instanceId, aclId"
+            getList.append("SUM(FlavorScores.value) as flavorScore")
+            flavorScoreCheck = "HAVING flavorScore > -500000"
+        else:
+            assert(flavorFilter == self._GET_TROVE_ALL_FLAVORS)
+            flavorScoringClause = ""
+            grouping = ""
+            getList.append("NULL")
+            flavorScoreCheck = ""
+
+        fullQuery = """
+                SELECT 
+                      %s
+                    FROM
+                    %s
+                    %s
+                    JOIN Nodes ON
+                        Nodes.itemId = Instances.itemId AND
+                        Nodes.versionId = Instances.versionId
+                    JOIN LabelMap AS NodeLabelMap ON
+                        NodeLabelMap.branchId = Nodes.branchId AND
+                        NodeLabelMap.itemId = Nodes.itemId
+                    LEFT OUTER JOIN UserPermissions ON
+                        UserPermissions.permittedLabelId = NodeLabelMap.labelId 
+                      OR
+                        UserPermissions.permittedLabelId is NULL
+                    %s
+                    %s
+                    %s
+                    %s
+                    WHERE
+                        user = ?
+                    %s
+                    %s
+        """ % (", ".join(getList), troveNameClause, instanceClause, 
+               versionClause, labelClause, flavorClause, flavorScoringClause,
+               grouping, flavorScoreCheck)
+        # this is a lot like the query for troveNames()... there is probably
+        # a way to unify this through some views
+        cu.execute(fullQuery, argList)
+
+        pwChecked = False
+        # this prevents dups that could otherwise arise from multiple
+        # acl's allowing access to the same information
+        allowed = {}
+
+        troveNames = []
+        troveVersions = {}
+
+        for (troveName, troveNamePattern, salt, password, versionStr, 
+             timeStamps, branchId, finalTimestamp, flavor, flavorScore) in cu:
+            if flavorScore is None:
+                flavorScore = 0
+
+            #os.system("echo %s %s %d > /dev/tty" % (troveName, flavor, flavorScore))
+            if allowed.has_key((troveName, versionStr, flavor)):
+                continue
+
+            if not self.auth.checkTrove(troveNamePattern, troveName):
+                continue
+
+            if not pwChecked:
+                if not self.auth.checkPassword(salt, password, authToken[1]):
+                    continue
+                pwChecked = True
+
+            allowed[(troveName, versionStr, flavor)] = True
+
+            if withVersions:
+                if latestFilter == self._GET_TROVE_VERY_LATEST:
+                    d = troveVersions.get(troveName, None)
+                    if d is None:
+                        d = {}
+                        troveVersions[troveName] = d
+
+                    lastTimestamp, lastFlavorScore = d.get(branchId, 
+                                                           (0, -500000))[0:2]
+                    # this rule implements "later is better"; we've already
+                    # thrown out incompatible troves, so whatever is left
+                    # is at least compatible; within compatible, newer
+                    # wins (even if it isn't as "good" as something older)
+                    if (flavorFilter == self._GET_TROVE_BEST_FLAVOR and 
+                                flavorScore > lastFlavorScore) or \
+                                finalTimestamp > lastTimestamp:
+                        d[branchId] = (finalTimestamp, flavorScore, versionStr, 
+                                        timeStamps, flavor)
+                elif flavorFilter == self._GET_TROVE_BEST_FLAVOR:
+                    assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
+                    assert(withFlavors)
+
+                    d = troveVersions.get(troveName, None)
+                    if d is None:
+                        d = {}
+                        troveVersions[troveName] = d
+
+                    lastTimestamp, lastFlavorScore = d.get(branchId, 
+                                                           (0, -500000))[0:2]
+
+                    if (flavorScore > lastFlavorScore):
+                        d[branchId] = (finalTimestamp, flavorScore, versionStr, 
+                                        timeStamps, flavor)
+                else:
+                    # if _GET_TROVE_ALL_VERSIONS is used, withFlavors must
+                    # be specified (or the various latest versions can't
+                    # be differentiated)
+                    assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
+                    assert(withFlavors)
+
+                    version = versions.VersionFromString(versionStr)
+                    version.setTimeStamps([float(x) for x in 
+                                                timeStamps.split(":")])
+
+                    d = troveVersions.get(troveName, None)
+                    if d is None:
+                        d = {}
+                        troveVersions[troveName] = d
+
+                    version = version.freeze()
+                    l = d.get(version, None)
+                    if l is None:
+                        l = []
+                        d[version] = l
+                    l.append(flavor)
+            else:
+                troveNames.append(troveName)
+
+        if dropTroveTable:
+            cu.execute("DROP TABLE gtvlTbl", start_transaction = False)
+
+        if flavorIndices:
+            cu.execute("DROP TABLE ffFlavor", start_transaction = False)
+
+        if withVersions:
+            if latestFilter == self._GET_TROVE_VERY_LATEST or \
+                        flavorFilter == self._GET_TROVE_BEST_FLAVOR:
+                newTroveVersions = {}
+                for troveName, versionDict in troveVersions.iteritems():
+                    if withFlavors:
+                        l = {}
+                    else:
+                        l = []
+
+                    for (finalTimestamp, flavorScore, versionStr, timeStamps, 
+                         flavor) in versionDict.itervalues():
+                        version = versions.VersionFromString(versionStr)
+                        version.setTimeStamps([float(x) for x in 
+                                                    timeStamps.split(":")])
+                        version = self.freezeVersion(version)
+
+                        if withFlavors:
+                            if flavor == None:
+                                flavor = "none"
+                            l[version] = [ flavor ]
+                        else:
+                            l.append(version)
+
+                    newTroveVersions[troveName] = l
+
+                troveVersions = newTroveVersions
+
+            return troveVersions
+        else:
+            return troveNames
+
+        assert(0)
+
+    def troveNames(self, authToken, clientVersion, labelStr):
+        if labelStr is None:    
+            return {}
+
+        return self._getTroveList(authToken, clientVersion, 
+                                  { None : { labelStr : None } }, 
+                                  withVersions = False, 
+                                  versionType = self._GTL_VERSION_TYPE_LABEL)
+
+    def getTroveVersionList(self, authToken, clientVersion, troveNameList,
+                            flavorFilter):
+        if troveNameList:
+            troveFilter = {}.fromkeys(troveNameList, 
+                                      { None : [ flavorFilter ] } )
+        else:
+            troveFilter = { None : { None : [ flavorFilter ] } }
+            
+        return self._getTroveList(authToken, clientVersion, troveFilter,
+                                  withVersions = True, withFlavors = True)
+
+    def getTroveVersionsByLabel(self, authToken, clientVersion, troveNameList, 
+                                labelStr, flavorFilter):
+        if not labelStr:
+            return {}
+        elif troveNameList:
+            troveFilter = {}.fromkeys(troveNameList, 
+                                      { labelStr: [ flavorFilter ] })
+        else:
+            troveFilter = { None : { labelStr : [ flavorFilter ] } }
+
+        return self._getTroveList(authToken, clientVersion, troveFilter,
+                                  withVersions = True, 
+                                  versionType = self._GTL_VERSION_TYPE_LABEL,
+                                  withFlavors = True)
+
+    def getTroveLeavesByBranch(self, authToken, clientVersion, troveSpecs,
+                               bestFlavor):
+        d = {}
+        for (name, branches) in troveSpecs.iteritems():
+            d[name] = {}
+            for branch, flavors in branches.iteritems():
+                if type(flavors) == list:
+                    d[name][branch] = [ self.toFlavor(x) for x in flavors ]
+                else:
+                    d[name][branch] = None
+
+        if bestFlavor:
+            flavorFilter = self._GET_TROVE_BEST_FLAVOR
+        else:
+            flavorFilter = self._GET_TROVE_ALL_FLAVORS
+
+        return self._getTroveList(authToken, clientVersion, d, 
+                                  withVersions = True, 
+                                  flavorFilter = flavorFilter,
+                                  versionType = self._GTL_VERSION_TYPE_BRANCH,
+                                  latestFilter = self._GET_TROVE_VERY_LATEST,
+                                  withFlavors = True)
+
+    def getTroveVersionFlavors(self, authToken, clientVersion, troveFilter,
+                               bestFlavor):
+        if bestFlavor:
+            flavorFilter = self._GET_TROVE_BEST_FLAVOR
+        else:
+            flavorFilter = self._GET_TROVE_ALL_FLAVORS
+
+        d = self._getTroveList(authToken, clientVersion, troveFilter,
+                                  withVersions = True, 
+                                  flavorFilter = flavorFilter,
+                                  versionType = self._GTL_VERSION_TYPE_VERSION,
+                                  withFlavors = True)
+        return d
+
+    def getAllTroveLeaves(self, authToken, clientVersion, troveNameList):
+        troveFilter = {}.fromkeys(troveNameList, { None : None })
+        return self._getTroveList(authToken, clientVersion, troveFilter,
+                                  withVersions = True, 
+                                  latestFilter = self._GET_TROVE_VERY_LATEST,
+                                  withFlavors = True)
+
+    def getTroveLeavesByLabel(self, authToken, clientVersion, troveNameList, 
+                              labelStr, flavorFilter):
+        if not labelStr:
+            return {}
+        elif troveNameList:
+            troveFilter = {}.fromkeys(troveNameList,
+                                      { labelStr : [ flavorFilter ] })
+            if troveFilter.has_key(None):
+                return
+        else:
+            troveFilter = { None : { labelStr : [ flavorFilter ] } }
+
+        if flavorFilter == 0:
+            flavorSelection = self._GET_TROVE_ALL_FLAVORS
+        else:
+            flavorSelection = self._GET_TROVE_BEST_FLAVOR
+
+        return self._getTroveList(authToken, clientVersion, troveFilter,
+                                  withVersions = True, 
+                                  versionType = self._GTL_VERSION_TYPE_LABEL,
+                                  latestFilter = self._GET_TROVE_VERY_LATEST,
+                                  withFlavors = True, 
+                                  flavorFilter = flavorSelection)
 
     def getFilesInTrove(self, authToken, clientVersion, troveName, versionStr, 
                         flavor, sortByPath = False, withFiles = False):
         # XXX this method is deprecated
         version = self.toVersion(versionStr)
-	if not self.repos.auth.check(authToken, write = False, 
+	if not self.auth.check(authToken, write = False, 
                                      trove = troveName,
 			       label = version.branch().label()):
 	    raise InsufficientPermission
 
-        gen = self.repos.troveStore.iterFilesInTrove(troveName,
+        gen = self.troveStore.iterFilesInTrove(troveName,
 					       version,
                                                self.toFlavor(flavor),
                                                sortByPath, 
@@ -215,11 +720,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         fileLabel = fileVersion.branch().label()
         fileId = self.toFileId(fileId)
 
-	if not self.repos.auth.check(authToken, write = False, 
+	if not self.auth.check(authToken, write = False, 
                                      label = fileLabel):
 	    raise InsufficientPermission
 
-        fileObj = self.repos.troveStore.findFileVersion(fileId)
+        fileObj = self.troveStore.findFileVersion(fileId)
 
         filePath = self.repos.contentsStore.hashToPath(
                         sha1helper.sha1ToString(fileObj.contents.sha1()))
@@ -234,92 +739,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            "changeset?%s" % os.path.basename(path)[:-4])
         return url
 
-    def getAllTroveLeafs(self, authToken, clientVersion, troveNames):
-	for troveName in troveNames:
-	    if not self.repos.auth.check(authToken, write = False, 
-                                         trove = troveName):
-		raise InsufficientPermission
-
-	d = {}
-	for (name, leafList) in \
-			self.repos.troveStore.iterAllTroveLeafs(troveNames):
-            if name != None:
-                d[name] = leafList
-	
-	return d
-
-    def getTroveLeavesByLabel(self, authToken, clientVersion, troveNameList, 
-                              labelStr):
-	d = {}
-	for troveName in troveNameList:
-	    if not self.repos.auth.check(authToken, write = False, 
-                                         trove = troveName):
-		raise InsufficientPermission
-
-	rd = {}
-
-	if len(troveNameList) == 1:
-	  for troveName in troveNameList:
-	    rd[troveName] = [ self.freezeVersion(x) for x in
-			self.repos.troveStore.iterTroveLeafsByLabel(troveName,
-								   labelStr) ]
-	else:
-	    d = self.repos.troveStore.iterTroveLeafsByLabelBulk(troveNameList,
-								labelStr)
-	    for name in troveNameList:
-		if d.has_key(name):
-		    rd[name] = [ self.freezeVersion(x) for x in d[name] ]
-		else:
-		    rd[name] = []
-
-	return rd
-
-    def getTroveVersionsByLabel(self, authToken, clientVersion, troveNameList, 
-                                labelStr):
-	d = {}
-	for troveName in troveNameList:
-	    if not self.repos.auth.check(authToken, write = False, 
-                                         trove = troveName):
-		raise InsufficientPermission
-
-	    d[troveName] = [ self.freezeVersion(x) for x in
-		    self.repos.troveStore.iterTroveVersionsByLabel(troveName,
-								   labelStr) ]
-
-	return d
-
-    def getTroveVersionFlavors(self, authToken, clientVersion, troveDict):
-	inD = {}
-	vMap = {}
-	for (troveName, versionList) in troveDict.iteritems():
-	    inD[troveName] = []
-	    for versionStr in versionList:
-		v = self.toVersion(versionStr)
-		vMap[v] = versionStr
-		inD[troveName].append(v)
-
-	outD = self.repos.troveStore.getTroveFlavors(inD)
-
-	retD = {}
-	for troveName in outD.iterkeys():
-	    retD[troveName] = {}
-	    for troveVersion in outD[troveName]:
-		verStr = vMap[troveVersion]
-		retD[troveName][verStr] = outD[troveName][troveVersion]
-
-	return retD
-
     def getTroveLatestVersion(self, authToken, clientVersion, pkgName, 
                               branchStr):
 	branch = self.toBranch(branchStr)
 
-	if not self.repos.auth.check(authToken, write = False, trove = pkgName,
+	if not self.auth.check(authToken, write = False, trove = pkgName,
 			       label = branch.label()):
 	    raise InsufficientPermission
 
         try:
             return self.freezeVersion(
-			self.repos.troveStore.troveLatestVersion(pkgName, 
+			self.troveStore.troveLatestVersion(pkgName, 
 						     self.toBranch(branchStr)))
         except KeyError:
             return 0
@@ -328,11 +758,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                      branchStr):
 	branch = self.toBranch(branchStr)
 
-	if not self.repos.auth.check(authToken, write = False, 
+	if not self.auth.check(authToken, write = False, 
                                      trove = troveName, label = branch.label()):
 	    raise InsufficientPermission
 
-	return self.repos.troveStore.iterTrovePerFlavorLeafs(troveName, branchStr)
+	return self.troveStore.iterTrovePerFlavorLeaves(troveName, branchStr)
 
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse, 
                      withFiles, withFileContents = None):
@@ -391,7 +821,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
 	    newVer = self.toVersion(new)
 
-	    if not self.repos.auth.check(authToken, write = False, trove = name,
+	    if not self.auth.check(authToken, write = False, trove = name,
 				   label = newVer.branch().label()):
 		raise InsufficientPermission
 
@@ -429,7 +859,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return urlList, newChgSetList, allFilesNeeded
 
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
-	if not self.repos.auth.check(authToken, write = False):
+	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
 	requires = {}
@@ -438,8 +868,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         label = self.toLabel(label)
 
-	sugDict = self.repos.troveStore.resolveRequirements(label, 
-                                                            requires.keys())
+	sugDict = self.troveStore.resolveRequirements(label, requires.keys())
 
 	result = {}
 	for (key, val) in sugDict.iteritems():
@@ -450,7 +879,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def prepareChangeSet(self, authToken, clientVersion):
 	# make sure they have a valid account and permission to commit to
 	# *something*
-	if not self.repos.auth.check(authToken, write = True):
+	if not self.auth.check(authToken, write = True):
 	    raise InsufficientPermission
 
 	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
@@ -476,7 +905,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	items = {}
 	for pkgCs in cs.iterNewPackageList():
 	    items[(pkgCs.getName(), pkgCs.getNewVersion())] = True
-	    if not self.repos.auth.check(authToken, write = True, 
+	    if not self.auth.check(authToken, write = True, 
 			       label = pkgCs.getNewVersion().branch().label(),
 			       trove = pkgCs.getName()):
 		raise InsufficientPermission
@@ -501,8 +930,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # special in an inode...
         r = []
         for (pathId, fileId) in fileList:
-            f = self.repos.troveStore.getFile(self.toPathId(pathId), 
-                                              self.toFileId(fileId))
+            f = self.troveStore.getFile(self.toPathId(pathId), 
+                                        self.toFileId(fileId))
             r.append(self.fromFile(f))
 
         return r
@@ -512,12 +941,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	# XXX needs to authentication against the trove the file is part of,
 	# which is unfortunate, though you have to wonder what could be so
         # special in an inode...
-	f = self.repos.troveStore.getFile(self.toPathId(pathId), 
-					  self.toFileId(fileId))
+	f = self.troveStore.getFile(self.toPathId(pathId), 
+                                    self.toFileId(fileId))
 	return self.fromFile(f)
 
     def checkVersion(self, authToken, clientVersion):
-	if not self.repos.auth.check(authToken, write = False):
+	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
         if clientVersion not in SERVER_VERSIONS:
@@ -528,6 +957,42 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def cacheChangeSets(self):
         return isinstance(self.cache, CacheSet)
 
+    def open(self):
+	if self.troveStore is not None:
+	    self.close()
+
+        self.db = sqlite3.connect(self.sqlDbPath)
+	self.troveStore = trovestore.TroveStore(self.db)
+	sb = os.stat(self.sqlDbPath)
+	self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
+
+        self.repos = fsrepos.FilesystemRepository(self.name, self.troveStore,
+                                                  self.repPath, self.map)
+	self.auth = NetworkAuthorization(self.db, self.name, 
+                                         anonymousReads = True)
+
+    def reopen(self):
+	sb = os.stat(self.sqlDbPath)
+
+	sqlDeviceInode = (sb.st_dev, sb.st_ino)
+	if self.sqlDeviceInode != sqlDeviceInode:
+	    del self.troveStore
+            del self.auth
+            del self.repos
+            del self.db
+
+            self.db = sqlite3.connect(self.sqlDbPath)
+	    self.troveStore = trovestore.TroveStore(self.db)
+
+	    sb = os.stat(self.sqlDbPath)
+	    self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
+
+            self.repos = fsrepos.FilesystemRepository(self.name, 
+                                                      self.troveStore,
+                                                      self.repPath, self.map)
+            self.auth = NetworkAuthorization(self.db, self.name, 
+                                             anonymousReads = True)
+
     def __init__(self, path, tmpPath, urlBase, name,
 		 repositoryMap, commitAction = None, cacheChangeSets = False):
 	self.map = repositoryMap
@@ -536,15 +1001,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.urlBase = urlBase
 	self.name = name
 	self.commitAction = commitAction
+        self.sqlDbPath = self.repPath + '/sqldb'
+        self.troveStore = None
 
-	self.repos = fsrepos.FilesystemRepository(self.name, self.repPath, 
-                                                  self.map)
+	try:
+	    util.mkdirChain(self.repPath)
+	except OSError, e:
+	    raise repository.repository.OpenError(str(e))
 
         if cacheChangeSets:
             self.cache = CacheSet(path + "/cache.sql", tmpPath, 
                                   CACHE_SCHEMA_VERSION)
         else:
             self.cache = NullCacheSet(tmpPath)
+
+        self.open()
 
 class NullCacheSet:
     def getEntry(self, item, recurse, withFiles, withFileContents):

@@ -194,7 +194,7 @@ def checkout(repos, cfg, workDir, name):
     try:
         trvList = repos.findTrove(cfg.buildLabel, name, None,
 				  versionStr = versionStr)
-    except repository.repository.PackageNotFound, e:
+    except repository.repository.TroveNotFound, e:
         log.error(str(e))
         return
     if len(trvList) > 1:
@@ -267,11 +267,13 @@ def commit(repos, cfg, message, sourceCheck = False):
 
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
-	if repos.hasPackage(cfg.buildLabel.getHost(), state.getName()):
+        name = state.getName()
+        if repos.getTroveLeavesByLabel([name], cfg.buildLabel).get(name, []):
 	    log.error("%s is marked as a new package but it " 
 		      "already exists" % state.getName())
 	    return
 	srcPkg = None
+        del name
     else:
 	srcPkg = repos.getTrove(state.getName(), state.getVersion(),
                                 deps.deps.DependencySet())
@@ -342,8 +344,12 @@ def annotate(repos, filename):
     branch = state.getVersion().branch()
     label = branch.label()
     troveName = state.getName()
-    # verList is in ascending order (first commit is first in list)
+
     labelVerList = repos.getTroveVersionsByLabel([troveName], label)[troveName]
+    labelVerList = labelVerList.keys()
+    # sort verList into ascending order (first commit is first in list)
+    labelVerList.sort(versions.Version.compare)
+
     switchedBranches = False
     branchVerList = {}
     for ver in labelVerList:
@@ -541,7 +547,7 @@ def diff(repos, versionStr = None):
         try:
             pkgList = repos.findTrove(None, state.getName(), None,
                                       versionStr = versionStr)
-        except repository.repository.PackageNotFound, e:
+        except repository.repository.TroveNotFound, e:
             log.error("Unable to find source component %s with version %s: %s",
                       state.getName(), versionStr, str(e))
             return
@@ -650,7 +656,7 @@ def updateSrc(repos, versionStr = None):
         try:
             pkgList = repos.findTrove(None, pkgName, None,
                                       versionStr = versionStr)
-        except repository.repository.PackageNotFound:
+        except repository.repository.TroveNotFound:
 	    log.error("Unable to find source component %s with version %s"
                       % (pkgName, versionStr))
 	    return
@@ -744,7 +750,9 @@ def newPackage(repos, cfg, name):
 
     state = SourceState(name, versions.NewVersion())
 
-    if repos and repos.hasPackage(cfg.buildLabel.getHost(), name):
+    # see if this package exists on our build branch
+    if repos and repos.getTroveLeavesByLabel([name], 
+                                               cfg.buildLabel).get(name, []):
 	log.error("package %s already exists" % name)
 	return
 
@@ -802,7 +810,8 @@ def showLog(repos, branch = None):
     troveName = state.getName()
 
     verList = repos.getTroveVersionsByLabel([troveName], branch.label())
-    verList = verList[troveName]
+    verList = verList[troveName].keys()
+    verList.sort(versions.Version.compare)
     verList.reverse()
     l = []
     for version in verList:

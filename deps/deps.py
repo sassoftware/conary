@@ -24,6 +24,20 @@ DEP_CLASS_TROVES	= 4
 DEP_CLASS_USE		= 5
 DEP_CLASS_SONAME	= 6
 
+FLAG_SENSE_REQUIRED     = 1
+FLAG_SENSE_PREFERRED    = 2
+FLAG_SENSE_PREFERNOT    = 3
+FLAG_SENSE_DISALLOWED   = 4
+
+senseMap = { FLAG_SENSE_REQUIRED   : "",
+             FLAG_SENSE_PREFERRED  : "~",
+             FLAG_SENSE_PREFERNOT  : "~!",
+             FLAG_SENSE_DISALLOWED : "!" }
+
+senseReverseMap = {}
+for key, val in senseMap.iteritems():
+    senseReverseMap[val] = key
+
 dependencyClasses = {}
 
 def _registerDepClass(classObj):
@@ -80,17 +94,19 @@ class Dependency(BaseDependency):
 
     def __str__(self):
 	if self.flags:
-	    flags = self.flags.keys()
+	    flags = self.flags.items()
 	    flags.sort()
-	    return "%s(%s)" % (self.name, " ".join(flags))
+	    return "%s(%s)" % (self.name, 
+                    " ".join([ "%s%s" % (senseMap[x[1]], x[0]) for x in flags]))
 	else:
 	    return self.name
 
     def freeze(self):
 	if self.flags:
-	    flags = self.flags.keys()
+	    flags = self.flags.items()
 	    flags.sort()
-	    return "%s:%s" % (self.name, ",".join(flags))
+	    return "%s:%s" % (self.name, 
+                    ",".join([ "%s%s" % (senseMap[x[1]], x[0]) for x in flags]))
 	else:
 	    return self.name
 
@@ -103,17 +119,22 @@ class Dependency(BaseDependency):
 	"""
 	if self.name != required.name: 
 	    return False
-	for requiredFlag in required.flags.iterkeys():
+	for (requiredFlag, requiredSense) in required.flags.iteritems():
             # it is fine to not match a flag that is
             # simply a preference
-            if requiredFlag[0] == '~':
+            if requiredSense == FLAG_SENSE_PREFERRED or \
+               requiredSense == FLAG_SENSE_PREFERNOT:
                 continue
-	    if not self.flags.has_key(requiredFlag): 
+
+            present = self.flags.has_key(requiredFlag)
+	    if requiredSense == FLAG_SENSE_REQUIRED and not present:
 		return False
+            elif requiredSense == FLAG_SENSE_DISALLOWED and present:
+                return False
 
 	return True
 
-    def mergeFlags(self, other):
+    def mergeFlags(self, other, override = False):
 	"""
 	Returns a new Dependency which merges the flags from the two
 	existing dependencies. We don't want to merge in place as this
@@ -123,43 +144,49 @@ class Dependency(BaseDependency):
         make the merged flavor !foo.  
 	"""
 	allFlags = self.flags.copy()
-        for flag in other.flags:
-            if flag[0] == '~':
-                baseFlag = flag[1:]
-            else:
-                baseFlag = flag
-            if baseFlag[0] == '!':
-                opposite = baseFlag[1:]
-            else:
-                opposite = '!' + baseFlag
+        for (flag, otherSense) in other.flags.iteritems():
+            if override or not allFlags.has_key(flag):
+                allFlags[flag] = otherSense
+                continue
 
-            if flag[0] == '~':
-                # don't allow ~foo and ~!foo, ignore this flag if a stronger
-                # flag (with no ~) exists
-                if '~' + opposite  in allFlags:
-                    raise RuntimeError, ("Invalid flag combination in merge:"
-                                         " %s and ~%s"  % (flag, opposite))
-                if opposite in allFlags or baseFlag in allFlags:
-                    continue
-                allFlags[flag] = True
-            else:
-                # don't allow foo and !foo, delete any weaker flags -- 
-                # (with ~)
-                if opposite in allFlags:
-                    raise RuntimeError, ("Invalid flag combination in merge:"
-                                         " %s and %s"  % (flag, opposite))
-                if ('~' + baseFlag) in allFlags:
-                    del allFlags['~' + baseFlag]
-                elif ('~' + opposite) in allFlags:
-                    del allFlags['~' + opposite]
-                allFlags[flag] = True
-	return Dependency(self.name, allFlags)
+            thisSense = allFlags[flag]
+
+            if thisSense == otherSense:
+                # same flag, same sense
+                continue
+
+            if ((thisSense == FLAG_SENSE_REQUIRED and 
+                        otherSense == FLAG_SENSE_DISALLOWED) or
+                (thisSense == FLAG_SENSE_DISALLOWED and
+                        otherSense == FLAG_SENSE_REQUIRED)   or
+                (thisSense == FLAG_SENSE_PREFERRED and 
+                        otherSense == FLAG_SENSE_PREFERNOT) or
+                (thisSense == FLAG_SENSE_PREFERNOT and
+                        otherSense == FLAG_SENSE_PREFERRED)):
+                thisFlag = "%s%s" % (senseMap[thisSense], flag)
+                otherFlag = "%s%s" % (senseMap[otherSense], flag)
+                raise RuntimeError, ("Invalid flag combination in merge:"
+                                     " %s and %s"  % (thisFlag, otherFlag))
+
+            # know they aren't the same, and they are compatible
+            if thisSense == FLAG_SENSE_REQUIRED or \
+                    thisSense == FLAG_SENSE_DISALLOWED:
+                continue
+            elif otherSense == FLAG_SENSE_REQUIRED or \
+                    otherSense == FLAG_SENSE_DISALLOWED:
+                allFlags[flag] = otherSense
+                continue
+
+            # we shouldn't end up here
+            assert(0)
+
+        return Dependency(self.name, allFlags)
 
     def getName(self):
         return (self.name,)
 
     def getFlags(self):
-        return (self.flags.keys(),)
+        return (self.flags.items(),)
 
     def __init__(self, name, flags = []):
 	self.name = name
@@ -167,12 +194,12 @@ class Dependency(BaseDependency):
 	    self.flags = flags
 	else:
 	    self.flags = {}
-	    for flags in flags:
-		self.flags[flags] = True
+	    for (flag, sense) in flags:
+		self.flags[flag] = sense
 
 class DependencyClass:
 
-    def addDep(self, dep):
+    def addDep(self, dep, override = False):
         assert(dep.__class__ == self.depClass)
 
 	if self.members.has_key(dep.name):
@@ -182,7 +209,7 @@ class DependencyClass:
 
 	    # merge the flags, and add the newly created dependency
 	    # into the class
-	    dep = self.members[dep.name].mergeFlags(dep)
+	    dep = self.members[dep.name].mergeFlags(dep, override = override)
 	    del self.members[dep.name]
 
 	if not dependencyCache.has_key(dep):
@@ -205,11 +232,11 @@ class DependencyClass:
 
 	return True
 
-    def union(self, other):
+    def union(self, other, override = False):
 	if other is None: return
 	for otherdep in other.members.itervalues():
 	    # calling this for duplicates is a noop
-	    self.addDep(otherdep)
+	    self.addDep(otherdep, override = override)
 
     def getDeps(self):
         l = self.members.items()
@@ -223,6 +250,19 @@ class DependencyClass:
         flags = []
         if len(l) > 1:
             flags = l[1].split(',')
+
+        for i, flag in enumerate(flags):
+            kind = flag[0:2]
+
+            if kind == '~!':
+                flags[i] = (flag[2:], FLAG_SENSE_PREFERNOT)
+            elif kind[0] == '!':
+                flags[i] = (flag[1:], FLAG_SENSE_DISALLOWED)
+            elif kind[0] == '~':
+                flags[i] = (flag[1:], FLAG_SENSE_PREFERRED)
+            else:
+                flags[i] = (flag, FLAG_SENSE_REQUIRED)
+
         d = Dependency(l[0], flags)
         if not dependencyCache.has_key(d):
             dependencyCache[d] = d
@@ -355,13 +395,14 @@ class DependencySet:
     def getDepClasses(self):
         return self.members
 
-    def union(self, other):
+    def union(self, other, override = False):
         if not other:
             return
 
 	for tag in other.members:
 	    if self.members.has_key(tag):
-		self.members[tag].union(other.members[tag])
+		self.members[tag].union(other.members[tag],
+                                        override = override)
 	    else:
 		self.members[tag] = copy.deepcopy(other.members[tag])
 
@@ -419,9 +460,62 @@ def ThawDependencySet(frz):
         depSet.addDep(depClass, depClass.thawDependency(frozen))
     return depSet
 
+def formatFlavor(flavor):
+    """
+    Formats a flavor and returns a string which parseFlavor can 
+    handle.
+    """
+    def _singleClass(depClass):
+        dep = depClass.getDeps().next()
+
+        flags = dep.getFlags()[0]
+
+	if flags:
+	    flags.sort()
+	    return "%s(%s)" % (dep.getName()[0],
+                    ",".join([ "%s%s" % (senseMap[x[1]], x[0]) 
+                                            for x in flags]))
+	else:
+	    return dep.getName()[0]
+
+    classes = flavor.getDepClasses()
+    insSet = classes.get(DEP_CLASS_IS, None)
+    useFlags = classes.get(DEP_CLASS_USE, None)
+
+    if insSet is not None:
+        insSet = _singleClass(insSet)
+
+    if useFlags is not None:
+        # strip the use() bit
+        useFlags = _singleClass(useFlags)[4:-1]
+
+    if insSet and useFlags:
+        return "%s use: %s" % (insSet, useFlags)
+    elif insSet:
+        return insSet
+    elif useFlags:
+        return "use: %s" % useFlags
+
+    return ""
+
 def parseFlavor(s):
     # return a DependencySet for the string passed. format is
     # [arch[(flag,[flag]*)]] [use:flag[,flag]*]
+
+    def _fixup(flag):
+        flag = flag.strip()
+        if senseReverseMap.has_key(flag[0:2]):
+            sense = senseReverseMap[flag[0:2]]
+            flag = flag[2:]
+        elif senseReverseMap.has_key(flag[0]):
+            sense = senseReverseMap[flag[0]]
+            flag = flag[1:]
+        else:
+            sense = FLAG_SENSE_REQUIRED
+
+        return (flag, sense)
+
+    s = s.strip()
 
     match = flavorRegexp.match(s)
     if not match:
@@ -436,16 +530,18 @@ def parseFlavor(s):
         if groups[1]:
             insSetFlags = groups[1].split(",")
             for i, flag in enumerate(insSetFlags):
-                insSetFlags[i] = insSetFlags[i].strip()
+                insSetFlags[i] = _fixup(flag)
         else:
             insSetFlags = []
+
         set.addDep(InstructionSetDependency, Dependency(baseInsSet, 
                                                         insSetFlags))
 
     if groups[2]:
         useFlags = groups[2].split(",")
         for i, flag in enumerate(useFlags):
-            useFlags[i] = useFlags[i].strip()
+            useFlags[i] = _fixup(flag)
+
         set.addDep(UseDependency, Dependency("use", useFlags))
 
     return set
@@ -453,14 +549,16 @@ def parseFlavor(s):
 dependencyCache = util.ObjectCache()
 
 ident = '(?:[_A-Za-z][0-9A-Za-z_]*)'
-useFlag = '(?:!|~!)?IDENT(?:\.IDENT)?'
-archClause = '(IDENT)(?:\((IDENT(?:,IDENT)*)\))?(?:$| )'
+flag = '(?:~?!?IDENT)'
+useFlag = '(?:!|~!)?FLAG(?:\.IDENT)?'
+archClause = '(IDENT)(?:\(( *FLAG(?: *, *FLAG)*)\))?(?:$| )'
 useClause = 'use: *(USEFLAG *(?:, *USEFLAG)*) *'
 exp = '^(?:ARCHCLAUSE)? *(?:USECLAUSE)?$'
 
 exp = exp.replace('ARCHCLAUSE', archClause)
 exp = exp.replace('USECLAUSE', useClause)
 exp = exp.replace('USEFLAG', useFlag)
+exp = exp.replace('FLAG', flag)
 exp = exp.replace('IDENT', ident)
 
 flavorRegexp = re.compile(exp)

@@ -273,13 +273,52 @@ class Flag(dict):
         new._frozen = self._frozen
         return new
 
-    def asSet(self, *flags, **kw):
+    def allAsSet(self):
+        """ Convert self and child flags to a flag set """
+        if self._name == '__GLOBAL__':
+            return self
+        top = parent = Flag(value=None, name=self._name, 
+                                        required=self._required)
+        cursor = self._parent
+        while cursor is not None:
+            child = parent
+            parent = Flag(value=None, name=cursor._name)
+            parent[child._name] = child
+            child._parent = parent
+            cursor = cursor._parent
+        # Use, Arch, etc Flag instances don't have/need a parent
+        # named __GLOBAL__ but sets containing both Use and Arch
+        # need a higher level to connect them.
+        if parent._name != '__GLOBAL__':
+            child = parent
+            globalFlag = Flag(value=None, name='__GLOBAL__')
+            child._parent = globalFlag
+            globalFlag[child._name] = child
+        else:
+            globalFlag = parent
+
+        childflags = []
+        for flag in self.keys():
+            childflags.append((flag, top, self))
+        while childflags:
+            (flagname, parent, current) = childflags.pop()
+            parent[flagname] = Flag(value=current[flagname]._get(), 
+                             name=flagname,
+                             parent=parent,
+                             required=current[flagname]._required)
+            for childflag in current[flagname].keys():
+                childflags.append((childflag, parent[flagname], 
+                                              current[flagname]))
+            
+        top._value = self._get()
+        return globalFlag
+
+    def asSet(self, *flags):
         """ Convert a flag to a flag set, containing only this flag.
             If any child flags are passed as arguments, a flag set is created
             containing this flag and the child flags """
         # a) create a Flag with knowledge about this flag and its
         # parents (parents all set to none)
-
         if self._name == '__GLOBAL__':
             return self
         top = parent = Flag(value=None, name=self._name, 
@@ -319,17 +358,17 @@ class Flag(dict):
         if self._name != '__GLOBAL__':
             self = self.asSet()
         if 'Use' in self or 'Flags' in self:
-            stringDeps = []
+            depFlags = []
             if 'Use' in self and self.Use.keys():
                 for flag in self.Use.iterkeys():
-                    stringDeps.extend(self.Use[flag].toDepStrings(topflag=self.Use))
+                    depFlags.extend(self.Use[flag].toDepFlags(topflag=self.Use))
             if 'Flags' in self and self.Flags.keys():
                 for flag in self.Flags.iterkeys():
-                    stringDeps.extend(
-                        self.Flags[flag].toDepStrings(prefix=recipename,
+                    depFlags.extend(
+                        self.Flags[flag].toDepFlags(prefix=recipename,
                                                    topflag=self.Flags))
-            if stringDeps:
-                dep = deps.Dependency('use', stringDeps)
+            if depFlags:
+                dep = deps.Dependency('use', depFlags)
                 set.addDep(deps.UseDependency, dep)
         if 'Arch' in self:
             excludeFlags = ['bits64', 'bits32', 'BE', 'LE' ] 
@@ -345,15 +384,15 @@ class Flag(dict):
                     continue
                 if arch in excludeFlags:
                     continue
-                stringDeps = []
+                depFlags = []
                 for subarch, flag in topflag.iteritems():
-                    stringDeps.extend(flag.toDepStrings(topflag=topflag))
-                dep = deps.Dependency(arch, stringDeps)
+                    depFlags.extend(flag.toDepFlags(topflag=topflag))
+                dep = deps.Dependency(arch, depFlags)
                 set.addDep(deps.InstructionSetDependency, dep)
         return set
 
-    def toDepStrings(self, prefix=None, topflag=None):
-        strings = []
+    def toDepFlags(self, prefix=None, topflag=None):
+        flags = []
         namelist = []
         if topflag is None:
             topflag = self
@@ -367,15 +406,15 @@ class Flag(dict):
         if self._value is not None:
             if self._value:
                 if self._required:
-                    strings.append(name)
+                    flags.append((name, deps.FLAG_SENSE_REQUIRED))
                 else:
-                    strings.append('~' + name)
+                    flags.append((name, deps.FLAG_SENSE_PREFERRED))
             else:
-                strings.append('~!' + name)
+                flags.append((name, deps.FLAG_SENSE_PREFERNOT))
         for subflag in self.iterkeys():
-            strings.extend(self[subflag].toDepStrings(prefix=prefix,
+            flags.extend(self[subflag].toDepFlags(prefix=prefix,
                                                       topflag=topflag))
-        return strings
+        return flags
 
     def __setitem__(self, key, value):
 	if self._frozen:
@@ -394,7 +433,7 @@ class Flag(dict):
             return flag
         if name in self._deprecated:
             return self._deprecated[name]
-        elif self._createOnAccess:
+        elif self._createOnAccess and name[0] != '_':
             # flag doesn't exist, add it
             flag =  Flag(value=None, name=name, parent=self,
                               createOnAccess=True, track=self._track)
@@ -761,3 +800,6 @@ def clearOverrides(config, pkgname):
     LocalFlags._clearOverrides()
     for key in LocalFlags.keys():
         LocalFlags[key]._clearOverrides()
+
+def allAsSet():
+    return Use.allAsSet() + LocalFlags.allAsSet() + Arch.allAsSet()

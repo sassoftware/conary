@@ -649,21 +649,23 @@ class GroupRecipe(Recipe):
         self.addTroveList.append((name, versionStr, flavor, source))
 
     def findTroves(self):
+        # use the current use flag set as the base against
+        # which reqrest for specific trove flavors is taken...
+        baseFlavor  = use.allAsSet()
+        baseFlavorDep = baseFlavor.toDependency()
         for (name, versionStr, flavor, source) in self.addTroveList:
             try:
-                # XXX this is where we need to integrate 
-                # flavors into groups - by combining self.flavor 
-                # and local variable flavor
-                pkgList = self.repos.findTrove(self.label, name, self.flavor, 
+                if flavor is None:
+                    desFlavor = baseFlavorDep
+                else:
+                    desFlavor = (baseFlavor + flavor).toDependency()
+                pkgList = self.repos.findTrove(self.label, name, desFlavor,
                                                versionStr = versionStr)
-            except repository.PackageNotFound, e:
+            except repository.TroveNotFound, e:
                 raise RecipeFileError, str(e)
             for trove in pkgList:
                 v = trove.getVersion()
                 f = trove.getFlavor()
-                if flavor is not None:
-                    if not self.flavor.satisfies(f):
-                        continue
                 l = self.troveVersionFlavors.get(name, [])
                 if (v, f) not in l:
                     l.append((v,f))
@@ -753,7 +755,7 @@ class FilesetRecipe(Recipe):
 	try:
 	    pkgList = self.repos.findTrove(self.label, component, self.flavor,
 					   versionStr = versionStr)
-	except repository.PackageNotFound, e:
+	except repository.TroveNotFound, e:
 	    raise RecipeFileError, str(e)
 
 	if len(pkgList) == 0:

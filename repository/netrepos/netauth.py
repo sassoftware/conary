@@ -15,6 +15,8 @@ import md5
 import sqlite3
 import re
 
+from repository.netclient import UserAlreadyExists
+
 class NetworkAuthorization:
     def check(self, authToken, write = False, admin = False, label = None, trove = None):
         if label and label.getHost() != self.name:
@@ -75,6 +77,27 @@ class NetworkAuthorization:
 
         return False
         
+    def checkTrove(self, pattern, trove):
+        if not pattern:
+            return True
+
+        regExp = self.reCache.get(pattern, None)
+        if regExp is None:
+            regExp = re.compile(pattern)
+            self.reCache[trove] = regExp
+
+        if regExp.match(trove):
+            return True
+
+        return False
+
+    def checkPassword(self, salt, password, challenge):
+        m = md5.new()
+        m.update(salt)
+        m.update(challenge)
+
+        return m.hexdigest() == password
+
     def checkUserPass(self, authToken, label = None):
         if label and label.getHost() != self.name:
             raise RepositoryMismatch
@@ -93,24 +116,81 @@ class NetworkAuthorization:
 
         return False
 
-    def addUser(self, user, password, write=True, admin=False):
+    def checkIsFullAdmin(self, user, password):
+        cu = self.db.cursor()
+        cu.execute("""SELECT salt, password  
+                        FROM userPermissions 
+                        WHERE User=? AND admin=1""", user)
+
+        for (salt, cryptPassword) in cu:
+            if not self.checkPassword(salt, cryptPassword, password):
+                return False
+            return True
+
+        return False
+
+    def addAcl(self, userGroup, trovePattern, label, write, capped, admin):
         cu = self.db.cursor()
 
+        if trovePattern:
+            cu.execute("SELECT * FROM Items WHERE item=?", trovePattern)
+            itemId = cu.fetchone()
+            if itemId:
+                itemId = itemId[0]
+            else:
+                cu.execute("INSERT INTO Items VALUES(NULL, ?)", trovePattern)
+                itemId = cu.lastrowid
+        else:
+            itemId = None
+
+        if label:
+            cu.execute("SELECT * FROM Labels WHERE label=?", label)
+            labelId = cu.fetchone()
+            if labelId:
+                labelId = labelId[0]
+            else:
+                cu.execute("INSERT INTO Labels VALUES(NULL, ?)", label)
+                labelId = cu.lastrowid
+        else:
+            labelId = None
+
+
+        cu.execute("""INSERT INTO Permissions
+                        SELECT userGroupId, ?, ?, ?, ?, ? FROM
+                            (SELECT userGroupId FROM userGroups WHERE
+                                userGroup=?)
+                        """, labelId, itemId, write, capped, admin, userGroup)
+
+        self.db.commit()
+                            
+    def addUser(self, user, password):
+        cu = self.db.cursor()
         salt = "AAAA"
         
         m = md5.new()
         m.update(salt)
         m.update(password)
-        cu.execute("INSERT INTO Users VALUES (NULL, ?, ?, ?)", user, 
-                   salt, m.hexdigest())
-        userId = cu.lastrowid
-        cu.execute("INSERT INTO UserGroups VALUES (NULL, ?)", user)
+
+        # insert into userGroups first; since every entry in users is
+        # also in userGroups, the uniqueness constraint on the 
+        # userGroups table ensures uniqueness in both, and lets us use
+        # the userGroupId as the userId as well
+
+        try:
+            cu.execute("INSERT INTO UserGroups VALUES (NULL, ?)", user)
+        except sqlite3.ProgrammingError, e:
+            if str(e) == 'column userGroup is not unique':
+                raise UserAlreadyExists, 'user: %s' % user
+            raise
+
         userGroupId = cu.lastrowid
+
+        cu.execute("INSERT INTO Users VALUES (?, ?, ?, ?)",
+                   (userGroupId, user, salt, m.hexdigest()))
         cu.execute("INSERT INTO UserGroupMembers VALUES (?, ?)", 
-                   userGroupId, userId)
+                   userGroupId, userGroupId)
         userGroupId = cu.lastrowid
-        cu.execute("INSERT INTO Permissions VALUES (?, Null, Null, ?, ?, ?)",
-                   userGroupId, write, True, admin)
+
         self.db.commit()
 
     def changePassword(self, user, newPassword):
@@ -141,7 +221,8 @@ class NetworkAuthorization:
         self.reCache = {}
 
         cu = self.db.cursor()
-        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type "
+                   "in ('table', 'view')")
         tables = [ x[0] for x in cu ]
 
         commit = False
@@ -178,6 +259,28 @@ class NetworkAuthorization:
                                                     admin INTEGER)""")
             cu.execute("""CREATE INDEX PermissionsIdx
                           ON Permissions(userGroupId, labelId, itemId)""")
+            commit = True
+
+        if "UserPermissions" not in tables:
+            cu.execute("""CREATE VIEW UserPermissions AS
+                  SELECT Users.user AS user,
+                         Users.salt AS salt,
+                         Users.password as password,
+                         PerItems.item AS permittedTrove,
+                         Permissions.labelId AS permittedLabelId,
+                         Labels.label AS permittedLabel,
+                         Permissions.admin AS admin,
+                         Permissions.write AS write,
+                         Permissions._ROWID_ as aclId
+                      FROM Users JOIN UserGroupMembers ON
+                          Users.userId = UserGroupMembers.userId
+                      JOIN Permissions ON
+                          UserGroupMembers.userGroupId = Permissions.userGroupId
+                      LEFT OUTER JOIN Items AS PerItems ON
+                          PerItems.itemId = Permissions.itemId
+                      LEFT OUTER JOIN Labels ON
+                          Permissions.labelId = Labels.labelId
+            """)
             commit = True
 
         if commit:

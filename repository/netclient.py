@@ -37,7 +37,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=20
+CLIENT_VERSION=21
 
 class _Method(xmlrpclib._Method):
 
@@ -70,6 +70,9 @@ class _Method(xmlrpclib._Method):
 	    raise repository.DuplicateBranch(exceptionArgs[0])
         elif exceptionName == "MethodNotSupported":
 	    raise repository.MethodNotSupported(exceptionArgs[0])
+        elif exceptionName == "UserAlreadyExists":
+            import netrepos
+	    raise UserAlreadyExists(exceptionArgs[0])
 	else:
 	    raise UnknownException(exceptionName, exceptionArgs)
 
@@ -135,9 +138,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def open(self, *args):
         pass
 
-    def hasPackage(self, serverName, pkg):
-        return self.c[serverName].hasPackage(pkg)
-
     def updateMetadata(self, troveName, branch, shortDesc, longDesc = "",
                        urls = [], licenses=[], categories = [],
                        source="local", language = "C"):
@@ -201,6 +201,23 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             mdDict[troveName] = metadata.Metadata(md)
         return mdDict
 
+    def addUser(self, label, user, newPassword):
+        # the label just identifies the repository to create the user in
+        self.c[label].addUser(user, newPassword)
+
+    def addAcl(self, reposLabel, userGroup, trovePattern, label, write,
+               capped, admin):
+        if not label:
+            label = ""
+        else:
+            label = self.fromLabel(label)
+
+        if not trovePattern:
+            trovePattern = ""
+
+        self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
+                                  capped, admin)
+
     def troveNames(self, label):
 	return self.c[label].troveNames(self.fromLabel(label))
 
@@ -243,10 +260,25 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             else:
                 yield (pathId, path, fileId, version)
     
-    def getAllTroveLeafs(self, serverName, troveNames):
-	d = self.c[serverName].getAllTroveLeafs(troveNames)
+    def _mergeTroveQuery(self, resultD, response):
+        for troveName, troveVersions in response.iteritems():
+            if not resultD.has_key(troveName):
+                resultD[troveName] = {}
+            for versionStr, flavors in troveVersions.iteritems():
+                version = self.thawVersion(versionStr)
+                resultD[troveName][version] = \
+                            [ self.toFlavor(x) for x in flavors ]
+
+        return resultD
+
+    def getAllTroveLeaves(self, serverName, troveNameList):
+	d = self.c[serverName].getAllTroveLeaves(troveNameList)
 	for troveName, troveVersions in d.iteritems():
-	    d[troveName] = [ self.toVersion(x) for x in troveVersions ]
+            subD = {}
+            d[troveName] = subD
+            for version, flavorList in troveVersions.iteritems():
+                version = self.thawVersion(version)
+                subD[version] = [ self.toFlavor(f) for f in flavorList ]
 
 	return d
 
@@ -257,66 +289,122 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                  self.c[branch].getTroveFlavorsLatestVersion(troveName, 
                                                      branch.asString()) ]
 
-    def getTroveVersionList(self, serverName, troveNameList):
-	d = self.c[serverName].getTroveVersionList(troveNameList)
+    def getTroveVersionList(self, serverName, troveNameList, 
+                            flavorFilter = None):
+	d = self.c[serverName].getTroveVersionList(troveNameList, 
+                                               self.fromFlavor(flavorFilter))
+
 	for troveName, troveVersions in d.iteritems():
-	    d[troveName] = [ self.thawVersion(x) for x in troveVersions ]
+            subD = {}
+            d[troveName] = subD
+            for version, flavorList in troveVersions.iteritems():
+                version = self.thawVersion(version)
+                subD[version] = [ self.toFlavor(f) for f in flavorList ]
 
 	return d
 
-    def getTroveLeavesByLabel(self, troveNameList, label):
+    def getTroveLeavesByLabel(self, troveNameList, label, flavorFilter = None):
 	d = self.c[label].getTroveLeavesByLabel(troveNameList, 
-						label.asString())
+						label.asString(),
+                                                self.fromFlavor(flavorFilter))
 	for troveName, troveVersions in d.iteritems():
-	    d[troveName] = [ self.thawVersion(x) for x in troveVersions ]
+            subD = {}
+            d[troveName] = subD
+            for version, flavorList in troveVersions.iteritems():
+                version = self.thawVersion(version)
+                subD[version] = [ self.toFlavor(f) for f in flavorList ]
 
 	return d
 	
-    def getTroveVersionsByLabel(self, troveNameList, label):
+    def getTroveVersionsByLabel(self, troveNameList, label, 
+                                flavorFilter = None):
 	d = self.c[label].getTroveVersionsByLabel(troveNameList, 
-						  label.asString())
+						  label.asString(),
+                                                  self.fromFlavor(flavorFilter))
 	for troveName, troveVersions in d.iteritems():
-	    d[troveName] = [ self.thawVersion(x) for x in troveVersions ]
+            subD = {}
+            d[troveName] = subD
+            for version, flavorList in troveVersions.iteritems():
+                version = self.thawVersion(version)
+                subD[version] = [ self.toFlavor(f) for f in flavorList ]
 
 	return d
 	
-    def getTroveVersionFlavors(self, troveDict):
-	requestD = {}
-	versionDict = {}
+    def getTroveVersionFlavors(self, troveDict, bestFlavor = False):
 
-	for (troveName, versionList) in troveDict.iteritems():
-	    for version in versionList:
+        def _cvtFlavor(flavor):
+            if flavor is None:
+                return 0
+            else:
+                return self.fromFlavor(flavor)
+
+	requestD = {}
+
+	for (troveName, subVersionDict) in troveDict.iteritems():
+	    for version, flavorList in subVersionDict.iteritems():
 		serverName = version.branch().label().getHost()
 
                 if not requestD.has_key(serverName):
                     requestD[serverName] = {}
                 if not requestD[serverName].has_key(troveName):
-                    requestD[serverName][troveName] = []
+                    requestD[serverName][troveName] = {}
 
 		versionStr = self.fromVersion(version)
-		versionDict[versionStr] = version
-		requestD[serverName][troveName].append(versionStr)
+
+                requestD[serverName][troveName][versionStr] = \
+                    [ _cvtFlavor(x) for x in flavorList ]
 
 	if not requestD:
-	    newD = {}
-	    for troveName in troveDict:
-		newD[troveName] = {}
-
-	    return newD
+	    return {}
 
         newD = {}
         for serverName, passD in requestD.iteritems():
-            result = self.c[serverName].getTroveVersionFlavors(passD)
+            result = self.c[serverName].getTroveVersionFlavors(passD, 
+                                                               bestFlavor)
 
             for troveName, troveVersions in result.iteritems():
                 if not newD.has_key(troveName):
                     newD[troveName] = {}
                 for versionStr, flavors in troveVersions.iteritems():
-                    version = versionDict[versionStr]
+                    version = self.thawVersion(versionStr)
                     newD[troveName][version] = \
                                 [ self.toFlavor(x) for x in flavors ]
 
 	return newD
+
+    def getAllTroveFlavors(self, troveDict):
+        d = {}
+        for name, versionList in troveDict.iteritems():
+            d[name] = {}.fromkeys(versionList, [ None ])
+
+	return self.getTroveVersionFlavors(d)
+
+    def getTroveLeavesByBranch(self, troveSpecs, bestFlavor = False):
+        d = {}
+        for name, branches in troveSpecs.iteritems():
+            for branch, flavors in branches.iteritems():
+                host = branch.label().getHost()
+                if not d.has_key(host):
+                    d[host] = {}
+
+                subD = d[host].get(name, None)
+                if subD is None:
+                    subD = {}
+                    d[host][name] = subD
+
+                if flavors is None:
+                    subD[branch.asString()] = ''
+                else:
+                    subD[branch.asString()] = \
+                                    [ self.fromFlavor(x) for x in flavors ]
+
+        result = {}
+
+        for host, requestD in d.iteritems():
+            respD = self.c[host].getTroveLeavesByBranch(requestD, bestFlavor)
+            self._mergeTroveQuery(result, respD)
+
+        return result
 
     def getTroveLatestVersion(self, troveName, branch):
 	b = self.fromBranch(branch)
@@ -868,11 +956,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             allVersions = self.getTroveVersionsByLabel([ troveName ],
                                                  newVersionBranch.label())
             lastOnBranch = None
-            for version in allVersions[troveName]:
-                if version.onBranch(newVersionBranch) and \
-                    version.sameVersion(newVersion) and \
-                    (not lastOnBranch or version.isAfter(lastOnBranch)):
-                    lastOnBranch = version
+            if allVersions.has_key(troveName):
+                for version in allVersions[troveName]:
+                    if version.onBranch(newVersionBranch) and \
+                        version.sameVersion(newVersion) and \
+                        (not lastOnBranch or version.isAfter(lastOnBranch)):
+                        lastOnBranch = version
 
             if lastOnBranch:
                 newVersion = lastOnBranch.copy()
@@ -896,6 +985,124 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 newVersion.incrementRelease()
             
         return newVersion
+
+    def findTrove(self, labelPath, name, defaultFlavor, versionStr = None,
+                  acrossRepositories = False, withFiles = True,
+                  affintyDatabase = None):
+	assert(not defaultFlavor or 
+	       isinstance(defaultFlavor, deps.DependencySet))
+
+        if not type(labelPath) == list:
+            labelPath = [ labelPath ]
+
+	if not labelPath:
+	    # if we don't have a label path, we need a fully qualified
+	    # version string; make sure have it
+	    if versionStr[0] != "/" and (versionStr.find("/") != -1 or
+					 versionStr.find("@") == -1):
+		raise repository.TroveNotFound, \
+		    "fully qualified version or label " + \
+		    "expected instead of %s" % versionStr
+
+	# a version is a label if
+	#   1. it doesn't being with / (it isn't fully qualified)
+	#   2. it only has one element (no /)
+	#   3. it contains an @ sign
+	if not versionStr or (versionStr[0] != "/" and  \
+		(versionStr.find("/") == -1) and versionStr.count("@")):
+	    # either the supplied version is a label or we're going to use
+	    # the default
+            if versionStr and versionStr[0] != "@":
+		try:
+		    label = versions.Label(versionStr)
+                    labelPath = [ label ]
+		except versions.ParseError:
+		    raise TroveMissing, "invalid version %s" % versionStr
+            elif versionStr:
+                # just a branch name was specified
+                repositories = [ x.getHost() for x in labelPath ]
+                labelPath = []
+                for serverName in repositories:
+                    labelPath.append(versions.Label("%s%s" % 
+                                                    (serverName, versionStr)))
+
+            flavorDict = { name : {} }
+            for label in labelPath:
+                d = self.getTroveLeavesByLabel([name], label, 
+                                               flavorFilter = defaultFlavor)
+                if not d.get(name, None):
+                    continue
+                elif not acrossRepositories:
+                    flavorDict = d
+                    break
+                else:
+                    self.queryMerge(flavorDict, d)
+
+	    if not flavorDict[name]:
+		raise repository.TroveNotFound, \
+                      ('"%s" was not found in the search path (%s)'
+                       %(name, " ".join([ x.asString() for x in labelPath ])))
+	elif versionStr[0] != "/" and versionStr.find("/") == -1:
+	    # version/release was given
+	    try:
+		verRel = versions.VersionRelease(versionStr)
+	    except versions.ParseError, e:
+		raise repository.TroveNotFound, str(e)
+
+            flavorDict = { name : {} }
+            for label in labelPath:
+                d = self.getTroveVersionsByLabel([name], label, 
+                                                 flavorFilter = defaultFlavor)
+                for version in d[name].keys():
+                    if version.trailingVersion() != verRel:
+                        del d[name][version]
+
+                if not d[name]:
+                    continue
+                elif not acrossRepositories:
+                    flavorDict = d
+                    break
+                else:
+                    self.queryMerge(flavorDict, d)
+
+	    if not flavorDict[name]:
+		raise repository.TroveNotFound, \
+		    "version %s of %s is not on found on path %s" % \
+		    (versionStr, name, " ".join([x.asString() for x in labelPath]))
+	elif versionStr[0] != "/":
+	    # partial version string, we don't support this
+	    raise repository.TroveNotFound, \
+		"incomplete version string %s not allowed" % versionStr
+	else:
+	    try:
+		version = versions.VersionFromString(versionStr)
+	    except versions.ParseError, e:
+		raise repository.TroveNotFound, str(e)
+
+            if version.isBranch():
+                fn = self.getTroveLeavesByBranch
+            else:
+                fn = self.getTroveVersionFlavors
+
+            # we're not allowed to ask for the bestFlavor if the 
+            # defaultFlavor is None
+            bestFlavor = defaultFlavor is not None
+            flavorDict = fn({ name : { version : [ defaultFlavor ] } },
+                            bestFlavor = bestFlavor)
+
+            if not flavorDict.has_key(name):
+                flavorDict[name] = {}
+
+	pkgList = []
+	for version, flavorList in flavorDict[name].iteritems():
+            pkgList += [ (name, version, flavor) for flavor in flavorList ]
+
+	if not pkgList:
+	    raise repository.TroveNotFound, "trove %s does not exist" % name
+
+	pkgList = self.getTroves(pkgList, withFiles = withFiles)
+
+	return pkgList
 
     def _commit(self, chgSet, fName):
 	serverName = None
@@ -942,3 +1149,6 @@ class UnknownException(repository.RepositoryError):
     def __init__(self, eName, eArgs):
 	self.eName = eName
 	self.eArgs = eArgs
+
+class UserAlreadyExists(Exception):
+    pass

@@ -455,16 +455,40 @@ class Database:
 				 troveFlavorId = flavorId,
 				 pristine = pristine)
 
-    def iterVersionByName(self, name):
+    def iterVersionByName(self, name, withFlavors):
 	cu = self.db.cursor()
-	cu.execute("""SELECT DISTINCT version, timeStamps FROM DBInstances
-                          NATURAL JOIN Versions 
-		      WHERE troveName=? AND isPresent=1""", name)
- 	for (match, timeStamps) in cu:
-            ts = [float(x) for x in timeStamps.split(':')]
-	    yield versions.VersionFromString(match, timeStamps=ts)
 
-    def getTroveVersionFlavors(self, troveDict):
+        if withFlavors:
+            flavorCol = "flavor"
+            flavorClause = """JOIN DBFlavors ON
+                            DBFlavors.flavorId = DBInstances.flavorId"""
+        else:
+            flavorCol = "NULL"
+            flavorClause = ""
+
+	cu.execute("""SELECT DISTINCT version, timeStamps, %s 
+                        FROM DBInstances NATURAL JOIN Versions 
+                        %s
+		        WHERE troveName='%s' AND isPresent=1"""
+                            % (flavorCol, flavorClause, name))
+
+        flavors = {}
+
+ 	for (match, timeStamps, flavorStr) in cu:
+            ts = [float(x) for x in timeStamps.split(':')]
+            version = versions.VersionFromString(match, timeStamps=ts)
+
+            if withFlavors:
+                f = flavors.get(flavorStr, None)
+                if f is None:
+                    f = deps.deps.ThawDependencySet(flavorStr)
+                    flavors[flavorStr] = f
+                
+                yield (version, f)
+            else:
+                yield (version)
+
+    def getAllTroveFlavors(self, troveDict):
         outD = {}
         cu = self.db.cursor()
         for name, versionList in troveDict.iteritems():

@@ -118,7 +118,8 @@ class DependencyTables:
             for dep in depClass.getDeps():
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
                     if flags:
-                        for flag in flags:
+                        for (flag, sense) in flags:
+                            assert(sense == deps.FLAG_SENSE_REQUIRED)
                             cu.execute("INSERT INTO %s VALUES(?, ?, ?, ?, "
                                                 "?, ?, ?)" % name,
                                        (troveNum, multiplier * len(depList), 
@@ -209,7 +210,7 @@ class DependencyTables:
             depSet = deps.DependencySet()
             for (classId, name, flag) in cu:
                 if (classId, name) == last:
-                    flags.append(flag)
+                    flags.append((flag, deps.FLAG_SENSE_REQUIRED))
                 else:
                     if last:
                         depSet.addDep(deps.dependencyClasses[last[0]],
@@ -218,7 +219,7 @@ class DependencyTables:
                     last = (classId, name)
                     flags = []
                     if flag != NO_FLAG_MAGIC:
-                        flags.append(flag)
+                        flags.append((flag, deps.FLAG_SENSE_REQUIRED))
                     
             if last:
                 depSet.addDep(deps.dependencyClasses[last[0]],

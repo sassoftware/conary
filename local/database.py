@@ -52,8 +52,8 @@ class SqlDbRepository(repository.DataStoreRepository,
 
 	return l[0]
 
-    def getTroveVersionFlavors(self, troveDict):
-        return self.db.getTroveVersionFlavors(troveDict)
+    def getAllTroveFlavors(self, troveDict):
+        return self.db.getAllTroveFlavors(troveDict)
 
     def pkgVersionFlavors(self, pkgName, version):
 	l = [ x.getFlavor() for x in self.db.iterFindByName(pkgName)
@@ -71,16 +71,19 @@ class SqlDbRepository(repository.DataStoreRepository,
 
 	return False
 
-    def getTroveVersionList(self, name):
+    def getTroveVersionList(self, name, withFlavors = False):
 	"""
 	Returns a list of all of the versions of a trove available
-	in the repository.
+	in the repository.. If withFlavors is True, (version, flavor)
+        tuples are returned instead.
 
 	@param name: trove
 	@type name: str
+        @param withFlavors: If True, flavor information is also returned.
+        @type withFlavors: boolean
 	@rtype: list of versions.Version
 	"""
-	return [ x for x in self.db.iterVersionByName(name) ]
+	return [ x for x in self.db.iterVersionByName(name, withFlavors) ]
 
     def getTroveList(self, name):
 	"""
@@ -193,7 +196,7 @@ class Database(SqlDbRepository):
             # get the current troves installed
             try:
                 instList += self.findTrove(name)
-            except repository.PackageNotFound, e:
+            except repository.TroveNotFound, e:
                 pass
 
         # now we need to figure out how to match up the version and flavors
@@ -553,11 +556,11 @@ class Database(SqlDbRepository):
 
 	if not pkgList:
             if versionStr:
-                raise repository.PackageNotFound, \
+                raise repository.TroveNotFound, \
                         "version %s of trove %s is not installed" % \
                         (versionStr, troveName)
             else:
-                raise repository.PackageNotFound, \
+                raise repository.TroveNotFound, \
                         "trove %s is not installed" % troveName
 
 	return pkgList

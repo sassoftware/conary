@@ -63,11 +63,11 @@ def _getUseDependencySet(recipe):
             val = flags[name]
             if val:
                 if val.getRequired():
-                    depFlags.append(name)
+                    depFlags.append((name, deps.FLAG_SENSE_REQUIRED))
                 else:
-                    depFlags.append('~' + name)
+                    depFlags.append((name, deps.FLAG_SENSE_PREFERRED))
             else:
-                depFlags.append('~!' + name)
+                depFlags.append((name, deps.FLAG_SENSE_PREFERNOT))
         dep = deps.Dependency('use', depFlags)
         set.addDep(deps.UseDependency, dep)
     return set
@@ -123,10 +123,12 @@ class BuildPackage(dict):
         """
 	set = deps.DependencySet()
 	for (depClass, main, flags) in elfinfo:
+            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
 	    if depClass == 'soname':
                 assert(abi)
 		curClass = deps.SonameDependencies
-                dep = deps.Dependency(abi[0] + "/" + main, abi[1] + flags)
+                flags.append((abi[1], deps.FLAG_SENSE_REQUIRED))
+                dep = deps.Dependency(abi[0] + "/" + main, flags)
 	    elif depClass == 'abi':
 		curClass = deps.AbiDependency
                 dep = deps.Dependency(main, flags)

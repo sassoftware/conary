@@ -79,6 +79,7 @@ class TroveStore:
 	self.versionOps = versionops.SqlVersioning(self.db, self.versionTable,
                                                    self.branchTable)
 	self.flavors = flavors.Flavors(self.db)
+        flavors.FlavorScores(self.db)
         self.depTables = deptable.DependencyTables(self.db)
         self.metadataTable = metadata.MetadataTable(self.db)
         self.db.commit()
@@ -142,17 +143,6 @@ class TroveStore:
 	itemId = self.getItemId(troveName)
 	branchId = self.versionOps.createBranch(itemId, branch)
 
-    def iterTroveVersions(self, troveName):
-	cu = self.db.cursor()
-	cu.execute("""
-	    SELECT version, Nodes.timeStamps FROM Items JOIN Nodes 
-		    ON Items.itemId = Nodes.itemId NATURAL
-		JOIN Versions WHERE item=?""", troveName)
-	for (versionStr, timeStamps) in cu:
-	    version = versions.VersionFromString(versionStr)
-	    version.setTimeStamps([float(x) for x in timeStamps.split(":")])
-	    yield version
-
     def troveLatestVersion(self, troveName, branch):
 	"""
 	Returns None if no versions of troveName exist on the branch.
@@ -171,6 +161,9 @@ class TroveStore:
 		    AitemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
 		JOIN Versions ON
 		    Nodes.versionId = versions.versionId
+                ORDER BY
+                    Nodes.finalTimeStamp
+                LIMIT 1
 	""", troveName, branch.asString())
         try:
 	    (verStr, timeStamps) = cu.next()
@@ -178,95 +171,6 @@ class TroveStore:
 		    timeStamps = [ float(x) for x in timeStamps.split(":") ] )
         except StopIteration:
             raise KeyError, (troveName, branch)
-
-    def iterTroveLeafsByLabelBulk(self, troveNameList, labelStr):
-	cu = self.db.cursor()
-	cu.execute("CREATE TEMPORARY TABLE itlblb(troveName str)", 
-		   start_transaction = False)
-	for name in troveNameList:
-	    cu.execute("INSERT INTO itlblb VALUES (?)", name,
-		       start_transaction = False)
-
-	cu.execute("""
-	    SELECT Items.item, Versions.version, Nodes.timeStamps FROM
-		itlblb JOIN Items ON
-		    itlblb.troveName = Items.item
-		JOIN LabelMap
-		    ON Items.itemId = LabelMap.itemId
-		JOIN (SELECT labelId as aLabelId FROM Labels 
-				WHERE Labels.label=?)
-		    ON LabelMap.labelId = aLabelId
-		JOIN Latest ON 
-		    Items.itemId=Latest.itemId AND LabelMap.branchId=Latest.branchId
-		JOIN Nodes ON
-		    Items.itemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
-		JOIN Versions ON
-		    Nodes.versionId = versions.versionId
-	""", labelStr)
-
-	d = {}
-	for (troveName, versionStr, timeStamps) in cu:
-	    v = versions.VersionFromString(versionStr, 
-		    timeStamps = [ float(x) for x in timeStamps.split(":") ] )
-	    if d.has_key(troveName):
-		d[troveName].append(v)
-	    else:
-		d[troveName] = [ v ]
-
-	cu.execute("DROP TABLE itlblb", start_transaction = False)
-
-	return d
-
-    def iterTroveLeafsByLabel(self, troveName, labelStr):
-	#cu = self.db.cursor()
-	# set up a table which lists the branchIds and the latest version
-	# id's for this search. the versionid will be NULL if it's an
-	# empty branch
-	cu = self.db.cursor()
-	cu.execute("""
-	    SELECT Versions.version, Nodes.timeStamps FROM 
-		(SELECT itemId AS AitemId, branchId as AbranchId FROM labelMap
-		    WHERE itemId=(SELECT itemId from Items 
-				WHERE item=?)
-		    AND labelId=(SELECT labelId FROM Labels 
-				WHERE label=?)
-		) 
-		JOIN Latest ON 
-		    AitemId=Latest.itemId AND AbranchId=Latest.branchId
-		JOIN Nodes ON
-		    AitemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
-		JOIN Versions ON
-		    Nodes.versionId = versions.versionId
-	""", troveName, labelStr)
-
-	for (versionStr, timeStamps) in cu:
-	    v = versions.VersionFromString(versionStr, 
-		    timeStamps = [ float(x) for x in timeStamps.split(":") ] )
-	    yield v
-
-    def iterTroveVersionsByLabel(self, troveName, labelStr):
-	cu = self.db.cursor()
-	# set up a table which lists the branchIds and the latest version
-	# id's for this search. the versionid will be NULL if it's an
-	# empty branch
-	cu.execute("""
-	    SELECT Versions.version, Nodes.timeStamps FROM 
-		(SELECT itemId AS AitemId, branchId as AbranchId FROM labelMap
-		    WHERE itemId=(SELECT itemId from Items 
-				WHERE item=?)
-		    AND labelId=(SELECT labelId FROM Labels 
-				WHERE label=?)
-		) JOIN Nodes ON
-		    AitemId=Nodes.itemId AND Nodes.branchId=AbranchId 
-		JOIN Versions ON
-		    Nodes.versionId = versions.versionId
-		ORDER BY Nodes.finalTimeStamp
-	""", troveName, labelStr)
-
-	for (versionStr, timeStamps) in cu:
-	    v = versions.VersionFromString(versionStr, 
-		    timeStamps = [ float(x) for x in timeStamps.split(":") ] )
-	    yield v
 
     def getTroveFlavors(self, troveDict):
 	cu = self.db.cursor()
@@ -322,29 +226,6 @@ class TroveStore:
         for (item,) in cu:
             yield item
 
-    def troveNames(self, label):
-        cu = self.db.cursor()
-        cu.execute("""SELECT DISTINCT item FROM 
-                            Labels JOIN LabelMap ON
-                                Labels.labelId = LabelMap.labelId
-                            JOIN Branches ON
-                                LabelMap.branchId = Branches.branchId
-                            JOIN Nodes ON
-				Branches.branchId = Nodes.branchId AND
-				LabelMap.itemId = Nodes.itemId
-                            JOIN Instances ON
-				Nodes.versionId = Instances.versionId AND
-				Nodes.itemId = Instances.itemId
-                            JOIN Items ON
-                                Instances.itemId = Items.itemId
-                            WHERE
-                                Labels.label=? AND isPresent=1
-                            ORDER BY item
-                    """, label.asString())
-
-        for (item,) in cu:
-            yield item
-
     def addTrove(self, trove):
 	cu = self.db.cursor()
 
@@ -373,14 +254,6 @@ class TroveStore:
 	if troveVersionId is not None:
 	    nodeId = self.versionOps.nodes.getRow(troveItemId, 
 						  troveVersionId, None)
-
-	if troveVersionId is None or nodeId is None:
-	    (nodeId, troveVersionId) = self.versionOps.createVersion(
-					    troveItemId, troveVersion)
-	    newVersion = True
-
-	    if trove.getChangeLog() and trove.getChangeLog().getName():
-		self.changeLogs.add(nodeId, trove.getChangeLog())
 
 	troveFlavor = trove.getFlavor()
 
@@ -435,11 +308,45 @@ class TroveStore:
 	else:
 	    troveFlavorId = 0
 
+	if troveVersionId is None or nodeId is None:
+	    (nodeId, troveVersionId) = self.versionOps.createVersion(
+					    troveItemId, troveVersion,
+                                            troveFlavorId)
+	    newVersion = True
+
+	    if trove.getChangeLog() and trove.getChangeLog().getName():
+		self.changeLogs.add(nodeId, trove.getChangeLog())
+            updateLatest = False
+        else:
+            updateLatest = True
+
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId, 
 					     troveFlavorId, isPresent = True)
 	assert(not self.troveTroves.has_key(troveInstanceId))
+
+        if updateLatest:
+            # this name/version already exists, so this must be a new
+            # flavor. update the latest table as needed
+            troveBranchId = self.branchTable[troveVersion.branch()]
+            cu.execute("DELETE FROM Latest WHERE branchId=? AND itemId=? "
+                       "AND flavorId=?", troveBranchId, troveItemId, 
+                       troveFlavorId)
+            cu.execute("""INSERT INTO Latest 
+                            SELECT ?, ?, ?, Instances.versionId 
+                                FROM Instances JOIN Nodes ON
+                                    Instances.itemId = Nodes.itemId AND
+                                    Instances.versionId = Nodes.versionId
+                                WHERE 
+                                    Instances.itemId=? AND 
+                                    Instances.flavorId=? AND
+                                    Nodes.branchId=?
+                                ORDER BY 
+                                    finalTimestamp DESC 
+                                LIMIT 1
+                       """, troveItemId, troveBranchId, troveFlavorId,
+                       troveItemId, troveFlavorId, troveBranchId)
 
         self.depTables.add(cu, trove, troveInstanceId)
 
@@ -560,34 +467,6 @@ class TroveStore:
 	
 	return self.instances.isPresent((troveItemId, troveVersionId, 
 					 troveFlavorId))
-
-    def iterAllTroveLeafs(self, troveNameList):
-	cu = self.db.cursor()
-
-	cu.execute("""
-	    SELECT item, version FROM Items NATURAL JOIN Latest 
-				      NATURAL JOIN Versions
-		WHERE item in (%s)""" % 
-	    ",".join(["'%s'" % x for x in troveNameList]))
-
-	lastName = None
-	leafList = []
-	for (name, version) in cu:
-	    if lastName != name and lastName:
-		yield (lastName, leafList)
-		leafList = []
-		lastName = name
-	    elif not lastName:
-		lastName = name
-
-	    leafList.append(version)
-		
-	yield (lastName, leafList)
-
-    def branchesOfTroveLabel(self, troveName, label):
-	troveId = self.items[troveName]
-	for branchId in self.versionOps.branchesOfLabel(troveId, label):
-	    yield self.branchTable.getId(branchId)
 
     def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True):
 	return self._getTrove(troveName = troveName, 
@@ -713,7 +592,7 @@ class TroveStore:
 	    else:
 		yield (pathId, path, fileId, version)
 
-    def iterTrovePerFlavorLeafs(self, troveName, branch):
+    def iterTrovePerFlavorLeaves(self, troveName, branch):
 	# this needs to return a list sorted by version, from oldest to
 	# newest
 
