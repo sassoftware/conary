@@ -69,7 +69,7 @@ SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
 
-class FileTableEntryFromFile1:
+class FileTableEntryFromFile1(object):
 
     __slots__ = [ "name", "offset", "size", "data", "src" ]
 
