@@ -552,10 +552,6 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     if recipeObj._trackedFlags is not None:
         use.setUsed(recipeObj._trackedFlags)
 
-    # when the recipe accesses the lib macro, it implicitly asserts
-    # that the recipe is architecture dependent
-    # thus, we explicitly turn on the architecture flag in this case
-    recipeObj.trackLibMacro(True)
     recipeObj.setup()
     recipeObj.checkBuildRequirements(cfg, sourceVersion, ignoreDeps=ignoreDeps)
     bldInfo = buildinfo.BuildInfo(builddir)
@@ -593,8 +589,6 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     try:
 	os.chdir(builddir + '/' + recipeObj.mainDir())
 	recipeObj.doBuild(builddir, resume=resume)
-        # don't track lib macro accesses in policy
-        recipeObj.trackLibMacro(False)
         
 	if resume and resume != "policy" and \
                       recipeObj.resumeList[-1][1] != False:

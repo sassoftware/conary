@@ -1505,8 +1505,9 @@ class Flavor(policy.Policy):
             '^(%(libdir)s'
             '|/%(lib)s'
             '|%(x11prefix)s/%(lib)s'
-            '|%(krbprefix)s/%(lib)s)/' %recipe.macros)
+            '|%(krbprefix)s/%(lib)s)(/|$)' %recipe.macros)
         self.baseIsnset = use.Arch.getCurrentArch()._name
+        self.troveMarked = False
 	policy.Policy.doProcess(self, recipe)
 
     def hasLib(self, path):
@@ -1520,12 +1521,24 @@ class Flavor(policy.Policy):
 	f = pkg.getFile(path)
         if path in pkg.isnsetMap:
             isnset = pkg.isnsetMap[path]
-        elif self.hasLib(path) and f.hasContents:
+        elif self.hasLib(path):
             # all possible paths in a %(lib)s-derived path get default
             # instruction set assigned if they don't have one already
-            isnset = self.baseIsnset
+            if f.hasContents:
+                isnset = self.baseIsnset
+            else:
+                # this file can't be marked by arch, but the troves
+                # and package must be
+                if self.troveMarked:
+                    return
+                set = use.Arch.getCurrentArch()._toDependency()
+                for pkg in pkgMap.values():
+                    pkg.flavor.union(set)
+                self.troveMarked = True
+                return
         else:
             return
+
 	set = deps.DependencySet()
         set.addDep(deps.InstructionSetDependency, deps.Dependency(isnset, []))
         # get the Arch.* dependencies

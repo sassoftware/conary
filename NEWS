@@ -1,9 +1,9 @@
 Changes in 0.50.2:
-  * Any file in a %(lib)s-derived path (/%(lib)s, %(libdir)s,
-    %(krbprefix)/%(lib)s, or %(x11prefix)/%(lib)s) will now cause the
-    entire package and all components to be flavored with the base
-    instruction set flavor, so that architecture-sensitive but non-code
-    files in (say) /usr/lib64 do not show up on 32-bit platforms.
+  * Any %(lib)s-derived path (/%(lib)s, %(libdir)s, %(krbprefix)/%(lib)s,
+    or %(x11prefix)/%(lib)s) will now cause the entire package and all
+    components to be flavored with the base instruction set flavor, so
+    that architecture-sensitive but non-code files in (say) /usr/lib64
+    do not show up on 32-bit platforms.
   * Sped up dependency resolution on the client
 
 Changes in 0.50.1:
