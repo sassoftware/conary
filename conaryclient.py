@@ -174,6 +174,8 @@ class ConaryClient:
                     newList = []
             else:
                 if self.db.hasPackage(troveName):
+                    justFirst = False
+
                     labels = [ x.getVersion().branch().label()
                                for x in self.db.findTrove(troveName) ]
 
@@ -192,6 +194,7 @@ class ConaryClient:
                             labels = [ None ]
                         
                 else:
+                    justFirst = True
                     labels = self.cfg.installLabelPath
 
                 newList = []
@@ -201,6 +204,7 @@ class ConaryClient:
                                                         self.cfg.flavor, 
                                                         versionStr,
                                                         withFiles = False)
+                        if justFirst and newList: break
                     except repository.PackageNotFound, e:
                         pass
 
