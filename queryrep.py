@@ -16,8 +16,8 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
     if trove:
 	troves = [ trove ]
     else:
+	# this returns a sorted list
 	troves = [ x for x in repos.iterAllTroveNames() ]
-	troves.sort()
 
     if versionStr or ls or ids or sha1s:
 	if all:
@@ -35,7 +35,7 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 
 	flavors = repos.getTroveVersionFlavors(versions)
 
-	for troveName in flavors.iterkeys():
+	for troveName in troves:
             if not flavors[troveName]:
                 log.error('No versions for "%s" were found in the repository',
                           troveName)
