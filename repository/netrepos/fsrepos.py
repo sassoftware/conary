@@ -466,7 +466,10 @@ class _FileDBClass(VersionedFile):
 def _FileDB(db, fileId):
     return db.openFile(fileId, fileClass = _FileDBClass)
 
-class ChangeSetJobFile:
+class ChangeSetJobFile(object):
+
+    __slots__ = [ "theVersion" , "theFile", "theRestoreContents",
+		  "fileContents", "changeSet", "thePath", "theFileId" ]
 
     def version(self):
 	return self.theVersion
