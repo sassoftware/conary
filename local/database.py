@@ -233,7 +233,8 @@ class Database(SqlDbRepository):
     # transaction
     def commitChangeSet(self, cs, isRollback = False, toStash = True,
                         replaceFiles = False, tagScript = None,
-			keepExisting = False, test = False):
+			keepExisting = False, test = False,
+                        justDatabase = False):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -362,32 +363,35 @@ class Database(SqlDbRepository):
 	    del inverse
 	    del localChanges
 
-	# run preremove scripts before updating the database, otherwise
-	# the file lists which get sent to them are incorrect. skipping
-        # this makes --test a little inaccurate, but life goes on
-        if not test:
-            fsJob.preapply(tagSet, tagScript)
+        if not justDatabase:
+            # run preremove scripts before updating the database, otherwise
+            # the file lists which get sent to them are incorrect. skipping
+            # this makes --test a little inaccurate, but life goes on
+            if not test:
+                fsJob.preapply(tagSet, tagScript)
 
-	# Build A->B
-	if toStash:
-	    # this updates the database from the changeset; the change
-	    # isn't committed until the self.commit below
-	    # an object for historical reasons
-	    localrep.LocalRepositoryChangeSetJob(self, cs, keepExisting)
+        # Build A->B
+        if toStash:
+            # this updates the database from the changeset; the change
+            # isn't committed until the self.commit below
+            # an object for historical reasons
+            localrep.LocalRepositoryChangeSetJob(self, cs, keepExisting)
 
-	errList = fsJob.getErrorList()
-	if errList:
-	    for err in errList: log.error(err)
-	    # FIXME need a --force for this
-	    return
+        errList = fsJob.getErrorList()
+        if errList:
+            for err in errList: log.error(err)
+            # FIXME need a --force for this
+            return
 
         if test:
             return
 
-	fsJob.apply(tagSet, tagScript)
+        if not justDatabase:
+            fsJob.apply(tagSet, tagScript)
 
-	for (troveName, troveVersion, troveFlavor, pathIdList) in fsJob.iterUserRemovals():
-	    self.db.removeFilesFromTrove(troveName, troveVersion, troveFlavor, pathIdList)
+        for (troveName, troveVersion, troveFlavor, pathIdList) in fsJob.iterUserRemovals():
+            self.db.removeFilesFromTrove(troveName, troveVersion, 
+                                         troveFlavor, pathIdList)
 
 	for (name, version, flavor) in fsJob.getOldPackageList():
 	    if toStash:
@@ -398,29 +402,29 @@ class Database(SqlDbRepository):
 	# finally, remove old directories. right now this has to be done
 	# after the sqldb has been updated (but before the changes are
 	# committted)
+        if not justDatabase:
+            list = directoryCandidates.keys()
+            list.sort()
+            list.reverse()
+            keep = {}
+            for path in list:
+                if keep.has_key(path):
+                    keep[os.path.dirname(path)] = True
+                    continue
 
-	list = directoryCandidates.keys()
-	list.sort()
-	list.reverse()
-	keep = {}
-	for path in list:
-	    if keep.has_key(path):
-		keep[os.path.dirname(path)] = True
-		continue
+                relativePath = path[len(self.root):]
+                if relativePath[0] != '/': relativePath = '/' + relativePath
+                
+                if self.db.pathIsOwned(relativePath):
+                    list = [ x for x in self.db.iterFindByPath(path)]
+                    keep[os.path.dirname(path)] = True
+                    continue
 
-	    relativePath = path[len(self.root):]
-	    if relativePath[0] != '/': relativePath = '/' + relativePath
-	    
-	    if self.db.pathIsOwned(relativePath):
-		list = [ x for x in self.db.iterFindByPath(path)]
-		keep[os.path.dirname(path)] = True
-		continue
-
-	    try:
-		# it would be nice if this was cheaper
-		os.rmdir(path)
-	    except OSError:
-		pass
+                try:
+                    # it would be nice if this was cheaper
+                    os.rmdir(path)
+                except OSError:
+                    pass
 
 	self.commit()
 

@@ -46,6 +46,10 @@ If two versions from the same branch are
 installed at the same time, this may confuse future update
 operations.
 .TP
+.B \-\-just-db
+The update is performed on the database, but the filesystem is not
+changed.
+.TP
 .B \-\-no-deps
 Skip dependency resolution and errors.
 .TP
@@ -81,6 +85,10 @@ Perform all actions up to the point of writing to the filesystem.
 Erase all instances of \fItrovename\fP (or only a specified \fIversion\fP)
 from the local system.
 .RS 4
+.TP 4
+.B \-\-just-db
+The troves are removed from the database, but their files are left in
+the filesystem.
 .TP 4
 .B \-\-test
 Perform all actions up to the point of writing to the filesystem.

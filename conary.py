@@ -69,20 +69,23 @@ def usage(rc = 1):
     print "       conary verify       <pkgname>[=<version>]*"
     print "       conary --version"
     print ""
-    print "commit flags:  --target-branch <branch>"
+    print "commit flags:   --target-branch <branch>"
     print ""
-    print 'common flags:  --build-label <label>'
-    print '               --config-file <path>'
-    print '               --config "<item> <value>"'
-    print '               --install-label <label>'
-    print "               --root <root>"
+    print 'common flags:   --build-label <label>'
+    print '                --config-file <path>'
+    print '                --config "<item> <value>"'
+    print '                --install-label <label>'
+    print "                --root <root>"
     print ""
-    print "query flags:   --full-versions"
-    print "               --ids"
-    print "               --path <file>"
-    print "               --ls"
-    print "               --sha1s"
-    print "               --tags"
+    print "erase flags:    --just-db"
+    print "                --test"
+    print ""
+    print "query flags:    --full-versions"
+    print "                --ids"
+    print "                --path <file>"
+    print "                --ls"
+    print "                --sha1s"
+    print "                --tags"
     print ""
     print "repquery flags: --all"
     print "                --deps"    
@@ -100,13 +103,14 @@ def usage(rc = 1):
     print "                --show-changes"
     print "                --tags"
     print ""
-    print "update flags: --keep-existing"
-    print "              --no-deps"
-    print "              --no-deps-recurse"
-    print "              --no-resolve"
-    print "              --replace-files"
-    print "              --resolve"
-    print "              --test"
+    print "update flags:   --just-db"
+    print "                --keep-existing"
+    print "                --no-deps"
+    print "                --no-deps-recurse"
+    print "                --no-resolve"
+    print "                --replace-files"
+    print "                --resolve"
+    print "                --test"
     return rc
 
 def openRepository(repMap):
@@ -138,6 +142,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["ids"] = NO_PARAM
     argDef["info"] = NO_PARAM
     argDef["install-label"] = MULT_PARAM
+    argDef["just-db"] = NO_PARAM
     argDef["keep-existing"] = NO_PARAM
     argDef["no-deps"] = NO_PARAM
     argDef["no-deps-recurse"] = NO_PARAM
@@ -435,6 +440,10 @@ def realMain(cfg, argv=sys.argv):
 	if argSet.has_key('no-deps-recurse'):
 	    kwargs['recurse'] = False
 	    del argSet['no-deps-recurse']
+
+	if argSet.has_key('just-db'):
+	    kwargs['justDatabase'] = False
+	    del argSet['just-db']
 
 	keepExisting = argSet.has_key('keep-existing')
 	if keepExisting:

@@ -264,7 +264,7 @@ class ConaryClient:
                                 keepExisting = keepExisting)
 
     def applyUpdate(self, theCs, replaceFiles = False, tagScript = None, 
-                    keepExisting = None, test = False):
+                    keepExisting = None, test = False, justDatabase = False):
         assert(isinstance(theCs, changeset.ReadOnlyChangeSet))
         cs = changeset.ReadOnlyChangeSet()
         for (how, what) in theCs.contents:
@@ -278,7 +278,7 @@ class ConaryClient:
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
                                 keepExisting = keepExisting,
-                                test = test)
+                                test = test, justDatabase = justDatabase)
 
     def eraseTrove(self, troveList, depCheck = True, tagScript = None,
                    test = False):

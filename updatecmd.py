@@ -26,7 +26,8 @@ import conaryclient
 
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
-                                  recurse = True, test = False):
+                                  recurse = True, test = False,
+                                  justDatabase = False):
     client = conaryclient.ConaryClient(cfg)
 
     applyList = []
@@ -89,7 +90,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             print "%s" % (" ".join(items))
 
         client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,
-                           test = test)
+                           test = test, justDatabase = justDatabase)
     except conaryclient.UpdateError, e:
         log.error(e)
     except repository.CommitError, e:
