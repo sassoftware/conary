@@ -10,8 +10,6 @@ import types
 import string
 import re
 import os
-import sha1helper
-import time
 
 class BuildFile:
 
@@ -124,9 +122,9 @@ class PackageSpecSet(dict):
     def _getname(self, prefix, subname, autoname):
         """Returns the full name of the package when subname could be None"""
 	if subname:
-	    return prefix + ":" + subname + ":" + autoname
+	    return string.join((prefix, subname, autoname), ':')
 	else:
-	    return prefix + ":" + autoname
+	    return string.join((prefix, autoname), ':')
     
     def add(self, path, autospec, explicitspec):
 	self.packageMap[explicitspec.name][autospec.name].instance.addFile(path)
