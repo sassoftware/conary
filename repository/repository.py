@@ -160,9 +160,9 @@ class AbstractTroveDatabase:
     def findTrove(self, defaultLabel, name, flavor, versionStr = None):
 	"""
 	Looks up a trove in the repository based on the name and
-	version provided. If any errors are occured, PackageNotFound is
-	raised with an appropriate error message. Multiple matches could
-	be found if versionStr refers to a label.
+	version provided. If any errors occur, PackageNotFound is
+	raised with an appropriate error message. Multiple matches
+	could be found if versionStr refers to a label.
 
 	@param defaultLabel: Label of the branch to use if no branch
 	is specified. If only a branch name is given (not a complete label),
