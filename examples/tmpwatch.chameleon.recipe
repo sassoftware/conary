@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-class tmpwatch(Recipe):
+class tmpwatch(PackageRecipe):
     buildRequires = [ "glibc" ]
 
     name = "tmpwatch"
@@ -24,4 +24,4 @@ class tmpwatch(Recipe):
 	r.Run('patch -p1 < tmpwatch.fakebug.patch')
 	r.Make()
 	r.MakeInstall(rootVar = "ROOT")
-	r.InstallFiles("crond-tmpwatch", "/etc/cron.daily/tmpwatch", mode=0755)
+	r.Install("crond-tmpwatch", "/etc/cron.daily/tmpwatch", mode=0755)

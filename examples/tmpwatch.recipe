@@ -6,7 +6,6 @@
 class tmpwatch(PackageRecipe):
 
     buildRequires = [ "glibc" ]
-    runRequires = [ "cron" ]
 
     name = "tmpwatch"
     version = "2.9.0"
