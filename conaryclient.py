@@ -245,36 +245,49 @@ class ConaryClient:
         # be installed by default.
         assert(not cs.isAbsolute())
 
-        for (trvName, trvVersion, trvFlavor) in cs.getPrimaryTroveList():
-            primaryTroveCs = cs.getNewPackageVersion(trvName, trvVersion, 
-                                                     trvFlavor)
+        primaries = cs.getPrimaryTroveList()
+        inclusions = {}
 
-            for (name, changeList) in primaryTroveCs.iterChangedTroves():
+        # find the troves which include other troves; they give useful
+        # hints as to which ones should be excluded due to byDefault
+        # flags
+        for troveCs in cs.iterNewPackageList():
+            for (name, changeList) in troveCs.iterChangedTroves():
                 for (changeType, version, flavor, byDef) in changeList:
-                    if changeType == '-': 
-                        continue
-
-                    troveCs = cs.getNewPackageVersion(name, version, flavor)
-
-                    oldItem = (name, troveCs.getOldVersion(), 
-                               troveCs.getOldFlavor())
-                    if not oldItem[1]: 
-                        # it's new -- it can stay as long as it isn't
-                        # already installed and isn't in the exclude list
-                        if not byDef:
-                            cs.delNewPackage(name, version, flavor)
-                        elif self.db.hasTrove(name, version, flavor):
-                            cs.delNewPackage(name, version, flavor)
+                    if changeType == '+':
+                        if byDef:
+                            inclusions[(name, version, flavor)] = True
                         else:
-                            for reStr, regExp in self.cfg.excludeTroves:
-                                if regExp.match(name):
-                                    cs.delNewPackage(name, version, flavor)
-                                    break
-                    elif not self.db.hasTrove(*oldItem):
-                        cs.delNewPackage(name, version, flavor)
-                    elif self.db.hasTrove(name, version, flavor):
-                        cs.delNewPackage(name, version, flavor)
+                            inclusions.setdefault((name, version, flavor), 
+                                                  False)
 
+        for troveCs in [ x for x in cs.iterNewPackageList() ]:
+            item = (troveCs.getName(), troveCs.getNewVersion(),
+                    troveCs.getNewFlavor())
+            if item in primaries:
+                continue 
+
+            oldItem = (troveCs.getName(), troveCs.getOldVersion(), 
+                       troveCs.getOldFlavor())
+            if self.db.hasTrove(*item):
+                # this trove is already installed
+                cs.delNewPackage(*item)
+            elif not oldItem[1]:
+                # it's a new trove
+                if not inclusions.get(item, True):
+                    # it was included by something else, but not by default
+                    cs.delNewPackage(*item)
+                else:
+                    # check the exclude list
+                    for reStr, regExp in self.cfg.excludeTroves:
+                        if regExp.match(name):
+                            cs.delNewPackage(*item)
+                            break
+            elif not self.db.hasTrove(*oldItem):
+                # the old version isn't present, so we don't want this
+                # one either
+                cs.delNewPackage(*item)
+            
     def _updateChangeSet(self, itemList, keepExisting = None, test = False):
         """
         Updates a trove on the local system to the latest version 

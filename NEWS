@@ -2,6 +2,8 @@ Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 
     repository findTrove function -- this enables conary q to work like 
     conary rq
+  * Group handling didn't work for multiple levels of group inclusion
+
 Changes in 0.50.2:
   * Any %(lib)s-derived path (/%(lib)s, %(libdir)s, %(krbprefix)s/%(lib)s,
     or %(x11prefix)s/%(lib)s) will now cause the entire package and all
