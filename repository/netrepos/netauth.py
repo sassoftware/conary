@@ -82,15 +82,14 @@ class NetworkAuthorization:
         cu.execute(stmt, authToken[0], m.hexdigest())
 
         row = cu.fetchone()
-        if row[0] > 0:
-            return True
-        else:
-            return False
+        return row[0]
 
     def add(self, user, password, write=True):
         cu = self.db.cursor()
         
-        cu.execute("INSERT INTO Users VALUES (Null, ?, ?)", user, password)
+        m = md5.new()
+        m.update(password)
+        cu.execute("INSERT INTO Users VALUES (Null, ?, ?)", user, m.hexdigest())
         userId = cu.lastrowid
 
         cu.execute("INSERT INTO Permissions VALUES (?, Null, Null, ?)",
