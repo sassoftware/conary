@@ -121,15 +121,49 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     @rtype: list of strings
     """
 
-    if issubclass(recipeClass, recipe.PackageRecipe):
-	return cookPackageObject(repos, cfg, recipeClass, buildBranch,
-				 changeSetFile = changeSetFile,
-				 prep = prep, macros = macros)
-    
-    assert(0)
+    log.info("Building %s", recipeClass.name)
+    fullName = cfg.packagenamespace + ":" + recipeClass.name
 
-def cookGroupObject(repos, cfg, recipeClass, buildBranch, 
-		      changeSetFile = None, prep=True, macros=()):
+    newVersion = None
+    if repos.hasPackage(fullName):
+	# if this package/version exists already, increment the
+	# existing revision
+	newVersion = repos.pkgLatestVersion(fullName, buildBranch)
+	if newVersion and (
+	  recipeClass.version == newVersion.trailingVersion().getVersion()):
+	    newVersion = newVersion.copy()
+	    newVersion.incrementBuildCount()
+	else:
+	    newVersion = None
+
+    # this package/version doesn't exist yet
+    if not newVersion:
+	newVersion = buildBranch.copy()
+	newVersion.appendVersionRelease(recipeClass.version, 1)
+
+    if issubclass(recipeClass, recipe.PackageRecipe):
+	(cs, built) = cookPackageObject(repos, cfg, recipeClass, newVersion, 
+					buildBranch,
+					prep = prep, macros = macros)
+    elif issubclass(recipeClass, recipe.GroupRecipe):
+	(cs, built) = cookGroupObject(repos, cfg, recipeClass, newVersion, 
+				      buildBranch,
+				      macros = macros)
+    else:
+	assert(0)
+    
+    if changeSetFile:
+	cs.writeToFile(changeSetFile)
+    else:
+	repos.open("w")
+	repos.commitChangeSet(cs)
+	repos.open("r")
+
+    return built
+
+
+def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch, 
+		      macros=()):
     """
     Just like cookObject(), but only works for objects descended
     from recipe.GroupRecipe.
@@ -138,15 +172,25 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch,
     cookObject()
     """
 
-    built = []
-    log.info("Building %s", recipeClass.name)
-
     fullName = cfg.packagenamespace + ":" + recipeClass.name
 
     recipeObj = recipeClass(repos, cfg)
+    recipeObj.setup()
 
-def cookPackageObject(repos, cfg, recipeClass, buildBranch, 
-		      changeSetFile = None, prep=True, macros=()):
+    includedSet = recipeObj.getTroveList()
+    grp = package.Package(fullName, newVersion)
+    for (name, versionList) in includedSet.iteritems():
+	grp.addPackage(name, versionList)
+
+    grpDiff = grp.diff(None, abstract = 1)[0]
+    changeSet = changeset.ChangeSet()
+    changeSet.newPackage(grpDiff)
+
+    built = [ (grp.getName(), grp.getVersion().asString()) ]
+    return (changeSet, built)
+
+def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch, 
+		      prep=True, macros=()):
     """
     Just like cookObject(), but only works for objects descended
     from recipe.PackageRecipe.
@@ -158,8 +202,6 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     repos.open("r")
 
     built = []
-
-    log.info("Building %s", recipeClass.name)
     fullName = cfg.packagenamespace + ":" + recipeClass.name
     srcName = fullName + ":sources"
 
@@ -168,23 +210,6 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     srcdirs = [ os.path.dirname(recipeClass.filename),
 		cfg.sourcepath % {'pkgname': recipeClass.name} ]
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
-
-    newVersion = None
-    if repos.hasPackage(fullName):
-	# if this package/version exists already, increment the
-	# existing revision
-	newVersion = repos.pkgLatestVersion(fullName, buildBranch)
-	if newVersion and (
-	  recipeObj.version == newVersion.trailingVersion().getVersion()):
-	    newVersion = newVersion.copy()
-	    newVersion.incrementBuildCount()
-	else:
-	    newVersion = None
-
-    # this package/version doesn't exist yet
-    if not newVersion:
-	newVersion = buildBranch.copy()
-	newVersion.appendVersionRelease(recipeObj.version, 1)
 
     # build up the name->fileid mapping so we reuse fileids wherever
     # possible; we do this by looking in the database for a pacakge
@@ -228,8 +253,6 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     log.info('Processing %s', recipeClass.name)
     recipeObj.doDestdirProcess() # includes policy
 
-    repos.open("w")
-    
     os.chdir(cwd)
     
     # build up the name->fileid mapping so we reuse fileids wherever
@@ -291,20 +314,13 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
 	grp.addPackage(pkg.getName(), [ pkg.getVersion() ])
 
     changeSet = changeset.CreateFromFilesystem(packageList)
+
     grpDiff = grp.diff(None, abstract = 1)[0]
-
     changeSet.newPackage(grpDiff)
-
-    if changeSetFile:
-	changeSet.writeToFile(changeSetFile)
-    else:
-	repos.commitChangeSet(changeSet)
-
-    repos.open("r")
 
     recipeObj.cleanup(builddir, destdir)
 
-    return built
+    return (changeSet, built)
 
 # -------------------- public below this line -------------------------
 
