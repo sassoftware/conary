@@ -26,7 +26,7 @@ class ChangeSet:
 	    list = pkg.getNewFileList() + pkg.getChangedFileList()
 	    for (fileId, path, version) in pkg.getNewFileList():
 		assert(self.files.has_key(fileId))
-		(oldVersion, newVersion, info) = self.getFile(fileId)
+		(oldVersion, newVersion, info) = self.files[fileId]
 		assert(newVersion.equal(version))
 
 		file = files.FileFromInfoLine(info, fileId)
@@ -64,13 +64,9 @@ class ChangeSet:
     def formatToFile(self, cfg, f):
 	for pkg in self.packages:
 	    pkg.formatToFile(self, cfg, f)
-	    print
 
     def getFileChange(self, fileId):
 	return self.files[fileId][2]
-
-    def getFile(self, fileId):
-	return self.files[fileId]
 
     def headerAsString(self):
 	rc = ""
@@ -133,7 +129,7 @@ class ChangeSet:
 		(curPath, curVersion) = pkg.getFile(fileId)
 		invertedPkg.changedFile(fileId, curPath, curVersion)
 
-		(oldVersion, newVersion, csInfo) = self.getFile(fileId)
+		(oldVersion, newVersion, csInfo) = self.files[fileId]
 		assert(curVersion.equal(oldVersion))
 
 		origFile = repos.getFileVersion(fileId, oldVersion)
@@ -182,6 +178,18 @@ class ChangeSetFromRepository(ChangeSet):
 
     def __init__(self, repos):
 	self.repos = repos
+	ChangeSet.__init__(self)
+
+class ChangeSetFromAbstractChangeSet(ChangeSet):
+
+    def getFileContents(self, fileId):
+	return self.absCS.getFileContents(fileId)
+
+    def hasFileContents(self, fileId):
+	return self.absCS.hasFileContents(fileId)
+
+    def __init__(self, absCS):
+	self.absCS = absCS
 	ChangeSet.__init__(self)
 
 class ChangeSetFromFile(ChangeSet):
