@@ -94,6 +94,16 @@ class NetworkAuthorization:
                    userId, write, admin)
         self.db.commit()
 
+    def changePassword(self, user, newPassword):
+        cu = self.db.cursor()
+        
+        m = md5.new()
+        m.update(newPassword)
+        password = m.hexdigest()
+
+        cu.execute("UPDATE Users SET password=? WHERE user=?", password, user)
+        self.db.commit()
+
     def iterUsers(self):
         cu = self.db.cursor()
         cu.execute("""SELECT Users.user, Users.userId, Permissions.write, Permissions.admin FROM Users
