@@ -20,24 +20,35 @@ def cook(repos, cfg, recipeFile, prep=0):
         classList = recipe.RecipeLoader(recipeFile)
     built = []
 
-    for (name, recipeClass) in classList.items():
-	print "Building", name
+    for (className, recipeClass) in classList.items():
+	print "Building", className
 
-	# find the files and ids which were owned by the last version of
-	# this package on the branch
+	# Find the files and ids which were owned by the last version of
+	# this package on the branch. We also construct an object which
+	# lets us look for source files this build needs inside of the
+	# repository
 	fileIdMap = {}
-	fullName = cfg.packagenamespace + "/" + name
+	fullName = cfg.packagenamespace + "/" + recipeClass.name
+	lcache = lookaside.RepositoryCache(repos)
 	if repos.hasPackage(fullName):
 	    for pkgName in repos.getPackageList(fullName):
 		pkgSet = repos.getPackageSet(pkgName)
 		pkg = pkgSet.getLatestPackage(cfg.defaultbranch)
 		for (fileId, path, version) in pkg.fileList():
 		    fileIdMap[path] = fileId
+		    if path[0] != "/":
+			# we might need to retrieve this source file
+			# to enable a build, so we need to find the
+			# sha1 hash of it since that's how it's indexed
+			# in the file store
+			filedb = repos.getFileDB(fileId)
+			file = filedb.getVersion(version)
+			lcache.addFileHash(path, file.sha1())
 
 	ident = IdGen(fileIdMap)
 
-        srcdirs = [ os.path.dirname(recipeClass.filename), cfg.sourcepath % {'pkgname': name} ]
-	recipeObj = recipeClass(cfg, srcdirs)
+        srcdirs = [ os.path.dirname(recipeClass.filename), cfg.sourcepath % {'pkgname': recipeClass.name} ]
+	recipeObj = recipeClass(cfg, lcache, srcdirs)
 
 	builddir = cfg.buildpath + "/" + recipeObj.name
 

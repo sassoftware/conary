@@ -108,10 +108,12 @@ class Recipe:
 	if not keyid:
 	    return
 	gpg = '%s.sig' %(file)
-	c = lookaside.searchAll(self.cfg, gpg, self.name, self.srcdirs)
+	c = lookaside.searchAll(self.cfg, self.laReposCache, gpg, 
+				self.name, self.srcdirs)
 	if not c:
 	    gpg = '%s.sign' %(file)
-	    c = lookaside.searchAll(self.cfg, gpg, self.name, self.srcdirs)
+	    c = lookaside.searchAll(self.cfg, self.laReposCache,
+				    gpg, self.name, self.srcdirs)
 	if c:
 	    if not self.signatures.has_key(file):
 		self.signatures[file] = []
@@ -122,12 +124,15 @@ class Recipe:
 	self.addSignature(file, keyid)
 
     def addTarballFromRPM(self, rpm, file, extractDir='', keyid=None):
-	f = lookaside.searchAll(self.cfg, os.path.basename(file), self.name, self.srcdirs)
+	f = lookaside.searchAll(self.cfg, self.laReposCache, 
+			     os.path.basename(file), self.name, self.srcdirs)
 	if not f:
-	    r = lookaside.findAll(self.cfg, rpm, self.name, self.srcdirs)
+	    r = lookaside.findAll(self.cfg, self.laReposCache, rpm, 
+				  self.name, self.srcdirs)
 	    c = lookaside.createCacheName(self.cfg, file, self.name)
 	    extractSourceFromRPM(r, c)
-	    f = lookaside.findAll(self.cfg, file, self.name, self.srcdirs)
+	    f = lookaside.findAll(self.cfg, self.laReposCache, file, 
+				  self.name, self.srcdirs)
 	self.tarballs.append((file, extractDir))
 	self.addSignature(f, keyid)
 
@@ -182,7 +187,8 @@ class Recipe:
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
 	for (file, extractdir) in self.tarballs:
-            f = lookaside.findAll(self.cfg, file, self.name, self.srcdirs)
+            f = lookaside.findAll(self.cfg, self.laReposCache, file, 
+				  self.name, self.srcdirs)
 	    self.checkSignatures(f, file)
             if f.endswith(".bz2"):
                 tarflags = "-jxf"
@@ -198,7 +204,8 @@ class Recipe:
 	    os.system("tar -C %s %s %s" % (destdir, tarflags, f))
 	
 	for file in self.sources:
-            f = lookaside.findAll(self.cfg, file, self.name, self.srcdirs)
+            f = lookaside.findAll(self.cfg, self.laReposCache, file, 
+				  self.name, self.srcdirs)
 	    destDir = builddir + "/" + self.theMainDir
 	    util.mkdirChain(destDir)
 	    shutil.copyfile(f, destDir + "/" + file)
@@ -247,12 +254,13 @@ class Recipe:
     def getPackageSet(self):
         return self.packageSet
 
-    def __init__(self, cfg, srcdirs):
+    def __init__(self, cfg, laReposCache, srcdirs):
 	self.tarballs = []
 	self.patches = []
 	self.sources = []
 	self.signatures = {}
         self.cfg = cfg
+	self.laReposCache = laReposCache
 	self.srcdirs = srcdirs
 	self.theMainDir = self.name + "-" + self.version
 	self.build = build.Make()

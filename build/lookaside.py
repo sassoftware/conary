@@ -13,10 +13,7 @@ import time
 
 def createCacheName(cfg, name, location, negative=''):
     cachedname = '%s/%s%s/%s' %(cfg.lookaside, negative, location, name)
-    try:
-	os.makedirs(os.path.dirname(cachedname))
-    except:
-	pass
+    util.mkdirChain(os.path.dirname(cachedname))
     return cachedname
 
 def createCacheEntry(cfg, name, location, infile):
@@ -62,14 +59,17 @@ def searchCache(cfg, name, location):
 	return util.searchFile(basename, ['%s/%s' %(cfg.lookaside, location)])
 
 
-def searchRepository(cfg, name, location):
+def searchRepository(cfg, repCache, name, location):
     """searches repository, and retrieves to cache"""
     basename = os.path.basename(name)
-    # FIXME: I don't know how to do this yet
+
+    if repCache.hasFile(basename):
+	return repCache.moveFileToCache(cfg, basename, location)
+
     return None
 
 
-def searchAll(cfg, name, location, srcdirs):
+def searchAll(cfg, repCache, name, location, srcdirs):
     """searches all locations, including populating the cache if the
     file can't be found in srcdirs, and returns the name of the file"""
     f = util.searchFile(os.path.basename(name), srcdirs)
@@ -77,7 +77,7 @@ def searchAll(cfg, name, location, srcdirs):
 
     # this needs to come before searching the cache, with the expense
     # of repopulating the cache "unnecessarily", to preserve reproducability
-    f = searchRepository(cfg, name, location)
+    f = searchRepository(cfg, repCache, name, location)
     if f: return f
 
     f = searchCache(cfg, name, location)
@@ -109,8 +109,8 @@ def searchAll(cfg, name, location, srcdirs):
     return None
 
 
-def findAll(cfg, name, location, srcdirs):
-    f = searchAll(cfg, name, location, srcdirs)
+def findAll(cfg, repcache, name, location, srcdirs):
+    f = searchAll(cfg, repcache, name, location, srcdirs)
     if not f:
 	raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT))
     return f
@@ -120,3 +120,22 @@ class LookAside(file):
     def __init__(cfg, name, location, srcdirs, buffered=-1):
 	f = findAll(cfg, name, location, srcdirs)
 	file.__init__(self, f, "r", buffered)
+
+class RepositoryCache:
+
+    def addFileHash(self, name, hash):
+	self.map[name] = hash
+
+    def hasFile(self, name):
+	return self.map.has_key(name)
+
+    def moveFileToCache(self, cfg, name, location):
+	cachedname = createCacheName(cfg, name, location)
+	f = open(cachedname, "w+")
+	self.repos.pullFileContents(self.map[name], f)
+	f.close()
+	return cachedname
+
+    def __init__(self, repos):
+	self.repos = repos
+	self.map = {}
