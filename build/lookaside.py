@@ -62,10 +62,12 @@ def searchCache(cfg, name, location):
 	negativeName = os.sep.join((cfg.lookaside, 'NEGATIVE',
                                     location, name[5:]))
 	if os.path.exists(negativeName):
-	    if time.time() > 60*60*24*7 + os.path.getmtime(negativeName):
+	    if time.time() > 60*60 + os.path.getmtime(negativeName):
 		os.remove(negativeName)
-		return searchCache(cfg, name, location)
-	    return -1
+            else:
+                log.warning('found %s, therefore not fetching %s',
+                    negativeName, name)
+                return -1
 
 	# exact match first, then look for cached responses from other servers
 	positiveName = os.sep.join((cfg.lookaside, location, name[5:]))
