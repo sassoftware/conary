@@ -187,7 +187,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
 	if not fileObj.hasContents:
 	    fileObj.restore(None, '/', fullPath, 1)
 	else:
-	    # to tracking the fileId separately from the fileObj lest
+	    # tracking the fileId separately from the fileObj lets
 	    # us sort the list of files by fileid
 	    assert(fileObj.id() == fileId)
 	    if fileObj.flags.isConfig():
