@@ -13,6 +13,7 @@ import fcntl
 import files
 import os
 import package
+import patch
 import util
 import versioned
 import bsddb
@@ -99,7 +100,7 @@ class Repository:
 	fileDB = self._getFileDB(fileId)
 	fileDB.eraseVersion(version)
 
-    def storeFileFromChangeset(self, chgSet, file, restoreContents):
+    def storeFileFromContents(self, chgSet, file, restoreContents):
 	raise NotImplemented
 
     def __del__(self):
@@ -110,20 +111,16 @@ class Repository:
 
 class LocalRepository(Repository):
 
-    def storeFileFromChangeset(self, chgSet, file, restoreContents):
-	if isinstance(file, files.RegularFile):
+    def storeFileFromContents(self, contents, file, restoreContents):
+	if file.hasContents:
 	    if restoreContents:
-		(t, cont) = chgSet.getFileContents(file.sha1())
-		assert(t == changeset.ChangedFileTypes.file)
-		f = cont.get()
+		f = contents.get()
 		targetFile = self.contentsStore.newFile(file.sha1())
 
 		# if targetFile is None the file is already in the store
 		if targetFile:
 		    targetFile.write(f.read())
 		    targetFile.close()
-
-		f.close()
 	    else:
 		# the file doesn't have any contents, so it must exist
 		# in the data store already; we still need to increment
@@ -209,17 +206,17 @@ class LocalRepository(Repository):
 		cs.addFile(fileId, oldVersion, newVersion, filecs)
 
 		if hash:
-		    #if oldFile and oldFile.isConfig() and newFile.isConfig():
-		#	diff = difflib.unified_diff(oldCont.get().readlines(),
-		#				    newCont.get().readlines(),
-		#				    "old", "new")
-		#	diff.next()
-		#	diff.next()
-		#	cont = FileContentsFromString("".join(diff))
-		#	cs.addFileContents(hash, 
-		#		    changeset.ChangedFileTypes.diff, cont)
-		    #else:
-		    cs.addFileContents(hash, 
+		    if oldFile and oldFile.isConfig() and newFile.isConfig():
+			diff = difflib.unified_diff(oldCont.get().readlines(),
+						    newCont.get().readlines(),
+						    "old", "new")
+			diff.next()
+			diff.next()
+			cont = FileContentsFromString("".join(diff))
+			cs.addFileContents(hash, 
+				    changeset.ChangedFileTypes.diff, cont)
+		    else:
+			cs.addFileContents(hash, 
 				changeset.ChangedFileTypes.file, newCont)
 
 	return cs
@@ -366,10 +363,15 @@ class ChangeSetJobFile:
     def copy(self):
 	return copy.deepcopy(self)
 
-    def __init__(self, fileId, file, version, path, restoreContents):
+    def getContents(self):
+	return self.fileContents
+
+    def __init__(self, fileId, file, version, path, fileContents,
+		 restoreContents):
 	self.theVersion = version
 	self.theFile = file
 	self.theRestoreContents = restoreContents
+	self.fileContents = fileContents
 	self.thePath = path
 	self.theFileId = fileId
 
@@ -440,7 +442,7 @@ class ChangeSetJob:
 
 	    # note that the order doesn't matter; we're just copying
 	    # files into the repository
-	    if self.repos.storeFileFromChangeset(self.cs, file, 
+	    if self.repos.storeFileFromContents(newFile.getContents(), file, 
 						 newFile.restoreContents()):
 		undo.addedFileContents(file.sha1())
 
@@ -506,9 +508,25 @@ class ChangeSetJob:
 	    # we should have had a package which requires this (new) version
 	    # of the file
 	    assert(newVer.equal(fileMap[fileId][1]))
+
+	    if file.hasContents:
+		(contType, fileContents) = cs.getFileContents(file.sha1())
+		if contType == changeset.ChangedFileTypes.diff:
+		    # the content for this file is in the form of a diff,
+		    # which we need to apply against the file in the repository
+		    assert(oldVer)
+		    f = repos.pullFileContentsObject(oldfile.sha1())
+		    oldLines = f.readlines()
+		    f.close()
+		    diff = fileContents.get().readlines()
+		    newLines = patch.patch(oldLines, diff)
+		    fileContents = FileContentsFromString("".join(newLines))
+	    else:
+		fileContents = None
+
 	    path = fileMap[fileId][0]
 	    self.addFile(ChangeSetJobFile(fileId, file, newVer, path, 
-					  restoreContents))
+					  fileContents, restoreContents))
 
 	for (pkgName, version) in cs.getOldPackageList():
 	    pkg = self.repos.getPackageVersion(pkgName, version)
@@ -520,6 +538,8 @@ class ChangeSetJob:
 		
 		if not self.containsFilePath(path):
 		    self.addStaleFile(path, file)
+	#import sys
+	#sys.exit(0)
 
 class ChangeSetUndo:
 
