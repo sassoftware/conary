@@ -319,10 +319,11 @@ class ChangeSetFromFile(ChangeSet):
 
 	    header = control.read()
 
-    def __init__(self, file, justContentsForConfig = 0):
+    def __init__(self, file, justContentsForConfig = 0, skipValidate = 1):
 	ChangeSet.__init__(self)
 	self.read(file)
-	self.validate(justContentsForConfig)
+	if not skipValidate:
+	    self.validate(justContentsForConfig)
 
 # old may be None
 def fileChangeSet(fileId, old, new):
