@@ -28,6 +28,8 @@ class SrsConfiguration:
 	    if self.defaultbranch.isVersion():
 		sys.stderr.write("The configured default branch %s specifies " +
 		     "version, not a branch.\n" % self.defaultbranch.asString())
+	elif key == "installbranch":
+	    self.installbranch = versions.BranchName(self.installbranch)
 
     def display(self):
 	keys = self.__dict__.keys()
@@ -37,6 +39,10 @@ class SrsConfiguration:
 		print "%-20s %s" % (item, self.__dict__[item])
 	    elif isinstance(self.__dict__[item], versions.Version):
 		print "%-20s %s" % (item, self.__dict__[item].asString())
+	    elif isinstance(self.__dict__[item], versions.BranchName):
+		print "%-20s %s" % (item, self.__dict__[item])
+	    else:
+		print "%-20s (unknown type)" % (item)
 
     def __init__(self):
 	self.reppath = "/var/lib/srsrep"
@@ -45,6 +51,7 @@ class SrsConfiguration:
 	self.buildpath = "/usr/src/srs/builds"
 	self.packagenamespace = ":localhost"
 	self.defaultbranch = None
+	self.installbranch = None
 	self.lookaside = "/var/cache/srs"
 	self.dbpath = "/var/lib/srsdb"
         self.tmpdir = "/var/tmp/"
