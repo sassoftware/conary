@@ -640,14 +640,8 @@ class Database:
 	""", start_transaction = False)
 
 	for (i, (pathId, fileId, version)) in enumerate(l):
-            import lib
-            if lib.sha1helper.sha1ToString(fileId) == 'd6791c46bd23b0813f5a632cfb9dd07a28d0f2d9':
-                lib.epdb.st()
 	    cu.execute("INSERT INTO getFilesTbl VALUES (?, ?)", 
 		       i, fileId, start_transaction = False)
-
-        import lib
-        lib.epdb.st()
 
 	cu.execute("""
 	    SELECT DISTINCT row, stream FROM getFilesTbl 
