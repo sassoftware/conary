@@ -1,5 +1,8 @@
 Changes in 0.10.9:
   * fixed some authorization issues with the xml-rpc repository interface
+  * the web management interface for the repository works now; see
+    http://wiki.specifix.com/ConaryConversion for information on how
+    to convert existing authdb's to support this
 
 Changes in 0.10.8:
   * changed iterAllTroves() to troveNames(), which searches a single
