@@ -197,14 +197,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	self.troveStore = trovestore.TroveStore(self.sqlDB)
 
     def commitChangeSet(self, cs):
-	self.troveStore.begin()
-	try:
-	    job = ChangeSetJob(self, cs)
-	except:
-	    self.rollback
-	    raise
-	else:
-	    self.commit()
+        job = ChangeSetJob(self, cs)
+        self.commit()
 
     def close(self):
 	if self.troveStore is not None:
