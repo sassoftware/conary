@@ -23,6 +23,13 @@ from repository import changeset
 class ClientError(Exception):
     """Base class for client errors"""
 
+class TroveNotFound(Exception):
+    def __init__(self, troveName):
+        self.troveName = troveName
+        
+    def __str__(self):
+        return "trove not found: %s" % self.troveName
+
 class UpdateError(ClientError):
     """Base class for update errors"""
 
@@ -114,7 +121,7 @@ class ConaryClient:
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, keepExisting = keepExisting)
 
-    def eraseTrove(pkg, versionStr = None, tagScript = None):
+    def eraseTrove(self, pkg, versionStr = None, tagScript = None):
         pkgList = self.db.findTrove(pkg, versionStr)
 
         list = []

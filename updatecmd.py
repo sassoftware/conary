@@ -23,6 +23,8 @@ import util
 import versions
 import conaryclient
 
+# FIXME client should instantiated once per execution of the command line conary client
+
 def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
                               tagScript = None, keepExisting = False):
     client = conaryclient.ConaryClient(repos, cfg)
@@ -38,14 +40,9 @@ def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
         log.error(e)
 
 def doErase(db, cfg, pkg, versionStr = None, tagScript = None):
+    client = conaryclient.ConaryClient(None, cfg)
+    
     try:
-	pkgList = db.findTrove(pkg, versionStr)
-    except helper.PackageNotFound, e:
-	log.error(str(e))
-	return
-
-    list = []
-    for pkg in pkgList:
-	list.append((pkg.getName(), pkg.getVersion(), pkg.getFlavor()))
-
-    db.eraseTroves(list, tagScript = tagScript)
+        client.eraseTrove(pkg, versionStr, tagScript)
+    except repository.PackageNotFound:
+        log.error("package not found: %s", pkg)
