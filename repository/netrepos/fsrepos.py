@@ -42,14 +42,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 				troveLeafList ]
 	return d
 
-    def getTroveVersionList(self, troveNameList):
-	d = {}
-	for troveName in troveNameList:
-	    d[troveName] = [ versions.VersionFromString(x) for x in
-				self.troveStore.iterTroveVersions(troveName) ]
-
-	return d
-
     def getTroveLeavesByLabel(self, troveNameList, label):
 	d = {}
 	labelStr = label.asString()

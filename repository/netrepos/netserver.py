@@ -74,16 +74,26 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return self.repos.troveStore.hasTrove(pkgName, troveVersion = version,
 					troveFlavor = flavor)
 
-    def getTroveVersionList(self, authToken, troveNameList):
+    def getTroveVersionList2(self, authToken, troveNameList, callVersion = 2):
+	# 1. version 1 has version strings
+	# 2. version 2 has frozen vesions
 	d = {}
 	for troveName in troveNameList:
 	    if not self.auth.check(authToken, write = False, trove = troveName):
 		raise InsufficientPermission
 
-	    d[troveName] = [ x for x in
-			    self.repos.troveStore.iterTroveVersions(troveName) ]
+	    if callVersion == 1:
+		d[troveName] = [ self.fromVersion(x) for x in
+			self.repos.troveStore.iterTroveVersions(troveName) ]
+	    else:
+		d[troveName] = [ self.freezeVersion(x) for x in
+			self.repos.troveStore.iterTroveVersions(troveName) ]
 
 	return d
+
+    def getTroveVersionList(self, authToken, troveNameList):
+	return self.getTroveVersionList2(authToken, troveNameList,
+					 callVersion = 1)
 
     def getFilesInTrove(self, authToken, troveName, versionStr, flavor,
                         sortByPath = False, withFiles = False):

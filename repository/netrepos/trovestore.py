@@ -128,11 +128,13 @@ class TroveStore:
     def iterTroveVersions(self, troveName):
 	cu = self.db.cursor()
 	cu.execute("""
-	    SELECT version FROM Items JOIN Nodes 
+	    SELECT version, Nodes.timeStamps FROM Items JOIN Nodes 
 		    ON Items.itemId = Nodes.itemId NATURAL
 		JOIN Versions WHERE item=%s""", troveName)
-	for (versionStr, ) in cu:
-	    yield versionStr
+	for (versionStr, timeStamps) in cu:
+	    version = versions.VersionFromString(versionStr)
+	    version.setTimeStamps([float(x) for x in timeStamps.split(":")])
+	    yield version
 
     def troveLatestVersion(self, troveName, branch):
 	"""
