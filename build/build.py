@@ -190,7 +190,7 @@ class MakeInstall(Make):
     """
     The MakeInstall class is like the Make class, except that it
     automatically sets DESTDIR.  If your package does not have
-    DESTDIR or an analog, use the GNUMakeInstall class instead,
+    DESTDIR or an analog, use the MakePathsInstall class instead,
     or as a last option, the Make class.
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
@@ -207,9 +207,9 @@ class MakeInstall(Make):
 	                  %(self.rootVar, macros['destdir'])})
 	util.execute(self.command %macros)
 
-class GNUMakeInstall(Make):
+class MakePathsInstall(Make):
     """
-    The GNUMakeInstall class is used when there is no single functional
+    The MakePathsInstall class is used when there is no single functional
     DESTDIR or similar definition, but enough of the de-facto standard 
     variables (prefix, bindir, etc) are honored by the Makefile to make
     a destdir installation successful.
