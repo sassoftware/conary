@@ -5,9 +5,9 @@ import util
 import commit
 import stat
 
-def doImport(dbpath, rpmFile):
-    scratch = dbpath + "/scratch"
-    fileDB = dbpath + "/files"
+def doImport(reppath, rpmFile):
+    scratch = reppath + "/scratch"
+    fileDB = reppath + "/files"
 
     ts = rpm.TransactionSet()
     ts.setVSFlags(~(rpm._RPMVSF_NOSIGNATURES))
@@ -86,7 +86,7 @@ def doImport(dbpath, rpmFile):
     if mustExtract:
 	os.system("cd %s; rpm2cpio %s | cpio -iumd --quiet" % 
 		    (scratch, pkgFile))
-    commit.finalCommit(dbpath, pkgName, version, scratch, fileList)
+    commit.finalCommit(reppath, pkgName, version, scratch, fileList)
 
     if mustExtract:
 	os.system("rm -rf %s" % scratch)

@@ -60,9 +60,9 @@ class PackageSet:
 	v = versioned.latest(self.packages.keys())
 	return (v, self.packages[v])
 	
-    def __init__(self, dbpath, name):
+    def __init__(self, reppath, name):
 	self.name = name
-	self.pkgPath = dbpath + "/pkgs/" + self.name
+	self.pkgPath = reppath + "/pkgs/" + self.name
 
 	f = versioned.open(self.pkgPath, "r+")
 	versions = f.versionList()

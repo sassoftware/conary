@@ -4,17 +4,17 @@ import os
 import files
 import shutil
 
-def finalCommit(dbpath, pkgName, version, root, fileList):
-    pkgSet = package.PackageSet(dbpath, pkgName)
+def finalCommit(reppath, pkgName, version, root, fileList):
+    pkgSet = package.PackageSet(reppath, pkgName)
     if pkgSet.hasVersion(version):
 	raise KeyError, ("package %s version %s is already installed" %
 		    (pkgName, version))
     p = pkgSet.createVersion(version)
 
-    fileDB = dbpath + "/files"
+    fileDB = reppath + "/files"
 
     for file in fileList:
-	infoFile = files.FileDB(dbpath, file.path())
+	infoFile = files.FileDB(reppath, file.path())
 
 	existing = infoFile.findVersion(file)
 	if not existing:
@@ -34,18 +34,18 @@ def finalCommit(dbpath, pkgName, version, root, fileList):
 
     pkgSet.write()
 
-def doCommit(dbpath, pkgName, version, root, fileNameFile):
+def doCommit(reppath, pkgName, version, root, fileNameFile):
     f = open(fileNameFile, "r")
     list = []
     for n in f.readlines():
 	list.append(n[:-1])	# chop
     f.close()
 
-    fileDB = dbpath + "/files"
+    fileDB = reppath + "/files"
 
     fileList = []
     for i in range(0, len(list)):
 	f = files.FileFromFilesystem(root, list[i])
 	fileList.append(f)
 
-    finalCommit(dbpath, pkgName, version, root, fileList)
+    finalCommit(reppath, pkgName, version, root, fileList)

@@ -15,7 +15,7 @@ class SrsConfiguration:
 	    f.close()
 
     def __init__(self):
-	self.dbpath = "/var/lib/srs"
+	self.reppath = "/var/lib/srsrep"
 	self.root = "/"
 
 	self.read(os.environ["HOME"] + "/" + ".srsrc")

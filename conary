@@ -12,8 +12,8 @@ import srscfg
 
 cfg = srscfg.SrsConfiguration()
 
-fileDB = cfg.dbpath + "/files"
-pkgDB = cfg.dbpath + "/pkgs"
+fileDB = cfg.reppath + "/files"
+pkgDB = cfg.reppath + "/pkgs"
 util.mkdirChain(fileDB, pkgDB)
 
 def usage():
@@ -23,9 +23,9 @@ def usage():
     print "       srs commit  <pkg> <version> <root> <filelist>"
     sys.exit(0)
 
-def displayPkgs(dbpath, packageList):
+def displayPkgs(reppath, packageList):
     for pkgName in packageList:
-	pkgSet = package.PackageSet(dbpath, pkgName)
+	pkgSet = package.PackageSet(reppath, pkgName)
 	l = pkgSet.versionList()
 	for version in l:
 	    print "%-24s %s" % (pkgName, version)
@@ -34,20 +34,20 @@ if (len(sys.argv) < 2):
     usage()
 elif (sys.argv[1] == "import"):
     for file in sys.argv[2:]:
-	importrpm.doImport(cfg.dbpath, file)
+	importrpm.doImport(cfg.reppath, file)
 elif (sys.argv[1] == "pkglist"):
     if (len(sys.argv) == 2):
-	displayPkgs(cfg.dbpath, os.listdir(cfg.dbpath + "/pkgs"))
+	displayPkgs(cfg.reppath, os.listdir(cfg.reppath + "/pkgs"))
     else:
-	displayPkgs(cfg.dbpath, sys.argv[2:])
+	displayPkgs(cfg.reppath, sys.argv[2:])
 elif (sys.argv[1] == "update"):
     for pkg in sys.argv[2:]:
-	update.doUpdate(cfg.dbpath, cfg.root, pkg)
+	update.doUpdate(cfg.reppath, cfg.root, pkg)
 elif (sys.argv[1] == "commit"):
     if (len(sys.argv) != 6 or sys.argv[3][0] != "/"):
 	print "usage: srs commit <pkg> <version> <root> <filelist>"
 	sys.exit(1)
 
-    commit.doCommit(cfg.dbpath, sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+    commit.doCommit(cfg.reppath, sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
 else:
     usage()

@@ -323,10 +323,10 @@ class FileDB:
 
 	f.close()
 
-    def __init__(self, dbpath, path):
-	self.dbpath = dbpath
+    def __init__(self, reppath, path):
+	self.reppath = reppath
 	self.path = path
-	self.dbfile = dbpath + '/files' + path + '.info'
+	self.dbfile = reppath + '/files' + path + '.info'
 	self.read()
 
 def FileFromFilesystem(root, path):
