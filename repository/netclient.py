@@ -790,11 +790,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     latest.incrementBuildCount()
                     return latest
 
-                # check to see if the source component release is newer
-                # if so, use the source component.  Otherwise, latest will
+                # check to see if the latest binary trove is for a different
+                # version, or if the versions are the same but the 
+                # source component release is newer.
+                # If so, use the source component.  Otherwise, latest will
                 # be used below and the build count will be incremented.
                 latestTrailing = latest.trailingVersion()
-                if latestTrailing.getRelease() < sourceTrailing.getRelease():
+                if (latestTrailing.getVersion() != versionStr or 
+                    latestTrailing.getRelease() < sourceTrailing.getRelease()):
                     latest = sourceVersion.getBinaryBranch()
                     latest.incrementBuildCount()
                     return latest
