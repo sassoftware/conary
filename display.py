@@ -4,8 +4,6 @@
 #
 
 import files
-import helper
-import log
 import versions
 
 _pkgFormat  = "%-39s %s"
