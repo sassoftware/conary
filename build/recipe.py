@@ -342,7 +342,8 @@ class Recipe:
 
 	    if filetype == 'patch':
 		(level, backup) = args
-		f = util.findFile(file, self.srcdirs)
+		f = lookaside.findAll(self.cfg, self.laReposCache, file, 
+			      self.name, self.srcdirs)
 		provides = "cat"
 		if file.endswith(".gz"):
 		    provides = "zcat"
@@ -350,11 +351,10 @@ class Recipe:
 		    provides = "bzcat"
 		if backup:
 		    backup = '-b -z %s' % backup
-		cd = ''
 		if targetdir:
-		    cd = 'cd %s;' %targetdir
-		util.execute('%s %s %s | patch -d %s -p%s %s'
-		             %(cd, provides, f, destDir, level, backup))
+		    destDir = "/".join((destDir, targetdir))
+		util.execute('%s %s | patch -d %s -p%s %s'
+		             %(provides, f, destDir, level, backup))
 		continue
 
 	    if filetype == 'source':
