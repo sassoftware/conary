@@ -8,9 +8,7 @@ import types
 import versions
 import sys
 
-_cfg = None
-
-class _SrsConfiguration:
+class SrsConfiguration:
 
     def read(self, file):
 	if os.path.exists(file):
@@ -55,9 +53,3 @@ class _SrsConfiguration:
 	if self.defaultbranch.isVersion():
 	    sys.stderr.write("The configured default branch %s specifies " +
 		 "version, not a branch.\n" % self.defaultbranch.asString())
-
-def SrsConfiguration():
-    global _cfg
-    if _cfg is None:
-	_cfg = _SrsConfiguration()
-    return _cfg
