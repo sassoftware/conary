@@ -141,24 +141,29 @@ macro set.
 .IP
 If \fB--resume <linenums>\fP is specified, 
 conary will cooking the specified line numbers.  The format of
-linenums is any number of pairs of n or n:m 
-separated by commas, n and m are lines in the recipe.  
-If the initial linenum in a pair is left off, leaving :m, 
+<linenums> is any number of pairs of n or n:m 
+separated by commas, where n and m are line numbers in the recipe.  
+If the initial line number in a pair is left off, leaving :m, 
 conary will begin cooking from the beginning of the file.  
-If the final linenum is left off, leaving n: conary will cook until the end 
-of the file, run policy, and create a changeset.  A --resume n without
-a colon is equivalent to n:n, there are other ranges given to resume,
+If the final line number is left off, leaving n:, conary will cook
+until the end 
+of the file, run all the policy, and create a changeset.  A --resume n without
+a colon is equivalent to n:n, if there are other ranges given to --resume,
 or n: if it is the only argument given to --resume.  All resume line 
-ranges must be given in increasing order.
+numbers must be provided in increasing order.
 
 If \fB--resume\fP is specified with no parameter,
 the recipe will be recooked from the line of last failure.  
 If \fB--resume policy\fP is specified, the policy will be rechecked 
-from the last build.  Note that the \fB--resume\fP option may
-only be used with local recipe files, not source components grabbed
-from a repository.
+from the last build; this only works if the destdir still exists,
+either because of a policy error or because the \fB--noclean\fP option
+was provided.
 
 Example: conary cook --resume 5:10,15,35:
+
+Note that the \fB--resume\fP option may
+be used only with local recipe files, not source components grabbed
+from a repository.
 .IP 
 The --use-flag option can be used to override the default Use flags 
 and package-specific flags for this instantiaton.   The format for
