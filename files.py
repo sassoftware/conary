@@ -30,9 +30,9 @@ class FileMode:
             self.thePerms = mode.thePerms
         if mode.theMtime is not None:
             self.theMtime = mode.theMtime
-        if self.theSize is not None:
+        if mode.theSize is not None:
             self.theSize = mode.theSize
-        if self.theFlags is not None:
+        if mode.theFlags is not None:
             self.theFlags = mode.theFlags
 
     def triplet(self, code, setbit = 0):
@@ -123,6 +123,8 @@ class FileMode:
 
     def isConfig(self, set = None):
 	if set != None:
+            if self.theFlags is None:
+                self.theFlags = 0x0
 	    if set:
 		self.theFlags |= _FILE_FLAG_CONFIG
 	    else:
