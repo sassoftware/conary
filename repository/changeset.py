@@ -703,7 +703,9 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     cs = result[0]
 
     for outerPackage in pkgList:
-	cs.addPrimaryPackage(outerPackage.getName(), outerPackage.getVersion())
+	cs.addPrimaryPackage(outerPackage.getName(), 
+	  outerPackage.getVersion().fork(
+		versions.LocalBranch(), sameVerRel = 1))
 
     hasChanges = False
     for (changed, fsPkg) in result[1]:
