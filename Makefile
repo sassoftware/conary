@@ -51,7 +51,7 @@ python_files = __init__.py	\
 
 example_files = examples/tmpwatch.recipe
 bin_files = srs srs-bootstrap
-extra_files = srs.recipe.in srs.recipe srs Makefile test/*.py
+extra_files = srs.recipe.in srs.recipe srs-wrapper.in Makefile test/*.py
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
 generated_files = srs-wrapper srs.recipe *.pyo *.pyc 
