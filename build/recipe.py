@@ -23,6 +23,7 @@ import package
 import packagepolicy
 from repository import repository
 import shutil
+import source
 import sys
 import tempfile
 import types
@@ -77,36 +78,6 @@ crossMacros = {
     'sysroot'		: '%(prefix)s/sys-root',
     'headerpath'	: '%(sysroot)s/usr/include',
 }
-
-def _extractSourceFromRPM(rpm, targetfile):
-    filename = os.path.basename(targetfile)
-    directory = os.path.dirname(targetfile)
-    r = file(rpm, 'r')
-    rpmhelper.seekToData(r)
-    gz = gzip.GzipFile(fileobj=r)
-    (rpipe, wpipe) = os.pipe()
-    pid = os.fork()
-    if not pid:
-	os.dup2(rpipe, 0)
-	os.chdir(directory)
-	os.execl('/bin/cpio', 'cpio', '-ium', filename)
-	os._exit(1)
-    while 1:
-	buf = gz.read(4096)
-	if not buf:
-	    break
-	os.write(wpipe, buf)
-    os.close(wpipe)
-    (pid, status) = os.waitpid(pid, 0)
-    if not os.WIFEXITED(status):
-	raise IOError, 'cpio died extracting %s from RPM %s' \
-	               %(filename, os.path.basename(rpm))
-    if os.WEXITSTATUS(status):
-	raise IOError, 'cpio returned failure %d extracting %s from RPM %s' \
-	               %(os.WEXITSTATUS(status), filename, os.path.basename(rpm))
-    if not os.path.exists(targetfile):
-	raise IOError, 'failed to extract source %s from RPM %s' \
-	               %(filename, os.path.basename(rpm))
 
 def setupRecipeDict(d, filename):
     exec 'from build import build' in d
@@ -296,242 +267,47 @@ class PackageRecipe(Recipe):
     buildRequires = []
     runRequires = []
 
-    def _addSignature(self, filename, keyid):
-	# do not search unless a gpg keyid is specified
-	if not keyid or not filename:
-	    return
-        for suffix in ('sig', 'sign', 'asc'):
-            gpg = '%s.%s' %(filename, suffix)
-            c = lookaside.searchAll(self.cfg, self.laReposCache, gpg, 
-                                    self.name, self.srcdirs)
-            if c:
-                if filename not in self.signatures:
-                    self.signatures[filename] = []
-                self.signatures[filename].append((gpg, c, keyid))
-                break
-
-    def _appendSource(self, filename, keyid, type, extractDir, use, args):
-	filename = filename % self.macros
-	self._sources.append((filename, type, extractDir, use, args))
-	self._addSignature(filename, keyid)
-
-    def addArchive(self, filename, extractDir='', keyid=None, use=None):
-	self._appendSource(filename, keyid, 'tarball', extractDir, use, ())
-
-    def addPatch(self, filename, level='1', backup='', extractDir='',
-                 keyid=None, use=None, macros=False, extraArgs=''):
-	self._appendSource(filename, keyid, 'patch', extractDir, use,
-                           (level, backup, macros, extraArgs))
-
-    def addSource(self, filename, keyid=None, extractDir='',
-                  apply='', use=None, macros=False):
-	self._appendSource(filename, keyid, 'source', extractDir, use,
-                           (apply %self.macros, macros))
-
-    def addAction(self, action, targetdir='', use=None):
-	self._appendSource('', '', 'action', targetdir, use,
-			   (action %self.macros))
-
-    def addBuild(self, action):
-        self._build.append(action)
-
-    def _extractFromRPM(self, rpm, filename):
-        """
-        Extracts filename from rpm file and creates an entry in the
-        source lookaside cache for the extracted file
-        """
-	# check signature in RPM package?
-	rpm = rpm % self.macros
-	filename = filename % self.macros
-	f = lookaside.searchAll(self.cfg, self.laReposCache, 
-                                os.path.basename(filename), self.name,
-                                self.srcdirs)
-	if not f:
-	    r = lookaside.findAll(self.cfg, self.laReposCache, rpm, 
-				  self.name, self.srcdirs)
-	    c = lookaside.createCacheName(self.cfg, filename, self.name)
-	    _extractSourceFromRPM(r, c)
-	    f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
-				  self.name, self.srcdirs)
-
-    def addArchiveFromRPM(self, rpm, filename, **keywords):
-        self._extractFromRPM(rpm, filename)
-        self.addArchive(filename, **keywords)
-
-    def addPatchFromRPM(self, rpm, filename, **keywords):
-        self._extractFromRPM(rpm, filename)
-        self.addPatch(filename, **keywords)
-
-    def addSourceFromRPM(self, rpm, filename, **keywords):
-        self._extractFromRPM(rpm, filename)
-        self.addSource(filename, **keywords)
-
-    def allSources(self):
-        sources = []
-        for (filename, filetype, extractDir, use, args) in self._sources:
-	    if filename: # no file for an action
-		sources.append(filename)
-	for signaturelist in self.signatures.values():
-            for (gpg, cached, keyid) in signaturelist:
-                sources.append(gpg)
-	return sources
-
     def mainDir(self, new = None):
 	if new:
 	    self.theMainDir = new % self.macros
-
 	return self.theMainDir
 
     def nameVer(self):
-	return self.name + "-" + self.version
+	return os.sep.join((self.name, self.version))
 
     def cleanup(self, builddir, destdir):
 	util.rmtree(builddir)
 	util.rmtree(destdir)
 
-    def checkSignatures(self, filepath, filename):
-        if filename not in self.signatures:
-            return
-        if not util.checkPath("gpg"):
-            return
-	for (gpg, signature, keyid) in self.signatures[filename]:
-	    # FIXME: our own keyring
-	    if os.system("gpg --no-secmem-warning --verify %s %s"
-			  %(signature, filepath)):
-		# FIXME: only do this if key missing, this is cheap for now
-		os.system("gpg --keyserver pgp.mit.edu --recv-keys 0x %s"
-		          %(keyid))
-		if os.system("gpg --no-secmem-warning --verify %s %s"
-			      %(signature, filepath)):
-		    raise RuntimeError, "GPG signature %s failed" %(signature)
-
     def fetchAllSources(self):
-        """
-        returns a list of file locations for all the sources in
-        the package recipe
-        """
-        files = []
-	for (filename, filetype, targetdir, use, args) in self._sources:
-	    if filetype in ('tarball', 'patch', 'source'):
-		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
-                                      self.name, self.srcdirs)
-		self.checkSignatures(f, filename)
-                files.append(f)
-        return files
+	"""
+	returns a list of file locations for all the sources in
+	the package recipe
+	"""
+	files = []
+	for src in self._sources:
+	    f = src.fetch()
+	    if f:
+		files.append(f)
+	return files
 
     def unpackSources(self, builddir):
-        self.macros.maindir = self.theMainDir
-        if os.path.exists(builddir):
+	self.macros.maindir = self.theMainDir
+	if os.path.exists(builddir):
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
+	for source in self._sources:
+	    source.unpack(builddir)
 
-	for (filename, filetype, targetdir, use, args) in self._sources:
-	    targetdir = targetdir %self.macros
-
-	    if use != None:
-		if type(use) is not tuple:
-		    use=(use,)
-		for usevar in use:
-		    if not usevar:
-			# put this in the repository, but do not apply it
-			filetype = None
-			continue
-		if filetype == None:
-		    continue
-
-	    if filetype == 'tarball':
-		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
-                                      self.name, self.srcdirs)
-		self.checkSignatures(f, filename)
-		if f.endswith(".bz2") or f.endswith(".tbz2"):
-		    tarflags = "-jxf"
-		elif f.endswith(".gz") or f.endswith(".tgz"):
-		    tarflags = "-zxf"
-		else:
-		    raise RuntimeError, "unknown archive compression"
-		if targetdir:
-                    targetdir = targetdir % self.macros
-		    destdir = '%s/%s' % (builddir, targetdir)
-		    util.mkdirChain(destdir)
-		else:
-		    destdir = builddir
-		util.execute("tar -C %s %s %s" % (destdir, tarflags, f))
-		continue
-
-	    # Not a tarball, so different assumption about where to operate
-	    destDir = builddir + "/" + self.theMainDir
-	    util.mkdirChain(destDir)
-
-	    if filetype == 'patch':
-		(level, backup, macros, extraArgs) = args
-		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
-			      self.name, self.srcdirs)
-		provides = "cat"
-		if filename.endswith(".gz"):
-		    provides = "zcat"
-		elif filename.endswith(".bz2"):
-		    provides = "bzcat"
-		if backup:
-		    backup = '-b -z %s' % backup
-		if targetdir:
-		    destDir = "/".join((destDir, targetdir))
-		    util.mkdirChain(destDir)
-		if macros:
-		    log.debug('applying macros to patch %s' %f)
-		    pin = util.popen("%s '%s'" %(provides, f))
-		    log.debug('patch -d %s -p%s %s %s'
-		              %(destDir, level, backup, extraArgs))
-		    pout = util.popen('patch -d %s -p%s %s %s'
-		                      %(destDir, level, backup, extraArgs), 'w')
-		    pout.write(pin.read()%self.macros)
-		    pin.close()
-		    pout.close()
-		else:
-		    util.execute("%s '%s' | patch -d %s -p%s %s %s"
-				 %(provides, f, destDir, level, backup, extraArgs))
-		continue
-
-	    if filetype == 'source':
-		(apply, macros) = args
-		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
-				      self.name, self.srcdirs)
-		if targetdir:
-		    destDir = "/".join((destDir, targetdir))
-		    util.mkdirChain(destDir)
-		if macros:
-		    log.debug('applying macros to source %s' %f)
-		    pin = file(f)
-		    pout = file(destDir + os.sep + os.path.basename(filename), "w")
-		    pout.write(pin.read()%self.macros)
-		    pin.close()
-		    pout.close()
-		else:
-		    util.copyfile(f, destDir + os.sep + os.path.basename(filename))
-		if apply:
-		    util.execute(apply, destDir)
-		continue
-
-	    if filetype == 'action':
-		(action) = args
-		util.execute(action, destDir)
+    def extraBuild(self, action):
+        self._build.append(action)
 
     def doBuild(self, buildpath, root):
-        builddir = buildpath + "/" + self.mainDir()
+        builddir = os.sep.join((buildpath, self.mainDir()))
 	self.macros.update({'builddir': builddir,
 			    'destdir': root})
-        
-        if self._build is None:
-            pass
-        elif isinstance(self._build, str):
-            util.execute(self._build %self.macros)
-        elif isinstance(self._build, (tuple, list)):
-	    for bld in self._build:
-                if type(bld) is str:
-                    util.execute(bld %self.macros)
-                else:
-                    bld.doBuild(self)
-	else:
-	    self._build.doBuild(self)
+	for bld in self._build:
+	    bld.doBuild(self)
 
     def doDestdirProcess(self):
 	for post in self.destdirPolicy:
@@ -546,7 +322,7 @@ class PackageRecipe(Recipe):
 
 
     def disableParallelMake(self):
-        self.macros['parallelmflags'] = ''
+        self.macros.parallelmflags = ''
 
     def __getattr__(self, name):
 	"""
@@ -562,6 +338,9 @@ class PackageRecipe(Recipe):
 	   added to the build list.
 	"""
         if not name.startswith('_'):
+	    if name.startswith('add'):
+		return _recipeHelper(self._sources,
+				     sources.__dict__[name[3:]])
 	    if name in build.__dict__:
 		return _recipeHelper(self._build, build.__dict__[name])
 	    for (policy, list) in (
@@ -607,37 +386,17 @@ class PackageRecipe(Recipe):
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}):
         assert(self.__class__ is not Recipe)
 	self._sources = []
-	# XXX fixme: convert to proper documentation string
-	# sources is list of (file, filetype, targetdir, use, (args)) tuples,
-	# where:
-	# - file is the name of the file
-	# - filetype is in ('tarball', 'patch', 'source', 'action')
-	# - targetdir is subdirectory to work in
-	# - use is a use flag or tuple of use flags; if it is a tuple,
-	#   they all have to be True in order to apply it
-	# - args is filetype-specific:
-	#   patch: (level, backup, macros, extraArgs)
-	#     - level is -p<level> (1)
-	#     - backup is .backupname suffix (none)
-	#     - macros is boolean: apply self.macros to patch? (False)
-	#     - extraArgs is string of additional patch args ('')
-	#   source: (apply, macros)
-	#     - apply is None or command to util.execute(apply)
-	#     - macros is boolean: apply self.macros to patch? (False)
-	#   action: (action)
-	#     - action is the command to execute, in builddir
-	self.signatures = {}
-        self.cfg = cfg
-	self.laReposCache = laReposCache
-	self.srcdirs = srcdirs
-	self.theMainDir = self.name + "-" + self.version
 	self._build = []
         self.destdirPolicy = destdirpolicy.DefaultPolicy()
         self.packagePolicy = packagepolicy.DefaultPolicy()
+        self.cfg = cfg
+	self.laReposCache = laReposCache
+	self.srcdirs = srcdirs
+	self.theMainDir = self.nameVer()
 	self.macros = macros.Macros()
 	self.macros.update(baseMacros)
-	self.macros['name'] = self.name
-	self.macros['version'] = self.version
+	self.macros.name = self.name
+	self.macros.version = self.version
 	if extraMacros:
 	    self.macros.update(extraMacros)
 
@@ -680,7 +439,7 @@ class FilesetRecipe(Recipe):
 		for n in pathMap.iterkeys():
 		    i = n.count("/")
 		    if i > dirCount:
-			dirName = "/".join(n.split("/")[:dirCount + 1])
+			dirName = os.sep.join(n.split(os.sep)[:dirCount + 1])
 			match = fnmatchcase(dirName, pattern)
 		    elif i == dirCount:
 			match = fnmatchcase(n, pattern)
