@@ -126,6 +126,10 @@ elif (otherArgs[1] == "commit"):
     for changeSet in otherArgs[2:]:
 	commit.doCommit(repos, cfg, changeSet)
 elif (otherArgs[1] == "cook"):
+    # this ensures the repository exists
+    repos = repository.Repository(cfg.reppath, "c")
+    repos.close()
+
     macros = ()
     prep = 0
     if argSet.has_key('prep'):

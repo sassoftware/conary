@@ -324,8 +324,8 @@ class Repository:
 	else:
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
 
-	self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db")
-	self.fileDB = versioned.Database(self.top + "/files.db")
+	self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", mode)
+	self.fileDB = versioned.Database(self.top + "/files.db", mode)
 
 	self.mode = mode
 
@@ -338,7 +338,7 @@ class Repository:
     def __del__(self):
 	self.close()
 
-    def __init__(self, path, mode = "c"):
+    def __init__(self, path, mode = "r"):
 	self.top = path
 	self.pkgDB = None
 	

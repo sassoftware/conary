@@ -108,7 +108,7 @@ class Database(repository.Repository):
 	    self.commitChangeSet(sourcepath, cs, eraseOld = 1)
 	    self.removeRollback(name)
 
-    def __init__(self, root, path, mode = "c"):
+    def __init__(self, root, path, mode = "r"):
 	self.root = root
 	fullPath = root + "/" + path
 	repository.Repository.__init__(self, fullPath, mode)

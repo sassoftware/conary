@@ -266,9 +266,8 @@ class Database:
     def close(self):
 	self.db.close()
 
-    def __init__(self, path):
-	# FIXME: this needs locking
-	self.db = dbhash.open(path, "c")
+    def __init__(self, path, mode = "r"):
+	self.db = dbhash.open(path, mode)
 
 class FileIndexedDatabase(Database):
 
@@ -298,7 +297,7 @@ class FileIndexedDatabase(Database):
     def fileList(self):
 	return self.files.keys()
 
-    def __init__(self, path):
-	Database.__init__(self, path)
+    def __init__(self, path, mode = "r"):
+	Database.__init__(self, path, mode)
 	self.readMap()
 
