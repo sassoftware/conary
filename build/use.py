@@ -649,7 +649,7 @@ The Arch flags have the following meanings:
 # All Arch flags default to False; deps/arch.py sets any that should be
 # True to True
 Arch = Flag(showdefaults=False, name='Arch')
-# Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686 | Arch.x86_64
+# Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686
 Arch.x86 = True
 Arch.x86.setShortDoc('True if any IA32-compatible architecture is set')
 Arch.x86.i386 = False
