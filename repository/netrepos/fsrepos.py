@@ -388,9 +388,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		allFiles = self._getLocalOrRemoteFileVersions(l)
 		idIdx.update(allFiles)
 
-	    import pdb
-	    pdb.set_trace()
-
 	    for (fileId, oldFileVersion, newFileVersion, oldPath, newPath) in \
 								filesNeeded:
 		oldFile = None
