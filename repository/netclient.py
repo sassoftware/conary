@@ -145,7 +145,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	l = []
 	for pkgCs in cs.iterNewPackageList():
 	    p = package.Trove(pkgCs.getName(), pkgCs.getOldVersion(),
-			      pkgCs.getFlavor())
+			      pkgCs.getFlavor(), pkgCs.getChangeLog())
 	    p.applyChangeSet(pkgCs)
 	    l.append(p)
 
