@@ -287,6 +287,12 @@ class ConaryClient:
                 # the old version isn't present, so we don't want this
                 # one either
                 cs.delNewPackage(*item)
+
+        # remove troves from the old package which aren't currently
+        # installed
+        for item in cs.getOldPackageList():
+            if not self.db.hasTrove(*item):
+                cs.delOldPackage(*item)
             
     def _updateChangeSet(self, itemList, keepExisting = None, recurse = True):
         """
