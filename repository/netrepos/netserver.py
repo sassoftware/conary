@@ -94,8 +94,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return newD
 
     def getTroveLatestVersion(self, pkgName, branchStr):
-	return self.fromVersion(self.repos.troveStore.troveLatestVersion(pkgName, 
-						  self.toBranch(branchStr)))
+        try:
+            return self.fromVersion(self.repos.troveStore.troveLatestVersion(pkgName, 
+                                                                             self.toBranch(branchStr)))
+        except KeyError:
+            return None
 
     def getTroveFlavorsLatestVersion(self, troveName, branch):
 	return [ x for x in self.repos.troveStore.iterTrovePerFlavorLeafs(troveName, branch) ]
