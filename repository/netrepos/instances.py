@@ -67,8 +67,8 @@ class InstanceTable:
 
     def setPresent(self, theId, val):
         cu = self.db.cursor()
-	cu.execute("UPDATE Instances SET isPresent=0 WHERE instanceId=%d" 
-			% theId)
+	cu.execute("UPDATE Instances SET isPresent=%d WHERE instanceId=%d",
+                   (val, theId))
 
     def has_key(self, item):
         cu = self.db.cursor()
