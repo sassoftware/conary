@@ -8,6 +8,9 @@ import log
 
 def listRollbacks(db, cfg):
     def verStr(cfg, version):
+	if version.isLocal():
+	    return "local"
+
 	if version.branch().label() == cfg.installlabel:
 	    return version.trailingVersion().asString()
 	return version.asString()
