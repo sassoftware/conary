@@ -484,9 +484,9 @@ class InstallSymlinks(_FileAction):
         """
         Create a new InstallSymlinks instance
 
-        @param fromFiles: paths(s) to which symlink(s) will be created
+        @keyword fromFiles: paths(s) to which symlink(s) will be created
         @type fromFiles: str or sequence of str
-        @param toFile: path to create the symlink, or a directory in which
+        @keyword toFile: path to create the symlink, or a directory in which
                        to create multiple symlinks
         @type toFile: str
         @keyword allowDangling: Optional argument; set to True to allow the
