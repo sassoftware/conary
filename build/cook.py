@@ -497,32 +497,40 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	targetVersion = targetVersion.fork(targetLabel)
 	targetVersion.trailingVersion().incrementBuildCount()
 
-    grp = trove.Trove(grpName, targetVersion, flavor, None)
 
     packageList = []
+    grpMap = {}
     for buildPkg in bldList:
+        compName = buildPkg.getName()
+        main, comp = compName.split(':')
+        if main not in grpMap:
+            grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
+        grp = grpMap[main]
+
 	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, 
 					targetVersion, ident)
 
 	requires.union(p.getRequires())
 	provides.union(p.getProvides())
 
-	built.append((p.getName(), p.getVersion().asString()))
+	built.append((compName, p.getVersion().asString()))
 	packageList.append((p, fileMap))
 	
 	# don't install :test component when you are installing
 	# the package
-	if not p.getName().endswith(':test'):
-	    grp.addTrove(p.getName(), p.getVersion(), p.getFlavor())
+	if not compName.endswith(':test'):
+	    grp.addTrove(compName, p.getVersion(), p.getFlavor())
 
-    grp.setRequires(requires)
-    grp.setProvides(provides)
+    for grp in grpMap.values():
+        grp.setRequires(requires)
+        grp.setProvides(provides)
 
     changeSet = changeset.CreateFromFilesystem(packageList)
     changeSet.addPrimaryPackage(grpName, targetVersion, None)
 
-    grpDiff = grp.diff(None, absolute = 1)[0]
-    changeSet.newPackage(grpDiff)
+    for grp in grpMap.values():
+        grpDiff = grp.diff(None, absolute = 1)[0]
+        changeSet.newPackage(grpDiff)
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
