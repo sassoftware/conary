@@ -51,8 +51,8 @@ def usage(rc = 1):
     print "       conary rblist"
     print "       conary rollback     <rollback>"
     print "       conary source       [usage]"
-    print "       conary update	   <pkgname> <version>"
-    print "           update       <changeset>"
+    print "       conary update       <pkgname> <version>"
+    print "              update       <changeset>"
     print "       conary usage"
     print ""
     print "commit flags:  --target-branch <branch>"
@@ -80,6 +80,7 @@ def usage(rc = 1):
     print "               --leaves"
     print "               --ls"
     print "               --sha1s"
+    print "               --tags"
     print ""
     print "update flags: --replace-files"
     return rc
@@ -115,6 +116,7 @@ def realMain():
     argDef["all"] = 0
     argDef["config"] = 2
     argDef["debug"] = 0
+    argDef["debug-exceptions"] = 0
     argDef["full-versions"] = 0
     argDef["ids"] = 0
     argDef["info"] = 0
@@ -123,10 +125,10 @@ def realMain():
     argDef["macros"] = 1
     argDef["message"] = 1
     argDef["prep"] = 0
-    argDef["debug-exceptions"] = 0
     argDef["profile"] = 0
     argDef["replace-files"] = 0
     argDef["sha1s"] = 0
+    argDef["tags"] = 0
     argDef["target-branch"] = 1
 
     argDef.update(srcctl.argDef)
@@ -330,6 +332,9 @@ def realMain():
 	info = argSet.has_key('info')
 	if info: del argSet['info']
 
+	tags = argSet.has_key('tags')
+	if tags: del argSet['tags']
+
 	sha1s = argSet.has_key('sha1s')
 	if sha1s: del argSet['sha1s']
 
@@ -342,7 +347,7 @@ def realMain():
 
 	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
 	    args = [repos, cfg, all, ls, ids, sha1s, leaves, fullVersions,
-		    info] + otherArgs[2:]
+		    info, tags] + otherArgs[2:]
 	    try:
 		queryrep.displayTroves(*args)
 	    except IOError, msg:

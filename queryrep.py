@@ -14,7 +14,7 @@ _grpFormat  = "  %-37s %s"
 
 def displayTroves(repos, cfg, all = False, ls = False, ids = False,
                   sha1s = False, leaves = False, fullVersions = False,
-		  info = False, trove = "", versionStr = None):
+		  info = False, tags = False, trove = "", versionStr = None):
     if trove:
 	troves = [ trove ]
     else:
@@ -22,14 +22,14 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 	troves = [ x for x in 
 		    repos.iterAllTroveNames(cfg.installLabel.getHost()) ]
 
-    if versionStr or ls or ids or sha1s or info:
+    if versionStr or ls or ids or sha1s or info or tags:
 	if all:
 	    log.error("--all cannot be used with queries which display file "
 		      "lists")
 	    return
 	for troveName in troves:
 	    _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-			      info, fullVersions)
+			      info, tags, fullVersions)
 	    continue
     else:
 	if all:
@@ -93,7 +93,7 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 					      versionStrs[version])
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-		      info, fullVersions):
+		      info, tags, fullVersions):
     try:
 	troveList = repos.findTrove(cfg.installLabel, troveName, 
 				    cfg.flavor, versionStr)
@@ -105,8 +105,6 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 	version = trove.getVersion()
 
 	if ls:
-	    fileL = [ (x[1], x[0], x[2]) for x in trove.iterFileList() ]
-	    fileL.sort()
 	    iter = repos.iterFilesInTrove(trove.getName(), trove.getVersion(),
                                           trove.getFlavor(), sortByPath = True, 
 					  withFiles = True)
@@ -122,6 +120,13 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 	elif ids:
 	    for (fileId, path, version) in trove.iterFileList():
 		print "%s %s" % (fileId, path)
+	elif tags:
+	    iter = repos.iterFilesInTrove(trove.getName(), trove.getVersion(),
+                                          trove.getFlavor(), sortByPath = True, 
+					  withFiles = True)
+
+	    for (fileId, path, version, fObj) in iter:
+		print "%-59s %s" % (path, " ".join(fObj.tags))
 	elif sha1s:
 	    for (fileId, path, version) in trove.iterFileList():
 		file = repos.getFileVersion(fileId, version)
