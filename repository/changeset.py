@@ -94,6 +94,9 @@ class ChangeSet:
     def getFileList(self):
 	return self.files.items()
 
+    def hasFile(self, fileId):
+	return self.files.has_key(fileId)
+
     def remapPaths(self, map):
 	for pkgCs in self.newPackages.values():
 	    pkgCs.remapPaths(map)
