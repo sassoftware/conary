@@ -1,0 +1,13 @@
+# -*- makefile -*-
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
+pyfiles-install:
+	mkdir -p $(DESTDIR)$(srsdir)
+	for f in $(python_files) $(bin_files); do \
+		mkdir -p `dirname $(DESTDIR)$(srsdir)/$$f`; \
+		cp -a $$f $(DESTDIR)$(srsdir)/$$f; \
+	done
+

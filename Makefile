@@ -3,6 +3,8 @@
 # All rights reserved
 #
 
+all: subdirs srs-wrapper srs.recipe
+
 VERSION = 0.1
 distdir = srs-$(VERSION)
 prefix = /usr
@@ -10,48 +12,36 @@ srsdir = $(prefix)/share/srs
 bindir = $(prefix)/bin
 PYTHON = python2.3
 
+SUBDIRS=build local repository
+
+subdirs_rule=
+
 python_files = __init__.py	\
 	branch.py		\
-	build.py		\
-	buildpackage.py		\
-	database.py		\
 	checkin.py		\
-	changeset.py		\
 	commit.py		\
 	cook.py			\
+	cscmd.py		\
 	datastore.py		\
-	destdirpolicy.py	\
 	display.py		\
 	enum.py			\
 	filecontainer.py	\
-	filecontents.py		\
 	files.py		\
-	fixedglob.py		\
-	fsrepos.py		\
 	helper.py		\
 	importrpm.py		\
-	localrep.py		\
 	log.py			\
-	lookaside.py		\
 	package.py		\
-	packagepolicy.py	\
 	patch.py		\
-	policy.py		\
-	recipe.py		\
-	repository.py		\
 	rollbacks.py		\
 	rpmhelper.py		\
 	sha1helper.py		\
 	srcctl.py		\
-	srs.py			\
 	srscfg.py		\
-	trovedb.py		\
-	update.py		\
+	srs.py			\
 	updatecmd.py		\
 	util.py			\
 	versioned.py		\
-	versions.py		\
-	use.py
+	versions.py
 
 example_files = examples/tmpwatch.recipe
 bin_files = srs srs-bootstrap
@@ -60,9 +50,11 @@ dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
 generated_files = srs-wrapper srs.recipe *.pyo *.pyc 
 
-.PHONY: clean bootstrap deps.dot pychecker dist install test debug-test
+.PHONY: clean bootstrap deps.dot pychecker dist install test debug-test subdirs
 
-all: srs-wrapper srs.recipe
+
+subdirs:
+	for d in $(SUBDIRS); do make -C $$d || exit 1; done
 
 srs-wrapper: srs-wrapper.in
 	sed s,@srsdir@,$(srsdir),g $< > $@
@@ -71,11 +63,9 @@ srs-wrapper: srs-wrapper.in
 srs.recipe: srs.recipe.in
 	sed s,@VERSION@,$(VERSION),g $< > $@
 
-install: all
-	mkdir -p $(DESTDIR)$(srsdir) $(DESTDIR)$(bindir)
-	for f in $(python_files) $(bin_files); do \
-		cp -a $$f $(DESTDIR)$(srsdir)/$$f; \
-	done
+install: all pyfiles-install
+	mkdir -p $(DESTDIR)$(bindir)
+	for d in $(SUBDIRS); do make -C $$d install || exit 1; done
 	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(srsdir)', ddir='$(srsdir)', quiet=1)"
 	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(srsdir)', ddir='$(srsdir)', quiet=1)"
 	install -m 755 srs-wrapper $(DESTDIR)$(bindir)
@@ -126,3 +116,5 @@ test:
 
 debug-test:
 	make -C test $@
+
+include Make.rules
