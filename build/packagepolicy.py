@@ -471,9 +471,15 @@ class DanglingSymlinks(policy.Policy):
 		log.warning('Absolute symlink %s points to %s, should probably be relative', file, contents)
 		return
 	    abscontents = util.joinPaths(os.path.dirname(file), contents)
-	    # XXX consider cross-component dangling
-	    # XXX it's OK for libraries; what should we do in general?
-	    if abscontents not in self.recipe.autopkg.pathMap:
+	    if abscontents in self.recipe.autopkg.pathMap:
+		pkgMap = self.recipe.autopkg.pkgMap
+		if pkgMap[abscontents] != pkgMap[file] and \
+		   not file.endswith('.so'):
+		    # warn about suspicious cross-component symlink
+		    log.warning('symlink %s points from package %s to %s',
+				file, pkgMap[file].getName(),
+				pkgMap[abscontents].getName())
+	    else:
 		for targetFilter in self.targetFilters:
 		    if targetFilter.match(abscontents):
 			# contents are an exception
