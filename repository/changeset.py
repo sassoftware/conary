@@ -23,8 +23,6 @@ class ChangeSet:
 
 	    # new and changed files need to have a file entry for the right 
 	    # version along with the contents for files which have any
-            # XXX: ewt - list is not used
-	    list = pkg.getNewFileList() + pkg.getChangedFileList()
 	    for (fileId, path, version) in pkg.getNewFileList():
 		assert(self.files.has_key(fileId))
 		(oldVersion, newVersion, info) = self.files[fileId]
