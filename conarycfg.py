@@ -32,14 +32,13 @@ class ConaryConfiguration:
     def read(self, file):
 	if os.path.exists(file):
 	    f = open(file, "r")
-	    self.file = file
 	    self.lineno = 1
 	    for line in f:
-		self.configLine(line)
+		self.configLine(line, file)
 		self.lineno = self.lineno + 1
 	    f.close()
 
-    def configLine(self, line):
+    def configLine(self, line, file = "override"):
 	line = line.strip()
 	if not line or line[0] == '#':
 	    return
