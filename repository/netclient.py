@@ -163,9 +163,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                                      branch.asString()) ]
 
     def getTroveVersionList(self, serverName, troveNameList):
-	d = self.c[serverName].getTroveVersionList(troveNameList)
+	d = self.c[serverName].getTroveVersionList2(troveNameList)
 	for troveName, troveVersions in d.iteritems():
-	    d[troveName] = [ self.toVersion(x) for x in troveVersions ]
+	    d[troveName] = [ self.thawVersion(x) for x in troveVersions ]
 
 	return d
 
