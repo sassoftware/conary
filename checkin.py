@@ -569,6 +569,5 @@ def showOneLog(version, changeLog=''):
 	for l in lines:
 	    print "    %s" % l
     else:
-	print "%s %s (no log message)" \
+	print "%s %s (no log message)\n" \
 	      %(versionStr, when)
-    print
