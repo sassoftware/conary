@@ -49,7 +49,7 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True):
                 log.error("trove %s has multiple branches named %s",
                           troveName, newVersionStr)
             else:
-                log.error("trove %s has multple matches on installLabelPath",
+                log.error("trove %s has multiple matches on installLabelPath",
                           troveName)
 
         newVersion = troveList[0][1]
