@@ -1110,6 +1110,9 @@ def shlibAction(root, shlibList, tagScript = None):
 		  " ".join(newlines))
 	ldsofd, ldsotmpname = tempfile.mkstemp(
 	    'ld.so.conf', '.ct', sysetc)
+        if not os.getuid():
+            # ld.so.conf should always be 0.0
+            os.chown(ldsotmpname, 0, 0)
 	try:
 	    ldso = os.fdopen(ldsofd, 'w')
 	    os.chmod(ldsotmpname, 0644)
