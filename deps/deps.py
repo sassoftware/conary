@@ -4,15 +4,14 @@ DEP_CLASS_SONAME    = 2
 DEP_CLASS_FILES	    = 3
 DEP_CLASS_TROVES    = 4
 
+import util
+
 class Dependency:
 
     """
     Implements a single dependency. This is relative to a DependencyClass,
-    which is part of a DependencySet. Multiple DependencySets make up a
-    DependencyGroup, which keeps multiple versions of the same dependency
-    as references saving (significant amounts of) memory. DependencySets
-    can be frozen, but that frozen version can only be thawed relative to 
-    the proper DependencyGroup (which can also be frozen).
+    which is part of a DependencySet. Dependency Sets can be frozen and
+    thawed.
 
     These are hashable, directly comparable, and implement a satisfies()
     method.
@@ -82,11 +81,11 @@ class DependencyClass:
 	    dep = self.members[dep.main].mergeFlags(dep)
 	    del self.members[dep.main]
 
-	if not self.dgroup.has_key(dep):
-	    self.dgroup[dep] = dep
+	if not dependencyCache.has_key(dep):
+	    dependencyCache[dep] = dep
 	    grpDep = dep
 	else:
-	    grpDep = self.dgroup[dep]
+	    grpDep = dependencyCache[dep]
 
 	self.members[grpDep.main] = grpDep
 	assert(not self.justOne or len(self.members) == 1)
@@ -122,9 +121,7 @@ class DependencyClass:
 	return "\n".join([ "%s: %s" % (self.tagName, dep) 
 		    for dep in self.members.itervalues() ])
 
-    def __init__(self, dgroup):
-	assert(self.__class__ != DependencyClass)
-	self.dgroup = dgroup
+    def __init__(self):
 	self.members = {}
 
 class AbiDependency(DependencyClass):
@@ -169,7 +166,7 @@ class DependencySet:
 
 	tag = depClass.tag
 	if not self.members.has_key(tag):
-	    self.members[tag] = depClass(self.dgroup)
+	    self.members[tag] = depClass()
 
 	self.members[tag].addDep(dep)
 
@@ -192,17 +189,7 @@ class DependencySet:
     def __str__(self):
 	return "\n".join([ str(x) for x in self.members.itervalues()])
 
-    def __init__(self, dgroup):
-	self.dgroup = dgroup
+    def __init__(self):
 	self.members = {}
 
-class DependencyGroup(dict):
-
-    # this keeps a reference to each dependency forever, which means
-    # they never get removed from memory! this is unfortunate. we'd
-    # really like to have items removed from this list as soon as their
-    # reference count hits 1, but I don't know if that's possible. this
-    # makes it important to delete these objects once they're no longer
-    # needed
-
-    pass
+dependencyCache = util.ObjectCache()
