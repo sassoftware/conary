@@ -13,6 +13,7 @@ import log
 import os
 import package
 import patch
+import repository
 import update
 import versions
 
@@ -59,17 +60,6 @@ class ChangeSet:
 	    for fileId in pkg.getOldFileList():
 		assert(not self.files.has_key(fileId))
 
-
-    def addFile(self, fileId, oldVersion, newVersion, csInfo):
-	assert(not oldVersion or oldVersion.timeStamp)
-	assert(newVersion.timeStamp)
-	self.files[fileId] = (oldVersion, newVersion, csInfo)
-
-	if oldVersion and oldVersion.isLocal():
-	    self.local = 1
-	if newVersion.isLocal():
-	    self.local = 1
-
     def newPackage(self, csPkg):
 	old = csPkg.getOldVersion()
 	new = csPkg.getNewVersion()
@@ -107,6 +97,16 @@ class ChangeSet:
 
     def hasFileContents(self, hash):
 	return self.fileContents.has_key(hash)
+
+    def addFile(self, fileId, oldVersion, newVersion, csInfo):
+	assert(not oldVersion or oldVersion.timeStamp)
+	assert(newVersion.timeStamp)
+	self.files[fileId] = (oldVersion, newVersion, csInfo)
+
+	if oldVersion and oldVersion.isLocal():
+	    self.local = 1
+	if newVersion.isLocal():
+	    self.local = 1
 
     def getFileList(self):
 	return self.files.items()
@@ -336,6 +336,73 @@ class ChangeSet:
 					     ChangedFileTypes.file, cont)
 
 	return rollback
+
+    def setTargetBranch(self, repos, targetBranchLabel):
+	"""
+	Retargets this changeset to create packages and files on
+	branch targetBranchName off of the source node.
+
+	@param repos: repository which will be committed to
+	@type repos: repository.Repository
+	@param targetBranchLabel: label of the branch to commit to
+	@param targetBranchLabel: versions.BranchName
+	"""
+	assert(not targetBranchLabel.equal(versions.LocalBranch()))
+
+	packageVersions = {}
+
+	for pkgCs in self.getNewPackageList():
+	    name = pkgCs.getName()
+	    oldVer = pkgCs.getOldVersion()
+	    ver = pkgCs.getNewVersion()
+	    # what to do about versions for new packages?
+	    assert(oldVer)
+
+	    newVer = oldVer.fork(targetBranchLabel, sameVerRel = 0)
+	    newVer.appendVersionReleaseObject(ver.trailingVersion())
+
+	    # try and reuse the version number we created; if
+	    # it's already in use we won't be able to though
+	    try:
+		repos.getPackageVersion(name, newVer)
+	    except repository.PackageMissing: 
+		pass
+	    else:
+		branch = oldVer.fork(targetBranchLabel, sameVerRel = 0)
+		newVer = repos.pkgLatestVersion(name, branch)
+
+	    pkgCs.changeNewVersion(newVer)
+	    if not packageVersions.has_key(name):
+		packageVersions[name] = []
+	    packageVersions[name].append((ver, newVer))
+
+	    # files on the local branch get remapped; others don't
+	    if self.isLocal(): 
+		for (fileId, path, fileVersion) in \
+			    pkgCs.getChangedFileList():
+		    if fileVersion != "-" and fileVersion.isLocal():
+			pkgCs.newFile(fileId, path, newVer)
+			oldVer = self.getFileOldVersion(fileId)
+			csInfo = self.getFileChange(fileId)
+			# this replaces the existing file 
+			self.addFile(fileId, oldVersion, newVer, csInfo)
+
+	for pkgCs in self.getNewPackageList():
+	    # the implemented of updateChangedPackage makes this whole thing
+	    # O(n^2) (n is the number of packages changed in pkgCs), which is
+	    # just silly. if large groups are added like this the effect could
+	    # become noticeable
+	    for (name, list) in pkgCs.getChangedPackages():
+		if not packageVersions.has_key(name): continue
+		for (change, version) in list:
+		    if change != '+': continue
+
+		    for (oldVer, newVer) in packageVersions[name]:
+			if oldVer.equal(version):
+			    pkgCs.updateChangedPackage(name, oldVer, newVer)
+
+	# this has to be true, I think...
+	self.local = 0
 
     def __init__(self):
 	self.newPackages = {}
