@@ -107,6 +107,7 @@ def doErase(cfg, itemList, tagScript = None, depCheck = True):
 
     client = conaryclient.ConaryClient(cfg=cfg)
 
+    brokenByErase = []
     try:
         brokenByErase = client.eraseTrove(troveList, tagScript = tagScript, 
                                           depCheck = depCheck)
