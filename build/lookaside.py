@@ -115,7 +115,7 @@ def searchAll(cfg, repCache, name, location, srcdirs):
 def findAll(cfg, repcache, name, location, srcdirs):
     f = searchAll(cfg, repcache, name, location, srcdirs)
     if not f:
-	raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT))
+	raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
     return f
 
 
