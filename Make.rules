@@ -24,4 +24,4 @@ default-all:
 	echo "nothing to build"
 
 default-clean:
-	rm -f *~ .#* *.pyo *.pyc
+	rm -f *~ .#* *.pyo *.pyc $(generated_files)
