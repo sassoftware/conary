@@ -273,7 +273,8 @@ class SharedLibrary(policy.Policy):
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.isfile(fullpath) and util.isregular(fullpath):
+	if os.path.isfile(fullpath) and util.isregular(fullpath) and \
+	   magic.magic(fullpath).name == 'ELF':
 	    self._markSharedLibrary(file)
 
 
