@@ -312,3 +312,7 @@ def checkBranchForDuplicate(repos, branch, file):
 
     return None
 
+def makeFileId(*args):
+    assert(args)
+    str = "".join(args)
+    return _IdGen()(str)
