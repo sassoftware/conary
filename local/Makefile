@@ -17,6 +17,7 @@ python_files = database.py	\
 		__init__.py	\
 		localrep.py	\
 		sqldb.py	\
+		troveinfo.py	\
 		trovetroves.py	\
 		update.py	\
 		versiontable.py \
