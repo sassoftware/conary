@@ -434,7 +434,7 @@ class SetModes(_FileAction):
     def do(self, macros):
 	files = []
 	for path in self.paths:
-	    files.extend(util.braceExpand(path %macros))
+	    files.extend(util.braceGlob(path %macros))
 	for f in files:
 	    log.debug('changing mode for %s to %o' %(f, self.mode))
 	    self.chmod(macros['destdir'], f)
