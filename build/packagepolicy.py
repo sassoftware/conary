@@ -938,18 +938,19 @@ class ObsoletePaths(policy.Policy):
     Warn about paths that used to be considered correct, but now are
     obsolete.  Does not honor exceptions!
     """
-    candidates = (
-	'/usr/man',
-	'/usr/info',
-	'/usr/doc',
-    )
+    candidates = {
+	'/usr/man': '/usr/share/man',
+	'/usr/info': '/usr/share/info',
+	'/usr/doc': '/usr/share/doc',
+    }
     def do(self):
 	d = self.recipe.macros.destdir
-	for path in self.candidates:
+	for path in self.candidates.keys():
 	    fullpath = util.joinPaths(d, path)
 	    if os.path.exists(fullpath):
 		self.recipe.reportErrors(
-		    'Path %s should not exist' %path)
+		    'Path %s should not exist, use %s instead'
+                    %(path, self.candidates[path]))
 
 
 class IgnoredSetuid(policy.Policy):
