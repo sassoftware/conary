@@ -5,6 +5,38 @@
 import copy
 import versions
 
+"""
+Packages are groups of files and other packages, which are included by
+reference. By convention, "package" often refers to a package with
+files but no other packages, while a "group" means a package with other
+packages but no files. While this object allows any mix of file and
+package inclusion, in practice srs doesn't allow it.
+
+Groups are most often created automatically as part of cook to group
+the packages from a recipe together. Groups can also be specified by
+a file which contains package names, white space, and a version. If
+the package name isn't fully qualified, it's assumed to be part of the
+same repository the group file is from. The version can be either fully
+qualified or a branch nickname, in which case if refers to the head of
+the branch at the time the group file is added to a repository.
+
+Group files are parsed into group objects, which resolve the package and
+name as specified above; the original group file is preserved for future
+modification. This also allows a group file to be checked out and back
+in again, and have it updated with new head versions of it's components.
+Some groups (notably ones derived from recipes) exist only in their
+parsed forms; these groups cannot be checked in or out.
+
+Group files can contain comment lines (which begin with #), and the first
+two lines should read::
+
+    name NAME
+    version VERSION
+
+Where the name is a simple package name (not fully qualified) and the
+version is just a version.
+"""
+
 # this is the repository's idea of a package
 class Package:
 
