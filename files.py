@@ -37,22 +37,22 @@ class FileMode:
             self.theFlags = mode.theFlags
 
     def triplet(self, code, setbit = 0):
-	list = [ "-", "-", "-" ]
+	l = [ "-", "-", "-" ]
 	if code & 4:
-	    list[0] = "r"
+	    l[0] = "r"
 	    
 	if code & 2:
-	    list[1] = "w"
+	    l[1] = "w"
 
 	if setbit:
 	    if code & 1:
-		list[2] = "s"
+		l[2] = "s"
 	    else:
-		list[2] = "S"
+		l[2] = "S"
 	elif code & 1:
-	    list[2] = "x"
+	    l[2] = "x"
 	    
-	return list
+	return l
 
     def sizeString(self):
 	return "%8d" % self.theSize
@@ -216,17 +216,17 @@ class FileMode:
 	
 class File(FileMode):
     def modeString(self):
-	list = self.triplet(self.thePerms >> 6, self.thePerms & 04000)
-	list = list + self.triplet(self.thePerms >> 3, self.thePerms & 02000)
-	list = list + self.triplet(self.thePerms >> 0)
+	l = self.triplet(self.thePerms >> 6, self.thePerms & 04000)
+	l = l + self.triplet(self.thePerms >> 3, self.thePerms & 02000)
+	l = l + self.triplet(self.thePerms >> 0)
 	
 	if self.thePerms & 01000:
-	    if list[8] == "x":
-		list[8] = "t"
+	    if l[8] == "x":
+		l[8] = "t"
 	    else:
-		list[8] = "T"
+		l[8] = "T"
 
-	return self.lsTag + string.join(list, "")
+	return self.lsTag + string.join(l, "")
 
     def copy(self):
 	return copy.deepcopy(self)
