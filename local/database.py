@@ -154,9 +154,9 @@ class Database(repository.LocalRepository):
 	job = DatabaseChangeSetJob(self, cs, localChanges)
 	undo = DatabaseChangeSetUndo(self)
 
-	if makeRollback:
-	    inverse = cs.invert(self, availableFiles = 1)
-	    self.addRollback(inverse)
+	#if makeRollback:
+	#    inverse = cs.invert(self, availableFiles = 1)
+	#    self.addRollback(inverse)
 
 	try:
 	    job.commit(undo, self.root)
@@ -435,8 +435,12 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 
 	    self.oldFile(f.fileId(), oldVersion, 
 			 repos.getFileVersion(f.fileId(), oldVersion))
+
+	    # this is removing the old local branch for the file; we need
+	    # to read that in from the filesystem to get the sha1 right
 	    self.oldFile(f.fileId(), oldBranch,
-			 repos.getFileVersion(f.fileId(), oldBranch))
+			 repos.getFileVersion(f.fileId(), oldBranch,
+					      path = path))
 
 	self.pathList.sort()
 
