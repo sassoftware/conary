@@ -20,19 +20,19 @@ _FILE_FLAG_CONFIG = 1 << 0
 class FileMode:
     def merge(self, mode):
         """merge another instance of a FileMode into this one"""
-        if mode.thePerms:
+        if mode.thePerms is not None:
             self.thePerms = mode.thePerms
-        if mode.theOwner:
+        if mode.theOwner is not None:
             self.theOwner = mode.theOwner 
-        if mode.theGroup:
+        if mode.theGroup is not None:
             self.theGroup = mode.theGroup
-        if mode.thePerms:
+        if mode.thePerms is not None:
             self.thePerms = mode.thePerms
-        if mode.theMtime:
+        if mode.theMtime is not None:
             self.theMtime = mode.theMtime
-        if self.theSize:
+        if self.theSize is not None:
             self.theSize = mode.theSize
-        if self.theFlags:
+        if self.theFlags is not None:
             self.theFlags = mode.theFlags
 
     def triplet(self, code, setbit = 0):
@@ -116,6 +116,11 @@ class FileMode:
 	if (new != None and new != "-"):
 	    self.theFlags = new
 
+        if self.theFlags is not None:
+            return self.theFlags
+        else:
+            return 0
+
     def isConfig(self, set = None):
 	if set != None:
 	    if set:
@@ -127,9 +132,9 @@ class FileMode:
 
     def infoLine(self):
 	return "0%o %s %s %s %s 0x%x" % (self.thePerms, self.theOwner, 
-				    self.theGroup, self.theSize,
-				    self.theMtime, self.theFlags)
-
+                                         self.theGroup, self.theSize,
+                                         self.theMtime, self.flags())
+    
     def diff(self, them):
 	if not them:
 	    return self.infoLine()
@@ -150,11 +155,11 @@ class FileMode:
 	    return self.infoLine()
 
     def same(self, other):
-	if self.thePerms == other.thePerms and \
-	   self.theOwner == other.theOwner and \
-	   self.theGroup == other.theGroup and \
-	   self.theFlags == other.theFlags and\
-	   self.theSize == other.theSize:
+	if (self.thePerms == other.thePerms and
+            self.theOwner == other.theOwner and
+            self.theGroup == other.theGroup and
+            self.theFlags == other.theFlags and
+            self.theSize == other.theSize):
 	    return 1
 
 	return 0
@@ -187,7 +192,7 @@ class FileMode:
 	    self.theGroup = None
 	    self.theMtime = None
 	    self.theSize = None
-	    self.theFlags = 0
+	    self.theFlags = None
 	
 class File(FileMode):
     def modeString(self):
@@ -370,7 +375,7 @@ class DeviceFile(File):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 
-	if sys.hexversion >= 0x20300f0
+	if sys.hexversion >= 0x20300f0:
             if self.infoTag == 'c':
                 flags = stat.S_IFCHR
             else:
