@@ -20,6 +20,7 @@ import sys
 def error(*args):
     "Log an error"
     logger.error(*args)
+    hdlr.error = True
 
 def warning(*args):
     "Log a warning"    
@@ -36,6 +37,9 @@ def debug(*args):
 def errorOccurred():
     return hdlr.error
 
+def resetErrorOccured():
+    hdlr.error = False
+
 def setVerbosity(val):
     if val < 1:
         logger.setLevel(logging.WARNING)
@@ -48,8 +52,6 @@ class ErrorCheckingHandler(logging.StreamHandler):
         logging.StreamHandler.__init__(self, *args, **keywords)
     
     def emit(self, record):
-        if record.levelno == logging.ERROR:
-            self.error = True
         logging.StreamHandler.emit(self, record)
 
 if not globals().has_key("logger"):
