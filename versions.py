@@ -130,22 +130,22 @@ class Revision(AbstractRevision):
     decimal point.
     """
 
-    __slots__ = ( "version", "release", "buildCount", "timeStamp" )
+    __slots__ = ( "version", "sourceCount", "buildCount", "timeStamp" )
 
     def asString(self, versus = None, frozen = False):
 	"""
 	Returns a string representation of a version/release pair.
 	"""
 	if versus and self.version == versus.version:
-	    if versus and self.release == versus.release:
+	    if versus and self.sourceCount == versus.sourceCount:
 		if self.buildCount is None:
-		    rc = str(self.release)
+		    rc = str(self.sourceCount)
 		else:
 		    rc = ""
 	    else:
-		rc = str(self.release)
+		rc = str(self.sourceCount)
 	else:
-	    rc = self.version + '-' + str(self.release)
+	    rc = self.version + '-' + str(self.sourceCount)
 
 	if self.buildCount != None:
 	    if rc:
@@ -191,13 +191,13 @@ class Revision(AbstractRevision):
 
 	return self.version
 
-    def getRelease(self):
+    def getSourceCount(self):
 	"""
 	Returns the source SerialNumber object of a version/release pair.
 
         @rtype: SerialNumber
 	"""
-	return self.release
+	return self.sourceCount
 
     def getBuildCount(self):
 	"""
@@ -208,7 +208,7 @@ class Revision(AbstractRevision):
 	return self.buildCount
 
     def shadowCount(self):
-        i = self.release.shadowCount()
+        i = self.sourceCount.shadowCount()
         if i:
             return i
 
@@ -219,19 +219,19 @@ class Revision(AbstractRevision):
 
     def __eq__(self, version):
 	if (type(self) == type(version) and self.version == version.version
-		and self.release == version.release
+		and self.sourceCount == version.sourceCount
 		and self.buildCount == version.buildCount):
 	    return 1
 	return 0
 
     def __hash__(self):
-	return hash(self.version) ^ hash(self.release) ^ hash(self.buildCount)
+	return hash(self.version) ^ hash(self.sourceCount) ^ hash(self.buildCount)
 
     def incrementSourceCount(self, shadowLength):
 	"""
 	Incremements the release number.
 	"""
-	self.release.increment(shadowLength)
+	self.sourceCount.increment(shadowLength)
 	self.timeStamp = time.time()
 
     def setBuildCount(self, buildCount):
@@ -277,7 +277,7 @@ class Revision(AbstractRevision):
 	if len(fields) == 1:
 	    if template and template.buildCount is not None:
 		self.version = template.version
-		self.release = template.release
+		self.sourceCount = template.sourceCount
 		buildCount = fields[0]
 	    elif template:
 		self.version = template.version
@@ -306,7 +306,7 @@ class Revision(AbstractRevision):
 
 	if release is not None:
 	    try:
-		self.release = SerialNumber(release)
+		self.sourceCount = SerialNumber(release)
 	    except:
 		raise ParseError, \
 		    ("release numbers must be all numeric: %s" % release)
@@ -625,7 +625,7 @@ class Version(VersionSequence):
         v = self.copy()
         
         release = v.trailingRevision()
-        shadowCount = release.release.shadowCount()
+        shadowCount = release.sourceCount.shadowCount()
         if release.buildCount and \
                 release.buildCount.shadowCount() > shadowCount:
             shadowCount = release.buildCount.shadowCount()
@@ -686,7 +686,7 @@ class Version(VersionSequence):
         items = self.versions[:-2] + [ self.versions[-1].copy() ]
 
         shadowCount = self.shadowLength() - 1
-        items[-1].release.truncateShadowCount(shadowCount)
+        items[-1].sourceCount.truncateShadowCount(shadowCount)
         if items[-1].buildCount:
             items[-1].buildCount.truncateShadowCount(shadowCount)
 
@@ -709,7 +709,7 @@ class Version(VersionSequence):
         # the right length for this shadow
         shadowLength = self.shadowLength()
 
-        sourceCount = self.versions[-1].getRelease()
+        sourceCount = self.versions[-1].getSourceCount()
         buildCount = self.versions[-1].getBuildCount()
 
         if sourceCount.shadowCount() == shadowLength:

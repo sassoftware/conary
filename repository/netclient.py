@@ -941,7 +941,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 # be used below and the build count will be incremented.
                 latestTrailing = latest.trailingRevision()
                 if (latestTrailing.getVersion() != versionStr or 
-                    latestTrailing.getRelease() < sourceTrailing.getRelease()):
+                    latestTrailing.getSourceCount() < 
+                        sourceTrailing.getSourceCount()):
                     latest = sourceVersion.getBinaryVersion()
                     latest.incrementBuildCount()
                     return latest
