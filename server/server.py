@@ -39,10 +39,13 @@ sys.path.append(mainPath)
 
 from repository.netrepos import netserver
 from repository.netrepos.netserver import NetworkRepositoryServer
+from repository.netrepos.netauth import NoPermission
 from conarycfg import ConfigFile
 from conarycfg import STRINGDICT
 from lib import options
 from lib import util
+from http import HttpHandler
+from htmlengine import HtmlEngine
 
 FILE_PATH="/tmp/conary-server"
 
@@ -78,13 +81,28 @@ class HttpRequests(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.endswith('/'):
             self.path = self.path[:-1]
-        base = os.path.basename(self.path).split('?')[0]
+        base = os.path.basename(self.path)
+        if "?" in base:
+            base, queryString = base.split("?")
+        else:
+            queryString = ""
         
         if base != 'changeset':
+            if httpHandler.requiresAuth(base):
+                authToken = self.checkAuth()
+                if not authToken:
+                    return
+            else:
+                authToken = (None, None)
+
             self.send_response(200)
             self.send_header("Content-type", "text/html")
             self.end_headers()
-            netRepos.handleGet(self.wfile.write, base)
+            fields = cgi.parse_qs(queryString)
+            try:
+                httpHandler.handleCmd(self.wfile.write, base, authToken, fields)
+            except:
+                self.traceback()
         else:
             urlPath = posixpath.normpath(urllib.unquote(self.path))
             localName = FILE_PATH + "/" + urlPath.split('?', 1)[1] + "-out"
@@ -123,43 +141,66 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 os.unlink(items[0][0])
 
     def do_POST(self):
-	if not self.headers.has_key('Authorization'):
-	    user = None
-	    pw = None
+        cmd = os.path.basename(self.path)
+        if httpHandler.requiresAuth(cmd):
+            authToken = self.checkAuth()
+            if not authToken:
+                return
+        else:
+            authToken = (None, None)
+            
+        if self.headers.get('Content-Type', '') == 'text/xml':
+            return self.handleXml(authToken)
+        try: 
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.end_headers()
+            c = cgi.FieldStorage(fp = self.rfile, headers = self.headers, 
+                                 environ = { 'REQUEST_METHOD' : 'POST' })
+            httpHandler.handleCmd(self.wfile.write, cmd, authToken, c)
+        except:
+            self.traceback()
+    
+    def checkAuth(self):
+ 	if not self.headers.has_key('Authorization'):
+            self.requestAuth()
+            return None
 	else:
 	    info = self.headers['Authorization'].split()
 	    if len(info) != 2 or info[0] != "Basic":
 		self.send_response(400)
-		return
+		return None
     
 	    try:
 		authString = base64.decodestring(info[1])
 	    except:
 		self.send_response(400)
-		return
+		return None
 
 	    if authString.count(":") != 1:
 		self.send_response(400)
-		return
+		return None
 		
-	    (user, pw) = authString.split(":")
+	    authToken = authString.split(":")
+            
+            # verify that the user/password actually exists in the database
+            if not netRepos.auth.checkUserPass(authToken):
+               self.requestAuth()
+               return None
 
-	authToken = (user, pw)
-
-        if self.headers.get('Content-Type', '') == 'text/xml':
-            return self.handleXml(authToken)
-
-        return self.handleCgi(authToken)
+	return authToken
+      
+    def requestAuth(self):
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="Conary Repository"')
+        self.end_headers()
+        return None
+      
+    def traceback(self):
+        htmlengine = HtmlEngine()
+        htmlengine.setWriter(self.wfile)
+        htmlengine.stackTrace(self.wfile)
         
-    def handleCgi(self, authToken):
-        self.wfile.write("HTTP/1.0 200 OK\n")
-        self.wfile.write("Content-Type: text/html\n")
-        self.wfile.write("\n")
-        c = cgi.FieldStorage(fp = self.rfile, headers = self.headers, 
-                             environ = { 'REQUEST_METHOD' : 'POST' })
-        netRepos.handlePost(self.wfile.write, authToken, 
-                            os.path.basename(self.path), c)
-
     def handleXml(self, authToken):
 	contentLength = int(self.headers['Content-Length'])
 	(params, method) = xmlrpclib.loads(self.rfile.read(contentLength))
@@ -261,6 +302,7 @@ if __name__ == '__main__':
 
     netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH, 
 			baseUrl, otherArgs[2], otherArgs[3], cfg.repositoryMap)
+    httpHandler = HttpHandler(netRepos)
 
     port = int(cfg.port)
     httpServer = HTTPServer(("", port), HttpRequests)
@@ -286,4 +328,3 @@ if __name__ == '__main__':
                 sys.exit(1)
             else:
                 raise
-            
