@@ -1,5 +1,7 @@
 Changes in 0.14.1:
   * fixed a typo in lookaside.py that prevented commits from working
+  * added a descriptive exception message when fileids in your database
+    do not match the fileids in the repository
 
 Changes in 0.14.0
   * added ability for changesets to ignore unknown fields in some places
