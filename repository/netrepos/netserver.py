@@ -213,7 +213,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             path = fileId
             fileId = None
 	elif clientVersion <= 9:
-	    pass	    
+            fileId = self.toFileId(fileId)
         else:
             fileVersion = fileId
             fileId = troveFlavor
