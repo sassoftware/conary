@@ -854,12 +854,10 @@ class Replace(BuildAction):
     def __init__(self, recipe, *args, **keywords):
         """
         @keyword lines: Determines the lines to which the replacement applies
-        @type lines: tuple (start, end) or int
-        @default lines: all
+        @type lines: tuple (start, end) or int (default: all)
         @keyword allowNoChange: do not raise an error if C{I{pattern}} did
                                 not apply
-        @type allowNoChange: bool
-        @default allowNoChange: False
+        @type allowNoChange: bool (default: False)
         """
         BuildAction.__init__(self, recipe, **keywords)
         if not args:
