@@ -593,7 +593,10 @@ class Install(_PutFiles):
     C{r.Install(I{srcfile}, I{destfile})}
 
     Note that a trailing C{/} on destfile means to create the directory
-    if necessary.
+    if necessary.  Source files with no execute permission will default
+    to mode 0644; Source files with any execute permission will default
+    to mode 0755.  If that rule doesn't suffice, use C{mode=0I{octalmode}}
+    to set the mode explicitly.
     """
     keywords = { 'mode': -2 }
 
@@ -608,7 +611,8 @@ class Copy(_PutFiles):
     C{r.Copy(I{srcfile}, I{destfile})}
 
     Note that a trailing C{/} on destfile means to create the directory
-    if necessary.
+    if necessary.  The mode of C{I{srcfile}} used for C{I{destfile}}
+    unless you set C{mode=0I{octalmode}}.
     """
     def __init__(self, recipe, *args, **keywords):
 	_PutFiles.__init__(self, recipe, *args, **keywords)
@@ -621,7 +625,8 @@ class Move(_PutFiles):
     C{r.Move(I{srcname}, I{destname})}
 
     Note that a trailing C{/} on destfile means to create the directory
-    if necessary.
+    if necessary.  The mode is preserved, unless you explicitly set the
+    new mode with C{mode=0I{octalmode}}.
     """
     def __init__(self, recipe, *args, **keywords):
 	_PutFiles.__init__(self, recipe, *args, **keywords)
