@@ -113,7 +113,7 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                         path = oldPath
                 elif cType == 'Del':
                     (oldPath, oldFileId, oldVersion) = oldTrove.getFile(pathId)
-                    fileObj = getFileVersion(pathId, oldfileId, oldVersion, 
+                    fileObj = getFileVersion(pathId, oldFileId, oldVersion, 
                                              db, repos)
                     path = oldPath
                 if tags and not ls and not fileObj.tags:
@@ -146,9 +146,18 @@ def printChangedFile(indent, f, path, oldF, oldPath, tags=False, sha1s=False, pa
             name = path
     space = ''
     if pathIds and pathId:
-        space += ' '*41
+        space += ' '*33
     if sha1s:
-        space += ' '*41
+        if hasattr(oldF, 'contents') and oldF.contents:
+            oldSha1 = oldF.contents.sha1()
+        if hasattr(f, 'contents') and f.contents:
+            sha1 = f.contents.sha1()
+        if sha1 != oldSha1:
+            sha1 = sha1ToString(sha1) + ' '
+        else:
+            sha1 = ' '*41
+    else:
+        sha1 = ' '*41
 
     if f.modeString() != oldF.modeString():
         mode = f.modeString()
@@ -160,12 +169,12 @@ def printChangedFile(indent, f, path, oldF, oldPath, tags=False, sha1s=False, pa
         size = f.sizeString()
     if f.timeString() != oldF.timeString():
         time = f.timeString()
-    if not tags or not fileObj.tags:
+    if not tags or not f.tags:
         taglist = ''
     else:
-        taglist = ' [' + ' '.join(fileObj.tags) + ']' 
-    print "%s---> %s%-10s      %-8s %-8s %8s %11s %s%s" % \
-      (indent, space, mode, owner, group, size, time, name, taglist)
+        taglist = ' [' + ' '.join(f.tags) + ']' 
+    print "%s---> %s%s%-10s      %-8s %-8s %8s %11s %s%s" % \
+      (indent, space, sha1, mode, owner, group, size, time, name, taglist)
 
 def depformat(name, dep):
     print '\t%s: %s' %(name, str(dep).replace('\n', '\n\t%s'
@@ -250,23 +259,31 @@ def getTroves(cs, troveList):
     return ([ (x, '') for x in troves], hasVersions)
 
 def getOldTrove(trove, db, repos):
-    try:
-        oldTrove = db.getTrove(trove.getName(), trove.getOldVersion(), 
-                                trove.getOldFlavor())
-    except repository.TroveMissing:
+    oldTrove = None
+    if db is not None:
+        try:
+            oldTrove = db.getTrove(trove.getName(), trove.getOldVersion(), 
+                                    trove.getOldFlavor())
+        except repository.TroveMissing:
+            pass
+    if oldTrove is None:
         try:
             oldTrove = repos.getTrove(trove.getName(), trove.getOldVersion(), 
                                       trove.getOldFlavor())
         except repository.TroveMissing:
-            return None
+            pass
     return oldTrove
 
 def getFileVersion(pathId, fileId, version, db, repos):
-    try:
-        fileObj = db.getFileVersion(pathId, fileId, version)
-    except KeyError:
+    fileObj = None
+    if db:
+        try:
+            fileObj = db.getFileVersion(pathId, fileId, version)
+        except KeyError:
+            pass
+    if not fileObj:
         try:
             fileObj = repos.getFileVersion(pathId, fileId, version) 
         except KeyError:
-            return None
+            pass
     return fileObj
