@@ -40,6 +40,20 @@ matches the \fBinstall-label\fP) and applies the changesets contained in any
 .B \-\-no-deps
 Skip dependency resolution and errors.
 .TP
+.B \-\-resolve
+Attempt to automatically resolve all dependencies
+Can be made the default option by FIXME.
+.TP
+.B \-\-no-resolve
+Do not resolve dependencies, only print out any dependency failures.
+Unless \-\-resolve has been made the default by FIXME, \-\-no-resolve
+is the default behavior.
+.TP
+.B \-\-no-deps-recurse
+Do not search dependencies recursively, print out only direct dependencies
+of the trove.  Meaningless with \-\-resolve because dependency resolution
+implies recursion.
+.TP
 .B \-\-replace-files
 .\" FIXME: add semantics
 .RE
