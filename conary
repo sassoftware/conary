@@ -96,9 +96,6 @@ for (arg, name) in cfgMap.items():
 	cfg.configLine("%s %s" % (name, argSet[arg]))
 	del argSet[arg]
 
-repos = repository.Repository(cfg.reppath, "r")
-db = repository.Database(cfg.root, cfg.dbpath)
-
 if (len(otherArgs) < 2):
     usage()
 elif (otherArgs[1] == "import"):
@@ -116,10 +113,10 @@ elif (otherArgs[1] == "changeset"):
 	(old, new) = (None, otherArgs[3])
 	outFile = otherArgs[4]
 
-    repos.open("w")
+    repos = repository.Repository(cfg.reppath, "w")
     changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
 elif (otherArgs[1] == "commit"):
-    repos.open("w")
+    repos = repository.Repository(cfg.reppath, "w")
     for changeSet in otherArgs[2:]:
 	commit.doCommit(repos, cfg, changeSet)
 elif (otherArgs[1] == "cook"):
@@ -138,14 +135,10 @@ elif (otherArgs[1] == "cook"):
         if not pid:
             os.setpgrp()
             os.tcsetpgrp(0, os.getpgrp())
+	    repos = repository.Repository(cfg.reppath, "r")
             cook.cook(repos, cfg, file, prep=prep)
             sys.exit(0)
         else:
-	    # we don't need these; the child process gets them and that's
-	    # good enough
-	    del repos
-	    del db
-
             while 1:
                 try:
                     # XXX replace 2 with os.WUNTRACED in python 2.3
@@ -165,10 +158,10 @@ elif (otherArgs[1] == "pkglist"):
     if all: del argSet['all']
 
     if argSet.has_key('repos'):
-	queryRepos = repos
+	queryRepos = repository.Repository(cfg.reppath, "r")
 	del argSet['repos']
     else:
-	queryRepos = db
+	queryRepos = repository.Database(cfg.root, cfg.dbpath)
 
     if argSet: usage
 
@@ -180,6 +173,9 @@ elif (otherArgs[1] == "pkglist"):
 elif (otherArgs[1] == "update"):
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
+	repos = repository.Repository(cfg.reppath, "r")
+	db = repository.Database(cfg.root, cfg.dbpath)
+
 	args = [repos, db, cfg] + otherArgs[2:]
 	update.doUpdate(*args)
     else:
