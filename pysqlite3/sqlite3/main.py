@@ -4,6 +4,12 @@ import _sqlite3 as _sqlite
 import copy, new, sys, weakref
 from types import *
 
+ver = _sqlite.sqlite_version().split('.')
+if ver >= (3,0,8):
+    _BEGIN = "BEGIN IMMEDIATE"
+else:
+    _BEGIN = "BEGIN"
+
 if sys.version_info[:2] >= (2,2):
     MyStopIteration = StopIteration
 else:
@@ -328,7 +334,7 @@ class Connection:
 
     def _begin(self):
         self.inTransaction = 1
-        self._execute("BEGIN")
+        self._execute(_BEGIN)
 
     #
     # PySQLite extensions:
