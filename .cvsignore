@@ -5,3 +5,4 @@ deps.dot
 *.tar.bz2
 conary-wrapper
 conary.recipe
+sqlite
