@@ -390,6 +390,24 @@ class AddModes(policy.Policy):
 	    self.recipe.autopkg.pathMap[path].inode.setPerms(mode)
 
 
+class WarnWriteable(policy.Policy):
+    """
+    Unless a mode has been set explicitly (i.e. with SetModes), warn
+    about group- or other-writeable files.
+    """
+    # Needs to run after AddModes in order to access the pathMap
+    def doFile(self, file):
+	fullpath = ('%(destdir)s/'+file) %self.macros
+	if os.path.islink(fullpath):
+	    return
+	mode = os.lstat(self.macros['destdir'] + os.sep + file)[stat.ST_MODE]
+	if mode & 022:
+	    # do we need to warn?
+	    if self.recipe.autopkg.pathMap[file].inode.perms():
+		log.warning('Possibly inappropriately writeable permission'
+			    ' 0%o for file %s', mode & 0777, file)
+
+
 class Ownership(policy.Policy):
     """
     Set user and group ownership of files.  The default is
@@ -472,6 +490,7 @@ def DefaultPolicy():
 	ParseManifest(),
 	MakeDevices(),
 	AddModes(),
+	WarnWriteable(),
 	Ownership(),
 	ExcludeDirectories(),
     ]
