@@ -23,33 +23,35 @@ if sys.version_info < (2, 3):
     print "error: python 2.3 or greater is requried"
     sys.exit(1)
 
-from lib import options
 import branch
-import commit
-import constants
 from build import cook
+import commit
+import conarycfg
+import constants
 import cscmd
-from local import database
 import display
 import importrpm
 from lib import log
+from lib import options
+from lib import util
+from local import database
+import metadata
 import os
 import queryrep
 import repository
-import rollbacks
-import conarycfg
-import updatecmd
-from lib import util
-import versions
-import showchangeset
-import xmlrpclib
 from repository import netclient
+import rollbacks
+import showchangeset
+import updatecmd
+import versions
+import xmlrpclib
 
 sys.excepthook = util.genExcepthook()
 
 def usage(rc = 1):
     print "usage: conary changeset <pkg>[=[<oldver>--]<newver>]+ <outfile>"
     print "       conary commit       <changeset>"
+    print "       conary details      <troveName>[=<trove version, branch, or label>]"
     print "       conary emerge       <troveName>+"
     print "       conary erase        <pkgname>[=<version>]+"
     print "       conary localcs      <pkg> <outfile>"
@@ -210,6 +212,19 @@ def realMain(cfg, argv=sys.argv):
 	    return usage()
 	else:
 	    cfg.display()
+    elif (otherArgs[1] == "details"):
+        log.setVerbosity(1)
+        db = database.Database(cfg.root, cfg.dbPath)
+        repos = openRepository(cfg.repositoryMap)
+       
+        if len(otherArgs) != 3:
+            return usage()
+        if '=' in otherArgs[2]:
+            troveName, branch = otherArgs[2].split('=')
+        else:
+            troveName = otherArgs[2]
+            branch = None
+        metadata.showDetails(repos, cfg, db, troveName, branch)
     elif (otherArgs[1] == "emerge"):
 	log.setVerbosity(1)
 

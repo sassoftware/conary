@@ -11,20 +11,19 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-
-from local import idtable
-import versions
+import metadata
+import textwrap
 import time
-
-from fmtroves import TroveCategories, LicenseCategories
-
-import urllib
 import urlparse
+import versions
 import xml.dom.minidom
 import xml.parsers.expat
-import metadata
-from urllib2 import urlopen
+
+from lib import log
+from local import idtable
+from fmtroves import TroveCategories, LicenseCategories
 from httplib import HTTPConnection
+from urllib2 import urlopen
 
 class MDClass:
     (SHORT_DESC, LONG_DESC,
@@ -192,7 +191,8 @@ class Metadata:
                 self.version = md["version"]
             if "source" in md and md["source"]:
                 self.source = md["source"]
-            self.language = md["language"]
+            if "language" in md:
+                self.language = md["language"]
 
     def freeze(self):
         return {"shortDesc": self.shortDesc,
@@ -270,3 +270,67 @@ def fetchFreshmeat(troveName):
         return Metadata(metadata)
     except xml.parsers.expat.ExpatError:
         raise NoFreshmeatRecord
+
+def showDetails(repos, cfg, db, troveName, branchStr=None):
+    sourceName = troveName + ":source"
+
+    branch = None
+    if branchStr:
+        if branchStr[0] == '/': # is a branch or version
+            version = versions.VersionFromString(branchStr)
+
+            if version.isVersion():
+                branch = version.branch()
+        else: # is a label
+            label = versions.Label(branchStr)
+
+            # find the first matching trove in branch of label
+            leaves = repos.getTroveLeavesByLabel([sourceName], label)
+            if leaves[sourceName]:
+                branch = leaves[sourceName][0].branch()
+
+        installedVers = None
+    else:
+        # search the local database and use the installed trove's branch first
+        versionList = db.getTroveVersionList(troveName)
+        if versionList:
+            installedVers = [x.trailingVersion().asString() for x in versionList]
+            branch = versionList[0].branch()
+        else:
+            # otherwise use the first installpath that has the trove
+            installedVers = ["None"]
+            for label in cfg.installLabelPath:
+                leaves = repos.getTroveLeavesByLabel([sourceName], label)
+                if leaves[sourceName]:
+                    branch = leaves[sourceName][0].branch()
+                    break
+                    
+    if not branch:
+        log.error("trove not found for branch %s: %s", branchStr, troveName)
+        return 0
+
+    log.info("retrieving package details for %s on %s", troveName, branch.asString())
+    md = repos.getMetadata([sourceName, branch], branch.label())
+
+    if sourceName in md:
+        md = md[sourceName]
+        wrapped = textwrap.wrap(md.getLongDesc())
+        wrappedDesc = "\n".join(wrapped)
+
+        print "Name       : %-25s" % troveName,
+        print "Branch     : %s" % branch.asString()
+        if installedVers and len(installedVers) > 1:
+            print "Versions   : %s" % ", ".join(installedVers)
+        elif installedVers and len(installedVers) == 1:
+            print "Version    : %s" % installedVers[0]
+        print "Size       : %-25s" % str(0),
+        print "Time built : %s" % "N/A"
+        for l in md.getLicenses():
+            print "License    : %s" % l
+        for c in md.getCategories():
+            print "Category   : %s" % c
+        print "Summary    : %s" % md.getShortDesc()
+        print "Description: \n%s" % (wrappedDesc)
+    else:
+        log.info("no details found for %s", troveName)
+
