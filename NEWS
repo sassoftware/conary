@@ -1,3 +1,6 @@
+Changes in 0.11.11
+  * repository caching (which isn't used yet) didn't track the recurse flag
+
 Changes in 0.11.10
   * changed flavor tracking when loadRecipe() is used to only track
     flavors in loaded recipes that are superclasses of the recipe

@@ -32,7 +32,7 @@ from local import versiontable
 from netauth import InsufficientPermission
 
 SERVER_VERSIONS = [ 20 ]
-CACHE_SCHEMA_VERSION = 10
+CACHE_SCHEMA_VERSION = 11
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -369,10 +369,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     oldFileId = 0
                     oldTroveF = 0
 
-                if not newFileId:
-                    import lib
-                    lib.epdb.st()
-
                 newTroveV = self.fromVersion(newTroveV)
                 newFileV = self.fromVersion(newFileV)
                 newFileId = self.fromFileId(newFileId)
@@ -385,10 +381,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                (newTroveV, newTroveF, newFileId, newFileV)))
 
             return new
-
-        if clientVersion == 6:
-            withFileContents = withFiles
-            withFiles = True
 
         urlList = []
         newChgSetList = []
@@ -412,14 +404,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 			   (self.toVersion(new), self.toFlavor(newFlavor)),
 			   absolute)
 
-            path = self.cache.getEntry(l, withFiles, withFileContents)
+            path = self.cache.getEntry(l, recurse, withFiles, withFileContents)
             if path is None:
                 (cs, trovesNeeded, filesNeeded) = \
                             self.repos.createChangeSet([ l ], 
                                         recurse = recurse, 
                                         withFiles = withFiles,
                                         withFileContents = withFileContents)
-                path = self.cache.addEntry(l, withFiles, withFileContents)
+                path = self.cache.addEntry(l, recurse, withFiles, 
+                                           withFileContents)
 
                 newChgSetList += _cvtTroveList(trovesNeeded)
                 allFilesNeeded += _cvtFileList(filesNeeded)
@@ -554,10 +547,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             self.cache = NullCacheSet(tmpPath)
 
 class NullCacheSet:
-    def getEntry(self, item, withFiles, withFileContents):
+    def getEntry(self, item, recurse, withFiles, withFileContents):
         return None 
 
-    def addEntry(self, item, withFiles, withFileContents):
+    def addEntry(self, item, recurse, withFiles, withFileContents):
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
                                       suffix = '.ccs-out')
         os.close(fd)
@@ -570,7 +563,7 @@ class CacheSet:
 
     filePattern = "%s/cache-%s.ccs-out"
 
-    def getEntry(self, item, withFiles, withFileContents):
+    def getEntry(self, item, recurse, withFiles, withFileContents):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
             item
 
@@ -603,9 +596,9 @@ class CacheSet:
                 troveName=? AND
                 oldFlavorId=? AND oldVersionId=? AND
                 newFlavorId=? AND newVersionId=? AND
-                absolute=? AND withFiles=? AND withFileContents=?
+                absolute=? AND recurse=? AND withFiles=? AND withFileContents=?
             """, name, oldFlavorId, oldVersionId, newFlavorId, 
-            newVersionId, absolute, withFiles, withFileContents)
+            newVersionId, absolute, recurse, withFiles, withFileContents)
 
         row = None
         for (row,) in cu:
@@ -620,7 +613,7 @@ class CacheSet:
 
         return None
 
-    def addEntry(self, item, withFiles, withFileContents):
+    def addEntry(self, item, recurse, withFiles, withFileContents):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
             item
 
@@ -649,9 +642,9 @@ class CacheSet:
 
         cu = self.db.cursor()
         cu.execute("""
-            INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, name, oldFlavorId, oldVersionId, newFlavorId, newVersionId, 
-        absolute, withFiles, withFileContents)
+        absolute, recurse, withFiles, withFileContents)
 
         row = cu.lastrowid
         path = self.filePattern % (self.tmpDir, row)
@@ -690,6 +683,7 @@ class CacheSet:
                     newFlavorId INTEGER,
                     newVersionId INTEGER,
                     absolute BOOLEAN,
+                    recurse BOOLEAN,
                     withFiles BOOLEAN,
                     withFileContents BOOLEAN)
             """)
