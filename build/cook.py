@@ -120,7 +120,7 @@ class _IdGen:
 
 def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None, 
 	       prep=True, macros={}, buildBranch = None, targetLabel = None, 
-	       resume = None):
+	       resume = None, alwaysBumpCount = False):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -154,6 +154,10 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     If 'policy', rerun the policy only.  Note that resume is only valid when
     cooking a recipe from a file, not from the repository.  
     @type resume: bool or str
+    @param alwaysBumpCount: if True, the cooked troves will not share a 
+    full version with any other existing troves with the same name, 
+    even if their flavors would differentiate them.  
+    @type alwaysBumpCount: bool
     
     @rtype: list of strings
     """
@@ -219,13 +223,16 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 	ret = cookPackageObject(repos, cfg, recipeClass, buildBranch,
                                 prep = prep, macros = macros,
 				targetLabel = targetLabel,
-				resume = resume)
+				resume = resume, 
+                                alwaysBumpCount = alwaysBumpCount)
     elif issubclass(recipeClass, recipe.GroupRecipe):
 	ret = cookGroupObject(repos, cfg, recipeClass, buildBranch, 
-			      macros = macros, targetLabel = targetLabel)
+			      macros = macros, targetLabel = targetLabel,
+                              alwaysBumpCount = alwaysBumpCount)
     elif issubclass(recipeClass, recipe.FilesetRecipe):
 	ret = cookFilesetObject(repos, cfg, recipeClass, buildBranch, 
-				macros = macros, targetLabel = targetLabel)
+				macros = macros, targetLabel = targetLabel,
+                                alwaysBumpCount = alwaysBumpCount)
     else:
         raise AssertionError
 
@@ -246,7 +253,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     return built
 
 def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
-		    targetLabel = None):
+		    targetLabel = None, alwaysBumpCount=False):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -268,6 +275,10 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     as a new branch from whatever version was previously built
     default), the buildBranch is used
     @type targetLabel: versions.Label
+    @param alwaysBumpCount: if True, the cooked troves will not share a 
+    full version with any other existing troves with the same name, 
+    even if their flavors would differentiate them.  
+    @type alwaysBumpCount: bool
     """
 
     fullName = recipeClass.name
@@ -291,7 +302,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
                 grpFlavor.union(flavor)
 
     targetVersion = repos.nextVersion(fullName, recipeClass.version, grpFlavor, 
-				      buildBranch, binary = True)
+				      buildBranch, binary = True, 
+                                      alwaysBumpCount=alwaysBumpCount)
 
     if targetLabel:
 	targetVersion = targetVersion.fork(targetLabel)
@@ -307,7 +319,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     return (changeSet, built, None)
 
 def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
-		      targetLabel = None):
+		      targetLabel = None, alwaysBumpCount=False):
     """
     Turns a fileset recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -327,6 +339,10 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
     as a new branch from whatever version was previously built
     default), the buildBranch is used
     @type targetLabel: versions.Label
+    @param alwaysBumpCount: if True, the cooked troves will not share a 
+    full version with any other existing troves with the same name, 
+    even if their flavors would differentiate them.  
+    @type alwaysBumpCount: bool
     @rtype: tuple
     """
 
@@ -353,7 +369,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 	# network for no reason
 
     targetVersion = repos.nextVersion(fullName, recipeClass.version, flavor, 
-				      buildBranch, binary = True)
+				      buildBranch, binary = True, 
+                                      alwaysBumpCount=False)
 
     if targetLabel:
 	targetVersion = targetVersion.fork(targetLabel)
@@ -370,7 +387,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
     return (changeSet, built, None)
 
 def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True, 
-		      macros={}, targetLabel = None, resume = None):
+		      macros={}, targetLabel = None, resume = None,
+                      alwaysBumpCount=False):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -392,9 +410,12 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     @type prep: boolean
     @param macros: set of macros for the build
     @type macros: dict
-    @param targetVersion: version to use for the cooked troves; if None (the
+    @param targetLabel: label to use for the cooked troves; if None (the
     default), the version used is the next version on the buildBranch 
-    @type targetVersion: versions.Version
+    @param alwaysBumpCount: if True, the cooked troves will not share a 
+    full version with any other existing troves with the same name, 
+    even if their flavors would differentiate them.  
+    @type alwaysBumpCount: bool
     @rtype: tuple
     """
 
@@ -474,7 +495,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	flavor.union(buildPkg.flavor)
 
     targetVersion = repos.nextVersion(grpName, recipeClass.version, 
-				      flavor, buildBranch, binary = True)
+				      flavor, buildBranch, binary = True,
+                                      alwaysBumpCount=alwaysBumpCount)
 
     if targetLabel:
 	targetVersion = targetVersion.fork(targetLabel)

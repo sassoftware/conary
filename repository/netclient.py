@@ -726,7 +726,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return result
 
     def nextVersion(self, troveName, versionStr, troveFlavor, currentBranch,
-                    binary = True, sourceName = None):
+                    binary = True, sourceName = None, alwaysBumpCount=False):
         """
         Calculates the version to use for a newly built trove which is about
         to be added to the repository.
@@ -744,6 +744,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         @param sourceName: the name of the :source component related to this
                            trove.  The default is troveName + ':source'
         @type sourceName: string
+        @param alwaysBumpCount: if True, the do not return a version that 
+        matches an existing trove, even if their flavors would differentiate 
+        them, instead, increase the appropriate count.  
+        @type alwaysBumpCount: bool
         """
 
         if binary:
@@ -826,7 +830,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     newVersion.incrementRelease()
             elif binary:
                 newVersion.incrementBuildCount()
-        elif latestForFlavor != latest:
+        elif (latestForFlavor != latest) and not alwaysBumpCount:
             # this is a flavor that does not exist at the latest
             # version on the branch.  Reuse the latest version to sync up.
             newVersion = latest
