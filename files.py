@@ -304,15 +304,16 @@ class File(streams.StreamSet):
 	os.chmod(target, self.inode.perms())
 
     def setPermissions(self, root, target):
+	if os.getuid() == 0:
+            global userCache, groupCache
+
+            uid = userCache.lookup(root, self.inode.owner())
+            gid = groupCache.lookup(root, self.inode.group())
+
+            os.lchown(target, uid, gid)
+        # do the chmod after the chown because some versions of Linux
+        # remove setuid/gid flags when changing ownership to root 
 	self.chmod(target)
-
-	if os.getuid(): return
-	global userCache, groupCache
-
-	uid = userCache.lookup(root, self.inode.owner())
-	gid = groupCache.lookup(root, self.inode.group())
-
-	os.lchown(target, uid, gid)
 
     def twm(self, diff, base, skip = []):
 	sameType = struct.unpack("B", diff[0])
