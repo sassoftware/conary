@@ -267,7 +267,7 @@ Use.qt = False
 Use.kde = False
 Use.xfce = False
 Use.gd = False
-Use.ldap = False
+Use.ldap = True
 Use.pie = False
 
 Use.desktop = Use.gnome | Use.kde | Use.xfce
