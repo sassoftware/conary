@@ -89,7 +89,7 @@ class Recipe:
 	self.tarballs.append((file, extractDir))
 	self.addSignature(f, keyid)
 
-    def addPatch(self, file, level='0', backup='', keyid=None):
+    def addPatch(self, file, level='1', backup='', keyid=None):
 	self.patches.append((file, level, backup))
 	self.addSignature(file, keyid)
 
