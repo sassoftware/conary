@@ -220,10 +220,14 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
     
     return loader
 
-def loadRecipe(file):
+def loadRecipe(file, sourcecomponent=None):
     callerGlobals = inspect.stack()[1][0].f_globals
     cfg = callerGlobals['cfg']
     repos = callerGlobals['repos']
+    if sourcecomponent and not sourcecomponent.endswith(':source'):
+	sourcecomponent = sourcecomponent + ':source'
+    else:
+	sourcecomponent = callerGlobals['component']
     if file[0] != '/':
         recipepath = os.path.dirname(callerGlobals['filename'])
         localfile = recipepath + '/' + file
@@ -231,7 +235,7 @@ def loadRecipe(file):
         loader = RecipeLoader(localfile)
     except IOError, err:
         if err.errno == errno.ENOENT:
-            loader = recipeLoaderFromSourceComponent(callerGlobals['component'],
+            loader = recipeLoaderFromSourceComponent(sourcecomponent,
                                                      file,
                                                      cfg,
                                                      repos)
