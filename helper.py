@@ -77,7 +77,7 @@ def findPackage(repos, packageNamespace, defaultNick, name,
 	else:
 	    nick = defaultNick
 
-	branchList = repos.getPackageNickList(name, nick)
+	branchList = repos.getPackageLabelBranches(name, nick)
 	if not branchList:
 	    raise PackageNotFound, "branch %s does not exist for package %s" \
 			% (str(nick), name)
@@ -87,7 +87,7 @@ def findPackage(repos, packageNamespace, defaultNick, name,
 	    pkgList.append(repos.getLatestPackage(name, branch))
     elif versionStr[0] != "/" and versionStr.find("/") == -1:
 	# version/release was given
-	branchList = repos.getPackageNickList(name, defaultNick)
+	branchList = repos.getPackageLabelBranches(name, defaultNick)
 	if not branchList:
 	    raise PackageNotFound, \
 			"branch %s does not exist for package %s" \
