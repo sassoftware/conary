@@ -17,6 +17,7 @@ import util
 import fixedglob
 import log
 import re
+import stat
 from use import Use
 
 # make sure that the decimal value really is unreasonable before
@@ -326,17 +327,19 @@ class CompilePython(BuildCommand):
 class _FileAction(BuildAction):
     keywords = {'component': None}
 
-    def chmod(self, destdir, path):
-	if self.mode >= 0:
+    def chmod(self, destdir, path, mode=None):
+	if not mode:
+	    mode=self.mode
+	if mode >= 0:
             # fixup obviously broken permissions
-	    if _permmap.has_key(self.mode):
+	    if _permmap.has_key(mode):
                 log.warning('odd permission %o, correcting to %o: add initial "0"?' \
-                            %(self.mode, _permmap[self.mode]))
-		self.mode = _permmap[self.mode]
-	    os.chmod(destdir+os.sep+path, self.mode & 01777)
-	    if self.mode & 06000:
-		self.recipe.AddModes(self.mode, path)
-	    if os.path.isdir(destdir+os.sep+path) and self.mode != 0755:
+                            %(mode, _permmap[mode]))
+		mode = _permmap[mode]
+	    os.chmod(destdir+os.sep+path, mode & 01777)
+	    if mode & 06000:
+		self.recipe.AddModes(mode, path)
+	    if os.path.isdir(destdir+os.sep+path) and mode != 0755:
 		self.recipe.ExcludeDirectories(exceptions=path)
 
     def setComponents(self, paths):
@@ -448,13 +451,22 @@ class _PutFiles(_FileAction):
 
 	if os.path.isdir(dest):
 	    dest = dest + os.path.basename(source)
+	
+	mode = self.mode
+	if mode == -2:
+	    # any executable bit on in source means 0755 on target, else 0644
+	    sourcemode = os.lstat(source)[stat.ST_MODE]
+	    if sourcemode & 0111:
+		mode = 0755
+	    else:
+		mode = 0644
 
 	if self.move:
 	    util.rename(source, dest)
 	else:
 	    util.copyfile(source, dest)
 	self.setComponents(dest[destlen:])
-	self.chmod(macros['destdir'], dest[destlen:])
+	self.chmod(macros['destdir'], dest[destlen:], mode=mode)
 	
 
     def __init__(self, *args, **keywords):
@@ -471,7 +483,7 @@ class InstallFiles(_PutFiles):
     """
     This class installs files from the builddir to the destdir.
     """
-    keywords = { 'mode': 0644 }
+    keywords = { 'mode': -2 }
 
     def __init__(self, *args, **keywords):
 	_PutFiles.__init__(self, *args, **keywords)
