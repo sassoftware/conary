@@ -16,11 +16,13 @@ only removes empty directories and regular files."""
 
     name = "tmpwatch"
     version = "2.9.0"
-    rpmrevision = "2.1"
 
     def setup(self):
-	self.addArchiveFromRPM("ftp://ftp.redhat.com/pub/fedora/linux/core/development/SRPMS/%s-%s-%s.src.rpm" %(self.name, self.version, self.rpmrevision), 
-	                      "%s-%s.tar.gz" %(self.name, self.version))
+	self.macros['rpmrevision'] = "2.1"
+	# The canonical URL is "ftp://ftp.redhat.com/pub/fedora/linux/core/development/SRPMS/tmpwatch-%(version)s-%(rpmrevision)s.src.rpm"
+	# but it is always too busy, so we'll go to a well-known mirror instead
+	self.addArchiveFromRPM("http://www.gtlib.cc.gatech.edu/pub/fedora.redhat/linux/core/development/SRPMS/tmpwatch-%(version)s-%(rpmrevision)s.src.rpm", 
+	                      "tmpwatch-%(version)s.tar.gz")
 	self.addSource("crond-tmpwatch")
 	self.install = (build.MakeInstall(rootVar = "ROOT"),
 			build.InstallFiles("crond-tmpwatch", 
