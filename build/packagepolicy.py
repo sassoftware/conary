@@ -31,6 +31,8 @@ class NonBinariesInBindirs(policy.Policy):
     invariantsubtrees = [
 	'%(bindir)s/',
 	'%(essentialbindir)s/',
+	'%(krbprefix)s/bin/',
+	'%(x11prefix)s/bin/',
 	'%(sbindir)s/',
 	'%(essentialsbindir)s/',
 	'%(initdir)s/',
