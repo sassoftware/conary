@@ -349,7 +349,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     if len(otherArgs) == 4:
-        cfg.read(otherArgs.pop())
+        cfg.read(otherArgs.pop(), exception = True)
 
     if len(otherArgs) != 3 or argSet:
 	usage()
