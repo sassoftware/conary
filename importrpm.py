@@ -5,9 +5,9 @@ import util
 import commit
 import stat
 
-def doImport(DBPATH, rpmFile):
-    scratch = DBPATH + "/scratch"
-    fileDB = DBPATH + "/files"
+def doImport(dbpath, rpmFile):
+    scratch = dbpath + "/scratch"
+    fileDB = dbpath + "/files"
 
     ts = rpm.TransactionSet()
     ts.setVSFlags(~(rpm._RPMVSF_NOSIGNATURES))
@@ -71,6 +71,6 @@ def doImport(DBPATH, rpmFile):
     util.mkdirChain(scratch)
 
     os.system("cd %s; rpm2cpio %s | cpio -iumd --quiet" % (scratch, pkgFile))
-    commit.finalCommit(DBPATH, pkgName, version, scratch, fileList)
+    commit.finalCommit(dbpath, pkgName, version, scratch, fileList)
     os.system("rm -rf %s" % scratch)
 

@@ -7,8 +7,8 @@ import pwd
 import grp
 import files
 
-def doUpdate(DBPATH, root, pkgName):
-    pkgSet = package.PackageSet(DBPATH, pkgName)
+def doUpdate(dbpath, root, pkgName):
+    pkgSet = package.PackageSet(dbpath, pkgName)
 
     if (not len(pkgSet.versionList())):
 	raise KeyError, "no versions exist of %s" % pkgName
@@ -16,10 +16,10 @@ def doUpdate(DBPATH, root, pkgName):
     (version, pkg) = pkgSet.getLatest()
 
     for (fileName, version) in pkg.fileList():
-	infoFile = files.FileDB(DBPATH, fileName)
+	infoFile = files.FileDB(dbpath, fileName)
 	f = infoFile.getVersion(version)
 
-	source = "%s/files/%s.contents/%s" % (DBPATH, fileName, f.uniqueName())
+	source = "%s/files/%s.contents/%s" % (dbpath, fileName, f.uniqueName())
 
 	target = "%s/%s" % (root, fileName)
 	dir = os.path.split(target)[0]
