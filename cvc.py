@@ -46,13 +46,6 @@ except conarycfg.ConaryCfgError, e:
 # reset the excepthook (using cfg values for exception settings)
 sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
 
-def openRepository(repMap):
-    try:
-        return repository.netclient.NetworkRepositoryClient(repMap)
-    except repository.repository.OpenError, e:
-        log.error('Unable to open repository %s: %s', path, str(e))
-        sys.exit(1)
-
 def usage(rc = 1):
     print "usage: cvc add <file> [<file2> <file3> ...]"
     print "       cvc branch <newbranch> <branchfrom> [<trove>]"
@@ -157,7 +150,7 @@ def sourceCommand(cfg, args, argSet):
     elif (args[0] == "branch"):
         if argSet: return usage()
         if len(args) != 4: return usage()
-        repos = openRepository(cfg.repositoryMap)
+        repos = NetworkRepositoryClient(cfg.repositoryMap)
 
         args = [repos, ] + args[1:]
         branch.branch(*args)
