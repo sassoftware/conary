@@ -337,7 +337,7 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	chg = changeSet.getFileChange(fileId)
 	f = files.ThawFile(chg, fileId)
 
-	if f.hasContents:
+	if f.hasContents and f.flags.isConfig():
 	    (contType, contents) = changeSet.getFileContents(fileId)
 	    print contents.get().read()
 
