@@ -238,10 +238,17 @@ class Epdb(pdb.Pdb):
             return self.multiline()
         if line.strip().endswith(':'):
             return self.multiline(line)
-        if line.count('(') > line.count(')'):
+        if line.endswith('\\'):
             return self.multiline(line)
-        return pdb.Pdb.default(self, line)
+        origLine = line
+        line = _removeQuotes(line)
+        if line is None:
+            return self.multiline(origLine)
+        if line.count('(') > line.count(')'):
+            return self.multiline(origLine)
+        return pdb.Pdb.default(self, origLine)
 
+                
     def multiline(self, firstline=''):
         full_input = []
         if firstline:
@@ -266,6 +273,7 @@ class Epdb(pdb.Pdb):
             full_input.append(line)
         locals = self.curframe.f_locals
         globals = self.curframe.f_globals
+        print ''
         try:
             code = compile('\n'.join(full_input) + '\n', '<stdin>', 'exec')
             exec code in globals, locals
@@ -275,8 +283,6 @@ class Epdb(pdb.Pdb):
                 exc_type_name = t
             else: exc_type_name = t.__name__
             print '***', exc_type_name + ':', v
-        else:
-            print ''
 
     def handle_directive(self, line):
         cmd = line.split('?', 1)
@@ -732,3 +738,36 @@ def matchFileOnDirPath(curpath, pathdir):
     if os.path.exists(tmppath):
        return tmppath
     return None
+
+def _removeQuotes(line):
+    origLine = line
+    line = line.replace(r'\\', 'X')
+    line = re.sub(r'\\\"|\\\'', 'X', line)
+    line = _removeQuoteSet(line, '"""', "'''")
+    if line is None: return None
+    if line != _removeQuoteSet(line, '""', "''"):
+        return origLine
+    line =  _removeQuoteSet(line, '"', "'")
+    if line is None:
+        return origLine
+    return line
+
+def _removeQuoteSet(line, quote1, quote2):
+    ln = len(quote1)
+    while True:
+        a = line.find(quote1), quote1   
+        b = line.find(quote2), quote2
+        if a[0] == -1 and b[0] == -1:             
+            return line
+        if b[0] == -1 or (b[0] < a[0]):
+            firstPoint = a[0]
+            firstQuote = a[1]
+        else:
+            firstPoint = b[0]
+            firstQuote = b[1]
+        secondPoint = line[(firstPoint+ln):].find(firstQuote)
+        if secondPoint == -1:
+            return None
+        secondPoint += firstPoint
+        line = line[:firstPoint] + line[(secondPoint+2*ln):]
+
