@@ -36,6 +36,12 @@ CLIENT_VERSION=5
 
 class _Method(xmlrpclib._Method):
 
+    def __repr__(self):
+        return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name) 
+
+    def __str__(self):
+        return self.__repr__()
+
     def __call__(self, *args):
         newArgs = ( CLIENT_VERSION, ) + args
         isException, result = self.__send(self.__name, newArgs)
@@ -57,6 +63,8 @@ class _Method(xmlrpclib._Method):
 	    raise repository.CommitError(exceptionArgs[0])
 	elif exceptionName == "DuplicateBranch":
 	    raise repository.DuplicateBranch(exceptionArgs[0])
+        elif exceptionName == "MethodNotSupported":
+	    raise repository.MethodNotSupported(exceptionArgs[0])
 	else:
 	    raise UnknownException(exceptionName, exceptionArgs)
 

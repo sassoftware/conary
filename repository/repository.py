@@ -733,6 +733,9 @@ class ChangeSetJob:
 class RepositoryError(Exception):
     """Base class for exceptions from the system repository"""
 
+class MethodNotSupported(RepositoryError):
+    """Attempt to call a server method which does not exist"""
+
 class TroveNotFound(Exception):
     """Raised when findTrove failes"""
 
