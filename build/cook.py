@@ -138,8 +138,19 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
             built.append(pkgname + "/" + name)
 	    packageList.append((pkgname + "/" + name, p, fileMap))
 
+        recipes = [ recipeClass.filename ]
+        # add any recipe that this recipeClass decends from to the sources
+        baseRecipeClasses = list(recipeClass.__bases__)
+        while baseRecipeClasses:
+            parent = baseRecipeClasses.pop()
+            baseRecipeClasses.extend(list(parent.__bases__))
+            if not parent.__dict__.has_key('filename'):
+                continue
+            if not parent.filename in recipes:
+                recipes.append(parent.filename)
+
 	srcList = []
-	for file in recipeObj.allSources() + [ recipeClass.filename ]:
+	for file in recipeObj.allSources() + recipes:
             src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
 	    srcList.append(src)
 	
