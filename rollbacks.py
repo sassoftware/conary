@@ -5,6 +5,7 @@
 
 import database
 import log
+import package
 import sys
 
 def listRollbacks(db, cfg):
