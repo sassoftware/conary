@@ -89,6 +89,9 @@ class LinkGroupStream(streams.Sha1Stream):
         else:
             streams.Sha1Stream.thaw(self, data)
 
+    def set(self, val):
+        self.s = val
+
     def freeze(self):
         if self.s is None:
             return ""
