@@ -218,7 +218,8 @@ class Revision(AbstractRevision):
         as being freshly branched.
         """
         self.sourceCount.truncateShadowCount(0, fromEnd = True)
-        self.buildCount.truncateShadowCount(0, fromEnd = True)
+        if self.buildCount:
+            self.buildCount.truncateShadowCount(0, fromEnd = True)
 
     def shadowCount(self):
         i = self.sourceCount.shadowCount()
