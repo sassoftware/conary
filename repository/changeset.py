@@ -222,10 +222,13 @@ class ChangeSetFromRepository(ChangeSet):
     def newPackage(self, pkg):
 	# add the time stamps to the package version numbers
 	if pkg.getOldVersion():
-	    pkg.changeOldVersion(self.repos.getFullVersion(pkg.getName(),
-							   pkg.getOldVersion()))
-	pkg.changeNewVersion(self.repos.getFullVersion(pkg.getName(),
-						       pkg.getNewVersion()))
+	    if not pkg.getOldVersion().timeStamp:
+		pkg.changeOldVersion(self.repos.getFullVersion(pkg.getName(),
+							       pkg.getOldVersion()))
+
+	if not pkg.getNewVersion().timeStamp:
+	    pkg.changeNewVersion(self.repos.getFullVersion(pkg.getName(),
+							   pkg.getNewVersion()))
 	ChangeSet.newPackage(self, pkg)
 
     def __init__(self, repos):
