@@ -2,19 +2,21 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-import string
 import copy
-import os
-import sha1helper
-import stat
-import pwd
 import grp
-import util
-import time
-import socket
-import struct
-import tempfile
 import log
+import os
+import pwd
+import sha1helper
+import socket
+import stat
+import string
+import struct
+import sys
+import tempfile
+import time
+import types
+import util
 
 from deps import filedeps, deps
 
@@ -23,24 +25,19 @@ _FILE_FLAG_INITSCRIPT = 1 << 1
 _FILE_FLAG_SHLIB = 1 << 2
 _FILE_FLAG_GCONFSCHEMA = 1<< 3
 
-_STREAM_INFO	    = 0
-_STREAM_SHORT	    = 1
-_STREAM_INT	    = 2
-_STREAM_LONGLONG    = 3
-_STREAM_STRING	    = 4
-_STREAM_DEVICE	    = 5
-_STREAM_SIZESHA1    = 6
-_STREAM_INODE	    = 7
-_STREAM_FLAGS	    = 8
-_STREAM_MTIME	    = 9
-_STREAM_DEPENDENCIES = 10
-_STREAM_STRINGS     = 11
+_STREAM_CONTENTS    = 1
+_STREAM_DEVICE	    = 2
+_STREAM_FLAGS	    = 3
+_STREAM_FLAVOR	    = 4
+_STREAM_INODE	    = 5
+_STREAM_PROVIDES    = 6
+_STREAM_REQUIRES    = 7
+_STREAM_TAGS	    = 8
+_STREAM_TARGET	    = 9
 
 class InfoStream(object):
 
     __slots__ = ()
-
-    streamId = _STREAM_INFO
 
     def copy(self):
         return self.__class__(self.freeze())
@@ -120,21 +117,15 @@ class NumericStream(InfoStream):
 
 class ShortStream(NumericStream):
 
-    streamId = _STREAM_SHORT
-
     format = "!H"
 
 class IntStream(NumericStream):
 
     __slots__ = ( "val", )
 
-    streamId = _STREAM_INT
-
     format = "!I"
 
 class MtimeStream(NumericStream):
-
-    streamId = _STREAM_MTIME
 
     format = "!I"
 
@@ -149,8 +140,6 @@ class MtimeStream(NumericStream):
 
 class LongLongStream(NumericStream):
 
-    streamId = _STREAM_LONGLONG
-
     format = "!Q"
 
 class StringStream(InfoStream):
@@ -159,7 +148,6 @@ class StringStream(InfoStream):
     """
 
     __slots__ = "s"
-    streamId = _STREAM_STRING
 
     def value(self):
 	return self.s
@@ -206,7 +194,6 @@ class DependenciesStream(InfoStream):
     """
 
     __slots__ = 'deps'
-    streamId = _STREAM_DEPENDENCIES
 
     def value(self):
 	return self.deps
@@ -251,7 +238,6 @@ class StringsStream(InfoStream):
     """
 
     __slots__ = 'l'
-    streamId = _STREAM_STRINGS
 
     def value(self):
 	return self.l
@@ -411,7 +397,6 @@ class DeviceStream(TupleStream):
     __slots__ = []
 
     makeup = (("major", IntStream, 4), ("minor", IntStream, 4))
-    streamId = _STREAM_DEVICE
 
     def major(self):
         return self.items[0].value()
@@ -443,8 +428,6 @@ class RegularFileStream(TupleStream):
     def setSha1(self, value):
         return self.items[1].set(value)
     
-    streamId = _STREAM_SIZESHA1
-
 class InodeStream(TupleStream):
 
     __slots__ = []
@@ -456,7 +439,6 @@ class InodeStream(TupleStream):
     # this is permissions, mtime, owner, group
     makeup = (("perms", ShortStream, 2), ("mtime", MtimeStream, 4), 
               ("owner", StringStream, "B"), ("group", StringStream, "B"))
-    streamId = _STREAM_INODE
 
     def perms(self):
         return self.items[0].value()
@@ -552,7 +534,6 @@ class InodeStream(TupleStream):
 class FlagsStream(IntStream):
 
     __slots__ = "val"
-    streamId = _STREAM_FLAGS
 
     def isConfig(self, set = None):
 	return self._isFlag(_FILE_FLAG_CONFIG, set)
@@ -581,9 +562,9 @@ class File(object):
 
     lsTag = None
     hasContents = 0
-    streamList = ( ("inode", InodeStream),
-                   ("flags", FlagsStream),
-		   ("tags", StringsStream) )
+    streamDict = { _STREAM_INODE : (InodeStream, "inode"),
+                   _STREAM_FLAGS : (FlagsStream, "flags"),
+		   _STREAM_TAGS : (StringsStream, "tags") }
     __slots__ = [ "theId", "inode", "flags", "tags" ]
 
     def modeString(self):
@@ -598,7 +579,7 @@ class File(object):
 
     def copy(self):
 	new = copy.deepcopy(self)
-        for name, streamClass in self.streamList:
+        for streamClass, name in self.streamDict.itervalues():
             stream = self.__getattribute__(name).copy()
             new.__setattr__(name, stream)
         return new
@@ -636,23 +617,22 @@ class File(object):
 	os.lchown(target, uid, gid)
 
     def initializeStreams(self, data):
-	if not data: 
-	    for (name, streamType) in self.streamList:
-		self.__setattr__(name, streamType())
-	else:
+	for streamType, name in self.streamDict.itervalues():
+	    self.__setattr__(name, streamType())
+
+	if data: 
 	    # skip over the file type for now
 	    i = 1
             dataLen = len(data)
-	    for (name, streamType) in self.streamList:
+	    while i < dataLen:
                 assert(i < dataLen)
 		(streamId, size) = struct.unpack("!BH", data[i:i+3])
-		assert(streamId == streamType.streamId)
+		(streamType, name) = self.streamDict[streamId]
 		i += 3
 		self.__setattr__(name, streamType(data[i:i + size]))
 		i += size
 
-	    # FIXME
-	    #assert(i == len(data))
+	    assert(i == dataLen)
 
     def diff(self, other):
 	if self.lsTag != other.lsTag:
@@ -660,7 +640,7 @@ class File(object):
 	    return struct.pack("!BH", 0, len(d)) + d
 
 	rc = [ "\x01", self.lsTag ]
-	for (name, streamType) in self.streamList:
+	for streamType, name in self.streamDict.itervalues():
 	    d = self.__getattribute__(name).diff(other.__getattribute__(name))
 	    rc.append(struct.pack("!H", len(d)) + d)
 
@@ -676,14 +656,14 @@ class File(object):
 	i = 2
 	conflicts = False
 	
-	for (name, streamType) in self.streamList:
+	for streamType, name in self.streamDict.itervalues():
 	    size = struct.unpack("!H", diff[i:i+2])[0]
 	    i += 2
 	    if name != skip:
 		w = self.__getattribute__(name).twm(diff[i:i+size], 
 					       base.__getattribute__(name))
+		conflicts = conflicts or w
 	    i += size
-	    conflicts = conflicts or w
 
 	assert(i == len(diff))
 
@@ -692,7 +672,7 @@ class File(object):
     def __eq__(self, other):
 	if other.lsTag != self.lsTag: return False
 
-	for (name, streamType) in self.streamList:
+	for streamType, name in self.streamDict.itervalues():
 	    if not self.__getattribute__(name) == other.__getattribute__(name):
 		return False
 
@@ -705,7 +685,7 @@ class File(object):
 	if not ignoreOwnerGroup:
 	    return self == other
 
-	for (name, streamType) in self.streamList:
+	for streamType, name in self.streamDict.itervalues():
 	    if name == 'inode':
 		if not self.__getattribute__(name).metadataEqual(
 		       other.__getattribute__(name)):
@@ -717,9 +697,10 @@ class File(object):
 
     def freeze(self):
 	rc = [ self.lsTag ]
-	for (name, streamType) in self.streamList:
+	for streamId, (streamType, name) in self.streamDict.iteritems():
 	    s = self.__getattribute__(name).freeze()
-	    rc.append(struct.pack("!BH", streamType.streamId, len(s)) + s)
+	    if len(s):
+		rc.append(struct.pack("!BH", streamId, len(s)) + s)
 	return "".join(rc)
 
     def __init__(self, fileId, streamData = None):
@@ -730,7 +711,8 @@ class File(object):
 class SymbolicLink(File):
 
     lsTag = "l"
-    streamList = File.streamList + (("target", StringStream ),)
+    streamDict = { _STREAM_TARGET : (StringStream, "target") }
+    streamDict.update(File.streamDict)
     __slots__ = "target"
 
     def sizeString(self):
@@ -793,7 +775,8 @@ class Directory(File):
 
 class DeviceFile(File):
 
-    streamList = File.streamList + (("devt", DeviceStream ),)
+    streamDict = { _STREAM_DEVICE : (DeviceStream, "devt") }
+    streamDict.update(File.streamDict)
     __slots__ = [ 'devt' ]
 
     def sizeString(self):
@@ -827,10 +810,11 @@ class CharacterDevice(DeviceFile):
     
 class RegularFile(File):
 
-    streamList = File.streamList + (('contents', RegularFileStream),
-                                    ('provides', DependenciesStream),
-                                    ('requires', DependenciesStream),
-                                    ('flavor', DependenciesStream))
+    streamDict = { _STREAM_CONTENTS : (RegularFileStream , 'contents' ), 
+                   _STREAM_PROVIDES : (DependenciesStream, 'provides' ), 
+                   _STREAM_REQUIRES : (DependenciesStream, 'requires' ), 
+                   _STREAM_FLAVOR   : (DependenciesStream, 'flavor' ) }
+    streamDict.update(File.streamDict)
     __slots__ = ('contents', 'provides', 'requires', 'flavor')
 
     lsTag = "-"
@@ -973,7 +957,7 @@ def contentsChanged(diff):
     if type != "-": return False
     i = 2
 
-    for (name, streamType) in RegularFile.streamList:
+    for streamType, name in RegularFile.streamDict.itervalues():
 	size = struct.unpack("!H", diff[i:i+2])[0]
 	i += 2
 	
@@ -1010,7 +994,7 @@ def fieldsChanged(diff):
 
     rc = []
 
-    for (name, streamType) in cl.streamList:
+    for streamType, name in cl.streamDict.itervalues():
 	size = struct.unpack("!H", diff[i:i+2])[0]
 	i += 2
 	if not size: continue
