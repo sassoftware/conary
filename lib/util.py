@@ -47,7 +47,15 @@ class Action:
 	if not self.__dict__.has_key('commonkeywords'):
 	    self.commonkeywords = {}
 	self.__dict__.update(self.commonkeywords)
-        self.__dict__.update(self.keywords)
+	# unfortunately, self.__dict__ isn't populated with
+	# class data until AFTER __init__ is called, so I
+	# can't use self.__dict__.has_key('keywords')
+	# like I can for commonkeywords which is set in
+	# __init__ of a subclass
+	try:
+	    self.__dict__.update(self.keywords)
+	except:
+	    pass
         # check to make sure that we don't get a keyword we don't expect
         for key in keywords.keys():
             if key not in self.keywords.keys() and \
