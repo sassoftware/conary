@@ -29,6 +29,6 @@ def listRollbacks(db, cfg):
 
 def apply(db, cfg, *names):
     try:
-	db.applyRollbackList(cfg.sourcepath, names)
+	db.applyRollbackList(names)
     except database.RollbackError, e:
 	sys.stderr.write("%s\n" % repr(e))	
