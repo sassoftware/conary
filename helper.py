@@ -176,6 +176,41 @@ def fullBranchName(nameSpace, defaultNick, version, versionStr):
     else:
 	return version.branch()
 
+def nextVersion(versionStr, currentVersion, currentBranch, binary = True):
+    """
+    Calculates the version to use for a newly built item which is about
+    to be added to the repository.
+
+    @param versionStr: version string from the recipe
+    @type versionStr: string
+    @param currentVersion: version of current head
+    @type currentVersion: versions.Version
+    @parm currentBranch: branch the new version should be on
+    @type currentBranch: versions.Version
+    @param binary: true if this version should use the binary build field
+    @type binary: boolean
+    """
+    if not currentVersion:
+	# new package
+	newVersion = currentBranch.copy()
+	newVersion.appendVersionRelease(versionStr, 1)
+	if binary:
+	    newVersion.incrementBuildCount()
+    elif currentVersion.trailingVersion().getVersion() == versionStr and \
+         currentBranch.equal(currentVersion.branch()):
+	newVersion = currentVersion.copy()
+	if binary:
+	    newVersion.incrementBuildCount()
+	else:
+	    newVersion.incrementRelease()
+    else:
+	newVersion = currentBranch.copy()
+	newVersion.appendVersionRelease(versionStr, 1)
+	if binary:
+	    newVersion.incrementBuildCount()
+
+    return newVersion
+
 class PackageNotFound(Exception):
 
     def __str__(self):
