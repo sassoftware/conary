@@ -126,9 +126,9 @@ class Recipe:
 		# FIXME: only do this if key missing, this is cheap for now
 		os.system("gpg --keyserver pgp.mit.edu --recv-keys 0x %s"
 		          %(keyid))
-	    if os.system("gpg --no-secmem-warning --verify %s %s"
-			  %(signature, filepath)):
-		raise RuntimeError, "GPG signature %s failed" %(signature)
+		if os.system("gpg --no-secmem-warning --verify %s %s"
+			      %(signature, filepath)):
+		    raise RuntimeError, "GPG signature %s failed" %(signature)
 
     def unpackSources(self, builddir):
 	if os.path.exists(builddir):
