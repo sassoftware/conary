@@ -601,18 +601,20 @@ class _addInfo(policy.Policy):
 	# instantiate filters
 	d = {}
 	for info in self.included:
+            newinfo = info % recipe.macros
 	    l = []
 	    for item in self.included[info]:
 		l.append(filter.Filter(item, recipe.macros))
-	    d[info] = l
+	    d[newinfo] = l
 	self.included = d
 
 	d = {}
 	for info in self.excluded:
+            newinfo = info % recipe.macros
 	    l = []
 	    for item in self.excluded[info]:
 		l.append(filter.Filter(item, recipe.macros))
-	    d[info] = l
+	    d[newinfo] = l
 	self.excluded = d
 
 	policy.Policy.doProcess(self, recipe)
