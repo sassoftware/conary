@@ -236,7 +236,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	c = httplib.HTTPConnection(host)
 	f = open(path)
 	c.connect()
-	c.request("PUT", putPath, f.read())
+	c.request("PUT", url, f.read())
 	r = c.getresponse()
 	assert(r.status == 200)
 
