@@ -515,18 +515,19 @@ class PackageRecipe(Recipe):
 	resumelist = []
 	if resume:
 	    lines = resume.split(',')
-	    for lines in resume.split(','):
-		if ':' in lines:
-		    begin, end = lines.split(':')
+	    for line in lines:
+		if ':' in line:
+		    begin, end = line.split(':')
 		    if begin:
 			begin = int(begin)
 		    if end:
 			end = int(end)
 		    resumelist.append([begin, end])
 		else:
-		    resumelist.append([int(lines), int(lines)])
-	    if len(resumelist) == 1 and resumelist[0][0] == resumelist[0][1]:
-		resumelist[0][1] = False
+                    if len(lines) == 1:
+                        resumelist.append([int(line), False])
+                    else:
+                        resumelist.append([int(line), int(line)])
 	self.resumeList = resumelist
 
     def iterResumeList(self, actions):
