@@ -63,7 +63,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	fc.close()
 
 	fileName = os.path.basename(path)
-	return "%s/%s" % (urlBase, fileName[:-4])
+	return "%s/%s" % (self.urlBase, fileName[:-4])
 
     def getAllTroveLeafs(self, troveNames):
 	d = {}
@@ -98,7 +98,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return self.fromVersion(self.repos.troveStore.troveLatestVersion(pkgName, 
                                                                              self.toBranch(branchStr)))
         except KeyError:
-            return None
+            return 0
 
     def getTroveFlavorsLatestVersion(self, troveName, branch):
 	return [ x for x in self.repos.troveStore.iterTrovePerFlavorLeafs(troveName, branch) ]
