@@ -244,8 +244,8 @@ class File(FileMode):
 	os.unlink(target)
 
     def restore(self, target, restoreContents, skipMtime = 0):
-	self.chmod(target)
 	self.setOwnerGroup(target)
+	self.chmod(target)
 
 	if not skipMtime:
 	    os.utime(target, (self.theMtime, self.theMtime))
