@@ -160,6 +160,8 @@ class FileMode:
 	    return self.infoLine()
 
     def same(self, other):
+	if self.__class__ != other.__class__: return 0
+
 	if (self.thePerms == other.thePerms and
             self.theOwner == other.theOwner and
             self.theGroup == other.theGroup and
@@ -279,6 +281,8 @@ class SymbolicLink(File):
 	return "l %s %s" % (self.theLinkTarget, FileMode.infoLine(self))
 
     def same(self, other):
+	if self.__class__ != other.__class__: return 0
+
 	if self.theLinkTarget == other.theLinkTarget:
 	    # recursing does a permission check, which doens't apply 
 	    # to symlinks under Linux
@@ -376,6 +380,8 @@ class DeviceFile(File):
 				  FileMode.infoLine(self))
 
     def same(self, other):
+	if self.__class__ != other.__class__: return 0
+
 	if (self.infoTag == other.infoTag and self.major == other.major and
             self.minor == other.minor):
 	    return File.same(self, other)
@@ -461,6 +467,8 @@ class RegularFile(File):
 			     FileMode.infoLine(self))
 
     def same(self, other):
+	if self.__class__ != other.__class__: return 0
+
 	if self.thesha1 == other.thesha1:
 	    return File.same(self, other)
 
