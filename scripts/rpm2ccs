@@ -547,7 +547,7 @@ def main(argv):
     if len(argv) < 2:
         return usage()
     rpmname = argv[-1]
-    if rpmname[0] != '/':
+    if '/' not in rpmname:
         rpmname = os.sep.join((os.getcwd(), rpmname))
     try:
         rpmfile = file(rpmname, 'r')
