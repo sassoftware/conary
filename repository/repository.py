@@ -125,7 +125,7 @@ class LocalRepository(Repository):
 		# the file doesn't have any contents, so it must exist
 		# in the data store already; we still need to increment
 		# the reference count for it
-		self.contentsStore.addFileReference(file.sha1)
+		self.contentsStore.addFileReference(file.sha1())
 
 	    return 1
 	
