@@ -18,6 +18,7 @@ from templates import library
                         value="{branch.freeze()}"/>
             </select>
 
+            <input py:if="source" type="hidden" name="source" value="{source}" />
             <input type="submit" />
         </form>
 

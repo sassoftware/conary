@@ -41,35 +41,35 @@ class HttpHandler:
         #       (requires auth, requires write access, requires admin))
         self.commands = {
              # metadata commands
-             "":               (self.mainpage, "Conary Repository",         
+             "":               (self.main, "Conary Repository",
                                (True, True, False)),
-             "metadata":       (self.metadataCmd, "View Metadata",          
+             "metadata":       (self.metadata, "View Metadata",          
                                (True, True, False)),
-             "chooseBranch":   (self.chooseBranchCmd, "View Metadata",
+             "chooseBranch":   (self.chooseBranch, "View Metadata",
                                (True, True, False)),
-             "getMetadata":    (self.getMetadataCmd, "View Metadata",       
+             "getMetadata":    (self.getMetadata, "View Metadata",       
                                (True, True, False)),
-             "updateMetadata": (self.updateMetadataCmd, "Metadata Updated", 
+             "updateMetadata": (self.updateMetadata, "Metadata Updated", 
                                (True, True, False)),
              
              # user administration commands
-             "userlist":       (self.userlistCmd, "User Administration",    
+             "userlist":       (self.userlist, "User Administration",    
                                (True, False, True)),
-             "addPermForm":    (self.addPermFormCmd, "Add Permission",
+             "addPermForm":    (self.addPermForm, "Add Permission",
                                (True, False, True)),
-             "addPerm":        (self.addPermCmd, "Add Permission",
+             "addPerm":        (self.addPerm, "Add Permission",
                                (True, False, True)),
-             "deletePerm":     (self.deletePermCmd, "Delete Permission",
+             "deletePerm":     (self.deletePerm, "Delete Permission",
                                (True, False, True)),
-             "addUserForm":    (self.addUserFormCmd, "Add User",            
+             "addUserForm":    (self.addUserForm, "Add User",            
                                (True, False, True)),
-             "addUser":        (self.addUserCmd, "Add User",                
+             "addUser":        (self.addUser, "Add User",                
                                (True, False, True)),
              
              # change password commands
-             "chPassForm":     (self.chPassFormCmd, "Change Password",
+             "chPassForm":     (self.chPassForm, "Change Password",
                                (True, False, False)),
-             "chPass":         (self.chPassCmd, "Change Password",
+             "chPass":         (self.chPass, "Change Password",
                                (True, False, False)),
         }
 
@@ -117,10 +117,10 @@ class HttpHandler:
         t = kid.load_template(path)
         self.writeFn(t.serialize(encoding="utf-8", pageTitle=self.pageTitle, **values))
 
-    def mainpage(self, authToken, fields):
+    def main(self, authToken, fields):
         self.kid_write("main_page", fields=fields)
 
-    def metadataCmd(self, authToken, fields, troveName=None):
+    def metadata(self, authToken, fields, troveName=None):
         troveList = [x for x in self.repServer.troveStore.iterTroveNames() if x.endswith(':source')]
         troveList.sort()
 
@@ -136,11 +136,13 @@ class HttpHandler:
         self.kid_write("pick_trove", troveList = troveList,
                                      troveName = troveName)
 
-    def chooseBranchCmd(self, authToken, fields):
+    def chooseBranch(self, authToken, fields):
         if fields.has_key('troveName'):
             troveName = fields['troveName'].value
         else:
             troveName = fields['troveNameList'].value
+        
+        source = str(fields.getfirst('source', '')).lower()
         
         versions = self.repServer.getTroveVersionList(authToken,
             netserver.SERVER_VERSIONS[-1], { troveName : None }, "")
@@ -154,9 +156,12 @@ class HttpHandler:
         if len(branches) == 1:
             self._getMetadata(fields, troveName, branches[0].freeze())
         else:
-            self.kid_write("choose_branch", branches = branches, troveName = troveName)
+            self.kid_write("choose_branch",
+                           branches = branches,
+                           troveName = troveName,
+                           source = source)
 
-    def getMetadataCmd(self, authToken, fields):
+    def getMetadata(self, authToken, fields):
         troveName = fields['troveName'].value
 
         branch = fields['branch'].value
@@ -165,7 +170,7 @@ class HttpHandler:
     def _getMetadata(self, fields, troveName, branch):
         branch = self.repServer.thawVersion(branch)
 
-        if "source" in fields and fields["source"].value == "freshmeat":
+        if "source" in fields and fields["source"].value.lower() == "freshmeat":
             if "freshmeatName" in fields:
                 fmName = fields["freshmeatName"].value
             else:
@@ -184,7 +189,7 @@ class HttpHandler:
         self.kid_write("metadata", metadata = md, branch = branch,
                                    troveName = troveName)
 
-    def updateMetadataCmd(self, authToken, fields):
+    def updateMetadata(self, authToken, fields):
         branch = self.repServer.thawVersion(fields["branch"].value)
         troveName = fields["troveName"].value
         
@@ -198,19 +203,19 @@ class HttpHandler:
             "C"
         )
 
-        self.metadataCmd(authToken, fields, troveName)
+        self.metadata(authToken, fields, troveName)
         
-    def userlistCmd(self, authToken, fields):
+    def userlist(self, authToken, fields):
         self.kid_write("user_admin", netAuth = self.repServer.auth)
 
-    def addPermFormCmd(self, authToken, fields):
+    def addPermForm(self, authToken, fields):
         groups = dict(self.repServer.auth.iterGroups())
         labels = dict(self.repServer.auth.iterLabels())
         items = dict(self.repServer.auth.iterItems())
     
         self.kid_write("permission", groups=groups, labels=labels, items=items)
 
-    def addPermCmd(self, authToken, fields):
+    def addPerm(self, authToken, fields):
         groupId = str(fields.getfirst("group", ""))
         labelId = str(fields.getfirst("label", ""))
         itemId = str(fields.getfirst("item", ""))
@@ -225,7 +230,7 @@ class HttpHandler:
                                  link = "User Administration",
                                  url = "userlist")
    
-    def deletePermCmd(self, authToken, fields):
+    def deletePerm(self, authToken, fields):
         groupId = str(fields.getfirst("groupId", ""))
         labelId = fields.getfirst("labelId", None)
         itemId = fields.getfirst("itemId", None)
@@ -235,10 +240,10 @@ class HttpHandler:
                                  link = "User Administration",
                                  url = "userlist")
    
-    def addUserFormCmd(self, authToken, fields):
+    def addUserForm(self, authToken, fields):
         self.kid_write("add_user")
 
-    def addUserCmd(self, authToken, fields):
+    def addUser(self, authToken, fields):
         user = fields["user"].value
         password = fields["password"].value
        
@@ -258,7 +263,7 @@ class HttpHandler:
                                  link = "User Administration",
                                  url = "userlist")
         
-    def chPassFormCmd(self, authToken, fields):
+    def chPassForm(self, authToken, fields):
         if fields.has_key("username"):
             username = fields["username"].value
             askForOld = False
@@ -268,7 +273,7 @@ class HttpHandler:
         
         self.kid_write("change_password", username = username, askForOld = askForOld)
         
-    def chPassCmd(self, authToken, fields):
+    def chPass(self, authToken, fields):
         username = fields["username"].value
         admin = self.repServer.auth.check(authToken, admin=True)
         
@@ -297,5 +302,4 @@ class HttpHandler:
                 returnLink = ("Main Menu", "")
 
             self.kid_write("notice", message = "Password successfully changed",
-                                     link = returnLink[0], url = returnLink[1])
-                                     
+                                     link = returnLink[0], url = returnLink[1])                             
