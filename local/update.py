@@ -923,7 +923,7 @@ def runTagCommands(tagScript, root, cmdList, preScript = False):
 	if root != '/' and uid:
 	    continue
 
-	fullCmd = [ tagInfo.file ] + cmd
+	fullCmd = [ tagInfo.file ] + list(cmd)
 	if tagInfo.datasource == 'args':
 	    fullCmd += args
 
