@@ -19,9 +19,9 @@ sys.excepthook = util.excepthook
 
 cfg = srscfg.SrsConfiguration()
 
-fileDB = cfg.reppath + "/files"
 pkgDB = cfg.reppath + "/pkgs"
-util.mkdirChain(fileDB, pkgDB)
+contentsDB = cfg.reppath + "/contents"
+util.mkdirChain(pkgDB, contentsDB)
 
 def usage():
     print "usage: srs import <file.rpm>"
