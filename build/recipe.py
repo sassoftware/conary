@@ -20,7 +20,9 @@ class RecipeLoader(types.DictionaryType):
         exec code in self.module.__dict__
         for (key, value) in  self.module.__dict__.items():
             if type(value) == types.ClassType:
-                self[key] = value
+                # XXX better test?
+                if 'nameVer' in dir(value):
+                    self[key] = value
 
 class Recipe:
 
