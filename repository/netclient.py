@@ -105,7 +105,12 @@ class ServerCache:
 
 	    if url is None:
 		url = "http://%s/conary/" % serverName
-	    server = ServerProxy(url, transport.Transport())
+            type, uri = urllib.splittype(url)
+            if type == 'http':
+                transporter = transport.Transport(https=False)
+            elif type == 'https':
+                transporter = transport.Transport(https=True)
+            server = ServerProxy(url, transporter)
 	    self.cache[serverName] = server
 
 	    try:

@@ -22,11 +22,17 @@ import zlib
 from StringIO import StringIO
         
 class XMLOpener(urllib.FancyURLopener):
+    def open_https(self, url, data=None):
+        return self.open_http(url, data=data, ssl=True)
     
-    def open_http(self, url, data=None):
+    def open_http(self, url, data=None, ssl=False):
         """override this WHOLE FUNCTION to change
 	   one magic string -- the content type --
-	   which is hardcoded in"""
+	   which is hardcoded in (this version also supports https)"""
+        if ssl:
+            protocol='https'
+        else:
+            protocol='http'
         import httplib
         user_passwd = None
         if isinstance(url, str):
@@ -58,16 +64,20 @@ class XMLOpener(urllib.FancyURLopener):
             auth = base64.encodestring(user_passwd).strip()
         else:
             auth = None
-        h = httplib.HTTP(host)
+        if ssl:
+            h = httplib.HTTPS(host, None, None)
+        else:
+            h = httplib.HTTP(host)
 	# SPX: use the full URL here, not just the selector or name
 	# based virtual hosts don't work
+        fullUrl = '%s:%s' %(protocol, url)
         if data is not None:
-            h.putrequest('POST', "http:" + url)
+            h.putrequest('POST', fullUrl)
             h.putheader('Content-type', 'text/xml')
             h.putheader('Content-length', '%d' % len(data))
             h.putheader('Accept-encoding', 'zlib')
         else:
-            h.putrequest('GET', "http:" + url)
+            h.putrequest('GET', fullUrl)
         if auth: h.putheader('Authorization', 'Basic %s' % auth)
         if realhost: h.putheader('Host', realhost)
         for args in self.addheaders: h.putheader(*args)
@@ -80,7 +90,7 @@ class XMLOpener(urllib.FancyURLopener):
             encoding = headers.get('Content-encoding', None)
             if encoding == 'zlib':
                 fp = StringIO(zlib.decompress(fp.read()))
-            return urllib.addinfourl(fp, headers, "http:" + url)
+            return urllib.addinfourl(fp, headers, fullUrl)
         else:
 	    raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
 
@@ -98,6 +108,14 @@ class Transport(xmlrpclib.Transport):
 
     # override?
     user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by Specifix, Inc.)" % xmlrpclib.__version__
+
+    def __init__(self, https=False):
+        self.https = https
+
+    def _protocol(self):
+        if self.https:
+            return 'https'
+        return 'http'
 
     def request(self, host, handler, request_body, verbose=0):
 	self.verbose = verbose
@@ -118,6 +136,7 @@ class Transport(xmlrpclib.Transport):
 	    for key, value in extra_headers:
 		opener.addheader(key,value)
 	opener.addheader('User-agent', self.user_agent)
-	response = opener.open(''.join(['http://', host, handler]), request_body)
+	response = opener.open(''.join([self._protocol(), '://', host, handler]), request_body)
 	return self.parse_response(response)
 
+    
