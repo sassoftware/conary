@@ -6,6 +6,8 @@ Changes in 0.13.0
   * added checks to validate merged file objects against the fileIds
     in the changeset
   * implemented shadows
+  * framework for redirects in place
+  * removed (unused) parentId field from Branches repository table
 
 Changes in 0.12.5
   * reworked dependency resolution a bit for a big speedup in the server
