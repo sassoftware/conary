@@ -292,8 +292,8 @@ def commit(repos, cfg, message):
     else:
 	branch = state.getVersion().branch()
 
-    newVersion = helper.nextVersion(repos, state.getName(), recipeVersionStr, 
-				    None, branch, binary = False)
+    newVersion = repos.nextVersion(state.getName(), recipeVersionStr, 
+				   None, branch, binary = False)
 
     result = update.buildLocalChanges(repos, 
 		    [(state, srcPkg, newVersion, update.IGNOREUGIDS)] )

@@ -290,9 +290,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
 		    if flavor:
 			grpFlavor.union(flavor)
 
-    targetVersion = helper.nextVersion(repos, fullName, 
-				       recipeClass.version, grpFlavor, 
-				       buildBranch, binary = True)
+    targetVersion = repos.nextVersion(fullName, recipeClass.version, grpFlavor, 
+				      buildBranch, binary = True)
 
     if targetLabel:
 	targetVersion = targetVersion.fork(targetLabel)
@@ -353,9 +352,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 	# source of an update, but it saves sending files across the
 	# network for no reason
 
-    targetVersion = helper.nextVersion(repos, fullName, 
-				       recipeClass.version, flavor, 
-				       buildBranch, binary = True)
+    targetVersion = repos.nextVersion(fullName, recipeClass.version, flavor, 
+				      buildBranch, binary = True)
 
     if targetLabel:
 	targetVersion = targetVersion.fork(targetLabel)
@@ -492,8 +490,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     for buildPkg in bldList:
 	flavor.union(buildPkg.flavor)
 
-    targetVersion = helper.nextVersion(repos, grpName, recipeClass.version, 
-				       flavor, buildBranch, binary = True)
+    targetVersion = repos.nextVersion(grpName, recipeClass.version, 
+				      flavor, buildBranch, binary = True)
 
     if targetLabel:
 	targetVersion = targetVersion.fork(targetLabel)
