@@ -20,7 +20,18 @@ _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_INITSCRIPT = 1 << 1
 _FILE_FLAG_SHLIB = 1 << 2
 
+_INFO_STREAM	    = 0
+_SHORT_STREAM	    = 1
+_INT_STREAM	    = 2
+_LONGLONG_STREAM    = 3
+_STRING_STREAM	    = 4
+_STREAM_DEVICE	    = 5
+_STREAM_SIZESHA1    = 6
+_STREAM_INODE	    = 7
+
 class InfoStream:
+
+    streamId = _INFO_STREAM
 
     def freeze(self):
 	raise NotImplementedError
@@ -76,13 +87,19 @@ class NumericStream(InfoStream):
 
 class ShortStream(NumericStream):
 
+    streamId = _SHORT_STREAM
+
     format = "!H"
 
 class IntStream(NumericStream):
 
+    streamId = _INT_STREAM
+
     format = "!I"
 
 class LongLongStream(NumericStream):
+
+    streamId = _LONGLONG_STREAM
 
     format = "!Q"
 
@@ -90,6 +107,8 @@ class StringStream(InfoStream):
     """
     Stores a simple string; used for the target of symbolic links
     """
+
+    streamId = _STRING_STREAM
 
     def value(self):
 	return self.s
@@ -188,6 +207,7 @@ class TupleStream(InfoStream):
 	idx = 0
 	for (i, (name, itemType, size)) in enumerate(self.makeup):
 	    if type(size) == int:
+		print "created", name
 		self.items.append(itemType(s[idx:idx + size]))
 	    elif (i + 1) == len(self.makeup):
 		self.items.append(itemType(s[idx:]))
@@ -221,10 +241,13 @@ class TupleStream(InfoStream):
 class DeviceStream(TupleStream):
 
     makeup = (("major", IntStream, 4), ("minor", IntStream, 4))
+    streamId = _STREAM_DEVICE
 
-class SizeSha1Stream(TupleStream):
+class RegularFileStream(TupleStream):
 
-    makeup = (("size", LongLongStream, 8), ("sha1", StringStream, 20))
+    makeup = (("size", LongLongStream, 8), ("flags", ShortStream, 2),
+              ("sha1", StringStream, 20))
+    streamId = _STREAM_SIZESHA1
 
 class InodeStream(TupleStream):
 
@@ -235,6 +258,7 @@ class InodeStream(TupleStream):
     # this is permissions, mtime, owner, group
     makeup = (("perms", ShortStream, 2), ("mtime", IntStream, 4), 
               ("owner", StringStream, "B"), ("group", StringStream, "B"))
+    streamId = _STREAM_INODE
 
     def triplet(self, code, setbit = 0):
 	l = [ "-", "-", "-" ]
@@ -334,6 +358,7 @@ class FileMode:
     def perms(self, new = None):
 	if (new != None and new != "-"):
 	    self.thePerms = new
+	self.update()
 
 	return self.thePerms
 
@@ -348,12 +373,14 @@ class FileMode:
     def owner(self, new = None):
 	if (new != None and new != "-"):
 	    self.theOwner = new
+	self.update()
 
 	return self.theOwner
 
     def group(self, new = None):
 	if (new != None and new != "-"):
 	    self.theGroup = new
+	self.update()
 
 	return self.theGroup
 
@@ -372,8 +399,13 @@ class FileMode:
 		self.theMtime = new
 	    else:
 		self.theMtime = int(new)
+	self.update()
 
 	return self.theMtime
+
+    def update(self):
+	self.inode = InodeStream(self.thePerms, self.theMtime, self.theOwner, 
+			         self.theGroup)
 
     def flags(self, new = None):
 	if (new != None and new != "-"):
@@ -475,6 +507,7 @@ class File(FileMode):
 
     lsTag = None
     hasContents = 0
+    streamList = ( ("inode", InodeStream), )
 
     def modeString(self):
 	l = self.triplet(self.thePerms >> 6, self.thePerms & 04000)
@@ -547,19 +580,46 @@ class File(FileMode):
 	assert(tag == self.infoTag)
 	self._applyChangeLine(line)
 
-    def __init__(self, fileId, info = None, infoTag = None):
-        assert(self.__class__ is not File)
+    def initializeStreams(self, data):
+	if not data: return
+
+	self.streams = {}
+	# skip over the file type for now
+	i = 1
+	for (name, streamType) in self.streamList:
+	    (streamId, size) = struct.unpack("!BH", data[i:i+3])
+	    print name, streamId, size, streamType
+	    assert(streamId == streamType.streamId)
+	    i += 3
+	    self.streams[name] = streamType(data[i:i + size])
+	    self.__dict__[name] = self.streams[name]
+	    i += size
+
+	#assert(i == len(data))
+
+    def freeze(self):
+	rc = [ self.lsTag ]
+	for (name, streamType) in self.streamList:
+	    s = self.__dict__[name].freeze()
+	    rc.append(struct.pack("!BH", streamType.streamId, len(s)) + s)
+	return "".join(rc)
+
+    def __init__(self, fileId, info = None, infoTag = None, streamData = None):
+        #assert(self.__class__ is not File)
 	self.theId = fileId
 	self.infoTag = infoTag
 	FileMode.__init__(self, info)
+	self.initializeStreams(streamData)
 
 class SymbolicLink(File):
 
     lsTag = "l"
+    streamList = File.streamList + (("target", StringStream ),)
 
     def linkTarget(self, newLinkTarget = None):
 	if (newLinkTarget and newLinkTarget != "-"):
 	    self.theLinkTarget = newLinkTarget
+	    self.target = StringStream(newLinkTarget)
 
 	return self.theLinkTarget
 
@@ -662,6 +722,8 @@ class Directory(File):
 
 class DeviceFile(File):
 
+    streamList = File.streamList + (("devt", DeviceStream ),)
+
     def sizeString(self):
 	return "%3d, %3d" % (self.major, self.minor)
 
@@ -698,6 +760,8 @@ class DeviceFile(File):
 	    self.major = major
 	if minor is not None:
 	    self.minor = minor
+
+	self.devt = DeviceStream(major, minor)
 	
 	return (self.infoTag, self.major, self.minor)
 
@@ -741,12 +805,16 @@ class CharacterDevice(DeviceFile):
 
 class RegularFile(File):
 
+    streamList = File.streamList + (('contents', RegularFileStream ),)
+
     lsTag = "-"
     hasContents = 1
 
     def sha1(self, sha1 = None):
 	if sha1 and sha1 != "-":
 	    self.thesha1 = sha1
+	self.contents = RegularFileStream(self.theSize, self.theFlags,
+					  self.thesha1)
 
 	return self.thesha1
 
@@ -882,6 +950,9 @@ def FileFromInfoLine(infoLine, fileId):
 	return Socket(fileId, infoLine)
     else:
 	raise FilesError("bad infoLine %s" % infoLine)
+
+def ThawFile(frz, fileId):
+    return File(fileId, streamData = frz)
 
 class FilesError(Exception):
     def __init__(self, msg):
