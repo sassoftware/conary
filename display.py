@@ -130,7 +130,7 @@ def printFile(fileObj, path, prefix='', verbose=True, tags=False, sha1s=False,
             sha1 = ' '*41
 
     if pathIds and pathId:
-        id = md5ToString(pathId) + ' '
+        id = md5ToString(pathId) + ' ' + sha1ToString(fileObj.fileId()) + ', '
     if verbose: 
         print "%s%s%s%s    1 %-8s %-8s %s %s %s%s" % \
           (prefix, id, sha1, fileObj.modeString(), fileObj.inode.owner(), fileObj.inode.group(), 

@@ -162,7 +162,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                             sortByPath = True, withFiles = True)
                 for (pathId, path, fileId, version, fObj) in iter:
                     display.printFile(fObj, path, verbose=ls, tags=tags, 
-                                    sha1s=sha1s, pathId=pathId, pathIds=ids)
+                                      sha1s=sha1s, pathId=pathId, pathIds=ids)
 	elif info:
 	    buildTime = time.strftime("%c",
 				time.localtime(version.timeStamps()[-1]))
