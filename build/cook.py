@@ -199,7 +199,7 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     for (name, versionList) in recipeObj.getTroveList().iteritems():
 	d[name] = versionList
 
-    d = repos.getTroveFlavorsVersion(d)
+    d = repos.getTroveVersionFlavors(d)
 
     for (name, subd) in d.iteritems():
 	for (v, flavorList) in subd.iteritems():
