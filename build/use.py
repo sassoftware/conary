@@ -223,6 +223,7 @@ Use.ssl = False
 Use.slang = False
 Use.netpbm = False
 Use.nptl = False
+Use.ipv6 = True
 Use._freeze()
 _addDocs(Use)
 
