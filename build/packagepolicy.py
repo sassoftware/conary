@@ -120,7 +120,7 @@ class CheckSonames(policy.Policy):
 		else:
 		    target = m.contents['soname']
 		log.warning(
-		    %s is not a symlink but probably should be a link to %s',
+		    '%s is not a symlink but probably should be a link to %s',
 		    path, target)
 	    return
 
@@ -193,7 +193,8 @@ class ComponentSpec(_filterSpec):
 		       '%(includedir)s/',
 		       '%(mandir)s/man(2|3)/',
 		       '%(datadir)s/aclocal/',
-		       '%(libdir)s/pkgconfig/')),
+		       '%(libdir)s/pkgconfig/',
+		       '%(bindir)s/..*-config')),
 	('lib',       ('.*/lib/.*\.so.*')),
 	# note that gtk-doc is not well-named; it is a shared system, like info,
 	# and is used by unassociated tools (devhelp)
