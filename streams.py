@@ -270,56 +270,38 @@ class DependenciesStream(InfoStream):
         self.deps = None
         self.thaw(dep)
 
-class StringsStream(InfoStream):
+class StringsStream(list, InfoStream):
     """
     Stores list of arbitrary strings
     """
 
-    __slots__ = 'l'
-
-    def value(self):
-	return self.l
-
     def set(self, val):
-        assert(type(val) is str)
-	if val not in self.l:
-	    self.l.append(val)
-	    self.l.sort()
-    
-    def __contains__(self, val):
-	return val in self.l
-
-    def __delitem__(self, val):
-	if val in self.l:
-	    self.l.remove(val)
-
-    def __iter__(self):
-	return self.l.__iter__()
+	assert(type(val) is str)
+	if val not in self:
+	    self.append(val)
+	    self.sort()
 
     def freeze(self):
-        if self.l is None:
+        if not self:
             return ''
-        return '\0'.join(self.l)
+        return '\0'.join(self)
 
     def diff(self, them):
-	if self.l != them.l:
+	if self != them:
 	    return self.freeze()
 	return ''
 
     def thaw(self, frz):
-	if len(frz) == 0:
-	    self.l = []
-	else:
-	    self.l = frz.split('\0')
+	del self[:]
+
+	if len(frz) != 0:
+	    self += frz.split('\0')
         
     def twm(self, diff, base):
 	if not diff:
 	    return False
         self.thaw(diff)
         return False
-
-    def __eq__(self, other):
-	return other.__class__ == self.__class__ and self.l == other.l
 
     def __init__(self, frz = ''):
 	self.thaw(frz)
