@@ -203,13 +203,15 @@ class RecipeLoader:
             pass
 
 def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
-                                    versionStr = None):
+                                    versionStr=None, label=None):
     if not component.endswith(':source'):
         component += ":source"
     name = filename[:-len('.recipe')]
+    if not label:
+	label = cfg.buildLabel
 
     try:
-	pkgs = repos.findTrove(cfg.buildLabel, component, None, versionStr)
+	pkgs = repos.findTrove(label, component, None, versionStr)
 	if len(pkgs) > 1:
 	    raise RecipeFileError("source component %s has multiple versions "
 				  "with label %s", component,
@@ -248,7 +250,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     recipe._trove = sourceComponent.copy()
     return (loader, sourceComponent.getVersion())
 
-def loadRecipe(file, sourcecomponent=None):
+def loadRecipe(file, sourcecomponent=None, label=None):
     callerGlobals = inspect.stack()[1][0].f_globals
     cfg = callerGlobals['cfg']
     repos = callerGlobals['repos']
@@ -266,7 +268,7 @@ def loadRecipe(file, sourcecomponent=None):
     except IOError, err:
         if err.errno == errno.ENOENT:
             loader = recipeLoaderFromSourceComponent(sourcecomponent, file, 
-						     cfg, repos)[0]
+						     cfg, repos, label=label)[0]
 
     for name, recipe in loader.allRecipes().items():
         # hide all recipes from RecipeLoader - we don't want to return
