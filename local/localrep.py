@@ -37,20 +37,16 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
     def removals(self):
 	for pkg in self.oldPackageList():
 	    self.repos.erasePackageVersion(pkg.getName(), pkg.getVersion())
-	    self.undoObj.removedPackage(pkg)
 
 	for (fileId, fileVersion, fileObj) in self.oldFileList():
 	    self.repos.eraseFileVersion(fileId, fileVersion)
-	    self.undoObj.removedFile(fileId, fileVersion, fileObj)
 
-	self.undoObj.reset()
 	for (fileId, fileVersion, fileObj) in self.oldFileList():
 	    if fileObj.hasContents and fileObj.flags.isConfig():
 		self.repos.removeFileContents(fileObj.contents.sha1())
 
     # remove the specified file 
     def removeFile(self, fileId, version):
-	# we need this object in case of an undo
 	fileObj = self.repos.getFileVersion(fileId, version)
 	self.oldFile(fileId, version, fileObj)
 

@@ -350,15 +350,6 @@ class FilesystemRepository(AbstractRepository):
 	job = self.buildJob(cs)
 	job.commit()
 	self.commit()
-	return
-
-	try:
-	    job.commit()
-	except:
-	    job.undo()
-	    raise
-
-	self.commit()
 
     def close(self):
 	if self.troveStore is not None:
@@ -478,10 +469,6 @@ class ChangeSetJob:
     def newFileList(self):
 	return self.files.values()
 
-    # the undo object is kept up-to-date with what needs to be done to undo
-    # the work completed so far; the caller can use a try/except block to
-    # cause an undo to happen if an error occurs the change set is needed to
-    # access the file contents; it's not used for anything else
     def commit(self):
 	# commit changes
 	filesToArchive = []
@@ -496,7 +483,6 @@ class ChangeSetJob:
 
 	    if not self.repos.hasFileVersion(fileId, newFile.version()):
 		self.repos.addFileVersion(fileId, newFile.version(), file)
-		self.undoObj.addedFile(newFile)
 
 		path = newFile.path()
 
@@ -504,25 +490,19 @@ class ChangeSetJob:
 	    # files into the repository. Restore the file pointer to
 	    # the beginning of the file as we may want to commit this
 	    # file to multiple locations.
-	    if self.repos.storeFileFromContents(newFile.getContents(), file, 
-						 newFile.restoreContents()):
-		self.undoObj.addedFileContents(file.contents.sha1())
+	    self.repos.storeFileFromContents(newFile.getContents(), file, 
+					     newFile.restoreContents())
 
 	for newPkg in self.newPackageList():
 	    self.repos.addPackage(newPkg)
-	    self.undoObj.addedPackage(newPkg)
 
 	# This doesn't actually remove anything! we never allow bits
 	# to get erased from repositories. The database, which is a child
 	# of this object, does allow removals.
 	
-    def undo(self):
-	self.undoObj.undo()
-
     def __init__(self, repos, cs):
 	self.repos = repos
 	self.cs = cs
-	self.undoObj = ChangeSetUndo(repos)
 
 	self.packages = []
 	self.files = {}
@@ -615,56 +595,3 @@ class ChangeSetJob:
 		
 		if not self.containsFilePath(path):
 		    self.addStaleFile(path, file)
-	#import sys
-	#sys.exit(0)
-
-class ChangeSetUndo:
-
-    def undo(self):
-	# something went wrong; try to unwind our commits. the order
-	# on this matters greatly!
-	for pkg in self.removedPackages:
-	    self.repos.addPackage(pkg)
-
-	for (fileId, fileVersion, fileObj) in self.removedFiles:
-	    self.repos.addFileVersion(fileId, fileVersion, fileObj)
-
-	for newFile in self.filesDone:
-	    self.repos.eraseFileVersion(newFile.fileId(), newFile.version())
-
-	for pkg in self.pkgsDone:
-	    self.repos.erasePackageVersion(pkg.getName(), pkg.getVersion())
-
-	for sha1 in self.filesStored:
-	    self.repos.removeFileContents(sha1)
-
-	self.reset()
-
-    def addedPackage(self, pkg):
-	self.pkgsDone.append(pkg)
-
-    def addedFile(self, file):
-	self.filesDone.append(file)
-
-    def addedFileContents(self, sha1):
-	self.filesStored.append(sha1)
-
-    def removedPackage(self, pkg):
-	self.removedPackages.append(pkg)
-
-    def removedFile(self, fileId, fileVersion, fileObj):
-	self.removedFiles.append((fileId, fileVersion, fileObj))
-
-    def reset(self):
-	self.filesDone = []
-	self.pkgsDone = []
-	self.filesStored = []
-	self.removedPackages = []
-	self.removedFiles = []
-	self.groupsDone = []
-
-    def __init__(self, repos):
-	self.reset()
-	self.repos = repos
-
-

@@ -242,24 +242,17 @@ class AbstractDatabase(repository.AbstractRepository):
 
 	# -------- database and system are updated below this line ---------
 
-	try:
-	    # add new packages
-	    if toStash: job.commit()
+	# add new packages
+	if toStash: job.commit()
 
-	    # remove old packages
-	    errList = fsJob.getErrorList()
-	    if errList:
-		for err in errList: log.error(err)
-		# FIXME need a --force for this
-		job.undo()
-		return
+	# remove old packages
+	errList = fsJob.getErrorList()
+	if errList:
+	    for err in errList: log.error(err)
+	    # FIXME need a --force for this
+	    return
 
-	    if toStash: job.removals()
-	except:
-	    # this won't work it things got too far, but it won't hurt
-	    # anything either
-	    if toStash: job.undo()
-	    raise
+	if toStash: job.removals()
 
 	# everything is in the database... save this so we can undo
 	# it later. 
