@@ -648,6 +648,9 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
         import checkin
         state = checkin.SourceStateFromFile('CONARY')
         if state.name == srcName and state.version != versions.NewVersion():
+            if state.version.trailingRevision().version != versionStr:
+                return state.version.branch().createVersion(
+                            versions.Revision('%s-1' % (versionStr)))
             return state.version
     # make an attempt at a reasonable version # for this trove
     # although the recipe we are cooking from may not be in any
