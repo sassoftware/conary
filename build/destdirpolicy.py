@@ -52,12 +52,14 @@ class Strip(policy.Policy):
     XXX system policy on whether to create debuginfo packages
     """
     invariantinclusions = [
-	'%(bindir)s/.*',
-	'%(essentialbindir)s/.*',
-	'%(sbindir)s/.*',
-	'%(essentialsbindir)s/.*',
-	'%(libdir)s/.*',
-	'%(essentiallibdir)s/.*',
+        # XXX temporary - remove ^ when Filter objects are used, since
+        # they will altomatically left anchor by the leading /
+	'^%(bindir)s/.*',
+	'^%(essentialbindir)s/.*',
+	'^%(sbindir)s/.*',
+	'^%(essentialsbindir)s/.*',
+	'^%(libdir)s/.*',
+	'^%(essentiallibdir)s/.*',
     ]
     def doFile(self, path):
 	if not os.path.islink(path):
