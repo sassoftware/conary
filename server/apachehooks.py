@@ -198,8 +198,7 @@ def traceback(wfile):
     htmlengine.stackTrace(wfile)
 
 def handler(req):
-    repName = os.path.basename(req.filename)
-
+    repName = req.filename
     if not repositories.has_key(repName):
         cfg = ServerConfig()
         cfg.read(req.filename)
@@ -221,7 +220,7 @@ def handler(req):
 
 	# and throw away any subdir portion
 	rest = req.uri[:-len(req.path_info)] + '/'
-
+        
 	urlBase = "http://%s:%d" % (req.server.server_hostname, port) + rest
 
         if not cfg.repositoryDir:
