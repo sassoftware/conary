@@ -666,26 +666,26 @@ class TroveStore:
 					       fileId BINARY)
 	""", start_transaction = False)
 
-	verCache = {}
-	lookup = range(len(l) + 1)
-        for tup in l:
-            (pathId, fileId) = tup[:2]
-	    cu.execute("INSERT INTO getFilesTbl VALUES(NULL, ?)",
-		       fileId, start_transaction = False)
-	    lookup[cu.lastrowid] = (pathId, fileId)
+        try:
+            verCache = {}
+            lookup = range(len(l) + 1)
+            for tup in l:
+                (pathId, fileId) = tup[:2]
+                cu.execute("INSERT INTO getFilesTbl VALUES(NULL, ?)",
+                           fileId, start_transaction = False)
+                lookup[cu.lastrowid] = (pathId, fileId)
 
-	cu.execute("""
-	    SELECT rowId, stream FROM getFilesTbl INNER JOIN FileStreams ON
-		    getFilesTbl.fileId = FileStreams.fileId 
-	""")
+            cu.execute("""
+                SELECT rowId, stream FROM getFilesTbl INNER JOIN FileStreams ON
+                        getFilesTbl.fileId = FileStreams.fileId 
+            """)
 
-	d = {}
-	for rowId, stream in cu:
-	    pathId, fileId = lookup[rowId]
-	    d[(pathId, fileId)] = files.ThawFile(stream, pathId)
-
-	cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
-
+            d = {}
+            for rowId, stream in cu:
+                pathId, fileId = lookup[rowId]
+                d[(pathId, fileId)] = files.ThawFile(stream, pathId)
+        finally:
+            cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
 	return d
 
     def resolveRequirements(self, label, depSetList):
