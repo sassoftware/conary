@@ -782,8 +782,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return result
 
-    def nextVersion(self, troveName, versionStr, troveFlavor, currentBranch,
-                    binary = True, sourceName = None, alwaysBumpCount=False):
+    def nextVersion(self, troveName, versionStr, troveFlavors, currentBranch,
+                    binary = True, sourceVersion = None, alwaysBumpCount=False):
         """
         Calculates the version to use for a newly built trove which is about
         to be added to the repository.
@@ -807,31 +807,22 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         @type alwaysBumpCount: bool
         """
 
-        if binary:
-            if sourceName is None:
-                sourceName = troveName + ':source'
-            # get the current source component (if any)
-            try:
-                sourceVersion = self.getTroveLatestVersion(sourceName, 
-                                        currentBranch.getSourceBranch())
-            except repository.TroveMissing:
-                sourceVersion = None
-        else:
-            sourceVersion = None
-            
         currentVersions = self.getTroveFlavorsLatestVersion(troveName, 
                                                              currentBranch)
 
-        if not troveFlavor:
-            troveFlavor = None
+        if not troveFlavors:
+            troveFlavors = (None,)
+        elif not isinstance(troveFlavors, (list, tuple)):
+            troveFlavors = (troveFlavors,)
         # find the latest version of this trove and the latest version of
         # this flavor of this trove
         latestForFlavor = None
         latest = None
         # this works because currentVersions is sorted earliest to latest
         for (version, flavor) in currentVersions:
-            if flavor == troveFlavor:
-                latestForFlavor = version
+            if flavor in troveFlavors:
+                if not latestForFlavor or flavor.isAfter(latestForFlavor):
+                    latestForFlavor = version
             latest = version
 
         # if we have a sourceVersion, and its release is newer than the latest

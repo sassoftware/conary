@@ -121,6 +121,7 @@ class _IdGen:
 
 def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None, 
 	       prep=True, macros={}, buildBranch = None, targetLabel = None, 
+               sourceVersion = None, 
 	       resume = None, alwaysBumpCount = False):
     """
     Turns a recipe object into a change set, and sometimes commits the
@@ -227,15 +228,18 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 	ret = cookPackageObject(repos, cfg, recipeClass, buildBranch,
                                 prep = prep, macros = macros,
 				targetLabel = targetLabel,
+                                sourceVersion = sourceVersion,
 				resume = resume, 
                                 alwaysBumpCount = alwaysBumpCount)
     elif issubclass(recipeClass, recipe.GroupRecipe):
 	ret = cookGroupObject(repos, cfg, recipeClass, buildBranch, 
 			      macros = macros, targetLabel = targetLabel,
+                              sourceVersion = sourceVersion,
                               alwaysBumpCount = alwaysBumpCount)
     elif issubclass(recipeClass, recipe.FilesetRecipe):
 	ret = cookFilesetObject(repos, cfg, recipeClass, buildBranch, 
 				macros = macros, targetLabel = targetLabel,
+                                sourceVersion = sourceVersion,
                                 alwaysBumpCount = alwaysBumpCount)
     else:
         raise AssertionError
@@ -257,7 +261,8 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     return built
 
 def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
-		    targetLabel = None, alwaysBumpCount=False):
+		    targetLabel = None, sourceVersion=None,
+                    alwaysBumpCount=False):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -307,6 +312,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
 
     targetVersion = repos.nextVersion(fullName, recipeClass.version, grpFlavor, 
 				      buildBranch, binary = True, 
+                                      sourceVersion=sourceVersion,
                                       alwaysBumpCount=alwaysBumpCount)
 
     if targetLabel:
@@ -323,7 +329,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     return (changeSet, built, None)
 
 def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
-		      targetLabel = None, alwaysBumpCount=False):
+		      targetLabel = None, sourceVersion=None,
+                      alwaysBumpCount=False):
     """
     Turns a fileset recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -375,6 +382,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 
     targetVersion = repos.nextVersion(fullName, recipeClass.version, flavor, 
 				      buildBranch, binary = True, 
+                                      sourceVersion=sourceVersion,
                                       alwaysBumpCount=False)
 
     if targetLabel:
@@ -392,8 +400,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
     return (changeSet, built, None)
 
 def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True, 
-		      macros={}, targetLabel = None, resume = None,
-                      alwaysBumpCount=False):
+		      macros={}, targetLabel = None, sourceVersion=None,
+                      resume = None, alwaysBumpCount=False):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -487,8 +495,6 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     
     grpName = recipeClass.name
 
-    flavor = deps.deps.DependencySet()
-
     bldList = recipeObj.getPackages()
     if not bldList:
 	# no components in packages
@@ -496,11 +502,21 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 		    %recipeClass.name)
 	return
 
+    flavorMap = {}
     for buildPkg in bldList:
-	flavor.union(buildPkg.flavor)
+        compName = buildPkg.getName()
+        main, comp = compName.split(':')
+        if main not in flavorMap:
+            flavorMap[main] = deps.deps.DependencySet()
+        flavorMap[main].union(buildPkg.flavor)
+    for pkg, flavor in flavorMap.iteritems():
+        if not flavor:
+            flavorMap[pkg] = None
 
     targetVersion = repos.nextVersion(grpName, recipeClass.version, 
-				      flavor, buildBranch, binary = True,
+				      flavorMap.values(), buildBranch, 
+                                      binary = True, 
+                                      sourceVersion=sourceVersion, 
                                       alwaysBumpCount=alwaysBumpCount)
 
     if targetLabel:
@@ -519,7 +535,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
         compName = buildPkg.getName()
         main, comp = compName.split(':')
         if main not in grpMap:
-            grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
+            grpMap[main] = trove.Trove(main, targetVersion, flavorMap[main], 
+                                                                        None)
 
         searchBranch = buildBranch
         versionList = []
@@ -562,7 +579,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 
     changeSet = changeset.CreateFromFilesystem(packageList)
     for packageName in grpMap:
-        changeSet.addPrimaryPackage(packageName, targetVersion, grp.getFlavor())
+        changeSet.addPrimaryPackage(packageName, targetVersion, 
+                                                        flavorMap[packageName])
 
     for grp in grpMap.values():
         grpDiff = grp.diff(None, absolute = 1)[0]
@@ -610,6 +628,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 
 	try:
 	    loader = recipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
+            version = None
 	except recipe.RecipeFileError, msg:
 	    raise CookError(str(msg))
 
@@ -619,6 +638,13 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 	srcName = recipeClass.name + ":source"
 	versionDict = repos.getTroveLeavesByLabel([srcName], cfg.buildLabel)
 	versionList = versionDict[srcName]
+        sourceVersion = None
+        if versionList:
+            maxVersion = versionList[0]
+            for version in versionList[1:]:
+                if version.isAfter(maxVersion):
+                    maxVersion = version
+            sourceVersion = maxVersion
 	targetLabel = versions.CookBranch()
     else:
 	if resume:
@@ -630,9 +656,9 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
             label = None
 
         try:
-            (loader, version) = recipe.recipeLoaderFromSourceComponent(item,
-					    item + '.recipe', cfg, repos,
-                                            label = label)[0:2]
+            (loader, sourceVersion) = recipe.recipeLoaderFromSourceComponent(
+                                        item, item + '.recipe', cfg, repos,
+                                        label = label)[0:2]
         except recipe.RecipeFileError, msg:
             raise CookError(str(msg))
 
@@ -650,6 +676,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
                             prep = prep, macros = macros,
 			    buildBranch = buildBranch, 
 			    targetLabel = targetLabel,
+                            sourceVersion = sourceVersion,
 			    resume = resume)
         if troves:
             built = (tuple(troves), changeSetFile)
