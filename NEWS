@@ -1,5 +1,8 @@
 Changes in 0.11.8
   * work around a python bug w/ fdopen() resetting file permissions
+  * r.Replace() as an alternative to r.Run("sed -i '...' file")
+  * Policy enforcing UTF-8 filenames
+  * r.macros.tagdatadir as a standard place to put data just for taghandlers
 
 Changes in 0.11.7
   * changed server.py to take extra config files via --config-file instead
