@@ -26,9 +26,11 @@ def usage():
     print "       srs update  <pkg> <version>"
     print "       srs cook    <first.recipe> <second.recipe> ..."
     print ""
-    print "common flags: --branch <defaultbranch>"
-    print '              --config "<item> <value>"'
-    print "              --root <root>"
+    print "common flags:  --branch <defaultbranch>"
+    print '               --config "<item> <value>"'
+    print "               --root <root>"
+    print ""
+    print "pkglist flags: --all"
     sys.exit(0)
 
 otherArgs = [ sys.argv[0] ]
@@ -43,6 +45,7 @@ cfgMap["branch"] = "defaultBranch"
 cfgMap["root"] = "root"
 
 argDef["config"] = 2
+argDef["all"] = 0
 
 for arg in cfgMap.keys():
     argDef[arg] = 1
@@ -91,6 +94,7 @@ if (len(otherArgs) < 2):
 elif (otherArgs[1] == "import"):
     print "this is broken"
 elif (otherArgs[1] == "cook"):
+    if argSet: usage
     for file in otherArgs[2:]:
         if file[0] != '/':
             file = "%s/%s" % (os.getcwd(), file)
@@ -103,18 +107,24 @@ elif (otherArgs[1] == "cook"):
             (id, status) = os.waitpid(pid, 0);
                 
 elif (otherArgs[1] == "pkglist"):
+    all = argSet.has_key('all')
+    if all: del argSet['all']
+    if argSet: usage
+
     if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	args = [repos, cfg] + otherArgs[2:]
+	args = [repos, cfg, all] + otherArgs[2:]
 	apply(display.displayPkgs, args)
     else:
 	usage()
 elif (otherArgs[1] == "update"):
+    if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	args = [repos, cfg] + otherArgs[2:]
 	apply(update.update, args)
     else:
 	usage()
 elif (otherArgs[1] == "config"):
+    if argSet: usage
     if (len(otherArgs) > 2):
 	usage()
     else:

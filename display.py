@@ -8,7 +8,7 @@ import versions
 _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
 
-def displayPkgs(repos, cfg, pkg = "", versionStr = None):
+def displayPkgs(repos, cfg, all = 0, pkg = "", versionStr = None):
     if pkg and pkg[0] != "/":
 	pkg = cfg.packagenamespace + "/" + pkg
 
@@ -17,12 +17,17 @@ def displayPkgs(repos, cfg, pkg = "", versionStr = None):
 	if versionStr:
             displayPkgInfo(repos, cfg, pkgName, versionStr)
             continue
-        l = pkgSet.versionList()
-        versions.versionSort(l)
-        for version in l:
-            print _pkgFormat % (
-                package.stripNamespace(cfg.packagenamespace, pkgName),
-                version.asString(cfg.defaultbranch))
+	else:
+	    if all:
+		l = pkgSet.versionList()
+		versions.versionSort(l)
+	    else:
+		l = ( pkgSet.getLatestVersion(cfg.defaultbranch), )
+	    
+	    for version in l:
+		print _pkgFormat % (
+		    package.stripNamespace(cfg.packagenamespace, pkgName),
+		    version.asString(cfg.defaultbranch))
 
 def displayPkgInfo(repos, cfg, pkgName, versionStr):
     if pkgName[0] != "/":
