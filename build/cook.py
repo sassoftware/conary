@@ -165,6 +165,9 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     use.overrideFlags(cfg, recipeClass.name)
     if not (hasattr(recipeClass, 'name') and hasattr(recipeClass, 'version')):
         raise CookError('recipe class must have name and version defined')
+    if '-' in recipeClass.version:
+        raise recipe.RecipeFileError(
+            "Version string %s has illegal '-' character" %recipeClass.version)
 
     log.info("Building %s", recipeClass.name)
     fullName = recipeClass.name

@@ -194,6 +194,10 @@ class RecipeLoader:
                         'Error in recipe file "%s": multiple recipe classes '
                         'with both name and version exist' %basename)
                 self.recipe = obj
+                if '-' in obj.version:
+                    raise RecipeFileError(
+                        "Version string %s has illegal '-' character"
+                        %obj.version)
                 found = True
 
     def allRecipes(self):
