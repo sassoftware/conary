@@ -640,9 +640,9 @@ class File(object):
 	    return struct.pack("!BH", 0, len(d)) + d
 
 	rc = [ "\x01", self.lsTag ]
-	for streamType, name in self.streamDict.itervalues():
+	for streamId, (streamType, name) in self.streamDict.iteritems():
 	    d = self.__getattribute__(name).diff(other.__getattribute__(name))
-	    rc.append(struct.pack("!H", len(d)) + d)
+	    rc.append(struct.pack("!BH", streamId, len(d)) + d)
 
 	return "".join(rc)
 
@@ -656,9 +656,12 @@ class File(object):
 	i = 2
 	conflicts = False
 	
-	for streamType, name in self.streamDict.itervalues():
-	    size = struct.unpack("!H", diff[i:i+2])[0]
-	    i += 2
+	while i < len(diff):
+	    streamId, size = struct.unpack("!BH", diff[i:i+3])
+
+	    streamType, name = self.streamDict[streamId]
+
+	    i += 3
 	    if name != skip:
 		w = self.__getattribute__(name).twm(diff[i:i+size], 
 					       base.__getattribute__(name))
@@ -957,14 +960,18 @@ def contentsChanged(diff):
     if type != "-": return False
     i = 2
 
-    for streamType, name in RegularFile.streamDict.itervalues():
-	size = struct.unpack("!H", diff[i:i+2])[0]
-	i += 2
+    while i < len(diff):
+	streamId, size = struct.unpack("!BH", diff[i:i+3])
+	i += 3
+
+	name = RegularFile.streamDict[streamId][1]
 	
 	if name == "contents":
 	    return size != 0
 
 	i += size
+
+    assert(i == len(diff))
 
     return False
 
@@ -994,10 +1001,12 @@ def fieldsChanged(diff):
 
     rc = []
 
-    for streamType, name in cl.streamDict.itervalues():
-	size = struct.unpack("!H", diff[i:i+2])[0]
-	i += 2
+    while i < len(diff):
+	streamId, size = struct.unpack("!BH", diff[i:i+3])
+	i += 3
 	if not size: continue
+
+	name = cl.streamDict[streamId][1]
 	
 	if name == "inode":
 	    l = tupleChanged(InodeStream, diff[i:i+size])
@@ -1013,6 +1022,8 @@ def fieldsChanged(diff):
 	    rc.append(name)
 
 	i += size
+
+    assert(i == len(diff))
 
     return rc
 
