@@ -33,6 +33,7 @@ import conarycfg
 from local import database
 from lib import util
 from repository import netclient
+import versions
 import updatecmd
 
 def usage():
@@ -61,15 +62,20 @@ def main(argv):
     db = database.Database(cfg.root, cfg.dbPath)
     dbpkgs = [ x for x in db.iterAllTroveNames() if x.find(':') == -1 ]
     dbpkgs.sort()
-    versions = repos.getTroveLeavesByLabel(dbpkgs, cfg.installLabel)
+    versionList = repos.getTroveLeavesByLabel(dbpkgs, cfg.installLabel)
 
     for pkg in dbpkgs:
-        if not versions[pkg]:
+        if not versionList[pkg]:
             continue
-        v = versions[pkg][0]
+        v = versionList[pkg][0]
         lv = db.getTroveVersionList(pkg)[0]
         vt = v.trailingVersion()
         lvt = lv.trailingVersion()
+        
+        if isinstance(lv.branch().label(), versions.CookBranch) or\
+           isinstance(lv.branch().label(), versions.EmergeBranch):
+            continue
+
         if (v.branch(),vt.getVersion(),vt.getRelease(),vt.buildCount) != (lv.branch(),lvt.getVersion(),lvt.getRelease(),lvt.buildCount):
             print "%-35s%-25s%-20s" % (pkg, lvt.asString(), vt.asString())
 
