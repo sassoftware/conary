@@ -573,10 +573,9 @@ def contentsChanged(diff):
 	streamId, size = struct.unpack("!BH", diff[i:i+3])
 	i += 3
 
-	name = RegularFile.streamDict[streamId][1]
-	
-	if name == "contents":
-	    return size != 0
+	if streamId == streams._STREAM_CONTENTS:
+	    changedCode = struct.unpack("B", diff[i])[0]
+	    return changedCode != 0
 
 	i += size
 
