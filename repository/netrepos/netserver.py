@@ -14,6 +14,7 @@
 
 import base64
 import cPickle
+from deps import deps
 from repository import changeset
 from repository import repository
 import fsrepos
@@ -189,8 +190,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             flavorSet[flavor] = flavorId
             for depClass in self.toFlavor(flavor).getDepClasses().itervalues():
                 for dep in depClass.getDeps():
-                    cu.execute("INSERT INTO ffFlavor VALUES (?, ?, NULL, NULL)",
-                               flavorId, dep.name, start_transaction = False)
+                    cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, NULL)",
+                               flavorId, dep.name, deps.FLAG_SENSE_REQUIRED,
+                               start_transaction = False)
                     for (flag, sense) in dep.flags.iteritems():
                         cu.execute("INSERT INTO ffFlavor VALUES (?, ?, ?, ?)",
                                    flavorId, dep.name, sense, flag, 
