@@ -14,7 +14,7 @@ class FileContents:
 
     def __init__(self):
 	if self.__class__ == FileContents:
-	    raise NotImplemented
+	    raise NotImplementedError
 
 class FromRepository(FileContents):
 

@@ -16,7 +16,7 @@ class AbstractRepository:
 	@rtype: list of str
 	"""
 
-	raise NotImplemented
+	raise NotImplementedError
 
     def hasPackage(self, troveName):
 	"""
@@ -27,7 +27,7 @@ class AbstractRepository:
 	@type troveName: str
 	@rtype: boolean
 	"""
-	raise NotImplemented
+	raise NotImplementedError
 
     def hasPackageVersion(self, troveName, version):
 	"""
@@ -37,7 +37,7 @@ class AbstractRepository:
 	@type troveName: str
 	@rtype: boolean
 	"""
-	raise NotImplemented
+	raise NotImplementedError
 
     def pkgLatestVersion(self, troveName, branch):
 	"""
@@ -51,7 +51,7 @@ class AbstractRepository:
 	@rtype: versions.Version
 	"""
 
-	raise NotImplemented
+	raise NotImplementedError
 
     def getLatestPackage(self, troveName, branch):
 	"""
@@ -63,7 +63,7 @@ class AbstractRepository:
 	@type branch: versions.Version
 	@rtype: package.Package
 	"""
-	raise NotImplemented
+	raise NotImplementedError
 
     def getPackageVersion(self, troveName, version):
 	"""
@@ -71,11 +71,11 @@ class AbstractRepository:
 
 	@param troveName: package name
 	@type troveName: str
-	@param branch: branch
-	@type branch: versions.Version
+	@param version: version
+	@type version: versions.Version
 	@rtype: package.Package
 	"""
-	raise NotImplemented
+	raise NotImplementedError
 
     def getPackageLabelBranches(self, troveName, label):
 	"""
@@ -88,7 +88,7 @@ class AbstractRepository:
 	@type label: versions.BranchName
 	@rtype: package.Package
 	"""
-	raise NotImplemented
+	raise NotImplementedError
 
     def getPackageVersionList(self, troveName):
 	"""
@@ -100,7 +100,7 @@ class AbstractRepository:
 	@rtype: list of versions.Version
 	"""
 
-	raise NotImplemented
+	raise NotImplementedError
 
     def getPackageBranchList(self, troveName):
 	"""
@@ -110,12 +110,12 @@ class AbstractRepository:
 	@type troveName: str
 	@rtype: list of versions.Version
 	"""
-	raise NotImplemented
+	raise NotImplementedError
 
     ### File functions
 
     def getFileVersion(self, fileId, version, path = None, withContents = 0):
-	raise NotImplemented
+	raise NotImplementedError
 
     def __init__(self):
 	assert(self.__class__ != AbstractRepository)
