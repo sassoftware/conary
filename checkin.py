@@ -94,7 +94,6 @@ def _verifyAtHead(repos, headPkg, state):
 
     # make sure the files in this directory are based on the same
     # versions as those in the package at head
-    bail = 0
     for (fileId, (path, version)) in state.iterFileList():
 	if isinstance(version, versions.NewVersion):
 	    assert(not headPkg.hasFile(fileId))
