@@ -393,7 +393,6 @@ class PackageRecipe(Recipe):
 	    pass
 	else:
 	    util.rmtree(builddir)
-	    util.rmtree(destdir)
 
     def fetchAllSources(self):
 	"""
@@ -462,8 +461,9 @@ class PackageRecipe(Recipe):
 		    if action.linenum == resumeBegin:
 			yield action
 
-    def unpackSources(self, builddir, resume=None):
+    def unpackSources(self, builddir, destdir, resume=None):
 	self.macros.builddir = builddir
+	self.macros.destdir = destdir
 
 	if resume == 'policy':
 	    return
@@ -487,19 +487,18 @@ class PackageRecipe(Recipe):
 	"""
         self._build.append(action)
 
-    def doBuild(self, buildPath, root, resume=None):
+    def doBuild(self, buildPath, resume=None):
         builddir = os.sep.join((buildPath, self.mainDir()))
-	self.macros.update({'builddir': builddir,
-			    'destdir': root})
-	self.magic = magic.magicCache(root)
-	if resume == 'policy':
-	    return
-	if resume:
-	    for bld in self.iterResumeList(self._build):
-		bld.doAction()
-	else:
-	    for bld in self._build:
-		bld.doAction()
+        self.macros.builddir = builddir
+        self.magic = magic.magicCache(self.macros.destdir)
+        if resume == 'policy':
+            return
+        if resume:
+            for bld in self.iterResumeList(self._build):
+                bld.doAction()
+        else:
+            for bld in self._build:
+                bld.doAction()
 
     def doDestdirProcess(self):
 	for post in self.destdirPolicy:

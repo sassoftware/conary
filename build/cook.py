@@ -484,41 +484,43 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     bldInfo = buildinfo.BuildInfo(builddir)
     recipeObj.buildinfo = bldInfo
 
-    # don't bother with prep the dirs if we are resuming
+
     if not resume:
+        destdir = ''
 	if os.path.exists(builddir):
 	    shutil.rmtree(builddir)
-	util.mkdirChain(builddir)
     else:
         try:
             bldInfo.read()
+            if 'destdir' in bldInfo:
+                destdir = bldInfo.destdir
         except:
             pass
 
+    util.mkdirChain(builddir + '/' + recipeObj.mainDir())
+    if not destdir:
+        destdir = builddir + '/root'
+    util.mkdirChain(destdir)
+
     bldInfo.begin()
+    bldInfo.destdir = destdir
     if resume is True:
         resume = bldInfo.lastline
-    recipeObj.unpackSources(builddir, resume)
+    recipeObj.unpackSources(builddir, destdir, resume)
+
     # if we're only extracting, continue to the next recipe class.
     if prep:
 	return
-	
+
     cwd = os.getcwd()
     try:
-	if resume and 'destdir' in bldInfo:
-	    destdir = bldInfo.destdir
-            # this writes destdir back out to the file
-            # in case we need it again
-            bldInfo.destdir = destdir
-	else:
-	    util.mkdirChain(builddir + '/' + recipeObj.mainDir())
-	    util.mkdirChain(cfg.tmpDir)
-	    destdir = tempfile.mkdtemp("", "conary-%s-" % recipeObj.name, cfg.tmpDir)
-	    bldInfo.destdir = destdir
 	os.chdir(builddir + '/' + recipeObj.mainDir())
-	recipeObj.doBuild(builddir, destdir, resume=resume)
-	if resume and resume != "policy" and recipeObj.resumeList[-1][1] != False:
-	    log.info('Finished Building %s Lines %s, Not Running Policy', recipeClass.name, resume)
+	recipeObj.doBuild(builddir, resume=resume)
+        
+	if resume and resume != "policy" and \
+                      recipeObj.resumeList[-1][1] != False:
+	    log.info('Finished Building %s Lines %s, Not Running Policy', 
+                                                   recipeClass.name, resume)
 	    return
 	log.info('Processing %s', recipeClass.name)
 	recipeObj.doDestdirProcess() # includes policy
