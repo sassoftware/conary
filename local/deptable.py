@@ -87,6 +87,8 @@ class DependencyTables:
     def _mergeTmpTable(self, cu, name):
         substDict = { 'name' : name }
 
+        cu = self.db.cursor()
+
         cu.execute("""INSERT INTO Dependencies 
                         SELECT DISTINCT
                             NULL,
@@ -101,7 +103,8 @@ class DependencyTables:
                             Dependencies.depId is NULL
                     """ % substDict)
 
-        cu.execute("""INSERT INTO Requires SELECT %(name)s.troveId, depId FROM
+        cu.execute("""INSERT INTO Requires 
+                    SELECT %(name)s.troveId, depId FROM
                         %(name)s JOIN Dependencies ON
                             %(name)s.class == Dependencies.class AND
                             %(name)s.name == Dependencies.name AND
@@ -177,12 +180,14 @@ class DependencyTables:
 
         cu.execute("DROP TABLE suspectDeps")
 
-    def _resolve(self, cu):
-        cu.execute("""
-                SELECT depCheck.depNum,
-                        Provides.instanceId
-                    FROM Requires LEFT OUTER JOIN Provides ON
-                        Requires.depId == Provides.depId
+    def _resolveStmt(self, providesTable = "Provides"):
+        substTable = { 'provides' : providesTable }
+
+        return """
+                SELECT depCheck.depNum as depNum,
+                        %(provides)s.instanceId as rsvInstanceId
+                    FROM Requires LEFT OUTER JOIN %(provides)s ON
+                        Requires.depId == %(provides)s.depId
                     JOIN Dependencies ON
                         Requires.depId == Dependencies.depId
                     JOIN DepCheck ON
@@ -191,14 +196,15 @@ class DependencyTables:
                         Dependencies.name == DepCheck.name AND
                         Dependencies.flag == DepCheck.flag
                     WHERE
-                        Requires.instanceId < 0 AND Provides.depId is not NULL
+                        Requires.instanceId < 0 
+                        AND %(provides)s.depId is not NULL
                         AND NOT DepCheck.isProvides
                     GROUP BY
                         DepCheck.depNum,
-                        Provides.instanceId
+                        %(provides)s.instanceId
                     HAVING
                         COUNT(DepCheck.troveId) == DepCheck.flagCount
-                """)
+                """ % substTable
 
     def check(self, changeSet):
         # XXX
@@ -225,7 +231,7 @@ class DependencyTables:
             return (False, [])
 
         self._mergeTmpTable(cu, "DepCheck")
-        self._resolve(cu)
+        cu.execute(self._resolveStmt())
 
         for (depNum, instanceId) in cu:
             depList[depNum] = None
@@ -258,6 +264,71 @@ class DependencyTables:
         self.db.rollback()
 
         return (missingDeps, failedList)
+
+    def resolve(self, label, depSetList):
+        cu = self.db.cursor()
+
+        cu.execute("""
+                CREATE VIEW providesBranch AS 
+                    SELECT provides.depId AS depId,
+                           provides.instanceId AS instanceId FROM 
+                    LabelMap JOIN Nodes ON
+                        LabelMap.itemId == Nodes.itemId AND
+                        LabelMap.branchId == Nodes.branchId
+                    JOIN Instances ON
+                        Instances.itemId == Nodes.itemId AND
+                        Instances.versionId == Nodes.versionId
+                    JOIN Provides ON
+                        Provides.instanceId == Instances.instanceId 
+                    WHERE
+                        LabelMap.labelId == 
+                            (SELECT labelId FROM Labels WHERE Label='%s')
+        """ % label.asString())
+
+        self._createTmpTable(cu, "DepCheck")
+
+        depList = []
+        for i, depSet in enumerate(depSetList):
+            self._populateTmpTable(cu, "DepCheck", depList, -i - 1, 
+                                   depSet, None)
+
+        self._mergeTmpTable(cu, "DepCheck")
+
+        cu.execute("""SELECT depNum, Items.item, Versions.version FROM 
+                        (%s)
+                      JOIN Instances ON
+                        rsvInstanceId == Instances.instanceId
+                      JOIN Items ON
+                        Instances.itemId == Items.itemId
+                      JOIN Versions ON
+                        Instances.versionId == Versions.versionId
+                      JOIN Nodes ON
+                        Instances.itemId == Nodes.itemId AND
+                        Instances.versionId == Nodes.versionId
+                      ORDER BY
+                        Nodes.finalTimestamp DESC
+                    """ % self._resolveStmt(providesTable = "providesBranch"))
+        result = {}
+        handled = {}
+        for (depId, troveName, versionStr) in cu:
+            if handled.has_key(depId):
+                continue
+
+            handled[depId] = True
+            
+            depNum = depList[depId][0]
+            depSet = depSetList[depNum]
+            l = result.get(depSet, None)
+            if not l:
+                result[depSet] = [ (troveName, versionStr) ]
+            elif (troveName, versionStr) not in l:
+                l.append((troveName, versionStr))
+
+        # no need to drop the DepCheck table since we're rolling this whole
+        # transaction back anyway
+        self.db.rollback()
+
+        return result
 
     def __init__(self, db):
         self.db = db
