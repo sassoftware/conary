@@ -58,19 +58,25 @@ class VersionRelease(AbstractVersion):
 
     """
     Version element for a version/release pair. These are formatted as
+		
     "version-release", with no hyphen allowed in either portion. The
     release must be a simple integer or two integers separated by a
     decimal point.
     """
 
-    def __str__(self):
+    def __str__(self, versus = None):
 	"""
 	Returns a string representation of a version/release pair.
 	"""
+	if versus and self.version == versus.version:
+	    rc = str(self.release)
+	else:
+	    rc = self.version + '-' + str(self.release)
+
 	if self.buildCount != None:
-	    return "%s-%d.%d" % (self.version, self.release, self.buildCount)
-	
-	return self.version + '-' + str(self.release)
+	    rc += ".%d" % self.buildCount
+
+	return rc
 
     def getVersion(self):
 	"""
@@ -101,7 +107,7 @@ class VersionRelease(AbstractVersion):
 	else:
 	    self.buildCount = 1
 
-    def __init__(self, value):
+    def __init__(self, value, template = None):
 	"""
 	Initialize a VersionRelease object from a string representation
 	of a version release. ParseError exceptions are thrown if the
@@ -114,16 +120,22 @@ class VersionRelease(AbstractVersion):
 	    raise ParseError, "version/release pairs may not contain @ signs"
 	cut = value.find("-")
 	if cut == -1:
-	    raise ParseError, ("version/release pair was expected")
-	self.version = value[:cut]
+	    if not template:
+		raise ParseError, ("version/release pair was expected")
 
-	try:
-	    int(self.version[0])
-	except:
-	    raise ParseError, \
-		("version numbers must be begin with a digit: %s" % value)
+	    self.version = template.version
+	    fullRelease = value
+	else:
+	    self.version = value[:cut]
 
-	fullRelease = value[cut + 1:]
+	    try:
+		int(self.version[0])
+	    except:
+		raise ParseError, \
+		    ("version numbers must be begin with a digit: %s" % value)
+
+	    fullRelease = value[cut + 1:]
+
 	cut = fullRelease.find(".") 
 	if cut != -1:
 	    self.release = fullRelease[:cut]
@@ -150,11 +162,14 @@ class BranchName(AbstractBranch):
     are of the form hostname@branch.
     """
 
-    def __str__(self):
+    def __str__(self, versus = None):
 	"""
 	Returns the string representation of a branch name.
 	"""
-	return self.host + '@' + str(self.branch)
+	if versus and self.host == versus.host:
+	    return self.branch
+
+	return self.host + '@' + self.branch
 
     def getHost(self):
 	return self.host
@@ -173,7 +188,7 @@ class BranchName(AbstractBranch):
 	    return 1
 	return 0
 
-    def __init__(self, value):
+    def __init__(self, value, template = None):
 	"""
 	Parses a branch name string into a BranchName object. A ParseError is
 	thrown if the BranchName is not well formed.
@@ -181,17 +196,21 @@ class BranchName(AbstractBranch):
 	@param value: String representation of a BranchName
 	@type value: str
 	"""
-	if value.find("@") == -1:
-	    raise ParseError, "@ expected between hostname and branch name"
 	if value.find("/") != -1:
 	    raise ParseError, "/ should not appear in a branch name"
 
-	(self.host, self.branch) = value.split("@", 1)
-	if not self.host:
-	    raise ParseError, ("repository names may not be empty: %s" % value)
-	elif not self.branch:
+	if value.find("@") == -1:
+	    if not template:
+		raise ParseError, "@ expected between hostname and branch name"
+
+	    self.host = template.host
+	    self.branch = value
+	else:
+	    (self.host, self.branch) = value.split("@", 1)
+
+	if not self.branch:
 	    raise ParseError, ("branch names may not be empty: %s" % value)
-	elif self.branch.find("@") != -1:
+	if self.branch.find("@") != -1:
 	    raise ParseError, ("branch names may not have @ signs: %s" % value)
 
 class LocalBranch(BranchName):
@@ -308,8 +327,12 @@ class Version:
 		list = self.versions[len(defaultBranch.versions):]
 		s = ""
 
+	oneAgo = None
+	twoAgo = None
 	for version in list:
-	    s = s + ("%s/" % version)
+	    s = s + ("%s/" % version.__str__(twoAgo))
+	    twoAgo = oneAgo
+	    oneAgo = version
 
 	return s[:-1]
 
@@ -482,14 +505,19 @@ class Version:
 	del parts[0]	# absolute versions start with a /
 
 	v = []
+	lastVersion = None
+	lastBranch = None
 	while parts:
 	    if parts[0] == "localhost@LOCAL":
+		lastBranch = None
 		v.append(LocalBranch())
 	    else:
-		v.append(BranchName(parts[0]))
+		lastBranch = BranchName(parts[0], template = lastBranch)
+		v.append(lastBranch)
 
 	    if len(parts) >= 2:
-		v.append(VersionRelease(parts[1]))
+		lastVersion = VersionRelease(parts[1], template = lastVersion)
+		v.append(lastVersion)
 		parts = parts[2:]
 	    else:
 		parts = None
