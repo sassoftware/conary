@@ -286,8 +286,10 @@ class DependencySet:
 	self.members = {}
 
 def ThawDependencySet(frz):
-    l = frz.split('|')
     depSet = DependencySet()
+    if frz == 'none':
+        return None
+    l = frz.split('|')
     for line in l:
         if not line:
             continue
