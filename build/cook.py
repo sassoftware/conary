@@ -389,34 +389,30 @@ def cookItem(repos, cfg, item, prep=0, macros=()):
 	    recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
 
 	try:
-	    classList = recipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
+	    loader = recipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
 	except recipe.RecipeFileError, msg:
 	    raise CookError(str(msg))
 
-	for (className, classObject) in classList.items():
-	    buildList.append((classObject, cfg.defaultbranch,
-			      "%s-%s.srs" % (classObject.name, 
-					     classObject.version)))
+	recipeClass = loader.getRecipe()
+        changeSetFile = "%s-%s.srs" % (recipeClass.name, recipeClass.version)
     else:
         try:
-            classList = \
-                      recipe.recipeLoaderFromSourceComponent(item,
-                                                             item + '.recipe',
-                                                             cfg, repos)
+            loader = recipe.recipeLoaderFromSourceComponent(item,
+                                                            item + '.recipe',
+                                                            cfg, repos)
         except recipe.RecipeFileError, msg:
             raise CookError(str(msg))
 
-	for (className, classObject) in classList.items():
-	    buildList.append((classObject, cfg.defaultbranch, None))
+        recipeClass = loader.getRecipe()
 
-    built = []
-    for (classObject, branch, csFile) in buildList:
-	try:
-	    built += cookObject(repos, cfg, classObject, branch,
-				changeSetFile = csFile,
-				prep = prep, macros = macros)
-	except repository.RepositoryError, e:
-	    raise CookError(str(e))
+    built = ((),)
+    try:
+        troves = cookObject(repos, cfg, recipeClass, cfg.defaultbranch,
+                            changeSetFile = changeSetFile,
+                            prep = prep, macros = macros)
+        built = (tuple(troves), changeSetFile)
+    except repository.RepositoryError, e:
+        raise CookError(str(e))
 
     return built
 
@@ -450,8 +446,13 @@ def cookCommand(cfg, args, prep, macros):
             except CookError, msg:
 		log.error(str(msg))
                 sys.exit(1)
-            for (pkg, version) in built:
-                print "Committed", pkg, version, "to the repository"
+            components, csFile = built
+            for component, version in troves:
+                print "Created component:", component, version
+            if csFile is None:
+                print 'Changeset committed to the repository.'
+            else:
+                print 'Changeset written to:', csFile
             sys.exit(0)
         else:
             while 1:

@@ -120,9 +120,7 @@ def _getRecipeVersion(recipeFile):
 	log.error("unable to load a valid recipe class from %s", recipeFile)
 	return None
 
-    assert(len(loader.values()) == 1)
-    recipeClass = loader.values()[0]
-
+    recipeClass = loader.getRecipe()
     return recipeClass.version
 
 

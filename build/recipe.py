@@ -153,7 +153,7 @@ def setupRecipeDict(d, filename):
 	exec 'sys.excepthook = util.excepthook' in d
     d['filename'] = filename
 
-class RecipeLoader(types.DictionaryType):
+class RecipeLoader:
     def __init__(self, filename, cfg=None, repos=None, component=None):
         self.recipes = {}
         
@@ -232,11 +232,14 @@ class RecipeLoader(types.DictionaryType):
                     raise RecipeFileError(
                         'Error in recipe file "%s": multiple recipe classes '
                         'with both name and version exist' %basename)
-                self[name] = obj
+                self.recipe = obj
                 found = True
 
     def allRecipes(self):
         return self.recipes
+
+    def getRecipe(self):
+        return self.recipe
 
     def __del__(self):
         try:
