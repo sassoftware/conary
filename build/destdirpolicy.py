@@ -639,7 +639,7 @@ class Strip(policy.Policy):
             oldmode = None
             fullpath = self.dm.destdir+path
             mode = os.lstat(fullpath)[stat.ST_MODE]
-            if not mode & 0600:
+            if mode & 0600 != 0600:
                 # need to be able to read and write the file to strip it
                 oldmode = mode
 		os.chmod(fullpath, mode|0600)
