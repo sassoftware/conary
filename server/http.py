@@ -273,7 +273,7 @@ class HttpHandler:
         elif p1 != p2:
             self.kid_write("error", error = "Error: passwords do not match")
         elif oldPassword == p1:
-            self.kid_write("Error: old and new passwords identical, not changing")
+            self.kid_write("error", error = "Error: old and new passwords identical, not changing")
         else:
             self.repServer.auth.changePassword(username, p1)
             if admin:
