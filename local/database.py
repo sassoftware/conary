@@ -391,6 +391,7 @@ class Database(SqlDbRepository):
                 callback.runningPreTagHandlers()
                 fsJob.preapply(tagSet, tagScript)
 
+        callback.creatingDatabaseTransaction()
         # Build A->B
         if toStash:
             # this updates the database from the changeset; the change

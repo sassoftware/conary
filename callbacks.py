@@ -25,6 +25,9 @@ class UpdateCallback(ChangesetCallback):
     def preparingUpdate(self):
         pass
 
+    def creatingDatabaseTransaction(self):
+        pass
+
     def restoreFiles(self, size, totalSize):
         pass
 

@@ -1,3 +1,8 @@
+Changes in 0.50.10:
+  * Added callback for creating database transaction, so that it does 
+    not look like we spend an inordinate amount of time executing tag
+    pre scripts.
+
 Changes in 0.50.9:
   * reimplemented StreamSet in C
   * moved findTroves out to findtrove.py, reworked it to be more modular

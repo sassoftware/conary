@@ -61,6 +61,9 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
             self._message("Removing %d of %d (%d%%)..."
                         % (fileNum , total, (fileNum * 100) / total))
 
+    def creatingDatabaseTransaction(self):
+        self._message("Creating database transaction...")
+
     def runningPreTagHandlers(self):
         self._message("Running tag pre-scripts...")
 
