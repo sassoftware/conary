@@ -146,7 +146,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         return contents
 
     def createChangeSet(self, troveList, recurse = True, withFiles = True,
-                        withFileContents = True):
+                        withFileContents = True, excludeAutoSource = False):
 	"""
 	troveList is a list of (troveName, flavor, oldVersion, newVersion, 
         absolute) tuples. 
@@ -295,12 +295,15 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 		cs.addFile(oldFileId, newFileId, filecs)
 
+                if not withFileContents or (excludeAutoSource and
+                   newFile.flags.isAutoSource()):
+                    continue
+
 		# this test catches files which have changed from not
 		# config files to config files; these need to be included
 		# unconditionally so we always have the pristine contents
 		# to include in the local database
-		if withFileContents and \
-                    (hash or (oldFile and newFile.flags.isConfig() 
+		if (hash or (oldFile and newFile.flags.isConfig() 
                                       and not oldFile.flags.isConfig())):
 		    if oldFileVersion :
 			oldCont = self.getFileContents(

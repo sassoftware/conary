@@ -230,7 +230,7 @@ def checkout(repos, cfg, workDir, name):
     cs = repos.createChangeSet([(trv.getName(), 
                                 (None, None), 
                                 (trv.getVersion(), deps.deps.DependencySet()),
-			        True)])
+			        True)], excludeAutoSource = True)
 
     pkgCs = cs.iterNewPackageList().next()
 

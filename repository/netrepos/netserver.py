@@ -828,7 +828,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return 0
 
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse, 
-                     withFiles, withFileContents = None):
+                     withFiles, withFileContents, excludeAutoSource):
 
         def _cvtTroveList(l):
             new = []
@@ -903,7 +903,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                             self.repos.createChangeSet([ l ], 
                                         recurse = recurse, 
                                         withFiles = withFiles,
-                                        withFileContents = withFileContents)
+                                        withFileContents = withFileContents,
+                                        excludeAutoSource = excludeAutoSource)
                 path = self.cache.addEntry(l, recurse, withFiles, 
                                            withFileContents)
 

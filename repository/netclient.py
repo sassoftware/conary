@@ -433,15 +433,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return l
 
-    def createChangeSet(self, list, withFiles = True, withFileContents = True):
+    def createChangeSet(self, list, withFiles = True, withFileContents = True,
+                        excludeAutoSource = False):
 	return self._getChangeSet(list, withFiles = withFiles, 
-                                  withFileContents = withFileContents)
+                                  withFileContents = withFileContents,
+                                  excludeAutoSource = excludeAutoSource)
 
     def createChangeSetFile(self, list, fName):
 	self._getChangeSet(list, target = fName)
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
-		      withFileContents = True, target = None):
+		      withFileContents = True, target = None,
+                      excludeAutoSource = False):
         # This is a bit complicated due to servers not wanting to talk
         # to other servers. To make this work, we do this:
         #
@@ -575,7 +578,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             for serverName, job in serverJobs.iteritems():
                 (urlList, extraTroveList, extraFileList) = \
                     self.c[serverName].getChangeSet(job, recurse, 
-                                                withFiles, withFileContents)
+                                                withFiles, withFileContents,
+                                                excludeAutoSource)
 
                 chgSetList += _cvtTroveList(extraTroveList)
                 filesNeeded += _cvtFileList(extraFileList)
