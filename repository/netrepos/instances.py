@@ -148,10 +148,12 @@ class FileStreams:
             yield row[0]
 
     def addStream(self, key, stream):
+        # XXX this method is no longer used.  trovestore handles inserting
+        # the filestreams itself.
 	(fileId, versionId) = key
 	fileId = encodeFileId(fileId)
         cu = self.db.cursor()
-        cu.execute("INSERT INTO FileStreams VALUES (NULL, ?, ?, ?, ?)",
+        cu.execute("INSERT INTO FileStreams VALUES (NULL, ?, ?, ?)",
                    (fileId, versionId, encodeStream(stream)))
 	return cu.lastrowid
         
