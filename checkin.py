@@ -35,11 +35,18 @@ def checkin(repos, cfg, file):
 
 def checkout(repos, cfg, name, file, versionStr = None):
     try:
-	pkg = helper.findPackage(repos, cfg.packagenamespace, cfg.defaultbranch,
-				 name, versionStr, forceGroup = 1)
+	pkgList = helper.findPackage(repos, cfg.packagenamespace, 
+				     cfg.defaultbranch, name, versionStr, 
+				     forceGroup = 1)
     except helper.PackageNotFound, e:
 	log.error(str(e))
 	return
+
+    if len(pkgList) > 1:
+	log.error("%s %s specified multiple packages" % (name, versionStr))
+	return
+
+    pkg = pkgList[0]
 
     f = open(file, "w")
     f.write("\n".join(pkg.getGroupFile()))

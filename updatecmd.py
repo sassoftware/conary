@@ -43,20 +43,22 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
         # so far no changeset (either the path didn't exist or we could not
         # read it
 	try:
-	    pkg = helper.findPackage(repos, cfg.packagenamespace, 
+	    pkgList = helper.findPackage(repos, cfg.packagenamespace, 
 				     cfg.defaultbranch, pkg, versionStr)
 	except helper.PackageNotFound, e:
 	    log.error(str(e))
 	    return
 
-	if db.hasPackage(pkg.getName()):
-	    # currentVersion could be None
-	    currentVersion = db.pkgLatestVersion(pkg.getName(), 
-						 pkg.getVersion().branch())
-	else:
-	    currentVersion = None
+	list = []
+	for pkg in pkgList:
+	    if db.hasPackage(pkg.getName()):
+		# currentVersion could be None
+		currentVersion = db.pkgLatestVersion(pkg.getName(), 
+						     pkg.getVersion().branch())
+	    else:
+		currentVersion = None
 
-	list = [(pkg.getName(), currentVersion, pkg.getVersion(), 0)]
+	    list.append = [(pkg.getName(), currentVersion, pkg.getVersion(), 0)]
 
 	cs = repos.createChangeSet(list)
 	cs.remapPaths(map)

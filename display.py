@@ -61,36 +61,38 @@ def _versionList(repos, pkgName):
 
 def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
     try:
-	pkg = helper.findPackage(repos, cfg.packagenamespace, cfg.defaultbranch,
-				 pkgName, versionStr)
+	pkgList = helper.findPackage(repos, cfg.packagenamespace, 
+				     cfg.defaultbranch, pkgName, versionStr)
     except helper.PackageNotFound, e:
 	log.error(str(e))
 	return
 
-    version = pkg.getVersion()
+    for pkg in pkgList:
+	version = pkg.getVersion()
 
-    if not ls:
-	print _pkgFormat % (
-	    package.stripNamespace(cfg.packagenamespace, pkgName),
-	    version.asString(cfg.defaultbranch))
+	if not ls:
+	    print _pkgFormat % (
+		package.stripNamespace(cfg.packagenamespace, pkgName),
+		version.asString(cfg.defaultbranch))
 
-	for (pkgName, verList) in pkg.getPackageList():
-	    for ver in verList:
-		print _grpFormat % (
-			package.stripNamespace(cfg.packagenamespace, pkgName),
-			ver.asString(cfg.defaultbranch))
+	    for (pkgName, verList) in pkg.getPackageList():
+		for ver in verList:
+		    print _grpFormat % (
+			    package.stripNamespace(cfg.packagenamespace, 
+						   pkgName),
+			    ver.asString(cfg.defaultbranch))
 
-	for (fileId, path, version) in pkg.fileList():
-	    print _fileFormat % (path, version.asString(cfg.defaultbranch))
-    else:
-	for (fileId, path, version) in pkg.fileList():
-	    file = repos.getFileVersion(fileId, version, path = path)
+	    for (fileId, path, version) in pkg.fileList():
+		print _fileFormat % (path, version.asString(cfg.defaultbranch))
+	else:
+	    for (fileId, path, version) in pkg.fileList():
+		file = repos.getFileVersion(fileId, version, path = path)
 
-	    if isinstance(file, files.SymbolicLink):
-		name = "%s -> %s" %(path, file.linkTarget())
-	    else:
-		name = path
+		if isinstance(file, files.SymbolicLink):
+		    name = "%s -> %s" %(path, file.linkTarget())
+		else:
+		    name = path
 
-	    print "%s    1 %-8s %-8s %s %s %s" % \
-		(file.modeString(), file.owner(), file.group(), 
-		 file.sizeString(), file.timeString(), name)
+		print "%s    1 %-8s %-8s %s %s %s" % \
+		    (file.modeString(), file.owner(), file.group(), 
+		     file.sizeString(), file.timeString(), name)
