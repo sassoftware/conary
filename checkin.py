@@ -167,19 +167,21 @@ class SourceStateFromFile(SourceState):
 	self.parseFile(file)
 
 def _verifyAtHead(repos, headPkg, state):
-    # we consider ourselves to be at head as long as the file versions
-    # we're based on our correct. we don't care what version we're actually
-    # at (since the version in CONARY may not be on the right branch, version
-    # checks would be tricky)
+    # get the latest version on our branch
+    headVersion = repos.getTroveLatestVersion(state.getName(),
+                                              state.getVersion().branch())
+    if headVersion != state.getVersion():
+        return False
 
+    # make sure the files in this directory are based on the same
+    # versions as those in the package at head
     for (pathId, path, fileId, version) in state.iterFileList():
 	if isinstance(version, versions.NewVersion):
 	    assert(not headPkg.hasFile(pathId))
 	    # new file, it shouldn't be in the old package at all
 	else:
 	    srcFileVersion = headPkg.getFile(pathId)[2]
-	    if (not version == srcFileVersion
-                and not version.canonicalVersion() == srcFileVersion):
+            if version != srcFileVersion:
 		return False
 
     return True
@@ -292,14 +294,22 @@ def commit(repos, cfg, message):
 	    return
 	srcPkg = None
     else:
-	srcPkg = repos.getTrove(troveName, 
-                                state.getVersion().canonicalVersion(),
-                                deps.deps.DependencySet())
-
-	if not _verifyAtHead(repos, srcPkg, state):
-	    log.error("contents of working directory are not all "
-		      "from the head of the branch; use update")
-	    return
+        try:
+            srcPkg = repos.getTrove(troveName, 
+                                    state.getVersion(),
+                                    deps.deps.DependencySet())
+            if not _verifyAtHead(repos, srcPkg, state):
+                log.error("contents of working directory are not all "
+                          "from the head of the branch; use update")
+                return
+        except repository.repository.TroveMissing:
+            # the version in the CONARY file doesn't exist in the repository.
+            # The only time this should happen is after a fresh merge, when
+            # the new version is in the CONARY file before the commit happens.
+            # XXX we skip the verifyAtHead checks in this case
+            srcPkg = repos.getTrove(troveName, 
+                                    state.getVersion().canonicalVersion(),
+                                    deps.deps.DependencySet())
 
     loader = _getRecipeLoader(cfg, repos, state.getRecipeFileName())
     if loader is None: return
