@@ -596,7 +596,7 @@ class FilesystemJob:
             (baseFilePath, baseFileVersion) = basePkg.getFile(fileId)
             baseFile = repos.getFileVersion(fileId, baseFileVersion)
             
-            # link groups come from the database; they aren't inferred frmo
+            # link groups come from the database; they aren't inferred from
             # the filesystem
             if fsFile.hasContents and baseFile.hasContents:
                 fsFile.linkGroup.set(baseFile.linkGroup.value())
