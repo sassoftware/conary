@@ -304,7 +304,7 @@ class ChangeSet:
 		    fsFile = files.FileFromFilesystem(fullPath, fileId,
 				possibleMatch = origFile)
 
-		    if fsFile.same(origFile):
+		    if fsFile == origFile:
 			cont = filecontents.FromFilesystem(fullPath)
 			rollback.addFileContents(fileId,
 						 ChangedFileTypes.file, cont, 0)

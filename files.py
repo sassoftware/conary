@@ -23,7 +23,7 @@ _STREAM_INFO	    = 0
 _STREAM_SHORT	    = 1
 _STREAM_INT	    = 2
 _STREAM_LONGLONG    = 3
-_STRING_STREAM	    = 4
+_STREAM_STRING	    = 4
 _STREAM_DEVICE	    = 5
 _STREAM_SIZESHA1    = 6
 _STREAM_INODE	    = 7
@@ -137,7 +137,7 @@ class StringStream(InfoStream):
     Stores a simple string; used for the target of symbolic links
     """
 
-    streamId = _STRING_STREAM
+    streamId = _STREAM_STRING
 
     def value(self):
 	return self.s
@@ -442,12 +442,12 @@ class File:
 	if os.getuid(): return
 
         try:
-            uid = pwd.getpwnam(self.owner())[2]
+            uid = pwd.getpwnam(self.inode.owner())[2]
         except KeyError:
             log.warning('user %s does not exist - using root', self.owner())
             uid = 0
         try:
-            gid = grp.getgrnam(self.group())[2]
+            gid = grp.getgrnam(self.inode.group())[2]
         except KeyError:
             log.warning('group %s does not exist - using root', self.group())
             gid = 0
@@ -541,12 +541,6 @@ class SymbolicLink(File):
     def sizeString(self):
 	return "%8d" % len(self.target.value())
 
-    def same(self, other, ignoreOwner = False):
-	# inherited method does a permission check, which doens't apply 
-	# to symlinks under Linux
-	return self.__class__ != other.__class__ and \
-	       self.target == other.target
-
     def chmod(self, target):
 	# chmod() on a symlink follows the symlink
 	pass
@@ -574,9 +568,6 @@ class Socket(File):
 
     lsTag = "s"
 
-    def same(self, other, ignoreOwner = False):
-	return File.same(self, other, ignoreOwner)
-
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
@@ -592,9 +583,6 @@ class Socket(File):
 class NamedPipe(File):
 
     lsTag = "p"
-
-    def same(self, other, ignoreOwner = False):
-	return File.same(self, other, ignoreOwner)
 
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
@@ -633,15 +621,6 @@ class DeviceFile(File):
 
     def sizeString(self):
 	return "%3d, %3d" % (self.major, self.minor)
-
-    def same(self, other, ignoreOwner = False):
-	if self.__class__ != other.__class__: return 0
-
-	if (self.infoTag == other.infoTag and self.major == other.major and
-            self.minor == other.minor):
-	    return File.same(self, other, ignoreOwner)
-	
-	return 0
 
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
@@ -699,14 +678,6 @@ class RegularFile(File):
 
     def sizeString(self):
 	return "%8d" % self.contents.size()
-
-    def same(self, other, ignoreOwner = False):
-	if self.__class__ != other.__class__: return 0
-
-	if self.thesha1 == other.thesha1:
-	    return File.same(self, other, ignoreOwner)
-
-	return 0
 
     def restore(self, fileContents, target, restoreContents):
 	if restoreContents:
@@ -790,8 +761,8 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
     #f.flags(0)
     
     # assume we have a match if the FileMode and object type match
-    if possibleMatch and (possibleMatch.__class__ == f.__class__):
-	if f.inode == possibleMatch.inode:
+    if possibleMatch and (possibleMatch.__class__ == f.__class__) and \
+       f.inode == possibleMatch.inode:
 	    return possibleMatch
 
     if needsSha1:
@@ -819,50 +790,6 @@ class FilesError(Exception):
 
     def __str__(self):
 	return repr(self)
-
-def mergeChangeLines(lineOne, lineTwo):
-    """
-    Merge two change lines into a new change line. Returns a tuple with
-    a boolean which is true there were conflicts and the new change
-    line (with ! for fields which conflict). If the file types differ
-    between the change lines (True, None) is returned.
-
-    @param lineOne: first change line
-    @type lineOne: str
-    @param lineTwo: first change line
-    @type lineTwo: str
-    @rtype: (boolean, str)
-    """
-
-    ourChanges = lineOne.split()
-    theirChanges = lineTwo.split()
-    resultChanges = []
-    conflicts = False
-
-    if ourChanges[0] != theirChanges[0]:
-	return (True, None)
-
-    # merge fields one by one, skipping over the mtime
-    fieldCount = len(ourChanges)
-    for i in range(0, fieldCount):
-	if i == (fieldCount - 2): 
-	    # mtime
-	    resultChanges.append("%d" % int(time.time()))
-	    continue
-
-	if ourChanges[i] == "-" and theirChanges[i] == "-":
-	    resultChanges.append("-")
-	elif ourChanges[i] == "-": # and theirChanges[i] != "-":
-	    resultChanges.append(theirChanges[i])
-	elif theirChanges[i] == "-": # and ourChanges[i] != "-":
-	    resultChanges.append(ourChanges[i])
-	elif ourChanges[i] == theirChanges[i]:
-	    resultChanges.append(ourChanges[i])
-	else:
-	    resultChanges.append("!")
-	    conflicts = True
-
-    return (conflicts, " ".join(resultChanges))
 
 def contentConflict(changeLine):
     """

@@ -235,7 +235,9 @@ class FilesystemJob:
 
 	    oldFile = repos.getFileVersion(fileId, version)
 
-	    if not oldFile.same(localFile, ignoreOwner = True):
+	    # XXX X this needs to ignore the owner for source packages, but
+	    # not for binary packages!
+	    if oldFile == localFile:
 		self.errors.append("%s has changed but has been removed "
 				   "on head" % path)
 		continue
@@ -317,8 +319,9 @@ class FilesystemJob:
 	    if basePkg and headFileVersion and not fsFile == headFile:
 		# something has changed for the file
 		if flags & MERGE:
-		    # XXX for all we know, headChanges is empty!
+		    # XXX X for all we know, headChanges is empty!
 		    conflicts = fsFile.twm(headChanges, baseFile)
+		    # XXX X what if just the contents changed?
 		    if not conflicts:
 			attributesChanged = True
 		    else:
@@ -327,7 +330,8 @@ class FilesystemJob:
 			self.errors.append("file attributes conflict for %s"
 						% realPath)
 		else:
-		    fsFile.applyChange(headChanges, ignoreContents = 1)
+		    # this forces the change to apply
+		    fsFile.twm(headChanges, fsFile)
 		    attributesChanged = True
 
 	    else:
@@ -356,8 +360,10 @@ class FilesystemJob:
 		else:
 		    headFileContType = None
 
+		# XXX X this needs to ignore the owner for source packages, but
+		# not for binary packages!
 		if (flags & REPLACEFILES) or (not flags & MERGE) or \
-				fsFile.same(baseFile, ignoreOwner = True):
+				fsFile == baseFile:
 		    # the contents changed in just the repository, so take
 		    # those changes
 		    if headFileContType == changeset.ChangedFileTypes.diff:
@@ -380,7 +386,9 @@ class FilesystemJob:
 				      "from repository" % realPath)
 
 		    beenRestored = True
-		elif headFile.same(baseFile, ignoreOwner = True):
+		# XXX X this needs to ignore the owner for source packages, but
+		# not for binary packages!
+		elif headFile == baseFile:
 		    # it changed in just the filesystem, so leave that change
 		    log.debug("preserving new contents of %s" % realPath)
 		elif fsFile.flags.isConfig() or headFile.flags.isConfig():
