@@ -615,9 +615,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             troveFilter = { None : { labelStr : [ flavorFilter ] } }
 
+        if flavorFilter:
+            flavorType = self._GET_TROVE_BEST_FLAVOR
+        else:
+            flavorType = self._GET_TROVE_ALL_FLAVORS
+
         return self._getTroveList(authToken, clientVersion, troveFilter,
                                   withVersions = True, 
                                   versionType = self._GTL_VERSION_TYPE_LABEL,
+                                  flavorFilter = flavorType,
                                   withFlavors = True)
 
     def getTroveVersionsByBranch(self, authToken, clientVersion, troveSpecs,
