@@ -179,7 +179,9 @@ class Make(BuildCommand):
     to system defaults, with system default for mflags and parallelmflags.
     This means, among other things, that if your package does not build
     correctly with parallelized make, you should disable parallel
-    make by using self.disableParallelMake() in your recipe.
+    make by using self.disableParallelMake() in your recipe.  If your
+    package can do parallel builds but needs some other mechanism,
+    then you can modify parallelmflags as necessary in your recipe.
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
