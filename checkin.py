@@ -489,12 +489,9 @@ def update(repos, versionStr = None):
 	    elif fsFile.same(baseFile, ignoreOwner = True):
 		# the contents changed in just the repository, so take
 		# those changes
-		log.info("replacing %s with contents from repository" % realPath)
-		src = repos.pullFileContentsObject(headFile.sha1())
-		dest = open(realPath, "w")
-		util.copyfileobj(src, dest)
-		del src
-		del dest
+		log.info("replacing %s with contents from repository" % 
+				realPath)
+		baseFile.restore(baseContents, realPath, 1)
 	    elif fsFile.isConfig() or headFile.isConfig():
 		# it changed in both the filesystem and the repository; our
 		# only hope is to generate a patch for what changed in the
