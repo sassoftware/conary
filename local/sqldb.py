@@ -739,7 +739,7 @@ class Database:
 	for (fileId, path, versionId, stream) in cu:
 	    version = versionCache.get(versionId, None)
 	    if not version:
-		version = self.versionTable.getId(versionId)
+		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
 	    if withFiles:
