@@ -47,6 +47,4 @@ def findFileFlavor(path):
             else:
                 set.addDep(deps.InstructionSetDependency,
                            deps.Dependency(isnset, []))
-            return set
-
-    raise AssertionError
+    return set
