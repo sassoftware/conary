@@ -14,7 +14,7 @@
 
 all: subdirs conary-wrapper
 
-export VERSION = 0.6.3
+export VERSION = 0.6.4
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
