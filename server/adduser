@@ -1,5 +1,8 @@
 #!/bin/bash
 
+DIR=`dirname $0`
+SCHEMA=$DIR/schema
+
 if [ $# -ne 3 ]; then
     echo "Not enough arguments: <username> <password> <authdb filename>"
     exit
@@ -12,11 +15,11 @@ else
 fi
 
 if [ ! -f $authdb ]; then
-    if [ ! -f schema ]; then
+    if [ ! -f $SCHEMA ]; then
         echo "Missing schema file."
         exit
     fi
-    sqlite3 $authdb < schema
+    sqlite3 $authdb < $SCHEMA
 fi
 
 pw=`echo -n $2 | md5sum | awk '{print $1}'`
