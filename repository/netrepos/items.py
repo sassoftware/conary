@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-import idtable
+from local import idtable
 
 class Items(idtable.IdTable):
     def __init__(self, db):

@@ -1,5 +1,5 @@
 from repository import changeset
-from repository import fsrepos
+from localrep import fsrepos
 import filecontainer
 import md5
 import os

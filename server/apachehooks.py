@@ -3,9 +3,6 @@ import base64
 import os
 import xmlrpclib
 
-import sys
-sys.path.append("/home/ewt/srs")
-
 import netserver
 
 BUFFER=1024 * 256

@@ -16,7 +16,10 @@ import trovecontents
 import versionops
 import versions
 
-class LocalRepVersionTable(versionops.VersionTable):
+from local import trovetroves
+from local import versiontable
+
+class LocalRepVersionTable(versiontable.VersionTable):
 
     def getId(self, theId, itemId):
         cu = self.db.cursor()
@@ -53,7 +56,7 @@ class TroveStore:
 	#cu.execute("PRAGMA temp_store = MEMORY", start_transaction = False)
 				 
         self.begin()
-	self.troveTroves = trovecontents.TroveTroves(self.db)
+	self.troveTroves = trovetroves.TroveTroves(self.db)
 	self.troveFiles = trovecontents.TroveFiles(self.db)
 	self.fileStreams = instances.FileStreams(self.db)
 	self.items = items.Items(self.db)
