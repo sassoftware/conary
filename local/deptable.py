@@ -295,6 +295,43 @@ class DependencyTables:
 
             return failedList
 
+        def _brokenItemsToSet(cu, depIdList):
+            # this only works for databases (not repositories)
+            if not depIdList: return []
+
+            cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depId INTEGER)",
+                       start_transaction = False)
+            for depId in depIdList:
+                cu.execute("INSERT INTO BrokenDeps VALUES (?)", depId,
+                           start_transaction = False)
+
+            cu.execute("""
+                    SELECT DISTINCT troveName, class, name, flag FROM 
+                        BrokenDeps JOIN Dependencies ON
+                            BrokenDeps.depId == Dependencies.depId
+                        JOIN Requires ON
+                            Dependencies.depId == Requires.depId
+                        JOIN DBInstances ON
+                            DBInstances.instanceId == Requires.instanceId
+                """, start_transaction = False)
+
+            failedSets = {}
+            for (troveName, depClass, depName, flag) in cu:
+                if not failedSets.has_key(troveName):
+                    failedSets[troveName] = deps.DependencySet()
+
+                if flag == NO_FLAG_MAGIC:
+                    flags = []
+                else:
+                    flags = [ flag ]
+
+                failedSets[troveName].addDep(deps.dependencyClasses[depClass],
+                            deps.Dependency(depName, flags))
+
+            cu.execute("DROP TABLE BrokenDeps", start_transaction = False)
+
+            return failedSets.items()
+
         # this works against a database, not a repository
         cu = self.db.cursor()
 
@@ -366,12 +403,6 @@ class DependencyTables:
                         SELECT * FROM TmpProvides""",
                    start_transaction = False)
 
-        #if not troveNames:
-        #    # XXX
-        #    assert(0)
-        #    self.db.rollback()
-        #    return (False, [])
-
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
                             "TmpProvides", "AllDeps", multiplier = -1)
 
@@ -417,13 +448,33 @@ class DependencyTables:
         # None in depList means the dependency got resolved; we track
         # would have been resolved by something which has been removed as
         # well
+
+        # depNum is the dependency number
+        #    negative ones are for dependencies being added (and they index
+        #    depList); positive ones are for dependencies broken by an
+        #    erase (and need to be looked up in the repository to get
+        #    a nice description)
+        # resolvingInstanceId is an instanceId which resolved this dependency
+        #    since we only see resolved dependencies here, it must be set
+        # removedInstanceId != None means that the dependency was resolved by 
+        #    something which is being removed
+        brokenByErase = {}
         unresolveable = [ None ] * len(depList)
         for (depNum, instanceId, removedInstanceId) in cu:
-            depNum = -depNum
-            if removedInstanceId is None:
-                depList[depNum] = None
+            if removedInstanceId is not None:
+                if depNum < 0:
+                    # the dependency would have been resolved, but this
+                    # change set removes what would have resolved it
+                    unresolveable[-depNum] = True
+                else:
+                    # this change set removes something which is needed
+                    # by something else on the system w/o providing a
+                    # replacement
+                    brokenByErase[depNum] = True
             else:
-                unresolveable[depNum] = True
+                # if we get here, the dependency is resolved; mark it as
+                # resolved by clearing it's entry in depList
+                depList[-depNum] = None
 
         # sort things out of unresolveable which were resolved by something
         # else
@@ -440,6 +491,7 @@ class DependencyTables:
 
         failedList = _depItemsToSet(depList)
         unresolveableList = _depItemsToSet(unresolveable)
+        unresolveableList += _brokenItemsToSet(cu, brokenByErase.keys())
 
         # no need to drop the DepCheck table since we're rolling this whole
         # transaction back anyway

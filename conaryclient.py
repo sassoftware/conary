@@ -273,7 +273,7 @@ class ConaryClient:
                                 tagScript = tagScript, 
                                 keepExisting = keepExisting)
 
-    def eraseTrove(self, troveList, tagScript = None):
+    def eraseTrove(self, troveList, depCheck = True, tagScript = None):
         list = []
 
 	cs = changeset.ChangeSet()
@@ -287,9 +287,12 @@ class ConaryClient:
                     cs.oldPackage(trove.getName(), trove.getVersion(), 
                                   trove.getFlavor())
 
-        #(depList, cannotResolve) = self.db.depCheck(cs)
-        #print depList, cannotResolve
-
+        if depCheck:
+            (depList, cannotResolve) = self.db.depCheck(cs)
+            assert(not depList)
+            if cannotResolve:
+                return cannotResolve
+            
 	self.db.commitChangeSet(cs, tagScript = tagScript)
 
     def getMetadata(self, troveList, label, cacheFile = None,

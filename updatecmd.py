@@ -93,7 +93,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
     except repository.CommitError, e:
         log.error(e)
 
-def doErase(cfg, itemList, tagScript = None):
+def doErase(cfg, itemList, tagScript = None, depCheck = True):
     troveList = []
     for item in itemList:
         l = item.split("=")
@@ -108,6 +108,14 @@ def doErase(cfg, itemList, tagScript = None):
     client = conaryclient.ConaryClient(cfg=cfg)
 
     try:
-        client.eraseTrove(troveList, tagScript)
+        brokenByErase = client.eraseTrove(troveList, tagScript = tagScript, 
+                                          depCheck = depCheck)
     except repository.PackageNotFound, e:
         log.error(str(e))
+
+    if brokenByErase:
+        print "Troves being removed create unresolved dependencies:"
+        for (troveName, depSet) in brokenByErase:
+            print "    %s:\n\t%s" %  \
+                    (troveName, "\n\t".join(str(depSet).split("\n")))
+        return 1

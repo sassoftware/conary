@@ -232,11 +232,13 @@ def realMain(cfg, argv=sys.argv):
 
 	cook.cookCommand(cfg, otherArgs[2:], False, {}, emerge = True)
     elif (otherArgs[1] == "erase"):
-	kwargs = {}
-
 	if argSet.has_key('tag-script'):
 	    kwargs['tagScript'] = argSet['tag-script']
 	    del argSet['tag-script']
+
+	if argSet.has_key('no-deps'):
+	    kwargs['depCheck'] = False
+	    del argSet['depCheck']
 
 	if argSet: return usage()
 
