@@ -18,6 +18,7 @@ import filecontents
 import files
 import gzip
 import httplib
+import xml
 from lib import log
 import os
 import repository
@@ -151,10 +152,48 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def hasPackage(self, serverName, pkg):
         return self.c[serverName].hasPackage(pkg)
 
-    def updateMetadata(self, troveName, branch, shortDesc = None, longDesc = None,
-                       urls = [], licenses=[], categories = [], source="local", language = "C"):
-        self.c[branch].updateMetadata(troveName, branch.freeze(), shortDesc, longDesc,
+    def updateMetadata(self, troveName, branch, shortDesc, longDesc = "",
+                       urls = [], licenses=[], categories = [],
+                       source="local", language = "C"):
+        self.c[branch].updateMetadata(troveName, self.fromBranch(branch), shortDesc, longDesc,
                                       urls, licenses, categories, source, language)
+
+    def updateMetadataFromXML(self, troveName, branch, xmlStr):
+        doc = xml.dom.minidom.parseString(xmlStr)
+
+        # the only required tag
+        shortDesc = str(doc.getElementsByTagName("shortDesc")[0].childNodes[0].data)
+       
+        # optional tags
+        longDesc = ""
+        language = "C"
+        source = "local"
+
+        node = doc.getElementsByTagName("longDesc")
+        if node and node[0].childNodes:
+            longDesc = node[0].childNodes[0].data
+        node = doc.getElementsByTagName("source")
+        if node and node[0].childNodes:
+            source = node[0].childNodes[0].data
+        node = doc.getElementsByTagName("language")
+        if node and node[0].childNodes:
+            language = node[0].childNodes[0].data
+        
+        urls = []
+        licenses = []
+        categories = []
+
+        for l, tagName in (urls, "url"),\
+                          (licenses, "license"),\
+                          (categories, "category"):
+            node = doc.getElementsByTagName(tagName)
+            for child in node:
+                l.append(str(child.childNodes[0].data))
+        
+        self.c[branch].updateMetadata(troveName, self.fromBranch(branch),
+                                      shortDesc, longDesc,
+                                      urls, licenses, categories,
+                                      source, language)
 
     def getMetadata(self, troveList, label, language="C"):
         if type(troveList[0]) is str:

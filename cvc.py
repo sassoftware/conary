@@ -47,6 +47,7 @@ def usage(rc = 1):
     print '                [--use-flag  "<prefix>.<flag> <bool>"]+ '
     print '                [--use-macro "<macro> <value>"]+ '
     print '                <file.recipe|troveName>+'
+    print '       cvc describe <xml file>'
     print "       cvc diff"
     print "       cvc log [<branch>]"
     print "       cvc newpkg <name>"
@@ -249,6 +250,22 @@ def sourceCommand(cfg, args, argSet):
         if argSet: return usage()
         
         cook.cookCommand(cfg, args[1:], prep, macros, resume=resume)
+    elif (args[0] == "describe"):
+        log.setVerbosity(1)
+        
+        xmlSource = args[1]
+        state = checkin.SourceStateFromFile("CONARY")
+        troveName = state.getName()
+        branch = state.getVersion().branch()
+        print branch.asString()
+       
+        log.info("describing trove %s with %s", troveName, xmlSource)
+        xmlFile = open(xmlSource)
+        xml = xmlFile.read()
+
+        repos = NetworkRepositoryClient(cfg.repositoryMap)
+        print cfg.installLabelPath[0]
+        repos.updateMetadataFromXML(troveName, branch, xml)
     elif (args[0] == "usage"):	
         return usage(rc = 0)
     else:
