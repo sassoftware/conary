@@ -409,7 +409,7 @@ class Database:
 	self.targetTable = DBTarget(self.db)
 	self.flavors = DBFlavors(self.db)
 	self.flavorMap = DBFlavorMap(self.db)
-	self.depTables = deptable.DependencyTables(self.db)
+	#self.depTables = deptable.DependencyTables(self.db)
         self.db.commit()
 	self.streamCache = {}
 	self.needsCleanup = False
@@ -551,7 +551,7 @@ class Database:
 					    isPresent = False)
 	    self.troveTroves.addItem(troveInstanceId, instanceId)
 
-        self.depTables.add(cu, trove, troveInstanceId)
+        #self.depTables.add(cu, trove, troveInstanceId)
 
 	return (cu, troveInstanceId)
 
@@ -689,7 +689,7 @@ class Database:
 
 	    trv.addFile(decodeFileId(fileId), path, version)
 
-        self.depTables.get(cu, trv, troveInstanceId)
+        #self.depTables.get(cu, trv, troveInstanceId)
 
 	return trv
 
@@ -704,7 +704,7 @@ class Database:
 
 	self.troveFiles.delInstance(troveInstanceId)
 	del self.troveTroves[troveInstanceId]
-        self.depTables.delete(self.db.cursor(), troveInstanceId)
+        #self.depTables.delete(self.db.cursor(), troveInstanceId)
 
 	# mark this trove as not present
 	self.instances.setPresent(troveInstanceId, 0)
@@ -734,8 +734,8 @@ class Database:
 	self.addVersionCache = {}
 	self.flavorsNeeded = {}
 
-    def depCheck(self, changeSet):
-        return self.depTables.check(changeSet)
+    #def depCheck(self, changeSet):
+        #return self.depTables.check(changeSet)
 	
     def pathIsOwned(self, path):
 	for instanceId in self.troveFiles.iterPath(path):
