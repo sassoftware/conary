@@ -185,7 +185,7 @@ class FileMode:
 	    self.theGroup = None
 	    self.theMtime = None
 	    self.theSize = None
-	    self.theFlags = None
+	    self.theFlags = 0
 	
 class File(FileMode):
     def modeString(self):
