@@ -34,7 +34,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 
 	    list = [ x.getName() for x  in cs.getNewPackageList() ]
 	    if versionStr:
-		sys.stderr.write("Verision should not be specified when a "
+		sys.stderr.write("Verison should not be specified when a "
 				 "SRS change set is being installed.\n")
 		return 1
 
