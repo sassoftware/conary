@@ -36,13 +36,16 @@ class TagFile(conarycfg.ConfigFile):
 	self.read(filename, exception=True)
 	if 'implements' in self.__dict__:
 	    for item in self.__dict__['implements']:
+		if item.find(" ") < 0:
+		    raise conarycfg.ParseError, \
+			'missing type/action in "implements %s"' %item
 		key, val = item.split(" ")
 		if key not in self.implementsCheck:
-		    raise conarycfg.ParseError, 'unknown type %s in %s' %(
-			key, item)
+		    raise conarycfg.ParseError, \
+			'unknown type %s in "implements %s"' %(key, item)
 		if val not in self.implementsCheck[key]:
-		    raise conarycfg.ParseError, 'unknown action %s in %s' %(
-			val, item)
+		    raise conarycfg.ParseError, \
+			'unknown action %s in "implements %s"' %(val, item)
 
     def filterCB(self, type, key=None, val=None):
 	if not self.macros:
