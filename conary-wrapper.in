@@ -1,4 +1,8 @@
 #!/bin/sh
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
 
 PYTHONORDER="python2.3 python23 python2.2 python22 python"
 
