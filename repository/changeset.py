@@ -64,6 +64,9 @@ class ChangeSet:
     def addPrimaryPackage(self, name, version):
 	self.primaryPackageList.append((name, version))
 
+    def getPrimaryPackageList(self):
+	return self.primaryPackageList
+
     def newPackage(self, csPkg):
 	old = csPkg.getOldVersion()
 	new = csPkg.getNewVersion()
