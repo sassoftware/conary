@@ -26,6 +26,8 @@ from lib import util
 from repository import xmlshims
 from repository import repository
 from local import idtable
+from local import sqldb
+from local import versiontable
 
 SERVER_VERSION=5
 
@@ -269,7 +271,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                      withFiles):
         urlList = []
 
-        # XXX all of these lookups should be a single operation through a 
+        # XXX all of these cache lookups should be a single operation through a 
         # temporary table
 	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
 	    newVer = self.toVersion(new)
@@ -279,22 +281,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 		raise InsufficientPermission
 
 	    if old == 0:
-		l = [ ((name, 
-			 (None, None),
-			 (self.toVersion(new), self.toFlavor(newFlavor)),
-			 absolute)) ]
+		l = (name, (None, None),
+			   (self.toVersion(new), self.toFlavor(newFlavor)),
+			   absolute)
 	    else:
-		l = [ ((name, 
-			 (self.toVersion(old), self.toFlavor(oldFlavor)),
-			 (self.toVersion(new), self.toFlavor(newFlavor)),
-			 absolute)) ]
+		l = (name, (self.toVersion(old), self.toFlavor(oldFlavor)),
+			   (self.toVersion(new), self.toFlavor(newFlavor)),
+			   absolute)
 
-            cs = self.repos.createChangeSet(l, recurse = recurse, 
-                                            withFiles = withFiles)
-            (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
-                                          suffix = '.ccs-out')
-            os.close(fd)
-            cs.writeToFile(path)
+            path = self.cache.getEntry(l, withFiles)
+            if path is None:
+                cs = self.repos.createChangeSet([ l ], recurse = recurse, 
+                                                withFiles = withFiles)
+                path = self.cache.addEntry(l, withFiles)
+                cs.writeToFile(path)
+
             fileName = os.path.basename(path)
 
             urlList.append("%s?%s" % (self.urlBase, fileName[:-4]))
@@ -371,8 +372,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return SERVER_VERSION
 
+    def cacheChangeSets(self):
+        return isinstance(self.cache, CacheSet)
+
     def __init__(self, path, tmpPath, urlBase, authDbPath, name,
-		 repositoryMap, commitAction = None):
+		 repositoryMap, commitAction = None, cacheChangeSets = False):
 	self.repos = fsrepos.FilesystemRepository(name, path, repositoryMap)
 	self.map = repositoryMap
 	self.repPath = path
@@ -381,11 +385,119 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.name = name
 	self.auth = NetworkAuthorization(authDbPath, name, 
                                          anonymousReads = True)
-        self.cache = CacheSet(path + "/cache.sql", tmpPath, SERVER_VERSION)
 	self.commitAction = commitAction
+
+        if cacheChangeSets:
+            self.cache = CacheSet(path + "/cache.sql", tmpPath, SERVER_VERSION)
+        else:
+            self.cache = NullCacheSet(tmpPath)
+
+class NullCacheSet:
+    def getEntry(self, item, withFiles):
+        return None 
+
+    def addEntry(self, item, withFiles):
+        (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
+                                      suffix = '.ccs-out')
+        os.close(fd)
+        return path
+
+    def __init__(self, tmpPath):
+        self.tmpPath = tmpPath
 
 class CacheSet:
 
+    filePattern = "%s/cache-%s.ccs-out"
+
+    def getEntry(self, item, withFiles):
+        (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
+            item
+
+        oldVersionId = 0
+        oldFlavorId = 0
+        newFlavorId = 0
+
+        if oldVersion:
+            oldVersionId = self.versions.get(oldVersion, None)
+            if oldVersionId is None:
+                return None
+
+        if oldFlavor:
+            oldFlavorId = self.flavors.get(oldFlavor, None)
+            if oldFlavorId is None: 
+                return None
+
+        if newFlavor:
+            newFlavorId = self.flavors.get(newFlavor, None)
+            if newFlavorId is None: 
+                return None
+        
+        newVersionId = self.versions.get(newVersion, None)
+        if newVersionId is None:
+            return None
+
+        cu = self.db.cursor()
+        cu.execute("""
+            SELECT row FROM CacheContents WHERE
+                troveName=? AND
+                oldFlavorId=? AND oldVersionId=? AND
+                newFlavorId=? AND newVersionId=? AND
+                absolute=? AND withFiles=?
+            """, name, oldFlavorId, oldVersionId, newFlavorId, 
+            newVersionId, absolute, withFiles)
+
+        row = None
+        for (row,) in cu:
+            path = self.filePattern % (self.tmpDir, row)
+            try:
+                fd = os.open(path, os.O_RDONLY)
+                os.close(fd)
+                return path
+            except OSError:
+                cu.execute("DELETE FROM CacheContents WHERE row=?", row)
+
+        return None
+
+    def addEntry(self, item, withFiles):
+        (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
+            item
+
+        oldVersionId = 0
+        oldFlavorId = 0
+        newFlavorId = 0
+
+        if oldVersion:
+            oldVersionId = self.versions.get(oldVersion, None)
+            if oldVersionId is None:
+                oldVersionId = self.versions.addId(oldVersion)
+
+        if oldFlavor:
+            oldFlavorId = self.flavors.get(oldFlavor, None)
+            if oldFlavorId is None: 
+                oldFlavorId = self.flavors.addId(oldFlavor)
+
+        if newFlavor:
+            newFlavorId = self.flavors.get(newFlavor, None)
+            if newFlavorId is None: 
+                newFlavorId = self.flavors.addId(newFlavor)
+
+        newVersionId = self.versions.get(newVersion, None)
+        if newVersionId is None:
+            newVersionId = self.versions.addId(newVersion)
+
+        cu = self.db.cursor()
+        cu.execute("""
+            INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?, ?)
+        """, name, oldFlavorId, oldVersionId, newFlavorId, newVersionId, 
+        absolute, withFiles)
+
+        row = cu.lastrowid
+        path = self.filePattern % (self.tmpDir, row)
+
+        self.db.commit()
+
+        return path
+        
     def createSchema(self, dbpath, protocolVersion):
 	self.db = sqlite3.connect(dbpath)
         cu = self.db.cursor()
@@ -415,7 +527,8 @@ class CacheSet:
                     oldVersionId INTEGER,
                     newFlavorId INTEGER,
                     newVersionId INTEGER,
-                    absolute INTEGER)
+                    absolute BOOLEAN,
+                    withFiles BOOLEAN)
             """)
             cu.execute("""
                 CREATE INDEX CacheContentsIdx ON 
@@ -431,9 +544,8 @@ class CacheSet:
 	self.tmpDir = tmpDir
         self.createSchema(dbpath, protocolVersion)
         self.db._begin()
-        self.flavors = idtable.IdTable(self.db, "Flavors", "flavorId", "flavor")
-        self.versions = idtable.IdTable(self.db, "Versions", "versionId", 
-                                        "version")
+        self.flavors = sqldb.DBFlavors(self.db)
+        self.versions = versiontable.VersionTable(self.db)
         self.db.commit()
 
 class NetworkAuthorization:

@@ -25,12 +25,13 @@ BUFFER=1024 * 256
 class ServerConfig(conarycfg.ConfigFile):
 
     defaults = {
-        'authDatabase'  :  None,
-        'commitAction'  :  None,
-        'repositoryMap' :  [ conarycfg.STRINGDICT, {} ],
-        'repositoryDir' :  None,
-        'serverName'    :  None,
-        'tmpDir'        :  "/var/tmp",
+        'authDatabase'      :  None,
+        'commitAction'      :  None,
+        'repositoryMap'     :  [ conarycfg.STRINGDICT, {} ],
+        'repositoryDir'     :  None,
+        'serverName'        :  None,
+        'tmpDir'            :  "/var/tmp",
+        'cacheChangeSets'   :  [ conarycfg.BOOLEAN, False ],
     }
 
 def xmlPost(repos, req):
@@ -72,7 +73,8 @@ def getFile(repos, req):
     size = os.stat(path).st_size
     req.content_type = "application/x-conary-change-set"
     req.sendfile(path)
-    os.unlink(path)
+    if req.args[0:6] != "cache-" or not repos.cacheChangeSets():
+        os.unlink(path)
     return apache.OK
 
 def putFile(repos, req):
@@ -122,7 +124,8 @@ def handler(req):
                                 cfg.authDatabase,
                                 cfg.serverName,
                                 cfg.repositoryMap,
-				commitAction = cfg.commitAction)
+				commitAction = cfg.commitAction,
+                                cacheChangeSets = cfg.cacheChangeSets)
 
     repos = repositories[repName]
 
