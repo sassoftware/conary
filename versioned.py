@@ -11,7 +11,7 @@ import types
 import dbhash
 
 _FILE_MAP = "FILEMAP"
-_VERSION_MAP = "VMAP-%s"
+_VERSION_INFO = "VINFO-%s-%s"
 _BRANCH_MAP = "BMAP-%s"
 _CONTENTS = "%s %s"
 
@@ -20,11 +20,12 @@ _CONTENTS = "%s %s"
 # FileIndexedDatabase provides a list of files present, and stores that
 # list in the _FILE_MAP entry
 #
-# Each file has a list of versions available provided by _VERSION_MAP, which
-#   also ties a version string to a frozen version (which includes sequencing
-#   information [a timestamp])
 # Each file has a mapping of branch names to the head of that branch
 #   stored as _BRANCH_MAP
+# Each file/version pair has an info node which stores a reference to both
+#   the parent and child of that version on the branch; they are stored
+#   as frozen versions to allow them to be properly ordered. It also stores
+#   the frozen version of the version uses info is being stored
 # The contents of each file are stored as _CONTENTS
 #
 # the versions are expected to be Version objects as defined by the versions
@@ -78,27 +79,6 @@ class FalseFile:
 
 class VersionedFile:
 
-    def readVersionMap(self):
-	if self.versionMap != None: return
-
-	self.versionMap = {}
-
-	if not self.db.has_key(_VERSION_MAP % self.key):
-	    return
-
-	# chop off the emptry string which gets created after the final \n
-	versionList = self.db[_VERSION_MAP % self.key].split('\n')[:-1]
-
-	for mapString in versionList:
-	    ver = versions.ThawVersion(mapString)
-	    self.versionMap[ver.asString()] = ver
-
-    def writeVersionMap(self):
-	rc = ""
-	for version in self.versionMap.values():
-	    rc += "%s\n" % version.freeze()
-	self.db[_VERSION_MAP % self.key] = rc
-
     # the branch map maps a fully qualified branch version to the latest
     # version on that branch; it's formatted as [<branch> <version>\n]+
     def readBranchMap(self):
@@ -113,11 +93,11 @@ class VersionedFile:
 	for mapString in branchList:
 	    (branchString, versionString) = mapString.split()
 	    self.branchMap[branchString] = \
-		versions.VersionFromString(versionString)
+		versions.ThawVersion(versionString)
 
     def writeBranchMap(self):
 	str = "".join(map(lambda x: "%s %s\n" % 
-					    (x, self.branchMap[x].asString()), 
+					    (x, self.branchMap[x].freeze()), 
 			    self.branchMap.keys()))
 	self.db[_BRANCH_MAP % self.key] = str
 
@@ -134,12 +114,46 @@ class VersionedFile:
 
 	return self.branchMap[branchStr]
 
+    def _getVersionInfo(self, version):
+	s = self.db[_VERSION_INFO % (self.key, version.asString())]
+	l = s.split()
+
+	v = versions.ThawVersion(l[0])
+
+	if l[1] == "-":
+	    previous = None
+	else:
+	    previous = versions.ThawVersion(l[1])
+
+	if l[2] == "-":
+	    next = None
+	else:
+	    next = versions.ThawVersion(l[2])
+
+	return (v, previous, next)
+
+    def _writeVersionInfo(self, node, parent, child):
+	vStr = node.freeze()
+
+	if parent:
+	    pStr = parent.freeze()
+	else:
+	    pStr = "-"
+
+	if child:
+	    cStr = child.freeze()
+	else:
+	    cStr = "-"
+
+	self.db[_VERSION_INFO % (self.key, node.asString())] = \
+	    "%s %s %s" % (vStr, pStr, cStr)
+
     # data can be a string, which is written into the new version, or
     # a file-type object, whose contents are copied into the new version
     #
-    # the new addition becomes the latest version on the branch
+    # the new addition gets placed on the proper branch in the position
+    # determined by the version's time stamp
     def addVersion(self, version, data):
-	self.readVersionMap()
 	self.readBranchMap()
 
 	versionStr = version.asString()
@@ -147,38 +161,69 @@ class VersionedFile:
 
 	if type(data) is not str:
 	    data = data.read()
+
+	# start at the end of this branch and work backwards until we
+	# find the right position to insert this node; this is quite
+	# efficient for adding at the end of a branch, which is the
+	# normal case
+	if self.branchMap.has_key(branchStr):
+	    curr = self.branchMap[branchStr]
+	    next = None
+	    while curr and curr.isAfter(version):
+		next = curr
+		curr = self.getVersionInfo(curr)[1]
+	else:
+	    curr = None
+	    next = None
+
+	# curr is the version we should be added after, None if we are
+	# the first item on the list
+	#
+	# next is the item which immediately follows this one; this lets
+	# us add at the head
+	
+	# this is (node, newParent, newChild)
+	self._writeVersionInfo(version, curr, next)
+	if curr:
+	    (node, parent, child) = self._getVersionInfo(curr)
+	    self._writeVersionInfo(curr, parent, version)
+	if next:
+	    (node, parent, child) = self._getVersionInfo(next)
+	    self._writeVersionInfo(next, version, child)
+
 	self.db[_CONTENTS % (self.key, versionStr)] = data
-	self.versionMap[versionStr] = version
 	self.branchMap[branchStr] = version
 
-	self.writeVersionMap()
 	self.writeBranchMap()
 	#self.db.sync()
 
     def eraseVersion(self, version):
-	self.readVersionMap()
-	    
 	versionStr = version.asString()
 	del self.db[_CONTENTS % (self.key, versionStr)]
-	del self.versionMap[versionStr]
-	self.writeVersionMap()
 	#self.db.sync()
 
     def hasVersion(self, version):
-	self.readVersionMap()
-	return self.versionMap.has_key(version.asString())
+	return self.db.has_key(_VERSION_INFO % (self.key, version.asString()))
 
     # returns a list of version objects
-    def versionList(self):
-	self.readVersionMap()
-	return self.versionMap.values()
-	    
+    def versionList(self, branch):
+	self.readBranchMap()
+
+	curr = self.branchMap[branch.asString()]
+	list = []
+	while curr:
+	    list.append(curr)
+	    curr = self._getVersionInfo(curr)[1]
+	
 	return list
+
+    def branchList(self):
+	self.readBranchMap()
+	return map(lambda x: x.branch(), self.branchMap.values())
 
     def __init__(self, db, filename):
 	self.db = db
 	self.key = filename
-	self.versionMap = None
 	self.branchMap = None
 
 class Database:
