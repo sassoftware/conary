@@ -286,7 +286,7 @@ class Repository:
 	return self._getPackageSet(pkgName).getVersion(version)
 
     def getPackageVersionList(self, pkgName):
-	return self._getPackageSet(pkgName).versionList()
+	return self._getPackageSet(pkgName).fullVersionList()
 
     def fileLatestVersion(self, fileId, branch):
 	fileDB = self._getFileDB(fileId)
@@ -465,8 +465,13 @@ class _PackageSet:
     def addVersion(self, version, package):
 	self.f.addVersion(version, package.formatString())
 
-    def versionList(self):
-	return self.f.versionList()
+    def fullVersionList(self):
+	branches = self.f.branchList()
+	rc = []
+	for branch in branches:
+	    rc += self.f.versionList(branch)
+
+	return rc
 
     def getLatestPackage(self, branch):
 	return self.getVersion(self.f.findLatestVersion(branch))
