@@ -398,9 +398,9 @@ class Recipe:
     def addProcess(self, post):
         self.process.append(post)
 
-    def doProcess(self, destdir):
+    def doProcess(self):
         for post in self.process:
-            post.doProcess(self, destdir)
+            post.doProcess(self, self.macros)
 
     def setConfig(self, path):
         for package in self.packages:
