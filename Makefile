@@ -50,7 +50,7 @@ python_files = __init__.py	\
 
 example_files = examples/tmpwatch.recipe
 bin_files = conary
-extra_files = conary-wrapper.in Makefile Make.rules conary.1
+extra_files = conary-wrapper.in Makefile Make.rules conary.1 LICENSE
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
 generated_files = conary-wrapper *.pyo *.pyc 
