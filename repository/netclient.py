@@ -541,12 +541,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             fileDict = {}
             for (key, fileObj) in zip(need, fileObjs):
                 fileDict[key] = fileObj
-            del fileObj
+            del fileObj, fileObjs, need
 
             (fd, name) = tempfile.mkstemp()
             os.unlink(name)
             tmpF = os.fdopen(fd, "r+")
             del fd
+
+            contentsNeeded = []
 
             for (fileId, troveName, 
                     (oldTroveVersion, oldTroveF, oldFileVersion),
@@ -568,13 +570,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 if withFileContents and hash:
                     # pull the contents from the trove it was originall
                     # built in
-                    cont = self.getFileContents([ (troveName, newFileVersion,
-                                                   fileId, newFileVersion) ],
-                                                tmpFile = tmpF)[0]
-                    internalCs.addFileContents(fileId, 
-                                   repository.changeset.ChangedFileTypes.file, 
-                                   cont, 
-                                   newFileObj.flags.isConfig())
+                    contentsNeeded.append( (troveName, newFileVersion, 
+                                      fileId, newFileVersion, newFileObj) )
+
+            contentList = self.getFileContents(contentsNeeded, 
+                                               tmpFile = tmpF,
+                                               lookInLocal = True)
+            for (item, contents) in zip(contentsNeeded, contentList):
+                fileId = item[2]
+                newFileObj = item[4]
+            
+                internalCs.addFileContents(fileId, 
+                               repository.changeset.ChangedFileTypes.file, 
+                               contents, 
+                               newFileObj.flags.isConfig())
 
 
         if not cs and internalCs:
@@ -631,10 +640,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 				   self.fromFileId(fileId), 
 				   self.fromVersion(version)))
 
-    def getFileContents(self, fileList, tmpFile = None):
-        contents = []
+    def getFileContents(self, fileList, tmpFile = None, lookInLocal = False):
+        contents = [ None ] * len(fileList)
 
-        for item in fileList:
+        for i, item in enumerate(fileList):
+            if contents[i] is not None:
+                continue
+
             (troveName, troveVersion, fileId, fileVersion) = item[0:4]
 
             # we try to get the file from the trove which originally contained
@@ -665,7 +677,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             gzfile = gzip.GzipFile(fileobj = outF)
             gzfile.fullSize = util.gzipFileSize(outF)
 
-            contents.append(filecontents.FromGzFile(gzfile))
+            contents[i] = filecontents.FromGzFile(gzfile)
 
         return contents
 
