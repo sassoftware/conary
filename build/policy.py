@@ -87,7 +87,7 @@ def _walkFile(policyObj, dirname, names):
     # chop off bit not useful for comparison
     path=dirname[len(policyObj.macros['destdir']):]
     for name in names:
-	thispath = path+name
+	thispath = path + os.sep + name
 	if not _policyException(policyObj, thispath):
 	    policyObj.doFile(thispath)
 
