@@ -117,7 +117,11 @@ class Package:
 	pkgEnd = fileEnd + pkgCount
 
 	for line in lines[start:fileEnd]:
-	    (fileId, path, version) = line.split()
+	    fields = line.split()
+	    fileId = fields.pop(0)
+	    version = fields.pop(-1)
+	    path = " ".join(fields)
+
 	    version = versions.ThawVersion(version)
 	    self.addFile(fileId, path, version)
 
@@ -601,7 +605,10 @@ class ThawPackageChangeSet(PackageChangeSet):
 	action = line[0]
 
 	if action == "+" or action == "~":
-	    (fileId, path, version) = line[1:].split()
+	    fields = line[1:].split()
+	    fileId = fields.pop(0)
+	    version = fields.pop(-1)
+	    path = " ".join(fields)
 
 	    if version == "-":
 		version = None
