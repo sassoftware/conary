@@ -217,6 +217,15 @@ class FlagsStream(streams.IntStream):
 
 	return (self.val and self.val & flag)
 
+def streamDictToList(d):
+    vals = d.keys()
+    m = max(vals)
+    l = range(m + 1)
+    for v in vals:
+	l[v] = d[v]
+
+    return l
+
 class File(object):
 
     lsTag = None
@@ -224,6 +233,7 @@ class File(object):
     streamDict = { streams._STREAM_INODE : (InodeStream, "inode"),
                    streams._STREAM_FLAGS : (FlagsStream, "flags"),
 		   streams._STREAM_TAGS :  (streams.StringsStream, "tags") }
+    streamList = streamDictToList(streamDict)
     __slots__ = [ "theId", "inode", "flags", "tags" ]
 
     def modeString(self):
@@ -286,7 +296,7 @@ class File(object):
 	    while i < dataLen:
                 assert(i < dataLen)
 		(streamId, size) = struct.unpack("!BH", data[i:i+3])
-		(streamType, name) = self.streamDict[streamId]
+		(streamType, name) = self.streamList[streamId]
 		i += 3
 		self.__setattr__(name, streamType(data[i:i + size]))
 		i += size
@@ -375,6 +385,7 @@ class SymbolicLink(File):
     lsTag = "l"
     streamDict = { streams._STREAM_TARGET : (streams.StringStream, "target") }
     streamDict.update(File.streamDict)
+    streamList = streamDictToList(streamDict)
     __slots__ = "target"
 
     def sizeString(self):
@@ -439,6 +450,7 @@ class DeviceFile(File):
 
     streamDict = { streams._STREAM_DEVICE : (DeviceStream, "devt") }
     streamDict.update(File.streamDict)
+    streamList = streamDictToList(streamDict)
     __slots__ = [ 'devt' ]
 
     def sizeString(self):
@@ -479,6 +491,7 @@ class RegularFile(File):
         streams._STREAM_FLAVOR   : (streams.DependenciesStream, 'flavor' ) }
 
     streamDict.update(File.streamDict)
+    streamList = streamDictToList(streamDict)
     __slots__ = ('contents', 'provides', 'requires', 'flavor')
 
     lsTag = "-"
