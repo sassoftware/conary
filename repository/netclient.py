@@ -1057,13 +1057,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 else:
                     self.queryMerge(flavorDict, d)
         elif versionStr[0] != "/" and versionStr.find("/") == -1:
-	    # version/release was given. look in the affinityDatabase
+	    # version or version/release was given. look in the affinityDatabase
             # for the branches to look on
 	    try:
 		verRel = versions.Revision(versionStr)
 	    except versions.ParseError, e:
-		raise repository.TroveNotFound, str(e)
-
+                verRel = None
             query = {}
             if affinityTroves:
                 query[name] = {}
@@ -1084,9 +1083,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 flavorDict = self.getTroveVersionsByBranch(query, 
                                                            bestFlavor = True)
 
-                for version in flavorDict[name].keys():
-                    if version.trailingRevision() != verRel:
-                        del flavorDict[name][version]
+                if verRel is not None:
+                    for version in flavorDict[name].keys():
+                        if version.trailingRevision() != verRel:
+                            del flavorDict[name][version]
+                else:
+                    for version in flavorDict[name].keys():
+                        if (version.trailingRevision().getVersion() \
+                                                            != versionStr):
+                            del flavorDict[name][version]
+                    if flavorDict[name]:
+                        version = sorted(flavorDict[name].iterkeys())[-1]
+                        flavorDict[name] = {version: flavorDict[name][version]}
             else:
                 flavorDict = { name : {} }
                 if flavor is None:
@@ -1095,10 +1103,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 for label in labelPath:
                     d = self.getTroveVersionsByLabel([name], label, 
                                              flavorFilter = flavor)
-                    for version in d.get(name, {}).keys():
-                        if version.trailingRevision() != verRel:
-                            del d[name][version]
-
+                    if verRel is not None:
+                        for version in d.get(name, {}).keys():
+                            if version.trailingRevision() != verRel:
+                                del d[name][version]
+                    else:
+                        for version in d.get(name, {}).keys():
+                            if version.trailingRevision().getVersion() \
+                                                            != versionStr:
+                                del d[name][version]
+                        if d[name]:
+                            version = sorted(d[name].iterkeys())[-1]
+                            d[name] = {version: d[name][version]}
                     if not d.has_key(name):
                         continue
                     elif not acrossRepositories:
