@@ -302,7 +302,7 @@ class FilesystemJob:
 	"""
 	if basePkg:
 	    assert(pkgCs.getOldVersion() == basePkg.getVersion())
-	fullyUpdated = 1
+	fullyUpdated = True
 	cwd = os.getcwd()
 
 	if (flags & IGNOREUGIDS) or os.getuid():
@@ -342,7 +342,7 @@ class FilesystemJob:
                 elif not flags & REPLACEFILES:
                     self.errors.append("%s is in the way of a newly " 
                                        "created file" % headRealPath)
-                    fullyUpdated = 0
+                    fullyUpdated = False
                     continue
             except OSError:
                 # the path doesn't exist, carry on with the restore
@@ -406,8 +406,8 @@ class FilesystemJob:
 	    else:
 		rootFixup = cwd + "/"
 
-	    pathOkay = 1
-	    contentsOkay = 1
+	    pathOkay = True
+	    contentsOkay = True
 	    finalPath = fsPath
 	    # if headPath is none, the name hasn't changed in the repository
 	    if headPath and headPath != fsPath:
@@ -427,7 +427,7 @@ class FilesystemJob:
 		    fsPkg.addFile(fileId, headPath, fsVersion)
 		    finalPath = headPath
 		else:
-		    pathOkay = 0
+		    pathOkay = False
 		    finalPath = fsPath	# let updates work still
 		    self.errors.append("path conflict for %s (%s on head)" % 
                                        (fsPath, headPath))
@@ -448,7 +448,7 @@ class FilesystemJob:
 		    # this can happen during source management
 		    self.errors.append("new file %s conflicts with file on "
                                        "head of branch" % realPath)
-		    contentsOkay = 0
+		    contentsOkay = False
 		else:
 		    (baseFilePath, baseFileVersion) = basePkg.getFile(fileId)
 		    baseFile = repos.getFileVersion(fileId, baseFileVersion)
@@ -463,7 +463,8 @@ class FilesystemJob:
 
 	    if basePkg and headFileVersion and \
 	         not fsFile.metadataEqual(headFile, ignoreOwnerGroup = noIds):
-		# something has changed for the file
+		# some of the attributes have changed for this file; try
+                # and merge
 		if flags & MERGE:
 		    if noIds:
 			# we don't want to merge owner/group ids in
@@ -485,10 +486,6 @@ class FilesystemJob:
 		    # this forces the change to apply
 		    fsFile.twm(headChanges, fsFile, skip = "contents")
 		    attributesChanged = True
-
-	    else:
-		conflicts = True
-		mergedChanges = None
 
 	    beenRestored = False
 
@@ -557,7 +554,7 @@ class FilesystemJob:
 		    if headFileContType != changeset.ChangedFileTypes.diff:
 			self.errors.append("unexpected content type for %s" % 
 						finalPath)
-			contentsOkay = 0
+			contentsOkay = False
 		    else:
 			cur = open(realPath, "r").readlines()
 			diff = headFileContents.get().readlines()
@@ -577,10 +574,10 @@ class FilesystemJob:
                                 "head into %s saved as %s.conflicts" % 
                                 (realPath, realPath))
 
-			contentsOkay = 1
+			contentsOkay = True
 		else:
 		    self.errors.append("file contents conflict for %s" % realPath)
-		    contentsOkay = 0
+		    contentsOkay = False
 
 	    if attributesChanged and not beenRestored:
 		self._restore(fsFile, realPath, 
@@ -595,7 +592,7 @@ class FilesystemJob:
 		    headFileVersion = fsPkg.getFile(fileId)[1]
 		fsPkg.addFile(fileId, finalPath, headFileVersion)
 	    else:
-		fullyUpdated = 0
+		fullyUpdated = False
 
 	if fullyUpdated:
 	    fsPkg.changeVersion(pkgCs.getNewVersion())
