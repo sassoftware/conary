@@ -321,16 +321,27 @@ class Source(_Source):
 	    Defaults to False.
         @keyword mode: If set, provides the mode to set on the file.
 	@keyword dest: If set, provides the name of the file in the build
-	    directory.  Do not include any subdirectories; use C{dir}
-	    instead for subdirectories.  Useful mainly when fetching
-	    the file from an source outside your direct control, such as
-	    a URL to a third-party web site, or copying a file out of an
-	    RPM package.
+	    directory.  Do not specify directory information here as well 
+            as in the dir keyword; use one or the other.  Useful mainly 
+            when fetching the file from an source outside your direct 
+            control, such as a URL to a third-party web site, or copying 
+            a file out of an RPM package.
 	"""
 	_Source.__init__(self, recipe, *args, **keywords)
 	if self.dest:
 	    # make sure that user did not pass subdirectory in
-	    self.dest = os.path.basename(self.dest %recipe.macros)
+	    fileName = os.path.basename(self.dest %recipe.macros)
+	    if fileName != self.dest:
+		if self.dir:
+		    self.init_error(RuntimeError, 
+				    'do not specify a directory in both dir and'
+				    ' dest keywords')
+		else:
+		    self.dir = os.path.dirname(self.dest % recipe.macros)
+		    self.dest = fileName
+		    # unfortunately, dir is going to be macro expanded again 
+		    # later, make sure any %s in the path name survive
+		    self.dir.replace('%', '%%') 
 	else:
 	    self.dest = os.path.basename(self.sourcename %recipe.macros)
 
