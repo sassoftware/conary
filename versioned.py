@@ -117,7 +117,7 @@ class VersionedFile:
 	for mapString in branchList:
 	    if mapString.find(" ") == -1:
 		# empty branch
-		self.branchMap[branchString] = None
+		self.branchMap[mapString] = None
 	    else:
 		(branchString, versionString) = mapString.split()
 		self.branchMap[branchString] = \
