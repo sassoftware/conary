@@ -92,7 +92,7 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     cs = result[0]
 
     for outerPackage in pkgList:
-	cs.addPrimaryPackage(outerPackage.getName(), 
+	cs.addPrimaryTrove(outerPackage.getName(), 
 	    outerPackage.getVersion().createBranch(
 		versions.LocalLabel(), withVerRel = 1),
 	   outerPackage.getFlavor())

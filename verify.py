@@ -81,7 +81,7 @@ def verifyTrove(trove, db, cfg):
         if not result: return
         cs = result[0]
 
-        cs.addPrimaryPackage(trove.getName(), 
+        cs.addPrimaryTrove(trove.getName(), 
                 trove.getVersion().createBranch(
                     versions.LocalLabel(), withVerRel = 1),
                 trove.getFlavor())

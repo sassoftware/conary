@@ -157,6 +157,36 @@ class ConaryClient:
 
         return (cs, depList, suggMap, cannotResolve)
 
+    def _mergeGroupChanges(self, cs):
+        # updates a change set by removing troves which don't need
+        # to be updated do to local state
+        assert(not cs.isAbsolute())
+
+        for (trvName, trvVersion, trvFlavor) in cs.getPrimaryTroveList():
+            primaryTroveCs = cs.getNewPackageVersion(trvName, trvVersion, 
+                                                     trvFlavor)
+
+            for (name, changeList) in primaryTroveCs.iterChangedTroves():
+                for (changeType, version, flavor) in changeList:
+                    if changeType == '-': 
+                        # XXX GROUPS we should do something better here (like
+                        # check this against the erase list in the
+                        # changeset)
+                        continue
+
+                    troveCs = cs.getNewPackageVersion(name, version, flavor)
+
+                    oldItem = (name, troveCs.getOldVersion(), 
+                               troveCs.getOldFlavor())
+                    if not oldItem[1]: 
+                        # it's new -- it can stay
+                        continue
+
+                    if not self.db.hasTrove(*oldItem):
+                        cs.delNewPackage(name, version, flavor)
+                    elif self.db.hasTrove(name, version, flavor):
+                        cs.delNewPackage(name, version, flavor)
+
     def _updateChangeSet(self, itemList, keepExisting = None, test = False):
         """
         Updates a trove on the local system to the latest version 
@@ -245,6 +275,8 @@ class ConaryClient:
             cs = self.repos.createChangeSet(changeSetList, withFiles = False)
             finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
 
+        self._mergeGroupChanges(finalCs)
+
         return finalCs
 
     def updateChangeSet(self, itemList, keepExisting = False,
@@ -260,28 +292,41 @@ class ConaryClient:
         return self._resolveDependencies(finalCs, keepExisting = keepExisting, 
                                          recurse = recurse)
 
-    def applyChangeSet(self, cs, replaceFiles = False, tagScript = None, 
-                       keepExisting = None):
-	assert(0)
-        assert(isinstance(cs, changeset.ChangeSet))
-
-	assert(not cs.isAbsolute)
-        self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
-                                tagScript = tagScript, 
-                                keepExisting = keepExisting)
-
     def applyUpdate(self, theCs, replaceFiles = False, tagScript = None, 
                     keepExisting = None, test = False, justDatabase = False,
                     journal = None):
         assert(isinstance(theCs, changeset.ReadOnlyChangeSet))
         cs = changeset.ReadOnlyChangeSet()
+
+        changedTroves = [ (x.getName(), 
+                           (x.getOldVersion(), x.getOldFlavor()),
+                           (x.getNewVersion(), x.getNewFlavor()), False)
+                               for x in theCs.iterNewPackageList() ]
+        changedTroves += [ (x[0], (x[1], x[2]), (None, None), False) 
+                               for x in theCs.getOldPackageList() ]
+        changedTroves = dict.fromkeys(changedTroves)
+
         for (how, what) in theCs.contents:
-            if how == self.repos.createChangeSet:
-                newCs = self.repos.createChangeSet(what)
+            if how == changeset.ChangeSetFromFile:
+                newCs = what
+
+                troves = [ (x.getName(), 
+                               (x.getOldVersion(), x.getOldFlavor()),
+                               (x.getNewVersion(), x.getNewFlavor()), False)
+                                    for x in theCs.iterNewPackageList() ]
+                troves += [ (x[0], (x[1], x[2]), (None, None), False) 
+                                    for x in theCs.getOldPackageList() ]
+
+                for item in troves:
+                    if changedTroves.has_key(item):
+                        del changedTroves[item]
+                    else:
+                        newCs.delNewPackage(x[0], x[2][0], x[2][1])
                 cs.merge(newCs)
-            else:
-                assert(how == changeset.ChangeSetFromFile)
-                cs.merge(what)
+
+        newCs = self.repos.createChangeSet(changedTroves.keys(), 
+                                           recurse = False)
+        cs.merge(newCs)
 
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
@@ -456,7 +501,7 @@ class ConaryClient:
                                     trove.getVersion().branch()))
                 else:
                     cs.newPackage(troveCs)
-                    cs.addPrimaryPackage(name, version, flavor)
+                    cs.addPrimaryTrove(name, version, flavor)
                     needsCommit = True
 
         if needsCommit:

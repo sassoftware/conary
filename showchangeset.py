@@ -285,7 +285,7 @@ def getTroves(cs, troveList):
         for trove in cs.iterNewPackageList():
             allTroves[trove.getName(), trove.getNewVersion(), \
                                                 trove.getNewFlavor()] = True
-        ppl =  cs.getPrimaryPackageList()
+        ppl =  cs.getPrimaryTroveList()
         if ppl:
             troveList = []
             for (name, version, flavor) in ppl:

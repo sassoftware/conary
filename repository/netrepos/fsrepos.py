@@ -157,8 +157,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	if newVersion == None then the trove is being removed
 	"""
 	cs = changeset.ChangeSetFromRepository(self)
-	for (name, (oldV, oldFlavor), (newV, newFlavor), absolute) in troveList:
-	    cs.addPrimaryPackage(name, newV, newFlavor)
 
         externalTroveList = []
         externalFileList = []

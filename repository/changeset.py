@@ -139,11 +139,15 @@ class ChangeSet(streams.LargeStreamSet):
     def isLocal(self):
 	return self.local
 
-    def addPrimaryPackage(self, name, version, flavor):
+    def addPrimaryTrove(self, name, version, flavor):
         assert(flavor is not None)
 	self.primaryTroveList.append((name, version, flavor))
 
-    def getPrimaryPackageList(self):
+    def setPrimaryTroveList(self, l):
+        del self.primaryTroveList[:]
+        self.primaryTroveList.extend(l)
+
+    def getPrimaryTroveList(self):
 	return self.primaryTroveList
 
     def newPackage(self, csPkg):
@@ -166,6 +170,9 @@ class ChangeSet(streams.LargeStreamSet):
     def oldPackage(self, name, version, flavor):
 	assert(min(version.timeStamps()) > 0)
 	self.oldPackages.append((name, version, flavor))
+
+    def delOldPackage(self, name, version, flavor):
+        self.oldPackages.remove((name, version, flavor))
 
     def iterNewPackageList(self):
 	return self.newPackages.itervalues()
@@ -443,6 +450,10 @@ class ChangeSet(streams.LargeStreamSet):
 	    pkg = db.getTrove(name, version, flavor)
 	    pkgDiff = pkg.diff(None)[0]
 	    rollback.newPackage(pkgDiff)
+
+            # everything in the rollback is considered primary
+            rollback.addPrimaryTrove(name, version, flavor)
+
 	    for (pathId, path, fileId, fileVersion) in pkg.iterFileList():
 		fileObj = db.getFileVersion(pathId, fileId, fileVersion)
 		rollback.addFile(None, fileId, fileObj.freeze())
@@ -468,11 +479,6 @@ class ChangeSet(streams.LargeStreamSet):
 		    rollback.addFileContents(pathId,
 					     ChangedFileTypes.file, cont,
 					     fileObj.flags.isConfig())
-
-        # the primary packages for the rollback should mirror those of the
-        # changeset it is created for
-	for (name, version, flavor) in self.getPrimaryPackageList():
-            rollback.addPrimaryPackage(name, version, flavor)
 
 	return rollback
 
@@ -541,7 +547,7 @@ class ChangeSet(streams.LargeStreamSet):
 	    # become noticeable
 	    for (name, list) in pkgCs.iterChangedTroves():
 		if not packageVersions.has_key(name): continue
-		for (change, version) in list:
+                for (change, version) in list:
 		    if change != '+': continue
 
 		    for (oldVer, newVer) in packageVersions[name]:
@@ -691,6 +697,8 @@ class ReadOnlyChangeSet(ChangeSet):
 		log.warning("package %s %s is already installed -- skipping",
 			    troveName, newVersion.asString())
                 del self.newPackages[key]
+                if key in self.primaryTroveList:
+                    self.primaryTroveList.remove(key)
 		continue
 
             if troveMap is None:

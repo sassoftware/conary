@@ -257,36 +257,6 @@ class Database(SqlDbRepository):
 
 	tagSet = tags.loadTagDict(self.root + "/etc/conary/tags")
 
-	# Make sure this change set doesn't unintentionally restore troves
-	# which have been removed.  take a look at which packages were removed
-	# from the primary packages, and remove those packages from the change
-	# set as well. Bleah.
-	#
-	# XXX This is expensive; we need hash's of version/name
-	# pairs. it also isn't quite right, as change sets
-	# can't actually store multiple versions of the same
-	# trove
-	remove = {}
-	for (name, version, flavor) in cs.getPrimaryPackageList():
-	    try:
-		pkgCs = cs.getNewPackageVersion(name, version, flavor)
-	    except KeyError:
-		continue
-
-	    oldVersion = pkgCs.getOldVersion()
-	    if not oldVersion: continue
-
-            oldFlavor = pkgCs.getOldFlavor()
-	    pristine = self.getTrove(name, oldVersion, oldFlavor, pristine = True)
-	    changed = self.getTrove(name, oldVersion, oldFlavor)
-
-	    for (subName, subVersion, subFlavor) in pristine.iterTroveList():
-		if not changed.hasTrove(subName, subVersion, subFlavor):
-		    remove[(subName, version, subFlavor)] = True
-
-	for (name, version, flavor) in remove.iterkeys():
-	    cs.delNewPackage(name, version, flavor)
-
 	# create the change set from A->A.local
 	pkgList = []
 	for newPkg in cs.iterNewPackageList():

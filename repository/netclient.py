@@ -439,10 +439,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	return l
 
     def createChangeSet(self, list, withFiles = True, withFileContents = True,
-                        excludeAutoSource = False):
+                        excludeAutoSource = False, recurse = True):
 	return self._getChangeSet(list, withFiles = withFiles, 
                                   withFileContents = withFileContents,
-                                  excludeAutoSource = excludeAutoSource)
+                                  excludeAutoSource = excludeAutoSource,
+                                  recurse = recurse)
 
     def createChangeSetFile(self, list, fName):
 	self._getChangeSet(list, target = fName)
@@ -477,6 +478,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             ourJobList = []
             for (troveName, (old, oldFlavor), (new, newFlavor), absolute) in \
                     jobList:
+                if not new:
+                    ourJobList.append((troveName, (old, oldFlavor),
+                                       (new, newFlavor), absolute))
+                    continue
+
                 serverName = new.branch().label().getHost()
                 if not serverJobs.has_key(serverName):
                     serverJobs[serverName] = []
@@ -570,10 +576,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             os.unlink(tmpName)
             
 
-        # it might a good idea to dedup the job list as we go? the only
-        # thing that makes that tricky is the first job, which could be
-        # written to a file and not yet read in (and it may never need
-        # to be read)
+        # (name, version, release) list. removed troves aren't primary
+        primaryTroves = [ (x[0], x[2][0], x[2][1]) for x in chgSetList 
+                                    if x[2][0] is not None ]
 
         while chgSetList:
             (serverJobs, ourJobList) = _separateJobList(chgSetList)
@@ -616,6 +621,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             if (ourJobList or filesNeeded) and not internalCs:
                 internalCs = changeset.ChangeSet()
+
+            # handle everything in ourJobList which is just a deletion
+            delList = []
+            for i, (troveName, (oldVersion, oldFlavor),
+                  (newVersion, newFlavor), absolute) in enumerate(ourJobList):
+                if not newVersion:
+                    internalCs.oldPackage(troveName, oldVersion, oldFlavor)
+                    delList.append(i)
+
+            for i in reversed(delList):
+                del ourJobList[i]
+            del delList
 
             # generate this change set, and put any recursive generation
             # which is needed onto the chgSetList for the next pass
@@ -665,9 +682,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 internalCs.newPackage(pkgChgSet)
 
-                if passCount == 0:
-                    internalCs.addPrimaryPackage(troveName, newVersion, 
-                                                 newFlavor)
             passCount += 1
 
         if withFiles and filesNeeded:
@@ -753,6 +767,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             internalCs = None
         elif cs and internalCs:
             cs.merge(internalCs)
+
+        # convert the versions in here to ones w/ timestamps
+        cs.setPrimaryTroveList([])
+        for (name, version, flavor) in primaryTroves:
+            trove = cs.getNewPackageVersion(name, version, flavor)
+            cs.addPrimaryTrove(name, trove.getNewVersion(), flavor)
 
         if target and cs:
             if passCount > 1 or internalCs:
