@@ -1,5 +1,12 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
 import package
 import versions
+
+_pkgFormat  = "%-39s %s"
+_fileFormat = "    %-35s %s"
 
 def displayPkgs(repos, cfg, pkg = "", versionStr = None):
     if pkg and pkg[0] != "/":
@@ -7,16 +14,15 @@ def displayPkgs(repos, cfg, pkg = "", versionStr = None):
 
     for pkgName in repos.getPackageList(pkg):
 	pkgSet = repos.getPackageSet(pkgName)
-	if not versionStr:
-	    l = pkgSet.versionList()
-	    versions.versionSort(l)
-	    for version in l:
-		    print "%-39s %s" % (
-			package.stripNamespace(cfg.packagenamespace, pkgName),
-			version.asString(cfg.defaultbranch)
-		      )
-	else:
-	    displayPkgInfo(repos, cfg, pkgName, versionStr)
+	if versionStr:
+            displayPkgInfo(repos, cfg, pkgName, versionStr)
+            continue
+        l = pkgSet.versionList()
+        versions.versionSort(l)
+        for version in l:
+            print _pkgFormat % (
+                package.stripNamespace(cfg.packagenamespace, pkgName),
+                version.asString(cfg.defaultbranch))
 
 def displayPkgInfo(repos, cfg, pkgName, versionStr):
     if pkgName[0] != "/":
@@ -33,10 +39,8 @@ def displayPkgInfo(repos, cfg, pkgName, versionStr):
     else:
 	pkg = pkgSet.getVersion(version)
 
-    print "%-39s %s" % (
-	    package.stripNamespace(cfg.packagenamespace, pkgName),
-	    version.asString(cfg.defaultbranch)
-	)
+    print _pkgFormat % (
+        package.stripNamespace(cfg.packagenamespace, pkgName),
+        version.asString(cfg.defaultbranch))
     for (fileId, path, version) in pkg.fileList():
-	print "    %-35s %s" % (path, version.asString(cfg.defaultbranch))
-
+	print _fileFormat % (path, version.asString(cfg.defaultbranch))
