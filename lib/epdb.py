@@ -19,7 +19,7 @@ import pdb
 import os
 import re
 try:
-    import rlcompleter
+    import erlcompleter
     import readline
 except ImportError:
     hasReadline = False
@@ -45,7 +45,7 @@ class Epdb(pdb.Pdb):
         self._config = {}
         pdb.Pdb.__init__(self)
         if hasReadline:
-            self._completer = rlcompleter.Completer()
+            self._completer = erlcompleter.ECompleter()
         self.prompt = '(Epdb) '
     
     def do_savestack(self, path):
@@ -146,13 +146,47 @@ class Epdb(pdb.Pdb):
                     print "%s: Not set" % (key)
             else:
                 key, value = args
-                if(hasattr(self, 'set_' + key)):
-                    fn = getattr(self, 'set_' + key)
+                if(hasattr(self, '_set_' + key)):
+                    fn = getattr(self, '_set_' + key)
                     fn(value)
                 else:
                     print "No such config value"
 
-    def set_path(self, paths):
+    def do_trace_cond(self, args):
+        args = args.split(' ', 1)
+        if len(args) not in (1, 2):
+            print "trace_cond <cond> [marker]"
+        if len(args) == 1:
+            cond = args[0]
+            marker = 'default'
+        else:
+            marker, cond = args
+        if cond == 'None': 
+            cond = None
+            set_trace_cond(cond, marker)
+            return
+        try:
+            cond = int(cond)
+            set_trace_cond(cond, marker)
+            return
+        except ValueError:
+            locals = self.curframe.f_locals
+            globals = self.curframe.f_globals
+            try:
+                print "Evaluating %s" % cond
+                cond = eval(cond + '\n', globals, locals) 
+                # test to be sure that what we code is a 
+                # function that can take one arg and return a bool
+                rv = (type(cond) == bool) or bool(cond(1))
+                set_trace_cond(cond, marker)
+            except:
+                t, v = sys.exc_info()[:2]
+                if type(t) == type(''):
+                    exc_type_name = t
+                else: exc_type_name = t.__name__
+                print '***', exc_type_name + ':', v
+
+    def _set_path(self, paths):
         paths = paths.split(' ')
         for path in paths:
             if path[0] != '/':
@@ -266,8 +300,10 @@ class Epdb(pdb.Pdb):
             curCount += 1
         except KeyError:
             (cond, curCount) = None, 1
-        if cond is None:
+        if cond is None or cond is True:
             rv = True
+        elif cond is False:
+            rv = False
         else:
             try:
                 rv = cond(curCount)
