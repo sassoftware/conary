@@ -78,6 +78,17 @@ class SqlDbRepository(repository.DataStoreRepository,
 	"""
 	return [ x for x in self.db.iterVersionByName(name) ]
 
+    def getTroveList(self, name):
+	"""
+	Returns a list of all of the troves available in the
+	repository.
+
+	@param name: trove
+	@type name: str
+	@rtype: list of trove.Trove instances
+	"""
+	return [ x for x in self.db.iterFindByName(name) ]
+
     def getFileVersion(self, fileId, version, withContents = 0):
 	file = self.db.getFile(fileId, version, pristine = True)
 	if withContents:
