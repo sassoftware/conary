@@ -84,7 +84,11 @@ class Transport(xmlrpclib.Transport):
 
     def request(self, host, handler, request_body, verbose=0):
 	self.verbose = verbose
-	opener = XMLOpener()
+	# turn off proxy for localhost
+	if host == 'localhost':
+	    opener = XMLOpener({})
+	else:
+	    opener = XMLOpener()
 	opener.addheaders = []
 	host, extra_headers, x509 = self.get_host_info(host)
 	opener.addheader('Host', host)
