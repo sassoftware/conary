@@ -51,7 +51,8 @@ def _createPackage(repos, cfg, bldPkg, ident):
             f = files.FileFromInfoLine(buildFile.infoLine(), ident(path))
         elif realPath:
             f = files.FileFromFilesystem(realPath, ident(path), 
-                                         type = buildFile.getType())
+                                         type = buildFile.getType(),
+                                         requireSymbolicOwnership=True)
 	    # setuid or setgid must be set explicitly in buildFile
 	    f.thePerms &= 01777
         else:

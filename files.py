@@ -529,7 +529,8 @@ class SourceFile(RegularFile):
     def __init__(self, fileId, info = None):
 	RegularFile.__init__(self, fileId, info, infoTag = "src")
 
-def FileFromFilesystem(path, fileId, type = None, possibleMatch = None):
+def FileFromFilesystem(path, fileId, type = None, possibleMatch = None,
+                       requireSymbolicOwnership = False):
     s = os.lstat(path)
 
     needsSha1 = 0
@@ -559,8 +560,22 @@ def FileFromFilesystem(path, fileId, type = None, possibleMatch = None):
         raise FilesError("unsupported file type for %s" % path)
 
     f.perms(s.st_mode & 07777)
-    f.owner(pwd.getpwuid(s.st_uid)[0])
-    f.group(grp.getgrgid(s.st_gid)[0])
+    try:
+        f.owner(pwd.getpwuid(s.st_uid)[0])
+    except KeyError, msg:
+        if requireSymbolicOwnership:
+            raise FilesError(
+                "Error mapping uid %d to user name: %s" %(s.st_uid, msg))
+        else:
+            s.owner(str(s.st_uid))
+    try:
+        f.group(grp.getgrgid(s.st_gid)[0])
+    except KeyError, msg:
+        if requireSymbolicOwnership:
+            raise FilesError(
+                "Error mapping gid %d to group name: %s" %(s.st_gid, msg))
+        else:
+            f.group(str(s.st_gid))
     f.mtime(s.st_mtime)
     f.size(s.st_size)
     f.flags(0)
