@@ -265,7 +265,6 @@ class Trove:
 	"""
 
 	assert(not them or self.name == them.name)
-	assert(not them or self.flavor == them.flavor)
 
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
@@ -426,7 +425,7 @@ class Trove:
 
 		if match:
 		    changePair.append((name, added[name][newFlavor], newFlavor, 
-				       removed[name][oldFlavor], oldFlavor))
+				       match, oldFlavor))
 		    del added[name][newFlavor]
 		    continue
 
@@ -671,9 +670,9 @@ class TroveChangeSet:
         if self.provides:
             depformat('Provides', self.provides, f)
         if self.oldFlavor:
-            depformat('Old Flavor', self.flavor, f)
+            depformat('Old Flavor', self.oldFlavor, f)
         if self.newFlavor:
-            depformat('New Flavor', self.flavor, f)
+            depformat('New Flavor', self.newFlavor, f)
 
 	for (fileId, path, version) in self.newFiles:
 	    #f.write("\tadded (%s(.*)%s)\n" % (fileId[:6], fileId[-6:]))
