@@ -33,6 +33,8 @@ def usage():
     print "       srs update  <pkgname> <version>"
     print "                   <pkgfile>"
     print ""
+    print "changeset flags: --fromdb"
+    print ""
     print "common flags:  --branch <defaultbranch>"
     print '               --config "<item> <value>"'
     print "               --reppath <repository-path>"
@@ -54,6 +56,7 @@ cfgMap["branch"] = "defaultbranch"
 cfgMap["reppath"] = "reppath"
 cfgMap["root"] = "root"
 
+argDef["fromdb"] = 0
 argDef["config"] = 2
 argDef["all"] = 0
 argDef["prep"] = 0
@@ -119,7 +122,12 @@ elif (otherArgs[1] == "changeset"):
 	(old, new) = (None, otherArgs[3])
 	outFile = otherArgs[4]
 
-    repos = repository.LocalRepository(cfg.reppath, "c")
+    if argSet.has_key('fromdb'):
+        del argSet['fromdb']
+	repos = database.Database(cfg.root, cfg.dbpath, "r")
+    else:
+	repos = repository.LocalRepository(cfg.reppath, "r")
+
     changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
 elif (otherArgs[1] == "commit"):
     repos = repository.LocalRepository(cfg.reppath, "c")
