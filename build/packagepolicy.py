@@ -115,8 +115,13 @@ class CheckSonames(policy.Policy):
 	if not os.path.islink(l):
 	    m = self.recipe.magic[path]
 	    if m and m.name == 'ELF' and 'soname' in m.contents:
-		log.warning('%s is not a symlink but probably should be'
-			    ' a link to %s', path, m.contents['soname'])
+		if os.path.basename(path) == m.contents['soname']:
+		    target = m.contents['soname']+'.something'
+		else:
+		    target = m.contents['soname']
+		log.warning(
+		    %s is not a symlink but probably should be a link to %s',
+		    path, target)
 	    return
 
 	# store initial contents
