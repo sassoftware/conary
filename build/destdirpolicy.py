@@ -59,8 +59,6 @@ class TestSuiteLinks(policy.Policy):
 		 'fileMap' : {}
 		} 
     invariantexceptions = [ 
-#			    [ '.*', stat.S_IFDIR ],
-			    [ '.*', stat.S_IFLNK ],
 			    '%(mandir)s/',
 			    '%(infodir)s/',
 			    '%(docdir)s/',
@@ -150,6 +148,8 @@ class TestSuiteLinks(policy.Policy):
 
     def doFile(self, path):
 	fullpath = self.macros.destdir + path
+        if os.path.islink(fullpath):
+            return
 
 	fileName = os.path.basename(path)
 	if fileName in self.builddirfiles:
