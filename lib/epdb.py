@@ -131,9 +131,18 @@ class Epdb(pdb.Pdb):
     do_f = do_file
 
     def do_until(self, arg):
-        self.do_tbreak(arg)
-        self.set_continue()
-        return 1
+        try:
+            int(arg)
+        except ValueError:
+            print "Error: only specify line numbers for until"
+            return 0
+        filename = self.canonic(self.curframe.f_code.co_filename)
+        if self.checkline(filename, int(arg)):
+            self.do_tbreak(arg)
+            self.set_continue()
+            return 1
+        else:
+            return 0
 
     def do_set(self, arg):
         if not arg:
