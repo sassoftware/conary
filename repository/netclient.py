@@ -361,11 +361,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         cs = None
         firstPath = target
+        scheduledSet = {}
+        internalCs = None
+        firstPass = True
+        filesNeeded = []
+
+        # it might a good idea to dedup the job list as we go? the only
+        # thing that makes that tricky is the first job, which could be
+        # written to a file and not yet read in (and it may never need
+        # to be read)
 
         while chgSetList:
-            # split the chgSetList into jobs for each server and one
-            # for this client
-            (serverJobs, ourJobLst) = _separateJobList(chgSetList)
+            (serverJobs, ourJobList) = _separateJobList(chgSetList)
 
             chgSetList = []
 
@@ -405,9 +412,80 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                             os.unlink(tmpName)
                         raise
 
+            if ourJobList and not internalCs:
+                internalCs = repository.changeset.ChangeSet()
+
+            # generate this change set, and put any recursive generation
+            # which is needed onto the chgSetList for the next pass
+            trovesNeeded = []
+            for (troveName, (oldVersion, oldFlavor),
+                            (newVersion, newFlavor), absolute) in ourJobList:
+                # old version and new version are both set, otherwise
+                # we wouldn't need to generate the change set ourself
+                trovesNeeded.append((troveName, oldVersion, oldFlavor))
+                trovesNeeded.append((troveName, newVersion, newFlavor))
+
+            troves = self.getTroves(trovesNeeded)
+            i = 0
+            for (troveName, (oldVersion, oldFlavor),
+                            (newVersion, newFlavor), absolute) in ourJobList:
+                old = troves[i]
+                new = troves[i + 1]
+                i += 2
+
+                (pkgChgSet, newFilesNeeded, pkgsNeeded) = \
+                                new.diff(old, absolute = absolute) 
+                filesNeeded += [ (troveName, newVersion, newFlavor, x) for x in 
+                                    newFilesNeeded ]
+
+                if recurse:
+                    for (otherTroveName, otherOldVersion, otherNewVersion, 
+                         otherOldFlavor, otherNewFlavor) in pkgsNeeded:
+                        chgSetList.append((otherTroveName, 
+                                           (otherOldVersion, otherOldFlavor),
+                                           (otherNewVersion, otherNewFlavor),
+                                           absolute))
+
+                internalCs.newPackage(pkgChgSet)
+
+                if firstPass:
+                    internalCs.addPrimaryPackage(troveName, newVersion, 
+                                                 newFlavor)
+
+            firstPass = False
+
+        if withFiles:
+            for (troveName, troveVersion, troveFlavor, 
+                    (fileId, oldFileVersion, newFileVersion, 
+                     oldPath, newPath)) in filesNeeded:
+                fileObj = self.getFileVersion(fileId, newFileVersion)
+
+		(filecs, hash) = repository.changeset.fileChangeSet(fileId, 
+                                                None, fileObj)
+
+		internalCs.addFile(fileId, None, newFileVersion, filecs)
+
+                if withFileContents and hash:
+                    cont = self.getFileContents(troveName, troveVersion, 
+                                            troveFlavor, fileId, newFileVersion)
+                    internalCs.addFileContents(fileId, 
+                                   repository.changeset.ChangedFileTypes.file, 
+                                   cont, 
+                                   fileObj.flags.isConfig())
+
+
+        if not cs and internalCs:
+            cs = internalCs
+            internalCs = None
+
         if target and cs:
-            newCs = repository.changeset.ChangeSetFromFile(target)
-            cs.merge(newCs)
+            if not firstPath:
+                newCs = repository.changeset.ChangeSetFromFile(target)
+                cs.merge(newCs)
+
+            if internalCs:
+                cs.merge(internalCs)
+
             cs.writeToFile(target)
             cs = None
 
