@@ -268,11 +268,13 @@ Use.kde = False
 Use.xfce = False
 Use.gd = False
 Use.ldap = True
-Use.sasl = False # Simple Authenication and Security Layer
+Use.sasl = False
+Use.sasl.setShortDoc('Build with support for SASL Simple Authenication '
+                     'and Security Layer')
 Use.pie = False
 
 Use.desktop = Use.gnome | Use.kde | Use.xfce
-Use.desktop.setShortDoc('Building with support for freedesktop.org specs')
+Use.desktop.setShortDoc('Build with support for freedesktop.org specs')
 Use.desktop.setLongDoc("""
 Set if any graphical desktop platform/environment that attempts to conform
 to the freedesktop.org specifications is enabled.  In particular, desktop
