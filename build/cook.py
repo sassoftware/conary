@@ -11,6 +11,7 @@ resulting packages to the repository.
 import buildpackage
 import changeset
 import files
+import helper
 import log
 import lookaside
 import os
@@ -126,22 +127,12 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     log.info("Building %s", recipeClass.name)
     fullName = cfg.packagenamespace + ":" + recipeClass.name
 
-    newVersion = None
+    currentVersion = None
     if repos.hasPackage(fullName):
-	# if this package/version exists already, increment the
-	# existing revision
-	newVersion = repos.pkgLatestVersion(fullName, buildBranch)
-	if newVersion and (
-	  recipeClass.version == newVersion.trailingVersion().getVersion()):
-	    newVersion = newVersion.copy()
-	    newVersion.incrementBuildCount()
-	else:
-	    newVersion = None
+	currentVersion = repos.pkgLatestVersion(fullName, buildBranch)
 
-    # this package/version doesn't exist yet
-    if not newVersion:
-	newVersion = buildBranch.copy()
-	newVersion.appendVersionRelease(recipeClass.version, 1)
+    newVersion = helper.nextVersion(recipeClass.version, currentVersion, 
+				    buildBranch, binary = True)
 
     if issubclass(recipeClass, recipe.PackageRecipe):
 	(cs, built, cleanup) = cookPackageObject(repos, cfg, recipeClass, 
