@@ -1314,6 +1314,7 @@ def _expandPaths(paths, macros):
     builddir = macros.builddir
     expPaths = []
     for path in paths:
+        path = path % macros
         if path[0] == '/':
             if path.startswith(destdir):
                 log.warning(
@@ -1324,7 +1325,7 @@ def _expandPaths(paths, macros):
                 path = destdir + path
         else:
             path = builddir + os.sep + path
-        expPaths.extend(util.braceGlob(path % macros))
+        expPaths.extend(util.braceGlob(path))
     notfound = []
     for path in expPaths:
         if not os.path.exists(path):
