@@ -37,7 +37,14 @@ def doCommit(repos, changeSetFile, targetBranch):
 		  "without a branch override")
 
     try:
-	repos.commitChangeSet(cs)
+        if targetBranch:
+            # XXX we currently cannot write out the retargeted changeset
+            repos.commitChangeSet(cs)
+        else:
+            # hopefully the file hasn't changed underneath us since we
+            # did the check at the top of doCommit().  We should probably
+            # add commitChangeSet method that takes a fd.
+            repos.commitChangeSetFile(changeSetFile)
     except repository.CommitError, e:
 	print e
 	
