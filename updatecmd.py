@@ -151,6 +151,12 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                 newVersion = x.getNewVersion()
                 if oldVersion:
                     oldTVersion = oldVersion.trailingRevision()
+                else:
+                    # if there is no oldVersion, this is a new trove
+                    new.append("N %s (%s)" % 
+                               (x.getName(), newTVersion.asString()))
+                    continue
+                    
                 newTVersion = newVersion.trailingRevision()
 
                 if oldVersion.branch() != newVersion.branch():
