@@ -2,6 +2,7 @@ Changes in 0.12.1
   * repquery and query always showed dependency information
   * getTroveLeavesByBranch did extra demarshalling of the flavor
   * repquery didn't deal with nonexistant troves well
+  * dependency failures on erase didn't reassemble dependency flags properly
 
 Changes in 0.12.0
   * document config command, and display supplied macro/use/arch information 
