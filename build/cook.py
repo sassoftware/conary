@@ -913,7 +913,15 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
         if not pid:
             # child, set ourself to be the foreground process
             os.setpgrp()
-            os.tcsetpgrp(0, os.getpgrp())
+            try:
+                # the child should control stdin -- if stdin is a tty
+                # that can be controlled
+                if sys.stdin.isatty():
+                    os.tcsetpgrp(0, os.getpgrp())
+            except AttributError:
+                # stdin might not even have an isatty method
+                pass
+
 	    # make sure we do not accidentally make files group-writeable
 	    os.umask(0022)
 	    # and if we do not create core files we will not package them
