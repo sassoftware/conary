@@ -129,12 +129,21 @@ branch only for that trove.
 .B cook \fI[\fR--prep\fI] [\fR--macros file\fI] [\fR--target-branch \fI<branch>]\fR \e
 .PD 0
 .TP
-.B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>...\fP
+.B \ \ \ \ \ [\fR--resume [<linenum>|policy]] \fI<file>\fP.recipe\fI|<component>...\fP
 .PD
 Build a package.  If \fB--prep\fP is specified, the souce code is
 unpacked, but is not built. if \fB--macros\fP is specified, it
 names a file containing macro definitions to apply to the recipe
-macro set.  If the thing to be cooked ends in \fB.recipe\fP, then
+macro set.  If \fB--resume <linenum>\fP is specified, 
+conary will continue cooking the specified recipe from the line
+number given.  If \fB--resume\fP is specified with no parameter,
+the recipe will be recooked from the line of last failure.  
+If \fB--resume policy\fP is specified, the policy will be rechecked 
+from the last build.  Note that the \fB--resume\fP option may
+only be used with local recipe files, not source components grabbed
+from a repository.
+.IP 
+If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the
 filesystem.  Otherwise, it must name a repository component and
 the package will be cooked from the repository.

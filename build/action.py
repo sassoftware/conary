@@ -178,12 +178,15 @@ class RecipeAction(Action):
 	exc_msg = sys.exc_info()[1]
 	prefix = "%s:%s:" % (self.file, self.linenum)
 	prefix_len = len(prefix)
-	if str(exc_msg)[:prefix_len] == prefix:
-	    raise exc_type, exc_message
-	else:
-	    raise exc_type, "%s:%s: %s: %s" % (self.file, self.linenum, 
+	if str(exc_msg)[:prefix_len] != prefix:
+	    exc_message = "%s:%s: %s: %s" % (self.file, self.linenum, 
 				          exc_type.__name__, exc_msg)
-
+	buildinfo = self.recipe.buildinfo
+	buildinfo.error = exc_message
+	buildinfo.file = self.file
+	buildinfo.lastline = self.linenum
+	buildinfo.stop()
+	raise exc_type, exc_message
 
 # XXX look at ShellCommand versus Action
 class ShellCommand(RecipeAction):

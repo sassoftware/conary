@@ -53,7 +53,7 @@ def usage(rc = 1):
     print "usage: conary branch <newbranch> <branchfrom> [<trove>]"
     print "       conary changeset <pkg> [<oldver>] <newver> <outfile>"
     print "       conary cook [--prep] [--debug-exceptions] [--macros file] <file.recipe|troveName>+"
-    print "       conary emerge <troveName>+"
+    print "       conary emerge       <troveName>+"
     print "       conary commit       <changeset>"
     print "       conary erase        <pkgname> [<version>]"
     print "       conary localcs      <pkg> <outfile>"
@@ -78,6 +78,7 @@ def usage(rc = 1):
     print ""
     print "cook flags:    --macros"
     print "               --prep"
+    print "               --resume [policy|<lineno>]"
     print "               --debug-exceptions"
     print "               --target-branch <branch>"
     print ""
@@ -118,26 +119,30 @@ def realMain():
     cfgMap["install-label"] = "installLabel"
     cfgMap["root"] = "root"
 
-    argDef["all"] = 0
-    argDef["config"] = 2
-    argDef["debug"] = 0
-    argDef["debug-exceptions"] = 0
-    argDef["full-versions"] = 0
-    argDef["ids"] = 0
-    argDef["info"] = 0
-    argDef["keep-existing"] = 0
-    argDef["leaves"] = 0
-    argDef["path"] = 1
-    argDef["ls"] = 0
-    argDef["macros"] = 1
-    argDef["message"] = 1
-    argDef["prep"] = 0
-    argDef["profile"] = 0
-    argDef["replace-files"] = 0
-    argDef["sha1s"] = 0
-    argDef["tag-script"] = 1
-    argDef["tags"] = 0
-    argDef["target-branch"] = 1
+    (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
+    (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
+
+    argDef["all"] = NO_PARAM
+    argDef["config"] = MULT_PARAM
+    argDef["debug"] = NO_PARAM
+    argDef["debug-exceptions"] = NO_PARAM
+    argDef["full-versions"] = NO_PARAM
+    argDef["ids"] = NO_PARAM
+    argDef["info"] = NO_PARAM
+    argDef["keep-existing"] = NO_PARAM
+    argDef["leaves"] = NO_PARAM
+    argDef["path"] = ONE_PARAM
+    argDef["ls"] = NO_PARAM
+    argDef["macros"] = ONE_PARAM
+    argDef["message"] = ONE_PARAM
+    argDef["prep"] = NO_PARAM
+    argDef["profile"] = NO_PARAM
+    argDef["replace-files"] = NO_PARAM
+    argDef["resume"] = OPT_PARAM
+    argDef["sha1s"] = NO_PARAM
+    argDef["tag-script"] = ONE_PARAM
+    argDef["tags"] = NO_PARAM
+    argDef["target-branch"] = ONE_PARAM
 
     argDef.update(srcctl.argDef)
 
@@ -202,10 +207,15 @@ def realMain():
 	log.setVerbosity(1)
 	macros = {}
 	prep = 0
+	resume = None
 	buildBranch = None
 	if argSet.has_key('prep'):
 	    del argSet['prep']
 	    prep = 1
+
+	if argSet.has_key('resume'):
+	    resume = argSet['resume']
+	    del argSet['resume']
 	if argSet.has_key('debug-exceptions'):
 	    del argSet['debug-exceptions']
 	    cfg.debugRecipeExceptions = True
@@ -224,7 +234,7 @@ def realMain():
 
 	if argSet: return usage()
 
-	cook.cookCommand(cfg, otherArgs[2:], prep, macros)                
+	cook.cookCommand(cfg, otherArgs[2:], prep, macros, resume=resume)                
     elif (otherArgs[1] == "emerge"):
 	log.setVerbosity(1)
 

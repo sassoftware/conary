@@ -26,11 +26,12 @@ from repository import repository
 import files
 import helper
 import log
-from build import lookaside, use
+from build import buildinfo, lookaside, use
 import os
 import package
 import resource
 import sha1helper
+import shutil
 import signal
 import sys
 import tempfile
@@ -111,7 +112,8 @@ class _IdGen:
 # -------------------- public below this line -------------------------
 
 def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None, 
-	       prep=True, macros={}, buildBranch = None, targetVersion = None):
+	       prep=True, macros={}, buildBranch = None, targetVersion = None, 
+	       resume = None):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -135,11 +137,16 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     @param buildBranch: branch to build on; if present buildLabel is ignored.
     this branch does not need to contain timestamps; they'll be looked up if
     they are missing.
+    @type buildBranch: versions.Version
     @param targetVersion: version to use for the cooked troves; if None (the
     default), the version used is the next version on the buildBranch 
     @type targetVersion: versions.Version
+    @param resume: indicates whether to resume the previous build.  If True,
+    resume at the line of last breakage.  If an integer, resume at that line.
+    If 'policy', rerun the policy only.  Note that resume is only valid when
+    cooking a recipe from a file, not from the repository.  
+    @type resume: bool or str
     
-    @type buildBranch: versions.Version
     @rtype: list of strings
     """
 
@@ -195,7 +202,8 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     if issubclass(recipeClass, recipe.PackageRecipe):
 	ret = cookPackageObject(repos, cfg, recipeClass, buildBranch,
                                 prep = prep, macros = macros,
-				targetVersion = targetVersion)
+				targetVersion = targetVersion,
+				resume = resume)
     elif issubclass(recipeClass, recipe.GroupRecipe):
 	ret = cookGroupObject(repos, cfg, recipeClass, buildBranch, 
 			      macros = macros, targetVersion = targetVersion)
@@ -345,7 +353,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
     return (changeSet, built, None)
 
 def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True, 
-		      macros={}, targetVersion = None):
+		      macros={}, targetVersion = None, resume = None):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -410,21 +418,39 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 
     try:
 	recipeObj.setup()
-	recipeObj.unpackSources(builddir)
+	bldInfo = buildinfo.BuildInfo(builddir)
+	recipeObj.buildinfo = bldInfo
+
+	# don't bother with prep the dirs if we are resuming
+	if not resume:
+	    if os.path.exists(builddir):
+		shutil.rmtree(builddir)
+	    util.mkdirChain(builddir)
+	    bldInfo.begin()
+	    recipeObj.unpackSources(builddir)
 	# if we're only extracting, continue to the next recipe class.
 	if prep:
 	    return
-	
+	    
 	cwd = os.getcwd()
-	util.mkdirChain(builddir + '/' + recipeObj.mainDir())
-
 	try:
+	    if resume:
+		bldInfo.read()
+		destdir = bldInfo.destdir
+		bldInfo.begin()
+		bldInfo.destdir = destdir
+		if resume is True:
+		    resume = bldInfo.lastline
+	    else:
+		util.mkdirChain(builddir + '/' + recipeObj.mainDir())
+		util.mkdirChain(cfg.tmpDir)
+		destdir = tempfile.mkdtemp("", "conary-%s-" % recipeObj.name, cfg.tmpDir)
+		bldInfo.destdir = destdir
 	    os.chdir(builddir + '/' + recipeObj.mainDir())
-	    util.mkdirChain(cfg.tmpDir)
-	    destdir = tempfile.mkdtemp("", "conary-%s-" % recipeObj.name, cfg.tmpDir)
-	    recipeObj.doBuild(builddir, destdir)
+	    recipeObj.doBuild(builddir, destdir, resume=resume)
 	    log.info('Processing %s', recipeClass.name)
 	    recipeObj.doDestdirProcess() # includes policy
+	    bldInfo.stop()
 	    use.track(False)
 	finally:
 	    os.chdir(cwd)
@@ -494,7 +520,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
 def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
-	     emerge = False):
+	     emerge = False, resume = None):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -537,6 +563,8 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 	recipeClass = loader.getRecipe()
         changeSetFile = "%s-%s.ccs" % (recipeClass.name, recipeClass.version)
     else:
+	if resume:
+	    raise CookError('Cannot use --resume argument when cooking in repository')
         try:
             (loader, version) = recipe.recipeLoaderFromSourceComponent(item,
 					    item + '.recipe', cfg, repos)[0:2]
@@ -556,8 +584,9 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
         troves = cookObject(repos, cfg, recipeClass, cfg.buildLabel,
                             changeSetFile = changeSetFile,
                             prep = prep, macros = macros,
-			    buildBranch = buildBranch,
-			    targetVersion = targetVersion)
+			    buildBranch = buildBranch, 
+			    targetVersion = targetVersion,
+			    resume = resume)
         if troves:
             built = (tuple(troves), changeSetFile)
     except repository.RepositoryError, e:
@@ -583,7 +612,7 @@ class CookError(Exception):
     def __str__(self):
 	return repr(self)
 
-def cookCommand(cfg, args, prep, macros, buildBranch = None, emerge = False):
+def cookCommand(cfg, args, prep, macros, buildBranch = None, emerge = False, resume = None):
     # this ensures the repository exists
     repos = helper.openRepository(cfg.repositoryMap)
 
@@ -602,7 +631,7 @@ def cookCommand(cfg, args, prep, macros, buildBranch = None, emerge = False):
 	    resource.setrlimit(resource.RLIMIT_CORE, (0,0))
             try:
                 built = cookItem(repos, cfg, item, prep=prep, macros=macros,
-				 emerge = emerge)
+				 emerge = emerge, resume = resume)
             except CookError, msg:
 		log.error(str(msg))
                 sys.exit(1)

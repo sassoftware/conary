@@ -327,9 +327,6 @@ class PackageRecipe(Recipe):
 	return files
 
     def unpackSources(self, builddir):
-	if os.path.exists(builddir):
-	    shutil.rmtree(builddir)
-	util.mkdirChain(builddir)
 	self.macros.builddir = builddir
 	for source in self._sources:
 	    source.doAction()
@@ -337,13 +334,22 @@ class PackageRecipe(Recipe):
     def extraBuild(self, action):
         self._build.append(action)
 
-    def doBuild(self, buildPath, root):
+    def doBuild(self, buildPath, root, resume=None):
         builddir = os.sep.join((buildPath, self.mainDir()))
 	self.macros.update({'builddir': builddir,
 			    'destdir': root})
 	self.magic = magic.magicCache(root)
-	for bld in self._build:
-	   bld.doAction()
+	if resume == 'policy':
+	    return
+	if resume:
+	    resume = int(resume)
+	    log.debug("Resuming on line %d" % resume)
+	    for bld in self._build:
+		if bld.linenum >= resume:
+		    bld.doAction()
+	else:
+	    for bld in self._build:
+		bld.doAction()
 
     def doDestdirProcess(self):
 	for post in self.destdirPolicy:
