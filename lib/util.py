@@ -276,7 +276,18 @@ def braceGlob(paths):
 def rmtree(paths, ignore_errors=False, onerror=None):
     for path in braceGlob(paths):
 	log.debug('deleting [tree] %s', path)
+	os.path.walk(path, _permsVisit, None)
 	shutil.rmtree(path, ignore_errors, onerror)
+
+def _permsVisit(arg, dirname, names):
+    for name in names:
+	path = dirname + os.sep + name
+	mode = os.lstat(path)[stat.ST_MODE]
+	# has to be executable to cd, readable to list, writeable to delete
+	if stat.S_ISDIR(mode) and (mode & 0700) != 0700:
+	    log.warn("working around illegal mode 0%o at %s", mode, path)
+	    mode |= 0700
+	    os.chmod(path, mode)
 
 def remove(paths):
     for path in braceGlob(paths):

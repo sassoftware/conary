@@ -346,10 +346,18 @@ class _FileAction(BuildAction):
                 log.warning('odd permission %o, correcting to %o: add initial "0"?' \
                             %(mode, _permmap[mode]))
 		mode = _permmap[mode]
-	    os.chmod(destdir+os.sep+path, mode & 01777)
-	    if mode & 06000:
+	    isdir = os.path.isdir(destdir+os.sep+path)
+	    if isdir and (mode & 0700) != 0700:
+		# regardless of what permissions go into the package,
+		# we need to be able to traverse this directory as
+		# the non-root build user
+		os.chmod(destdir+os.sep+path, (mode & 01777) | 0700)
 		self.recipe.AddModes(mode, path)
-	    if os.path.isdir(destdir+os.sep+path) and mode != 0755:
+	    else:
+		os.chmod(destdir+os.sep+path, mode & 01777)
+		if mode & 06000:
+		    self.recipe.AddModes(mode, path)
+	    if isdir and mode != 0755:
 		self.recipe.ExcludeDirectories(exceptions=path)
 
     def setComponents(self, paths):

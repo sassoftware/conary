@@ -6,6 +6,7 @@
 import util
 import re
 import os
+import stat
 import policy
 import log
 
@@ -14,6 +15,26 @@ Module used by recipes to modify the state of the installed %(destdir)s
 Classes from this module are not used directly; instead, they are used
 through eponymous interfaces in recipe.
 """
+
+class FixDirModes(policy.Policy):
+    """
+    Any directories that do not have user read/write/execute must be
+    fixed up now so that we can traverse the tree in following policy,
+    packaging, and removing the tree after building.
+
+    This policy must be run first so that other policies can be
+    counted on to search the full directory tree.
+    """
+    # call doFile for all directories that are not readable, writeable,
+    # and executable for the user
+    invariantinclusions = [ ('.*', stat.S_IFDIR) ]
+    invariantexceptions = [ ('.*', 0700) ]
+
+    def doFile(self, path):
+	fullpath = util.normpath(self.macros['destdir']+os.sep+path)
+	mode = os.lstat(fullpath)[stat.ST_MODE]
+	self.recipe.AddModes(mode, path)
+	os.chmod(fullpath, mode | 0700)
 
 class SanitizeSonames(policy.Policy):
     """
@@ -315,6 +336,7 @@ def DefaultPolicy():
     A recipe can then modify this list if necessary.
     """
     return [
+	FixDirModes(),
 	SanitizeSonames(),
 	RemoveExtraLibs(),
 	FixupMultilibPaths(),

@@ -423,8 +423,8 @@ class PackageRecipe(Recipe):
 	return self.name + "-" + self.version
 
     def cleanup(self, builddir, destdir):
-	shutil.rmtree(builddir)
-	shutil.rmtree(destdir)
+	util.rmtree(builddir)
+	util.rmtree(destdir)
 
     def checkSignatures(self, filepath, filename):
         if filename not in self.signatures:
