@@ -189,7 +189,7 @@ def commit(repos, cfg, message):
 
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
-	if repos.hasPackage(state.getName()):
+	if repos.hasPackage(cfg.buildLabel.getHost(), state.getName()):
 	    log.error("%s is marked as a new package but it " 
 		      "already exists" % state.getName())
 	    return
@@ -496,7 +496,7 @@ def newPackage(repos, cfg, name):
 
     state = SourceState(name, versions.NewVersion())
 
-    if repos and repos.hasPackage(name):
+    if repos and repos.hasPackage(cfg.buildLabel.getHost(), name):
 	log.error("package %s already exists" % name)
 	return
 

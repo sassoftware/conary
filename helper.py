@@ -11,9 +11,9 @@ import repository
 import repository.netclient
 import versions
 
-def openRepository(path):
+def openRepository(repMap, path):
     if path.startswith("http://"):
-        repos = repository.netclient.NetworkRepositoryClient(path)
+        repos = repository.netclient.NetworkRepositoryClient(repMap, path)
     else:
 	import log, sys
 	log.error("only networked repositories are supported")

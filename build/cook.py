@@ -138,7 +138,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     fullName = recipeClass.name
 
     if not buildBranch:
-	if repos.hasPackage(fullName):
+	if repos.hasPackage(buildLabel.getHost(), fullName):
 	    vers = repos.getTroveLeavesByLabel([fullName], buildLabel)[fullName]
 	    if not len(vers):
 		raise CookError('No branches labeled %s exist for trove %s'

@@ -82,9 +82,9 @@ def usage(rc = 1):
     print "update flags: --replace-files"
     return rc
 
-def openRepository(path):
+def openRepository(repMap, path):
     try:
-        return helper.openRepository(path)
+        return helper.openRepository(repMap, path)
     except repository.repository.OpenError, e:
 	log.error('Unable to open repository %s: %s', path, str(e))
 	sys.exit(1)
@@ -194,7 +194,7 @@ def realMain():
     elif (otherArgs[1] == "branch"):
 	if argSet: return usage
 	if len(otherArgs) < 4 or len(otherArgs) > 5: return usage()
-	repos = openRepository(cfg.repPath)
+	repos = openRepository(cfg.repositoryMap, cfg.repPath)
 
 	args = [repos, ] + otherArgs[2:]
 	branch.branch(*args)
@@ -211,7 +211,7 @@ def realMain():
 	    (old, new) = (None, otherArgs[3])
 	    outFile = otherArgs[4]
 
-	repos = openRepository(cfg.repPath)
+	repos = openRepository(cfg.repositoryMap, cfg.repPath)
 
 	cscmd.ChangeSetCommand(repos, cfg, name, outFile, old, new)
     elif (otherArgs[1] == "commit"):
@@ -220,7 +220,7 @@ def realMain():
 	    targetBranch  = argSet['target-branch']
 	    del argSet['target-branch']
 	if len(otherArgs) < 3: return usage()
-	repos = openRepository(cfg.repPath)
+	repos = openRepository(cfg.repositoryMap, cfg.repPath)
 	for changeSet in otherArgs[2:]:
 	    commit.doCommit(repos, changeSet, targetBranch)
     elif (otherArgs[1] == "config"):
@@ -269,7 +269,7 @@ def realMain():
 	if len(otherArgs) != 3 and len(otherArgs) != 3:
 	    return usage()
 
-	repos = openRepository(cfg.repPath)
+	repos = openRepository(cfg.repositoryMap, cfg.repPath)
 	importrpm.doImport(repos, cfg, otherArgs[2])
     elif (otherArgs[1] == "localcs"):
 	if len(otherArgs) != 4 and len(otherArgs) != 4:
@@ -333,7 +333,7 @@ def realMain():
 	leaves = argSet.has_key('leaves')
 	if leaves: del argSet['leaves']
 
-	repos = openRepository(cfg.repPath)
+	repos = openRepository(cfg.repositoryMap, cfg.repPath)
 
 	if argSet: return usage()
 
@@ -376,7 +376,7 @@ def realMain():
 	    del argSet['replace-files']
 	if argSet: return usage
 	if len(otherArgs) >=3 and len(otherArgs) <= 4:
-	    repos = openRepository(cfg.repPath)
+	    repos = openRepository(cfg.repositoryMap, cfg.repPath)
 	    db = openDatabase(cfg.root, cfg.dbPath)
 
 	    args = [repos, db, cfg] + otherArgs[2:]

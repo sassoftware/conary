@@ -6,6 +6,7 @@
 import filecontainer
 import gzip
 import httplib
+import log
 import os
 import package
 import repository
@@ -18,6 +19,46 @@ import xmlrpclib
 import xmlshims
 from deps import deps
 
+class ServerCache:
+
+    def __getitem__(self, item):
+	if isinstance(item, versions.BranchName):
+	    serverName = item.getHost()
+	elif isinstance(item, str):
+	    serverName = item
+	else:
+	    if item.isBranch():
+		serverName = item.label().getHost()
+	    else:
+		serverName = item.branch().label().getHost()
+
+	server = self.cache.get(serverName, None)
+	if server is None:
+	    url = self.map.get(serverName, None)
+	    if url is None:
+		url = "http://%s/conary/" % serverName
+	    server = xmlrpclib.Server(url)
+	    self.cache[serverName] = server
+
+	    try:
+		if server.checkVersion(0) < 0:
+		    raise repository.OpenError('Server version too old')
+	    except OSError, e:
+		raise repository.OpenError('Error occured opening repository '
+			    '%s: %s' % (server, e.strerror))
+	    except socket.error, e:
+		raise repository.OpenError('Error occured opening repository '
+			    '%s: %s' % (server, e[1]))
+	    except Exception, e:
+		raise repository.OpenError('Error occured opening repository '
+			    '%s: %s' % (server, str(e)))
+
+	return server
+		
+    def __init__(self, repMap):
+	self.cache = {}
+	self.map = repMap
+
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			      repository.AbstractRepository):
 
@@ -28,32 +69,39 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	if isinstance(where, versions.Version):
 	    kind = 'v'
 	    frz = self.fromVersion(where)
+	    if where.isBranch():
+		label = where.label()
+	    else:
+		label = where.branch().label()
 	else:
 	    kind = 'l'
 	    frz = self.fromLabel(where)
+	    label = where
 
-	self.s.createBranch(self.fromLabel(newBranch), kind, frz, troveList)
+	newBranchStr = self.fromLabel(newBranch)
+
+	if label.getHost() != newBranch.getHost():
+	    log.error("cannot create label %s in repository on %s",
+		      newBranchStr, label.getHost())
+
+	self.c[where].createBranch(newBranchStr, kind, frz, troveList)
 
     def open(self, *args):
         pass
 
-    def hasPackage(self, pkg):
-        return self.s.hasPackage(pkg)
+    def hasPackage(self, serverName, pkg):
+        return self.c[serverName].hasPackage(pkg)
 
     def hasTrove(self, pkgName, version, flavor):
 	return self.s.hasTrove(pkgName, version, flavor)
 
-    def iterAllTroveNames(self):
-	for name in self.s.allTroveNames():
-	    yield name
-
-    def iterAllTroveNames(self):
-	for name in self.s.allTroveNames():
+    def iterAllTroveNames(self, serverName):
+	for name in self.c[serverName].allTroveNames():
 	    yield name
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
-        gen = self.s.getFilesInTrove(troveName,
+        gen = self.c[version].getFilesInTrove(troveName,
                                      self.fromVersion(version),
                                      self.fromFlavor(flavor),
                                      sortByPath,
@@ -65,8 +113,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             for (fileId, path, version) in gen:
                 yield (fileId, path, self.toVersion(version))
 
-    def getAllTroveLeafs(self, troveNames):
-	d = self.s.getAllTroveLeafs(troveNames)
+    def getAllTroveLeafs(self, serverName, troveNames):
+	d = self.c[serverName].getAllTroveLeafs(troveNames)
 	for troveName, troveVersions in d.iteritems():
 	    d[troveName] = [ self.toVersion(x) for x in troveVersions ]
 
@@ -76,25 +124,27 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	return [ (versions.VersionFromString(x[0], 
 			timeStamps = [ float(z) for z in x[1].split(":")]),
 		  self.toFlavor(x[2])) for x in 
-                 self.s.getTroveFlavorsLatestVersion(troveName, 
+                 self.c[branch].getTroveFlavorsLatestVersion(troveName, 
                                                      branch.asString()) ]
 
-    def getTroveVersionList(self, troveNameList):
-	d = self.s.getTroveVersionList(troveNameList)
+    def getTroveVersionList(self, serverName, troveNameList):
+	d = self.c[serverName].getTroveVersionList(troveNameList)
 	for troveName, troveVersions in d.iteritems():
 	    d[troveName] = [ self.toVersion(x) for x in troveVersions ]
 
 	return d
 
     def getTroveLeavesByLabel(self, troveNameList, label):
-	d = self.s.getTroveLeavesByLabel(troveNameList, label.asString())
+	d = self.c[label].getTroveLeavesByLabel(troveNameList, 
+						label.asString())
 	for troveName, troveVersions in d.iteritems():
 	    d[troveName] = [ self.thawVersion(x) for x in troveVersions ]
 
 	return d
 	
     def getTroveVersionsByLabel(self, troveNameList, label):
-	d = self.s.getTroveVersionsByLabel(troveNameList, label.asString())
+	d = self.c[label].getTroveVersionsByLabel(troveNameList, 
+						  label.asString())
 	for troveName, troveVersions in d.iteritems():
 	    d[troveName] = [ self.thawVersion(x) for x in troveVersions ]
 
@@ -103,14 +153,31 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def getTroveVersionFlavors(self, troveDict):
 	passD = {}
 	versionDict = {}
+
+	serverName = None
+
 	for (troveName, versionList) in troveDict.iteritems():
 	    passD[troveName] = []
 	    for version in versionList:
+		s = version.branch().label().getHost()
+		if serverName is None:
+		    serverName = s
+
+		# XXX 
+		assert(serverName == s)
+
 		versionStr = self.fromVersion(version)
 		versionDict[versionStr] = version
 		passD[troveName].append(versionStr)
 
-	result = self.s.getTroveVersionFlavors(passD)
+	if not serverName:
+	    newD = {}
+	    for troveName in passD:
+		newD[troveName] = {}
+
+	    return newD
+
+	result = self.c[serverName].getTroveVersionFlavors(passD)
 
 	newD = {}
 	for troveName, troveVersions in result.iteritems():
@@ -123,7 +190,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def getTroveLatestVersion(self, troveName, branch):
 	b = self.fromBranch(branch)
-	v = self.s.getTroveLatestVersion(troveName, b)
+	v = self.c[branch].getTroveLatestVersion(troveName, b)
         if v == 0:
             raise repository.PackageMissing(troveName, branch)
 	return self.thawVersion(v)
@@ -163,17 +230,25 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True):
 	l = []
+	serverName = None
 	for (name, flavor, old, new, absolute) in chgSetList:
 	    if old:
 		l.append((name, self.fromFlavor(flavor),
 			  self.fromVersion(old), self.fromVersion(new), 
 			  absolute))
+		if serverName is None:
+		    serverName = old.branch().label().getHost()
+		assert(serverName == old.branch().label().getHost())
 	    else:
 		l.append((name, self.fromFlavor(flavor),
 			  0, self.fromVersion(new),
 			  absolute))
 
-	url = self.s.getChangeSet(l, recurse, withFiles)
+	    if serverName is None:
+		serverName = new.branch().label().getHost()
+	    assert(serverName == new.branch().label().getHost())
+
+	url = self.c[serverName].getChangeSet(l, recurse, withFiles)
 
 	# XXX we shouldn't need to copy this locally most of the time
 	inF = urllib.urlopen(url)
@@ -189,10 +264,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return cs
 
-    def getFileVersion(self, fileId, version, withContents = 0):
-        # XXX handle withContents
-        assert(withContents == 0)
-        return self.toFile(self.s.getFileVersion(fileId,
+    def getFileVersion(self, fileId, version):
+        return self.toFile(self.c[version].getFileVersion(fileId,
                                                  self.fromVersion(version)))
 
     def getFileContents(self, sha1List):
@@ -246,18 +319,31 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	return d
 
     def commitChangeSet(self, chgSet):
+	serverName = None
+	for pkg in chgSet.iterNewPackageList():
+	    v = pkg.getOldVersion()
+	    if v:
+		if serverName is None:
+		    serverName = v.branch().label().getHost()
+		assert(serverName == v.branch().label().getHost())
+
+	    v = pkg.getNewVersion()
+	    if serverName is None:
+		serverName = v.branch().label().getHost()
+	    assert(serverName == v.branch().label().getHost())
+	    
 	(outFd, path) = tempfile.mkstemp()
 	os.close(outFd)
 	chgSet.writeToFile(path)
 
-	url = self.s.prepareChangeSet()
+	url = self.c[serverName].prepareChangeSet()
 
 	try:
 	    self._putFile(url, path)
 	finally:
 	    os.unlink(path)
 
-	self.s.commitChangeSet(url)
+	self.c[serverName].commitChangeSet(url)
 
     def _putFile(self, url, path):
 	assert(url.startswith("http://"))
@@ -269,14 +355,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	r = c.getresponse()
 	assert(r.status == 200)
 
-    def __init__(self, server):
+    def __init__(self, repMap, server):
 	self.s = xmlrpclib.Server(server)
-        try:
-            if self.s.checkVersion(0) < 0:
-                raise repository.OpenError('Server version too old')
-        except OSError, e:
-            raise repository.OpenError('Error occured opening the repository: %s' %e.strerror)
-        except socket.error, e:
-            raise repository.OpenError('Error occured opening the repository: %s' %e[1])
-        except Exception, e:
-            raise repository.OpenError('Error occured opening the repository: %s' %str(e))
+	self.c = ServerCache(repMap)

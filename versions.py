@@ -626,11 +626,11 @@ class Version(AbstractVersion):
 	lastVersion = None
 	lastBranch = None
 	while parts:
-	    if parts[0] == "localhost@local:LOCAL":
+	    lastBranch = BranchName(parts[0], template = lastBranch)
+	    if lastBranch.asString() == "localhost@local:LOCAL":
 		lastBranch = None
 		v.append(LocalBranch())
 	    else:
-		lastBranch = BranchName(parts[0], template = lastBranch)
 		v.append(lastBranch)
 
 	    if len(parts) >= 2:

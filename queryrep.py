@@ -19,7 +19,8 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 	troves = [ trove ]
     else:
 	# this returns a sorted list
-	troves = [ x for x in repos.iterAllTroveNames() ]
+	troves = [ x for x in 
+		    repos.iterAllTroveNames(cfg.installLabel.getHost()) ]
 
     if versionStr or ls or ids or sha1s or info:
 	if all:
@@ -32,9 +33,11 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 	    continue
     else:
 	if all:
-	    versions = repos.getTroveVersionList(troves)
+	    versions = repos.getTroveVersionList(cfg.installLabel.getHost(),
+						 troves)
 	elif leaves:
-            versions = repos.getAllTroveLeafs(troves)
+            versions = repos.getAllTroveLeafs(cfg.installLabel.getHost(), 
+					      troves)
 	else:
             versions = repos.getTroveLeavesByLabel(troves, cfg.installLabel)
 
