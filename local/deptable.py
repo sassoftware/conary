@@ -653,7 +653,7 @@ class DependencyTables:
                             None, ("Dependencies", "TmpDependencies"), 
                             multiplier = -1)
 
-        full = """SELECT depNum, Items.item, Versions.version FROM 
+        full = """SELECT depNum, Items.item, Versions.version, flavor FROM 
                         (%s)
                       JOIN Instances ON
                         provInstanceId == Instances.instanceId
@@ -661,6 +661,8 @@ class DependencyTables:
                         Instances.itemId == Items.itemId
                       JOIN Versions ON
                         Instances.versionId == Versions.versionId
+                      JOIN Flavors ON
+                        Instances.flavorId == Flavors.flavorId
                       JOIN Nodes ON
                         Instances.itemId == Nodes.itemId AND
                         Instances.versionId == Nodes.versionId
@@ -671,16 +673,53 @@ class DependencyTables:
                                 providesLabel = label.asString())
                     
         cu.execute(full,start_transaction = False)
-        result = {}
-        handled = {}
-        for (depId, troveName, versionStr) in cu:
+
+        # this depends intimately on things being sorted newest to oldest
+
+        depSolutions = [ {} ] * len(depList)
+        troveNameSolutions = {}
+        solutionCount = {}
+
+        saw = {}
+        for (depId, troveName, versionStr, flavorStr) in cu:
             depId = -depId
 
-            if handled.has_key(depId):
+            # only remember the first (newest) version of each trove for
+            # a particular flavor
+            sawVersion = saw.setdefault((troveName, flavorStr), versionStr)
+            if sawVersion != versionStr:
                 continue
 
-            handled[depId] = True
-            
+            d = depSolutions[depId].setdefault(troveName, {}) 
+            l = d.setdefault((versionStr, flavorStr), [])
+            l.append((versionStr, flavorStr))
+
+            if not troveNameSolutions.has_key((troveName, depId)):
+                troveNameSolutions[(troveName, depId)] = True
+                solutionCount.setdefault(troveName, 0)
+                solutionCount[troveName] += 1
+
+        result = {}
+
+        #import lib
+        #lib.epdb.st()
+
+        for depId, troveNames in enumerate(depSolutions):
+            if depId == 0: continue
+            if not troveNames: 
+                # no solutions for this depId
+                continue
+
+            countList = []
+            for troveName in troveNames:
+                countList.append((solutionCount[troveName], troveName))
+            countList.sort()
+
+            troveName = countList[-1][1]
+
+            # XXX
+            versionStr = troveNames[troveName].keys()[0][0]
+
             depNum = depList[depId][0]
             depSet = depSetList[depNum]
             l = result.get(depSet, None)
