@@ -15,6 +15,7 @@ import metadata
 
 from htmlengine import HtmlEngine
 from metadata import MDClass
+from repository.netrepos import netserver
 
 class ServerError(Exception):
     def __str__(self):
@@ -130,7 +131,11 @@ class HttpHandler(HtmlEngine):
             source = None
         
         branches = {}
-        for version in self.troveStore.iterTroveVersions(troveName):
+        versions = self.repServer.getTroveVersionList(authToken,
+            netserver.SERVER_VERSIONS[-1], [troveName], "")
+        
+        for version in versions[troveName]:
+            version = self.repServer.thawVersion(version)
             branch = version.branch().freeze()
 
             branchName = branch.split("@")[-1]
