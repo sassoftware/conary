@@ -45,12 +45,12 @@ python_files = __init__.py	\
 
 example_files = examples/tmpwatch.recipe
 bin_files = srs srs-bootstrap
-extra_files = srs.recipe.in srs.recipe srs-wrapper.in Makefile
+extra_files = srs.recipe.in srs.recipe srs-wrapper.in Makefile test/*.py
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
 generated_files = srs-wrapper srs.recipe *.pyo *.pyc 
 
-.PHONY: clean bootstrap deps.dot pychecker dist install
+.PHONY: clean bootstrap deps.dot pychecker dist install test
 
 all: srs-wrapper srs.recipe
 
@@ -108,3 +108,6 @@ deps.dot:
 
 pychecker:
 	python2.3 /usr/lib/python2.2/site-packages/pychecker/checker.py *.py
+
+test:
+	python2.3 test/testsuite.py
