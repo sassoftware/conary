@@ -33,7 +33,7 @@ from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExi
 import trovestore
 import versions
 
-SERVER_VERSIONS = [ 21, 22 ]
+SERVER_VERSIONS = [ 21, 22, 23 ]
 CACHE_SCHEMA_VERSION = 11
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -590,13 +590,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   withVersions = False, 
                                   versionType = self._GTL_VERSION_TYPE_LABEL)
 
-    def getTroveVersionList(self, authToken, clientVersion, troveNameList,
-                            flavorFilter):
-        if troveNameList:
-            troveFilter = {}.fromkeys(troveNameList, 
-                                      { None : [ flavorFilter ] } )
+    def getTroveVersionList(self, authToken, clientVersion, troveNameFlavors,
+                            flavorFilter = None):
+        if clientVersion >= 23:
+            troveFilter = {}
+
+            for name, flavors in troveNameFlavors.iteritems():
+                if len(name) == 0:
+                    name = None
+
+                if type(flavors) is list:
+                    troveFilter[name] = { None : flavors }
+                else:
+                    troveFilter[name] = { None : None }
         else:
-            troveFilter = { None : { None : [ flavorFilter ] } }
+            if troveNameFlavors:
+                troveFilter = {}.fromkeys(troveNameFlavors, 
+                                            { None : flavorFilter })
+            else:
+                troveFilter = { None : { None : flavorFilter } } 
             
         return self._getTroveList(authToken, clientVersion, troveFilter,
                                   withVersions = True, withFlavors = True)
@@ -676,8 +688,26 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   withFlavors = True)
         return d
 
-    def getAllTroveLeaves(self, authToken, clientVersion, troveNameList):
-        troveFilter = {}.fromkeys(troveNameList, { None : None })
+    def getAllTroveLeaves(self, authToken, clientVersion, troveNameFlavors,
+                          flavorFilter = None):
+        if clientVersion >= 23:
+            troveFilter = {}
+
+            for name, flavors in troveNameFlavors.iteritems():
+                if len(name) == 0:
+                    name = None
+
+                if type(flavors) is list:
+                    troveFilter[name] = { None : flavors }
+                else:
+                    troveFilter[name] = { None : None }
+        else:
+            if troveNameFlavors:
+                troveFilter = {}.fromkeys(troveNameFlavors, 
+                                            { None : flavorFilter })
+            else:
+                troveFilter = { None : { None : flavorFilter } } 
+            
         return self._getTroveList(authToken, clientVersion, troveFilter,
                                   withVersions = True, 
                                   latestFilter = self._GET_TROVE_VERY_LATEST,

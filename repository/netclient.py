@@ -37,7 +37,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=22
+CLIENT_VERSION=23
 
 class _Method(xmlrpclib._Method):
 
@@ -275,7 +275,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return resultD
 
     def getAllTroveLeaves(self, serverName, troveNameList):
-	d = self.c[serverName].getAllTroveLeaves(troveNameList)
+        req = {}
+        for name, flavors in troveNameList.iteritems():
+            if name is None:
+                name = ''
+
+            if flavors is None:
+                req[name] = True
+            else:
+                req[name] = [ self.fromFlavor(x) for x in flavors ]
+
+	d = self.c[serverName].getAllTroveLeaves(req)
+
         return self._mergeTroveQuery({}, d)
 
     def getTroveFlavorsLatestVersion(self, troveName, branch):
@@ -285,10 +296,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                  self.c[branch].getTroveFlavorsLatestVersion(troveName, 
                                                      branch.asString()) ]
 
-    def getTroveVersionList(self, serverName, troveNameList, 
-                            flavorFilter = None):
-	d = self.c[serverName].getTroveVersionList(troveNameList, 
-                                               self.fromFlavor(flavorFilter))
+    def getTroveVersionList(self, serverName, troveNameList):
+        req = {}
+        for name, flavors in troveNameList.iteritems():
+            if name is None:
+                name = ''
+
+            if flavors is None:
+                req[name] = True
+            else:
+                req[name] = [ self.fromFlavor(x) for x in flavors ]
+
+	d = self.c[serverName].getTroveVersionList(req)
         return self._mergeTroveQuery({}, d)
 
     def getTroveLeavesByLabel(self, troveNameList, label, flavorFilter = None):

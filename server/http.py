@@ -132,7 +132,7 @@ class HttpHandler(HtmlEngine):
         
         branches = {}
         versions = self.repServer.getTroveVersionList(authToken,
-            netserver.SERVER_VERSIONS[-1], [troveName], "")
+            netserver.SERVER_VERSIONS[-1], { troveName : None }, "")
         
         for version in versions[troveName]:
             version = self.repServer.thawVersion(version)

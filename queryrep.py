@@ -36,7 +36,8 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
     hasVersions = False
 
     if troveList:
-        (troves, hasVersions) = display.parseTroveStrings(troveList)
+        (troves, hasVersions, hasFlavors) = \
+                    display.parseTroveStrings(troveList, cfg.flavor)
     else:
 	# this returns a sorted list
         troves = []
@@ -44,20 +45,20 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
             troves += [ (x, None) for x in repos.troveNames(label) ]
             troves.sort()
 
-    if hasVersions or ls or ids or sha1s or info or tags or deps:
+    if hasVersions or hasFlavors or ls or ids or sha1s or info or tags or deps:
 	if all:
 	    log.error("--all cannot be used with queries which display file "
 		      "lists")
 	    return
-	for troveName, versionStr in troves:
+	for troveName, versionStr, flavor in troves:
 	    _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-			      info, tags, deps, fullVersions)
+			      info, tags, deps, fullVersions, flavor)
 	    continue
     else:
 	if all or leaves:
             repositories = {}
             allHosts = [ x.getHost() for x in cfg.installLabelPath ]
-            for (name, versionStr) in troves:
+            for (name, versionStr, flavor) in troves:
                 if versionStr and versionStr[0] != '@':
                     hostList = versions.Label(versionStr).getHost()
                 else:
@@ -65,9 +66,10 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
                     
                 for host in hostList:
                     if repositories.has_key(host):
-                        repositories[host].append(name)
+                        if repositries[host].has_key(name):
+                            repositories[host][name].append(flavor)
                     else:
-                        repositories[host] = [ name ]
+                        repositories[host] = { name : [ flavor ] }
 
             if all:
                 fn = repos.getTroveVersionList
@@ -85,7 +87,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
                 repos.queryMerge(flavors, d)
 
         displayc = display.DisplayCache()
-	for troveName, versionStr in troves:
+	for troveName, versionStr, flavor in troves:
             if not flavors.has_key(troveName):
 		if all or leaves:
 		    log.error('No versions for "%s" were found in the '
@@ -114,12 +116,15 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
                 
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-		      info, tags, deps, fullVersions):
+		      info, tags, deps, fullVersions, flavor):
     withFiles = ids
+
+    if flavor is None:
+        flavor = cfg.flavor
 
     try:
 	troveList = repos.findTrove(cfg.installLabelPath, troveName, 
-				    cfg.flavor, versionStr,
+				    flavor, versionStr,
                                     acrossRepositories = True,
                                     withFiles = withFiles)
     except repository.TroveNotFound, e:

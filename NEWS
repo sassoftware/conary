@@ -14,6 +14,8 @@ Changes in 0.12.2
     of a single version
   * fix for updating multiple flavors of a single version of a trove
     simultaneously
+  * reworked getTroveVersionList and getAllTroveVersions for per-trove
+    flavor filtering
 
 Changes in 0.12.1
   * repquery and query always showed dependency information

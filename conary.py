@@ -318,7 +318,8 @@ def realMain(cfg, argv=sys.argv):
 	if len(otherArgs) >= 2:
 	    try:
                 display.displayTroves(db, otherArgs[2:], paths, ls, ids, sha1s,
-                                      fullVersions, tags)
+                                      fullVersions, tags, 
+                                      defaultFlavor = cfg.flavor)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
 		return 1

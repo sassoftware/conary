@@ -23,6 +23,7 @@ from lib import log
 from deps import deps
 from lib.sha1helper import sha1ToString, md5ToString
 from repository import repository
+import updatecmd
 
 _troveFormat  = "%-39s %s"
 _troveFormatWithFlavor  = "%-39s %s%s"
@@ -137,21 +138,20 @@ def printFile(fileObj, path, prefix='', verbose=True, tags=False, sha1s=False,
     else:
         print "%s%s%s%s" % (id, sha1,path, taglist)
 
-def parseTroveStrings(troveNameList):
+def parseTroveStrings(troveNameList, defaultFlavor):
     troveNames = []
     hasVersions = False
+    hasFlavors = False
     for item in troveNameList:
-        if item.find("=") != -1:
-            l = item.split("=")
-            if len(l) > 2:
-                log.error("versions may not contain =")
-                return
-            troveNames.append(tuple(l))
+        (name, version, flavor) = updatecmd.parseTroveSpec(item, defaultFlavor)
+        if version is not None:
             hasVersions = True
-        else:
-            troveNames.append((item, None))
-    return troveNames, hasVersions
+        if flavor is not None:
+            hasFlavors = True
 
+        troveNames.append((name, version, flavor))
+
+    return troveNames, hasVersions, hasFlavors
 
 def _formatFlavor(flavor):
     if flavor:
@@ -184,20 +184,23 @@ def _printOneTrove(db, troveName, troveVersions, fullVersions):
 
 def displayTroves(db, troveNameList = [], pathList = [], ls = False, 
                   ids = False, sha1s = False, fullVersions = False, 
-                  tags = False):
-    (troveNames, hasVersions) = parseTroveStrings(troveNameList)
+                  tags = False, defaultFlavor = None):
+    (troveNames, hasVersions, hasFlavors) = \
+        parseTroveStrings(troveNameList, defaultFlavor)
+
     pathList = [os.path.abspath(util.normpath(x)) for x in pathList]
     
     if not troveNames and not pathList:
 	troveNames = [ (x, None) for x in db.iterAllTroveNames() ]
 	troveNames.sort()
 
-    if not hasVersions and not ls and not ids and not sha1s and not tags:
+    if not hasVersions and not hasFlavors and not ls and not ids and \
+                                              not sha1s and not tags:
         for path in pathList:
             for trove in db.iterTrovesByPath(path):
                 troveNames.append((trove.getName(), [ trove.getVersion() ]))
 
-        for troveName, versionList in troveNames:
+        for troveName, versionList, flavor in troveNames:
             _printOneTrove(db, troveName, versionList, fullVersions)
         return
 
@@ -205,10 +208,12 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
         for trove in db.iterTrovesByPath(path):
 	    _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags)
 
-    for (troveName, versionStr) in troveNames:
+    for (troveName, versionStr, flavor) in troveNames:
         try:
             for trove in db.findTrove(troveName, versionStr):
-                _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags)
+                if not flavor or trove.getFlavor().satisfies(flavor):
+                    _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, 
+                                      tags)
         except repository.TroveNotFound:
             if versionStr:
                 log.error("version %s of trove %s is not installed",
