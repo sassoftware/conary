@@ -615,6 +615,7 @@ class MakeDevices(policy.Policy):
 	    # perms is optional, all other arguments must be there
 	    assert((l > 5) and (l < 8))
 	    if l == 6:
+                args = list(args)
 		args.append(0400)
 	    self.devices.append(args)
 	policy.Policy.updateArgs(self, **keywords)
