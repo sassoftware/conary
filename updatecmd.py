@@ -55,7 +55,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
         (cs, depFailures, suggMap, brokenByErase) = \
             client.updateChangeSet(applyList, recurse = recurse,
                                    resolveDeps = depCheck,
-                                   keepExisting = keepExisting)
+                                   keepExisting = keepExisting,
+                                   test = test)
 
         if brokenByErase:
             print "Troves being removed create unresolved dependencies:"

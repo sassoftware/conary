@@ -134,7 +134,7 @@ class ConaryClient:
 
         return (cs, depList, suggMap, cannotResolve)
 
-    def _updateChangeSet(self, itemList, keepExisting = None):
+    def _updateChangeSet(self, itemList, keepExisting = None, test = False):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -144,8 +144,6 @@ class ConaryClient:
         update, or a (name, versionString) tuple. 
         @type itemList: list
         """
-        self._prepareRoot()
-
         changeSetList = []
         finalCs = UpdateChangeSet()
         for item in itemList:
@@ -239,7 +237,10 @@ class ConaryClient:
         return finalCs
 
     def updateChangeSet(self, itemList, keepExisting = False,
-                        recurse = True, resolveDeps = True):
+                        recurse = True, resolveDeps = True, test = False):
+        if not test:
+            self._prepareRoot()
+
         finalCs = self._updateChangeSet(itemList, keepExisting = keepExisting)
 
         if not resolveDeps:
