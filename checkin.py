@@ -3,11 +3,11 @@
 # All rights reserved
 #
 
-import group
+#import group
 
 def checkin(repos, cfg, file):
     f = open(file, "r")
-    grp = group.GroupFromTextFile(f, cfg.packagenamespace, repos)
+    #grp = group.GroupFromTextFile(f, cfg.packagenamespace, repos)
     simpleVer = grp.getSimpleVersion()
 
     ver = repos.grpLatestVersion(grp.getName(), cfg.defaultbranch)
