@@ -6,23 +6,32 @@ import package
 import files
 import shutil
 import string
+import copy
 
 # version is a short package version, not an SRS version string
-def finalCommit(cfg, pkgName, version, root, fileList):
+def finalCommit(cfg, pkgName, simpleVersion, root, fileList):
     pkgSet = package.PackageSet(cfg.reppath, pkgName)
 
-    if pkgSet.hasVersion(version):
-	raise KeyError, ("package %s version %s is already installed" %
-		    (pkgName, version))
-    p = pkgSet.createVersion(version)
+    version = pkgSet.getLatestVersion(cfg.defaultbranch)
+    if version and simpleVersion == version.trailingVersion():
+	# yes, increment the revision
+	version = copy.deepcopy(version)
+	version.incrementVersionRelease()
+    else:
+	# no, make a new version
+	version = copy.deepcopy(cfg.defaultbranch)
+	version.appendVersionRelease(simpleVersion, 1)
+
+    p = package.Package(version)
 
     fileDB = cfg.reppath + "/files"
 
     for file in fileList:
 	infoFile = files.FileDB(cfg.reppath, file.pathInRep(cfg.reppath))
 
-	existing = infoFile.findVersion(file)
-	if not existing:
+	duplicateVersion = infoFile.checkBranchForDuplicate(cfg.defaultbranch,
+					file)
+	if not duplicateVersion:
 	    file.version(version)
 	    infoFile.addVersion(version, file)
 
@@ -32,13 +41,14 @@ def finalCommit(cfg, pkgName, version, root, fileList):
 	    else:
 		p.addFile(file.path(), file.version())
 
-	    infoFile.write()
+	    infoFile.close()
 	else:
 	    if file.__class__ == files.SourceFile:
-		p.addSource(file.path(), existing[0])
+		p.addSource(file.path(), duplicateVersion)
 	    else:
-		p.addFile(file.path(), existing[0])
+		p.addFile(file.path(),  duplicateVersion)
 
 	file.archive(cfg.reppath, root)
 
-    pkgSet.write()
+    pkgSet.addVersion(version, p)
+    pkgSet.close()
