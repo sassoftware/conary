@@ -1,0 +1,40 @@
+div.formHeader {
+    float: left;
+    font-weight: bold;
+    width: 16%;
+}
+
+div.warning {
+    color: red;
+}
+
+div.tbHeader {
+    font-size: 150%;
+    color: white;
+    background-color: red;
+    font-weight: bold;
+}
+
+h2 {
+    font-size: 150%;
+    color: white;
+    background-color: #333399;
+    font-weight: bold;
+}
+
+td {
+    vertical-align: top;
+}
+
+hr {
+    border: 0px;
+    height: 2px;
+    color: black;
+    background-color: black;
+}
+
+tr.header {
+    background-color: #dddddd;
+    font-weight: bold;
+    font-size: 105%;
+}

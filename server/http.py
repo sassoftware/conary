@@ -12,6 +12,11 @@
 # full details.
 #
 import metadata
+import os
+import sys
+
+import kid
+import templates 
 
 from htmlengine import HtmlEngine
 from metadata import MDClass
@@ -31,6 +36,7 @@ class HttpHandler(HtmlEngine):
     def __init__(self, repServer):
         self.repServer = repServer
         self.troveStore = repServer.troveStore
+        self.templatePath = os.path.dirname(sys.modules['templates'].__file__) + os.path.sep
         
         # "command name": (command handler, page title, 
         #       (requires auth, requires write access, requires admin))
@@ -40,7 +46,7 @@ class HttpHandler(HtmlEngine):
                                (True, True, False)),
              "metadata":       (self.metadataCmd, "View Metadata",          
                                (True, True, False)),
-             "chooseBranch":   (self.chooseBranchCmd, "View Metadata",      
+             "chooseBranch":   (self.chooseBranchCmd, "View Metadata",
                                (True, True, False)),
              "getMetadata":    (self.getMetadataCmd, "View Metadata",       
                                (True, True, False)),
@@ -58,9 +64,7 @@ class HttpHandler(HtmlEngine):
                                (True, False, False)),
              "chPass":         (self.chPassCmd, "Change Password",
                                (True, False, False)),
-             "test":           (self.test, "Testing",                       
-                               (True, True, False)),
-                        }
+        }
 
     def requiresAuth(self, cmd):
         if cmd in self.commands:
@@ -73,6 +77,14 @@ class HttpHandler(HtmlEngine):
         self.setWriter(writeFn)
         if cmd.endswith('/'):
             cmd = cmd[:-1]
+
+        # handle the odd case of style sheet and javascript libraries
+        # XXX these items are served with the wrong content-type
+        if cmd in ["style.css", "library.js"]:
+            f = open(os.path.join(self.templatePath, cmd))
+            self.writeFn(f.read())
+            f.close()
+            return 
     
         if cmd in self.commands:
             handler = self.commands[cmd][0]
@@ -90,18 +102,16 @@ class HttpHandler(HtmlEngine):
         else:
 	    home = self.repServer.urlBase
 
-        self.htmlHeader(pageTitle)
+        self.pageTitle = pageTitle
         handler(authToken, fields)
-        self.htmlFooter(home)
+
+    def kid_write(self, templateName, **values):
+        path = os.path.join(self.templatePath, templateName + ".kid")
+        t = kid.load_template(path)
+        self.writeFn(t.serialize(encoding="utf-8", pageTitle=self.pageTitle, **values))
 
     def mainpage(self, authToken, fields):
-        self.htmlPageTitle("Conary Repository")
-        self.htmlMainPage()
-
-    def test(self, authToken, fields):
-        self.htmlPageTitle("Testing")
-        self.writeFn("<pre>Authentication token: " + str(authToken))
-        self.writeFn("\n\nFields: " + str(fields) + "</pre>")
+        self.kid_write("main_page", fields=fields)
 
     def metadataCmd(self, authToken, fields, troveName=None):
         troveList = [x for x in self.repServer.troveStore.iterTroveNames() if x.endswith(':source')]
@@ -116,8 +126,8 @@ class HttpHandler(HtmlEngine):
             if loc < len(troveList):
                 troveName = troveList[loc+1]
 
-        self.htmlPageTitle("Metadata")
-        self.htmlPickTrove(troveList, troveName=troveName)
+        self.kid_write("pick_trove", troveList = troveList,
+                                     troveName = troveName)
 
     def chooseBranchCmd(self, authToken, fields):
         if fields.has_key('troveName'):
@@ -125,44 +135,29 @@ class HttpHandler(HtmlEngine):
         else:
             troveName = fields['troveNameList'].value
         
-        if fields.has_key('source'):
-            source = fields['source'].value.lower()
-        else:
-            source = None
-        
-        branches = {}
         versions = self.repServer.getTroveVersionList(authToken,
             netserver.SERVER_VERSIONS[-1], { troveName : None }, "")
         
+        branches = []
         for version in versions[troveName]:
             version = self.repServer.thawVersion(version)
-            branch = version.branch().freeze()
-
-            branchName = branch.split("@")[-1]
-            branches[branch] = branchName
+            branches.append(version.branch())
 
         if len(branches) == 1:
-            self._getMetadata(fields, troveName, branches.keys()[0], source)
-            return
-
-        self.htmlPageTitle("Please choose a branch:")
-        self.htmlPickBranch(troveName, branches)
+            self._getMetadata(fields, troveName, branches[0].freeze())
+        else:
+            self.kid_write("choose_branch", branches = branches, troveName = troveName)
 
     def getMetadataCmd(self, authToken, fields):
         troveName = fields['troveName'].value
+
         branch = fields['branch'].value
-        if 'source' in fields:
-            source = fields['source'].value.lower()
-        else:
-            source = "local"
+        self._getMetadata(fields, troveName, branch)
 
-        self._getMetadata(fields, troveName, branch, source)
-
-    def _getMetadata(self, fields, troveName, branch, source):
+    def _getMetadata(self, fields, troveName, branch):
         branch = self.repServer.thawVersion(branch)
 
-        self.htmlPageTitle("Metadata for %s" % troveName)
-        if source == "freshmeat":
+        if "source" in fields and fields["source"] == "freshmeat":
             if "freshmeatName" in fields:
                 fmName = fields["freshmeatName"].value
             else:
@@ -176,19 +171,21 @@ class HttpHandler(HtmlEngine):
             md = self.troveStore.getMetadata(troveName, branch)
 
         if not md: # fill a stub
-            md = metadata.Metadata(None) 
-        self.htmlMetadataEditor(troveName, branch, md, md.getSource())
-  
+            md = metadata.Metadata(None)
+
+        self.kid_write("metadata", metadata = md, branch = branch,
+                                   troveName = troveName)
+
     def updateMetadataCmd(self, authToken, fields):
         branch = self.repServer.thawVersion(fields["branch"].value)
         troveName = fields["troveName"].value
-
+        
         self.troveStore.updateMetadata(troveName, branch,
             fields["shortDesc"].value,
             fields["longDesc"].value,
-            fields.getlist("urlList"),
-            fields.getlist("licenseList"),
-            fields.getlist("categoryList"),
+            fields.getlist("selUrl"),
+            fields.getlist("selLicense"),
+            fields.getlist("selCategory"),
             fields["source"].value,
             "C"
         )
