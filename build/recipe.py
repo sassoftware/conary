@@ -600,6 +600,8 @@ class PackageRecipe(Recipe):
         for buildReq in self.buildRequires:
             (name, versionStr, flavor) = updatecmd.parseTroveSpec(buildReq, 
                                                                      None)
+            # XXX move this to use more of db.findTrove's features, instead
+            # of hand parsing
             try:
                 troves = db.findTrove(None, name)
                 troves = db.getTroves(troves)
@@ -614,7 +616,12 @@ class PackageRecipe(Recipe):
                     continue
                 if versionStr.find('@') == -1:
                     label = trove.getVersion().branch().label()
-                    if versionStr.find(':') == -1:
+                    if versionStr[0] == ':' or versionStr.find(':') == -1:
+                        if versionStr[0] == ':':
+                            versionStr = versionStr[1:]
+                        else:
+                            log.warning('Deprecated buildreq format.  Use '
+                                        ' foo=:label, not foo=label')
                         if label.getLabel() == versionStr:
                             versionMatches.append(trove)
                         continue
