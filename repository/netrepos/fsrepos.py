@@ -440,7 +440,12 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 		cs.addFile(fileId, oldFileVersion, newFileVersion, filecs)
 
-		if hash and withFiles:
+		# this test catches files which have changed from not
+		# config files to config files; these need to be included
+		# unconditionally so we always have the pristine contents
+		# to include in the local database
+		if withFiles and (hash or (oldFile and newFile.flags.isConfig() 
+					   and not oldFile.flags.isConfig())):
 		    if oldFileVersion :
 			oldCont = self.getFileContents(troveName, oldVersion, 
 				    flavor, oldPath, oldFileVersion, 
