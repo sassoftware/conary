@@ -378,7 +378,7 @@ def annotate(repos, filename):
 
         if oldFileV != newFileV:
             oldFile = repos.getFileContents(troveName, oldV, None, 
-                                            filename, oldFileV)
+                                            fileId, oldFileV)
             oldLines = oldFile.get().readlines()
             oldContact = oldTrove.changeLog.getName()
             if newV == None:

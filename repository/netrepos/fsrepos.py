@@ -340,7 +340,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         return self.troveStore.resolveRequirements(label, depSetList)
 
     def getFileContents(self, troveName, troveVersion, troveFlavor, 
-		        path, fileVersion, fileObj):
+		        fileId, fileVersion, fileObj):
 	# the get trove netclient provides doesn't work with a 
 	# FilesystemRepository (it needs to create a change set which gets 
 	# passed)
@@ -356,7 +356,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    # troves. it might be better to close the file and return
 	    # a filecontents object?
 	    return self.reposSet.getFileContents(troveName, fileVersion, 
-					      troveFlavor, path, fileVersion)
+                                      troveFlavor, fileId, fileVersion)
 
     def createChangeSet(self, troveList, recurse = True, withFiles = True,
                         withFileContents = True):
@@ -504,11 +504,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                       and not oldFile.flags.isConfig())):
 		    if oldFileVersion :
 			oldCont = self.getFileContents(troveName, oldVersion, 
-				    oldFlavor, oldPath, oldFileVersion, 
+				    oldFlavor, fileId, oldFileVersion, 
 				    fileObj = oldFile)
 
 		    newCont = self.getFileContents(troveName, newVersion, 
-				    newFlavor, newPath, newFileVersion, 
+				    newFlavor, fileId, newFileVersion, 
 				    fileObj = newFile)
 
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 

@@ -700,7 +700,7 @@ class FilesystemJob:
 			baseLineF = repos.getFileContents(pkgCs.getName(),
 					pkgCs.getOldVersion(), 
 					pkgCs.getOldFlavor(),
-					basePkg.getFile(fileId)[0],
+                                        fileId,
 					basePkg.getFile(fileId)[1]).get()
 
 			baseLines = baseLineF.readlines()
@@ -997,7 +997,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 		if srcFile.hasContents:
 		    srcCont = repos.getFileContents(srcPkg.getName(),
 				srcPkg.getVersion(), srcPkg.getFlavor(), 
-				srcPath, srcFileVersion)
+				fileId, srcFileVersion)
 
                     (contType, cont) = changeset.fileContentsDiff(srcFile, srcCont,
                                                                   f, newCont)

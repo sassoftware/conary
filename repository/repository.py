@@ -78,8 +78,8 @@ class AbstractTroveDatabase:
 	"""
 	raise NotImplementedError
 
-    def getFileContents(self, troveName, troveVersion, troveFlavor, path,
-			fileObj = None):
+    def getFileContents(self, troveName, troveVersion, troveFlavor, fileId,
+			fileVersion, fileObj = None):
 	"""
 	Retrieves the files specified by the fileDict. The dictionary is
 	indexed by (troveName, troveVersion, troveFlavor) tuples, and each
@@ -507,7 +507,7 @@ class DataStoreRepository:
     def _hasFileContents(self, sha1):
 	return self.contentsStore.hasFile(sha1helper.sha1ToString(sha1))
 
-    def getFileContents(self, troveName, troveVersion, troveFlavor, path,
+    def getFileContents(self, troveName, troveVersion, troveFlavor, fileId,
 			fileVersion, fileObj = None):
 	if fileObj:
 	    return filecontents.FromDataStore(self.contentsStore,
@@ -516,10 +516,10 @@ class DataStoreRepository:
 
 	# this could be much more efficient; iterating over the files is
 	# just silly
-	for (fileId, tpath, tversion, fileObj) in \
+	for (tFileId, tpath, tversion, fileObj) in \
 		self.iterFilesInTrove(troveName, troveVersion, 
 					    troveFlavor, withFiles = True):
-	    if tpath != path or tversion != fileVersion: continue
+	    if tFileId != fileId or tversion != fileVersion: continue
 
 	    return filecontents.FromDataStore(self.contentsStore,
 					      fileObj.contents.sha1(),
@@ -685,7 +685,7 @@ class ChangeSetJob:
 		sha1 = oldfile.contents.sha1()
 
 		f = self.repos.getFileContents(pkgName, 
-			    oldTroveVersion, troveFlavor, oldPath, 
+			    oldTroveVersion, troveFlavor, fileId,
 			    oldVersion, fileObj = oldfile).get()
 
 		oldLines = f.readlines()

@@ -34,7 +34,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=8
+CLIENT_VERSION=9
 
 class _Method(xmlrpclib._Method):
 
@@ -385,7 +385,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 				   self.fromFileId(fileId), 
 				   self.fromVersion(version)))
 
-    def getFileContents(self, troveName, troveVersion, troveFlavor, path,
+    def getFileContents(self, troveName, troveVersion, troveFlavor, fileId,
 		        fileVersion, fileObj = None):
 	# we try to get the file from the trove which originally contained
 	# it since we know that server has the contents; other servers may
@@ -393,7 +393,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	url = self.c[fileVersion].getFileContents(troveName, 
 		    self.fromVersion(troveVersion), 
 		    self.fromFlavor(troveFlavor),
-		    path, self.fromVersion(fileVersion))
+		    self.fromFileId(fileId), self.fromVersion(fileVersion))
 
 	inF = urllib.urlopen(url)
 	(fd, path) = tempfile.mkstemp()

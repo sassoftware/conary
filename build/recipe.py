@@ -235,8 +235,8 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
 	if filePath == filename:
 	    inF = repos.getFileContents(sourceComponent.getName(),
 					sourceComponent.getVersion(),
-					sourceComponent.getFlavor(), filename,
-					fileVersion).get()
+					sourceComponent.getFlavor(), 
+                                        fileId, fileVersion).get()
 	    break
     
     if not inF:
@@ -494,7 +494,7 @@ class PackageRecipe(Recipe):
                     # it only makes sense to fetch regular files, skip
                     # anything that isn't
                     self.laReposCache.addFileHash(srcName, srcVersion,
-                                                  None, path, version)
+                                                  None, fileId, path, version)
 
     def __getattr__(self, name):
 	"""

@@ -31,7 +31,7 @@ from local import idtable
 from local import sqldb
 from local import versiontable
 
-SERVER_VERSIONS=[6,7,8]
+SERVER_VERSIONS=[6,7,8,9]
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -207,7 +207,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return l, verList, dirList
 
     def getFileContents(self, authToken, clientVersion, troveName, 
-                            troveVersion, troveFlavor, path, fileVersion):
+                            troveVersion, troveFlavor, fileId, fileVersion):
+        if clientVersion <= 8:
+            path = fileId
+            fileId = None
+        else:
+            path = None
+            fileId = self.toFileId(fileId)
+
 	troveVersion = self.toVersion(troveVersion)
 	fileVersion = self.toVersion(fileVersion)
 	troveFlavor = self.toFlavor(troveFlavor)
@@ -218,10 +225,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	# this could be much more efficient; iterating over the files is
 	# just silly
-	for (fileId, tpath, tversion, fileStream) in \
+	for (tFileId, tpath, tversion, fileStream) in \
 		self.repos.iterFilesInTrove(troveName, troveVersion, 
 					    troveFlavor, withFiles = True):
-	    if tpath != path or tversion != fileVersion: continue
+            if tversion != fileVersion: continue
+            if fileId and tFileId != fileId: continue
+            if path and tpath != path: continue
 
             fileObj = files.ThawFile(fileStream, fileId)
 

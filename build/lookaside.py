@@ -153,9 +153,9 @@ def findAll(cfg, repcache, name, location, srcdirs):
 
 class RepositoryCache:
 
-    def addFileHash(self, troveName, troveVersion, troveFlavor, path, 
+    def addFileHash(self, troveName, troveVersion, troveFlavor, fileId, path, 
 		    fileVersion):
-	self.map[path] = (troveName, troveVersion, troveFlavor, path,
+	self.map[path] = (troveName, troveVersion, troveFlavor, fileId, path,
 			      fileVersion)
 
     def hasFile(self, fileName):
@@ -163,10 +163,10 @@ class RepositoryCache:
 
     def moveFileToCache(self, cfg, fileName, location):
 	cachedname = createCacheName(cfg, fileName, location)
-	(troveName, troveVersion, troveFlavor, troveFile,
-	 troveFileVersion) = self.map[fileName]
+	(troveName, troveVersion, troveFlavor, fileId, troveFile,
+                    troveFileVersion) = self.map[fileName]
 	f = self.repos.getFileContents(troveName, troveVersion, troveFlavor,
-                                       troveFile, troveFileVersion).get()
+                                       fileId, troveFileVersion).get()
 	util.copyfileobj(f, open(cachedname, "w"))
 
 	return cachedname
