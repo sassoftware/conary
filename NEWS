@@ -1,5 +1,24 @@
 Changes in 0.10.1:
-  * dependency checking resolves dependencies against the installLabelPath
+  * when applying a changeset, dependency failures are resolved by
+    querying servers in the installLabelPath
+  * troves that satisfy a dependency can automatically be added to a
+    transaction.  This behavior is controlled by the "autoResolve"
+    variable in conaryrc or the "--resolve" command line option to
+    "conary update"
+  * dependency resolution is calculated recursively.  To limit the
+    recursion depth to check only first order dependencies, a
+    "--no-deps-recurse" option has been added to "conary update"
+  * "conary repquery" now takes a "--deps" argument, which prints the
+    Requires and Provides information for the trove that is being
+    queried.
+  * changes have been made to the build side of Conary to facilitate
+    building recipes that use cross compilers
+  * symlinks now get the appropriate ownership set when they are
+    restored
+  * groups can now specify which flavor of a trove to include
+  * repository queries that don't need file information no longer ask
+    the repository for files.
+  * various bug fixes and cleanups
 
 Changes in 0.10.0:
   * dependency checking is now performed before changesets are
