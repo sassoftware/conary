@@ -39,19 +39,19 @@ class FileInfo(files.TupleStream):
     def oldVersion(self):
         return self.items[1].value()
 
-    def setOldVersion(self, version):
+    def setOldVersion(self, value):
         return self.items[1].set(value)
 
     def newVersion(self):
         return self.items[2].value()
 
-    def setNewVersion(self, version):
+    def setNewVersion(self, value):
         return self.items[2].set(value)
 
     def csInfo(self):
         return self.items[3].value()
 
-    def setCsInfo(self, version):
+    def setCsInfo(self, value):
         return self.items[3].set(value)
 
 class ChangeSet:
