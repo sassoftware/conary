@@ -110,6 +110,15 @@ class Package:
 	"""
 	return self.packages.items()
 
+    def iterPackageList(self):
+	"""
+	Returns a generator for (packageName, versionList) ordered pairs, 
+	listing all of the package in the group, along with their versions. 
+
+	@rtype: list
+	"""
+	return self.packages.iteritems()
+
     def read(self, dataFile):
 	lines = dataFile.readlines()
 
@@ -672,6 +681,43 @@ def stripNamespace(namespace, pkgName):
     if pkgName.startswith(namespace + ":"):
 	return pkgName[len(namespace) + 1:]
     return pkgName
+
+def walkPackageSet(repos, pkg):
+    """
+    Generator returns all of the packages included by pkg, including
+    pkg itself.
+    """
+    yield pkg
+    seen = { pkg.getName() : [ pkg.getVersion().asString() ] }
+
+    list = []
+    for (name, versionList) in pkg.iterPackageList():
+	for version in versionList:
+	    list.append((name, version))
+
+    while list:
+	(name, version) = list[0]
+	del list[0]
+
+	if seen.has_key(name):
+	    match = False
+	    for ver in seen[name]:
+		if version.equal(ver):
+		    match = True
+		    break
+	    if match: continue
+
+	    seen[name].append(version)
+	else:
+	    seen[name] = [ version ]
+
+	pkg = repos.getPackageVersion(name, version)
+
+	yield pkg
+
+	for (pkg, verList) in pkg.iterPackageList():
+	    for version in verList:
+		list.append((pkg, version))
 
 class PackageError(Exception):
 
