@@ -413,7 +413,6 @@ class _PutFiles(_FileAction):
 		self._do_one(source, dest, destlen, macros)
 
     def _do_one(self, source, dest, destlen, macros):
-	print source, dest
 	if os.path.isdir(source):
 	    srcbase = os.path.basename(source)
 	    dest = dest+os.sep+srcbase
