@@ -58,7 +58,6 @@ class VersionRelease(AbstractVersion):
 
     """
     Version element for a version/release pair. These are formatted as
-		
     "version-release", with no hyphen allowed in either portion. The
     release must be a simple integer or two integers separated by a
     decimal point.
