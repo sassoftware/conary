@@ -303,6 +303,20 @@ class IdealRepository(AbstractTroveDatabase):
 	"""
 	raise NotImplementedError
 
+    def getTroveLatestVersionFlavors(self, troveName, branch):
+	"""
+	Returns a list of the most recent version for each flavor of a
+        trove available on a particular branch. If that branch doesn't
+        exist for the trove, PackageMissing is raised.
+
+	@param troveName: package name
+	@type troveName: str
+	@param branch: branch
+	@type branch: versions.Version
+	@rtype: list of (versions.Version, flavor) tuples
+	"""
+	raise NotImplementedError
+
     def getTroveVersionFlavors(self, troveDict):
 	"""
 	Converts a dictionary of the format retured by getAllTroveLeafs()
