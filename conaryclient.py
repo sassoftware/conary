@@ -68,6 +68,9 @@ class ConaryClient:
         """
         self._prepareRoot()
 
+        import pdb
+        pdb.set_trace()
+
         changeSetList = []
         finalCs = None
         for item in itemList:
@@ -89,32 +92,44 @@ class ConaryClient:
                 troveName = item[0]
                 versionStr = item[1]
 
-            if self.db.hasPackage(troveName):
-                labels = [ x.getVersion().branch().label()
-                           for x in self.db.findTrove(troveName) ]
-
-                # this removes duplicates
-                labels = {}.fromkeys(labels).keys()
-                
-                # check for locally-cooked troves
-                if True in [isinstance(x, versions.CookBranch) or
-                            isinstance(x, versions.EmergeBranch)
-                            for x in labels]:
-                    raise UpdateError, \
-                        "Package %s cooked locally, not updating" % troveName
-            else:
-                labels = self.cfg.installLabelPath
-
-            newList = []
-            for label in labels:
+            if versionStr and versionStr[0] == '/':
+                # fully qualified versions don't need repository affinity
+                # or the label search path
                 try:
-                    newList += self.repos.findTrove(label, troveName, 
-                                                    self.cfg.flavor, versionStr)
+                    newList = self.repos.findTrove(None, troveName, 
+                                                   self.cfg.flavor, versionStr)
                 except repository.PackageNotFound, e:
+                    # we give an error for this later on
                     pass
+            else:
+                if self.db.hasPackage(troveName):
+                    labels = [ x.getVersion().branch().label()
+                               for x in self.db.findTrove(troveName) ]
 
-            if not newList:
-                raise repository.TroveMissing(troveName, labels)
+                    # this removes duplicates
+                    labels = {}.fromkeys(labels).keys()
+                    
+                    # check for locally-cooked troves
+                    if True in [isinstance(x, versions.CookBranch) or
+                                isinstance(x, versions.EmergeBranch)
+                                for x in labels]:
+                        raise UpdateError, \
+                            "Package %s cooked locally, not updating" \
+                                    % troveName
+                else:
+                    labels = self.cfg.installLabelPath
+
+                newList = []
+                for label in labels:
+                    try:
+                        newList += self.repos.findTrove(label, troveName, 
+                                                        self.cfg.flavor, 
+                                                        versionStr)
+                    except repository.PackageNotFound, e:
+                        pass
+
+                if not newList:
+                    raise repository.TroveMissing(troveName, labels)
 
             if keepExisting:
                 for newTrove in newList:
