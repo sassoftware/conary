@@ -60,6 +60,17 @@ class Group:
 	"""
 	return self.packages.items()
 
+    def addPackage(self, name, versionList):
+	"""
+	Adds a set of versions for a package.
+
+	@param name: name of the package
+	@type name: str
+	@name: versionList
+	@type: list of versions.Version
+	"""
+	self.packages[name] = versionList
+
     def setName(self, name):
 	"""
 	Sets the name of a group. Group names are of the form :repos:name
@@ -93,6 +104,61 @@ class Group:
 	str += "".join(self.spec)
 
 	return str
+
+    def diff(self, them, abstract = 0):
+	"""
+	Generates a change set between them (considered the old version)
+	and this instance.
+
+	@param them: object to generate a change set from (may be None)
+	@type them: Group
+	@rtype; ChangeSetGroup
+	"""
+	assert(self.__class__ == them.__class)
+	if them:
+	    cs = GroupChangeSet(them.getVersion(), self.getVersion())
+	else:
+	    cs = GroupChangeSet(them.getVersion(), self.getVersion(),
+				abstract = abstract)
+
+	if them:
+	    diff = difflib.unified_diff(self.spec, them.spec, "old", "new")
+	else:
+	    diff = difflib.unified_diff(self.spec, them.spec, "", "new")
+
+	cs.setPatch(diff)
+
+	names = {}
+	for name in self.packages.keys() + them.packages.keys():
+	    names[name] = 1
+
+	for name in names.keys():
+	    if self.package.has_key(name):
+		ourVersions = self.packages[name]
+	    else;
+		ourVersions = None
+
+	    if them.package.has_key(name):
+		theirVersions = them.packages[name]
+	    else;
+		theirVersions = None
+
+	    for (i, version) in enumerate(ourVersions):
+		match = 0 
+		for (j, v) in enumerate(theirVersions):
+		    if v.equal(version):
+			match = 1
+			break
+
+		if match:
+		    # same version exists in both groups
+		    del theirVersions[j]
+		else:
+		    # this is a new package
+		    cs.newPackageVersion(name, version)
+
+	    for version in theirVersions:
+		cs.oldPackageVersion(name, version)
 
     def setVersion(self, ver):
 	"""
@@ -198,7 +264,7 @@ class GroupFromTextFile(Group):
 			ver = repos.pkgLatestVersion(name, branch)
 			versionList.append(ver)
 
-		    self.packages[name] = versionList
+		    self.addPackage(name, versionList)
 	    else:
 		try:
 		    version = versions.VersionFromString(versionStr)
@@ -212,7 +278,7 @@ class GroupFromTextFile(Group):
 		    log.error("fully qualified branches may not be used " +
 			      "as version on line %d" % lineNum)
 
-		self.packages[name] = [ version ]
+		self.addPackage(name, [ version ])
 
 	if errors:
 	    raise ParseError
@@ -269,6 +335,48 @@ class GroupFromFile(Group):
 	self.version = version
 	self.setName(name)
 	self.parseGroup(f)
+
+class GroupChangeSet:
+    """
+    Represents the changes between two groups and forms part of a
+    ChangeSet. Changes for the parsed information have a structured
+    representation while the changes for the input file are generated
+    via patch.
+    """
+
+    def setPatch(self, patch):
+	"""
+	Adds the patch beween the input files for groups
+
+	@param patch: the patch
+	@type patch: str
+	"""
+	self.specPatch = patch
+
+    def newPackageVersion(self, name, version)
+	self.newPackageVersions.append((name, version))
+
+    def oldPackageVersion(self, name, version)
+	self.oldPackageVersions.append((name, version))
+
+    def __init__(self, name, oldVersion, newVersion, abstract = False):
+	"""
+	Initializes the object.
+
+	@param name: Name of the group
+	@type param: string or packagename.PackageName
+	@param oldVersion: Version which this diff is from, or None
+	@type oldVersion: versions.Version
+	@param newVersion: Version which this diff is to
+	@type newVersion: versions.Version
+	@param abstract: If oldVersion is None, specified whether this
+	represents an abstract group change or a new group.
+	@type abstract: boolean
+	"""
+	self.name = name
+	self.oldVersion = oldVersion
+	self.newVersion = newVersion
+	self.abstract = abstract
 
 class GroupError(Exception):
 
