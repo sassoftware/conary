@@ -82,6 +82,14 @@ bootstrap:
 	fi
 	time ./srs-bootstrap `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"`
 
+bootstrap-continue:
+	@if ! [ -d /opt/ -a -w /opt/ ]; then \
+		echo "/opt isn't writable, this won't work"; \
+		exit 1; \
+	fi
+	time ./srs-bootstrap `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` --skip=$$(for i in `./srs replist | cut -d: -f 1 | sort | uniq`; do echo -n $$i,; done)
+
+
 deps.dot:
 	./srs-bootstrap --dot `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` > deps.dot
 
