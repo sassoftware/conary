@@ -463,7 +463,11 @@ class TroveStore:
         # follow the branch tree up until we find metadata
         md = None
         while not md:
-            branchId = self.branchTable[branch]
+            # make sure we're on the same server
+            if self.branchTable.has_key(branch):
+                branchId = self.branchTable[branch]
+            else:
+                return None
             
             if not version:
                 latestVersion = self.metadataTable.getLatestVersion(itemId, branchId)
