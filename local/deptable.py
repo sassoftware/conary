@@ -179,11 +179,8 @@ class DependencyTables:
 
     def _resolve(self, cu):
         cu.execute("""
-            SELECT depNum, instanceId FROM
-                (SELECT COUNT(DepCheck.troveId) as matchCount,
-                        DepCheck.flagCount as neededCount,
-                        DepCheck.depNum as depNum,
-                        Provides.instanceId as instanceId
+                SELECT depCheck.depNum,
+                        Provides.instanceId
                     FROM Requires LEFT OUTER JOIN Provides ON
                         Requires.depId == Provides.depId
                     JOIN Dependencies ON
@@ -199,11 +196,9 @@ class DependencyTables:
                     GROUP BY
                         DepCheck.depNum,
                         Provides.instanceId
-                 )
-                WHERE 
-                    matchCount == neededCount
+                    HAVING
+                        COUNT(DepCheck.troveId) == DepCheck.flagCount
                 """)
-
 
     def check(self, changeSet):
         # XXX
