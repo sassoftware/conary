@@ -486,8 +486,8 @@ class PackageRecipe(Recipe):
         assert(self.__class__ is not Recipe)
 	self._sources = []
 	self._build = []
-        self.destdirPolicy = destdirpolicy.DefaultPolicy()
-        self.packagePolicy = packagepolicy.DefaultPolicy()
+        self.destdirPolicy = destdirpolicy.DefaultPolicy(self)
+        self.packagePolicy = packagepolicy.DefaultPolicy(self)
         self.cfg = cfg
 	self.laReposCache = laReposCache
 	self.srcdirs = srcdirs

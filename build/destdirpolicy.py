@@ -729,23 +729,23 @@ class RelativeSymlinks(policy.Policy):
 		os.symlink(normpath, fullpath)
 
 
-def DefaultPolicy():
+def DefaultPolicy(recipe):
     """
     Returns a list of actions that expresses the default policy.
     """
     return [
-	TestSuiteLinks(),
-	TestSuiteFiles(),
-	FixDirModes(),
-	RemoveNonPackageFiles(),
-	FixupMultilibPaths(),
-	ExecutableLibraries(),
-	Strip(),
-	NormalizeCompression(),
-	NormalizeManPages(),
-	NormalizeInfoPages(),
-	NormalizeInitscripts(),
-	RelativeSymlinks(),
+	TestSuiteLinks(recipe),
+	TestSuiteFiles(recipe),
+	FixDirModes(recipe),
+	RemoveNonPackageFiles(recipe),
+	FixupMultilibPaths(recipe),
+	ExecutableLibraries(recipe),
+	Strip(recipe),
+	NormalizeCompression(recipe),
+	NormalizeManPages(recipe),
+	NormalizeInfoPages(recipe),
+	NormalizeInitscripts(recipe),
+	RelativeSymlinks(recipe),
     ]
 
 

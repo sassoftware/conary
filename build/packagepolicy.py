@@ -377,7 +377,7 @@ class SharedLibrary(policy.Policy):
 
     C{r.SharedLibrary} does B{not} walk entire directory trees.  Every
     directory that you want to add must be passed in using the
-    C{subtree} keyword.
+    C{subtrees} keyword.
     """
     invariantsubtrees = destdirpolicy.librarydirs
     invariantinclusions = [
@@ -388,9 +388,8 @@ class SharedLibrary(policy.Policy):
     # needs to share with ExecutableLibraries and CheckSonames
     def updateArgs(self, *args, **keywords):
 	policy.Policy.updateArgs(self, *args, **keywords)
-        # XXX there is no recipe here - only in doProcess context
-	# self.recipe.ExecutableLibraries(*args, **keywords)
-	# self.recipe.CheckSonames(*args, **keywords)
+	self.recipe.ExecutableLibraries(*args, **keywords)
+	self.recipe.CheckSonames(*args, **keywords)
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
@@ -904,36 +903,36 @@ class reportErrors(policy.Policy):
 
 
 
-def DefaultPolicy():
+def DefaultPolicy(recipe):
     """
     Return a list of actions that expresses the default policy.
     """
     return [
-	NonBinariesInBindirs(),
-	FilesInMandir(),
-	ImproperlyShared(),
-	CheckSonames(),
-	CheckDestDir(),
-	ComponentSpec(),
-	PackageSpec(),
-	EtcConfig(),
-	Config(),
-	Transient(),
-	SharedLibrary(),
-	TagDescription(),
-	TagSpec(),
-	ParseManifest(),
-	MakeDevices(),
-	DanglingSymlinks(),
-	AddModes(),
-	WarnWriteable(),
-	IgnoredSetuid(),
-	Ownership(),
-	ExcludeDirectories(),
-	Requires(),
-	Provides(),
-	Flavor(),
-	reportErrors(),
+	NonBinariesInBindirs(recipe),
+	FilesInMandir(recipe),
+	ImproperlyShared(recipe),
+	CheckSonames(recipe),
+	CheckDestDir(recipe),
+	ComponentSpec(recipe),
+	PackageSpec(recipe),
+	EtcConfig(recipe),
+	Config(recipe),
+	Transient(recipe),
+	SharedLibrary(recipe),
+	TagDescription(recipe),
+	TagSpec(recipe),
+	ParseManifest(recipe),
+	MakeDevices(recipe),
+	DanglingSymlinks(recipe),
+	AddModes(recipe),
+	WarnWriteable(recipe),
+	IgnoredSetuid(recipe),
+	Ownership(recipe),
+	ExcludeDirectories(recipe),
+	Requires(recipe),
+	Provides(recipe),
+	Flavor(recipe),
+	reportErrors(recipe),
     ]
 
 

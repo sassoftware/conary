@@ -72,7 +72,7 @@ class Policy(action.RecipeAction):
 
     rootdir = '%(destdir)s'
 
-    def __init__(self, *args, **keywords):
+    def __init__(self, recipe, **keywords):
 	"""
 	@keyword exceptions: Optional argument; regexp(s) specifying
 	files to ignore while taking the policy action.  It will be
@@ -86,14 +86,9 @@ class Policy(action.RecipeAction):
 	"""
 	# enforce pure virtual status
 	assert(self.__class__ is not Policy)
-	action.RecipeAction.__init__(self, None, [], **keywords)
 
-	# only update inclusions if specified, otherwise, do  
-	# not overwrite None 
-	if args:
-	    if self.inclusions is None:
-		self.inclusions = []
-	    self.inclusions.extend(args)
+	action.RecipeAction.__init__(self, None, [], **keywords)
+	self.recipe = recipe
 
 
     def updateArgs(self, *args, **keywords):
