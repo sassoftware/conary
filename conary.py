@@ -81,6 +81,7 @@ def usage(rc = 1):
     print "               --root <root>"
     print ""
     print "cook flags:    --macros"
+    print "               --noclean"
     print "               --prep"
     print "               --resume [policy|<lineno>]"
     print "               --debug-exceptions"
@@ -139,6 +140,7 @@ def realMain():
     argDef["ls"] = NO_PARAM
     argDef["macros"] = ONE_PARAM
     argDef["message"] = ONE_PARAM
+    argDef["noclean"] = NO_PARAM
     argDef["prep"] = NO_PARAM
     argDef["profile"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
@@ -220,6 +222,11 @@ def realMain():
 	    del argSet['prep']
 	    prep = 1
 
+	if argSet.has_key('noclean'):
+	    del argSet['noclean']
+	    cfg.noClean = True
+	else:
+	    cfg.noClean = False
 	if argSet.has_key('resume'):
 	    resume = argSet['resume']
 	    del argSet['resume']

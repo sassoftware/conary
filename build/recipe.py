@@ -318,8 +318,9 @@ class PackageRecipe(Recipe):
 	return '-'.join((self.name, self.version))
 
     def cleanup(self, builddir, destdir):
-	util.rmtree(builddir)
-	util.rmtree(destdir)
+	if not self.cfg.noClean:
+	    util.rmtree(builddir)
+	    util.rmtree(destdir)
 
     def fetchAllSources(self):
 	"""
