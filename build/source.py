@@ -171,7 +171,7 @@ class Patch(_Source):
 	elif self.sourcename.endswith(".bz2"):
 	    provides = "bzcat"
 	if self.backup:
-	    backup = '-b -z %s' % self.backup
+	    self.backup = '-b -z %s' % self.backup
 	if self.dir:
 	    destDir = os.sep.join((destDir, self.dir))
 	    util.mkdirChain(destDir)
@@ -179,15 +179,17 @@ class Patch(_Source):
 	    log.debug('applying macros to patch %s' %f)
 	    pin = util.popen("%s '%s'" %(provides, f))
 	    log.debug('patch -d %s -p%s %s %s'
-		      %(destDir, self.level, backup, self.extraArgs))
+		      %(destDir, self.level, self.backup, self.extraArgs))
 	    pout = util.popen('patch -d %s -p%s %s %s'
-		              %(destDir, self.level, backup, self.extraArgs), 'w')
+		              %(destDir, self.level, self.backup,
+			        self.extraArgs), 'w')
 	    pout.write(pin.read()%self.recipe.macros)
 	    pin.close()
 	    pout.close()
 	else:
 	    util.execute("%s '%s' | patch -d %s -p%s %s %s"
-			 %(provides, f, destDir, self.level, backup, self.extraArgs))
+			 %(provides, f, destDir, self.level, self.backup,
+			   self.extraArgs))
 
 
 class Source(_Source):
