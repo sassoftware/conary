@@ -289,7 +289,6 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
     int fd;
     Elf * elf;
     int rc;
-    char magic[4];
     Elf_Kind kind;
 
     if (!PyArg_ParseTuple(args, "s", &fileName))
@@ -301,12 +300,6 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
 	return NULL;
     }
 
-    if (read(fd, magic, sizeof(magic)) != 4) {
-	close(fd);
-	Py_INCREF(Py_None);
-	return Py_None;
-    }
-
     elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
     if (!elf) {
 	close(fd);
@@ -316,6 +309,7 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
 
     kind = elf_kind(elf);
     if (kind != ELF_K_AR && kind != ELF_K_ELF) {
+	close(fd);
 	elf_end(elf);
 	Py_INCREF(Py_None);
 	return Py_None;
