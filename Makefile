@@ -40,6 +40,7 @@ python_files = __init__.py	\
 	rpmhelper.py		\
 	sha1helper.py		\
 	srcctl.py		\
+	srs.py			\
 	srscfg.py		\
 	update.py		\
 	updatecmd.py		\
@@ -50,16 +51,16 @@ python_files = __init__.py	\
 
 example_files = examples/tmpwatch.recipe
 bin_files = srs srs-bootstrap
-extra_files = srs.recipe.in srs.recipe srs-wrapper.in Makefile test/*.py
+extra_files = srs.recipe.in srs.recipe srs Makefile test/*.py
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
-generated_files = srs-wrapper srs.recipe *.pyo *.pyc 
+generated_files = srs.final srs.recipe *.pyo *.pyc 
 
 .PHONY: clean bootstrap deps.dot pychecker dist install test debug-test
 
-all: srs-wrapper srs.recipe
+all: srs-final srs.recipe
 
-srs-wrapper: srs-wrapper.in
+srs-final: srs
 	sed s,@srsdir@,$(srsdir),g $< > $@
 	chmod 755 $@
 
@@ -71,9 +72,9 @@ install: all
 	for f in $(python_files) $(bin_files); do \
 		cp -a $$f $(srsdir)/$$f; \
 	done
-	install -m 755 srs-wrapper $(bindir)
+	install -m 755 srs-final $(bindir)
 	for f in $(bin_files); do \
-		ln -sf srs-wrapper $(bindir)/$$f; \
+		ln -sf srs-final $(bindir)/$$f; \
 	done
 
 dist: $(dist_files)
