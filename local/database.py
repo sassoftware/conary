@@ -146,7 +146,48 @@ class AbstractDatabase(repository.AbstractRepository):
             flags |= update.REPLACEFILES
 
 	for pkg in cs.getNewPackageList():
-	    if pkg.name.endswith(":sources"): raise SourcePackageInstall
+	    if pkg.getName().endswith(":sources"): raise SourcePackageInstall
+
+	# Make sure this change set doesn't unintentionally restore troves
+	# which have been removed.  take a look at which packages were removed
+	# from the primary packages, and remove those packages from the change
+	# set as well. Bleah.
+	#
+	# XXX This is expensive; we need hash's of version/name
+	# pairs. it also isn't quite right, as change sets
+	# can't actually store multiple versions of the same
+	# trove
+	remove = {}
+	for (name, version) in cs.getPrimaryPackageList():
+	    try:
+		pkgCs = cs.getNewPackage(name)
+	    except KeyError:
+		continue
+
+	    assert(pkgCs.getNewVersion().equal(version))
+	    oldVersion = pkgCs.getOldVersion()
+	    if not oldVersion: continue
+
+	    pristine = self.getPackageVersion(name, oldVersion, 
+					      pristine = True)
+	    changed = self.getPackageVersion(name, oldVersion)
+
+	    # this is obviously horrible
+	    for (subName, subList) in pristine.iterPackageList():
+		for subVersion in subList:
+		    for (otherName, otherList) in changed.iterPackageList():
+			for otherVersion in otherList:
+			    match = False
+			    if otherName == subName and \
+				    otherVersion.equal(subVersion):
+				match = True
+				break
+
+			    if not match:
+				remove[subName] = True
+
+	for name in remove.iterkeys():
+	    cs.delNewPackage(name)
 
 	# create the change set from A->A.local
 	pkgList = []
