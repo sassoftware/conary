@@ -476,10 +476,11 @@ class DataStoreRepository:
 
     """
     Mix-in class which lets a TroveDatabase use a Datastore object for
-    storing and retrieving files.
+    storing and retrieving files. These functions aren't provided by
+    network repositories.
     """
 
-    def storeFileFromContents(self, contents, file, restoreContents):
+    def _storeFileFromContents(self, contents, file, restoreContents):
 	if file.hasContents:
 	    if restoreContents:
 		f = contents.get()
@@ -494,7 +495,7 @@ class DataStoreRepository:
 	
 	return 0
 
-    def removeFileContents(self, sha1):
+    def _removeFileContents(self, sha1):
 	self.contentsStore.removeFile(sha1)
 
     def getFileContents(self, sha1List):
@@ -511,7 +512,7 @@ class DataStoreRepository:
 
 	return d
 
-    def hasFileContents(self, fileId):
+    def _hasFileContents(self, fileId):
 	return self.contentsStore.hasFile(fileId)
 
     def __init__(self, path):
@@ -605,6 +606,7 @@ class ChangeSetJobFile(object):
 	self.changeSet = changeSet
 	self.thePath = path
 	self.theFileId = fileId
+
 class ChangeSetJob:
     """
     ChangeSetJob provides a to-do list for applying a change set; file
@@ -635,8 +637,8 @@ class ChangeSetJob:
 	# the beginning of the file as we may want to commit this
 	# file to multiple locations.
 	if storeContents:
-	    self.repos.storeFileFromContents(newFile.getContents(), file, 
-					     newFile.restoreContents())
+	    self.repos._storeFileFromContents(newFile.getContents(), file, 
+					      newFile.restoreContents())
 
     def __init__(self, repos, cs):
 	self.repos = repos
@@ -700,13 +702,14 @@ class ChangeSetJob:
 	    if file.hasContents and restoreContents:
 		fileContents = None
 
-		if repos.hasFileContents(file.contents.sha1()):
+		if repos._hasFileContents(file.contents.sha1()):
 		    # if we already have the file in the data store we can
 		    # get the contents from there
 		    fileContents = filecontents.FromRepository(repos,
 				    file.contents.sha1(), file.contents.size())
 		    contType = changeset.ChangedFileTypes.file
 		else:
+		    oldFile = fileMap[fileId][3]
 		    contType = cs.getFileContentsType(fileId)
 		    if contType == changeset.ChangedFileTypes.diff:
 			# the content for this file is in the form of a diff,

@@ -166,13 +166,14 @@ class Trove:
 
 	for (fileId, path, fileVersion) in pkgCS.getNewFileList():
 	    self.addFile(fileId, path, fileVersion)
-	    fileMap[fileId] = self.idMap[fileId] + (self.name, )
+	    fileMap[fileId] = self.idMap[fileId] + (self.name, None)
 
 	for (fileId, path, fileVersion) in pkgCS.getChangedFileList():
+	    (oldPath, oldVersion) = self.idMap[fileId]
 	    self.updateFile(fileId, path, fileVersion)
 	    # look up the path/version in self.idMap as the ones here
 	    # could be None
-	    fileMap[fileId] = self.idMap[fileId] + (self.name, )
+	    fileMap[fileId] = self.idMap[fileId] + (self.name, oldPath)
 
 	for fileId in pkgCS.getOldFileList():
 	    self.removeFile(fileId)

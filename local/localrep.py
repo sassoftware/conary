@@ -97,4 +97,4 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
 	for (fileId, fileVersion, fileObj) in self.oldFileList():
 	    if fileObj.hasContents and fileObj.flags.isConfig():
-		self.repos.removeFileContents(fileObj.contents.sha1())
+		self.repos._removeFileContents(fileObj.contents.sha1())

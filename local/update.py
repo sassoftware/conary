@@ -425,7 +425,7 @@ class FilesystemJob:
                                        "head of branch" % realPath)
 		    contentsOkay = 0
 		else:
-		    baseFileVersion = basePkg.getFile(fileId)[1]
+		    (baseFilePath, baseFileVersion) = basePkg.getFile(fileId)
 		    baseFile = repos.getFileVersion(fileId, baseFileVersion)
 		
 		headChanges = changeSet.getFileChange(fileId)
