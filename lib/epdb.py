@@ -226,43 +226,151 @@ class Epdb(pdb.Pdb):
     do_l = do_list
 
     def default(self, line):
-        if line[-1] != '?':
+        cmd = line.split('?', 1)
+        if len(cmd) == 1:
             return pdb.Pdb.default(self, line)
-        if line[-2:] == '??':
-            self.do_define(line[:-2])
-            self.do_doc(line[:-2])
+        cmd, directive = cmd
+        if directive and directive not in '?cdmp':
+            return pdb.Pdb.default(self, line)
+        self.do_define(cmd)
+        if directive == '?':
+            self.do_doc(cmd)
+        if directive == 'c':
+            self.do_showclasses(cmd)
+        elif directive == 'd':
+            self.do_showdata(cmd)
+        elif directive == 'm':
+            self.do_showmethods(cmd)
+        elif directive == 'p':
+            pdb.Pdb.default(self, 'print ' + cmd)
+
+    def do_p(self, arg):
+        cmd = arg.split('?', 1)
+        if len(cmd) == 1:
+            pdb.Pdb.do_p(self, arg)
         else:
-            self.do_define(line[:-1])
+            self.default(arg)
+
+    def _showmethods(self, obj):
+        methods = self._getMembersOfType(obj, 'm')
+        methods.sort()
+        for (methodName, method) in methods:
+            self._define(method)
+
+    def _showdata(self, obj):
+        data = self._getMembersOfType(obj, 'd')
+        data.sort()
+        print [ x[0] for x in data]
+
+    def _showclasses(self, obj):
+        classes = self._getMembersOfType(obj, 'c')
+        classes.sort()
+        for (className, class_) in classes:
+            self._define(class_)
+            print
+
+    def _objtype(self, obj):
+        if inspect.isroutine(obj) or type(obj).__name__ == 'method-wrapper':
+            return 'm'
+        elif inspect.isclass(obj):
+            return 'c'
+        else:
+            return 'd'
+
+    def _getMembersOfType(self, obj, objType):
+        names = dir(obj)
+        members = []
+        for n in names:
+            member = getattr(obj, n)
+            if self._objtype(member) == objType:
+                members.append((n, member))
+        return members
+    
+    def do_showmethods(self, arg):
+        locals = self.curframe.f_locals
+        globals = self.curframe.f_globals
+        try:
+            result = eval(arg + '\n', globals, locals) 
+            self._showmethods(result)
+        except:
+            t, v = sys.exc_info()[:2]
+            if type(t) == type(''):
+                exc_type_name = t
+            else: exc_type_name = t.__name__
+            print '***', exc_type_name + ':', v
+
+    def do_showclasses(self, arg):
+        locals = self.curframe.f_locals
+        globals = self.curframe.f_globals
+        try:
+            result = eval(arg + '\n', globals, locals) 
+            self._showclasses(result)
+        except:
+            t, v = sys.exc_info()[:2]
+            if type(t) == type(''):
+                exc_type_name = t
+            else: exc_type_name = t.__name__
+            print '***', exc_type_name + ':', v
+
+
+    def do_showdata(self, arg):
+        locals = self.curframe.f_locals
+        globals = self.curframe.f_globals
+        try:
+            result = eval(arg + '\n', globals, locals) 
+            self._showdata(result)
+        except:
+            t, v = sys.exc_info()[:2]
+            if type(t) == type(''):
+                exc_type_name = t
+            else: exc_type_name = t.__name__
+            print '***', exc_type_name + ':', v
+
+    def _define(self, obj):
+        if inspect.isclass(obj):
+            bases = inspect.getmro(obj)
+            bases = [ x.__name__ for x in bases[1:] ]
+            if bases:
+                bases = ' -- Bases (' + ', '.join(bases) + ')'
+            else:
+                bases = '' 
+            if hasattr(obj, '__init__') and inspect.isroutine(obj.__init__):
+                try:
+                    initfn = obj.__init__.im_func
+                
+                    argspec = inspect.getargspec(initfn)
+                    # get rid of self from arg list...
+                    fnargs = argspec[0][1:] 
+                    newArgSpec = (fnargs, argspec[1], argspec[2], argspec[3])
+                    argspec = inspect.formatargspec(*newArgSpec)
+                except TypeError:
+                    argspec = '(?)'
+            else:
+                argspec = ''
+            print "Class " + obj.__name__ + argspec + bases
+        elif inspect.ismethod(obj):
+            m_class = obj.im_class
+            m_self = obj.im_self
+            m_func = obj.im_func
+            name = m_class.__name__ + '.' +  m_func.__name__
+            if m_self:
+                name = "<Bound>"  + name
+            argspec = inspect.formatargspec(*inspect.getargspec(m_func))
+            print "%s%s" % (name, argspec)
+        elif inspect.isfunction(obj):
+            name = obj.__name__
+            argspec = inspect.formatargspec(*inspect.getargspec(obj))
+            print "%s%s" % (name, argspec)
+        else:
+            print type(obj)
+
 
     def do_define(self, arg):
         locals = self.curframe.f_locals
         globals = self.curframe.f_globals
         try:
             result = eval(arg + '\n', globals, locals) 
-            if inspect.isclass(result):
-                bases = inspect.getmro(result)
-                bases = [ x.__name__ for x in bases[1:] ]
-                bases = '(' + ', '.join(bases) + ')'
-                print "Class " + result.__name__ + bases
-                if hasattr(result, '__init__'):
-                    result = result.__init__
-                else:
-                    result = None
-            if inspect.ismethod(result):
-                m_class = result.im_class
-                m_self = result.im_self
-                m_func = result.im_func
-                name = m_class.__name__ + '.' +  m_func.__name__
-                if m_self:
-                    name = "<Bound>"  + name
-                argspec = inspect.formatargspec(*inspect.getargspec(m_func))
-                print "%s%s" % (name, argspec)
-            elif inspect.isfunction(result):
-                name = result.__name__
-                argspec = inspect.formatargspec(*inspect.getargspec(result))
-                print "%s%s" % (name, argspec)
-            else:
-                print type(result)
+            self._define(result)
         except:
             t, v = sys.exc_info()[:2]
             if type(t) == type(''):
