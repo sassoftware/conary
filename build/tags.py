@@ -28,7 +28,7 @@ class TagFile(conarycfg.ConfigFile):
 	self.macros = macros
 	self.filterlist = []
 	conarycfg.ConfigFile.__init__(self)
-	self.read(filename)
+	self.read(filename, exception=True)
 
     def filterCB(self, type, key=None, val=None):
 	if not self.macros:

@@ -15,7 +15,7 @@ class ConfigFile:
 
     defaults = {}
 
-    def read(self, file):
+    def read(self, file, exception=False):
 	if os.path.exists(file):
 	    f = open(file, "r")
 	    self.lineno = 1
@@ -23,6 +23,8 @@ class ConfigFile:
 		self.configLine(line, file)
 		self.lineno = self.lineno + 1
 	    f.close()
+	elif exception:
+	    raise IOError, file
 
     def configLine(self, line, file = "override"):
 	line = line.strip()
