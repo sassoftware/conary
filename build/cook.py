@@ -277,18 +277,11 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     grp = trove.Trove(fullName, versions.NewVersion(), grpFlavor, None)
 
     d = {}
-    for (name, versionList) in recipeObj.getTroveList().iteritems():
-	d[name] = versionList
-
-    d = repos.getTroveVersionFlavors(d)
-
-    for (name, subd) in d.iteritems():
-	for (v, flavorList) in subd.iteritems():
-	    for flavor in flavorList:
-		if not flavor or cfg.flavor.satisfies(flavor):
-		    grp.addTrove(name, v, flavor)
-		    if flavor:
-			grpFlavor.union(flavor)
+    for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
+        for (version, flavor) in versionFlavorList:
+            grp.addTrove(name, version, flavor)
+            if flavor:
+                grpFlavor.union(flavor)
 
     targetVersion = repos.nextVersion(fullName, recipeClass.version, grpFlavor, 
 				      buildBranch, binary = True)

@@ -103,6 +103,7 @@ def setupRecipeDict(d, filename):
     exec 'from lib import util' in d
     exec 'import os, re, sys, stat' in d
     exec 'from build.use import Use, Arch' in d
+    exec 'from build.use import LocalFlags as Flags' in d
     d['filename'] = filename
 
 class RecipeLoader:
@@ -571,29 +572,39 @@ class PackageRecipe(Recipe):
 
 class GroupRecipe(Recipe):
 
-    def addTrove(self, name, versionStr = None):
-        self.addTroveList.append((name, versionStr))
+    def addTrove(self, name, versionStr = None, flavor = None):
+        if flavor is not None:
+            flavor = flavor.asSet()
+        self.addTroveList.append((name, versionStr, flavor))
 
     def findTroves(self):
-        for (name, versionStr) in self.addTroveList:
+        for (name, versionStr, flavor) in self.addTroveList:
             try:
+                # XXX this is where we need to integrate 
+                # flavors into groups - by combining self.flavor 
+                # and local variable flavor
                 pkgList = self.repos.findTrove(self.label, name, self.flavor, 
                                                versionStr = versionStr)
             except repository.PackageNotFound, e:
                 raise RecipeFileError, str(e)
-            l = self.troveVersions.get(name, [])
-            for version in [ x.getVersion() for x in pkgList ]:
-                if version not in l:
-                    l.append(version)
-            self.troveVersions[name] = l
+            for trove in pkgList:
+                v = trove.getVersion()
+                f = trove.getFlavor()
+                if flavor is not None:
+                    if not self.flavor.satisfies(f):
+                        continue
+                l = self.troveVersionFlavors.get(name, [])
+                if (v, f) not in l:
+                    l.append((v,f))
+                self.troveVersionFlavors[name] = l
 
     def getTroveList(self):
-	return self.troveVersions
+	return self.troveVersionFlavors
 
     def __init__(self, repos, cfg, branch, flavor):
 	self.repos = repos
 	self.cfg = cfg
-	self.troveVersions = {}
+	self.troveVersionFlavors = {}
 	self.label = branch.label()
 	self.flavor = flavor
         self.addTroveList = []
