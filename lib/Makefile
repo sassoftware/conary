@@ -27,7 +27,7 @@ python_files=	    __init__.py		\
 python_modules=elfmodule.so miscmodule.so cstreamsmodule.so
 elfmodule_objs=elf.o
 miscmodule_objs=misc.o
-cstreamsmodule_objs=cstreams.o
+cstreamsmodule_objs=cstreams.o streamset.o
 generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules)
 dist_files = $(python_files) elf.c misc.c cstreams.c Makefile
 
@@ -41,7 +41,7 @@ miscmodule.so: $(miscmodule_objs)
 	$(CC) -shared -o $@ $< -lelf
 
 cstreamsmodule.so: $(cstreamsmodule_objs)
-	$(CC) -shared -o $@ $< -lelf
+	$(CC) -shared -o $@ $^ -lelf
 
 install: pyfiles-install
 	mkdir -p $(DESTDIR)$(conarydir)/$(DIR)
@@ -53,4 +53,4 @@ dist: default-dist
 
 include ../Make.rules
 # needs to come after including Make.rules so that PYINCLUDE is defined
-CFLAGS:=-Wall -I$(PYINCLUDE) -fPIC $(CFLAGS)
+CFLAGS:=-Wall -I$(PYINCLUDE) -fPIC $(CFLAGS) -g

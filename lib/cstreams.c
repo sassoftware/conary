@@ -552,12 +552,13 @@ static PyMethodDef CStreamsMethods[] = {
     {NULL}  /* Sentinel */
 };
 
+void streamsetinit(PyObject * m);
+
 #define REGISTER_TYPE(name) \
     if (PyType_Ready(&name ## Type) < 0) \
         return; \
     Py_INCREF(&name ## Type); \
     PyModule_AddObject(m, #name, (PyObject *) &name ## Type);
-    
 
 #ifndef PyMODINIT_FUNC  /* declarations for DLL import/export */
 #define PyMODINIT_FUNC void
@@ -575,6 +576,9 @@ initcstreams(void)
     REGISTER_TYPE(NumericStream);
     REGISTER_TYPE(IntStream);
     REGISTER_TYPE(ShortStream);
+
+    /* streamset.c */
+    streamsetinit(m);
 }
 
 /*
