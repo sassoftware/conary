@@ -614,6 +614,7 @@ class ChangeSetFromFile(ChangeSet):
         return rc
 
     def getFileContents(self, fileId, withSize = False):
+        name = None
 	if self.configCache.has_key(fileId):
             name = fileId
 	    (tag, str) = self.configCache[fileId]
