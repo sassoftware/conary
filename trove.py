@@ -520,6 +520,11 @@ class Trove:
 	    for oldVersion in oldVersionList:
 		pkgList.append((name, oldVersion, None, oldFlavor, None))
 
+        for name, flavorList in removed.iteritems():
+            for flavor, versionList in flavorList.iteritems():
+                for version in versionList:
+                    pkgList.append((name, version, None, flavor, None))
+
 	return (chgSet, filesNeeded, pkgList)
 
     def setProvides(self, provides):
