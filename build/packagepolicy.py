@@ -33,6 +33,7 @@ import buildpackage
 import files
 import filter
 import destdirpolicy
+import use
 
 
 class NonBinariesInBindirs(policy.Policy):
@@ -1364,7 +1365,6 @@ class Flavor(policy.Policy):
 	f = pkg.getFile(path)
 	set = deps.DependencySet()
         isnset = pkg.isnsetMap[path]
-        # XXX add Arch flag information here
         if isnset == 'x86':
             set.addDep(deps.InstructionSetDependency,
                        deps.Dependency('x86', []))
@@ -1374,6 +1374,8 @@ class Flavor(policy.Policy):
         else:
             set.addDep(deps.InstructionSetDependency,
                        deps.Dependency(isnset, []))
+        # get the Arch.* dependencies
+        set.union(use.Arch.getUsedSet().toDependency())
         f.flavor.set(set)
 	pkg.flavor.union(f.flavor.value())
 
