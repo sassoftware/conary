@@ -846,6 +846,26 @@ class WarnWriteable(policy.Policy):
 			' 0%o for %s %s', mode & 0777, type, file)
 
 
+class WorldWriteableExecutables(policy.Policy):
+    """
+    No executable file should ever be world-writeable.  If you have an
+    exception, you can use:
+    C{r.NonBinariesInBindirs(exceptions=I{filterexp})}
+    But you should never have an exception.  Note that this policy is
+    separate from C{WarnWriteable} because calling C{r.SetModes} should
+    not override this policy automatically.
+    """
+    invariantexceptions = [ ('.*', stat.S_IFDIR) ]
+    def doFile(self, file):
+	d = self.macros['destdir']
+	mode = os.lstat(util.joinPaths(d, file))[stat.ST_MODE]
+        if mode & 0111 and mode & 02 and not stat.S_ISLNK(mode):
+	    self.recipe.reportErrors(
+		"%s has mode 0%o with world-writeable permission in bindir"
+		%(file, mode))
+
+
+
 class FilesForDirectories(policy.Policy):
     """
     Warn about files where we expect directories, commonly caused
@@ -1283,6 +1303,7 @@ def DefaultPolicy(recipe):
 	DanglingSymlinks(recipe),
 	AddModes(recipe),
 	WarnWriteable(recipe),
+        WorldWriteableExecutables(recipe),
 	FilesForDirectories(recipe),
 	ObsoletePaths(recipe),
 	IgnoredSetuid(recipe),
