@@ -323,7 +323,7 @@ def commit(repos, cfg, message, sourceCheck = False):
         d = repos.getTroveVersionsByBranch({ troveName : 
                                              { state.getBranch() : None } } )
         versionList = d.get(troveName, {}).keys()
-        versionList.sort(versions.Version.compare)
+        versionList.sort()
 
         if state.getVersion().trailingVersion().getVersion() != \
                                     recipeVersionStr:
@@ -402,7 +402,7 @@ def annotate(repos, filename):
                         {troveName: { branch : None}})[troveName]
     labelVerList = labelVerList.keys()
     # sort verList into ascending order (first commit is first in list)
-    labelVerList.sort(versions.Version.compare)
+    labelVerList.sort()
 
     switchedBranches = False
     branchVerList = {}
@@ -540,7 +540,7 @@ def annotate(repos, filename):
                 labelVerList = repos.getTroveVersionsByBranch(
                         { troveName : { branch : None }})[troveName]
                 keys = labelVerList.keys()
-                keys.sort(versions.Version.compare)
+                keys.sort()
 
                 for ver in keys:
                     b = ver.branch()
@@ -594,7 +594,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 	vers = repos.getTroveVersionsByBranch( 
                                 { troveName : { newV.branch() : None } } )
 	vers = vers[troveName].keys()
-        vers.sort(versions.Version.compare)
+        vers.sort()
 	# erase everything later then us
 	i = vers.index(newV)
 	del vers[i:]
@@ -963,7 +963,7 @@ def showLog(repos, branch = None):
 
     verList = repos.getTroveVersionsByLabel([troveName], branch.label())
     verList = verList[troveName].keys()
-    verList.sort(versions.Version.compare)
+    verList.sort()
     verList.reverse()
     l = []
     for version in verList:

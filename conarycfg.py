@@ -204,6 +204,33 @@ class ConfigFile:
         for (key, value) in self.__dict__.items():
             self.lowerCaseMap[key.lower()] = key
 
+    def initializeFlavors(self):
+        import flavorcfg
+        self.flavorConfig = flavorcfg.FlavorConfig(self.useDir, self.archDir)
+
+        self.flavor = self.flavorConfig.toDependency(override=self.flavor)
+
+        if not deps.deps.DEP_CLASS_IS in self.flavor.getDepClasses():
+            insSet = deps.deps.DependencySet()
+            for dep in deps.arch.currentArch:
+                insSet.addDep(deps.deps.InstructionSetDependency, dep)
+            self.flavor.union(insSet)
+
+        # buildFlavor is installFlavor + overrides
+        buildFlavor = self.flavor.copy()
+        if deps.deps.DEP_CLASS_IS in self.buildFlavor.getDepClasses():
+            # instruction set deps are overridden completely -- remove 
+            # any self.flavor instruction set info
+            del buildFlavor.members[deps.deps.DEP_CLASS_IS]
+
+        buildFlavor.union(self.buildFlavor, 
+                          mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
+        self.buildFlavor = buildFlavor
+        # create the build flags 
+        self.flavorConfig.populateBuildFlags()
+        # set their values
+        use.setBuildFlagsFromFlavor(None, self.buildFlavor, error=False)
+
 class ConaryConfiguration(ConfigFile):
 
     defaults = {

@@ -190,30 +190,7 @@ def realMain(cfg, argv=sys.argv):
 
     cfg.installLabel = cfg.installLabelPath[0]
 
-    # XXX initialization of lots of this stuff should likely live somewhere
-    # else, instead of conary.py, so that other applications do not
-    # have to duplicate this code.
-    # the flavor from the rc file wins
-    flavorConfig = flavorcfg.FlavorConfig(cfg.useDir, cfg.archDir)
-    cfg.flavor = flavorConfig.toDependency(override=cfg.flavor)
-
-    if not deps.deps.DEP_CLASS_IS in cfg.flavor.getDepClasses():
-        insSet = deps.deps.DependencySet()
-        for dep in deps.arch.currentArch:
-            insSet.addDep(deps.deps.InstructionSetDependency, dep)
-        cfg.flavor.union(insSet)
-
-    # buildFlavor is installFlavor + overrides
-    buildFlavor = cfg.flavor.copy()
-    if deps.deps.DEP_CLASS_IS in cfg.buildFlavor.getDepClasses():
-        # instruction set deps are overridden completely -- remove 
-        # any cfg.flavor instruction set info
-        del buildFlavor.members[deps.deps.DEP_CLASS_IS]
-
-    buildFlavor.union(cfg.buildFlavor, 
-                      mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
-    cfg.buildFlavor = buildFlavor
-                       
+    cfg.initializeFlavors()
 
     profile = False
     if argSet.has_key('profile'):

@@ -460,16 +460,6 @@ class VersionSequence(object):
 
         return -1
 
-    def compare(first, second):
-        if first.isAfter(second):
-            return 1
-        elif first == second:
-            return 0
-
-        return -1
-
-    compare = staticmethod(compare)
-
     def _listsEqual(self, list, other):
 	if len(other.versions) != len(list): return 0
 

@@ -108,7 +108,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
             displayc.cache(troveName, flavors[troveName], fullVersions)
 
             versionList = flavors[troveName].keys()
-            versionList.sort(versions.Version.compare)
+            versionList.sort()
             
 	    for version in reversed(versionList):
 		for flavor in flavors[troveName][version]:

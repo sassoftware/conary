@@ -900,7 +900,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # this mimics the result of an old call which was sorted
             # earliest to latest, and provides currentVersion as
             # a set of (version, flavor) tuples
-            for ver in sorted(d[troveName].keys(), versions.Version.compare):
+            for ver in sorted(d[troveName].keys()):
                 currentVersions += [ (ver, x) for x in d[troveName][ver] ]
 
         del d
