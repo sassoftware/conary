@@ -230,7 +230,7 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
 
 def doCook(repos, cfg, recipeFile, prep=0, macros=()):
     try:
-	_cook(repos, cfg, recipeFile, prep = prep, macros = macros)
+	return _cook(repos, cfg, recipeFile, prep = prep, macros = macros)
     except repository.RepositoryError, e:
 	raise CookError(str(e))
 
