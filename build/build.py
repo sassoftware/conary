@@ -84,7 +84,7 @@ class Run(BuildCommand):
 
 class Automake(BuildCommand):
     # note: no use of %(args)s -- which command would it apply to?
-    template = ('cd %%(builddir)s; '
+    template = ('cd %%(builddir)s/%(subDir)s; '
                 'aclocal %%(m4DirArgs)s %(acLocalArgs)s; '
 		'%(preAutoconf)s autoconf %(autoConfArgs)s; '
 		'automake%(automakeVer)s %(autoMakeArgs)s')
@@ -93,7 +93,8 @@ class Automake(BuildCommand):
 		'acLocalArgs': '',
 		'preAutoconf': '',
                 'm4Dir': '',
-		'automakeVer': ''}
+		'automakeVer': '',
+                'subDir': ''}
     
     def do(self, macros):
 	macros = macros.copy()
@@ -161,24 +162,27 @@ class Configure(BuildCommand):
         util.execute(self.command %macros)
 
 class ManualConfigure(Configure):
-    template = ('cd %%(builddir)s; '
+    template = ('cd %%(builddir)s/%(subDir)s; '
                 '%%(mkObjdir)s '
 	        '%(preConfigure)s %%(configure)s %(args)s')
+    keywords = {'subDir': ''}
 
 class Make(BuildCommand):
-    template = ('cd %%(builddir)s; '
+    template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
                 ' %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s')
-    keywords = {'preMake': ''}
+    keywords = {'preMake': '',
+                'subDir': ''}
 
 class MakeInstall(BuildCommand):
-    template = ('cd %%(builddir)s; '
+    template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
                 ' %(preMake)s make %%(mflags)s %%(rootVarArgs)s'
 		' %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
                 'preMake': '',
-		'installtarget': 'install'}
+		'installtarget': 'install',
+                'subDir': ''}
 
     def do(self, macros):
 	macros = macros.copy()
@@ -190,7 +194,7 @@ class MakeInstall(BuildCommand):
 class GNUMakeInstall(BuildCommand):
     """For use at least when there is no single functional DESTDIR or similar"""
     template = (
-	'cd %%(builddir)s; '
+	'cd %%(builddir)s/%(subDir)s; '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 	' %(preMake)s make %%(mflags)s'
 	' prefix=%%(destdir)s/%%(prefix)s'
@@ -208,7 +212,8 @@ class GNUMakeInstall(BuildCommand):
 	' infodir=%%(destdir)s/%%(infodir)s'
 	' %(installtarget)s %(args)s')
     keywords = {'preMake': '',
-		'installtarget': 'install'}
+		'installtarget': 'install',
+                'subDir': ''}
 
 
 
