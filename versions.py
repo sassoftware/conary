@@ -42,17 +42,17 @@ class VersionRelease(AbstractVersion):
 	self.version = value[:cut]
 	self.release = value[cut + 1:]
 	if self.release.find("-") != -1:
-	    raise KeyError, ("version numbers may not have hyphens: %s" % value)
+	    raise ParseError, ("version numbers may not have hyphens: %s" % value)
 
 	try:
 	    int(self.version[0])
 	except:
-	    raise KeyError, ("version numbers must be begin with a digit: %s" % value)
+	    raise ParseError, ("version numbers must be begin with a digit: %s" % value)
 
 	try:
 	    self.release = int(self.release)
 	except:
-	    raise KeyError, ("release numbers must be all numeric: %s" % value)
+	    raise ParseError, ("release numbers must be all numeric: %s" % value)
 
 class BranchName(AbstractBranch):
 
@@ -69,7 +69,7 @@ class BranchName(AbstractBranch):
 	# throws an exception if no @ is found
 	(self.host, self.branch) = value.split("@", 1)
 	if self.branch.find("@") != -1:
-	    raise KeyError, ("branch names may not have @ signs: %s" % value)
+	    raise ParseError, ("branch names may not have @ signs: %s" % value)
 
 class LocalBranch(BranchName):
 
@@ -215,3 +215,18 @@ class VersionFromString(Version):
 	v = self.parseVersionString(ver, defaultBranch)
 
 	Version.__init__(self, v, 0)
+
+class VersionsError(Exception):
+
+    pass
+
+class ParseError(VersionsError):
+
+    def __repr__(self):
+	return self.str
+
+    def __str__(self):
+	return self.str
+
+    def __init__(self, str):
+	self.str = str
