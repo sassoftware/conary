@@ -1,0 +1,76 @@
+#!/usr/bin/python2.3
+# -*- mode: python -*-
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
+import os
+import sys
+
+if os.path.dirname(sys.argv[0]):
+    if sys.argv[0][0] == "/":
+	fullPath = os.path.dirname(sys.argv[0])
+    else:
+	fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.append(os.path.dirname(fullPath))
+from repository.changeset import ChangeSetFromFile
+from local import database
+import conarycfg
+import util
+import helper
+import queryrep
+import checkin
+import versions
+
+sys.excepthook = util.excepthook
+
+cfg = conarycfg.ConaryConfiguration()
+repos = helper.openRepository(cfg.repositoryMap)
+
+if len(sys.argv) != 2:
+    print "Usage: graphbranch <trovename>"
+    sys.exit(1)
+
+troveName = sys.argv[1]
+
+def getNestedBranches(troveName, host, label):
+    versions = repos.getTroveVersionList(host, [troveName])
+    
+    branches = []
+    for v in versions[troveName]:
+	if v.branch() not in branches:
+	    # skip ourself
+	    if v.branch().label().asString() == label:
+		continue
+	    # make sure our parent is directly underneath us
+	    if v.branch().hasParent() and v.branch().parentNode().branch().label().asString() == label:
+		branches.append(v.branch())
+
+    return branches 
+
+def printVersionsAndLeaves(trove, label, level):
+    branches = getNestedBranches(trove, cfg.installLabel.getHost(), label.asString())
+    versions = repos.getTroveVersionsByLabel([trove], label)
+
+    flavors = repos.getTroveVersionFlavors(versions) 
+   
+    for branch in branches:
+	print '"%s" [shape=box,label="%s"];' % (branch.label().asString(), branch.asString())
+	if branch.hasParent():
+	    print '"%s" -> "%s";' % (branch.parentNode().asString(), branch.label().asString())
+	printVersionsAndLeaves(trove, branch.label(), level+1)
+   
+    for version in flavors[trove]:
+	for flavor in flavors[trove][version]:
+	    print '"%s" [label="%s"];' % (version.asString(), version.trailingVersion().asString())
+	    print '"%s" -> "%s"' % (label.asString(), version.asString())
+
+# go
+print "digraph branch_structure {"
+print '"%s" [shape=box,peripheries=2,label="%s"]' % (cfg.installLabel.asString(), troveName)
+printVersionsAndLeaves(troveName, cfg.installLabel, 0)
+print "}"
