@@ -7,17 +7,19 @@ import files
 import shutil
 import string
 
-def finalCommit(reppath, pkgName, version, root, fileList):
-    pkgSet = package.PackageSet(reppath, pkgName)
+# version is a short package version, not an SRS version string
+def finalCommit(cfg, pkgName, version, root, fileList):
+    pkgSet = package.PackageSet(cfg.reppath, pkgName)
+
     if pkgSet.hasVersion(version):
 	raise KeyError, ("package %s version %s is already installed" %
 		    (pkgName, version))
     p = pkgSet.createVersion(version)
 
-    fileDB = reppath + "/files"
+    fileDB = cfg.reppath + "/files"
 
     for file in fileList:
-	infoFile = files.FileDB(reppath, file.pathInRep(reppath))
+	infoFile = files.FileDB(cfg.reppath, file.pathInRep(cfg.reppath))
 
 	existing = infoFile.findVersion(file)
 	if not existing:
@@ -37,6 +39,6 @@ def finalCommit(reppath, pkgName, version, root, fileList):
 	    else:
 		p.addFile(file.path(), existing[0])
 
-	file.archive(reppath, root)
+	file.archive(cfg.reppath, root)
 
     pkgSet.write()
