@@ -717,6 +717,8 @@ class MakeDirs(_FileAction):
             path = path %macros
             dirs = util.braceExpand(path)
             for d in dirs:
+		if d[0] != '/':
+		    raise TypeError, 'Inappropriately relative directory %s: directories must start with "/"' %d
                 d = d %macros
                 dest = macros['destdir'] + d
                 log.debug('creating directory %s', d)
@@ -730,6 +732,3 @@ class MakeDirs(_FileAction):
 	    self.paths = args[0]
 	else:
 	    self.paths = args
-	for arg in args:
-	    if arg[0] != '/':
-                raise TypeError, 'Directories must start with "/"'
