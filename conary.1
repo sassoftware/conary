@@ -20,16 +20,17 @@ the commands.
 The following \fBcommands\fP are used to install, update, erase, and
 otherwise manage software installed on a local system.
 .TP 4
-.B query \fIpkgname [version]\fP
+.B query \fItrvname [version]\fP
 Lists troves installed on the local system.
 .TP 4
 .B query \fI--path <file>\fP
 Lists the package that owns the specified file.  Must use absolute file name.
 .TP
-.B update [\fIargs\fP] \fIpkgname version\fP
-Updates \fIpkgname\fR from the appropriate repository to match \fIversion,\fR
-upgrading, downgrading, or installing as necessary to do so.
-Arguments include:
+.B update [\fIargs\fP] <\fItrvname\fP[=\fIversion\fP]>* <\fIchangeset-file\fP>*
+Updates the trove \fItrvname\fR from the appropriate repository to 
+match the optional \fIversion\fP (otherwise the most recent version which 
+matches the \fBinstall-label\fP) and applies the changesets contained in any
+\fIchange-files\fP given.
 .RS 4
 .TP 4
 .B --keep-existing
@@ -39,12 +40,9 @@ Arguments include:
 .\" FIXME: add semantics
 .RE
 .TP
-.B update \fIchangeset\fP
-Applies \fIchangeset\fR to the local system, making whatever changes
-to the local system are specified in \fIchangeset.\fR
 .TP
-.B erase \fIpkgname [version]\fP
-Erase all instances of \fIpkgname\fP (or only a specified \fIversion\fP)
+.B erase \fItrvname [version]\fP
+Erase all instances of \fItrvname\fP (or only a specified \fIversion\fP)
 from the local system
 .TP
 .B remove \fIpath\fP
@@ -58,14 +56,14 @@ the component that now contains \fI/foo/blah\fP instead of
 \fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
 as a new file.)
 .TP
-.B changeset \fIpkgname [oldver] newver outfile\fP
-Creates an absolute changeset for \fIpkgname newver\fP, or a relative
-changeset between \fIpkgname oldver\fP and \fIpkgname newver\fP, and stores
+.B changeset \fItrvname [oldver] newver outfile\fP
+Creates an absolute changeset for \fItrvname newver\fP, or a relative
+changeset between \fItrvname oldver\fP and \fItrvname newver\fP, and stores
 it in outfile.
 .TP
-.B localcs \fIpkgname outfile\fP
+.B localcs \fItrvname outfile\fP
 Creates a local changeset, which represents the changes made on the
-local system to \fIpkgname\fP, relative to the package as it is
+local system to \fItrvname\fP, relative to the package as it is
 represented in the repository.
 .TP
 .B localcommit
@@ -84,7 +82,7 @@ Lists available rollbacks.
 Applies rollback \fIrollback\fP.  (Syntax may change in future versions
 of Conary.)
 .TP
-.B repquery [\fIargs\fP \fIpkgname [version]\fP
+.B repquery [\fIargs\fP \fItrvname [version]\fP
 Lists troves in the repository.
 Arguments include
 .RS 4
