@@ -23,7 +23,7 @@ import weakref
 
 staticLabelTable = {}
 
-class AbstractVersion(object):
+class AbstractRevision(object):
 
     """
     Ancestor class for all versions (as opposed to labels)
@@ -121,7 +121,7 @@ class SerialNumber(object):
     def __init__(self, value):
         self.numList = [ int(x) for x in value.split(".") ]
 
-class VersionRelease(AbstractVersion):
+class Revision(AbstractRevision):
 
     """
     Version element for a version/release pair. These are formatted as
@@ -227,7 +227,7 @@ class VersionRelease(AbstractVersion):
     def __hash__(self):
 	return hash(self.version) ^ hash(self.release) ^ hash(self.buildCount)
 
-    def incrementRelease(self, shadowLength):
+    def incrementSourceCount(self, shadowLength):
 	"""
 	Incremements the release number.
 	"""
@@ -245,13 +245,13 @@ class VersionRelease(AbstractVersion):
 
     def __init__(self, value, template = None, frozen = False):
 	"""
-	Initialize a VersionRelease object from a string representation
+	Initialize a Revision object from a string representation
 	of a version release. ParseError exceptions are thrown if the
 	string representation is ill-formed.
 
-	@param value: String representation of a VersionRelease
+	@param value: String representation of a Revision
 	@type value: string
-	@type template: VersionRelease
+	@type template: Revision
 	"""
 	self.timeStamp = 0
 	self.buildCount = None
@@ -415,7 +415,7 @@ class StaticLabel(Label):
     def __init__(self):
 	Label.__init__(self, self.name)
 
-class LocalBranch(StaticLabel):
+class LocalLabel(StaticLabel):
 
     """
     Class defining the local branch.
@@ -423,7 +423,7 @@ class LocalBranch(StaticLabel):
 
     name = "local@local:LOCAL"
 
-class EmergeBranch(StaticLabel):
+class EmergeLabel(StaticLabel):
 
     """
     Class defining the emerge branch.
@@ -431,7 +431,7 @@ class EmergeBranch(StaticLabel):
 
     name = "local@local:EMERGE"
 
-class CookBranch(StaticLabel):
+class CookLabel(StaticLabel):
 
     """
     Class defining the emerge branch.
@@ -439,9 +439,9 @@ class CookBranch(StaticLabel):
 
     name = "local@local:COOK"
 
-staticLabelTable[LocalBranch.name] = LocalBranch
-staticLabelTable[EmergeBranch.name] = EmergeBranch
-staticLabelTable[CookBranch.name] = CookBranch
+staticLabelTable[LocalLabel.name] = LocalLabel
+staticLabelTable[EmergeLabel.name] = EmergeLabel
+staticLabelTable[CookLabel.name] = CookLabel
 
 class VersionSequence(object):
 
@@ -545,19 +545,19 @@ class VersionSequence(object):
 
     def timeStamps(self):
         return [ x.timeStamp for x in self.versions if 
-                                            isinstance(x, AbstractVersion)]
+                                            isinstance(x, AbstractRevision)]
 
     def setTimeStamps(self, timeStamps):
         i = 0
         for item in self.versions:
-            if isinstance(item, AbstractVersion):
+            if isinstance(item, AbstractRevision):
                 item.timeStamp = timeStamps[i]
                 i += 1
             
     def __init__(self, versionList):
         """
         Creates a Version object from a list of AbstractLabel and
-        AbstractVersion objects.
+        AbstractRevision objects.
         """
 	self.versions = versionList
 
@@ -610,7 +610,7 @@ class Version(VersionSequence):
         iter.next()
         
         for item in iter:
-            if expectVersion and isinstance(item, AbstractVersion):
+            if expectVersion and isinstance(item, AbstractRevision):
                 return count
             elif expectVersion:
                 count += 1
@@ -624,7 +624,7 @@ class Version(VersionSequence):
         # shadow of a version, we return that original version
         v = self.copy()
         
-        release = v.trailingVersion()
+        release = v.trailingRevision()
         shadowCount = release.release.shadowCount()
         if release.buildCount and \
                 release.buildCount.shadowCount() > shadowCount:
@@ -650,14 +650,14 @@ class Version(VersionSequence):
         if self.versions[-1].buildCount is None:
             return True
 
-        # find the previous VersionRelease object. If the shadow counts are
+        # find the previous Revision object. If the shadow counts are
         # the same, this is a direct child
         iter = reversed(self.versions)
         # this skips the first one
         item = iter.next()
         item = iter.next()
         try:
-            while not isinstance(item, AbstractVersion):
+            while not isinstance(item, AbstractRevision):
                 item = iter.next()
         except StopIteration:
             return False
@@ -679,7 +679,7 @@ class Version(VersionSequence):
         assert(self.hasParentVersion())
 
         # if this is a branch, finding the parent is easy
-        if isinstance(self.versions[-3], AbstractVersion):
+        if isinstance(self.versions[-3], AbstractRevision):
             return Version(self.versions[:-2])
 
         # this is a shadow. work a bit harder
@@ -692,19 +692,12 @@ class Version(VersionSequence):
 
 	return Version(items)
 
-    def incrementRelease(self):
+    def incrementSourceCount(self):
 	"""
 	The release number for the final element in the version is
 	incremented by one and the time stamp is reset.
 	"""
-	self.versions[-1].incrementRelease(self.shadowLength())
-
-    def incrementBuildCount(self):
-	"""
-	The build count number for the final element in the version is
-	incremented by one and the time stamp is reset.
-	"""
-	self.versions[-1].incrementBuildCount(self.shadowLength())
+	self.versions[-1].incrementSourceCount(self.shadowLength())
 
     def incrementBuildCount(self):
 	"""
@@ -735,9 +728,9 @@ class Version(VersionSequence):
 
         self.versions[-1].resetTimeStamp()
 
-    def trailingVersion(self):
+    def trailingRevision(self):
 	"""
-	Returns the AbstractVersion object at the end of the version.
+	Returns the AbstractRevision object at the end of the version.
 
 	@rtype: AbstactVersion
 	"""
@@ -750,7 +743,7 @@ class Version(VersionSequence):
 
 	@rtype: boolean
 	"""
-	return isinstance(self.versions[-2], LocalBranch)
+	return isinstance(self.versions[-2], LocalLabel)
 
     def branch(self):
 	"""
@@ -813,30 +806,30 @@ class Version(VersionSequence):
         newList = self.versions[:-1] + [ label ] + [ newRelease ]
         return Version(copy.deepcopy(newList))
 
-    def getSourceBranch(self):
+    def getSourceVersion(self):
         """ 
         Takes a binary version and returns its associated source version (any
         trailing version info is left untouched).  If source is branched off of
         <repo1>-2 into <repo2>, its new version will be <repo1>-2/<repo2>/2.
         The corresponding build will be on branch <repo1>-2-0/<repo2>/2-1.
-        getSourceBranch converts from the latter to the former.  Always returns
+        getSourceVersion converts from the latter to the former.  Always returns
         a copy of the version, even when the two are equal.
         """
         v = self.copy()
 
         for item in v.versions:
-            if isinstance(item, VersionRelease):
+            if isinstance(item, Revision):
                 item.buildCount = None
 
         return v
 
-    def getBinaryBranch(self):
+    def getBinaryVersion(self):
         """ 
         Takes a source branch and returns its associated binary branch.  (any
         trailing version info is left untouched).  If source is branched off of
         <repo1>-2 into <repo2>, its new version will be <repo1>-2/<repo2>/2.
         The corresponding build will be on branch <repo1>-2-0/<repo2>/2-1.
-        getBinaryBranch converts from the former to the latter.  Always returns
+        getBinaryVersion converts from the former to the latter.  Always returns
         a copy of the branch, even when the two are equal.
         """
         newV = self.copy()
@@ -844,7 +837,7 @@ class Version(VersionSequence):
 
         while v.hasParentVersion():
             v = v.parentVersion()
-            v.trailingVersion().buildCount = 0
+            v.trailingRevision().buildCount = 0
 
         return newV
 
@@ -871,7 +864,7 @@ class Branch(VersionSequence):
 	@rtype: Version
 	"""
         items = self.versions[:-1]
-        if isinstance(items[-1], VersionRelease):
+        if isinstance(items[-1], Revision):
             del items[-1]
 
         assert(items)
@@ -888,7 +881,7 @@ class Branch(VersionSequence):
 	stamp is reset as a new version has been created.
 
 	@param verRel: object for the version and release
-	@type verRel: VersionRelease
+	@type verRel: Revision
 	"""
 
 	verRel.timeStamp = time.time()
@@ -913,7 +906,7 @@ class Branch(VersionSequence):
 
 def _parseVersionString(ver, frozen):
     """
-    Converts a string representation of a version into a VersionRelease
+    Converts a string representation of a version into a Revision
     object.
 
     @param ver: version string
@@ -995,7 +988,7 @@ def _VersionFromString(ver, defaultBranch = None, frozen = False,
         else:
             expectLabel = True
 
-            lastVersion = VersionRelease(part, template = lastVersion,
+            lastVersion = Revision(part, template = lastVersion,
                                          frozen = frozen)
             if lastVersion.shadowCount() > shadowCount:
                 raise ParseError, "two many shadow serial numbers in '%s'" \
@@ -1003,7 +996,7 @@ def _VersionFromString(ver, defaultBranch = None, frozen = False,
             vList.append(lastVersion)
             parts = parts[2:]
 
-    if isinstance(vList[-1], AbstractVersion):
+    if isinstance(vList[-1], AbstractRevision):
         ver = Version(vList)
     else:
         ver = Branch(vList)

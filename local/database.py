@@ -290,7 +290,7 @@ class Database(SqlDbRepository):
 	    old = newPkg.getOldVersion()
 	    flavor = newPkg.getOldFlavor()
 	    if self.hasPackage(name) and old:
-		ver = old.createBranch(versions.LocalBranch(), withVerRel = 1)
+		ver = old.createBranch(versions.LocalLabel(), withVerRel = 1)
 		pkg = self.getTrove(name, old, flavor)
 		origPkg = self.getTrove(name, old, flavor, pristine = 1)
 		assert(pkg)
@@ -299,7 +299,7 @@ class Database(SqlDbRepository):
 
 	if not keepExisting:
 	    for (name, version, flavor) in cs.getOldPackageList():
-		localVersion = version.createBranch(versions.LocalBranch(), 
+		localVersion = version.createBranch(versions.LocalLabel(), 
 					            withVerRel = 1)
 		pkg = self.getTrove(name, version, flavor)
 		origPkg = self.getTrove(name, version, flavor, pristine = 1)
@@ -542,15 +542,15 @@ class Database(SqlDbRepository):
 		versionList = [ v for v in versionList if 
 				str(v.branch().label()) == versionStr ]
 	    else:
-		verRel = versions.VersionRelease(versionStr)
+		verRel = versions.Revision(versionStr)
 		try:
-		    verRel = versions.VersionRelease(versionStr)
+		    verRel = versions.Revision(versionStr)
 		except:
 		    log.error("unknown version string: %s", versionStr)
 		    return
 
 		versionList = [ v for v in versionList if 
-					v.trailingVersion() == verRel ]
+					v.trailingRevision() == verRel ]
 
 	pkgList = []
 	for version in versionList:

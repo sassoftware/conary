@@ -923,14 +923,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # if we have a sourceVersion, and its release is newer than the latest
         # binary on the branch, use it instead.
         if sourceVersion is not None:
-            sourceTrailing = sourceVersion.trailingVersion()
+            sourceTrailing = sourceVersion.trailingRevision()
             # if the upstream version part of the source component is the same
             # as what we're currently using, we can use the source version
             if versionStr == sourceTrailing.getVersion():
                 # if there isn't a latest, we can just use the source version
                 # number after incrementing the build count
                 if latest is None:
-                    latest = sourceVersion.getBinaryBranch()
+                    latest = sourceVersion.getBinaryVersion()
                     latest.incrementBuildCount()
                     return latest
 
@@ -939,14 +939,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 # source component release is newer.
                 # If so, use the source component.  Otherwise, latest will
                 # be used below and the build count will be incremented.
-                latestTrailing = latest.trailingVersion()
+                latestTrailing = latest.trailingRevision()
                 if (latestTrailing.getVersion() != versionStr or 
                     latestTrailing.getRelease() < sourceTrailing.getRelease()):
-                    latest = sourceVersion.getBinaryBranch()
+                    latest = sourceVersion.getBinaryVersion()
                     latest.incrementBuildCount()
                     return latest
 
-        if latest is None or latest.trailingVersion().getVersion() != versionStr:
+        if latest is None or latest.trailingRevision().getVersion() != versionStr:
             # this is a good guess, but it could be wrong since the same version
             # can appear at discountinuous points in the tree. it would be
             # better if this search was done on the server (it could be much
@@ -956,7 +956,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             lastOnBranch = None
             for version in allVersions.get(troveName, []):
-                if (version.trailingVersion().getVersion() == 
+                if (version.trailingRevision().getVersion() == 
                             versionStr) and \
                     (not lastOnBranch or version.isAfter(lastOnBranch)):
                     lastOnBranch = version
@@ -969,15 +969,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 # the 1 goes (this gets things right for shadows)
                 if binary:
                     newVersion = currentBranch.createVersion(
-                                versions.VersionRelease("%s-1-0" % versionStr))
+                                versions.Revision("%s-1-0" % versionStr))
                 else:
                     newVersion = currentBranch.createVersion(
-                                versions.VersionRelease("%s-0" % versionStr))
+                                versions.Revision("%s-0" % versionStr))
 
             if binary:
                 newVersion.incrementBuildCount()
             else:
-                newVersion.incrementRelease()
+                newVersion.incrementSourceCount()
 
         elif (latestForFlavor != latest) and not alwaysBumpCount:
             # this is a flavor that does not exist at the latest
@@ -990,7 +990,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if binary:
                 newVersion.incrementBuildCount()
             else:
-                newVersion.incrementRelease()
+                newVersion.incrementSourceCount()
             
         return newVersion
 
@@ -1119,7 +1119,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	    # version/release was given. look in the affinityDatabase
             # for the branches to look on
 	    try:
-		verRel = versions.VersionRelease(versionStr)
+		verRel = versions.Revision(versionStr)
 	    except versions.ParseError, e:
 		raise repository.TroveNotFound, str(e)
 
@@ -1144,7 +1144,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                                            bestFlavor = True)
 
                 for version in flavorDict[name].keys():
-                    if version.trailingVersion() != verRel:
+                    if version.trailingRevision() != verRel:
                         del flavorDict[name][version]
             else:
                 flavorDict = { name : {} }
@@ -1155,7 +1155,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     d = self.getTroveVersionsByLabel([name], label, 
                                              flavorFilter = flavor)
                     for version in d.get(name, {}).keys():
-                        if version.trailingVersion() != verRel:
+                        if version.trailingRevision() != verRel:
                             del d[name][version]
 
                     if not d.has_key(name):

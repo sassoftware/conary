@@ -324,7 +324,7 @@ def getTroves(cs, troveList):
                     if not reqVersion:
                         troves[pkg] = True
                         break
-                    elif pkg[1].trailingVersion().asString() == reqVersion:
+                    elif pkg[1].trailingRevision().asString() == reqVersion:
                         troves[pkg] = True
                         break
     if not troves:

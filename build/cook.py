@@ -226,7 +226,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 
 	# hack
 	for version in buildBranch.versions:
-	    if isinstance(version, versions.VersionRelease) and \
+	    if isinstance(version, versions.Revision) and \
 			version.buildCount is None:
 		version.buildCount = 0
 
@@ -430,7 +430,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
     if targetLabel:
 	targetVersion = targetVersion.createBranch(targetLabel,
                                                    withVerRel = True)
-	targetVersion.trailingVersion().incrementBuildCount()
+	targetVersion.trailingRevision().incrementBuildCount()
 
     fileset = trove.Trove(fullName, targetVersion, flavor, None)
     for (pathId, path, version, fileId) in l:
@@ -689,7 +689,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
                 if version.isAfter(maxVersion):
                     maxVersion = version
             sourceVersion = maxVersion
-	targetLabel = versions.CookBranch()
+	targetLabel = versions.CookLabel()
     else:
 	if resume:
 	    raise CookError('Cannot use --resume argument when cooking in repository')
@@ -711,7 +711,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 	if emerge:
 	    (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % item)
 	    os.close(fd)
-	    targetLabel = versions.EmergeBranch()
+	    targetLabel = versions.EmergeLabel()
 
     built = None
     try:

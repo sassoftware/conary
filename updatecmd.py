@@ -72,7 +72,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             for (req, suggList) in suggMap.iteritems():
                 print "    %s -> %s" % \
                   (req, " ".join(["%s(%s)" % 
-                  (x[0], x[1].trailingVersion().asString()) for x in suggList]))
+                  (x[0], x[1].trailingRevision().asString()) for x in suggList]))
             return
         elif suggMap:
             print "Including extra troves to resolve dependencies:"
@@ -85,7 +85,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             items = items.keys()
             items.sort()
             print "%s" % (" ".join(["%s(%s)" % 
-                           (x[0], x[1].trailingVersion().asString())
+                           (x[0], x[1].trailingRevision().asString())
                            for x in items]))
 
         client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,

@@ -841,7 +841,7 @@ class FilesystemJob:
 	for pkgCs in changeSet.iterNewPackageList():
             old = pkgCs.getOldVersion()
 	    if old:
-		localVer = old.createBranch(versions.LocalBranch(), 
+		localVer = old.createBranch(versions.LocalLabel(), 
                                             withVerRel = 1)
                 newFsPkg = fsPkgDict[(pkgCs.getName(), localVer)].copy()
             else:

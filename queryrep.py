@@ -177,7 +177,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 
 	    else:
 		print "%-30s %s" % \
-		    (("Version   : %s" % version.trailingVersion().asString()),
+		    (("Version   : %s" % version.trailingRevision().asString()),
 		     ("Label     : %s" % version.branch().label().asString()))
 
             if sourceTrove:
@@ -204,14 +204,14 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		print _troveFormat % (trove.getName(), version.asString())
 	    else:
 		print _troveFormat % (trove.getName(), 
-				      version.trailingVersion().asString())
+				      version.trailingRevision().asString())
 
 	    for (troveName, ver, flavor) in trove.iterTroveList():
 		if fullVersions or ver.branch() != version.branch():
 		    print _grpFormat % (troveName, ver.asString())
 		else:
 		    print _grpFormat % (troveName, 
-					ver.trailingVersion().asString())
+					ver.trailingRevision().asString())
 
 	    iter = repos.iterFilesInTrove(trove.getName(), trove.getVersion(),
                                           trove.getFlavor(), sortByPath = True, 
@@ -221,4 +221,4 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		    print _fileFormat % (path, ver.asString())
 		else:
 		    print _fileFormat % (path, 
-					 ver.trailingVersion().asString())
+					 ver.trailingRevision().asString())

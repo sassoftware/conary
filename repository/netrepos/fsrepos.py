@@ -96,11 +96,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	for pkg in cs.iterNewPackageList():
 	    v = pkg.getNewVersion()
 	    label = v.branch().label()
-	    if isinstance(label, versions.EmergeBranch):
+	    if isinstance(label, versions.EmergeLabel):
 		raise repository.repository.CommitError, \
 		    "can not commit items on localhost@local:EMERGE"
 	    
-	    if isinstance(label, versions.CookBranch):
+	    if isinstance(label, versions.CookLabel):
 		raise repository.repository.CommitError, \
 		    "can not commit items on localhost@local:COOK"
 

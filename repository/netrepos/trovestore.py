@@ -420,7 +420,7 @@ class TroveStore:
         if language == "C":
             if latestVersion: # a version exists, increment it
                 version = versions.VersionFromString(latestVersion)
-                version.incrementRelease()
+                version.incrementSourceCount()
             else: # otherwise make a new version
                 version = versions._VersionFromString("1-1", defaultBranch=branch)
 

@@ -218,8 +218,8 @@ class ConaryClient:
                                 for x in l ]
                 # XXX where does this go now?                    
                 # updating locally cooked troves needs a label override
-                #if True in [isinstance(x, versions.CookBranch) or
-                #            isinstance(x, versions.EmergeBranch)
+                #if True in [isinstance(x, versions.CookLabel) or
+                #            isinstance(x, versions.EmergeLabel)
                 #            for x in labels]:
                 #    if not versionStr:
                 #        raise UpdateError, \

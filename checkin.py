@@ -317,32 +317,32 @@ def commit(repos, cfg, message, sourceCheck = False):
     if isinstance(state.getVersion(), versions.NewVersion):
         # increment it like this to get it right on shadows
         newVersion = state.getBranch().createVersion(
-                           versions.VersionRelease("%s-0" % recipeVersionStr))
-        newVersion.incrementRelease()
+                           versions.Revision("%s-0" % recipeVersionStr))
+        newVersion.incrementSourceCount()
     else:
         d = repos.getTroveVersionsByBranch({ troveName : 
                                              { state.getBranch() : None } } )
         versionList = d.get(troveName, {}).keys()
         versionList.sort()
 
-        if state.getVersion().trailingVersion().getVersion() != \
+        if state.getVersion().trailingRevision().getVersion() != \
                                     recipeVersionStr:
             for ver in reversed(versionList):
-                if ver.trailingVersion().getVersion() == recipeVersionStr:
+                if ver.trailingRevision().getVersion() == recipeVersionStr:
                     break
 
-            if ver.trailingVersion().getVersion() == recipeVersionStr:
+            if ver.trailingRevision().getVersion() == recipeVersionStr:
                 newVersion = ver.copy()
             else:
                 newVersion = state.getBranch().createVersion(
-                           versions.VersionRelease("%s-0" % recipeVersionStr))
+                           versions.Revision("%s-0" % recipeVersionStr))
         else:
             newVersion = state.getVersion().copy()
 
-        newVersion.incrementRelease()
+        newVersion.incrementSourceCount()
         if troveName in d:
             while newVersion in versionList:
-                newVersion.incrementRelease()
+                newVersion.incrementSourceCount()
 
         del d
             
@@ -568,7 +568,7 @@ def annotate(repos, filename):
 
     for line in finalLines:
         version = line[1][0]
-        tv = version.trailingVersion()
+        tv = version.trailingRevision()
         name = line[1][1]
         date = time.strftime('%x', time.localtime(tv.timeStamp))
         info = '(%-*s %s):' % (maxN, name, date) 
@@ -773,7 +773,7 @@ def updateSrc(repos, versionStr = None):
     pkgCs = packageChanges.next()
     assert(util.assertIteratorAtEnd(packageChanges))
 
-    localVer = state.getVersion().createBranch(versions.LocalBranch(), 
+    localVer = state.getVersion().createBranch(versions.LocalLabel(), 
                                                withVerRel = 1)
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
@@ -822,7 +822,7 @@ def merge(repos):
     pkgCs = packageChanges.next()
     assert(util.assertIteratorAtEnd(packageChanges))
 
-    localVer = parentRootVersion.createBranch(versions.LocalBranch(), 
+    localVer = parentRootVersion.createBranch(versions.LocalLabel(), 
                                                withVerRel = 1)
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { (state.getName(), localVer) : state }, "",
@@ -838,7 +838,7 @@ def merge(repos):
 
     if newState.getVersion() == pkgCs.getNewVersion():
         branch = state.getVersion().branch()
-        version = branch.createVersion(newState.getVersion().trailingVersion())
+        version = branch.createVersion(newState.getVersion().trailingRevision())
 	newState.changeVersion(version)
 
     newState.write("CONARY")
@@ -987,7 +987,7 @@ def showOneLog(version, changeLog=''):
     if version == versions.NewVersion():
 	versionStr = "(working version)"
     else:
-	versionStr = version.trailingVersion().asString()
+	versionStr = version.trailingRevision().asString()
 
     if changeLog.getName():
 	print "%s %s (%s) %s" % \

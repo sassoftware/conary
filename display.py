@@ -60,7 +60,7 @@ class DisplayCache:
             return
         passed = True
         for version in versionList:
-            v = version.trailingVersion().asString()
+            v = version.trailingRevision().asString()
             _cache[troveName][version] = v
             if short.has_key(v):
                 # two versions have the same version/release
@@ -74,7 +74,7 @@ class DisplayCache:
             for version in versionList:
                 if version.hasParentVersion():
                     v = version.branch().label().asString() + '/' + \
-                        version.trailingVersion().asString()
+                        version.trailingRevision().asString()
                 else:
                     v = version.asString()
 
@@ -260,14 +260,14 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags):
             print _troveFormat % (trove.getName(), version.asString())
         else:
             print _troveFormat % (trove.getName(), 
-                                  version.trailingVersion().asString())
+                                  version.trailingRevision().asString())
 
         for (troveName, ver, flavor) in trove.iterTroveList():
             if fullVersions:
                 print _grpFormat % (troveName, ver.asString())
             else:
                 print _grpFormat % (troveName, 
-                                    ver.trailingVersion().asString())
+                                    ver.trailingRevision().asString())
 
         fileL = [ (x[1], x[0], x[2], x[3]) for x in trove.iterFileList() ]
         fileL.sort()
@@ -276,4 +276,4 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags):
                 print _fileFormat % (path, version.asString())
             else:
                 print _fileFormat % (path, 
-                                     version.trailingVersion().asString())
+                                     version.trailingRevision().asString())

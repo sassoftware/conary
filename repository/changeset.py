@@ -463,7 +463,7 @@ class ChangeSet(streams.LargeStreamSet):
 	@param targetBranchLabel: label of the branch to commit to
 	@type targetBranchLabel: versions.Label
 	"""
-	assert(not targetBranchLabel == versions.LocalBranch())
+	assert(not targetBranchLabel == versions.LocalLabel())
 
 	packageVersions = {}
 
@@ -475,7 +475,7 @@ class ChangeSet(streams.LargeStreamSet):
 	    assert(oldVer)
 
 	    newBr = oldVer.createBranch(targetBranchLabel, withVerRel = 0)
-	    newVer = newBr.createVersion(ver.trailingVersion())
+	    newVer = newBr.createVersion(ver.trailingRevision())
             del newBr
 
 	    # try and reuse the version number we created; if
