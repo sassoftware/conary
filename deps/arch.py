@@ -25,9 +25,9 @@ def flags_i686():
 	for flag in fields[2:]:
 	    if ofInterest.has_key(flag): rc.append(flag)
 
-	return deps.Dependency('i386', rc)
+	return deps.Dependency('x86', rc)
 
-    return deps.Dependency('i386')
+    return deps.Dependency('x86')
 
 def current():
     return currentArch
