@@ -13,6 +13,7 @@
 #
 
 import datastore
+from callback import UpdateCallback
 from repository import changeset
 import errno
 from repository import filecontents
@@ -275,7 +276,8 @@ class Database(SqlDbRepository):
                         replaceFiles = False, tagScript = None,
 			keepExisting = False, test = False,
                         justDatabase = False, journal = None,
-                        localRollbacks = False):
+                        localRollbacks = False, 
+                        callback = UpdateCallback()):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -312,6 +314,8 @@ class Database(SqlDbRepository):
 		pkgList.append((pkg, origPkg, localVersion, 
 				update.MISSINGFILESOKAY))
 
+        callback.creatingRollback()
+
 	result = update.buildLocalChanges(self, pkgList, root = self.root)
 	if not result: return
 
@@ -328,6 +332,8 @@ class Database(SqlDbRepository):
             flags |= update.MERGE
 	if keepExisting:
 	    flags |= update.KEEPEXISTING
+
+        callback.preparingUpdate()
 
 	fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root, 
 				     flags = flags)
@@ -382,6 +388,7 @@ class Database(SqlDbRepository):
             # the file lists which get sent to them are incorrect. skipping
             # this makes --test a little inaccurate, but life goes on
             if not test:
+                callback.runningPreTagHandlers()
                 fsJob.preapply(tagSet, tagScript)
 
         # Build A->B
@@ -399,7 +406,7 @@ class Database(SqlDbRepository):
             return
 
         if not justDatabase:
-            fsJob.apply(tagSet, tagScript, journal)
+            fsJob.apply(tagSet, tagScript, journal, callback)
 
         for (troveName, troveVersion, troveFlavor, pathIdList) in fsJob.iterUserRemovals():
             self.db.removeFilesFromTrove(troveName, troveVersion, 

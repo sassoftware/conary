@@ -25,11 +25,68 @@ import sys
 # FIXME client should instantiated once per execution of the command line 
 # conary client
 
+class UpdateCallback:
+
+    def _message(self, msg):
+        assert(0)
+        print "\r",
+        print msg,
+        if len(msg) < self.last:
+            i = self.last - len(msg)
+            print " " * i + "\b" * i,
+        sys.stdout.flush()
+        self.last = len(msg)
+
+    def preparingChangeSet(self):
+        self._message("Preparing changeset...")
+
+    def resolvingDependencies(self):
+        self._message("Resolving dependencies...")
+
+    def downloadingChangeSet(self, got, need):
+        self._message("Downloading changeset (%d%% of %dk)..." 
+                    % ((got * 100)/ need , need / 1024))
+
+    def requestingChangeSet(self):
+        self._message("Requesting changeset...")
+
+    def creatingRollback(self):
+        self._message("Creating rollback...")
+
+    def preparingUpdate(self):
+        self._message("Preparing update...")
+
+    def restoreFiles(self, size, totalSize):
+        self.restored += size
+        self._message("Writing %dk of %dk (%d%%)..." 
+                    % (self.restored / 1024 , totalSize / 1024,
+                       (self.restored * 100) / totalSize))
+
+    def removeFiles(self, fileNum, total):
+        self._message("Removing %d of %d (%d%%)..."
+                    % (fileNum , total, (fileNum * 100) / total))
+
+    def runningPreTagHandlers(self):
+        self._message("Running pretag scripts...")
+
+    def runningPostTagHandlers(self):
+        self._message("Running posttag scripts...")
+
+    def __init__(self):
+        self.last = 0
+        self.restored = 0
+
+    def __del__(self):
+        if self.last:
+            self._message("")
+            print "\r",
+
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
                                   depsRecurse = True, test = False,
                                   justDatabase = False, recurse = True,
-                                  info = False, updateByDefault = True):
+                                  info = False, updateByDefault = True,
+                                  callback = UpdateCallback()):
     client = conaryclient.ConaryClient(cfg)
 
     applyList = []
@@ -60,7 +117,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                    resolveDeps = depCheck,
                                    keepExisting = keepExisting,
                                    test = test, recurse = recurse,
-                                   updateByDefault = updateByDefault)
+                                   updateByDefault = updateByDefault,
+                                   callback = callback)
 
         if brokenByErase:
             print "Troves being removed create unresolved dependencies:"
@@ -141,7 +199,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
 
         client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,
                            test = test, justDatabase = justDatabase,
-                           localRollbacks = cfg.localRollbacks)
+                           localRollbacks = cfg.localRollbacks,
+                           callback = callback)
     except conaryclient.UpdateError, e:
         log.error(e)
     except repository.CommitError, e:
@@ -182,3 +241,4 @@ def toTroveSpec(name, versionStr, flavor):
 class TroveSpecError(Exception):
 
     pass
+

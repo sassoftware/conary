@@ -24,6 +24,7 @@ the way of a newly created file will be overwritten.  Otherwise an error
 is produced.
 """
 
+from callback import UpdateCallback
 from repository import changeset
 import errno
 from repository import filecontents
@@ -62,6 +63,8 @@ class FilesystemJob:
     def _restore(self, fileObj, target, msg, contentsOverride = ""):
 	self.restores.append((fileObj.pathId(), fileObj.freeze(), target, 
                               contentsOverride, msg))
+        if fileObj and fileObj.hasContents:
+            self.restoreSize += fileObj.contents.size()
 
 	for tag in fileObj.tags:
             l = self.tagUpdates.setdefault(tag, [])
@@ -168,7 +171,8 @@ class FilesystemJob:
 
     ptrCmp = staticmethod(ptrCmp)
 
-    def apply(self, tagSet = {}, tagScript = None, journal = None):
+    def apply(self, tagSet = {}, tagScript = None, journal = None,
+              callback = UpdateCallback()):
 	# this is run after the changes are in the database (but before
 	# they are committed
 	tagCommands = []
@@ -191,8 +195,9 @@ class FilesystemJob:
 	paths = self.removes.keys()
 	paths.sort()
 	paths.reverse()
-	for target in paths:
+	for fileNum, target in enumerate(paths):
 	    (fileObj, msg) = self.removes[target]
+            callback.removeFiles(fileNum, len(paths))
 
 	    # don't worry about files which don't exist
 	    try:
@@ -247,6 +252,9 @@ class FilesystemJob:
             # opportunity to make a hard link instead of actually restoring it.
 	    fileObj = files.ThawFile(fileObj, pathId)
 
+            if fileObj.hasContents:
+                callback.restoreFiles(fileObj.contents.size(), 
+                                      self.restoreSize)
 	    if override != "":
 		contents = override
 	    elif fileObj.hasContents:
@@ -415,6 +423,7 @@ class FilesystemJob:
 		tagCommands.append(cmd)
 	    
 	if tagCommands:
+            callback.runningPostTagHandlers()
 	    runTagCommands(tagScript, self.root, tagCommands)
 
     def getErrorList(self):
@@ -879,6 +888,7 @@ class FilesystemJob:
 	"""
 	self.renames = []
 	self.restores = []
+        self.restoreSize = 0
 	self.removes = {}
 	self.oldPackages = []
 	self.errors = []

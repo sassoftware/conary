@@ -15,6 +15,7 @@ import os
 from lib import util
 import pickle
 
+from callback import UpdateCallback
 import conarycfg
 import deps
 import versions
@@ -61,7 +62,6 @@ class UpdateChangeSet(changeset.ReadOnlyChangeSet):
         changeset.ReadOnlyChangeSet.__init__(self, *args)
         self.contents = []
         self.empty = True
-
 
 # use a special sort because:
 # l = [ False, -1, 1 ]
@@ -476,23 +476,29 @@ class ConaryClient:
 
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         depsRecurse = True, resolveDeps = True, test = False,
-                        updateByDefault = True):
+                        updateByDefault = True, callback = UpdateCallback()):
         if not test:
             self._prepareRoot()
 
-        finalCs = self._updateChangeSet(itemList, keepExisting = keepExisting,
+        callback.preparingChangeSet()
+
+        finalCs = self._updateChangeSet(itemList, 
+                                        keepExisting = keepExisting,
                                         recurse = recurse,
                                         updateMode = updateByDefault)
 
         if not resolveDeps:
             return (finalCs, [], {}, [])
 
+        callback.resolvingDependencies()
+
         return self._resolveDependencies(finalCs, keepExisting = keepExisting, 
                                          depsRecurse = depsRecurse)
 
     def applyUpdate(self, theCs, replaceFiles = False, tagScript = None, 
                     keepExisting = None, test = False, justDatabase = False,
-                    journal = None, localRollbacks = False):
+                    journal = None, localRollbacks = False, 
+                    callback = UpdateCallback()):
         assert(isinstance(theCs, changeset.ReadOnlyChangeSet))
         cs = changeset.ReadOnlyChangeSet()
 
@@ -523,7 +529,8 @@ class ConaryClient:
                 cs.merge(newCs)
 
         newCs = self.repos.createChangeSet(changedTroves.keys(), 
-                                           recurse = False)
+                                           recurse = False,
+                                           callback = callback)
         cs.merge(newCs)
 
         try:
@@ -531,7 +538,7 @@ class ConaryClient:
                                     tagScript = tagScript, 
                                     keepExisting = keepExisting,
                                     test = test, justDatabase = justDatabase,
-                                    journal = journal,
+                                    journal = journal, callback = callback,
                                     localRollbacks = localRollbacks)
         except database.CommitError, e:
             raise UpdateError, "changeset cannot be applied"

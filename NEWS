@@ -18,6 +18,7 @@ Changes in 0.50.8:
   * conary now resides in /usr/$LIB/python$PYVERSION/site-packages/conary/
   * calling r.Replace on a non-regular file results in a warning instead
     of an unhandled exception
+  * implemented basic callbacks for update and erase
 
 Changes in 0.50.7:
   * Added the XInetdService action to avoid having to include

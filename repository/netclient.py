@@ -437,12 +437,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def createChangeSet(self, list, withFiles = True, withFileContents = True,
                         excludeAutoSource = False, recurse = True,
-                        primaryTroveList = None):
+                        primaryTroveList = None, callback = None):
 	return self._getChangeSet(list, withFiles = withFiles, 
                                   withFileContents = withFileContents,
                                   excludeAutoSource = excludeAutoSource,
                                   recurse = recurse, 
-                                  primaryTroveList = primaryTroveList)
+                                  primaryTroveList = primaryTroveList,
+                                  callback = callback)
 
     def createChangeSetFile(self, list, fName, recurse = True,
                             primaryTroveList = None):
@@ -451,7 +452,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
 		      withFileContents = True, target = None,
-                      excludeAutoSource = False, primaryTroveList = None):
+                      excludeAutoSource = False, primaryTroveList = None,
+                      callback = None):
         # This is a bit complicated due to servers not wanting to talk
         # to other servers. To make this work, we do this:
         #
@@ -587,6 +589,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             chgSetList = []
 
             for serverName, job in serverJobs.iteritems():
+                if callback:
+                    callback.requestingChangeSet()
                 (url, sizes, extraTroveList, extraFileList) = \
                     self.c[serverName].getChangeSet(job, recurse, 
                                                 withFiles, withFileContents,
@@ -599,11 +603,19 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 inF = urllib.urlopen(url)
 
+                if callback:
+                    callback.downloadingChangeSet(0, sum(sizes))
+                    copyCallback = \
+                        lambda x: callback.downloadingChangeSet(x, sum(sizes))
+                else:
+                    copyCallback = None
+
                 try:
                     # seek to the end of the file
                     outFile.seek(0, 2)
                     start = outFile.tell()
-                    totalSize = util.copyfileobj(inF, outFile)
+                    totalSize = util.copyfileobj(inF, outFile,
+                                                 callback = copyCallback )
                     #assert(totalSize == sum(sizes))
                     inF.close()
                 except:
