@@ -276,6 +276,10 @@ class ChangeSet:
 						 ChangedFileTypes.file, cont, 0)
 
 	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
+		if not pkg.hasFile(fileId):
+		    # the file has been removed from the local system; we
+		    # don't need to restore it on a rollback
+		    continue
 		(curPath, curVersion) = pkg.getFile(fileId)
 
 		if newPath:
@@ -656,31 +660,13 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     list = []
     dupFilter = {}
     i = 0
-    pkgList = [ (x.getName(), x.getVersion()) for x in pkgList ]
-    while pkgList:
-	(name, ver) = pkgList[0]
-	del pkgList[0]
-	match = False
-	if dupFilter.has_key(name):
-	    for version in dupFilter[name]:
-		if version.equal(ver):
-		    match = True
-		    break
-
-	if not match:
-	    if dupFilter.has_key(name):
-		dupFilter[name].append(ver)
-	    else:
-		dupFilter[name] = [ ver ]
-	    pkg = db.getPackageVersion(name, ver)
-	    origPkg = db.getPackageVersion(name, ver, pristine = True)
+    for outerPackage in pkgList:
+	for pkg in package.walkPackageSet(db, outerPackage):
+	    ver = pkg.getVersion()
+	    origPkg = db.getPackageVersion(pkg.getName(), ver, pristine = True)
 	    ver = ver.fork(versions.LocalBranch(), sameVerRel = 1)
 	    list.append((pkg, origPkg, ver))
 	    
-	    for (otherPkg, verList) in pkg.getPackageList():
-		for otherVer in verList:
-		    pkgList.append((otherPkg, otherVer))
-
     result = update.buildLocalChanges(db, list, root = cfg.root)
     if not result: return
     cs = result[0]
