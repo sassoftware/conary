@@ -609,51 +609,71 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
 def guessSourceVersion(repos, name, versionStr, buildLabel, 
                                                 searchBuiltTroves=False):
+    """ Make a reasonable guess at what a sourceVersion should be when 
+        you don't have an actual source component from a repository to get 
+        the version from.  Searches the repository for troves that are 
+        relatively close to the desired trove, and grabbing their timestamp
+        information.
+        @param repos: repository client
+        @type repos: NetworkRepositoryClient
+        @param name: name of the trove being built
+        @type name: str
+        @param versionStr: the version stored in the recipe being built
+        @type versionStr: str
+        @param buildLabel: the label to search for troves matching the 
+        @type buildLabel: versions.Label
+        @param searchBuiltTroves: if True, search for binary troves  
+        that match the desired trove's name, versionStr and label. 
+        @type searchBuiltTroves: bool
+    """
     srcName = name + ':source'
     sourceVerison = None
-    if False and os.path.exists('CONARY'):
-        pass
-        # XXX should check sourceState here
-    else:
-        # make an attempt at a reasonable version # for this trove
-        # although the recipe we are cooking from may not be in any
-        # repository
-        versionDict = repos.getTroveLeavesByLabel([srcName], buildLabel)
-        versionList = versionDict.get(srcName, {}).keys()
+    if os.path.exists('CONARY'):
+        # XXX checkin imports cook functions as well, perhaps move
+        # SourceState or some functions here to a third file?
+        import checkin
+        state = checkin.SourceStateFromFile('CONARY')
+        if state.name == srcName:
+            return state.version
+    # make an attempt at a reasonable version # for this trove
+    # although the recipe we are cooking from may not be in any
+    # repository
+    versionDict = repos.getTroveLeavesByLabel([srcName], buildLabel)
+    versionList = versionDict.get(srcName, {}).keys()
+    if versionList:
+        relVersionList  = [ x for x in versionList \
+                if x.trailingRevision().version == versionStr ] 
+        if relVersionList:
+            relVersionList.sort()
+            return relVersionList[-1]
+        else:
+            # we've got a reasonable branch to build on, but not
+            # a sourceCount.  Reset the sourceCount to 1.
+            versionList.sort()
+            return versionList[-1].branch().createVersion(
+                        versions.Revision('%s-1' % (versionStr)))
+    if searchBuiltTroves:
+        # XXX this is generally a bad idea -- search for a matching
+        # built trove on the branch that our source version is to be
+        # built on and reuse that branch.  But it's useful for cases
+        # when you really know what you're doing and don't want to depend
+        # on a source trove being in the repository.
+        versionDict = repos.getTroveLeavesByLabel([name], buildLabel)
+        versionList = versionDict.get(name, {}).keys()
         if versionList:
             relVersionList  = [ x for x in versionList \
                     if x.trailingRevision().version == versionStr ] 
             if relVersionList:
                 relVersionList.sort()
-                return relVersionList[-1]
+                sourceVersion = relVersionList[-1].copy()
+                sourceVersion.trailingRevision().buildCount = None
+                return sourceVersion
             else:
                 # we've got a reasonable branch to build on, but not
                 # a sourceCount.  Reset the sourceCount to 1.
                 versionList.sort()
                 return versionList[-1].branch().createVersion(
                             versions.Revision('%s-1' % (versionStr)))
-        elif searchBuiltTroves:
-            # XXX this is generally a bad idea -- search for a matching
-            # built trove on the branch that our source version is to be
-            # built on and reuse that branch.  But it's useful for cases
-            # when you really know what you're doing and don't want to depend
-            # on a source trove being in the repository.
-            versionDict = repos.getTroveLeavesByLabel([name], buildLabel)
-            versionList = versionDict.get(name, {}).keys()
-            if versionList:
-                relVersionList  = [ x for x in versionList \
-                        if x.trailingRevision().version == versionStr ] 
-                if relVersionList:
-                    relVersionList.sort()
-                    sourceVersion = relVersionList[-1].copy()
-                    sourceVersion.trailingRevision().buildCount = None
-                    return sourceVersion
-                else:
-                    # we've got a reasonable branch to build on, but not
-                    # a sourceCount.  Reset the sourceCount to 1.
-                    versionList.sort()
-                    return versionList[-1].branch().createVersion(
-                                versions.Revision('%s-1' % (versionStr)))
     return None
             
 
