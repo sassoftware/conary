@@ -32,8 +32,7 @@ def patch(oldLines, unifiedDiff):
 	    result.append(oldLines[fromLine])
 	    fromLine = fromLine + 1
 
-	fromStartedAt = fromLine
-	toStartedAt = len(result)
+	assert(toStart == len(result))
 
 	i = i + 1
 	while i < last and unifiedDiff[i][0] != "@":
@@ -51,9 +50,9 @@ def patch(oldLines, unifiedDiff):
 
 	    i = i + 1
 
-	if (fromStartedAt + fromCount != fromLine):
+	if (fromStart + fromCount != fromLine):
 	    raise BadHunk
-	if (toStartedAt + toCount != len(result)):
+	if (toStart + toCount != len(result)):
 	    raise BadHunk
 	
 	return result
