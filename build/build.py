@@ -845,7 +845,7 @@ class TestCommand(_FileAction):
 	f.write('''#!/bin/sh -x
 # run this script to execute the test suite
 ''')
-	f.write(contents)
+	f.write(contents % macros)
 	f.close()
 	self.setComponents(path)
 	self.chmod(macros['destdir'], path)
