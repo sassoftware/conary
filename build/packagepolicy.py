@@ -774,6 +774,25 @@ class FilesForDirectories(policy.Policy):
 			'File %s should be a directory; bad r.Install()?' %file)
 
 
+class ObsoletePaths(policy.Policy):
+    """
+    Warn about paths that used to be considered correct, but now are
+    obsolete.  Does not honor exceptions!
+    """
+    candidates = (
+	'/usr/man',
+	'/usr/info',
+	'/usr/doc',
+    )
+    def do(self):
+	d = self.recipe.macros.destdir
+	for path in self.candidates:
+	    fullpath = util.joinPaths(d, path)
+	    if os.path.exists(fullpath):
+		self.recipe.reportErrors(
+		    'Path %s should not exist' %file)
+
+
 class IgnoredSetuid(policy.Policy):
     """
     Files/directories that are setuid/setgid in the filesystem
@@ -979,6 +998,7 @@ def DefaultPolicy(recipe):
 	AddModes(recipe),
 	WarnWriteable(recipe),
 	FilesForDirectories(recipe),
+	ObsoletePaths(recipe),
 	IgnoredSetuid(recipe),
 	Ownership(recipe),
 	ExcludeDirectories(recipe),
