@@ -210,7 +210,7 @@ class GNUMakeInstall(ShellCommand):
 		'installtarget': 'install'}
 
 
-class _PutFile:
+class _PutFiles:
     def doInstall(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 	util.mkdirChain(os.path.dirname(dest))
@@ -246,19 +246,19 @@ class _PutFile:
 	self.mode = mode
     
 
-class InstallFile(_PutFile):
-    def __init__(self, fromFiles, toFile, perms = 0644):
-	_PutFile.__init__(self, fromFiles, toFile, perms)
+class InstallFiles(_PutFiles):
+    def __init__(self, fromFiles, toFile, mode = 0644):
+	_PutFiles.__init__(self, fromFiles, toFile, mode)
 	self.source = ''
 	self.move = 0
 
-class MoveFile(_PutFile):
-    def __init__(self, fromFiles, toFile, perms = -1):
-	_PutFile.__init__(self, fromFiles, toFile, perms)
+class MoveFiles(_PutFiles):
+    def __init__(self, fromFiles, toFile, mode = -1):
+	_PutFiles.__init__(self, fromFiles, toFile, mode)
 	self.source = '%(destdir)s'
 	self.move = 1
 
-class InstallSymlink:
+class InstallSymlinks:
 
     def doInstall(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
@@ -310,7 +310,7 @@ class RemoveFiles:
 	    self.filespecs = filespecs
 	self.recursive = recursive
 
-class InstallDoc:
+class InstallDocs:
 
     def doInstall(self, macros):
 	macros = macros.copy()
