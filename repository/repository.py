@@ -204,7 +204,7 @@ class LocalRepository(Repository):
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
 
 	self.pkgDB = None
-	self.fileDB = None
+	self.groupDB = None
 
         try:
             self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", 
