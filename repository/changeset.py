@@ -91,10 +91,47 @@ class ChangeSetNewPackageList(dict, streams.InfoStream):
 	if data:
 	    self.thaw(data)
 	    
+class ChangeSetFileDict(dict, streams.InfoStream):
+
+    def freeze(self):
+	fileList = []
+	for (fileId, (oldVersion, newVersion, csInfo)) in self.iteritems():
+	    if oldVersion:
+		oldStr = oldVersion.asString()
+	    else:
+		oldStr = ""
+
+	    s = FileInfo(fileId, oldStr, newVersion.asString(), csInfo).freeze()
+	    fileList.append(struct.pack("!I", len(s)) + s)
+
+	return "".join(fileList)
+
+    def thaw(self ,data):
+	i = 0
+	while i < len(data):
+	    size = struct.unpack("!I", data[i:i+4])[0]
+	    i += 4
+	    info = FileInfo(data[i:i+size])
+	    i += size
+	    
+	    oldVerStr = info.oldVersion()
+
+	    if not oldVerStr:
+		oldVersion = None
+	    else:
+		oldVersion = versions.VersionFromString(oldVerStr)
+
+	    newVersion = versions.VersionFromString(info.newVersion())
+	    self[info.fileId()] = (oldVersion, newVersion, info.csInfo())
+
+    def __init__(self, data = None):
+	if data:
+	    self.thaw(data)
 
 _STREAM_CS_PRIMARY  = 1
 _STREAM_CS_PKGS     = 2
 _STREAM_CS_OLD_PKGS = 3
+_STREAM_CS_FILES    = 4
 
 class ChangeSet(streams.LargeStreamSet):
 
@@ -102,6 +139,7 @@ class ChangeSet(streams.LargeStreamSet):
         _STREAM_CS_PRIMARY :(streams.ReferencedTroveList, "primaryTroveList" ),
         _STREAM_CS_PKGS    :(ChangeSetNewPackageList,     "newPackages"      ),
         _STREAM_CS_OLD_PKGS:(streams.ReferencedTroveList, "oldPackages"      ),
+        _STREAM_CS_FILES   :(ChangeSetFileDict,		  "files"            ),
     }
 
     def isAbsolute(self):
@@ -242,30 +280,6 @@ class ChangeSet(streams.LargeStreamSet):
     def hasFileChange(self, fileId):
 	return self.files.has_key(fileId)
 
-    def headerAsString(self):
-	start = self.freeze()
-
-	rc = []
-
-	fileList = [ None,]
-	totalLen = 0
-	for (fileId, (oldVersion, newVersion, csInfo)) in self.files.iteritems():
-	    if oldVersion:
-		oldStr = oldVersion.asString()
-	    else:
-		oldStr = "(none)"
-
-	    s = FileInfo(fileId, oldStr, newVersion.asString(), csInfo).freeze()
-	    fileList.append(struct.pack("!I", len(s)) + s)
-	    totalLen += len(fileList[-1])
-
-	fileList[0] = "FILES %d\n" % totalLen
-	
-	return "%s%s%s%s" % \
-		    (struct.pack("!I", len(start)), start,
-		     "".join(rc),
-		     "".join(fileList))
-
     def writeContents(self, csf, contents, early):
 	# these are kept sorted so we know which one comes next
 	idList = contents.keys()
@@ -290,7 +304,7 @@ class ChangeSet(streams.LargeStreamSet):
 	    csf = filecontainer.FileContainer(outFile)
 	    outFile.close()
 
-	    str = self.headerAsString()
+	    str = self.freeze()
 	    csf.addFile("CONARYCHANGESET", filecontents.FromString(str), "")
 	    self.writeAllContents(csf)
 	    csf.close()
@@ -545,7 +559,6 @@ class ChangeSet(streams.LargeStreamSet):
 
     def __init__(self, data = None):
 	streams.LargeStreamSet.__init__(self, data)
-	self.files = {}
 	self.earlyFileContents = {}
 	self.lateFileContents = {}
 	self.primaryPackageList = []
@@ -617,9 +630,7 @@ class ChangeSetFromFile(ChangeSet):
 
 	(tagInfo, control, size) = self.csf.getFile("CONARYCHANGESET")
 
-	startSize = control.read(4)
-	startSize = struct.unpack("!I", startSize)[0]
-	start = control.read(startSize)
+	start = control.read()
 	ChangeSet.__init__(self, data = start)
 
 	for trvCs in self.newPackages.itervalues():
@@ -631,37 +642,6 @@ class ChangeSetFromFile(ChangeSet):
 
 	    if (old and old.isLocal()) or new.isLocal():
 		self.local = 1
-
-	line = control.readline()
-	while line:
-	    header = line[:-1]
-
-	    if header.startswith("FILES "):
-		size = int(header.split()[1])
-
-		buf = control.read(size)
-		i = 0
-		while i < len(buf):
-		    size = struct.unpack("!I", buf[i:i+4])[0]
-		    i += 4
-		    info = FileInfo(buf[i:i+size])
-		    i += size
-		    
-		    oldVerStr = info.oldVersion()
-
-		    if oldVerStr == "(none)":
-			oldVersion = None
-		    else:
-			oldVersion = versions.VersionFromString(oldVerStr)
-		    newVersion = versions.VersionFromString(info.newVersion())
-		    self.addFile(info.fileId(), oldVersion, newVersion, 
-				 info.csInfo())
-	    else:
-		print header
-		raise IOError, "invalid line in change set %s" % file
-
-	    line = control.readline()
-
 
 	self.configCache = {}
 	self.earlyFileContents = None
