@@ -180,32 +180,6 @@ class FileContainer:
 
 	self.gzfile = gzip.GzipFile(None, "rb", None, self.file)
 
-	if version == 1:
-	    tableLen = self.gzfile.read(8)
-	    (tableLen, entryCount) = struct.unpack("!ii", tableLen)
-
-	    while (entryCount):
-		entry = FileTableEntryFromFile1(self.gzfile)
-		self.entries[entry.name] = entry
-		entryCount = entryCount - 1
-
-	    early = []
-	    late = []
-	    self.entryOrder = []
-	    for entry in self.entries.values():
-		if entry.name == 'CONARYCHANGESET':
-		    self.entryOrder.append(entry.name)
-		elif entry.data[0] == '1':
-		    early.append(entry.name)
-		else:
-		    late.append(entry.name)
-
-	    early.sort()
-	    late.sort()
-	    self.entryOrder += early + late
-
-	    self.lastFetched = -1
-
 	self.contentsStart = self.gzfile.tell()
 	self.next = self.contentsStart
 
@@ -261,9 +235,6 @@ class FileContainer:
 	if self.file:
 	    self.close()
 
-    def iterFileList(self):
-	return self.entries.iterkeys()
-
     def __init__(self, file):
         """
         Create a FileContainer object.
@@ -278,7 +249,6 @@ class FileContainer:
 	self.file = os.fdopen(os.dup(file.fileno()), file.mode)
 
 	self.file.seek(0, SEEK_END)
-	self.entries = {}
 	if not self.file.tell():
 	    self.file.seek(SEEK_SET, 0)
 	    self.file.truncate()
