@@ -142,7 +142,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
 class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 
-    def reset(self):
+    def reset(self, authToken):
 	del self.repos
 	shutil.rmtree(self.repPath)
 	self.repos = fsrepos.FilesystemRepository(self.name, self.repPath,
