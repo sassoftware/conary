@@ -99,7 +99,7 @@ dist: $(dist_files)
 		mkdir -p $(DISTDIR)/`dirname $$f`; \
 		cp -a $$f $(DISTDIR)/$$f; \
 	done
-	tar cjf $(DISTDIR).tar.bz2 conary-$(VERSION)
+	tar cjf $(DISTDIR).tar.bz2 `basename $(DISTDIR)`
 	rm -rf $(DISTDIR)
 
 clean: clean-subdirs default-clean
@@ -111,5 +111,8 @@ tag:
 
 force-tag:
 	cvs tag -F conary-`echo $(VERSION) | sed 's/\./_/g'`
+
+distcheck: dist
+	(tar tjf $(DISTDIR).tar.bz2 | grep '\.py$$' | sed s/conary-$(VERSION)/\./g; find -name "*.py") | sort | uniq -u
 
 include Make.rules
