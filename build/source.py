@@ -47,14 +47,22 @@ class _Source:
         if not util.checkPath("gpg"):
             return
 	# FIXME: our own keyring
-	if os.system("gpg --no-secmem-warning --verify %s %s"
-		      %(self.localgpgfile, filepath)):
+	if not self._checkKeyID(filepath, self.keyid):
 	    # FIXME: only do this if key missing, this is cheap for now
-	    os.system("gpg --keyserver pgp.mit.edu --recv-keys 0x %s"
-		      %(self.keyid))
-	    if os.system("gpg --no-secmem-warning --verify %s %s"
-			  %(self.localgpgfile, filepath)):
+	    os.system("gpg --no-secmem-warning --keyserver pgp.mit.edu --recv-keys 0x%s")
+	    if not self._checkKeyID(filepath, self.keyid):
+		log.error(self.failedtest)
 		raise SourceError, "GPG signature %s failed" %(self.localgpgfile)
+
+    def _checkKeyID(self, filepath, keyid):
+	p = util.popen("gpg --logger-fd 1 --no-secmem-warning --verify %s %s"
+		      %(self.localgpgfile, filepath))
+	result = p.read()
+	found = result.find("key ID %s" % keyid)
+	if found == -1:
+	    self.failedtest = result
+	    return False
+	return True
 
     def _extractFromRPM(self):
         """
