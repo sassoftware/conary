@@ -153,7 +153,10 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	for file in recipeObj.allSources() + recipes:
             src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
 	    srcBldPkg.addFile(os.path.basename(src), src, type="src")
-	
+
+        for recipeFile in recipes:
+            srcBldPkg[os.path.basename(recipeFile)].isConfig(True)
+
 	(p, fileMap) = createPackage(repos, cfg, srcBldPkg, ident)
 	packageList.append((p, fileMap))
 
