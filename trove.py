@@ -379,6 +379,10 @@ class Trove:
 	# for things that are left, see if we can match flavors based on
 	# the architecture
 	for name in added.keys():
+            if not removed.has_key(name):
+                # nothing to match up against
+                continue
+
 	    for newFlavor in added[name].keys():
 		if not newFlavor:
 		    # this isn't going to match anything well
@@ -388,7 +392,7 @@ class Trove:
 
 		# first check for matches which are a superset of the old
 		# flavor, then for ones which are a subset of the old flavor
-		for oldFlavor in removed.get(name, {}).keys():
+		for oldFlavor in removed[name]:
 		    if not oldFlavor:
 			continue
 
