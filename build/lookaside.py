@@ -23,9 +23,14 @@ def createCacheEntry(cfg, name, location, infile):
     # cache needs to be hierarchical to avoid collisions, thus we
     # use location so that files with the same name and different
     # contents in different packages do not collide
+    #print 'Downloading', infile.url
     cachedname = createCacheName(cfg, name, location)
     f = open(cachedname, "w+")
-    f.write(infile.read())
+    while 1:
+        buf = infile.read(1024 * 16)
+        if not buf:
+            break
+        f.write(buf)
     f.close()
     infile.close()
     return cachedname
