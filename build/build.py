@@ -24,13 +24,15 @@ the permissions on files in classes derived from _PutFile.
 """
 
 import os
-from lib import util
-import fixedglob
-from lib import log
 import re
 import stat
 import sys
+import tempfile
+
+#conary imports
 import action
+import fixedglob
+from lib import log, util
 from use import Use
 
 # make sure that the decimal value really is unreasonable before
@@ -801,6 +803,127 @@ class Remove(BuildAction):
 	else:
 	    self.filespecs = args
 
+class Replace(BuildAction):
+
+    r""" Substitute text in a file: 
+         C{Replace((<pattern>, <sub>)+, path+)} 
+         or C{Replace(<pattern>, <sub>, path+)}. 
+        
+         Replaces <sub> for <pattern> in files, using python regexp rules.  
+         Note that Replace cannot do multi line substitutions.  For complicated
+         replacements, sed is appropriate, however, Replace performs error
+         checking that sed does not.
+         
+         Remember that python will interpret \1-\7 as octal characters;
+         you must either escape the backslash: \\1, or make the string
+         raw by prepending r to the string (e.g. r.Replace('(a)', r'\1bc') 
+ 
+         @keyword lines: Determines the lines to which the replacement applies
+         @type lines: tuple (start, end) or int
+         @keyword allowNoChange: do not raise an error if <pattern> did not 
+                                 apply
+         @type allowNoChange: bool
+         @default allowNoChange: False
+    """
+        
+
+    keywords = { 'allowNoChange' : False,
+                 'lines'         : None }
+
+    octalchars = re.compile('[\1\2\3\4\5\6\7]')
+    
+    def __init__(self, recipe, *args, **keywords):
+        BuildAction.__init__(self, recipe, **keywords)
+        if not args:
+	    self.init_error(TypeError, 'not enough arguments')
+        if isinstance(args[0], (list, tuple)):
+            # command is in Replace((pattern, sub)+, file+) format
+            self.regexps = []
+            while args and isinstance(args[0], (list, tuple)):
+                self.regexps.append(args[0])
+                args = args[1:]
+        else:
+            # command is in Replace(pattern, sub, file+) format
+            if len(args) < 2:
+                self.init_error(TypeError, 'not enough arguments')
+            self.regexps = ([args[0], args[1]],)
+            args = args[2:]
+        for pattern, sub in self.regexps:
+            if self.octalchars.match(sub):
+                self.init_error(TypeError,
+                     "Found octal char in substitution string --  "
+                     " probably you forgot to make the string raw by "
+                     " prepending it with a r, eg r'foo' ")
+
+        if not args:
+	    self.init_error(TypeError, 
+                            'not enough arguments - no files supplied')
+        self.paths = args[:]
+        
+        if self.lines:
+            if isinstance(self.lines, (list, tuple)):
+                self.min, self.max = (self.lines)
+            else:
+                self.min = self.max = self.lines
+            if min(self.min, self.max, 1) != 1:
+                self.init_error(RuntimeError, 
+                                "r.Replace line indices start at 1")
+        else:
+            self.min = self.max = None
+
+    def do(self, macros):
+        paths = _expandPaths(self.paths, macros)
+        log.debug("Replacing '%s' in %s", 
+                  "', '".join(["' -> '".join(x) for x in self.regexps ] ),
+                  ' '.join(paths))
+        if not paths:
+            if self.allowNoChange:
+                log.warning("Did not find any matching files for file globs")
+                return
+            else:
+                raise RuntimeError, \
+                        "Did not find any matching files for file globs"
+
+        regexps = []
+        for pattern, sub in self.regexps:
+            regexps.append((re.compile(pattern % macros), sub % macros))
+
+        unchanged = []
+        min, max = self.min, self.max
+        for path in paths:
+            fd, tmppath = tempfile.mkstemp(suffix='rep', 
+                                           prefix=os.path.basename(path), 
+                                           dir=os.path.dirname(path))
+            try:
+                foundMatch = False
+                index = 1
+                for line in open(path):
+                    if (not min or index >= min) and (not max or index <= max):
+                        for (regexp, sub) in regexps:
+                            line, count = regexp.subn(sub, line)
+                            if count: 
+                                foundMatch = True
+
+                    os.write(fd, line)
+                    index += 1
+                if foundMatch:
+                    mode = os.stat(path)[stat.ST_MODE]
+                    os.rename(tmppath, path)
+                    os.chmod(path, mode)
+            finally:
+                if os.path.exists(tmppath):
+                    os.remove(tmppath)
+            if not foundMatch:
+                unchanged.append(path)
+
+        if unchanged:
+            msg = ("The following files were not modified during the "
+                   "replacement: %s" % '\n'.join(unchanged))
+            if self.allowNoChange:
+                log.warning(msg)
+            else:
+                raise RuntimeError, msg
+
 class Doc(_FileAction):
     """
     Installs documentation files from the C{%(builddir)s}
@@ -1177,3 +1300,33 @@ class ConsoleHelper(BuildAction):
         # automatically depend on consolehelper
         # cannot use %(bindir)s here, do not have macros...
         recipe.Requires('/usr/bin/consolehelper', self.linkname)
+
+
+def _expandPaths(paths, macros):
+    """ Expand braces, globs, and macros in path names, and root all
+        path names to either the build dir or dest dir.  
+        Relative paths (not starting with a /) are
+        relative to builddir.  All absolute paths to are relative to 
+        destdir.  
+    """
+    destdir = macros.destdir
+    builddir = macros.builddir
+    expPaths = []
+    for path in paths:
+        if path[0] == '/':
+            if path.startswith(destdir):
+                log.warning("remove destdir from path name -- absolute"
+                            " paths are automatically within destdir ")
+            else:
+                path = destdir + path
+        else:
+            path = builddir + os.sep + path
+        expPaths.extend(util.braceGlob(path % macros))
+    notfound = []
+    for path in expPaths:
+        if not os.path.exists(path):
+            notfound.append(path)
+    if notfound:
+        raise RuntimeError, "No such files %s" % ' '.join(notfound)
+    return expPaths
+
