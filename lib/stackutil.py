@@ -20,6 +20,7 @@ import smtplib
 import sys
 import tempfile
 import traceback
+import xmlrpclib
 
 def printTraceBack(tb=None, output=sys.stderr, exc_type=None, exc_msg=None):
     if isinstance(output, str):
@@ -111,7 +112,9 @@ def _printFrame(f, output=sys.stderr):
 
 def _getStringValue(val):
     try:
-        if hasattr(val, 'asString'):
+        if isinstance(val, xmlrpclib.ServerProxy):
+            rval = "<Server Proxy>"
+        elif hasattr(val, 'asString'):
             rval = val.asString()
         elif inspect.isclass(val):
             rval = '<Class %s.%s>' % (val.__module__, val.__name__)
