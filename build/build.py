@@ -131,6 +131,7 @@ class Configure(BuildCommand):
 	'%%(cdSubDir)s '
 	'%%(mkObjdir)s '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	' CPPFLAGS="%%(cppflag)s"'
 	' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
 	' %(preConfigure)s %%(configure)s'
 	# XXX host/build/target here
@@ -214,6 +215,7 @@ class Make(BuildCommand):
     # them.
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+		' CPPFLAGS="%%(cppflag)s"'
 		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
                 ' %(preMake)s make %%(overrides)s'
 		' %%(mflags)s %%(parallelmflags)s %(args)s')
@@ -240,6 +242,7 @@ class Make(BuildCommand):
 	    macros = macros.copy()
 	    macros.update(
 		{'overrides': 'CFLAGS="%(cflags)s" CXXFLAGS="%(cflags)s"'
+			      ' CPPFLAGS="%(cppflag)s"'
 	                      ' LDFLAGS="%(ldflag)s"' %macros})
 	BuildCommand.do(self, macros)
 
@@ -251,6 +254,7 @@ class MakeParallelSubdir(Make):
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+		' CPPFLAGS="%%(cppflag)s"'
 		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
                 ' %(preMake)s make %%(overrides)s'
 		' %%(mflags)s '
@@ -265,6 +269,7 @@ class MakeInstall(Make):
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+		' CPPFLAGS="%%(cppflag)s"'
 		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
                 ' %(preMake)s make %%(overrides)s'
 		' %%(mflags)s %%(rootVarArgs)s'
@@ -289,6 +294,7 @@ class MakePathsInstall(Make):
     template = (
 	'cd %%(builddir)s/%(subDir)s; '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	' CPPFLAGS="%%(cppflag)s"'
 	' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
 	' %(preMake)s make %%(overrides)s'
 	' %%(mflags)s'
