@@ -7,8 +7,6 @@ import log
 import package
 import versions
 
-from packagename import PackageName
-
 _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"

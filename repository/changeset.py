@@ -10,11 +10,9 @@ import files
 import os
 import package
 import patch
-import packagename
 import repository
 import versions
 
-from packagename import PackageName
 import os
 
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff")
@@ -445,11 +443,10 @@ def CreateFromFilesystem(pkgList):
 
     return cs
 
-def ChangeSetCommand(repos, cfg, itemName, outFileName, oldVersionStr, \
+def ChangeSetCommand(repos, cfg, pkgName, outFileName, oldVersionStr, \
 	      newVersionStr):
-    if itemName[0] != ":":
-	itemName = cfg.packagenamespace + ":" + itemName
-    itemName = PackageName(itemName)
+    if pkgName[0] != ":":
+	pkgName = cfg.packagenamespace + ":" + pkgName
 
     newVersion = versions.VersionFromString(newVersionStr, cfg.defaultbranch)
 
@@ -459,7 +456,7 @@ def ChangeSetCommand(repos, cfg, itemName, outFileName, oldVersionStr, \
     else:
 	oldVersion = None
 
-    list = [(itemName, oldVersion, newVersion, (not oldVersion))]
+    list = [(pkgName, oldVersion, newVersion, (not oldVersion))]
 
     cs = repos.createChangeSet(list)
     cs.writeToFile(outFileName)
