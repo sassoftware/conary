@@ -177,10 +177,14 @@ class StringStream(InfoStream):
 
 class Sha1Stream(StringStream):
 
-    # stores the sha1 as a binary, but can present it as a string
+    def freeze(self):
+	return struct.pack("!5I", int(self.s[ 0: 8], 16), 
+		int(self.s[ 8:16], 16), int(self.s[16:24], 16), 
+		int(self.s[24:32], 16), int(self.s[32:40], 16))
 
-    def __str__(self):
-	return "%x%x%x%x%x" % struct.unpack("!5I", self.s)
+    def thaw(self, data):
+	if data:
+	    self.s = "%08x%08x%08x%08x%08x" % struct.unpack("!5I", data)
 
 class FrozenVersionStream(InfoStream):
 
