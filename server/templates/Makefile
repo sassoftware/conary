@@ -12,7 +12,7 @@
 # full details.
 #
 
-extra_inst=	add_user.kid 		\
+extra_inst =	add_user.kid 		\
 		change_password.kid	\
 		choose_branch.kid	\
 		error.kid		\
@@ -26,7 +26,9 @@ extra_inst=	add_user.kid 		\
 		style.css		\
 		user_admin.kid
 
-python_files =	__init__.py
+extra_dist = Makefile
+
+python_files = __init__.py
 
 dist_files = $(python_files) $(extra_inst)
 
