@@ -217,16 +217,16 @@ class VersionedFile:
 	    if not prev:
 		del self.branchMap[branchStr]
 	    else:
-		self.branchMap[branchStr] = version
+		self.branchMap[branchStr] = prev
 
 	    self.writeBranchMap()
 
 	if prev:
-	    thePrev = self._getVersionInfo(version)[1]
+	    thePrev = self._getVersionInfo(prev)[1]
 	    self._writeVersionInfo(prev, thePrev, next)
 	
 	if next:
-	    theNext = self._getVersionInfo(version)[2]
+	    theNext = self._getVersionInfo(next)[2]
 	    self._writeVersionInfo(next, prev, theNext)
 
 	del self.db[_CONTENTS % (self.key, versionStr)]
