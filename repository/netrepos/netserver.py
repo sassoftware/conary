@@ -101,7 +101,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return 0
 
     def getTroveFlavorsLatestVersion(self, troveName, branch):
-	return [ x for x in self.repos.troveStore.iterTrovePerFlavorLeafs(troveName, branch) ]
+	return self.repos.troveStore.iterTrovePerFlavorLeafs(troveName, branch)
 
     def getChangeSet(self, chgSetList, recurse, withFiles):
 	l = []
