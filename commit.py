@@ -6,6 +6,7 @@ import changeset
 import copy
 import files
 import package
+import string
 import sys
 
 def commitChangeSet(repos, cfg, cs):
@@ -29,7 +30,7 @@ def commitChangeSet(repos, cfg, cs):
 	if old:
 	    newPkg = copy.deepcopy(pkgSet.getVersion(old))
 	else:
-	    newPkg = package.Package(newVersion)
+	    newPkg = package.Package(pkg.name)
 
 	newFileMap = newPkg.applyChangeSet(repos, pkg)
 	pkgList.append((pkg.getName(), newPkg, newVersion))
@@ -62,6 +63,7 @@ def commitChangeSet(repos, cfg, cs):
 	for (fileId, fileVersion, file) in fileList:
 	    infoFile = repos.getFileDB(fileId)
 	    pathInPkg = fileMap[fileId][0]
+	    pkgName = fileMap[fileId][2]
 
 	    # this version may already exist, abstract change sets
 	    # include redundant files quite often
@@ -69,22 +71,20 @@ def commitChangeSet(repos, cfg, cs):
 		infoFile.addVersion(fileVersion, file)
 		infoFile.close()
 		filesDone.append(fileId)
-		filesToArchive.append((file, pathInPkg))
+		filesToArchive.append((file, pathInPkg, pkgName))
 
-	for (file, path) in filesToArchive:
+	for (file, path, pkgName) in filesToArchive:
 	    if isinstance(file, files.SourceFile):
-		#path = (cfg.sourcepath) % cfg + "/" + path
-		#path =
-		#d = {}
-		#d['pkgname'] = mainPackageName
-		path = "/sources/" + path
+		basePkgName = string.split(pkgName, '/')[-2]
+		d = { 'pkgname' : basePkgName }
+		path = (cfg.sourcepath) % d + "/" + path
 
 	    repos.storeFileFromChangeset(cs, file, path)
     except:
 	# something went wrong; try to unwind our commits
 	for fileId in filesDone:
 	    infoFile = repos.getFileDB(fileId)
-	    (path, fileVersion) = fileMap[fileId]
+	    (path, fileVersion) = fileMap[fileId][0:2]
 	    infoFile.eraseVersion(fileVersion)
 
 	for (pkgSet, newVersion) in pkgsDone:
