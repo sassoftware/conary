@@ -207,14 +207,17 @@ class HttpHandler(HtmlEngine):
         
     def chPassFormCmd(self, authToken, fields):
         self.htmlPageTitle("Change Password")
-        self.htmlChPassForm()
+        self.htmlChPassForm(authToken[0])
         
     def chPassCmd(self, authToken, fields):
+        oldPassword = fields["oldPassword"].value
         p1 = fields["password1"].value
         p2 = fields["password2"].value
 
         self.htmlPageTitle("Change Password")
-        if p1 != p2:
+        if authToken[1] != oldPassword:
+            self.writeFn("""<div class="warning">Error: old password is incorrect</div>""")
+        elif p1 != p2:
             self.writeFn("""<div class="warning">Error: passwords do not match</div>""")
         else:
             self.repServer.auth.changePassword(authToken[0], p1)

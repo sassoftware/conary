@@ -244,16 +244,18 @@ Choose a branch: %s
 </form>
 """)
 
-    def htmlChPassForm(self):
+    def htmlChPassForm(self, username):
         self.writeFn("""
 <form method="post" action="chPass">
-<table>
-<tr><td>New Password:</td><td><input type="password" name="password1"></td></tr>
+<table cellpadding="6">
+<tr><td>Changing password for:</td><td><b>%s</b></td></tr>
+<tr><td>Old password:</td><td><input type="password" name="oldPassword"></td></tr>
+<tr><td>New password:</td><td><input type="password" name="password1"></td></tr>
 <tr><td>Again:</td><td><input type="password" name="password2"></td></tr>
 </table>
 <p><input type="submit"></p>
 </form>
-""")
+""" % username)
 
     def makeSelectAppender(self, name, selectionName):
         """Generates an input box and add/remove button pair to manage a list of arbitrary
