@@ -84,8 +84,9 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 	else:
             flavors = {}
             for label in cfg.installLabelPath:
-                d = repos.getTroveLeavesByLabel([ x[0] for x in troves], label,
-                                                flavorFilter = cfg.flavor)
+                d = dict.fromkeys([ x[0] for x in troves ],
+                                  { label : [ cfg.flavor ] } )
+                d = repos.getTroveLeavesByLabel(d, bestFlavor = True)
                 repos.queryMerge(flavors, d)
 
         displayc = display.DisplayCache()

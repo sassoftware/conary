@@ -953,8 +953,8 @@ def newPackage(repos, cfg, name):
     state = SourceState(name, versions.NewVersion(), branch)
 
     # see if this package exists on our build branch
-    if repos and repos.getTroveLeavesByLabel([name], 
-                                               cfg.buildLabel).get(name, []):
+    if repos and repos.getTroveLeavesByLabel(
+                        { name : { cfg.buildLabel : None } }).get(name, []):
 	log.error("package %s already exists" % name)
 	return
 
@@ -1003,7 +1003,8 @@ def showLog(repos, branch = None):
 
     troveName = state.getName()
 
-    verList = repos.getTroveVersionsByLabel([troveName], branch.label())
+    verList = repos.getTroveVersionsByLabel(
+                            { troveName : { branch.label() : None } } )
     verList = verList[troveName].keys()
     verList.sort()
     verList.reverse()

@@ -730,7 +730,8 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     # make an attempt at a reasonable version # for this trove
     # although the recipe we are cooking from may not be in any
     # repository
-    versionDict = repos.getTroveLeavesByLabel([srcName], buildLabel)
+    versionDict = repos.getTroveLeavesByLabel(
+                                { srcName : { buildLabel : None } })
     versionList = versionDict.get(srcName, {}).keys()
     if versionList:
         relVersionList  = [ x for x in versionList \
@@ -750,7 +751,8 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
         # built on and reuse that branch.  But it's useful for cases
         # when you really know what you're doing and don't want to depend
         # on a source trove being in the repository.
-        versionDict = repos.getTroveLeavesByLabel([name], buildLabel)
+        versionDict = repos.getTroveLeavesByLabel(
+                                { name : { buildLabel : None } })
         versionList = versionDict.get(name, {}).keys()
         if versionList:
             relVersionList  = [ x for x in versionList \

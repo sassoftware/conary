@@ -37,7 +37,7 @@ import trovestore
 import versions
 
 # a list of the protocols we understand
-SERVER_VERSIONS = [ 29, 30 ]
+SERVER_VERSIONS = [ 29, 30, 31 ]
 CACHE_SCHEMA_VERSION = 12
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -599,8 +599,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return self._getTroveList(authToken, clientVersion, troveFilter,
                                   withVersions = True, withFlavors = True)
 
-    def getTroveVersionsByLabel(self, authToken, clientVersion, troveNameList, 
-                                labelStr, flavorFilter):
+    def oldgetTroveVersionsByLabel(self, authToken, clientVersion, 
+                                   troveNameList, labelStr, flavorFilter):
         if not labelStr:
             return {}
         elif troveNameList:
@@ -620,65 +620,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   flavorFilter = flavorType,
                                   withFlavors = True)
 
-    def getTroveVersionsByBranch(self, authToken, clientVersion, troveSpecs,
-                                 bestFlavor):
-        d = {}
-        for (name, branches) in troveSpecs.iteritems():
-            d[name] = {}
-            for branch, flavors in branches.iteritems():
-                if type(flavors) == list:
-                    d[name][branch] = flavors
-                else:
-                    d[name][branch] = None
-
-        if bestFlavor:
-            flavorFilter = self._GET_TROVE_BEST_FLAVOR
-        else:
-            flavorFilter = self._GET_TROVE_ALL_FLAVORS
-
-        return self._getTroveList(authToken, clientVersion, d, 
-                                  withVersions = True, 
-                                  flavorFilter = flavorFilter,
-                                  versionType = self._GTL_VERSION_TYPE_BRANCH,
-                                  latestFilter = self._GET_TROVE_ALL_VERSIONS,
-                                  withFlavors = True)
-
-    def getTroveLeavesByBranch(self, authToken, clientVersion, troveSpecs,
+    def getTroveVersionFlavors(self, authToken, clientVersion, troveSpecs,
                                bestFlavor):
-        d = {}
-        for (name, branches) in troveSpecs.iteritems():
-            d[name] = {}
-            for branch, flavors in branches.iteritems():
-                if type(flavors) == list:
-                    d[name][branch] = flavors
-                else:
-                    d[name][branch] = None
-
-        if bestFlavor:
-            flavorFilter = self._GET_TROVE_BEST_FLAVOR
-        else:
-            flavorFilter = self._GET_TROVE_ALL_FLAVORS
-
-        return self._getTroveList(authToken, clientVersion, d, 
-                                  withVersions = True, 
-                                  flavorFilter = flavorFilter,
-                                  versionType = self._GTL_VERSION_TYPE_BRANCH,
-                                  latestFilter = self._GET_TROVE_VERY_LATEST,
-                                  withFlavors = True)
-
-    def getTroveVersionFlavors(self, authToken, clientVersion, troveFilter,
-                               bestFlavor):
-        if bestFlavor:
-            flavorFilter = self._GET_TROVE_BEST_FLAVOR
-        else:
-            flavorFilter = self._GET_TROVE_ALL_FLAVORS
-
-        d = self._getTroveList(authToken, clientVersion, troveFilter,
-                                  withVersions = True, 
-                                  flavorFilter = flavorFilter,
-                                  versionType = self._GTL_VERSION_TYPE_VERSION,
-                                  withFlavors = True)
-        return d
+        return self._getTroveVerInfoByVer(authToken, clientVersion, troveSpecs, 
+                              bestFlavor, self._GTL_VERSION_TYPE_VERSION, 
+                              latestFilter = self._GET_TROVE_ALL_VERSIONS)
 
     def getAllTroveLeaves(self, authToken, clientVersion, troveSpecs,
                           flavorFilter = 0):
@@ -698,8 +644,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   latestFilter = self._GET_TROVE_VERY_LATEST,
                                   withFlavors = True)
 
-    def getTroveLeavesByLabel(self, authToken, clientVersion, troveNameList, 
-                              labelStr, flavorFilter):
+    def oldgetTroveLeavesByLabel(self, authToken, clientVersion, troveNameList, 
+                                 labelStr, flavorFilter):
         if not labelStr:
             return {}
         elif troveNameList:
@@ -721,6 +667,77 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   latestFilter = self._GET_TROVE_VERY_LATEST,
                                   withFlavors = True, 
                                   flavorFilter = flavorSelection)
+
+    def _getTroveVerInfoByVer(self, authToken, clientVersion, troveSpecs, 
+                              bestFlavor, versionType, latestFilter):
+        hasFlavors = False
+
+        d = {}
+        for (name, labels) in troveSpecs.iteritems():
+            if not name:
+                name = None
+
+            d[name] = {}
+            for label, flavors in labels.iteritems():
+                if type(flavors) == list:
+                    d[name][label] = flavors
+                    hasFlavors = True
+                else:
+                    d[name][label] = None
+
+        if bestFlavor and hasFlavors:
+            flavorFilter = self._GET_TROVE_BEST_FLAVOR
+        else:
+            flavorFilter = self._GET_TROVE_ALL_FLAVORS
+
+        return self._getTroveList(authToken, clientVersion, d, 
+                                  withVersions = True, 
+                                  flavorFilter = flavorFilter,
+                                  versionType = versionType,
+                                  latestFilter = latestFilter,
+                                  withFlavors = True)
+
+    def getTroveVersionsByBranch(self, authToken, clientVersion, troveSpecs,
+                                 bestFlavor):
+        return self._getTroveVerInfoByVer(authToken, clientVersion,
+                                          troveSpecs, bestFlavor,
+                                          self._GTL_VERSION_TYPE_BRANCH, 
+                                          self._GET_TROVE_ALL_VERSIONS)
+
+    def getTroveLeavesByBranch(self, authToken, clientVersion, troveSpecs,
+                               bestFlavor):
+        return self._getTroveVerInfoByVer(authToken, clientVersion,
+                                          troveSpecs, bestFlavor,
+                                          self._GTL_VERSION_TYPE_BRANCH, 
+                                          self._GET_TROVE_VERY_LATEST)
+
+    def getTroveLeavesByLabel(self, authToken, clientVersion, troveNameList, 
+                              labelStr, flavorFilter = None):
+        if clientVersion <= 30:
+            return self.oldgetTroveLeavesByLabel(authToken, clientVersion,
+                                                 troveNameList, labelStr, 
+                                                 flavorFilter)
+
+        troveSpecs = troveNameList
+        bestFlavor = labelStr
+        return self._getTroveVerInfoByVer(authToken, clientVersion,
+                                          troveSpecs, bestFlavor,
+                                          self._GTL_VERSION_TYPE_LABEL, 
+                                          self._GET_TROVE_VERY_LATEST)
+
+    def getTroveVersionsByLabel(self, authToken, clientVersion, troveNameList, 
+                              labelStr, flavorFilter = None):
+        if clientVersion <= 30:
+            return self.oldgetTroveLeavesByLabel(authToken, clientVersion,
+                                                 troveNameList, labelStr, 
+                                                 flavorFilter)
+
+        troveSpecs = troveNameList
+        bestFlavor = labelStr
+        return self._getTroveVerInfoByVer(authToken, clientVersion,
+                                          troveSpecs, bestFlavor,
+                                          self._GTL_VERSION_TYPE_LABEL, 
+                                          self._GET_TROVE_ALL_VERSIONS)
 
     def getFileContents(self, authToken, clientVersion, fileList):
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 

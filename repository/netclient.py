@@ -38,7 +38,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 30 ]
+CLIENT_VERSIONS = [ 30, 31 ]
 
 class _Method(xmlrpclib._Method):
 
@@ -52,7 +52,7 @@ class _Method(xmlrpclib._Method):
         return self.doCall(CLIENT_VERSIONS[-1], *args)
 
     def doCall(self, clientVersion, *args):
-        newArgs = ( CLIENT_VERSIONS[-1], ) + args
+        newArgs = ( clientVersion, ) + args
         isException, result = self.__send(self.__name, newArgs)
 	if not isException:
 	    return result
@@ -324,79 +324,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	d = self.c[serverName].getTroveVersionList(req)
         return self._mergeTroveQuery({}, d)
 
-    def getTroveLeavesByLabel(self, troveNameList, label, flavorFilter = None):
-	d = self.c[label].getTroveLeavesByLabel(troveNameList, 
-						label.asString(),
-                                                self.fromFlavor(flavorFilter))
-        return self._mergeTroveQuery({}, d)
+    def getTroveLeavesByLabel(self, troveSpecs, bestFlavor = False):
+        return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor, 
+                                           'getTroveLeavesByLabel', 
+                                           labels = True)
 
-    def _getTroveLeavesByLabel(self, troveSpecs, bestFlavor = False):
-        # XXX remove this function once real getTroveLeavesByLabel
-        # has been switched to new-style syntax
-        res = {}
-        for name, labelDict in troveSpecs.iteritems():
-            for label, flavors in labelDict.iteritems():
-                for flavor in flavors:
-                    d = self.getTroveLeavesByLabel([name], label,
-                                                   flavorFilter=flavor)
-                    self.queryMerge(res, d)
-        return res
+    def getTroveVersionsByLabel(self, troveSpecs, bestFlavor = False):
+        return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor, 
+                                           'getTroveVersionsByLabel', 
+                                           labels = True)
 
-	
-    def getTroveVersionsByLabel(self, troveNameList, label, 
-                                flavorFilter = None):
-	d = self.c[label].getTroveVersionsByLabel(troveNameList, 
-						  label.asString(),
-                                                  self.fromFlavor(flavorFilter))
-        return self._mergeTroveQuery({}, d)
-
-    def _getTroveVersionsByLabel(self, troveSpecs, bestFlavor = False):
-        # XXX remove this function once real getTroveVersionsByLabel
-        # has been switched to new-style syntax
-        res = {}
-        for name, labelDict in troveSpecs.iteritems():
-            for label, flavors in labelDict.iteritems():
-                for flavor in flavors:
-                    d = self.getTroveVersionsByLabel([name], label,
-                                                     flavorFilter=flavor)
-                    self.queryMerge(res, d)
-        return res
-
-	
-    def getTroveVersionFlavors(self, troveDict, bestFlavor = False):
-
-        def _cvtFlavor(flavor):
-            if flavor is None:
-                return 0
-            else:
-                return self.fromFlavor(flavor)
-
-	requestD = {}
-
-	for (troveName, subVersionDict) in troveDict.iteritems():
-	    for version, flavorList in subVersionDict.iteritems():
-		serverName = version.branch().label().getHost()
-
-                if not requestD.has_key(serverName):
-                    requestD[serverName] = {}
-                if not requestD[serverName].has_key(troveName):
-                    requestD[serverName][troveName] = {}
-
-		versionStr = self.fromVersion(version)
-
-                requestD[serverName][troveName][versionStr] = \
-                    [ _cvtFlavor(x) for x in flavorList ]
-
-        newD = {}
-	if not requestD:
-	    return newD
-
-        for serverName, passD in requestD.iteritems():
-            result = self.c[serverName].getTroveVersionFlavors(passD, 
-                                                               bestFlavor)
-            self._mergeTroveQuery(newD, result)
-
-	return newD
+    def getTroveVersionFlavors(self, troveSpecs, bestFlavor = False):
+        return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor,
+                                           'getTroveVersionFlavors',
+                                           versions = True)
 
     def getAllTroveFlavors(self, troveDict):
         d = {}
@@ -405,26 +346,38 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return self.getTroveVersionFlavors(d)
 
-    def _getTroveInfoByBranch(self, troveSpecs, bestFlavor, method):
-        d = {}
-        for name, branches in troveSpecs.iteritems():
-            for branch, flavors in branches.iteritems():
-                host = branch.label().getHost()
-                if not d.has_key(host):
-                    d[host] = {}
+    def _getTroveInfoByVerInfo(self, troveSpecs, bestFlavor, method, 
+                               branches = False, labels = False, 
+                               versions = False):
+        assert(branches + labels + versions == 1)
 
-                subD = d[host].get(name, None)
-                if subD is None:
-                    subD = {}
-                    d[host][name] = subD
+        d = {}
+        for name, verSet in troveSpecs.iteritems():
+            if not name:
+                name = ""
+
+            for ver, flavors in verSet.iteritems():
+                if branches:
+                    host = ver.label().getHost()
+                    verStr = self.fromBranch(ver)
+                elif versions:
+                    host = ver.branch().label().getHost()
+                    verStr = self.fromVersion(ver)
+                else:
+                    host = ver.getHost()
+                    verStr = self.fromLabel(ver)
+
+                versionDict = d.setdefault(host, {})
+                flavorDict = versionDict.setdefault(name, {})
 
                 if flavors is None:
-                    subD[branch.asString()] = ''
+                    flavorDict[verStr] = ''
                 else:
-                    subD[branch.asString()] = \
-                                    [ self.fromFlavor(x) for x in flavors ]
+                    flavorDict[verStr] = [ self.fromFlavor(x) for x in flavors ]
 
         result = {}
+	if not d:
+	    return result
 
         for host, requestD in d.iteritems():
             respD = self.c[host].__getattr__(method)(requestD, bestFlavor)
@@ -433,12 +386,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return result
 
     def getTroveLeavesByBranch(self, troveSpecs, bestFlavor = False):
-        return self._getTroveInfoByBranch(troveSpecs, bestFlavor, 
-                                          'getTroveLeavesByBranch')
+        return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor, 
+                                           'getTroveLeavesByBranch', 
+                                           branches = True)
 
     def getTroveVersionsByBranch(self, troveSpecs, bestFlavor = False):
-        return self._getTroveInfoByBranch(troveSpecs, bestFlavor, 
-                                          'getTroveVersionsByBranch')
+        return self._getTroveInfoByVerInfo(troveSpecs, bestFlavor, 
+                                           'getTroveVersionsByBranch', 
+                                           branches = True)
 
     def getTroveLatestVersion(self, troveName, branch):
 	b = self.fromBranch(branch)
@@ -1120,7 +1075,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         f = overrideFlavor(defaultFlavor, f, 
                                     mergeType = deps.DEP_MERGE_TYPE_PREFS)
                     if f is None:
-                        dNoFlavor[name] = { version : [None]}
+                        dNoFlavor[name] = { version : [ None ] }
                         mapD[name] = tup
                         continue
                 if name in d:
@@ -1348,7 +1303,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         continue
                     else:
                         query[name] = req
-                res = self._getTroveLeavesByLabel(query, bestFlavor=True)
+
+                # map [ None ] flavor to None
+                for verSet in query.itervalues():
+                    for version, flavorList in verSet.items():
+                        if flavorList == [ None ]:
+                            verSet[version] = None
+                        else:
+                            assert(None not in flavorList)
+
+                res = self.getTroveLeavesByLabel(query, bestFlavor=True)
 
                 for name in res:
                     if not res[name]:
@@ -1374,7 +1338,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         del verRelLabel[name]
                         continue
                     query[name] = req
-                res = self._getTroveVersionsByLabel(query, bestFlavor=True)
+
+                # map [ None ] flavor to None
+                for verSet in query.itervalues():
+                    for version, flavorList in verSet.items():
+                        if flavorList == [ None ]:
+                            verSet[version] = None
+                        else:
+                            assert(None not in flavorList)
+
+                res = self.getTroveVersionsByLabel(query, bestFlavor=True)
 
                 for name in res:
                     if not res[name]:
