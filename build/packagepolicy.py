@@ -346,15 +346,12 @@ class SharedLibrary(policy.Policy):
 	(r'..*\.so\..*', None, stat.S_IFDIR),
     ]
 
-    def _markSharedLibrary(self, filename):
-	log.debug('shared library: %s', filename)
-	self.recipe.autopkg.pathMap[filename].tags.set("shlib")
-
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and util.isregular(fullpath) and \
 	   self.recipe.magic[file].name == 'ELF':
-	    self._markSharedLibrary(file)
+	    log.debug('shared library: %s', file)
+	    self.recipe.autopkg.pathMap[file].tags.set("shlib")
 
 
 class InitScript(policy.Policy):
@@ -364,14 +361,26 @@ class InitScript(policy.Policy):
     """
     invariantinclusions = [ '%(initdir)s/.[^/]*$' ]
 
-    def _markInitScript(self, filename):
-	log.debug('initscript: %s', filename)
-	self.recipe.autopkg.pathMap[filename].tags.set("initscript")
+    def doFile(self, file):
+	fullpath = ('%(destdir)s/'+file) %self.macros
+	if os.path.isfile(fullpath) and util.isregular(fullpath):
+	    log.debug('initscript: %s', file)
+	    self.recipe.autopkg.pathMap[file].tags.set("initscript")
+
+
+class TagDescription(policy.Policy):
+    """
+    Mark tag description files as such so that conary handles the
+    correctly.  By default, every file in %(sysconfdir)s/conary/tags/
+    is marked as a tag description file.
+    """
+    invariantinclusions = [ '%(sysconfdir)s/conary/tags/.[^/]*$' ]
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    self._markInitScript(file)
+	    log.debug('conary tag file: %s', file)
+	    self.recipe.autopkg.pathMap[file].tags.set("tagdescription")
 
 
 class Tags(policy.Policy):
