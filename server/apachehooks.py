@@ -66,13 +66,10 @@ def putFile(repos, req):
     return apache.OK
 
 def handler(req):
-    if req.uri.endswith(".cnr"):
-	repName = req.filename
-    else:
-	repName = os.path.dirname(req.filename)
+    repName = os.path.dirname(req.filename)
 
     if not repositories.has_key(repName):
-	codeStr = open(repName, "r").read()
+	codeStr = open(req.filename, "r").read()
 	d = {}
 	exec codeStr in d
 	urlBase = "http://%s:%d" % (req.hostname, 
