@@ -102,6 +102,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
             fields = cgi.FieldStorage(environ = { 'QUERY_STRING' : queryString })
             try:
                 httpHandler.handleCmd(self.wfile.write, base, authToken, fields)
+            except netserver.InsufficientPermission:
+                self.send_response(403)
             except:
                 self.traceback()
         else:
@@ -164,6 +166,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
             c = cgi.FieldStorage(fp = self.rfile, headers = self.headers, 
                                  environ = { 'REQUEST_METHOD' : 'POST' })
             httpHandler.handleCmd(self.wfile.write, cmd, authToken, c)
+        except netserver.InsufficientPermission:
+            self.send_response(403)
         except:
             self.traceback()
 
@@ -197,9 +201,9 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 return
             
             # verify that the user/password actually exists in the database
-            if not netRepos.auth.checkUserPass(authToken):
-               self.requestAuth()
-               return None
+            if not netRepos.repos.auth.checkUserPass(authToken):
+                self.send_response(403)
+                return None
 
 	return authToken
       

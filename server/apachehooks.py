@@ -105,6 +105,8 @@ def post(repos, httpHandler, req):
         try:
             httpHandler.handleCmd(req.write, cmd, authToken,
                                   util.FieldStorage(req))
+        except netserver.InsufficientPermission:
+            return apache.HTTP_FORBIDDEN
         except:
             traceback(req)
 
@@ -132,6 +134,8 @@ def get(repos, httpHandler, req):
         req.content_type = "text/html"
         try:
             httpHandler.handleCmd(req.write, cmd, authToken, fields)
+        except netserver.InsufficientPermission:
+            return apache.HTTP_FORBIDDEN
         except:
             traceback(req)
         return apache.OK
