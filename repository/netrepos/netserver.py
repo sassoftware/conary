@@ -127,7 +127,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	for (fileId, tpath, tversion, fileObj) in \
 		self.repos.iterFilesInTrove(troveName, troveVersion, 
 					    troveFlavor, withFiles = True):
-	    if tpath != path or tversion != fileVersion: continue
+	    if tpath != path: continue
 
 	    inF = self.repos.contentsStore.openRawFile(fileObj.contents.sha1())
 
