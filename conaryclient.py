@@ -314,7 +314,7 @@ class ConaryClient:
                     if lStr in cache and\
                        bStr in cache[lStr] and\
                        troveName in cache[lStr][bStr]:
-                        metadata[troveName] = cache[lStr][bStr][troveName]
+                        metadata[troveName] = metadata.Metadata(cache[lStr][bStr][troveName])
                         troveList.remove((troveName, branch))
 
         # if the cache missed any, grab from the repos
@@ -342,7 +342,7 @@ class ConaryClient:
                     if bStr not in cache[lStr]:
                         cache[lStr][bStr] = {}
 
-                    cache[lStr][bStr][troveName] = metadata[troveName]
+                    cache[lStr][bStr][troveName] = metadata[troveName].freeze()
 
                 pickle.dump(cache, cacheFp)
                 cacheFp.close()
