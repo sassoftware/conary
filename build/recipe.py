@@ -36,6 +36,7 @@ baseMacros = (
     ('cflags'           , '-O2'),
     ('mflags'		, ''),
     ('parallelmflags'   , ''),
+    ('sysroot'		, ''),
 )
 
 crossMacros = (
