@@ -529,6 +529,8 @@ def main(argv=sys.argv):
 	print >> sys.stderr, str(e)
     except repository.repository.TroveNotFound, e:
 	print >> sys.stderr, str(e)
+    except updatecmd.TroveSpecError, e:
+	print >> sys.stderr, str(e)
 	    
 if __name__ == "__main__":
     sys.exit(main())
