@@ -38,6 +38,7 @@ import conarycfg
 import srcctl
 import updatecmd
 import util
+import versions
 import xmlrpclib
 from repository import netclient
 
@@ -150,6 +151,9 @@ def realMain():
         argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
     except options.OptionError, e:
         sys.exit(e.val)
+    except versions.ParseError, e:
+	print >> sys.stderr, e
+	sys.exit(1)
 
     if cfg.installLabel is None:
         print >> sys.stderr, "installLabel is not set"

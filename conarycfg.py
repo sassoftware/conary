@@ -61,7 +61,7 @@ class ConfigFile:
 	    try:
 		self.__dict__[key] = versions.BranchName(val)
 	    except versions.ParseError, e:
-		raise ParseError, str(e)
+		raise versions.ParseError, str(e)
 	elif type == BOOL:
 	    if val.lower() in ('0', 'false'):
 		self.__dict__[key] = False
