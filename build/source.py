@@ -4,8 +4,9 @@
 #
 
 """
-Modules used by recipes to find source code and unpack and patch it
-in the correct directory.
+Modules used by recipes to find source code, check GPG signatures on
+it, unpack it, and patch it in the correct directory.  Each of the
+public classes in this module is accessed from a recipe as addI{Name}.
 """
 
 import gzip
@@ -133,7 +134,33 @@ class _Source:
 
 
 class Archive(_Source):
+    """
+    Called as self.addArchive from a recipe, this class adds an archive
+    such as an optionally compressed tarball or zip file, unpacking it
+    into the appropriate directory.
+    
+    If you provide the C{keyid} argument, it will search for a file
+    named I{sourcename}C{.{sig,sign,asc}} and make sure that it is
+    signed with the appropriate GPG key.  A missing signature is a
+    warning; a failed signature check is fatal.
+
+    FIXME: must fix the rules for directories, then explain here.
+    """
     def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None, use=None):
+	"""
+	@param recipe: The recipe object currently being built.
+	@param sourcename: The name of the archive
+	@param rpm: If specified, causes Archive to look in the URL or
+	    file specified by C{rpm} for an RPM containing C{sourcename}
+	@param dir: FIXME: need to make directory handling more sensible,
+	    then describe it
+	@param keyid: The 8-digit GPG key ID (no leading C{0x}) for the
+	    signature.  Indicates that a signature should be sought and
+	    checked.
+	@param use: A Use flag or boolean, or a tuple of Use flags and/or
+	    booleans, that determine whether the archive is actually
+	    unpacked or merely stored in the archive.
+	"""
 	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
 
     def doUnpack(self):
@@ -160,8 +187,44 @@ class Archive(_Source):
 
 
 class Patch(_Source):
+    """
+    Called as self.addPatch from a recipe, this class applies a
+    patch.
+    
+    If you provide the C{keyid} argument, it will search for a file
+    named I{sourcename}C{.{sig,sign,asc}} and make sure that it is
+    signed with the appropriate GPG key.  A missing signature is a
+    warning; a failed signature check is fatal.
+    """
     def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None,
 		 use=None, level='1', backup='', macros=False, extraArgs=''):
+	"""
+	@param recipe: The recipe object currently being built.
+	@param sourcename: The name of the patch file
+	@param rpm: If specified, causes Archive to look in the URL or
+	    file specified by C{rpm} for an RPM containing C{sourcename}
+	@param dir: The directory relative to C{%(builddir)s} to which
+	    to change before applying the patch.
+	@param keyid: The 8-digit GPG key ID (no leading C{0x}) for the
+	    signature.  Indicates that a signature should be sought and
+	    checked.
+	@param use: A Use flag or boolean, or a tuple of Use flags and/or
+	    booleans, that determine whether the archive is actually
+	    unpacked or merely stored in the archive.
+	@param level: The number of initial subdirectory names to strip
+	    out when applying the patch; the default is 1.
+	@param backup: A backup suffix to use for storing the versions
+	    of files before the patch is applied.
+	@param macros: If true, interpolate recipe macros in the body
+	    of the patch before applying it.  For example, you might
+	    have a patch that changes C{CFLAGS = -O2} to
+	    C{CFLAGS = %(cflags)s}, which will cause C{%(cflags)s} to
+	    be replaced with the current setting of C{recipe.macros.cflags}.
+	    Defaults to False.
+	@param extraArgs: Arbitrary arguments to pass to the patch program.
+	    Use only as a last resort -- and probably also file a bug
+	    report suggesting the possibility of direct support.
+	"""
 	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
 	self.level = level
 	self.backup = backup
@@ -201,10 +264,42 @@ class Patch(_Source):
 
 
 class Source(_Source):
+    """
+    Called as self.addSource from a recipe, this class copies a file
+    into the build directory %(builddir)s.
+    
+    If you provide the C{keyid} argument, it will search for a file
+    named I{sourcename}C{.{sig,sign,asc}} and make sure that it is
+    signed with the appropriate GPG key.  A missing signature is a
+    warning; a failed signature check is fatal.
+    """
     def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None,
                   use=None, apply='', macros=False):
+	"""
+	@param recipe: The recipe object currently being built.
+	@param sourcename: The name of the archive
+	@param rpm: If specified, causes Archive to look in the URL or
+	    file specified by C{rpm} for an RPM containing C{sourcename}
+	@param dir: The directory in which to store the file, relative
+	    to C{%(builddir)s}.  Defaults to storing directly in the
+	    C{%(builddir)s}.
+	@param keyid: The 8-digit GPG key ID (no leading C{0x}) for the
+	    signature.  Indicates that a signature should be sought and
+	    checked.
+	@param use: A Use flag or boolean, or a tuple of Use flags and/or
+	    booleans, that determine whether the archive is actually
+	    unpacked or merely stored in the archive.
+	@param apply: A command line to run after storing the file.
+	    Macros will be interpolated into this command.
+	@param macros: If true, interpolate recipe macros in the body
+	    of the patch before applying it.  For example, you might
+	    have a patch that changes C{CFLAGS = -O2} to
+	    C{CFLAGS = %(cflags)s}, which will cause C{%(cflags)s} to
+	    be replaced with the current setting of C{recipe.macros.cflags}.
+	    Defaults to False.
+	"""
 	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
-	self.apply = apply % self.recipe.macros
+	self.apply = apply
 	self.applymacros = macros
 
     def doUnpack(self):
@@ -227,24 +322,42 @@ class Source(_Source):
 	    util.copyfile(f, os.sep.join((destDir,
 					  os.path.basename(self.sourcename))))
 	if self.apply:
-	    util.execute(self.apply, destDir)
+	    util.execute(self.apply %self.recipe.macros, destDir)
 
 
 class Action(_Source):
+    """
+    Called as self.addSource from a recipe, this class copies a file
+    into the build directory %(builddir)s.
+    """
     def __init__(self, recipe, action, dir='', use=None):
+	"""
+	@param recipe: The recipe object currently being built.
+	@param action: A command line to run.
+	    Macros will be interpolated into this command.
+	@param dir: The directory in which to store the file, relative
+	    to C{%(builddir)s}.  Defaults to storing directly in the
+	    C{%(builddir)s}.
+	@param use: A Use flag or boolean, or a tuple of Use flags and/or
+	    booleans, that determine whether the archive is actually
+	    unpacked or merely stored in the archive.
+	"""
 	_Source.__init__(self, recipe, '', '', dir, None, None)
-	self.action = action % self.recipe.macros
+	self.action = action
 
     def doUnpack(self):
 	destDir = os.sep.join((self.builddir, self.recipe.theMainDir))
 	util.mkdirChain(destDir)
-	util.execute(self.action, destDir)
+	if self.dir:
+	    destDir = os.sep.join((destDir, self.dir))
+	    util.mkdirChain(destDir)
+	util.execute(self.action %self.recipe.macros, destDir)
 
 
 
 class SourceError(Exception):
     """
-    Base class from which policy error classes inherit
+    Base class from which source error classes inherit
     """
     def __init__(self, msg, *args):
         self.msg = msg %args
