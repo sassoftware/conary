@@ -491,7 +491,49 @@ class StreamSet(InfoStream):
 
 	return conflicts
 
+class ReferencedTroveList(list, InfoStream):
+
+    def freeze(self):
+	l = []
+	for (name, version, flavor) in self:
+	    version = version.freeze()
+	    if flavor:
+		flavor = flavor.freeze()
+	    else:
+		flavor = ""
+
+	    l.append(name)
+	    l.append(version)
+	    l.append(flavor)
+
+	return "\0".join(l)
+
+    def thaw(self, data):
+	del self[:]
+	if not data: return
+
+	l = data.split("\0")
+	i = 0
+
+	while i < len(l):
+	    name = l[i]
+	    version = versions.ThawVersion(l[i + 1])
+	    flavor = l[i + 2]
+
+	    if not flavor:
+		flavor = None
+	    else:
+		flavor = deps.ThawDependencySet(flavor)
+
+	    self.append((name, version, flavor))
+	    i += 3
+
+    def __init__(self, data = None):
+	list.__init__(self)
+	if data is not None:
+	    self.thaw(data)
+
 class LargeStreamSet(StreamSet):
 
-    headerFormat = "!BI"
-    headerSize = 5
+    headerFormat = "!HI"
+    headerSize = 6

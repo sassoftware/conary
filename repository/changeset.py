@@ -64,7 +64,13 @@ class FileInfo(streams.TupleStream):
     def setCsInfo(self, value):
         return self.items[3].set(value)
 
-class ChangeSet:
+_STREAM_CS_PRIMARY = 1
+
+class ChangeSet(streams.LargeStreamSet):
+
+    streamDict = { 
+        _STREAM_CS_PRIMARY  :(streams.ReferencedTroveList, "primaryTroveList" ),
+    }
 
     def isAbsolute(self):
 	return self.absolute
@@ -106,10 +112,10 @@ class ChangeSet:
 		assert(not self.files.has_key(fileId))
 
     def addPrimaryPackage(self, name, version, flavor):
-	self.primaryPackageList.append((name, version, flavor))
+	self.primaryTroveList.append((name, version, flavor))
 
     def getPrimaryPackageList(self):
-	return self.primaryPackageList
+	return self.primaryTroveList
 
     def newPackage(self, csPkg):
 	old = csPkg.getOldVersion()
@@ -181,7 +187,7 @@ class ChangeSet:
 
     def formatToFile(self, cfg, f):
 	f.write("primary packages:\n")
-	for (pkgName, version, flavor) in self.primaryPackageList:
+	for (pkgName, version, flavor) in self.primaryTroveList:
 	    if flavor:
 		f.write("\t%s %s %s\n" % (pkgName, version.asString(), 
 					  flavor.freeze()))
@@ -205,18 +211,10 @@ class ChangeSet:
 	return self.files.has_key(fileId)
 
     def headerAsString(self):
+	start = self.freeze()
+
 	rc = []
 
-	primaries = [ ]
-	for (name, version, flavor) in self.primaryPackageList:
-	    primaries.append(name)
-	    primaries.append(version.asString())
-	    if flavor:
-		primaries.append(flavor.freeze())
-	    else:
-		primaries.append("")
-	primaries = "\0".join(primaries)
-	
 	for pkg in self.iterNewPackageList():
 	    s = pkg.freeze()
 	    rc.append("PKG %d\n" % len(s))
@@ -244,8 +242,8 @@ class ChangeSet:
 
 	fileList[0] = "FILES %d\n" % totalLen
 	
-	return "PRIMARIES %d\n%s%s%s" % \
-		    (len(primaries), primaries,
+	return "%s%s%s%s" % \
+		    (struct.pack("!I", len(start)), start,
 		     "".join(rc),
 		     "".join(fileList))
 
@@ -526,7 +524,8 @@ class ChangeSet:
 	# this has to be true, I think...
 	self.local = 0
 
-    def __init__(self):
+    def __init__(self, data = None):
+	streams.LargeStreamSet.__init__(self, data)
 	self.newPackages = {}
 	self.oldPackages = []
 	self.files = {}
@@ -584,13 +583,27 @@ class ChangeSetFromFile(ChangeSet):
     def hasFileContents(self, hash):
 	return self.csf.hasFile(hash)
 
-    def read(self, file):
+    def writeAllContents(self, csf):
+	rc = self.csf.getNextFile()
+	while rc is not None:
+	    (fileId, tag, f, size) = rc
+	    cont = filecontents.FromFile(f, size)
+	    csf.addFile(fileId, cont, tag)
+
+	    rc = self.csf.getNextFile()
+
+    def __init__(self, file, justContentsForConfig = 0, skipValidate = 1):
 	f = open(file, "r")
 	self.csf = filecontainer.FileContainer(f)
 	f.close()
 	#return
 
 	(tagInfo, control, size) = self.csf.getFile("CONARYCHANGESET")
+
+	startSize = control.read(4)
+	startSize = struct.unpack("!I", startSize)[0]
+	start = control.read(startSize)
+	ChangeSet.__init__(self, data = start)
 
 	line = control.readline()
 	while line:
@@ -655,21 +668,11 @@ class ChangeSetFromFile(ChangeSet):
 
 	    line = control.readline()
 
-    def writeAllContents(self, csf):
-	rc = self.csf.getNextFile()
-	while rc is not None:
-	    (fileId, tag, f, size) = rc
-	    cont = filecontents.FromFile(f, size)
-	    csf.addFile(fileId, cont, tag)
 
-	    rc = self.csf.getNextFile()
-
-    def __init__(self, file, justContentsForConfig = 0, skipValidate = 1):
-	ChangeSet.__init__(self)
 	self.configCache = {}
 	self.earlyFileContents = None
 	self.lateFileContents = None
-	self.read(file)
+
 	if not skipValidate:
 	    self.validate(justContentsForConfig)
 
