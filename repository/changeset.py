@@ -35,13 +35,13 @@ class FileInfo(streams.TupleStream):
     __slots__ = []
 
     # fileId, oldVersion, newVersion, csInfo
-    makeup = (("fileId", streams.StringStream, 40), 
+    makeup = (("fileId", streams.Sha1Stream, 20), 
 	      ("oldVersion", streams.StringStream, "!H"),
 	      ("newVersion", streams.StringStream, "!H"), 
 	      ("csInfo", streams.StringStream, "B"))
 
     def fileId(self):
-        return self.items[0].value()
+        return self.items[0].asString()
 
     def setFileId(self, value):
         return self.items[0].set(value)
@@ -63,6 +63,16 @@ class FileInfo(streams.TupleStream):
 
     def setCsInfo(self, value):
         return self.items[3].set(value)
+
+    def __init__(self, first = None, oldStr = None, newVer = None, chg = None):
+	# XXX this can go away once we track binary fileids
+	if oldStr is None:
+	    streams.TupleStream.__init__(self, first)
+	else:
+	    sha1 = streams.Sha1Stream()
+	    sha1.setFromString(first)
+
+	    streams.TupleStream.__init__(self, sha1.freeze(), oldStr, newVer, chg)
 
 class ChangeSetNewPackageList(dict, streams.InfoStream):
 
@@ -94,8 +104,13 @@ class ChangeSetNewPackageList(dict, streams.InfoStream):
 class ChangeSetFileDict(dict, streams.InfoStream):
 
     def freeze(self):
+	# XXX this can go away once we track binary fileids
+	sha1 = streams.Sha1Stream()
+	
 	fileList = []
 	for (fileId, (oldVersion, newVersion, csInfo)) in self.iteritems():
+	    sha1.setFromString(fileId)
+
 	    if oldVersion:
 		oldStr = oldVersion.asString()
 	    else:
