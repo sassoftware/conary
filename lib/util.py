@@ -457,3 +457,6 @@ class SeekableNestedFile(NestedFile):
         
         self.pos = newPos
         self.needsSeek = True
+
+    def tell(self):
+        return self.pos

@@ -543,6 +543,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 fileDict[key] = fileObj
             del fileObj
 
+            (fd, name) = tempfile.mkstemp()
+            os.unlink(name)
+            tmpF = os.fdopen(fd, "r+")
+            del fd
+
             for (fileId, troveName, 
                     (oldTroveVersion, oldTroveF, oldFileVersion),
                     (newTroveVersion, newTroveF, newFileVersion)) \
@@ -564,7 +569,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     # pull the contents from the trove it was originall
                     # built in
                     cont = self.getFileContents(troveName, newFileVersion,
-                                        fileId, newFileVersion)
+                                        fileId, newFileVersion,
+                                        tmpFile = tmpF)
                     internalCs.addFileContents(fileId, 
                                    repository.changeset.ChangedFileTypes.file, 
                                    cont, 
@@ -626,7 +632,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 				   self.fromVersion(version)))
 
     def getFileContents(self, troveName, troveVersion, fileId,
-		        fileVersion, fileObj = None):
+		        fileVersion, fileObj = None, tmpFile = None):
 	# we try to get the file from the trove which originally contained
 	# it since we know that server has the contents; other servers may
 	# not
@@ -635,13 +641,22 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 		    self.fromFileId(fileId), self.fromVersion(fileVersion))
 
 	inF = urllib.urlopen(url)
-	(fd, path) = tempfile.mkstemp()
-	os.unlink(path)
-	outF = os.fdopen(fd, "r+")
-	util.copyfileobj(inF, outF)
+
+        if not tmpFile:
+            (fd, path) = tempfile.mkstemp()
+            os.unlink(path)
+            outF = os.fdopen(fd, "r+")
+        else:
+            start = tmpFile.tell()
+            outF = tmpFile
+
+	size = util.copyfileobj(inF, outF)
 	del inF
 
 	outF.seek(0)
+
+        if tmpFile:
+            outF = util.SeekableNestedFile(tmpFile, size, start)
 
 	gzfile = gzip.GzipFile(fileobj = outF)
 	gzfile.fullSize = util.gzipFileSize(outF)
