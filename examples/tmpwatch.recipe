@@ -23,5 +23,5 @@ only removes empty directories and regular files."""
 	                      "%s-%s.tar.gz" %(self.name, self.version))
 	self.addSource("crond-tmpwatch")
 	self.install = (build.MakeInstall(rootVar = "ROOT"),
-			build.InstallFile("crond-tmpwatch", 
-					  "/etc/cron.daily/tmpwatch", 0755))
+			build.InstallFiles("crond-tmpwatch", 
+					   "/etc/cron.daily/tmpwatch", 0755))
