@@ -457,6 +457,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		allFiles = self._getLocalOrRemoteFileVersions(l)
 		idIdx.update(allFiles)
 
+            # put files into the change set in the right order; this makes sure
+            # we we create ptr entries they come after the file which has the
+            # contents
+            filesNeeded.sort()
+            ptrTable = {}
 	    for (fileId, oldFileVersion, newFileVersion, oldPath, newPath) in \
 								filesNeeded:
 		oldFile = None
@@ -490,6 +495,17 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
+
+                    if contType == changeset.ChangedFileTypes.file:
+                        hash = newFile.contents.sha1()
+                        ptr = ptrTable.get(hash, None)
+                        if ptr is not None:
+                            contType = changeset.ChangedFileTypes.ptr
+                            cont = filecontents.FromString(ptr)
+                        else:
+                            pass
+                            # uncomment this to enable ptr record types
+                            #ptrTable[hash] = fileId
 
 		    cs.addFileContents(fileId, contType, cont, 
 				       newFile.flags.isConfig())
