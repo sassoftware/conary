@@ -357,7 +357,7 @@ def realMain(cfg, argv=sys.argv):
 
 	if len(otherArgs) >= 2:
 	    args = [repos, cfg, otherArgs[2:], all, ls, ids, sha1s, leaves, 
-                    fullVersions, info, tags, deps] 
+                    fullVersions, info, tags, showDeps] 
 	    try:
 		queryrep.displayTroves(*args)
 	    except IOError, msg:
@@ -435,7 +435,7 @@ def realMain(cfg, argv=sys.argv):
         showchangeset.displayChangeSet(db, repos, cs, component, cfg, ls, 
                                         tags, fullVersions, showChanges, 
                                         ids=ids, sha1s=sha1s, all=all, 
-                                        deps=deps)
+                                        deps=showDeps)
     elif (otherArgs[1] == "update"):
 	kwargs = {}
 
