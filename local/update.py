@@ -238,7 +238,7 @@ class FilesystemJob:
                 
                 contType, contents = self.changeSet.getFileContents(pathId)
                 assert(contType == changeset.ChangedFileTypes.file)
-                fileObj.restore(contents, self.root, target, True)
+                fileObj.restore(contents, self.root, target)
                 del delayedRestores[match[0]]
 
                 if fileObj.hasContents and fileObj.linkGroup.value():
@@ -282,7 +282,7 @@ class FilesystemJob:
 
                         continue
 
-	    fileObj.restore(contents, self.root, target, contents != None)
+	    fileObj.restore(contents, self.root, target)
             if ptrTargets.has_key(pathId):
                 ptrTargets[pathId] = target
 	    log.debug(msg, target)
@@ -309,7 +309,7 @@ class FilesystemJob:
                     self.linkGroups[linkGroup] = target
 
             fileObj.restore(filecontents.FromFilesystem(ptrTargets[ptrId]),
-                            self.root, target, True)
+                            self.root, target)
             log.debug(msg, target)
 
         del delayedRestores

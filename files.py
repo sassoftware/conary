@@ -291,9 +291,8 @@ class File(streams.StreamSet):
     def remove(self, target):
 	os.unlink(target)
 
-    def restore(self, root, target, restoreContents, skipMtime = 0):
-	self.setOwnerGroup(root, target)
-	self.chmod(target)
+    def restore(self, root, target, skipMtime = 0):
+	self.setPermissions(root, target)
 
 	if not skipMtime:
 	    self.setMtime(target)
@@ -304,9 +303,10 @@ class File(streams.StreamSet):
     def chmod(self, target):
 	os.chmod(target, self.inode.perms())
 
-    def setOwnerGroup(self, root, target):
-	if os.getuid(): return
+    def setPermissions(self, root, target):
+	self.chmod(target)
 
+	if os.getuid(): return
 	global userCache, groupCache
 
 	uid = userCache.lookup(root, self.inode.owner())
@@ -362,49 +362,49 @@ class SymbolicLink(File):
 	# chmod() on a symlink follows the symlink
 	pass
 
-    def restore(self, fileContents, root, target, restoreContents):
+    def restore(self, fileContents, root, target):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         util.mkdirChain(os.path.dirname(target))
 	os.symlink(self.target.value(), target)
-	File.restore(self, root, target, restoreContents, skipMtime = 1)
+	File.restore(self, root, target, skipMtime = 1)
 
 class Socket(File):
 
     lsTag = "s"
     __slots__ = []
 
-    def restore(self, fileContents, root, target, restoreContents):
+    def restore(self, fileContents, root, target):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         util.mkdirChain(os.path.dirname(target))
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
         sock.bind(target)
         sock.close()
-	File.restore(self, root, target, restoreContents)
+	File.restore(self, root, target)
 
 class NamedPipe(File):
 
     lsTag = "p"
     __slots__ = []
 
-    def restore(self, fileContents, root, target, restoreContents):
+    def restore(self, fileContents, root, target):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         util.mkdirChain(os.path.dirname(target))
 	os.mkfifo(target)
-	File.restore(self, root, target, restoreContents)
+	File.restore(self, root, target)
 
 class Directory(File):
 
     lsTag = "d"
     __slots__ = []
 
-    def restore(self, fileContents, root, target, restoreContents):
+    def restore(self, fileContents, root, target):
 	if not os.path.isdir(target):
 	    util.mkdirChain(target)
 
-	File.restore(self, root, target, restoreContents)
+	File.restore(self, root, target)
 
     def remove(self, target):
 	raise NotImplementedError
@@ -418,7 +418,7 @@ class DeviceFile(File):
     def sizeString(self):
 	return "%3d, %3d" % (self.devt.major(), self.devt.minor())
 
-    def restore(self, fileContents, root, target, restoreContents):
+    def restore(self, fileContents, root, target):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 
@@ -432,7 +432,7 @@ class DeviceFile(File):
 	os.mknod(target, flags, os.makedev(self.devt.major(), 
 		 self.devt.minor()))
             
-	File.restore(self, root, target, restoreContents)
+	File.restore(self, root, target)
 
 class BlockDevice(DeviceFile):
 
@@ -463,8 +463,8 @@ class RegularFile(File):
     def sizeString(self):
 	return "%8d" % self.contents.size()
 
-    def restore(self, fileContents, root, target, restoreContents):
-	if restoreContents:
+    def restore(self, fileContents, root, target):
+	if fileContents != None:
 	    # this is first to let us copy the contents of a file
 	    # onto itself; the unlink helps that to work
 	    src = fileContents.get()
@@ -476,7 +476,7 @@ class RegularFile(File):
 
 	    tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
 	    try:
-		File.restore(self, root, tmpname, restoreContents)
+		File.restore(self, root, tmpname)
 		f = os.fdopen(tmpfd, 'w')
 		util.copyfileobj(src, f)
 		f.close()
@@ -489,7 +489,7 @@ class RegularFile(File):
 		raise
 
 	else:
-	    File.restore(self, root, target, restoreContents)
+	    File.restore(self, root, target)
 
     def __init__(self, *args, **kargs):
 	File.__init__(self, *args, **kargs)

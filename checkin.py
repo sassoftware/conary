@@ -236,15 +236,15 @@ def checkout(repos, cfg, workDir, name):
 	fileObj = files.ThawFile(cs.getFileChange(None, fileId), pathId)
 
 	if not fileObj.hasContents:
-	    fileObj.restore(None, '/', fullPath, 1)
+	    fileObj.restore(None, '/', fullPath)
 	else:
 	    # tracking the pathId separately from the fileObj lets
 	    # us sort the list of files by fileid
 	    assert(fileObj.pathId() == pathId)
 	    if fileObj.flags.isConfig():
-		earlyRestore.append((pathId, fileObj, ('/', fullPath, 1)))
+		earlyRestore.append((pathId, fileObj, ('/', fullPath)))
 	    else:
-		lateRestore.append((pathId, fileObj, ('/', fullPath, 1)))
+		lateRestore.append((pathId, fileObj, ('/', fullPath)))
 
     earlyRestore.sort()
     lateRestore.sort()
