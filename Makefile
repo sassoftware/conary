@@ -21,6 +21,7 @@ python_files = __init__.py	\
 	display.py		\
 	enum.py			\
 	filecontainer.py	\
+	filecontents.py		\
 	files.py		\
 	fixedglob.py		\
 	importrpm.py		\
