@@ -185,11 +185,12 @@ class NetworkAuthorization:
 
         cu.execute("INSERT INTO Users VALUES (?, ?, ?, ?)",
                    (userGroupId, user, salt, m.hexdigest()))
+        userId = cu.lastrowid
         cu.execute("INSERT INTO UserGroupMembers VALUES (?, ?)", 
                    userGroupId, userGroupId)
-        userGroupId = cu.lastrowid
 
         self.db.commit()
+        return userId
 
     def changePassword(self, user, newPassword):
         cu = self.db.cursor()
