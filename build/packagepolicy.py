@@ -90,13 +90,15 @@ class _filterSpec(policy.Policy):
 
     def updateArgs(self, *args, **keywords):
 	"""
-	ThisClass('<name>', 'regex1', 'regex2', [setmodes=stat.??] [unsetmodes=stat.???])
+	Call derived classes (C{ComponentSpec} or C{PackageSpec}) as::
+	    ThisClass('<name>', 'filterexp1', 'filterexp2')
+	where C{filterexp} is either a regular expression or a
+	tuple of C{(regexp[, setmodes[, unsetmodes]])}
 	"""
 	if args:
-	    # pull setmodes and unsetmodes out of **keywords
-	    setmodes = keywords.pop('setmodes', None)
-	    unsetmodes = keywords.pop('unsetmodes', None)
-	    self.extraFilters.append((args[0], args[1:], setmodes, unsetmodes))
+	    theName = args[0]
+	    for filterexp in args[1:]:
+		self.extraFilters.append((theName, filterexp))
 	policy.Policy.updateArgs(self, [], **keywords)
 
 
