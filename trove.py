@@ -808,7 +808,7 @@ class TroveChangeSet:
         return self.requires
 
     def getOldFlavor(self):
-        return self.newFlavor
+        return self.oldFlavor
 
     def getNewFlavor(self):
         return self.newFlavor
