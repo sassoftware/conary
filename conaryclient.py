@@ -272,37 +272,28 @@ class ConaryClient:
         metadata = {}
         if cacheFile and not saveOnly:
             try:
-                print "opening cache"
                 cacheFp = open(cacheFile, "r")
                 cache = pickle.load(cacheFp)
                 cacheFp.close()
             except IOError, EOFError:
-                print "got an error, returning"
                 if cacheOnly:
                     return {}
             else:
-                print "reading cache"
-                print cache
                 lStr = label.asString()
 
                 t = troveList[:]
                 for troveName, branch in t:
-                    print "searching cache for ", troveName
                     bStr = branch.asString()
 
-                    print lStr, bStr, troveName
                     if lStr in cache and\
                        bStr in cache[lStr] and\
                        troveName in cache[lStr][bStr]:
                         metadata[troveName] = cache[lStr][bStr][troveName]
                         troveList.remove((troveName, branch))
 
-        print "done with cache:", metadata
         # if the cache missed any, grab from the repos
         if not cacheOnly and troveList:
-            print "not cacheOnly and troveList"
             metadata.update(self.repos.getMetadata(troveList, label))
-            print "new metadata:", metadata 
             if metadata and cacheFile:
                 try:
                     cacheFp = open(cacheFile, "rw")
