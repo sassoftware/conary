@@ -8,35 +8,64 @@ import shutil
 import pwd
 import grp
 import files
+import string
+import sys
+import versions
 
-def doUpdate(cfg, root, pkgName, binaries = 1, sources = 0):
-    if root == "/":
+def doUpdate(repos, cfg, pkg, mainPackageName):
+    if cfg.root == "/":
 	print "using srs to update to your actual system is dumb."
 	import sys
 	sys.exit(0)
 
-    if pkgName[0] != "/":
-	pkgName = cfg.packagenamespace + "/" + pkgName
-
-    pkgSet = package.PackageSet(cfg.reppath, pkgName)
-
-    if (not len(pkgSet.versionList())):
-	raise KeyError, "no versions exist of %s" % pkgName
-
-    pkg = pkgSet.getLatestPackage(cfg.defaultbranch)
-
-    fileList = []
-    packageFiles = []
-
-    if binaries:
-	packageFiles = packageFiles + pkg.fileList()
-    if sources:
-	packageFiles = packageFiles + pkg.sourceList()
-
-    for (fileName, version) in packageFiles:
-	infoFile = files.FileDB(cfg.reppath, cfg.reppath + fileName)
-	fileList.append(infoFile)
-
-    for infoFile in fileList:
+    for (fileId, path, version) in pkg.fileList():
+	infoFile = repos.getFileDB(fileId)
 	f = infoFile.getVersion(version)
-	f.restore(cfg.reppath, cfg.sourcepath, root)
+
+	if f.__class__ == files.SourceFile:
+	    d = {}
+	    d['pkgname'] = mainPackageName
+
+	    path = (cfg.sourcepath) % d + "/" + path
+
+	f.restore(repos, cfg.root + path)
+
+def update(repos, cfg, pkg, versionStr = None):
+    if pkg and pkg[0] != "/":
+	pkg = cfg.packagenamespace + "/" + pkg
+
+    if versionStr and versionStr[0] != "/":
+	versionStr = cfg.defaultbranch.asString() + "/" + versionStr
+
+    if versionStr:
+	version = versions.VersionFromString(versionStr)
+    else:
+	version = None
+
+    list = []
+    bail = 0
+    mainPackageName = None
+    for pkgName in repos.getPackageList(pkg):
+	pkgSet = repos.getPackageSet(pkgName)
+
+	if not version:
+	    version = pkgSet.getLatestVersion(cfg.defaultbranch)
+	if not pkgSet.hasVersion(version):
+	    sys.stderr.write("package %s does not contain version %s\n" %
+				 (pkgName, version.asString()))
+	    bail = 1
+	else:
+	    pkg = pkgSet.getVersion(version)
+	    list.append(pkg)
+
+	# sources are only in source packages, which are always
+	# named <pkgname>/<source>
+	#
+	# this means we can parse a simple name of the package
+	# out of the full package identifier
+	if pkgName[-8:] == "/sources":
+	    mainPackageName = pkgName[:-8]
+
+    for pkg in list:
+	doUpdate(repos, cfg, pkg, mainPackageName)
+

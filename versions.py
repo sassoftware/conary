@@ -82,10 +82,13 @@ class Version:
     def compare(self, other):
 	return self.compareList(self.versions, other)
 
-    def __str__(self):
-	return self.asString()
+    #def __str__(self):
+	#return self.asString()
 
-    def asString(self):
+    def asString(self, defaultBranch = None):
+	if defaultBranch and self.onBranch(defaultBranch):
+	    return "%s" % self.versions[-1]
+
 	s = ""
 	for version in self.versions:
 	    s = s + ("/%s" % version)
@@ -128,3 +131,5 @@ def VersionFromString(str):
 
     return Version(v)
 	
+def versionSort(list):
+    list.sort

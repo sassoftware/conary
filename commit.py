@@ -9,8 +9,8 @@ import string
 import copy
 
 # version is a short package version, not an SRS version string
-def finalCommit(cfg, pkgName, simpleVersion, root, fileList):
-    pkgSet = package.PackageSet(cfg.reppath, pkgName)
+def finalCommit(repos, cfg, pkgName, simpleVersion, fileList):
+    pkgSet = repos.getPackageSet(pkgName, "w")
 
     version = pkgSet.getLatestVersion(cfg.defaultbranch)
     if version and simpleVersion == version.trailingVersion():
@@ -24,31 +24,21 @@ def finalCommit(cfg, pkgName, simpleVersion, root, fileList):
 
     p = package.Package(version)
 
-    fileDB = cfg.reppath + "/files"
-
-    for file in fileList:
-	infoFile = files.FileDB(cfg.reppath, file.pathInRep(cfg.reppath))
+    for (file, pathToFile, pathInPkg) in fileList:
+	infoFile = repos.getFileDB(file.id())
 
 	duplicateVersion = infoFile.checkBranchForDuplicate(cfg.defaultbranch,
 					file)
 	if not duplicateVersion:
-	    file.version(version)
 	    infoFile.addVersion(version, file)
 
-	    if file.__class__ == files.SourceFile:
-		p.addSource("/" + file.fileName(), 
-			    file.version())
-	    else:
-		p.addFile(file.path(), file.version())
+	    p.addFile(file.id(), pathInPkg, version)
 
 	    infoFile.close()
 	else:
-	    if file.__class__ == files.SourceFile:
-		p.addSource(file.path(), duplicateVersion)
-	    else:
-		p.addFile(file.path(),  duplicateVersion)
+	    p.addFile(file.id(), pathInPkg, duplicateVersion)
 
-	file.archive(cfg.reppath, root)
+	file.archive(repos, pathToFile)
 
     pkgSet.addVersion(version, p)
     pkgSet.close()

@@ -6,22 +6,6 @@ import os
 import shutil
 import util
 
-class ManualConfigure:
-
-    def doBuild(self, dir):
-	os.system("cd %s; ./configure %s" % (dir, self.extraflags))
-
-    def __init__(self, extraflags=""):
-        self.extraflags = extraflags
-
-class Configure:
-
-    def doBuild(self, dir):
-	os.system("cd %s; ./configure --prefix=/usr --sysconfdir=/etc %s" % (dir, self.extraflags))
-
-    def __init__(self, extraflags=""):
-        self.extraflags = extraflags
-
 class Make:
 
     def doBuild(self, dir):

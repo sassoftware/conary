@@ -6,6 +6,7 @@ from filecontainer import FileContainer
 import __builtin__
 import time
 import versions
+import types
 
 # implements a simple versioned file on top of a FileContainer; the version
 # string is used as the file name, and branch marks are stored as extra data 
@@ -14,12 +15,10 @@ import versions
 # the versions are expected to be Version objects as defined by the versions
 # module
 
-class File:
+class OpenedFile:
 
-    def open(self, filename, mode):
-	f = __builtin__.open(filename, mode)
+    def open(self, f):
 	self.container = FileContainer(f)
-	f.close()
 
 	self.versionMap = {}
 	for versionString in self.container.fileList():
@@ -48,10 +47,8 @@ class File:
     # data can be a string, which is written into the new version, or
     # a file-type object, whose contents are copied into the new version
     def addVersion(self, version, data):
-	version.isBranch()
-
 	versionStr = version.asString()
-	self.container.addFile(versionStr, data, "%f" % time.time())
+	self.container.addFile(versionStr, data, "%.3f" % time.time())
 	self.versionMap[versionStr] = version
 
     def hasVersion(self, version):
@@ -61,15 +58,20 @@ class File:
 	# returns a list of version objects
 	return self.versionMap.values()
 
+    def __init__(self, file):
+	return self.open(file)
+
+class File(OpenedFile):
+    def open(self, filename, mode):
+	f = __builtin__.open(filename, mode)
+	OpenedFile.open(self, f)
+	f.close()
+
     def __init__(self, filename, mode):
 	return self.open(filename, mode);
 
-def open(filename, mode):
-    return File(filename, mode)
-
-def latest(versionList):
-    # for now the lastest version is the last in this list
-
-    list = versionList[:]
-    list.sort()
-    return list[-1]
+def open(file, mode = "r"):
+    if type(file) == types.StringType:
+	return File(file, mode)
+    else:
+	return OpenedFile(file)

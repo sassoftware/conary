@@ -8,10 +8,10 @@ import files
 import commit
 import os
 import util
+import sha1helper
 
-def cook(cfg, srcdirs, recipeFile):
+def cook(repos, cfg, recipeFile):
     classList = recipe.RecipeLoader(recipeFile)
-    built = []
 
     if recipeFile[0] != "/":
 	raise IOError, "recipe file names must be absolute paths"
@@ -19,12 +19,30 @@ def cook(cfg, srcdirs, recipeFile):
     for (name, theClass) in classList.items():
 	print "Building", name
 
-	recp = theClass(srcdirs)
+	# find the files and ids which were owned by the last version of
+	# this package on the branch
+	fileIdMap = {}
+	fullName = cfg.packagenamespace + "/" + name
+	if repos.hasPackage(fullName):
+	    for pkgName in repos.getPackageList(fullName):
+		pkgSet = repos.getPackageSet(pkgName)
+		pkg = pkgSet.getLatestPackage(cfg.defaultbranch)
+		for (id, path, version) in pkg.fileList():
+		    fileIdMap[path] = id
+
+	id = idgen(fileIdMap)
+
+	d = {}
+	d['pkgname'] = name
+
+	srcdirs = [ os.path.dirname(recipeFile), cfg.sourcepath % d ]
+
+	recp = theClass()
 
 	ourBuildDir = cfg.buildpath + "/" + recp.name
 
 	recp.setup()
-	recp.unpackSources(ourBuildDir)
+	recp.unpackSources(srcdirs, ourBuildDir)
 	recp.doBuild(ourBuildDir)
 
 	rootDir = "/var/tmp/srs/%s-%d" % (recp.name, int(time.time()))
@@ -34,28 +52,46 @@ def cook(cfg, srcdirs, recipeFile):
         recp.packages(rootDir)
         pkgSet = recp.getPackageSet()
 
-        pkgname = cfg.packagenamespace + "/" + recp.name
-        
 	for (name, buildPkg) in pkgSet.packageSet():
-            built.append(pkgname + "/" + name)
 	    fileList = []
 
 	    for filePath in buildPkg.keys():
-		f = files.FileFromFilesystem(recp.name, rootDir, filePath)
-		fileList.append(f)
+		realPath = rootDir + filePath
+		f = files.FileFromFilesystem(realPath, id(filePath))
+		fileList.append((f, realPath, filePath))
 
-	    commit.finalCommit(cfg, pkgname + "/" + name, recp.version, 
-                               rootDir, fileList)
+	    commit.finalCommit(repos, cfg, 
+			   cfg.packagenamespace + "/" + recp.name + "/" + name, 
+			   recp.version, fileList)
 
-	f = files.FileFromFilesystem(recp.name, "/", recipeFile, "src")
-	fileList = [ f ]
+	recipeName = os.path.basename(recipeFile)
+	f = files.FileFromFilesystem(recipeFile, id(recipeName), type = "src")
+	fileList = [ (f, recipeFile, recipeName) ]
+
 	for file in recp.allSources():
             src = util.findFile(file, srcdirs)
-	    f = files.FileFromFilesystem(recp.name, "/", src, "src")
-	    fileList.append(f)
+	    srcName = os.path.basename(src)
+	    f = files.FileFromFilesystem(src, id(srcName), type = "src")
+	    fileList.append((f, src, srcName))
 
-	commit.finalCommit(cfg, pkgname + "/sources", recp.version,
-                           "/", fileList)
+	commit.finalCommit(repos, cfg, 
+			   cfg.packagenamespace + "/" + recp.name + "/sources",
+			   recp.version, fileList)
 
 	recp.cleanup(ourBuildDir, rootDir)
-    return built
+
+class idgen:
+
+    def __call__(self, path):
+	if self.map.has_key(path):
+	    return self.map[path]
+
+	return sha1helper.hashString("%s %f %s" % (path, time.time(), 
+						    self.noise))
+
+    def __init__(self, map):
+	# file ids need to be unique. we include the time and path when
+	# we generate them; any data put here is also used
+	uname = os.uname()
+	self.noise = "%s %s" % (uname[1], uname[2])
+	self.map = map

@@ -4,67 +4,51 @@
 # All rights reserved
 #
 
-import os
-import sys
-import importrpm
-import string
-import package
-import update
 import commit
-import srscfg
 import cook
+import os
+import srscfg
+import sys
+import update
 import util
+import repository
+import display
 
 sys.excepthook = util.excepthook
 
 cfg = srscfg.SrsConfiguration()
 
-pkgDB = cfg.reppath + "/pkgs"
-contentsDB = cfg.reppath + "/contents"
-util.mkdirChain(pkgDB, contentsDB)
+repos = repository.Repository(cfg.reppath)
+del cfg.reppath				    # this should never be used again
 
 def usage():
-    print "usage: srs import <file.rpm>"
-    print "       srs pkglist <pkg>"
-    print "       srs update  <pkg>"
+    print "usage: srs import  <file.rpm>"
+    print "       srs pkglist <pkg> <version>"
+    print "       srs update  <pkg> <version>"
     print "       srs cook    <first.recipe> <second.recipe> ..."
     sys.exit(0)
-
-def displayPkgs(reppath, packageList):
-    for pkgName in packageList:
-	if os.path.isdir(reppath + "/pkgs/" + pkgName):
-	    files = os.listdir(reppath + "/pkgs/" + pkgName)
-	    for sub in files:
-		displayPkgs(reppath, [ pkgName + "/" + sub ])
-	else:
-	    pkgSet = package.PackageSet(reppath, pkgName)
-	    l = pkgSet.versionList()
-	    for version in l:
-		print "/%-39s %s" % (pkgName, version)
 
 if (len(sys.argv) < 2):
     usage()
 elif (sys.argv[1] == "import"):
-    for file in sys.argv[2:]:
-	importrpm.doImport(cfg.reppath, file)
+    print "this is broken"
 elif (sys.argv[1] == "cook"):
     for file in sys.argv[2:]:
         if file[0] != '/':
             file = "%s/%s" % (os.getcwd(), file)
-        pid = os.fork()
-        if not pid:
-            cook.cook(cfg, [os.path.dirname(file), cfg.sourcepath], file)
-        else:
-            (id, status) = os.waitpid(pid, 0);
-                
+	cook.cook(repos, cfg, file)
 elif (sys.argv[1] == "pkglist"):
-    if (len(sys.argv) == 2):
-	displayPkgs(cfg.reppath, os.listdir(cfg.reppath + "/pkgs"))
+    if len(sys.argv) >= 2 and len(sys.argv) <= 4:
+	args = [repos, cfg] + sys.argv[2:]
+	apply(display.displayPkgs, args)
     else:
-	displayPkgs(cfg.reppath, sys.argv[2:])
+	usage()
 elif (sys.argv[1] == "update"):
-    for pkg in sys.argv[2:]:
-	update.doUpdate(cfg, cfg.root, pkg, binaries = 1, sources = 1)
+    if len(sys.argv) >=3 and len(sys.argv) <= 4:
+	args = [repos, cfg] + sys.argv[2:]
+	apply(update.update, args)
+    else:
+	usage()
 elif (sys.argv[1] == "config"):
     if (len(sys.argv) > 2):
 	usage()

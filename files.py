@@ -14,7 +14,9 @@ import pwd
 import grp
 import util
 import types
+import zipfile
 import datastore
+from datastore import DataStore
 
 class FileMode:
 
@@ -103,49 +105,24 @@ class FileMode:
 	    self.theMtime = None
 	
 class File(FileMode):
-    def path(self, new = None):
-	if (new != None):
-	    l = os.path.split(new)
-	    self.dir(l[0])
-	    self.name(l[1])
-	
-	return self.dir() + '/' + self.name()
-
-    # path to the file in the repository
-    def pathInRep(self, reppath):
-	return reppath + "/files" + self.path()
-
-    def name(self, new = None):
-	if (new != None):
-	    self.theName = new
-
-	return self.theName
-
-    def dir(self, new = None):
-	if (new != None):
-	    self.theDir = new
-
-	return self.theDir
-
-    def version(self, new = None):
-	if (new != None):
-	    self.theVersion = new
-
-	return self.theVersion
-
-    def uniqueName(self):
-	return sha1helper.hashString(self.path)
 
     def infoLine(self):
 	return FileMode.infoLine(self)
 
-    def restore(self, reppath, root):
-	self.chmod(root)
+    def id(self, new = None):
+	if new:
+	    self.theId = new
 
-    def chmod(self, root):
-	os.chmod(root + self.path(), self.thePerms)
+	return self.theId
 
-    def setOwnerGroup(self, root):
+    def restore(self, target):
+	self.chmod(target)
+	self.setOwnerGroup(target)
+
+    def chmod(self, target):
+	os.chmod(target, self.thePerms)
+
+    def setOwnerGroup(self, target):
 	if os.getuid(): return
 
 	# root should set the file ownerships properly
@@ -154,16 +131,15 @@ class File(FileMode):
 
 	# FIXME: this needs to use lchown, which is in 2.3, and
 	# this should happen unconditionally
-	os.chown(root + self.path(), uid, gid)
+	os.chown(target, uid, gid)
 
     # copies a files contents into the repository, if necessary
-    def archive(self, reppath, root):
+    def archive(self, repos, source):
 	# most file types don't need to do this
 	pass
 
-    def __init__(self, path, newVersion = None, info = None):
-	self.path(path)
-	self.theVersion = newVersion
+    def __init__(self, id, info = None):
+	self.theId = id
 	FileMode.__init__(self, info)
 
 class SymbolicLink(File):
@@ -185,28 +161,27 @@ class SymbolicLink(File):
 
 	return 0
 
-    def chmod(self, root, path):
+    def chmod(self, target):
 	# chmod() on a symlink follows the symlink
 	pass
 
-    def setOwnerGroup(self, root, path):
+    def setOwnerGroup(self, target):
 	# chmod() on a symlink follows the symlink
 	pass
 
-    def restore(self, reppath, srcpath, root):
-	target = root + self.path()
+    def restore(self, repos, target):
+	if os.path.exists(target):
+	    os.unlink(target)
 	os.symlink(self.theLinkTarget, target)
+	File.restore(self, target)
 
-	# this doesn't actually do anything for a symlink
-	File.restore(self, reppath, root)
-
-    def __init__(self, path, version = None, info = None):
+    def __init__(self, id, info = None):
 	if (info):
 	    (self.theLinkTarget, info) = string.split(info, None, 1)
 	else:
 	    self.theLinkTarget = None
 
-	File.__init__(self, path, version, info)
+	File.__init__(self, id, info)
 
 class Socket(File):
 
@@ -219,8 +194,8 @@ class Socket(File):
     def copy(self, source, target):
 	pass
 
-    def __init__(self, path, version = None, info = None):
-	File.__init__(self, path, version, info)
+    def __init__(self, id, info = None):
+	File.__init__(self, id, info)
 
 class NamedPipe(File):
 
@@ -230,15 +205,14 @@ class NamedPipe(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, reppath, srcpath, root):
-	target = root + self.path()
-	if not os.path.exists(target):
-	    os.mkfifo(target)
+    def restore(self, repos, target):
+	if os.path.exists(target):
+	    os.unlink(target)
+	os.mkfifo(target)
+	File.restore(self, target)
 
-	File.restore(self, reppath, root)
-
-    def __init__(self, path, version = None, info = None):
-	File.__init__(self, path, version, info)
+    def __init__(self, id, info = None):
+	File.__init__(self, id, info)
 
 class Directory(File):
 
@@ -248,15 +222,14 @@ class Directory(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, reppath, srcpath, root):
-	target = root + self.path()
-	if not os.path.exists(target):
+    def restore(self, repos, target):
+	if not os.path.isdir(target):
 	    os.mkdir(target)
 
-	File.restore(self, reppath, root)
+	File.restore(self, target)
 
-    def __init__(self, path, version = None, info = None):
-	File.__init__(self, path, version, info)
+    def __init__(self, id, info = None):
+	File.__init__(self, id, info)
 
 class DeviceFile(File):
 
@@ -271,14 +244,15 @@ class DeviceFile(File):
 	
 	return 0
 
-    def restore(self, reppath, srcpath, root):
-	target = root + self.path()
-	if not os.path.exists(target):
-	    # FIXME os.mknod is in 2.3
-	    os.system("mknod %s %c %d %d" % (target, self.type, self.major,
-					    self.minor))
+    def restore(self, repos, target):
+	if os.path.exists(target):
+	    os.unlink(target)
 
-	File.restore(self, reppath, root)
+	# FIXME os.mknod is in 2.3
+	os.system("mknod %s %c %d %d" % (target, self.type, self.major,
+					self.minor))
+
+	File.restore(self, target)
 
     def majorMinor(self, type = None, major = None, minor = None):
 	if type:
@@ -288,14 +262,14 @@ class DeviceFile(File):
 	
 	return (self.type, self.major, self.minor)
 
-    def __init__(self, path, version = None, info = None):
+    def __init__(self, id, info = None):
 	if (info):
 	    (self.type, self.major, self.minor, info) = \
 		    string.split(info, None, 3)
 	    self.major = int(self.major)
 	    self.minor = int(self.minor)
 
-	File.__init__(self, path, version, info)
+	File.__init__(self, id, info)
 
 class RegularFile(File):
 
@@ -303,9 +277,6 @@ class RegularFile(File):
 	if (sha1 != None):
 	    self.thesha1 = sha1
 
-	return self.thesha1
-
-    def uniqueName(self):
 	return self.thesha1
 
     def infoLine(self):
@@ -317,60 +288,41 @@ class RegularFile(File):
 
 	return 0
 
-    def restore(self, reppath, srcpath, root):
-	target = root + self.path()
-	return self.doRestore(reppath, root, target)
-	
-    def doRestore(self, reppath, root, target):
-	store = datastore.DataStore(reppath + "/contents")
-	path = os.path.dirname(target)
-	util.mkdirChain(path)
-	f = open(target, "w")
-	srcFile = store.openFile(self.uniqueName())
-	f.write(srcFile.read())
-	f.close()
-	srcFile.close()
-	File.restore(self, reppath, root)
+    def restore(self, repos, target):
+	if os.path.exists(target):
+	    os.unlink(target)
+	else:
+	    path = os.path.dirname(target)
+	    util.mkdirChain(path)
 
-    def archive(self, reppath, root):
-	# no need to store the same contents twice; this happens regularly
-	# for source and packaged files (config files for example), as well
-	# as when the same file exists on multiple branches. we don't allow
-	# removing from the archive, so we don't need to ref count or anything
-	store = datastore.DataStore(reppath + "/contents")
-	if store.hasFile(self.uniqueName()): 
+	f = open(target, "w")
+	repos.pullFileContents(self.sha1(), f)
+	f.close()
+	File.restore(self, target)
+
+    def archive(self, repos, source):
+	if repos.hasFileContents(self.sha1()):
 	    return
 
-	file = open(root + "/" +  self.path(), "r")
-	store.addFile(file, self.uniqueName())
+	file = open(source, "r")
+	repos.newFileContents(self.sha1(), file)
 	file.close()
 
-    def __init__(self, path, version = None, info = None):
+    def __init__(self, id, info = None):
 	if (info):
 	    (self.thesha1, info) = string.split(info, None, 1)
 	else:
 	    self.thesha1 = None
 
-	File.__init__(self, path, version, info)
+	File.__init__(self, id, info)
 
 class SourceFile(RegularFile):
-
-    def restore(self, reppath, srcpath, root):
-	target = root + "/" + srcpath + "/" + os.path.basename(self.path())
-	return self.doRestore(reppath, root + "/" + srcpath, target)
-
-    def fileName(self):
-	return self.pkgName + "/" + os.path.basename(self.path())
-
-    def pathInRep(self, reppath):
-	return reppath + "/sources/" + self.fileName()
 
     def infoLine(self):
 	return "src %s %s" % (self.thesha1, File.infoLine(self))
 
-    def __init__(self, pkgName, path, version = None, info = None):
-	self.pkgName = pkgName
-	RegularFile.__init__(self, path, version, info)
+    def __init__(self, id, info = None):
+	RegularFile.__init__(self, id, info)
 
 class FileDB:
 
@@ -383,7 +335,7 @@ class FileDB:
 	    return None
 
 	f1 = self.f.getVersion(version)
-	lastFile = FileFromInfoLine(self.path, version, f1.read())
+	lastFile = FileFromInfoLine(f1.read(), self.fileId)
 	f1.close()
 
 	if file.same(lastFile):
@@ -391,25 +343,18 @@ class FileDB:
 
 	return None
 
-    def findVersion(self, file):
-	for (v, f) in self.versions.items():
-	    if type(f) == type(file) and f.same(file):
-		return (v, f)
-
-	return None
-
     def addVersion(self, version, file):
 	if self.f.hasVersion(version):
 	    raise KeyError, "duplicate version for database"
-	#else:
-	    #if file.pathInRep(self.reppath) + ".info" != self.dbfile:
-		#raise KeyError, "path mismatch for file database"
+	else:
+	    if file.id() != self.fileId:
+		raise KeyError, "file id mismatch for file database"
 	
 	self.f.addVersion(version, "%s\n" % file.infoLine())
 
     def getVersion(self, version):
 	f1 = self.f.getVersion(version)
-	file = FileFromInfoLine(self.path, version, f1.read())
+	file = FileFromInfoLine(f1.read(), self.fileId)
 	f1.close()
 	return file
 
@@ -421,44 +366,39 @@ class FileDB:
     def __del__(self):
 	self.close()
 
-    # path is the *full* *absolute* path to the file in the repository
-    def __init__(self, reppath, path):
-	self.reppath = reppath
-
-	# strip off the leading /reppath/files or /reppath/sources
-	parts = string.split(path[len(reppath):], "/")
-	self.path = "/" + string.join(parts[2:], "/")
-
-	dbfile = path + ".info"
-	util.mkdirChain(os.path.dirname(dbfile))
-	if os.path.exists(dbfile):
-	    self.f = versioned.open(dbfile, "r+")
+    def __init__(self, dbpath, fileId):
+	self.fileId = fileId
+	store = DataStore(dbpath)
+	if store.hasFile(fileId):
+	    f = store.openFile(fileId, "r+")
 	else:
-	    self.f = versioned.open(dbfile, "w+")
+	    f = store.newFile(fileId)
 
-def FileFromFilesystem(pkgName, root, path, type = "auto"):
-    s = os.lstat(root + path)
+	self.f = versioned.open(f)
 
-    if (type == "src"):
-	f = SourceFile(pkgName, path)
-	f.sha1(sha1helper.hashFile(root + path))
+def FileFromFilesystem(path, id, type = None):
+    s = os.lstat(path)
+
+    if type == "src":
+	f = SourceFile(id)
+	f.sha1(sha1helper.hashFile(path))
     elif (stat.S_ISREG(s.st_mode)):
-	f = RegularFile(path)
-	f.sha1(sha1helper.hashFile(root + path))
+	f = RegularFile(id)
+	f.sha1(sha1helper.hashFile(path))
     elif (stat.S_ISLNK(s.st_mode)):
-	f = SymbolicLink(path)
-	f.linkTarget(os.readlink(root + path))
+	f = SymbolicLink(id)
+	f.linkTarget(os.readlink(path))
     elif (stat.S_ISDIR(s.st_mode)):
-	f = Directory(path)
+	f = Directory(id)
     elif (stat.S_ISSOCK(s.st_mode)):
-	f = Socket(path)
+	f = Socket(id)
     elif (stat.S_ISFIFO(s.st_mode)):
-	f = NamedPipe(path)
+	f = NamedPipe(id)
     elif (stat.S_ISBLK(s.st_mode)):
-	f = DeviceFile(path)
+	f = DeviceFile(id)
 	f.majorMinor("b", s.st_rdev >> 8, s.st_rdev & 0xff)
     elif (stat.S_ISCHR(s.st_mode)):
-	f = DeviceFile(path)
+	f = DeviceFile(id)
 	f.majorMinor("c", s.st_rdev >> 8, s.st_rdev & 0xff)
     else:
 	raise TypeError, "unsupported file type for %s" % path
@@ -470,27 +410,21 @@ def FileFromFilesystem(pkgName, root, path, type = "auto"):
 
     return f
 
-def FileFromInfoLine(path, version, infoLine):
+def FileFromInfoLine(infoLine, id):
     (type, infoLine) = string.split(infoLine, None, 1)
     if type == "f":
-	return RegularFile(path, version, infoLine)
+	return RegularFile(id, infoLine)
     elif type == "l":
-	return SymbolicLink(path, version, infoLine)
+	return SymbolicLink(id, infoLine)
     elif type == "d":
-	return Directory(path, version, infoLine)
+	return Directory(id, infoLine)
     elif type == "p":
-	return NamedPipe(path, version, infoLine)
+	return NamedPipe(id, infoLine)
     elif type == "v":
-	return DeviceFile(path, version, infoLine)
+	return DeviceFile(id, infoLine)
     elif type == "s":
-	return Socket(path, version, infoLine)
+	return Socket(id, infoLine)
     elif type == "src":
-	# just use the basename here; we don't need the /sources/pkgname bit
-	# of things; the base filename is all we need
-	#
-	# the pkgname "foo" isn't actually used; it will go away from
-	# here entirely when we make more progress on the repository
-	# format
-	return SourceFile("foo", os.path.basename(path), version, infoLine)
+	return SourceFile(id, infoLine)
     else:
 	raise KeyError, "bad infoLine %s" % infoLine

@@ -12,34 +12,20 @@ import versions
 # this is the repository's idea of a package
 class Package:
 
-    def addFile(self, path, version):
-	self.files["/files" + path] = version
-
-    def addSource(self, path, version):
-	self.files["/sources" + path] = version
+    def addFile(self, id, path, version):
+	self.files[id] = (path, version)
 
     def fileList(self):
 	l = []
-        paths = self.files.keys()
-        paths.sort()
-        for path in paths:
-	    if path[:6] == "/files":
-		l.append((path, self.files[path]))
-
-	return l
-
-    def sourceList(self):
-	l = []
-	for (path, file) in self.files.items():
-	    if path[:8] == "/sources":
-		l.append((path, file))
+	for (fileId, (path, version)) in self.files.items():
+	    l.append((fileId, path, version))
 
 	return l
 
     def formatString(self):
 	str = ""
-	for (file, version) in self.files.items():
-	    str = str + ("%s %s\n" % (file, version))
+	for (fileId, (path, version)) in self.files.items():
+	    str = str + ("%s %s %s\n" % (fileId, path, version.asString()))
 	return str
 
     def __init__(self, name):
@@ -50,22 +36,24 @@ class PackageFromFile(Package):
 
     def read(self, dataFile):
 	for line in dataFile.readLines():
-	    (path, version) = string.split(line)
+	    (fileId, path, version) = string.split(line)
 	    version = versions.VersionFromString(version)
-	    if path[:8] == "/sources":
-		self.addSource(path[8:], version)
-	    else:
-		self.addFile(path[6:], version)
+	    self.addFile(fileId, path, version)
 
     def __init__(self, name, dataFile):
 	Package.__init__(self, name)
 	self.read(dataFile)
 
+def stripNamespace(namespace, str):
+    if str[:len(namespace) + 1] == namespace + "/":
+	return str[len(namespace) + 1:]
+    return str
+
 # this is a set of all of the versions of a single packages 
 class PackageSet:
     def getVersion(self, version):
 	f1 = self.f.getVersion(version)
-	p = PackageFromFile(name, f1)
+	p = PackageFromFile(self.name, f1)
 	f1.close()
 	return p
 
@@ -79,11 +67,7 @@ class PackageSet:
 	return self.f.versionList()
 
     def getLatestPackage(self, branch):
-	version = self.f.findLatestVersion(branch)
-	f1 = self.f.getVersion(version)
-	p = PackageFromFile(self.name, f1)
-	f1.close()
-	return p
+	return self.getVersion(self.f.findLatestVersion(branch))
 
     def getLatestVersion(self, branch):
 	return self.f.findLatestVersion(branch)
@@ -95,13 +79,16 @@ class PackageSet:
     def __del__(self):
 	if self.f: self.close()
 
-    def __init__(self, reppath, name):
+    def __init__(self, dbpath, name, mode = "r"):
 	self.name = name
-	self.pkgPath = reppath + "/pkgs/" + self.name
+	self.pkgPath = dbpath + self.name
 	self.packages = {}
 
 	util.mkdirChain(os.path.dirname(self.pkgPath))
-	if os.path.exists(self.pkgPath):
+
+	if mode == "r":
+	    self.f = versioned.open(self.pkgPath, "r")
+	elif os.path.exists(self.pkgPath):
 	    self.f = versioned.open(self.pkgPath, "r+")
 	else:
 	    self.f = versioned.open(self.pkgPath, "w+")
@@ -156,15 +143,12 @@ def Auto(name, root):
     return set
 
 def autoVisit(arg, dir, files):
-    (root, pkg, man) = arg
-    dir = dir[len(root):]
+    (root, buildPkg, manPkg) = arg
+
     for file in files:
-        if dir:
-            path = dir + '/' + file
-        else:
-            path = '/' + file
+	path = dir[len(root):] + "/" + file
 	if not os.path.isdir(path):
 	    if path[:15] == "/usr/share/man/":
-		man.addFile(path)
+		manPkg.addFile(path)
 	    else:
-		pkg.addFile(path)
+		buildPkg.addFile(path)
