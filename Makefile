@@ -93,4 +93,10 @@ clean: clean-subdirs default-clean
 	rm -f _sqlite.so
 	rm -rf sqlite
 
+tag:
+	cvs tag conary-`echo $(VERSION) | sed 's/\./_/g'`
+
+force-tag:
+	cvs tag -f conary-`echo $(VERSION) | sed 's/\./_/g'`
+
 include Make.rules
