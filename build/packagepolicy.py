@@ -1538,8 +1538,14 @@ class Provides(policy.Policy):
                 # This is for libraries that don't really include a soname,
                 # but programs linked against them require a soname
                 main = provision[7:].strip()
+                soflags = []
+                if '(' in main:
+                    # get list of arbitrary flags
+                    main, rest = main.split('(')
+                    soflags.extend(rest[:-1].split())
                 abi = m.contents['abi']
-                flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in abi[1] ]
+                soflags.extend(abi[1])
+                flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in soflags ]
                 pkg.providesMap[path].addDep(deps.SonameDependencies,
                     deps.Dependency('/'.join((abi[0], main)), flags))
             return

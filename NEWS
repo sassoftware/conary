@@ -5,6 +5,8 @@ Changes in 0.50.7:
     conflict with local configuration changes.
   * groups are no longer allowed to contain redirects
   * added setLabelPath to group recipe
+  * Allow r.Provides("soname: libfoo.so(FLAGS)", "/some/file") (added
+    the "(FLAGS)" part).
 
 Changes in 0.50.6:
   * conaryclient.updateChangeSet should have recursed by default
