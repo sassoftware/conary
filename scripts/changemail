@@ -53,4 +53,4 @@ if [ -z "$repPath" ]; then
 fi
 
 conary src rdiff --reppath $repPath $trove -1 $version | \
-    mail -s "$trove $version" johnsonm@lambchop.rdu.specifixinc.com
+    mail -s "$trove $version" distro-commits@lambchop.rdu.specifixinc.com
