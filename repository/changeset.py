@@ -111,6 +111,11 @@ class ChangeSet:
 	for (pkgName, version) in self.oldPackages:
 	    print pkgName, "removed", version.asString(cfg.defaultbranch)
 
+    def dump(self):
+	import srscfg, sys
+	cfg = srscfg.SrsConfiguration()
+	self.formatToFile(cfg, sys.stdout)
+
     def getFileChange(self, fileId):
 	return self.files[fileId][2]
 
