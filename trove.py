@@ -47,9 +47,13 @@ class Trove:
     def changeFlavor(self, flavor):
         self.flavor = flavor
 
+    def isRedirect(self):
+        return self.redirect
+
     def addFile(self, pathId, path, version, fileId):
 	assert(len(pathId) == 16)
 	assert(fileId is None or len(fileId) == 20)
+        assert(not self.redirect)
 	self.idMap[pathId] = (path, fileId, version)
 
     # pathId is the only thing that must be here; the other fields could
@@ -149,6 +153,11 @@ class Trove:
 	@type pkgCS: TroveChangeSet
 	@rtype: dict
 	"""
+
+	self.redirect = pkgCS.getIsRedirect()
+        if self.redirect:
+            # we don't explicitly remove files for redirects
+            self.idMap = None
 
 	fileMap = {}
 
@@ -254,13 +263,15 @@ class Trove:
 				      them.getVersion(),	
 				      self.getVersion(),
 				      them.getFlavor(), self.getFlavor(),
-				      absolute = False)
+				      absolute = False,
+                                      isRedirect = self.redirect)
 	else:
 	    themMap = {}
 	    chgSet = TroveChangeSet(self.name, self.changeLog,
 				      None, self.getVersion(),
 				      None, self.getFlavor(),
-				      absolute = absolute)
+				      absolute = absolute,
+                                      isRedirect = self.redirect)
 
 	# dependency and flavor information is always included in total;
 	# this lets us do dependency checking w/o having to load packages
@@ -273,42 +284,45 @@ class Trove:
 	sameIds = {}
 	filesNeeded = []
 
-	allIds = self.idMap.keys() + themMap.keys()
-	for pathId in allIds:
-	    inSelf = self.idMap.has_key(pathId)
-	    inThem = themMap.has_key(pathId)
-	    if inSelf and inThem:
-		sameIds[pathId] = None
-	    elif inSelf:
-		addedIds.append(pathId)
-	    else:
-		removedIds.append(pathId)
+        if not self.redirect:
+            # we just ignore file information for redirects
+            allIds = self.idMap.keys() + themMap.keys()
+            for pathId in allIds:
+                inSelf = self.idMap.has_key(pathId)
+                inThem = themMap.has_key(pathId)
+                if inSelf and inThem:
+                    sameIds[pathId] = None
+                elif inSelf:
+                    addedIds.append(pathId)
+                else:
+                    removedIds.append(pathId)
 
-	for pathId in removedIds:
-	    chgSet.oldFile(pathId)
+            for pathId in removedIds:
+                chgSet.oldFile(pathId)
 
-	for pathId in addedIds:
-	    (selfPath, selfFileId, selfVersion) = self.idMap[pathId]
-	    filesNeeded.append((pathId, None, None, selfFileId, selfVersion))
-	    chgSet.newFile(pathId, selfPath, selfFileId, selfVersion)
+            for pathId in addedIds:
+                (selfPath, selfFileId, selfVersion) = self.idMap[pathId]
+                filesNeeded.append((pathId, None, None, selfFileId, 
+                                    selfVersion))
+                chgSet.newFile(pathId, selfPath, selfFileId, selfVersion)
 
-	for pathId in sameIds.keys():
-	    (selfPath, selfFileId, selfVersion) = self.idMap[pathId]
-	    (themPath, themFileId, themVersion) = themMap[pathId]
+            for pathId in sameIds.keys():
+                (selfPath, selfFileId, selfVersion) = self.idMap[pathId]
+                (themPath, themFileId, themVersion) = themMap[pathId]
 
-	    newPath = None
-	    newVersion = None
+                newPath = None
+                newVersion = None
 
-	    if selfPath != themPath:
-		newPath = selfPath
+                if selfPath != themPath:
+                    newPath = selfPath
 
-	    if selfVersion != themVersion or themFileId != selfFileId:
-		newVersion = selfVersion
-		filesNeeded.append((pathId, themFileId, themVersion, 
-                                    selfFileId, selfVersion))
+                if selfVersion != themVersion or themFileId != selfFileId:
+                    newVersion = selfVersion
+                    filesNeeded.append((pathId, themFileId, themVersion, 
+                                        selfFileId, selfVersion))
 
-	    if newPath or newVersion:
-		chgSet.changedFile(pathId, newPath, selfFileId, newVersion)
+                if newPath or newVersion:
+                    chgSet.changedFile(pathId, newPath, selfFileId, newVersion)
 
 	# now handle the packages we include
 	added = {}
@@ -546,7 +560,7 @@ class Trove:
     def getChangeLog(self):
         return self.changeLog
 
-    def __init__(self, name, version, flavor, changeLog):
+    def __init__(self, name, version, flavor, changeLog, isRedirect = False):
         assert(flavor is not None)
 	self.idMap = {}
 	self.name = name
@@ -556,6 +570,7 @@ class Trove:
         self.provides = None
         self.requires = None
 	self.changeLog = changeLog
+        self.redirect = isRedirect
 
 class ReferencedTroveSet(dict, streams.InfoStream):
 
@@ -714,6 +729,7 @@ _STREAM_TCS_NEW_FILES       =  9
 _STREAM_TCS_CHG_FILES       = 10
 _STREAM_TCS_OLD_FLAVOR      = 11
 _STREAM_TCS_NEW_FLAVOR      = 12
+_STREAM_TCS_IS_REDIRECT     = 13
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
@@ -734,6 +750,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         _STREAM_TCS_CHG_FILES   : (ReferencedFileList,         "changedFiles"),
         _STREAM_TCS_OLD_FLAVOR  : (streams.DependenciesStream, "oldFlavor"   ),
         _STREAM_TCS_NEW_FLAVOR  : (streams.DependenciesStream, "newFlavor"   ),
+        _STREAM_TCS_IS_REDIRECT : (streams.ByteStream,         "isRedirect"  ),
      }
 
     """
@@ -901,6 +918,13 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
     def setProvides(self, provides):
 	self.provides.set(provides)
 
+    def setIsRedirect(self, val):
+        assert(type(val) == bool)
+        self.isRedirect.set(val)
+
+    def getIsRedirect(self):
+        return self.isRedirect.value()
+
     def getProvides(self):
         p = self.provides.value()
         if not p:
@@ -925,7 +949,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 class TroveChangeSet(AbstractTroveChangeSet):
 
     def __init__(self, name, changeLog, oldVersion, newVersion, 
-		 oldFlavor, newFlavor, absolute = 0):
+		 oldFlavor, newFlavor, absolute = 0, isRedirect = False):
 	AbstractTroveChangeSet.__init__(self)
 	assert(isinstance(newVersion, versions.VersionSequence))
 	assert(isinstance(newFlavor, deps.DependencySet))
@@ -943,6 +967,7 @@ class TroveChangeSet(AbstractTroveChangeSet):
         self.requires.set(None)
 	self.oldFlavor.set(oldFlavor)
 	self.newFlavor.set(newFlavor)
+        self.isRedirect.set(isRedirect)
 
 class ThawTroveChangeSet(AbstractTroveChangeSet):
 
