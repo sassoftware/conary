@@ -2,20 +2,6 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-from filecontainer import FileContainer
-import __builtin__
-import time
-import string
-import versions
-import types
-import dbhash
-
-_FILE_MAP = "FILEMAP"
-_VERSION_INFO = "VINFO-%s-%s"
-_BRANCH_MAP = "BMAP-%s"
-_CONTENTS = "%s %s"
-_BRANCH_NICK = "BNICK-%s-%s"
-
 """
 implements a set of versioned files on top of a single hashed db file
 
@@ -36,6 +22,20 @@ The _BRANCH_NICK stores a mapping from a branch nickname to a list of
 the versions are expected to be Version objects as defined by the versions
 module
 """
+
+from filecontainer import FileContainer
+import __builtin__
+import time
+import string
+import versions
+import types
+import dbhash
+
+_FILE_MAP = "FILEMAP"
+_VERSION_INFO = "VINFO-%s-%s"
+_BRANCH_MAP = "BMAP-%s"
+_CONTENTS = "%s %s"
+_BRANCH_NICK = "BNICK-%s-%s"
 
 class FalseFile:
     """
