@@ -704,7 +704,7 @@ class ChangeSetFromFile(ChangeSet):
             # cache all config file contents
             if tag != ChangedFileTypes.diff:
                 break
-            #if tagInfo[0] == "1":
+            #if tagInfo[0] == "0":
                 #break
 
             cont = filecontents.FromFile(f)
