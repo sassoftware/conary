@@ -159,7 +159,7 @@ class ChangeSet:
 	for pkg in self.newPackages.itervalues():
 	    pkg.formatToFile(self, cfg, f)
 	for (pkgName, version) in self.oldPackages:
-	    f.write(pkgName, "removed\n", 
+	    f.write("removed %s %s\n" %
 		    (pkgName, version.asString(cfg.defaultbranch)))
 
     def dump(self):
