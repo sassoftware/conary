@@ -1,3 +1,6 @@
+Changes in 0.10.6:
+  * Lots of bug fixes for distributed branching
+
 Changes in 0.10.5:
   * The local database is used for fetching file information (but not
     contents), reducing network traffic when creating change sets
