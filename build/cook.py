@@ -36,6 +36,7 @@ import sys
 import tempfile
 import time
 import types
+import updatecmd
 import util
 import versions
 
@@ -110,7 +111,7 @@ class _IdGen:
 # -------------------- public below this line -------------------------
 
 def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None, 
-	       prep=True, macros={}, buildBranch = None):
+	       prep=True, macros={}, buildBranch = None, targetVersion = None):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -134,6 +135,9 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     @param buildBranch: branch to build on; if present buildLabel is ignored.
     this branch does not need to contain timestamps; they'll be looked up if
     they are missing.
+    @param targetVersion: version to use for the cooked troves; if None (the
+    default), the version used is the next version on the buildBranch 
+    @type targetVersion: versions.Version
     
     @type buildBranch: versions.Version
     @rtype: list of strings
@@ -190,13 +194,14 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 
     if issubclass(recipeClass, recipe.PackageRecipe):
 	ret = cookPackageObject(repos, cfg, recipeClass, buildBranch,
-                                prep = prep, macros = macros)
+                                prep = prep, macros = macros,
+				targetVersion = targetVersion)
     elif issubclass(recipeClass, recipe.GroupRecipe):
 	ret = cookGroupObject(repos, cfg, recipeClass, buildBranch, 
-			      macros = macros)
+			      macros = macros, targetVersion = targetVersion)
     elif issubclass(recipeClass, recipe.FilesetRecipe):
 	ret = cookFilesetObject(repos, cfg, recipeClass, buildBranch, 
-				macros = macros)
+				macros = macros, targetVersion = targetVersion)
     else:
         raise AssertionError
 
@@ -216,7 +221,8 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 
     return built
 
-def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
+def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
+		    targetVersion = None):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -234,6 +240,9 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
     @param macros: set of macros for the build
     @type macros: dict
     @rtype: tuple
+    @param targetVersion: version to use for the cooked troves; if None (the
+    default), the version used is the next version on the buildBranch 
+    @type targetVersion: versions.Version
     """
 
     fullName = recipeClass.name
@@ -262,9 +271,11 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
 		    if flavor:
 			grpFlavor.union(flavor)
 
-    nextVersion = helper.nextVersion(repos, fullName, recipeClass.version, 
-				     grpFlavor, buildBranch, binary = True)
-    grp.changeVersion(nextVersion)
+    if not targetVersion:
+	targetVersion = helper.nextVersion(repos, fullName, 
+					   recipeClass.version, grpFlavor, 
+					   buildBranch, binary = True)
+    grp.changeVersion(targetVersion)
 
     grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet = changeset.ChangeSet()
@@ -273,7 +284,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
     built = [ (grp.getName(), grp.getVersion().asString()) ]
     return (changeSet, built, None)
 
-def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={}):
+def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
+		      targetVersion = None):
     """
     Turns a fileset recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -289,6 +301,9 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={}):
     @type buildBranch: versions.Version
     @param macros: set of macros for the build
     @type macros: dict
+    @param targetVersion: version to use for the cooked troves; if None (the
+    default), the version used is the next version on the buildBranch 
+    @type targetVersion: versions.Version
     @rtype: tuple
     """
 
@@ -314,10 +329,12 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={}):
 	# source of an update, but it saves sending files across the
 	# network for no reason
 
-    nextVersion = helper.nextVersion(repos, fullName, recipeClass.version, 
-				     flavor, buildBranch, binary = True)
+    if not targetVersion:
+	targetVersion = helper.nextVersion(repos, fullName, 
+					   recipeClass.version, flavor, 
+					   buildBranch, binary = True)
 
-    fileset = package.Trove(fullName, nextVersion, flavor, None)
+    fileset = package.Trove(fullName, targetVersion, flavor, None)
     for (fileId, path, version) in l:
 	fileset.addFile(fileId, path, version)
 
@@ -327,8 +344,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={}):
     built = [ (fileset.getName(), fileset.getVersion().asString()) ]
     return (changeSet, built, None)
 
-def cookPackageObject(repos, cfg, recipeClass, buildBranch, 
-		      prep=True, macros={}):
+def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True, 
+		      macros={}, targetVersion = None):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -350,6 +367,9 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     @type prep: boolean
     @param macros: set of macros for the build
     @type macros: dict
+    @param targetVersion: version to use for the cooked troves; if None (the
+    default), the version used is the next version on the buildBranch 
+    @type targetVersion: versions.Version
     @rtype: tuple
     """
 
@@ -444,15 +464,16 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     for buildPkg in bldList:
 	flavor.union(buildPkg.flavor)
 
-    nextVersion = helper.nextVersion(repos, grpName, recipeClass.version, 
-				     flavor, buildBranch, binary = True)
+    if not targetVersion:
+	targetVersion = helper.nextVersion(repos, grpName, recipeClass.version, 
+					   flavor, buildBranch, binary = True)
 
-    grp = package.Trove(grpName, nextVersion, flavor, None)
+    grp = package.Trove(grpName, targetVersion, flavor, None)
 
     packageList = []
     for buildPkg in bldList:
 	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, 
-					nextVersion, ident)
+					targetVersion, ident)
 
 	requires.union(p.getRequires())
 	provides.union(p.getProvides())
@@ -465,14 +486,15 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     grp.setProvides(provides)
 
     changeSet = changeset.CreateFromFilesystem(packageList)
-    changeSet.addPrimaryPackage(grpName, nextVersion, None)
+    changeSet.addPrimaryPackage(grpName, targetVersion, None)
 
     grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet.newPackage(grpDiff)
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
-def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None):
+def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
+	     emerge = False):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -495,7 +517,13 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None):
 
     buildList = []
     changeSetFile = None
+    targetVersion = None
+
     if item.endswith('.recipe') and os.path.isfile(item):
+	if emerge:
+	    raise CookError, \
+		("troves must be emerged from directly from a repository")
+
 	recipeFile = item
 
 	if recipeFile[0] != '/':
@@ -510,24 +538,38 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None):
         changeSetFile = "%s-%s.ccs" % (recipeClass.name, recipeClass.version)
     else:
         try:
-            loader = recipe.recipeLoaderFromSourceComponent(item,
-                                                            item + '.recipe',
-                                                            cfg, repos)
+            (loader, version) = recipe.recipeLoaderFromSourceComponent(item,
+					    item + '.recipe', cfg, repos)[0:2]
         except recipe.RecipeFileError, msg:
             raise CookError(str(msg))
 
         recipeClass = loader.getRecipe()
+
+	if emerge:
+	    (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % item)
+	    os.close(fd)
+	    targetVersion = version.fork(versions.EmergeBranch(),
+				         sameVerRel = True)
 
     built = None
     try:
         troves = cookObject(repos, cfg, recipeClass, cfg.buildLabel,
                             changeSetFile = changeSetFile,
                             prep = prep, macros = macros,
-			    buildBranch = buildBranch)
+			    buildBranch = buildBranch,
+			    targetVersion = targetVersion)
         if troves:
             built = (tuple(troves), changeSetFile)
     except repository.RepositoryError, e:
+	if emerge:
+	    os.unlink(changeSetFile)
         raise CookError(str(e))
+
+    if emerge:
+	try:
+	    updatecmd.doUpdate(None, cfg, changeSetFile)
+	finally:
+	    os.unlink(changeSetFile)
 
     return built
 
@@ -541,7 +583,7 @@ class CookError(Exception):
     def __str__(self):
 	return repr(self)
 
-def cookCommand(cfg, args, prep, macros, buildBranch = None):
+def cookCommand(cfg, args, prep, macros, buildBranch = None, emerge = False):
     # this ensures the repository exists
     repos = helper.openRepository(cfg.repositoryMap)
 
@@ -559,7 +601,8 @@ def cookCommand(cfg, args, prep, macros, buildBranch = None):
 	    # and if we do not create core files we will not package them
 	    resource.setrlimit(resource.RLIMIT_CORE, (0,0))
             try:
-                built = cookItem(repos, cfg, item, prep=prep, macros=macros)
+                built = cookItem(repos, cfg, item, prep=prep, macros=macros,
+				 emerge = emerge)
             except CookError, msg:
 		log.error(str(msg))
                 sys.exit(1)

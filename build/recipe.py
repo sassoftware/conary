@@ -241,7 +241,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     finally:
         os.unlink(recipeFile)
     
-    return loader
+    return (loader, sourceComponent.getVersion())
 
 def loadRecipe(file, sourcecomponent=None):
     callerGlobals = inspect.stack()[1][0].f_globals
@@ -260,10 +260,9 @@ def loadRecipe(file, sourcecomponent=None):
         loader = RecipeLoader(localfile)
     except IOError, err:
         if err.errno == errno.ENOENT:
-            loader = recipeLoaderFromSourceComponent(sourcecomponent,
-                                                     file,
-                                                     cfg,
-                                                     repos)
+            loader = recipeLoaderFromSourceComponent(sourcecomponent, file, 
+						     cfg, repos)[0]
+
     for name, recipe in loader.allRecipes().items():
         # hide all recipes from RecipeLoader - we don't want to return
         # a recipe that has been loaded by loadRecipe

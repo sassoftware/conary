@@ -20,8 +20,10 @@ from repository import repository
 import sys
 import util
 
-def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False,
+def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
 	     tagScript = None, keepExisting = False):
+    db = database.Database(cfg.root, cfg.dbPath)
+
     cs = None
     if not os.path.exists(cfg.root):
         util.mkdirChain(cfg.root)

@@ -52,7 +52,8 @@ except conarycfg.ConaryCfgError, e:
 def usage(rc = 1):
     print "usage: conary branch <newbranch> <branchfrom> [<trove>]"
     print "       conary changeset <pkg> [<oldver>] <newver> <outfile>"
-    print "       conary cook [--prep] [--debug-exceptions] [--macros file] <file.recipe>+"
+    print "       conary cook [--prep] [--debug-exceptions] [--macros file] <file.recipe|troveName>+"
+    print "       conary emerge <troveName>+"
     print "       conary commit       <changeset>"
     print "       conary erase        <pkgname> [<version>]"
     print "       conary localcs      <pkg> <outfile>"
@@ -107,12 +108,7 @@ def openRepository(repMap):
 	sys.exit(1)
 
 def openDatabase(root, path):
-    try:
-        db = database.Database(root, path)
-    except repository.repository.OpenError, e:
-        log.error('Unable to open database %s%s%s: %s', root, os.sep, path, str(e))
-        sys.exit(1)
-    return db
+    return database.Database(root, path)
 
 def realMain():
     argDef = {}
@@ -229,6 +225,12 @@ def realMain():
 	if argSet: return usage()
 
 	cook.cookCommand(cfg, otherArgs[2:], prep, macros)                
+    elif (otherArgs[1] == "emerge"):
+	log.setVerbosity(1)
+
+	if argSet: return usage()
+
+	cook.cookCommand(cfg, otherArgs[2:], False, {}, emerge = True)
     elif (otherArgs[1] == "erase"):
 	kwargs = {}
 
@@ -388,9 +390,8 @@ def realMain():
 	if argSet: return usage
 	if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	    repos = openRepository(cfg.repositoryMap)
-	    db = openDatabase(cfg.root, cfg.dbPath)
 
-	    args = [repos, db, cfg] + otherArgs[2:]
+	    args = [repos, cfg] + otherArgs[2:]
 	    updatecmd.doUpdate(*args, **kwargs)
 	else:
 	    return usage()
@@ -419,6 +420,8 @@ def main():
 	    "An unknown exception occured on the repository server:"
 	print >> sys.stderr, "\t%s" % str(e)
     except repository.repository.TroveMissing, e:
+	print >> sys.stderr, str(e)
+    except database.OpenError, e:
 	print >> sys.stderr, str(e)
 	    
 if __name__ == "__main__":

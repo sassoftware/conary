@@ -359,6 +359,15 @@ class LocalBranch(BranchName):
     def __init__(self):
 	BranchName.__init__(self, "localhost@local:LOCAL")
 
+class EmergeBranch(BranchName):
+
+    """
+    Class defining the emerge branch.
+    """
+
+    def __init__(self):
+	BranchName.__init__(self, "localhost@local:EMERGE")
+
 class Version(AbstractVersion):
 
     """

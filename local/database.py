@@ -618,3 +618,12 @@ class SourcePackageInstall(DatabaseError):
 
     def __str__(self):
 	return "cannot install a source package onto the local system"
+
+class OpenError(DatabaseError):
+
+    def __str__(self):
+        return 'Unable to open database %s: %s' % (self.path, self.msg)
+
+    def __init__(self, path, msg):
+	self.path = path
+	self.msg = msg

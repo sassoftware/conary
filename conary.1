@@ -149,6 +149,11 @@ operation, so take care.  The \fB--target-branch\fP option
 is only appropriate when you commit a \fBlocal changeset\fP
 to a repository.
 .TP
+.B emerge \fI<component>...\fP
+Builds the recipe for the given component (which it finds using the
+\fIbuildLabel\fP) onto the \fBlocalhost@local:EMERGE\fP branch
+and updates the local system to the new build.
+.TP
 .B conary source \fIsubcommand\fP
 Actions on source components, \fIexcept for \fBcook\fR, are
 subcommands on \fBconary source\fP, which can be abbreviated
