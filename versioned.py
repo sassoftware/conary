@@ -109,4 +109,12 @@ class File:
 
 def open(filename, mode):
     return File(filename, mode)
-	
+
+def latest(versionList):
+    # for now the lastest version is the last in this list
+
+    list = versionList[:]
+    list.sort()
+    return list[-1]
+
+

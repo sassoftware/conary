@@ -8,6 +8,13 @@ class Package:
     def addFile(self, path, version):
 	self.files[path] = version
 
+    def fileList(self):
+	l = []
+	for item in self.files.items():
+	    l.append(item)
+
+	return l
+
     def write(self, dataFile):
 	for (file, version) in self.files.items():
 	    dataFile.write("%s %s\n" % (file, version))
@@ -48,6 +55,10 @@ class PackageSet:
 
     def versionList(self):
 	return self.packages.keys()
+
+    def getLatest(self):
+	v = versioned.latest(self.packages.keys())
+	return (v, self.packages[v])
 	
     def __init__(self, dbpath, name):
 	self.name = name

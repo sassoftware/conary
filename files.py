@@ -167,7 +167,7 @@ class FileDB:
 
 	return None
 
-    def add(self, version, file):
+    def addVersion(self, version, file):
 	if self.versions.has_key(version):
 	    raise KeyError, "duplicate version for database"
 	else:
@@ -175,6 +175,9 @@ class FileDB:
 		raise KeyError, "path mismatch for file database"
 	
 	self.versions[version] = file
+
+    def getVersion(self, version):
+	return self.versions[version]
 
     def write(self):
 	f = versioned.open(self.dbfile, "w")
