@@ -267,19 +267,25 @@ class InstallSymlink:
 	os.symlink(self.fromFile %macros, dest)
 
     def __init__(self, fromFile, toFile):
+	# Note: this class is unusual in this set for not taking a tuple --
+	# but a tuple wouldn't make much sense, either
 	self.fromFile = fromFile
 	self.toFile = toFile
 
 class RemoveFiles:
 
     def doInstall(self, macros):
-	if self.recursive:
-	    util.rmtree("%s/%s" %(macros['destdir'], self.filespec %macros))
-	else:
-	    util.remove("%s/%s" %(macros['destdir'], self.filespec %macros))
+	for filespec in self.filespecs:
+	    if self.recursive:
+		util.rmtree("%s/%s" %(macros['destdir'], filespec %macros))
+	    else:
+		util.remove("%s/%s" %(macros['destdir'], filespec %macros))
 
-    def __init__(self, filespec, recursive=0):
-	self.filespec = filespec
+    def __init__(self, filespecs, recursive=0):
+	if type(filespecs) is str:
+	    self.filespecs = (filespecs,)
+	else:
+	    self.filespecs = filespecs
 	self.recursive = recursive
 
 class InstallDoc:
