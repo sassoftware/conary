@@ -106,9 +106,8 @@ class SqlDbRepository(repository.DataStoreRepository,
 
 	return file
 
-    def findFileVersion(self, troveName, troveVersion, fileId, fileVersion):
-        return self.db.findFileVersion(troveName, troveVersion,
-                                       fileId, fileVersion)
+    def findFileVersion(self, fileId, fileVersion):
+        return self.db.findFileVersion(fileId, fileVersion)
 
     def getFileVersions(self, l):
 	return self.db.iterFiles(l)
@@ -148,18 +147,6 @@ class SqlDbRepository(repository.DataStoreRepository,
     def eraseFileVersion(self, fileId, version):
 	# files get removed with their troves
 	pass
-
-    def eraseTroves(self, eraseList, tagScript = None):
-	cs = changeset.ChangeSet()
-
-	for (name, version, flavor) in eraseList:
-	    outerTrove = self.getTrove(name, version, flavor)
-
-	    for trove in self.walkTroveSet(outerTrove, ignoreMissing = True):
-		cs.oldPackage(trove.getName(), trove.getVersion(), 
-			      trove.getFlavor())
-
-	self.commitChangeSet(cs, tagScript = tagScript)
 
     def writeAccess(self):
         return os.access(self.dbpath, os.W_OK)
