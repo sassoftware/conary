@@ -205,7 +205,7 @@ class LocalRepository(Repository):
 	    if branchedTroves.has_key(troveName): continue
 	    branchedTroves[troveName] = 1
 	    if not self.hasPackage(troveName):
-		log.warning("pacakge %s does not exist" % troveName)
+		log.warning("package %s does not exist" % troveName)
 		continue
 
 	    list = []
