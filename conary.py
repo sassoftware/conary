@@ -59,7 +59,7 @@ def usage(rc = 1):
     print "       conary repquery     <pkgname>[=<version>]*"
     print "       conary rblist"
     print "       conary rollback     <rollback>"
-    print "       conary showcs       <changeset>"
+    print "       conary showcs       <changeset> [trove[=<version>]]"
     print "       conary update       <pkgname>[=<version>]* <changeset>*"
     print "       conary usage"
     print "       conary --version"
