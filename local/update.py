@@ -594,6 +594,7 @@ class FilesystemJob:
             # get the baseFile which was originally installed
             (baseFilePath, baseFileId, baseFileVersion) = basePkg.getFile(pathId)
             baseFile = repos.getFileVersion(pathId, baseFileId, baseFileVersion)
+            assert(baseFile.fileId() == baseFileId)
             
             # link groups come from the database; they aren't inferred from
             # the filesystem
@@ -606,6 +607,8 @@ class FilesystemJob:
                 # the file was stored as a diff
                 headFile = baseFile.copy()
                 headFile.twm(headChanges, headFile)
+                # verify that the merge yielded the correct fileId
+                assert(headFile.fileId() == headFileId)
             else:
                 # the file was stored frozen. this happens when the file
                 # type changed between versions
