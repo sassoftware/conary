@@ -18,7 +18,7 @@ def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
     if pkg:
 	list = [ pkg ]
     else:
-	list = repos.getAllPackageNames()
+	list = repos.getAllTroveNames()
 	list.sort()
 
     for pkgName in list:

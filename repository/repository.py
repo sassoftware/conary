@@ -33,7 +33,7 @@ class Repository:
 
     ### Package access functions
 
-    def getAllPackageNames(self):
+    def getAllTroveNames(self):
 	return self.pkgDB.fileList()
 
     def hasPackage(self, pkg):
