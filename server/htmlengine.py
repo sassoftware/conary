@@ -158,7 +158,7 @@ Choose a branch: %s
         licenses.sort()
         categories = [x for x in TroveCategories.values() if x.startswith('Topic') and '::' in x]
         categories.sort()
-
+        
         self.writeFn("""
 <h4>Branch: %s</h4>
 <h4>Metadata revision: %s</h4>
@@ -175,15 +175,15 @@ Choose a branch: %s
 <input type="hidden" name="troveName" value="%s" />
 </form>
 """     % (branchStr, versionStr,
-           metadata[MDClass.SHORT_DESC][0],
-           metadata[MDClass.LONG_DESC][0],
-           self.makeSelect(metadata[MDClass.URL], "urlList", size=4,
+           metadata["shortDesc"][0],
+           metadata["longDesc"][0],
+           self.makeSelect(metadata["url"], "urlList", size=4,
                            expand="53%", multiple=True,
                            onClick="setValue('urlList', 'newUrl')"),
            self.makeSelectAppender("newUrl", "urlList"),
-           self.makeSelect(metadata[MDClass.LICENSE], "licenseList", size=4, expand="53%", multiple=True),
+           self.makeSelect(metadata["license"], "licenseList", size=4, expand="53%", multiple=True),
            self.makeSelectAppenderList("newLicense", "licenseList", licenses),
-           self.makeSelect(metadata[MDClass.CATEGORY], "categoryList", size=4, expand="53%", multiple=True),
+           self.makeSelect(metadata["category"], "categoryList", size=4, expand="53%", multiple=True),
            self.makeSelectAppenderList("newCategory", "categoryList", categories), 
            branchFrz, troveName)
           )

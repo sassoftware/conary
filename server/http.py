@@ -150,11 +150,11 @@ class HttpHandler(HtmlEngine):
         # fill a stub
         if not md:
             md = {
-                    MDClass.SHORT_DESC: [ "" ],
-                    MDClass.LONG_DESC:  [ "" ],
-                    MDClass.URL:        [],
-                    MDClass.LICENSE:    [],
-                    MDClass.CATEGORY:   [],
+                    "shortDesc":  [ "" ],
+                    "longDesc":   [ "" ],
+                    "url":        [],
+                    "license":    [],
+                    "category":   [],
                  }
 
         self.htmlMetadataEditor(troveName, branch, md)
