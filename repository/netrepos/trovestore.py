@@ -726,6 +726,9 @@ class TroveStore:
 	if not versionId: return False
 	return self.fileStreams.has_key((fileId, versionId))
 
+    def resolveRequirements(self, label, depSetList):
+        return self.depTables.resolve(label, depSetList)
+
     def eraseFile(Self, fileId, fileVersion):
 	# we automatically remove files when no troves reference them. 
 	# cool, huh?

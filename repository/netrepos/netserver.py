@@ -317,6 +317,24 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	return self.repos.iterAllTroveNames()
 
+    def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
+	if not self.auth.check(authToken, write = False):
+	    raise InsufficientPermission
+
+	requires = {}
+	for dep in requiresList:
+	    requires[self.toDepSet(dep)] = dep
+
+        label = self.toLabel(label)
+
+	sugDict = self.repos.resolveRequirements(label, requires.keys())
+
+	result = {}
+	for (key, val) in sugDict.iteritems():
+            result[requires[key]] = val
+
+        return result
+
     def prepareChangeSet(self, authToken, clientVersion):
 	# make sure they have a valid account and permission to commit to
 	# *something*

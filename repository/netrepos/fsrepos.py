@@ -331,6 +331,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	return d
 
+    def resolveRequirements(self, label, depSetList):
+        return self.troveStore.resolveRequirements(label, depSetList)
+
     def getFileContents(self, troveName, troveVersion, troveFlavor, 
 		        path, fileVersion, fileObj):
 	# the get trove netclient provides doesn't work with a 
