@@ -15,7 +15,6 @@ from datastore import DataStore
 
 class FileMode:
 
-    # new can be an integer file mode or a string (ls style) listing
     def perms(self, new = None):
 	if (new != None and new != "-"):
 	    self.thePerms = new
@@ -41,8 +40,8 @@ class FileMode:
 	return self.theMtime
 
     def infoLine(self):
-	return "%o %s %s %s" % (self.thePerms, self.theOwner, self.theGroup,
-				self.theMtime)
+	return "0%o %s %s %s" % (self.thePerms, self.theOwner, self.theGroup,
+				 self.theMtime)
 
     def diff(self, them):
 	if not them:
@@ -76,7 +75,7 @@ class FileMode:
 	if p == "-": 
 	    p = None
 	else:
-	    p = int(p)
+	    p = int(p, 8)
 
 	self.perms(p)
 	self.owner(o)
