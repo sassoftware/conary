@@ -9,7 +9,7 @@ import commit
 import os
 import util
 
-def cook(reppath, srcdirs, builddir, recipeFile):
+def cook(cfg, srcdirs, recipeFile):
     classList = recipe.RecipeLoader(recipeFile)
 
     if recipeFile[0] != "/":
@@ -20,7 +20,7 @@ def cook(reppath, srcdirs, builddir, recipeFile):
 
 	recp = theClass()
 
-	ourBuildDir = builddir + "/" + recp.name
+	ourBuildDir = cfg.buildpath + "/" + recp.name
 
 	recp.setup()
 	recp.unpackSources(srcdirs, ourBuildDir)
@@ -40,8 +40,10 @@ def cook(reppath, srcdirs, builddir, recipeFile):
 		f = files.FileFromFilesystem(recp.name, rootDir, filePath)
 		fileList.append(f)
 
-	    commit.finalCommit(reppath, recp.name + "/" + name, recp.version, 
-			       rootDir, fileList)
+	    commit.finalCommit(cfg.reppath, 
+			   cfg.packagenamespace + "/" + recp.name + "/" + name, 
+			   recp.version, 
+			   rootDir, fileList)
 
 	f = files.FileFromFilesystem(recp.name, "/", recipeFile, "src")
 	fileList = [ f ]
@@ -50,5 +52,8 @@ def cook(reppath, srcdirs, builddir, recipeFile):
 	    f = files.FileFromFilesystem(recp.name, "/", src, "src")
 	    fileList.append(f)
 
-	commit.finalCommit(reppath, recp.name + "/sources", recp.version,
-			    "/", fileList)
+	commit.finalCommit(cfg.reppath, 
+			   cfg.packagenamespace + "/" + recp.name + "/sources",
+			   recp.version, "/", fileList)
+
+	recp.cleanup(ourBuildDir, rootDir)
