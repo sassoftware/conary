@@ -134,7 +134,7 @@ class NormalizeManPages(policy.Policy):
 			print '+ replacing %s (%s) with symlink ../%s' \
 			      %(name, match.group(0), match.group(1))
 			os.remove(path)
-			os.symlink('../'+match.group(1), path)
+			os.symlink(os.path.normpath('../'+match.group(1)), path)
 
     def _gzsymlink(self, dirname, names):
 	for name in names:
@@ -147,7 +147,7 @@ class NormalizeManPages(policy.Policy):
 		    contents = contents + '.gz'
 		if not path.endswith('.gz'):
 		    path = path + '.gz'
-		os.symlink(contents, path)
+		os.symlink(os.path.normpath(contents), path)
 
     def __init__(self, *args, **keywords):
 	policy.Policy.__init__(self, *args, **keywords)
@@ -187,6 +187,23 @@ class NormalizeInfoPages(policy.Policy):
 			syspath = syspath[:-3]
 		    util.execute('gzip -n -9 %s' %syspath)
 
+class RelativeSymlinks(policy.Policy):
+    """
+    Make all symlinks relative
+    """
+    def doFile(self, path):
+	fullpath = self.macros['destdir']+path
+	if os.path.islink(fullpath):
+	    contents = os.readlink(fullpath)
+	    if contents.startswith('/'):
+		os.remove(fullpath)
+		dots = "../"
+		dots *= path.count('/') - 1
+		normpath = os.path.normpath(dots + contents)
+		print 'Fixing absolute symlink %s to relative symlink %s' \
+		    %(path, normpath)
+		os.symlink(normpath, fullpath)
+
 
 def DefaultPolicy():
     """
@@ -201,4 +218,5 @@ def DefaultPolicy():
 	NormalizeBzip(),
 	NormalizeManPages(),
 	NormalizeInfoPages(),
+	RelativeSymlinks(),
     ]
