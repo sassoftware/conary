@@ -433,8 +433,12 @@ class FilesystemJob:
 
 	if (flags & IGNOREUGIDS) or os.getuid():
 	    noIds = True
+            # XXX this keeps attributes from being properly merged. we
+            # need a better fix (twm needs to be made much more flexible)
+            twmSkipList = [ "contents", "inode" ]
 	else:
 	    noIds = False
+            twmSkipList = [ "contents" ]
 
 	if fsPkg:
 	    fsPkg = fsPkg.copy()
@@ -665,7 +669,7 @@ class FilesystemJob:
 			baseFile.inode.setGroup(headFile.inode.group())
 
 		    conflicts = fsFile.twm(headChanges, baseFile, 
-					   skip = "contents")
+					   skip = twmSkipList)
 		    if not conflicts:
 			attributesChanged = True
 		    else:

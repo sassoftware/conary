@@ -376,8 +376,8 @@ class TupleStream(InfoStream):
 		    else:
 			raise AssertionError
 
-		conflicts = conflicts or \
-		    self.items[i].twm(diff[idx:idx + size], base.items[i])
+                w = self.items[i].twm(diff[idx:idx + size], base.items[i])
+		conflicts = conflicts or w
 		idx += size
 
 	return conflicts
@@ -487,7 +487,7 @@ class StreamSet(InfoStream):
             new.__setattr__(name, stream)
         return new
 
-    def twm(self, diff, base, skip = None):
+    def twm(self, diff, base, skip = []):
 	i = 0
 	conflicts = False
 	
@@ -498,7 +498,7 @@ class StreamSet(InfoStream):
 	    streamType, name = self.streamDict[streamId]
 
 	    i += self.headerSize
-	    if name != skip:
+	    if name not in skip:
 		w = self.__getattribute__(name).twm(diff[i:i+size], 
 					       base.__getattribute__(name))
 		conflicts = conflicts or w

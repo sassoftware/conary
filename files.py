@@ -308,7 +308,7 @@ class File(streams.StreamSet):
 
 	os.lchown(target, uid, gid)
 
-    def twm(self, diff, base, skip = None):
+    def twm(self, diff, base, skip = []):
 	sameType = struct.unpack("B", diff[0])
 	if not sameType: 
 	    # XXX file type changed -- we don't support this yet
