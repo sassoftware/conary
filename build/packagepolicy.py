@@ -51,7 +51,8 @@ class ComponentSpec(_filterSpec):
 		       '%(mandir)s/man(2|3)',
 		       '%(datadir)s/aclocal/',
 		       '%(datadir)s/aclocal')),
-	('lib',       ('.*/lib/.*\.so\..*')),
+	('lib',       ('.*/lib/.*\.so\..*',
+                       '.*/lib')),
 	# note that gtk-doc is not well-named; it is a shared system, like info,
 	# and is used by unassociated tools (devhelp)
 	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info)/',
