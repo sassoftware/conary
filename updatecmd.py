@@ -2,20 +2,13 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-import package
 import files
-import shutil
-import pwd
-import grp
-import files
-import string
 import sys
 import versions
 
 def doUpdate(repos, cfg, pkg, mainPackageName):
     if cfg.root == "/":
 	print "using srs to update to your actual system is dumb."
-	import sys
 	sys.exit(0)
 
     for (fileId, path, version) in pkg.fileList():
