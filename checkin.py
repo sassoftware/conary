@@ -47,9 +47,9 @@ class SourceState(trove.Trove):
 
     def write(self, filename):
 	f = open(filename, "w")
-	f.write("name %s\n" % self.name)
+	f.write("name %s\n" % self.getName())
 	if self.version:
-	    f.write("version %s\n" % self.version.freeze())
+	    f.write("version %s\n" % self.getVersion().freeze())
 	f.write(self.freezeFileList())
 
     def changeBranch(self, branch):
@@ -270,7 +270,7 @@ def commit(repos, cfg, message):
 	message += '\n'
 
     cl = changelog.ChangeLog(cfg.name, cfg.contact, message)
-    if message is None and not cl.getMessage():
+    if message is None and not cl.getMessageFromUser():
 	log.error("no change log message was given")
 	return
 
