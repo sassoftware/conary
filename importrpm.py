@@ -66,9 +66,9 @@ def doImport(DBPATH, rpmFile):
 	if not existingFile:
 	    file.version(version)
 	    infoFile.add(version, file)
-	    p.addFile(file)
+	    p.addFile(file.path(), file.version())
 	    infoFile.write()
 	else:
-	    p.addFile(existingFile)
+	    p.addFile(file.path(), file.version())
 
     p.write()

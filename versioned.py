@@ -1,6 +1,7 @@
 import os
 import os.path
 import string
+import __builtin__
 
 class Entry:
 
@@ -45,8 +46,12 @@ class File:
 
 	if mode == "r+" and not os.path.exists(filename):
 	    return
+	if mode == "w":
+	    f = __builtin__.open(filename, "w")
+	    f.close()
+	    return
 
-	f = open(filename, "r")
+	f = __builtin__.open(filename, "r")
 
 	lines = f.readlines()
 	f.close()
@@ -65,7 +70,7 @@ class File:
 	    i = i + 1 + lineCount;
 
     def close(self):
-	f = open(self.filename, "w")
+	f = __builtin__.open(self.filename, "w")
 	for version in self.entries.keys():
 	    l = self.entries[version].readAllLines()
 	    f.write("Version %s %d\n" % (version, len(l)))
@@ -99,6 +104,9 @@ class File:
     def write(self, line):
 	return self.currentEntry.write(line)
 
-    def __init__(self):
-	pass
+    def __init__(self, filename, mode):
+	return self.open(filename, mode);
+
+def open(filename, mode):
+    return File(filename, mode)
 	

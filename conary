@@ -5,6 +5,7 @@ import sys
 import util
 import importrpm
 import string
+import versioned
 
 DBPATH=os.getcwd() + "/srsdb"
 
@@ -15,24 +16,17 @@ util.mkdirChain(scratch, fileDB, pkgDB)
 
 def usage():
     print "usage: srs import <file.rpm>"
+    print "           pkglist <pkg>"
     sys.exit(0)
 
-def displayPkgs(fullPath, pathElements):
-    if not os.path.isdir(fullPath):
-	if os.path.exists(fullPath):
-	    pass
-	else:
-	    raise KeyError, ("no match for %s" % pathElements)
-
-	return
-
-    for fileName in os.listdir(fullPath):
-	newPath = fullPath + "/" + fileName
-	if os.path.isdir(newPath):
-	    displayPkgs(newPath, pathElements + [ fileName ])
-	else:
-	    elements = pathElements + [ fileName ]
-	    print "%-24s%s" % (elements[0], string.join(elements[1:], "/"))
+def displayPkgs(DBPATH, packageList):
+    for pkgName in packageList:
+	f = versioned.open(DBPATH + "/pkgs/" + pkgName, "r")
+	l = f.versionList()
+	l.sort()
+	for version in l:
+	    print "%-24s %s" % (pkgName, version)
+	f.close()
 
 if (len(sys.argv) < 2):
     usage()
@@ -41,9 +35,8 @@ elif (sys.argv[1] == "import"):
 	importrpm.doImport(DBPATH, file)
 elif (sys.argv[1] == "pkglist"):
     if (len(sys.argv) == 2):
-	displayPkgs(DBPATH + "/pkgs", [])
+	displayPkgs(DBPATH, os.listdir(DBPATH + "/pkgs"))
     else:
-	displayPkgs(DBPATH + "/pkgs/" + 
-		    string.join(sys.argv[2:], "/"), sys.argv[2:])
+	displayPkgs(DBPATH, sys.argv[2:])
 else:
     usage()

@@ -1,28 +1,40 @@
 import os.path
-import util
+import versioned
+import string
 
 class Package:
     
-    def addFile(self, file):
-	self.files[file.path()] = file
+    def addFile(self, path, version):
+	self.files[path] = version
 
     def write(self):
-	pkgPath = self.dbpath + "/pkgs/" + self.name + self.version
-	(dir, name) = os.path.split(pkgPath)
-	util.mkdirChain(dir)
+	f = versioned.open(self.pkgPath, "r+")
+	if f.hasVersion(self.version):
+	    f.setVersion(self.version)
+	else:
+	    f.createVersion(self.version)
 
-	f = open(pkgPath, "w")
-	for file in self.files.values():
-	    f.write("%s %s\n" % (file.path(), file.version()))
+	for (file, version) in self.files.items():
+	    f.write("%s %s\n" % (file, version))
+
 	f.close()
 
-    def read(self, file):
-	pass
+    def read(self):
+	if os.path.exists(self.pkgPath):
+	    # this creates the file if it doesn't exist so write()
+	    # knows it does exist
+	    f = versioned.open(self.pkgPath, "r+")
+	    if f.hasVersion(self.version):
+		for line in f.readLines():
+		    (path, version) = string.split(line)
+		    self.addFile(path, version)
 
-    def __init__(self, dbpath, name, version, file = None):
+	    f.close()
+
+    def __init__(self, dbpath, name, version):
 	self.files = {}
 	self.name = name
 	self.version = version
 	self.dbpath = dbpath
-	if file:
-	    self.read(file)
+	self.pkgPath = self.dbpath + "/pkgs/" + self.name
+	self.read()

@@ -1,5 +1,6 @@
 import string
 import os
+import versioned
 
 class FileMode:
 
@@ -150,13 +151,13 @@ class RegularFile(File):
 class FileDB:
 
     def read(self):
-	if (not os.path.exists(self.dbfile)):
-	    return
+	f = versioned.open(self.dbfile, "r+")
+	self.versions = {}
 
-	f = open(self.dbfile, "r")
-	for line in f.readlines():
-	    (version, rest) = string.split(line, None, 1)
-	    self.versions[version] = RegularFile(self.path, version, rest)
+	for version in f.versionList():
+	    f.setVersion(version)
+	    line = f.read()
+	    self.versions[version] = RegularFile(self.path, version, line)
 	f.close()
 
     def findVersion(self, file):
@@ -176,13 +177,14 @@ class FileDB:
 	self.versions[version] = file
 
     def write(self):
-	f = open(self.dbfile, "w")
+	f = versioned.open(self.dbfile, "w")
 	for (version, file) in self.versions.items():
-	    f.write("%s %s\n" % (version, file.infoLine()))
+	    f.createVersion(version)
+	    f.write("%s\n" % file.infoLine())
+
 	f.close()
 
     def __init__(self, dbpath, path):
-	self.versions = {}
 	self.dbpath = dbpath
 	self.path = path
 	self.dbfile = dbpath + '/files' + path + '.info'
