@@ -28,7 +28,7 @@ import versions
 from local import trovetroves
 from local import versiontable
 
-from sha1helper import encodeFileId, decodeFileId
+from sha1helper import encodeFileId, decodeFileId, encodeStream, decodeStream
 
 class LocalRepVersionTable(versiontable.VersionTable):
 
@@ -584,6 +584,7 @@ class TroveStore:
 
 	versionCache = {}
 	for (fileId, path, versionId, stream) in cu:
+            stream = decodeStream(stream)
 	    version = versionCache.get(versionId, None)
 	    if not version:
 		version = self.versionTable.getBareId(versionId)
@@ -664,7 +665,7 @@ class TroveStore:
 	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
 
 	if fileObj:
-	    stream = sqlite3.encode(fileObj.freeze())
+	    stream = encodeStream(fileObj.freeze())
 	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?)", 
 		       (encodeFileId(fileId), versionId, stream, path))
 	else:
@@ -705,8 +706,9 @@ class TroveStore:
 	""")
 
 	d = {}
-	for (rowId, stream) in cu:
-	    (fileId, version) = lookup[rowId]
+	for rowId, stream in cu:
+	    fileId, version = lookup[rowId]
+            stream = decodeStream(stream)
 	    d[(fileId, version)] = files.ThawFile(stream, fileId)
 
 	cu.execute("DROP TABLE getFilesTbl", start_transaction = False)

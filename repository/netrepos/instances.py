@@ -14,7 +14,7 @@
 
 import sqlite3
 
-from sha1helper import encodeFileId, decodeFileId
+from sha1helper import encodeFileId, decodeFileId, encodeStream, decodeStream
 
 class InstanceTable:
     """
@@ -152,7 +152,7 @@ class FileStreams:
 	fileId = encodeFileId(fileId)
         cu = self.db.cursor()
         cu.execute("INSERT INTO FileStreams VALUES (NULL, ?, ?, ?, ?)",
-                   (fileId, versionId, sqlite3.encode(stream)))
+                   (fileId, versionId, encodeStream(stream)))
 	return cu.lastrowid
         
     def __delitem__(self, key):
@@ -180,7 +180,7 @@ class FileStreams:
         row = cu.fetchone()
         if row is None:
             raise KeyError, key
-        return row[0]
+        return decodeStream(row[0])
 
     def getStreamId(self, key):
 	(fileId, versionId) = key
