@@ -70,15 +70,26 @@ class Automake(ShellCommand):
 
 
 class Configure(ShellCommand):
-    template = ('cd %%(builddir)s; '
-                '%%(mkObjdir)s '
-		'%(preConfigure)s %%(configure)s '
-		'  --prefix=%%(prefix)s '
-		'  --bindir=%%(bindir)s '
-                '  --sysconfdir=%%(sysconfdir)s '
-		'  --datadir=%%(datadir)s '
-		'  --mandir=%%(mandir)s --infodir=%%(infodir)s '
-		'  %(args)s')
+    template = (
+	'cd %%(builddir)s; '
+	'%%(mkObjdir)s '
+	'CFLAGS=%%(cflags)s CXXFLAGS=%%(cflags)s'
+	' %(preConfigure)s %%(configure)s'
+	# XXX host/build/target here
+	' --prefix=%%(prefix)s'
+	' --exec-prefix=%%(exec_prefix)s'
+	' --bindir=%%(bindir)s'
+	' --sbindir=%%(sbindir)s'
+	' --sysconfdir=%%(sysconfdir)s'
+	' --datadir=%%(datadir)s'
+	' --includedir=%%(includedir)s'
+	' --libdir=%%(libdir)s'
+	' --libexecdir=%%(libexecdir)s'
+	' --localstatedir=%%(localstatedir)s'
+	' --sharedstatedir=%%(sharedstatedir)s'
+	' --mandir=%%(mandir)s'
+	' --infodir=%%(infodir)s'
+	'  %(args)s')
     keywords = {'preConfigure': '',
                 'objDir': ''}
     
@@ -98,11 +109,10 @@ class ManualConfigure(Configure):
 	        '%(preConfigure)s %%(configure)s %(args)s')
 
 class GNUConfigure(Configure):
-    """For use at least when there is no single functional DESTDIR or similar"""
     template = (
 	'cd %%(builddir)s; '
+	'%%(mkObjdir)s '
 	'CFLAGS=%%(cflags)s CXXFLAGS=%%(cflags)s'
-	' %%(mkObjdir)s'
 	' %(preConfigure)s %%(configure)s'
 	# XXX host/build/target here
 	' --prefix=%%(prefix)s'
@@ -119,8 +129,6 @@ class GNUConfigure(Configure):
 	' --mandir=%%(mandir)s'
 	' --infodir=%%(infodir)s'
 	'  %(args)s')
-    keywords = {'preConfigure': '',
-                'objDir': ''}
 
 class Make(ShellCommand):
     template = ('cd %%(builddir)s; '
@@ -143,6 +151,7 @@ class MakeInstall(ShellCommand):
 	util.execute(self.command %macros)
 
 class GNUMakeInstall(ShellCommand):
+    """For use at least when there is no single functional DESTDIR or similar"""
     template = (
 	'cd %%(builddir)s; '
 	'%(preMake)s make %%(mflags)s'
