@@ -9,22 +9,31 @@ import util
 import versions
 
 def doUpdate(repos, db, cfg, pkg, versionStr = None):
+    cs = None
     if not os.path.exists(cfg.root):
         util.mkdirChain(cfg.root)
     
     if os.path.exists(pkg):
+        # there is a file, try to read it as a changeset file
 	if versionStr:
 	    sys.stderr.write("Verison should not be specified when a SRS "
 			     "change set is being installed.\n")
 	    return 1
 
-	cs = changeset.ChangeSetFromFile(pkg)
+        try:
+            cs = changeset.ChangeSetFromFile(pkg)
+        except KeyError:
+            # invalid changeset file
+            pass
+        else:
+            if cs.isAbstract():
+                newcs = db.rootChangeSet(cs, cfg.defaultbranch)
+                if newcs:
+                    cs = newcs
 
-	if cs.isAbstract():
-	    newcs = db.rootChangeSet(cs, cfg.defaultbranch)
-	    if newcs:
-		cs = newcs
-    else:
+    if not cs:
+        # so far no changeset (either the path didn't exist or we could not
+        # read it
 	if pkg and pkg[0] != ":":
 	    pkg = cfg.packagenamespace + ":" + pkg
 
