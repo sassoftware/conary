@@ -541,7 +541,8 @@ class UTF8Filenames(policy.Policy):
         try:
             path.decode('utf-8')
         except UnicodeDecodeError:
-            self.recipe.reportErrors('path "%s" is not valid UTF-8' %path)
+            #self.recipe.reportErrors('path "%s" is not valid UTF-8' %path)
+            log.warning('path "%s" is not valid UTF-8' %path)
 
 class ReadableDocs(policy.Policy):
     """
