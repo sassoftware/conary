@@ -47,8 +47,7 @@ elif (sys.argv[1] == "import"):
 	importrpm.doImport(cfg.reppath, file)
 elif (sys.argv[1] == "cook"):
     for file in sys.argv[2:]:
-	cook.cook(cfg.reppath, cfg.sourcepath, cfg.buildpath,
-		  os.getcwd() + "/" + file)
+	cook.cook(cfg.reppath, cfg.sourcepath, cfg.buildpath, file)
 elif (sys.argv[1] == "pkglist"):
     if (len(sys.argv) == 2):
 	displayPkgs(cfg.reppath, os.listdir(cfg.reppath + "/pkgs"))
