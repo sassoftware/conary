@@ -318,7 +318,9 @@ class PackageRecipe(Recipe):
 	return '-'.join((self.name, self.version))
 
     def cleanup(self, builddir, destdir):
-	if not self.cfg.noClean:
+	if 'noClean' in self.cfg.__dict__ and self.cfg.noClean:
+	    pass
+	else:
 	    util.rmtree(builddir)
 	    util.rmtree(destdir)
 
