@@ -458,8 +458,7 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	self.paths = {}
 
 	for f in origJob.newFileList():
-	    if not skipPaths.has_key(f.path()):
-		self.paths[f.path()] = f
+	    self.paths[f.path()] = f
 
 	for f in self.newFileList():
 	    self.paths[f.path()] = f
