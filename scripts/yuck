@@ -33,6 +33,7 @@ import conarycfg
 from local import database
 from lib import util
 from repository import netclient
+from repository import repository
 import versions
 import updatecmd
 
@@ -70,34 +71,95 @@ def main(argv):
     repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
     db = database.Database(cfg.root, cfg.dbPath)
     dbpkgs = [ x for x in db.iterAllTroveNames() if x.find(':') == -1 ]
-    dbpkgs.sort()
-    versionList = repos.getTroveLeavesByLabel(dbpkgs, cfg.installLabelPath[0])
-
+    dbVersions = {}
+    labelPkgs = {}
     for pkg in dbpkgs:
         if pkg in updateExceptions:
             continue
-        if not versionList[pkg]:
+        dbVersions = db.getTroveVersionList(pkg)
+        for v in dbVersions:
+            label = v.branch().label()
+            if isinstance(label, versions.CookBranch) or\
+               isinstance(label, versions.EmergeBranch):
+                continue
+            if label not in labelPkgs:
+                labelPkgs[label] = {}
+            if pkg not in labelPkgs[label]:
+                labelPkgs[label][pkg] = []
+            labelPkgs[label][pkg].append(v)
+    dbpkgs.sort()
+
+    updates = []
+    notavail = []
+    for label in labelPkgs.keys():
+        labelDbpkgs = labelPkgs[label].keys()
+        labelDbpkgs.sort()
+        try:
+            versionList = repos.getTroveLeavesByLabel(labelDbpkgs, label)
+        except repository.OpenError, e:
+            print "Warning: could not access %s: %s" % (label.asString(), e)
+            print "Skipping packages %s" % labelDbpkgs
             continue
-        v = versionList[pkg][0]
-        lv = db.getTroveVersionList(pkg)[0]
-        vt = v.trailingVersion()
+        for pkg in labelDbpkgs:
+            dbVersions = labelPkgs[label][pkg]
+            repoVersions = versionList[pkg]
+            # only look for updates to this version on the same branch
+            for lv in dbVersions:
+                if not repoVersions:
+                    
+                    lvt = lv.trailingVersion()
+                    notavail.append((label, pkg, lv, None))
+                for v in repoVersions:
+                    if lv.branch() != v.branch():
+                        continue
+                    if v.isAfter(lv):
+                        updates.append((label, pkg, lv, v))
+
+    maxL = 0
+    maxP = 0
+    maxLV = 0
+    if notavail:
+        maxV = len('<Not Avail>')
+    else:
+        maxV = 0
+
+    
+    for (label, pkg, lv, v) in updates + notavail:
+        maxL = max(maxL, len(label.asString()))
+        maxP = max(maxP, len(pkg))
+        maxLV = max(maxLV, len(lv.trailingVersion().asString()))
+        if v:
+            maxV = max(maxV, len(v.trailingVersion().asString()))
+
+    for (label, pkg, lv, v) in updates + notavail:
         lvt = lv.trailingVersion()
-        
-        if isinstance(lv.branch().label(), versions.CookBranch) or\
-           isinstance(lv.branch().label(), versions.EmergeBranch):
-            continue
-
-        if (v.branch(),vt.getVersion(),vt.getRelease(),vt.buildCount) != (lv.branch(),lvt.getVersion(),lvt.getRelease(),lvt.buildCount):
-            print "%-35s%-25s%-20s" % (pkg, lvt.asString(), vt.asString())
-
-            if doUpdate:
-                updatecmd.doUpdate(repos, cfg, [ "%s=%s" %(pkg, v.asString()) ])
+        if v:
+            vt = v.trailingVersion()
+            if lvt.getVersion() != vt.getVersion():
+                change = 'V'
+            elif lvt.getRelease() != vt.getRelease():
+                change = 'S'
+            else:
+                change = 'B'
+            vt = vt.asString()
+        else:
+            vt = '<Not Avail>'
+            change = ' '
+        print "%s  %-*s    %-*s    %-*s" % (change, maxP, pkg, maxV, vt, maxL, label.asString())
+        if doUpdate:
+            updatecmd.doUpdate(repos, cfg, [ "%s=%s" %(pkg, v.asString()) ])
 
     if listMissing:
-        
         missing = []
-        repopkgs = [ x for x in repos.iterAllTroveNames(cfg.installLabel.getHost()) if x.find(':') == -1 and not (x.startswith('cross-') or x.startswith('bootstrap-')) ]
-        for pkg in repopkgs:
+        repoMap = {}
+        for label in cfg.installLabelPath:
+            repopkgs = [ x for x in repos.iterAllTroveNames(label.getHost()) if x.find(':') == -1 and not (x.startswith('cross-') or x.startswith('bootstrap-')) ]
+            for pkg in repopkgs:
+                if pkg not in repoMap:
+                    repoMap[pkg] = label
+        allpkgs = repoMap.keys()
+        allpkgs.sort()
+        for pkg in allpkgs:
             if not dbpkgs:
                 missing.append(pkg)
                 continue
@@ -108,7 +170,14 @@ def main(argv):
                     missing.append(pkg)
             else: 
                 del dbpkgs[0]
-        print "Missing packages: %s" % missing
+        maxL = 0
+        maxP = 0
+        for pkg in missing:
+            maxP = max(maxP, len(pkg))
+            maxL = max(maxL, len(repoMap[pkg].asString()))
+        print "=" * 78
+        for pkg in missing:
+            print "   %-*s    <Not Installed>    %-*s" % (maxP, pkg, maxL, repoMap[pkg].asString())
     return 0
 
 if __name__ == "__main__":
