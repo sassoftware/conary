@@ -99,12 +99,12 @@ class Run(BuildCommand):
 class Automake(BuildCommand):
     # note: no use of %(args)s -- which command would it apply to?
     template = ('cd %%(builddir)s/%(subDir)s; '
-                'aclocal %%(m4DirArgs)s %(acLocalArgs)s; '
+                'aclocal %%(m4DirArgs)s %(aclocalArgs)s; '
 		'%(preAutoconf)s autoconf %(autoConfArgs)s; '
 		'automake%(automakeVer)s %(autoMakeArgs)s')
     keywords = {'autoConfArgs': '',
                 'autoMakeArgs': '',
-		'acLocalArgs': '',
+		'aclocalArgs': '',
 		'preAutoconf': '',
                 'm4Dir': '',
 		'automakeVer': '',
