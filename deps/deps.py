@@ -616,7 +616,7 @@ def parseFlavor(s, mergeBase = None):
 
 dependencyCache = util.ObjectCache()
 
-ident = '(?:[0-9A-Za-z_]+)'
+ident = '(?:[0-9A-Za-z_-]+)'
 flag = '(?:~?!?IDENT)'
 useFlag = '(?:!|~!)?FLAG(?:\.IDENT)?'
 archFlags = '\(( *FLAG(?: *, *FLAG)*)\)'
