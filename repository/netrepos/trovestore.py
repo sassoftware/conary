@@ -504,7 +504,8 @@ class TroveStore:
 
 	troveInstanceId = self.instances[(troveNameId, troveVersionId, 
 					  troveFlavorId)]
-	trove = package.Trove(troveName, troveVersion, troveFlavor)
+	trove = package.Trove(troveName, troveVersion, troveFlavor,
+			      None)
 	for instanceId in self.troveTroves[troveInstanceId]:
 	    (itemId, versionId, flavorId, isPresent) = \
 		    self.instances.getId(instanceId)

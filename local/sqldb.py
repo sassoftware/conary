@@ -602,7 +602,8 @@ class Database:
 	if not troveVersion or min(troveVersion.timeStamps()) == 0:
 	    troveVersion = self.instances.getVersion(troveInstanceId)
 
-	trove = package.Trove(troveName, troveVersion, troveFlavor)
+	trove = package.Trove(troveName, troveVersion, troveFlavor,
+			      None)
 
 	flavorCache = {}
 

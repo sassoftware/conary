@@ -37,7 +37,7 @@ import versions
 # returns a (pkg, fileMap) tuple
 def _createComponent(repos, branch, bldPkg, newVersion, ident):
     fileMap = {}
-    p = package.Trove(bldPkg.getName(), newVersion, bldPkg.flavor)
+    p = package.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
     p.setRequires(bldPkg.requires)
     p.setProvides(bldPkg.provides)
 
@@ -223,7 +223,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
 				     None, buildBranch, binary = True)
 
     grpFlavor = deps.deps.DependencySet()
-    grp = package.Package(fullName, nextVersion, grpFlavor)
+    grp = package.Trove(fullName, nextVersion, grpFlavor, None)
 
     d = {}
     for (name, versionList) in recipeObj.getTroveList().iteritems():
@@ -290,7 +290,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={}):
     nextVersion = helper.nextVersion(repos, fullName, recipeClass.version, 
 				     flavor, buildBranch, binary = True)
 
-    fileset = package.Package(fullName, nextVersion, flavor)
+    fileset = package.Trove(fullName, nextVersion, flavor, None)
     for (fileId, path, version) in l:
 	fileset.addFile(fileId, path, version)
 
@@ -412,7 +412,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     nextVersion = helper.nextVersion(repos, grpName, recipeClass.version, 
 				     flavor, buildBranch, binary = True)
 
-    grp = package.Package(grpName, nextVersion, flavor)
+    grp = package.Trove(grpName, nextVersion, flavor, None)
 
     packageList = []
     for buildPkg in bldList:

@@ -18,7 +18,7 @@ import sys
 import util
 import versions
 
-class SourceState(package.Package):
+class SourceState(package.Trove):
 
     def removeFilePath(self, file):
 	for (fileId, path, version) in self.iterFileList():
@@ -57,7 +57,7 @@ class SourceState(package.Package):
 	return versionStr
 
     def __init__(self, name, version):
-	package.Package.__init__(self, name, version, None)
+	package.Trove.__init__(self, name, version, None, None)
 
 class SourceStateFromFile(SourceState):
 

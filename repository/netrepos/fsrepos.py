@@ -367,7 +367,7 @@ class ChangeSetJob:
 		newPkg.changeVersion(newVersion)
 	    else:
 		newPkg = package.Trove(csPkg.getName(), newVersion,
-					 csPkg.getFlavor())
+				     csPkg.getFlavor(), csPkg.getChangeLog())
 
 	    newFileMap = newPkg.applyChangeSet(csPkg)
 

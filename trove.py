@@ -8,7 +8,7 @@ import versions
 from deps import deps
 
 # this is the repository's idea of a package
-class Package:
+class Trove:
     """
     Packages are groups of files and other packages, which are included by
     reference. By convention, "package" often refers to a package with
@@ -177,6 +177,7 @@ class Package:
 
 	self.mergeTroveListChanges(pkgCS.iterChangedTroves())
 	self.flavor = pkgCS.getFlavor()
+	self.changeLog = pkgCS.getChangeLog()
 	self.setProvides(pkgCS.getProvides())
 	self.setRequires(pkgCS.getRequires())
 	self.changeVersion(pkgCS.getNewVersion())
@@ -255,20 +256,20 @@ class Package:
 	# stayed the same
 	if them:
 	    themMap = them.idMap
-	    chgSet = TroveChangeSet(self.name, self.flavor, 
+	    chgSet = TroveChangeSet(self.name, self.flavor, self.changeLog,
 				      them.getVersion(),	
 				      self.getVersion(),
 				      absolute = False)
 	else:
 	    themMap = {}
-	    chgSet = TroveChangeSet(self.name, self.flavor, 
+	    chgSet = TroveChangeSet(self.name, self.flavor, self.changeLog,
 				      None, 
 				      self.getVersion(),
 				      absolute = absolute)
 
 	# dependency and flavor information is always included in total;
 	# this lets us do dependency checking w/o having to load packages
-	# on the clien
+	# on the client
 	chgSet.setRequires(self.requires)
 	chgSet.setProvides(self.provides)
 
@@ -409,7 +410,10 @@ class Package:
     def getFlavor(self):
         return self.flavor
 
-    def __init__(self, name, version, flavor):
+    def getChangeLog(self):
+        return self.changeLog
+
+    def __init__(self, name, version, flavor, changeLog):
 	self.idMap = {}
 	self.name = name
 	self.version = version
@@ -417,10 +421,7 @@ class Package:
 	self.packages = {}
         self.provides = None
         self.requires = None
-
-class Trove(Package):
-
-    pass
+	self.changeLog = changeLog
 
 class TroveChangeSet:
 
@@ -446,6 +447,9 @@ class TroveChangeSet:
 
     def getName(self):
 	return self.name
+
+    def getChangeLog(self):
+	return self.changeLog
 
     def changeOldVersion(self, version):
 	self.oldVersion = version
@@ -576,9 +580,11 @@ class TroveChangeSet:
 	later be parsed by parse(). The representation begins with a
 	header::
 
-         ABS <name> <newversion>
-         CS <name> <oldversion> <newversion>
-         NEW <name> <newversion>
+         ABS <name> <newversion> ||
+           CS <name> <oldversion> <newversion> ||
+           NEW <name> <newversion>
+	 [CL <name> <email> <linecount>
+	   <line count lines of change log>]
          [REQUIRES <dep set>]
          [PROVIDES <dep set>]
          [FLAVOR <dep set>]
@@ -600,6 +606,10 @@ class TroveChangeSet:
 	else:
 	    rc.append("CS %s %s %s\n" % (self.name, self.oldVersion.freeze(),
                                          self.newVersion.freeze()))
+	if self.changeLog:
+	    frz = self.changeLog.freeze()
+	    rc.append("CL %d\n", frz.count("\n"))
+	    rc.append(frz)
         if self.requires:
             rc.append("REQUIRES %s\n" % (self.requires.freeze()))
         if self.provides:
@@ -658,10 +668,12 @@ class TroveChangeSet:
     def getFlavor(self):
         return self.flavor
 
-    def __init__(self, name, flavor, oldVersion, newVersion, absolute = 0):
+    def __init__(self, name, flavor, changeLog, oldVersion, newVersion, 
+		 absolute = 0):
 	self.name = name
 	self.oldVersion = oldVersion
 	self.newVersion = newVersion
+	self.changeLog = changeLog
 	self.newFiles = []
 	self.oldFiles = []
 	self.changedFiles = []
@@ -757,7 +769,14 @@ class ThawTroveChangeSet(TroveChangeSet):
 		flavor = deps.ThawDependencySet(dep)
 		break
 
-	TroveChangeSet.__init__(self, pkgName, flavor, oldVersion, 
+	# find the change log
+	changeLog = None
+	for l in lines[1:5]:
+	    if l.startswith("CL "):
+		lines = int(l.split(' ', 1)[1])
+		changeLog = changelog.ThawChangeLog(lines)
+
+	TroveChangeSet.__init__(self, pkgName, flavor, changeLog, oldVersion, 
 				  newVersion, absolute = (pkgType == "ABS"))
         
 	for line in lines:

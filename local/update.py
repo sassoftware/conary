@@ -285,8 +285,8 @@ class FilesystemJob:
 	if fsPkg:
 	    fsPkg = fsPkg.copy()
 	else:
-	    fsPkg = package.Package(pkgCs.getName(), versions.NewVersion(),
-				    pkgCs.getFlavor())
+	    fsPkg = package.Trove(pkgCs.getName(), versions.NewVersion(),
+				    pkgCs.getFlavor(), pkgCs.getChangeLog())
 
 	fsPkg.mergeTroveListChanges(pkgCs.iterChangedTroves(),
 				    redundantOkay = True)

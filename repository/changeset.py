@@ -295,7 +295,7 @@ class ChangeSet:
 	    # this is a modified package and needs to be inverted
 
 	    invertedPkg = package.TroveChangeSet(pkgCs.getName(), 
-			       pkgCs.getFlavor(),
+			       pkgCs.getFlavor(), pkg.getChangeLog(),
 			       pkgCs.getNewVersion(), pkgCs.getOldVersion())
 
 	    for (name, list) in pkgCs.iterChangedTroves():
