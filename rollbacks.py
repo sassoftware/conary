@@ -50,4 +50,6 @@ def apply(db, cfg, *names):
 	db.applyRollbackList(names)
     except database.RollbackError, e:
 	log.error("%s", e)
-	sys.exit(1)
+	return 1
+
+    return 0
