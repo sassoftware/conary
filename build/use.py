@@ -115,8 +115,11 @@ class Flag(dict):
 
     def __nonzero__(self):
         if self._tracking:
-            self._used = True    
+            self._setUsed(True)
         return self._value
+
+    def _setUsed(self, used=True):
+        self._used = used
 
     def __eq__(self, other):
         if not isinstance(other, (Flag, bool)):
@@ -173,6 +176,9 @@ class Collection(dict):
     def _delAttr(self, name):
 	del self._attrs[name]
 
+    def _getAttr(self, name):
+	return self._attrs[name]
+
     def _addFlag(self, key, *args, **kw):
 	if 'track' not in kw:
 	    kw = kw.copy()
@@ -196,7 +202,7 @@ class Collection(dict):
         if key in self:
             return self[key]
         if key in self._attrs:
-            return self._attrs[key]
+            return self._getAttr(key)
         if key[0] == '_':
             raise AttributeError, key
         return self._getNonExistantKey(key)
@@ -433,6 +439,14 @@ class ArchCollection(Collection):
                 for flag in child._iterAll():
                     yield flag
 
+    def _getAttr(self, name):
+        currentArch = self.getCurrentArch()
+        # when getting an architecture prop like bits64, 
+        # set the architecture flag if tracking is on
+        if currentArch is not None:
+            bool(currentArch)
+        return Collection._getAttr(self, name)
+
     def _getUnameArch(self):
         """ return the appropriate unameArch for the currently set 
             build flags.
@@ -479,6 +493,14 @@ class MajorArch(CollectionWithFlag):
         self._collectionType = SubArch
         CollectionWithFlag.__init__(self, name, parent, track=track)
 
+    def _setUsed(self, used=True):
+        CollectionWithFlag._setUsed(self, used)
+        # if we are not the current architecture, find
+        # the current architecture and set it
+        if used and not self._get():
+            currentArch = self._parent.getCurrentArch()
+            currentArch._setUsed()
+
     def _getArchMacro(self, key):
         for subArch in self.itervalues():
             if subArch._get() and getattr(subArch, '_' + key) is not None:
@@ -522,9 +544,12 @@ class MajorArch(CollectionWithFlag):
         return set
 
     def _trackUsed(self, value=True):
-        if self._get():
-            CollectionWithFlag._trackUsed(self, value=value)
+        CollectionWithFlag._trackUsed(self, value=value)
 
+    def _iterUsed(self):
+        if self._get():
+            return CollectionWithFlag._iterUsed(self)
+        return []
 
 class SubArch(Flag):
 
@@ -538,6 +563,14 @@ class SubArch(Flag):
         self._targetArch = targetArch
         self._optFlags = optFlags
         Flag.__init__(self, name, parent, required=True, track=track)
+
+    def _setUsed(self, used=True):
+        Flag._setUsed(self, used)
+        # if we are not the current architecture, find
+        # the current architecture and set it
+        if used and not self._parent._get():
+            currentArch = self._parent._parent.getCurrentArch()
+            currentArch._setUsed()
 
     def _toDependency(self):
         """ Creates a DependencySet with the subarch in it.
@@ -691,7 +724,7 @@ def createFlavor(recipeName, *flagIterables):
         if flagType == MajorArch:
             if not flag._get():
                 continue
-            majArch = flag._name
+            set.union(flag._toDependency())
         elif flagType ==  SubArch:
             set.union(flag._toDependency())
         elif flagType == UseFlag:

@@ -10,6 +10,8 @@ Changes in 0.50.0:
   * Groups can have requirements now
   * protocol-level getFileContents works on multiple files simultaneously
   * repository log had too many files added to it
+  * set instruction set flavor for a cooked trove whenever any Arch flags are 
+    checked
 
 Changes in 0.14.12:
   * The shadow command looks at buildLabel instead of following

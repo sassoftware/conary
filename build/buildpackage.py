@@ -52,7 +52,8 @@ def _getUseDependencySet(recipe):
     that have been used.
     """
     return use.createFlavor(recipe.name, use.Use._iterUsed(), 
-                                         recipe.Flags._iterUsed())
+                                         recipe.Flags._iterUsed(), 
+                                         use.Arch._iterUsed())
     
 class BuildPackage(dict):
 
