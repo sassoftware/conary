@@ -32,12 +32,6 @@ class InstanceTable:
                    (itemId, versionId, flavorId))
 	return cu.lastrowid
 
-    def addRedirect(self, itemId, versionId, redirectId):
-        cu = self.db.cursor()
-        cu.execute("INSERT INTO Instances VALUES (NULL, %d, %d, -1, %d, 1)",
-                   (itemId, versionId, redirectId))
-	return cu.lastrowid
-
     def delId(self, theId):
         assert(type(theId) is int)
         cu = self.db.cursor()
