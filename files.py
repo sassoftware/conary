@@ -479,10 +479,15 @@ class RegularFile(File):
 
 	    tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
 	    try:
-		File.restore(self, root, tmpname)
 		f = os.fdopen(tmpfd, 'w')
 		util.copyfileobj(src, f)
 		f.close()
+
+                # fdopen()/write() turns off setuid bits!!! placing this
+                # restore after the file contents are created avoid that
+                # bug
+		File.restore(self, root, tmpname)
+
                 if os.path.isdir(target):
                     os.rmdir(target)
 		os.rename(tmpname, target)
