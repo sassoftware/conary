@@ -160,18 +160,10 @@ def _formatFlavor(flavor):
         return '\n   None'
 
 
-def _printOneTrove(db, troveName, troveVersions, fullVersions):
+def _printOneTroveName(db, troveName, troveDict, fullVersions):
     displayC = DisplayCache()
-    if troveVersions is None:
-        troveVersions = db.getTroveVersionList(troveName)
-    if not troveVersions:
-        log.error("%s is not installed", troveName)
-        return
-    versionDict = {}.fromkeys(troveVersions)
-    troveDict = db.getAllTroveFlavors({troveName: troveVersions})
-    displayC.cache(troveName, troveVersions, fullVersions)
-
-    for version in troveVersions:
+    displayC.cache(troveName, troveDict[troveName].keys(), fullVersions)
+    for version in troveDict[troveName]:
         if len(troveDict[troveName][version]) > 1:
             # if there is more than one instance of a version
             # installed, show the flavor information
@@ -191,19 +183,35 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
     pathList = [os.path.abspath(util.normpath(x)) for x in pathList]
     
     if not troveNames and not pathList:
-	troveNames = [ (x, None) for x in db.iterAllTroveNames() ]
+	troveNames = [ (x, None, None) for x in db.iterAllTroveNames() ]
 	troveNames.sort()
 
     if not hasVersions and not hasFlavors and not ls and not ids and \
                                               not sha1s and not tags:
+        
+        troveDict = {}
         for path in pathList:
             for trove in db.iterTrovesByPath(path):
-                troveNames.append((trove.getName(), [ trove.getVersion() ]))
-
-        for troveName, versionList, flavor in troveNames:
-            _printOneTrove(db, troveName, versionList, fullVersions)
+                n, v, f = trove.getName(), trove.getVersion(), trove.getFlavor()
+                if n not in troveDict:
+                    troveDict[n] = {}
+                if v not in troveDict[n]:
+                    troveDict[n][v] = []
+                if f not in troveDict[n][v]:
+                    troveDict[n][v].append(f)
+        # now convert into a trove dict
+        # throw away name, version variables, we know they're empty
+        # because hasVersions and hasFlavors are false
+        leaves = {}
+        for troveName, version, flavor in troveNames:
+            leaves[troveName] = db.getTroveVersionList(troveName)
+        flavors = db.getAllTroveFlavors(leaves)
+        db.queryMerge(flavors, troveDict) 
+        for troveName in sorted(flavors.iterkeys()):
+            if not flavors[troveName]: 
+                log.error("%s is not installed", troveName)
+            _printOneTroveName(db, troveName, flavors, fullVersions)
         return
-
     for path in pathList:
         for trove in db.iterTrovesByPath(path):
 	    _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags)
