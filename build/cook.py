@@ -454,8 +454,6 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     
     grpName = recipeClass.name
 
-    requires = deps.deps.DependencySet()
-    provides = deps.deps.DependencySet()
     flavor = deps.deps.DependencySet()
 
     bldList = recipeObj.getPackages()
@@ -526,13 +524,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	# don't install :test component when you are installing
 	# the package
 	if not comp in recipeObj.getUnpackagedComponentNames():
-            requires.union(p.getRequires())
-            provides.union(p.getProvides())
 	    grp.addTrove(compName, p.getVersion(), p.getFlavor())
-
-    for grp in grpMap.values():
-        grp.setRequires(requires)
-        grp.setProvides(provides)
 
     changeSet = changeset.CreateFromFilesystem(packageList)
     changeSet.addPrimaryPackage(grpName, targetVersion, grp.getFlavor())
