@@ -42,6 +42,9 @@ _FILE_FLAG_GCONFSCHEMA = 1 << 3
 # transient contents that may have modified contents overwritten
 _FILE_FLAG_TRANSIENT = 1 << 4
 _FILE_FLAG_SOURCEFILE = 1 << 5
+# files which were added to source components by conary rather then by
+# the user. this isn't used yet, just reserved.
+_FILE_FLAG_AUTOSOURCE = 1 << 6	
 
 class DeviceStream(streams.TupleStream):
 
