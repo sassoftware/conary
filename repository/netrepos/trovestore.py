@@ -532,16 +532,16 @@ class TroveStore:
 	    else:
 		yield (fileId, path, version)
 
-    def iterTrovePerFlavorLeafs(troveName, branch):
-	cu = db.cursor()
+    def iterTrovePerFlavorLeafs(self, troveName, branch):
+	cu = self.db.cursor()
 	cu.execute("""
 	   SELECT Versions.version, Flavors.flavor FROM 
 		Nodes JOIN Instances ON Nodes.itemId=Instances.itemId AND 
 				        Nodes.versionId=Instances.versionId 
 		      JOIN Versions ON Instances.versionId=Versions.versionId
 		      JOIN Flavors ON Instances.flavorId = Flavors.flavorId
-	   WHERE Nodes.itemId=(SELECT itemId from Items WHERE item=%s)
-	     AND branchId=(SELECT branchId from Branch WHERE branch=%s)
+	   WHERE Nodes.itemId=(SELECT itemId FROM Items WHERE item=%s)
+	     AND branchId=(SELECT branchId FROM Branches WHERE branch=%s)
 	   ORDER BY finalTimeStamp;
 	""", troveName, branch)
 
