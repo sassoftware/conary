@@ -287,20 +287,18 @@ class ComponentSpec(_filterSpec):
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
 	('test',      ('%(testdir)s/')),
-	('runtime',   ('%(essentiallibdir)s/security/',
-		       '/lib/security/',
-		       r'%(libdir)s/perl./vendor_perl/', # modules, not shlibs
-		       '%(datadir)s/gnome/help/.*/C/')), # help menu stuff
+	('runtime',   ('%(datadir)s/gnome/help/.*/C/')), # help menu stuff
+        # python is potentially architecture-specific because of %(lib)
 	('python',    ('/usr/(%(lib)s|lib)/python.*/site-packages/')),
         # devellib is architecture-specific
         ('devellib',  (r'\.so',), stat.S_IFLNK),
-	('devellib',  (r'\.a')),
-        # devel is architecture-generic
+	('devellib',  (r'\.a',
+                       '%(libdir)s/pkgconfig/')),
+        # devel is architecture-generic -- no %(lib)s/%(libdir)s
         ('devel',     (r'.*/include/.*\.h',
 		       '%(includedir)s/',
 		       '%(mandir)s/man(2|3)/',
 		       '%(datadir)s/aclocal/',
-		       '%(libdir)s/pkgconfig/',
 		       '%(bindir)s/..*-config')),
         # Anything in {,/usr}/lib{,64} is architecture-specific
 	('lib',       (r'.*/(%(lib)s|lib)/')),
