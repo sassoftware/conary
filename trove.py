@@ -556,6 +556,10 @@ _STREAM_TCS_REQUIRES    = streams._STREAM_TROVE_CHANGE_SET + 3
 _STREAM_TCS_PROVIDES    = streams._STREAM_TROVE_CHANGE_SET + 4
 _STREAM_TCS_CHANGE_LOG  = streams._STREAM_TROVE_CHANGE_SET + 5
 _STREAM_TCS_OLD_FILES   = streams._STREAM_TROVE_CHANGE_SET + 6
+_STREAM_TCS_TYPE        = streams._STREAM_TROVE_CHANGE_SET + 7
+
+_TCS_TYPE_ABSOLUTE = 1
+_TCS_TYPE_RELATIVE = 2
 
 class AbstractTroveChangeSet(streams.StreamSet):
 
@@ -567,6 +571,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         _STREAM_TCS_PROVIDES    : (streams.DependenciesStream,  "provides" ),
         _STREAM_TCS_CHANGE_LOG  : (changelog.AbstractChangeLog, "changeLog" ),
         _STREAM_TCS_OLD_FILES   : (streams.StringsStream,       "oldFiles" ),
+        _STREAM_TCS_TYPE        : (streams.IntStream,           "tcsType" ),
      }
 
     """
@@ -575,7 +580,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
     """
 
     def isAbsolute(self):
-	return self.absolute
+	return self.tcsType.value() == _TCS_TYPE_ABSOLUTE
 
     def newFile(self, fileId, path, version):
 	self.newFiles.append((fileId, path, version))
@@ -674,7 +679,8 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	self.packages[name].append(('-', version, flavor))
 
     def formatToFile(self, changeSet, f):
-	f.write("%s " % self.name)
+	f.write("%s " % self.getName())
+	f.write("KIND %d\n" % self.tcsType.value())
 
 	if self.isAbsolute():
 	    f.write("absolute ")
@@ -753,13 +759,6 @@ class AbstractTroveChangeSet(streams.StreamSet):
 
 	rc = []
 	lines = 0
-
-	if self.absolute:
-            rc.append("ABS\n")
-	elif not self.getOldVersion():
-	    rc.append("NEW\n")
-	else:
-	    rc.append("CS\n")
 
         if self.oldFlavor and self.newFlavor:
             rc.append("FLAVOR %s %s\n" % (self.oldFlavor.freeze(),
@@ -844,7 +843,10 @@ class TroveChangeSet(AbstractTroveChangeSet):
 	    self.changeLog = changeLog
 	self.newFiles = []
 	self.changedFiles = []
-	self.absolute = absolute
+	if absolute:
+	    self.tcsType.set(_TCS_TYPE_ABSOLUTE)
+	else:
+	    self.tcsType.set(_TCS_TYPE_RELATIVE)
 	self.packages = {}
         self.provides.set(None)
         self.requires.set(None)
@@ -917,7 +919,7 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
 	# find the flavor
 	oldFlavor = None
 	newFlavor = None
-	for i, l in enumerate(lines[1:4]):
+	for i, l in enumerate(lines):
 	    if l.startswith("FLAVOR "):
 		lst = l.split(' ', 2)
 		oldFlavorStr, newFlavorStr = lst[1:3]
@@ -928,22 +930,11 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
 		if newFlavorStr != "-":
 		    newFlavor = deps.ThawDependencySet(newFlavorStr)
 
-		del lines[i + 1]
+		del lines[i]
 		break
-
-	# find the change log
-	changeLog = None
-	for i, l in enumerate(lines[1:5]):
-	    if l.startswith("CL "):
-		cnt = int(l.split(' ', 1)[1])
-		first = i + 2
-		changeLog = changelog.ThawChangeLog(lines[first:first + cnt])
-		del lines[i: first + cnt]
-                break
 
 	self.newFiles = []
 	self.changedFiles = []
-	self.absolute = (pkgType == "ABS")
 	self.packages = {}
 	self.oldFlavor = oldFlavor
 	self.newFlavor = newFlavor
