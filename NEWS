@@ -1,11 +1,13 @@
 Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 
     repository findTrove function -- this enables conary q to work like 
-    conary rq
-  * Group handling didn't work for multiple levels of group inclusion
-  * Database.hasTrove() no longer needs to instantiate troves
-  * Fixed overly agressive cleaning of the cache
-  * added repository findTroves call to parallelize findTrove calls
+    conary rq.
+  * Group handling didn't work for multiple levels of group inclusion.
+  * Database.hasTrove() no longer needs to instantiate troves.
+  * Fixed overly-aggressive cleaning of the cache.
+  * Added repository findTroves call to parallelize findTrove calls.
+  * Added the NonMultilibDirectories policy to prevent 32-bit troves from
+    utilizing lib64 directories.
 
 Changes in 0.50.2:
   * Any %(lib)s-derived path (/%(lib)s, %(libdir)s, %(krbprefix)s/%(lib)s,

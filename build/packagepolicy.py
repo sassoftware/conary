@@ -119,6 +119,13 @@ class BadInterpreterPaths(policy.Policy):
 
 
 class NonMultilibComponent(policy.Policy):
+    """
+    Python and Perl components should generally be under /usr/lib, unless
+    they have binaries and are built on a 64-bit platform, in which case
+    they should have no files under /usr/lib, so that both the 32-bit abd
+    64-bit components can be installed at the same time (that is, they
+    should have multilib support).
+    """
     invariantsubtrees = [
         '%(libdir)s/',
         '%(prefix)s/lib/',
@@ -158,6 +165,24 @@ class NonMultilibComponent(policy.Policy):
                 ' but not both: at least %s and %s both exist' %(
                 p, self.foundlib[p], self.foundlib64[p]))
             self.reported[p] = True
+
+
+class NonMultilibDirectories(policy.Policy):
+    """
+    Troves for 32-bit platforms should not normally contain
+    directories named "lib64".
+    """
+    invariantinclusions = [ ( '.*/lib64', stat.S_IFDIR ), ]
+
+    def test(self):
+	if self.macros.lib == 'lib64':
+	    # no need to do anything
+	    return False
+        return True
+
+    def doFile(self, path):
+        self.recipe.reportErrors('path %s has illegal lib64 component on 32-bit platform' %path)
+
 
 
 class ImproperlyShared(policy.Policy):
@@ -1584,6 +1609,7 @@ def DefaultPolicy(recipe):
 	FilesInMandir(recipe),
         BadInterpreterPaths(recipe),
         NonMultilibComponent(recipe),
+        NonMultilibDirectories(recipe),
 	ImproperlyShared(recipe),
 	CheckSonames(recipe),
         RequireChkconfig(recipe),
