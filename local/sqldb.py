@@ -105,6 +105,7 @@ class DBTroveFiles:
 
     def addItem(self, pathId, versionId, path, fileId, instanceId, stream, 
                 tags):
+        assert(len(pathId) == 16)
         cu = self.db.cursor()
         cu.execute("""
 	    INSERT INTO DBTroveFiles VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)

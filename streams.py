@@ -25,11 +25,11 @@ class InfoStream(object):
 
     __slots__ = ()
 
-    def __deepcopy__(self, mem = None):
+    def __deepcopy__(self, mem):
         return self.__class__(self.freeze())
 
     def copy(self):
-        return self.__deepcopy__()
+        return self.__class__(self.freeze())
     
     def freeze(self, skipSet = None):
 	raise NotImplementedError
@@ -55,6 +55,9 @@ class NumericStream(InfoStream):
 
     __slots__ = "val"
 
+    def __deepcopy__(self, mem):
+        return self.__class__.thaw(self, self.freeze())
+
     def value(self):
 	return self.val
 
@@ -74,7 +77,10 @@ class NumericStream(InfoStream):
 	return None
 
     def thaw(self, frz):
-	self.val = struct.unpack(self.format, frz)[0]
+        if frz == "":
+            self.val = None
+        else:
+            self.val = struct.unpack(self.format, frz)[0]
 
     def twm(self, diff, base):
 	newVal = struct.unpack(self.format, diff)[0]
@@ -537,13 +543,6 @@ class StreamSet(InfoStream):
 	    if len(s):
 		rc.append(struct.pack(self.headerFormat, streamId, len(s)) + s)
 	return "".join(rc)
-
-    def copy(self):
-	new = copy.deepcopy(self)
-        for streamClass, name in self.streamDict.itervalues():
-            stream = self.__getattribute__(name).copy()
-            new.__setattr__(name, stream)
-        return new
 
     def twm(self, diff, base, skip = []):
 	i = 0

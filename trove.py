@@ -266,6 +266,9 @@ class Trove:
 	# stayed the same
 	if them:
             troveInfoDiff = self.troveInfo.diff(them.troveInfo)
+            if troveInfoDiff is None:
+                troveInfoDiff = ""
+
 	    themMap = them.idMap
 	    chgSet = TroveChangeSet(self.name, self.changeLog,
 				      them.getVersion(),	
@@ -990,6 +993,7 @@ class TroveChangeSet(AbstractTroveChangeSet):
 	self.oldFlavor.set(oldFlavor)
 	self.newFlavor.set(newFlavor)
         self.isRedirect.set(isRedirect)
+        assert(troveInfoDiff is not None)
         self.troveInfoDiff.set(troveInfoDiff)
 
 class ThawTroveChangeSet(AbstractTroveChangeSet):

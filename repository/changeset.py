@@ -281,12 +281,17 @@ class ChangeSet(streams.LargeStreamSet):
 	    pkg = db.getTrove(pkgCs.getName(), pkgCs.getOldVersion(),
 			      pkgCs.getOldFlavor())
 
+            newTroveInfo = pkg.getTroveInfo().copy()
+            newTroveInfo.twm(pkgCs.getTroveInfoDiff(), pkg)
+            newTroveInfoDiff = pkg.getTroveInfo().diff(newTroveInfo)
+
 	    # this is a modified package and needs to be inverted
 
 	    invertedPkg = trove.TroveChangeSet(pkgCs.getName(), 
 			       pkg.getChangeLog(),
 			       pkgCs.getNewVersion(), pkgCs.getOldVersion(),
-			       pkgCs.getNewFlavor(), pkgCs.getOldFlavor())
+			       pkgCs.getNewFlavor(), pkgCs.getOldFlavor(),
+                               troveInfoDiff = newTroveInfoDiff)
 
 	    for (name, list) in pkgCs.iterChangedTroves():
 		for (oper, version, flavor) in list:

@@ -272,13 +272,19 @@ class File(streams.StreamSet):
 		   FILE_STREAM_TAGS :  (streams.StringsStream, "tags") }
     __slots__ = [ "thePathId", "inode", "flags", "tags" ]
 
+    def __deepcopy__(self, mem):
+        return ThawFile(self.freeze(), self.thePathId)
+
+    def copy(self):
+        return ThawFile(self.freeze(), self.thePathId)
+
     def diff(self, other):
 	if self.lsTag != other.lsTag:
 	    d = self.freeze()
 	    return struct.pack(self.headerFormat, 0, len(d)) + d
 
 	rc = [ "\x01", self.lsTag ]
-        rc.append(StreamSet.diff(other))
+        rc.append(streams.StreamSet.diff(self, other))
 
 	return "".join(rc)
 

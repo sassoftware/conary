@@ -504,6 +504,7 @@ class ChangeSetJob:
                                 # change)
                                 fileObj = oldfile.copy()
                                 fileObj.twm(diff, oldfile)
+                                assert(fileObj.pathId() == pathId)
                             else:
                                 fileObj = files.ThawFile(diff, pathId)
 
