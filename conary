@@ -77,6 +77,8 @@ argDef["prep"] = 0
 argDef["macros"] = 1
 argDef["ls"] = 0
 
+argDef.update(srcctl.argDef)
+
 for arg in cfgMap.keys():
     argDef[arg] = 1
 
