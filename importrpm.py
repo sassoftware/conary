@@ -84,7 +84,7 @@ def doImport(repos, cfg, rpmFile):
     for i in xrange(0, len(list)):
 	if (stat.S_ISBLK(modes[i])):
 	    buildPkg.addDevice(list[i], "b", (rdevs[i] & 0xff00) >> 8,
-			       rdeves[i] & 0xff, owners[i], groups[i],
+			       rdevs[i] & 0xff, owners[i], groups[i],
 			       modes[i] & 07777)
 	elif  (stat.S_ISCHR(modes[i])):
 	    buildPkg.addDevice(list[i], "c", (rdevs[i] & 0xff00) >> 8,
