@@ -251,7 +251,8 @@ class Flag(dict):
 
         if self._name == '__GLOBAL__':
             return self
-        top = parent = Flag(value=None, name=self._name)
+        top = parent = Flag(value=None, name=self._name, 
+                                        required=self._required)
         cursor = self._parent
         while cursor is not None:
             child = parent
@@ -272,7 +273,8 @@ class Flag(dict):
         #    to True
         if flags:
             for flag in flags:
-                top[flag] = Flag(value=True, name=flag, parent=top)
+                top[flag] = Flag(value=True, name=flag, parent=top,
+                                 required=self[flag]._required)
         else:
             top._value = True
         return parent
