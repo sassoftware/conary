@@ -111,7 +111,7 @@ class FilesystemJob:
 			del self.tagRemoves[tagInfo.tag]
 
 		    if "self preremove" in tagInfo.implements:
-			tagCommands.append([ path, "self", "preremove" ] + 
+			tagCommands.append([ tagInfo.file, "self", "preremove" ] + 
 			   [x for x in 
 				self.repos.iterFilesWithTag(tagInfo.tag) ])
 
@@ -209,11 +209,11 @@ class FilesystemJob:
 		    del self.tagUpdates[tagInfo.tag]
 
 		if "self update" in tagInfo.implements:
-		    cmd = [ path, "self", "update" ] + \
+		    cmd = [ tagInfo.file, "self", "update" ] + \
 			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)]
 		    tagCommands.append(cmd)
 		elif "files update" in tagInfo.implements:
-		    cmd = [ path, "files", "update" ] + \
+		    cmd = [ tagInfo.file, "files", "update" ] + \
 			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)]
 		    if len(cmd) > 3:
 			tagCommands.append(cmd)
