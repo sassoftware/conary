@@ -105,6 +105,7 @@ class HttpHandler(HtmlEngine):
 
     def metadataCmd(self, authToken, fields):
         troveList = [x for x in self.repServer.repos.iterAllTroveNames() if x.endswith(':source')]
+        troveList.sort()
 
         self.htmlPageTitle("Metadata")
         self.htmlPickTrove(troveList)
