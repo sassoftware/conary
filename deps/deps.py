@@ -181,7 +181,7 @@ class InstructionSetDependency(DependencyClass):
 
     tag = DEP_CLASS_IS
     tagName = "is"
-    exactMatch = False
+    exactMatch = True
     justOne = True
 _registerDepClass(InstructionSetDependency)
 
