@@ -954,6 +954,7 @@ class Replace(BuildAction):
             finally:
                 if os.path.exists(tmppath):
                     os.remove(tmppath)
+                os.close(fd)
             if not foundMatch:
                 unchanged.append(path)
 
