@@ -14,12 +14,15 @@
 #include <unistd.h>
 
 static PyObject * inspect(PyObject *self, PyObject *args);
+static PyObject * info(PyObject *self, PyObject *args);
 
 static PyObject * ElfError;
 
 static PyMethodDef ElfMethods[] = {
     { "inspect", inspect, METH_VARARGS, 
 	"inspect an ELF file for dependency information" },
+    { "info", info, METH_VARARGS, 
+	"return basic information about an ELF file" },
     { NULL, NULL, 0, NULL }
 };
 
@@ -281,6 +284,90 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
 
     /* worked */
     return Py_BuildValue("OO", reqList, provList);
+}
+
+static int doInfo(Elf * elf) {
+    Elf_Scn * sect = NULL;
+    GElf_Shdr shdr;
+    size_t shstrndx;
+    char * name;
+
+    if (elf_kind(elf) != ELF_K_ELF) {
+	PyErr_SetString(ElfError, "not a plain elf file");
+	return 1;
+    }
+
+    
+    while ((sect = elf_nextscn(elf, sect))) {
+	if (!gelf_getshdr(sect, &shdr)) {
+	    PyErr_SetString(ElfError, "error getting section header!");
+	    return 1;
+	}
+
+	elf_getshstrndx (elf, &shstrndx);
+	name = elf_strptr (elf, shstrndx, shdr.sh_name);
+	printf("section %s\n", name);
+
+    }
+
+    return 0;
+}
+
+static PyObject * info(PyObject *self, PyObject *args) {
+    PyObject * reqList, * provList;
+    char * fileName;
+    int fd;
+    Elf * elf;
+    int rc;
+    char magic[4];
+
+    if (!PyArg_ParseTuple(args, "s", &fileName))
+	return NULL;
+
+    fd = open(fileName, O_RDONLY);
+    if (fd < 0) {
+	PyErr_SetFromErrno(PyExc_IOError);
+	return NULL;
+    }
+
+    if (read(fd, magic, sizeof(magic)) != 4) {
+	close(fd);
+	Py_INCREF(Py_None);
+	return Py_None;
+    }
+
+    if (magic[0] != 0x7f || magic[1] != 0x45 || magic[2] != 0x4c ||
+	magic[3] != 0x46) {
+	close(fd);
+	Py_INCREF(Py_None);
+	return Py_None;
+    }
+
+    lseek(fd, 0, 0);
+
+    elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
+    if (!elf) {
+	PyErr_SetString(ElfError, "error initializing elf file");
+	return NULL;
+    }
+
+    reqList = PyList_New(0);
+    provList = PyList_New(0);
+
+    rc = doInfo(elf);
+    elf_end(elf);
+    close(fd);
+
+    if (rc) {
+	/* didn't work */
+	Py_DECREF(provList);
+	Py_DECREF(reqList);
+	return NULL;
+    }
+
+    /* worked */
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 PyMODINIT_FUNC
