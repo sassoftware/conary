@@ -1,6 +1,11 @@
-Changes in 0.11.11
- * document config command, and display supplied macro/use/arch information 
-   in output
+Changes in 0.12.0
+  * document config command, and display supplied macro/use/arch information 
+    in output
+  * repository acl's work for almost everything
+  * anonymous access must be explicitly enabled by creating an acl for
+    user 'anonymous' with password 'anonymous'
+  * server side flavor scoring used
+  * queries reworked for flavor matching
 
 Changes in 0.11.10.1
   * move to python2.4
