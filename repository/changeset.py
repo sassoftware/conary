@@ -34,6 +34,11 @@ from StringIO import StringIO
 
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff", "ptr")
 
+_STREAM_CS_PRIMARY  = 1
+_STREAM_CS_PKGS     = 2
+_STREAM_CS_OLD_PKGS = 3
+_STREAM_CS_FILES    = 4
+
 class FileInfo(streams.TupleStream):
 
     __slots__ = []
@@ -57,6 +62,93 @@ class FileInfo(streams.TupleStream):
 	    streams.TupleStream.__init__(self, first)
 	else:
 	    streams.TupleStream.__init__(self, first, newFileId, chg)
+
+class RollbackRecordNewPackges(dict, streams.InfoStream):
+
+    def freeze(self, skipSet = None):
+	l = []
+	for newInfo, oldInfo in self.iteritems():
+            if oldInfo[0] is None:
+                l.append('')
+            else:
+                l.append(oldInfo[0])
+                l.append(oldInfo[1].asString())
+                l.append(oldInfo[2].freeze())
+
+            l.append(newInfo[0])
+            l.append(newInfo[1].asString())
+            l.append(newInfo[2].freeze())
+	
+	return "\0".join(l)
+
+    def thaw(self, data):
+        l = data.split('\0')
+	i = 0
+	while i < len(l):
+            if l[i]:
+                oldInfo = (l[i], versions.VersionFromString(l[i + 1]),
+                           deps.ThawDependencySet(l[i + 2]))
+                i += 3
+            else:
+                oldInfo = (None, None, None)
+                i += 1
+
+            newInfo = (l[i], versions.VersionFromString(l[i + 1]),
+                       deps.ThawDependencySet(l[i + 2]))
+            i += 3
+            self[newInfo] = oldInfo
+
+    def __init__(self, data = None):
+	if data:
+	    self.thaw(data)
+
+class RollbackRecord(streams.LargeStreamSet):
+
+    streamDict = { 
+        _STREAM_CS_PKGS:    (RollbackRecordNewPackges,    "newPackages"      ),
+        _STREAM_CS_OLD_PKGS:(streams.ReferencedTroveList, "oldPackages"      ),
+    }
+
+    """
+    Subsitutes for a changeset when full rollback information is
+    retrieved from a repository instead of being stored locally in
+    a changeset.
+    """
+
+    ROLLBACK_RECORD_MAGIC = "\xEA\x3F\x81\xBC"
+
+    def writeToFile(self, outFileName):
+        f = open(outFileName, 'w')
+        f.write(self.ROLLBACK_RECORD_MAGIC)
+        f.write(self.freeze())
+
+    def __init__(self, changeSet = None, fileName = None):
+        assert(not(changeSet and fileName))
+
+        if changeSet:
+            streams.LargeStreamSet.__init__(self)
+            for pkgCs in changeSet.iterNewPackageList():
+                newInfo = (pkgCs.getName(), pkgCs.getNewVersion(),
+                           pkgCs.getNewFlavor())
+
+                if pkgCs.getOldVersion():
+                    oldInfo = (pkgCs.getName(), pkgCs.getOldVersion(),
+                               pkgCs.getOldFlavor())
+
+                    self.newPackages[oldInfo] = newInfo
+                else:
+                    self.oldPackages.append(newInfo)
+
+            for (name, version, flavor) in changeSet.getOldPackageList():
+                self.newPackages[(name, version, flavor)] = (None, None, None)
+        else:
+            f = open(fileName, "r")
+            magic = f.read(len(self.ROLLBACK_RECORD_MAGIC))
+            if magic != self.ROLLBACK_RECORD_MAGIC:
+                raise filecontainer.BadContainer
+
+            data = f.read()
+            streams.LargeStreamSet.__init__(self, data)
 
 class ChangeSetNewPackageList(dict, streams.InfoStream):
 
@@ -116,11 +208,6 @@ class ChangeSetFileDict(dict, streams.InfoStream):
     def __init__(self, data = None):
 	if data:
 	    self.thaw(data)
-
-_STREAM_CS_PRIMARY  = 1
-_STREAM_CS_PKGS     = 2
-_STREAM_CS_OLD_PKGS = 3
-_STREAM_CS_FILES    = 4
 
 class ChangeSet(streams.LargeStreamSet):
 

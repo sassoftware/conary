@@ -92,7 +92,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                            for x in items]))
 
         client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,
-                           test = test, justDatabase = justDatabase)
+                           test = test, justDatabase = justDatabase,
+                           localRollbacks = cfg.localRollbacks)
     except conaryclient.UpdateError, e:
         log.error(e)
     except repository.CommitError, e:
@@ -112,7 +113,8 @@ def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False,
     try:
         brokenByErase = client.eraseTrove(troveList, tagScript = tagScript, 
                                           depCheck = depCheck, test = test,
-                                          justDatabase = justDatabase)
+                                          justDatabase = justDatabase,
+                                          localRollbacks = cfg.localRollbacks)
     except repository.TroveNotFound, e:
         log.error(str(e))
 

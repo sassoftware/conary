@@ -393,8 +393,9 @@ def realMain(cfg, argv=sys.argv):
 	db.removeFile(otherArgs[2])
     elif (otherArgs[1] == "rollback"):
 	if argSet: return usage()
+	repos = openRepository(cfg.repositoryMap)
 	db = openDatabase(cfg.root, cfg.dbPath)
-	args = [db, cfg] + otherArgs[2:]
+	args = [db, repos, cfg] + otherArgs[2:]
 	rollbacks.apply(*args)
     elif (otherArgs[1] == "verify"):
 	db = openDatabase(cfg.root, cfg.dbPath)

@@ -14,6 +14,7 @@
 
 from local import database
 from lib import log
+from repository import changeset
 
 def listRollbacks(db, cfg):
     def verStr(cfg, version):
@@ -29,34 +30,36 @@ def listRollbacks(db, cfg):
 
 	rb = db.getRollback(rollbackName)
 	for cs in rb:
-	    list = []
-	    for pkg in cs.iterNewPackageList():
-		list.append((pkg.getName(), pkg))
+            if isinstance(cs, changeset.RollbackRecord):
+                newList = [ (x[0][0], x[1][1], x[0][1])
+                                        for x in cs.newPackages.iteritems() ]
+                oldList = [ x[0:2] for x in cs.oldPackages ]
+            else:
+                newList = []
+                for pkg in cs.iterNewPackageList():
+                    newList.append((pkg.getName(), pkg.getOldVersion(),
+                                    pkg.getNewVersion()))
+                oldList = [ x[0:2] for x in cs.getOldPackageList() ]
 
-	    list.sort()
-	    for (name, pkg) in list:
-		if not pkg.getOldVersion():
+	    newList.sort()
+	    oldList.sort()
+	    for (name, oldVersion, newVersion) in newList:
+		if not oldVersion:
 		    print "\t%s %s removed" % (name, 
-					       verStr(cfg, pkg.getNewVersion()))
+					       verStr(cfg, newVersion))
 		else:
 		    print "\t%s %s -> %s" % \
-			(name, 
-			 verStr(cfg, pkg.getOldVersion()),
-			 verStr(cfg, pkg.getNewVersion()))
+			(name, verStr(cfg, oldVersion),
+			       verStr(cfg, newVersion))
 
-	    list = []
-	    for (pkg, version, flavor) in cs.getOldPackageList():
-		list.append((pkg, version))
-
-	    list.sort()
-	    for (pkg, version) in list:
-		print "\t%s %s added" %  (pkg, verStr(cfg, version))
+	    for (name, version) in oldList:
+		print "\t%s %s added" %  (name, verStr(cfg, version))
 
 	print
 
-def apply(db, cfg, *names):
+def apply(db, repos, cfg, *names):
     try:
-	db.applyRollbackList(names)
+	db.applyRollbackList(repos, names)
     except database.RollbackError, e:
 	log.error("%s", e)
 	return 1

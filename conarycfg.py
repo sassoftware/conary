@@ -250,6 +250,7 @@ class ConaryConfiguration(ConfigFile):
         'excludeTroves'         : [ REGEXPLIST, [] ],
         'flavor'                : [ FLAVOR, deps.deps.DependencySet() ],
 	'installLabelPath'	: [ LABELLIST, [] ],
+        'localRollbacks'        : [ BOOL, False ],
 	'lookaside'		: '/var/cache/conary',
 	'name'			: None,
 	'repositoryMap'	        : [ STRINGDICT, {} ],

@@ -16,6 +16,7 @@ import datastore
 from repository import changeset
 import errno
 from repository import filecontents
+from repository import filecontainer
 from lib import log
 import localrep
 import os
@@ -273,7 +274,8 @@ class Database(SqlDbRepository):
     def commitChangeSet(self, cs, isRollback = False, toStash = True,
                         replaceFiles = False, tagScript = None,
 			keepExisting = False, test = False,
-                        justDatabase = False, journal = None):
+                        justDatabase = False, journal = None,
+                        localRollbacks = False):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -319,7 +321,11 @@ class Database(SqlDbRepository):
 	    fsPkgDict[(fsPkg.getName(), fsPkg.getVersion())] = fsPkg
 
 	if not isRollback:
-	    inverse = cs.makeRollback(self, configFiles = 1)
+            localRollbacks = True
+            if localRollbacks:
+                inverse = cs.makeRollback(self, configFiles = 1)
+            else:
+                inverse = changeset.RollbackRecord(changeSet = cs)
             flags |= update.MERGE
 	if keepExisting:
 	    flags |= update.KEEPEXISTING
@@ -512,11 +518,14 @@ class Database(SqlDbRepository):
 	rc = []
 	for ch in [ "r", "l" ]:
 	    name = self.rollbackCache + "/" + "rb.%c.%d" % (ch, num)
-	    rc.append(changeset.ChangeSetFromFile(name))
+            try:
+                rc.append(changeset.ChangeSetFromFile(name))
+            except filecontainer.BadContainer:
+                rc.append(changeset.RollbackRecord(fileName = name))
 
 	return rc
 
-    def applyRollbackList(self, names):
+    def applyRollbackList(self, repos, names):
 	last = self.lastRollback
 	for name in names:
 	    if not self.hasRollback(name):
@@ -529,6 +538,14 @@ class Database(SqlDbRepository):
 
 	for name in names:
 	    (reposCs, localCs) = self.getRollback(name)
+            if isinstance(reposCs, changeset.RollbackRecord):
+                jobList = [ (x[0][0], (x[1][1], x[1][2]),
+                                      (x[0][1], x[0][2]), False)
+                                for x in reposCs.newPackages.iteritems() ]
+                jobList += [ (x[0], (x[1], x[2]), (None, None), False)
+                                for x in reposCs.oldPackages ]
+                reposCs = repos.createChangeSet(jobList, recurse = False)
+
 	    self.commitChangeSet(reposCs, isRollback = True)
 	    self.commitChangeSet(localCs, isRollback = True, toStash = False)
 	    self.removeRollback(name)
