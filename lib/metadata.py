@@ -105,11 +105,11 @@ class MetadataTable:
 
         # create a dictionary of metadata classes
         # each key points to a list of metadata items
-        items = {MDClass.URL: [], MDClass.LICENSE: [], MDClass.CATEGORY: []}
+        items = {str(MDClass.URL): [], str(MDClass.LICENSE): [], str(MDClass.CATEGORY): []}
         for mdClass, data in cu:
-            if not items.has_key(mdClass):
-                items[mdClass] = []
-            items[mdClass].append(data)
+            if not items.has_key(str(mdClass)):
+                items[str(mdClass)] = []
+            items[str(mdClass)].append(data)
 
         return items
 

@@ -482,22 +482,25 @@ class TroveStore:
         branchId = self.branchTable[branch]
        
         # if we're updating the default language, always create a new version
+        # XXX we can remove one vesionTable.get call from here...
+        # XXX this entire mass of code can probably be improved.
+        #     surely someone does something similar someplace else...
         latestVersion = self.metadataTable.getLatestVersion(itemId, branchId)
         if language == "C":
             if latestVersion:
                 version = versions.VersionFromString(latestVersion)
                 version.incrementRelease()
+                self.versionTable.addId(version)
             else:
                 version = versions._VersionFromString("1-1", defaultBranch=branch)
-            
-            self.versionTable.addId(version)
+                if not self.versionTable.get(version, None):
+                    self.versionTable.addId(version)
         else: # if this is a translation, update the current version
             if not latestVersion:
                 raise KeyError, troveName
             version = versions.VersionFromString(latestVersion)
-           
+        
         versionId = self.versionTable.get(version, None)
-
         return self.metadataTable.add(itemId, versionId, branchId, shortDesc, longDesc,
                                       urls, licenses, categories, language)
 
@@ -509,7 +512,6 @@ class TroveStore:
             latestVersion = self.metadataTable.getLatestVersion(itemId, branchId)
         else:
             latestVersion = version.asString()
-
         cu = self.db.cursor()
         cu.execute("SELECT versionId FROM Versions WHERE version=?", latestVersion)
 

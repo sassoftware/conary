@@ -152,15 +152,24 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def updateMetadata(self, troveName, branch, shortDesc = None, longDesc = None,
                        urls = [], licenses=[], categories = [], language = "C"):
- 
         self.c[branch].updateMetadata(troveName, branch.freeze(), shortDesc, longDesc,
                                       urls, licenses, categories, language)
 
-    def getMetadata(self, troveName, branch, language="C", version=""):
-        if version:
-            version = version.freeze()
-            
-        return self.c[branch].getMetadata(troveName, branch.freeze(), language, version)
+    def getMetadata(self, troveList, label, language="C"):
+        if type(troveList[0]) is str:
+            troveList = [troveList]
+
+        frozenList = []
+        for trove in troveList:
+            branch = trove[1].freeze()
+            if len(trove) == 2:
+                version = ""
+            else:
+                version = trove[2].freeze()
+            item = (trove[0], branch, version)
+            frozenList.append(item)
+         
+        return self.c[label].getMetadata(frozenList, language)
 
     def troveNames(self, label):
 	return self.c[label].troveNames(self.fromLabel(label))

@@ -135,12 +135,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return retval
 
     def getMetadata(self, authToken, clientVersion,
-                    troveName, branch, language, version):
-        branch = self.toBranch(branch)
-        if version:
-            version = self.toVersion(version)
-
-        return self.repos.troveStore.getMetadata(troveName, branch, version)
+                    troveList, language):
+        metadata = {}
+        
+        # XXX optimize this to one SQL query downstream
+        for troveName, branch, version in troveList:
+            branch = self.toBranch(branch)
+            if version:
+                version = self.toVersion(version)
+            else:
+                version = None
+            print troveName, branch, version, language        
+            md = self.repos.troveStore.getMetadata(troveName, branch, version, language)
+            if md:
+                metadata[troveName] = md
+                print md
+        return metadata
     
     def hasPackage(self, authToken, clientVersion, pkgName):
 	if not self.auth.check(authToken, write = False, trove = pkgName):
