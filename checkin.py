@@ -4,6 +4,7 @@
 #
 
 import changeset
+import helper
 import log
 import package
 import versions
@@ -33,31 +34,12 @@ def checkin(repos, cfg, file):
     repos.commitChangeSet(changeSet)
 
 def checkout(repos, cfg, name, file, versionStr = None):
-    if name[0] != ":":
-	name = cfg.packagenamespace + ":" + name
-    else:
-	name = name
-
-    if name.count(":") != 2:
-	log.error("group names may not include colons")
+    try:
+	pkg = helper.findPackage(repos, cfg.packagenamespace, cfg.defaultbranch,
+				 name, versionStr, forceGroup = 1)
+    except helper.PackageNotFound, e:
+	log.error(str(e))
 	return
-
-    last = name.split(":")[-1]
-    if not last.startswith("group-"):
-	log.error("only groups may be checked out of the repository")
-	return
-
-    if not versionStr:
-	version = cfg.defaultbranch
-    else:
-	if versionStr[0] != "/":
-	    versionStr = cfg.defaultbranch.asString() + "/" + versionStr
-	version = versions.VersionFromString(versionStr)
-
-    if version.isBranch():
-	pkg = repos.getLatestPackage(name, version)
-    else:
-	pkg = repos.getPackageVersion(name, version)
 
     f = open(file, "w")
     f.write("\n".join(pkg.getGroupFile()))
