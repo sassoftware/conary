@@ -50,6 +50,8 @@ def usage(rc = 1):
     print "           update       <changeset>"
     print "       srs usage"
     print ""
+    print "commit flags:  --target-branch <branch>"
+    print ""
     print "common flags:  --branch <defaultbranch>"
     print '               --config "<item> <value>"'
     print "               --reppath <repository-path>"
@@ -58,7 +60,7 @@ def usage(rc = 1):
     print "pkglist flags: --all"
     print "               --ls"
     print ""
-    print "update flags: --replacefiles"
+    print "update flags: --replace-files"
     sys.exit(rc)
 
 def openRepository(path, mode):
@@ -89,13 +91,14 @@ cfgMap["branch"] = "defaultbranch"
 cfgMap["reppath"] = "reppath"
 cfgMap["root"] = "root"
 
-argDef["config"] = 2
 argDef["all"] = 0
-argDef["prep"] = 0
-argDef["macros"] = 1
+argDef["config"] = 2
 argDef["ls"] = 0
+argDef["macros"] = 1
+argDef["prep"] = 0
 argDef["profile"] = 0
-argDef["replacefiles"] = 0
+argDef["replace-files"] = 0
+argDef["target-branch"] = 1
 
 argDef.update(srcctl.argDef)
 
@@ -181,10 +184,14 @@ elif (otherArgs[1] == "changeset"):
 
     changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
 elif (otherArgs[1] == "commit"):
+    targetBranch = None
+    if argSet.has_key('target-branch'):
+	targetBranch  = argSet['target-branch']
+	del argSet['target-branch']
     if len(otherArgs) < 3: usage()
     repos = openRepository(cfg.reppath, "c")
     for changeSet in otherArgs[2:]:
-	commit.doCommit(repos, changeSet)
+	commit.doCommit(repos, changeSet, targetBranch)
 elif (otherArgs[1] == "config"):
     if argSet: usage
     if (len(otherArgs) > 2):
@@ -270,10 +277,10 @@ elif (otherArgs[1] == "source" or otherArgs[1] == "src"):
     srcctl.sourceCommand(cfg, otherArgs[2:], argSet)
 elif (otherArgs[1] == "update"):
     kwargs = {}
-    replaceFiles = argSet.has_key('replacefiles')
+    replaceFiles = argSet.has_key('replace-files')
     if replaceFiles:
         kwargs['replaceFiles'] = True
-        del argSet['replacefiles']
+        del argSet['replace-files']
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	repos = openRepository(cfg.reppath, "r")

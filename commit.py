@@ -3,13 +3,24 @@
 # All rights reserved
 #
 import changeset
+import log
 import repository
+import versions
 
-def doCommit(repos, changeSetFile):
+def doCommit(repos, changeSetFile, targetBranch):
     cs = changeset.ChangeSetFromFile(changeSetFile)
+    if targetBranch:
+	if cs.isAbstract():
+	    # we can't do this -- where would we branch from?
+	    log.error("abstract change sets cannot be retargeted")
+	    return
+	label = versions.BranchName(targetBranch)
+	cs.setTargetBranch(repos, label)
+
     if cs.isLocal():
 	log.error("local change sets cannot be applied to a repository "
 		  "without a branch override")
+
     try:
 	repos.commitChangeSet(cs)
     except repository.CommitError, e:
