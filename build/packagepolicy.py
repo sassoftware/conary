@@ -15,6 +15,14 @@ Classes from this module are not used directly; instead, they are used
 through eponymous interfaces in recipe.
 """
 
+def _markConfig(recipe, filename):
+    packages = recipe.autopkg.packages
+    for package in packages.keys():
+	if packages[package].has_key(filename):
+	    print 'config:', filename
+	    packages[package][filename].isConfig(True)
+
+
 class EtcConfig(policy.Policy):
     """
     Mark all files below /etc as config files
@@ -24,10 +32,7 @@ class EtcConfig(policy.Policy):
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and not os.path.islink(fullpath):
-	    for package in self.recipe.packages:
-		if package.has_key(file):
-		    print 'config:', file
-		    package[file].isConfig(True)
+	    _markConfig(self.recipe, file)
 
 
 class Config(policy.Policy):
@@ -56,10 +61,7 @@ class Config(policy.Policy):
 	if os.path.isfile(fullpath) and not os.path.islink(fullpath):
 	    for configRE in self.configREs:
 		if configRE.search(file):
-		    for package in self.recipe.packages:
-			if package.has_key(file):
-			    print 'config:', file
-			    package[file].isConfig(True)
+		    _markConfig(self.recipe, file)
 
 
 def DefaultPolicy():

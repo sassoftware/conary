@@ -45,15 +45,15 @@ class BuildAction(util.Action):
 	# change self.use to be a simple flag
 	self.use = util.checkUse(self.use)
 
-    def doBuild(self, macros):
+    def doBuild(self, recipe):
+	self.recipe = recipe
 	if self.use:
-	    self.do(macros)
+	    self.do(recipe.macros)
 
 class BuildCommand(BuildAction, util.ShellCommand):
     """
-    Pure virtual class which implements the default doBuild method
-    required of build classes based on the shell command built from
-    a template.
+    Pure virtual class which implements the do method,
+    based on the shell command built from a template.
     """
     def __init__(self, *args, **keywords):
 	# enforce pure virtual status
@@ -71,7 +71,7 @@ class BuildCommand(BuildAction, util.ShellCommand):
         @return: None
         @rtype: None
 	"""
-        if self.use: util.execute(self.command %macros)
+        util.execute(self.command %macros)
 
 
 class Run(BuildCommand):
@@ -219,8 +219,8 @@ class InstallDesktopfile(BuildCommand):
     keywords = {'vendor': 'net',
 		'categories': None}
 
-    def doBuild(self, macros):
-	macros = macros.copy()
+    def doBuild(self, recipe):
+	macros = recipe.macros.copy()
         if self.categories:
 	    macros['category'] = '--add-category %s' %self.categories
 	BuildCommand.doBuild(self, macros)

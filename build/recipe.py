@@ -419,9 +419,9 @@ class Recipe:
                 if type(bld) is str:
                     util.execute(bld %self.macros)
                 else:
-                    bld.doBuild(self.macros)
+                    bld.doBuild(self)
 	else:
-	    self.build.doBuild(self.macros)
+	    self.build.doBuild(self)
 
     def addProcess(self, post):
 	self.process[:0] = [post] # prepend so that policy is done last
@@ -432,10 +432,6 @@ class Recipe:
 	for post in self.destdirPolicy:
             post.doProcess(self)
 
-    def doPackagePolicy(self):
-	for policy in self.packagePolicy:
-	    policy.doProcess(self)
-
     def addDevice(self, target, devtype, major, minor, owner, group, perms):
         self._devices.append((target, devtype, major, minor, owner, group, perms))
 
@@ -443,13 +439,16 @@ class Recipe:
         # by default, everything that hasn't matched a pattern in the
         # main package filter goes in the package named self.name
         self.mainFilters.append(buildpackage.Filter(self.name, '.*'))
-	autopkg = buildpackage.AutoBuildPackage(namePrefix, version,
-                                                self.mainFilters,
-                                                self.subFilters)
-        autopkg.walk(root)
+	self.autopkg = buildpackage.AutoBuildPackage(namePrefix, version,
+                                                     self.mainFilters,
+                                                     self.subFilters)
+        self.autopkg.walk(root)
+	for policy in self.packagePolicy:
+	    policy.doProcess(self)
+	# XXX next two should get wrapped up in policy, I think
         for device in self._devices:
-            autopkg.addDevice(*device)
-        self.packages = autopkg.getPackages()
+            self.autopkg.addDevice(*device)
+        self.packages = self.autopkg.getPackages()
 
     def package(self):
         pass
