@@ -582,6 +582,8 @@ class Strip(policy.Policy):
 	('%(essentialbindir)s/', None, stat.S_IFDIR),
 	('%(sbindir)s/', None, stat.S_IFDIR),
 	('%(essentialsbindir)s/', None, stat.S_IFDIR),
+	('%(x11prefix)s/bin/', None, stat.S_IFDIR),
+	('%(krbprefix)s/bin/', None, stat.S_IFDIR),
 	('%(libdir)s/', None, stat.S_IFDIR),
 	('%(essentiallibdir)s/', None, stat.S_IFDIR),
         # we need to strip these separately on a multilib system, and
