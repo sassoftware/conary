@@ -119,14 +119,6 @@ class ExecutableLibraries(policy.Policy):
 	log.warning('non-executable library %s, changing to mode 0755' %path)
 	os.chmod(fullpath, 0755)
 
-class SanitizeSonames(policy.Policy):
-    """
-    make sure that .so -> SONAME -> fullname
-    """
-    invariantinclusions = [ (r'..*\.so\..*', None, stat.S_IFDIR), ]
-    def do(self):
-	pass
-
 class RemoveBackupFiles(policy.Policy):
     """
     Kill editor and patch backup files
@@ -384,7 +376,6 @@ def DefaultPolicy():
 	RemoveExtraLibs(),
 	FixupMultilibPaths(),
 	ExecutableLibraries(),
-	SanitizeSonames(),
 	RemoveBackupFiles(),
 	Strip(),
 	NormalizeCompression(),
