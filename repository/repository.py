@@ -57,7 +57,10 @@ class Repository:
 	return self._getPackageSet(pkgName).getLatestPackage(branch)
 
     def getPackageVersion(self, pkgName, version):
-	return self._getPackageSet(pkgName).getVersion(version)
+	try:
+	    return self._getPackageSet(pkgName).getVersion(version)
+	except KeyError:
+	    raise PackageMissing(pkgName, version)
 
     def erasePackageVersion(self, pkgName, version):
 	ps = self._getPackageSet(pkgName)
