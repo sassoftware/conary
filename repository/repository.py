@@ -612,7 +612,9 @@ class ChangeSetJob:
 	for csPkg in cs.iterNewPackageList():
 	    newVersion = csPkg.getNewVersion()
 	    old = csPkg.getOldVersion()
+	    oldTroveVersion = old
 	    pkgName = csPkg.getName()
+	    troveFlavor = csPkg.getFlavor()
 
 	    if repos.hasTrove(pkgName, newVersion, csPkg.getFlavor()):
 		raise CommitError, \
@@ -667,7 +669,7 @@ class ChangeSetJob:
 				     file.contents.size())
 		    contType = changeset.ChangedFileTypes.file
 		else:
-		    oldFile = fileMap[fileId][3]
+		    oldPath = fileMap[fileId][3]
 		    contType = cs.getFileContentsType(fileId)
 		    if contType == changeset.ChangedFileTypes.diff:
 			# the content for this file is in the form of a diff,
@@ -676,7 +678,20 @@ class ChangeSetJob:
 			assert(oldVer)
 			(contType, fileContents) = cs.getFileContents(fileId)
 			sha1 = oldfile.contents.sha1()
-			f = repos._getFileObject(sha1)
+
+			# ugh. we could use getFileContents() directly,
+			# but that's slow since it has to look up the sha1....
+			if oldVer.branch().label().getHost() == self.repos.name:
+			    f = repos._getFileObject(sha1)
+			else:
+			    import pdb
+			    pdb.set_trace()
+			    f = self.repos._getLocalOrRemoteFileContents(
+					pkgName, oldTroveVersion, troveFlavor, 
+					oldPath, oldVer, 
+					oldfile.contents.sha1(),
+					oldfile.contents.size()).get()
+
 			oldLines = f.readlines()
 			del f
 			diff = fileContents.get().readlines()
