@@ -6,7 +6,7 @@
     <head py:def="html_header(title)">
         <title>${title}</title>
         <link rel="stylesheet" type="text/css" href="style.css" />
-        <script language="javascript1.2" src="library.js" />
+        <script language="javascript1.2" src="library.js"> </script>
     </head>
 
     <!-- define the HTML footer -->
