@@ -13,6 +13,7 @@ import os
 import package
 import util
 import versioned
+import bsddb
 
 class Repository:
 
@@ -275,24 +276,40 @@ class LocalRepository(Repository):
 	    self.close()
 
 	self.lockfd = os.open(self.top + "/lock", os.O_CREAT | os.O_RDWR)
+        # XXX check return value of os.open
 
-	if (mode == "r"):
+	if mode == "r":
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_SH)
 	else:
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
 
-	self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", mode)
-	self.fileDB = versioned.Database(self.top + "/files.db", mode)
+        try:
+            self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", mode)
+            self.fileDB = versioned.Database(self.top + "/files.db", mode)
+        # XXX this should be translated into a generic versioned.DatabaseError
+        except bsddb.error:
+            # an error occured, close our databases and relinquish the lock
+            if self.pkgDB is not None:
+                self.pkgDB.close()
+                self.pkgDB = None
+	    fcntl.lockf(self.lockfd, fcntl.LOCK_UN)
+            os.close(self.lockfd)
+            self.lockfd = -1
+            raise
 
 	self.mode = mode
 
     def close(self):
-	if self.pkgDB:
+	if self.pkgDB is not None:
+            self.pkgDB.close()
+            self.fileDB.close()
 	    self.pkgDB = None
 	    self.fileDB = None
 	    os.close(self.lockfd)
+            self.lockfd = -1
 
     def __init__(self, path, mode = "r"):
+        self.lockfd = -1
 	self.top = path
 	self.pkgDB = None
 	
