@@ -119,27 +119,6 @@ class FileTableEntryFromFile1(object):
 	# and the arbitrary data
 	(self.data,) = struct.unpack("%ds" % size, rest[i:])
 
-class FileContainerFile:
-
-    def close(self):
-	pass
-
-    def read(self, bytes = -1):
-	if bytes < 0 or (self.end - self.pos) <= bytes:
-	    # return the rest of the file
-	    count = self.end - self.pos
-	    self.pos = self.end
-	    return self.file.read(count)
-	else:
-	    self.pos = self.pos + bytes
-	    return self.file.read(bytes)
-
-    def __init__(self, file, size):
-	self.file = file
-	self.size = size
-	self.end = self.size
-	self.pos = 0
-
 class FileContainer:
 
     bufSize = 128 * 1024
@@ -195,7 +174,7 @@ class FileContainer:
 	if name is None:
 	    return None
 
-	fcf = FileContainerFile(self.gzfile, size)
+	fcf = util.NestedFile(self.gzfile, size)
 	self.next = self.gzfile.tell() + size
 
 	return (name, tag, fcf, size)

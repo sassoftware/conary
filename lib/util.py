@@ -404,3 +404,56 @@ def tupleListBsearchInsert(haystack, newItem, cmpFn):
             haystack.insert(start + 1, newItem)
         elif rc > 0:
             haystack.insert(start, newItem)
+
+class NestedFile:
+
+    def close(self):
+	pass
+
+    def read(self, bytes = -1):
+        if self.needsSeek:
+            self.file.seek(self.pos + self.start, 0)
+            self.needsSeek = False
+
+	if bytes < 0 or (self.end - self.pos) <= bytes:
+	    # return the rest of the file
+	    count = self.end - self.pos
+	    self.pos = self.end
+	    return self.file.read(count)
+	else:
+	    self.pos = self.pos + bytes
+	    return self.file.read(bytes)
+
+    def __init__(self, file, size):
+	self.file = file
+	self.size = size
+	self.end = self.size
+	self.pos = 0
+        self.start = 0
+        self.needsSeek = False
+
+class SeekableNestedFile(NestedFile):
+
+    def __init__(self, file, size, start = -1):
+        NestedFile.__init__(self, file, size)
+
+        if start == -1:
+            self.start = file.tell()
+        else:
+            self.start = start
+
+        self.needsSeek = True
+
+    def seek(self, offset, whence = 0):
+        if whence == 0:
+            newPos = offset
+        elif whence == 1:
+            newPos = self.pos + offset
+        else:
+            newPos = self.size + offset
+            
+        if newPos > self.size or newPos < 0:
+            raise IOError
+        
+        self.pos = newPos
+        self.needsSeek = True
