@@ -163,7 +163,7 @@ class Version:
 	@param version: string representing a version
 	@type version: str
 	@param release: release number
-	@type version: int
+	@type release: int
 	"""
 	assert(self.isBranch())
 	self.versions.append(VersionRelease("%s-%d" % (version, release)))

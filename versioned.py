@@ -3,24 +3,27 @@
 # All rights reserved
 #
 """
-implements a set of versioned files on top of a single hashed db file
+Implements a set of versioned files on top of a single hashed db file
 
 FileIndexedDatabase provides a list of files present, and stores that
-list in the _FILE_MAP entry
+list in the _FILE_MAP entry.
 
 Each file has a mapping of branch names to the head of that branch
-  stored as _BRANCH_MAP. Empty branches have a map entry which maps
-  the branch to the empty string.
-Each file/version pair has an info node which stores a reference to both
-  the parent and child of that version on the branch; they are stored
-  as frozen versions to allow them to be properly ordered. It also stores
-  the frozen version of the version uses info is being stored
-The contents of each file are stored as _CONTENTS
-The _BRANCH_NICK stores a mapping from a branch nickname to a list of
-  all of the versions which that branch maps to.
+stored as _BRANCH_MAP. Empty branches have a map entry which maps
+the branch to the empty string.
 
-the versions are expected to be Version objects as defined by the versions
-module
+Each file/version pair has an info node which stores a reference to both
+the parent and child of that version on the branch; they are stored
+as frozen versions to allow them to be properly ordered. It also stores
+the frozen version of the version uses info is being stored.
+
+The contents of each file are stored as _CONTENTS.
+
+The _BRANCH_NICK stores a mapping from a branch nickname to a list of
+all of the versions to which that branch maps.
+
+The versions are expected to be Version objects as defined by the versions
+module.
 """
 
 from filecontainer import FileContainer
