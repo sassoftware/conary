@@ -56,6 +56,7 @@ Use = UseClass({
     'slang':		False,
     'netpbm':		False,
     'nptl':		False,
+    'gdbm':		False,
 })
 
 Arch = UseClass({
