@@ -356,7 +356,8 @@ class taghandlerBuilder:
             "        # this file needs to have different contents in each build",
             "        # in order for rpm script update conventions to work",
             "        # some random data should be good enough",
-            "        r.Run('dd if=/dev/random bs=64 | md5sum > /usr/lib/conary/rpm-scripts/%(name)s/updatefile')",
+            "        r.Create('/usr/lib/conary/rpm-scripts/%(name)s/updatefile')",
+            "        r.Run('dd if=/dev/random bs=64 count=1 | md5sum > %(destdir)s/usr/lib/conary/rpm-scripts/%(name)s/updatefile')",
             "        r.TagSpec(r.name, '/usr/lib/conary/rpm-scripts/%(name)s/updatefile')"
         ]
         if POST in self.scripts:
@@ -378,6 +379,7 @@ class recipeBuilder:
         self.recipename = self.packagename + '.recipe'
         # get information from RPM
         rpmdata = {}
+        rpmdata['classname'] = '_'.join(self.packagename.split('-'))
         rpmdata['packagename'] = self.packagename
         rpmdata['version'] = '_'.join((
             self.rpmHeader[rpmhelper.VERSION],
@@ -385,17 +387,42 @@ class recipeBuilder:
         rpmdata['rpmname'] = os.path.basename(rpmname)
 
         self.recipe = [
-            "class %(packagename)s(PackageRecipe):" %rpmdata,
+            "class %(classname)s(PackageRecipe):" %rpmdata,
             "    name = '%(packagename)s'" %rpmdata,
             "    version = '%(version)s'" %rpmdata,
+            "",
             "    def setup(r):",
             "        r.addArchive('%(rpmname)s', dir='/')" %rpmdata,
+            "",
             "        # by default, we do not split RPMs up into components",
             "        r.ComponentSpec('runtime', '.*')",
+            "",
             "        # RPMs may not follow conary rules for config files for",
             "        # each file in /etc, so we'll stick to only files marked",
             "        # as config files in the RPM proper",
             "        r.EtcConfig(exceptions='.*')",
+            "",
+            "        # We also need to disable a lot of other policy that is",
+            "        # very useful when building software, but not when",
+            "        # trying to repackage something essentially unchanged.",
+            "        r.RemoveNonPackageFiles(exceptions='.*')",
+            "        r.FixupMultilibPaths(exceptions='.*')",
+            "        r.ExecutableLibraries(exceptions='.*')",
+            "        r.Strip(exceptions='.*')",
+            "        r.NormalizeCompression(exceptions='.*')",
+            "        r.NonBinariesInBindirs(exceptions='.*')",
+            "        r.FilesInMandir(exceptions='.*')",
+            "        r.BadInterpreterPaths(exceptions='.*')",
+            "        r.ImproperlyShared(exceptions='.*')",
+            "        r.CheckSonames(exceptions='.*')",
+            "        r.RequireChkconfig(exceptions='.*')",
+            "        r.CheckDestDir(exceptions='.*')",
+            "        r.DanglingSymlinks(exceptions='.*')",
+            "        r.WarnWriteable(exceptions='.*')",
+            "        r.WorldWriteableExecutables(exceptions='.*')",
+            "        # ObsoletePaths does not honor exceptions",
+            "        del r.ObsoletePaths",
+            "        r.IgnoredSetuid(exceptions='.*')",
             "",
         ]
 
