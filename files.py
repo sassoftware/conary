@@ -165,7 +165,7 @@ class SymbolicLink(File):
 	# chmod() on a symlink follows the symlink
 	pass
 
-    def restore(self, repos, target):
+    def restore(self, changeSet, target):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.symlink(self.theLinkTarget, target)
@@ -200,7 +200,7 @@ class NamedPipe(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, repos, target):
+    def restore(self, changeSet, target):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.mkfifo(target)
@@ -214,9 +214,9 @@ class Directory(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, repos, target):
+    def restore(self, changeSet, target):
 	if not os.path.isdir(target):
-	    os.mkdir(target)
+	    util.mkdirChain(target)
 
 	File.restore(self, target)
 
@@ -236,7 +236,7 @@ class DeviceFile(File):
 	
 	return 0
 
-    def restore(self, repos, target):
+    def restore(self, changeSet, target):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 
@@ -296,7 +296,7 @@ class RegularFile(File):
 
 	return 0
 
-    def restore(self, repos, target):
+    def restore(self, changeSet, target):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	else:
@@ -304,8 +304,10 @@ class RegularFile(File):
 	    util.mkdirChain(path)
 
 	f = open(target, "w")
-	repos.pullFileContents(self.sha1(), f)
+	src = changeSet.getFileContents(self.sha1())
+	f.write(src.read())
 	f.close()
+	src.close()
 	File.restore(self, target)
 
     def archive(self, repos, file):
