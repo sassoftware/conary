@@ -24,8 +24,6 @@ if os.path.dirname(sys.argv[0]):
 else:
     fullPath = os.getcwd()
 
-fullPath = '/home/dbc/spx/cvs/conary/'
-
 sys.path.append(os.path.dirname(fullPath))
 
 import conarycfg
