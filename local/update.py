@@ -111,9 +111,9 @@ class FilesystemJob:
 			del self.tagRemoves[tagInfo.tag]
 
 		    if "self preremove" in tagInfo.implements:
-			tagCommands.append([ tagInfo.file, "self", "preremove" ] + 
+			tagCommands.append([ tagInfo, ("self", "preremove"), 
 			   [x for x in 
-				self.repos.iterFilesWithTag(tagInfo.tag) ])
+				self.repos.iterFilesWithTag(tagInfo.tag) ] ] )
 
 	    del self.tagRemoves['tagdescription']
 
@@ -123,18 +123,12 @@ class FilesystemJob:
 
 	    if "files preremove" in tagInfo.implements:
 		l.sort()
-		cmd = [ tagInfo.file, "files", "preremove"] + \
-			    [ x[rootLen:] for x in l ]
+		cmd = [ tagInfo, ("files", "preremove"),
+			    [ x[rootLen:] for x in l ] ]
 		tagCommands.append(cmd)
 	    
 	if tagCommands:
-	    if tagScript:
-		f = open(tagScript, "a")
-		for cmd in tagCommands:
-		    f.write("# %s\n" % " ".join(cmd))
-		f.close()
-	    else:
-		runTagCommands(self.root, tagCommands)
+	    runTagCommands(tagScript, self.root, tagCommands, preScript = True)
 
     def apply(self, tagSet = {}, tagScript = None):
 	# this is run after the changes are in the database (but before
@@ -209,13 +203,14 @@ class FilesystemJob:
 		    del self.tagUpdates[tagInfo.tag]
 
 		if "self update" in tagInfo.implements:
-		    cmd = [ tagInfo.file, "self", "update" ] + \
-			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)]
+		    cmd = [ tagInfo, ("self", "update"),
+			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)] ]
 		    tagCommands.append(cmd)
 		elif "files update" in tagInfo.implements:
-		    cmd = [ tagInfo.file, "files", "update" ] + \
-			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)]
-		    if len(cmd) > 3:
+		    files = [x for x in 
+				self.repos.iterFilesWithTag(tagInfo.tag) ] 
+		    if files:
+			cmd = [ tagInfo, ("files", "update"), files ]
 			tagCommands.append(cmd)
 
 		tagSet[tagInfo.tag] = tagInfo
@@ -228,8 +223,8 @@ class FilesystemJob:
 
 	    if "files update" in tagInfo.implements:
 		l.sort()
-		cmd = [ tagInfo.file, "files", "update" ] + \
-		    [ x[rootLen:] for x in l ]
+		cmd = [ tagInfo, ("files", "update"), 
+		    [ x[rootLen:] for x in l ] ]
 		tagCommands.append(cmd)
 
 	for tag, l in self.tagRemoves.iteritems():
@@ -238,18 +233,12 @@ class FilesystemJob:
 
 	    if "files remove" in tagInfo.implements:
 		l.sort()
-		cmd = [ tagInfo.file, "files", "remove"] + \
-			    [ x[rootLen:] for x in l ]
+		cmd = [ tagInfo, ("files", "remove"),
+			    [ x[rootLen:] for x in l ] ]
 		tagCommands.append(cmd)
 	    
 	if tagCommands:
-	    if tagScript:
-		f = open(tagScript, "a")
-		f.write("\n".join([" ".join(x) for x in tagCommands]))
-		f.write("\n")
-		f.close()
-	    else:
-		runTagCommands(self.root, tagCommands)
+	    runTagCommands(tagScript, self.root, tagCommands)
 
     def getErrorList(self):
 	return self.errors
@@ -895,26 +884,58 @@ def shlibAction(root, shlibList):
 	if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
 	    log.error("ldconfig failed")
 
-def runTagCommands(root, cmdList):
+def runTagCommands(tagScript, root, cmdList, preScript = False):
+    if tagScript:
+	if preScript:
+	    pre = "# "
+	else:
+	    pre = ""
+
+	f = open(tagScript, "a")
+	for (tagInfo, cmd, args) in cmdList:
+	    if tagInfo.datasource == 'args':
+		f.write("%s%s %s %s\n" % (pre, tagInfo.file, " ".join(cmd), 
+					" ".join(args)))
+	    else:
+		f.write("%s%s %s <<EOF\n" % (pre, tagInfo.file, " ".join(cmd)))
+		for arg in args:
+		    f.write("%s%s\n" % (pre, arg))
+		f.write("%sEOF\n" % pre)
+		
+	f.close()
+	return
+
     uid = os.getuid()
 
-    for cmd in cmdList:
-	log.debug("running %s", " ".join(cmd))
+    for (tagInfo, cmd, args) in cmdList:
+	log.debug("running %s %s", tagInfo.file, " ".join(cmd))
 	if root != '/' and uid:
 	    continue
 
+	fullCmd = [ tagInfo.file ] + cmd
+	if tagInfo.datasource == 'args':
+	    fullCmd += args
+
 	pid = os.fork()
+	p = os.pipe()
 	if not pid:
+	    os.close(p[1])
 	    os.environ['PATH'] = "/sbin:/bin:/usr/sbin:/usr/bin"
 	    if root != '/':
 		os.chdir(root)
 		os.chroot(root)
 
 	    try:
-		os.execv(cmd[0], cmd)
+		os.execv(fullCmd[0], fullCmd)
 	    except Exception, e:
 		sys.stderr.write('%s\n' %e)
 	    os._exit(1)
+
+	os.close(p[0])
+	if tagInfo.datasource == 'stdin':
+	    for arg in args:
+		os.write(p[1], arg + "\n")
+	os.close(p[0])
 
 	(id, status) = os.waitpid(pid, 0)
 	if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
