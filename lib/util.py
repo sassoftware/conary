@@ -57,17 +57,12 @@ class Action:
             baselist.append(parent)
         baselist.reverse()
         for base in baselist:
-            if base.__dict__.has_key('keywords'):
+            if 'keywords' in base.__dict__:
                 self.__dict__.update(base.__dict__['keywords'])
-        if self.__class__.__dict__.has_key('keywords'):
+        if 'keywords' in self.__class__.__dict__:
             self.__dict__.update(self.__class__.keywords)
-        
-    def __init__(self, *args, **keywords):
-        assert(self.__class__ is not Action)
-	# keywords will be in the class object, not the instance
-	if not hasattr(self.__class__, 'keywords'):
-	    self.keywords = {}
-        self._applyDefaults()
+
+    def addArgs(self, *args, **keywords):
         # check to make sure that we don't get a keyword we don't expect
         for key in keywords.keys():
             # XXX this is not the best test, but otherwise we have to
@@ -78,6 +73,14 @@ class Action:
                                   "'%s'" % (self.__class__.__name__, key))
         # copy the keywords into our dict, overwriting the defaults
         self.__dict__.update(keywords)
+        
+    def __init__(self, *args, **keywords):
+        assert(self.__class__ is not Action)
+	# keywords will be in the class object, not the instance
+	if not hasattr(self.__class__, 'keywords'):
+	    self.keywords = {}
+        self._applyDefaults()
+	self.addArgs(*args, **keywords)
 
 class ShellCommand(Action):
     """Base class for shell-based commands. ShellCommand is an abstract class
@@ -113,6 +116,11 @@ class ShellCommand(Action):
         self.args = string.join(args)
         # pre-fill in the preMake and arguments
         self.command = self.template % self.__dict__
+
+    def addArgs(self, *args, **keywords):
+	# append new arguments as well as include keywords
+        self.args = self.args + string.join(args)
+	Action.addArgs(self, *args, **keywords)
 
 
 # Simple ease-of-use extensions to python libraries

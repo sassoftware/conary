@@ -174,7 +174,6 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
         os.chdir(cwd)
         
 	packageList = []
-        recipeObj.packages(cfg.packagenamespace, newVersion, destdir)
 
 	# build up the name->fileid mapping so we reuse fileids wherever
 	# possible; we do this by looking in the database for a pacakge
@@ -194,7 +193,7 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
 		    pkgList += pkg.getPackageList()
 		    ident.populate(repos, lcache, pkg)
 
-	for buildPkg in recipeObj.getPackages():
+	for buildPkg in recipeObj.getPackages(cfg.packagenamespace, newVersion):
 	    (p, fileMap) = _createPackage(repos, buildBranch, buildPkg, ident)
             built.append((p.getName(), p.getVersion().asString()))
 	    packageList.append((p, fileMap))

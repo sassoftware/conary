@@ -68,32 +68,6 @@ crossMacros = (
     ('headerpath'	, '%(sysroot)s/usr/include')
 )
 
-# XXX TEMPORARY - remove directories such as /usr/include from this
-# list when filesystem package is in place.
-baseSubFilters = (
-    # automatic subpackage names and sets of regexps that define them
-    # cannot be a dictionary because it is ordered; first match wins
-    ('devel', ('\.a',
-               '\.so',
-               '.*/include/.*\.h',
-               '%(includedir)s/',
-               '%(includedir)s',
-               '%(mandir)s/man(2|3)/',
-               '%(mandir)s/man(2|3)',
-               '%(datadir)s/develdoc/',
-               '%(datadir)s/develdoc',
-               '%(datadir)s/aclocal/',
-               '%(datadir)s/aclocal')),
-    ('lib', ('.*/lib/.*\.so\..*')),
-    # note that gtk-doc is not well-named; it is a shared system, like info
-    # and is used by unassociated tools (devhelp)
-    ('doc', ('%(datadir)s/(gtk-doc|doc|man|info)/',
-             '%(datadir)s/(gtk-doc|doc|man|info)')),
-    ('locale', ('%(datadir)s/locale/',
-                '%(datadir)s/locale')),
-    ('runtime', ('.*',)),
-)
-
 class Macros(dict):
     def __setitem__(self, name, value):
         # only expand references to ourself
@@ -107,7 +81,7 @@ class Macros(dict):
         
     # we want keys that don't exist to default to empty strings
     def __getitem__(self, name):
-	if self.has_key(name):
+	if name in self:
 	    return dict.__getitem__(self, name) %self
 	return ''
     
@@ -193,7 +167,7 @@ class RecipeLoader(types.DictionaryType):
             # it was loaded from another recipe by loadRecipe()
             # (don't use hasattr here, we want to check only the recipe
             # class itself, not any parent class
-            if obj.__dict__.has_key('ignore'):
+            if 'ignore' in obj.__dict__:
                 continue
             # make sure the class is derived from Recipe
             # and has a name
@@ -252,26 +226,10 @@ class _recipeHelper:
         self.list.append(self.theclass(*args, **keywords))
 
 class _policyUpdater:
-    def __init__(self, list, index, theobject, theclass):
-        self.list = list
-	self.index = index
+    def __init__(self, theobject):
         self.theobject = theobject
-        self.theclass = theclass
     def __call__(self, *args, **keywords):
-	if not args:
-	    # we can just update the existing object
-	    for key in keywords.keys():
-		if key not in self.theobject.__dict__:
-		    raise TypeError, (
-			'no such key %s in %s'
-			    %(key, self.theobject.__class__.__name__))
-	    self.theobject.__dict__.update(keywords)
-	else:
-	    # we have to replace the old object with a new one
-	    # we don't yet use args for anything, but if we do
-	    # it will be evaluated at init time and so cannot be
-	    # re-evaluated...
-	    self.list[self.index] = self.theclass(*args, **keywords)
+	self.theobject.updateArgs(*args, **keywords)
 
 class Recipe:
     buildRequires = []
@@ -286,7 +244,7 @@ class Recipe:
             c = lookaside.searchAll(self.cfg, self.laReposCache, gpg, 
                                     self.name, self.srcdirs)
             if c:
-                if not self.signatures.has_key(filename):
+                if filename not in self.signatures:
                     self.signatures[filename] = []
                 self.signatures[filename].append((gpg, c, keyid))
                 break
@@ -367,7 +325,7 @@ class Recipe:
 	shutil.rmtree(destdir)
 
     def checkSignatures(self, filepath, filename):
-        if not self.signatures.has_key(filename):
+        if filename not in self.signatures:
             return
         if not util.checkPath("gpg"):
             return
@@ -507,29 +465,14 @@ class Recipe:
     def getDevices(self):
         return self._devices
 
-    def packages(self, namePrefix, version, root):
-        # by default, everything that hasn't matched a pattern in the
-        # main package filter goes in the package named self.name
-        self.mainFilters.append(buildpackage.Filter(self.name, '.*',
-						    self.macros))
-	# the extras need to come first in order to override decisions
-	# in the base subfilters
-	for (name, patterns) in self.extraSubFilters:
-	    self.subFilters.append(buildpackage.Filter(name, patterns,
-						       self.macros))
-	for (name, patterns) in baseSubFilters:
-	    self.subFilters.append(buildpackage.Filter(name, patterns,
-						       self.macros))
-	self.autopkg = buildpackage.AutoBuildPackage(namePrefix, version,
-                                                     self.mainFilters,
-                                                     self.subFilters)
-        self.autopkg.walk(root)
+    def getPackages(self, namePrefix, fullVersion):
+	# policies look at the recipe instance for all information
+	self.namePrefix = namePrefix
+	self.fullVersion = fullVersion
 	for policy in self.packagePolicy:
 	    policy.doProcess(self)
-        self.packages = self.autopkg.getPackages()
+        return self.autopkg.getPackages()
 
-    def getPackages(self):
-        return self.packages
 
     def disableParallelMake(self):
         self.macros['parallelmflags'] = ''
@@ -543,29 +486,52 @@ class Recipe:
 	   automatically when they are referenced.
 	 - The public namespaces of the policy modules are accessible;
 	   policy objects already on their respective lists are returned,
-	   policy objects not on ther respective lists are added to
-	   them like build objects are added to the build list.
+	   policy objects not on their respective lists are added to
+	   the end of their respective lists like build objects are
+	   added to the build list.
 	"""
         if not name.startswith('_'):
-	    if build.__dict__.has_key(name):
+	    if name in build.__dict__:
 		return _recipeHelper(self.build, build.__dict__[name])
-	    if destdirpolicy.__dict__.has_key(name):
-		policyClass = destdirpolicy.__dict__[name]
-		for index in range(len(self.destdirPolicy)):
-		    policyObj = self.destdirPolicy[index]
-		    if isinstance(policyObj, policyClass):
-			return _policyUpdater(self.destdirPolicy, index,
-			                      policyObj, policyClass)
-		return _recipeHelper(self.destdirPolicy, policyClass)
-	    if packagepolicy.__dict__.has_key(name):
-		policyClass = packagepolicy.__dict__[name]
-		for index in range(len(self.packagePolicy)):
-		    policyObj = self.packagePolicy[index]
-		    if isinstance(policyObj, policyClass):
-			return _policyUpdater(self.packagePolicy, index,
-			                      policyObj, policyClass)
-		return _recipeHelper(self.packagePolicy, policyClass)
+	    for (policy, list) in (
+		(destdirpolicy, self.destdirPolicy),
+		(packagepolicy, self.packagePolicy)):
+		if name in policy.__dict__:
+		    policyClass = policy.__dict__[name]
+		    for policyObj in list:
+			if isinstance(policyObj, policyClass):
+			    return _policyUpdater(policyObj)
+		    return _recipeHelper(list, policyClass)
         return self.__dict__[name]
+
+    def __delattr__(self, name):
+	"""
+	Allows us to delete policy items from their respective lists
+	by deleting a name in the recipe self namespace.  For example,
+	to remove the EtcConfig package policy from the package policy
+	list, one could do::
+	 del self.EtcConfig
+	This would prevent the EtcConfig package policy from being
+	executed.  The policy objects are carefully ordered in the
+	default policy lists; deleting a policy object and then
+	referencing it again will cause it to show up at the end of
+	the list.  Don't do that.
+
+	In general, delete policy only as a last resort; you can
+	usually disable policy entirely with the keyword argument::
+	 exceptions='.*'
+	"""
+	for (policy, list) in (
+	    (destdirpolicy, self.destdirPolicy),
+	    (packagepolicy, self.packagePolicy)):
+	    if name in policy.__dict__:
+		policyClass = policy.__dict__[name]
+		for index in range(len(list)):
+		    policyObj = list[index]
+		    if isinstance(policyObj, policyClass):
+			del list[index]
+			return
+	del self.__dict__[name]
     
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
         assert(self.__class__ is not Recipe)
@@ -608,11 +574,6 @@ class Recipe:
 	self.macros['version'] = self.version
 	if extraMacros:
 	    self.addMacros(extraMacros)
-            
-	self.extraSubFilters = []
-
-	self.mainFilters = []
-	self.subFilters = []
 
 class RecipeFileError(Exception):
     def __init__(self, msg):

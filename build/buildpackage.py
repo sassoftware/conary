@@ -112,49 +112,49 @@ class AutoBuildPackage:
     provides facilities for automatically populating them with files
     according to Filters.
     """
-    def __init__(self, namePrefix, version, mainFilters, subFilters):
+    def __init__(self, namePrefix, version, pkgFilters, compFilters):
         """
 	@param namePrefix: the package prefix, such as ":srs.specifixinc.com"
 	@param version: the version of each package
         @type version: versions.Version instance
-	@param mainFilters: Filters used to add files to main packages
-	@type mainFilters: sequence of Filter instances
-	@param subFilters: Filters used to add files to sub packages
-	@type subFilters: sequence of Filter instances
+	@param pkgFilters: Filters used to add files to main packages
+	@type pkgFilters: sequence of Filter instances
+	@param compFilters: Filters used to add files to components
+	@type compFilters: sequence of Filter instances
 	"""
-	self.mainFilters = mainFilters
-        self.subFilters = subFilters
+	self.pkgFilters = pkgFilters
+        self.compFilters = compFilters
         # dictionary of all the build packages
         self.packages = {}
-        # reverse map from the main-package:sub-package combination to
+        # reverse map from the package:component combination to
         # the correct build package
 	self.packageMap = {}
-	for main in self.mainFilters:
-	    for sub in self.subFilters:
-		name = self._getname(namePrefix, main.name, sub.name)
+	for main in self.pkgFilters:
+	    for comp in self.compFilters:
+		name = self._getname(namePrefix, main.name, comp.name)
 		if name not in self.packages:
 		    package = BuildPackage(name, version)
 		    self.packages[name] = package
 		if main not in self.packageMap:
 		    self.packageMap[main] = {}
-		self.packageMap[main][sub] = self.packages[name]
+		self.packageMap[main][comp] = self.packages[name]
 
-    def _getname(self, prefix, pkgname, subname):
-        return string.join((prefix, pkgname, subname), ':')
+    def _getname(self, prefix, pkgname, compname):
+        return string.join((prefix, pkgname, compname), ':')
 
     def findPackage(self, path):
         """Return the BuildPackage that matches the path"""
-	for main in self.mainFilters:
+	for main in self.pkgFilters:
 	    if main.match(path):
-		for sub in self.subFilters:
-		    if sub.match(path):
-			return self.packageMap[main][sub]
+		for comp in self.compFilters:
+		    if comp.match(path):
+			return self.packageMap[main][comp]
         return None
     
     def addFile(self, path, realPath):
         """
         Add a path to the correct BuildPackage instance by matching
-        the file name against the main-package and sub-package filters
+        the file name against the package and component filters
 
         @param path: path to add to the BuildPackage
         @type path: str
@@ -167,7 +167,7 @@ class AutoBuildPackage:
                   owner='root', group='root', perms=0660):
         """
         Add a device to the correct BuildPackage instance by matching
-        the file name against the main package and sub-package filters
+        the file name against the package and component filters
         """
         pkg = self.findPackage(path)
         pkg.addDevice(path, devtype, major, minor, owner, group, perms)

@@ -8,6 +8,7 @@ import re
 import os
 import policy
 import log
+import buildpackage
 
 """
 Module used by recipes to effect packaging policy; things like setting
@@ -16,13 +17,94 @@ Classes from this module are not used directly; instead, they are used
 through eponymous interfaces in recipe.
 """
 
+class _filterSpec(policy.Policy):
+    def __init__(self, *args, **keywords):
+	self.extraFilters = []
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+	"""
+	ThisClass('<name>', 'regex1', 'regex2'...)
+	"""
+	if args:
+	    self.extraFilters.append((args[0], args[1:]))
+	policy.Policy.updateArgs(self, [], **keywords)
+
+
+class ComponentSpec(_filterSpec):
+    """
+    Determines which component each file is in.
+    """
+    # XXX TEMPORARY - remove directories such as /usr/include from this
+    # list when filesystem package is in place.
+    baseFilters = (
+	# automatic subpackage names and sets of regexps that define them
+	# cannot be a dictionary because it is ordered; first match wins
+	('devel', ('\.a',
+		   '\.so',
+		   '.*/include/.*\.h',
+		   '%(includedir)s/',
+		   '%(includedir)s',
+		   '%(mandir)s/man(2|3)/',
+		   '%(mandir)s/man(2|3)',
+		   '%(datadir)s/develdoc/',
+		   '%(datadir)s/develdoc',
+		   '%(datadir)s/aclocal/',
+		   '%(datadir)s/aclocal')),
+	('lib', ('.*/lib/.*\.so\..*')),
+	# note that gtk-doc is not well-named; it is a shared system, like info
+	# and is used by unassociated tools (devhelp)
+	('doc', ('%(datadir)s/(gtk-doc|doc|man|info)/',
+		 '%(datadir)s/(gtk-doc|doc|man|info)')),
+	('locale', ('%(datadir)s/locale/',
+		    '%(datadir)s/locale')),
+	('runtime', ('.*',)),
+    )
+
+    def doProcess(self, recipe):
+	compFilters = []
+	macros = recipe.macros
+
+	# the extras need to come first in order to override decisions
+	# in the base subfilters
+	for (name, patterns) in self.extraFilters:
+	    compFilters.append(buildpackage.Filter(name, patterns, macros))
+	for (name, patterns) in self.baseFilters:
+	    compFilters.append(buildpackage.Filter(name, patterns, macros))
+
+	# pass these down to PackageSpec for building the package
+	recipe.PackageSpec(compFilters=compFilters)
+
+class PackageSpec(_filterSpec):
+    keywords = { 'compFilters': None }
+
+    def doProcess(self, recipe):
+	pkgFilters = []
+	macros = recipe.macros
+
+	for (name, patterns) in self.extraFilters:
+	    pkgFilters.append(buildpackage.Filter(name, patterns, macros))
+	# by default, everything that hasn't matched a pattern in the
+	# main package filter goes in the package named recipe.name
+	pkgFilters.append(buildpackage.Filter(recipe.name, '.*', macros))
+
+	# OK, all the filters exist, build an autopackage object that
+	# knows about them
+	recipe.autopkg = buildpackage.AutoBuildPackage(
+	    recipe.namePrefix, recipe.fullVersion,
+	    pkgFilters, self.compFilters)
+
+	# now walk the tree -- all policy classes after this require
+	# that the initial tree is built
+        recipe.autopkg.walk(macros['destdir'])
+
+
 def _markConfig(recipe, filename):
     packages = recipe.autopkg.packages
     for package in packages.keys():
 	if packages[package].has_key(filename):
             log.debug('config: %s', filename)
 	    packages[package][filename].isConfig(True)
-
 
 class EtcConfig(policy.Policy):
     """
@@ -61,7 +143,7 @@ class Config(policy.Policy):
 		self.inclusions = (self.inclusions,)
 	    for inclusion in self.inclusions:
 		self.configREs.append(re.compile(inclusion %self.macros))
-	policy.Policy.__init__(self, recipe)
+	policy.Policy.doProcess(self, recipe)
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
@@ -73,6 +155,11 @@ class Config(policy.Policy):
 
 class ParseManifest(policy.Policy):
     """
+    Parse a file containing a manifest intended for RPM, finding the
+    information that can't be represented by pure filesystem status
+    with a non-root built: device files (%dev), directory responsibility
+    (%dir), and ownership (%attr).  It translates these into the
+    related SRS construct for each.
     """
     keywords = {
 	'path': None
@@ -137,6 +224,8 @@ def DefaultPolicy():
     A recipe can then modify this list if necessary.
     """
     return [
+	ComponentSpec(),
+	PackageSpec(),
 	EtcConfig(),
 	Config(),
 	ParseManifest(),

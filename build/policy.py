@@ -66,6 +66,17 @@ class Policy(util.Action):
 	assert(self.__class__ is not Policy)
 	util.Action.__init__(self, *args, **keywords)
 
+    def updateArgs(self, *args, **keywords):
+	"""
+	The default way to update a class is to override any provided
+	keywords.  Subclasses which have the ability to provide more
+	intelligent handling can override this method.  This method
+	is invoked automatically by recipe.py when a recipe references
+	a policy object.  It acts rather like __init__ except that it
+	can meaningfully be called more than once for an object.
+	"""
+	self.addArgs(*args, **keywords)
+
     def doProcess(self, recipe):
 	"""
 	Invocation instance
