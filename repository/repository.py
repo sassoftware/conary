@@ -36,7 +36,7 @@ class AbstractTroveDatabase:
                   acrossRepositories = False, withFiles = True):
 	"""
 	Looks up a trove in the repository based on the name and
-	version provided. If any errors occur, PackageNotFound is
+	version provided. If any errors occur, TroveNotFound is
 	raised with an appropriate error message. Multiple matches
 	could be found if versionStr refers to a label.
 
@@ -327,7 +327,7 @@ class IdealRepository(AbstractTroveDatabase):
 	    # version string; make sure have it
 	    if versionStr[0] != "/" and (versionStr.find("/") != -1 or
 					 versionStr.find("@") == -1):
-		raise PackageNotFound, \
+		raise TroveNotFound, \
 		    "fully qualified version or label " + \
 		    "expected instead of %s" % versionStr
 
@@ -366,16 +366,16 @@ class IdealRepository(AbstractTroveDatabase):
                         versionDict[name] += versionList
 
 	    if not versionDict[name]:
-		raise PackageNotFound, "branches %s do not exist for " \
-                            "package %s" % \
-                            (" ".join([ x.asString() for x in labelPath ]), 
-                            name)
+		raise TroveNotFound, \
+                      ('"%s" was not found in the search path (%s)'
+                       %(name, " ".join([ x.asString() for x in labelPath ])))
+
 	elif versionStr[0] != "/" and versionStr.find("/") == -1:
 	    # version/release was given
 	    try:
 		verRel = versions.VersionRelease(versionStr)
 	    except versions.ParseError, e:
-		raise PackageNotFound, str(e)
+		raise TroveNotFound, str(e)
 
             versionDict = { name : [] }
             for label in labelPath:
@@ -394,18 +394,18 @@ class IdealRepository(AbstractTroveDatabase):
                         versionDict[name] += versionList
 
 	    if not versionDict[name]:
-		raise PackageNotFound, \
+		raise TroveNotFound, \
 		    "version %s of %s is not on found on path %s" % \
 		    (versionStr, name, " ".join([x.asString() for x in labelPath]))
 	elif versionStr[0] != "/":
 	    # partial version string, we don't support this
-	    raise PackageNotFound, \
+	    raise TroveNotFound, \
 		"incomplete version string %s not allowed" % versionStr
 	else:
 	    try:
 		version = versions.VersionFromString(versionStr)
 	    except versions.ParseError, e:
-		raise PackageNotFound, str(e)
+		raise TroveNotFound, str(e)
 
 	    try:
 		# XXX
@@ -414,7 +414,7 @@ class IdealRepository(AbstractTroveDatabase):
 
 		versionDict = { name : [ version ] }
 	    except TroveMissing, e:  
-		raise PackageNotFound, str(e)
+		raise TroveNotFound, str(e)
 
 	flavorDict = self.getTroveVersionFlavors(versionDict)
 	pkgList = []
@@ -425,7 +425,7 @@ class IdealRepository(AbstractTroveDatabase):
 		    pkgList.append((name, version, flavor))
 
 	if not pkgList:
-	    raise PackageNotFound, "trove %s does not exist" % name
+	    raise TroveNotFound, "trove %s does not exist" % name
 
 	pkgList = self.getTroves(pkgList, withFiles = withFiles)
 
@@ -727,7 +727,8 @@ class MethodNotSupported(RepositoryError):
 class TroveNotFound(Exception):
     """Raised when findTrove failes"""
 
-class PackageNotFound(TroveNotFound): pass
+# XXX deprecated exception name
+PackageNotFound = TroveNotFound
 
 class OpenError(RepositoryError):
     """Error occured opening the repository"""
