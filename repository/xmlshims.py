@@ -48,6 +48,12 @@ class NetworkConvertors(object):
         assert(len(f) == 29)
 	return base64.decodestring(f)
 
+    def fromPath(self, path):
+	return base64.encodestring(path)
+
+    def toPath(self, path):
+	return base64.decodestring(path)
+
     def fromBranch(self, b):
 	return b.asString()
 

@@ -36,7 +36,7 @@ from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExi
 import trovestore
 import versions
 
-SERVER_VERSIONS = [ 26, 27 ]
+SERVER_VERSIONS = [ 26, 27, 28 ]
 CACHE_SCHEMA_VERSION = 11
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -1055,6 +1055,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         ids = {}
         for (pathId, path) in cu:
             if not ids.has_key(path):
+                if clientVersion <= 28:
+                    path = self.fromPath(path)
                 ids[path] = self.fromPathId(pathId)
 
         return ids

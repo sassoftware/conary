@@ -37,7 +37,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=27
+CLIENT_VERSION=28
 
 class _Method(xmlrpclib._Method):
 
@@ -873,7 +873,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         """
         ids = self.c[branch].getPackageBranchPathIds(sourceName, 
                                                      self.fromVersion(branch))
-        return dict((x[0], self.toPathId(x[1])) for x in ids.iteritems())
+        return dict((self.toPath(x[0]), self.toPathId(x[1]))
+                    for x in ids.iteritems())
 
     def commitChangeSetFile(self, fName):
         cs = changeset.ChangeSetFromFile(fName)
