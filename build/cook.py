@@ -4,7 +4,7 @@
 #
 
 """
-Contains the cook() function which builds a recipe and commits the
+Contains the doCook() function which builds a recipe and commits the
 resulting packages to the repository.
 """
 
