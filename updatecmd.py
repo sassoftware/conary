@@ -47,26 +47,9 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 
 	list = []
 	for pkg in pkgList:
-	    if db.hasPackage(pkg.getName()):
-		# currentVersion could be None
-		currentVersionList = db.getPackageVersionList(pkg.getName())
-		if len(currentVersionList) == 1:
-		    currentVersion = currentVersionList[0]
-		elif len(currentVersionList) == 0:
-		    currentVersion = None
-		else:
-		    # there are multiple versions installed; rather then
-		    # upgrade all of them look for one on the same branch
-		    # as the one we're installing. if there's a match, great;
-		    # if not, bail
-		    currentVersion = db.getTroveLatestVersion(pkg.getName(), 
-						     pkg.getVersion().branch())
-		    if not currentVersion:
-			log.error("multiple versions of %s are installed and "
-				  "none are on the same branch as the update") 
-			return
-	    else:
-		currentVersion = None
+	    currentVersion = helper.previousVersion(db, pkg.getName(),
+						    pkg.getVersion(),
+						    pkg.getFlavor())
 
 	    list.append((pkg.getName(), pkg.getFlavor(), currentVersion, 
 			 pkg.getVersion(), 0))
