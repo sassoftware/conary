@@ -4,7 +4,6 @@
 #
 
 import util
-import magic
 import os
 import policy
 import log
@@ -42,12 +41,12 @@ class NonBinariesInBindirs(policy.Policy):
 
     def doFile(self, file):
 	d = self.macros['destdir']
-	mode = os.lstat(d + os.sep + file)[stat.ST_MODE]
+	mode = os.lstat(util.joinPaths(d, file))[stat.ST_MODE]
 	if not mode & 0111:
 	    raise PackagePolicyError(
 		"%s has mode 0%o with no executable permission in bindir"
 		%(file, mode))
-	m = magic.magic(file, d)
+	m = self.recipe.magic[file]
 	if m and m.name == 'ltwrapper':
 	    raise PackagePolicyError(
 		"%s is a build-only libtool wrapper script" %file)
@@ -74,8 +73,7 @@ class ImproperlyShared(policy.Policy):
     invariantsubtrees = [ '/usr/share/' ]
 
     def doFile(self, file):
-	destdir = self.macros['destdir']
-        m = magic.magic(file, destdir)
+        m = self.recipe.magic[file]
 	if m and m.name == "ELF":
 	    raise PackagePolicyError(
 		"Architecture-specific file %s in shared data directory" %file)
@@ -319,7 +317,7 @@ class SharedLibrary(policy.Policy):
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and util.isregular(fullpath) and \
-	   magic.magic(fullpath).name == 'ELF':
+	   self.recipe.magic[file].name == 'ELF':
 	    self._markSharedLibrary(file)
 
 

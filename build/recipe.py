@@ -17,6 +17,7 @@ import imp
 import inspect
 import log
 import macros
+import magic
 import os
 import package
 import packagepolicy
@@ -310,6 +311,7 @@ class PackageRecipe(Recipe):
         builddir = os.sep.join((buildpath, self.mainDir()))
 	self.macros.update({'builddir': builddir,
 			    'destdir': root})
+	self.magic = magic.magicCache(root)
 	for bld in self._build:
 	    bld.doBuild(self)
 

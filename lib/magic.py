@@ -83,6 +83,14 @@ def magic(path, basedir=''):
 
     return None
 
+class magicCache(dict):
+    def __init__(self, basedir=''):
+	self.basedir = basedir
+    def __getitem__(self, name):
+	if name not in self.__dict__:
+	    self.__dict__[name] = magic(name, self.basedir)
+	return self.__dict__[name]
+
 # internal helpers
 
 def _string(buffer):

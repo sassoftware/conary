@@ -9,7 +9,6 @@ import os
 import stat
 import policy
 import log
-import magic
 
 """
 Module used by recipes to modify the state of the installed %(destdir)s
@@ -36,13 +35,6 @@ class FixDirModes(policy.Policy):
 	mode = os.lstat(fullpath)[stat.ST_MODE]
 	self.recipe.AddModes(mode, path)
 	os.chmod(fullpath, mode | 0700)
-
-class SanitizeSonames(policy.Policy):
-    """
-    make sure that .so -> SONAME -> fullname
-    """
-    def do(self):
-	pass
 
 class RemoveExtraLibs(policy.Policy):
     """
@@ -82,15 +74,15 @@ class FixupMultilibPaths(policy.Policy):
 	return True
 
     def doFile(self, path):
-	destdir = self.macros['destdir']
-	m = magic.magic(path, destdir)
+	m = self.recipe.magic[path]
 	if not m or (m.name != "ELF" and m.name != "ar"):
 	    log.warning("non-executable object with library name %s", path)
 	    return
 	basename = os.path.basename(path)
 	targetdir = self.dirmap[self.currentsubtree %self.macros]
 	target = util.joinPaths(targetdir, basename)
-	if os.path.exists(destdir + os.sep + target):
+	destdir = self.macros.destdir
+	if os.path.exists(util.joinPaths(destdir, target)):
 	    raise DestdirPolicyError(
 		"Conflicting library files %s and %s installed" %(
 		    path, target))
@@ -127,6 +119,14 @@ class ExecutableLibraries(policy.Policy):
 	log.warning('non-executable library %s, changing to mode 0755' %path)
 	os.chmod(fullpath, 0755)
 
+class SanitizeSonames(policy.Policy):
+    """
+    make sure that .so -> SONAME -> fullname
+    """
+    invariantinclusions = [ (r'..*\.so\..*', None, stat.S_IFDIR), ]
+    def do(self):
+	pass
+
 class RemoveBackupFiles(policy.Policy):
     """
     Kill editor and patch backup files
@@ -153,8 +153,7 @@ class Strip(policy.Policy):
 	('%(essentiallibdir)s/', None, stat.S_IFDIR),
     ]
     def doFile(self, path):
-	d = self.macros['destdir']
-	m = magic.magic(path, d)
+	m = self.recipe.magic[path]
 	if not m:
 	    return
 	# FIXME: should be:
@@ -164,7 +163,7 @@ class Strip(policy.Policy):
 	# for archives as well as elf files
 	if (m.name == "ELF" and m.contents['hasDebug']) or \
 	   (m.name == "ar"):
-	    util.execute('%(strip)s -g ' %self.macros +d+path)
+	    util.execute('%(strip)s -g ' %self.macros +self.macros.destdir+path)
 
 
 class NormalizeCompression(policy.Policy):
@@ -182,11 +181,10 @@ class NormalizeCompression(policy.Policy):
 	('.*\.(gz|bz2)', None, stat.S_IFDIR),
     ]
     def doFile(self, path):
-	d = self.macros['destdir']
-	m = magic.magic(path, d)
+	m = self.recipe.magic[path]
 	if not m:
 	    return
-	p = d+path
+	p = self.macros.destdir+path
 	if m.name == 'gzip' and \
 	   (m.contents['compression'] != '9' or 'name' in m.contents):
 	    util.execute('gunzip %s; gzip -n -9 %s' %(p, p[:-3]))
@@ -314,7 +312,7 @@ class NormalizeInfoPages(policy.Policy):
 		syspath = '%(destdir)s/%(infodir)s/' %self.macros + file
 		path = '%(infodir)s/' %self.macros + file
 		if not self.policyException(path):
-		    m = magic.magic(syspath)
+		    m = self.recipe.magic[path]
 		    if not m:
 			# not compressed
 			util.execute('gzip -n -9 %s' %syspath)
@@ -383,10 +381,10 @@ def DefaultPolicy():
     """
     return [
 	FixDirModes(),
-	SanitizeSonames(),
 	RemoveExtraLibs(),
 	FixupMultilibPaths(),
 	ExecutableLibraries(),
+	SanitizeSonames(),
 	RemoveBackupFiles(),
 	Strip(),
 	NormalizeCompression(),
