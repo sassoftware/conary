@@ -362,7 +362,18 @@ class ChangeSet(streams.LargeStreamSet):
 		else:
 		    invertedPkg.changedFile(pathId, None, curFileId, curVersion)
 
-                csInfo = self.files[(curFileId, newFileId)]
+                try:
+                    csInfo = self.files[(curFileId, newFileId)]
+                except KeyError:
+                    log.error('File objects stored in your database do '
+                              'not match the same version of those file '
+                              'objects in the repository. The best thing '
+                              'to do is erase the version on your system '
+                              'by using "conary erase --just-db --no-deps" '
+                              'and then run the update again by using '
+                              '"conary update --replace-files"')
+                    continue
+                    
                 origFile = db.getFileVersion(pathId, curFileId, curVersion)
 
                 if csInfo[0] == "\x01":

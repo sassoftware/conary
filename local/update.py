@@ -68,8 +68,7 @@ class FilesystemJob:
 
     def _remove(self, fileObj, target, msg):
 	if isinstance(fileObj, files.Directory):
-	    if not self.directorySet.has_key(target):
-		self.directorySet[target] = 0
+            self.directorySet.setdefault(target, 0)
 	else:
 	    self.removes[target] = (fileObj, msg)
 
@@ -640,6 +639,16 @@ class FilesystemJob:
 
             # now assemble what the file is supposed to look like on head
             headChanges = changeSet.getFileChange(baseFileId, headFileId)
+            if headChanges is None:
+                log.error('File objects stored in your database do '
+                          'not match the same version of those file '
+                          'objects in the repository. The best thing '
+                          'to do is erase the version on your system '
+                          'by using "conary erase --just-db --no-deps" '
+                          'and then run the update again by using '
+                          '"conary update --replace-files"')
+                raise AssertionError
+                
             if headChanges[0] == '\x01':
                 # the file was stored as a diff
                 headFile = baseFile.copy()
