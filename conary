@@ -21,7 +21,7 @@ sys.excepthook = util.excepthook
 cfg = srscfg.SrsConfiguration()
 
 def usage():
-    print "usage: srs changeset <pkg> <outfile> [<oldver>] <newver>"
+    print "usage: srs changeset <pkg> [<oldver>] <newver> <outfile>"
     print "       srs cook    [--prep] <first.recipe> <second.recipe> ..."
     print "       srs commit  <file>"
     print "       srs pkglist <pkg> <version>"
