@@ -57,9 +57,9 @@ def usage(rc = 1):
     print "       conary erase        <pkgname> [<version>]"
     print "       conary localcs      <pkg> <outfile>"
     print "       conary localcommit  <changeset>"
-    print "       conary pkglist      <pkgname> [<version>]"
+    print "       conary pkgquery     <pkgname> [<version>]"
     print "       conary remove       <path>"
-    print "       conary replist      <pkgname> [<version>]"
+    print "       conary repquery     <pkgname> [<version>]"
     print "       conary rblist"
     print "       conary rollback     <rollback>"
     print "       conary showchangeset <changeset>"
@@ -80,19 +80,20 @@ def usage(rc = 1):
     print "               --debug-exceptions"
     print "               --target-branch <branch>"
     print ""
-    print "pkglist flags: --full-versions"
-    print "               --ids"
-    print "               --ls"
-    print "               --sha1s"
+    print "pkgquery flags: --full-versions"
+    print "                --ids"
+    print "                --path <file>"
+    print "                --ls"
+    print "                --sha1s"
     print ""
-    print "replist flags: --all"
-    print "               --full-versions"
-    print "               --ids"
-    print "               --info"
-    print "               --leaves"
-    print "               --ls"
-    print "               --sha1s"
-    print "               --tags"
+    print "repquery flags: --all"
+    print "                --full-versions"
+    print "                --ids"
+    print "                --info"
+    print "                --leaves"
+    print "                --ls"
+    print "                --sha1s"
+    print "                --tags"
     print ""
     print "update flags: --keep-existing"
     print "              --replace-files"
@@ -130,6 +131,7 @@ def realMain():
     argDef["info"] = 0
     argDef["keep-existing"] = 0
     argDef["leaves"] = 0
+    argDef["path"] = 1
     argDef["ls"] = 0
     argDef["macros"] = 1
     argDef["message"] = 1
@@ -263,7 +265,16 @@ def realMain():
 	db = database.Database(cfg.root, cfg.dbPath, "c")
 	for changeSet in otherArgs[2:]:
 	    commit.doLocalCommit(db, changeSet)
-    elif (otherArgs[1] == "pkglist"):
+    elif (otherArgs[1] == "pkgquery") or (otherArgs[1] == "pq") \
+	or (otherArgs[1] == "pkglist"):
+	if otherArgs[1] == "pkglist":
+	    log.warning("Outdated syntax: use pkgquery or pq")
+	if argSet.has_key('path'):
+	    path = argSet['path']
+	    del argSet['path']
+	else:
+	    path = None
+	
 	ls = argSet.has_key('ls')
 	if ls: del argSet['ls']
 
@@ -281,7 +292,7 @@ def realMain():
 	if argSet: return usage()
 
 	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	    args = [db, cfg, ls, ids, sha1s, fullVersions] + otherArgs[2:]
+	    args = [db, cfg, ls, ids, sha1s, fullVersions, path] + otherArgs[2:]
 	    try:
 		display.displayTroves(*args)
 	    except IOError, msg:
@@ -289,7 +300,10 @@ def realMain():
 		sys.exit(1)
 	else:
 	    return usage()
-    elif (otherArgs[1] == "replist"):
+    elif (otherArgs[1] == "repquery") or (otherArgs[1] == "rq") \
+	    or (otherArgs[1] == "replist"):
+	if otherArgs[1] == "replist":
+	    log.warning("Outdated syntax: use repquery or rq")
 	all = argSet.has_key('all')
 	if all: del argSet['all']
 

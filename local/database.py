@@ -187,6 +187,9 @@ class Database(SqlDbRepository):
 			flavor, sortByPath = sortByPath,
 			withFiles = withFiles, pristine = False)
 
+    def getTroveIdsFromPath(self, path):
+	return [ x for x in self.db.iterIdByPath(path) ]
+
     # takes an absolute change set and creates a differential change set 
     # against a branch of the repository
     def rootChangeSet(self, absSet):

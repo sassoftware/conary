@@ -20,8 +20,11 @@ the commands.
 The following \fBcommands\fP are used to install, update, erase, and
 otherwise manage software installed on a local system.
 .TP 4
-.B pkglist \fIpkgname [version]\fP
+.B pkgquery \fIpkgname [version]\fP
 Lists troves installed on the local system.
+.TP 4
+.B pkgquery \fI--path <file>\fP
+Lists the package that owns the specified file.  Must use absolute file name.
 .TP
 .B update [\fIargs\fP] \fIpkgname version\fP
 Updates \fIpkgname\fR from the appropriate repository to match \fIversion,\fR
@@ -81,7 +84,7 @@ Lists available rollbacks.
 Applies rollback \fIrollback\fP.  (Syntax may change in future versions
 of Conary.)
 .TP
-.B replist [\fIargs\fP \fIpkgname [version]\fP
+.B repquery [\fIargs\fP \fIpkgname [version]\fP
 Lists troves in the repository.
 Arguments include
 .RS 4

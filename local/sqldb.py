@@ -756,6 +756,11 @@ class Database:
 	    trv = self._getTrove(troveInstanceId = instanceId, 
 				 pristine = pristine)
 	    yield trv
+    
+    def iterIdByPath(self, path):
+	for instanceId in self.troveFiles.iterPath(path):
+	    troveId = self.instances.getId(instanceId)
+	    yield troveId
 
     def removeFileFromTrove(self, trove, path):
 	versionId = self.versionTable[trove.getVersion()]

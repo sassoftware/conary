@@ -19,8 +19,15 @@ _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
 def displayTroves(db, cfg, ls = False, ids = False, sha1s = False,
-                  fullVersions = False, trove = "", versionStr = None):
-    if trove:
+                  fullVersions = False, path = None, trove = "", versionStr = None):
+
+    if path:
+	assert(not trove)
+	troves = db.getTroveIdsFromPath(path)
+	troves = [ troveid[0] for troveid in troves ]
+	if not troves:
+	    return
+    elif trove:
 	troves = [ trove ]
     else:
 	troves = [ x for x in db.iterAllTroveNames() ]
