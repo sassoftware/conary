@@ -134,27 +134,6 @@ class FileContainerFile:
 	    self.pos = self.pos + bytes
 	    return self.file.read(bytes)
 
-    def readline(self):
-	# XXX THIS IS HORRIBLE. I'd really like readline and readlines
-	# to go away completely
-	s = ""
-	a = self.read(1)
-	while a and a != "\n":
-	    s += a
-	    a = self.read(1)
-
-	if a == "\n": s += a
-	return s
-
-    def readlines(self):
-	list = self.read().split('\n')
-	list2 = []
-
-	# cut off the last element (which wasn't newline terminated anyway)
-	for item in list[:-1]:
-	    list2.append(item + "\n")
-	return list2
-
     def __init__(self, file, size):
 	self.file = file
 	self.size = size
