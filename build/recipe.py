@@ -122,7 +122,8 @@ class RecipeLoader:
         if component:
             pkgname = component.split(':')[0]
         else:
-            pkgname = filename.split('/')[-1].split('.')[0]
+            pkgname = filename.split('/')[-1]
+            pkgname = pkgname[:-len('.recipe')]
         basename = os.path.basename(filename)
         self.file = basename.replace('.', '-')
         self.module = imp.new_module(self.file)
