@@ -126,8 +126,6 @@ class Strip(policy.Policy):
     ]
     def doFile(self, path):
 	d = self.macros['destdir']
-	if os.path.islink(util.joinPaths(d, path)):
-	    return
 	m = magic.magic(path, d)
 	if not m:
 	    return
