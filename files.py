@@ -1,3 +1,4 @@
+#
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
@@ -311,7 +312,7 @@ class DeviceStream(TupleStream):
 class RegularFileStream(TupleStream):
 
     makeup = (("size", LongLongStream, 8), ("sha1", StringStream, 40))
-    __slots__ = _makeTupleSlots(makeup) + [ "provides", "requires" ]
+    __slots__ = _makeTupleSlots(makeup)
     streamId = _STREAM_SIZESHA1
 
 class InodeStream(TupleStream):
@@ -531,7 +532,7 @@ class File(object):
 	if other.lsTag != self.lsTag: return False
 
 	for (name, streamType) in self.streamList:
-	    if not self._getattribute__(name) == other.__getattribute__(name):
+	    if not self.__getattribute__(name) == other.__getattribute__(name):
 		return False
 
 	return True
@@ -669,7 +670,7 @@ class CharacterDevice(DeviceFile):
 class RegularFile(File):
 
     streamList = File.streamList + (('contents', RegularFileStream ),)
-    __slots__ = [ 'contents' ]
+    __slots__ = ('contents', 'provides', 'requires')
 
     lsTag = "-"
     hasContents = 1
