@@ -58,34 +58,58 @@ def fullBranchName(defaultLabel, version, versionStr):
     else:
 	return version.branch()
 
-def nextVersion(versionStr, currentVersion, currentBranch, binary = True):
+def nextVersion(repos, troveName, versionStr, troveFlavor, currentBranch, 
+		binary = True):
     """
-    Calculates the version to use for a newly built item which is about
+    Calculates the version to use for a newly built trove which is about
     to be added to the repository.
 
+    @param repos: repository the trove will be part of
+    @type repos: repository.AbstractRepository
+    @param troveName: name of the trove being built
+    @type troveName: str
     @param versionStr: version string from the recipe
     @type versionStr: string
-    @param currentVersion: version of current head
-    @type currentVersion: versions.Version
+    @param troveFlavor: flavor of the trove being built
+    @type troveFlavor: deps.deps.DependencySet
     @param currentBranch: branch the new version should be on
     @type currentBranch: versions.Version
     @param binary: true if this version should use the binary build field
     @type binary: boolean
     """
-    if not currentVersion:
-	# new package
+
+    currentVersions = repos.getTroveFlavorsLatestVersion(troveName, 
+							 currentBranch)
+
+    # find the latest version of this trove and the latest version of
+    # this flavor of this trove
+    latestForFlavor = None
+    latest = None
+    # this works because currentVersions is sorted earliest to latest
+    for (version, flavor) in currentVersions:
+	if flavor == troveFlavor:
+	    latestForFlavor = version
+	latest = version
+
+    if not latest:
+	# new package.
 	newVersion = currentBranch.copy()
 	newVersion.appendVersionRelease(versionStr, 1)
 	if binary:
 	    newVersion.incrementBuildCount()
-    elif currentVersion.trailingVersion().getVersion() == versionStr and \
-         currentBranch == currentVersion.branch():
-	newVersion = currentVersion.copy()
+    elif latestForFlavor != latest and \
+		latest.trailingVersion().getVersion() == versionStr:
+	# catching up to head
+	newVersion = latest
+    elif latest.trailingVersion().getVersion() == versionStr:
+	# new build of existing version
+	newVersion = latest.copy()
 	if binary:
 	    newVersion.incrementBuildCount()
 	else:
 	    newVersion.incrementRelease()
     else:
+	# new version
 	newVersion = currentBranch.copy()
 	newVersion.appendVersionRelease(versionStr, 1)
 	if binary:

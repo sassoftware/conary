@@ -536,9 +536,11 @@ class TroveStore:
 		yield (fileId, path, version)
 
     def iterTrovePerFlavorLeafs(self, troveName, branch):
+	# this needs to return a list sorted by version, from oldest to
+	# newest
 	cu = self.db.cursor()
 	cu.execute("""
-	   SELECT Versions.version, Flavors.flavor FROM 
+	   SELECT Versions.version, Nodes.timeStamps, Flavors.flavor FROM 
 		Nodes JOIN Instances ON Nodes.itemId=Instances.itemId AND 
 				        Nodes.versionId=Instances.versionId 
 		      JOIN Versions ON Instances.versionId=Versions.versionId
@@ -549,10 +551,24 @@ class TroveStore:
 	""", troveName, branch)
 
 	latest = {}	
-	for (version, flavor) in cu:
-	    latest[flavor] = version
+	deleteList = []
+	fullList = []
+	for i, (version, timeStamps, flavor) in enumerate(cu):
+	    if latest.has_key(flavor):
+		deleteList.append(i)
 
-	return latest.iteritems()
+	    if flavor == "none":
+		flavor = None
+
+	    latest[flavor] = i
+	    fullList.append((version, timeStamps, flavor))
+
+	deleteList.sort()
+	deleteList.reverse()
+	for i in deleteList:
+	    del fullList[i]
+
+	return fullList
 	    
     def addFile(self, fileObj, fileVersion):
 	self.filesToAdd[(fileObj.id(), fileVersion)] = fileObj

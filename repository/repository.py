@@ -307,13 +307,15 @@ class IdealRepository(AbstractTroveDatabase):
 	"""
 	Returns a list of the most recent version for each flavor of a
         trove available on a particular branch. If that branch doesn't
-        exist for the trove, PackageMissing is raised.
+        exist for the trove, an empty list is returned. The list is sorted
+	by version, with earlier versions first. The versions returned
+	by this function include time stamps.
 
 	@param troveName: package name
 	@type troveName: str
 	@param branch: branch
 	@type branch: versions.Version
-	@rtype: list of (flavor, versions.Version) tuples
+	@rtype: list of (versions.Version, flavor) tuples
 	"""
 	raise NotImplementedError
 

@@ -73,8 +73,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	return d
 
     def getTroveFlavorsLatestVersion(self, troveName, branch):
-	return [ (versions.VersionFromString(x[1]),
-		  deps.ThawDependencySet(x[0])) for x in 
+	return [ (versions.VersionFromString(x[0], 
+			timeStamps = [ float(z) for z in x[1].split(":")]),
+		  deps.ThawDependencySet(x[2])) for x in 
                  self.s.getTroveFlavorsLatestVersion(troveName, 
                                                      branch.asString()) ]
 

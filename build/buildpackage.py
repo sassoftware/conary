@@ -101,18 +101,8 @@ class BuildPackage(dict):
         """
 	return self.name
 
-    def getVersion(self):
-        """
-        Return the version of the BuildPackage
-
-        @returns: name of the BuildPackag
-        @rtype: versions.Version instance
-        """
-	return self.version
-
-    def __init__(self, name, version):
+    def __init__(self, name):
 	self.name = name
-	self.version = version
         self.requires = deps.DependencySet()
         self.provides = deps.DependencySet()
         self.flavor = _getUseDependencySet()
@@ -125,10 +115,8 @@ class AutoBuildPackage:
     provides facilities for automatically populating them with files
     according to Filters.
     """
-    def __init__(self, version, pkgFilters, compFilters):
+    def __init__(self, pkgFilters, compFilters):
         """
-	@param version: the version of each package
-        @type version: versions.Version instance
 	@param pkgFilters: Filters used to add files to main packages
 	@type pkgFilters: sequence of Filter instances
 	@param compFilters: Filters used to add files to components
@@ -145,7 +133,7 @@ class AutoBuildPackage:
 	    for comp in self.compFilters:
 		name = self._getname(main.name, comp.name)
 		if name not in self.packages:
-		    self.packages[name] = BuildPackage(name, version)
+		    self.packages[name] = BuildPackage(name)
 		if main not in self.packageMap:
 		    self.packageMap[main] = {}
 		self.packageMap[main][comp] = self.packages[name]

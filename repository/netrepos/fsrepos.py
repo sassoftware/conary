@@ -28,6 +28,12 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     ### Package access functions
 
+    def thawFlavor(self, flavor):
+	if flavor:
+	    return deps.ThawDependencySet(flavor)
+
+	return None
+
     def iterAllTroveNames(self):
 	return self.troveStore.iterTroveNames()
 
@@ -57,8 +63,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	return d
 
     def getTroveFlavorsLatestVersion(self, troveName, branch):
-	return [ (versions.VersionFromString(x[1]),
-		  deps.ThawDependencySet(x[0])) for x in 
+	return [ (versions.VersionFromString(x[0], 
+			timeStamps = [ float(z) for z in x[1].split(":")]),
+		  self.thawFlavor(x[2])) for x in 
 		    self.troveStore.iterTrovePerFlavorLeafs(troveName, 
 							    branch.asString()) ]
 	

@@ -34,9 +34,9 @@ import util
 # type could be "src"
 #
 # returns a (pkg, fileMap) tuple
-def _createComponent(repos, branch, bldPkg, ident):
+def _createComponent(repos, branch, bldPkg, newVersion, ident):
     fileMap = {}
-    p = package.Trove(bldPkg.getName(), bldPkg.getVersion(), bldPkg.flavor)
+    p = package.Trove(bldPkg.getName(), newVersion, bldPkg.flavor)
     p.setRequires(bldPkg.requires)
     p.setProvides(bldPkg.provides)
 
@@ -50,7 +50,7 @@ def _createComponent(repos, branch, bldPkg, ident):
 
         if not fileVersion:
             # no existing versions for this path
-	    p.addFile(f.id(), path, bldPkg.getVersion())
+	    p.addFile(f.id(), path, newVersion)
 	else:
 	    oldFile = repos.getFileVersion(f.id(), fileVersion)
             # check to see if the file we have now is the same as the
@@ -60,7 +60,7 @@ def _createComponent(repos, branch, bldPkg, ident):
 		p.addFile(f.id(), path, fileVersion)
 	    else:
                 # otherwise use the new version
-		p.addFile(f.id(), path, bldPkg.getVersion())
+		p.addFile(f.id(), path, newVersion)
 
         fileMap[f.id()] = (f, realPath, path)
 
@@ -135,19 +135,15 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     if repos.hasPackage(fullName):
 	currentVersion = repos.getTroveLatestVersion(fullName, buildBranch)
 
-    newVersion = helper.nextVersion(recipeClass.version, currentVersion, 
-				    buildBranch, binary = True)
-
     if issubclass(recipeClass, recipe.PackageRecipe):
-	ret = cookPackageObject(repos, cfg, recipeClass, 
-                                newVersion, buildBranch,
+	ret = cookPackageObject(repos, cfg, recipeClass, buildBranch,
                                 prep = prep, macros = macros)
     elif issubclass(recipeClass, recipe.GroupRecipe):
-	ret = cookGroupObject(repos, cfg, recipeClass, 
-                              newVersion, buildBranch, macros = macros)
+	ret = cookGroupObject(repos, cfg, recipeClass, buildBranch, 
+			      macros = macros)
     elif issubclass(recipeClass, recipe.FilesetRecipe):
-	ret = cookFilesetObject(repos, cfg, recipeClass, 
-                                newVersion, buildBranch, macros = macros)
+	ret = cookFilesetObject(repos, cfg, recipeClass, buildBranch, 
+				macros = macros)
     else:
         raise AssertionError
 
@@ -213,8 +209,7 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     built = [ (grp.getName(), grp.getVersion().asString()) ]
     return (changeSet, built, None)
 
-def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch, 
-		      macros={}):
+def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={}):
     """
     Turns a fileset recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -226,7 +221,6 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
     @type cfg: srscfg.SrsConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
-    @param newVersion: version to assign the newly built objects
     @param buildBranch: the branch the new build will be committed to
     @type buildBranch: versions.Version
     @param macros: set of macros for the build
@@ -256,7 +250,10 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
 	# source of an update, but it saves sending files across the
 	# network for no reason
 
-    fileset = package.Package(fullName, newVersion, flavor)
+    nextVersion = helper.nextVersion(repos, fullName, recipeClass.version, 
+				     flavor, buildBranch, binary = True)
+
+    fileset = package.Package(fullName, nextVersion, flavor)
     for (fileId, path, version) in l:
 	fileset.addFile(fileId, path, version)
 
@@ -266,7 +263,7 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
     built = [ (fileset.getName(), fileset.getVersion().asString()) ]
     return (changeSet, built, None)
 
-def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch, 
+def cookPackageObject(repos, cfg, recipeClass, buildBranch, 
 		      prep=True, macros={}):
     """
     Turns a package recipe object into a change set. Returns the absolute
@@ -282,7 +279,6 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     @type cfg: srscfg.SrsConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
-    @param newVersion: version to assign the newly built objects
     @param buildBranch: the branch the new build will be committed to
     @type buildBranch: versions.Version
     @param prep: If true, the build stops after the package is unpacked
@@ -370,24 +366,34 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     requires = deps.deps.DependencySet()
     provides = deps.deps.DependencySet()
     flavor = deps.deps.DependencySet()
-    grp = package.Package(grpName, newVersion, flavor)
-    grp.setRequires(requires)
-    grp.setProvides(provides)
+
+    bldList = recipeObj.getPackages()
+
+    for buildPkg in bldList:
+	flavor.union(buildPkg.flavor)
+
+    nextVersion = helper.nextVersion(repos, grpName, recipeClass.version, 
+				     flavor, buildBranch, binary = True)
+
+    grp = package.Package(grpName, nextVersion, flavor)
 
     packageList = []
-    for buildPkg in recipeObj.getPackages(newVersion):
-	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, ident)
+    for buildPkg in bldList:
+	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, 
+					nextVersion, ident)
 
 	requires.union(p.getRequires())
 	provides.union(p.getProvides())
-	flavor.union(p.getFlavor())
 
 	built.append((p.getName(), p.getVersion().asString()))
 	packageList.append((p, fileMap))
 	grp.addTrove(p.getName(), p.getVersion(), p.getFlavor())
 
+    grp.setRequires(requires)
+    grp.setProvides(provides)
+
     changeSet = changeset.CreateFromFilesystem(packageList)
-    changeSet.addPrimaryPackage(grpName, newVersion, None)
+    changeSet.addPrimaryPackage(grpName, nextVersion, None)
 
     grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet.newPackage(grpDiff)

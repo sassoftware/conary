@@ -215,12 +215,13 @@ def commit(repos, cfg):
     
     recipeVersionStr = recipeClass.version
 
-    if srcPkg:
-	newVersion = helper.nextVersion(recipeVersionStr, srcPkg.getVersion(),
-					state.getBranch(), binary = False)
+    if isinstance(state.getVersion(), versions.NewVersion):
+	branch = state.getBranch()
     else:
-	newVersion = helper.nextVersion(recipeVersionStr, None,
-					state.getBranch(), binary = False)
+	branch = state.getVersion().branch()
+
+    newVersion = helper.nextVersion(repos, state.getName(), recipeVersionStr, 
+				    None, branch, binary = False)
 
     result = update.buildLocalChanges(repos, [(state, srcPkg, newVersion)],
 				      flags = update.IGNOREUGIDS)

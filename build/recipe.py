@@ -319,9 +319,8 @@ class PackageRecipe(Recipe):
 	for post in self.destdirPolicy:
             post.doProcess(self)
 
-    def getPackages(self, fullVersion):
+    def getPackages(self):
 	# policies look at the recipe instance for all information
-	self.fullVersion = fullVersion
 	for policy in self.packagePolicy:
 	    policy.doProcess(self)
         return self.autopkg.getPackages()

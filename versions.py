@@ -55,6 +55,9 @@ class NewVersion(AbstractVersion):
     def timeStamps(self):
 	return [ time.time() ]
 
+    def branch(self):
+	return None
+
 class AbstractBranch(object):
 
     """
