@@ -75,8 +75,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	if nameList:
 	    # if this package/version exists already, increment the
 	    # existing revision
-	    pkgSet = repos.getPackageSet(nameList[0])
-	    version = pkgSet.getLatestVersion(cfg.defaultbranch)
+	    version = repos.pkgLatestVersion(nameList[0], cfg.defaultbranch)
 	    if version and recipeObj.version == version.trailingVersion():
 		version = copy.deepcopy(version)
 		version.incrementVersionRelease()
@@ -181,8 +180,7 @@ class IdGen:
 	fullName = cfg.packagenamespace + ":" + name
 	pkg = None
 	for pkgName in repos.getPackageList(fullName):
-	    pkgSet = repos.getPackageSet(pkgName)
-	    pkg = pkgSet.getLatestPackage(cfg.defaultbranch)
+	    pkg = repos.getLatestPackage(pkgName, cfg.defaultbranch)
 	    for (fileId, path, version) in pkg.fileList():
 		fileIdMap[path] = fileId
 		if path[0] != "/":

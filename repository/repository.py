@@ -182,6 +182,15 @@ class Repository:
 
     def hasPackage(self, pkg):
 	return self.pkgDB.hasFile(pkg)
+
+    def hasPackageVersion(self, pkgName, version):
+	return package.PackageSet(self.pkgDB, pkgName).hasVersion(version)
+
+    def pkgLatestVersion(self, pkgName, branch):
+	return package.PackageSet(self.pkgDB, pkgName).getLatestVersion(branch)
+
+    def getLatestPackage(self, pkgName, branch):
+	return package.PackageSet(self.pkgDB, pkgName).getLatestPackage(branch)
 	
     def storeFileFromChangeset(self, chgSet, file, pathToFile):
 	if isinstance(file, files.RegularFile):
