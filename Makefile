@@ -13,6 +13,7 @@ python_files = __init__.py	\
 	build.py		\
 	buildpackage.py		\
 	database.py		\
+	checkin.py		\
 	changeset.py		\
 	commit.py		\
 	cook.py			\
@@ -24,6 +25,7 @@ python_files = __init__.py	\
 	filecontents.py		\
 	files.py		\
 	fixedglob.py		\
+	group.py		\
 	importrpm.py		\
 	log.py			\
 	lookaside.py		\
