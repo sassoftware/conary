@@ -13,99 +13,142 @@ configuration sufficient to build.
 
 """
 
-class Flag:
+class Flag(dict):
     """
-    Implements the object for a single flag; contains the value
-    of the flag, and optionally a short summary (a sentence
-    fragment) and a longer description (can be multiple paragraphs).
-    """
-    def __init__(self, value):
-        self.value = value
-        self.short = ""
-        self.long = ""
+    Implements a dictionary which also has its own value; used to
+    create hierarchical dictionaries.  It also may contain a
+    short summary (a sentence fragment) and a longer description
+    (can be multiple paragraphs) of documentation.
 
-    def setShortDoc(self, doc):
-        self.short = doc
-
-    def setLongDoc(self, doc):
-        self.long = doc
-
-    def set(self, value):
-        self.value = value
-
-    def __repr__(self):
-        return repr(self.value)
-
-    def __coerce__(self, other):
-        if type(other) is Flag:
-            other = other.value
-        return (self.value, other)
-
-    def __nonzero__(self):
-        return self.value
-
-class UseClass(dict):
-    """
-    Implements a simple object that contains boolean flags objects.
     Magic is used to make the initialization of the object easy.
     """
-
-    def __init__(self, showdefaults=True):
-	self.showdefaults = showdefaults
-        self.initialized = False
-	self.frozen = False
-        self.track = False
-        self.usedFlags = {}
+    def __init__(self, value=None, showdefaults=True):
+	self._showdefaults = showdefaults
+        self._value = value
+        self._short = ""
+        self._long = ""
+	self._frozen = False
+        self._track = False
+        self._usedFlags = {}
         # this must be set last
-        self.initialized = True
+        self._initialized = True
+
+    def setShortDoc(self, doc):
+        self._short = doc
+
+    def setLongDoc(self, doc):
+        self._long = doc
+
+    def _set(self, value):
+        self._value = value
+
+    def _values(self):
+	return self.copy()
+
+    def __repr__(self):
+	if self._value == None:
+	    # top-level flag, no point in printing out None...
+	    return repr(self.copy())
+        return repr(self._value)
+
+    def __ror__(self, other):
+        if type(other) is Flag:
+            other = other._value
+        return self._value | other
+
+    def __or__(self, other):
+	return self.__ror__(other)
+
+    def __rand__(self, other):
+        if type(other) is Flag:
+            other = other._value
+        return self._value & other
+
+    def __and__(self, other):
+	return self.__rand__(other)
+
+    def __nonzero__(self):
+        return self._value
 
     def _freeze(self):
-	self.frozen = True
+	self._frozen = True
 
     def _thaw(self):
-	self.frozen = False
+	self._frozen = False
 
     def getUsed(self):
-        return self.usedFlags
+        return self._usedFlags
 
     def trackUsed(self, val):
-        self.track = val
+        self._track = val
 
     def __setitem__(self, key, value):
-	if self.frozen:
+	if self._frozen:
 	    raise TypeError, 'flags are frozen'
-        if self.has_key(key):
-            self[key].set(bool(value))
+        if key in self:
+            self[key]._set(bool(value))
         else:
             dict.__setitem__(self, key, value)
             
     def __getattr__(self, name):
-        if self.__dict__.has_key(name):
+        if name in self.__dict__:
             return self.__dict__[name]
-        if self.has_key(name):
+        if name in self:
             flag = self[name]
-            if self.track:
-                self.usedFlags[name] = flag
+            if self._track:
+                self._usedFlags[name] = flag
             return flag
         raise AttributeError, "class %s has no attribute '%s'" % (self.__class__.__name__, name)
 
     def __setattr__(self, name, value):
-        initialized = self.__dict__.get('initialized', False)
+        initialized = self.__dict__.get('_initialized', False)
         # this allows us to add instance variables during __init__
         if not initialized:
             self.__dict__[name] = value
             return
         # after init, only set instance variables that already exist
-        if self.__dict__.has_key(name):
+        if name in self.__dict__:
             self.__dict__[name] = value
             return
         # everything else should be handled as a Use flag
-        if self.frozen:
+        if self._frozen:
             raise TypeError, 'flags are frozen'
-        if self.has_key(name):
-            self[name].set(value)
+        if name in self:
+            self[name]._set(value)
         else:
             self[name] = Flag(value)
+
+
+def _addShortDoc(baseobj, obj, keys, level=1):
+    global __doc__
+    for key in keys:
+        flag = obj[key]
+	dflt = ''
+	if baseobj._showdefaults:
+	    dflt = 'Default=C{%s}; ' %str(flag._value)
+        desc = flag._short
+        if not desc:
+            desc = '%s flag' %key
+        __doc__ += ' '*(2*level) + '- B{C{%s}}: %s%s.\n'% (key, dflt, desc)
+	newkeys = flag.keys()
+	if newkeys:
+	    newkeys.sort
+	    _addShortDoc(baseobj, flag, newkeys, level=level+1)
+
+def _addLongDoc(baseobj, obj, keys, prefix=''):
+    global __doc__
+    for key in keys:
+        flag = obj[key]
+        if flag._long:
+            __doc__ += 'B{C{'+key+'}}: ' + flag._long + '\n\n'
+	newkeys = flag.keys()
+	if newkeys:
+	    newkeys.sort
+	    if prefix:
+		newprefix = '%s.%s' %(prefix, key)
+	    else:
+		newprefix = key
+	    _addLongDoc(baseobj, flag, newkeys, newprefix)
 
 def _addDocs(obj):
     global __doc__
@@ -113,30 +156,19 @@ def _addDocs(obj):
         return
     keys = obj.keys()
     keys.sort()
-    for key in keys:
-        flag = obj[key]
-	dflt = ''
-	if obj.showdefaults:
-	    dflt = 'Default=C{%s}; ' %str(flag.value)
-        desc = flag.short
-        if not desc:
-            desc = '%s flag' %key
-        __doc__ += '  - B{C{%s}}: %s%s.\n'% (key, dflt, desc)
+    _addShortDoc(obj, obj, keys)
     __doc__ += '\n\nMore details:\n\n'
-    for key in keys:
-        flag = obj[key]
-        if flag.long:
-            __doc__ += 'B{C{'+key+'}}: ' + flag.long + '\n\n'
+    _addLongDoc(obj, obj, keys)
 
 
 if __doc__ is not None:
     __doc__ += """
 @sort: Use, Arch
-@type Use: UseClass
+@type Use: Flag
 @var Use: Set of flags defined for this build, with their boolean status.
 The Use flags have the following meanings:
 """
-Use = UseClass(showdefaults=True)
+Use = Flag(showdefaults=True)
 
 Use.pcre = True
 Use.pcre.setShortDoc('Use the Perl-compatible regex library')
@@ -256,15 +288,18 @@ _addDocs(Use)
 
 if __doc__ is not None:
     __doc__ += """
-@type Arch: UseClass
+@type Arch: Flag
 @var Arch: Set of architectures defined for this build, with their boolean status.
 The Arch flags have the following meanings:
 """
-Arch = UseClass(showdefaults=False)
-Arch.i386 = True
-Arch.i486 = True
-Arch.i586 = True
+Arch = Flag(showdefaults=False)
+Arch.i386 = False
+Arch.i486 = False
+Arch.i586 = False
 Arch.i686 = True
+Arch.i686.cmov = True
+Arch.i686.sse = True
+Arch.i686.sse2 = True
 Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686
 Arch.x86.setShortDoc('True if any IA32 architecture is set')
 Arch.x86_64 = False
