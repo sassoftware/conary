@@ -103,6 +103,10 @@ class Dependency(BaseDependency):
 	if self.name != required.name: 
 	    return False
 	for requiredFlag in required.flags.iterkeys():
+            # it is fine to not match a flag that is
+            # simply a preference
+            if requiredFlag[0] == '~':
+                continue
 	    if not self.flags.has_key(requiredFlag): 
 		return False
 
