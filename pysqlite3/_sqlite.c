@@ -1365,9 +1365,9 @@ static PyObject* _con_prepare(pysqlc* self, PyObject *args)
     pystmt->con = self;
     ret = sqlite3_prepare(self->p_db, sql, sql_len, &pystmt->p_stmt, &query_tail);
     if (*query_tail != '\0') {
+        Py_DECREF(pystmt);
 	PyErr_SetString(_sqlite_ProgrammingError,
 			"SQL must only contain one statement.");
-        Py_DECREF(pystmt);
         return NULL;
     }
     
@@ -1870,7 +1870,10 @@ static PyObject* _stmt_execute(pysqlstmt *self, PyObject *args)
     /* Maybe there occurred an error in a user-defined function */
     if (PyErr_Occurred())
     {
+	PyObject *err_type, *err_value, *err_traceback;
+	PyErr_Fetch(&err_type, &err_value, &err_traceback);
         Py_DECREF(p_rset);
+	PyErr_Restore(err_type, err_value, err_traceback);
         return NULL;
     }
 
@@ -1881,8 +1884,8 @@ static PyObject* _stmt_execute(pysqlstmt *self, PyObject *args)
 
     if(ret != SQLITE_OK)
     {
-	PyErr_SetString(_sqlite_DatabaseError, sqlite3_errmsg(self->con->p_db));
         Py_DECREF(p_rset);
+	PyErr_SetString(_sqlite_DatabaseError, sqlite3_errmsg(self->con->p_db));
         return NULL;
     }
 
