@@ -459,7 +459,7 @@ class DependencyTables:
         # removedInstanceId != None means that the dependency was resolved by 
         #    something which is being removed
         brokenByErase = {}
-        unresolveable = [ None ] * len(depList)
+        unresolveable = [ None ] * (len(depList) + 1)
         for (depNum, instanceId, removedInstanceId) in cu:
             if removedInstanceId is not None:
                 if depNum < 0:
