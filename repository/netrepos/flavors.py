@@ -93,6 +93,8 @@ class FlavorScores:
                                     FlavorScores(request, present)""")
 
             for (request, present), value in deps.flavorScores.iteritems():
+                if value is None:
+                    value = -1000000
                 cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)", 
                            request, present, value)
                             

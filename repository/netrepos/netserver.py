@@ -389,9 +389,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                             (ffFlavor.flag is NULL AND
                              FlavorMap.flag is NULL))
                     LEFT OUTER JOIN FlavorScores ON
-                        FlavorScores.request = ffFlavor.sense AND
-                        FlavorScores.present = FlavorMap.sense
+                        FlavorScores.present = FlavorMap.sense AND
+                        (FlavorScores.request = ffFlavor.sense OR
+                         (ffFlavor.sense is NULL AND
+                          FlavorScores.request = 0
+                         )
+                        )
             """ % extraJoin
+                        #(FlavorScores.request = ffFlavor.sense OR
+                        #    (ffFlavor.sense is NULL AND
+                        #     FlavorScores.request = 0)
+                        #)
             grouping = "GROUP BY instanceId, aclId"
             getList.append("SUM(FlavorScores.value) as flavorScore")
             flavorScoreCheck = "HAVING flavorScore > -500000"
