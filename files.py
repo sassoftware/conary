@@ -31,20 +31,27 @@ import util
 from deps import filedeps, deps
 
 _FILE_FLAG_CONFIG = 1 << 0
-# the following three are a legacy from before tag handlers, kept because they
-# describe entries in the main repository...  If we run out, we can
-# touch up our main repository (the only one that has any references to
-# these flag values) to use the corresponding tags and then reuse these
-# values.
-_FILE_FLAG_INITSCRIPT = 1 << 1
-_FILE_FLAG_SHLIB = 1 << 2
-_FILE_FLAG_GCONFSCHEMA = 1 << 3
+# the following three are a legacy from before tag handlers; all repositories
+# and databases have been purged of them, so it can be used at will
+_FILE_FLAG_UNUSED0 = 1 << 1
+_FILE_FLAG_UNUSED1 = 1 << 2
+_FILE_FLAG_UNUSED2 = 1 << 3
 # transient contents that may have modified contents overwritten
 _FILE_FLAG_TRANSIENT = 1 << 4
 _FILE_FLAG_SOURCEFILE = 1 << 5
 # files which were added to source components by conary rather then by
 # the user. this isn't used yet, just reserved.
 _FILE_FLAG_AUTOSOURCE = 1 << 6	
+
+FILE_STREAM_CONTENTS        = 1
+FILE_STREAM_DEVICE	    = 2
+FILE_STREAM_FLAGS	    = 3
+FILE_STREAM_FLAVOR	    = 4
+FILE_STREAM_INODE	    = 5
+FILE_STREAM_PROVIDES        = 6
+FILE_STREAM_REQUIRES        = 7
+FILE_STREAM_TAGS	    = 8
+FILE_STREAM_TARGET	    = 9
 
 class DeviceStream(streams.TupleStream):
 
@@ -230,9 +237,9 @@ class File(streams.StreamSet):
 
     lsTag = None
     hasContents = 0
-    streamDict = { streams._STREAM_INODE : (InodeStream, "inode"),
-                   streams._STREAM_FLAGS : (FlagsStream, "flags"),
-		   streams._STREAM_TAGS :  (streams.StringsStream, "tags") }
+    streamDict = { FILE_STREAM_INODE : (InodeStream, "inode"),
+                   FILE_STREAM_FLAGS : (FlagsStream, "flags"),
+		   FILE_STREAM_TAGS :  (streams.StringsStream, "tags") }
     __slots__ = [ "theId", "inode", "flags", "tags" ]
 
     def modeString(self):
@@ -319,7 +326,7 @@ class File(streams.StreamSet):
 class SymbolicLink(File):
 
     lsTag = "l"
-    streamDict = { streams._STREAM_TARGET : (streams.StringStream, "target") }
+    streamDict = { FILE_STREAM_TARGET : (streams.StringStream, "target") }
     streamDict.update(File.streamDict)
     __slots__ = "target"
 
@@ -383,7 +390,7 @@ class Directory(File):
 
 class DeviceFile(File):
 
-    streamDict = { streams._STREAM_DEVICE : (DeviceStream, "devt") }
+    streamDict = { FILE_STREAM_DEVICE : (DeviceStream, "devt") }
     streamDict.update(File.streamDict)
     __slots__ = [ 'devt' ]
 
@@ -419,10 +426,10 @@ class CharacterDevice(DeviceFile):
 class RegularFile(File):
 
     streamDict = { 
-	streams._STREAM_CONTENTS : (RegularFileStream , 'contents' ), 
-        streams._STREAM_PROVIDES : (streams.DependenciesStream, 'provides' ), 
-        streams._STREAM_REQUIRES : (streams.DependenciesStream, 'requires' ), 
-        streams._STREAM_FLAVOR   : (streams.DependenciesStream, 'flavor' ) }
+	FILE_STREAM_CONTENTS : (RegularFileStream , 'contents' ), 
+        FILE_STREAM_PROVIDES : (streams.DependenciesStream, 'provides' ), 
+        FILE_STREAM_REQUIRES : (streams.DependenciesStream, 'requires' ), 
+        FILE_STREAM_FLAVOR   : (streams.DependenciesStream, 'flavor' ) }
 
     streamDict.update(File.streamDict)
     __slots__ = ('contents', 'provides', 'requires', 'flavor')
@@ -573,7 +580,7 @@ def contentsChanged(diff):
 	streamId, size = struct.unpack("!BH", diff[i:i+3])
 	i += 3
 
-	if streamId == streams._STREAM_CONTENTS:
+	if streamId == FILE_STREAM_CONTENTS:
 	    changedCode = struct.unpack("B", diff[i])[0]
 	    return changedCode != 0
 

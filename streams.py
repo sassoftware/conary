@@ -21,18 +21,6 @@ import versions
 
 from deps import filedeps, deps
 
-_STREAM_CONTENTS    = 1
-_STREAM_DEVICE	    = 2
-_STREAM_FLAGS	    = 3
-_STREAM_FLAVOR	    = 4
-_STREAM_INODE	    = 5
-_STREAM_PROVIDES    = 6
-_STREAM_REQUIRES    = 7
-_STREAM_TAGS	    = 8
-_STREAM_TARGET	    = 9
-
-_STREAM_TROVE_CHANGE_SET = 100
-
 class InfoStream(object):
 
     __slots__ = ()
