@@ -290,6 +290,7 @@ class Flag(dict):
                 for flag in self.Use.iterkeys():
                     stringDeps.extend(self.Use[flag].toDepStrings(topflag=self.Use))
             if 'Flags' in self:
+                assert(recipename)
                 for flag in self.Flags.iterkeys():
                     stringDeps.extend(
                         self.Flags[flag].toDepStrings(prefix=recipename,
