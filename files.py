@@ -15,66 +15,30 @@ from datastore import DataStore
 
 class FileMode:
 
-    # parses "rwx" style string
-    def parseTriplet(self, str, shleft, setval):
-	i = 0
-	add = 0
-	if str[0] == "r":
-	    i = 4
-	if str[1] == "w":
-	    i = i + 2
-	if str[2] == "x":
-	    i = i + 1
-	if str[2] == "s" or str[2] == "t":
-	    i = i + 1
-	    add = setval
-	if str[2] == "S" or str[2] == "T":
-	    add = setval
-
-	return add + (i << shleft)
-
     # new can be an integer file mode or a string (ls style) listing
     def perms(self, new = None):
-	if (new != None):
-	    if type(new) == types.IntType:
-		self.thePerms = new
-	    elif type(new) == types.StringType:
-		a = self.parseTriplet(new[1:4], 6, 04000)
-		b = self.parseTriplet(new[4:7], 3, 02000)
-		c = self.parseTriplet(new[7:10], 0, 01000)
-		self.thePerms = a + b + c
+	if (new != None and new != "-"):
+	    self.thePerms = new
 
 	return self.thePerms
 
     def owner(self, new = None):
-	if (new != None):
+	if (new != None and new != "-"):
 	    self.theOwner = new
 
 	return self.theOwner
 
     def group(self, new = None):
-	if (new != None):
+	if (new != None and new != "-"):
 	    self.theGroup = new
 
 	return self.theGroup
 
     def mtime(self, new = None):
-	if (new != None):
+	if (new != None and new != "-"):
 	    self.theMtime = new
 
 	return self.theMtime
-
-    # parses ls style output, returns the filename
-    def parsels(self, line):
-	info = string.split(line)
-
-	self.perms(info[0])
-	self.owner(info[2])
-	self.group(info[3])
-
-	#date = info[5:7]
-
-	return info[8]
 
     def infoLine(self):
 	return "%o %s %s %s" % (self.thePerms, self.theOwner, self.theGroup,
@@ -107,11 +71,21 @@ class FileMode:
 
 	return 0
 
+    def applyChangeLine(self, line):
+	(p, o, g, m) = string.split(line)
+	if p == "-": 
+	    p = None
+	else:
+	    p = int(p)
+
+	self.perms(p)
+	self.owner(o)
+	self.group(g)
+	self.mtime(m)
+
     def __init__(self, info = None):
 	if info:
-	    (self.thePerms, self.theOwner, self.theGroup, self.theMtime) = \
-		string.split(info)
-	    self.thePerms = int(self.thePerms, 8)
+	    self.applyChangeLine(info)
 	else:
 	    self.thePerms = None
 	    self.theOwner = None
@@ -151,6 +125,15 @@ class File(FileMode):
 	# most file types don't need to do this
 	pass
 
+    # public interface to applyChangeLine
+    #
+    # returns 1 if the change worked, 0 if the file changed too much for
+    # the change to apply (which means this is a different file type)
+    def applyChange(self, line):
+	(tag, line) = string.split(line, None, 1)
+	assert(tag == self.infoTag)
+	self.applyChangeLine(line)
+
     def __init__(self, fileId, info = None, infoTag = None):
 	self.theId = fileId
 	self.infoTag = infoTag
@@ -159,7 +142,7 @@ class File(FileMode):
 class SymbolicLink(File):
 
     def linkTarget(self, newLinkTarget = None):
-	if (newLinkTarget):
+	if (newLinkTarget and newLinkTarget != "-"):
 	    self.theLinkTarget = newLinkTarget
 
 	return self.theLinkTarget
@@ -189,9 +172,14 @@ class SymbolicLink(File):
 	os.symlink(self.theLinkTarget, target)
 	File.restore(self, target)
 
+    def applyChangeLine(self, line):
+	(target, line) = string.split(line, None, 1)
+	self.linkTarget(target)
+	File.applyChangeLine(self, line)
+
     def __init__(self, fileId, info = None):
 	if (info):
-	    (self.theLinkTarget, info) = string.split(info, None, 1)
+	    self.applyChangeLine(line)
 	else:
 	    self.theLinkTarget = None
 
@@ -260,26 +248,41 @@ class DeviceFile(File):
 	File.restore(self, target)
 
     def majorMinor(self, type = None, major = None, minor = None):
-	if type:
+	if type and type != "-":
 	    self.type = type
+	if major:
 	    self.major = major
+	if minor:
 	    self.minor = minor
 	
 	return (self.type, self.major, self.minor)
 
+    def applyChangeLine(self, line):
+	(t, ma, mi, line) = string.split(line, None, 3)
+
+	if ma == "-":
+	    ma = None
+	else:
+	    ma = int(ma)
+	    
+	if mi == "-":
+	    mi = None
+	else:
+	    mi = int(mi)
+
+	self.majorMinor(t, ma, mi)
+	File.applyChangeLine(self, line)
+
     def __init__(self, fileId, info = None):
 	if (info):
-	    (self.type, self.major, self.minor, info) = \
-		    string.split(info, None, 3)
-	    self.major = int(self.major)
-	    self.minor = int(self.minor)
+	    self.applyChangeLine(info)
 
 	File.__init__(self, fileId, info, infoTag = "v")
 
 class RegularFile(File):
 
     def sha1(self, sha1 = None):
-	if (sha1 != None):
+	if sha1 and sha1 != "-":
 	    self.thesha1 = sha1
 
 	return self.thesha1
@@ -312,9 +315,14 @@ class RegularFile(File):
 
 	repos.newFileContents(self.sha1(), file)
 
+    def applyChangeLine(self, line):
+	(sha, line) = string.split(line, None, 1)
+	self.sha1(sha)
+	File.applyChangeLine(self, line)
+
     def __init__(self, fileId, info = None, infoTag = "f"):
 	if (info):
-	    (self.thesha1, info) = string.split(info, None, 1)
+	    self.applyChangeLine(info)
 	else:
 	    self.thesha1 = None
 
