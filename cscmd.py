@@ -12,38 +12,35 @@
 # full details.
 #
 
+from lib import log
 from local import update
 from repository import repository
-from lib import log
+from updatecmd import parseTroveSpec
 import versions
 
 def ChangeSetCommand(repos, cfg, troveList, outFileName):
     list = []
 
     for item in troveList:
-        l = item.split("=")
+        l = item.split("--")
+
         if len(l) == 1:
-            newVersionStr = None
             oldVersionStr = None
-            troveName = item
+            oldFlavor = None
+            (troveName, newVersionStr, newFlavor) = parseTroveSpec(l[0],
+                                                        cfg.flavor)
         elif len(l) != 2:
             log.error("one = expected in '%s' argument to changeset", item)
             return
         else:
-            troveName = l[0]
-            l = l[1].split("--")
-            if len(l) == 1:
-                newVersionStr = l[0]
-                oldVersionStr = None
-            elif len(l) == 2:
-                oldVersionStr = l[0]
-                newVersionStr = l[1]
-            else:
-                log.error("only one -- is allowed in '%s' argument to "
-                          "changeset", item)
-                return
+            (troveName, oldVersionStr, oldFlavor) = parseTroveSpec(l[0],
+                                                        cfg.flavor)
+            l[1] = troveName + "=" + l[1]
+            (troveName, newVersionStr, newFlavor) = parseTroveSpec(l[1],
+                                                        cfg.flavor)
 
-        pkgList = repos.findTrove(cfg.installLabelPath, troveName, cfg.flavor,
+
+        pkgList = repos.findTrove(cfg.installLabelPath, troveName, newFlavor,
                                   newVersionStr)
         if len(pkgList) > 1:
             if newVersionStr:
@@ -56,9 +53,9 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName):
         newVersion = pkgList[0].getVersion()
         newFlavor = pkgList[0].getFlavor()
 
-        if (oldVersionStr):
+        if oldVersionStr:
             pkgList = repos.findTrove(cfg.installLabelPath, troveName, 
-                                      pkgList[0].getFlavor(), oldVersionStr)
+                                      oldFlavor, oldVersionStr)
             if len(pkgList) > 1:
                 log.error("trove %s has multiple branches named %s",
                           troveName, oldVersionStr)
@@ -67,7 +64,6 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName):
             oldFlavor = pkgList[0].getFlavor()
         else:
             oldVersion = None
-            oldFlavor = None
 
         list.append((troveName, (oldVersion, oldFlavor), 
                                 (newVersion, newFlavor),
