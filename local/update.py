@@ -178,8 +178,7 @@ class FilesystemJob:
 		    # XXX is it right to use this default in this case?
 		    os.environ['GCONF_CONFIG_SOURCE'] = 'xml::/etc/gconf/gconf.xml.defaults'
 		for path in self.gconfSchema:
-		    name = os.path.basename(path)
-		    log.debug("running gconftool-2 --makefile-install-rule %s", name)
+		    log.debug("running gconftool-2 --makefile-install-rule %s", path)
 		    pid = os.fork()
 		    if not pid:
 			os.chdir(self.root)
@@ -189,7 +188,7 @@ class FilesystemJob:
 			    null = os.open('/dev/null', os.O_WRONLY)
 			    os.dup2(null, 2)
 			    os.close(null)
-                            os.execl(p, p, "--makefile-install-rule", name)
+                            os.execl(p, p, "--makefile-install-rule", path)
                         except:
                             os._exit(1)
 		    (id, status) = os.waitpid(pid, 0)
