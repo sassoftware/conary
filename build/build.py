@@ -105,7 +105,9 @@ class Automake(BuildCommand):
 class Configure(BuildCommand):
     """The Configure class runs an autoconf configure script with the
     default paths as defined by the macro set passed into it when doBuild
-    is invoked.
+    is invoked.  It provides many common arguments, set correctly to
+    values provided by system macros.  If any of these arguments do
+    not work for a program, then use the ManualConfigure class instead.
     """
     # note that template is NOT a tuple, () is used merely to group strings
     # to avoid trailing \ characters on every line
@@ -161,26 +163,42 @@ class Configure(BuildCommand):
         util.execute(self.command %macros)
 
 class ManualConfigure(Configure):
+    """
+    The ManualConfigure class works exactly like the configure class,
+    except that all the arguments to the configure script have to be
+    provided explicitly.
+    """
     template = ('cd %%(builddir)s/%(subDir)s; '
                 '%%(mkObjdir)s '
 	        '%(preConfigure)s %%(configure)s %(args)s')
 
 class Make(BuildCommand):
+    """
+    The Make class runs the make utility with CFLAGS and CXXFLAGS set
+    to system defaults, with system default for mflags and parallelmflags.
+    This means, among other things, that if your package does not build
+    correctly with parallelized make, you should override the
+    parallelmflags macro in your package.
+    """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
                 ' %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
                 'subDir': ''}
     
-class MakeInstall(BuildCommand):
+class MakeInstall(Make):
+    """
+    The MakeInstall class is like the Make class, except that it
+    automatically sets DESTDIR.  If your package does not have
+    DESTDIR or an analog, use the GNUMakeInstall class instead,
+    or as a last option, the Make class.
+    """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
                 ' %(preMake)s make %%(mflags)s %%(rootVarArgs)s'
 		' %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
-                'preMake': '',
-		'installtarget': 'install',
-                'subDir': ''}
+		'installtarget': 'install'}
 
     def do(self, macros):
 	macros = macros.copy()
@@ -189,8 +207,13 @@ class MakeInstall(BuildCommand):
 	                  %(self.rootVar, macros['destdir'])})
 	util.execute(self.command %macros)
 
-class GNUMakeInstall(BuildCommand):
-    """For use at least when there is no single functional DESTDIR or similar"""
+class GNUMakeInstall(Make):
+    """
+    The GNUMakeInstall class is used when there is no single functional
+    DESTDIR or similar definition, but enough of the de-facto standard 
+    variables (prefix, bindir, etc) are honored by the Makefile to make
+    a destdir installation successful.
+    """
     template = (
 	'cd %%(builddir)s/%(subDir)s; '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
@@ -209,13 +232,15 @@ class GNUMakeInstall(BuildCommand):
 	' mandir=%%(destdir)s/%%(mandir)s'
 	' infodir=%%(destdir)s/%%(infodir)s'
 	' %(installtarget)s %(args)s')
-    keywords = {'preMake': '',
-		'installtarget': 'install',
-                'subDir': ''}
+    keywords = {'installtarget': 'install'}
 
 
 
 class InstallDesktopfile(BuildCommand):
+    """
+    The InstallDesktopfile class should be used to provide categories
+    (and vendor, if necessary) for files in /usr/share/applications/
+    """
     template = ('desktop-file-install --vendor %(vendor)s'
 		' --dir %%(destdir)s/%%(datadir)s/applications'
 		' %%(category)s'
@@ -238,15 +263,31 @@ class _FileAction(BuildAction):
 		self.recipe.fixmodes[path] = self.mode
 	
 class SetModes(_FileAction):
-    def __init__(self, path, mode):
+    """
+    In order for a file to be setuid in the repository, it needs to
+    have its mode explicitly provided in the recipe.  If any file
+    installation class that provides a mode is used, that will be
+    sufficient, but for files that are installed by makefiles, a
+    specific, intentional listing of their mode must be provided.
+    The SetModes class provides the mechanism for that.
+
+    In addition, of course, it can be used to change arbitrary
+    file modes in the destdir.
+    """
+    def __init__(self, path, mode, use=None):
 	self.mode = mode
 	if type(path) is string:
 	    path = (path,)
 	self.paths = path
+	self.use = use
 
     def do(self, macros):
+	files = []
 	for path in self.paths:
-	    self.chmod(macros['destdir'], path)
+	    files.extend(util.braceExpand(path %macros))
+	for file in files:
+	    print '+ changing mode for %s to %o' %(file, self.mode)
+	    self.chmod(macros['destdir'], file)
 
 class _PutFiles(_FileAction):
     def do(self, macros):
@@ -289,12 +330,18 @@ class _PutFiles(_FileAction):
     
 
 class InstallFiles(_PutFiles):
+    """
+    This class installs files from the builddir to the destdir.
+    """
     def __init__(self, fromFiles, toFile, mode = 0644, use=None):
 	_PutFiles.__init__(self, fromFiles, toFile, mode, use)
 	self.source = ''
 	self.move = 0
 
 class MoveFiles(_PutFiles):
+    """
+    This class moves files within the destdir.
+    """
     def __init__(self, fromFiles, toFile, mode = -1, use=None):
 	_PutFiles.__init__(self, fromFiles, toFile, mode, use)
 	self.source = '%(destdir)s'
@@ -387,7 +434,9 @@ class InstallSymlinks(BuildAction):
         self.allowDangling = allowDangling
 
 class RemoveFiles(BuildAction):
-
+    """
+    The RemoveFiles class removes files from within the destdir
+    """
     def do(self, macros):
 	for filespec in self.filespecs:
 	    if self.recursive:
@@ -404,7 +453,10 @@ class RemoveFiles(BuildAction):
 	self.use = util.checkUse(use)
 
 class InstallDocs(BuildAction):
-
+    """
+    The InstallDocs class installs documentation files from the builddir
+    into the destdir in the appropriate directory.
+    """
     def do(self, macros):
 	macros = macros.copy()
 	if self.subdir:
@@ -427,6 +479,9 @@ class InstallDocs(BuildAction):
 	self.use = util.checkUse(use)
 
 class MakeDirs(_FileAction):
+    """
+    The MakeDirs class creates directories in destdir
+    """
     keywords = { 'mode': 0755 }
 
     def do(self, macros):
