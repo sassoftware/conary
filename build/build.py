@@ -408,7 +408,7 @@ class _FileAction(BuildAction):
 
 class Desktopfile(BuildCommand, _FileAction):
     """
-    The Desktopfile class should be used to provide categories
+    The Desktopfile class should be used to provide category
     (and vendor, if necessary) for files in /usr/share/applications/,
     if the target has enabled building desktop files.
     """
@@ -419,15 +419,14 @@ class Desktopfile(BuildCommand, _FileAction):
 		' %%(category)s'
 		' %(args)s')
     keywords = {'vendor': 'net',
-		'categories': None}
+		'category': None}
 
     def doBuild(self, recipe):
 	if not Use.desktop or not self.use:
 	    return
 	macros = recipe.macros.copy()
-        # XXX why is the keyword "categories"?
-        if self.categories:
-	    macros['category'] = '--add-category "%s"' %self.categories
+        if self.category:
+	    macros['category'] = '--add-category "%s"' %self.category
         else:
             macros['category'] = ''
 	self.do(macros)
