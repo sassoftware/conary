@@ -418,6 +418,7 @@ class FilesystemJob:
 	    if flags & MERGE:
 		try:
 		    # don't remove files if they've been changed locally
+                    # XXX change to not calculate sha1 in this case
 		    localFile = files.FileFromFilesystem(realPath, fileId)
 		except OSError, exc:
 		    # it's okay if the file is missing, it means we all agree
@@ -431,8 +432,6 @@ class FilesystemJob:
 
 	    oldFile = repos.getFileVersion(fileId, version)
             # XXX mask out any flag that isn't the config flag.
-            # There are some flags that the localFile won't have
-            # such as SHLIB or INITSCRIPT
             oldFile.flags.set(oldFile.flags.value() & files._FILE_FLAG_CONFIG)
             
 	    # don't worry about metadata changes, just content changes
