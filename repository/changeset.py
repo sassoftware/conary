@@ -673,8 +673,9 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
 	    else:
 		dupFilter[name] = [ ver ]
 	    pkg = db.getPackageVersion(name, ver)
+	    origPkg = db.getPackageVersion(name, ver, pristine = True)
 	    ver = ver.fork(versions.LocalBranch(), sameVerRel = 1)
-	    list.append((pkg, pkg, ver))
+	    list.append((pkg, origPkg, ver))
 	    
 	    for (otherPkg, verList) in pkg.getPackageList():
 		for otherVer in verList:
