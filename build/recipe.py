@@ -275,7 +275,7 @@ class Recipe:
 
     def mainDir(self, new = None):
 	if new:
-	    self.theMainDir = new
+	    self.theMainDir = new % self.macros
 
 	return self.theMainDir
 
