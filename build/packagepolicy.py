@@ -387,7 +387,7 @@ class SharedLibrary(policy.Policy):
 
     # needs to share with ExecutableLibraries and CheckSonames
     def updateArgs(self, *args, **keywords):
-	policy.updateArgs(self, *args, **keywords)
+	policy.Policy.updateArgs(self, *args, **keywords)
 	self.recipe.ExecutableLibraries(*args, **keywords)
 	self.recipe.CheckSonames(*args, **keywords)
 
