@@ -187,7 +187,7 @@ class AbstractTroveDatabase:
 	been unlinked, and has no file name in this case).
 
 	@param sha1List: files to retrieve
-	@type: list
+	@type param: list
 	@rtype: list
 	"""
 
