@@ -19,6 +19,7 @@ python_files = __init__.py	\
 	datastore.py		\
 	destdirpolicy.py	\
 	display.py		\
+	enum.py			\
 	filecontainer.py	\
 	files.py		\
 	fixedglob.py		\
@@ -26,6 +27,7 @@ python_files = __init__.py	\
 	lookaside.py		\
 	package.py		\
 	packagepolicy.py	\
+	patch.py		\
 	policy.py		\
 	recipe.py		\
 	repository.py		\
@@ -77,6 +79,10 @@ dist:
 	tar cjf $(distdir).tar.bz2 $(distdir)
 	rm -rf $(distdir)
 
+distcheck:
+	@echo Possible missing files:
+	@(ls *py; for f in $(python_files); do echo $$f; done) | sort | uniq -u
+
 clean:
 	rm -f *~ .#* $(generated_files)
 
@@ -99,4 +105,4 @@ deps.dot:
 	./srs-bootstrap --dot `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` > deps.dot
 
 pychecker:
-	pychecker *.py
+	python2.3 /usr/lib/python2.2/site-packages/pychecker/checker.py *.py
