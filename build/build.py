@@ -24,19 +24,26 @@ class ShellCommand:
 
     def execute(self, command):
         print '+', command
-        os.system(command)
+        rc = os.system(command)
+        if rc:
+            raise RuntimeError, ('Shell command "%s" returned '
+                                 'non-zero status %d' % (command, rc))
+
 
 class Configure(ShellCommand):
     template = ('cd %%s; %(preConfigure)s ./configure --prefix=/usr '
-                '--sysconfdir=/etc %(extraFlags)s')
-    keywords = {'preConfigure': '',
-                'extraFlags': ''}
+                '--sysconfdir=/etc %(args)s')
+    keywords = {'preConfigure': ''}
     
     def doBuild(self, dir):
         self.execute(self.command % dir)
 
 class ManualConfigure(Configure):
-    template = 'cd %%s; %(preConfigure)s ./configure %(extraFlags)s'
+    template = 'cd %%s; %(preConfigure)s ./configure %(args)s'
+
+class ObjdirConfigure(Configure):
+    template = ('cd %%s; mkdir obj; cd obj; %(preConfigure)s '
+                '../configure %(args)s')
 
 class Make(ShellCommand):
     template = 'cd %%s; %(preMake)s make %(args)s'
