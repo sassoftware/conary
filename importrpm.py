@@ -66,10 +66,12 @@ def doImport(dbpath, rpmFile):
 	    f = files.Socket(list[i])
 	elif (stat.S_ISBLK(modes[i])):
 	    f = files.DeviceFile(list[i])
-	    f.majorMinor("b", rdevs[i] >> 8, rdevs[i] & 0xff)
+	    major = (rdevs[i] & 0xffff) >> 8
+	    f.majorMinor("b", major, rdevs[i] & 0xff)
 	elif (stat.S_ISCHR(modes[i])):
 	    f = files.DeviceFile(list[i])
-	    f.majorMinor("c", rdevs[i] >> 8, rdevs[i] & 0xff)
+	    major = (rdevs[i] & 0xffff) >> 8
+	    f.majorMinor("c", major, rdevs[i] & 0xff)
 	else:
 	    raise TypeError, "unsupported file type for %s" % list[i]
 
