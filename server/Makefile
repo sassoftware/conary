@@ -13,7 +13,10 @@
 #
 
 python_files = apachehooks.py \
-		server.py
+	       server.py      \
+               http.py        \
+               htmlengine.py  \
+               fmtroves.py
 
 extra_dist = Makefile adduser schema
 
