@@ -403,6 +403,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             return new
 
+        if not chgSetList:
+            # no need to work hard to find this out
+            return repository.changeset.ReadOnlyChangeSet()
+
         cs = None
         firstPath = target
         scheduledSet = {}
@@ -518,6 +522,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             fileDict = {}
             for (key, fileObj) in zip(need, fileObjs):
                 fileDict[key] = fileObj
+            del fileObj
 
             for (fileId, troveName, 
                     (oldTroveVersion, oldTroveF, oldFileVersion),
@@ -544,7 +549,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     internalCs.addFileContents(fileId, 
                                    repository.changeset.ChangedFileTypes.file, 
                                    cont, 
-                                   fileObj.flags.isConfig())
+                                   newFileObj.flags.isConfig())
 
 
         if not cs and internalCs:
