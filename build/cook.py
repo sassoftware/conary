@@ -454,7 +454,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}):
 	    raise CookError(str(msg))
 
 	recipeClass = loader.getRecipe()
-        changeSetFile = "%s-%s.srs" % (recipeClass.name, recipeClass.version)
+        changeSetFile = "%s-%s.ccs" % (recipeClass.name, recipeClass.version)
     else:
         try:
             loader = recipe.recipeLoaderFromSourceComponent(item,
