@@ -15,6 +15,7 @@ import grp
 import util
 import types
 import zipfile
+import datastore
 
 class FileMode:
 
@@ -134,12 +135,12 @@ class File(FileMode):
 	return self.theVersion
 
     def uniqueName(self):
-	return md5sum.md5str(self.theVersion)
+	return md5sum.md5str(self.path)
 
     def infoLine(self):
 	return FileMode.infoLine(self)
 
-    def restore(self, reppath, srcpath, root):
+    def restore(self, reppath, root):
 	self.chmod(root)
 
     def chmod(self, root):
@@ -198,7 +199,7 @@ class SymbolicLink(File):
 	os.symlink(self.theLinkTarget, target)
 
 	# this doesn't actually do anything for a symlink
-	File.restore(self, reppath, srcpath, root)
+	File.restore(self, reppath, root)
 
     def __init__(self, path, version = None, info = None):
 	if (info):
@@ -235,7 +236,7 @@ class NamedPipe(File):
 	if not os.path.exists(target):
 	    os.mkfifo(target)
 
-	File.restore(self, reppath, srcpath, root)
+	File.restore(self, reppath, root)
 
     def __init__(self, path, version = None, info = None):
 	File.__init__(self, path, version, info)
@@ -253,7 +254,7 @@ class Directory(File):
 	if not os.path.exists(target):
 	    os.mkdir(target)
 
-	File.restore(self, reppath, srcpath, root)
+	File.restore(self, reppath, root)
 
     def __init__(self, path, version = None, info = None):
 	File.__init__(self, path, version, info)
@@ -278,7 +279,7 @@ class DeviceFile(File):
 	    os.system("mknod %s %c %d %d" % (target, self.type, self.major,
 					    self.minor))
 
-	File.restore(self, reppath, srcpath, root)
+	File.restore(self, reppath, root)
 
     def majorMinor(self, type = None, major = None, minor = None):
 	if type:
@@ -305,6 +306,9 @@ class RegularFile(File):
 
 	return self.themd5
 
+    def uniqueName(self):
+	return self.themd5
+
     def infoLine(self):
 	return "f %s %s" % (self.themd5, File.infoLine(self))
 
@@ -315,27 +319,32 @@ class RegularFile(File):
 	return 0
 
     def restore(self, reppath, srcpath, root):
-	zip = zipfile.ZipFile(self.pathInRep(reppath) + ".contents")
 	target = root + self.path()
+	return self.doRestore(reppath, root, target)
+	
+    def doRestore(self, reppath, root, target):
+	store = datastore.DataStore(reppath + "/contents")
 	path = os.path.dirname(target)
 	util.mkdirChain(path)
 	f = open(target, "w")
-	f.write(zip.read(self.uniqueName()))
+	srcFile = store.openFile(self.uniqueName())
+	f.write(srcFile.read())
 	f.close()
-	zip.close()
-	File.restore(self, reppath, srcpath, root)
+	srcFile.close()
+	File.restore(self, reppath, root)
 
     def archive(self, reppath, root):
-	util.mkdirChain(self.pathInRep(reppath))
-	dest = self.pathInRep(reppath) + '.contents'
+	# no need to store the same contents twice; this happens regularly
+	# for source and packaged files (config files for example), as well
+	# as when the same file exists on multiple branches. we don't allow
+	# removing from the archive, so we don't need to ref count or anything
+	store = datastore.DataStore(reppath + "/contents")
+	if store.hasFile(self.uniqueName()): 
+	    return
 
-	if os.path.exists(dest):
-	    zip = zipfile.ZipFile(dest, "r")
-	else:
-	    zip = zipfile.ZipFile(dest, "w")
-
-	zip.write(root + "/" + self.path(), self.uniqueName())
-	zip.close()
+	file = open(root + "/" +  self.path(), "r")
+	store.addFile(file, self.uniqueName())
+	file.close()
 
     def __init__(self, path, version = None, info = None):
 	if (info):
@@ -348,14 +357,8 @@ class RegularFile(File):
 class SourceFile(RegularFile):
 
     def restore(self, reppath, srcpath, root):
-	zip = zipfile.ZipFile(self.pathInRep(reppath) + ".contents")
-	target = root + srcpath + "/" + self.fileName()
-	path = os.path.dirname(target)
-	util.mkdirChain(path)
-	f = open(target, "w")
-	f.write(zip.read(self.uniqueName()))
-	f.close()
-	zip.close()
+	target = root + "/" + srcpath + "/" + os.path.basename(self.path())
+	return self.doRestore(reppath, root + "/" + srcpath, target)
 
     def fileName(self):
 	return self.pkgName + "/" + os.path.basename(self.path())
@@ -473,9 +476,12 @@ def FileFromInfoLine(path, version, infoLine):
     elif type == "s":
 	return Socket(path, version, infoLine)
     elif type == "src":
-	# this is horrible. trule horrible. hideous, really.
-	parts = string.split(path, "/")
-	pkgName = parts[-2]
-	return SourceFile(pkgName, path, version, infoLine)
+	# just use the basename here; we don't need the /sources/pkgname bit
+	# of things; the base filename is all we need
+	#
+	# the pkgname "foo" isn't actually used; it will go away from
+	# here entirely when we make more progress on the repository
+	# format
+	return SourceFile("foo", os.path.basename(path), version, infoLine)
     else:
 	raise KeyError, "bad infoLine %s" % infoLine
