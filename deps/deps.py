@@ -571,11 +571,11 @@ def parseFlavor(s, mergeBase = None):
 
     set = DependencySet()
 
-    baseInsSet = groups[0]
+    baseInsSet = groups[1]
     if baseInsSet:
         needsInsSet = False
-        if groups[1]:
-            insSetFlags = groups[1].split(",")
+        if groups[2]:
+            insSetFlags = groups[2].split(",")
             for i, flag in enumerate(insSetFlags):
                 insSetFlags[i] = _fixup(flag)
         else:
@@ -583,10 +583,12 @@ def parseFlavor(s, mergeBase = None):
 
         set.addDep(InstructionSetDependency, Dependency(baseInsSet, 
                                                         insSetFlags))
+    elif groups[0]:
+        needsInsSet = False
 
-    if groups[2]:
+    if groups[3]:
         needsUse = False
-        useFlags = groups[2].split(",")
+        useFlags = groups[3].split(",")
         for i, flag in enumerate(useFlags):
             useFlags[i] = _fixup(flag)
 
@@ -612,8 +614,8 @@ ident = '(?:[_A-Za-z][0-9A-Za-z_]*)'
 flag = '(?:~?!?IDENT)'
 useFlag = '(?:!|~!)?FLAG(?:\.IDENT)?'
 archClause = '(IDENT)(?:\(( *FLAG(?: *, *FLAG)*)\))?(?:$| )'
-useClause = 'use: *(USEFLAG *(?:, *USEFLAG)*) *'
-exp = '^(?:ARCHCLAUSE)? *(?:USECLAUSE)?$'
+useClause = 'use: *(USEFLAG *(?:, *USEFLAG)*)? *'
+exp = '^(is:)? *(?:ARCHCLAUSE)? *(?:USECLAUSE)?$'
 
 exp = exp.replace('ARCHCLAUSE', archClause)
 exp = exp.replace('USECLAUSE', useClause)
@@ -622,6 +624,8 @@ exp = exp.replace('FLAG', flag)
 exp = exp.replace('IDENT', ident)
 
 flavorRegexp = re.compile(exp)
+
+del ident, flag, useFlag, archClause, useClause, exp
 
 # None means disallowed match
 flavorScores = {
