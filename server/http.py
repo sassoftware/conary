@@ -192,7 +192,7 @@ class HttpHandler(HtmlEngine):
         
     def userlistCmd(self, authToken, fields):
         self.htmlPageTitle("User List")
-        userlist = list(self.repServer.auth.iterUsers())
+        userlist = list(self.repServer.repos.auth.iterUsers())
         self.htmlUserlist(userlist)
 
     def addUserFormCmd(self, authToken, fields):
@@ -212,7 +212,7 @@ class HttpHandler(HtmlEngine):
             admin = True
         else:
             admin = False
-        self.repServer.auth.addUser(user, password, write=write, admin=admin)
+        self.repServer.repos.auth.addUser(user, password, write=write, admin=admin)
         self.writeFn("""User added successfully. <a href="userlist">Return</a>""")
         
     def chPassFormCmd(self, authToken, fields):
@@ -230,7 +230,7 @@ class HttpHandler(HtmlEngine):
     def chPassCmd(self, authToken, fields):
         username = fields["username"].value
         if username != authToken[0]:
-            if not self.repServer.auth.check(authToken, admin=True):
+            if not self.repServer.repos.auth.check(authToken, admin=True):
                 raise InsufficientPermission
         
         if fields.has_key("oldPassword"):
@@ -248,5 +248,5 @@ class HttpHandler(HtmlEngine):
         elif oldPassword == p1:
             self.writeFn("""<div class="warning">Error: old and new passwords identical, not changing.</div>""")
         else:
-            self.repServer.auth.changePassword(username, p1)
+            self.repServer.repos.auth.changePassword(username, p1)
             self.writeFn("""<div>Password successfully changed.</div>""")

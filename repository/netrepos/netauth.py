@@ -130,7 +130,7 @@ class NetworkAuthorization:
     def iterUsers(self):
         cu = self.db.cursor()
         cu.execute("""SELECT Users.user, Users.userId, Permissions.write, Permissions.admin FROM Users
-                      LEFT JOIN Permissions ON Users.userId=Permissions.userId""")
+                      LEFT JOIN Permissions ON Users.userId=Permissions.userGroupId""")
         for row in cu:
             yield row
 
