@@ -67,6 +67,8 @@ class FixupMultilibPaths(policy.Policy):
 	    raise DestdirPolicyError(
 		"Conflicting library files %s and %s installed" %(
 		    path, target))
+	log.warning('Multilib error: file %s found in wrong directory,'
+		    'attempting to fix...' %path)
 	util.mkdirChain(self.macros['destdir'] + os.sep +
 			self.macros['initdir'])
 	util.rename(self.macros['destdir'] + path,
