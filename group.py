@@ -165,17 +165,22 @@ class Group:
     def diff(self, them, abstract = False):
 	"""
 	Generates a change set between them (considered the old version)
-	and this instance.
+	and this instance. We return the change set and a list of package
+	diffs which should be included for the group change set to be
+	complete. That list is of the form (pkgName, oldVersion, newVersion).
+	If abstract is True, oldVersion is always None and abstract
+	diffs can be used. Otherwise, abstract versions are not necessary,
+	and oldVersion of None means the package is new.
 
 	@param them: object to generate a change set from (may be None)
 	@type them: Group
 	@param abstract: tells if this is a new group or an abstract change
 	when them is None
 	@type abstract: boolean
-	@rtype; ChangeSetGroup
+	@rtype; (ChangeSetGroup, list)
 	"""
 	if them:
-	    assert(self.__class__ == them.__class)
+	    assert(self.__class__ == them.__class__)
 	    assert(self.name == them.name)
 	    cs = GroupChangeSet(self.name, them.getVersion(), self.getVersion())
 	else:
@@ -196,6 +201,9 @@ class Group:
 
 	for name in list:
 	    names[name] = 1
+
+	added = {}
+	removed = {}
 
 	for name in names.keys():
 	    if self.packages.has_key(name):
@@ -221,11 +229,73 @@ class Group:
 		else:
 		    # this is a new package
 		    cs.newPackageVersion(name, version)
+		    if (added.has_key(name)):
+			added[name].append(version)
+		    else:
+			added[name] = [ version ]
 
 	    for version in theirVersions:
 		cs.oldPackageVersion(name, version)
+		if (removed.has_key(name)):
+		    removed[name].append(version)
+		else:
+		    removed[name] = [ version ]
 
-	return cs
+	pkgList = []
+
+	if abstract:
+	    for name in added.keys():
+		for version in added[name]:
+		    pkgList.append((name, None, version))
+	    return (cs, pkgList)
+
+	# use added and removed to assemble a list of diffs which need to
+	# go along with this change set
+	for name in added.keys():
+	    if not removed.has_key(name):
+		for version in added[name]:
+		    pkgList.append((name, None, version))
+		continue
+
+	    # name was changed between this version. for each new version
+	    # of a package, try and generate the diff between that package
+	    # and the version of the package which was removed which was
+	    # on the same branch. if that's not possible, see if the parent
+	    # of the package was removed, and use that as the diff. if
+	    # we can't do that and only one version of this package is
+	    # being obsoleted, use that for the diff. if we can't do that
+	    # either, throw up our hands in a fit of pique
+	    
+	    for version in added[name]:
+		branch = version.branch()
+		if version.hasParent():
+		    parent = version.parent()
+		else:
+		    parent = None
+		found = 0
+
+		if len(removed[name]) == 1:
+		    pkgList.append((name, removed[name][0], version))
+		else:
+		    sameBranch = None
+		    parentNode = None
+
+		    for other in removed[name]:
+			if other.branch().equal(branch):
+			    sameBranch = other
+			if parent and other.equal(parent):
+			    parentNode = other
+
+		    if sameBranch:
+			pkgList.append((name, sameBranch, version))
+		    elif parentNode:
+			pkgList.append((name, parentNode, version))
+		    else:
+			# Here's the fit of pique. This shouldn't happen
+			# except for the most ill-formed of groups.
+			raise IOError, "ick. yuck. blech. ptooey."
+
+	return (cs, pkgList)
 
     def setVersion(self, ver):
 	"""
@@ -412,6 +482,12 @@ class GroupChangeSet:
     representation while the changes for the input file are generated
     via patch.
     """
+
+    def changeOldVersion(self, version):
+	self.oldVersion = version
+
+    def changeNewVersion(self, version):
+	self.newVersion = version
 
     def getName(self):
 	"""
