@@ -14,7 +14,7 @@
 
 class TroveFiles:
     """
-    Maps an instanceId onto a (fileId, versionId, path) tuple
+    Maps an instanceId onto a (pathId, versionId, path) tuple
     """
     def __init__(self, db):
         self.db = db
@@ -24,36 +24,11 @@ class TroveFiles:
         tables = [ x[0] for x in cu ]
         if "TroveFiles" not in tables:
             cu.execute("""CREATE TABLE TroveFiles(
-					  instanceId integer,
-					  streamId integer,
-					  path str)
+					  instanceId INTEGER,
+					  streamId INTEGER,
+					  versionId BINARY,
+					  pathId BINARY,
+					  path STR)
 		       """)
 	    cu.execute("CREATE INDEX TroveFilesIdx ON TroveFiles(instanceId)")
 	    cu.execute("CREATE INDEX TroveFilesIdx2 ON TroveFiles(streamId)")
-
-    def has_key(self, key):
-        cu = self.db.cursor()
-	
-        cu.execute("SELECT instanceId FROM TroveFiles "
-			    "WHERE instanceId=?", (key,))
-		   
-	item = cu.fetchone()	
-	return item != None
-
-    def __getitem__(self, key):
-	cu = self.db.cursor()
-	cu.execute("SELECT streamId, path FROM TroveFiles "
-		   "WHERE instanceId=?", (key,))
-	for match in cu:
-	    yield match
-
-    def __delitem__(self, key):
-        cu = self.db.cursor()
-	
-        cu.execute("DELETE from TroveFiles WHERE instanceId=?", key)
-
-    def addItem(self, instanceId, streamId, path):
-        cu = self.db.cursor()
-        cu.execute("INSERT INTO TroveFiles VALUES (?, ?, ?)",
-                   (instanceId, streamId, path ))
-

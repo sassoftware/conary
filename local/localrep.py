@@ -38,20 +38,19 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     def oldPackageList(self):
 	return self.oldPackages
 
-    def oldFile(self, fileId, fileVersion, fileObj):
-	self.oldFiles.append((fileId, fileVersion, fileObj))
+    def oldFile(self, pathId, fileId, fileObj):
+	self.oldFiles.append((pathId, fileId, fileObj))
 
     def oldFileList(self):
 	return self.oldFiles
 
-    def addFile(self, troveId, fileId, fileObj, path, version):
-	repository.ChangeSetJob.addFile(self, troveId, fileId, fileObj, path, 
-					version)
+    def addFile(self, troveId, pathId, fileObj, path, fileId, version,
+                oldFileId = None):
+	repository.ChangeSetJob.addFile(self, troveId, pathId, fileObj, path, 
+					fileId, version)
 
-	if fileObj:
-	    oldVersion = self.cs.getFileOldVersion(fileId)
-	    if oldVersion:
-		self.removeFile(fileId, oldVersion)
+	if oldFileId:
+            self.removeFile(pathId, oldFileId)
 
     def addFileContents(self, sha1, newVer, fileContents, restoreContents,
 			isConfig):
@@ -60,9 +59,12 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 			     fileContents, restoreContents, isConfig)
 
     # remove the specified file 
-    def removeFile(self, fileId, version):
-	fileObj = self.repos.getFileVersion(fileId, version)
-	self.oldFile(fileId, version, fileObj)
+    def removeFile(self, pathId, fileId):
+        # getFileVersion only really needs the version for network
+        # repositories (so it knows which one to use), so passing
+        # None here works
+	fileObj = self.repos.getFileVersion(pathId, fileId, None)
+	self.oldFile(pathId, fileId, fileObj)
 
     # If retargetLocal is set, then localCs is for A->A.local whlie
     # origJob is A->B, so localCs needs to be changed to be B->B.local.
@@ -101,9 +103,9 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	    oldPkg = repos.getTrove(name, oldVersion, csPkg.getOldFlavor())
 	    self.oldPackage(oldPkg)
 
-	    for fileId in csPkg.getOldFileList():
-		(oldPath, oldFileVersion) = oldPkg.getFile(fileId)
-		self.removeFile(fileId, oldFileVersion)
+	    for pathId in csPkg.getOldFileList():
+		(oldPath, oldFileId, oldFileVersion) = oldPkg.getFile(pathId)
+		self.removeFile(pathId, oldFileId)
 
 	repository.ChangeSetJob.__init__(self, repos, cs)
 
@@ -112,9 +114,9 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 		self.repos.eraseTrove(pkg.getName(), pkg.getVersion(),
 				      pkg.getFlavor())
 
-	for (fileId, fileVersion, fileObj) in self.oldFileList():
-	    self.repos.eraseFileVersion(fileId, fileVersion)
+	for (pathId, fileVersion, fileObj) in self.oldFileList():
+	    self.repos.eraseFileVersion(pathId, fileVersion)
 
-	for (fileId, fileVersion, fileObj) in self.oldFileList():
+	for (pathId, fileVersion, fileObj) in self.oldFileList():
 	    if fileObj.hasContents and fileObj.flags.isConfig():
 		self.repos._removeFileContents(fileObj.contents.sha1())

@@ -69,8 +69,8 @@ class TroveStore:
 				 
         self.begin()
 	self.troveTroves = trovetroves.TroveTroves(self.db)
-	self.troveFiles = trovefiles.TroveFiles(self.db)
-	self.fileStreams = instances.FileStreams(self.db)
+	trovefiles.TroveFiles(self.db)
+	instances.FileStreams(self.db)
 	self.items = items.Items(self.db)
 	self.instances = instances.InstanceTable(self.db)
 	self.versionTable = LocalRepVersionTable(self.db)
@@ -349,8 +349,9 @@ class TroveStore:
 	cu = self.db.cursor()
 
 	cu.execute("""
-	    CREATE TEMPORARY TABLE NewFiles(fileId BINARY,
+	    CREATE TEMPORARY TABLE NewFiles(pathId BINARY,
 					    versionId INTEGER,
+					    fileId BINARY,
 					    stream BINARY,
 					    path STRING)
 	""")
@@ -443,22 +444,21 @@ class TroveStore:
         self.depTables.add(cu, trove, troveInstanceId)
 
         cu.execute("""
-	    INSERT INTO FileStreams SELECT NULL,
+	    INSERT INTO FileStreams SELECT DISTINCT NULL,
 					   NewFiles.fileId,
-					   NewFiles.versionId,
 					   NewFiles.stream
 		FROM NewFiles LEFT OUTER JOIN FileStreams ON
-		    NewFiles.fileId = FileStreams.fileId AND
-		    NewFiles.versionId = FileStreams.versionId
+		    NewFiles.fileId = FileStreams.fileId 
 		WHERE FileStreams.streamId is NULL
                 """)
         cu.execute("""
 	    INSERT INTO TroveFiles SELECT ?,
 					  FileStreams.streamId,
+					  NewFiles.versionId,
+					  NewFiles.pathId,
 					  NewFiles.path
 		FROM NewFiles JOIN FileStreams ON
-		    NewFiles.fileId = FileStreams.fileId AND
-		    NewFiles.versionId = FileStreams.versionId
+                    NewFiles.fileId == FileStreams.fileId
                     """, troveInstanceId)
         cu.execute("DROP TABLE NewFiles")
 
@@ -650,29 +650,26 @@ class TroveStore:
 
         if withFiles:
             versionCache = {}
-            cu.execute("SELECT fileId, path, versionId FROM "
+            cu.execute("SELECT pathId, path, versionId, fileId FROM "
                    "TroveFiles NATURAL JOIN FileStreams WHERE instanceId = ?", 
                    troveInstanceId)
-            for (fileId, path, versionId) in cu:
+            for (pathId, path, versionId, fileId) in cu:
                 version = versionCache.get(versionId, None)
                 if not version:
                     version = self.versionTable.getBareId(versionId)
                     versionCache[versionId] = version
 
-                trv.addFile(fileId, path, version)
+                trv.addFile(pathId, path, version, fileId)
 
         self.depTables.get(cu, trv, troveInstanceId)
 
 	return trv
 
-    def findFileVersion(self, fileId, fileVersion):
+    def findFileVersion(self, fileId):
         cu = self.db.cursor()
         cu.execute("""
-                SELECT stream FROM
-                    FileStreams JOIN Versions ON
-                        FileStreams.versionId == Versions.versionId
-                    WHERE fileId == ? AND version == ?
-            """, fileId, fileVersion.asString())
+                SELECT stream FROM FileStreams WHERE fileId = ?
+            """, fileId)
                             
         for (stream,) in cu:
             return files.ThawFile(stream, fileId)
@@ -694,22 +691,25 @@ class TroveStore:
 					  troveFlavorId)]
 	versionCache = {}
 
-	cu.execute("SELECT fileId, path, versionId, stream FROM "
+	cu.execute("SELECT pathId, path, fileId, versionId, stream FROM "
 		   "TroveFiles NATURAL JOIN FileStreams "
 		   "WHERE instanceId = ? %s" %sort, 
 		   troveInstanceId)
 
 	versionCache = {}
-	for (fileId, path, versionId, stream) in cu:
+	for (pathId, path, fileId, versionId, stream) in cu:
 	    version = versionCache.get(versionId, None)
 	    if not version:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
+            if stream:
+                fObj = files.ThawFile(stream, fileId)
+
 	    if withFiles:
-		yield (fileId, path, version, stream)
+		yield (pathId, path, fileId, version, stream)
 	    else:
-		yield (fileId, path, version)
+		yield (pathId, path, fileId, version)
 
     def iterTrovePerFlavorLeafs(self, troveName, branch):
 	# this needs to return a list sorted by version, from oldest to
@@ -771,69 +771,62 @@ class TroveStore:
 
 	return fullList
 	    
-    def addFile(self, troveInfo, fileId, fileObj, path, fileVersion):
+    def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion):
 	cu = troveInfo[0]
 	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
 
 	if fileObj:
 	    stream = fileObj.freeze()
-	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?)", 
-		       (fileId, versionId, stream, path))
+	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?, ?)", 
+		       (pathId, versionId, fileId, stream, path))
 	else:
-	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, NULL, ?)", 
-		       (fileId, versionId, path))
+	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, NULL, ?)", 
+		       (pathId, versionId, fileId, path))
 
-    def getFile(self, fileId, fileVersion):
-	versionId = self.versionTable[fileVersion]
-	stream = self.fileStreams[(fileId, versionId)]
-	return files.ThawFile(stream, fileId)
+    def getFile(self, pathId, fileId):
+        cu = self.db.cursor()
+        cu.execute("SELECT stream FROM FileStreams WHERE fileId=?", fileId)
+        stream = cu.next()[0]
+
+        return files.ThawFile(stream, pathId)
 
     def getFiles(self, l):
+        # this only needs a list of (pathId, fileId) pairs, but it sometimes
+        # gets (pathId, fileId, version) pairs instead (which is what
+        # the network repository client uses)
 	cu = self.db.cursor()
 
 	cu.execute("""
 	    CREATE TEMPORARY TABLE getFilesTbl(rowId INTEGER PRIMARY KEY,
-					       fileId STRING,
-					       versionId INT)
+					       fileId BINARY)
 	""", start_transaction = False)
 
 	verCache = {}
 	lookup = range(len(l) + 1)
-	for (fileId, fileVersion) in l:
-	    versionId = verCache.get(fileVersion, None)
-	    if versionId is None:
-		versionId = self.versionTable[fileVersion]
-		verCache[fileVersion] = versionId
-
-	    cu.execute("INSERT INTO getFilesTbl VALUES(NULL, ?, ?)",
-		       (fileId, versionId), 
-		       start_transaction = False)
-	    lookup[cu.lastrowid] = (fileId, fileVersion)
+        for tup in l:
+            (pathId, fileId) = tup[:2]
+	    cu.execute("INSERT INTO getFilesTbl VALUES(NULL, ?)",
+		       fileId, start_transaction = False)
+	    lookup[cu.lastrowid] = (pathId, fileId)
 
 	cu.execute("""
 	    SELECT rowId, stream FROM getFilesTbl JOIN FileStreams ON
-		    getFilesTbl.versionId = FileStreams.versionId AND
 		    getFilesTbl.fileId = FileStreams.fileId 
 	""")
 
 	d = {}
 	for rowId, stream in cu:
-	    fileId, version = lookup[rowId]
-	    d[(fileId, version)] = files.ThawFile(stream, fileId)
+	    pathId, fileId = lookup[rowId]
+	    d[(pathId, fileId)] = files.ThawFile(stream, pathId)
 
 	cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
 
 	return d
 
-    def hasFile(self, fileId, fileVersion):
-	versionId = self.versionTable.get(fileVersion, None)
-	if not versionId: return False
-	return self.fileStreams.has_key((fileId, versionId))
-
     def resolveRequirements(self, label, depSetList):
         return self.depTables.resolve(label, depSetList)
 
-    def eraseFile(Self, fileId, fileVersion):
+    def eraseFile(Self, pathId, fileVersion):
 	# we automatically remove files when no troves reference them. 
 	# cool, huh?
 	assert(0)

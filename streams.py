@@ -28,7 +28,7 @@ class InfoStream(object):
     def copy(self):
         return self.__class__(self.freeze())
     
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	raise NotImplementedError
     
     def diff(self, them):
@@ -42,7 +42,7 @@ class InfoStream(object):
 	"""
 	raise NotImplementedError
 
-    def __eq__(self, them):
+    def __eq__(self, them, skipSet = None):
 	raise NotImplementedError
 
     def __ne__(self, them):
@@ -58,7 +58,7 @@ class NumericStream(InfoStream):
     def set(self, val):
 	self.val = val
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	return struct.pack(self.format, self.val)
 
     def diff(self, them):
@@ -82,7 +82,7 @@ class NumericStream(InfoStream):
 
 	return False
 
-    def __eq__(self, other):
+    def __eq__(self, other, skipSet = None):
 	return other.__class__ == self.__class__ and \
 	       self.val == other.val
 
@@ -106,7 +106,7 @@ class MtimeStream(NumericStream):
 
     format = "!I"
 
-    def __eq__(self, other):
+    def __eq__(self, other, skipSet = None):
 	# don't ever compare mtimes
 	return True
 
@@ -133,7 +133,7 @@ class StringStream(InfoStream):
         assert(not val or type(val) is str)
 	self.s = val
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	return self.s
 
     def asString(self):
@@ -159,16 +159,46 @@ class StringStream(InfoStream):
 
 	return False
 
-    def __eq__(self, other):
+    def __eq__(self, other, skipSet = None):
 	return other.__class__ == self.__class__ and \
 	       self.s == other.s
 
     def __init__(self, s = ''):
 	self.thaw(s)
 
+class Md5Stream(StringStream):
+
+    def freeze(self, skipSet = None):
+	assert(len(self.s) == 16)
+	return self.s
+
+    def asString(self):
+	assert(0)
+	return "%08x%08x%08x%08x" % struct.unpack("!4I", self.s)
+
+    def thaw(self, data):
+	if data:
+	    assert(len(data) == 16)
+	    self.s = data
+
+    def twm(self, diff, base):
+	assert(len(diff) == 16)
+	assert(len(base.s) == 16)
+	assert(len(self.s) == 16)
+	StringStream.twm(self, diff, base)
+
+    def set(self, val):
+	assert(len(val) == 16)
+	self.s = val
+
+    def setFromString(self, val):
+	self.s = struct.pack("!4I", int(val[ 0: 8], 16), 
+				    int(val[ 8:16], 16), int(val[16:24], 16), 
+				    int(val[24:32], 16))
+
 class Sha1Stream(StringStream):
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	assert(len(self.s) == 20)
 	return self.s
 
@@ -207,7 +237,7 @@ class FrozenVersionStream(InfoStream):
 	assert(not val or min(val.timeStamps()) > 0)
 	self.v = val
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	if self.v:
 	    return self.v.freeze()
 	else:
@@ -236,7 +266,7 @@ class FrozenVersionStream(InfoStream):
 
 	return False
 
-    def __eq__(self, other):
+    def __eq__(self, other, skipSet = None):
 	return other.__class__ == self.__class__ and \
 	       self.v == other.v
 
@@ -256,7 +286,7 @@ class DependenciesStream(InfoStream):
     def set(self, val):
 	self.deps = val
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
         if self.deps is None:
             return ''
         return self.deps.freeze()
@@ -276,7 +306,7 @@ class DependenciesStream(InfoStream):
         self.thaw(diff)
         return False
 
-    def __eq__(self, other):
+    def __eq__(self, other, skipSet = None):
 	return other.__class__ == self.__class__ and self.deps == other.deps
 
     def __init__(self, dep = ''):
@@ -295,7 +325,10 @@ class StringsStream(list, InfoStream):
 	    self.append(val)
 	    self.sort()
 
-    def freeze(self):
+    def __eq__(self, other, skipSet = None):
+        return list.__eq__(self, other)
+
+    def freeze(self, skipSet = None):
         if not self:
             return ''
         return '\0'.join(self)
@@ -325,14 +358,30 @@ class TupleStream(InfoStream):
 
     __slots__ = "items"
 
-    def __eq__(self, other):
-	return other.__class__ == self.__class__ and other.items == self.items
+    def __eq__(self, other, skipSet = None):
+        if other.__class__ != self.__class__:
+            return False
 
-    def freeze(self):
+        if not skipSet:
+            return other.items == self.items
+
+	for (i, (name, itemType, size)) in enumerate(self.makeup):
+            if not(name in skipSet) and \
+               not (self.items[i].__eq__(other.items[i], skipSet = skipSet)):
+                return False
+
+	return True
+
+    eq = __eq__
+
+    def freeze(self, skipSet = None):
 	rc = []
 	items = self.items
 	makeup = self.makeup
 	for (i, (name, itemType, size)) in enumerate(makeup):
+            if skipSet and name in skipSet:
+                continue
+
 	    if type(size) == int or (i + 1 == len(makeup)):
 		rc.append(items[i].freeze())
 	    else:
@@ -462,9 +511,11 @@ class StreamSet(InfoStream):
 
 	return "".join(rc)
 
-    def __eq__(self, other):
+    def __eq__(self, other, skipSet = None):
 	for streamType, name in self.streamDict.itervalues():
-	    if not self.__getattribute__(name) == other.__getattribute__(name):
+	    if (not skipSet or not name in skipSet) and \
+               not self.__getattribute__(name).__eq__(
+                            other.__getattribute__(name), skipSet = skipSet):
 		return False
 
 	return True
@@ -472,10 +523,13 @@ class StreamSet(InfoStream):
     def __ne__(self, other):
 	return not self.__eq__(other)
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	rc = []
+
 	for streamId, (streamType, name) in self.streamDict.iteritems():
-	    s = self.__getattribute__(name).freeze()
+            if skipSet and streamId in skipSet: continue
+
+	    s = self.__getattribute__(name).freeze(skipSet = skipSet)
 	    if len(s):
 		rc.append(struct.pack(self.headerFormat, streamId, len(s)) + s)
 	return "".join(rc)
@@ -510,7 +564,7 @@ class StreamSet(InfoStream):
 
 class ReferencedTroveList(list, InfoStream):
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	l = []
 	for (name, version, flavor) in self:
 	    version = version.freeze()

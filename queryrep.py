@@ -142,9 +142,9 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                 iter = repos.iterFilesInTrove(trove.getName(), 
                             trove.getVersion(), trove.getFlavor(), 
                             sortByPath = True, withFiles = True)
-                for (fileId, path, version, fObj) in iter:
+                for (pathId, path, fileId, version, fObj) in iter:
                     display.printFile(fObj, path, verbose=ls, tags=tags, 
-                                    sha1s=sha1s, fileId=fileId, fileIds=ids)
+                                    sha1s=sha1s, pathId=pathId, pathIds=ids)
 	elif info:
 	    buildTime = time.strftime("%c",
 				time.localtime(version.timeStamps()[-1]))
@@ -194,7 +194,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 	    iter = repos.iterFilesInTrove(trove.getName(), trove.getVersion(),
                                           trove.getFlavor(), sortByPath = True, 
 					  withFiles = False)
-	    for (fileId, path, ver) in iter:
+	    for (pathId, path, fileId, ver) in iter:
 		if fullVersions or ver.branch() != version.branch():
 		    print _fileFormat % (path, ver.asString())
 		else:

@@ -59,8 +59,8 @@ class FilesystemJob:
         self.linkGroups[linkGroup] = target
 
     def _restore(self, fileObj, target, msg, contentsOverride = ""):
-	self.restores.append((fileObj.id(), fileObj.freeze(), target, contentsOverride, 
-			      msg))
+	self.restores.append((fileObj.pathId(), fileObj.freeze(), target, 
+                              contentsOverride, msg))
 
 	for tag in fileObj.tags:
 	    if self.tagUpdates.has_key(tag):
@@ -86,16 +86,16 @@ class FilesystemJob:
 	    else:
 		self.tagRemoves[tag] = [ target ]
 
-    def userRemoval(self, troveName, troveVersion, troveFlavor, fileId):
+    def userRemoval(self, troveName, troveVersion, troveFlavor, pathId):
 	if not self.userRemovals.has_key((troveName, troveVersion, troveFlavor)):
-	    self.userRemovals[(troveName, troveVersion, troveFlavor)] = [ fileId ]
+	    self.userRemovals[(troveName, troveVersion, troveFlavor)] = [ pathId ]
 	else:
-	    self.userRemovals[(troveName, troveVersion, troveFlavor)].append(fileId)
+	    self.userRemovals[(troveName, troveVersion, troveFlavor)].append(pathId)
 
     def iterUserRemovals(self):
-	for ((troveName, troveVersion, troveFlavor), fileIdList) in \
+	for ((troveName, troveVersion, troveFlavor), pathIdList) in \
 					    self.userRemovals.iteritems():
-	    yield (troveName, troveVersion, troveFlavor, fileIdList)
+	    yield (troveName, troveVersion, troveFlavor, pathIdList)
 
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
@@ -219,7 +219,7 @@ class FilesystemJob:
         restoreIndex = 0
         j = 0
         while restoreIndex < len(restores):
-	    (fileId, fileObj, target, override, msg) = restores[restoreIndex]
+	    (pathId, fileObj, target, override, msg) = restores[restoreIndex]
             restoreIndex += 1
 
             if not fileObj:
@@ -228,7 +228,7 @@ class FilesystemJob:
                 # the delayedRestore list for someplace to put this file
                 match = None
                 for j, item in enumerate(delayedRestores):
-                    if fileId == item[4]:
+                    if pathId == item[4]:
                         match = j, item
                         break
 
@@ -236,7 +236,7 @@ class FilesystemJob:
 
                 (otherId, fileObj, target, msg, ptrId) = match[1]
                 
-                contType, contents = self.changeSet.getFileContents(fileId)
+                contType, contents = self.changeSet.getFileContents(pathId)
                 assert(contType == changeset.ChangedFileTypes.file)
                 fileObj.restore(contents, self.root, target, True)
                 del delayedRestores[match[0]]
@@ -251,7 +251,7 @@ class FilesystemJob:
 	    # contents from the change set or from the database". If we 
             # take the file contents from the change set, we look for the
             # opportunity to make a hard link instead of actually restoring it.
-	    fileObj = files.ThawFile(fileObj, fileId)
+	    fileObj = files.ThawFile(fileObj, pathId)
 
 	    if override != "":
 		contents = override
@@ -267,12 +267,12 @@ class FilesystemJob:
                     if self._createLink(fileObj.linkGroup.value(), target):
                         continue
                 else:
-                    contType, contents = self.changeSet.getFileContents(fileId)
+                    contType, contents = self.changeSet.getFileContents(pathId)
                     assert(contType != changeset.ChangedFileTypes.diff)
                     # PTR types are restored later
                     if contType == changeset.ChangedFileTypes.ptr:
                         ptrId = contents.get().read()
-                        delayedRestores.append((fileId, fileObj, target, msg, 
+                        delayedRestores.append((pathId, fileObj, target, msg, 
                                                 ptrId))
                         if not ptrTargets.has_key(ptrId):
                             ptrTargets[ptrId] = None
@@ -283,15 +283,15 @@ class FilesystemJob:
                         continue
 
 	    fileObj.restore(contents, self.root, target, contents != None)
-            if ptrTargets.has_key(fileId):
-                ptrTargets[fileId] = target
+            if ptrTargets.has_key(pathId):
+                ptrTargets[pathId] = target
 	    log.debug(msg, target)
 
             if fileObj.hasContents and fileObj.linkGroup.value():
                 linkGroup = fileObj.linkGroup.value()
                 self.linkGroups[linkGroup] = target
 
-	for (fileId, fileObj, target, msg, ptrId) in delayedRestores:
+	for (pathId, fileObj, target, msg, ptrId) in delayedRestores:
             # we wouldn't be here if the fileObj didn't have contents and
             # no override
 
@@ -404,14 +404,14 @@ class FilesystemJob:
         # have changed contents.
 	cwd = os.getcwd()
 
-	for fileId in pkgCs.getOldFileList():
-	    (path, version) = basePkg.getFile(fileId)
+	for pathId in pkgCs.getOldFileList():
+	    (path, fileId, version) = basePkg.getFile(pathId)
 
-	    if not fsPkg.hasFile(fileId):
+	    if not fsPkg.hasFile(pathId):
 		log.debug("%s has already been removed" % path)
 		continue
 
-	    oldFile = repos.getFileVersion(fileId, version)
+	    oldFile = repos.getFileVersion(pathId, fileId, version)
             # XXX mask out any flag that isn't the config flag.
             oldFile.flags.set(oldFile.flags.value() & files._FILE_FLAG_CONFIG)
             
@@ -423,12 +423,12 @@ class FilesystemJob:
 	    if flags & MERGE:
 		try:
 		    # don't remove files if they've been changed locally
-		    localFile = files.FileFromFilesystem(realPath, fileId,
+		    localFile = files.FileFromFilesystem(realPath, pathId,
                                                 possibleMatch = oldFile)
 		except OSError, exc:
 		    # it's okay if the file is missing, it means we all agree
 		    if exc.errno == errno.ENOENT:
-			fsPkg.removeFile(fileId)
+			fsPkg.removeFile(pathId)
 			continue
 		    else:
 			raise
@@ -443,7 +443,7 @@ class FilesystemJob:
 				   "on head", path)
 
 	    self._remove(oldFile, realPath, "removing %s")
-	    fsPkg.removeFile(fileId)
+	    fsPkg.removeFile(pathId)
 
     def _singleTrove(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
 		       flags):
@@ -490,13 +490,13 @@ class FilesystemJob:
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
-	for (fileId, headPath, headFileVersion) in pkgCs.getNewFileList():
+	for (pathId, headPath, headFileId, headFileVersion) in pkgCs.getNewFileList():
 	    if headPath[0] == '/':
 		headRealPath = root + headPath
 	    else:
 		headRealPath = cwd + "/" + headPath
 
-	    headFile = files.ThawFile(changeSet.getFileChange(fileId), fileId)
+	    headFile = files.ThawFile(changeSet.getFileChange(None, headFileId), pathId)
 
             try:
                 s = os.lstat(headRealPath)
@@ -529,19 +529,19 @@ class FilesystemJob:
                 pass
 
 	    self._restore(headFile, headRealPath, "creating %s")
-	    fsPkg.addFile(fileId, headPath, headFileVersion)
+	    fsPkg.addFile(pathId, headPath, headFileVersion, headFileId)
 
         # Handle files which have changed betweeen versions. This is by
         # far the most complicated case.
-	for (fileId, headPath, headFileVersion) in pkgCs.getChangedFileList():
-	    if not fsPkg.hasFile(fileId):
+	for (pathId, headPath, headFileId, headFileVersion) in pkgCs.getChangedFileList():
+	    if not fsPkg.hasFile(pathId):
 		# the file was removed from the local system; this change
 		# wins
 		self.userRemoval(pkgCs.getName(), pkgCs.getNewVersion(),
-                                 pkgCs.getNewFlavor(), fileId)
+                                 pkgCs.getNewFlavor(), pathId)
 		continue
 
-	    (fsPath, fsVersion) = fsPkg.getFile(fileId)
+	    (fsPath, fsFileId, fsVersion) = fsPkg.getFile(pathId)
 	    if fsPath[0] == "/":
 		rootFixup = root
 	    else:
@@ -556,17 +556,17 @@ class FilesystemJob:
 		# the paths are different; if one of them matches the one
 		# from the old package, take the other one as it is the one
 		# which changed
-		if basePkg.hasFile(fileId):
-		    basePath = basePkg.getFile(fileId)[0]
+		if basePkg.hasFile(pathId):
+		    basePath = basePkg.getFile(pathId)[0]
 		else:
 		    basePath = None
 
 		if (not flags & MERGE) or fsPath == basePath :
-		    # the path changed in the repository, propage that change
+		    # the path changed in the repository, propagate that change
 		    self._rename(rootFixup + fsPath, rootFixup + headPath,
 		                 "renaming %s to %s" % (fsPath, headPath))
 
-		    fsPkg.addFile(fileId, headPath, fsVersion)
+		    fsPkg.addFile(pathId, headPath, fsVersion, fsFileId)
 		    finalPath = headPath
 		else:
 		    pathOkay = False
@@ -591,11 +591,11 @@ class FilesystemJob:
             # to see if we need to go into the if statement which follows
             # this rather then having to look up the file from the old
             # package for every file which has changed
-            fsFile = files.FileFromFilesystem(realPath, fileId)
+            fsFile = files.FileFromFilesystem(realPath, pathId)
             
             # get the baseFile which was originally installed
-            (baseFilePath, baseFileVersion) = basePkg.getFile(fileId)
-            baseFile = repos.getFileVersion(fileId, baseFileVersion)
+            (baseFilePath, baseFileId, baseFileVersion) = basePkg.getFile(pathId)
+            baseFile = repos.getFileVersion(pathId, baseFileId, baseFileVersion)
             
             # link groups come from the database; they aren't inferred from
             # the filesystem
@@ -603,7 +603,7 @@ class FilesystemJob:
                 fsFile.linkGroup.set(baseFile.linkGroup.value())
 
             # now assemble what the file is supposed to look like on head
-            headChanges = changeSet.getFileChange(fileId)
+            headChanges = changeSet.getFileChange(baseFileId, headFileId)
             if headChanges[0] == '\x01':
                 # the file was stored as a diff
                 headFile = baseFile.copy()
@@ -611,7 +611,7 @@ class FilesystemJob:
             else:
                 # the file was stored frozen. this happens when the file
                 # type changed between versions
-                headFile = files.ThawFile(headChanges, fileId)
+                headFile = files.ThawFile(headChanges, pathId)
                 
             fsFile.flags.isConfig(headFile.flags.isConfig())
             fsFile.flags.isSource(headFile.flags.isSource())
@@ -652,7 +652,7 @@ class FilesystemJob:
             # if we're forcing an update, we don't need to merge this
             # stuff
 	    if not forceUpdate and \
-               not fsFile.metadataEqual(headFile, ignoreOwnerGroup = noIds):
+               not fsFile.eq(headFile, ignoreOwnerGroup = noIds):
 		# some of the attributes have changed for this file; try
                 # and merge
 		if flags & MERGE:
@@ -694,12 +694,12 @@ class FilesystemJob:
 		    # the contents changed in just the repository, so take
 		    # those changes
                     if headFile.flags.isConfig and \
-                                changeSet.configFileIsDiff(fileId):
+                                changeSet.configFileIsDiff(pathId):
 			(headFileContType,
-			 headFileContents) = changeSet.getFileContents(fileId)
+			 headFileContents) = changeSet.getFileContents(pathId)
 
-			baseLineF = repos.getFileContents([ (fileId,
-					basePkg.getFile(fileId)[1]) ])[0].get()
+			baseLineF = repos.getFileContents([ (baseFileId,
+					basePkg.getFile(pathId)[2]) ])[0].get()
 
 			baseLines = baseLineF.readlines()
 			del baseLineF
@@ -738,13 +738,13 @@ class FilesystemJob:
 		    # it changed in both the filesystem and the repository; our
 		    # only hope is to generate a patch for what changed in the
 		    # repository and try and apply it here
-                    if not changeSet.configFileIsDiff(fileId):
+                    if not changeSet.configFileIsDiff(pathId):
 			self.errors.append("unexpected content type for %s" % 
 						finalPath)
 			contentsOkay = False
 		    else:
                         (headFileContType,
-                         headFileContents) = changeSet.getFileContents(fileId)
+                         headFileContents) = changeSet.getFileContents(pathId)
 
 			cur = open(realPath, "r").readlines()
 			diff = headFileContents.get().readlines()
@@ -783,7 +783,8 @@ class FilesystemJob:
 		# XXX this doesn't even attempt to merge file permissions
 		# and such; the good part of that is differing owners don't
 		# break things
-		fsPkg.addFile(fileId, finalPath, headFileVersion)
+		fsPkg.addFile(pathId, finalPath, headFileVersion, 
+                              fsFile.fileId())
 	    else:
 		fullyUpdated = False
 
@@ -878,8 +879,8 @@ class FilesystemJob:
 	for (name, oldVersion, oldFlavor) in changeSet.getOldPackageList():
 	    self.oldPackages.append((name, oldVersion, oldFlavor))
 	    oldPkg = repos.getTrove(name, oldVersion, oldFlavor)
-	    for (fileId, path, version) in oldPkg.iterFileList():
-		fileObj = repos.getFileVersion(fileId, version)
+	    for (pathId, path, fileId, version) in oldPkg.iterFileList():
+		fileObj = repos.getFileVersion(pathId, fileId, version)
 		self._remove(fileObj, root + path, "removing %s")
 
 def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
@@ -912,9 +913,9 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     newPkg = curPkg.copy()
     newPkg.changeVersion(newVersion)
 
-    fileIds = {}
-    for (fileId, path, version) in newPkg.iterFileList():
-	fileIds[fileId] = True
+    pathIds = {}
+    for (pathId, path, fileId, version) in newPkg.iterFileList():
+	pathIds[pathId] = True
 
     # Iterating over the files in newPkg would be much more natural
     # then iterating over the ones in the old package, and then going
@@ -934,12 +935,12 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	'ico', 'rpm', 'ccs', 'gz', 'bz2', 'tgz', 'tbz', 'tbz2')
     isSrcPkg = curPkg.getName().endswith(':source')
 
-    for (fileId, srcPath, srcFileVersion) in fileList:
+    for (pathId, srcPath, srcFileId, srcFileVersion) in fileList:
 	# file disappeared
-	if not fileIds.has_key(fileId): continue
+	if not pathIds.has_key(pathId): continue
 
-	(path, version) = newPkg.getFile(fileId)
-	del fileIds[fileId]
+	(path, fileId, version) = newPkg.getFile(pathId)
+	del pathIds[pathId]
 
 	if path[0] == '/':
 	    realPath = root + path
@@ -958,12 +959,12 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 		log.warning("%s is missing (use remove if this is intentional)" 
 		    % path)
 
-            newPkg.removeFile(fileId)
+            newPkg.removeFile(pathId)
             continue
 
-	srcFile = repos.getFileVersion(fileId, srcFileVersion)
+	srcFile = repos.getFileVersion(pathId, srcFileId, srcFileVersion)
 
-	f = files.FileFromFilesystem(realPath, fileId,
+	f = files.FileFromFilesystem(realPath, pathId,
 				     possibleMatch = srcFile)
 
 	if isSrcPkg:
@@ -987,27 +988,27 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 		os.close(fd)
 
-	if not f.metadataEqual(srcFile, ignoreOwnerGroup = noIds):
-	    newPkg.addFile(fileId, path, newVersion)
+	if not f.eq(srcFile, ignoreOwnerGroup = noIds):
+	    newPkg.addFile(pathId, path, newVersion, f.fileId())
 
-	    (filecs, hash) = changeset.fileChangeSet(fileId, srcFile, f)
-	    changeSet.addFile(fileId, srcFileVersion, newVersion, filecs)
+	    (filecs, hash) = changeset.fileChangeSet(pathId, srcFile, f)
+	    changeSet.addFile(srcFileId, f.fileId(), filecs)
 	    if hash:
 		newCont = filecontents.FromFilesystem(realPath)
 
 		if srcFile.hasContents:
 		    srcCont = repos.getFileContents(
-                                        [ (fileId, srcFileVersion) ])[0]
+                                        [ (srcFileId, srcFileVersion) ])[0]
 
                     (contType, cont) = changeset.fileContentsDiff(srcFile, srcCont,
                                                                   f, newCont)
 
-                    changeSet.addFileContents(fileId, contType, cont, 
+                    changeSet.addFileContents(pathId, contType, cont, 
                                               f.flags.isConfig())
             
 
-    for fileId in fileIds.iterkeys():
-	(path, version) = newPkg.getFile(fileId)
+    for pathId in pathIds.iterkeys():
+	(path, fileId, version) = newPkg.getFile(pathId)
 
 	if path[0] == '/':
 	    realPath = root + path
@@ -1019,7 +1020,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	# be.
 	assert(srcPkg or isinstance(version, versions.NewVersion))
 
-	f = files.FileFromFilesystem(realPath, fileId)
+	f = files.FileFromFilesystem(realPath, pathId)
 
 	extension = path.split(".")[-1]
 	if isSrcPkg:
@@ -1028,12 +1029,12 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
                 f.flags.isConfig(set = True)
 
 	# new file, so this part is easy
-	changeSet.addFile(fileId, None, newVersion, f.freeze())
-	newPkg.addFile(fileId, path, newVersion)
+	changeSet.addFile(None, f.fileId(), f.freeze())
+	newPkg.addFile(pathId, path, newVersion, f.fileId())
 
 	if f.hasContents:
 	    newCont = filecontents.FromFilesystem(realPath)
-	    changeSet.addFileContents(fileId,
+	    changeSet.addFileContents(pathId,
 				      changeset.ChangedFileTypes.file,
 				      newCont, f.flags.isConfig())
 

@@ -47,14 +47,15 @@ class Trove:
     def changeFlavor(self, flavor):
         self.flavor = flavor
 
-    def addFile(self, fileId, path, version):
-	assert(len(fileId) == 20)
-	self.idMap[fileId] = (path, version)
+    def addFile(self, pathId, path, version, fileId):
+	assert(len(pathId) == 16)
+	assert(fileId is None or len(fileId) == 20)
+	self.idMap[pathId] = (path, fileId, version)
 
-    # fileId is the only thing that must be here; the other fields could
+    # pathId is the only thing that must be here; the other fields could
     # be None
-    def updateFile(self, fileId, path, version):
-	(origPath, origVersion) = self.idMap[fileId]
+    def updateFile(self, pathId, path, version, fileId):
+	(origPath, origFileId, origVersion) = self.idMap[pathId]
 
 	if not path:
 	    path = origPath
@@ -62,24 +63,29 @@ class Trove:
 	if not version:
 	    version = origVersion
 	    
-	self.idMap[fileId] = (path, version)
+	if not fileId:
+	    fileId = origFileId
+	    
+	self.idMap[pathId] = (path, fileId, version)
 
-    def removeFile(self, fileId):   
-	del self.idMap[fileId]
+    def removeFile(self, pathId):   
+	del self.idMap[pathId]
 
 	return self.idMap.iteritems()
 
     def iterFileList(self):
 	# don't use idMap.iteritems() here; we don't want to exposure
 	# our internal format
-	for (theId, (path, version)) in self.idMap.iteritems():
-	    yield (theId, path, version)
+	for (theId, (path, fileId, version)) in self.idMap.iteritems():
+	    yield (theId, path, fileId, version)
 
-    def getFile(self, fileId):
-	return self.idMap[fileId]
+    def getFile(self, pathId):
+        x = self.idMap[pathId]
+        # put the fileId in the middle
+	return (x[0], x[1], x[2])
 
-    def hasFile(self, fileId):
-	return self.idMap.has_key(fileId)
+    def hasFile(self, pathId):
+	return self.idMap.has_key(pathId)
 
     def addTrove(self, name, version, flavor, presentOkay = False):
 	"""
@@ -132,11 +138,11 @@ class Trove:
     def hasTrove(self, name, version, flavor):
 	return self.packages.has_key((name, version, flavor))
 
-    # returns a dictionary mapping a fileId to a (path, version, pkgName) tuple
+    # returns a dictionary mapping a pathId to a (path, version, pkgName) tuple
     def applyChangeSet(self, pkgCS):
 	"""
 	Updates the package from the changes specified in a change set.
-	Returns a dictionary, indexed by fileId, which gives the
+	Returns a dictionary, indexed by pathId, which gives the
 	(path, version, packageName) for that file.
 
 	@param pkgCS: change set
@@ -146,19 +152,19 @@ class Trove:
 
 	fileMap = {}
 
-	for (fileId, path, fileVersion) in pkgCS.getNewFileList():
-	    self.addFile(fileId, path, fileVersion)
-	    fileMap[fileId] = self.idMap[fileId] + (self.name, None, None)
+	for (pathId, path, fileId, fileVersion) in pkgCS.getNewFileList():
+	    self.addFile(pathId, path, fileVersion, fileId)
+	    fileMap[pathId] = self.idMap[pathId] + (self.name, None, None, None)
 
-	for (fileId, path, fileVersion) in pkgCS.getChangedFileList():
-	    (oldPath, oldVersion) = self.idMap[fileId]
-	    self.updateFile(fileId, path, fileVersion)
+	for (pathId, path, fileId, fileVersion) in pkgCS.getChangedFileList():
+	    (oldPath, oldFileId, oldVersion) = self.idMap[pathId]
+	    self.updateFile(pathId, path, fileVersion, fileId)
 	    # look up the path/version in self.idMap as the ones here
 	    # could be None
-	    fileMap[fileId] = self.idMap[fileId] + (self.name, oldPath, oldVersion)
+	    fileMap[pathId] = self.idMap[pathId] + (self.name, oldPath, oldFileId, oldVersion)
 
-	for fileId in pkgCS.getOldFileList():
-	    self.removeFile(fileId)
+	for pathId in pkgCS.getOldFileList():
+	    self.removeFile(pathId)
 
 	self.mergeTroveListChanges(pkgCS.iterChangedTroves())
 	self.flavor = pkgCS.getNewFlavor()
@@ -226,7 +232,7 @@ class Trove:
 	newFlavor).  If absolute is True, oldVersion is always None and
 	absolute diffs can be used.  Otherwise, absolute versions are not
 	necessary, and oldVersion of None means the package is new. The list of
-	file changes is a list of (fileId, oldVersion, newVersion, oldPath,
+	file changes is a list of (pathId, oldVersion, newVersion, oldPath,
 	newPath) tuples, where newPath is 
 	the path to the file in this package.
 
@@ -268,27 +274,27 @@ class Trove:
 	filesNeeded = []
 
 	allIds = self.idMap.keys() + themMap.keys()
-	for id in allIds:
-	    inSelf = self.idMap.has_key(id)
-	    inThem = themMap.has_key(id)
+	for pathId in allIds:
+	    inSelf = self.idMap.has_key(pathId)
+	    inThem = themMap.has_key(pathId)
 	    if inSelf and inThem:
-		sameIds[id] = None
+		sameIds[pathId] = None
 	    elif inSelf:
-		addedIds.append(id)
+		addedIds.append(pathId)
 	    else:
-		removedIds.append(id)
+		removedIds.append(pathId)
 
-	for id in removedIds:
-	    chgSet.oldFile(id)
+	for pathId in removedIds:
+	    chgSet.oldFile(pathId)
 
-	for id in addedIds:
-	    (selfPath, selfVersion) = self.idMap[id]
-	    filesNeeded.append((id, None, selfVersion))
-	    chgSet.newFile(id, selfPath, selfVersion)
+	for pathId in addedIds:
+	    (selfPath, selfFileId, selfVersion) = self.idMap[pathId]
+	    filesNeeded.append((pathId, None, None, selfFileId, selfVersion))
+	    chgSet.newFile(pathId, selfPath, selfFileId, selfVersion)
 
-	for id in sameIds.keys():
-	    (selfPath, selfVersion) = self.idMap[id]
-	    (themPath, themVersion) = themMap[id]
+	for pathId in sameIds.keys():
+	    (selfPath, selfFileId, selfVersion) = self.idMap[pathId]
+	    (themPath, themFileId, themVersion) = themMap[pathId]
 
 	    newPath = None
 	    newVersion = None
@@ -296,12 +302,13 @@ class Trove:
 	    if selfPath != themPath:
 		newPath = selfPath
 
-	    if not selfVersion == themVersion:
+	    if selfVersion != themVersion or themFileId != selfFileId:
 		newVersion = selfVersion
-		filesNeeded.append((id, themVersion, selfVersion))
+		filesNeeded.append((pathId, themFileId, themVersion, 
+                                    selfFileId, selfVersion))
 
 	    if newPath or newVersion:
-		chgSet.changedFile(id, newPath, newVersion)
+		chgSet.changedFile(pathId, newPath, selfFileId, newVersion)
 
 	# now handle the packages we include
 	added = {}
@@ -545,7 +552,7 @@ class Trove:
 
 class ReferencedTroveSet(dict, streams.InfoStream):
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	l = []
 	for name, troveList in self.iteritems():
 	    subL = []
@@ -600,15 +607,15 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 
 class OldFileStream(list, streams.InfoStream):
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	return "".join(self)
 
     def thaw(self, data):
 	i = 0
 	del self[:]
 	while i < len(data):
-	    self.append(data[i:i+20])
-	    i += 20
+	    self.append(data[i:i+16])
+	    i += 16
 	assert(i == len(data))
 
     def __init__(self, data = None):
@@ -618,16 +625,22 @@ class OldFileStream(list, streams.InfoStream):
 
 class ReferencedFileList(list, streams.InfoStream):
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	l = []
 
-	for (fileId, path, version) in self:
-	    l.append(fileId)
+	for (pathId, path, fileId, version) in self:
+	    l.append(pathId)
 	    if not path:
 		path = ""
 
 	    l.append(struct.pack("!H", len(path)))
 	    l.append(path)
+
+	    if not fileId:
+		fileId = ""
+
+	    l.append(struct.pack("!H", len(fileId)))
+	    l.append(fileId)
 
 	    if version:
 		version = version.asString()
@@ -646,8 +659,8 @@ class ReferencedFileList(list, streams.InfoStream):
 
 	i = 0
 	while i < len(data):
-	    fileId = data[i:i+20]
-	    i += 20
+	    pathId = data[i:i+16]
+	    i += 16
 
 	    pathLen = struct.unpack("!H", data[i:i+2])[0]
 	    i += 2
@@ -657,6 +670,15 @@ class ReferencedFileList(list, streams.InfoStream):
 	    else:
 		path = None
 
+	    fileIdLen = struct.unpack("!H", data[i:i+2])[0]
+	    i += 2
+	    if fileIdLen:
+                assert(fileIdLen == 20)
+		fileId = data[i:i+20]
+		i += fileIdLen
+	    else:
+		fileIdLen = None
+
 	    versionLen = struct.unpack("!H", data[i:i+2])[0]
 	    i += 2
 	    if versionLen:
@@ -665,7 +687,7 @@ class ReferencedFileList(list, streams.InfoStream):
 	    else:
 		version = None
 
-	    self.append((fileId, path, version))
+	    self.append((pathId, path, fileId, version))
 
     def __init__(self, data = None):
 	list.__init__(self)
@@ -715,14 +737,14 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
     def isAbsolute(self):
 	return self.tcsType.value() == _TCS_TYPE_ABSOLUTE
 
-    def newFile(self, fileId, path, version):
-	self.newFiles.append((fileId, path, version))
+    def newFile(self, pathId, path, fileId, version):
+	self.newFiles.append((pathId, path, fileId, version))
 
     def getNewFileList(self):
 	return self.newFiles
 
-    def oldFile(self, fileId):
-	self.oldFiles.append(fileId)
+    def oldFile(self, pathId):
+	self.oldFiles.append(pathId)
 
     def getOldFileList(self):
 	return self.oldFiles
@@ -749,8 +771,8 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	return self.newVersion.value()
 
     # path and/or version can be None
-    def changedFile(self, fileId, path, version):
-	self.changedFiles.append((fileId, path, version))
+    def changedFile(self, pathId, path, fileId, version):
+	self.changedFiles.append((pathId, path, fileId, version))
 
     def getChangedFileList(self):
 	return self.changedFiles
@@ -836,10 +858,10 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         if self.getNewFlavor():
             depformat('New Flavor', self.getNewFlavor(), f)
 
-	for (fileId, path, version) in self.newFiles:
-	    #f.write("\tadded (%s(.*)%s)\n" % (fileId[:6], fileId[-6:]))
-            change = changeSet.getFileChange(fileId)
-            fileobj = files.ThawFile(change, fileId)
+	for (pathId, path, version) in self.newFiles:
+	    #f.write("\tadded (%s(.*)%s)\n" % (pathId[:6], pathId[-6:]))
+            change = changeSet.getFileChange(pathId)
+            fileobj = files.ThawFile(change, pathId)
             
 	    if isinstance(fileobj, files.SymbolicLink):
 		name = "%s -> %s" % (path, fileobj.target.value())
@@ -851,19 +873,19 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
                    fileobj.inode.group(), fileobj.sizeString(),
                    fileobj.timeString(), name)
 
-	for (fileId, path, version) in self.changedFiles:
-	    fileIdStr = sha1helper.sha1ToString(fileId)
+	for (pathId, path, fileId, version) in self.changedFiles:
+	    pathIdStr = sha1helper.sha1ToString(pathId)
 	    if path:
 		f.write("\tchanged %s (%s(.*)%s)\n" % 
-			(path, fileIdStr[:6], fileIdStr[-6:]))
+			(path, pathIdStr[:6], pathIdStr[-6:]))
 	    else:
-		f.write("\tchanged %s\n" % fileIdStr)
-	    change = changeSet.getFileChange(fileId)
+		f.write("\tchanged %s\n" % pathIdStr)
+	    change = changeSet.getFileChange(pathId)
 	    f.write("\t\t%s\n" % " ".join(files.fieldsChanged(change)))
 
-	for fileId in self.oldFiles:
-	    fileIdStr = sha1helper.sha1ToString(fileId)
-	    f.write("\tremoved %s(.*)%s\n" % (fileIdStr[:6], fileIdStr[-6:]))
+	for pathId in self.oldFiles:
+	    pathIdStr = sha1helper.sha1ToString(pathId)
+	    f.write("\tremoved %s(.*)%s\n" % (pathIdStr[:6], pathIdStr[-6:]))
 
 	for name in self.packages.keys():
 	    list = [ x[0] + x[1].asString() for x in self.packages[name] ]

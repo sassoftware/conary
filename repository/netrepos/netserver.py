@@ -32,8 +32,8 @@ from local import versiontable
 from netauth import NetworkAuthorization
 from netauth import InsufficientPermission
 
-SERVER_VERSIONS=[6,7,8,9,10,11,12]
-CACHE_SCHEMA_VERSION=10
+SERVER_VERSIONS = [ 20 ]
+CACHE_SCHEMA_VERSION = 10
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -194,11 +194,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         l = []
 
         for tup in gen:
-            (fileId, filePath, fileVersion) = tup[0:3]
+            (pathId, filePath, fileId, fileVersion) = tup[0:4]
             if withFiles:
-                fileStream = tup[3]
+                fileStream = tup[4]
                 if fileStream is None:
-                    fileObj = self.repos.getFileVersion(fileId, fileVersion)
+                    fileObj = self.repos.getFileVersion(pathId, fileId,
+                                                        fileVersion)
                     fileStream = fileObj.freeze()
 
             dir = os.path.dirname(filePath)
@@ -216,60 +217,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 verDict[fileVersion] = verNum
                 verList.append(self.fromVersion(fileVersion))
 
-            if clientVersion in [6,7]:
-                if withFiles:
-                    fileObj = files.ThawFile(fileStream, fileId)
-                    l.append((self.fromFileId(fileId), filePath, 
-                              self.fromVersion(fileVersion), 
-                              self.fromFile(fileObj)))
-                else:
-                    l.append((self.fromFileId(fileId), filePath, 
-                              self.fromVersion(fileVersion)))
+            if withFiles:
+                l.append((self.fromPathId(pathId), dirNum, fileName, 
+                          self.fromFileId(fileId), verNum, 
+                          base64.encodestring(fileStream)))
             else:
-                if withFiles:
-                    l.append((base64.encodestring(fileId), dirNum, fileName, 
-                              verNum, base64.encodestring(fileStream)))
-                else:
-                    l.append((base64.encodestring(fileId), dirNum, fileName, 
-                              verNum))
-
-        if clientVersion in [6,7]:
-            return l
+                l.append((self.fromPathId(pathId), dirNum, fileName, 
+                          self.fromFileId(fileId), verNum))
 
 	return l, verList, dirList
 
-    def getFileContents(self, authToken, clientVersion, troveName, 
-			troveVersion, troveFlavor = None, fileId = None, 
-                        fileVersion = None):
-        # the modern prototype is 
-        #      (self, authToken, clientVersion, fileId, fileVersion)
-        if clientVersion <= 8:
-            path = fileId
-            fileId = None
-	elif clientVersion <= 9:
-            fileId = self.toFileId(fileId)
-        elif clientVersion <= 11:
-            fileVersion = fileId
-            fileId = troveFlavor
-            troveFlavor = None
-            path = None
-            fileId = self.toFileId(fileId)
-        else:
-            fileId = troveName
-            fileVersion = troveVersion
-            fileId = self.toFileId(fileId)
-
-        del troveName
-        del troveVersion
-        del troveFlavor
-
+    def getFileContents(self, authToken, clientVersion, fileId, fileVersion):
 	fileVersion = self.toVersion(fileVersion)
         fileLabel = fileVersion.branch().label()
+        fileId = self.toFileId(fileId)
 
 	if not self.auth.check(authToken, write = False, label = fileLabel):
 	    raise InsufficientPermission
 
-        fileObj = self.repos.findFileVersion(fileId, fileVersion)
+        fileObj = self.repos.findFileVersion(fileId)
 
         filePath = self.repos.contentsStore.hashToPath(
                         sha1helper.sha1ToString(fileObj.contents.sha1()))
@@ -403,26 +369,33 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         def _cvtFileList(l):
             new = []
-            for (fileId, troveName, (oldTroveV, oldTroveF, oldFileV), 
-                                    (newTroveV, newTroveF, newFileV)) in l:
+            for (pathId, troveName, (oldTroveV, oldTroveF, oldFileId, oldFileV), 
+                                    (newTroveV, newTroveF, newFileId, newFileV)) in l:
                 if oldTroveV:
                     oldTroveV = self.fromVersion(oldTroveV)
                     oldFileV = self.fromVersion(oldFileV)
+                    oldFileId = self.fromFileId(oldFileId)
                     oldTroveF = self.fromFlavor(oldTroveF)
                 else:
                     oldTroveV = 0
                     oldFileV = 0
+                    oldFileId = 0
                     oldTroveF = 0
+
+                if not newFileId:
+                    import lib
+                    lib.epdb.st()
 
                 newTroveV = self.fromVersion(newTroveV)
                 newFileV = self.fromVersion(newFileV)
+                newFileId = self.fromFileId(newFileId)
                 newTroveF = self.fromFlavor(newTroveF)
 
-                fileId = self.fromFileId(fileId)
+                pathId = self.fromPathId(pathId)
 
-                new.append((fileId, troveName, 
-                               (oldTroveV, oldTroveF, oldFileV),
-                               (newTroveV, newTroveF, newFileV)))
+                new.append((pathId, troveName, 
+                               (oldTroveV, oldTroveF, oldFileId, oldFileV),
+                               (newTroveV, newTroveF, newFileId, newFileV)))
 
             return new
 
@@ -546,20 +519,20 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	# which is unfortunate, though you have to wonder what could be so
         # special in an inode...
         r = []
-        for (fileId, version) in fileList:
-            f = self.repos.troveStore.getFile(self.toFileId(fileId), 
-                                              self.toVersion(version))
+        for (pathId, fileId) in fileList:
+            f = self.repos.troveStore.getFile(self.toPathId(pathId), 
+                                              self.toFileId(fileId))
             r.append(self.fromFile(f))
 
         return r
 
-    def getFileVersion(self, authToken, clientVersion, fileId, version, 
+    def getFileVersion(self, authToken, clientVersion, pathId, fileId, 
                        withContents = 0):
 	# XXX needs to authentication against the trove the file is part of,
 	# which is unfortunate, though you have to wonder what could be so
         # special in an inode...
-	f = self.repos.troveStore.getFile(self.toFileId(fileId), 
-					  self.toVersion(version))
+	f = self.repos.troveStore.getFile(self.toPathId(pathId), 
+					  self.toFileId(fileId))
 	return self.fromFile(f)
 
     def checkVersion(self, authToken, clientVersion):

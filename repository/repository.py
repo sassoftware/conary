@@ -61,15 +61,15 @@ class AbstractTroveDatabase:
 	"""
 	raise NotImplementedError
 
-    def getFileVersion(self, fileId, version, withContents = 0):
+    def getFileVersion(self, pathId, fileId, version, withContents = 0):
 	"""
-	Returns the file object for the given (fileId, version).
+	Returns the file object for the given (pathId, fileId, version).
 	"""
 	raise NotImplementedError
 
     def getFileVersions(self, l):
 	"""
-	Returns the file objects for the (fileId, version) pairs in
+	Returns the file objects for the (pathId, fileId, version) pairs in
 	list; the order returns is the same order in the list.
 
 	@param l:
@@ -79,7 +79,7 @@ class AbstractTroveDatabase:
 	raise NotImplementedError
 
     def getFileContents(self, fileList):
-        # troveName, troveVersion, fileId, fileVersion, fileObj
+        # troveName, troveVersion, pathId, fileVersion, fileObj
 
 	raise NotImplementedError
 
@@ -128,7 +128,7 @@ class AbstractTroveDatabase:
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
 	"""
-	Returns a generator for (fileId, path, version) tuples for all
+	Returns a generator for (pathId, path, fileId, version) tuples for all
 	of the files in the trove. This is equivlent to trove.iterFileList(),
 	but if withFiles is set this is *much* more efficient.
 
@@ -139,7 +139,7 @@ class AbstractTroveDatabase:
 
     def iterFilesInTroveAncestry(self, troveName, version, flavor):
 	"""
-        Returns a generator for (fileId, path, version, fileObj) tuples
+        Returns a generator for (pathId, path, version, fileObj) tuples
         for all of the unique file paths ever contained in a trove
         throughout history. Only one tuple will be return per file
         path.  The newest version of each file will be returned.
@@ -497,7 +497,7 @@ class DataStoreRepository:
             if len(item) == 3:
                 fileObj = item[2]
             else:
-                fileObj = self.findFileVersion(fileId, fileVersion)
+                fileObj = self.findFileVersion(fileId)
             
             if fileObj:
                 cont = filecontents.FromDataStore(self.contentsStore,
@@ -535,11 +535,13 @@ class ChangeSetJob:
     def oldPackage(self, pkg):
 	pass
 
-    def oldFile(self, fileId, fileVersion, fileObj):
+    def oldFile(self, pathId, fileVersion, fileObj):
 	pass
 
-    def addFile(self, troveId, fileId, fileObj, path, version):
-	self.repos.addFileVersion(troveId, fileId, fileObj, path, version)
+    def addFile(self, troveId, pathId, fileObj, path, fileId, version,
+                oldFileId = None):
+	self.repos.addFileVersion(troveId, pathId, fileObj, path, 
+                                  fileId, version)
 
     def addFileContents(self, sha1, fileVersion, fileContents, 
 		restoreContents, isConfig):
@@ -558,7 +560,7 @@ class ChangeSetJob:
 
 	# create the package objects which need to be installed; the
 	# file objects which map up with them are created later, but
-	# we do need a map from fileId to the path and version of the
+	# we do need a map from pathId to the path and version of the
 	# file we need, so build up a dictionary with that information
 	for csPkg in cs.iterNewPackageList():
 	    newVersion = csPkg.getNewVersion()
@@ -584,12 +586,13 @@ class ChangeSetJob:
 
 	    troveInfo = self.addPackage(newPkg)
 
-	    for (fileId, path, newVersion) in newPkg.iterFileList():
-		tuple = newFileMap.get(fileId, None)
+	    for (pathId, path, fileId, newVersion) in newPkg.iterFileList():
+		tuple = newFileMap.get(pathId, None)
 		if tuple is not None:
-		    (oldPath, oldVersion) = tuple[-2:]
+		    (oldPath, oldFileId, oldVersion) = tuple[-3:]
 		else:
 		    oldVersion = None
+                    oldFileId = None
 
 		if tuple is None or oldVersion == newVersion:
 		    # the file didn't change between versions; we can just
@@ -598,10 +601,11 @@ class ChangeSetJob:
 		elif oldVersion == newVersion:
 		    fileObj = None
 		else:
-		    diff = cs.getFileChange(fileId)
+		    diff = cs.getFileChange(oldFileId, fileId)
 		    restoreContents = 1
 		    if oldVersion:
-			oldfile = repos.getFileVersion(fileId, oldVersion)
+			oldfile = repos.getFileVersion(pathId, oldFileId,
+                                                       oldVersion)
 			fileObj = oldfile.copy()
 			fileObj.twm(diff, oldfile)
 
@@ -611,10 +615,11 @@ class ChangeSetJob:
 						    oldfile.flags.isConfig()):
 			    restoreContents = 0
 		    else:
-			fileObj = files.ThawFile(diff, fileId)
+			fileObj = files.ThawFile(diff, pathId)
 			oldfile = None
 
-		self.addFile(troveInfo, fileId, fileObj, path, newVersion)
+		self.addFile(troveInfo, pathId, fileObj, path, fileId, 
+                             newVersion, oldFileId = oldFileId)
 
 		# files with contents need to be tracked so we can stick
 		# there contents in the archive "soon"; config files need
@@ -641,12 +646,12 @@ class ChangeSetJob:
  					 fileContents, restoreContents, 
  					 fileObj.flags.isConfig())
 		elif fileObj.flags.isConfig():
-		    tup = (fileId, fileObj, oldPath, oldfile, pkgName,
+		    tup = (pathId, fileObj, oldPath, oldfile, pkgName,
 			   oldTroveVersion, troveFlavor, newVersion, 
-			   oldVersion, restoreContents)
+                           fileId, oldVersion, oldFileId, restoreContents)
 		    configRestoreList.append(tup)
 		else:
-		    tup = (fileId, fileObj.contents.sha1(), newVersion, 
+		    tup = (pathId, fileObj.contents.sha1(), newVersion, 
 			   restoreContents)
 		    normalRestoreList.append(tup)
 
@@ -656,11 +661,11 @@ class ChangeSetJob:
 	configRestoreList.sort()
 	normalRestoreList.sort()
 
-	for (fileId, fileObj, oldPath, oldfile, pkgName, oldTroveVersion,
-	     troveFlavor, newVersion, oldVersion, restoreContents) in \
-							configRestoreList:
-            if cs.configFileIsDiff(fileId):
-                (contType, fileContents) = cs.getFileContents(fileId)
+	for (pathId, fileObj, oldPath, oldfile, pkgName, oldTroveVersion,
+	     troveFlavor, newVersion, newFileId, oldVersion, 
+             oldFileId, restoreContents) in configRestoreList:
+            if cs.configFileIsDiff(pathId):
+                (contType, fileContents) = cs.getFileContents(pathId)
 
 		assert(fileObj.flags.isConfig())
 		# the content for this file is in the form of a
@@ -670,7 +675,7 @@ class ChangeSetJob:
 		sha1 = oldfile.contents.sha1()
 
 		f = self.repos.getFileContents(
-                                    [(fileId, oldVersion, oldfile)])[0].get()
+                                [(oldFileId, oldVersion, oldfile)])[0].get()
 
 		oldLines = f.readlines()
 		del f
@@ -684,7 +689,7 @@ class ChangeSetJob:
 		    fileContents = filecontents.WithFailedHunks(
 					fileContents, failedHunks)
             else:
-                fileContents = filecontents.FromChangeSet(cs, fileId)
+                fileContents = filecontents.FromChangeSet(cs, pathId)
 
 	    self.addFileContents(fileObj.contents.sha1(), newVersion, 
 				 fileContents, restoreContents, 1)
@@ -692,8 +697,8 @@ class ChangeSetJob:
         # normalRestoreList is empty if storeOnlyConfigFiles
 	normalRestoreList.sort()
         ptrRestores = []
-	for (fileId, sha1, version, restoreContents) in normalRestoreList:
-	    (contType, fileContents) = cs.getFileContents(fileId)
+	for (pathId, sha1, version, restoreContents) in normalRestoreList:
+	    (contType, fileContents) = cs.getFileContents(pathId)
             if contType == changeset.ChangedFileTypes.ptr:
                 ptrRestores.append(sha1)
                 continue
@@ -712,9 +717,9 @@ class ChangeSetJob:
 	    pkg = self.repos.getTrove(pkgName, version, flavor)
 	    self.oldPackage(pkg)
 
-	    for (fileId, path, version) in pkg.iterFileList():
-		file = self.repos.getFileVersion(fileId, version)
-		self.oldFile(fileId, version, file)
+	    for (pathId, path, fileId, version) in pkg.iterFileList():
+		file = self.repos.getFileVersion(pathId, fileId, version)
+		self.oldFile(pathId, version, file)
 
 class RepositoryError(Exception):
     """Base class for exceptions from the system repository"""

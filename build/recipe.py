@@ -239,7 +239,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     outF = os.fdopen(fd, "w")
 
     inF = None
-    for (fileId, filePath, fileVersion) in sourceComponent.iterFileList():
+    for (pathId, filePath, fileId, fileVersion) in sourceComponent.iterFileList():
 	if filePath == filename:
 	    inF = repos.getFileContents([ (fileId, fileVersion) ])[0].get()
 	    break
@@ -493,7 +493,7 @@ class PackageRecipe(Recipe):
             srcVersion = rclass._trove.getVersion()
             for f in repos.iterFilesInTrove(srcName, srcVersion, None,
                                             withFiles=True):
-                fileId, path, version, fileObj = f
+                pathId, path, fileId, version, fileObj = f
                 assert(path[0] != "/")
                 # we might need to retrieve this source file
                 # to enable a build, so we need to find the
@@ -503,7 +503,8 @@ class PackageRecipe(Recipe):
                     # it only makes sense to fetch regular files, skip
                     # anything that isn't
                     self.laReposCache.addFileHash(srcName, srcVersion,
-                                                  None, fileId, path, version)
+                                                  None, pathId, path, 
+                                                  fileId, version)
 
     def __getattr__(self, name):
 	"""
@@ -626,8 +627,8 @@ class FilesetRecipe(Recipe):
 
     def addFileFromPackage(self, pattern, pkg, recurse, remapList):
 	pathMap = {}
-	for (fileId, pkgPath, version) in pkg.iterFileList():
-	    pathMap[pkgPath] = (fileId, version)
+	for (pathId, pkgPath, fileId, version) in pkg.iterFileList():
+	    pathMap[pkgPath] = (pathId, fileId, version)
 
 	patternList = util.braceExpand(pattern)
 	matches = {}
@@ -657,7 +658,7 @@ class FilesetRecipe(Recipe):
 	    return False
 
 	for path in matches.keys():
-	    (fileId, version) = matches[path]
+	    (pathId, fileId, version) = matches[path]
 
 	    for (old, new) in remapList:
 		if path == old:
@@ -672,7 +673,7 @@ class FilesetRecipe(Recipe):
 		raise RecipeFileError, "%s has been included multiple times" \
 			% path
 
-	    self.files[fileId] = (path, version)
+	    self.files[pathId] = (path, fileId, version)
 	    self.paths[path] = 1
 
 	return True
@@ -714,8 +715,8 @@ class FilesetRecipe(Recipe):
 		(pattern, pkg.getVersion().asString(), pkg.getName())
 	    
     def iterFileList(self):
-	for (fileId, (path, version)) in self.files.iteritems():
-	    yield (fileId, path, version)
+	for (pathId, (path, fileId, version)) in self.files.iteritems():
+	    yield (pathId, path, fileId, version)
 	    
     def __init__(self, repos, cfg, branch, flavor):
 	self.repos = repos

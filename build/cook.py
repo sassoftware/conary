@@ -52,7 +52,7 @@ def _createComponent(repos, branch, bldPkg, newVersion, ident):
 
     linkGroups = {}
     for pathList in bldPkg.linkGroups.itervalues():
-        linkGroupId = sha1helper.hashString("\n".join(pathList))
+        linkGroupId = sha1helper.sha1String("\n".join(pathList))
         linkGroups.update({}.fromkeys(pathList, linkGroupId))
 
     for (path, (realPath, f)) in bldPkg.iteritems():
@@ -60,8 +60,8 @@ def _createComponent(repos, branch, bldPkg, newVersion, ident):
             flavor = f.flavor.deps
         else:
             flavor = None
-        (fileId, fileVersion, oldFile) = ident(path, flavor)
-	f.id(fileId)
+        (pathId, fileVersion, oldFile) = ident(path, flavor)
+	f.pathId(pathId)
         
         linkGroupId = linkGroups.get(path, None)
         if linkGroupId:
@@ -69,34 +69,33 @@ def _createComponent(repos, branch, bldPkg, newVersion, ident):
 
         if not fileVersion:
             # no existing versions for this path
-	    p.addFile(f.id(), path, newVersion)
+	    p.addFile(f.pathId(), path, newVersion, f.fileId())
 	else:
             # check to see if the file we have now is the same as the
             # file in the previous version of the file (modes, contents, etc)
 	    if oldFile == f:
                 # if it's the same, use old version
-		p.addFile(f.id(), path, fileVersion)
+		p.addFile(f.pathId(), path, fileVersion, f.fileId())
 	    else:
                 # otherwise use the new version
-		p.addFile(f.id(), path, newVersion)
+		p.addFile(f.pathId(), path, newVersion, f.fileId())
 
-        fileMap[f.id()] = (f, realPath, path)
+        fileMap[f.pathId()] = (f, realPath, path)
 
     return (p, fileMap)
 
 class _IdGen:
     def __call__(self, path, flavor):
-	if self.map.has_key((path, flavor)):
-	    return self.map[(path, flavor)]
+	if self.map.has_key(path):
+	    return self.map[path]
 
-	fileid = sha1helper.hashString("%s %f %s %s" % (path, time.time(), 
-                                                     self.noise,
-                                                     flavor))
+	fileid = sha1helper.md5String("%s %f %s" % (path, time.time(), 
+                                                     self.noise))
 	self.map[(path, flavor)] = (fileid, None, None)
 	return (fileid, None, None)
 
     def __init__(self, map=None):
-	# file ids need to be unique. we include the time and path when
+	# path ids need to be unique. we include the time and path when
 	# we generate them; any data put here is also used
 	uname = os.uname()
 	self.noise = "%s %s" % (uname[1], uname[2])
@@ -110,12 +109,14 @@ class _IdGen:
 	# this package on the branch.
         for f in repos.iterFilesInTrove(pkg.getName(), pkg.getVersion(),
                                         pkg.getFlavor(), withFiles=True):
-            fileId, path, version, fileObj = f
+            pathId, path, fileId, version, fileObj = f
             if isinstance(fileObj, files.RegularFile):
                 flavor = fileObj.flavor.deps
             else:
                 flavor = None
-            self.map[(path, flavor)] = (fileId, version, fileObj)
+            if self.map.has_key(path):
+                assert(self.map[path][0] == pathId)
+            self.map[path] = (pathId, version, fileObj)
 # -------------------- public below this line -------------------------
 
 def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None, 
@@ -358,13 +359,14 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 
     l = []
     flavor = deps.deps.DependencySet()
-    for (fileId, path, version) in recipeObj.iterFileList():
-	fileObj = repos.getFileVersion(fileId, version)
-	l.append((fileId, path, version))
+    for (pathId, path, fileId, version) in recipeObj.iterFileList():
+	fileObj = repos.getFileVersion(pathId, fileId, version)
+	l.append((pathId, path, version, fileId))
 	if fileObj.hasContents:
 	    flavor.union(fileObj.flavor.value())
-	changeSet.addFile(fileId, None, version, fileObj.freeze())
+	changeSet.addFile(None, fileId, fileObj.freeze())
 	
+
 	# since the file is already in the repository (we just committed
 	# it there, so it must be there!) leave the contents out. this
 	# means that the change set we generate can't be used as the 
@@ -380,8 +382,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 	targetVersion.trailingVersion().incrementBuildCount()
 
     fileset = trove.Trove(fullName, targetVersion, flavor, None)
-    for (fileId, path, version) in l:
-	fileset.addFile(fileId, path, version)
+    for (pathId, path, version, fileId) in l:
+	fileset.addFile(pathId, path, version, fileId)
 
     filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newPackage(filesetDiff)

@@ -38,45 +38,29 @@ class FileInfo(streams.TupleStream):
 
     __slots__ = []
 
-    # fileId, oldVersion, newVersion, csInfo
-    makeup = (("fileId", streams.Sha1Stream, 20), 
-	      ("oldVersion", streams.StringStream, "!H"),
-	      ("newVersion", streams.StringStream, "!H"), 
+    # pathId, oldVersion, newVersion, csInfo
+    makeup = (("oldFileId", streams.StringStream, "B"),
+	      ("newFileId", streams.Sha1Stream, 20),
 	      ("csInfo", streams.StringStream, "B"))
 
-    def fileId(self):
-        return self.items[0]
+    def oldFileId(self):
+        return self.items[0].value()
 
-    def setFileId(self, value):
-        return self.items[0].set(value)
-
-    def oldVersion(self):
+    def newFileId(self):
         return self.items[1].value()
 
-    def setOldVersion(self, value):
-        return self.items[1].set(value)
-
-    def newVersion(self):
+    def csInfo(self):
         return self.items[2].value()
 
-    def setNewVersion(self, value):
-        return self.items[2].set(value)
-
-    def csInfo(self):
-        return self.items[3].value()
-
-    def setCsInfo(self, value):
-        return self.items[3].set(value)
-
-    def __init__(self, first = None, oldStr = None, newVer = None, chg = None):
-	if oldStr is None:
+    def __init__(self, first, newFileId = None, chg = None):
+	if newFileId is None:
 	    streams.TupleStream.__init__(self, first)
 	else:
-	    streams.TupleStream.__init__(self, first, oldStr, newVer, chg)
+	    streams.TupleStream.__init__(self, first, newFileId, chg)
 
 class ChangeSetNewPackageList(dict, streams.InfoStream):
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	l = []
 	for pkg in self.itervalues():
 	    s = pkg.freeze()
@@ -103,15 +87,13 @@ class ChangeSetNewPackageList(dict, streams.InfoStream):
 	    
 class ChangeSetFileDict(dict, streams.InfoStream):
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	fileList = []
-	for (fileId, (oldVersion, newVersion, csInfo)) in self.iteritems():
-	    if oldVersion:
-		oldStr = oldVersion.asString()
-	    else:
-		oldStr = ""
+	for ((oldFileId, newFileId), (csInfo)) in self.iteritems():
+	    if not oldFileId:
+                oldFileId = ""
 
-	    s = FileInfo(fileId, oldStr, newVersion.asString(), csInfo).freeze()
+	    s = FileInfo(oldFileId, newFileId, csInfo).freeze()
 	    fileList.append(struct.pack("!I", len(s)) + s)
 
 	return "".join(fileList)
@@ -124,16 +106,12 @@ class ChangeSetFileDict(dict, streams.InfoStream):
 	    info = FileInfo(data[i:i+size])
 	    i += size
 	    
-	    oldVerStr = info.oldVersion()
+            oldFileId = info.oldFileId()
+            if oldFileId == "":
+                oldFileId = None
 
-	    if not oldVerStr:
-		oldVersion = None
-	    else:
-		oldVersion = versions.VersionFromString(oldVerStr)
-
-	    newVersion = versions.VersionFromString(info.newVersion())
-	    self[info.fileId().value()] = (oldVersion, newVersion, 
-					   info.csInfo())
+            newFileId = info.newFileId()
+            self[(oldFileId, newFileId)] = info.csInfo()
 
     def __init__(self, data = None):
 	if data:
@@ -195,43 +173,29 @@ class ChangeSet(streams.LargeStreamSet):
     def getOldPackageList(self):
 	return self.oldPackages
 
-    def configFileIsDiff(self, fileId):
-        (tag, cont) = self.configCache.get(fileId, (None, None))
+    def configFileIsDiff(self, pathId):
+        (tag, cont) = self.configCache.get(pathId, (None, None))
         return tag == ChangedFileTypes.diff
 
-    def addFileContents(self, fileId, contType, contents, cfgFile):
+    def addFileContents(self, pathId, contType, contents, cfgFile):
 	if cfgFile:
-	    self.configCache[fileId] = (contType, contents)
+	    self.configCache[pathId] = (contType, contents)
 	else:
-	    self.fileContents[fileId] = (contType, contents)
+	    self.fileContents[pathId] = (contType, contents)
 
-    def getFileContents(self, fileId, withSize = False):
-	if self.fileContents.has_key(fileId):
-	    cont = self.fileContents[fileId]
+    def getFileContents(self, pathId, withSize = False):
+	if self.fileContents.has_key(pathId):
+	    cont = self.fileContents[pathId]
 	else:
-	    cont = self.configCache[fileId]
+	    cont = self.configCache[pathId]
 
 	if not withSize:
 	    return cont
 
 	return cont + (cont.size(), )
 
-    def addFile(self, fileId, oldVersion, newVersion, csInfo):
-	self.files[fileId] = (oldVersion, newVersion, csInfo)
-
-	if oldVersion and oldVersion.isLocal():
-	    self.local = 1
-	if newVersion.isLocal():
-	    self.local = 1
-
-    def getFileList(self):
-	return self.files.items()
-
-    def getFile(self, fileId):
-	return self.files[fileId]
-
-    def hasFile(self, fileId):
-	return self.files.has_key(fileId)
+    def addFile(self, oldFileId, newFileId, csInfo):
+        self.files[(oldFileId, newFileId)] = csInfo
 
     def formatToFile(self, cfg, f):
 	f.write("primary packages:\n")
@@ -249,14 +213,8 @@ class ChangeSet(streams.LargeStreamSet):
 	    f.write("remove %s %s\n" %
 		    (pkgName, version.asString()))
 
-    def getFileChange(self, fileId):
-	return self.files[fileId][2]
-
-    def getFileOldVersion(self, fileId):
-	return self.files[fileId][0]
-
-    def hasFileChange(self, fileId):
-	return self.files.has_key(fileId)
+    def getFileChange(self, oldFileId, newFileId):
+	return self.files[(oldFileId, newFileId)]
 
     def writeContents(self, csf, contents, early):
 	# these are kept sorted so we know which one comes next
@@ -329,15 +287,15 @@ class ChangeSet(streams.LargeStreamSet):
 		    elif oper == "-":
 			invertedPkg.newTroveVersion(name, version, flavor)
 
-	    for (fileId, path, version) in pkgCs.getNewFileList():
-		invertedPkg.oldFile(fileId)
+	    for (pathId, path, fileId, version) in pkgCs.getNewFileList():
+		invertedPkg.oldFile(pathId)
 
-	    for fileId in pkgCs.getOldFileList():
-		(path, version) = pkg.getFile(fileId)
-		invertedPkg.newFile(fileId, path, version)
+	    for pathId in pkgCs.getOldFileList():
+		(path, fileId, version) = pkg.getFile(pathId)
+		invertedPkg.newFile(pathId, path, fileId, version)
 
-		origFile = db.getFileVersion(fileId, version)
-		rollback.addFile(fileId, None, version, origFile.freeze())
+		origFile = db.getFileVersion(pathId, fileId, version)
+		rollback.addFile(None, fileId, origFile.freeze())
 
 		if not origFile.hasContents:
 		    continue
@@ -353,13 +311,13 @@ class ChangeSet(streams.LargeStreamSet):
 						       origFile.contents.sha1(),
 
 						       origFile.contents.size())
-		    rollback.addFileContents(fileId,
+		    rollback.addFileContents(pathId,
 					     ChangedFileTypes.file, cont, 1)
 		else:
 		    fullPath = db.root + path
 
                     try:
-                        fsFile = files.FileFromFilesystem(fullPath, fileId,
+                        fsFile = files.FileFromFilesystem(fullPath, pathId,
                                     possibleMatch = origFile)
                     except OSError, e:
                         if e.errno != errno.ENOENT:
@@ -374,30 +332,28 @@ class ChangeSet(streams.LargeStreamSet):
 			# empty file in here so we can apply the rollback
 			cont = filecontents.FromString("")
 
-		    rollback.addFileContents(fileId, ChangedFileTypes.file, 
+		    rollback.addFileContents(pathId, ChangedFileTypes.file, 
 					     cont, 0)
 
-	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
-		if not pkg.hasFile(fileId):
+	    for (pathId, newPath, newFileId, newVersion) in pkgCs.getChangedFileList():
+		if not pkg.hasFile(pathId):
 		    # the file has been removed from the local system; we
 		    # don't need to restore it on a rollback
 		    continue
-		(curPath, curVersion) = pkg.getFile(fileId)
+		(curPath, curFileId, curVersion) = pkg.getFile(pathId)
 
 		if newPath:
-		    invertedPkg.changedFile(fileId, curPath, curVersion)
+		    invertedPkg.changedFile(pathId, curPath, curFileId, curVersion)
 		else:
-		    invertedPkg.changedFile(fileId, None, curVersion)
+		    invertedPkg.changedFile(pathId, None, curFileId, curVersion)
 
-		(oldVersion, newVersion, csInfo) = self.files[fileId]
-		assert(curVersion == oldVersion)
+                csInfo = self.files[(curFileId, newFileId)]
 
-		origFile = db.getFileVersion(fileId, oldVersion)
-		newFile = db.getFileVersion(fileId, oldVersion)
+		origFile = db.getFileVersion(pathId, curFileId, curVersion)
+		newFile = origFile.copy()
 		newFile.twm(csInfo, origFile)
 
-		rollback.addFile(fileId, newVersion, oldVersion, 
-				  origFile.diff(newFile))
+		rollback.addFile(newFileId, curFileId, origFile.diff(newFile))
 
 		if not isinstance(origFile, files.RegularFile):
 		    continue
@@ -409,25 +365,25 @@ class ChangeSet(streams.LargeStreamSet):
 		# a diff rather then saving the full contents
 		if (origFile.contents.sha1() != newFile.contents.sha1()) and \
 		   origFile.flags.isConfig():
-                    if self.configFileIsDiff(newFile.id()):
-                        (contType, cont) = self.getFileContents(newFile.id())
+                    if self.configFileIsDiff(newFile.pathId()):
+                        (contType, cont) = self.getFileContents(newFile.pathId())
 			f = cont.get()
 			diff = "".join(patch.reverse(f.readlines()))
 			f.seek(0)
 			cont = filecontents.FromString(diff)
-			rollback.addFileContents(fileId,
+			rollback.addFileContents(pathId,
 						 ChangedFileTypes.diff, cont, 1)
 		    else:
 			cont = filecontents.FromDataStore(db.contentsStore, 
 				    origFile.contents.sha1(),
                                     origFile.contents.size())
-			rollback.addFileContents(fileId,
+			rollback.addFileContents(pathId,
 						 ChangedFileTypes.file, cont,
 						 newFile.flags.isConfig())
 		elif origFile.contents.sha1() != newFile.contents.sha1():
 		    # this file changed, so we need the contents
 		    fullPath = db.root + curPath
-		    fsFile = files.FileFromFilesystem(fullPath, fileId,
+		    fsFile = files.FileFromFilesystem(fullPath, pathId,
 				possibleMatch = origFile)
 
                     if (isinstance(fsFile, files.RegularFile) and
@@ -440,7 +396,7 @@ class ChangeSet(streams.LargeStreamSet):
 			# about getting this right
 			cont = filecontents.FromString("")
 
-		    rollback.addFileContents(fileId,
+		    rollback.addFileContents(pathId,
 					     ChangedFileTypes.file, cont,
 					     origFile.flags.isConfig() or
 					     newFile.flags.isConfig())
@@ -451,14 +407,14 @@ class ChangeSet(streams.LargeStreamSet):
 	    pkg = db.getTrove(name, version, flavor)
 	    pkgDiff = pkg.diff(None)[0]
 	    rollback.newPackage(pkgDiff)
-	    for (fileId, path, fileVersion) in pkg.iterFileList():
-		fileObj = db.getFileVersion(fileId, fileVersion)
-		rollback.addFile(fileId, None, fileVersion, fileObj.freeze())
+	    for (pathId, path, fileId, fileVersion) in pkg.iterFileList():
+		fileObj = db.getFileVersion(pathId, fileId, fileVersion)
+		rollback.addFile(None, fileId, fileObj.freeze())
 		if fileObj.hasContents:
 		    fullPath = db.root + path
 
 		    if os.path.exists(fullPath):
-			fsFile = files.FileFromFilesystem(fullPath, fileId,
+			fsFile = files.FileFromFilesystem(fullPath, pathId,
 				    possibleMatch = fileObj)
 		    else:
 			fsFile = None
@@ -473,7 +429,7 @@ class ChangeSet(streams.LargeStreamSet):
 			# about getting this right
 			cont = filecontents.FromString("")
 
-		    rollback.addFileContents(fileId,
+		    rollback.addFileContents(pathId,
 					     ChangedFileTypes.file, cont,
 					     fileObj.flags.isConfig())
 
@@ -523,18 +479,23 @@ class ChangeSet(streams.LargeStreamSet):
 		packageVersions[name] = []
 	    packageVersions[name].append((ver, newVer))
 
+            # FILEID
+            # this is just hosed. needs attention.
+
 	    # files on the local branch get remapped; others don't
 	    if self.isLocal(): 
 		for (listMethod, addMethod) in [
 			(pkgCs.getChangedFileList, pkgCs.changedFile),
 			(pkgCs.getNewFileList, pkgCs.newFile) ]:
-		    for (fileId, path, fileVersion) in listMethod():
+		    for (pathId, path, fileId, fileVersion) in listMethod():
 			if fileVersion != "-" and fileVersion.isLocal():
-			    addMethod(fileId, path, newVer)
-			    oldVer = self.getFileOldVersion(fileId)
-			    csInfo = self.getFileChange(fileId)
+			    addMethod(pathId, path, newVer)
+			    oldVer = self.getFileOldVersion(pathId)
+			    csInfo = self.getFileChange(pathId)
+                            (otherPathId, oldVer, otherNewVer, csInfo) = \
+                                self.getFile()
 			    # this replaces the existing file 
-			    self.addFile(fileId, oldVer, newVer, csInfo)
+			    self.addFile(pathId, oldVer, newVer, csInfo)
 
 	for pkgCs in self.iterNewPackageList():
 	    # the implemented of updateChangedPackage makes this whole thing
@@ -598,8 +559,8 @@ class ReadOnlyChangeSet(ChangeSet):
 
     fileQueueCmp = staticmethod(fileQueueCmp)
 
-    def configFileIsDiff(self, fileId):
-        (tag, str) = self.configCache.get(fileId, (None, None))
+    def configFileIsDiff(self, pathId):
+        (tag, str) = self.configCache.get(pathId, (None, None))
         return tag == ChangedFileTypes.diff
 
     def _nextFile(self):
@@ -619,11 +580,11 @@ class ReadOnlyChangeSet(ChangeSet):
         del self.fileQueue[0]
         return rc
 
-    def getFileContents(self, fileId, withSize = False):
+    def getFileContents(self, pathId, withSize = False):
         name = None
-	if self.configCache.has_key(fileId):
-            name = fileId
-	    (tag, contents) = self.configCache[fileId]
+	if self.configCache.has_key(pathId):
+            name = pathId
+	    (tag, contents) = self.configCache[pathId]
 
             if type(contents) == str:
                 cont = filecontents.FromString(contents)
@@ -638,23 +599,23 @@ class ReadOnlyChangeSet(ChangeSet):
             while rc:
                 name, tagInfo, f, size, csf = rc
                 
-                # if we found the fileId we're looking for, or the fileId
+                # if we found the pathId we're looking for, or the pathId
                 # we got is a config file, cache or break out of the loop
                 # accordingly
-                if name == fileId or tagInfo[0] == '1':
+                if name == pathId or tagInfo[0] == '1':
                     tag = 'cft-' + tagInfo.split()[1]
                     cont = filecontents.FromFile(f)
 
                     # we found the one we're looking for, break out
-                    if name == fileId:
+                    if name == pathId:
                         self.lastCsf = csf
                         break
 
                 rc = self._nextFile()
 
-        if name != fileId:
-            raise KeyError, 'fileId %s is not in the changeset' % \
-                            sha1helper.sha1ToString(fileId)
+        if name != pathId:
+            raise KeyError, 'pathId %s is not in the changeset' % \
+                            sha1helper.md5ToString(pathId)
         elif withSize:
             return (tag, cont, size)
         else:
@@ -717,31 +678,29 @@ class ReadOnlyChangeSet(ChangeSet):
 	    newPackages.append(pkgChgSet)
             filesNeeded.sort()
 
-	    for (fileId, oldVersion, newVersion) in filesNeeded:
-		(foldVersion, fNewVersion, filecs) = self.getFile(fileId)
-		assert(not foldVersion)
-		assert(newVersion == fNewVersion)
-		fileObj = files.ThawFile(filecs, fileId)
+	    for (pathId, oldFileId, oldVersion, newFileId, newVersion) in filesNeeded:
+                filecs = self.getFileChange(None, newFileId)
+		fileObj = files.ThawFile(filecs, pathId)
 		
 		oldFile = None
 		if oldVersion:
-		    (oldFile, oldCont) = db.getFileVersion(fileId, 
-					    oldVersion, withContents = 1)
+		    (oldFile, oldCont) = db.getFileVersion(pathId, 
+                                    oldFileId, oldVersion, withContents = 1)
 
-		(filecs, hash) = fileChangeSet(fileId, oldFile, fileObj)
+		(filecs, hash) = fileChangeSet(pathId, oldFile, fileObj)
 
-		newFiles.append((fileId, oldVersion, newVersion, filecs))
+		newFiles.append((oldFileId, newFileId, filecs))
 
 		if hash and oldVersion and \
                         oldFile.flags.isConfig() and fileObj.flags.isConfig():
 		    contType = ChangedFileTypes.file
-		    cont = filecontents.FromChangeSet(self, fileId)
+		    cont = filecontents.FromChangeSet(self, pathId)
 		    if oldVersion:
 			(contType, cont) = fileContentsDiff(oldFile, oldCont, 
                                                             fileObj, cont)
 
                     if contType == ChangedFileTypes.diff:
-                        self.configCache[fileId] = (contType, cont.get().read())
+                        self.configCache[pathId] = (contType, cont.get().read())
 
 	self.files = {}
 	for tup in newFiles:
@@ -792,12 +751,12 @@ class ReadOnlyChangeSet(ChangeSet):
             # make a copy. the configCache should only store diffs
             configs = {}
 
-            for (fileId, (contType, contents)) in \
+            for (pathId, (contType, contents)) in \
                                     otherCs.configCache.iteritems():
                 if contType == ChangedFileTypes.diff:
-                    self.configCache[fileId] = (contType, contents)
+                    self.configCache[pathId] = (contType, contents)
                 else:
-                    configs[fileId] = (contType, contents)
+                    configs[pathId] = (contType, contents)
                     
             wrapper = dictAsCsf(otherCs.fileContents)
             wrapper.addConfigs(configs)
@@ -876,7 +835,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
             self.fileQueue.append(nextFile + (csf,))
 
 # old may be None
-def fileChangeSet(fileId, old, new):
+def fileChangeSet(pathId, old, new):
     hash = None
 
     if old and old.__class__ == new.__class__:
@@ -932,13 +891,13 @@ def CreateFromFilesystem(pkgList):
 	(pkgChgSet, filesNeeded, pkgsNeeded) = pkg.diff(None, absolute = 1)
 	cs.newPackage(pkgChgSet)
 
-	for (fileId, oldVersion, newVersion) in filesNeeded:
-	    (file, realPath, filePath) = fileMap[fileId]
-	    (filecs, hash) = fileChangeSet(fileId, None, file)
-	    cs.addFile(fileId, oldVersion, newVersion, filecs)
+	for (pathId, oldFileId, oldVersion, newFileId, newVersion) in filesNeeded:
+	    (file, realPath, filePath) = fileMap[pathId]
+	    (filecs, hash) = fileChangeSet(pathId, None, file)
+	    cs.addFile(oldFileId, newFileId, filecs)
 
 	    if hash:
-		cs.addFileContents(fileId, ChangedFileTypes.file,
+		cs.addFileContents(pathId, ChangedFileTypes.file,
 			  filecontents.FromFilesystem(realPath),
 			  file.flags.isConfig())
 

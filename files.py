@@ -94,7 +94,7 @@ class LinkGroupStream(streams.Sha1Stream):
     def set(self, val):
         self.s = val
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
         if self.s is None:
             return ""
         return streams.Sha1Stream.freeze(self)
@@ -228,15 +228,10 @@ class InodeStream(streams.TupleStream):
 	else:
 	    return time.strftime("%b %e  %Y", timeSet)
 
-    def metadataEqual(self, other):
-	return self.__class__ == other.__class__ and \
-	       self.perms() == other.perms() 
+    def __eq__(self, other, skipSet = { 'mtime' : True }):
+        return streams.TupleStream.eq(self, other, skipSet = skipSet)
 
-    def __eq__(self, other):
-	return self.__class__ == other.__class__ and \
-	       self.perms() == other.perms() and\
-	       self.owner() == other.owner() and \
-	       self.group() == other.group()
+    eq = __eq__
 
 class FlagsStream(streams.IntStream):
 
@@ -272,7 +267,7 @@ class File(streams.StreamSet):
     streamDict = { FILE_STREAM_INODE : (InodeStream, "inode"),
                    FILE_STREAM_FLAGS : (FlagsStream, "flags"),
 		   FILE_STREAM_TAGS :  (streams.StringsStream, "tags") }
-    __slots__ = [ "theId", "inode", "flags", "tags" ]
+    __slots__ = [ "thePathId", "inode", "flags", "tags" ]
 
     def modeString(self):
 	l = self.inode.permsString()
@@ -284,11 +279,14 @@ class File(streams.StreamSet):
     def sizeString(self):
 	return "       0"
 
-    def id(self, new = None):
+    def pathId(self, new = None):
 	if new:
-	    self.theId = new
+	    self.thePathId = new
 
-	return self.theId
+	return self.thePathId
+
+    def fileId(self):
+        return sha1helper.sha1String(self.freeze(skipSet = [ 'mtime' ]))
 
     def remove(self, target):
 	os.unlink(target)
@@ -326,30 +324,25 @@ class File(streams.StreamSet):
 	
 	return streams.StreamSet.twm(self, diff[2:], base, skip = skip)
 
-    def __eq__(self, other):
+    def __eq__(self, other, ignoreOwnerGroup = False):
 	if other.lsTag != self.lsTag: return False
-	return streams.StreamSet.__eq__(self, other)
 
-    def metadataEqual(self, other, ignoreOwnerGroup):
-	if not ignoreOwnerGroup:
-	    return self == other
+	if ignoreOwnerGroup:
+            return streams.StreamSet.__eq__(self, other, 
+                           skipSet = { 'mtime' : True,
+                                       'owner' : True, 
+                                       'group' : True } )
 
-	for streamType, name in self.streamDict.itervalues():
-	    if name == 'inode':
-		if not self.__getattribute__(name).metadataEqual(
-		       other.__getattribute__(name)):
-		    return False
-	    elif not self.__getattribute__(name) == other.__getattribute__(name):
-		return False
+        return streams.StreamSet.__eq__(self, other)
 
-	return True
+    eq = __eq__
 
-    def freeze(self):
-	return self.lsTag + streams.StreamSet.freeze(self)
+    def freeze(self, skipSet = None):
+	return self.lsTag + streams.StreamSet.freeze(self, skipSet = skipSet)
 
-    def __init__(self, fileId, streamData = None):
+    def __init__(self, pathId, streamData = None):
         assert(self.__class__ is not File)
-	self.theId = fileId
+	self.thePathId = pathId
 	if streamData is not None:
 	    streams.StreamSet.__init__(self, streamData[1:])
 	else:
@@ -501,7 +494,7 @@ class RegularFile(File):
     def __init__(self, *args, **kargs):
 	File.__init__(self, *args, **kargs)
 
-def FileFromFilesystem(path, fileId, possibleMatch = None, inodeInfo = False):
+def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False):
     s = os.lstat(path)
 
     try:
@@ -520,23 +513,23 @@ def FileFromFilesystem(path, fileId, possibleMatch = None, inodeInfo = False):
     inode = InodeStream(s.st_mode & 07777, s.st_mtime, owner, group)
 
     if (stat.S_ISREG(s.st_mode)):
-	f = RegularFile(fileId)
+	f = RegularFile(pathId)
 	needsSha1 = 1
     elif (stat.S_ISLNK(s.st_mode)):
-	f = SymbolicLink(fileId)
+	f = SymbolicLink(pathId)
 	f.target.set(os.readlink(path))
     elif (stat.S_ISDIR(s.st_mode)):
-	f = Directory(fileId)
+	f = Directory(pathId)
     elif (stat.S_ISSOCK(s.st_mode)):
-	f = Socket(fileId)
+	f = Socket(pathId)
     elif (stat.S_ISFIFO(s.st_mode)):
-	f = NamedPipe(fileId)
+	f = NamedPipe(pathId)
     elif (stat.S_ISBLK(s.st_mode)):
-	f = BlockDevice(fileId)
+	f = BlockDevice(pathId)
 	f.devt.setMajor(s.st_rdev >> 8)
 	f.devt.setMinor(s.st_rdev & 0xff)
     elif (stat.S_ISCHR(s.st_mode)):
-	f = CharacterDevice(fileId)
+	f = CharacterDevice(pathId)
 	f.devt.setMajor(s.st_rdev >> 8)
 	f.devt.setMinor(s.st_rdev & 0xff)
     else:
@@ -556,7 +549,7 @@ def FileFromFilesystem(path, fileId, possibleMatch = None, inodeInfo = False):
         return possibleMatch
 
     if needsSha1:
-	sha1 = sha1helper.hashFileBin(path)
+	sha1 = sha1helper.sha1FileBin(path)
 	f.contents = RegularFileStream()
 	f.contents.setSize(s.st_size)
 	f.contents.setSha1(sha1)
@@ -566,21 +559,21 @@ def FileFromFilesystem(path, fileId, possibleMatch = None, inodeInfo = False):
 
     return f
 
-def ThawFile(frz, fileId):
+def ThawFile(frz, pathId):
     if frz[0] == "-":
-	return RegularFile(fileId, streamData = frz)
+	return RegularFile(pathId, streamData = frz)
     elif frz[0] == "d":
-	return Directory(fileId, streamData = frz)
+	return Directory(pathId, streamData = frz)
     elif frz[0] == "p":
-	return NamedPipe(fileId, streamData = frz)
+	return NamedPipe(pathId, streamData = frz)
     elif frz[0] == "s":
-	return Socket(fileId, streamData = frz)
+	return Socket(pathId, streamData = frz)
     elif frz[0] == "l":
-	return SymbolicLink(fileId, streamData = frz)
+	return SymbolicLink(pathId, streamData = frz)
     elif frz[0] == "b":
-	return BlockDevice(fileId, streamData = frz)
+	return BlockDevice(pathId, streamData = frz)
     elif frz[0] == "c":
-	return CharacterDevice(fileId, streamData = frz)
+	return CharacterDevice(pathId, streamData = frz)
 
     raise AssertionError
 

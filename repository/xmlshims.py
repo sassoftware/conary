@@ -32,11 +32,21 @@ class NetworkConvertors(object):
     def toVersion(self, v):
 	return versions.VersionFromString(v)
 
+    def fromPathId(self, f):
+        assert(len(f) == 16)
+	return base64.encodestring(f)
+
+    def toPathId(self, f):
+        assert(len(f) == 25)
+	return base64.decodestring(f)
+
     def fromFileId(self, f):
-	return sha1helper.sha1ToString(f)
+        assert(len(f) == 20)
+	return base64.encodestring(f)
 
     def toFileId(self, f):
-	return sha1helper.sha1FromString(f)
+        assert(len(f) == 29)
+	return base64.decodestring(f)
 
     def fromBranch(self, b):
 	return b.asString()
@@ -57,13 +67,13 @@ class NetworkConvertors(object):
 	return f.freeze()
 
     def toFile(self, f):
-        fileId = f[:40]
-        return files.ThawFile(base64.decodestring(f[40:]), 
-			      self.toFileId(fileId))
+        pathId = f[:25]
+        return files.ThawFile(base64.decodestring(f[25:]), 
+			      self.toPathId(pathId))
 
     def fromFile(self, f):
         s = base64.encodestring(f.freeze())
-        return self.fromFileId(f.id()) + s
+        return self.fromPathId(f.pathId()) + s
 
     def fromLabel(self, l):
 	return l.asString()

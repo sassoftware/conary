@@ -39,9 +39,9 @@ import versions
 class SourceState(trove.Trove):
 
     def removeFilePath(self, file):
-	for (fileId, path, version) in self.iterFileList():
+	for (pathId, path, fileId, version) in self.iterFileList():
 	    if path == file: 
-		self.removeFile(fileId)
+		self.removeFile(pathId)
 		return True
 
 	return False
@@ -55,12 +55,12 @@ class SourceState(trove.Trove):
 	information is not needed.  The format of the string is:
 
 	<file count>
-	FILEID1 PATH1 VERSION1
-	FILEID2 PATH2 VERSION2
+	PATHID1 PATH1 FILEID1 VERSION1
+	PATHID2 PATH2 FILEID2 VERSION2
 	.
 	.
 	.
-	FILEIDn PATHn VERSIONn
+	PATHIDn PATHn FILEIDn VERSIONn
 	"""
         assert(len(self.packages) == 0)
 
@@ -72,8 +72,9 @@ class SourceState(trove.Trove):
         rc = []
 	rc.append("%d\n" % (len(self.idMap)))
 
-        rc += [ "%s %s %s\n" % (sha1helper.sha1ToString(x[0]), x[1][0], 
-				x[1][1].asString())
+        rc += [ "%s %s %s %s\n" % (sha1helper.md5ToString(x[0]), x[1][0], 
+                                sha1helper.sha1ToString(x[1][1]),
+				x[1][2].asString())
                 for x in self.idMap.iteritems() ]
 
 	f.write("".join(rc))
@@ -110,12 +111,13 @@ class SourceStateFromFile(SourceState):
 
         for line in dataFile:
 	    fields = line.split()
-	    fileId = sha1helper.sha1FromString(fields.pop(0))
+	    pathId = sha1helper.md5FromString(fields.pop(0))
 	    version = fields.pop(-1)
+	    fileId = sha1helper.sha1FromString(fields.pop(-1))
 	    path = " ".join(fields)
 
 	    version = versions.VersionFromString(version)
-	    self.addFile(fileId, path, version)
+	    self.addFile(pathId, path, version, fileId)
 
     def parseFile(self, filename):
 	f = open(filename)
@@ -149,12 +151,12 @@ def _verifyAtHead(repos, headPkg, state):
 
     # make sure the files in this directory are based on the same
     # versions as those in the package at head
-    for (fileId, path, version) in state.iterFileList():
+    for (pathId, path, fileId, version) in state.iterFileList():
 	if isinstance(version, versions.NewVersion):
-	    assert(not headPkg.hasFile(fileId))
+	    assert(not headPkg.hasFile(pathId))
 	    # new file, it shouldn't be in the old package at all
 	else:
-	    srcFileVersion = headPkg.getFile(fileId)[1]
+	    srcFileVersion = headPkg.getFile(pathId)[2]
 	    if not version == srcFileVersion:
 		return False
 
@@ -218,28 +220,28 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
     earlyRestore = []
     lateRestore = []
 
-    for (fileId, path, version) in pkgCs.getNewFileList():
+    for (pathId, path, fileId, version) in pkgCs.getNewFileList():
 	fullPath = workDir + "/" + path
 
-	state.addFile(fileId, path, version)
-	fileObj = files.ThawFile(cs.getFileChange(fileId), fileId)
+	state.addFile(pathId, path, version, fileId)
+	fileObj = files.ThawFile(cs.getFileChange(None, fileId), pathId)
 
 	if not fileObj.hasContents:
 	    fileObj.restore(None, '/', fullPath, 1)
 	else:
-	    # tracking the fileId separately from the fileObj lets
+	    # tracking the pathId separately from the fileObj lets
 	    # us sort the list of files by fileid
-	    assert(fileObj.id() == fileId)
+	    assert(fileObj.pathId() == pathId)
 	    if fileObj.flags.isConfig():
-		earlyRestore.append((fileId, fileObj, ('/', fullPath, 1)))
+		earlyRestore.append((pathId, fileObj, ('/', fullPath, 1)))
 	    else:
-		lateRestore.append((fileId, fileObj, ('/', fullPath, 1)))
+		lateRestore.append((pathId, fileObj, ('/', fullPath, 1)))
 
     earlyRestore.sort()
     lateRestore.sort()
 
-    for fileId, fileObj, tup in earlyRestore + lateRestore:
-	contents = cs.getFileContents(fileObj.id())[1]
+    for pathId, fileObj, tup in earlyRestore + lateRestore:
+	contents = cs.getFileContents(pathId)[1]
 	fileObj.restore(*((contents,) + tup))
 
     state.write(workDir + "/CONARY")
@@ -339,13 +341,13 @@ def annotate(repos, filename):
         branchVerList[b].append(ver)
     
     found = False
-    for (fileId, name, someFileV) in state.iterFileList():
+    for (pathId, name, fileId, someFileV) in state.iterFileList():
         if name == filename:
             found = True
             break
 
     if not found:
-        log.error("%s is not a member of this source trove", fileId)
+        log.error("%s is not a member of this source trove", pathId)
         return
     
     # finalLines contains the current version of the file and the 
@@ -371,13 +373,13 @@ def annotate(repos, filename):
         oldTrove = repos.getTrove(troveName, oldV, None)
 
         try:
-            name, oldFileV = oldTrove.getFile(fileId)
+            name, oldFileId, oldFileV = oldTrove.getFile(pathId)
         except KeyError:
             # this file doesn't exist from this version forward
             break
 
         if oldFileV != newFileV:
-            oldFile = repos.getFileContents([ (fileId, oldFileV) ])[0]
+            oldFile = repos.getFileContents([ (oldFileId, oldFileV) ])[0]
             oldLines = oldFile.get().readlines()
             oldContact = oldTrove.changeLog.getName()
             if newV == None:
@@ -554,20 +556,20 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 
     showOneLog(pkgCs.getNewVersion(), pkgCs.getChangeLog())
 
-    fileList = [ (x[0], x[1], True, x[2]) for x in pkgCs.getNewFileList() ]
-    fileList += [ (x[0], x[1], False, x[2]) for x in 
+    fileList = [ (x[0], x[1], True, x[2], x[3]) for x in pkgCs.getNewFileList() ]
+    fileList += [ (x[0], x[1], False, x[2], x[3]) for x in 
 			    pkgCs.getChangedFileList() ]
 
-    # sort by fileId to match the changeset order
+    # sort by pathId to match the changeset order
     fileList.sort()
-    for (fileId, path, isNew, newVersion) in fileList:
+    for (pathId, path, isNew, fileId, newVersion) in fileList:
 	if isNew:
 	    print "%s: new" % path
-	    chg = changeSet.getFileChange(fileId)
-	    f = files.ThawFile(chg, fileId)
+	    chg = changeSet.getFileChange(None, fileId)
+	    f = files.ThawFile(chg, pathId)
 
 	    if f.hasContents and f.flags.isConfig():
-		(contType, contents) = changeSet.getFileContents(fileId)
+		(contType, contents) = changeSet.getFileContents(pathId)
 		print contents.get().read()
 	    continue
 
@@ -575,11 +577,13 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	if path:
 	    dispStr = path
 	    if oldPackage:
-		oldPath = oldPackage.getFile(fileId)[0]
+		oldPath = oldPackage.getFile(pathId)[0]
 		dispStr += " (aka %s)" % oldPath
 	else:
-	    path = oldPackage.getFile(fileId)[0]
+	    path = oldPackage.getFile(pathId)[0]
 	    dispStr = path
+
+        oldFileId = oldPackage.getFile(pathId)[1]
 	
 	if not newVersion:
 	    sys.stdout.write(dispStr + '\n')
@@ -589,11 +593,11 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
         
 	sys.stdout.write("Index: %s\n%s\n" %(path, '=' * 68))
 
-	csInfo = changeSet.getFileChange(fileId)
+	csInfo = changeSet.getFileChange(oldFileId, fileId)
 	print '\n'.join(files.fieldsChanged(csInfo))
 
 	if files.contentsChanged(csInfo):
-	    (contType, contents) = changeSet.getFileContents(fileId)
+	    (contType, contents) = changeSet.getFileContents(pathId)
 	    if contType == changeset.ChangedFileTypes.diff:
                 sys.stdout.write('--- %s %s\n+++ %s %s\n'
                                  %(path, newPackage.getVersion().asString(),
@@ -604,8 +608,8 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 		print str
 		print
 
-    for fileId in pkgCs.getOldFileList():
-	path = oldPackage.getFile(fileId)[0]
+    for pathId in pkgCs.getOldFileList():
+	path = oldPackage.getFile(pathId)[0]
 	print "%s: removed" % path
 	
 def updateSrc(repos, versionStr = None):
@@ -682,7 +686,7 @@ def addFiles(fileList):
 	    continue
 
 	found = False
-	for (fileId, path, version) in state.iterFileList():
+	for (pathId, path, fileId, version) in state.iterFileList():
 	    if path == file:
 		log.error("file %s is already part of this source component" % path)
 		found = True
@@ -698,9 +702,9 @@ def addFiles(fileList):
 	    log.error("refusing to add CONARY to the list of managed sources")
 	    continue
 
-	fileId = cook.makeFileId(os.getcwd(), file)
+	pathId = cook.makeFileId(os.getcwd(), file)
 
-	state.addFile(fileId, file, versions.NewVersion())
+	state.addFile(pathId, file, versions.NewVersion(), "0" * 20)
 
     state.write("CONARY")
 
@@ -755,10 +759,10 @@ def renameFile(oldName, newName):
 	log.error("%s already exists" % newName)
 	return
 
-    for (fileId, path, version) in state.iterFileList():
+    for (pathId, path, fileId, version) in state.iterFileList():
 	if path == oldName:
 	    os.rename(oldName, newName)
-	    state.addFile(fileId, newName, version)
+	    state.addFile(pathId, newName, version, fileId)
 	    state.write("CONARY")
 	    return
     

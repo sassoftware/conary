@@ -64,60 +64,10 @@ import struct
 from lib import util
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
-FILE_CONTAINER_VERSION = 2004092001
+FILE_CONTAINER_VERSION = 2004110201
 SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
-
-class FileTableEntryFromFile1(object):
-
-    __slots__ = [ "name", "offset", "size", "data", "src" ]
-
-    def write(self, file):
-	rc = (struct.pack("!i", len(self.name)) + self.name +
-	      struct.pack("!i", self.offset) +
-	      struct.pack("!i", self.size) +
-	      struct.pack("!i", len(self.data)) + self.data)
-	rc = struct.pack("!i", len(rc)) + rc
-	assert(len(rc) == self.tableSize())
-	return file.write(rc)
-
-    def tableSize(self):
-	return len(self.name) + len(self.data) + 20 
-
-    def setOffset(self, new):
-	self.offset = new
-
-    def writeContents(self, dest):
-	(fileObj, size) = self.src.getWithSize()
-	dest.write(struct.pack("!HI", len(self.name), size))
-	dest.write(self.name)
-	util.copyfileobj(fileObj, dest)
-
-    def __init__(self, f):
-	# read the length of the entry
-	size = f.read(4)
-	(size,) = struct.unpack("!i", size)
-
-	rest = f.read(size)
-
-	# unpack the length of the file name
-	(size,) = struct.unpack("!i", rest[0:4])
-	i = 4
-	# and the file name
-	(self.name,) = struct.unpack("%ds" % size, rest[i:i+size])
-	i = i + size
-	# and the file offset
-	(self.offset,) = struct.unpack("!i", rest[i:i+4])
-	i = i+ 4
-	# and the file size
-	(self.size,) = struct.unpack("!i", rest[i:i+4])
-	i = i+ 4
-	# the length of the arbitrary data
-	(size,) = struct.unpack("!i", rest[i:i+4])
-	i = i + 4
-	# and the arbitrary data
-	(self.data,) = struct.unpack("%ds" % size, rest[i:])
 
 class FileContainer:
 

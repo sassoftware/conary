@@ -30,7 +30,7 @@ class Tags(idtable.CachedIdTable):
 
 class DBTroveFiles:
     """
-    fileId, versionId, path, instanceId, stream
+    pathId, versionId, path, instanceId, stream
     """
     def __init__(self, db):
         self.db = db
@@ -42,15 +42,16 @@ class DBTroveFiles:
         if "DBTroveFiles" not in tables:
             cu.execute("""CREATE TABLE DBTroveFiles(
 					  streamId INTEGER PRIMARY KEY,
-					  fileId BINARY,
+					  pathId BINARY,
 					  versionId INTEGER,
 					  path STR,
+                                          fileId BINARY,
 					  instanceId INTEGER,
 					  isPresent INTEGER,
 					  stream BINARY)
 		       """)
 	    cu.execute("CREATE INDEX DBTroveFilesIdx ON "
-		       "DBTroveFiles(fileId, versionId)")
+		       "DBTroveFiles(fileId)")
 	    cu.execute("CREATE INDEX DBTroveFilesInstanceIdx ON "
 		       "DBTroveFiles(instanceId)")
 	    cu.execute("CREATE INDEX DBTroveFilesPathIdx ON "
@@ -87,40 +88,28 @@ class DBTroveFiles:
         (SELECT streamId from DBTroveFiles WHERE instanceId=?)""", instanceId)
         cu.execute("DELETE from DBTroveFiles WHERE instanceId=?", instanceId)
 
-    def hasFileId(self, fileId, versionId, pristine):
-	cu = self.db.cursor()
-	if pristine:
-	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE fileId=? AND versionId = ?", fileId, versionId)
-	else:
-	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE fileId=? AND versionId = ? "
-		       "AND isPresent=1", fileId, versionId)
-	return cu.fetchone() != None
-
-    def getFileByFileId(self, fileId, versionId, justPresent = True):
+    def getFileByFileId(self, fileId, justPresent = True):
 	cu = self.db.cursor()
 	if justPresent:
 	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE fileId=? AND versionId=? AND isPresent = 1", 
-		       fileId, versionId)
+		       "WHERE fileId=? AND isPresent = 1", fileId)
 	else:
 	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE fileId=? AND versionId=?",
-		       fileId, versionId)
+		       "WHERE fileId=?", fileId)
 	# there could be multiple matches, but they should all be redundant
 	try:
             path, stream = cu.next()
             return (path, stream)
 	except StopIteration:
-            raise KeyError, (fileId, versionId)
+            raise KeyError, fileId
 
-    def addItem(self, fileId, versionId, path, instanceId, stream, tags):
+    def addItem(self, pathId, versionId, path, fileId, instanceId, stream, 
+                tags):
         cu = self.db.cursor()
         cu.execute("""
-	    INSERT INTO DBTroveFiles VALUES (NULL, ?, ?, ?, ?, ?, ?)
+	    INSERT INTO DBTroveFiles VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)
 	""",
-	   (fileId, versionId, path, instanceId, 1, stream))
+	   (pathId, versionId, path, fileId, instanceId, 1, stream))
 
 	streamId = cu.lastrowid
 
@@ -140,24 +129,24 @@ class DBTroveFiles:
 	cu.execute("UPDATE DBTroveFiles SET isPresent=0 WHERE path=? "
 		   "AND instanceId=?", (path, instanceId))
 
-    def removeFileIds(self, instanceId, fileIdList, forReal = False):
-        fileIdListPattern = ",".join(( '?' ) * len(fileIdList))
+    def removeFileIds(self, instanceId, pathIdList, forReal = False):
+        pathIdListPattern = ",".join(( '?' ) * len(pathIdList))
         cu = self.db.cursor()
 	cu.execute("""DELETE FROM DBFileTags WHERE 
 			streamId IN (
 			    SELECT streamId FROM DBTroveFiles
-				WHERE instanceId=%d AND fileId in (%s)
+				WHERE instanceId=%d AND pathId in (%s)
 			)
-		    """ % (instanceId, fileIdListPattern), fileIdList)
+		    """ % (instanceId, pathIdListPattern), pathIdList)
 
 	if forReal:
 	    cu.execute("DELETE FROM DBTroveFiles WHERE instanceId=%d "
-		       "AND fileId in (%s)" % (instanceId, fileIdListPattern),
-                       fileIdList)
+		       "AND pathId in (%s)" % (instanceId, pathIdListPattern),
+                       pathIdList)
 	else:
 	    cu.execute("UPDATE DBTroveFiles SET isPresent=0 WHERE "
-		       "instanceId=%d AND fileId in (%s)" % (instanceId,
-			       fileIdListPattern), fileIdList)
+		       "instanceId=%d AND pathId in (%s)" % (instanceId,
+			       pathIdListPattern), pathIdList)
 
     def iterFilesWithTag(self, tag):
 	cu = self.db.cursor()
@@ -414,7 +403,6 @@ class Database:
 	self.depTables = deptable.DependencyTables(self.db)
         if self.db.inTransaction:
             self.db.commit()
-	self.streamCache = {}
 	self.needsCleanup = False
 	self.addVersionCache = {}
 	self.flavorsNeeded = {}
@@ -536,12 +524,6 @@ class Database:
 	    if flavor:
 		flavors[flavor] = True
 
-	for (fileId, path, version) in trove.iterFileList():
-	    versionId = self.getVersionId(version, self.addVersionCache)
-	    result = self.streamCache.get((fileId, versionId), None)
-	    if result and result[1]:
-		flavors[result[1]] = True
-
 	flavorMap = self.flavors.getItemDict(flavors.iterkeys())
 	del flavors
 
@@ -579,37 +561,34 @@ class Database:
 
 	return (cu, troveInstanceId)
 
-    def addFile(self, troveInfo, fileId, fileObj, path, fileVersion):
+    def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion):
 	(cu, troveInstanceId) = troveInfo
 	versionId = self.getVersionId(fileVersion, self.addVersionCache)
 
 	if fileObj:
-	    self.troveFiles.addItem(fileObj.id(), versionId, path, 
-				    troveInstanceId, fileObj.freeze(), 
-				    fileObj.tags)
+	    self.troveFiles.addItem(fileObj.pathId(), versionId, path, 
+                                    fileObj.fileId(), troveInstanceId, 
+                                    fileObj.freeze(), fileObj.tags)
 	else:
-	    pass
 	    cu.execute("""
 		UPDATE DBTroveFiles SET instanceId=? WHERE
-		    fileId=? and versionId=?""", troveInstanceId,
-		fileId, versionId)
+		    pathId=? and versionId=?""", troveInstanceId,
+		pathId, versionId)
 
-    def getFile(self, fileId, fileVersion, pristine = False):
-	versionId = self.versionTable[fileVersion]
-	stream = self.troveFiles.getFileByFileId(fileId, versionId,
+    def getFile(self, pathId, fileId, pristine = False):
+	stream = self.troveFiles.getFileByFileId(fileId, 
 						 justPresent = not pristine)[1]
-	return files.ThawFile(stream, fileId)
+	return files.ThawFile(stream, pathId)
 
-    def findFileVersion(self, fileId, fileVersion):
+    def findFileVersion(self, fileId):
         cu = self.db.cursor()
-        cu.execute("""SELECT stream AS stream FROM
+        cu.execute("""SELECT stream FROM
                             DBTroveFiles JOIN Versions ON
                                 DBTroveFiles.versionId == Versions.versionId
-                            WHERE fileId == ? AND version == ?
-            """, fileId, fileVersion.asString())
+                            WHERE fileId == ?""", fileId)
                             
         for (stream,) in cu:
-            return files.ThawFile(stream, fileId)
+            return files.ThawFile(stream, None)
 
         return None
 
@@ -618,39 +597,30 @@ class Database:
 
 	cu.execute("""
 	    CREATE TEMPORARY TABLE getFilesTbl(row INTEGER PRIMARY KEY,
-                                               fileId BINARY, version STR)
+                                               fileId BINARY)
 	""", start_transaction = False)
 
-	versionStrs = {}
-	for i, (fileId, version) in enumerate(l):
-	    if versionStrs.has_key(version):
-		vs = versionStrs[version]
-	    else:
-		vs = version.asString()
-		versionStrs[version] = vs
-
-	    cu.execute("INSERT INTO getFilesTbl VALUES (?, ?, ?)", 
-		       i, fileId, vs,
-		       start_transaction = False)
-	del versionStrs
+	for (i, (pathId, fileId, version)) in enumerate(l):
+	    cu.execute("INSERT INTO getFilesTbl VALUES (?, ?)", 
+		       i, fileId, start_transaction = False)
 
 	cu.execute("""
-	    SELECT row, getFilesTbl.fileId, stream FROM getFilesTbl 
-                JOIN Versions ON
-		    getFilesTbl.version = Versions.version
-		JOIN DBTroveFiles ON
-		    getFilesTbl.fileId = DBTroveFiles.fileId AND
-		    Versions.versionId == DBTroveFiles.versionId
+	    SELECT DISTINCT row, stream FROM getFilesTbl 
+                JOIN DBTroveFiles ON
+		    getFilesTbl.fileId = DBTroveFiles.fileId
 	""")
 
         nextRow = 0
-	for (row, fileId, stream) in cu:
+	for (row, stream) in cu:
             while nextRow < row:
                 yield None
                 nextRow += 1
 
             nextRow += 1
-	    yield files.ThawFile(stream, fileId)
+            # FILEOBJ
+            fObj = files.ThawFile(stream, l[row][0])
+            assert(l[row][1] == fObj.fileId())
+	    yield fObj
 
         cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
 
@@ -763,10 +733,9 @@ class Database:
 
 	    trv.addTrove(name, version, flavor)
 
-	cu = self.db.cursor()
-	cu.execute("SELECT fileId, path, versionId, isPresent FROM "
+	cu.execute("SELECT pathId, path, versionId, fileId, isPresent FROM "
 		   "DBTroveFiles WHERE instanceId = ?", troveInstanceId)
-	for (fileId, path, versionId, isPresent) in cu:
+	for (pathId, path, versionId, fileId, isPresent) in cu:
 	    if not pristine and not isPresent:
 		continue
 	    version = versionCache.get(versionId, None)
@@ -774,7 +743,7 @@ class Database:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
-	    trv.addFile(fileId, path, version)
+	    trv.addFile(pathId, path, version, fileId)
 
         self.depTables.get(cu, trv, troveInstanceId)
 
@@ -851,11 +820,11 @@ class Database:
 	instanceId = self.instances[(trove.getName(), versionId, flavorId)]
 	self.troveFiles.removePath(instanceId, path)
 
-    def removeFilesFromTrove(self, troveName, troveVersion, troveFlavor, fileIdList):
+    def removeFilesFromTrove(self, troveName, troveVersion, troveFlavor, pathIdList):
 	versionId = self.versionTable[troveVersion]
         flavorId = self.flavors[troveFlavor]
 	instanceId = self.instances[(troveName, versionId, flavorId)]
-	self.troveFiles.removeFileIds(instanceId, fileIdList)
+	self.troveFiles.removeFileIds(instanceId, pathIdList)
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False,
@@ -876,26 +845,26 @@ class Database:
 	versionCache = {}
 
 	if pristine:
-	    cu.execute("SELECT fileId, path, versionId, stream FROM "
+	    cu.execute("SELECT pathId, path, fileId, versionId, stream FROM "
 		       "DBTroveFiles WHERE instanceId = ? "
 		       "%s" % sort, troveInstanceId)
 	else:
-	    cu.execute("SELECT fileId, path, versionId, stream FROM "
+	    cu.execute("SELECT pathId, path, fileId, versionId, stream FROM "
 		       "DBTroveFiles WHERE instanceId = ? "
 		       "AND isPresent=1 %s" % sort, troveInstanceId)
 
 	versionCache = {}
-	for (fileId, path, versionId, stream) in cu:
+	for (pathId, path, fileId, versionId, stream) in cu:
 	    version = versionCache.get(versionId, None)
 	    if not version:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
 	    if withFiles:
-		fileObj = files.ThawFile(stream, fileId)
-		yield (fileId, path, version, fileObj)
+		fileObj = files.ThawFile(stream, pathId)
+		yield (pathId, path, fileId, version, fileObj)
 	    else:
-		yield (fileId, path, version)
+		yield (pathId, path, fileId, version)
 
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)

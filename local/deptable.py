@@ -38,7 +38,8 @@ def createDepUserTable(cu, name, isTemp):
         tmp = ""
 
     cu.execute("""CREATE %s TABLE %s(instanceId integer,
-                                  depId integer
+                                  depId integer,
+                                  depCount integer
                                  )""" % (tmp, name),
                start_transaction = (not isTemp))
     cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
@@ -134,7 +135,7 @@ class DependencyTables:
                            % (depTable, multiplier), start_transaction = False)
 
         cu.execute("""INSERT INTO %(reqTable)s 
-                    SELECT %(tmpName)s.troveId, depId FROM
+                    SELECT %(tmpName)s.troveId, depId, flagCount FROM
                         %(tmpName)s JOIN %(allDeps)s ON
                             %(tmpName)s.class == %(allDeps)s.class AND
                             %(tmpName)s.name == %(allDeps)s.name AND
@@ -147,7 +148,7 @@ class DependencyTables:
             return
 
         cu.execute("""INSERT INTO %(provTable)s SELECT 
-                            %(tmpName)s.troveId, depId FROM
+                            %(tmpName)s.troveId, depId, flagCount FROM
                         %(tmpName)s JOIN %(allDeps)s ON
                             %(tmpName)s.class == %(allDeps)s.class AND
                             %(tmpName)s.name == %(allDeps)s.name AND
@@ -159,9 +160,14 @@ class DependencyTables:
     def get(self, cu, trv, troveId):
         for (tblName, setFn) in (('Requires', trv.setRequires),
                                  ('Provides', trv.setProvides)):
+            if tblName == 'Provides':
+                classClause = "AND class != %d" % deps.DEP_CLASS_TROVES
+            else:
+                classClause = ""
+
             cu.execute("SELECT class, name, flag FROM %s NATURAL JOIN "
-                       "Dependencies WHERE instanceId=? ORDER BY class, name"
-                    % tblName, troveId)
+                       "Dependencies WHERE instanceId=? %s ORDER BY class, name"
+                    % (tblName, classClause), troveId)
 
             last = None
             flags = []
@@ -187,8 +193,17 @@ class DependencyTables:
     def add(self, cu, trove, troveId):
         assert(cu.con.inTransaction)
         self._createTmpTable(cu, "NeededDeps")
+
+        prov = trove.getProvides()
+
         self._populateTmpTable(cu, "NeededDeps", [], troveId, 
-                               trove.getRequires(), trove.getProvides())
+                               trove.getRequires(), prov)
+
+        cu.execute("INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)",
+                       (troveId, 1, 1, 
+                        1, deps.DEP_CLASS_TROVES, 
+                        trove.getName(), NO_FLAG_MAGIC), 
+                        start_transaction = False)
         self._mergeTmpTable(cu, "NeededDeps", "Dependencies", "Requires", 
                             "Provides", "Dependencies")
 
@@ -220,15 +235,21 @@ class DependencyTables:
 
     def _resolveStmt(self, providesTable = "Provides", 
                      depTable = "Dependencies",
-                     requiresTable = "Requires"):
+                     requiresTable = "Requires",
+                     includeUnresolved = False):
         substTable = { 'provides' : providesTable,
                        'requires' : requiresTable,
                        'deptable' : depTable }
 
+        if includeUnresolved:
+            substTable['jointype'] = 'LEFT OUTER JOIN'
+        else:
+            substTable['jointype'] = 'JOIN'
+
         return """
                 SELECT depCheck.depNum as depNum,
                         %(provides)s.instanceId as rsvInstanceId
-                    FROM %(requires)s JOIN %(provides)s ON
+                    FROM %(requires)s %(jointype)s %(provides)s ON
                         %(requires)s.depId == %(provides)s.depId
                     JOIN %(deptable)s ON
                         %(requires)s.depId == %(deptable)s.depId
@@ -343,14 +364,31 @@ class DependencyTables:
                         SELECT * FROM TmpProvides""",
                    start_transaction = False)
 
-        if not troveNames:
-            # XXX
-            assert(0)
-            self.db.rollback()
-            return (False, [])
+        #if not troveNames:
+        #    # XXX
+        #    assert(0)
+        #    self.db.rollback()
+        #    return (False, [])
 
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
                             "TmpProvides", "AllDeps", multiplier = -1)
+
+        # check the dependencies for anything which depends on things which
+        # we've removed
+        cu.execute("""
+                INSERT INTO TmpRequires SELECT 
+                    DISTINCT Requires.instanceId, Requires.depId, depCount
+                FROM Requires WHERE Requires.instanceId IN RemovedTroveIds
+        """, start_transaction = False)
+        cu.execute("""
+                INSERT INTO DepCheck SELECT
+                    RemovedTroveIds.troveId, Dependencies.depId, 1, 0, Dependencies.class,
+                    Dependencies.name, Dependencies.flag
+                FROM RemovedTroveIds JOIN Requires ON
+                    RemovedTroveIds.troveId == Requires.instanceId
+                JOIN Dependencies ON
+                    Dependencies.depId == Requires.depId
+        """, start_transaction = False)
 
         # dependencies which could have been resolved by something in
         # RemovedIds, but instead weren't resolved at all are considered

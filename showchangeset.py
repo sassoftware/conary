@@ -76,12 +76,12 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
             printedData = False
             fileList = []
             # create a file list of each file type
-            for (fileId, path, version) in trove.getNewFileList():
-                fileList.append(('New', fileId, path, version))
-            for (fileId, path, version) in trove.getChangedFileList():
-                fileList.append(('Mod', fileId, path, version))
-            for fileId in trove.getOldFileList():
-                fileList.append(('Del', fileId, None, None))
+            for (pathId, path, fileId, version) in trove.getNewFileList():
+                fileList.append(('New', pathId, path, fileId, version))
+            for (pathId, path, fileId, version) in trove.getChangedFileList():
+                fileList.append(('Mod', pathId, path, fileId, version))
+            for pathId in trove.getOldFileList():
+                fileList.append(('Del', pathId, None, None, None))
             if trove.changedFiles or trove.oldFiles:
                 oldTrove = getOldTrove(trove, db, repos)
                 if not oldTrove:
@@ -91,34 +91,37 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                        not printing information about this trove""") % trove.getName()
                     continue
 
-            for (cType, fileId, path, version) in fileList:
+            for (cType, pathId, path, fileId, version) in fileList:
                 if cType == 'New':
                     # when file is in changeset, grab it locally
-                    change = cs.getFileChange(fileId)
-                    fileObj = files.ThawFile(change, fileId)
+                    change = cs.getFileChange(pathId)
+                    fileObj = files.ThawFile(change, pathId)
                 elif cType == 'Mod':
-                    fileObj = getFileVersion(fileId, version, db, repos) 
-                    (oldPath, oldVersion) = oldTrove.getFile(fileId)
-                    oldFileObj = getFileVersion(fileId, oldVersion, db, repos)
+                    fileObj = getFileVersion(pathId, fileId, version, db, 
+                                             repos) 
+                    (oldPath, oldFileId, oldVersion) = oldTrove.getFile(pathId)
+                    oldFileObj = getFileVersion(pathId, oldFileId, version, 
+                                                db, repos)
                     if showChanges:
                         # special option for showing both old and new version
                         # of changed files
                         printChangedFile(indent + ' ', fileObj, path, 
                             oldFileObj, oldPath, tags=tags, sha1s=sha1s, 
-                            fileId=fileId, fileIds=ids)
+                            pathId=pathId, pathIds=ids)
                         continue
                     if not path:
                         path = oldPath
                 elif cType == 'Del':
-                    (oldPath, oldVersion) = oldTrove.getFile(fileId)
-                    fileObj = getFileVersion(fileId, oldVersion, db, repos)
+                    (oldPath, oldFileId, oldVersion) = oldTrove.getFile(pathId)
+                    fileObj = getFileVersion(pathId, oldfileId, oldVersion, 
+                                             db, repos)
                     path = oldPath
                 if tags and not ls and not fileObj.tags:
                     continue
                 prefix = indent + ' ' + cType + '  '
                 display.printFile(fileObj, path, prefix=prefix, verbose=ls, 
                                                  tags=tags, sha1s=sha1s,
-                                                 fileId=fileId, fileIds=ids)
+                                                 pathId=pathId, pathIds=ids)
                 printedData = True
             if printedData:
                 print
@@ -130,9 +133,9 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
         for (troveName, version, flavor) in cs.oldPackages:
             print "remove %s %s" % (troveName, version.asString())
 
-def printChangedFile(indent, f, path, oldF, oldPath, tags=False, sha1s=False, fileIds=False, fileId=None ):
+def printChangedFile(indent, f, path, oldF, oldPath, tags=False, sha1s=False, pathIds=False, pathId=None ):
     display.printFile(oldF, oldPath, prefix=indent+'Mod  ', tags=tags, 
-                        sha1s=sha1s, fileIds=fileIds, fileId=fileId)
+                        sha1s=sha1s, pathIds=pathIds, pathId=pathId)
     #only print out data that has changed on the second line
     #otherwise, print out blank space
     mode = owner = group = size = time = name = ''
@@ -142,7 +145,7 @@ def printChangedFile(indent, f, path, oldF, oldPath, tags=False, sha1s=False, fi
         else:
             name = path
     space = ''
-    if fileIds and fileId:
+    if pathIds and pathId:
         space += ' '*41
     if sha1s:
         space += ' '*41
@@ -258,12 +261,12 @@ def getOldTrove(trove, db, repos):
             return None
     return oldTrove
 
-def getFileVersion(fileId, version, db, repos):
+def getFileVersion(pathId, fileId, version, db, repos):
     try:
-        fileObj = db.getFileVersion(fileId, version)
+        fileObj = db.getFileVersion(pathId, fileId, version)
     except KeyError:
         try:
-            fileObj = repos.getFileVersion(fileId, version) 
+            fileObj = repos.getFileVersion(pathId, fileId, version) 
         except KeyError:
             return None
     return fileObj

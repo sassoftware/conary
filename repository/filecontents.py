@@ -70,25 +70,25 @@ class FromFilesystem(FileContents):
 
 class FromChangeSet(FileContents):
 
-    __slots__ = ( "cs", "fileId" )
+    __slots__ = ( "cs", "pathId" )
 
     def copy(self):
-        return self.__class__(self.cs, self.fileId)
+        return self.__class__(self.cs, self.pathId)
 
     def get(self):
-	return self.cs.getFileContents(self.fileId)[1].get()
+	return self.cs.getFileContents(self.pathId)[1].get()
 
     def getWithSize(self):
-	f, size = self.cs.getFileContents(self.fileId, withSize = True)[1:]
+	f, size = self.cs.getFileContents(self.pathId, withSize = True)[1:]
 	f = f.get()
 	return (f, size)
 
     def size(self):
 	assert(0)
 
-    def __init__(self, cs, fileId):
+    def __init__(self, cs, pathId):
 	self.cs = cs
-	self.fileId = fileId
+	self.pathId = pathId
 
 class FromString(FileContents):
 

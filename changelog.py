@@ -46,7 +46,7 @@ class AbstractChangeLog(streams.TupleStream):
 	assert(not value or value[-1] == '\n')
 	return self.items[2].set(value)
 
-    def freeze(self):
+    def freeze(self, skipSet = None):
 	if self.items[0].value() or self.items[1].value() or \
 	   self.items[2].value():
 	    return streams.TupleStream.freeze(self)
@@ -76,7 +76,7 @@ class AbstractChangeLog(streams.TupleStream):
 	self.setMessage(newMsg)
 	return True
 
-    def __eq__(self, other):
+    def __eq__(self, other, skipSet = None):
 	if not isinstance(other, AbstractChangeLog):
 	    return False
 

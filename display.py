@@ -20,7 +20,7 @@ import os
 from lib import util
 from lib import log
 
-from lib.sha1helper import sha1ToString
+from lib.sha1helper import sha1ToString, md5ToString
 from repository import repository
 
 _troveFormat  = "%-39s %s"
@@ -110,7 +110,7 @@ class DisplayCache:
         return self._cache[troveName][version]
 
 def printFile(fileObj, path, prefix='', verbose=True, tags=False, sha1s=False,
-              fileId=None, fileIds=False):
+              pathId=None, pathIds=False):
     taglist = ''
     sha1 = ''
     id = ''
@@ -127,8 +127,8 @@ def printFile(fileObj, path, prefix='', verbose=True, tags=False, sha1s=False,
         else:
             sha1 = ' '*41
 
-    if fileIds and fileId:
-        id = sha1ToString(fileId) + ' '
+    if pathIds and pathId:
+        id = sha1ToString(pathId) + ' '
     if verbose: 
         print "%s%s%s%s    1 %-8s %-8s %s %s %s%s" % \
           (prefix, id, sha1, fileObj.modeString(), fileObj.inode.owner(), fileObj.inode.group(), 
@@ -222,7 +222,7 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags):
             iter = db.iterFilesInTrove(trove.getName(), trove.getVersion(),
                                        trove.getFlavor(),
                                        sortByPath = True, withFiles = True)
-            for (fileId, path, version, file) in iter:
+            for (pathId, path, fileId, version, file) in iter:
                 if tags: 
                     if not file.tags:
                         continue
@@ -231,11 +231,11 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags):
                     continue
                 printFile(file, path)
     elif ids:
-        for (fileId, path, version) in trove.iterFileList():
-            print "%s %s" % (sha1ToString(fileId), path)
+        for (pathId, path, fileId, version) in trove.iterFileList():
+            print "%s %s, %s" % (md5ToString(pathId), sha1ToString(fileId), path)
     elif sha1s:
-        for (fileId, path, version) in trove.iterFileList():
-            file = db.getFileVersion(fileId, version)
+        for (pathId, path, fileId, version) in trove.iterFileList():
+            file = db.getFileVersion(pathId, fileId, version)
             if file.hasContents:
                 print "%s %s" % (sha1ToString(file.contents.sha1()), path)
     else:
@@ -252,9 +252,9 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags):
                 print _grpFormat % (troveName, 
                                     ver.trailingVersion().asString())
 
-        fileL = [ (x[1], x[0], x[2]) for x in trove.iterFileList() ]
+        fileL = [ (x[1], x[0], x[2], x[3]) for x in trove.iterFileList() ]
         fileL.sort()
-        for (path, fileId, version) in fileL:
+        for (path, pathId, fileId, version) in fileL:
             if fullVersions:
                 print _fileFormat % (path, version.asString())
             else:

@@ -92,22 +92,22 @@ class SqlDbRepository(repository.DataStoreRepository,
 	"""
 	return [ x for x in self.db.iterFindByName(name) ]
 
-    def getFileVersion(self, fileId, version, withContents = 0):
-	file = self.db.getFile(fileId, version, pristine = True)
+    def getFileVersion(self, pathId, fileId, version, withContents = 0):
+	fileObj = self.db.getFile(pathId, fileId, pristine = True)
 	if withContents:
-	    if file.hasContents:
+	    if fileObj.hasContents:
 		cont = filecontents.FromDataStore(self.contentsStore,
-					          file.contents.sha1(), 
-					          file.contents.size())
+					          fileObj.contents.sha1(), 
+					          fileObj.contents.size())
 	    else:
 		cont = None
 
-	    return (file, cont)
+	    return (fileObj, cont)
 
-	return file
+	return fileObj
 
-    def findFileVersion(self, fileId, fileVersion):
-        return self.db.findFileVersion(fileId, fileVersion)
+    def findFileVersion(self, fileId):
+        return self.db.findFileVersion(fileId)
 
     def getFileVersions(self, l):
 	return self.db.iterFiles(l)
@@ -123,8 +123,8 @@ class SqlDbRepository(repository.DataStoreRepository,
     def iterFilesWithTag(self, tag):
 	return self.db.iterFilesWithTag(tag)
 
-    def addFileVersion(self, troveId, fileId, fileObj, path, version):
-	self.db.addFile(troveId, fileId, fileObj, path, version)
+    def addFileVersion(self, troveId, pathId, fileObj, path, fileId, version):
+	self.db.addFile(troveId, pathId, fileObj, path, fileId, version)
 
     def addPackage(self, pkg):
 	return self.db.addTrove(pkg)
@@ -144,7 +144,7 @@ class SqlDbRepository(repository.DataStoreRepository,
     def pathIsOwned(self, path):
 	return self.db.pathIsOwned(path)
 
-    def eraseFileVersion(self, fileId, version):
+    def eraseFileVersion(self, pathId, version):
 	# files get removed with their troves
 	pass
 
@@ -380,8 +380,8 @@ class Database(SqlDbRepository):
 
 	fsJob.apply(tagSet, tagScript)
 
-	for (troveName, troveVersion, troveFlavor, fileIdList) in fsJob.iterUserRemovals():
-	    self.db.removeFilesFromTrove(troveName, troveVersion, troveFlavor, fileIdList)
+	for (troveName, troveVersion, troveFlavor, pathIdList) in fsJob.iterUserRemovals():
+	    self.db.removeFilesFromTrove(troveName, troveVersion, troveFlavor, pathIdList)
 
 	for (name, version, flavor) in fsJob.getOldPackageList():
 	    if toStash:

@@ -142,35 +142,35 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	log.debug("creating branch %s for %s", branch.asString(), pkgName)
         return self.troveStore.createTroveBranch(pkgName, branch)
 
-    def findFileVersion(self, fileId, fileVersion):
-        return self.troveStore.findFileVersion(fileId, fileVersion)
+    def findFileVersion(self, fileId):
+        return self.troveStore.findFileVersion(fileId)
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
 	gen = self.troveStore.iterFilesInTrove(troveName, version, flavor,
 						    sortByPath, withFiles)
 
-	for (fileId, path, version, fileObj) in gen:
+	for (pathId, path, fileId, version, fileObj) in gen:
 	    if fileObj:
-		yield fileId, path, version, fileObj
+		yield pathId, path, version, fileObj
 
 	    # if fileObj is None, we need to get the fileObj from a remote
 	    # repository
 
-	    fileObj = self.getFileVersion(fileId, version)
-	    yield fileId, path, version, fileObj
+	    fileObj = self.getFileVersion(pathId, fileId, version)
+	    yield pathId, path, version, fileObj
 
     ### File functions
 
-    def getFileVersion(self, fileId, fileVersion, withContents = 0):
+    def getFileVersion(self, pathId, fileId, fileVersion, withContents = 0):
 	# the get trove netclient provides doesn't work with a 
 	# FilesystemRepository (it needs to create a change set which gets 
 	# passed)
 	if fileVersion.branch().label().getHost() != self.name:
 	    assert(not withContents)
-	    return self.reposSet.getFileVersion(fileId, fileVersion)
+	    return self.reposSet.getFileVersion(pathId, fileId, fileVersion)
 
-	file = self.troveStore.getFile(fileId, fileVersion)
+	file = self.troveStore.getFile(pathId, fileId)
 	if withContents:
 	    if file.hasContents:
 		cont = filecontents.FromDataStore(self.contentsStore, 
@@ -186,13 +186,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def getFileVersions(self, l):
 	return self.troveStore.getFiles(l)
 
-    def addFileVersion(self, troveInfo, fileId, fileObj, path, fileVersion):
-	# don't add duplicated to this repository
-	#if not self.troveStore.hasFile(fileObj.id(), fileVersion):
-	self.troveStore.addFile(troveInfo, fileId, fileObj, path, fileVersion)
+    def addFileVersion(self, troveInfo, pathId, fileObj, path, fileId, fileVersion):
+	# don't add duplicates to this repository
+	#if not self.troveStore.hasFile(fileObj.pathId(), fileVersion):
+	self.troveStore.addFile(troveInfo, pathId, fileObj, path, fileId, fileVersion)
 
-    def eraseFileVersion(self, fileId, version):
-	self.troveStore.eraseFile(fileId, version)
+    def eraseFileVersion(self, pathId, version):
+	self.troveStore.eraseFile(pathId, version)
 
     ###
 
@@ -304,8 +304,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    trove.addTrove(name, branchedVersion, flavor)
 
 		troveInfo = self.addTrove(trove)
-		for (fileId, path, version) in trove.iterFileList():
-		    self.addFileVersion(troveInfo, fileId, None, path, version)
+		for (pathId, path, fileId, version) in trove.iterFileList():
+		    self.addFileVersion(troveInfo, pathId, None, path, fileId,
+                                        version)
 		self.addTroveDone(troveInfo)
 
         # commit branch to the repository
@@ -494,21 +495,21 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             getList = []
             newFilesNeeded = []
 
-	    for (fileId, oldFileVersion, newFileVersion) in filesNeeded:
+	    for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in filesNeeded:
                 # if either the old or new file version is on a different
                 # repository, creating this diff is someone else's problem
                 if newFileVersion.branch().label().getHost() != self.name or \
                    (oldFileVersion and
                     oldFileVersion.branch().label().getHost() != self.name):
-                    externalFileList.append((fileId, troveName,
-                                     (oldVersion, oldFlavor, oldFileVersion),
-                                     (newVersion, newFlavor, newFileVersion)))
+                    externalFileList.append((pathId, troveName,
+                         (oldVersion, oldFlavor, oldFileId, oldFileVersion),
+                         (newVersion, newFlavor, newFileId, newFileVersion)))
                 else:
-                    newFilesNeeded.append((fileId, oldFileVersion,
-                                             newFileVersion))
+                    newFilesNeeded.append((pathId, oldFileId, oldFileVersion,
+                                             newFileId, newFileVersion))
                     if oldFileVersion:
-                        getList.append((fileId, oldFileVersion))
-                    getList.append((fileId, newFileVersion))
+                        getList.append((pathId, oldFileId, oldFileVersion))
+                    getList.append((pathId, newFileId, newFileVersion))
 
             filesNeeded = newFilesNeeded
             del newFilesNeeded
@@ -523,20 +524,20 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             filesNeeded.reverse()
 
             ptrTable = {}
-	    for (fileId, oldFileVersion, newFileVersion) in filesNeeded:
+	    for (pathId, oldFileId, oldFileVersion, newFileId, newFileVersion) in filesNeeded:
 		oldFile = None
 		if oldFileVersion:
-		    oldFile = idIdx[(fileId, oldFileVersion)]
+		    oldFile = idIdx[(pathId, oldFileId)]
 
 		oldCont = None
 		newCont = None
 
-		newFile = idIdx[(fileId, newFileVersion)]
+		newFile = idIdx[(pathId, newFileId)]
 
-		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
+		(filecs, hash) = changeset.fileChangeSet(pathId, oldFile, 
 							 newFile)
 
-		cs.addFile(fileId, oldFileVersion, newFileVersion, filecs)
+		cs.addFile(oldFileId, newFileId, filecs)
 
 		# this test catches files which have changed from not
 		# config files to config files; these need to be included
@@ -547,10 +548,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                       and not oldFile.flags.isConfig())):
 		    if oldFileVersion :
 			oldCont = self.getFileContents(
-                            [ (fileId, oldFileVersion, oldFile) ])[0]
+                            [ (oldFileId, oldFileVersion, oldFile) ])[0]
 
 		    newCont = self.getFileContents(
-                            [ (fileId, newFileVersion, newFile) ])[0]
+                            [ (newFileId, newFileVersion, newFile) ])[0]
 
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
@@ -568,9 +569,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                             contType = changeset.ChangedFileTypes.ptr
                             cont = filecontents.FromString(ptr)
                         else:
-                            ptrTable[hash] = fileId
+                            ptrTable[hash] = pathId
 
-		    cs.addFileContents(fileId, contType, cont, 
+		    cs.addFileContents(pathId, contType, cont, 
 				       newFile.flags.isConfig())
 
 	return (cs, externalTroveList, externalFileList)
