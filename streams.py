@@ -72,6 +72,8 @@ class NumericStream(InfoStream):
 
     def diff(self, them):
 	if self.val != them.val:
+            if self.val is None:
+                return ''
 	    return struct.pack(self.format, self.val)
 
 	return None
@@ -83,7 +85,10 @@ class NumericStream(InfoStream):
             self.val = struct.unpack(self.format, frz)[0]
 
     def twm(self, diff, base):
-	newVal = struct.unpack(self.format, diff)[0]
+        if diff == '':
+            newVal = None
+        else:
+            newVal = struct.unpack(self.format, diff)[0]
 	if self.val == base.val:
 	    self.val = newVal
 	    return False
