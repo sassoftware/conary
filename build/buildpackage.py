@@ -3,8 +3,12 @@
 # All rights reserved
 #
 
-#----------------------------------------------------------------------------
-# this is the build system's idea of a package. maybe they'll merge. someday.
+"""
+The buildpackage module contains classes used during the build process
+to collect files into BuildPackages.  These BuildPackages are used to
+create Packages and create changesets from the files created during the
+build process
+"""
 
 import string
 import re
@@ -60,9 +64,21 @@ class BuildPackage(dict):
 	self[path] = BuildDeviceFile(devtype, major, minor, user, group, perms)
 
     def getName(self):
+        """
+        Return the name of the BuildPackage
+
+        @returns: name of the BuildPackag
+        @rtype: str
+        """
 	return self.name
 
     def getVersion(self):
+        """
+        Return the version of the BuildPackage
+
+        @returns: name of the BuildPackag
+        @rtype: versions.Version instance
+        """
 	return self.version
 
     def __init__(self, name, version):
@@ -99,10 +115,9 @@ class AutoBuildPackage:
     """
     def __init__(self, namePrefix, version, mainFilters, subFilters):
         """
-	@param namePrefix: the fully qualified name of the main package
-	such as ":srs.specifixinc.com"
-	@param version: a versionObject specifying the version of the
-	package, which is used as the version of each subpackage
+	@param namePrefix: the package prefix, such as ":srs.specifixinc.com"
+	@param version: the version of each package
+        @type version: versions.Version instance
 	@param mainFilters: Filters used to add files to main packages
 	@type mainFilters: sequence of Filter instances
 	@param subFilters: Filters used to add files to sub packages
@@ -173,8 +188,8 @@ class AutoBuildPackage:
             
     def walk(self, root):
         """
-        Traverse the directory tree specified by @C{root}, adding entries
-        to the BuildPackages
+        Traverse the directory tree specified by @C{root}, adding file
+        entries to the BuildPackages
 
         @param root: root of path to walk
         @type root: str
