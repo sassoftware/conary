@@ -126,23 +126,23 @@ class ChangeSet:
 	return self.files.has_key(fileId)
 
     def headerAsString(self):
-	rc = ""
+	rc = []
 	for pkg in self.getNewPackageList():
-            rc += pkg.freeze()
+            rc.append(pkg.freeze())
 
 	for (pkgName, version) in self.getOldPackageList():
-	    rc += "SRS PKG REMOVED %s %s\n" % (pkgName, version.freeze())
+	    rc.append("SRS PKG REMOVED %s %s\n" % (pkgName, version.freeze()))
 	
-	for (fileId, (oldVersion, newVersion, csInfo)) in self.getFileList():
+	for (fileId, (oldVersion, newVersion, csInfo)) in self.files.iteritems():
 	    if oldVersion:
 		oldStr = oldVersion.freeze()
 	    else:
 		oldStr = "(none)"
 
-	    rc += "SRS FILE CHANGESET %s %s %s\n%s\n" % \
-			    (fileId, oldStr, newVersion.freeze(), csInfo)
+	    rc.append("SRS FILE CHANGESET %s %s %s\n%s\n" %
+                      (fileId, oldStr, newVersion.freeze(), csInfo))
 	
-	return rc
+	return "".join(rc)
 
     def writeToFile(self, outFileName):
 	try:
@@ -152,7 +152,7 @@ class ChangeSet:
 
 	    csf.addFile("SRSCHANGESET", self.headerAsString(), "")
 
-	    for (hash, (contType, f)) in self.fileContents.items():
+	    for (hash, (contType, f)) in self.fileContents.iteritems():
 		csf.addFile(hash, f.get(), contType[4:])
 
 	    csf.close()
