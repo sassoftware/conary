@@ -198,6 +198,7 @@ class Config(policy.Policy):
 	    self.inclusions.extend(args)
 	inclusions = keywords.pop('inclusions', None)
 	if inclusions:
+            # XXX no local variable called "exceptions"
 	    self.inclusions.append(exceptions)
 	policy.Policy.updateArgs(self, [], **keywords)
 
