@@ -363,6 +363,20 @@ class TroveStore:
 		    NewFiles.fileId = FileStreams.fileId 
 		WHERE FileStreams.streamId is NULL
                 """)
+
+        # this update the streamId for streams where streamId is NULL
+        # (because they were originally added from a distributed branch)
+        # for items whose stream is present in NewFiles
+        cu.execute("""
+            INSERT OR REPLACE INTO FileStreams 
+                SELECT FileStreams.streamId, FileStreams.fileId, 
+                       NewFiles.fileId
+                FROM NewFiles JOIN FileStreams ON
+                    NewFiles.fileId = FileStreams.FileId
+                WHERE
+                    FileStreams.streamId IS NULL
+        """)
+
         cu.execute("""
 	    INSERT INTO TroveFiles SELECT ?,
 					  FileStreams.streamId,
