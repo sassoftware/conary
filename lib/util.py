@@ -446,6 +446,10 @@ class SeekableNestedFile(NestedFile):
 
         self.needsSeek = True
 
+    def read(self, bytes = -1):
+        self.needsSeek = True
+        return NestedFile.read(self, bytes)
+
     def seek(self, offset, whence = 0):
         if whence == 0:
             newPos = offset
