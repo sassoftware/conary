@@ -122,6 +122,12 @@ class Version:
 	assert(not self.isBranch())
 	return Version(self.versions[:-1], 0)
 
+    def isBefore(self, other):
+	return self.timeStamp < other.timeStamp
+
+    def isAfter(self, other):
+	return self.timeStamp > other.timeStamp
+
     def isVersion(self):
 	return isinstance(self.versions[-1], VersionRelease)
 
@@ -173,6 +179,3 @@ class VersionFromString(Version):
 	v = self.parseVersionString(ver)
 
 	Version.__init__(self, v, 0)
-	
-def versionSort(list):
-    list.sort()
