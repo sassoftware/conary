@@ -355,6 +355,8 @@ class ComponentSpec(_filterSpec):
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
 	('test',      ('%(testdir)s/')),
+	('debuginfo', ('%(debugsrcdir)s/',
+		       '%(debuglibdir)s/')),
 	('runtime',   ('%(datadir)s/gnome/help/.*/C/')), # help menu stuff
         # python is potentially architecture-specific because of %(lib)
 	('python',    ('/usr/(%(lib)s|lib)/python.*/site-packages/')),

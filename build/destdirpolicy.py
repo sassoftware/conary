@@ -29,13 +29,15 @@ a file as explicitly included.  Most policies default to all the files
 they would need to apply to, so C{exceptions} is the most common.
 """
 
-from lib import util
-import re
-import os
-import stat
-import policy
 from lib import log
 from lib import magic
+from lib import util
+import macros
+import os
+import policy
+import re
+import shutil
+import stat
 
 # used in multiple places, should be maintained in one place
 # probably needs to migrate to some form of configuration
@@ -573,7 +575,6 @@ class Strip(policy.Policy):
     May (depending on configuration) save the debugging information
     for future use.
     """
-    # XXX system policy on whether to create debuginfo packages
     invariantinclusions = [
 	('%(bindir)s/', None, stat.S_IFDIR),
 	('%(essentialbindir)s/', None, stat.S_IFDIR),
@@ -586,6 +587,44 @@ class Strip(policy.Policy):
 	('%(prefix)s/lib/', None, stat.S_IFDIR),
 	('/lib/', None, stat.S_IFDIR),
     ]
+    invariantexceptions = [
+        # let's not recurse...
+	'%(debugsrcdir)s/',
+	'%(debuglibdir)s/',
+    ]
+
+    def __init__(self, *args, **keywords):
+	policy.Policy.__init__(self, *args, **keywords)
+	self.tryDebuginfo = True
+
+    def updateArgs(self, *args, **keywords):
+        self.debuginfo = False
+	self.tryDebuginfo = keywords.pop('debuginfo', True)
+	policy.Policy.updateArgs(self, *args, **keywords)
+
+    def test(self):
+        # see if we can do debuginfo
+        self.debuginfo = False
+        # we need this for the debuginfo case
+        self.dm = macros.Macros()
+        self.dm.update(self.macros)
+        # we need to start searching from just below the build directory
+        topbuilddir = '/'.join(self.macros.builddir.split('/')[:-1])
+        builddirlen = len(topbuilddir)
+        if self.macros.lib == 'lib':
+            # we don't want debug info on one arch and not another, so
+            # make sure there is always enough room
+            builddirlen += 2
+        if self.tryDebuginfo and\
+           'eu-strip' in self.macros.strip and \
+           'debugedit' in self.macros and \
+           util.checkPath(self.macros.debugedit) and \
+           len(self.macros.debugsrcdir) <= builddirlen:
+            self.debuginfo = True
+            self.debugfiles = set()
+            self.dm.topbuilddir = topbuilddir
+        return True
+
     def doFile(self, path):
 	m = self.recipe.magic[path]
 	if not m:
@@ -598,17 +637,52 @@ class Strip(policy.Policy):
 	if (m.name == "ELF" and m.contents['hasDebug']) or \
 	   (m.name == "ar"):
             oldmode = None
-            fullpath = self.macros['destdir']+path
+            fullpath = self.dm.destdir+path
             mode = os.lstat(fullpath)[stat.ST_MODE]
             if not mode & 0600:
                 # need to be able to read and write the file to strip it
                 oldmode = mode
 		os.chmod(fullpath, mode|0600)
-	    util.execute('%(strip)s -g ' %self.macros +self.macros.destdir+path)
+            if self.debuginfo and m.name == 'ELF':
+
+                dir=os.path.dirname(path)
+                b=os.path.basename(path)
+                if not b.endswith('.debug'):
+                    b += '.debug'
+
+                debuglibdir = '%(destdir)s%(debuglibdir)s' %self.dm +dir
+                debuglibpath = util.joinPaths(debuglibdir, b)
+                if os.path.exists(debuglibpath):
+                    return
+
+                self.debugfiles.update(frozenset([x[:-1] for x in util.popen(
+                    '%(debugedit)s -b %(topbuilddir)s -d %(debugsrcdir)s'
+                    ' -l /dev/stdout '%self.dm +fullpath).readlines()]))
+                util.mkdirChain(debuglibdir)
+                util.execute('%s -f %s %s' %(
+                    self.dm.strip, debuglibpath, fullpath))
+
+            else:
+                if m.name == 'ar':
+                    # just in case strip is eu-strip, which segfaults
+                    # whenever it touches an ar archive...
+                    util.execute('%(strip-archive)s -g ' %self.dm +fullpath)
+                else:
+                    util.execute('%(strip)s -g ' %self.dm +fullpath)
+
             del self.recipe.magic[path]
             if oldmode is not None:
                 os.chmod(fullpath, oldmode)
 
+    def postProcess(self):
+        if self.debuginfo:
+            debugfiles = list(self.debugfiles)
+            debugfiles.sort()
+            for file in debugfiles:
+                dir = os.path.dirname(file)
+                util.mkdirChain('%(destdir)s%(debugsrcdir)s/'%self.dm +dir)
+                shutil.copy2('%(topbuilddir)s/'%self.dm +file,
+                             '%(destdir)s%(debugsrcdir)s/'%self.dm +file)
 
 class NormalizeCompression(policy.Policy):
     """

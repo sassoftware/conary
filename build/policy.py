@@ -210,6 +210,9 @@ class Policy(action.RecipeAction):
 	if self.use:
 	    self.do()
 
+	if hasattr(self.__class__, 'postProcess'):
+	    self.postProcess()
+
     def do(self):
 	# calls doFile on all appropriate files -- can be overridden by
 	# subclasses

@@ -12,6 +12,10 @@ Changes in 0.50.3:
   * fixed the network client code to return file contents properly when
     multiple file contents are requested from the server (bz#50)
   * rewrote Database.getTroveLatestVersion()
+  * Added :debuginfo handling in Strip policy, which requires debugging
+    to be turned on in optflags and elfutils's eu-strip and debugedit to
+    be installed.  Like :test components, :debuginfo components are not
+    installed by default.
 
 Changes in 0.50.2:
   * Any %(lib)s-derived path (/%(lib)s, %(libdir)s, %(krbprefix)s/%(lib)s,

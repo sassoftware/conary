@@ -76,6 +76,8 @@ baseMacros = {
     'tagdatadir'        : '%(datadir)s/conary/tags',
     'testdir'	        : '%(localstatedir)s/conary/tests',
     'thistestdir'	: '%(testdir)s/%(name)s-%(version)s',
+    'debuglibdir'       : '%(libdir)s/debug',
+    'debugsrcdir'       : '%(prefix)s/src/debug',
     # special component prefixes that the whole system needs to share
     'krbprefix'		: '%(exec_prefix)s/kerberos',
     'x11prefix'		: '%(exec_prefix)s/X11R6',
@@ -83,16 +85,19 @@ baseMacros = {
     'cc'		: 'gcc',
     'cxx'		: 'g++',
     'cxxflags'          : '',    # cxx specific flags
-    'optflags'          : '-O2', # -g when we have debuginfo
-    'cflags'            : '%(optflags)s', 
+    'optflags'          : '-O2',
+    'dbgflags'          : '-g', # for debuginfo
+    'cflags'            : '%(optflags)s %(dbgflags)s', 
     'cppflags'		: '', # just for providing in recipes
-    'ldflags'		: '', # -g when we have debuginfo
+    'ldflags'		: '%(dbgflags)s',
     'mflags'		: '', # make flags
     'parallelmflags'    : '',
     'sysroot'		: '',
     'os'		: 'linux',
     'target'		: '%(targetarch)s-unknown-linux',
-    'strip'		: 'strip',
+    'debugedit'         : 'debugedit',
+    'strip'             : 'eu-strip', # eu-strip for debuginfo
+    'strip-archive'     : 'strip', # eu-strip segfaults on ar
     'buildbranch'       : '',
     'buildlabel'        : '',
 }
