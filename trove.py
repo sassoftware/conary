@@ -612,7 +612,7 @@ class ReferencedFileList(list, streams.InfoStream):
 	sha1 = streams.Sha1Stream()
 
 	for (fileId, path, version) in self:
-	    sha1.set(fileId)
+	    sha1.setFromString(fileId)
 	    l.append(sha1.freeze())
 	    if not path:
 		path = ""
@@ -639,7 +639,7 @@ class ReferencedFileList(list, streams.InfoStream):
 	while i < len(data):
 	    # XXX this can go away once we track binary fileids
 	    sha1 = streams.Sha1Stream(data[i:i+20])
-	    fileId = sha1.value()
+	    fileId = sha1.asString()
 	    i += 20
 
 	    pathLen = struct.unpack("!H", data[i:i+2])[0]

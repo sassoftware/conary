@@ -14,6 +14,7 @@
 
 import sha
 import os
+import struct
 
 def hashFile(path):
     fd = os.open(path, os.O_RDONLY)
@@ -26,7 +27,22 @@ def hashFile(path):
 
     return m.hexdigest()
 
+def hashFileBin(path):
+    fd = os.open(path, os.O_RDONLY)
+    m = sha.new()
+    buf = os.read(fd, 40960)
+    while len(buf):
+	m.update(buf)
+	buf = os.read(fd, 40960)
+    os.close(fd)
+
+    return m.digest()
+
 def hashString(buf):
     m = sha.new()
     m.update(buf)
     return m.hexdigest()
+
+def sha1ToString(buf):
+    assert(len(buf) == 20)
+    return "%08x%08x%08x%08x%08x" % struct.unpack("!5I", buf)

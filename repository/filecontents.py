@@ -14,6 +14,7 @@
 
 import os
 from StringIO import StringIO
+import sha1helper
 
 SEEK_SET=-1
 SEEK_CUR=1
@@ -38,7 +39,7 @@ class FromDataStore(FileContents):
         return self.__class__(self.repos, self.sha1, self.theSize)
 
     def get(self):
-	return self.store.openFile(self.sha1)
+	return self.store.openFile(sha1helper.sha1ToString(self.sha1))
 
     def size(self):
 	return self.theSize

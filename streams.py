@@ -148,6 +148,9 @@ class StringStream(InfoStream):
     def freeze(self):
 	return self.s
 
+    def asString(self):
+	return self.s
+
     def diff(self, them):
 	if self.s != them.s:
 	    return self.s
@@ -178,15 +181,31 @@ class StringStream(InfoStream):
 class Sha1Stream(StringStream):
 
     def freeze(self):
-	assert(len(self.s) == 40)
-	return struct.pack("!5I", int(self.s[ 0: 8], 16), 
-		int(self.s[ 8:16], 16), int(self.s[16:24], 16), 
-		int(self.s[24:32], 16), int(self.s[32:40], 16))
+	assert(len(self.s) == 20)
+	return self.s
+
+    def asString(self):
+	return "%08x%08x%08x%08x%08x" % struct.unpack("!5I", self.s)
 
     def thaw(self, data):
 	if data:
 	    assert(len(data) == 20)
-	    self.s = "%08x%08x%08x%08x%08x" % struct.unpack("!5I", data)
+	    self.s = data
+
+    def twm(self, diff, base):
+	assert(len(diff) == 20)
+	assert(len(base.s) == 20)
+	assert(len(self.s) == 20)
+	StringStream.twm(self, diff, base)
+
+    def set(self, val):
+	assert(len(val) == 20)
+	self.s = val
+
+    def setFromString(self, val):
+	self.s = struct.pack("!5I", int(val[ 0: 8], 16), 
+				    int(val[ 8:16], 16), int(val[16:24], 16), 
+				    int(val[24:32], 16), int(val[32:40], 16))
 
 class FrozenVersionStream(InfoStream):
 
@@ -384,7 +403,7 @@ class TupleStream(InfoStream):
 		items.append(itemType(s[idx:idx + size]))
 	    elif (i + 1) == len(makeup):
 		items.append(itemType(s[idx:]))
-		size = 0
+		size = len(s) - idx
 	    else:
 		if size == "B":
 		    size = struct.unpack("B", s[idx])[0]
@@ -398,6 +417,8 @@ class TupleStream(InfoStream):
 		items.append(itemType(s[idx:idx + size]))
 
 	    idx += size
+
+	assert(idx == len(s))
 
 	self.items = items
 

@@ -64,7 +64,7 @@ class RegularFileStream(streams.TupleStream):
 
     __slots__ = []
     makeup = (("size", streams.LongLongStream, 8), 
-	      ("sha1", streams.Sha1Stream, 40))
+	      ("sha1", streams.Sha1Stream, 20))
 
     def size(self):
         return self.items[0].value()
@@ -513,7 +513,7 @@ def FileFromFilesystem(path, fileId, possibleMatch = None, buildDeps = False):
         return possibleMatch
 
     if needsSha1:
-	sha1 = sha1helper.hashFile(path)
+	sha1 = sha1helper.hashFileBin(path)
 	f.contents = RegularFileStream()
 	f.contents.setSize(s.st_size)
 	f.contents.setSha1(sha1)

@@ -19,6 +19,7 @@ import datastore
 import deps.deps
 import files
 import patch
+import sha1helper
 import tempfile
 import trove
 import util
@@ -450,23 +451,24 @@ class DataStoreRepository:
 
     def _storeFileFromContents(self, contents, sha1, restoreContents):
 	if restoreContents:
-	    self.contentsStore.addFile(contents.get(), sha1)
+	    self.contentsStore.addFile(contents.get(), 
+				       sha1helper.sha1ToString(sha1))
 	else:
 	    # the file doesn't have any contents, so it must exist
 	    # in the data store already; we still need to increment
 	    # the reference count for it
-	    self.contentsStore.addFileReference(file.contents.sha1())
+	    self.contentsStore.addFileReference(sha1helper.sha1ToString(sha1))
 
 	return 1
 
     def _removeFileContents(self, sha1):
-	self.contentsStore.removeFile(sha1)
+	self.contentsStore.removeFile(sha1helper.sha1ToString(sha1))
 
     def _getFileObject(self, sha1):
-	return self.contentsStore.openFile(sha1)
+	return self.contentsStore.openFile(sha1helper.sha1ToString(sha1))
 
-    def _hasFileContents(self, fileId):
-	return self.contentsStore.hasFile(fileId)
+    def _hasFileContents(self, sha1):
+	return self.contentsStore.hasFile(sha1helper.sha1ToString(sha1))
 
     def getFileContents(self, troveName, troveVersion, troveFlavor, path,
 			fileVersion, fileObj = None):
