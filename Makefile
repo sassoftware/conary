@@ -97,6 +97,8 @@ distcheck: dist
 	rm -rf $$d
 
 clean: clean-subdirs default-clean
+	rm -f _sqlite.so
+	rm -rf sqlite
 
 bootstrap:
 	@if ! [ -d /opt/ -a -w /opt/ ]; then \
