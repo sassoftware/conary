@@ -3,6 +3,7 @@
 # All rights reserved
 #
 import changeset
+import database
 import helper
 import log
 import os
@@ -65,5 +66,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 
     try:
 	db.commitChangeSet(cs)
+    except database.SourcePackageInstall, e:
+	log.error(e)
     except repository.CommitError, e:
-	print e
+	log.error(e)
