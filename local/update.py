@@ -117,13 +117,14 @@ class FilesystemJob:
 		    del tagSet[tagInfo.tag]
 
 		    if self.tagRemoves.has_key(tagInfo.tag):
-			# we're running "self preremove"; we don't need to
-			# run "files preremove" as well, and we won't be
+			# we're running "description preremove"; we don't need 
+                        # to run "files preremove" as well, and we won't be
 			# able to run "files remove"
 			del self.tagRemoves[tagInfo.tag]
 
-		    if "self preremove" in tagInfo.implements:
-			tagCommands.append([ tagInfo, ("self", "preremove"), 
+		    if "description preremove" in tagInfo.implements:
+			tagCommands.append([ tagInfo, ("description", 
+                                                       "preremove"), 
 			   [x for x in 
 				self.repos.iterFilesWithTag(tagInfo.tag) ] ] )
 
@@ -223,8 +224,8 @@ class FilesystemJob:
 		if self.tagUpdates.has_key(tagInfo.tag):
 		    del self.tagUpdates[tagInfo.tag]
 
-		if "self update" in tagInfo.implements:
-		    cmd = [ tagInfo, ("self", "update"),
+		if "description update" in tagInfo.implements:
+		    cmd = [ tagInfo, ("description", "update"),
 			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)] ]
 		    tagCommands.append(cmd)
 		elif "files update" in tagInfo.implements:
