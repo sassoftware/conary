@@ -52,6 +52,7 @@ FILE_STREAM_PROVIDES        = 6
 FILE_STREAM_REQUIRES        = 7
 FILE_STREAM_TAGS	    = 8
 FILE_STREAM_TARGET	    = 9
+FILE_STREAM_LINKGROUP	    = 10
 
 class DeviceStream(streams.TupleStream):
 
@@ -70,6 +71,41 @@ class DeviceStream(streams.TupleStream):
 
     def setMinor(self, value):
         return self.items[1].set(value)
+
+class LinkGroupStream(streams.Sha1Stream):
+
+    def diff(self, other):
+        if self != other:
+            if self.s is None:
+                return "\0"
+            else:
+                return self.s
+
+        return ""
+
+    def thaw(self, data):
+        if not data:
+            self.s = None
+        else:
+            streams.Sha1Stream.thaw(self, data)
+
+    def freeze(self):
+        if self.s is None:
+            return ""
+        return streams.Sha1Stream.freeze(self)
+
+    def twm(self, diff, base):
+	if not diff: return False
+        if diff == "\x01":
+            diff = ""
+
+	if self.s == base.s:
+	    self.s = diff
+	    return False
+	elif self.s != diff:
+	    return True
+
+	return False
 
 class RegularFileStream(streams.TupleStream):
 
@@ -426,10 +462,12 @@ class CharacterDevice(DeviceFile):
 class RegularFile(File):
 
     streamDict = { 
-	FILE_STREAM_CONTENTS : (RegularFileStream , 'contents' ), 
-        FILE_STREAM_PROVIDES : (streams.DependenciesStream, 'provides' ), 
-        FILE_STREAM_REQUIRES : (streams.DependenciesStream, 'requires' ), 
-        FILE_STREAM_FLAVOR   : (streams.DependenciesStream, 'flavor' ) }
+	FILE_STREAM_CONTENTS : (RegularFileStream ,         'contents'  ),
+        FILE_STREAM_PROVIDES : (streams.DependenciesStream, 'provides'  ),
+        FILE_STREAM_REQUIRES : (streams.DependenciesStream, 'requires'  ),
+        FILE_STREAM_FLAVOR   : (streams.DependenciesStream, 'flavor'    ),
+        FILE_STREAM_LINKGROUP: (LinkGroupStream,            'linkGroup' ),
+    }
 
     streamDict.update(File.streamDict)
     __slots__ = ('contents', 'provides', 'requires', 'flavor')

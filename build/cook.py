@@ -52,9 +52,6 @@ def _createComponent(repos, branch, bldPkg, newVersion, ident):
     p.setRequires(bldPkg.requires)
     p.setProvides(bldPkg.provides)
 
-    import pdb
-    pdb.set_trace()
-
     linkGroups = {}
     for pathList in bldPkg.linkGroups.itervalues():
         linkGroupId = sha1helper.hashString("\n".join(pathList))

@@ -55,6 +55,9 @@ class FilesystemJob:
     def _rename(self, oldPath, newPath, msg):
 	self.renames.append((oldPath, newPath, msg))
 
+    def _registerLinkGroup(self, linkGroup, target):
+        self.linkGroups[linkGroup] = target
+
     def _restore(self, fileObj, target, msg, contentsOverride = ""):
 	self.restores.append((fileObj.id(), fileObj.freeze(), target, contentsOverride, 
 			      msg))
@@ -160,13 +163,30 @@ class FilesystemJob:
 
 	for (fileId, fileObj, target, override, msg) in self.restores:
 	    # None means "don't restore contents"; "" means "take the
-	    # contents from the change set"
+	    # contents from the change set". If we take the file contents
+            # from the change set, we look for the opportunity to make
+            # a hard link instead of actually restoring it.
 	    fileObj = files.ThawFile(fileObj, fileId)
+
+            if override == "" and fileObj.linkGroup.value():
+                linkGroup = fileObj.linkGroup.value()
+                linkPath = self.linkGroups.get(linkGroup, None)
+                if linkPath is None:
+                    self.linkGroups[linkGroup] = target
+                else:
+                    try:
+                        os.link(linkPath, target)
+                        continue
+                    except OSError, e:
+                        if e.errno != errno.EXDEV:
+                            raise
+
 	    if override != "":
 		contents = override
 	    elif fileObj.hasContents:
 		contType, contents = self.changeSet.getFileContents(fileId)
 		assert(contType != changeset.ChangedFileTypes.diff)
+
 	    fileObj.restore(contents, self.root, target, contents != None)
 	    log.debug(msg, target)
 
@@ -467,6 +487,11 @@ class FilesystemJob:
             (baseFilePath, baseFileVersion) = basePkg.getFile(fileId)
             baseFile = repos.getFileVersion(fileId, baseFileVersion)
             
+            # link groups come from the database; they aren't inferred frmo
+            # the filesystem
+            if fsFile.hasContents and baseFile.hasContents:
+                fsFile.linkGroup.set(baseFile.linkGroup.value())
+
             # now assemble what the file is supposed to look like on head
             headChanges = changeSet.getFileChange(fileId)
             if headChanges[0] == '\x01':
@@ -636,6 +661,11 @@ class FilesystemJob:
 		else:
 		    self.errors.append("file contents conflict for %s" % realPath)
 		    contentsOkay = False
+            elif headFile.hasContents and headFile.linkGroup.value():
+                # the contents haven't changed, but the link group has changed.
+                # we want to let files in that link group hard link to this file
+                # (if appropriate)
+                self._registerLinkGroup(headFile.linkGroup.value(), realPath)
 
 	    if attributesChanged and not beenRestored:
 		self._restore(fsFile, realPath, 
@@ -687,6 +717,7 @@ class FilesystemJob:
 	self.userRemovals = {}
 	self.tagUpdates = {}
 	self.tagRemoves = {}
+        self.linkGroups = {}
 	self.repos = repos
 
 	for pkgCs in changeSet.iterNewPackageList():
@@ -802,6 +833,10 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 	if isSrcPkg:
 	    f.flags.isSource(set = True)
+
+        # the link group doesn't change due to local mods
+        if srcFile.hasContents and f.hasContents:
+            f.linkGroup.set(srcFile.linkGroup.value())
 	
 	extension = path.split(".")[-1]
 	if isSrcPkg and extension not in nonCfgExt:
