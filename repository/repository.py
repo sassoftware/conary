@@ -450,6 +450,18 @@ class ChangeSetJobFile:
 # this far
 class ChangeSetJob:
 
+    def addGroup(self, grp):
+	self.groups.append(grp)
+
+    def newGroupList(self):
+	return self.groups
+
+    def oldGroup(self, grp):
+	self.oldGroups.append(grp)
+
+    def oldGroupList(self):
+	return self.oldGroups
+
     def addPackage(self, pkg):
 	self.packages.append(pkg)
 
@@ -496,6 +508,10 @@ class ChangeSetJob:
 	# commit changes
 	filesToArchive = []
 
+	for newGrp in self.newGroupList():
+	    self.repos.addGroup(newGrp)
+	    undo.addedGroup(newGrp)
+
 	for newPkg in self.newPackageList():
 	    self.repos.addPackage(newPkg)
 	    undo.addedPackage(newPkg)
@@ -532,8 +548,35 @@ class ChangeSetJob:
 	self.oldPackages = []
 	self.oldFiles = []
 	self.staleFiles = []
+	self.groups = []
+	self.oldGroups = []
 
 	fileMap = {}
+
+	# create the group objects which need installing. at some point
+	# we should make sure these package versions all exist FIXME
+	for csGrp in cs.getNewGroupList():
+	    newVersion = csGrp.getNewVersion()
+	    old = csGrp.getOldVersion()
+	    grpName = csGrp.getName()
+
+	    if repos.hasGroup(grpName):
+		if repos.hasGroupVersion(GrpName, newVersion):
+		    raise CommitError, "version %s for %s is already installed" % \
+			    (newVersion.asString(), csGrp.getName())
+
+	    if old:
+		newGrp = repos.getGroupVersion(grpName, old)
+		newGrp.setVersion(newVersion)
+	    else:
+		newGrp = group.Group()
+		newGrp.setName(csGrp.name)
+		newGrp.setVersion(newVersion)
+
+	    # FIXME for above, this should return a list of the new
+	    # package versions which are needed
+	    newGrp.applyChangeSet(csGrp)
+	    self.addGroup(newGrp)
 
 	# create the package objects which need to be installed; the
 	# file objects which map up with them are created later, but
@@ -618,7 +661,8 @@ class ChangeSetJob:
 class ChangeSetUndo:
 
     def undo(self):
-	# something went wrong; try to unwind our commits
+	# something went wrong; try to unwind our commits. the order
+	# on this matters greatly!
 	for pkg in self.removedPackages:
 	    self.repos.addPackage(pkg)
 
@@ -631,6 +675,9 @@ class ChangeSetUndo:
 	for pkg in self.pkgsDone:
 	    self.repos.erasePackageVersion(pkg.getName(), pkg.getVersion())
 
+	for grp in self.groupsDone:
+	    self.repos.eraseGroupVersion(grp.getName(), grp.getVersion())
+
 	for sha1 in self.filesStored:
 	    self.repos.removeFileContents(sha1)
 
@@ -638,6 +685,9 @@ class ChangeSetUndo:
 
     def addedPackage(self, pkg):
 	self.pkgsDone.append(pkg)
+
+    def addedGroup(self, grp):
+	self.groupsDone.append(grp)
 
     def addedFile(self, file):
 	self.filesDone.append(file)
@@ -657,6 +707,7 @@ class ChangeSetUndo:
 	self.filesStored = []
 	self.removedPackages = []
 	self.removedFiles = []
+	self.groupsDone = []
 
     def __init__(self, repos):
 	self.reset()
@@ -676,27 +727,39 @@ class CommitError(RepositoryError):
 class PackageMissing(RepositoryError):
 
     def __str__(self):
-	if self.version.isBranch():
-	    return ("package %s does not exist on branch %s" % \
-		(self.packageName, self.version.asString()))
+	if self.version:
+	    if self.version.isBranch():
+		return ("%s %s does not exist on branch %s" % \
+		    (self.type, self.packageName, self.version.asString()))
 
-	return "version %s of package %s does not exist" % \
-	    (self.version.asString(), self.packageName)
+	    return "version %s of %s %s does not exist" % \
+		(self.version.asString(), self.type, self.packageName)
+	else:
+	    return "%s %s does not exist" % (self.type, self.packageName)
 
-    def __init__(self, packageName, version):
-	self.packageName = packageName
+    def __init__(self, packageName, version = None):
+	"""
+	Initializes a PackageMissing exception.
+
+	@param packageName: package which could not be found
+	@type packageName: str or PackageName
+	@param version: version of the package which does not exist
+	@type version: versions.Version
+	"""
+	self.packageName = str(packageName)
 	self.version = version
+	self.type = "package"
 
-class GroupMissing(RepositoryError):
-
-    def __str__(self):
-	if self.version.isBranch():
-	    return ("group %s does not exist on branch %s" % \
-		(self.groupName, self.version.asString()))
-
-	return "version %s of group %s does not exist" % \
-	    (self.version.asString(), self.groupName)
+class GroupMissing(PackageMissing):
 
     def __init__(self, groupName, version):
-	self.groupName = groupName
-	self.version = version
+	"""
+	Initializes a GroupMissing exception.
+
+	@param packageName: package which could not be found
+	@type packageName: str or PackageName
+	@param version: version of the package which does not exist
+	@type version: versions.Version
+	"""
+	PackageMissing.__init__(groupName, version)
+	self.type = "group"
