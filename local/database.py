@@ -402,17 +402,18 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 		ver = version.fork(versions.LocalBranch(), sameVerRel = 1)
 		branchPkg.updateFile(fileId, path, ver)
 
-	# get the list of files which need to be created; this includes
-	# all of the files mentioned on this job's newFileList as well
-	# as any files which we need to create from the original change
-	# set (as it was committed just to the database, not to the live
-	# filesystem)
+	# get the list of files which need to be created; files which
+	# are on the new jobs newFileList don't need to be created; they
+	# are already in the filesystem (as members of A.local, and now
+	# they'll be members of B.local as well)
+	skipPaths = {}
+	for f in self.newFileList():
+	    skipPaths[f.path()] = 1
+
 	self.paths = {}
 	for f in origJob.newFileList():
-	    self.paths[f.path()] = (f, origJob.cs)
-
-	for f in self.newFileList():
-	    self.paths[f.path()] = (f, localCs)
+	    if not skipPaths.has_key(f.path()):
+		self.paths[f.path()] = (f, origJob.cs)
 
 	return
 
