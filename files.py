@@ -281,7 +281,13 @@ class TupleStream(InfoStream):
 	    for (i, (name, itemType, size)) in enumerate(self.makeup):
 		self.items.append(itemType(all[i]))
 
+	print "----"
+	print self.makeup
+	print self.items
+	print first
 	for (i, (name, itemType, size)) in enumerate(self.makeup):
+	    print "I", i
+	    print self.items[i]
 	    self.__dict__[name] = lambda num = i: self.items[num].value()
 	    setName = "set" + name[0].capitalize() + name[1:]
 	    self.__dict__[setName] = \
@@ -530,23 +536,15 @@ class File:
 	    rc.append(struct.pack("!BH", streamType.streamId, len(s)) + s)
 	return "".join(rc)
 
-    def __init__(self, fileId, info = None, infoTag = None, streamData = None):
-        #assert(self.__class__ is not File)
+    def __init__(self, fileId, streamData = None):
+        assert(self.__class__ is not File)
 	self.theId = fileId
-	self.infoTag = infoTag
 	self.initializeStreams(streamData)
 
 class SymbolicLink(File):
 
     lsTag = "l"
     streamList = File.streamList + (("target", StringStream ),)
-
-    def linkTarget(self, newLinkTarget = None):
-	if (newLinkTarget and newLinkTarget != "-"):
-	    self.theLinkTarget = newLinkTarget
-	    self.target = StringStream(newLinkTarget)
-
-	return self.theLinkTarget
 
     def sizeString(self):
 	return "%8d" % len(self.target.value())
@@ -566,14 +564,6 @@ class SymbolicLink(File):
 	os.symlink(self.theLinkTarget, target)
 	File.restore(self, target, restoreContents, skipMtime = 1)
 
-    def __init__(self, fileId, line = None):
-	if (line):
-	    self._applyChangeLine(line)
-	else:
-	    self.theLinkTarget = None
-
-	File.__init__(self, fileId, line, infoTag = "l")
-
 class Socket(File):
 
     lsTag = "s"
@@ -587,9 +577,6 @@ class Socket(File):
         sock.close()
 	File.restore(self, target, restoreContents)
 
-    def __init__(self, fileId, info = None):
-	File.__init__(self, fileId, info, infoTag = "s")
-
 class NamedPipe(File):
 
     lsTag = "p"
@@ -600,9 +587,6 @@ class NamedPipe(File):
         util.mkdirChain(os.path.dirname(target))
 	os.mkfifo(target)
 	File.restore(self, target, restoreContents)
-
-    def __init__(self, fileId, info = None):
-	File.__init__(self, fileId, info, infoTag = "p")
 
 class Directory(File):
 
@@ -621,10 +605,6 @@ class Directory(File):
             # XXX
             log.warning('rmdir %s failed: %s', target, str(err))
 
-    def __init__(self, fileId, info = None, streamData = None):
-	File.__init__(self, fileId, info, infoTag = "d", 
-		      streamData = streamData)
-
 class DeviceFile(File):
 
     streamList = File.streamList + (("devt", DeviceStream ),)
@@ -638,7 +618,7 @@ class DeviceFile(File):
 
 	if os.getuid(): return
 
-	if self.infoTag == 'c':
+	if self.lsTag == 'c':
 	    flags = stat.S_IFCHR
 	else:
 	    flags = stat.S_IFBLK
@@ -647,38 +627,14 @@ class DeviceFile(File):
             
 	File.restore(self, target, restoreContents)
 
-    def majorMinor(self, major = None, minor = None):
-	if major is not None:
-	    self.major = major
-	if minor is not None:
-	    self.minor = minor
-
-	self.devt = DeviceStream(major, minor)
-	
-	return (self.infoTag, self.major, self.minor)
-
-    def __init__(self, fileId, info = None):
-	if (info):
-	    self._applyChangeLine(info)
-
-	File.__init__(self, fileId, info, infoTag = self.infoTag)
-
 class BlockDevice(DeviceFile):
 
     lsTag = "b"
-
-    def __init__(self, fileId, info = None):
-	self.infoTag = "b"
-	DeviceFile.__init__(self, fileId, info)
 
 class CharacterDevice(DeviceFile):
 
     lsTag = "c"
     
-    def __init__(self, fileId, info = None):
-	self.infoTag = "c"
-	DeviceFile.__init__(self, fileId, info)
-
 class RegularFile(File):
 
     streamList = File.streamList + (('contents', RegularFileStream ),)
@@ -706,17 +662,6 @@ class RegularFile(File):
 	    f.close()
 
 	File.restore(self, target, restoreContents)
-
-    def __init__(self, fileId, info = None, infoTag = "f", streamData = None):
-	if (info):
-	    self._applyChangeLine(info)
-	else:
-	    self.thesha1 = None
-
-	self.infoTag = infoTag
-
-	File.__init__(self, fileId, info, infoTag = self.infoTag,
-		      streamData = streamData)
 
 def FileFromFilesystem(path, fileId, possibleMatch = None,
                        requireSymbolicOwnership = False):
@@ -748,7 +693,7 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
 	needsSha1 = 1
     elif (stat.S_ISLNK(s.st_mode)):
 	f = SymbolicLink(fileId)
-	f.linkTarget(os.readlink(path))
+	f.target.set(os.readlink(path))
     elif (stat.S_ISDIR(s.st_mode)):
 	f = Directory(fileId)
     elif (stat.S_ISSOCK(s.st_mode)):
@@ -757,10 +702,12 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
 	f = NamedPipe(fileId)
     elif (stat.S_ISBLK(s.st_mode)):
 	f = BlockDevice(fileId)
-	f.majorMinor(s.st_rdev >> 8, s.st_rdev & 0xff)
+	f.devt.major(s.st_rdev >> 8)
+	f.devt.minor(s.st_rdev & 0xff)
     elif (stat.S_ISCHR(s.st_mode)):
 	f = CharacterDevice(fileId)
-	f.majorMinor(s.st_rdev >> 8, s.st_rdev & 0xff)
+	f.devt.major(s.st_rdev >> 8)
+	f.devt.minor(s.st_rdev & 0xff)
     else:
         raise FilesError("unsupported file type for %s" % path)
 
@@ -780,10 +727,22 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
     return f
 
 def ThawFile(frz, fileId):
+    type = frz[0]
+
     if frz[0] == "-":
 	return RegularFile(fileId, streamData = frz)
     elif frz[0] == "d":
 	return Directory(fileId, streamData = frz)
+    elif frz[0] == "p":
+	return NamedPipe(fileId, streamData = frz)
+    elif frz[0] == "s":
+	return Socket(fileId, streamData = frz)
+    elif frz[0] == "l":
+	return SymbolicLink(fileId, streamData = frz)
+    elif frz[0] == "b":
+	return BlockDevice(fileId, streamData = frz)
+    elif frz[0] == "c":
+	return CharacterDevice(fileId, streamData = frz)
 
     assert(0)
 
