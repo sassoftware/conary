@@ -50,10 +50,10 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
             applyList.append((l[0], l[1]))
         else:
             applyList.append(pkgStr)
-            
+
     try:
         (cs, depFailures, suggMap) = \
-            client.updateChangeSet(applyList, replaceFiles, recurse = recurse,
+            client.updateChangeSet(applyList, recurse = recurse,
                                    resolveDeps = depCheck)
 
         if depFailures:
@@ -63,7 +63,7 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
                         (troveName, "\n\t".join(str(depSet).split("\n")))
             return
         elif not cfg.autoResolve and suggMap:
-            print "Extra packages are needed for the install"
+            print "Additional packages are needed for the install"
             for (req, suggList) in suggMap.iteritems():
                 print "    %s -> %s" % (req, " ".join([x[0] for x in suggList]))
             return
@@ -71,17 +71,12 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
             print "Installing extra packages for dependency resolution"
             print "    %s" % " ".join(suggMap.iterkeys())
 
-        return
-
         client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,
                            depCheck)
     except conaryclient.UpdateError, e:
         log.error(e)
     except repository.CommitError, e:
         log.error(e)
-    except database.MissingDependencies, e:
-        print "Dependency check failure:"
-        print "\t" + "\n\t".join(str(e).split("\n"))
 
 def doErase(cfg, itemList, tagScript = None):
     troveList = []
