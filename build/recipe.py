@@ -411,6 +411,11 @@ class Recipe:
         for post in self.post:
             post.doPost(self)
 
+    def setConfig(self, path):
+        for package in self.packages:
+            if package.has_key(path):
+                package[path].isConfig(True)
+
     def addDevice(self, target, devtype, major, minor, owner, group, perms):
         self._devices.append((target, devtype, major, minor, owner, group, perms))
 
@@ -425,6 +430,9 @@ class Recipe:
         for device in self._devices:
             autopkg.addDevice(*device)
         self.packages = autopkg.getPackages()
+
+    def package(self):
+        pass
 
     def getPackages(self):
         return self.packages

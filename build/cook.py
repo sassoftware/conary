@@ -47,6 +47,9 @@ def createPackage(repos, cfg, bldPkg, ident):
         else:
             raise RuntimeError, "unable to create file object for package"
 
+        # set ownership, flags, etc
+        f.merge(buildFile)
+        
 	duplicateVersion = checkBranchForDuplicate(repos, f.id(),
 						   cfg.defaultbranch, f)
         if not duplicateVersion:
@@ -127,6 +130,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         
 	packageList = []
         recipeObj.packages(cfg.packagenamespace, version, destdir)
+        recipeObj.package()
 
 	for buildPkg in recipeObj.getPackages():
 	    (p, fileMap) = createPackage(repos, cfg, buildPkg, ident)

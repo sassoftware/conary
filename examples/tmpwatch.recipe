@@ -29,3 +29,6 @@ only removes empty directories and regular files."""
 	    build.InstallFiles("crond-tmpwatch", 
 			       "/etc/cron.daily/tmpwatch", 0755)
 	)
+
+    def package(self):
+        self.setConfig('/etc/cron.daily/tmpwatch')
