@@ -106,6 +106,10 @@ class Version:
 	if self.isBranch(): return 0
 	return self.listsEqual(self.versions[:-1], branch)
 
+    def branch(self):
+	assert(not self.isBranch())
+	return Version(self.versions[:-1])
+
     def isVersion(self):
 	return (len(self.versions) % 3) == 0
 
@@ -131,7 +135,7 @@ def VersionFromString(str, defaultBranch = None):
 	v.append(BranchVersion(parts[0]))
 	v.append(BranchVersion(parts[1]))
 
-	if len(parts) == 3:
+	if len(parts) >= 3:
 	    v.append(VersionRelease(parts[2]))
 	    parts = parts[3:]
 	else:
