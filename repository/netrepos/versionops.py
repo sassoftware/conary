@@ -247,6 +247,7 @@ class Nodes:
 		   itemId, branchId, versionId, 
 		   ":".join(["%.3f" % x for x in timeStamps]),
 		   timeStamps[-1],)
+	return cu.lastrowid
 		    
     def hasItemId(self, itemId):
         cu = self.db.cursor()
@@ -259,6 +260,16 @@ class Nodes:
         cu.execute("SELECT itemId FROM Nodes "
 			"WHERE itemId=%d AND versionId=%d", itemId, versionId)
 	return not(cu.fetchone() == None)
+
+    def getRow(self, itemId, versionId, default):
+        cu = self.db.cursor()
+        cu.execute("SELECT itemId FROM Nodes "
+			"WHERE itemId=%d AND versionId=%d", itemId, versionId)
+	nodeId = cu.fetchone()
+	if nodeId is None:
+	    return default
+
+	return nodeId[0]
 
 class SqlVersioning:
 
@@ -331,9 +342,10 @@ class SqlVersioning:
 		del self.latest[(itemId, branchId)]
 		self.latest[(itemId, branchId)] = versionId
 
-	self.nodes.addRow(itemId, branchId, versionId, version.timeStamps())
+	nodeId = self.nodes.addRow(itemId, branchId, versionId, 
+				   version.timeStamps())
 
-	return versionId
+	return (nodeId, versionId)
 
     def eraseVersion(self, itemId, versionId):
 	# should we make them pass in the version as well to save the

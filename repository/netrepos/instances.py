@@ -3,7 +3,6 @@
 # All rights reserved
 #
 
-import idtable
 import sqlite
 
 class InstanceTable:

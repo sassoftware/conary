@@ -3,6 +3,8 @@
 # All rights reserved
 #
 
+import changelog
+import cltable
 import deps.deps
 import instances
 import items
@@ -58,6 +60,7 @@ class TroveStore:
 	self.instances = instances.InstanceTable(self.db)
 	self.versionTable = LocalRepVersionTable(self.db)
         self.branchTable = versionops.BranchTable(self.db)
+        self.changeLogs = cltable.ChangeLogTable(self.db)
 	self.versionOps = versionops.SqlVersioning(self.db, self.versionTable,
                                                    self.branchTable)
 	self.flavors = flavors.Flavors(self.db)
@@ -261,12 +264,17 @@ class TroveStore:
 	newVersion = False
 	troveVersionId = self.versionTable.get(troveVersion, None)
 	if troveVersionId is not None:
-	    versionExists = self.versionOps.nodes.hasRow(troveItemId, 
-							      troveVersionId)
-	if troveVersionId is None or not versionExists:
-	    troveVersionId = self.versionOps.createVersion(troveItemId, 
-							   troveVersion)
+	    nodeId = self.versionOps.nodes.getRow(troveItemId, 
+						  troveVersionId, None)
+
+	if troveVersionId is None or nodeId is None:
+	    (nodeId, troveVersionId) = self.versionOps.createVersion(
+					    troveItemId, troveVersion)
 	    newVersion = True
+
+	    if trove.getChangeLog():
+		self.changeLogs.add(nodeId, trove.getChangeLog())
+
 	troveFlavor = trove.getFlavor()
 
 	cu = self.db.cursor()
@@ -502,10 +510,29 @@ class TroveStore:
 	    troveVersion.setTimeStamps(
 		self.versionTable.getTimeStamps(troveVersion, troveNameId))
 
-	troveInstanceId = self.instances[(troveNameId, troveVersionId, 
-					  troveFlavorId)]
+	cu = self.db.cursor()
+	cu.execute("""SELECT instances.instanceId, ChangeLogs.name, 
+			     ChangeLogs.email,
+			     ChangeLogs.message FROM
+		      Instances JOIN Nodes ON 
+		             Instances.itemId=Nodes.itemId AND
+			     Instances.versionId=Nodes.versionId
+		        LEFT OUTER JOIN ChangeLogs ON
+			     Nodes.nodeId = ChangeLogs.NodeId
+		      WHERE  Instances.itemId=%d AND
+			     Instances.versionId=%d AND
+			     Instances.flavorId=%d""",
+		      troveNameId, troveVersionId, troveFlavorId)
+
+	result = cu.fetchone()
+	troveInstanceId = result[0]
+	if result[1] is not None:
+	    changeLog = changelog.ChangeLog(*result[1:4])
+	else:
+	    changeLog = None
+
 	trove = package.Trove(troveName, troveVersion, troveFlavor,
-			      None)
+			      changeLog)
 	for instanceId in self.troveTroves[troveInstanceId]:
 	    (itemId, versionId, flavorId, isPresent) = \
 		    self.instances.getId(instanceId)
@@ -516,7 +543,6 @@ class TroveStore:
 	    trove.addTrove(name, version, flavor)
 
 	versionCache = {}
-	cu = self.db.cursor()
 	cu.execute("SELECT fileId, path, versionId FROM "
 		   "TroveFiles NATURAL JOIN FileStreams WHERE instanceId = %d", 
 		   troveInstanceId)
