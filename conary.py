@@ -352,7 +352,10 @@ def realMain(cfg, argv=sys.argv):
 	    try:
 		queryrep.displayTroves(*args)
 	    except IOError, msg:
-		sys.stderr.write(msg.strerror + '\n')
+                # XXX when is a msg.strerror not a str?
+                # at least socket.gaierror, which is a tuple of
+                # return code and string
+		sys.stderr.write(str(msg.strerror) + '\n')
 		sys.exit(1)
 	else:
 	    return usage()
