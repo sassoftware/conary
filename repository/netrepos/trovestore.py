@@ -48,7 +48,7 @@ class TroveStore:
 	self.db = sqlite.connect(path, timeout = 30000)
 
 	cu = self.db.cursor()
-	cu.execute("PRAGMA temp_store = MEMORY", start_transaction = False)
+	#cu.execute("PRAGMA temp_store = MEMORY", start_transaction = False)
 				 
         self.begin()
 	self.troveTroves = trovecontents.TroveTroves(self.db)
