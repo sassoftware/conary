@@ -410,6 +410,10 @@ class FilesystemJob:
 		log.debug("%s has already been removed" % path)
 		continue
 
+	    oldFile = repos.getFileVersion(fileId, version)
+            # XXX mask out any flag that isn't the config flag.
+            oldFile.flags.set(oldFile.flags.value() & files._FILE_FLAG_CONFIG)
+            
 	    if path[0] == '/':
 		realPath = root + path
 	    else:
@@ -418,7 +422,8 @@ class FilesystemJob:
 	    if flags & MERGE:
 		try:
 		    # don't remove files if they've been changed locally
-		    localFile = files.FileFromFilesystem(realPath, fileId)
+		    localFile = files.FileFromFilesystem(realPath, fileId,
+                                                possibleMatch = oldFile)
 		except OSError, exc:
 		    # it's okay if the file is missing, it means we all agree
 		    if exc.errno == errno.ENOENT:
@@ -429,10 +434,6 @@ class FilesystemJob:
 	    else:
 		localFile = None
 
-	    oldFile = repos.getFileVersion(fileId, version)
-            # XXX mask out any flag that isn't the config flag.
-            oldFile.flags.set(oldFile.flags.value() & files._FILE_FLAG_CONFIG)
-            
 	    # don't worry about metadata changes, just content changes
 	    if oldFile.hasContents and localFile and localFile.hasContents and \
 			oldFile.contents != localFile.contents and \
