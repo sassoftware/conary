@@ -16,8 +16,13 @@ class Package:
 	    f.write("%s %s\n" % (file.path(), file.version()))
 	f.close()
 
-    def __init__(self, dbpath, name, version):
+    def read(self, file):
+	pass
+
+    def __init__(self, dbpath, name, version, file = None):
 	self.files = {}
 	self.name = name
 	self.version = version
 	self.dbpath = dbpath
+	if file:
+	    self.read(file)

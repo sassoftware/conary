@@ -4,6 +4,7 @@ import os
 import sys
 import util
 import importrpm
+import string
 
 DBPATH=os.getcwd() + "/srsdb"
 
@@ -16,10 +17,33 @@ def usage():
     print "usage: srs import <file.rpm>"
     sys.exit(0)
 
+def displayPkgs(fullPath, pathElements):
+    if not os.path.isdir(fullPath):
+	if os.path.exists(fullPath):
+	    pass
+	else:
+	    raise KeyError, ("no match for %s" % pathElements)
+
+	return
+
+    for fileName in os.listdir(fullPath):
+	newPath = fullPath + "/" + fileName
+	if os.path.isdir(newPath):
+	    displayPkgs(newPath, pathElements + [ fileName ])
+	else:
+	    elements = pathElements + [ fileName ]
+	    print "%-24s%s" % (elements[0], string.join(elements[1:], "/"))
+
 if (len(sys.argv) < 2):
     usage()
 elif (sys.argv[1] == "import"):
     for file in sys.argv[2:]:
 	importrpm.doImport(DBPATH, file)
+elif (sys.argv[1] == "pkglist"):
+    if (len(sys.argv) == 2):
+	displayPkgs(DBPATH + "/pkgs", [])
+    else:
+	displayPkgs(DBPATH + "/pkgs/" + 
+		    string.join(sys.argv[2:], "/"), sys.argv[2:])
 else:
     usage()
