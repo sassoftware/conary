@@ -279,7 +279,7 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 	    newClasses = recipe.RecipeLoader(filename)
 	    classes.update(newClasses)
     except recipe.RecipeFileError, msg:
-	raise CookError(str(msg))
+	raise cook.CookError(str(msg))
 
     if not classes:
 	log.error("no recipe files were found")
@@ -638,7 +638,7 @@ def newPackage(repos, cfg, name):
 	name = cfg.packagenamespace + ":" + name
     name += ":sources"
 
-    if repos.hasPackage(name):
+    if repos and repos.hasPackage(name):
 	log.error("package %s already exists" % name)
 	return
 

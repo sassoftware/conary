@@ -65,7 +65,11 @@ def sourceCommand(cfg, args, argSet):
 	checkin.renameFile(args[1], args[2])
     elif (args[0] == "newpkg"):
 	if len(args) != 2: usage()
-	repos = repository.LocalRepository(cfg.reppath, "r")
+	
+	try:
+	    repos = repository.LocalRepository(cfg.reppath, "r")
+	except OSError:
+	    repos = None
 
 	checkin.newPackage(repos, cfg, args[1])
     elif (args[0] == "update"):
