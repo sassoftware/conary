@@ -97,7 +97,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-type", "text/html")
             self.end_headers()
-            fields = cgi.parse_qs(queryString)
+
+            fields = cgi.FieldStorage(environ = { 'QUERY_STRING' : queryString })
             try:
                 httpHandler.handleCmd(self.wfile.write, base, authToken, fields)
             except:
