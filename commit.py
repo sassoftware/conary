@@ -9,8 +9,7 @@ import package
 import sys
 
 def commitChangeSet(repos, cfg, changeSetFile):
-    cs = changeset.ChangeSet()
-    cs.useFile(changeSetFile)
+    cs = changeset.ChangeSetFromFile(changeSetFile)
 
     pkgList = []
     fileMap = {}

@@ -7,6 +7,27 @@ import os
 
 class ChangeSet:
 
+    def getPackageList(self):
+	return self.packages
+
+    def getFileList(self):
+	return self.files.items()
+
+    def formatToFile(self, cfg, f):
+	for pkg in self.packages:
+	    pkg.formatToFile(self, cfg, f)
+	    print
+
+    def getFileChange(self, fileId):
+	return self.files[fileId][2]
+
+    def __init__(self):
+	self.packages = []
+	self.files = {}
+	pass
+
+class ChangeSetFromFile(ChangeSet):
+
     def getFileContents(self, hash):
 	loc = self.csf.getTag(hash)
 	if loc == "seefile":
@@ -15,7 +36,7 @@ class ChangeSet:
 
 	return self.csf.getFile(hash)
 
-    def useFile(self, file):
+    def read(self, file):
 	f = open(file, "r")
 	self.csf = filecontainer.FileContainer(f)
 	f.close()
@@ -63,24 +84,9 @@ class ChangeSet:
 
 	    header = control.read()
 
-    def getPackageList(self):
-	return self.packages
-
-    def getFileList(self):
-	return self.files.items()
-
-    def formatToFile(self, cfg, f):
-	for pkg in self.packages:
-	    pkg.formatToFile(self, cfg, f)
-	    print
-
-    def getFileChange(self, fileId):
-	return self.files[fileId][2]
-
-    def __init__(self):
-	self.packages = []
-	self.files = {}
-	pass
+    def __init__(self, file):
+	ChangeSet.__init__(self)
+	self.read(file)
 
 # old may be None
 def fileChangeSet(fileId, old, oldVersion, new, newVersion):

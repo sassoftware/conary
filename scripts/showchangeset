@@ -12,11 +12,10 @@ else:
     fullPath = os.getcwd()
 
 sys.path.append(os.path.dirname(fullPath))
-from changeset import ChangeSet
+from changeset import ChangeSetFromFile
 import srscfg
 
 cfg = srscfg.SrsConfiguration()
 
-cs = ChangeSet()
-cs.useFile(sys.argv[1])
+cs = ChangeSetFromFile(sys.argv[1])
 cs.formatToFile(cfg, sys.stdout)
