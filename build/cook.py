@@ -103,7 +103,7 @@ class _IdGen:
                     lcache.addFileHash(path, f.contents.sha1())
 
 def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None, 
-	       prep=True, macros=()):
+	       prep=True, macros={}):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -123,7 +123,7 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     and None is returned instead of a changeset.
     @type prep: boolean
     @param macros: set of macros for the build
-    @type macros: sequence
+    @type macros: dict
     @rtype: list of strings
     """
 
@@ -172,7 +172,7 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     return built
 
 def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch, 
-		      macros=()):
+		      macros={}):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -188,7 +188,7 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     @param buildBranch: the branch the new build will be committed to
     @type buildBranch: versions.Version
     @param macros: set of macros for the build
-    @type macros: sequence
+    @type macros: dict
     @rtype: tuple
     """
 
@@ -211,7 +211,7 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     return (changeSet, built, None)
 
 def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch, 
-		      macros=()):
+		      macros={}):
     """
     Turns a fileset recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -227,7 +227,7 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
     @param buildBranch: the branch the new build will be committed to
     @type buildBranch: versions.Version
     @param macros: set of macros for the build
-    @type macros: sequence
+    @type macros: dict
     @rtype: tuple
     """
 
@@ -257,7 +257,7 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
     return (changeSet, built, None)
 
 def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch, 
-		      prep=True, macros=()):
+		      prep=True, macros={}):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -279,7 +279,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     and None is returned instead of a changeset.
     @type prep: boolean
     @param macros: set of macros for the build
-    @type macros: sequence
+    @type macros: dict
     @rtype: tuple
     """
 
@@ -365,7 +365,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 
 # -------------------- public below this line -------------------------
 
-def cookItem(repos, cfg, item, prep=0, macros=()):
+def cookItem(repos, cfg, item, prep=0, macros={}):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -383,7 +383,7 @@ def cookItem(repos, cfg, item, prep=0, macros=()):
     and None is returned instead of a changeset.
     @type prep: boolean
     @param macros: set of macros for the build
-    @type macros: sequence
+    @type macros: dict
     """
 
     buildList = []

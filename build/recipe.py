@@ -31,57 +31,53 @@ import util
 
 from fnmatch import fnmatchcase
 
-baseMacros = (
-    # Note that these macros cannot be represented as a dictionary,
-    # because the items need to be added in order so that they will
-    # be properly interpolated.
-    #
+baseMacros = {
     # paths
-    ('prefix'		, '/usr'),
-    ('sysconfdir'	, '/etc'),
-    ('initdir'		, '%(sysconfdir)s/init.d'),
-    ('lib'              , 'lib'),  # may be overridden with 'lib64'
-    ('exec_prefix'	, '%(prefix)s'),
-    ('bindir'		, '%(exec_prefix)s/bin'),
-    ('essentialbindir'	, '/bin'),
-    ('sbindir'		, '%(exec_prefix)s/sbin'),
-    ('essentialsbindir'	, '/sbin'),
-    ('libdir'		, '%(exec_prefix)s/%(lib)s'),
-    ('essentiallibdir'	, '/%(lib)s'),
-    ('libexecdir'	, '%(exec_prefix)s/libexec'),
-    ('localstatedir'	, '/var'),
-    ('cachedir'		, '%(localstatedir)s/cache'),
-    ('sharedstatedir'	, '%(prefix)s/com'),
-    ('includedir'	, '%(prefix)s/include'),
-    ('datadir'		, '%(prefix)s/share'),
-    ('mandir'		, '%(datadir)s/man'),
-    ('infodir'		, '%(datadir)s/info'),
-    ('docdir'		, '%(datadir)s/doc'),
-    ('thisdocdir'       , '%(docdir)s/%(name)s-%(version)s'),
+    'prefix'		: '/usr',
+    'sysconfdir'	: '/etc',
+    'initdir'		: '%(sysconfdir)s/init.d',
+    'lib'               : 'lib',  # may be overridden with 'lib64'
+    'exec_prefix'	: '%(prefix)s',
+    'bindir'		: '%(exec_prefix)s/bin',
+    'essentialbindir'	: '/bin',
+    'sbindir'		: '%(exec_prefix)s/sbin',
+    'essentialsbindir'	: '/sbin',
+    'libdir'		: '%(exec_prefix)s/%(lib)s',
+    'essentiallibdir'	: '/%(lib)s',
+    'libexecdir'	: '%(exec_prefix)s/libexec',
+    'localstatedir'	: '/var',
+    'cachedir'		: '%(localstatedir)s/cache',
+    'sharedstatedir'	: '%(prefix)s/com',
+    'includedir'	: '%(prefix)s/include',
+    'datadir'		: '%(prefix)s/share',
+    'mandir'		: '%(datadir)s/man',
+    'infodir'		: '%(datadir)s/info',
+    'docdir'		: '%(datadir)s/doc',
+    'thisdocdir'        : '%(docdir)s/%(name)s-%(version)s',
     # special component prefixes that the whole system needs to share
-    ('krbprefix'	, '%(exec_prefix)s/kerberos'),
-    ('x11prefix'	, '%(exec_prefix)s/X11R6'),
+    'krbprefix'		: '%(exec_prefix)s/kerberos',
+    'x11prefix'		: '%(exec_prefix)s/X11R6',
     # arguments/flags (empty ones are for documentation; non-existant = empty)
-    ('cc'		, 'gcc'),
-    ('cflags'           , '-O2'), # -g when we have debuginfo
-    ('cppflags'		, ''), # just for providing in recipes
-    ('ldflags'		, ''), # -g when we have debuginfo
-    ('mflags'		, ''),
-    ('parallelmflags'   , ''),
-    ('sysroot'		, ''),
-    ('march'		, 'i386'), # "machine arch"
-    ('os'		, 'linux'),
-    ('target'		, 'i386-unknown-linux'),
-    ('strip'		, 'strip'),
-)
+    'cc'		: 'gcc',
+    'cflags'            : '-O2', # -g when we have debuginfo
+    'cppflags'		: '', # just for providing in recipes
+    'ldflags'		: '', # -g when we have debuginfo
+    'mflags'		: '',
+    'parallelmflags'    : '',
+    'sysroot'		: '',
+    'march'		: 'i386', # "machine arch"
+    'os'		: 'linux',
+    'target'		: 'i386-unknown-linux',
+    'strip'		: 'strip',
+}
 
-crossMacros = (
+crossMacros = {
     # set crossdir from cook, directly or indirectly, before adding the rest
-    #('crossdir'	, 'cross-target'),
-    ('prefix'		, '/opt/%(crossdir)s'),
-    ('sysroot'		, '%(prefix)s/sys-root'),
-    ('headerpath'	, '%(sysroot)s/usr/include')
-)
+    #'crossdir'		: 'cross-target',
+    'prefix'		: '/opt/%(crossdir)s',
+    'sysroot'		: '%(prefix)s/sys-root',
+    'headerpath'	: '%(sysroot)s/usr/include',
+}
 
 class Macros(dict):
     def __setitem__(self, name, value):
@@ -89,10 +85,13 @@ class Macros(dict):
         d = {name: self.get(name)}
         # escape any macros in the new value
         value = value.replace('%', '%%')
-        # unescape refrences to ourself
+        # unescape references to ourself
         value = value.replace('%%%%(%s)s' %name, '%%(%s)s'%name)
         # expand our old value when defining the new value
  	dict.__setitem__(self, name, value % d)
+
+    def __setattr__(self, name, value):
+	self.__setitem__(name, value)
         
     # we want keys that don't exist to default to empty strings
     # but warn so that we can catch bugs
@@ -101,20 +100,9 @@ class Macros(dict):
 	    return dict.__getitem__(self, name) %self
 	log.warning('name %s does not exist in macros', name)
 	return ''
-    
-    def addMacros(self, *macroSet):
-	# must be in order; later macros in the set can depend on
-	# earlier ones
-	# for ease of use, we allow passing in a tuple of tuples, or
-	# a simple set of tuples
-	if len(macroSet) == 1 and type(macroSet[0]) is tuple:
-	    # we were passed a tuple of tuples (like baseMacros)
-	    macroSet = macroSet[0]
-        if len(macroSet) > 0 and type(macroSet[0]) is not tuple:
-            # we were passed something like ('foo', 'bar')
-            macroSet = (macroSet,)
-	for key, value in macroSet:
-	    self[key] = value
+
+    def __getattr__(self, name):
+	return self.__getitem__(name)
     
     def copy(self):
 	new = Macros()
@@ -461,7 +449,7 @@ class PackageRecipe(Recipe):
         return files
 
     def unpackSources(self, builddir):
-        self.addMacros('maindir', self.theMainDir)
+        self.macros.maindir = self.theMainDir
         if os.path.exists(builddir):
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
@@ -558,8 +546,8 @@ class PackageRecipe(Recipe):
 
     def doBuild(self, buildpath, root):
         builddir = buildpath + "/" + self.mainDir()
-	self.addMacros(('builddir', builddir),
-                       ('destdir', root))
+	self.macros.update({'builddir': builddir,
+			    'destdir': root})
         
         if self._build is None:
             pass
@@ -645,7 +633,7 @@ class PackageRecipe(Recipe):
 			return
 	del self.__dict__[name]
     
-    def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
+    def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}):
         assert(self.__class__ is not Recipe)
 	self._sources = []
 	# XXX fixme: convert to proper documentation string
@@ -676,12 +664,11 @@ class PackageRecipe(Recipe):
         self.destdirPolicy = destdirpolicy.DefaultPolicy()
         self.packagePolicy = packagepolicy.DefaultPolicy()
 	self.macros = Macros()
-	self.addMacros = self.macros.addMacros
-	self.addMacros(baseMacros)
+	self.macros.update(baseMacros)
 	self.macros['name'] = self.name
 	self.macros['version'] = self.version
 	if extraMacros:
-	    self.addMacros(extraMacros)
+	    self.macros.update(extraMacros)
 
 class GroupRecipe(Recipe):
 

@@ -214,7 +214,7 @@ def main():
 	    cfg.display()
     elif (otherArgs[1] == "cook"):
 	log.setVerbosity(1)
-	macros = ()
+	macros = {}
 	prep = 0
 	if argSet.has_key('prep'):
 	    del argSet['prep']
