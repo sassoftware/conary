@@ -4,6 +4,8 @@ Changes in 0.14.9:
   * Reworked the code which looks up pathIds to take advantage of a new
     server call (getPackageBranchPathIds) so it's faster and looks on
     both the full branch, and full parent branches
+  * apache repository server allows mixed ssl and normal requests
+  * Added forceSSL to apache repository server configuration
   * The network client code now supports accessing servers over https
 
 Changes in 0.14.8:
