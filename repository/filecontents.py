@@ -10,13 +10,17 @@ SEEK_SET=0
 SEEK_CUR=1
 SEEK_END=2
 
-class FileContents:
+class FileContents(object):
+
+    __slots__ = ()
 
     def __init__(self):
 	if self.__class__ == FileContents:
 	    raise NotImplementedError
 
 class FromRepository(FileContents):
+
+    __slots__ = ( "repos", "theSize", "fileId" )
 
     def get(self):
 	return self.repos.pullFileContentsObject(self.fileId)
@@ -31,6 +35,8 @@ class FromRepository(FileContents):
 
 class FromFilesystem(FileContents):
 
+    __slots__ = ( "path" )
+
     def get(self):
 	return open(self.path, "r")
 
@@ -41,6 +47,8 @@ class FromFilesystem(FileContents):
 	self.path = path
 
 class FromChangeSet(FileContents):
+
+    __slots__ = ( "cs", "fileId" )
 
     def get(self):
 	return self.cs.getFileContents(self.fileId)[1].get()
@@ -54,6 +62,8 @@ class FromChangeSet(FileContents):
 
 class FromString(FileContents):
 
+    __slots__ = "str"
+
     def get(self):
 	return versioned.FalseFile(self.str)
 
@@ -64,6 +74,8 @@ class FromString(FileContents):
 	self.str = str
 
 class FromFile(FileContents):
+
+    __slots__ = "f"
 
     def size(self):
 	pos = self.f.tell()
@@ -78,6 +90,8 @@ class FromFile(FileContents):
 	self.f = f
 
 class WithFailedHunks(FileContents):
+
+    __slots__ = ( "fc", "hunks" )
 
     def get(self):
 	return self.fc.get()
