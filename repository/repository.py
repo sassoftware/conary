@@ -639,9 +639,10 @@ class FileContentsFromFile(FileContents):
 	self.f = f
 
 class RepositoryError(Exception):
-
     """Base class for exceptions from the system repository"""
-    pass
+
+    def __init__(self):
+        Exception.__init__(self)
 
 class CommitError(RepositoryError):
 
