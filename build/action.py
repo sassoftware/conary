@@ -12,9 +12,11 @@
 # full details.
 #
 
+import pdb
 import util
 import sys
 import string
+import traceback
 
 # build.py and policy.py need some common definitions
 
@@ -96,6 +98,33 @@ class Action:
         # copy the keywords into our dict, overwriting the defaults
         self.__dict__.update(keywords)
 
+def excepthook(type, exc_msg, tb):
+    sys.excepthook = sys.__excepthook__
+    global actionobject
+    self = actionobject
+    if actionobject.recipe.cfg.debugRecipeExceptions:
+	lines = traceback.format_exception(type, exc_msg, tb)
+	print string.joinfields(lines, "")
+    if self.linenum is not None:
+	prefix = "%s:%s:" % (self.file, self.linenum)
+	prefix_len = len(prefix)
+	if str(exc_msg)[:prefix_len] != prefix:
+	    exc_message = "%s:%s: %s: %s" % (self.file, self.linenum, 
+					  type.__name__, exc_msg)
+	print exc_message
+    buildinfo = self.recipe.buildinfo
+    buildinfo.error = exc_message
+    buildinfo.file = self.file
+    buildinfo.lastline = self.linenum
+    buildinfo.stop()
+
+    if actionobject.recipe.cfg.debugRecipeExceptions and sys.stdout.isatty() \
+					         and sys.stdin.isatty():
+	pdb.post_mortem(tb)
+    else:
+	sys.exit(1)
+
+
 class RecipeAction(Action):
     """
     Action class which accepts the use= keyword to control execution,
@@ -118,11 +147,15 @@ class RecipeAction(Action):
         
     # virtual method for actually executing the action
     def doAction(self):
+	global actionobject
 	if self.use:
-	    try:
+	    if self.linenum is None:
 		self.do()
-	    except Exception:
-		self.handle_exception()
+	    else:
+		sys.excepthook = excepthook
+		actionobject = self
+		self.do()
+		sys.excepthook = sys.__excepthook__
 
 
     def do(self):
@@ -169,25 +202,7 @@ class RecipeAction(Action):
 	
 	raise type, "%s:%s: %s: %s" % (self.file, self.linenum,
 					   type.__name__, msg)
-
-    def handle_exception(self):
-	if self.linenum is None:
-	    raise exc_type, exc_message
-	# Avoid duplicating file/name prefix
-	exc_type = sys.exc_info()[0]
-	exc_msg = sys.exc_info()[1]
-	prefix = "%s:%s:" % (self.file, self.linenum)
-	prefix_len = len(prefix)
-	if str(exc_msg)[:prefix_len] != prefix:
-	    exc_message = "%s:%s: %s: %s" % (self.file, self.linenum, 
-				          exc_type.__name__, exc_msg)
-	buildinfo = self.recipe.buildinfo
-	buildinfo.error = exc_message
-	buildinfo.file = self.file
-	buildinfo.lastline = self.linenum
-	buildinfo.stop()
-	raise exc_type, exc_message
-
+    
 # XXX look at ShellCommand versus Action
 class ShellCommand(RecipeAction):
     """Base class for shell-based commands. ShellCommand is an abstract class

@@ -29,6 +29,7 @@ import fixedglob
 import log
 import re
 import stat
+import sys
 import action
 from use import Use
 
@@ -62,10 +63,13 @@ class BuildAction(action.RecipeAction):
 
     def doAction(self):
 	if self.use:
-	    try:
+	    if self.linenum is None:
 		self.do(self.recipe.macros)
-	    except Exception:
-		self.handle_exception()
+	    else:
+		sys.excepthook = action.excepthook
+		action.actionobject = self
+		self.do(self.recipe.macros)
+		sys.excepthook = sys.__excepthook__
 
     def do(self, macros):
         """

@@ -404,50 +404,43 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     builddir = cfg.buildPath + "/" + recipeObj.name
     use.track(True, recipeObj.Flags)
 
-    try:
-	recipeObj.setup()
-	bldInfo = buildinfo.BuildInfo(builddir)
-	recipeObj.buildinfo = bldInfo
+    recipeObj.setup()
+    bldInfo = buildinfo.BuildInfo(builddir)
+    recipeObj.buildinfo = bldInfo
 
-	# don't bother with prep the dirs if we are resuming
-	if not resume:
-	    if os.path.exists(builddir):
-		shutil.rmtree(builddir)
-	    util.mkdirChain(builddir)
+    # don't bother with prep the dirs if we are resuming
+    if not resume:
+	if os.path.exists(builddir):
+	    shutil.rmtree(builddir)
+	util.mkdirChain(builddir)
+	bldInfo.begin()
+	recipeObj.unpackSources(builddir)
+    # if we're only extracting, continue to the next recipe class.
+    if prep:
+	return
+	
+    cwd = os.getcwd()
+    try:
+	if resume:
+	    bldInfo.read()
+	    destdir = bldInfo.destdir
 	    bldInfo.begin()
-	    recipeObj.unpackSources(builddir)
-	# if we're only extracting, continue to the next recipe class.
-	if prep:
-	    return
-	    
-	cwd = os.getcwd()
-	try:
-	    if resume:
-		bldInfo.read()
-		destdir = bldInfo.destdir
-		bldInfo.begin()
-		bldInfo.destdir = destdir
-		if resume is True:
-		    resume = bldInfo.lastline
-	    else:
-		util.mkdirChain(builddir + '/' + recipeObj.mainDir())
-		util.mkdirChain(cfg.tmpDir)
-		destdir = tempfile.mkdtemp("", "conary-%s-" % recipeObj.name, cfg.tmpDir)
-		bldInfo.destdir = destdir
-	    os.chdir(builddir + '/' + recipeObj.mainDir())
-	    recipeObj.doBuild(builddir, destdir, resume=resume)
-	    log.info('Processing %s', recipeClass.name)
-	    recipeObj.doDestdirProcess() # includes policy
-	    bldInfo.stop()
-	    use.track(False, recipeObj.Flags)
-	finally:
-	    os.chdir(cwd)
-    except Exception, e:
-	if cfg.debugRecipeExceptions:
-	    raise 
-	else: 
-	    print e 
-	    sys.exit(1)
+	    bldInfo.destdir = destdir
+	    if resume is True:
+		resume = bldInfo.lastline
+	else:
+	    util.mkdirChain(builddir + '/' + recipeObj.mainDir())
+	    util.mkdirChain(cfg.tmpDir)
+	    destdir = tempfile.mkdtemp("", "conary-%s-" % recipeObj.name, cfg.tmpDir)
+	    bldInfo.destdir = destdir
+	os.chdir(builddir + '/' + recipeObj.mainDir())
+	recipeObj.doBuild(builddir, destdir, resume=resume)
+	log.info('Processing %s', recipeClass.name)
+	recipeObj.doDestdirProcess() # includes policy
+	bldInfo.stop()
+	use.track(False, recipeObj.Flags)
+    finally:
+	os.chdir(cwd)
     
     grpName = recipeClass.name
 
