@@ -4,7 +4,7 @@
 # All rights reserved
 #
 
-DIR=`echo $0 | sed 's,/[^/].*$,,'`
+DIR=`echo $0 | sed 's,/[^/]*$,,'`
 if [ -n "$DIR" ]; then
     PYTHON=""
 else
