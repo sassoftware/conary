@@ -21,6 +21,7 @@ import instances
 import items
 import files
 import flavors
+import metadata
 import sqlite3
 import trove
 import trovefiles
@@ -79,6 +80,7 @@ class TroveStore:
                                                    self.branchTable)
 	self.flavors = flavors.Flavors(self.db)
         self.depTables = deptable.DependencyTables(self.db)
+        self.metadataTable = metadata.MetadataTable(self.db)
         self.db.commit()
         
 	self.streamIdCache = {}
@@ -445,6 +447,54 @@ class TroveStore:
 	    self.troveTroves.addItem(troveInstanceId, instanceId)
 
 	del self.fileVersionCache 
+
+    def updateMetadata(self, troveName, branch, shortDesc, longDesc,
+                    urls, licenses, categories, language):
+        cu = self.db.cursor()
+       
+        itemId = self.getItemId(troveName)
+        branchId = self.branchTable[branch]
+       
+        # if we're updating the default language, always create a new version
+        latestVersion = self.metadataTable.getLatestVersion(itemId, branchId)
+        if language == "C":
+            if latestVersion:
+                version = versions.VersionFromString(latestVersion)
+                version.incrementRelease()
+            else:
+                version = versions._VersionFromString("1-1", defaultBranch=branch)
+            
+            self.versionTable.addId(version)
+        else: # if this is a translation, update the current version
+            if not latestVersion:
+                raise KeyError, troveName
+            version = versions.VersionFromString(latestVersion)
+           
+        versionId = self.versionTable.get(version, None)
+
+        return self.metadataTable.add(itemId, versionId, branchId, shortDesc, longDesc,
+                                      urls, licenses, categories, language)
+
+    def getMetadata(self, troveName, branch, version=None, language="C"):
+        itemId = self.getItemId(troveName)
+        branchId = self.branchTable[branch]
+        
+        if not version:
+            latestVersion = self.metadataTable.getLatestVersion(itemId, branchId)
+        else:
+            latestVersion = version.asString()
+
+        cu = self.db.cursor()
+        cu.execute("SELECT versionId FROM Versions WHERE version=?", latestVersion)
+
+        versionId = cu.fetchone()
+        if versionId:
+            versionId = versionId[0]
+        else:
+            return None
+       
+        metadata = self.metadataTable.get(itemId, versionId, branchId, language)
+        return metadata
 
     def hasTrove(self, troveName, troveVersion = None, troveFlavor = 0):
 	if not troveVersion:

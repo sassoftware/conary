@@ -46,14 +46,21 @@ class MetadataTable:
                                            language STR)""")
 
     def add(self, itemId, versionId, branchId, shortDesc, longDesc,
-            urls, licenses, categories, language):
+            urls, licenses, categories, language="C"):
         cu = self.db.cursor()
 
-        cu.execute("""
-            INSERT INTO Metadata (itemId, versionId, branchId, timestamp)
-            VALUES(?, ?, ?, ?)""", itemId, versionId, branchId, time.time())
-        mdId = cu.lastrowid
-        
+        if language == "C":
+            cu.execute("""
+                INSERT INTO Metadata (itemId, versionId, branchId, timestamp)
+                VALUES(?, ?, ?, ?)""", itemId, versionId, branchId, time.time())
+            mdId = cu.lastrowid
+        else:
+            cu.execute("""
+                SELECT metadataId FROM Metadata
+                WHERE itemId=? AND versionId=? AND branchId=?""",
+                itemId, versionId, branchId)
+            mdId = cu.fetchone()[0]
+
         for mdClass, data in (self.METADATA_CLASS_SHORT_DESC, [shortDesc]),\
                              (self.METADATA_CLASS_LONG_DESC, [longDesc]),\
                              (self.METADATA_CLASS_URL, urls),\
@@ -65,7 +72,7 @@ class MetadataTable:
                     VALUES(?, ?, ?, ?)""", mdId, mdClass, d, language)
         return mdId
 
-    def get(self, itemId, versionId, branchId, language):
+    def get(self, itemId, versionId, branchId, language="C"):
         cu = self.db.cursor()
 
         cu.execute("SELECT metadataId FROM Metadata WHERE itemId=? AND versionId=? AND branchId=?",
@@ -76,18 +83,21 @@ class MetadataTable:
         else:
             return None
             
-        cu.execute("SELECT class, data FROM MetadataItems WHERE metadataId=? and language=?",
-                   metadataId, language)
+        cu.execute("""SELECT class, data FROM MetadataItems
+                      WHERE metadataId=? and (language=?
+                            OR class IN (?, ?, ?))""",
+                   metadataId, language, self.METADATA_CLASS_URL,
+                                         self.METADATA_CLASS_LICENSE,
+                                         self.METADATA_CLASS_CATEGORY)
 
         # create a dictionary of metadata classes
         # each key points to a list of metadata items
-        classes = []
-        mdData = []
+        items = {}
         for mdClass, data in cu:
-            classes.append(str(mdClass))
-            mdData.append(data)
-        items = dict(zip(classes, mdData))
-        
+            if not items.has_key(mdClass):
+                items[mdClass] = []
+            items[mdClass].append(data)
+
         return items
 
     def getLatestVersion(self, itemId, branchId):

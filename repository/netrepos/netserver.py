@@ -102,6 +102,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	return self.repos.createBranch(newBranch, location, troveList)
 
+    def updateMetadata(self, authToken, clientVersion,
+                       troveName, branch, shortDesc, longDesc,
+                       urls, categories, licenses, language):
+        branch = self.toBranch(branch)
+        retval = self.repos.troveStore.updateMetadata(troveName, branch, shortDesc, longDesc,
+                                                      urls, categories, licenses, language)
+        self.repos.troveStore.commit()
+        return retval
+
+    def getMetadata(self, authToken, clientVersion,
+                    troveName, branch, language, version):
+        branch = self.toBranch(branch)
+        if version:
+            version = self.toVersion(version)
+
+        return self.repos.troveStore.getMetadata(troveName, branch, version)
+    
     def hasPackage(self, authToken, clientVersion, pkgName):
 	if not self.auth.check(authToken, write = False, trove = pkgName):
 	    raise InsufficientPermission
