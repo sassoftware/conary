@@ -534,8 +534,8 @@ class InstallSymlinks(_FileAction):
     exists or if the path ends with the directory separator character
     ("/" on UNIX systems)
     """
-
     keywords = { 'allowDangling': False }
+
     def do(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 
@@ -610,6 +610,42 @@ class InstallSymlinks(_FileAction):
 	if len(self.fromFiles) > 1:
 	    if not self.toFile.endswith('/') or os.path.isdir(self.toFile):
 		raise TypeError, 'too many targets for non-directory %s' %self.toFile
+
+class InstallLinks(_FileAction):
+    """
+    Install a hard link.  Much more limited than a symlink, hard links
+    are only permitted within the same directory, you cannot create a
+    hard link to a directory.  Use symlinks in preference to hard links
+    unless it is ABSOLUTELY necessary to use a hard link!
+    """
+    def do(self, macros):
+	d = macros['destdir']
+	e = util.joinPaths(d, self.existingpath)
+	if not os.path.exists(e):
+	    raise TypeError, \
+		'hardlink target %s does not exist' %self.existingpath
+	for name in self.newnames:
+	    newpath = util.joinPaths(self.basedir, name)
+	    n = util.joinPaths(d, newpath)
+	    self.setComponents(newpath)
+	    if os.path.exists(n) or os.path.islink(n):
+		os.remove(n)
+	    os.link(e, n)
+
+    def __init__(self, *args, **keywords):
+        """
+        Create a new InstallLinks instance::
+	    self.InstallLinks(newname, [newname, ...,] existingpath)
+        """
+        _FileAction.__init__(self, *args, **keywords)
+	split = len(args) - 1
+	self.newnames = args[:split]
+	self.existingpath = args[split]
+	# raise error while we can still tell what is wrong...
+	for name in self.newnames:
+	    if name.find('/') != -1:
+		raise TypeError, 'hardlink %s crosses directories' %name
+	self.basedir = os.path.dirname(self.existingpath)
 
 class RemoveFiles(BuildAction):
     """
