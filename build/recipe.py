@@ -55,15 +55,15 @@ baseAutoSpec = (
     # automatic subpackage names and sets of regexps that define them
     # cannot be a dictionary because it is ordered; first match wins
     ('devel',
-	('.*\.a$',
-	 '.*\.so$',
-	 '.*/include/.*\.h$',
-	 '^/usr/include/.*',
-	 '^/usr/share/man/man(2|3)',
-	 '^/usr/share/develdoc/')),
-    ('lib', ('.*/lib/.*\.so\.')),
-    ('doc', ('^/usr/share/(doc|man|info)/')),
-    ('locale', ('^/usr/share/locale/',)),
+	('\.a',
+	 '\.so',
+	 '.*/include/.*\.h',
+	 '/usr/include/',
+	 '/usr/share/man/man(2|3)/',
+	 '/usr/share/develdoc/')),
+    ('lib', ('.*/lib/.*\.so\..*')),
+    ('doc', ('/usr/share/(doc|man|info)/')),
+    ('locale', ('/usr/share/locale/',)),
     ('runtime', ('.*',)),
 )
 
