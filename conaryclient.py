@@ -99,6 +99,8 @@ class ConaryClient:
                             [ x[1] for x in depList ])
 
             if sugg:
+                troves = {}
+
                 for (troveName, depSet) in depList:
                     if sugg.has_key(depSet):
                         if suggMap.has_key(troveName):
@@ -106,11 +108,9 @@ class ConaryClient:
                         else:
                             suggMap[troveName] = sugg[depSet]
 
-                troves = {}
-                for suggList in suggMap.itervalues():
-                    suggList = [ (x[0], x[1]) for x in suggList ]
-                    troves.update(dict.fromkeys(suggList))
-                
+			suggList = [ (x[0], x[1]) for x in sugg[depSet] ]
+			troves.update(dict.fromkeys(suggList))
+
                 troves = troves.keys()
                 newCs = self._updateChangeSet(troves, 
                                               keepExisting = keepExisting)
