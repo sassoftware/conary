@@ -31,7 +31,7 @@ class FilesystemJob:
 	self.restores.append((fileObj, target, contents, msg))
 
     def _remove(self, fileObj, target, msg):
-	self.removes.append((fileObj, target, msg))
+	self.removes[target] = (fileObj, msg)
 
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
@@ -45,8 +45,13 @@ class FilesystemJob:
 	    fileObj.restore(contents, target, 1)
 	    log.debug(msg)
 
-	for (fileObj, target, msg) in self.removes:
+	paths = self.removes.keys()
+	paths.sort()
+	paths.reverse()
+	for target in paths:
+	    (fileObj, msg) = self.removes[target]
 	    fileObj.remove(target)
+	    log.debug(msg)
 
 	for (target, str, msg) in self.newFiles:
 	    f = open(target, "w")
@@ -60,7 +65,8 @@ class FilesystemJob:
     def getNewPackageList(self):
 	return self.newPackages
 
-    def _singlePackage(self, repos, pkgCs, changeSet, basePkg, fsPkg, root):
+    def _singlePackage(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
+		       merge):
 	"""
 	Build up the todo list for applying a single package to the
 	filesystem. Returns a package object which represents what will
@@ -80,6 +86,9 @@ class FilesystemJob:
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
+	@param merge: a merge is attempted if true, otherwise the changes
+	from the changeset are used (this is for rollbacks)
+	@type merge: boolean
 	@rtype: package.Package
 	"""
 	if basePkg:
@@ -100,7 +109,6 @@ class FilesystemJob:
 
 	    headFile = files.FileFromInfoLine(changeSet.getFileChange(fileId),
 					      fileId)
-
 	    try:
 		s = os.lstat(headRealPath)
 		if (not isinstance(headFile, files.Directory)
@@ -135,16 +143,17 @@ class FilesystemJob:
 	    else:
 		realPath = cwd + "/" + path
 
-	    # don't remove files if they've been changed locally
-	    try:
-		localFile = files.FileFromFilesystem(realPath, fileId)
-	    except OSError, exc:
-		# it's okay if the file is missing, it just means we all agree
-		if exc.errno == errno.ENOENT:
-		    fsPkg.removeFile(fileId)
-		    continue
-		else:
-		    raise
+	    if merge:
+		try:
+		    # don't remove files if they've been changed locally
+		    localFile = files.FileFromFilesystem(realPath, fileId)
+		except OSError, exc:
+		    # it's okay if the file is missing, it means we all agree
+		    if exc.errno == errno.ENOENT:
+			fsPkg.removeFile(fileId)
+			continue
+		    else:
+			raise
 
 	    oldFile = repos.getFileVersion(fileId, version)
 
@@ -176,7 +185,7 @@ class FilesystemJob:
 		else:
 		    basePath = None
 
-		if fsPath == basePath:
+		if (not merge) or fsPath == basePath :
 		    # the path changed in the repository, propage that change
 		    self._rename(rootFixup + fsPath, rootFixup + headPath,
 		                 "renaming %s to %s" % (fsPath, headPath))
@@ -221,15 +230,19 @@ class FilesystemJob:
 	    if (basePkg and headFileVersion
                 and not fsFile.same(headFile, ignoreOwner = True)):
 		# something has changed for the file
-		(conflicts, mergedChanges) = files.mergeChangeLines(
-						headChanges, fsChanges)
-		if mergedChanges and (not conflicts or
-				      files.contentConflict(mergedChanges)):
-		    fsFile.applyChange(mergedChanges, ignoreContents = 1)
+		if merge:
+		    (conflicts, mergedChanges) = files.mergeChangeLines(
+						    headChanges, fsChanges)
+		    if mergedChanges and (not conflicts or
+					  files.contentConflict(mergedChanges)):
+			fsFile.applyChange(mergedChanges, ignoreContents = 1)
+		    else:
+			contentsOkay = False
+			self.errors.append("file attributes conflict for %s"
+						% realPath)
 		else:
-		    contentsOkay = False
-		    self.errors.append("file attributes conflict for %s"
-					    % realPath)
+		    fsFile.applyChange(headChanges, ignoreContents = 1)
+
 	    else:
 		conflicts = True
 		mergedChanges = None
@@ -253,10 +266,7 @@ class FilesystemJob:
 		else:
 		    headFileContents = None
 
-		if headFile.same(baseFile, ignoreOwner = True):
-		    # it changed in just the filesystem, so leave that change
-		    log.debug("preserving new contents of %s" % realPath)
-		elif fsFile.same(baseFile, ignoreOwner = True):
+		if (not merge) or fsFile.same(baseFile, ignoreOwner = True):
 		    # the contents changed in just the repository, so take
 		    # those changes
 		    if headFileContType == changeset.ChangedFileTypes.diff:
@@ -271,6 +281,9 @@ class FilesystemJob:
 		    self._restore(headFile, realPath, headFileContents,
                                   "replacing %s with contents "
                                   "from repository" % realPath)
+		elif headFile.same(baseFile, ignoreOwner = True):
+		    # it changed in just the filesystem, so leave that change
+		    log.debug("preserving new contents of %s" % realPath)
 		elif fsFile.isConfig() or headFile.isConfig():
 		    # it changed in both the filesystem and the repository; our
 		    # only hope is to generate a patch for what changed in the
@@ -316,7 +329,7 @@ class FilesystemJob:
 
 	return fsPkg
 
-    def __init__(self, repos, changeSet, fsPkgDict, root):
+    def __init__(self, repos, changeSet, fsPkgDict, root, merge = True):
 	"""
 	Constructs the job for applying a change set to the filesystem.
 
@@ -331,10 +344,13 @@ class FilesystemJob:
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
+	@param merge: a merge is attempted if true, otherwise the changes
+	from the changeset are used (this is for rollbacks)
+	@type merge: boolean
 	"""
 	self.renames = []
 	self.restores = []
-	self.removes = []
+	self.removes = {}
 	self.newPackages = []
 	self.errors = []
 	self.newFiles = []
@@ -350,12 +366,19 @@ class FilesystemJob:
 	    if old:
 		basePkg = repos.getPackageVersion(name, old)
 		pkg = self._singlePackage(repos, pkgCs, changeSet, basePkg, 
-					  fsPkgDict[name], root)
+					  fsPkgDict[name], root, merge)
 	    else:
 		pkg = self._singlePackage(repos, pkgCs, changeSet, None, 
-					  None, root)
+					  None, root, merge)
 
 	    self.newPackages.append(pkg)
+
+	for (name, oldVersion) in changeSet.getOldPackageList():
+	    oldPkg = repos.getPackageVersion(name, oldVersion)
+	    for (fileId, (path, version)) in oldPkg.iterFileList():
+		fileObj = repos.getFileVersion(fileId, version)
+		self._remove(fileObj, root + path,
+			     "removing %s" % root + path)
 
 def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
     """
