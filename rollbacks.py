@@ -7,6 +7,11 @@ from local import database
 import log
 
 def listRollbacks(db, cfg):
+    def verStr(cfg, version):
+	if version.branch().label() == cfg.installlabel:
+	    return version.trailingVersion().asString()
+	return version.asString()
+
     for rollbackName in db.getRollbackList():
 	print "%s:" % rollbackName
 
@@ -19,13 +24,13 @@ def listRollbacks(db, cfg):
 	    list.sort()
 	    for (name, pkg) in list:
 		if not pkg.getOldVersion():
-		    print "\t%s %s removed" % (name,
-			 pkg.getNewVersion().asString(cfg.defaultbranch))
+		    print "\t%s %s removed" % (name, 
+					       verStr(cfg, pkg.getNewVersion()))
 		else:
 		    print "\t%s %s -> %s" % \
-			(name,
-			 pkg.getOldVersion().asString(cfg.defaultbranch), 
-			 pkg.getNewVersion().asString(cfg.defaultbranch))
+			(name, 
+			 verStr(cfg, pkg.getOldVersion()),
+			 verStr(cfg, pkg.getNewVersion()))
 
 	    list = []
 	    for (pkg, version, flavor) in cs.getOldPackageList():
@@ -33,8 +38,7 @@ def listRollbacks(db, cfg):
 
 	    list.sort()
 	    for (pkg, version) in list:
-		print "\t%s %s added" %  \
-				(pkg, version.asString(cfg.defaultbranch))
+		print "\t%s %s added" %  (pkg, verStr(cfg, version))
 
 	print
 
