@@ -77,7 +77,7 @@ class DependencyTables:
                    start_transaction = False)
 
     def _populateTmpTable(self, cu, name, depList, troveNum, requires, 
-                          provides):
+                          provides, multiplier = 1):
         allDeps = []
         if requires:
             allDeps += [ (False, x) for x in 
@@ -93,15 +93,15 @@ class DependencyTables:
                         for flag in flags:
                             cu.execute("INSERT INTO %s VALUES(?, ?, ?, ?, "
                                                 "?, ?, ?)" % name,
-                                       (troveNum, len(depList), len(flags), 
-                                        isProvides, classId, 
+                                       (troveNum, multiplier * len(depList), 
+                                        len(flags), isProvides, classId, 
                                         depName, flag),
                                        start_transaction = False)
                     else:
                         cu.execute(    "INSERT INTO %s VALUES(?, ?, ?, ?, "
                                                 "?, ?, ?)" % name,
-                                       (troveNum, len(depList), 1, 
-                                        isProvides, classId, 
+                                       (troveNum, multiplier * len(depList), 
+                                        1, isProvides, classId, 
                                         depName, NO_FLAG_MAGIC),
                                        start_transaction = False)
 
@@ -307,19 +307,21 @@ class DependencyTables:
         createDepUserTable(cu, 'TmpRequires', isTemp = True)
     
         # build the table of all the requirements we're looking for
-        depList = []
+        depList = [ None ]
         oldTroves = []
         troveNames = []
         for i, trvCs in enumerate(changeSet.iterNewPackageList()):
             troveNames.append((trvCs.getName()))
             self._populateTmpTable(cu, "DepCheck", depList, -i - 1, 
-                                   trvCs.getRequires(), 
-                                   trvCs.getProvides())
+                                   trvCs.getRequires(), trvCs.getProvides(),
+                                   multiplier = -1)
 
             if trvCs.getOldVersion():
                 oldTroves.append((trvCs.getName(), trvCs.getOldVersion(),
                                   trvCs.getOldFlavor()))
 
+            # using depNum 0 is a hack, but it's just on a provides so
+            # it shouldn't matter
             cu.execute("INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)",
                        (-i - 1, 0, 1, True, deps.DEP_CLASS_TROVES, 
                         trvCs.getName(), NO_FLAG_MAGIC), 
@@ -377,15 +379,23 @@ class DependencyTables:
         # we've removed
         cu.execute("""
                 INSERT INTO TmpRequires SELECT 
-                    DISTINCT Requires.instanceId, Requires.depId, depCount
-                FROM Requires WHERE Requires.instanceId IN RemovedTroveIds
+                    DISTINCT Requires.instanceId, Requires.depId, 
+                             Requires.depCount
+                FROM RemovedTroveIds JOIN Provides ON
+                    RemovedTroveIds.troveId == Provides.instanceId
+                JOIN Requires ON
+                    Provides.depId = Requires.depId
         """, start_transaction = False)
+
         cu.execute("""
                 INSERT INTO DepCheck SELECT
-                    RemovedTroveIds.troveId, Dependencies.depId, 1, 0, Dependencies.class,
+                    Requires.instanceId, Dependencies.depId,
+                    Requires.DepCount, 0, Dependencies.class,
                     Dependencies.name, Dependencies.flag
-                FROM RemovedTroveIds JOIN Requires ON
-                    RemovedTroveIds.troveId == Requires.instanceId
+                FROM RemovedTroveIds JOIN Provides ON
+                    RemovedTroveIds.troveId == Provides.instanceId
+                JOIN Requires ON
+                    Provides.depId = Requires.depId
                 JOIN Dependencies ON
                     Dependencies.depId == Requires.depId
         """, start_transaction = False)
@@ -409,6 +419,7 @@ class DependencyTables:
         # well
         unresolveable = [ None ] * len(depList)
         for (depNum, instanceId, removedInstanceId) in cu:
+            depNum = -depNum
             if removedInstanceId is None:
                 depList[depNum] = None
             else:
@@ -471,10 +482,10 @@ class DependencyTables:
                             (SELECT labelId FROM Labels WHERE Label='%s')
         """ % label.asString(), start_transaction = False)
 
-        depList = []
+        depList = [ None ]
         for i, depSet in enumerate(depSetList):
             self._populateTmpTable(cu, "DepCheck", depList, -i - 1, 
-                                   depSet, None)
+                                   depSet, None, multiplier = -1)
 
 
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
@@ -500,6 +511,8 @@ class DependencyTables:
         result = {}
         handled = {}
         for (depId, troveName, versionStr) in cu:
+            depId = -depId
+
             if handled.has_key(depId):
                 continue
 
