@@ -46,7 +46,6 @@ class _Source(action.RecipeAction):
 
     def doAction(self):
 	self.builddir = self.recipe.macros.builddir
-	self.dir = self.dir % self.recipe.macros
 	action.RecipeAction.doAction(self)
 
     def _addSignature(self):
@@ -151,7 +150,7 @@ class Archive(_Source):
 	    file specified by C{rpm} for an RPM containing C{sourcename}
 	@keyword dir: If specified, the subdirectory in which to unpack
 	    the sources, relative to C{%(builddir)s}; defaults to
-	    C{%(maindir)s}
+	    C{%(maindir)s}  
 	@keyword keyid: The 8-digit GPG key ID (no leading C{0x}) for the
 	    signature.  Indicates that a signature should be sought and
 	    checked.
@@ -164,19 +163,21 @@ class Archive(_Source):
     def do(self):
 	f = self._findSource()
 	self._checkSignature(f)
-
-	if self.dir:
-	    destdir = '%s/%s' % (self.builddir, self.dir)
-	    util.mkdirChain(destdir)
-	else:
-	    destdir = self.builddir
+        if dir == '':
+            # default for no dir specified is different from when a 
+            # relative dir is specified, 
+            destDir = os.sep.join((self.buildDir, r.recipe.macros.mainDir))
+        else:
+            destDir = action._expandOnePath(self.dir, self.recipe.macros, 
+                                                      defaultDir=self.builddir)
+        util.mkdirChain(destDir)
 
 	if f.endswith(".zip"):
-	    util.execute("unzip -q -o -d %s %s" % (destdir, f))
+	    util.execute("unzip -q -o -d %s %s" % (destDir, f))
 	    return
 
 	if f.endswith(".rpm"):
-	    _extractFilesFromRPM(f, directory=destdir)
+	    _extractFilesFromRPM(f, directory=destDir)
 	    return
 
 	if f.endswith(".bz2") or f.endswith(".tbz2"):
@@ -185,7 +186,7 @@ class Archive(_Source):
 	    tarflags = "-zxf"
 	else:
 	    raise SourceError, "unknown archive compression"
-	util.execute("tar -C %s %s %s" % (destdir, tarflags, f))
+	util.execute("tar -C %s %s %s" % (destDir, tarflags, f))
 
 
 class Patch(_Source):
@@ -212,8 +213,9 @@ class Patch(_Source):
 	@keyword sourcename: The name of the patch file
 	@keyword rpm: If specified, causes Archive to look in the URL or
 	    file specified by C{rpm} for an RPM containing C{sourcename}
-	@keyword dir: The directory relative to C{%(builddir)s} to which
-	    to change before applying the patch.
+	@keyword dir: The directory to change to before applying the patch.
+            Relative dirs are relative to C{%(builddir)s}.  Absolute dirs
+            are relative to C{%(destdir)s}.
 	@keyword keyid: The 8-digit GPG key ID (no leading C{0x}) for the
 	    signature.  Indicates that a signature should be sought and
 	    checked.
@@ -238,8 +240,6 @@ class Patch(_Source):
 	self.applymacros = self.macros
 
     def do(self):
-	destDir = os.sep.join((self.builddir, self.recipe.theMainDir))
-	util.mkdirChain(destDir)
 
 	f = self._findSource()
 	provides = "cat"
@@ -249,9 +249,10 @@ class Patch(_Source):
 	    provides = "bzcat"
 	if self.backup:
 	    self.backup = '-b -z %s' % self.backup
-	if self.dir:
-	    destDir = os.sep.join((destDir, self.dir))
-	    util.mkdirChain(destDir)
+        defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
+        destDir = action._expandOnePath(self.dir, self.recipe.macros, 
+                                                  defaultDir=defaultDir)
+        util.mkdirChain(destDir)
 	if self.applymacros:
 	    log.debug('applying macros to patch %s' %f)
 	    pin = util.popen("%s '%s'" %(provides, f))
@@ -272,7 +273,8 @@ class Patch(_Source):
 class Source(_Source):
     """
     Called as C{r.addSource()} from a recipe, this class copies a file
-    into the build directory %(builddir)s.
+    into the build directory %(builddir)s or the destination directory
+    %(destdir)s.   
     
     If you provide the C{keyid} argument, it will search for a file
     named I{sourcename}C{.{sig,sign,asc}} and make sure that it is
@@ -298,7 +300,8 @@ class Source(_Source):
 	@keyword rpm: If specified, causes Archive to look in the URL or
 	    file specified by C{rpm} for an RPM containing C{sourcename}
 	@keyword dir: The directory in which to store the file, relative
-	    to C{%(builddir)s}.  Defaults to storing directly in the
+	    to C{%(builddir)s}. Absolute directories will be considered
+            relative to c{%(destdir)s}. Defaults to storing directly in the
 	    C{%(builddir)s}.
 	@keyword keyid: The 8-digit GPG key ID (no leading C{0x}) for the
 	    signature.  Indicates that a signature should be sought and
@@ -330,6 +333,7 @@ class Source(_Source):
 	    self.dest = os.path.basename(self.dest %recipe.macros)
 	else:
 	    self.dest = os.path.basename(self.sourcename %recipe.macros)
+
 	if self.contents is not None:
 	    # Do not look for a file that does not exist...
 	    self.sourcename = ''
@@ -339,13 +343,12 @@ class Source(_Source):
 	    self.applymacros = False
 
     def do(self):
-	destDir = os.sep.join((self.builddir, self.recipe.theMainDir))
-	util.mkdirChain(destDir)
-
 	f = self._findSource()
-	if self.dir:
-	    destDir = os.sep.join((destDir, self.dir))
-	    util.mkdirChain(destDir)
+
+        defaultDir = os.sep.join((self.builddir, self.recipe.theMainDir))
+        destDir = action._expandOnePath(self.dir, self.recipe.macros, 
+                                                  defaultDir=defaultDir)
+        util.mkdirChain(destDir)
         destFile = os.sep.join((destDir, self.dest))
 	if self.contents is not None:
 	    pout = file(destFile, "w")
@@ -386,7 +389,8 @@ class Action(action.RecipeAction):
 	@keyword action: A command line to run.
 	    Macros will be interpolated into this command.
 	@keyword dir: The directory in which to store the file, relative
-	    to C{%(builddir)s}.  Defaults to storing directly in the
+	    to C{%(builddir)s}.  Absolute directories will be considered
+            relative to c{%(destdir)s}.  Defaults to storing directly in the
 	    C{%(builddir)s}.
 	@keyword use: A Use flag or boolean, or a tuple of Use flags and/or
 	    booleans, that determine whether the archive is actually
@@ -396,13 +400,11 @@ class Action(action.RecipeAction):
 	self.action = args[0]
 
     def do(self):
-	self.builddir = self.recipe.macros.builddir
-	self.dir = self.dir % self.recipe.macros
-	destDir = os.sep.join((self.builddir, self.recipe.theMainDir))
-	util.mkdirChain(destDir)
-	if self.dir:
-	    destDir = os.sep.join((destDir, self.dir))
-	    util.mkdirChain(destDir)
+	builddir = self.recipe.macros.builddir
+        defaultDir = os.sep.join((builddir, self.recipe.theMainDir))
+        destDir = action._expandOnePath(self.dir, self.recipe.macros, 
+                                                  defaultDir)
+        util.mkdirChain(destDir)
 	util.execute(self.action %self.recipe.macros, destDir)
 
     def fetch(self): 

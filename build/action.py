@@ -286,3 +286,58 @@ class ShellCommand(RecipeAction):
 	RecipeAction.addArgs(self, *args, **keywords)
 
 
+def _expandOnePath(path, macros, defaultDir, braceGlob=False, error=False):
+    if braceGlob:
+        return _expandPaths([path], macros, defaultDir, True, error)
+    path = path % macros
+    if path and path[0] == '/':
+        if path.startswith(macros.destdir):
+            log.warning(
+                "remove destdir from path name %s;"
+                " absolute paths are automatically relative to destdir"
+                %path)
+        else:
+            path = macros.destdir + path
+    else:
+        path = os.path.join(defaultDir, path)
+
+    if error:
+        if not os.path.exists(path):
+            raise RuntimeError, "No such file '%s'" % path
+    return path
+
+def _expandPaths(paths, macros, defaultPath=None, braceGlob=True, error=False):
+    """
+    Expand braces, globs, and macros in path names, and root all path names
+    to either the build dir or dest dir.  Relative paths (not starting with
+    a /) are relative to builddir.  All absolute paths to are relative to 
+    destdir.  
+    """
+    destdir = macros.destdir
+    if defaultPath is None:
+        defaultPath = macros.builddir
+    expPaths = []
+    for path in paths:
+        path = path % macros
+        if path[0] == '/':
+            if path.startswith(destdir):
+                log.warning(
+                    "remove destdir from path name %s;"
+                    " absolute paths are automatically relative to destdir"
+                    %path)
+            else:
+                path = destdir + path
+        else:
+            path = defaultPath + os.sep + path
+        if braceGlob:
+            expPaths.extend(util.braceGlob(path))
+        else:
+            expPaths.append(path)
+    if error:
+        notfound = []
+        for path in expPaths:
+            if not os.path.exists(path):
+                notfound.append(path)
+        if notfound:
+            raise RuntimeError, "No such file(s) '%s'" % "', '".join(notfound)
+    return expPaths

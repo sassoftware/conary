@@ -2,6 +2,9 @@ Changes in 0.12.5
   * reworked dependency resolution a bit for a big speedup in the server
   * moved destdir to %(builddir)s/root
   * made macros.destdir available during the unpacking of sources 
+  * source commands (r.addAction, etc.), if given absolute directories for 
+    their dir keywords, will perform their actions in the destdir instead
+    of the builddir
 
 Changes in 0.12.4
   * set more arch flags for x86 and x86_64

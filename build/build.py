@@ -873,7 +873,7 @@ class Replace(BuildAction):
             self.min = self.max = None
 
     def do(self, macros):
-        paths = _expandPaths(self.paths, macros)
+        paths = action._expandPaths(self.paths, macros, error=True)
         log.debug("Replacing '%s' in %s", 
                   "', '".join(["' -> '".join(x) for x in self.regexps ] ),
                   ' '.join(paths))
@@ -1303,33 +1303,3 @@ class ConsoleHelper(BuildAction):
         recipe.Requires('/usr/bin/consolehelper', self.linkname)
 
 
-def _expandPaths(paths, macros):
-    """
-    Expand braces, globs, and macros in path names, and root all path names
-    to either the build dir or dest dir.  Relative paths (not starting with
-    a /) are relative to builddir.  All absolute paths to are relative to 
-    destdir.  
-    """
-    destdir = macros.destdir
-    builddir = macros.builddir
-    expPaths = []
-    for path in paths:
-        path = path % macros
-        if path[0] == '/':
-            if path.startswith(destdir):
-                log.warning(
-                    "remove destdir from path name %s;"
-                    " absolute paths are automatically relative to destdir"
-                    %path)
-            else:
-                path = destdir + path
-        else:
-            path = builddir + os.sep + path
-        expPaths.extend(util.braceGlob(path))
-    notfound = []
-    for path in expPaths:
-        if not os.path.exists(path):
-            notfound.append(path)
-    if notfound:
-        raise RuntimeError, "No such files %s" % ' '.join(notfound)
-    return expPaths
