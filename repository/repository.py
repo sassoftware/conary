@@ -320,7 +320,6 @@ class LocalRepository(Repository):
 	    self.close()
 
 	self.lockfd = os.open(self.top + "/lock", os.O_CREAT | os.O_RDWR)
-        # XXX check return value of os.open
 
 	if mode == "r":
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_SH)
