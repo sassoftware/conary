@@ -41,6 +41,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     # 2. netserver.InsufficientPermission
 
     def callWrapper(self, methodname, authToken, args):
+
+        def condRollback():
+            if self.repos.troveStore.db.inTransaction:
+                self.repos.rollback()
+
 	# reopens the sqlite db if it's changed
 	self.repos.reopen()
 
@@ -58,6 +63,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    r = self.__getattribute__(method)(authToken, *args)
 	    return (False, r)
 	except repository.TroveMissing, e:
+            condRollback()
 	    if not e.troveName:
 		return (True, ("TroveMissing", "", ""))
 	    elif not e.version:
@@ -66,12 +72,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 		return (True, ("TroveMissing", e.troveName, 
 			self.fromVersion(e.version)))
 	except repository.CommitError, e:
+            condRollback()
 	    return (True, ("CommitError", str(e)))
 	except ClientTooOld, e:
+            condRollback()
 	    return (True, ("ClientTooOld", str(e)))
 	except repository.DuplicateBranch, e:
+            condRollback()
 	    return (True, ("DuplicateBranch", str(e)))
 	#except Exception:
+        #    self.condRollback()
 	#    import traceback, sys, string
         #    import lib.epdb
 	#    excInfo = sys.exc_info()
