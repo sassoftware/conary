@@ -59,5 +59,10 @@ def encodeFileId(fileId):
     return sqlite3.encode(fileId)
 
 def decodeFileId(fileId):
-    return fileId
+    return sqlite3.decode(fileId)
 
+def encodeStream(fileId):
+    return sqlite3.encode(fileId)
+
+def decodeStream(fileId):
+    return sqlite3.decode(fileId)

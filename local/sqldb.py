@@ -23,7 +23,7 @@ import versions
 import versiontable
 
 # these will go away once we switch internal fileids
-from sha1helper import encodeFileId, decodeFileId
+from sha1helper import encodeFileId, decodeFileId, encodeStream, decodeStream
 
 class Tags(idtable.CachedIdTable):
 
@@ -67,8 +67,8 @@ class DBTroveFiles:
 	cu = self.db.cursor()
 	cu.execute("SELECT path, stream FROM DBTroveFiles "
 		   "WHERE instanceId=? and isPresent=1", instanceId)
-	for match in cu:
-	    yield match
+	for path, stream in cu:
+            yield (path, decodeStream(stream))
 
     def getByInstanceId(self, instanceId, justPresent = True):
 	cu = self.db.cursor()
@@ -80,8 +80,8 @@ class DBTroveFiles:
 	    cu.execute("SELECT path, stream FROM DBTroveFiles "
 		       "WHERE instanceId=?", instanceId)
 
-	for match in cu:
-	    yield match
+	for path, stream in cu:
+	    yield (path, decodeStream(stream))
 
     def delInstance(self, instanceId):
         cu = self.db.cursor()
@@ -113,7 +113,8 @@ class DBTroveFiles:
 		       fileId, versionId)
 	# there could be multiple matches, but they should all be redundant
 	try:
-	    return cu.next()
+            path, stream = cu.next()
+            return (path, decodeStream(stream))
 	except StopIteration:
             raise KeyError, (fileId, versionId)
 
@@ -123,7 +124,7 @@ class DBTroveFiles:
         cu.execute("""
 	    INSERT INTO DBTroveFiles VALUES (NULL, ?, ?, ?, ?, ?, ?)
 	""",
-	   (fileId, versionId, path, instanceId, 1, sqlite3.encode(stream)))
+	   (fileId, versionId, path, instanceId, 1, encodeStream(stream)))
 
 	streamId = cu.lastrowid
 
@@ -137,7 +138,7 @@ class DBTroveFiles:
         cu = self.db.cursor()
 	cu.execute("UPDATE DBTroveFiles SET versionId=?, stream=? "
 		   "WHERE fileId=? AND versionId=? AND instanceId=?",
-		   newVersionId, sqlite3.encode(newStream), fileId, 
+		   newVersionId, encodeStream(newStream), fileId, 
 		   oldVersionId, instanceId)
 
     def iterPath(self, path):
@@ -606,6 +607,8 @@ class Database:
 	""")
 
 	for (fileId, stream) in cu:
+            fileId = decodeFileId(fileId)
+            stream = decodeStream(stream)
 	    yield files.ThawFile(stream, fileId)
 
     def getTrove(self, troveName, troveVersion, troveFlavor, pristine = False):
@@ -792,6 +795,7 @@ class Database:
 
 	versionCache = {}
 	for (fileId, path, versionId, stream) in cu:
+            stream = decodeStream(stream)
 	    version = versionCache.get(versionId, None)
 	    if not version:
 		version = self.versionTable.getBareId(versionId)
