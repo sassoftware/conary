@@ -448,7 +448,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	    bldInfo.destdir = destdir
 	os.chdir(builddir + '/' + recipeObj.mainDir())
 	recipeObj.doBuild(builddir, destdir, resume=resume)
-	if resume and resume != "policy" and recipeObj.resumeList[-1][1]:
+	if resume and resume != "policy" and recipeObj.resumeList[-1][1] != False:
 	    log.info('Finished Building %s Lines %s, Not Running Policy', recipeClass.name, resume)
 	    return
 	log.info('Processing %s', recipeClass.name)
