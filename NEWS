@@ -5,6 +5,8 @@ Changes in 0.50.4:
   * The CONARY state after a merge operation on a shadow now has the
     correct fileId for files that are not different than the parent
     version.
+  * Added /usr/lib/conary/conarybugz.py to make it easy to automatically
+    populate bugzilla databases from repositories.
 
 Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 
