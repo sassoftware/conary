@@ -49,5 +49,10 @@ def sourceCommand(cfg, args, argSet):
 
 	if argSet or len(args) != 1: usage()
 	checkin.diff(repos, cfg)
+    elif (args[0] == "update"):
+	repos = repository.LocalRepository(cfg.reppath, "r")
+
+	if argSet or len(args) != 1: usage()
+	checkin.update(repos, cfg)
     else:
 	usage()

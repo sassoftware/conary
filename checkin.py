@@ -11,6 +11,7 @@ import helper
 import log
 import os
 import package
+import patch
 import recipe
 import repository
 import util
@@ -24,7 +25,7 @@ class SourceState:
     """
 
     def addFile(self, fileId, path, version):
-	self.files[path] = (fileId, version)
+	self.files[fileId] = (path, version)
 
     def setTroveName(self, name):
 	self.troveName = name
@@ -47,9 +48,15 @@ class SourceState:
     def getFileList(self):
 	return self.files.iteritems()
 
+    def getFile(self, fileId):
+	return self.files[fileId]
+
+    def hasFile(self, fileId):
+	return self.files.has_key(fileId)
+
     def getRecipeFileNames(self):
 	list = []
-	for path in self.files.iterkeys():
+	for (fileId, (path, version)) in self.files.iteritems():
 	    if path.endswith(".recipe"): list.append(os.getcwd() + '/' + path)
 
 	return list
@@ -74,7 +81,7 @@ class SourceState:
 	f.write("version %s\n" % self.troveVersion.asString())
 	f.write("branch %s\n" % self.troveBranch.asString())
 
-	for (path, (fileId, version)) in self.files.iteritems():
+	for (fileId, (path, version)) in self.files.iteritems():
 	    f.write("file %s %s %s\n" % (fileId, path, version.asString()))
 
     def __init__(self, filename = None):
@@ -203,13 +210,23 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 
     srcPkg = repos.getPackageVersion(state.getTroveName(), srcVersion)
 
-    if needsHead and not srcVersion.equal(state.getTroveVersion()):
-	log.error("working version (%s) is different from the head of the " +
-		  "branch (%s); use update", 
-		  state.getTroveVersion().asString(), 
-		  oldPackage.getVersion().asString())
-	return
+    if needsHead:
+	if not srcVersion.equal(state.getTroveVersion()):
+	    log.error("working version (%s) is different from the head of " +
+		      "the branch (%s); use update", 
+		      state.getTroveVersion().asString(), 
+		      srcVersion.asString())
+	    return
 
+	# make sure the files in this directory are based on the same
+	# versions as those in the package at head
+	bail = 0
+	for (fileId, (path, version)) in state.getFileList():
+	    srcVersion = srcPkg.getFile(fileId)[1]
+	    if not version.equal(srcVersion):
+		log.error("%s is not at head; use update" % path)
+    
+	if bail: return
 
     # load the recipe; we need this to figure out what version we're building
     try:
@@ -220,6 +237,10 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 	    classes.update(newClasses)
     except recipe.RecipeFileError, msg:
 	raise CookError(str(msg))
+
+    if not classes:
+	log.error("no recipe files were found")
+	return
 
     recipeVersionStr = None
     for className in classes.iterkeys():
@@ -244,7 +265,7 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 
     foundDifference = 0
 
-    for (path, (fileId, version)) in state.getFileList():
+    for (fileId, (path, version)) in state.getFileList():
 	realPath = os.getcwd() + "/" + path
 
 	f = files.FileFromFilesystem(realPath, fileId, type = "src")
@@ -284,7 +305,6 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 
 def commit(repos, cfg):
     # we need to commit based on changes to the head of a branch
-
     result = buildChangeSet(repos, needsHead = True)
     if not result: return
 
@@ -298,7 +318,7 @@ def commit(repos, cfg):
 
 def diff(repos, cfg):
 
-    result = buildChangeSet(repos, needsHead = True)
+    result = buildChangeSet(repos)
     if not result: return
 
     (changed, state, changeSet, oldPackage) = result
@@ -326,3 +346,126 @@ def diff(repos, cfg):
 		print str
 		print
 	
+def update(repos, cfg):
+    if not os.path.isfile("SRS"):
+	log.error("SRS file must exist in the current directory for source commands")
+	return
+
+    state = SourceState("SRS")
+    pkgName = state.getTroveName()
+    baseVersion = state.getTroveVersion()
+    
+    head = repos.getLatestPackage(pkgName, state.getTroveBranch())
+    headVersion = head.getVersion()
+    if headVersion.equal(baseVersion):
+	log.info("working directory is already based on head of branch")
+	return
+
+    changeSet = repos.createChangeSet([(pkgName, baseVersion, headVersion, 0)])
+
+    packageChanges = changeSet.getNewPackageList()
+    assert(len(packageChanges) == 1)
+    pkgCs = packageChanges[0]
+    basePkg = repos.getPackageVersion(state.getTroveName(), 
+				      state.getTroveVersion())
+
+    fullyUpdated = 1
+    for (fileId, headPath, headVersion) in pkgCs.getChangedFileList():
+	(fsPath, fsVersion) = state.getFile(fileId)
+	pathOkay = 1
+	contentsOkay = 1
+	realPath = fsPath
+	# if headPath is none, the name hasn't changed in the repository
+	if headPath and headPath != fsPath:
+	    # the paths are different; if one of them matches the one
+	    # from the old package, take the other one as it is the one
+	    # which changed
+	    if basePkg.hasFile(fileId):
+		basePath = basePkg.getFile(fileId)[0]
+	    else:
+		basePath = None
+
+	    if fsPath == basePath:
+		# the path changed in the repository, propage that change
+		log.info("renaming %s to %s" % (fsPath, headPath))
+		os.rename(fsPath, headPath)
+		state.addFile(fileId, headPath, fsVersion)
+		realPath = headPath
+	    else:
+		pathOkay = 0
+		realPath = fsPath	# let updates work still
+		log.error("path conflict for %s (%s on head)" % 
+			  (fsPath, headPath))
+
+	fsFile = files.FileFromFilesystem(realPath, fileId, type = "src")
+	(headFile, headFileContents) = \
+		repos.getFileVersion(fileId, headVersion, withContents = 1)
+
+	if fsFile.sha1() != headFile.sha1():
+	    # the contents have changed... let's see what to do
+	    if basePkg.hasFile(fileId):
+		baseFileVersion = basePkg.getFile(fileId)[1]
+		(baseFile, baseFileContents) = repos.getFileVersion(fileId, 
+				    baseFileVersion, withContents = 1)
+	    else:
+		baseFile = None
+
+	    if not baseFile:
+		log.error("new file %s conflicts with file on head of branch"
+				% realPath)
+		contentsOkay = 0
+	    elif headFile.sha1() == baseFile.sha1():
+		# it changed in just the filesystem, so leave that change
+		log.info("preserving new contents of %s" % realPath)
+	    elif fsFile.sha1() == baseFile.sha1():
+		# the contents changed in just the repository, so take
+		# those changes
+		log.info("replacing %s with contents from head" % realPath)
+		src = repos.pullFileContentsObject(headFile.sha1())
+		dest = open(realPath, "w")
+		util.copyfileobj(src, dest)
+		del src
+		del dest
+	    elif fsFile.isConfig() or headFile.isConfig():
+		# it changed in both the filesystem and the repository; our
+		# only hope is to generate a patch for what changed in the
+		# repository and try and apply it here
+		(contType, cont) = changeset.fileContentsDiff(
+			baseFile, baseFileContents,
+			headFile, headFileContents)
+		if contType != changeset.ChangedFileTypes.diff:
+		    log.error("contents conflict for %s" % realPath)
+		    contentsOkay = 0
+		else:
+		    log.info("merging changes from head into %s" % realPath)
+		    diff = cont.get().readlines()
+		    cur = open(realPath, "r").readlines()
+		    (newLines, failedHunks) = patch.patch(cur, diff)
+
+		    f = open(realPath, "w")
+		    f.write("".join(newLines))
+
+		    if failedHunks:
+			log.warning("conflicts from merging changes from " +
+			    "head into %s saved as %s.conflicts" % 
+			    (realPath, realPath))
+			failedHunks.write(realPath + ".conflicts", 
+					  "current", "head")
+
+		    contentsOkay = 1
+	    else:
+		log.error("contents conflict for %s" % realPath)
+		contentsOkay = 0
+
+	if pathOkay and contentsOkay:
+	    # XXX this doesn't even attempt to merge file permissions
+	    # and such; the good part of that is differing owners don't
+	    # break things
+	    state.addFile(fileId, realPath, headVersion)
+	else:
+	    fullyUpdated = 0
+
+    if fullyUpdated:
+	state.setTroveVersion(headVersion)
+
+    state.write("SRS")
