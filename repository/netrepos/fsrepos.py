@@ -131,13 +131,20 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    # if fileObj is None, we need to get the fileObj from a remote
 	    # repository
 
-	    fileObj = self._getLocalOrRemoteFileVersion(fileId, version)
+	    fileObj = self.getFileVersion(fileId, version)
 	    yield fileId, path, version, fileObj
 
     ### File functions
 
-    def getFileVersion(self, fileId, version, withContents = 0):
-	file = self.troveStore.getFile(fileId, version)
+    def getFileVersion(self, fileId, fileVersion, withContents = 0):
+	# the get trove netclient provides doesn't work with a 
+	# FilesystemRepository (it needs to create a change set which gets 
+	# passed)
+	if fileVersion.branch().label().getHost() != self.name:
+	    assert(not withContents)
+	    return self.reposSet.getFileVersion(fileId, fileVersion)
+
+	file = self.troveStore.getFile(fileId, fileVersion)
 	if withContents:
 	    if file.hasContents:
 		cont = filecontents.FromDataStore(self.contentsStore, 
@@ -260,14 +267,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	else:
 	    return self.reposSet.getTrove(troveName, troveVersion, troveFlavor)
 
-    def _getLocalOrRemoteFileVersion(self, fileId, fileVersion):
-	# the get trove netclient provides doesn't work with a FilesystemRepository
-	# (it needs to create a change set which gets passed)
-	if fileVersion.branch().label().getHost() == self.name:
-	    return self.getFileVersion(fileId, fileVersion)
-	else:
-	    return self.reposSet.getFileVersion(fileId, fileVersion)
-
     def _getLocalOrRemoteFileVersions(self, l):
 	# this assumes all of the files are from the same server!
 
@@ -276,8 +275,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	else:
 	    d = {}
 	    for (fileId, fileVersion) in l:
-		d[(fileId, fileVersion)] = self._getLocalOrRemoteFileVersion(
-						fileId, fileVersion)
+		d[(fileId, fileVersion)] = self.getFileVersion(fileId, 
+							       fileVersion)
 
 	return d
 
@@ -292,7 +291,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    # a bit of sleight of hand here... we look for this file in
 	    # the trove it was first built in
 	    f = self.reposSet.getFileContents(troveName, fileVersion, 
-					      troveFlavor, path)
+					      troveFlavor, path, fileVersion)
 	    return filecontents.FromGzFile(f)
 
     def createChangeSet(self, troveList, recurse = True, withFiles = True):
