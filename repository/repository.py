@@ -28,8 +28,13 @@ class Repository:
     def _getPackageSet(self, name):
 	return _PackageSet(self.pkgDB, name)
 
+    def _getGroupSet(self, name):
+	return _GroupSet(self.groupDB, name)
+
     def _getFileDB(self, fileId):
 	return _FileDB(self.fileDB, fileId)
+
+    ### Package access functions
 
     def getPackageList(self, groupName = ""):
 	if self.pkgDB.hasFile(groupName):
@@ -73,11 +78,16 @@ class Repository:
 	ps = self._getPackageSet(pkg.getName())
 	ps.addVersion(pkg.getVersion(), pkg)
 
+    def getPackageNickList(self, pkgName, nick):
+	return self._getPackageSet(pkgName).mapBranchNickname(nick)
+
     def getPackageVersionList(self, pkgName):
 	return self._getPackageSet(pkgName).fullVersionList()
 
     def getPackageBranchList(self, pkgName):
 	return self._getPackageSet(pkgName).branchList()
+
+    ### File functions
 
     def fileLatestVersion(self, fileId, branch):
 	fileDB = self._getFileDB(fileId)
@@ -110,6 +120,36 @@ class Repository:
 
     def storeFileFromContents(self, chgSet, file, restoreContents):
 	raise NotImplemented
+
+    ### Group functions
+
+    def hasGroup(self, grp):
+	return self.grpDB.hasFile(grp)
+
+    def hasGroupVersion(self, grpName, version):
+	return self._getGroupSet(grpName).hasVersion(version)
+
+    def grpLatestVersion(self, grpName, branch):
+	return self._getGroupSet(grpName).findLatestVersion(branch)
+
+    def getLatestGroup(self, grpName, branch):
+	return self._getGroupSet(grpName).getLatestGroup(branch)
+
+    def getGroupVersion(self, grpName, version):
+	return self._getGroupSet(grpName).getVersion(version)
+
+    def eraseGroupVersion(self, grpName, version):
+	gs = self._getGroupSet(grpName)
+	gs.eraseVersion(version)
+
+    def addGroup(self, grp):
+	gs = self._getGroupSet(grp.getName())
+	gs.addVersion(grp.getVersion(), grp)
+
+    def getGroupNickList(self, grpName, nick):
+	return self._getGroupSet(grpName).mapBranchNickname(nick)
+
+    ###
 
     def __del__(self):
 	self.close()
@@ -163,17 +203,27 @@ class LocalRepository(Repository):
 	else:
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
 
+	self.pkgDB = None
+	self.fileDB = None
+
         try:
             self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", 
 						   self.createBranches, mode)
             self.fileDB = versioned.Database(self.top + "/files.db", 
 					     self.createBranches, mode)
+            self.groupDB = versioned.FileIndexedDatabase(
+			    self.top + "/groups.db", self.createBranches, mode)
         # XXX this should be translated into a generic versioned.DatabaseError
         except bsddb.error:
             # an error occured, close our databases and relinquish the lock
             if self.pkgDB is not None:
                 self.pkgDB.close()
                 self.pkgDB = None
+
+            if self.groupDB is not None:
+                self.groupDB.close()
+                self.groupDB = None
+
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_UN)
             os.close(self.lockfd)
             self.lockfd = -1
@@ -324,6 +374,24 @@ class _FileDBClass(VersionedFile):
 
 def _FileDB(db, fileId):
     return db.openFile(fileId, fileClass = _FileDBClass)
+
+class _GroupSetClass(VersionedFile):
+
+    def getVersion(self, version):
+	f1 = VersionedFile.getVersion(self, version)
+	p = group.GroupFromFile(self.name, f1, version)
+	f1.close()
+	return p
+
+    def addVersion(self, version, group):
+	VersionedFile.addVersion(self, version, group.formatString())
+
+    def __init__(self, db, name, createBranches):
+	VersionedFile.__init__(self, db, name, createBranches)
+	self.name = name
+
+def _GroupSet(db, fileId):
+    return db.openFile(fileId, fileClass = _GroupSetClass)
 
 class ChangeSetJobFile:
 
