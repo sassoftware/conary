@@ -3,6 +3,8 @@
 # All rights reserved
 #
 
+import filecontainer
+import gzip
 import httplib
 import os
 import package
@@ -163,6 +165,56 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         assert(withContents == 0)
         return self.toFile(self.s.getFileVersion(fileId,
                                                  self.fromVersion(version)))
+
+    def getFileContents(self, sha1List):
+	l = sha1List[:]
+	l.sort()
+
+	sha1s = []
+	for item in sha1List:
+	    if type(item) == tuple:
+		sha1s.append(item[0])
+	    else:
+		sha1s.append(item)
+
+	url = self.s.getFileContents(sha1s)
+
+	# XXX we shouldn't need to copy this locally; doing so is silly
+	inF = urllib.urlopen(url)
+	(fd, path) = tempfile.mkstemp()
+	os.unlink(path)
+	outF = os.fdopen(fd, "r+")
+	util.copyfileobj(inF, outF)
+	inF.close()
+
+	outF.seek(0)
+	fc = filecontainer.FileContainer(outF)
+	del outF
+
+	d = {}
+	for item in sha1List:
+	    if type(item) == tuple:
+		(sha1, path) = item
+		f = open(path, "w")
+		returnFile = False
+	    else:
+		sha1 = item
+		(fd, path) = tempfile.mkstemp()
+		f = os.fdopen(fd, "w+")
+		returnFile = True
+
+	    inF = fileobj = fc.getFile(sha1)
+	    util.copyfileobj(inF, f)
+	    del inF
+
+	    if returnFile:
+		f.seek(0)
+		d[sha1] = f
+	    else:
+		del f
+		d[sha1] = path
+
+	return d
 
     def commitChangeSet(self, chgSet):
 	(outFd, path) = tempfile.mkstemp()

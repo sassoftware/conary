@@ -462,7 +462,7 @@ class DataStoreRepository:
 	    else:
 		(sha1, path) = item
 		outF = open(path, "w+")
-		inF = self.contentsStore.openFile(item)
+		inF = self.contentsStore.openFile(sha1)
 		util.copyfileobj(inF, outF)
 		d[item] = path
 
