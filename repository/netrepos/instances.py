@@ -4,7 +4,6 @@
 #
 
 import idtable
-import versions
 import sqlite
 
 class InstanceTable:
