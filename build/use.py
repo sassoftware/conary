@@ -223,6 +223,7 @@ Use.kde = False
 Use.xfce = False
 Use.gd = False
 Use.ldap = False
+Use.pie = False
 
 Use.desktop = Use.gnome | Use.kde | Use.xfce
 Use.desktop.setShortDoc('Building with support for freedesktop.org specs')
