@@ -228,7 +228,7 @@ class FilesystemJob:
 		    fileList = [x for x in 
 				self.repos.iterFilesWithTag(tagInfo.tag) ] 
 		    if fileList:
-			cmd = [ tagInfo, ("files", "update"), files ]
+			cmd = [ tagInfo, ("files", "update"), fileList ]
 			tagCommands.append(cmd)
 
 		tagSet[tagInfo.tag] = tagInfo
