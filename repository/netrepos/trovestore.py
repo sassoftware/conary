@@ -380,8 +380,13 @@ class TroveStore:
 			NeededFlavors LEFT OUTER JOIN Flavors ON
 			    NeededFlavors.flavor = Flavors.Flavor 
 			WHERE Flavors.flavorId is NULL""")
+        # make a list of the flavors we're going to create.  Add them
+        # after we have retreived all of the rows from this select
+        l = []
 	for (flavorStr,) in cu:
-	    self.flavors.createFlavor(flavorIndex[flavorStr])
+            l.append(flavorIndex[flavorStr])
+        for flavor in l:
+	    self.flavors.createFlavor(flavor)
 
 	flavors = {}
 	cu.execute("""SELECT Flavors.flavor, Flavors.flavorId FROM
