@@ -50,6 +50,11 @@ class NonBinariesInBindirs(policy.Policy):
 	'%(initdir)s/',
 	'%(libexecdir)s/',
 	'%(sysconfdir)s/profile.d/',
+	'%(sysconfdir)s/cron.daily/',
+	'%(sysconfdir)s/cron.hourly/',
+	'%(sysconfdir)s/cron.weekly/',
+	'%(sysconfdir)s/cron.monthly/',
+	'%(sysconfdir)s/cron.d/',
     ]
 
     def doFile(self, file):
