@@ -320,7 +320,7 @@ class TroveStore:
                    "Items WHERE isPresent=1");
 
         for (item,) in cu:
-            return item
+            yield item
 
     def addTrove(self, trove):
 	cu = self.db.cursor()
