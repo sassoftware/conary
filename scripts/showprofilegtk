@@ -226,7 +226,6 @@ if __name__ == '__main__':
         f = open(filename)
         stats = cPickle.load(f)
     else:    
-        progress('loading %s' %filename)
         stats = hotshot.stats.load(filename)
 
     app = StatWindow()
