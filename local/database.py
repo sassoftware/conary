@@ -294,6 +294,8 @@ class Database(SqlDbRepository):
         flags = 0
         if replaceFiles:
             flags |= update.REPLACEFILES
+        if isRollback:
+            flags |= update.MISSINGFILESOKAY
 
 	for pkg in cs.iterNewPackageList():
 	    if pkg.getName().endswith(":source"): raise SourcePackageInstall
@@ -341,7 +343,8 @@ class Database(SqlDbRepository):
 		pkg = self.getTrove(name, old, flavor)
 		origPkg = self.getTrove(name, old, flavor, pristine = 1)
 		assert(pkg)
-		pkgList.append((pkg, origPkg, ver, 0))
+		pkgList.append((pkg, origPkg, ver, 
+                                flags & update.MISSINGFILESOKAY))
 
 	if not keepExisting:
 	    for (name, version, flavor) in cs.getOldPackageList():
