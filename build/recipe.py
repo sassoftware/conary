@@ -666,10 +666,10 @@ class PackageRecipe(Recipe):
 
 class GroupRecipe(Recipe):
 
-    def addTrove(self, name, versionStr):
+    def addTrove(self, name, versionStr = None):
 	try:
 	    pkgList = helper.findPackage(self.repos, self.cfg.packagenamespace,
-				     None, name, versionStr)
+				     self.branchNick, name, versionStr)
 	except helper.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
 
@@ -679,10 +679,11 @@ class GroupRecipe(Recipe):
     def getTroveList(self):
 	return self.troveVersions
 
-    def __init__(self, repos, cfg):
+    def __init__(self, repos, cfg, branch):
 	self.repos = repos
 	self.cfg = cfg
 	self.troveVersions = {}
+	self.branchNick = branch.branchNickname()
 
 class FilesetRecipe(Recipe):
 
@@ -696,7 +697,7 @@ class FilesetRecipe(Recipe):
 
 	try:
 	    pkgList = helper.findPackage(self.repos, self.cfg.packagenamespace,
-				     self.buildNick, component, versionStr)
+				     self.branchNick, component, versionStr)
 	except helper.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
 
@@ -745,14 +746,13 @@ class FilesetRecipe(Recipe):
     def iterFileList(self):
 	return self.files.iteritems()
 	    
-    def __init__(self, repos, cfg, branchNick):
+    def __init__(self, repos, cfg, branch):
 	self.repos = repos
 	self.cfg = cfg
 	self.files = {}
 	self.paths = {}
-	self.branchNick = branchNick
+	self.branchNick = branch.branchNickname()
 	
-
 class RecipeFileError(Exception):
     def __init__(self, msg):
         self.msg = msg
