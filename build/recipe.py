@@ -104,6 +104,7 @@ def setupRecipeDict(d, filename):
     exec 'from build import action' in d
     exec 'from build.recipe import PackageRecipe' in d
     exec 'from build.recipe import GroupRecipe' in d
+    exec 'from build.recipe import RedirectRecipe' in d
     exec 'from build.recipe import FilesetRecipe' in d
     exec 'from build.recipe import loadRecipe' in d
     exec 'from lib import util' in d
@@ -137,8 +138,6 @@ class RecipeLoader:
         self.module.__dict__['cfg'] = cfg
         self.module.__dict__['repos'] = repos
         self.module.__dict__['component'] = component
-
-        
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -182,7 +181,10 @@ class RecipeLoader:
                 continue
             recipename = getattr(obj, 'name', '')
             # make sure the class is derived from Recipe
-            if issubclass(obj, PackageRecipe) and obj is not PackageRecipe:
+            if (issubclass(obj, PackageRecipe) 
+                        and obj is not PackageRecipe) or \
+               (issubclass(obj, RedirectRecipe) 
+                        and obj is not RedirectRecipe):
                 if recipename.startswith('group-'):
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name cannot '
@@ -640,7 +642,7 @@ class PackageRecipe(Recipe):
 	    self.macros.update(extraMacros)
 	self.mainDir(self.nameVer())
 
-class GroupRecipe(Recipe):
+class _GroupOrRedirectRecipe(Recipe):
     Flags = use.LocalFlags
 
     def addTrove(self, name, versionStr = None, flavor = None, source = None):
@@ -696,6 +698,14 @@ class GroupRecipe(Recipe):
 	self.label = branch.label()
 	self.flavor = flavor
         self.addTroveList = []
+
+class GroupRecipe(_GroupOrRedirectRecipe):
+
+    pass
+
+class RedirectRecipe(_GroupOrRedirectRecipe):
+
+    pass
 
 class FilesetRecipe(Recipe):
     # XXX need to work on adding files from different flavors of troves

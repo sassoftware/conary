@@ -233,12 +233,17 @@ def displayTroveHeader(trove, indent, displayC, fullVersions):
     """ Displays very basic information about the trove """
     troveName = trove.getName()
     version = trove.getNewVersion()
-    if trove.isAbsolute():
-        verFrom =  " (absolute)"
-    elif trove.getOldVersion():
-        verFrom = " (from %s)" % displayC[troveName,trove.getOldVersion()]
+    if trove.getIsRedirect():
+        verFrom = " (redirect)"
     else:
-        verFrom =  " (new) "
+        verFrom = ""
+
+    if trove.isAbsolute():
+        verFrom +=  " (absolute)"
+    elif trove.getOldVersion():
+        verFrom += " (from %s)" % displayC[troveName,trove.getOldVersion()]
+    else:
+        verFrom +=  " (new) "
     print "%-30s %-15s" % (indent + troveName, 
                            displayC[troveName, version] + verFrom)
     if trove.getOldFlavor() != trove.getNewFlavor():

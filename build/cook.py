@@ -258,6 +258,12 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
                                 sourceVersion = sourceVersion,
 				resume = resume, 
                                 alwaysBumpCount = alwaysBumpCount)
+    elif issubclass(recipeClass, recipe.RedirectRecipe):
+	ret = cookGroupObject(repos, cfg, recipeClass, buildBranch, 
+			      macros = macros, targetLabel = targetLabel,
+                              sourceVersion = sourceVersion,
+                              alwaysBumpCount = alwaysBumpCount,
+                              redirect = True)
     elif issubclass(recipeClass, recipe.GroupRecipe):
 	ret = cookGroupObject(repos, cfg, recipeClass, buildBranch, 
 			      macros = macros, targetLabel = targetLabel,
@@ -289,7 +295,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 
 def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
 		    targetLabel = None, sourceVersion=None,
-                    alwaysBumpCount=False):
+                    alwaysBumpCount=False, redirect = False):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -315,6 +321,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     full version with any other existing troves with the same name, 
     even if their flavors would differentiate them.  
     @type alwaysBumpCount: bool
+    @param redirect: if True, a redirect trove is built instead of a
+    normal trove.
     """
 
     fullName = recipeClass.name
@@ -337,7 +345,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
         for (version, flavor) in versionFlavorList:
             grpFlavor.union(flavor)
 
-    grp = trove.Trove(fullName, versions.NewVersion(), grpFlavor, None)
+    grp = trove.Trove(fullName, versions.NewVersion(), grpFlavor, None,
+                      isRedirect = redirect)
 
     for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
         for (version, flavor) in versionFlavorList:
@@ -351,7 +360,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     if targetLabel:
 	targetVersion = targetVersion.createBranch(targetLabel,
                                                    withVerRel = True)
-	targetVersion.trailingVersion().incrementBuildCount()
+	targetVersion.incrementBuildCount()
 
     grp.changeVersion(targetVersion)
 
