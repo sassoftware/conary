@@ -473,6 +473,7 @@ class StreamSet(InfoStream):
 
     headerFormat = "!BH"
     headerSize = 3
+    ignoreUnknown = False
 
     def __init__(self, data = None):
 	for streamType, name in self.streamDict.itervalues():
@@ -485,10 +486,16 @@ class StreamSet(InfoStream):
                 assert(i < dataLen)
 		(streamId, size) = struct.unpack(self.headerFormat, 
 						 data[i:i + self.headerSize])
-		(streamType, name) = self.streamDict[streamId]
-		i += self.headerSize
-		self.__setattr__(name, streamType(data[i:i + size]))
-		i += size
+                tup = self.streamDict.get(streamId, None)
+                i += self.headerSize
+                streamData = data[i:i + size]
+                i += size
+
+                if tup:
+                    (streamType, name) = tup
+                    self.__setattr__(name, streamType(streamData))
+                elif not self.ignoreUnknown:
+                    raise UnknownStream
 
 	    assert(i == dataLen)
 
@@ -599,3 +606,7 @@ class LargeStreamSet(StreamSet):
 
     headerFormat = "!HI"
     headerSize = 6
+
+class UnknownStream(Exception):
+
+    pass
