@@ -588,10 +588,10 @@ class ChangeSetJob:
 	    pkgName = csPkg.getName()
 	    troveFlavor = csPkg.getFlavor()
 
-	    #if repos.hasTrove(pkgName, newVersion, csPkg.getFlavor()):
-	#	raise CommitError, \
-	#	       "version %s of %s is already installed" % \
-	#		(newVersion.asString(), csPkg.getName())
+	    if repos.hasTrove(pkgName, newVersion, csPkg.getFlavor()):
+		raise CommitError, \
+		       "version %s of %s is already installed" % \
+			(newVersion.asString(), csPkg.getName())
 
 	    if old:
 		newPkg = repos.getTrove(pkgName, old, csPkg.getFlavor(),

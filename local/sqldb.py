@@ -221,13 +221,19 @@ class DBInstanceTable:
  	for match in cu:
 	    yield match
 
-    def addId(self, troveName, versionId, flavorId, timeStamps):
+    def addId(self, troveName, versionId, flavorId, timeStamps, 
+	      isPresent = True):
 	assert(min(timeStamps) > 0)
+	if isPresent:
+	    isPresent = 1
+	else:
+	    isPresent = 0
+
         cu = self.db.cursor()
         cu.execute("INSERT INTO DBInstances VALUES (NULL, %s, %d, %d, "
 						   "%s, %d)",
                    (troveName, versionId, flavorId, 
-		    ":".join([ "%.3f" % x for x in timeStamps]), 1))
+		    ":".join([ "%.3f" % x for x in timeStamps]), isPresent))
 	return cu.lastrowid
 
     def delId(self, theId):
@@ -447,12 +453,12 @@ class Database:
 	return theId
 
     def getInstanceId(self, troveName, versionId, flavorId,
-		      timeStamps):
+		      timeStamps, isPresent = True):
 	theId = self.instances.get((troveName, versionId, flavorId), 
 				   None)
 	if theId is None:
 	    theId = self.instances.addId(troveName, versionId, flavorId,
-					 timeStamps)
+					 timeStamps, isPresent = isPresent)
 
 	return theId
 
@@ -594,7 +600,8 @@ class Database:
 	    else:
 		flavorId = 0
 	    instanceId = self.getInstanceId(name, versionId, flavorId,
-					    version.timeStamps())
+					    version.timeStamps(),
+					    isPresent = False)
 	    self.troveTroves.addItem(troveInstanceId, instanceId)
 
     def addFile(self, fileObj, fileVersion):
