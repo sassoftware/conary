@@ -336,7 +336,7 @@ class DeviceFile(File):
 	    os.unlink(target)
 
 	# FIXME os.mknod is in 2.3
-	os.system("mknod %s %c %d %d" % (target, self.type, self.major,
+	os.system("mknod %s %c %d %d" % (target, self.infoTag, self.major,
 					self.minor))
 
 	File.restore(self, target)
