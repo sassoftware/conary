@@ -49,7 +49,7 @@ class Action:
 	    self.commonkeywords = {}
 	self.__dict__.update(self.commonkeywords)
 	# keywords will be in the class object, not the instance
-	if not self.__class__.__dict__.has_key('keywords'):
+	if not hasattr(self.__class__, 'keywords'):
 	    self.keywords = {}
 	self.__dict__.update(self.keywords)
         # check to make sure that we don't get a keyword we don't expect
