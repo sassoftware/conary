@@ -137,7 +137,7 @@ class StatWindow(gtk.Window):
     def __init__(self, filename):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
         self.set_title('Profile viewer: %s' %filename)
-        self.connect('destroy', lambda *x: gtk.mainquit())
+        self.connect('destroy', lambda *x: gtk.main_quit())
         self.set_default_size(700, 400)
         pane = gtk.VPaned()
 
