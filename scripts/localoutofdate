@@ -239,8 +239,22 @@ def main(argv):
             maxP = max(maxP, len(pkg))
             maxL = max(maxL, len(repoMap[pkg].asString()))
         print "=" * 78
+        displayVals = {}
+                
+
         for pkg in missing:
-            print "   %-*s    <Not Installed>    %-*s" % (maxP, pkg, maxL, repoMap[pkg].asString())
+            displayVals['local'] = '<Not Installed>'
+            displayVals['version'] = ''
+            displayVals['change'] = ''
+            displayVals['repo'] = repoMap[pkg].asString()
+            displayVals['name'] =  pkg
+            displayArgs = []
+            for param in displayOrder:
+                displayArgs.extend(displayVars[param][1])
+                displayArgs.append(displayVals[param])
+            print displayStr % tuple(displayArgs)
+
+           # print "   %-*s    <Not Installed>    %-*s" % (maxP, pkg, maxL, repoMap[pkg].asString())
     return 0
 
 if __name__ == "__main__":
