@@ -538,8 +538,11 @@ class FileIndexedDatabase(Database):
 	assert(issubclass(fileClass, IndexedVersionedFile))
 
 	if not self.files.has_key(file):
-	    self.files[file] = 1
-	    self._writeMap()
+	    if not self.readOnly:
+		self.files[file] = 1
+		self._writeMap()
+	    else:
+		raise KeyError, "file %s is not in the database" % file
 	
 	return fileClass(self.db, file, self.createBranches, self)
 
@@ -586,6 +589,7 @@ class FileIndexedDatabase(Database):
 
     def __init__(self, path, createBranches, mode = "r"):
 	Database.__init__(self, path, createBranches, mode)
+	self.readOnly = (mode == "r")
 	self._readMap()
 
 class VersionedFileError(Exception):
