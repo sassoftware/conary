@@ -148,6 +148,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	return file
 
+    def getFileVersions(self, l):
+	return self.troveStore.getFiles(l)
+
     def addFileVersion(self, fileId, version, file):
 	# don't add duplicated to this repository
 	if not self.troveStore.hasFile(fileId, version):
@@ -264,10 +267,15 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    return self.reposSet.getFileVersion(fileId, fileVersion)
 
     def _getLocalOrRemoteFileVersions(self, l):
-	d = {}
-	for (fileId, fileVersion) in l:
-	    d[(fileId, fileVersion)] = self._getLocalOrRemoteFileVersion(
-					    fileId, fileVersion)
+	# this assumes all of the files are from the same server!
+
+	if l[0][1].branch().label().getHost() == self.name:
+	    d = self.getFileVersions(l)
+	else:
+	    d = {}
+	    for (fileId, fileVersion) in l:
+		d[(fileId, fileVersion)] = self._getLocalOrRemoteFileVersion(
+						fileId, fileVersion)
 
 	return d
 
@@ -348,7 +356,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 					    absolute))
 		    
 		continue
-		    
+
 	    new = self._getLocalOrRemoteTrove(troveName, newVersion, flavor)
 	 
 	    if oldVersion:
@@ -397,8 +405,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		oldCont = None
 		newCont = None
 
-		newFile = self._getLocalOrRemoteFileVersion(fileId, 
-							    newFileVersion)
+		newFile = idIdx[(fileId, newFileVersion)]
 
 		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
 							 newFile)

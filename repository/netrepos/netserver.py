@@ -24,6 +24,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def callWrapper(self, method, authToken, args):
 	print method, args
+
 	try:
 	    r = self.__class__.__dict__[method](self, authToken, *args)
 	    return (False, r)

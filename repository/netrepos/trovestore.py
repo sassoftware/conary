@@ -700,6 +700,42 @@ class TroveStore:
 	stream = self.fileStreams[(fileId, versionId)]
 	return files.ThawFile(stream, fileId)
 
+    def getFiles(self, l):
+	cu = self.db.cursor()
+
+	cu.execute("""
+	    CREATE TEMPORARY TABLE getFilesTbl(rowId INTEGER PRIMARY KEY,
+					       fileId STRING,
+					       versionId INT)
+	""", start_transaction = False)
+
+	verCache = {}
+	lookup = range(len(l) + 1)
+	for (fileId, fileVersion) in l:
+	    versionId = verCache.get(fileVersion, None)
+	    if versionId is None:
+		versionId = self.versionTable[fileVersion]
+		verCache[fileVersion] = versionId
+
+	    cu.execute("INSERT INTO getFilesTbl VALUES(NULL, %s, %d)",
+		       (fileId, versionId), start_transaction = False)
+	    lookup[cu.lastrowid] = (fileId, fileVersion)
+
+	cu.execute("""
+	    SELECT rowId, stream FROM getFilesTbl JOIN FileStreams ON
+		    getFilesTbl.versionId = FileStreams.versionId AND
+		    getFilesTbl.fileId = FileStreams.fileId 
+	""")
+
+	d = {}
+	for (rowId, stream) in cu:
+	    (fileId, version) = lookup[rowId]
+	    d[(fileId, version)] = files.ThawFile(stream, fileId)
+
+	cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
+
+	return d
+
     def hasFile(self, fileId, fileVersion):
 	versionId = self.versionTable.get(fileVersion, None)
 	if not versionId: return False
