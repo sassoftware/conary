@@ -1,3 +1,4 @@
+import types
 
 class Hunk:
 
@@ -48,6 +49,13 @@ class Hunk:
 # lines should be omitted, and only a single file can be patched
 def patch(oldLines, unifiedDiff):
     i = 0
+
+    if type(unifiedDiff) == types.GeneratorType:
+	list = []
+	for l in unifiedDiff:
+	    list.append(l)
+	unifiedDiff = list
+
     last = len(unifiedDiff)
     hunks = []
     while i < last:
@@ -130,7 +138,7 @@ def patch(oldLines, unifiedDiff):
 		break
 
 	conflictCount = best[0]
-	if (hunk.contextCount - conflictCount) < 2:
+	if conflictCount and (hunk.contextCount - conflictCount) < 2:
 	    failedHunks.append(hunk)
 	    continue
 
