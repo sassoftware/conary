@@ -289,6 +289,9 @@ class BranchName(AbstractBranch):
     def getHost(self):
 	return self.host
 
+    def getNamespace(self):
+	return self.namespce
+
     def __eq__(self, version):
 	if (isinstance(version, BranchName)
 	     and self.host == version.host
@@ -675,6 +678,12 @@ class Version(AbstractVersion):
 	    if lastBranch.asString() == "localhost@local:LOCAL":
 		lastBranch = None
 		v.append(LocalBranch())
+	    elif lastBranch.asString() == "localhost@local:COOK":
+		lastBranch = None
+		v.append(CookBranch())
+	    elif lastBranch.asString() == "localhost@local:EMERGE":
+		lastBranch = None
+		v.append(EmergeBranch())
 	    else:
 		v.append(lastBranch)
 

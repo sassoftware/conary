@@ -347,9 +347,9 @@ class IdealRepository(AbstractTroveDatabase):
 		label = defaultLabel
 
 	    versionDict = self.getTroveLeavesByLabel([name], label)
-	    if not versionDict:
+	    if not versionDict[name]:
 		raise PackageNotFound, "branch %s does not exist for package %s" \
-			    % (str(label), name)
+			    % (label.asString(), name)
 	elif versionStr[0] != "/" and versionStr.find("/") == -1:
 	    # version/release was given
 	    try:

@@ -13,11 +13,17 @@
 #
 from repository import changeset
 from repository import repository
+import filecontainer
 import log
 import versions
 
 def doCommit(repos, changeSetFile, targetBranch):
-    cs = changeset.ChangeSetFromFile(changeSetFile)
+    try:
+	cs = changeset.ChangeSetFromFile(changeSetFile)
+    except filecontainer.BadContainer:
+	log.error("invalid changeset %s", changeSetFile)
+	return 1
+
     if targetBranch:
 	if cs.isAbsolute():
 	    # we can't do this -- where would we branch from?

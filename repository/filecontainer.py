@@ -173,14 +173,14 @@ class FileContainer:
     def readTable(self):
 	magic = self.file.read(4)
 	if len(magic) != 4 or magic != FILE_CONTAINER_MAGIC:
-	    raise KeyError, "bad file container magic"
+	    raise BadContainer, "bad magic"
 
 	version = self.file.read(2)
 	if len(version) != 2:
-	    raise KeyError, "bad file container version"
+	    raise BadContainer, "invalid container version"
 	version = struct.unpack("!H", version)[0]
 	if version != FILE_CONTAINER_VERSION:
-	    raise KeyError, "unknown file container version %d" % version
+	    raise BadContainer, "unknown file container version %d" % version
 
 	self.gzfile = gzip.GzipFile(None, "rb", None, self.file)
 
@@ -296,4 +296,6 @@ class FileContainer:
 		raise
 	    self.mutable = False
 	
+class BadContainer(Exception):
 
+    pass

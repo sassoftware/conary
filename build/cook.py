@@ -578,13 +578,14 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 	recipeClass = loader.getRecipe()
         changeSetFile = "%s-%s.ccs" % (recipeClass.name, recipeClass.version)
 
-	versionList = repos.getTroveLeavesByLabel([
-			    recipeClass.name + ":source"], cfg.buildLabel)
+	srcName = recipeClass.name + ":source"
+	versionDict = repos.getTroveLeavesByLabel([srcName], cfg.buildLabel)
+	versionList = versionDict[srcName]
 
 	if versionList:
 	    match = None
 	    if len(versionList) != 1:
-		for version in versionList.values()[0]:
+		for version in versionList:
 		    if version.branch() == buildBranch:
 			match = version
 
@@ -593,7 +594,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 				(recipeClass.name, cfg.buildLabel.asString()))
 		v = match
 	    else:
-		v = versionList.values()[0][0]
+		v = versionList[0]
 
 	    targetVersion = v.fork(versions.CookBranch(), sameVerRel = True)
 	else:
