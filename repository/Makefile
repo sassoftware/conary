@@ -20,7 +20,7 @@ python_files = __init__.py	\
 		netclient.py 	\
 		repository.py	\
 		transport.py	\
-		xmlshims.py	\
+		xmlshims.py
 
 extra_dist = Makefile
 

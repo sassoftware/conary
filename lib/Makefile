@@ -21,6 +21,7 @@ python_files=	    __init__.py		\
 		    magic.py		\
 		    options.py		\
 		    patch.py		\
+		    sha1helper.py	\
 		    stackutil.py	\
 		    util.py
 

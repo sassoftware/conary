@@ -40,20 +40,14 @@ python_files = __init__.py	\
 	display.py		\
 	files.py		\
 	importrpm.py		\
-	log.py			\
-	magic.py		\
-	patch.py		\
 	queryrep.py		\
 	rollbacks.py		\
 	rpmhelper.py		\
-	sha1helper.py		\
 	srcctl.py		\
 	streams.py		\
 	trove.py		\
 	updatecmd.py		\
-	util.py			\
-	versions.py		\
-	xmlshims.py
+	versions.py
 
 example_files = examples/tmpwatch.recipe
 bin_files = conary
