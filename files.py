@@ -172,6 +172,21 @@ class SymbolicLink(File):
 
 	File.__init__(self, path, version, info)
 
+class NamedPipe(File):
+
+    def infoLine(self):
+	return "p %s" % (File.infoLine(self))
+
+    def compare(self, other):
+	return File.compare(self, other)
+
+    def copy(self, source, target):
+	if not os.path.exists(target):
+	    os.system("mknod %s p" % target)
+
+    def __init__(self, path, version = None, info = None):
+	File.__init__(self, path, version, info)
+
 class Directory(File):
 
     def infoLine(self):
@@ -185,6 +200,41 @@ class Directory(File):
 	    os.mkdir(target)
 
     def __init__(self, path, version = None, info = None):
+	File.__init__(self, path, version, info)
+
+class DeviceFile(File):
+
+    def infoLine(self):
+	return "v %c %d %d %s" % (self.type, self.major, self.minor,
+				  File.infoLine(self))
+
+    def compare(self, other):
+	if (self.type == other.type and self.major == other.major and
+			self.minor == other.minor):
+	    return File.compare(self, other)
+	
+	return 0
+
+    def copy(self, source, target):
+	if not os.path.exists(target):
+	    os.system("mknod %s %c %d %d" % (target, self.type, self.major,
+					    self.minor))
+
+    def majorMinor(self, type = None, major = None, minor = None):
+	if type:
+	    self.type = type
+	    self.major = major
+	    self.minor = minor
+	
+	return (self.type, self.major, self.minor)
+
+    def __init__(self, path, version = None, info = None):
+	if (info):
+	    (self.type, self.major, self.minor, info) = \
+		    string.split(info, None, 3)
+	    self.major = int(self.major)
+	    self.minor = int(self.minor)
+
 	File.__init__(self, path, version, info)
 
 class RegularFile(File):
@@ -265,26 +315,31 @@ class FileDB:
 	self.read()
 
 def FileFromFilesystem(root, path):
-    (perms, inode, dev, links, uid, gid, size, atime, mtime, ctime) = \
-	os.lstat(root + path)
+    s = os.lstat(root + path)
 
-    if (stat.S_ISREG(perms)):
+    if (stat.S_ISREG(s.st_mode)):
 	f = RegularFile(path)
-	f.perms(perms)
 	f.md5(md5sum.md5sum(root + path))
-    elif (stat.S_ISLNK(perms)):
+    elif (stat.S_ISLNK(s.st_mode)):
 	f = SymbolicLink(path)
-	f.perms(0777)
 	f.linkTarget(os.readlink(root + path))
-    elif (stat.S_ISDIR(perms)):
+    elif (stat.S_ISDIR(s.st_mode)):
 	f = Directory(path)
-	f.perms(perms & 07777)
+    elif (stat.S_ISFIFO(s.st_mode)):
+	f = NamedPipe(path)
+    elif (stat.S_ISBLK(s.st_mode)):
+	f = DeviceFile(path)
+	f.majorMinor("b", s.st_rdev >> 8, s.st_rdev & 0xff)
+    elif (stat.S_ISCHR(s.st_mode)):
+	f = DeviceFile(path)
+	f.majorMinor("c", s.st_rdev >> 8, s.st_rdev & 0xff)
     else:
 	raise TypeError, "unsupported file type for %s" % path
 
-    f.owner(pwd.getpwuid(uid)[0])
-    f.group(grp.getgrgid(gid)[0])
-    f.mtime(mtime)
+    f.perms(s.st_mode & 07777)
+    f.owner(pwd.getpwuid(s.st_uid)[0])
+    f.group(grp.getgrgid(s.st_gid)[0])
+    f.mtime(s.st_mtime)
 
     return f
 
@@ -296,5 +351,9 @@ def FileFromInfoLine(path, version, infoLine):
 	return SymbolicLink(path, version, infoLine)
     elif type == "d":
 	return Directory(path, version, infoLine)
+    elif type == "p":
+	return NamedPipe(path, version, infoLine)
+    elif type == "v":
+	return DeviceFile(path, version, infoLine)
     else:
 	raise KeyError, "bad infoLine %s" % infoLine
