@@ -1,3 +1,8 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 class EnumeratedType(dict):
 
     def __getattr__(self, item):
