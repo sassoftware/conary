@@ -1,3 +1,24 @@
+Changes in 0.10.3:
+  * this version introduces changes to the network protocol for
+    obtaining file contents and changeset generation. The client
+    protocol version number has increased, so version 0.10.3 can only
+    communicate with servers running the server from 0.10.3. The
+    server remains backward compatible with older clients.
+  * a warning message is now displayed when the user attempts to
+    create a branch that already exists on a trove.
+  * the correct trove names are displayed when automatically resolving
+    dependencies 
+  * packages no longer get the union of all the dependency information
+    of the components they contain.  This information would have to be
+    recalculated if a user installed a package then removed a
+    component afterward.
+  * a package policy check was added to reject any world-writable
+    executable file.
+  * r.TagSpec('tagname', exceptions='filter') now overrides a match by
+    another r.TagSpec('tagname', 'filter')
+  * more changes to metadata interface
+  * various other bug fixes and improvements
+
 Changes in 0.10.2:
   * the repository code is now included in the main conary source
     archive
