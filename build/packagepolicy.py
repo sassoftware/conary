@@ -1226,15 +1226,15 @@ class Requires(_addInfo):
             else: # by process of elimination, must be a trove
                 if info.startswith('group-'):
                     self.recipe.reportErrors(
-                        'group dependency %s no allowed' %info)
+                        'group dependency %s not allowed' %info)
                     return
                 if info.startswith('fileset-'):
                     self.recipe.reportErrors(
-                        'fileset dependency %s no allowed' %info)
+                        'fileset dependency %s not allowed' %info)
                     return
                 if ':' not in info:
                     self.recipe.reportErrors(
-                        'package dependency %s no allowed' %info)
+                        'package dependency %s not allowed' %info)
                     return
                 depClass = deps.TroveDependencies
             self._addRequirement(path, info, pkg, depClass)
