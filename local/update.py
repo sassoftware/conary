@@ -128,6 +128,9 @@ class FilesystemJob:
     def getNewPackageList(self):
 	return self.newPackages
 
+    def getOldPackageList(self):
+	return self.oldPackages
+
     def _singlePackage(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
 		       flags):
 	"""
@@ -439,6 +442,7 @@ class FilesystemJob:
 	self.restores = []
 	self.removes = {}
 	self.newPackages = []
+	self.oldPackages = []
 	self.errors = []
 	self.newFiles = []
 	self.runLdconfig = False
@@ -458,6 +462,8 @@ class FilesystemJob:
 		basePkg = repos.getPackageVersion(name, old)
 		pkg = self._singlePackage(repos, pkgCs, changeSet, basePkg, 
 					  fsPkgDict[name], root, flags)
+		self.oldPackages.append((basePkg.getName(), 
+					 basePkg.getVersion()))
 	    else:
 		pkg = self._singlePackage(repos, pkgCs, changeSet, None, 
 					  None, root, flags)
@@ -465,6 +471,7 @@ class FilesystemJob:
 	    self.newPackages.append(pkg)
 
 	for (name, oldVersion) in changeSet.getOldPackageList():
+	    self.oldPackages.append((name, oldVersion))
 	    oldPkg = repos.getPackageVersion(name, oldVersion)
 	    for (fileId, (path, version)) in oldPkg.iterFileList():
 		fileObj = repos.getFileVersion(fileId, version)
