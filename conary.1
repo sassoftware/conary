@@ -195,6 +195,12 @@ is specified.
 .TP
 .B \-\-tags
 Show any files in the changeset that have tags.
+.RE
+.TP
+.B verify [--all] \fI<trove>[=version]*\fP
+Compares the files in the given \fItrove\fP (or all troves if the --all 
+option if given) against the trove files as they were  at the time of install,
+and displays any differences.
 .\"
 .\"
 .\"

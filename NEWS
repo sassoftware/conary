@@ -5,6 +5,8 @@ Changes in 0.11.10
     the distribution python version will not add all of the python
     recipe's flavor information to the loading recipe class, as long
     as the loading recipe does not subclass the Python class.)
+  * add conary verify command for comparing the local system's state to 
+    the state it was in at install time
 
 Changes in 0.11.9
   * change the order of permissions setting (chmod after chown)

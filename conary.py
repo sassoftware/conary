@@ -23,6 +23,11 @@ if sys.version_info < (2, 3):
     print "error: python 2.3 or greater is requried"
     sys.exit(1)
 
+#stdlib
+import os
+import xmlrpclib
+
+#conary
 from build import cook
 import commit
 import conarycfg
@@ -35,15 +40,14 @@ from lib import options
 from lib import util
 from local import database
 import metadata
-import os
 import queryrep
 import repository
 from repository import netclient
 import rollbacks
 import showchangeset
 import updatecmd
+import verify
 import versions
-import xmlrpclib
 
 sys.excepthook = util.genExcepthook()
 
@@ -62,6 +66,7 @@ def usage(rc = 1):
     print "       conary showcs       <changeset> <trove>[=<version>]*"
     print "       conary update       <pkgname>[=<version>]* <changeset>*"
     print "       conary usage"
+    print "       conary verify       <pkgname>[=<version>]*"
     print "       conary --version"
     print ""
     print "commit flags:  --target-branch <branch>"
@@ -356,6 +361,14 @@ def realMain(cfg, argv=sys.argv):
 	db = openDatabase(cfg.root, cfg.dbPath)
 	args = [db, cfg] + otherArgs[2:]
 	rollbacks.apply(*args)
+    elif (otherArgs[1] == "verify"):
+	db = openDatabase(cfg.root, cfg.dbPath)
+        all = argSet.has_key('all')
+	if all: del argSet['all']
+        if len(otherArgs) < 2 or argSet:
+            return verify.usage()
+        troves = otherArgs[2:]
+        verify.verify(troves, db, cfg, all=all)
     elif (otherArgs[1] == "showcs" or otherArgs[1] == "scs"):
         ls = argSet.has_key('ls')
 	if ls: del argSet['ls']
