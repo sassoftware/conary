@@ -110,7 +110,7 @@ class Group:
 	    if not self.spec:
 		old = []
 	    else:
-		old = string.split(self.spec, '\n')
+		old = self.spec.split('\n')
 
 	    (new, failed) = patch.patch(old, cs.getPatch().split('\n'))
 	    if failed:
@@ -294,7 +294,6 @@ class GroupFromTextFile(Group):
 		name = name
 
 	    if name.count(":") != 2:
-		print "--", parts
 		log.error("group names may not include colons")
 		errors = 1
 		name = "localhost:unknown"
@@ -524,7 +523,8 @@ class GroupChangeSet:
 		       len(self.packages.keys()))
 	elif not self.oldVersion:
 	    hdr = "SRS GRP NEW %s %s %d\n" % \
-		      (self.name, self.newVersion.freeze(), rc.count("\n"))
+		      (self.name, self.newVersion.freeze(),
+                       len(self.packages.keys()))
 	else:
 	    hdr = "SRS GRP CHANGESET %s %s %s %d\n" % \
 		      (self.name, self.oldVersion.freeze(), 
