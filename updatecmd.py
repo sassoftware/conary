@@ -58,16 +58,18 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
             log.error("repository does not contain a package called %s" % 
 		      (package.stripNamespace(cfg.packagenamespace, pkg)))
 	    bail = 1
-	elif not repos.hasPackageVersion(pkg, newVersion):
-	    log.error("package %s does not contain version %s" %
-		      (package.stripNamespace(cfg.packagenamespace, pkg), 
-		      newVersion.asString(cfg.defaultbranch)))
-	    bail = 1
 	else:
 	    if not newVersion:
 		newVersion = repos.pkgLatestVersion(pkg, cfg.defaultbranch)
 
+	    if not newVersion or not repos.hasPackageVersion(pkg, newVersion):
+		log.error("package %s does not contain version %s" %
+			  (package.stripNamespace(cfg.packagenamespace, pkg), 
+			  newVersion.asString(cfg.defaultbranch)))
+		bail = 1
+
 	    if db.hasPackage(pkg):
+		# currentVersion could be None
 		currentVersion = db.pkgLatestVersion(pkg, 
 						     newVersion.branch())
 	    else:
