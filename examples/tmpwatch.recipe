@@ -1,0 +1,21 @@
+
+class Logrotate(recipe.Recipe):
+
+    description = """Logrotate is a genuinally useful piece of code for
+preventing files from growing ad nauseum"""
+
+    buildRequires = [ "glibc" ]
+    installRequires = [ "cron" ]
+
+    name = "tmpwatch"
+    version = "2.9.0"
+
+    def setup(self):
+	self.addTarball("tmpwatch-2.9.0.tar.gz")
+	self.build = build.Make()
+	self.install = build.MakeInstall(rootVar = "ROOT")
+
+    def packages(self, root):
+	pkgs = package.Auto("tmpwatch", root)
+
+	return pkgs
