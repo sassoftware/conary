@@ -76,6 +76,7 @@ class Policy(action.RecipeAction):
 	@keyword use: Optional argument; Use flag(s) telling whether
 	to actually perform the action.
 	@type use: None, Use flag, or tuple/list of Use flags
+	XXX: document inclusions and subtrees
 	"""
 	# enforce pure virtual status
 	assert(self.__class__ is not Policy)
