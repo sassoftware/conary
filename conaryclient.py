@@ -13,6 +13,7 @@
 #
 import os
 from lib import util
+import pickle
 
 import conarycfg
 import versions
@@ -263,8 +264,74 @@ class ConaryClient:
 
             for t in troves:
                 list.append((t.getName(), t.getVersion(), t.getFlavor()))
-
+ 
         self.db.eraseTroves(list, tagScript = tagScript)
+
+    def getMetadata(self, troveList, label, cacheFile = None,
+                    cacheOnly = False, saveOnly = False):
+        metadata = {}
+        if cacheFile and not saveOnly:
+            try:
+                print "opening cache"
+                cacheFp = open(cacheFile, "r")
+                cache = pickle.load(cacheFp)
+                cacheFp.close()
+            except IOError, EOFError:
+                print "got an error, returning"
+                if cacheOnly:
+                    return {}
+            else:
+                print "reading cache"
+                print cache
+                lStr = label.asString()
+
+                t = troveList[:]
+                for troveName, branch in t:
+                    print "searching cache for ", troveName
+                    bStr = branch.asString()
+
+                    print lStr, bStr, troveName
+                    if lStr in cache and\
+                       bStr in cache[lStr] and\
+                       troveName in cache[lStr][bStr]:
+                        metadata[troveName] = cache[lStr][bStr][troveName]
+                        troveList.remove((troveName, branch))
+
+        print "done with cache:", metadata
+        # if the cache missed any, grab from the repos
+        if not cacheOnly and troveList:
+            print "not cacheOnly and troveList"
+            metadata.update(self.repos.getMetadata(troveList, label))
+            print "new metadata:", metadata 
+            if metadata and cacheFile:
+                try:
+                    cacheFp = open(cacheFile, "rw")
+                    cache = pickle.load(cacheFp)
+                    cacheFp.close()
+                except IOError, EOFError:
+                    cache = {}
+
+                cacheFp = open(cacheFile, "w")
+
+                # filter down troveList to only contain items for which we found metadata
+                cacheTroves = [x for x in troveList if x[0] in metadata]
+
+                lStr = label.asString()
+                for troveName, branch in cacheTroves:
+                    bStr = branch.asString()
+
+                    if lStr not in cache:
+                        cache[lStr] = {}
+                    if bStr not in cache[lStr]:
+                        cache[lStr][bStr] = {}
+
+                    cache[lStr][bStr][troveName] = metadata[troveName]
+
+                pickle.dump(cache, cacheFp)
+                cacheFp.close()
+
+        return metadata
+
 
     def _prepareRoot(self):
         """
