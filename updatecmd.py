@@ -69,7 +69,7 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
                 print "    %s -> %s" % (req, " ".join([x[0] for x in suggList]))
             return
         elif suggMap:
-            print "Installing extra troves for dependency resolution"
+            print "Including extra troves for dependency resolution"
             print "    %s" % " ".join(suggMap.iterkeys())
 
         client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,
