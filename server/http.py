@@ -125,6 +125,11 @@ class HttpHandler(HtmlEngine):
         else:
             troveName = fields['troveNameList'].value
         
+        if fields.has_key('source'):
+            source = fields['source'].value.lower()
+        else:
+            source = None
+        
         branches = {}
         for version in self.troveStore.iterTroveVersions(troveName):
             branch = version.branch().freeze()
@@ -133,7 +138,7 @@ class HttpHandler(HtmlEngine):
             branches[branch] = branchName
 
         if len(branches) == 1:
-            self._getMetadata(troveName, branches.keys()[0])
+            self._getMetadata(troveName, branches.keys()[0], source)
             return
 
         self.htmlPageTitle("Please choose a branch:")
@@ -143,7 +148,7 @@ class HttpHandler(HtmlEngine):
         troveName = fields['troveName'].value
         branch = fields['branch'].value
         if 'source' in fields:
-            source = fields['source'].value
+            source = fields['source'].value.lower()
         else:
             source = None
 
@@ -173,7 +178,7 @@ class HttpHandler(HtmlEngine):
                     "source":     [ "" ],
                  }
         
-        self.htmlMetadataEditor(troveName, branch, md)
+        self.htmlMetadataEditor(troveName, branch, md, source)
   
     def updateMetadataCmd(self, authToken, fields):
         branch = self.repServer.thawVersion(fields["branch"].value)

@@ -123,6 +123,7 @@ tr.header {
 <p><div class="formHeader">Pick a trove:</div>%s</p>
 <p><div class="formHeader">Or enter a trove name:</div><input type="text" name="troveName"></p>
 <p><input type="submit"></p>
+<p><input type="submit" value="Freshmeat" name="source" /></p>
 </form>
         """ % (action, troveSelection))
        
@@ -143,16 +144,18 @@ Choose a branch: %s
     def htmlWarning(self, warning=""):
         self.writeFn("""<div class="warning">%s</div>""" % warning)
         
-    # XXX this is just a placeholder for a real editor
-    def htmlMetadataEditor(self, troveName, branch, metadata):
+    def htmlMetadataEditor(self, troveName, branch, metadata, source=None):
         branchStr = branch.asString().split("/")[-1]
         branchFrz = branch.freeze()
 
-        if "version" in metadata:
+        if source:
+            versionStr = "initial %s source" % source
+        elif "version" in metadata:
             # the only number that matters in the metadata version is the source revision
             versionStr = metadata["version"].split("-")[-1]
         else:
             versionStr = "Initial Version"
+            
         if not metadata["source"]:
             metadata["source"].append("")
 
