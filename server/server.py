@@ -23,6 +23,7 @@ import sys
 import tempfile
 import xmlrpclib
 import urllib
+import zlib
 from BaseHTTPServer import HTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
@@ -138,6 +139,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	resp = xmlrpclib.dumps((result,), methodresponse=1)
 
 	self.send_response(200)
+        encoding = self.headers.get('Accept-encoding', '')
+        if len(resp) > 200 and 'zlib' in encoding:
+            resp = zlib.compress(resp, 5)
+            self.send_header('Content-encoding', 'zlib')
 	self.send_header("Content-type", "text/xml")
 	self.send_header("Content-length", str(len(resp)))
 	self.end_headers()

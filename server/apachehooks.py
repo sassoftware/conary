@@ -17,6 +17,7 @@ from mod_python import util
 import base64
 import os
 import xmlrpclib
+import zlib
 
 import netserver
 import conarycfg
@@ -66,6 +67,10 @@ def post(repos, req):
 
         resp = xmlrpclib.dumps((result,), methodresponse=1)
         req.content_type = "text/xml"
+        encoding = req.headers_in.get('Accept-encoding', '')
+        if 'zlib' in encoding:
+            req.headers_out['Content-encoding'] = 'zlib'
+            resp = zlib.compress(resp, 5)
         req.write(resp) 
     else:
         req.content_type = "text/html"

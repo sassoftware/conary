@@ -18,7 +18,9 @@
 
 import xmlrpclib
 import urllib
-
+import zlib
+from StringIO import StringIO
+        
 class XMLOpener(urllib.FancyURLopener):
     
     def open_http(self, url, data=None):
@@ -63,6 +65,7 @@ class XMLOpener(urllib.FancyURLopener):
             h.putrequest('POST', "http:" + url)
             h.putheader('Content-type', 'text/xml')
             h.putheader('Content-length', '%d' % len(data))
+            h.putheader('Accept-encoding', 'zlib')
         else:
             h.putrequest('GET', "http:" + url)
         if auth: h.putheader('Authorization', 'Basic %s' % auth)
@@ -73,6 +76,9 @@ class XMLOpener(urllib.FancyURLopener):
             h.send(data)
         errcode, errmsg, headers = h.getreply()
         fp = h.getfile()
+        encoding = headers.get('Content-encoding', None)
+        if encoding == 'zlib':
+            fp = StringIO(zlib.decompress(fp.read()))
         if errcode == 200:
             return urllib.addinfourl(fp, headers, "http:" + url)
         else:
