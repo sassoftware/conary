@@ -80,8 +80,14 @@ class Policy(action.RecipeAction):
 	"""
 	# enforce pure virtual status
 	assert(self.__class__ is not Policy)
-	self.inclusions = args
 	action.RecipeAction.__init__(self, None, [], **keywords)
+
+	# only update inclusions if specified, otherwise, do  
+	# not overwrite None 
+	if args:
+	    if self.inclusions is None:
+		self.inclusions = []
+	    self.inclusions.extend(args)
 
 
     def updateArgs(self, *args, **keywords):
@@ -175,7 +181,11 @@ class Policy(action.RecipeAction):
 	# compile the inclusions
 	self.inclusionFilters = []
 	self.compileFilters(self.invariantinclusions, self.inclusionFilters)
-	if self.inclusions:
+	if not self.inclusions:
+	    # an empty list, as opposed to None, means nothing is included
+	    if isinstance(self.inclusions, (tuple, list)):
+		return
+	else:
 	    if not isinstance(self.inclusions, (tuple, list)):
 		# turn a plain string into a sequence
 		self.inclusions = (self.inclusions,)

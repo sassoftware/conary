@@ -308,50 +308,14 @@ class Config(policy.Policy):
     """
     Mark only explicit inclusions as config files
     """
-    # XXX convert to generic inclusions after we add a mechnism to
-    # make generic inclusions default to nothing instead of everything...
-    keywords = {
-	'inclusions': []
-    }
 
-    def __init__(self, *args, **keywords):
-        """
-        @keyword inclusions: regexp(s) specifying files to be included.
-        Do not mention files in /etc, which are already covered by the
-        EtcConfig class.
-        @type inclusions: None, filter expression, sequence of filter expressions.
-        """
-        policy.Policy.__init__(self, *args, **keywords)
-        
-
-    def updateArgs(self, *args, **keywords):
-	"""
-	Config(pathregex(s)...)
-	"""
-	if args:
-	    self.inclusions.extend(args)
-	inclusions = keywords.pop('inclusions', None)
-	if inclusions:
-	    self.inclusions.append(inclusions)
-	policy.Policy.updateArgs(self, **keywords)
-
-    def doProcess(self, recipe):
-	self.rootdir = self.rootdir % recipe.macros
-	self.configFilters = []
-	if self.inclusions:
-	    if not isinstance(self.inclusions, (tuple, list)):
-		self.inclusions = (self.inclusions,)
-	    for inclusion in self.inclusions:
-		self.configFilters.append(
-		    filter.Filter(inclusion, recipe.macros))
-	policy.Policy.doProcess(self, recipe)
+    keywords = policy.Policy.keywords.copy()
+    keywords['inclusions'] = []
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    for configFilter in self.configFilters:
-		if configFilter.match(file):
-		    _markConfig(self.recipe, file, fullpath)
+	    _markConfig(self.recipe, file, fullpath)
 
 
 class Transient(policy.Policy):
