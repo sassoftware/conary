@@ -22,7 +22,7 @@ export conarydir = $(prefix)/share/conary
 export bindir = $(prefix)/bin
 export mandir = $(prefix)/share/man
 
-SUBDIRS=build local repository server lib pysqlite3 deps scripts
+SUBDIRS=build local repository server lib pysqlite3 deps scripts config
 
 python_files = __init__.py	\
 	branch.py		\
