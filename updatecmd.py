@@ -53,17 +53,17 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 
 	bail = 0
 
-	if not newVersion:
-	    newVersion = repos.pkgLatestVersion(pkg, cfg.defaultbranch)
-
 	if not repos.hasPackage(pkg):
-            log.error("repository does not contain a package called %s\n" % pkg)
+            log.error("repository does not contain a package called %s" % pkg)
 	    bail = 1
 	elif not repos.hasPackageVersion(pkg, newVersion):
-	    log.error("package %s does not contain version %s\n" %
+	    log.error("package %s does not contain version %s" %
 				 (pkg, newVersion.asString()))
 	    bail = 1
 	else:
+	    if not newVersion:
+		newVersion = repos.pkgLatestVersion(pkg, cfg.defaultbranch)
+
 	    if db.hasPackage(pkg):
 		currentVersion = db.pkgLatestVersion(pkg, 
 						     newVersion.branch())
