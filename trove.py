@@ -70,15 +70,15 @@ class Package:
 
 	return fileMap
 
-    def diff(self, them):
+    def diff(self, them, themVersion, ourVersion):
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
 	if them:
 	    themMap = them.idMap
+	    chgSet = PackageChangeSet(self.name, themVersion, ourVersion)
 	else:
 	    themMap = {}
-
-	rc = ""
+	    chgSet = PackageChangeSet(self.name, None, ourVersion)
 
 	removedIds = []
 	addedIds = []
@@ -97,31 +97,31 @@ class Package:
 		removedIds.append(id)
 
 	for id in removedIds:
-	    rc = rc + "-%s\n" % id
+	    chgSet.oldFile(id)
 
 	for id in addedIds:
 	    (selfPath, selfVersion) = self.idMap[id]
-	    rc = rc + "+%s %s %s\n" % (id, selfPath, selfVersion.asString())
 	    filesNeeded.append((id, None, selfVersion))
+	    chgSet.newFile(id, selfPath, selfVersion)
 
 	for id in sameIds.keys():
 	    (selfPath, selfVersion) = self.idMap[id]
 	    (themPath, themVersion) = themMap[id]
 
-	    newPath = "-"
-	    newVersion = "-"
+	    newPath = None
+	    newVersion = None
 
 	    if selfPath != themPath:
 		newPath = selfPath
 
 	    if not selfVersion.equal(themVersion):
-		newVersion = selfVersion.asString()
+		newVersion = selfVersion
 		filesNeeded.append((id, themVersion, selfVersion))
 
-	    if newPath != "-" or newVersion != "-":
-		rc = rc + "~%s %s %s\n" % (id, newPath, newVersion)
+	    if newPath or newVersion:
+		chgSet.changedFile(id, newPath, newVersion)
 
-	return (rc, filesNeeded)
+	return (chgSet, filesNeeded)
 
     def __init__(self, name):
 	self.files = {}
@@ -195,6 +195,37 @@ class PackageChangeSet:
 	    print "\t\t%s" % change
 	for path in self.oldFiles:
 	    f.write("\tremoved %s(.*)%s\n" % (path[:8], path[-8:]))
+
+    def asString(self):
+	rc = ""
+
+	for id in self.getOldFileList():
+	    rc = rc + "-%s\n" % id
+
+	for (id, path, version) in self.getNewFileList():
+	    rc = rc + "+%s %s %s\n" % (id, path, version.asString())
+
+	for (id, path, version) in self.getChangedFileList():
+	    rc = rc + "~%s " % id
+	    if path:
+		rc = rc + path
+	    else:
+		rc = rc + "-"
+
+	    if version:
+		rc = rc + " " + version.asString() + "\n"
+	    else:
+		rc = rc = " -\n"
+
+	if self.oldVersion:
+	    oldVerStr = self.oldVersion.asString()
+	else:
+	    oldVerStr = "(none)"
+
+	hdr = "SRS PKG CHANGESET %s %s %s %d\n" % \
+		  (self.name, oldVerStr, self.newVersion.asString(), 
+		   rc.count("\n"))
+	return hdr + rc	
     
     def __init__(self, name, oldVersion, newVersion):
 	self.name = name
