@@ -23,7 +23,7 @@ def checkin(repos, cfg, file):
     if not ver:
 	ver = cfg.defaultbranch.copy()
 	ver.appendVersionRelease(simpleVer, 1)
-    elif ver.trailingVersion() == simpleVer:
+    elif ver.trailingVersion().getVersion() == simpleVer:
 	ver.incrementVersionRelease()
     else:
 	ver = ver.branch()
@@ -36,7 +36,7 @@ def checkin(repos, cfg, file):
 def checkout(repos, cfg, name, file, versionStr = None):
     try:
 	pkgList = helper.findPackage(repos, cfg.packagenamespace, 
-				     cfg.defaultbranch, name, versionStr, 
+				     cfg.installbranch, name, versionStr, 
 				     forceGroup = 1)
     except helper.PackageNotFound, e:
 	log.error(str(e))

@@ -138,7 +138,8 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
 	    # if this package/version exists already, increment the
 	    # existing revision
 	    newVersion = repos.pkgLatestVersion(fullName, buildBranch)
-	    if newVersion and recipeObj.version == newVersion.trailingVersion():
+	    if newVersion and (
+	      recipeObj.version == newVersion.trailingVersion().getVersion()):
 		newVersion = newVersion.copy()
 		newVersion.incrementVersionRelease()
 	    else:

@@ -10,7 +10,7 @@ Simple functions used throughout srs.
 import repository
 import versions
 
-def findPackage(repos, packageNamespace, defaultBranch, name, 
+def findPackage(repos, packageNamespace, defaultNick, name, 
 		versionStr = None, forceGroup = 0, oneMatch = 1):
     """
     Looks up a package in the given repository based on the name and
@@ -22,8 +22,9 @@ def findPackage(repos, packageNamespace, defaultBranch, name,
     @type repos: repository.Repository
     @param packageNamespace: Default namespace for the package
     @type packageNamespace: str
-    @param defaultBranch: Default branch if just a version/release is given
-    @type defaultBranch: versions.Version
+    @param defaultNick: Nickname of the branch to use if no branch
+    is specified
+    @type defaultNick: versions.BranchName
     @param name: Package name
     @type name: str
     @param versionStr: Package version
@@ -38,6 +39,9 @@ def findPackage(repos, packageNamespace, defaultBranch, name,
     else:
 	name = name
 
+    if not repos.hasPackage(name):
+	raise PackageNotFound, "package %s does not exist" % name
+
     if forceGroup:
 	if name.count(":") != 2:
 	    raise PackageNotFound, "group names may not include colons"
@@ -47,39 +51,55 @@ def findPackage(repos, packageNamespace, defaultBranch, name,
 	    raise PackageNotFound,  \
 		    "only groups may be checked out of the repository"
 
+    if (not versionStr or versionStr[0] != "/") and (not defaultNick):
+	raise PackageNotFound, \
+	    "fully qualified version or branch nickname expected"
+
     # a version is a branch nickname if
-    #   1. it exists
-    #   2. it doesn't being with / (it isn't fully qualified)
-    #   3. it only has one element (no /)
-    #   4. it contains an @ sign
-    if versionStr and versionStr[0] != "/" and  \
-	    (versionStr.find("/") == -1) and versionStr.count("@"):
-	try:
-	    nick = versions.BranchName(versionStr)
-	except versions.ParseError:
-	    raise PackageMissing, "invalid version %s" % versionStr
+    #   1. it doesn't being with / (it isn't fully qualified)
+    #   2. it only has one element (no /)
+    #   3. it contains an @ sign
+    if not versionStr or (versionStr[0] != "/" and  \
+	    (versionStr.find("/") == -1) and versionStr.count("@")):
+	if versionStr:
+	    try:
+		nick = versions.BranchName(versionStr)
+	    except versions.ParseError:
+		raise PackageMissing, "invalid version %s" % versionStr
+	else:
+	    nick = defaultNick
 
 	branchList = repos.getPackageNickList(name, nick)
 	if not branchList:
-	    raise PackageMissing, "branch %s does not exist for package %s" \
+	    raise PackageNotFound, "branch %s does not exist for package %s" \
 			% (str(nick), name)
 
 	pkgList = []
 	for branch in branchList:
 	    pkgList.append(repos.getLatestPackage(name, branch))
+    elif versionStr[0] != "/":
+	branchList = repos.getPackageNickList(name, defaultNick)
+	if not branchList:
+	    raise PackageNotFound, \
+			"branch %s does not exist for package %s" \
+			% (str(nick), name)
+	
+	try:
+	    verRel = versions.VersionRelease(versionStr)
+	except versions.ParseError, e:
+	    raise PackageNotFound, str(e)
+
+	pkgList = []
+	for branch in branchList:
+	    pkg = repos.getLatestPackage(name, branch)
+	    pkgVerRel = pkg.getVersion().trailingVersion()
+	    if pkgVerRel.equal(verRel):
+		pkgList.append(pkg)
     else:
-	if (not versionStr or versionStr[0] != "/") and (not defaultBranch):
-	    if not defaultBranch:
-		raise PackageNotFound, \
-		    "fully qualified version or branch nickname expected"
-
-	if not versionStr:
-	    version = defaultBranch
-	else:
-	    if versionStr[0] != "/":
-		versionStr = defaultBranch.asString() + "/" + versionStr
-
+	try:
 	    version = versions.VersionFromString(versionStr)
+	except versions.ParseError:
+	    raise PackageNotFound, str(e)
 
 	try:
 	    if version.isBranch():

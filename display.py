@@ -62,7 +62,7 @@ def _versionList(repos, pkgName):
 def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
     try:
 	pkgList = helper.findPackage(repos, cfg.packagenamespace, 
-				     cfg.defaultbranch, pkgName, versionStr)
+				     cfg.installbranch, pkgName, versionStr)
     except helper.PackageNotFound, e:
 	log.error(str(e))
 	return

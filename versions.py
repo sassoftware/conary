@@ -75,8 +75,9 @@ class VersionRelease(AbstractVersion):
 	@param value: String representation of a VersionRelease
 	@type value: string
 	"""
-	# throws an exception if no - is found
-	cut = value.index("-")
+	cut = value.find("-")
+	if cut == -1:
+	    raise ParseError, ("version/release pair was expected")
 	self.version = value[:cut]
 	self.release = value[cut + 1:]
 	if self.release.find("-") != -1:
@@ -187,7 +188,7 @@ class Version:
 	"""
 	assert(self.isVersion())
 
-	return self.versions[-1].getVersion()
+	return self.versions[-1]
 
     def _listsEqual(self, list, other):
 	if len(other.versions) != len(list): return 0

@@ -44,7 +44,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
         # read it
 	try:
 	    pkgList = helper.findPackage(repos, cfg.packagenamespace, 
-				     cfg.defaultbranch, pkg, versionStr)
+				     cfg.installbranch, pkg, versionStr)
 	except helper.PackageNotFound, e:
 	    log.error(str(e))
 	    return
