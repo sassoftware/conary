@@ -12,7 +12,7 @@ import files
 import flavors
 import package
 import sqlite
-import trovecontents
+import trovefiles
 import versionops
 import versions
 
@@ -57,7 +57,7 @@ class TroveStore:
 				 
         self.begin()
 	self.troveTroves = trovetroves.TroveTroves(self.db)
-	self.troveFiles = trovecontents.TroveFiles(self.db)
+	self.troveFiles = trovefiles.TroveFiles(self.db)
 	self.fileStreams = instances.FileStreams(self.db)
 	self.items = items.Items(self.db)
 	self.instances = instances.InstanceTable(self.db)
