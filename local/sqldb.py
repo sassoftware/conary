@@ -549,12 +549,6 @@ class Database:
 	if not troveVersionId:
 	    troveVersionId = self.versionTable[troveVersion]
 
-	if not troveInstanceId:
-	    troveInstanceId = self.instances.get((troveName, 
-			    troveVersionId, 0), None)
-	    if troveInstanceId is None:
-		raise KeyError, troveName
-
 	if not troveVersion.timeStamp:
 	    troveVersion.timeStamp = \
 		    self.versionTable.getTimestamp(troveVersionId)
@@ -570,6 +564,12 @@ class Database:
 		troveFlavor = None
 	    else:
 		troveFlavor = self.flavors.getId(troveFlavorId)
+
+	if not troveInstanceId:
+	    troveInstanceId = self.instances.get((troveName, 
+			    troveVersionId, troveFlavorId), None)
+	    if troveInstanceId is None:
+		raise KeyError, troveName
 
 	trove = package.Trove(troveName, troveVersion, troveFlavor)
 
@@ -677,12 +677,14 @@ class Database:
 
     def removeFileFromTrove(self, trove, path):
 	versionId = self.versionTable[trove.getVersion()]
-	instanceId = self.instances[(trove.getName(), versionId, 0)]
+        flavorId = self.flavors[trove.getFlavor()]
+	instanceId = self.instances[(trove.getName(), versionId, flavorId)]
 	self.troveFiles.removePath(instanceId, path)
 
-    def removeFilesFromTrove(self, troveName, troveVersion, fileIdList):
+    def removeFilesFromTrove(self, troveName, troveVersion, troveFlavor, fileIdList):
 	versionId = self.versionTable[troveVersion]
-	instanceId = self.instances[(troveName, versionId, 0)]
+        flavorId = self.flavors[troveFlavor]
+	instanceId = self.instances[(troveName, versionId, flavorId)]
 	self.troveFiles.removeFileIds(instanceId, fileIdList)
 
     def iterFilesInTrove(self, troveName, version, flavor,

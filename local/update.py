@@ -58,16 +58,16 @@ class FilesystemJob:
 	    else:
 		self.directorySet[dir] = 1
 
-    def userRemoval(self, troveName, troveVersion, fileId):
-	if not self.userRemovals.has_key((troveName, troveVersion)):
-	    self.userRemovals[(troveName, troveVersion)] = [ fileId ]
+    def userRemoval(self, troveName, troveVersion, troveFlavor, fileId):
+	if not self.userRemovals.has_key((troveName, troveVersion, troveFlavor)):
+	    self.userRemovals[(troveName, troveVersion, troveFlavor)] = [ fileId ]
 	else:
 	    self.userRemovals.append(fileId)
 
     def iterUserRemovals(self):
-	for ((troveName, troveVersion), fileIdList) in \
+	for ((troveName, troveVersion, troveFlavor), fileIdList) in \
 					    self.userRemovals.iteritems():
-	    yield (troveName, troveVersion, fileIdList)
+	    yield (troveName, troveVersion, troveFlavor, fileIdList)
 
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
@@ -278,7 +278,7 @@ class FilesystemJob:
 		# the file was removed from the local system; this change
 		# wins
 		self.userRemoval(pkgCs.getName(), pkgCs.getNewVersion(),
-				 fileId)
+                                 pkgCs.getFlavor(), fileId)
 		continue
 
 	    (fsPath, fsVersion) = fsPkg.getFile(fileId)
@@ -566,8 +566,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     us iterate right over the changeset we get from the repository.
     """
     if srcPkg:
-	cs = repos.createChangeSet([(srcPkg.getName(), None, None,
-				     srcPkg.getVersion(), True)])
+	cs = repos.createChangeSet([(srcPkg.getName(), srcPkg.getFlavor(),
+                                     None, srcPkg.getVersion(), True)])
 	pkgCs = cs.iterNewPackageList().next()
 	fileList = pkgCs.getNewFileList()
     else:

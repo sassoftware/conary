@@ -351,8 +351,8 @@ class Database(SqlDbRepository):
 
 	fsJob.apply()
 
-	for (troveName, troveVersion, fileIdList) in fsJob.iterUserRemovals():
-	    self.db.removeFilesFromTrove(troveName, troveVersion, fileIdList)
+	for (troveName, troveVersion, troveFlavor, fileIdList) in fsJob.iterUserRemovals():
+	    self.db.removeFilesFromTrove(troveName, troveVersion, troveFlavor, fileIdList)
 
 	for (name, version, flavor) in fsJob.getOldPackageList():
 	    if toStash:
