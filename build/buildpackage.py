@@ -69,8 +69,8 @@ class PackageSpec:
 	# front-anchor searches
 	return self.regexp.search(string)
 
-class BuildPackageGenerator:
-    """BuildPackageGenerator creates a set of BuildPackage instances
+class BuildPackageFactory:
+    """BuildPackageFactory creates a set of BuildPackage instances
     and provides facilities for populating them with files according
     to PackageSpecs.
     """
@@ -130,7 +130,7 @@ class BuildPackageGenerator:
 		break
 
     def packageSet(self):
-        """examine the BuildPackage instances created by the generator
+        """examine the BuildPackage instances created by the factory
         return a new BuildPackageSet instance that includes only those
         which have files
         
@@ -154,8 +154,8 @@ class BuildPackageGenerator:
 
 def _autoVisit(arg, dir, files):
     """Helper function called by os.path.walk() when
-    BuildPackageGenerator.walk() is called"""
-    (root, generator) = arg
+    BuildPackageFactory.walk() is called"""
+    (root, factory) = arg
     dir = dir[len(root):]
 
     for file in files:
@@ -164,4 +164,4 @@ def _autoVisit(arg, dir, files):
         else:
             path = '/' + file
 
-        generator.addPath(path)
+        factory.addPath(path)
