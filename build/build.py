@@ -4,7 +4,8 @@
 #
 """
 Module used by recipes to direct the build and installation of
-software packages.
+software packages.  Classes from this module are not used directly;
+instead, they are used through eponymous interfaces in recipe.
 
 @var _permmap: A mapping of common integer file modes to their octal
 equivalents.  This is used to check for common mistakes when specifying
