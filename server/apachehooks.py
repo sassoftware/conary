@@ -8,10 +8,6 @@ sys.path.append("/home/ewt/srs")
 
 import netserver
 
-FILE_PATH="/tmp/conary-server"
-BASE_URL="http://localhost/~ewt"
-REP_PATH="/home/ewt/srs/srsrep"
-
 BUFFER=1024 * 256
 
 def xmlPost(repos, req):
@@ -49,7 +45,7 @@ def xmlPost(repos, req):
     return apache.OK
 
 def getFile(repos, req):
-    path = FILE_PATH + "/" + os.path.basename(req.filename) + "-out"
+    path = repos.tmpPath + "/" + os.path.basename(req.filename) + "-out"
     size = os.stat(path).st_size
     req.content_type = "application/x-conary-change-set"
     req.sendfile(path)
@@ -57,7 +53,7 @@ def getFile(repos, req):
     return apache.OK
 
 def putFile(repos, req):
-    path = FILE_PATH + "/" + os.path.basename(req.filename) + "-in"
+    path = repos.tmpPath + "/" + os.path.basename(req.filename) + "-in"
     size = os.stat(path).st_size
     if size != 0:
 	return apache.HTTP_UNAUTHORIZED
