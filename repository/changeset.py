@@ -7,6 +7,7 @@ import enum
 import filecontainer
 import files
 import package
+import patch
 import versions
 import os
 import repository
@@ -181,7 +182,7 @@ class ChangeSet:
 		origFile = db.getFileVersion(fileId, version)
 		rollback.addFile(fileId, None, version, origFile.diff(None))
 
-		if not isinstance(origFile, files.RegularFile):
+		if not origFile.hasContents:
 		    continue
 
 		# We only have the contents of config files available
@@ -232,16 +233,26 @@ class ChangeSet:
 		if not isinstance(origFile, files.RegularFile):
 		    continue
 
-		# if a config file has changed between versions, save
+		# If a config file has changed between versions, save
 		# it; if it hasn't changed the unmodified version will
 		# still be available from the database when the rollback
-		# gets applied
+		# gets applied. We may be able to get away with just reversing
+		# a diff rather then saving the full contents
 		if (origFile.sha1() != newFile.sha1()) and	    \
 		   (origFile.isConfig() or newFile.isConfig()):
-		    cont = repository.FileContentsFromRepository(db, 
-						  origFile.sha1())
-		    rollback.addFileContents(origFile.sha1(), 
-					     ChangedFileTypes.file, cont)
+		    (contType, cont) = self.getFileContents(newFile.sha1())
+		    if contType == ChangedFileTypes.diff:
+			f = cont.get()
+			diff = "".join(patch.reverse(f.readlines()))
+			f.seek(0)
+			cont = repository.FileContentsFromString(diff)
+			rollback.addFileContents(origFile.sha1(), 
+						 ChangedFileTypes.diff, cont)
+		    else:
+			cont = repository.FileContentsFromRepository(db, 
+						      origFile.sha1())
+			rollback.addFileContents(origFile.sha1(), 
+						 ChangedFileTypes.file, cont)
 		elif origFile.sha1() != newFile.sha1():
 		    # if a file which isn't a config file has changed, and
 		    # the right version of the file is available in the
