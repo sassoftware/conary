@@ -611,7 +611,7 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
 	if dupFilter.has_key(name):
 	    for version in dupFilter[name]:
 		if version.equal(ver):
-		    match = true
+		    match = True
 		    break
 
 	if not match:
