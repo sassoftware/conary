@@ -300,11 +300,16 @@ class FileContainer:
     def iterFileList(self):
 	return self.entries.iterkeys()
 
-    # file is a python file object which refers to the file container
-    # if that file is empty (size 0) the file container is immediately
-    # initialized. we make our own copy of the file so the caller can
-    # close it if they like
     def __init__(self, file):
+        """
+        Create a FileContainer object.
+        
+        @param file: an open python file object referencing the file
+        container file on disk. If that file is empty (size 0) the
+        file container is immediately initialized. A copy of the file
+        is retained, so the caller may optionally close it.
+        """
+        
 	# make our own copy of this file which nobody can close underneath us
 	self.file = os.fdopen(os.dup(file.fileno()), file.mode)
 
