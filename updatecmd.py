@@ -28,17 +28,23 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
     bail = 0
     mainPackageName = None
     for pkgName in repos.getPackageList(pkg):
-	pkgSet = repos.getPackageSet(pkgName)
+	reposPkgSet = repos.getPackageSet(pkgName)
 
 	if not newVersion:
-	    newVersion = pkgSet.getLatestVersion(cfg.defaultbranch)
+	    newVersion = reposPkgSet.getLatestVersion(cfg.defaultbranch)
 
-	if not pkgSet.hasVersion(newVersion):
+	if not reposPkgSet.hasVersion(newVersion):
 	    sys.stderr.write("package %s does not contain version %s\n" %
 				 (pkgName, version.asString()))
 	    bail = 1
 	else:
-	    list.append((pkgName, None, newVersion))
+	    if db.hasPackage(pkgName):
+		dbPkgSet = db.getPackageSet(pkgName)
+		currentVersion = dbPkgSet.getLatestVersion(newVersion.branch())
+	    else:
+		currentVersion = None
+
+	    list.append((pkgName, currentVersion, newVersion))
 
     if bail:
 	return
