@@ -172,23 +172,35 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
     # just going to request it again
     cs = repos.createChangeSet([(trv.getName(), None, None, trv.getVersion(),
 			        True)])
+    cs.writeToFile("FOO")
+    from repository import changeset
+    cs = changeset.ChangeSetFromFile("FOO")
 
     pkgCs = cs.iterNewPackageList().next()
 
-    fileList = pkgCs.getNewFileList()
-    fileList.sort()
+    earlyRestore = []
+    lateRestore = []
 
-    for (fileId, path, version) in fileList:
+    for (fileId, path, version) in pkgCs.getNewFileList():
 	fullPath = workDir + "/" + path
-	fileObj = files.ThawFile(cs.getFileChange(fileId), fileId)
-	if fileObj.hasContents:
-	    contents = cs.getFileContents(fileId)[1]
-	else:
-	    contents = None
-
-	fileObj.restore(contents, '/', fullPath, 1)
 
 	state.addFile(fileId, path, version)
+	fileObj = files.ThawFile(cs.getFileChange(fileId), fileId)
+
+	if not fileObj.hasContents:
+	    fileObj.restore(*tup)
+	else:
+	    if fileObj.flags.isConfig():
+		earlyRestore.append((fileId, ('/', fullPath, 1)))
+	    else:
+		lateRestore.append((fileId, ('/', fullPath, 1)))
+
+    earlyRestore.sort()
+    lateRestore.sort()
+
+    for fileId, tup in earlyRestore + lateRestore:
+	contents = cs.getFileContents(fileId)[1]
+	fileObj.restore(*((contents,) + tup))
 
     state.write(workDir + "/CONARY")
 
