@@ -11,15 +11,16 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from repository import changeset
-from local import database
+from deps import deps
 from lib import log
-import os
+from lib import util
+from local import database
+from repository import changeset
 from repository import repository
 from repository.filecontainer import BadContainer
-import sys
-from lib import util
 import conaryclient
+import os
+import sys
 
 # FIXME client should instantiated once per execution of the command line 
 # conary client

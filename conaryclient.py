@@ -161,7 +161,7 @@ class ConaryClient:
             else:
                 troveName = item[0]
                 versionStr = item[1]
-                flavor = item[1]
+                flavor = item[2]
 
             if versionStr and versionStr[0] == '/':
                 # fully qualified versions don't need repository affinity
@@ -170,16 +170,19 @@ class ConaryClient:
                     newList = self.repos.findTrove(None, troveName, 
                                                    self.cfg.flavor, versionStr,
                                                    withFiles = False,
-                                                   affinityDatabase = self.db)
+                                                   affinityDatabase = self.db,
+                                                   flavor = flavor)
 
                 except repository.TroveNotFound, e:
                     # we give an error for this later on
                     newList = []
             else:
-                newList = self.repos.findTrove(self.cfg.installLabelPath, troveName, 
+                newList = self.repos.findTrove(self.cfg.installLabelPath, 
+                                               troveName, 
                                                self.cfg.flavor, versionStr,
                                                withFiles = False,
-                                               affinityDatabase = self.db)
+                                               affinityDatabase = self.db,
+                                               flavor = flavor)
                     # XXX where does this go now?                    
                     # updating locally cooked troves needs a label override
                     #if True in [isinstance(x, versions.CookBranch) or

@@ -963,7 +963,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def findTrove(self, labelPath, name, defaultFlavor, versionStr = None,
                   acrossRepositories = False, withFiles = True,
-                  affinityDatabase = None, flavorStr = None):
+                  affinityDatabase = None, flavor = None):
 	assert(not defaultFlavor or 
 	       isinstance(defaultFlavor, deps.DependencySet))
 
@@ -992,20 +992,25 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     # XXX what if multiple troves are on this branch,
                     # but with different flavors?
 
-                    flavor = defaultFlavor.copy()
-                    flavor.union(trove.getFlavor(), 
-                                 mergeType = deps.DEP_MERGE_TYPE_PREFS)
-                    query[name][trove.getVersion().branch()] = \
-                        [ flavor ]
+                    if flavor is not None:
+                        f = flavor
+                    else:
+                        f = defaultFlavor.copy()
+                        f.union(trove.getFlavor(), 
+                                     mergeType = deps.DEP_MERGE_TYPE_PREFS)
+                    query[name][trove.getVersion().branch()] = [ f ]
 
             if query:
                 flavorDict = self.getTroveLeavesByBranch(query, 
                                                          bestFlavor = True)
             else:
                 flavorDict = { name : {} }
+                if flavor is None:
+                    flavor = defaultFlavor
+
                 for label in labelPath:
                     d = self.getTroveLeavesByLabel([name], label, 
-                                             flavorFilter = defaultFlavor)
+                                             flavorFilter = flavor)
 
                     if not d.has_key(name):
                         continue
@@ -1039,24 +1044,27 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             flavorDict = { name : {} }
             for label in labelPath:
-                flavors = []
-                for trove in affinityTroves:
-                    if trove.getVersion().branch().label() == label:
-                        flavors.append(trove.getFlavor())
-
-                if not flavors:
-                    finalFlavor = defaultFlavor
+                if flavor is not None:
+                    finalFlavor = flavor
                 else:
-                    # make sure the flavors are the same; otherwise
-                    # fall back to the default flavor
-                    flavor = flavors[0]
-                    for f in flavors:
-                        if f != flavor:
-                            flavor = defaultFlavor
-                            break
+                    flavors = []
+                    for trove in affinityTroves:
+                        if trove.getVersion().branch().label() == label:
+                            flavors.append(trove.getFlavor())
 
-                    finalFlavor = defaultFlavor.copy()
-                    finalFlavor.union(flavor, 
+                    if not flavors:
+                        finalFlavor = defaultFlavor
+                    else:
+                        # make sure the flavors are the same; otherwise
+                        # fall back to the default flavor
+                        f = flavors[0]
+                        for otherFlavor in flavors:
+                            if otherFlavor != f:
+                                f = defaultFlavor
+                                break
+
+                        finalFlavor = defaultFlavor.copy()
+                        finalFlavor.union(f, 
                                       mergeType = deps.DEP_MERGE_TYPE_PREFS)
             
                 d = self.getTroveLeavesByLabel([name], label, 
@@ -1083,11 +1091,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     # XXX what if multiple troves are on this label,
                     # but with different flavors?
 
-                    flavor = defaultFlavor.copy()
-                    flavor.union(trove.getFlavor(), 
-                                 mergeType = deps.DEP_MERGE_TYPE_PREFS)
-                    query[name][trove.getVersion().branch()] = \
-                        [ flavor ]
+                    if flavor is not None:
+                        f = flavor
+                    else:
+                        f = defaultFlavor.copy()
+                        f.union(trove.getFlavor(), 
+                                mergeType = deps.DEP_MERGE_TYPE_PREFS)
+
+                    query[name][trove.getVersion().branch()] = [ f ]
 
             if query:
                 flavorDict = self.getTroveVersionsByBranch(query, 
@@ -1098,9 +1109,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         del flavorDict[name][version]
             else:
                 flavorDict = { name : {} }
+                if flavor is not None:
+                    flavor = defaultFlavor
+
                 for label in labelPath:
                     d = self.getTroveVersionsByLabel([name], label, 
-                                             flavorFilter = defaultFlavor)
+                                             flavorFilter = flavor)
                     for version in d[name].keys():
                         if version.trailingVersion() != verRel:
                             del d[name][version]
@@ -1127,30 +1141,26 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             else:
                 fn = self.getTroveVersionFlavors
 
-            if affinityTroves:
+            if flavor is not None:
+                finalFlavor = flavor
+            elif affinityTroves:
                 flavors = [ x.getFlavor() for x in affinityTroves ]
-                flavor = flavors[0]
-                for f in flavors:
-                    if f != flavor:
-                        flavor = defaultFlavor
+                f = flavors[0]
+                for otherFlavor in flavors:
+                    if otherFlavor != f:
+                        f = defaultFlavor
                         break
 
                 finalFlavor = defaultFlavor.copy()
-                finalFlavor.union(flavor, 
-                                  mergeType = deps.DEP_MERGE_TYPE_PREFS)
+                finalFlavor.union(f, mergeType = deps.DEP_MERGE_TYPE_PREFS)
             else:
                 finalFlavor = defaultFlavor
 
             # we're not allowed to ask for the bestFlavor if the 
             # defaultFlavor is None
-            if finalFlavor is None:
-                bestFlavor = False
-                flavor = None
-            else:
-                bestFlavor = True
-                flavor = finalFlavor
+            bestFlavor = finalFlavor is not None
 
-            flavorDict = fn({ name : { version : [ flavor ] } },
+            flavorDict = fn({ name : { version : [ finalFlavor ] } },
                             bestFlavor = bestFlavor)
 
             if not flavorDict.has_key(name):
@@ -1171,7 +1181,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	pkgList = []
 	for version, flavorList in flavorDict[name].iteritems():
-            pkgList += [ (name, version, flavor) for flavor in flavorList ]
+            pkgList += [ (name, version, f) for f in flavorList ]
 
 	if not pkgList:
 	    raise repository.TroveNotFound, "trove %s does not exist" % name
