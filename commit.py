@@ -3,12 +3,13 @@
 # All rights reserved
 #
 import changeset
+import repository
 
 def doCommit(repos, cfg, changeSetFile):
     cs = changeset.ChangeSetFromFile(changeSetFile)
 
     try:
 	repos.commitChangeSet(cs)
-    except CommitError, e:
+    except repository.CommitError, e:
 	print e
 	
