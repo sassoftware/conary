@@ -147,9 +147,13 @@ def CreateFromRepository(repos, packageList, outFileName):
      
 	if oldVersion:
 	    old = pkgSet.getVersion(oldVersion)
+	    oldVerStr = oldVersion.asString()
+	else:
+	    old = None
+	    oldVerStr = None
 
 	(newCs, filesNeeded) = packageChangeSet(packageName, old, 
-						oldVersion.asString(), new, 
+						oldVerStr, new, 
 						newVersion.asString())
 	cs = cs + newCs
 
