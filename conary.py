@@ -64,7 +64,7 @@ def usage(rc = 1):
     print "       conary localcommit  <changeset>"
     print "       conary query        <pkgname> [<version>]"
     print "       conary remove       <path>"
-    print "       conary repquery     <pkgname> [<version>]"
+    print "       conary repquery     <pkgname>[=<version>]*"
     print "       conary rblist"
     print "       conary rollback     <rollback>"
     print "       conary showcs       <changeset>"
