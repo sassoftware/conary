@@ -197,9 +197,12 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	self.close()
 
     def createBranch(self, newBranch, where, troveList = []):
+
 	if newBranch.getHost() != self.name:
 	    raise RepositoryError("cannot create branch for %s on %s",
 		      newBranch.getHost(), self.name)
+
+        self.troveStore.begin()
 	
 	troveList = [ (x, where) for x in troveList ]
 
@@ -224,8 +227,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    verDict = self.getTroveLeavesByLabel([troveName], location)
 		else:
 		    verDict = self.reposSet.getTroveLeavesByLabel([troveName], location)
-
-	    # XXX this probably doesn't get flavors right
 
 	    if serverName == self.name:
 		d = self.getTroveVersionFlavors(verDict)
@@ -266,8 +267,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    self.addFileVersion(troveInfo, fileId, None, path, version)
 		self.addTroveDone(troveInfo)
 
-		# commit branch to the repository
-		self.commit()
+        # commit branch to the repository
+        self.commit()
 
 	return True
 		    
