@@ -142,7 +142,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
 class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 
-    def reset(self, authToken):
+    def reset(self, authToken, clientVersion):
         import shutil
         from localrep import fsrepos
 	del self.repos
