@@ -273,11 +273,7 @@ class ChangeSet:
 			rollback.addFileContents(fileId,
 						 ChangedFileTypes.file, cont)
 		elif origFile.sha1() != newFile.sha1():
-		    # if a file which isn't a config file has changed, and
-		    # the right version of the file is available in the
-		    # filesystem, go ahead and grab it (otherwise we'll
-		    # leave it to the local branch change set to preserve
-		    # the contents)
+		    # this file changed, so we need the contents
 		    if isinstance(origFile, files.SourceFile):
 			type = "src"
 		    else:
@@ -289,9 +285,16 @@ class ChangeSet:
 				type = type, possibleMatch = origFile)
 
 		    if fsFile.sha1() == origFile.sha1():
+			# the contents in the file system are right
 			cont = filecontents.FromFilesystem(fullPath)
-			rollback.addFileContents(fileId,
-						 ChangedFileTypes.file, cont)
+		    else:
+			# the contents in the file system are wrong; insert
+			# a placeholder and let the local change set worry
+			# about getting this right
+			cont = filecontents.FromString("")
+
+		    rollback.addFileContents(fileId,
+					     ChangedFileTypes.file, cont)
 
 	    rollback.newPackage(invertedPkg)
 
