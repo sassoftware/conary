@@ -65,13 +65,15 @@ class Recipe:
 	# do not search unless a gpg keyid is specified
 	if not keyid:
 	    return
-	gpg = lookaside.searchAll(self.cfg, '%s.sig' %(file), self.name, self.srcdirs)
-	if not gpg:
-	    gpg = lookaside.searchAll(self.cfg, '%s.sign' %(file), self.name, self.srcdirs)
-	if gpg:
+	gpg = '%s.sig' %(file)
+	c = lookaside.searchAll(self.cfg, gpg, self.name, self.srcdirs)
+	if not c:
+	    gpg = '%s.sign' %(file)
+	    c = lookaside.searchAll(self.cfg, gpg, self.name, self.srcdirs)
+	if c:
 	    if not self.signatures.has_key(file):
 		self.signatures[file] = []
-	    self.signatures[file].append(gpg)
+	    self.signatures[file].append((gpg, c))
 
     def addTarball(self, file, extractDir='', keyid=None):
 	self.tarballs.append((file, extractDir))
@@ -101,7 +103,9 @@ class Recipe:
             sources.append(tarball)
         for (patch, level, backup) in self.patches:
             sources.append(patch)
-	return sources + self.sources + flatten(self.signatures.values())
+	for (gpg, cached) in self.signatures.values()[0]:
+	    sources.append(gpg)
+	return sources + self.sources
 
     def mainDir(self, new = None):
 	if new:
@@ -119,7 +123,7 @@ class Recipe:
     def checkSignatures(self, filepath, file):
         if not self.signatures.has_key(file):
             return
-	for signature in self.signatures[file]:
+	for (gpg, signature) in self.signatures[file]:
 	    # FIXME: our own keyring
 	    if os.system("gpg --no-secmem-warning --verify %s %s"
 			  %(signature, filepath)):
