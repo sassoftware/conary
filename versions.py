@@ -23,6 +23,9 @@ class AbstractVersion(object):
     def __init__(self):
 	pass
 
+    def __eq__(self, them):
+        raise NotImplementedError
+
     def __ne__(self, them):
 	return not self.__eq__(them)
 
@@ -62,6 +65,9 @@ class AbstractBranch(object):
 
     def __init__(self):
 	pass
+
+    def __eq__(self, them):
+        raise NotImplementedError
 
     def __ne__(self, them):
 	return not self.__eq__(them)
