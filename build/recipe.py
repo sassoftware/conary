@@ -801,6 +801,7 @@ class GroupRecipe(Recipe):
         self.size = 0
 
         validSize = True
+        troveList = []
         for (name, versionStr, flavor, source) in self.addTroveList:
             try:
                 desFlavor = self.cfg.buildFlavor.copy()
@@ -813,7 +814,11 @@ class GroupRecipe(Recipe):
             except repository.TroveNotFound, e:
                 raise RecipeFileError, str(e)
             assert(len(pkgList) == 1)
-            trove = self.repos.getTrove(*pkgList[0])
+            troveList.append(pkgList[0])
+
+        troves = self.repos.getTroves(troveList, withFiles = False)
+        for trove in troves:
+            name = trove.getName()
             v = trove.getVersion()
             f = trove.getFlavor()
             l = self.troveVersionFlavors.get(name, [])
