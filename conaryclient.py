@@ -35,9 +35,11 @@ class NoNewTrovesError(UpdateError):
         return "no new troves found"
 
 class ConaryClient:
-    def __init__(self, repos, cfg = None):
+    def __init__(self, repos = None, cfg = None):
         if cfg == None:
             cfg = conarycfg.ConaryConfiguration()
+        if repos == None:
+            repos = helper.openRepository(cfg.repositoryMap)
         
         self.repos = repos
         self.cfg = cfg
