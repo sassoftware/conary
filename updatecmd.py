@@ -18,12 +18,8 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 
     map = ( ( None, cfg.sourcepath + "/" ), )
     
-    if os.path.exists(pkg):
-        # there is a file, try to read it as a changeset file
-	if versionStr:
-	    sys.stderr.write("Verison should not be specified when a SRS "
-			     "change set is being installed.\n")
-	    return 1
+    if os.path.exists(pkg) and os.path.isfile(pkg):
+	# there is a file, try to read it as a changeset file
 
         try:
             cs = changeset.ChangeSetFromFile(pkg)
@@ -37,6 +33,11 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
                 cs = db.rootChangeSet(cs, cfg.defaultbranch)
 
 	    list = [ x.getName() for x  in cs.getNewPackageList() ]
+	    if versionStr:
+		sys.stderr.write("Verison should not be specified when a SRS "
+				 "change set is being installed.\n")
+		return 1
+
 
     if not cs:
         # so far no changeset (either the path didn't exist or we could not
