@@ -20,6 +20,8 @@ import files
 import log
 import time
 
+from sha1helper import sha1ToString
+
 _troveFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
@@ -151,7 +153,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 	    for (fileId, path, version) in trove.iterFileList():
 		file = repos.getFileVersion(fileId, version)
 		if file.hasContents:
-		    print "%s %s" % (file.contents.sha1(), path)
+		    print "%s %s" % (sha1ToString(file.contents.sha1()), path)
 	elif info:
 	    buildTime = time.strftime("%c",
 				time.localtime(version.timeStamps()[-1]))

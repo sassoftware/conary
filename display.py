@@ -17,6 +17,8 @@ Provides the output for the "conary query" command
 
 import files
 
+from sha1helper import sha1ToString
+
 _troveFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
@@ -81,7 +83,7 @@ def _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s,
 	    for (fileId, path, version) in trove.iterFileList():
 		file = db.getFileVersion(fileId, version)
 		if file.hasContents:
-		    print "%s %s" % (file.contents.sha1(), path)
+		    print "%s %s" % (sha1ToString(file.contents.sha1()), path)
 	else:
 	    if fullVersions:
 		print _troveFormat % (troveName, version.asString())
