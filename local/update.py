@@ -103,8 +103,8 @@ class FilesystemJob:
 		s = os.lstat(headRealPath)
 		if not isinstance(headFile, files.Directory) or \
 		   not stat.S_ISDIR(s.st_mode):
-		    self.errors.append("%s is in the way of a newly " +
-			      "created file" % headRealPath)
+		    self.errors.append("%s is in the way of a newly " 
+                                       "created file" % headRealPath)
 		    fullyUpdated = 0
 
 		# FIXME: this isn't the right directory handling
