@@ -230,7 +230,9 @@ class NetworkAuthorization:
 
     def iterPermsByGroupId(self, userGroupId):
         cu = self.db.cursor()
-        cu.execute("""SELECT Labels.label, PerItems.item, write, capped, admin
+        cu.execute("""SELECT Permissions.labelId, Labels.label,
+                             PerItems.itemId, PerItems.item,
+                             write, capped, admin
                       FROM Permissions
                       LEFT OUTER JOIN Items AS PerItems ON
                           PerItems.itemId = Permissions.itemId
@@ -248,6 +250,16 @@ class NetworkAuthorization:
         cu = self.db.cursor()
         cu.execute("INSERT INTO Permissions VALUES(?, ?, ?, ?, ?, ?)",
                    userGroupId, labelId, itemId, write, capped, admin)
+        self.db.commit()
+
+    def deletePermission(self, userGroupId, labelId, itemId):
+        cu = self.db.cursor()
+        
+        cu.execute("""DELETE FROM Permissions
+                      WHERE userGroupId=? AND
+                            labelId=? AND
+                            itemId=?""",
+                   userGroupId, labelId, itemId)
         self.db.commit()
 
     # XXX this is probably the wrong place for these functions...
