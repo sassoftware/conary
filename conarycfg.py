@@ -59,7 +59,7 @@ class ConfigFile:
 	if not line or line[0] == '#':
 	    return
 	(key, val) = line.split(None, 1)
-	(key, type) = self.checkKey(key)
+	(key, type) = self.checkKey(key, file)
 	if key:
 	    if type == EXEC:
 		self.execCmd(key, val, file)
@@ -71,7 +71,7 @@ class ConfigFile:
 	    for cfgfile in util.braceGlob(val):
 		self.read(cfgfile, exception=True)
 
-    def checkKey(self, key):
+    def checkKey(self, key, file = "override"):
 	lckey = key.lower()
 	# XXX may have to generalize this some day
 	if lckey == 'includeconfigfile':
@@ -207,13 +207,13 @@ class ConaryConfiguration(ConfigFile):
 	    self.read(os.environ["HOME"] + "/" + ".conaryrc")
 	self.read("conaryrc")
 
-    def checkKey(self, key):
+    def checkKey(self, key, file = ""):
 	if key.find('.') != -1:
 	    directive,arg = key.split('.', 1)
 	    directive = directive.lower()
 	    if directive in ('use', 'flags', 'arch', 'macros'):
 		return self.checkFlagKey(directive, arg)
-	return ConfigFile.checkKey(self, key)
+	return ConfigFile.checkKey(self, key, file)
 	
     def checkFlagKey(self, directive, key):
 	if directive == 'use':
