@@ -1,3 +1,18 @@
+Changes in 0.9.1:
+ * Bug fixes:
+   * Applying a changeset that has a flavor which is a superset of the
+     previous version's flavor now works.
+   * Parsing optional arguments to command line parameters that appear as
+     the last thing on the command line works
+ * Build changes:
+   * Package policy now checks to ensure that files in /etc/cron.*/*
+     are executable
+ * Update changes:
+   * Conary no longer complains if a transient file has been modified
+     on disk but no longer exists in a new version of a component.
+ * Miscellaneous changes:
+   * Version 1 on-disk changeset file support has been removed.
+
 Changes in 0.9.0:
  * protocol versioning is much more granular now allowing for backwards
    compatible versions of functions
