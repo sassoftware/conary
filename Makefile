@@ -31,6 +31,8 @@ python_files = __init__.py	\
 	changelog.py		\
 	checkin.py		\
 	commit.py		\
+	conary.py		\
+	conarycfg.py		\
 	cook.py			\
 	cscmd.py		\
 	datastore.py		\
@@ -41,20 +43,18 @@ python_files = __init__.py	\
 	helper.py		\
 	importrpm.py		\
 	log.py			\
+	magic.py		\
 	options.py		\
-	package.py		\
 	patch.py		\
 	queryrep.py		\
 	rollbacks.py		\
 	rpmhelper.py		\
 	sha1helper.py		\
-	streams.py		\
 	srcctl.py		\
-	conarycfg.py		\
-	conary.py			\
+	streams.py		\
+	trove.py		\
 	updatecmd.py		\
 	util.py			\
-	magic.py		\
 	versions.py		\
 	xmlshims.py
 
