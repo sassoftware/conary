@@ -215,7 +215,7 @@ class Recipe:
     buildRequires = []
     runRequires = []
 
-    def addSignature(self, file, keyid):
+    def _addSignature(self, file, keyid):
 	# do not search unless a gpg keyid is specified
 	if not keyid:
 	    return
@@ -231,11 +231,19 @@ class Recipe:
 		self.signatures[file] = []
 	    self.signatures[file].append((gpg, c, keyid))
 
-    def addArchive(self, file, extractDir='', keyid=None, use=None):
-	self.sources.append((file, 'tarball', extractDir, use, ()))
-	self.addSignature(file, keyid)
+    def _appendSource(self, file, keyid, type, extractDir, use, args):
+	file = file % self.macros
+	self.sources.append((file, type, extractDir, use, args))
+	self._addSignature(file, keyid)
 
-    def addArchiveFromRPM(self, rpm, file, extractDir='', keyid=None, use=None):
+    def addArchive(self, file, extractDir='', keyid=None, use=None):
+	self._appendSource(file, keyid, 'tarball', extractDir, use, ())
+
+    def addArchiveFromRPM(self, rpm, file, extractDir='', use=None):
+	# no keyid -- what would it apply to?
+	# may choose to check key in RPM package instead?
+	rpm = rpm % self.macros
+	file = file % self.macros
 	f = lookaside.searchAll(self.cfg, self.laReposCache, 
 			     os.path.basename(file), self.name, self.srcdirs)
 	if not f:
@@ -245,16 +253,14 @@ class Recipe:
 	    extractSourceFromRPM(r, c)
 	    f = lookaside.findAll(self.cfg, self.laReposCache, file, 
 				  self.name, self.srcdirs)
+	# file already expanded, and no key can be supplied
 	self.sources.append((file, 'tarball', extractDir, use, ()))
-	self.addSignature(f, keyid)
 
     def addPatch(self, file, level='1', backup='', keyid=None, use=None):
-	self.sources.append((file, 'patch', '', use, (level, backup)))
-	self.addSignature(file, keyid)
+	self._appendSource(file, keyid, 'patch', '', use, (level, backup))
 
     def addSource(self, file, keyid=None, extractDir='', apply=None, use=None):
-	self.sources.append((file, 'source', extractDir, use, (apply)))
-	self.addSignature(file, keyid)
+	self._appendSource(file, keyid, 'source', extractDir, use, (apply))
 
     def allSources(self):
         sources = []
