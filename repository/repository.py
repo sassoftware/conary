@@ -524,6 +524,10 @@ class ChangeSetJob:
 		    diff = fileContents.get().readlines()
 		    (newLines, failedHunks) = patch.patch(oldLines, diff)
 		    fileContents = filecontents.FromString("".join(newLines))
+
+		    if failedHunks:
+			fileContents = filecontents.WithFailedHunks(
+					    fileContents, failedHunks)
 	    else:
 		fileContents = None
 
