@@ -564,6 +564,7 @@ class PackageRecipe(Recipe):
 	    self.macros._override(key, cfg['macros.' + key])
 	self.macros.name = self.name
 	self.macros.version = self.version
+        self.packages = { self.name : True }
 	if extraMacros:
 	    self.macros.update(extraMacros)
 	self.mainDir(self.nameVer())
