@@ -33,6 +33,7 @@ class Epdb(pdb.Pdb):
         self._exc_type = None
         self._exc_msg = None
         self._tb = None
+        self._config = {}
         pdb.Pdb.__init__(self)
         self.prompt = '(Epdb) '
     
@@ -87,6 +88,8 @@ class Epdb(pdb.Pdb):
                 frame = frame.f_back
         stackutil.printStack(frame, sys.stderr)
 
+    
+
     def do_printframe(self, arg):
         if not arg:
             if 'stack' in self.__dict__:
@@ -108,6 +111,50 @@ class Epdb(pdb.Pdb):
             for i in xrange(0, depth):
                 frame = frame.f_back
         stackutil.printFrame(frame, sys.stderr)
+
+    def do_file(self, arg):
+        frame, lineno = self.stack[self.curindex]
+        filename = self.canonic(frame.f_code.co_filename)
+        print "%s:%s" % (filename, lineno) 
+    do_f = do_file
+
+    def do_set(self, arg):
+        if not arg:
+            keys = self._config.keys()
+            keys.sort()
+            for key in keys:
+                print "%s: %s" % (key, self._config[key])
+        else:
+            args = arg.split(None, 1)
+            if len(args) == 1:
+                key = args[0]
+                if key in self._config:
+                    print "Removing %s: %s" % (key, self._config[key])
+                    del self._config[key]
+                else:
+                    print "%s: Not set" % (key)
+            else:
+                key, value = args
+                if(hasattr(self, 'set_' + key)):
+                    fn = getattr(self, 'set_' + key)
+                    fn(value)
+                else:
+                    print "No such config value"
+
+    def set_path(self, paths):
+        paths = paths.split(' ')
+        for path in paths:
+            if path[0] != '/':
+                print "must give absolute path"
+            if not os.path.exists(path):
+                print "Path %s does not exist" % path
+            if path[-1] == '/':
+                path = path[:-1]
+            path = os.path.realpath(path)
+            if 'path' not in self._config:
+                self._config['path'] = []
+            self._config['path'].append(path)
+        print "Set path to %s" % self._config['path']
 
     def do_list(self, arg):
         rel = re.compile(r'^[-+] *[0-9]* *$')
@@ -148,6 +195,24 @@ class Epdb(pdb.Pdb):
             # now we copy whatever te proxy points to to 1
             os.dup2(os.open('/dev/tty', os.O_WRONLY), sys.stdout.fileno())
         return
+
+    # override for cases where we want to search a different
+    # path for the file
+    def canonic(self, filename):
+        canonic = self.fncache.get(filename)
+        if not canonic or not os.path.exists(canonic):
+            canonic = os.path.abspath(filename)
+            canonic = os.path.normcase(canonic)
+            if not os.path.exists(canonic):
+                if 'path' in self._config:
+                    for path in self._config['path']:
+                        pos = matchFileOnDirPath(path, canonic)
+                        if pos:
+                            canonic = pos
+                            break
+                self.fncache[filename] = canonic
+        return canonic
+
 
     # bdb hooks
     def user_call(self, frame, argument_list):
@@ -194,3 +259,42 @@ def post_mortem(t, exc_type=None, exc_msg=None):
         t = t.tb_next
     p.interaction(t.tb_frame, t)
 
+def matchFileOnDirPath(curpath, pathdir):
+    """Find match for a file by slicing away its directory elements
+       from the front and replacing them with pathdir.  Assume that the
+       end of curpath is right and but that the beginning may contain
+       some garbage (or it may be short)
+       Overlaps are allowed:
+       e.g /tmp/fdjsklf/real/path/elements, /all/the/real/ =>
+       /all/the/real/path/elements (assuming that this combined
+       path exists)
+    """
+    if os.path.exists(curpath):
+        return curpath
+    filedirs = curpath.split('/')[1:]
+    filename = filedirs[-1]
+    filedirs = filedirs[:-1]
+    if pathdir[-1] == '/':
+        pathdir = pathdir[:-1]
+    # assume absolute paths
+    pathdirs = pathdir.split('/')[1:]
+    lp = len(pathdirs)
+    # Cut off matching file elements from the ends of the two paths
+    for x in range(1, min(len(filedirs, pathdirs))):
+        # XXX this will not work if you have 
+        # /usr/foo/foo/filename.py
+        if filedirs[-1] == pathdirs[-x]:
+            filedirs = filedirs[:-1]
+        else:
+            break
+
+    # Now cut try cuting off incorrect initial elements of curpath
+    while filedirs:
+        tmppath = '/' + '/'.join(pathdirs + filedirs + [filename]) 
+        if os.path.exists(tmppath):
+            return tmppath
+        filedirs = filedirs[1:]
+    tmppath = '/' + '/'.join(pathdirs + [filename])
+    if os.path.exists(tmppath):
+       return tmppath
+    return None
