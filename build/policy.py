@@ -121,6 +121,19 @@ class Policy(util.Action):
 		    os.path.walk(('%(destdir)s'+subtree) %self.macros,
 				 _walkFile, self)
 
+class PolicyError(Exception):
+    """
+    Base class from which policy error classes inherit
+    """
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __repr__(self):
+	return self.msg
+
+    def __str__(self):
+	return repr(self)
+
 
 # internal helpers
 
