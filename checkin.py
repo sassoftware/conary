@@ -172,9 +172,6 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
     # just going to request it again
     cs = repos.createChangeSet([(trv.getName(), None, None, trv.getVersion(),
 			        True)])
-    cs.writeToFile("FOO")
-    from repository import changeset
-    cs = changeset.ChangeSetFromFile("FOO")
 
     pkgCs = cs.iterNewPackageList().next()
 
