@@ -182,7 +182,7 @@ class RecipeLoader:
                 continue
             recipename = getattr(obj, 'name', '')
             # make sure the class is derived from Recipe
-            if issubclass(obj, PackageRecipe):
+            if issubclass(obj, PackageRecipe) and obj is not PackageRecipe:
                 if recipename.startswith('group-'):
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name cannot '
@@ -191,12 +191,12 @@ class RecipeLoader:
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name cannot '
                         'begin with "fileset-"' %basename)
-	    elif issubclass(obj, GroupRecipe):
+	    elif issubclass(obj, GroupRecipe) and obj is not GroupRecipe:
                 if recipename and not recipename.startswith('group-'):
                     raise RecipeFileError(
                         'Error in recipe file "%s": group name must '
                         'begin with "group-"' %basename)
-	    elif issubclass(obj, FilesetRecipe):
+	    elif issubclass(obj, FilesetRecipe) and obj is not FilesetRecipe:
                 if recipename and not recipename.startswith('fileset-'):
                     raise RecipeFileError(
                         'Error in recipe file "%s": fileset name must '
@@ -221,15 +221,23 @@ class RecipeLoader:
                         "file/component name '%s'"
                         % (obj.name, pkgname))
                 found = True
+            else:
+                raise RecipeFileError(
+                    "Recipe in file/component '%s' did not contain both a name"
+                    " and a version attribute." % pkgname)
         # inherit any tracked flags that we found while loading parent
         # classes
-        if self.recipe._trackedFlags is not None:
-            use.setUsed(self.recipe._trackedFlags)
-        
-        # add in the tracked flags that we found while loading this
-        # class
-        self.recipe._trackedFlags = use.getUsed()
-
+        if found:
+            if self.recipe._trackedFlags is not None:
+                use.setUsed(self.recipe._trackedFlags)
+            
+            # add in the tracked flags that we found while loading this
+            # class
+            self.recipe._trackedFlags = use.getUsed()
+        else:
+            # we'll get this if the recipe file is empty 
+            raise RecipeFileError(
+                "file/component '%s' did not contain a valid recipe" % pkgname)
 
     def allRecipes(self):
         return self.recipes
