@@ -129,6 +129,12 @@ class CONARYFileMissing(Exception):
 
 class SourceStateFromFile(SourceState):
 
+    # name : (isVersion, required)
+    fields = { 'name'       : (False, True ),
+               'version'    : (True,  True ),
+               'branch'     : (True,  True ),
+               'lastmerged' : (True,  False) }
+
     def readFileList(self, lines):
 	fileCount = int(lines[0][:-1])
 
@@ -149,18 +155,24 @@ class SourceStateFromFile(SourceState):
         lines = f.readlines()
         kwargs = {}
 
-        for (what, isVer) in [ ('name', 0), ('version', 1), ('branch', 1) ]:
-	    line = lines[0][:-1]
-            del lines[0]
-	    fields = line.split()
+        while lines:
+	    fields = lines[0][:-1].split()
+
+            # the file count ends the list of fields
+            if len(fields) == 1: break
 	    assert(len(fields) == 2)
-	    assert(fields[0] == what)
+            del lines[0]
+
+	    what = fields[0]
+            assert(not kwargs.has_key(what))
+            isVer = self.fields[what][0]
+
 	    if isVer:
                 kwargs[what] = versions.ThawVersion(fields[1])
 	    else:
                 kwargs[what] = fields[1]
 
-        required = set(('name', 'version', 'branch'))
+        required = set([ x[0] for x in self.fields.items() if x[1][1] ])
         assert((set(kwargs.keys()) & required) == required)
 
 	SourceState.__init__(self, **kwargs)
@@ -706,6 +718,8 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     _showChangeSet(repos, cs, old, new)
 
 def diff(repos, versionStr = None):
+    state = SourceStateFromFile("CONARY")
+
     if state.getVersion() == versions.NewVersion():
 	log.error("no versions have been committed")
 	return
