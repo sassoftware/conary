@@ -596,9 +596,16 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
     else:
 	if resume:
 	    raise CookError('Cannot use --resume argument when cooking in repository')
+
+        if emerge:
+            label = cfg.installLabelPath
+        else:
+            label = None
+
         try:
             (loader, version) = recipe.recipeLoaderFromSourceComponent(item,
-					    item + '.recipe', cfg, repos)[0:2]
+					    item + '.recipe', cfg, repos,
+                                            label = label)[0:2]
         except recipe.RecipeFileError, msg:
             raise CookError(str(msg))
 

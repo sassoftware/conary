@@ -214,7 +214,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     if not label:
 	label = cfg.buildLabel
     else:
-	if '@' not in label:
+	if type(label) == str and '@' not in label:
 	    # copy namespace and branchname
 	    l = cfg.buildLabel
 	    label = versions.Label('%s@%s:%s' %(label, l.getNamespace(), l.getLabel()))
