@@ -7,10 +7,10 @@
 PYTHON = python2.3
 
 pyfiles-install:
-	mkdir -p $(DESTDIR)$(srsdir)
+	mkdir -p $(DESTDIR)$(conarydir)
 	for f in $(python_files) $(bin_files); do \
-		mkdir -p `dirname $(DESTDIR)/$(srsdir)/$(DIR)/$$f`; \
-		cp -a $$f $(DESTDIR)/$(srsdir)/$(DIR)/$$f; \
+		mkdir -p `dirname $(DESTDIR)/$(conarydir)/$(DIR)/$$f`; \
+		cp -a $$f $(DESTDIR)/$(conarydir)/$(DIR)/$$f; \
 	done
 
 default-dist: dist-subdirs

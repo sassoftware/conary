@@ -4,7 +4,7 @@
 # All rights reserved
 #
 
-PYTHONORDER="/usr/lib/srs/python/bin/python2.3 python2.3 python23 python"
+PYTHONORDER="/usr/lib/conary/python/bin/python2.3 python2.3 python23 python"
 
 for p in $PYTHONORDER; do
     if type $p > /dev/null 2>&1; then
@@ -18,4 +18,4 @@ if [ -z "$PYTHON" ]; then
     exit 1
 fi
 
-$PYTHON @srsdir@/`basename $0` $*
+$PYTHON @conarydir@/`basename $0` $*

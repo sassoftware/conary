@@ -10,7 +10,7 @@ all:
 	$(PYTHON) setup.py install --install-lib=..
 
 install:
-	$(PYTHON) setup.py install --install-lib=$(DESTDIR)/$(srsdir)
+	$(PYTHON) setup.py install --install-lib=$(DESTDIR)/$(conarydir)
 
 clean:
 	rm -rf build dist

@@ -17,8 +17,8 @@ elfmodule.so: $(elfmodule_objs)
 	$(CC) -shared -o $@ $< -lelf
 
 install: pyfiles-install
-	mkdir -p $(DESTDIR)$(srsdir)/$(DIR)
-	install -m 755 $(python_modules) $(DESTDIR)$(srsdir)/$(DIR)
+	mkdir -p $(DESTDIR)$(conarydir)/$(DIR)
+	install -m 755 $(python_modules) $(DESTDIR)$(conarydir)/$(DIR)
 
 clean: default-clean
 

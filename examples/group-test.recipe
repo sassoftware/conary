@@ -3,5 +3,5 @@ class groupTest(GroupRecipe):
     version = "1.0"
 
     def setup(r):
-	r.addTrove("tmpwatch:runtime", "srs.specifixinc.com@linux")
-	r.addTrove("tmpwatch:doc", "srs.specifixinc.com@linux")
+	r.addTrove("tmpwatch:runtime", "conary.specifixinc.com@linux")
+	r.addTrove("tmpwatch:doc", "conary.specifixinc.com@linux")
