@@ -412,6 +412,9 @@ class TupleStream(InfoStream):
 
 class StreamSet(InfoStream):
 
+    headerFormat = "!BH"
+    headerSize = 3
+
     def __init__(self, data = None):
 	for streamType, name in self.streamDict.itervalues():
 	    self.__setattr__(name, streamType())
@@ -421,9 +424,10 @@ class StreamSet(InfoStream):
             dataLen = len(data)
 	    while i < dataLen:
                 assert(i < dataLen)
-		(streamId, size) = struct.unpack("!BH", data[i:i+3])
+		(streamId, size) = struct.unpack(self.headerFormat, 
+						 data[i:i + self.headerSize])
 		(streamType, name) = self.streamDict[streamId]
-		i += 3
+		i += self.headerSize
 		self.__setattr__(name, streamType(data[i:i + size]))
 		i += size
 
@@ -432,12 +436,12 @@ class StreamSet(InfoStream):
     def diff(self, other):
 	if self.lsTag != other.lsTag:
 	    d = self.freeze()
-	    return struct.pack("!BH", 0, len(d)) + d
+	    return struct.pack(self.headerFormat, 0, len(d)) + d
 
 	rc = [ "\x01", self.lsTag ]
 	for streamId, (streamType, name) in self.streamDict.iteritems():
 	    d = self.__getattribute__(name).diff(other.__getattribute__(name))
-	    rc.append(struct.pack("!BH", streamId, len(d)) + d)
+	    rc.append(struct.pack(self.headerFormat, streamId, len(d)) + d)
 
 	return "".join(rc)
 
@@ -456,7 +460,7 @@ class StreamSet(InfoStream):
 	for streamId, (streamType, name) in self.streamDict.iteritems():
 	    s = self.__getattribute__(name).freeze()
 	    if len(s):
-		rc.append(struct.pack("!BH", streamId, len(s)) + s)
+		rc.append(struct.pack(self.headerFormat, streamId, len(s)) + s)
 	return "".join(rc)
 
     def copy(self):
@@ -471,11 +475,12 @@ class StreamSet(InfoStream):
 	conflicts = False
 	
 	while i < len(diff):
-	    streamId, size = struct.unpack("!BH", diff[i:i+3])
+	    streamId, size = struct.unpack(self.headerFormat, 
+					   diff[i:i + self.headerSize])
 
 	    streamType, name = self.streamDict[streamId]
 
-	    i += 3
+	    i += self.headerSize
 	    if name != skip:
 		w = self.__getattribute__(name).twm(diff[i:i+size], 
 					       base.__getattribute__(name))
@@ -485,3 +490,8 @@ class StreamSet(InfoStream):
 	assert(i == len(diff))
 
 	return conflicts
+
+class LargeStreamSet(StreamSet):
+
+    headerFormat = "!BI"
+    headerSize = 5
