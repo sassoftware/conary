@@ -178,7 +178,8 @@ def _verifyAtHead(repos, headPkg, state):
 	    # new file, it shouldn't be in the old package at all
 	else:
 	    srcFileVersion = headPkg.getFile(pathId)[2]
-	    if not version == srcFileVersion:
+	    if (not version == srcFileVersion
+                and not version.canonicalVersion() == srcFileVersion):
 		return False
 
     return True
@@ -890,10 +891,19 @@ def merge(repos):
     newState = newPkgs.next()
     assert(util.assertIteratorAtEnd(newPkgs))
 
+    # create a new branched version
+    branch = state.getVersion().branch()
+    version = branch.createVersion(newState.getVersion().trailingRevision())
+
+    # set the version of the source componet to the new version on the branch
     if newState.getVersion() == pkgCs.getNewVersion():
-        branch = state.getVersion().branch()
-        version = branch.createVersion(newState.getVersion().trailingRevision())
 	newState.changeVersion(version)
+
+    # set each file that is currently not on the branch to the new
+    # version on the branch
+    for pathId, path, fileId, v in newState.iterFileList():
+        if v == pkgCs.getNewVersion():
+            newState.updateFile(pathId, None, version, None)
 
     newState.write("CONARY")
 

@@ -16,6 +16,8 @@ Changes in 0.50.3:
     to be turned on in optflags and elfutils's eu-strip and debugedit to
     be installed.  Like :test components, :debuginfo components are not
     installed by default.
+  * File versions are now properly set to a branched version after a
+    merge operation
 
 Changes in 0.50.2:
   * Any %(lib)s-derived path (/%(lib)s, %(libdir)s, %(krbprefix)s/%(lib)s,
