@@ -121,8 +121,7 @@ def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
     except repository.CommitError, e:
 	log.error(e)
 
-    if eraseList:
-	db.eraseTroves(eraseList, tagScript = tagScript)
+    # this doesn't do anything with eraselist; leave other branches alone
 
 def doErase(db, cfg, pkg, versionStr = None, tagScript = None):
     try:

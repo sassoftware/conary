@@ -730,6 +730,11 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	try:
 	    os.lstat(realPath)
 	except OSError:
+            if isSrcPkg:
+		log.error("%s is missing (use remove if this is intentional)" 
+		    % path)
+                return None
+
 	    if (flags & MISSINGFILESOKAY) == 0:
 		log.warning("%s is missing (use remove if this is intentional)" 
 		    % path)

@@ -230,14 +230,7 @@ class Database(SqlDbRepository):
 			  newPkg.getFlavor()))
 
 	outdated, eraseList = helper.outdatedTroves(self, items)
-
-	# this is the same code as eraseTroves(), 
-	for (name, version, flavor) in eraseList:
-	    outerTrove = self.getTrove(name, version, flavor)
-
-	    for trove in self.walkTroveSet(outerTrove, ignoreMissing = True):
-		cs.oldPackage(trove.getName(), trove.getVersion(), 
-			      trove.getFlavor())
+        # this ignores eraseList, juts like doUpdate does
 
 	for newPkg in job.newPackageList():
 	    pkgName = newPkg.getName()
