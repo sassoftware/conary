@@ -210,7 +210,7 @@ def main(argv):
         print displayStr % tuple(displayArgs)
         #print "%s  %-*s   %-*s   %-*s    %-*s" % (change, maxP, pkg, maxLV, lvt, maxV, vt, maxL, label.asString())
         if doUpdate:
-            updatecmd.doUpdate(repos, cfg, [ "%s=%s" %(pkg, v.asString()) ])
+            updatecmd.doUpdate(cfg, [ "%s=%s" %(pkg, v.asString()) ])
 
     if listMissing:
         missing = []
