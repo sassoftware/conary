@@ -53,7 +53,7 @@ def _versionList(repos, pkgName):
 	if not branch.isLocal():
 	    version = repos.pkgLatestVersion(pkgName, branch)
 	    # filter out empty branches 
-	    if version.onBranch(branch):
+	    if version and version.onBranch(branch):
 		l.append(version)
 
     return l
