@@ -59,16 +59,14 @@ class UpdateChangeSet(changeset.ReadOnlyChangeSet):
         self.empty = True
 
 class ConaryClient:
-    def __init__(self, repos = None, cfg = None):
+    def __init__(self, cfg = None):
         if cfg == None:
             cfg = conarycfg.ConaryConfiguration()
-        if repos == None:
-            repos = NetworkRepositoryClient(cfg.repositoryMap)
         
         cfg.installLabel = cfg.installLabelPath[0]
-        self.repos = repos
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
+        self.repos = NetworkRepositoryClient(cfg.repositoryMap)
 
     def _resolveDependencies(self, cs, keepExisting = None, recurse = True):
         pathIdx = 0

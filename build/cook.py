@@ -618,7 +618,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
         raise CookError(str(e))
 
     if emerge:
-        client = conaryclient.ConaryClient(repos, cfg)
+        client = conaryclient.ConaryClient(cfg)
         try:
             changeSet = changeset.ChangeSetFromFile(changeSetFile)
             client.applyChangeSet(changeSet)

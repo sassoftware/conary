@@ -24,10 +24,10 @@ import conaryclient
 # FIXME client should instantiated once per execution of the command line 
 # conary client
 
-def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None, 
+def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
                                   recurse = True):
-    client = conaryclient.ConaryClient(repos, cfg)
+    client = conaryclient.ConaryClient(cfg)
 
     applyList = []
 

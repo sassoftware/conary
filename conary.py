@@ -406,8 +406,6 @@ def realMain(cfg, argv=sys.argv):
 
 	if argSet: return usage()
 	if len(otherArgs) >=3:
-	    repos = openRepository(cfg.repositoryMap)
-
 	    updatecmd.doUpdate(repos, cfg, otherArgs[2:], **kwargs)
 	else:
 	    return usage()
