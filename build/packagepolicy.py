@@ -38,14 +38,20 @@ class EtcConfig(policy.Policy):
 class Config(policy.Policy):
     """
     Mark only explicit inclusions as config files
-    @param inclusions: regexp(s) specifying files to be included.
-    Do not mention files in /etc, which are already covered by the
-    EtcConfig class.
-    @type inclusions: None, regexp string, sequence of regexp strings.
     """
     keywords = {
 	'inclusions': None
     }
+
+    def __init__(self, *args, **keywords):
+        """
+        @param inclusions: regexp(s) specifying files to be included.
+        Do not mention files in /etc, which are already covered by the
+        EtcConfig class.
+        @type inclusions: None, regexp string, sequence of regexp strings.
+        """
+        policy.Policy.__init__(self, *args, **keywords)
+        
 
     def doProcess(self, recipe):
 	self.configREs = []
