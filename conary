@@ -139,6 +139,11 @@ elif (otherArgs[1] == "cook"):
             cook.cook(repos, cfg, file, prep=prep)
             sys.exit(0)
         else:
+	    # we don't need these; the child process gets them and that's
+	    # good enough
+	    del repos
+	    del db
+
             while 1:
                 try:
                     # XXX replace 2 with os.WUNTRACED in python 2.3

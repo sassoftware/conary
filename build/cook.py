@@ -51,6 +51,8 @@ def createPackage(repos, cfg, destdir, fileList, name, version, ident,
     return (p, fileMap)
 
 def cook(repos, cfg, recipeFile, prep=0, macros=()):
+    repos.open("r")
+
     if type(recipeFile) is types.ClassType:
         classList = {recipeFile.__name__: recipeFile}
     else:
@@ -116,7 +118,10 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         
         cwd = os.getcwd()
         os.chdir(builddir + '/' + recipeObj.mainDir())
+
+	repos.close()
 	recipeObj.doBuild(builddir)
+	repos.open("w")
 
 	destdir = "/var/tmp/srs/%s-%d" % (recipeObj.name, int(time.time()))
         if os.path.exists(destdir):
@@ -162,6 +167,8 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
 	changeSet = changeset.CreateFromFilesystem(packageList, version)
 	commit.commitChangeSet(repos, cfg, changeSet)
+
+	repos.open("r")
 
 	recipeObj.cleanup(builddir, destdir)
 

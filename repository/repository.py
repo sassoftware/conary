@@ -11,6 +11,7 @@ import files
 import datastore
 import os
 import versioned
+import fcntl
 
 class Repository:
 
@@ -61,17 +62,38 @@ class Repository:
 	    file.archive(self, f)
 	    f.close()
 
-    def __init__(self, path):
+    def open(self, mode):
+	self.close()
+
+	self.lockfd = os.open(self.top + "/lock", os.O_CREAT | os.O_RDWR)
+
+	if (mode == "r"):
+	    fcntl.lockf(self.lockfd, fcntl.LOCK_SH)
+	else:
+	    fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
+
+	self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db")
+	self.fileDB = versioned.Database(self.top + "/files.db")
+
+    def close(self):
+	if self.pkgDB:
+	    self.pkgDB = None
+	    self.fileDB = None
+	    os.close(self.lockfd)
+
+    def __del__(self):
+	self.close()
+
+    def __init__(self, path, mode = "c"):
 	self.top = path
+	self.pkgDB = None
 	
 	self.contentsDB = self.top + "/contents"
 	util.mkdirChain(self.contentsDB)
 
-	# FIXME this needs some locking
-	self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db")
-	self.fileDB = versioned.Database(self.top + "/files.db")
-
 	self.contentsStore = datastore.DataStore(self.contentsDB)
+
+	self.open(mode)
 
 # The database is a magic repository where files in the data store are quite
 # often pointers to the actual file in the file system
