@@ -112,6 +112,9 @@ class ChangeSet:
     def getFileOldVersion(self, fileId):
 	return self.files[fileId][0]
 
+    def hasFileChange(self, fileId):
+	return self.files.has_key(fileId)
+
     def headerAsString(self):
 	rc = ""
 	for pkg in self.getNewPackageList():
