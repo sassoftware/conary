@@ -4,18 +4,24 @@
 #
 
 class tmpwatch(Recipe):
-    description = """Logrotate is a genuinally useful piece of code for
-preventing files from growing ad nauseum
-OK, but what is tmpwatch?  :-)"""
+    description = """The tmpwatch utility recursively searches through specified
+directories and removes files which have not been accessed in a
+specified period of time. Tmpwatch is normally used to clean up
+directories that are used for temporarily holding files (for example,
+/tmp). Tmpwatch ignores symlinks, will not switch filesystems, and
+only removes empty directories and regular files."""
 
     buildRequires = [ "glibc" ]
     runRequires = [ "cron" ]
 
     name = "tmpwatch"
     version = "2.9.0"
+    rpmrevision = "2.1"
 
     def setup(self):
-	self.addTarball("%s-%s.tar.gz" % (self.name, self.version))
+	#self.addTarball("%s-%s.tar.gz" % (self.name, self.version))
+	self.addSourceFromRPM("ftp://ftp.redhat.com/pub/fedora/linux/core/development/SRPMS/%s-%s-%s" %(self.name, self.version, self.rpmrevision),
+	                      "%s-%s.tar.gz %(self.name, self.version))
 	self.addSource("crond-tmpwatch")
 	self.install = (build.MakeInstall(rootVar = "ROOT"),
 			build.InstallFile("crond-tmpwatch", 
