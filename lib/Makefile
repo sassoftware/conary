@@ -20,7 +20,6 @@ python_files=	    __init__.py		\
 		    erlcompleter.py	\
 		    log.py		\
 		    magic.py		\
-                    metadata.py         \
 		    options.py		\
 		    patch.py		\
 		    sha1helper.py	\

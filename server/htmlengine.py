@@ -13,7 +13,7 @@
 #
 import traceback
 
-from lib.metadata import MDClass
+from metadata import MDClass
 from fmtroves import TroveCategories, LicenseCategories
 
 class HtmlEngine:
@@ -144,21 +144,16 @@ Choose a branch: %s
     def htmlWarning(self, warning=""):
         self.writeFn("""<div class="warning">%s</div>""" % warning)
         
-    def htmlMetadataEditor(self, troveName, branch, metadata, source=None):
+    def htmlMetadataEditor(self, troveName, branch, metadata, source):
         branchStr = branch.asString().split("/")[-1]
         branchFrz = branch.freeze()
 
-        if source:
-            versionStr = "initial %s source" % source
-        elif "version" in metadata:
+        if metadata.getVersion():
             # the only number that matters in the metadata version is the source revision
-            versionStr = metadata["version"].split("-")[-1]
+            versionStr = metadata.getVersion().split("-")[-1]
         else:
-            versionStr = "Initial Version"
+            versionStr = "Initial %s version" % source
             
-        if not metadata["source"]:
-            metadata["source"].append("")
-
         licenses = [x for x in LicenseCategories.values() if "::" in x]
         licenses.sort()
         categories = [x for x in TroveCategories.values() if x.startswith('Topic') and '::' in x]
@@ -181,17 +176,17 @@ Choose a branch: %s
 <input type="hidden" name="troveName" value="%s" />
 </form>
 """     % (branchStr, versionStr,
-           metadata["shortDesc"][0],
-           metadata["longDesc"][0],
-           self.makeSelect(metadata["url"], "urlList", size=4,
+           metadata.getShortDesc(),
+           metadata.getLongDesc(),
+           self.makeSelect(metadata.getUrls(), "urlList", size=4,
                            expand="53%", multiple=True,
                            onClick="setValue('urlList', 'newUrl')"),
            self.makeSelectAppender("newUrl", "urlList"),
-           self.makeSelect(metadata["license"], "licenseList", size=4, expand="53%", multiple=True),
+           self.makeSelect(metadata.getLicenses(), "licenseList", size=4, expand="53%", multiple=True),
            self.makeSelectAppenderList("newLicense", "licenseList", licenses),
-           self.makeSelect(metadata["category"], "categoryList", size=4, expand="53%", multiple=True),
+           self.makeSelect(metadata.getCategories(), "categoryList", size=4, expand="53%", multiple=True),
            self.makeSelectAppenderList("newCategory", "categoryList", categories), 
-           self.makeSelect(['local', 'freshmeat'], "source", default=metadata["source"][0]),
+           self.makeSelect(['local', 'freshmeat'], "source", default=source),
            branchFrz, troveName)
           )
 

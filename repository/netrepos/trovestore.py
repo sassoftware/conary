@@ -21,7 +21,7 @@ import instances
 import items
 import files
 import flavors
-from lib import metadata
+import metadata
 import sqlite3
 import trove
 import trovefiles
@@ -525,9 +525,10 @@ class TroveStore:
         else:
             return None
        
-        metadata = self.metadataTable.get(itemId, versionId, branchId, language)
-        metadata["version"] = versions.VersionFromString(latestVersion).asString()
-        return metadata
+        md = self.metadataTable.get(itemId, versionId, branchId, language)
+        md["version"] = versions.VersionFromString(latestVersion).asString()
+        md["language"] = language
+        return metadata.Metadata(md)
 
     def hasTrove(self, troveName, troveVersion = None, troveFlavor = 0):
 	if not troveVersion:

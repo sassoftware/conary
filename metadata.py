@@ -27,12 +27,9 @@ from urllib2 import urlopen
 from httplib import HTTPConnection
 
 class MDClass:
-    SHORT_DESC = 0
-    LONG_DESC = 1
-    URL = 2
-    LICENSE = 3
-    CATEGORY = 4
-    SOURCE = 5
+    (SHORT_DESC, LONG_DESC,
+     URL, LICENSE, CATEGORY,
+     SOURCE) = range(6)
 
     # mapping from enum id to real name
     className = {SHORT_DESC: "shortDesc",
@@ -41,7 +38,16 @@ class MDClass:
                  LICENSE:    "license",
                  CATEGORY:   "category",
                  SOURCE:     "source"}
-                  
+    
+    (STRING, LIST) = range(2)
+    
+    types = {SHORT_DESC:    STRING,
+             LONG_DESC:     STRING,
+             URL:           LIST,
+             LICENSE:       LIST,
+             CATEGORY:      LIST,
+             SOURCE:        STRING}
+    
 class MetadataTable:
     def __init__(self, db):
         self.db = db
@@ -118,12 +124,24 @@ class MetadataTable:
         # each key points to a list of metadata items
                  
         items = {}
-        for className in MDClass.className.values():
-            items[className] = []
+        for mdClass, className in MDClass.className.items():
+            classType = MDClass.types[mdClass]
+            
+            if classType == MDClass.STRING:
+                items[className] = ""
+            elif classType == MDClass.LIST:
+                items[className] = []
+            else:
+                items[className] = None
         
         for mdClass, data in cu:
             className = MDClass.className[mdClass]
-            items[className].append(data)
+            classType = MDClass.types[mdClass]
+            
+            if classType == MDClass.STRING:
+                items[className] = data
+            elif classType == MDClass.LIST:
+                items[className].append(data)
 
         return items
 
@@ -153,38 +171,102 @@ def resolveUrl(url):
         realUrl = urlparse.urlunparse(url)
     return realUrl
 
+class Metadata:
+    shortDesc = ""
+    longDesc = ""
+    urls = []
+    licenses = []
+    categories = []
+    language = "C"
+    version = None
+    source = "local"
+
+    def __init__(self, md):
+        if md:
+            self.shortDesc = md["shortDesc"]
+            self.longDesc = md["longDesc"]
+            self.urls = md["url"]
+            self.licenses = md["license"]
+            self.categories = md["category"]
+            if "version" in md:
+                self.version = md["version"]
+            if "source" in md and md["source"]:
+                self.source = md["source"]
+            self.language = md["language"]
+
+    def freeze(self):
+        return {"shortDesc": self.shortDesc,
+                "longDesc":  self.longDesc,
+                "url":       self.urls,
+                "license":   self.licenses,
+                "category":  self.categories,
+                "version":   self.version,
+                "source":    self.source,
+                "language":  self.language}
+
+    def getShortDesc(self):
+        return self.shortDesc
+
+    def getLongDesc(self):
+        return self.longDesc
+
+    def getUrls(self):
+        return self.urls
+
+    def getLicenses(self):
+        return self.licenses
+
+    def getCategories(self):
+        return self.categories
+    
+    def getVersion(self):
+        return self.version
+
+    def getSource(self):
+        return self.source
+        
+    def getLanguage(self):
+        return self.language
+
+class NoFreshmeatRecord(xml.parsers.expat.ExpatError):
+    pass
+
 def fetchFreshmeat(troveName):
     url = urlopen('http://freshmeat.net/projects-xml/%s/%s.xml' % (troveName, troveName))
 
-    doc = xml.dom.minidom.parse(url)
-    metadata = {}
-    
-    shortDesc = doc.getElementsByTagName("desc_short")[0]
-    if shortDesc.childNodes:
-        metadata["shortDesc"] = [shortDesc.childNodes[0].data]
+    try:
+        doc = xml.dom.minidom.parse(url)
+        metadata = {}
+        
+        shortDesc = doc.getElementsByTagName("desc_short")[0]
+        if shortDesc.childNodes:
+            metadata["shortDesc"] = shortDesc.childNodes[0].data
 
-    longDesc = doc.getElementsByTagName("desc_full")[0]
-    if longDesc.childNodes:
-        metadata["longDesc"] = [longDesc.childNodes[0].data]
-    
-    metadata["url"] = []
-    urlHomepage = doc.getElementsByTagName("url_homepage")[0]
-    if urlHomepage.childNodes:
-        metadata["url"].append(resolveUrl(urlHomepage.childNodes[0].data))
-    metadata["url"].append("http://freshmeat.net/projects/%s/" % troveName)
-    
-    metadata["license"] = []
-    metadata["category"] = []
+        longDesc = doc.getElementsByTagName("desc_full")[0]
+        if longDesc.childNodes:
+            metadata["longDesc"] = longDesc.childNodes[0].data
+        
+        metadata["url"] = []
+        urlHomepage = doc.getElementsByTagName("url_homepage")[0]
+        if urlHomepage.childNodes:
+            metadata["url"].append(resolveUrl(urlHomepage.childNodes[0].data))
+        metadata["url"].append("http://freshmeat.net/projects/%s/" % troveName)
+        
+        metadata["license"] = []
+        metadata["category"] = []
 
-    for node in doc.getElementsByTagName("trove_id"):
-        id = node.childNodes[0].data
-        if id in LicenseCategories:
-            name = LicenseCategories[id]
-            metadata["license"].append(name)
-        else:
-            name = TroveCategories[id]
-            if name.startswith('Topic ::'):
-                metadata["category"].append(name)
+        for node in doc.getElementsByTagName("trove_id"):
+            id = node.childNodes[0].data
+            if id in LicenseCategories:
+                name = LicenseCategories[id]
+                metadata["license"].append(name)
+            else:
+                name = TroveCategories[id]
+                if name.startswith('Topic ::'):
+                    metadata["category"].append(name)
 
-    metadata["source"] = ["freshmeat"]
-    return metadata
+        metadata["source"] = "freshmeat"
+        metadata["language"] = "C"
+        return Metadata(metadata)
+    except xml.parsers.expat.ExpatError:
+        raise NoFreshmeatRecord

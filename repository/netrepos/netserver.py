@@ -147,7 +147,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 version = None
             md = self.repos.troveStore.getMetadata(troveName, branch, version, language)
             if md:
-                metadata[troveName] = md 
+                metadata[troveName] = md.freeze() 
+
         return metadata
     
     def hasPackage(self, authToken, clientVersion, pkgName):

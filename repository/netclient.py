@@ -22,6 +22,7 @@ from lib import log
 import os
 import repository
 import changeset
+import metadata
 import socket
 import tempfile
 import transport
@@ -151,9 +152,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self.c[serverName].hasPackage(pkg)
 
     def updateMetadata(self, troveName, branch, shortDesc = None, longDesc = None,
-                       urls = [], licenses=[], categories = [], language = "C"):
+                       urls = [], licenses=[], categories = [], source="local", language = "C"):
         self.c[branch].updateMetadata(troveName, branch.freeze(), shortDesc, longDesc,
-                                      urls, licenses, categories, language)
+                                      urls, licenses, categories, source, language)
 
     def getMetadata(self, troveList, label, language="C"):
         if type(troveList[0]) is str:
@@ -169,7 +170,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             item = (trove[0], branch, version)
             frozenList.append(item)
          
-        return self.c[label].getMetadata(frozenList, language)
+        mdDict = {}
+        md = self.c[label].getMetadata(frozenList, language)
+        for troveName, md in md.items():
+            mdDict[troveName] = metadata.Metadata(md)
+        return mdDict
 
     def troveNames(self, label):
 	return self.c[label].troveNames(self.fromLabel(label))

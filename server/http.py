@@ -11,11 +11,10 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from lib import metadata
-import xml.parsers.expat
+import metadata
 
 from htmlengine import HtmlEngine
-from lib.metadata import MDClass
+from metadata import MDClass
 
 class ServerError(Exception):
     def __str__(self):
@@ -150,36 +149,30 @@ class HttpHandler(HtmlEngine):
         if 'source' in fields:
             source = fields['source'].value.lower()
         else:
-            source = None
+            source = "local"
 
         self._getMetadata(fields, troveName, branch, source)
 
-    def _getMetadata(self, fields, troveName, branch, source=None):
+    def _getMetadata(self, fields, troveName, branch, source):
         branch = self.repServer.thawVersion(branch)
 
         self.htmlPageTitle("Metadata for %s" % troveName)
         if source == "freshmeat":
-            fmName = fields["freshmeatName"].value
+            if "freshmeatName" in fields:
+                fmName = fields["freshmeatName"].value
+            else:
+                fmName = troveName[:-7]
             try:
                 md = metadata.fetchFreshmeat(fmName)
-            except xml.parsers.expat.ExpatError:
+            except metadata.NoFreshmeatRecord:
                 md = None
                 self.htmlWarning("No Freshmeat record found.")
         else:
             md = self.troveStore.getMetadata(troveName, branch)
 
-        # fill a stub
-        if not md:
-            md = {
-                    "shortDesc":  [ "" ],
-                    "longDesc":   [ "" ],
-                    "url":        [],
-                    "license":    [],
-                    "category":   [],
-                    "source":     [ "" ],
-                 }
-        
-        self.htmlMetadataEditor(troveName, branch, md, source)
+        if not md: # fill a stub
+            md = metadata.Metadata(None) 
+        self.htmlMetadataEditor(troveName, branch, md, md.getSource())
   
     def updateMetadataCmd(self, authToken, fields):
         branch = self.repServer.thawVersion(fields["branch"].value)
