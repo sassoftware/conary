@@ -315,9 +315,9 @@ class File(streams.StreamSet):
                 uid = userCache.lookup(root, self.inode.owner())
                 gid = groupCache.lookup(root, self.inode.group())
                 os.lchown(target, uid, gid)
-            # do the chmod after the chown because some versions of Linux
-            # remove setuid/gid flags when changing ownership to root 
-            self.chmod(target)
+        # do the chmod after the chown because some versions of Linux
+        # remove setuid/gid flags when changing ownership to root 
+        self.chmod(target)
 
     def twm(self, diff, base, skip = []):
 	sameType = struct.unpack("B", diff[0])
