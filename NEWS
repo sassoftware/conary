@@ -12,6 +12,10 @@ Changes in 0.14.0
     using mmap to read them won't work.
   * the repository code now uses a 30 second timeout when attempting to
     access the database
+  * Have architectures control their march values in the architecture
+     config files.
+  * add Arch.getCurrentArch() to get the major architecture that is in use
+    during a build
 
 Changes in 0.13.3
   * added ability for a contents log file (makes syncing much easier)
