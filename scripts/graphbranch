@@ -36,7 +36,7 @@ import queryrep
 import checkin
 import versions
 
-sys.excepthook = util.excepthook
+sys.excepthook = util.genExcepthook()
 
 cfg = conarycfg.ConaryConfiguration()
 repos = helper.openRepository(cfg.repositoryMap)

@@ -39,7 +39,7 @@ def usage():
     print "Usage: localoutofdate [--missing]"
     return 1
 
-sys.excepthook = util.excepthook
+sys.excepthook = util.genExcepthook()
 
 
 def main(argv):
