@@ -61,9 +61,12 @@ def _getUseDependencySet(recipe):
         for name in names:
             val = flags[name]
             if val:
-                depFlags.append(name)
+                if val.getRequired():
+                    depFlags.append(name)
+                else:
+                    depFlags.append('~' + name)
             else:
-                depFlags.append('!' + name)
+                depFlags.append('~!' + name)
         dep = deps.Dependency('use', depFlags)
         set.addDep(deps.UseDependency, dep)
     return set

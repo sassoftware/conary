@@ -33,7 +33,7 @@ class Flag(dict):
     Magic is used to make the initialization of the object easy.
     """
     def __init__(self, value=None, name=None, showdefaults=True, ref=None, 
-                createOnAccess=False):
+                 createOnAccess=False, required=True):
 	self._showdefaults = showdefaults
         self._value = value
         self._short = ""
@@ -45,6 +45,7 @@ class Flag(dict):
         self._usedFlags = {}
 	self._overrides = {}
         self._createOnAccess = createOnAccess
+        self._required = required
         # this must be set last
         self._initialized = True
 
@@ -53,6 +54,12 @@ class Flag(dict):
 
     def setLongDoc(self, doc):
         self._long = doc
+
+    def setRequired(self, required):
+        self._required = required
+
+    def getRequired(self):
+        return self._required
 
     def _set(self, value):
         self._value = value
@@ -104,7 +111,8 @@ class Flag(dict):
             self[key]._set(bool(value))
         else:
             # override flag values that haven't been entered yet
-            self[key] = Flag(value, name=key, ref=self, createOnAccess=self._createOnAccess)
+            self[key] = Flag(value=value, name=key, ref=self,
+                createOnAccess=self._createOnAccess, required=self._required)
 	self._overrides[key] = value
 
     def __delattr__(self, key):
@@ -120,7 +128,7 @@ class Flag(dict):
         """
         assert(other._name == self._name)
         # RHS value (other) is propogated 
-        new = Flag(other._value, other._name)
+        new = Flag(value=other._value, name=other._name)
         # overrides and usedFlags are combined
         # from both
         new._overrides = self._overrides.copy()
@@ -195,8 +203,10 @@ class Flag(dict):
     def deepCopy(self, ref=None):
         """ Create a copy of a flag set, creating new Flag instances
             for all children """
-        new = Flag(self._value, self._name, self._showdefaults, 
-                ref, self._createOnAccess)
+        new = Flag(value=self._value, name=self._name,
+                   showdefaults=self._showdefaults, ref=ref,
+                   createOnAccess=self._createOnAccess,
+                   required=self._required)
         new._overrides = self._overrides.copy()
         new._usedFlags = self._usedFlags.copy()
         new._track = self._track
@@ -215,11 +225,11 @@ class Flag(dict):
 
         if self._name == '__GLOBAL__':
             return self
-        top = parent = Flag(None, self._name)
+        top = parent = Flag(value=None, name=self._name)
         cursor = self._ref
         while cursor is not None:
             child = parent
-            parent = Flag(None, cursor._name)
+            parent = Flag(value=None, name=cursor._name)
             parent[child._name] = child
             child._ref = parent
             cursor = cursor._ref
@@ -228,7 +238,7 @@ class Flag(dict):
         # need a higher level to connect them.
         if parent._name != '__GLOBAL__':
             child = parent
-            parent = Flag(None, '__GLOBAL__')
+            parent = Flag(value=None, name='__GLOBAL__')
             child._ref = parent
             parent[child._name] = child
 
@@ -236,7 +246,7 @@ class Flag(dict):
         #    to True
         if flags:
             for flag in flags:
-                top[flag] = Flag(True, flag, ref=top)
+                top[flag] = Flag(value=True, name=flag, ref=top)
         else:
             top._value = True
         return parent
@@ -276,9 +286,12 @@ class Flag(dict):
             prefix = self._name
         if self._value is not None:
             if self._value:
-                strings.append(prefix)
+                if self._required:
+                    strings.append(prefix)
+                else:
+                    strings.append('~' + prefix)
             else:
-                strings.append('!' + prefix)
+                strings.append('~!' + prefix)
         for subflag in self.iterkeys():
             strings.extend(self[subflag].toDepStrings(prefix=prefix))
         return strings
@@ -302,7 +315,7 @@ class Flag(dict):
             return flag
         elif self._createOnAccess:
             # flag doesn't exist, add it
-            self[name] = Flag(None, name=name, ref=self, createOnAccess=True)
+            self[name] = Flag(value=None, name=name, ref=self, createOnAccess=True)
             return self[name]
         raise AttributeError, "class %s has no attribute '%s'" % (self.__class__.__name__, name)
 
@@ -324,7 +337,7 @@ class Flag(dict):
                 return
             self[name]._set(value)
         else:
-            self[name] = Flag(value, name=name, ref=self, createOnAccess=self._createOnAccess)
+            self[name] = Flag(value=value, name=name, ref=self, createOnAccess=self._createOnAccess)
 
 def _addShortDoc(baseobj, obj, keys, level=1):
     global __doc__
@@ -423,6 +436,7 @@ early stages of bootstrapping a new architecture.
 
 Use.dietlibc = False
 Use.bootstrap = False
+Use.bootstrap.setRequired(False)
 Use.python = True
 Use.perl = True
 Use.readline = True
@@ -449,6 +463,7 @@ required.
 
 # flags to use for special situations
 Use.builddocs = True
+Use.builddocs.setRequired(False)
 Use.builddocs.setShortDoc('Build documentation as well as binaries')
 Use.builddocs.setLongDoc("""
 Some packages have documentation that needs to be built, not just
@@ -464,6 +479,7 @@ for embedded targets.
 """)
 
 Use.buildtests = True
+Use.buildtests.setRequired(False)
 Use.buildtests.setShortDoc('Build test suites')
 Use.buildtests.setLongDoc("""
 Conary supports the installation of build-time test suites in a
@@ -492,6 +508,7 @@ Use.sasl.setShortDoc('Build with support for SASL Simple Authenication '
 Use.pie = False
 
 Use.desktop = Use.gnome | Use.kde | Use.xfce
+Use.desktop.setRequired(False)
 Use.desktop.setShortDoc('Build with support for freedesktop.org specs')
 Use.desktop.setLongDoc("""
 Set if any graphical desktop platform/environment that attempts to conform
