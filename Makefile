@@ -18,9 +18,10 @@ export VERSION = 0.50.7
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
-export conarydir = $(prefix)/share/conary
 export bindir = $(prefix)/bin
+export libdir = $(prefix)/lib
 export mandir = $(prefix)/share/man
+export conarydir = $(libdir)/python$(PYVERSION)/site-packages/conary
 
 SUBDIRS=build local repository server lib pysqlite3 deps scripts config
 
@@ -72,7 +73,7 @@ generated_files = conary-wrapper *.pyo *.pyc
 
 subdirs: default-subdirs
 
-conary-wrapper: conary-wrapper.in
+conary-wrapper: conary-wrapper.in Makefile
 	sed s,@conarydir@,$(conarydir),g $< > $@
 	chmod 755 $@
 

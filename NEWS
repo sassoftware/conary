@@ -15,6 +15,7 @@ Changes in 0.50.8:
   * updating a package to a version that comes from a different
     repository when that package had an uninstalled component works
     now.
+  * conary now resides in /usr/$LIB/python$PYVERSION/site-packages/conary/
 
 Changes in 0.50.7:
   * Added the XInetdService action to avoid having to include
