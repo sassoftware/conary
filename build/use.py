@@ -223,7 +223,8 @@ class Flag(dict):
 
     def resetUsed(self):
         self._usedFlags.clear()
-
+        for flag in self.itervalues():
+            flag.resetUsed()
     
     def deepCopy(self, parent=None):
         """ Create a copy of a flag set, creating new Flag instances
