@@ -33,29 +33,26 @@ def checkBranchForDuplicate(repos, fileId, branch, file):
 # type could be "src"
 #
 # returns a (pkg, fileMap) tuple
-def createPackage(repos, cfg, destdir, bldPkg, ident, pkgtype = "auto"):
+def createPackage(repos, cfg, bldPkg, ident):
     fileMap = {}
     p = package.Package(bldPkg.getName(), bldPkg.getVersion())
 
-    for filePath in bldPkg.keys():
-	if pkgtype == "auto":
-	    realPath = destdir + filePath
-	    targetPath = filePath
-	else:
-	    realPath = filePath
-	    targetPath = os.path.basename(filePath)
-
-	file = files.FileFromFilesystem(realPath, ident(targetPath), 
-					type = pkgtype)
+    for (path, file) in bldPkg.items():
+        realPath = file.getRealPath()
+        if realPath:
+            file = files.FileFromFilesystem(realPath, ident(path), 
+                                            type = file.getType())
+        else:
+            raise RuntimeError, "unable to find file on filesystem when building package"
 
 	duplicateVersion = checkBranchForDuplicate(repos, file.id(),
 						   cfg.defaultbranch, file)
         if not duplicateVersion:
-	    p.addFile(file.id(), targetPath, bldPkg.getVersion())
+	    p.addFile(file.id(), path, bldPkg.getVersion())
 	else:
-	    p.addFile(file.id(), targetPath, duplicateVersion)
+	    p.addFile(file.id(), path, duplicateVersion)
 
-        fileMap[file.id()] = (file, realPath, targetPath)
+        fileMap[file.id()] = (file, realPath, path)
 
     return (p, fileMap)
 
@@ -125,8 +122,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         recipeObj.packages(cfg.packagenamespace, version, destdir)
 
 	for (name, buildPkg) in recipeObj.getPackageSet().packageSet():
-	    (p, fileMap) = createPackage(repos, cfg, destdir, buildPkg,
-					 ident, "auto")
+	    (p, fileMap) = createPackage(repos, cfg, buildPkg, ident)
             built.append(p.getName())
 	    packageList.append((p, fileMap))
 
@@ -145,10 +141,9 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	srcBldPkg = buildpackage.BuildPackage(srcName, version)
 	for file in recipeObj.allSources() + recipes:
             src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
-	    srcBldPkg.addFile(src)
+	    srcBldPkg.addFile(os.path.basename(src), src, type="src")
 	
-	(p, fileMap) = createPackage(repos, cfg, destdir, srcBldPkg, 
-				     ident, "src")
+	(p, fileMap) = createPackage(repos, cfg, srcBldPkg, ident)
 	packageList.append((p, fileMap))
 
 	changeSet = changeset.CreateFromFilesystem(packageList)

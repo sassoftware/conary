@@ -12,17 +12,27 @@ import re
 import os
 
 class BuildFile:
+    def getRealPath(self):
+        return self.realPath
 
-    def configFile(self):
-	self.isConfigFile = 1
+    def getType(self):
+        return self.type
 
-    def __init__(self):
-	self.isConfigFile = 0
+    def __init__(self, realPath, type):
+        self.realPath = realPath
+        self.type = type
 
 class BuildPackage(types.DictionaryType):
 
-    def addFile(self, path):
-	self[path] = BuildFile()
+    def addFile(self, path, realPath, type="auto"):
+        """add a file to the build package
+        @param path: the location of the file in the package
+        @param realPath: the location of the actual file on the filesystem,
+        used to obtain the contents of the file when creating a changeset
+        to commit to the repository
+        @param type: type of file.  Use "src" for source files.
+        """
+	self[path] = BuildFile(realPath, type)
 
     def getName(self):
 	return self.name
@@ -111,8 +121,17 @@ class BuildPackageFactory:
 	    return string.join((prefix, subname, autoname), ':')
 	else:
 	    return string.join((prefix, autoname), ':')
+
+    def findPackage(self, path):
+        """Return the BuildPackage that matches the path"""
+	for explicitspec in self.explicit:
+	    if explicitspec.match(path):
+		for autospec in self.auto:
+		    if autospec.match(path):
+			return self.packageMap[explicitspec][autospec]
+        return None
     
-    def addPath(self, path):
+    def addFile(self, path, realPath=None):
         """Add a path to the correct BuildPackage instance by matching
         the file name against the the explicit and auto specs
 
@@ -120,17 +139,11 @@ class BuildPackageFactory:
         @type path: str
         @rtype: None
         """
-	for explicitspec in self.explicit:
-	    if explicitspec.match(path):
-		for autospec in self.auto:
-		    if autospec.match(path):
-			pkg = self.packageMap[explicitspec][autospec]
-                        pkg.addFile(path)
-			break
-		break
+        pkg = self.findPackage(path)
+        pkg.addFile(path, realPath)
 
     def packageSet(self):
-        """examine the BuildPackage instances created by the factory
+        """Examine the BuildPackage instances created by the factory
         return a new BuildPackageSet instance that includes only those
         which have files
         
@@ -144,7 +157,7 @@ class BuildPackageFactory:
         return set
             
     def walk(self, root):
-        """traverse the directory tree specified by @C{root}, adding entries
+        """Traverse the directory tree specified by @C{root}, adding entries
         to the BuildPackages
         @param root: root of path to walk
         @type root: str
@@ -164,4 +177,4 @@ def _autoVisit(arg, dir, files):
         else:
             path = '/' + file
 
-        factory.addPath(path)
+        factory.addFile(path, root + path)
