@@ -59,18 +59,21 @@ def _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s,
 	version = trove.getVersion()
 
 	if ls:
-	    iter = db.iterFilesInTrove(trove.getName(), trove.getVersion(),
-                                       trove.getFlavor(),
-                                       sortByPath = True, withFiles = True)
-	    for (fileId, path, version, file) in iter:
-		if isinstance(file, files.SymbolicLink):
-		    name = "%s -> %s" %(path, file.target.value())
-		else:
-		    name = path
+	    outerTrove = trove
+	    for trove in db.walkTroveSet(outerTrove):
+		iter = db.iterFilesInTrove(trove.getName(), trove.getVersion(),
+					   trove.getFlavor(),
+					   sortByPath = True, withFiles = True)
+		for (fileId, path, version, file) in iter:
+		    if isinstance(file, files.SymbolicLink):
+			name = "%s -> %s" %(path, file.target.value())
+		    else:
+			name = path
 
-		print "%s    1 %-8s %-8s %s %s %s" % \
-		    (file.modeString(), file.inode.owner(), file.inode.group(), 
-		     file.sizeString(), file.timeString(), name)
+		    print "%s    1 %-8s %-8s %s %s %s" % \
+			(file.modeString(), file.inode.owner(), 
+			 file.inode.group(), 
+			 file.sizeString(), file.timeString(), name)
 	elif ids:
 	    for (fileId, path, version) in trove.iterFileList():
 		print "%s %s" % (fileId, path)
