@@ -714,18 +714,21 @@ class DependencyTables:
                 countList.append((solutionCount[troveName], troveName))
             countList.sort()
 
+            # pick the trove which helped the most
             troveName = countList[-1][1]
+            choices = [ (troveName, x[0], x[1]) 
+                            for x in troveNames[troveName].keys() ]
 
             # XXX
-            versionStr = troveNames[troveName].keys()[0][0]
+            versionStr = choices[0][1]
 
             depNum = depList[depId][0]
             depSet = depSetList[depNum]
-            l = result.get(depSet, None)
-            if not l:
-                result[depSet] = [ (troveName, versionStr) ]
-            elif (troveName, versionStr) not in l:
-                l.append((troveName, versionStr))
+            l = result.setdefault(depSet, [])
+
+            for choice in choices:
+                if choice not in l:
+                    l.append(choice)
 
         cu.execute("DROP TABLE TmpDependencies", start_transaction= False)
         cu.execute("DROP TABLE TmpRequires", start_transaction= False)

@@ -928,9 +928,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	sugDict = self.troveStore.resolveRequirements(label, requires.keys())
 
-	result = {}
-	for (key, val) in sugDict.iteritems():
-            result[requires[key]] = val
+        if clientVersion == 24:
+            result = {}
+            for (key, val) in sugDict.iteritems():
+                # val is (troveName, versionStr, flavorStr)*, and needs
+                # to have the flavorStr stripped, and be dedupped
+                val = {}.fromkeys([(x[0], x[1]) for x in val]).keys()
+                result[requires[key]] = val
+        else:
+            assert(0)
 
         return result
 
