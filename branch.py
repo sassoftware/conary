@@ -30,9 +30,5 @@ def branch(repos, branchName, branchFrom, troveName = None):
     except versions.ParseError, e:
 	log.error(str(e))
 	return
-    except:
-        raise
 
     repos.createBranch(newBranch, branchSource, [troveName])
-	    
-
