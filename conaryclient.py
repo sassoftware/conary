@@ -445,7 +445,7 @@ class ConaryClient:
 
         return finalCs
 
-    def updateChangeSet(self, itemList, keepExisting = False, recurse = False,
+    def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         depsRecurse = True, resolveDeps = True, test = False):
         if not test:
             self._prepareRoot()
