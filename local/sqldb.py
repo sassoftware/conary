@@ -367,7 +367,7 @@ class Database:
     schemaVersion = 1
 
     def __init__(self, path):
-	self.db = sqlite3.connect(path)
+	self.db = sqlite3.connect(path, timeout=30000)
 
         try:
             self.db._begin()
