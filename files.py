@@ -108,7 +108,10 @@ class FileMode:
 
     def size(self, new = None):
 	if (new != None and new != "-"):
-	    self.theSize = new
+	    if type(new) == types.IntType:
+		self.theSize = new
+	    else:
+		self.theSize = int(new)
 
 	return self.theSize
 
@@ -162,7 +165,7 @@ class FileMode:
 	self.owner(o)
 	self.group(g)
 	self.mtime(m)
-	self.size(int(s))
+	self.size(s)
 
     def __init__(self, info = None):
 	if info:
