@@ -144,25 +144,25 @@ class Database(repository.LocalRepository):
 	map = ( ( None, sourcePath + "/" ), )
 	cs.remapPaths(map)
 
-	# create the change set from A->A.local
-	list = []
-	for pkg in cs.getNewPackageList():
-	    name = pkg.getName()
-	    old = pkg.getOldVersion()
-	    if self.hasPackage(name) and old:
-		branch = old.fork(versions.LocalBranch(), sameVerRel = 0)
-		new = self.pkgLatestVersion(name, branch)
-		list.append((name, old, new, 0))
-
-	localChanges = self.createChangeSet(list)
-
 	if not localRollback:
+	    # create the change set from A->A.local
+	    list = []
+	    for pkg in cs.getNewPackageList():
+		name = pkg.getName()
+		old = pkg.getOldVersion()
+		if self.hasPackage(name) and old:
+		    branch = old.fork(versions.LocalBranch(), sameVerRel = 0)
+		    new = self.pkgLatestVersion(name, branch)
+		    list.append((name, old, new, 0))
+
+	    localChanges = self.createChangeSet(list)
+
 	    # rollbacks have two pieces, B->A and A->A.local; applying
 	    # both of them gets us back where we started
 	    inverse = cs.makeRollback(self, configFiles = 1)
 	    self.addRollback(inverse, localChanges)
-	#else:
-	#    localChanges = localRollback
+	else:
+	    localChanges = localRollback
 
 	# Build and commit A->B
 	job = repository.ChangeSetJob(self, cs)
@@ -182,7 +182,12 @@ class Database(repository.LocalRepository):
 	# in the local tree
 	try:
 	    dbUndo = DatabaseChangeSetUndo(self)
-	    dbJob = DatabaseChangeSetJob(self, localChanges, job)
+	    if localRollback:
+		dbJob = DatabaseChangeSetJob(self, localChanges, job,
+					     retargetLocal = 0)
+	    else:
+		dbJob = DatabaseChangeSetJob(self, localChanges, job,
+					     retargetLocal = 1)
 	    dbJob.commit(dbUndo, self.root)
 	except:
 	    dbUndo.undo()
@@ -226,7 +231,8 @@ class Database(repository.LocalRepository):
     # name looks like "r.%d"
     def removeRollback(self, name):
 	rollback = int(name[2:])
-	os.unlink(self.rollbackCache + "/" + name)
+	os.unlink(self.rollbackCache + "/rb.r.%d" % rollback)
+	os.unlink(self.rollbackCache + "/rb.l.%d" % rollback)
 	if rollback == self.lastRollback:
 	    self.lastRollback -= 1
 	    self.writeRollbackStatus()
@@ -373,7 +379,11 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	if not origJob.containsFilePath(path):
 	    self.addStaleFile(path, fileObj)
 
-    def __init__(self, repos, localCs, origJob, retargetLocal = 0):
+    # If retargetLocal is set, then localCs is for A->A.local whlie
+    # origJob is A->B, so localCs needs to be changed to be B->B.local.
+    # Otherwise, we're applying a rollback and origJob is B->A and
+    # localCs is A->A.local, so it doesn't need retargeting.
+    def __init__(self, repos, localCs, origJob, retargetLocal = 1):
 	# list of packages which need to be removed
 	self.oldPackages = []
 	self.oldFiles = []
@@ -381,43 +391,44 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 
 	assert(not origJob.cs.isAbstract())
 
-	# Make sure every package in the original change set has a local
-	# branch with the right versions. The target of things in localCS
-	# needs to be the new local branch, and the source is the same
-	# as the target of the original CS (this is creating B->B.local
-	# from A->A.local when origJob is A->B; A, A.local, and B are all
-	# available)
-	for Bpkg in origJob.newPackageList():
-	    name = Bpkg.getName()
-	    Bver = Bpkg.getVersion()
-	    Bloc = Bver.fork(versions.LocalBranch(), sameVerRel = 1)
-	    if not localCs.hasNewPackage(name):
-		BlocPkg = Bpkg.copy()
-		BlocPkg.changeVersion(Bloc)
-		BlocCs = BlocPkg.diff(Bpkg)[0]
-	    else:
-		BlocCs = localCs.getNewPackage(name)
-		BlocCs.changeOldVersion(Bver)
-		BlocCs.changeNewVersion(Bloc)
-	    # this overwrites the package if it already exists in the
-	    # change set
-	    localCs.newPackage(BlocCs)
+	if retargetLocal:
+	    # Make sure every package in the original change set has a local
+	    # branch with the right versions. The target of things in localCS
+	    # needs to be the new local branch, and the source is the same
+	    # as the target of the original CS (this is creating B->B.local
+	    # from A->A.local when origJob is A->B; A, A.local, and B are all
+	    # available)
+	    for Bpkg in origJob.newPackageList():
+		name = Bpkg.getName()
+		Bver = Bpkg.getVersion()
+		Bloc = Bver.fork(versions.LocalBranch(), sameVerRel = 1)
+		if not localCs.hasNewPackage(name):
+		    BlocPkg = Bpkg.copy()
+		    BlocPkg.changeVersion(Bloc)
+		    BlocCs = BlocPkg.diff(Bpkg)[0]
+		else:
+		    BlocCs = localCs.getNewPackage(name)
+		    BlocCs.changeOldVersion(Bver)
+		    BlocCs.changeNewVersion(Bloc)
+		# this overwrites the package if it already exists in the
+		# change set
+		localCs.newPackage(BlocCs)
 
-	# look through each of the file changes specified by A->A.local
-	# and map those onto B->B.local.
-	for (fileId, (Aver, Aloc, csInfo)) in localCs.getFileList():
-	    # this file could have disappeared between A and B, which
-	    # means we don't need to map A->A.local onto it
-	    if not origJob.files.has_key(fileId): continue
+	    # look through each of the file changes specified by A->A.local
+	    # and map those onto B->B.local.
+	    for (fileId, (Aver, Aloc, csInfo)) in localCs.getFileList():
+		# this file could have disappeared between A and B, which
+		# means we don't need to map A->A.local onto it
+		if not origJob.files.has_key(fileId): continue
 
-	    Bfile = origJob.files[fileId].file()
-	    Bver = origJob.files[fileId].version()
+		Bfile = origJob.files[fileId].file()
+		Bver = origJob.files[fileId].version()
 
-	    # XXX this could have "conflict" written all over it! we're
-	    # just blindly using our local changes
-	    BlocFile = Bfile.copy()
-	    BlocFile.applyChange(csInfo)
-	    origJob.files[fileId].changeFile(BlocFile)
+		# XXX this could have "conflict" written all over it! we're
+		# just blindly using our local changes
+		BlocFile = Bfile.copy()
+		BlocFile.applyChange(csInfo)
+		origJob.files[fileId].changeFile(BlocFile)
 
 	repository.ChangeSetJob.__init__(self, repos, localCs)
 
@@ -430,13 +441,18 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 		    ver = version.fork(versions.LocalBranch(), sameVerRel = 1)
 		    branchPkg.updateFile(fileId, path, ver)
 
-	# get the list of files which need to be created; files which
-	# are on the new jobs newFileList don't need to be created; they
-	# are already in the filesystem (as members of A.local, and now
-	# they'll be members of B.local as well)
+	# if we're applying a rollback, every file needs to be created.  if
+	# we're not, then get the list of files which need to be created; files
+	# which are on the new jobs newFileList don't need to be created; they
+	# are already in the filesystem (as members of A.local, and now they'll
+	# be members of B.local as well)
 	skipPaths = {}
-	for f in self.newFileList():
-	    skipPaths[f.path()] = 1
+	if retargetLocal:
+	    for f in self.newFileList():
+		skipPaths[f.path()] = 1
+	else:
+	    for f in self.newFileList():
+		self.paths[f.path()] = (f, localCs)
 
 	self.paths = {}
 	for f in origJob.newFileList():
@@ -456,7 +472,6 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	# those files candidates for removal package change sets also know 
 	# when file paths have changed, and those old paths are also candidates
 	# for removal
-
 	for csPkg in origJob.cs.getNewPackageList():
 	    name = csPkg.getName()
 	    oldVersion = csPkg.getOldVersion()
@@ -491,6 +506,7 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 			fileObj = self.repos.getFileVersion(fileId, 
 							    oldFileVersion)
 			self.addStaleFile(oldPath, fileObj)
+			print "s:", oldPath
 
 	# for each file which has changed, erase the old version of that
 	# file from the repository
