@@ -5,6 +5,7 @@
 import os
 import string
 import types
+import versions
 
 class SrsConfiguration:
 
@@ -32,8 +33,12 @@ class SrsConfiguration:
 	self.sourcepath = "/usr/src/srs/sources"
 	self.buildpath = "/usr/src/srs/builds"
 	self.packagenamespace = "/localhost"
-	self.defaultbranch = "local"
+	self.defaultbranch = None
 
 	self.read("/etc/srsrc")
 	self.read(os.environ["HOME"] + "/" + ".srsrc")
-	
+
+	if self.defaultbranch:
+	    self.defaultbranch = versions.VersionFromString(self.defaultbranch)
+	else:
+	    self.defaultbranch = versions.VersionFromString("/localhost/local")
