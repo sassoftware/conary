@@ -115,7 +115,6 @@ class ConaryConfiguration(ConfigFile):
     defaults = {
 	'buildLabel'	        : [ LABEL, versions.BranchName('localhost@local:trunk') ],
 	'buildPath'		: '/usr/src/conary/builds',
-	'cookNewBranches'	: [ BOOL, False ], 
 	'contact'		: None,
 	'dbPath'		: '/var/lib/conarydb',
 	'debugRecipeExceptions' : [ BOOL, False ], 

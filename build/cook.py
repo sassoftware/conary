@@ -157,8 +157,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 	    raise CookError('Multiple branches labeled %s exist for '
 			    'trove %s' % (fullName, buildLabel.asString))
 	elif not len(vers):
-	    if cfg.cookNewBranches or \
-		    not repos.hasPackage(buildLabel.getHost(), fullName):
+	    if not repos.hasPackage(buildLabel.getHost(), fullName):
 		# for the first build, we're willing to create the branch for
 		# them 
 		buildBranch = versions.Version([buildLabel])
@@ -167,6 +166,13 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 				% (buildLabel.asString(), fullName))
 	else:
 	    buildBranch = vers[0].branch()
+
+	# hack
+	for version in buildBranch.versions:
+	    if isinstance(version, versions.VersionRelease) and \
+			version.buildCount is None:
+		version.buildCount = 0
+
 
     elif not buildBranch.timeStamps():
 	# trunk branch, go ahead and create if
