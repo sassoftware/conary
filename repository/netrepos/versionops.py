@@ -56,18 +56,18 @@ class BranchTable(idtable.IdTable):
             DELETE FROM LabelMap WHERE LabelMap.LabelId IN
                 (SELECT LabelMap.LabelId FROM LabelMap LEFT OUTER JOIN
                     Latest ON LabelMap.branchId = Latest.branchId
-                    WHERE Latest.versionId IS NULL);
-	    DELETE FROM Branches WHERE branchId IN 
+                    WHERE Latest.versionId IS NULL)""")
+        cu.execute("""
+            DELETE FROM Branches WHERE branchId IN 
 		(SELECT branchId from Branches LEFT OUTER JOIN 
 		    (SELECT branchId AS fooId from LabelMap)
-		ON Branches.branchId = fooId WHERE fooId is NULL);
-	    """)
+		ON Branches.branchId = fooId WHERE fooId is NULL)""")
 
     def __init__(self, db):
         self.db = db
-	self.tableName = 'branches';
+	self.tableName = 'branches'
 	self.keyName = 'branchId'
-	self.strName = 'branch';
+	self.strName = 'branch'
         
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
@@ -128,7 +128,7 @@ class LabelMap(idtable.IdPairSet):
 	    DELETE FROM Labels WHERE Labels.LabelId IN 
 		(SELECT Labels.labelId from Labels LEFT OUTER JOIN 
 			LabelMap ON Labels.labelId = LabelMap.labelId 
-		 WHERE LabelMap.labelId is NULL);
+		 WHERE LabelMap.labelId is NULL)
 	""")
 
 class ParentTable(idtable.IdPairMapping):
@@ -156,13 +156,12 @@ class Nodes:
 					    branchId INT,
 					    versionId INT,
 					    timeStamps STR,
-					    finalTimeStamp FLOAT);
-		CREATE INDEX NodesIdx ON 
-			Nodes(itemId, branchId);
-		CREATE INDEX NodesIdx2 ON 
-			Nodes(itemId, versionId);
-	    """)
-
+					    finalTimeStamp FLOAT)""")
+            cu.execute("""CREATE INDEX NodesIdx ON 
+                              Nodes(itemId, branchId)""")
+            cu.execute("""CREATE INDEX NodesIdx2 ON
+                              Nodes(itemId, versionId)""")
+            
     def addRow(self, itemId, branchId, versionId, timeStamps):
         cu = self.db.cursor()
 	cu.execute("INSERT INTO Nodes VALUES (NULL, ?, ?, ?, ?, ?)",

@@ -26,13 +26,12 @@ class Flavors:
         tables = [ x[0] for x in cu ]
         if "Flavors" not in tables:
 	    cu.execute("""CREATE TABLE Flavors(flavorId INTEGER PRIMARY KEY,
-					       flavor STR UNIQUE);
-	                  CREATE TABLE FlavorMap(flavorId INT,
+					       flavor STR UNIQUE)""")
+            cu.execute("""CREATE TABLE FlavorMap(flavorId INT,
 						 base STR,
-						 flag STR);
-			  CREATE INDEX FlavorMapIndex ON FlavorMap(flavorId);
-			  INSERT INTO Flavors VALUES (0, 'none');
-		       """)
+						 flag STR)""")
+            cu.execute("""CREATE INDEX FlavorMapIndex ON FlavorMap(flavorId)""")
+            cu.execute("""INSERT INTO Flavors VALUES (0, 'none')""")
 
     def createFlavor(self, flavor):
 	cu = self.db.cursor()

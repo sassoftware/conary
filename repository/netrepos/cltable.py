@@ -29,7 +29,7 @@ class ChangeLogTable:
 				nodeId INTEGER UNIQUE,
 				name STR, 
 				contact STR, 
-				message STR);
+				message STR)
 			""")
 	    cu.execute("INSERT INTO ChangeLogs values(0, NULL, NULL, NULL)")
 

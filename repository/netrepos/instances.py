@@ -32,10 +32,9 @@ class InstanceTable:
 				itemId INT, 
 				versionId INT, 
 				flavorId INT,
-				isPresent INT);
-			  CREATE UNIQUE INDEX InstancesIdx ON 
-		               Instances(itemId, versionId, flavorId);
-			""")
+				isPresent INT)""")
+            cu.execute("""CREATE UNIQUE INDEX InstancesIdx ON 
+		               Instances(itemId, versionId, flavorId)""")
 
     def addId(self, itemId, versionId, flavorId, isPresent = True):
 	if isPresent:
@@ -116,7 +115,7 @@ class InstanceTable:
 		      Instances.instanceId = TroveTroves.includedId 
 		      WHERE TroveTroves.includedId is NULL and 
 			     Instances.isPresent = 0
-		    );""")
+		    )""")
 
 class FileStreams:
     def __init__(self, db):
@@ -128,7 +127,7 @@ class FileStreams:
             cu.execute("""CREATE TABLE FileStreams(streamId INTEGER PRIMARY KEY,
 						   fileId BINARY,
 						   versionId INT,
-                                                   stream BINARY);""")
+                                                   stream BINARY)""")
 	    # in sqlite 2.8.15, a unique here seems to cause problems
 	    # (as the versionId isn't unique, apparently)
 	    cu.execute("""CREATE INDEX FileStreamsIdx ON

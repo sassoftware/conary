@@ -30,5 +30,5 @@ class Items(idtable.IdTable):
 	    DELETE FROM Items WHERE Items.itemId IN 
 		(SELECT items.itemId FROM items
 		 LEFT OUTER JOIN instances ON items.itemId = instances.itemId 
-		 WHERE instances.itemId is NULL);
+		 WHERE instances.itemId is NULL)
 	""")

@@ -199,7 +199,6 @@ class TroveStore:
 		    Items.itemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
 		JOIN Versions ON
 		    Nodes.versionId = versions.versionId
-	    ;
 	""", labelStr)
 
 	d = {}
