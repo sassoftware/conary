@@ -54,4 +54,9 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 
 	cs = repos.createChangeSet(list)
 
-    db.commitChangeSet(cfg.sourcepath, cs)
+    if cs.isAbstract():
+	db.commitChangeSet(cfg.sourcepath, cs, eraseOld = 0)
+    else:
+	inverse = cs.invert(db)
+	db.addRollback(inverse)
+	db.commitChangeSet(cfg.sourcepath, cs, eraseOld = 1)
