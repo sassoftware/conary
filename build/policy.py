@@ -118,7 +118,7 @@ def _walkFile(policyObj, dirname, names):
        thispath = path + os.sep + name
        if policyInclusion (policyObj, thispath) and \
           not policyException(policyObj, thispath):
-           policyObj.doFile(thispath)
+           policyObj.doFile(os.path.normpath(thispath))
 
 # external helpers
 

@@ -344,7 +344,7 @@ class InstallSymlinks(BuildAction):
 	    if os.path.exists(to) or os.path.islink(to):
 		os.remove(to)
             print '+ creating symlink %s -> %s' %(to, source)
-	    os.symlink(source, to)
+	    os.symlink(os.path.normpath(source), to)
 
     def __init__(self, fromFiles, toFile, use=None, allowDangling=False):
         """
