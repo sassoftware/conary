@@ -767,7 +767,7 @@ class Database:
                          sortByPath = False, withFiles = False,
 			 pristine = False):
 	if sortByPath:
-	    sort = " ORDER BY path";
+	    sort = " ORDER BY path"
 	else:
 	    sort =""
 	cu = self.db.cursor()

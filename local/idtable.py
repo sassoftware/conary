@@ -18,9 +18,9 @@ class IdTable:
     """
     def __init__(self, db, tableName, keyName, strName):
         self.db = db
-	self.tableName = tableName;
-	self.keyName = keyName;
-	self.strName = strName;
+	self.tableName = tableName
+	self.keyName = keyName
+	self.strName = strName
         
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")

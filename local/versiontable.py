@@ -98,6 +98,6 @@ class VersionTable:
 		(SELECT versionId from Versions LEFT OUTER JOIN 
 		    (SELECT versionId AS fooId from Parent UNION 
 		     SELECT versionId AS fooId FROM FileStreams) 
-		ON Versions.versionId = fooId WHERE fooId is NULL);
+		ON Versions.versionId = fooId WHERE fooId is NULL)
 	    """)
 
