@@ -33,6 +33,7 @@ from netauth import NetworkAuthorization
 from netauth import InsufficientPermission
 
 SERVER_VERSIONS=[6,7,8,9,10]
+CACHE_SCHEMA_VERSION=10
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -425,14 +426,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 			   (self.toVersion(new), self.toFlavor(newFlavor)),
 			   absolute)
 
-            path = self.cache.getEntry(l, withFiles)
+            path = self.cache.getEntry(l, withFiles, withFileContents)
             if path is None:
                 (cs, trovesNeeded, filesNeeded) = \
                             self.repos.createChangeSet([ l ], 
                                         recurse = recurse, 
                                         withFiles = withFiles,
                                         withFileContents = withFileContents)
-                path = self.cache.addEntry(l, withFiles)
+                path = self.cache.addEntry(l, withFiles, withFileContents)
 
                 newChgSetList += _cvtTroveList(trovesNeeded)
                 allFilesNeeded += _cvtFileList(filesNeeded)
@@ -566,15 +567,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.commitAction = commitAction
 
         if cacheChangeSets:
-            self.cache = CacheSet(path + "/cache.sql", tmpPath, SERVER_VERSION)
+            self.cache = CacheSet(path + "/cache.sql", tmpPath, 
+                                  CACHE_SCHEMA_VERSION)
         else:
             self.cache = NullCacheSet(tmpPath)
 
 class NullCacheSet:
-    def getEntry(self, item, withFiles):
+    def getEntry(self, item, withFiles, withFileContents):
         return None 
 
-    def addEntry(self, item, withFiles):
+    def addEntry(self, item, withFiles, withFileContents):
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
                                       suffix = '.ccs-out')
         os.close(fd)
@@ -587,7 +589,7 @@ class CacheSet:
 
     filePattern = "%s/cache-%s.ccs-out"
 
-    def getEntry(self, item, withFiles):
+    def getEntry(self, item, withFiles, withFileContents):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
             item
 
@@ -620,9 +622,9 @@ class CacheSet:
                 troveName=? AND
                 oldFlavorId=? AND oldVersionId=? AND
                 newFlavorId=? AND newVersionId=? AND
-                absolute=? AND withFiles=?
+                absolute=? AND withFiles=? AND withFileContents=?
             """, name, oldFlavorId, oldVersionId, newFlavorId, 
-            newVersionId, absolute, withFiles)
+            newVersionId, absolute, withFiles, withFileContents)
 
         row = None
         for (row,) in cu:
@@ -633,11 +635,11 @@ class CacheSet:
                 return path
             except OSError:
                 cu.execute("DELETE FROM CacheContents WHERE row=?", row)
-                db.commit()
+                self.db.commit()
 
         return None
 
-    def addEntry(self, item, withFiles):
+    def addEntry(self, item, withFiles, withFileContents):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
             item
 
@@ -666,9 +668,9 @@ class CacheSet:
 
         cu = self.db.cursor()
         cu.execute("""
-            INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?)
         """, name, oldFlavorId, oldVersionId, newFlavorId, newVersionId, 
-        absolute, withFiles)
+        absolute, withFiles, withFileContents)
 
         row = cu.lastrowid
         path = self.filePattern % (self.tmpDir, row)
@@ -677,7 +679,7 @@ class CacheSet:
 
         return path
         
-    def createSchema(self, dbpath, protocolVersion):
+    def createSchema(self, dbpath, schemaVersion):
 	self.db = sqlite3.connect(dbpath, timeout = 30000)
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
@@ -685,7 +687,7 @@ class CacheSet:
         if "CacheContents" in tables:
             cu.execute("SELECT version FROM CacheVersion")
             version = cu.next()[0]
-            if version != protocolVersion:
+            if version != schemaVersion:
                 cu.execute("SELECT row from CacheContents")
                 for (row,) in cu:
                     fn = self.tmpDir + "/cache-%s.ccs-out"
@@ -707,7 +709,8 @@ class CacheSet:
                     newFlavorId INTEGER,
                     newVersionId INTEGER,
                     absolute BOOLEAN,
-                    withFiles BOOLEAN)
+                    withFiles BOOLEAN,
+                    withFileContents BOOLEAN)
             """)
             cu.execute("""
                 CREATE INDEX CacheContentsIdx ON 
@@ -716,12 +719,12 @@ class CacheSet:
             """)
 
             cu.execute("CREATE TABLE CacheVersion(version INTEGER)")
-            cu.execute("INSERT INTO CacheVersion VALUES(?)", protocolVersion)
+            cu.execute("INSERT INTO CacheVersion VALUES(?)", schemaVersion)
             self.db.commit()
 
-    def __init__(self, dbpath, tmpDir, protocolVersion):
+    def __init__(self, dbpath, tmpDir, schemaVersion):
 	self.tmpDir = tmpDir
-        self.createSchema(dbpath, protocolVersion)
+        self.createSchema(dbpath, schemaVersion)
         self.db._begin()
         self.flavors = sqldb.DBFlavors(self.db)
         self.versions = versiontable.VersionTable(self.db)
