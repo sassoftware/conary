@@ -56,15 +56,15 @@ def loadRecipe(file):
 class Recipe:
 
     def addSignature(self, file):
-	md5 = util.searchFile('%s.md5sum' %(file), self.srcdirs):
+	md5 = util.searchFile('%s.md5sum' %(file), self.srcdirs)
 	if md5:
 	    if not self.signatures.has_key(file):
 		self.signatures[file] = []
 	    self.signatures[file].append(md5)
 
-	gpg = util.searchFile('%s.sign' %(file), self.srcdirs):
+	gpg = util.searchFile('%s.sign' %(file), self.srcdirs)
 	if not gpg:
-	    gpg = util.searchFile('%s.sig' %(file), self.srcdirs):
+	    gpg = util.searchFile('%s.sig' %(file), self.srcdirs)
 	if gpg:
 	    if not self.signatures.has_key(file):
 		self.signatures[file] = []
