@@ -402,7 +402,6 @@ class ConaryClient:
                 if seen.has_key(key):
                     continue
                 seen[key] = True
-                print key[0]
 
                 # add contained troves to the todo-list
                 troveList += [ x for x in trove.iterTroveList() ]
