@@ -101,8 +101,20 @@ class PackageChangeSet:
     def newFile(self, fileId, path, version):
 	self.newFiles.append((fileId, path, version))
 
+    def getNewFileList(self):
+	return self.newFiles
+
     def oldFile(self, fileId):
 	self.newFiles.append(fileId)
+
+    def getName(self):
+	return self.name
+
+    def getOldVersion(self):
+	return self.oldVersion
+
+    def getNewVersion(self):
+	return self.newVersion
 
     # path and/or version can be None
     def changedFile(self, fileId, path, version):
@@ -180,6 +192,9 @@ class PackageSet:
 
     def hasVersion(self, version):
 	return self.f.hasVersion(version)
+
+    def eraseVersion(self, version):
+	self.f.eraseVersion(version)
 
     def addVersion(self, version, package):
 	self.f.addVersion(version, package.formatString())
