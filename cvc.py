@@ -70,6 +70,7 @@ def usage(rc = 1):
     print "cook flags:    --macros"
     print "               --no-clean"
     print '               --unknown-flags'
+    print '               --no-deps'
     print '               --use-flavor  "<flavor>"'
     print '               --use-macro "<macro> <value>"'
     print "               --prep"
@@ -98,6 +99,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["macros"] = ONE_PARAM
     argDef["message"] = ONE_PARAM
     argDef["no-clean"] = NO_PARAM
+    argDef["no-deps"] = NO_PARAM
     argDef["prep"] = NO_PARAM
     argDef["profile"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
@@ -258,6 +260,11 @@ def sourceCommand(cfg, args, argSet):
         if argSet.has_key('prep'):
             del argSet['prep']
             prep = 1
+        if argSet.has_key('no-deps'):
+            del argSet['no-deps']
+            ignoreDeps = True
+        else:
+            ignoreDeps = False
 
         if argSet.has_key('no-clean'):
             del argSet['no-clean']
@@ -287,7 +294,7 @@ def sourceCommand(cfg, args, argSet):
         if argSet: return usage()
         
         cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
-                                              allowUnknownFlags=unknownFlags)
+                         allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps)
         log.setVerbosity(level)
     elif (args[0] == "describe"):
         level = log.getVerbosity()

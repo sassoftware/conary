@@ -102,7 +102,9 @@ def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False,
             justDatabase = False):
     client = conaryclient.ConaryClient(cfg=cfg)
 
-    troveList = [ parseTroveSpec(item, cfg.flavor) for item in itemList ]
+    troveList = []
+    troveList = [ parseTroveSpec(item, None) for item in itemList ] 
+
     # dedup
     troveList = {}.fromkeys(troveList).keys()
 

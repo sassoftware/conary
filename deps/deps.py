@@ -146,6 +146,15 @@ class Dependency(BaseDependency):
 	"""
         return self.score(required) is not False
 
+    def toStrongFlavor(self):
+        newFlags = self.flags.copy()
+        for (flag, sense) in self.flags.iteritems():
+            if sense == FLAG_SENSE_PREFERNOT:
+                newFlags[flag] = FLAG_SENSE_DISALLOWED
+            elif sense == FLAG_SENSE_PREFERRED:
+                newFlags[flag] = FLAG_SENSE_REQUIRED
+        return Dependency(self.name, newFlags)
+
     def intersection(self, other):
         intFlags = {}
         for (flag, sense) in other.flags.iteritems():
@@ -166,7 +175,7 @@ class Dependency(BaseDependency):
 	Returns a new Dependency which merges the flags from the two
 	existing dependencies. We don't want to merge in place as this
 	Dependency could be shared between many objects (via a 
-	DependencyGroup).  Always pick an absolute flavor over a preference:
+	DependencyGroup).  Always pick an strong flavor over a weak one:
         e.g. when merging a set of flags with a ~foo and !foo, 
         make the merged flavor !foo.  
 	"""
@@ -270,6 +279,12 @@ class DependencyClass:
             score += thisScore
 
         return thisScore
+
+    def toStrongFlavor(self):
+        newDepClass = self.__class__()
+        for dep in self.members.values():
+            newDepClass.addDep(dep.toStrongFlavor())
+        return newDepClass
 
     def satisfies(self, requirements):
         return self.score(requirements) is not False
@@ -427,6 +442,12 @@ class DependencySet:
     def copy(self):
         return copy.deepcopy(self)
 
+    def toStrongFlavor(self):
+        newDep = DependencySet()
+        for tag, depClass in self.members.iteritems():
+            newDep.members[tag] = depClass.toStrongFlavor()
+        return newDep
+
     def score(self,other):
         score = 0
 	for tag in other.members:
@@ -443,6 +464,10 @@ class DependencySet:
 
     def satisfies(self, other):
         return self.score(other) is not False
+
+    def stronglySatisfies(self, other):
+        return self.toStrongFlavor().score(
+                    other.toStrongFlavor()) is not False
 
     def getDepClasses(self):
         return self.members

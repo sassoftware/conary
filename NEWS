@@ -1,5 +1,11 @@
 Changes in 0.14.10:
   * FlavorMap sense wasn't set right for base instruction set
+  * Actually check build requirements before building, use --no-deps to 
+    ignore the check.
+  * make conary q and conary update convert all flavors to  strong flavors
+    for comparison; ~readline becomes readline, and ~!readline becomes 
+    !readline, so that conary q foo[readline] works as expected.
+  * no default flavor is presumed for local operations (erase, q)
 
 Changes in 0.14.9:
   * Shadow Branch objects didn't return parent branches properly. This

@@ -143,12 +143,12 @@ def parseTroveStrings(troveNameList, defaultFlavor):
     hasVersions = False
     hasFlavors = False
     for item in troveNameList:
-        (name, version, flavor) = updatecmd.parseTroveSpec(item, defaultFlavor)
+        (name, version, flavor) = updatecmd.parseTroveSpec(item, None)
+
         if version is not None:
             hasVersions = True
         if flavor is not None:
             hasFlavors = True
-
         troveNames.append((name, version, flavor))
 
     return troveNames, hasVersions, hasFlavors
@@ -219,7 +219,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
     for (troveName, versionStr, flavor) in troveNames:
         try:
             for trove in db.findTrove(troveName, versionStr):
-                if not flavor or trove.getFlavor().satisfies(flavor):
+                if not flavor or trove.getFlavor().stronglySatisfies(flavor):
                     _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, 
                                       tags)
         except repository.TroveNotFound:

@@ -52,6 +52,9 @@ modify, and cook source components:
 .B \ \ \ \ \ [\fR\-\-no-clean] [\fR\-\-unknown-flags] \e
 .PD 0
 .TP
+.B \ \ \ \ \ [\fR\-\-no-deps] \e
+.PD 0
+.TP
 .B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>[=<version>]...
 .PD
 
@@ -101,6 +104,11 @@ after the build is complete, even if the build is successful.
 This can be useful for rerunning policy for a complete build using 
 \-\-resume, or for examining the completed build directories.
 .IP 
+The \-\-no-deps option prevents conary from raising an error 
+if a component or package listed as a build requirement for the package
+is not installed on the build system.
+.IP 
+
 If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the
 filesystem.  Otherwise, it must name a repository component and

@@ -16,30 +16,35 @@
 Contains the base Recipe class, default macros, and miscellaneous
 components used by conary .recipe files
 """
-
-import build
-import buildpackage
-import destdirpolicy
+#stdlib
 import errno
-import files
+from fnmatch import fnmatchcase
 import imp
 import inspect
-from lib import log
-import macros
-from lib import magic
 import os
-import packagepolicy
-from repository import repository
-import source
 import sys
 import tempfile
 import types
-import use
-from lib import util
-import versions
-from deps import deps
 
-from fnmatch import fnmatchcase
+#conary
+import build
+import buildpackage
+from deps import deps
+import destdirpolicy
+import files
+from lib import log
+from lib import magic
+from lib import util
+from local import database
+import macros
+import packagepolicy
+from repository import repository
+import source
+import use
+import updatecmd
+import versions
+
+
 
 baseMacros = {
     # paths
@@ -433,6 +438,62 @@ class PackageRecipe(Recipe):
 		else:
 		    files.append(f)
 	return files
+
+    def checkBuildRequirements(self, cfg, sourceVersion, ignoreDeps=False):
+        """ Checks to see if the build requirements for the recipe 
+            are installed
+        """
+	db = database.Database(cfg.root, cfg.dbPath)
+        time = sourceVersion.timeStamps()[-1]
+        reqMap = {}
+        missingReqs = []
+        for buildReq in self.buildRequires:
+            (name, versionStr, flavor) = updatecmd.parseTroveSpec(buildReq, 
+                                                                     None)
+            try:
+                troves = db.findTrove(name)
+            except repository.TroveNotFound:
+                missingReqs.append(buildReq)
+                continue
+                break
+            versionMatches = []
+            for trove in troves:
+                if versionStr is None:
+                    versionMatches.append(trove) 
+                    continue
+                if versionStr.find('@') == -1:
+                    label = trove.getVersion().branch().label()
+                    if versionStr.find(':') == -1:
+                        if label.getLabel() == versionStr:
+                            versionMatches.append(trove)
+                        continue
+                    if ("%s:%s" % (label.getNamespace(), label.getLabel())\
+                                                              == versionStr):
+                        versionMatches.append(trove)
+                        break
+                    continue
+                else:
+                    raise RecipeFileError("Unsupported buildReq format")
+            if not versionMatches:
+                missingReqs.append(buildReq)
+                continue
+            versionMatches.sort(lambda a, b: a.getVersion().__cmp__(b.getVersion()))
+            if not flavor:
+                reqMap[buildReq] = versionMatches[-1]
+                continue
+            for trove in reversed(versionMatches):
+                troveFlavor = trove.getFlavor()
+                if troveFlavor.stronglySatisfies(flavor):
+                    reqMap[buildReq] = trove
+                    break
+            if buildReq not in reqMap:
+                missingReqs.append(buildReq)
+        if missingReqs:
+            if not ignoreDeps:
+                raise RuntimeError, ("Could not find the following troves "
+                                     "needed to cook this recipe:\n"  
+                                     "%s" % '\n'.join(missingReqs))
+        self.buildReqMap = reqMap
 
     def extraSource(self, action):
 	"""

@@ -161,7 +161,8 @@ class _IdGen:
 def cookObject(repos, cfg, recipeClass, sourceVersion,
                changeSetFile = None, prep=True, macros={}, 
                targetLabel = None, resume = None, alwaysBumpCount = False, 
-               allowUnknownFlags = False, allowMissingSource = False):
+               allowUnknownFlags = False, allowMissingSource = False,
+               ignoreDeps = False):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -248,7 +249,8 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                                 prep = prep, macros = macros,
 				targetLabel = targetLabel,
 				resume = resume, 
-                                alwaysBumpCount = alwaysBumpCount)
+                                alwaysBumpCount = alwaysBumpCount, 
+                                ignoreDeps = ignoreDeps)
     elif issubclass(recipeClass, recipe.RedirectRecipe):
 	ret = cookGroupObject(repos, cfg, recipeClass,  sourceVersion,
 			      macros = macros, targetLabel = targetLabel,
@@ -429,7 +431,8 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
 
 def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True, 
 		      macros={}, targetLabel = None, 
-                      resume = None, alwaysBumpCount=False):
+                      resume = None, alwaysBumpCount=False, 
+                      ignoreDeps=False):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -474,6 +477,7 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         use.setUsed(recipeObj._trackedFlags)
 
     recipeObj.setup()
+    recipeObj.checkBuildRequirements(cfg, sourceVersion, ignoreDeps=ignoreDeps)
     bldInfo = buildinfo.BuildInfo(builddir)
     recipeObj.buildinfo = bldInfo
 
@@ -739,7 +743,8 @@ def nextVersion(repos, troveName, sourceVersion, troveFlavor,
     return latest
 
 def cookItem(repos, cfg, item, prep=0, macros={}, 
-	     emerge = False, resume = None, allowUnknownFlags = False):
+	     emerge = False, resume = None, allowUnknownFlags = False,
+             ignoreDeps = False):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -843,7 +848,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                             sourceVersion = sourceVersion,
 			    resume = resume, 
                             allowUnknownFlags = allowUnknownFlags,
-                            allowMissingSource=False)
+                            allowMissingSource=False, ignoreDeps=ignoreDeps)
         if troves:
             built = (tuple(troves), changeSetFile)
     except repository.RepositoryError, e:
@@ -878,7 +883,8 @@ class CookError(Exception):
 	return repr(self)
 
 def cookCommand(cfg, args, prep, macros, emerge = False, 
-                resume = None, allowUnknownFlags = False):
+                resume = None, allowUnknownFlags = False,
+                ignoreDeps = False):
     # this ensures the repository exists
     repos = NetworkRepositoryClient(cfg.repositoryMap)
 
@@ -905,7 +911,8 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
             try:
                 built = cookItem(repos, cfg, item, prep=prep, macros=macros,
 				 emerge = emerge, resume = resume, 
-                                 allowUnknownFlags = allowUnknownFlags)
+                                 allowUnknownFlags = allowUnknownFlags, 
+                                 ignoreDeps = ignoreDeps)
             except CookError, msg:
 		log.error(str(msg))
                 sys.exit(1)
