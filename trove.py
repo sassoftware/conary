@@ -24,11 +24,9 @@ import struct
 import versions
 from deps import deps
 from changelog import AbstractChangeLog
-from streams import StringStream
 from streams import FrozenVersionStream
 from streams import DependenciesStream
 from streams import ByteStream
-from lib import cstreams
 
 class Trove:
     """
@@ -192,7 +190,7 @@ class Trove:
 	self.changeVersion(pkgCS.getNewVersion())
 	self.changeFlavor(pkgCS.getNewFlavor())
 
-        if pkgCS.isAbsolute():
+        if not pkgCS.getOldVersion():
             self.troveInfo = TroveInfo(pkgCS.getTroveInfoDiff())
         else:
             self.troveInfo.twm(pkgCS.getTroveInfoDiff(), self.troveInfo)
@@ -716,15 +714,15 @@ _TROVEINFO_TAG_SOURCENAME  = 1
 _TROVEINFO_TAG_BUILDTIME   = 2
 _TROVEINFO_TAG_CONARYVER   = 3
 
-class TroveInfo(cstreams.StreamSet):
+class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
     streamDict = {
-        _TROVEINFO_TAG_SIZE       : ( streams.LongLongStream, 'size'       ),
-        _TROVEINFO_TAG_SOURCENAME : ( streams.StringStream,   'sourceName' ),
-        _TROVEINFO_TAG_BUILDTIME  : ( streams.LongLongStream, 'buildTime'  ),
-        _TROVEINFO_TAG_CONARYVER  : ( streams.StringStream,   'conaryVersion'),
+        _TROVEINFO_TAG_SIZE       : ( streams.LongLongStream,'size'       ),
+        _TROVEINFO_TAG_SOURCENAME : ( streams.StringStream,  'sourceName' ),
+        _TROVEINFO_TAG_BUILDTIME  : ( streams.LongLongStream,'buildTime'  ),
+        _TROVEINFO_TAG_CONARYVER  : ( streams.StringStream,  'conaryVersion'),
     }
-    _streamDict = cstreams.StreamSetDef(streamDict)
+    _streamDict = streams.StreamSetDef(streamDict)
 
 class ReferencedFileList(list, streams.InfoStream):
 
@@ -819,7 +817,7 @@ _TCS_TYPE_RELATIVE = 2
 class AbstractTroveChangeSet(streams.LargeStreamSet):
 
     streamDict = { 
-	_STREAM_TCS_NAME	: (StringStream,         "name"          ),
+	_STREAM_TCS_NAME	: (streams.StringStream, "name"          ),
         _STREAM_TCS_OLD_VERSION : (FrozenVersionStream,  "oldVersion"    ),
         _STREAM_TCS_NEW_VERSION : (FrozenVersionStream,  "newVersion"    ),
         _STREAM_TCS_REQUIRES    : (DependenciesStream,   "requires"      ),
@@ -833,7 +831,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         _STREAM_TCS_OLD_FLAVOR  : (DependenciesStream,   "oldFlavor"     ),
         _STREAM_TCS_NEW_FLAVOR  : (DependenciesStream,   "newFlavor"     ),
         _STREAM_TCS_IS_REDIRECT : (ByteStream,           "isRedirect"    ),
-        _STREAM_TCS_TROVEINFO   : (StringStream,         "troveInfoDiff" ),
+        _STREAM_TCS_TROVEINFO   : (streams.StringStream, "troveInfoDiff" ),
     }
 
     ignoreUnknown = True

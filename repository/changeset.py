@@ -45,7 +45,7 @@ class FileInfo(streams.TupleStream):
 
     # pathId, oldVersion, newVersion, csInfo
     makeup = (("oldFileId", streams.StringStream, "B"),
-	      ("newFileId", streams.Sha1Stream, 20),
+	      ("newFileId", streams.StringStream, 20),
 	      ("csInfo", streams.StringStream, "B"))
 
     def oldFileId(self):

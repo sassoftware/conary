@@ -21,6 +21,13 @@ import versions
 
 from deps import deps
 
+from lib import cstreams
+IntStream = cstreams.IntStream
+ShortStream = cstreams.ShortStream
+StringStream = cstreams.StringStream
+StreamSet = cstreams.StreamSet
+StreamSetDef = cstreams.StreamSetDef
+
 class InfoStream(object):
 
     __slots__ = ()
@@ -111,10 +118,6 @@ class ByteStream(NumericStream):
 
     format = "!B"
 
-from lib import cstreams
-IntStream = cstreams.IntStream
-ShortStream = cstreams.ShortStream
-
 class MtimeStream(NumericStream):
 
     format = "!I"
@@ -132,99 +135,54 @@ class LongLongStream(NumericStream):
 
     format = "!Q"
 
-class StringStream(InfoStream):
-    """
-    Stores a simple string; used for the target of symbolic links
-    """
-
-    __slots__ = "s"
-
-    def __call__(self):
-	return self.s
-
-    def set(self, val):
-        assert(not val or type(val) is str)
-	self.s = val
-
-    def freeze(self, skipSet = None):
-	return self.s
-
-    def diff(self, them):
-	if self.s != them.s:
-	    return self.s
-
-	return None
-
-    def thaw(self, frz):
-	self.s = frz
-
-    def twm(self, diff, base):
-	if self.s == base.s:
-	    self.s = diff
-	    return False
-	elif self.s != diff:
-	    return True
-
-	return False
-
-    def __eq__(self, other, skipSet = None):
-	return other.__class__ == self.__class__ and \
-	       self.s == other.s
-
-    def __init__(self, s = ''):
-	self.thaw(s)
-
 class Md5Stream(StringStream):
 
     def freeze(self, skipSet = None):
-	assert(len(self.s) == 16)
-	return self.s
+	assert(len(self()) == 16)
+	return self()
 
     def thaw(self, data):
 	if data:
 	    assert(len(data) == 16)
-	    self.s = data
+	    self.set(data)
 
     def twm(self, diff, base):
 	assert(len(diff) == 16)
-	assert(len(base.s) == 16)
-	assert(len(self.s) == 16)
+	assert(len(base()) == 16)
+	assert(len(self()) == 16)
 	StringStream.twm(self, diff, base)
 
     def set(self, val):
 	assert(len(val) == 16)
-	self.s = val
+        StringStream.set(val)
 
     def setFromString(self, val):
-	self.s = struct.pack("!4I", int(val[ 0: 8], 16), 
-				    int(val[ 8:16], 16), int(val[16:24], 16), 
-				    int(val[24:32], 16))
+	s = struct.pack("!4I", int(val[ 0: 8], 16), 
+			       int(val[ 8:16], 16), int(val[16:24], 16), 
+			       int(val[24:32], 16))
+        StringStream.set(s)
 
 class Sha1Stream(StringStream):
 
     def freeze(self, skipSet = None):
-	assert(len(self.s) == 20)
-	return self.s
-
-    def thaw(self, data):
-	if data:
-	    assert(len(data) == 20)
-	    self.s = data
+	assert(len(self()) == 20)
+	return StringStream.freeze(self, skipSet = skipSet)
 
     def twm(self, diff, base):
 	assert(len(diff) == 20)
-	assert(len(base.s) == 20)
-	assert(len(self.s) == 20)
+	assert(len(base()) == 20)
+	assert(len(self()) == 20)
 	StringStream.twm(self, diff, base)
 
     def set(self, val):
 	assert(len(val) == 20)
-	self.s = val
+        StringStream.set(self, val)
 
     def setFromString(self, val):
-	self.s = struct.pack("!5I", int(val[ 0: 8], 16), 
-				    int(val[ 8:16], 16), int(val[16:24], 16), 
-				    int(val[24:32], 16), int(val[32:40], 16))
+	s = struct.pack("!5I", int(val[ 0: 8], 16), 
+			       int(val[ 8:16], 16), int(val[16:24], 16), 
+			       int(val[24:32], 16), int(val[32:40], 16))
+        StringStream.set(self, val)
 
 class FrozenVersionStream(InfoStream):
 

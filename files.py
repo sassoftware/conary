@@ -70,7 +70,7 @@ class DeviceStream(streams.TupleStream):
     def setMinor(self, value):
         return self.items[1].set(value)
 
-class LinkGroupStream(streams.Sha1Stream):
+class LinkGroupStream(streams.StringStream):
 
     def diff(self, other):
         if self != other:
@@ -78,26 +78,23 @@ class LinkGroupStream(streams.Sha1Stream):
             # is a change between having a link group set and not having
             # one set.  This is used in twm to clear out a link group
             # upon merge.
-            if self.s is None:
+            if not self():
                 return "\0"
             else:
-                return self.s
+                return self()
 
         return None
 
     def thaw(self, data):
         if not data:
-            self.s = None
+            self.set(None)
         else:
-            streams.Sha1Stream.thaw(self, data)
-
-    def set(self, val):
-        self.s = val
+            streams.StringStream.thaw(self, data)
 
     def freeze(self, skipSet = None):
-        if self.s is None:
+        if self() is None:
             return ""
-        return streams.Sha1Stream.freeze(self)
+        return streams.StringStream.freeze(self)
 
     def twm(self, diff, base):
         # if the diff is the special value of "\0", that means that
@@ -106,10 +103,10 @@ class LinkGroupStream(streams.Sha1Stream):
         if diff == "\0":
             diff = None
 
-	if self.s == base.s:
-	    self.s = diff
+	if self() == base():
+            self.set(diff)
 	    return False
-	elif self.s != diff:
+	elif self() != diff:
 	    return True
 
 	return False
@@ -263,9 +260,7 @@ class FlagsStream(streams.NumericStream):
 
 	return (self.val and self.val & flag)
 
-from lib import cstreams
-
-class File(cstreams.StreamSet):
+class File(streams.StreamSet):
 
     lsTag = None
     hasContents = False
@@ -273,7 +268,7 @@ class File(cstreams.StreamSet):
     streamDict = { FILE_STREAM_INODE : (InodeStream, "inode"),
                    FILE_STREAM_FLAGS : (FlagsStream, "flags"),
 		   FILE_STREAM_TAGS :  (streams.StringsStream, "tags") }
-    _streamDict = cstreams.StreamSetDef(streamDict)
+    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ "thePathId", "inode", "flags", "tags" ]
 
     def __deepcopy__(self, mem):
@@ -288,7 +283,7 @@ class File(cstreams.StreamSet):
 	    return struct.pack(self.headerFormat, 0, len(d)) + d
 
 	rc = [ "\x01", self.lsTag ]
-        rc.append(cstreams.StreamSet.diff(self, other))
+        rc.append(streams.StreamSet.diff(self, other))
 
 	return "".join(rc)
 
@@ -349,41 +344,41 @@ class File(cstreams.StreamSet):
 	assert(self.lsTag == base.lsTag)
 	assert(self.lsTag == diff[1])
 	
-	return cstreams.StreamSet.twm(self, diff[2:], base, skip = skip)
+	return streams.StreamSet.twm(self, diff[2:], base, skip = skip)
 
     def __eq__(self, other, ignoreOwnerGroup = False):
 	if other.lsTag != self.lsTag: return False
 
 	if ignoreOwnerGroup:
-            return cstreams.StreamSet.__eq__(self, other, 
+            return streams.StreamSet.__eq__(self, other, 
                            skipSet = { 'mtime' : True,
                                        'owner' : True, 
                                        'group' : True } )
 
-        return cstreams.StreamSet.__eq__(self, other)
+        return streams.StreamSet.__eq__(self, other)
 
     eq = __eq__
 
     def freeze(self, skipSet = None):
-	return self.lsTag + cstreams.StreamSet.freeze(self, skipSet = skipSet)
+	return self.lsTag + streams.StreamSet.freeze(self, skipSet = skipSet)
 
     def __init__(self, pathId, streamData = None):
         assert(self.__class__ is not File)
 	self.thePathId = pathId
 	if streamData is not None:
-	    cstreams.StreamSet.__init__(self, streamData, offset = 1)
+	    streams.StreamSet.__init__(self, streamData, offset = 1)
 	else:
-	    cstreams.StreamSet.__init__(self)
+	    streams.StreamSet.__init__(self)
 
 class SymbolicLink(File):
 
     lsTag = "l"
     streamDict = {
-        FILE_STREAM_TARGET : (streams.StringStream, "target"),
+        FILE_STREAM_TARGET :   (streams.StringStream, "target"),
         FILE_STREAM_REQUIRES : (streams.DependenciesStream, 'requires'  ),
     }
     streamDict.update(File.streamDict)
-    _streamDict = cstreams.StreamSetDef(streamDict)
+    _streamDict = streams.StreamSetDef(streamDict)
     # chmod() on a symlink follows the symlink
     skipChmod = True
     __slots__ = [ "target", "requires" ]
@@ -404,7 +399,7 @@ class Socket(File):
 
     lsTag = "s"
     __slots__ = []
-    _streamDict = cstreams.StreamSetDef(File.streamDict)
+    _streamDict = streams.StreamSetDef(File.streamDict)
 
     def restore(self, fileContents, root, target, journal=None):
 	if os.path.exists(target) or os.path.islink(target):
@@ -419,7 +414,7 @@ class NamedPipe(File):
 
     lsTag = "p"
     __slots__ = []
-    _streamDict = cstreams.StreamSetDef(File.streamDict)
+    _streamDict = streams.StreamSetDef(File.streamDict)
 
     def restore(self, fileContents, root, target, journal=None):
 	if os.path.exists(target) or os.path.islink(target):
@@ -432,7 +427,7 @@ class Directory(File):
 
     lsTag = "d"
     __slots__ = []
-    _streamDict = cstreams.StreamSetDef(File.streamDict)
+    _streamDict = streams.StreamSetDef(File.streamDict)
 
     def restore(self, fileContents, root, target, journal=None):
 	if not os.path.isdir(target):
@@ -447,7 +442,7 @@ class DeviceFile(File):
 
     streamDict = { FILE_STREAM_DEVICE : (DeviceStream, "devt") }
     streamDict.update(File.streamDict)
-    _streamDict = cstreams.StreamSetDef(streamDict)
+    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ 'devt' ]
 
     def sizeString(self):
@@ -498,7 +493,7 @@ class RegularFile(File):
     }
 
     streamDict.update(File.streamDict)
-    _streamDict = cstreams.StreamSetDef(streamDict)
+    _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = ('contents', 'provides', 'requires', 'flavor', 'linkGroup')
 
     lsTag = "-"

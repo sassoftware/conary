@@ -553,6 +553,7 @@ static PyMethodDef CStreamsMethods[] = {
 };
 
 void streamsetinit(PyObject * m);
+void stringstreaminit(PyObject * m);
 
 #define REGISTER_TYPE(name) \
     if (PyType_Ready(&name ## Type) < 0) \
@@ -579,6 +580,7 @@ initcstreams(void)
 
     /* streamset.c */
     streamsetinit(m);
+    stringstreaminit(m);
 }
 
 /*
