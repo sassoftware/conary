@@ -289,7 +289,7 @@ class SymbolicLink(File):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.symlink(self.theLinkTarget, target)
-	File.restore(self, target)
+	File.restore(self, target, skipContents)
 
     def applyChangeLine(self, line):
 	(target, line) = line.split(None, 1)
@@ -317,7 +317,7 @@ class Socket(File):
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
         sock.bind(target)
         sock.close()
-	File.restore(self, target)
+	File.restore(self, target, skipContents)
 
     def __init__(self, fileId, info = None):
 	File.__init__(self, fileId, info, infoTag = "s")
@@ -333,7 +333,7 @@ class NamedPipe(File):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.mkfifo(target)
-	File.restore(self, target)
+	File.restore(self, target, skipContents)
 
     def __init__(self, fileId, info = None):
 	File.__init__(self, fileId, info, infoTag = "p")
@@ -349,7 +349,7 @@ class Directory(File):
 	if not os.path.isdir(target):
 	    util.mkdirChain(target)
 
-	File.restore(self, target)
+	File.restore(self, target, skipContents)
 
     def __init__(self, fileId, info = None):
 	File.__init__(self, fileId, info, infoTag = "d")
@@ -384,7 +384,7 @@ class DeviceFile(File):
             os.system("mknod %s %c %d %d" % (target, self.infoTag, self.major,
                                              self.minor))
             
-	File.restore(self, target)
+	File.restore(self, target, skipContents)
 
     def majorMinor(self, major = None, minor = None):
 	if major is not None:
@@ -466,7 +466,7 @@ class RegularFile(File):
 	    f.close()
 	    src.close()
 
-	File.restore(self, target)
+	File.restore(self, target, skipContents)
 
     def archive(self, repos, file):
 	if repos.hasFileContents(self.sha1()):
