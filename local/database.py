@@ -145,12 +145,12 @@ class SqlDbRepository(repository.DataStoreRepository,
 	# files get removed with their troves
 	pass
 
-    def eraseTroves(self, list):
+    def eraseTroves(self, list, tagScript = None):
 	cs = changeset.ChangeSet()
 	for (name, flavor, version) in list:
 	    cs.oldPackage(name, version, flavor)
-	    
-	self.commitChangeSet(cs)
+
+	self.commitChangeSet(cs, tagScript = tagScript)
 
     def __init__(self, path):
 	repository.DataStoreRepository.__init__(self, path)

@@ -263,12 +263,19 @@ def realMain():
 
 	cook.cookCommand(cfg, otherArgs[2:], prep, macros)                
     elif (otherArgs[1] == "erase"):
-	if argSet: return usage
+	kwargs = {}
+
+	if argSet.has_key('tag-script'):
+	    kwargs['tagScript'] = argSet['tag-script']
+	    del argSet['tag-script']
+
+	if argSet: return usage()
+
 	if len(otherArgs) >= 3 and len(otherArgs) <=4:
 	    db = openDatabase(cfg.root, cfg.dbPath)
 
 	    args = [db, cfg] + otherArgs[2:]
-	    updatecmd.doErase(*args)
+	    updatecmd.doErase(*args, **kwargs)
 	else:
 	    return usage()
     elif (otherArgs[1] == "import"):

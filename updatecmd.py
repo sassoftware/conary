@@ -77,7 +77,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False,
     except repository.CommitError, e:
 	log.error(e)
 
-def doErase(db, cfg, pkg, versionStr = None):
+def doErase(db, cfg, pkg, versionStr = None, tagScript = None):
     try:
 	pkgList = db.findTrove(pkg, versionStr)
     except helper.PackageNotFound, e:
@@ -88,4 +88,4 @@ def doErase(db, cfg, pkg, versionStr = None):
     for pkg in pkgList:
 	list.append((pkg.getName(), pkg.getFlavor(), pkg.getVersion()))
 
-    db.eraseTroves(list)
+    db.eraseTroves(list, tagScript = tagScript)

@@ -94,7 +94,7 @@ class FilesystemJob:
 	    for path in self.tagRemoves['tagdescription']:
 		path = path[rootLen:]
 		tagInfo = None	
-		for ti in tagSet.iteritems:
+		for ti in tagSet.itervalues():
 		    if ti.file == path: 
 			tagInfo = ti
 			break
@@ -212,11 +212,11 @@ class FilesystemJob:
 	    tagInfo = tagSet[tag]
 
 	    if "files remove" in tagInfo.implements:
-		cmd = [ tagInfo.tag, "files", "preremove"] + \
+		cmd = [ tagInfo.tag, "files", "remove"] + \
 			    [ x[rootLen:] for x in l ]
 		tagCommands.append(cmd)
 	    
-	if tagScript:
+	if tagCommands and tagScript:
 	    f = open(tagScript, "a")
 	    f.write("\n".join([" ".join(x) for x in tagCommands]))
 	    f.write("\n")
