@@ -133,10 +133,6 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
                     cfg.sourcepath % {'pkgname': recipeClass.name} ]
 	recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
 
-	if recipeObj.name.startswith("group-"):
-	    raise CookError('package names are not allowed to begin ' +
-			    'with "group-"')
-
 	newVersion = None
 	if repos.hasPackage(fullName):
 	    # if this package/version exists already, increment the
