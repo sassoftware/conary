@@ -1,3 +1,6 @@
+Changes in 0.10.1:
+  * dependency checking resolves dependencies against the installLabelPath
+
 Changes in 0.10.0:
   * dependency checking is now performed before changesets are
     applied.  This uses new tables in the local system's database.
