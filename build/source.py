@@ -31,9 +31,11 @@ class _Source:
     def _addSignature(self):
         for suffix in ('sig', 'sign', 'asc'):
             self.gpg = '%s.%s' %(self.sourcename, suffix)
-            self.localgpgfile = lookaside.searchAll(self.cfg,
-				    self.laReposCache, gpg, 
-                                    self.name, self.srcdirs)
+            self.localgpgfile = lookaside.searchAll(self.recipe.cfg,
+				    self.recipe.laReposCache, self.gpg, 
+                                    self.recipe.name, self.recipe.srcdirs)
+	    if self.localgpgfile:
+		return
 
     def _checkSignature(self, filepath):
 	if 'localgpgfile' not in self.__dict__:
