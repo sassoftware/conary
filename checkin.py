@@ -411,12 +411,14 @@ def annotate(repos, filename):
 
                 # update the linemap for places where the files are
                 # the same.
+                changes = {}
                 for (startold, startnew, lines) in blocks:
                     if startold == startnew:
                         continue
                     for i in range(0, lines):
                         if lineMap.get(startnew + i, None) is not None:
-                            lineMap[startold + i] = lineMap[startnew + i]
+                            changes[startold + i] = lineMap[startnew + i]
+                lineMap.update(changes)
         (newV, newTrove, newContact) = (oldV, oldTrove, oldContact)
         (newFileV, newLines) = (oldFileV, oldLines)
             
