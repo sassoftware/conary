@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-.PHONY: clean bootstrap
+.PHONY: clean bootstrap deps.dot
 
 clean:
 	rm -f *~ .#*
@@ -14,3 +14,6 @@ bootstrap:
 		exit 1; \
 	fi
 	time ./srs-bootstrap `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"`
+
+deps.dot:
+	./srs-bootstrap --dot `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` > deps.dot
