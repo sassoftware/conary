@@ -66,7 +66,9 @@ class BranchName(AbstractBranch):
 	return 0
 
     def __init__(self, value):
-	# throws an exception if no @ is found
+	if value.find("@") == -1:
+	    raise ParseError, "@ expected between hostname and branch name"
+
 	(self.host, self.branch) = value.split("@", 1)
 	if self.branch.find("@") != -1:
 	    raise ParseError, ("branch names may not have @ signs: %s" % value)
