@@ -53,6 +53,7 @@ Use = UseClass({
     'kde':		False,
     'readline':		False,
     'ssl':		False,
+    'slang':		False,
 })
 
 Arch = UseClass({
