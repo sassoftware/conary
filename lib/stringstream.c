@@ -151,12 +151,18 @@ static int StringStream_Init(PyObject * self, PyObject * args,
     PyObject * initObj = NULL;
     static char * kwlist[] = { "frozen", NULL };
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|O!", kwlist, 
-				     &PyString_Type, &initObj)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, 
+				     &initObj)) {
         return -1;
     }
 
     if (initObj) {
+	if (initObj != Py_None && initObj->ob_type != &PyString_Type) {
+	    PyErr_SetString(PyExc_TypeError, "frozen value must be "
+			    "None or a string");
+	    return -1;
+	}
+	    
 	o->s = initObj;
     } else {
 	o->s = PyString_FromString("");
