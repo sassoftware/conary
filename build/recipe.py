@@ -332,9 +332,10 @@ class Recipe:
 		    shutil.copyfile(f, destDir + "/" + os.path.basename(file))
 		continue
 
-    def doBuild(self, buildpath):
+    def doBuild(self, buildpath, root):
         builddir = buildpath + "/" + self.mainDir()
-	self.macros['builddir'] = builddir
+	self.addMacros(('builddir', builddir),
+	               ('destdir', root))
         if self.build is None:
             pass
         elif type(self.build) is str:
