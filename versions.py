@@ -38,6 +38,9 @@ class AbstractVersion(object):
     def __ne__(self, them):
 	return not self.__eq__(them)
 
+    def copy(self):
+	return copy.deepcopy(self)
+
 class NewVersion(AbstractVersion):
 
     """
@@ -642,7 +645,7 @@ class Version(AbstractVersion):
 	newlist = [ branch ]
 
 	if sameVerRel:
-	    newlist.append(self.versions[-1])
+	    newlist.append(self.versions[-1].copy())
 
 	return Version(self.versions + newlist)
 
