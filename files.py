@@ -111,6 +111,9 @@ class LinkGroupStream(streams.StringStream):
 
 	return False
 
+    def __init__(self, data = None):
+	streams.StringStream.__init__(self, data)
+
 class RegularFileStream(streams.TupleStream):
 
     __slots__ = []
