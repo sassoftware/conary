@@ -206,26 +206,43 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
-        (gen, verList, dirList) = self.c[version].getFilesInTrove(troveName,
-                                             self.fromVersion(version),
-                                             self.fromFlavor(flavor),
-                                             sortByPath,
-                                             withFiles)
-        verList = [ self.toVersion(x) for x in verList ]
-
-        for tup in gen:
-            (pathId, dirNum, fileName, fileId, verNum) = tup[0:5]
-            path = os.path.join(dirList[dirNum], fileName)
-
-            pathId = self.toPathId(pathId)
-            fileId = self.toFileId(fileId)
-
+        # XXX this code should most likely go away, and anything that
+        # uses it should be written to use other functions
+        l = [(troveName, (None, None), (version, flavor), True)]
+        cs = self._getChangeSet(l, recurse = False, withFiles = True,
+                                withFileContents = False)
+        try:
+            trvCs = cs.getNewPackageVersion(troveName, version, flavor)
+        except KeyError:
+            raise StopIteration
+        
+        t = trove.Trove(trvCs.getName(), trvCs.getOldVersion(),
+                        trvCs.getNewFlavor(), trvCs.getChangeLog())
+        t.applyChangeSet(trvCs)
+        # if we're sorting, we'll need to pull out all the paths ahead
+        # of time.  We'll use a generator that returns the items
+        # in the same order as iterFileList() to reuse code.
+        if sortByPath:
+            pathDict = {}
+            for pathId, path, fileId, version in t.iterFileList():
+                pathDict[path] = (pathId, fileId, version)
+            paths = pathDict.keys()
+            paths.sort()
+            def rearrange(paths, pathDict):
+                for path in paths:
+                    (pathId, fileId, version) = pathDict[path]
+                    yield (pathId, path, fileId, version)
+            generator = rearrange(paths, pathDict)
+        else:
+            generator = t.iterFileList()
+        for pathId, path, fileId, version in generator:
             if withFiles:
-                yield (pathId, path, fileId, verList[verNum],
-                       files.ThawFile(base64.decodestring(tup[5]), pathId))
+                fileStream = files.ThawFile(cs.getFileChange(None, fileId),
+                                            pathId)
+                yield (pathId, path, fileId, version, fileStream)
             else:
-                yield (pathId, path, fileId, verList[verNum])
-
+                yield (pathId, path, fileId, version)
+    
     def getAllTroveLeafs(self, serverName, troveNames):
 	d = self.c[serverName].getAllTroveLeafs(troveNames)
 	for troveName, troveVersions in d.iteritems():
