@@ -74,26 +74,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return self.repos.troveStore.hasTrove(pkgName, troveVersion = version,
 					troveFlavor = flavor)
 
-    def getTroveVersionList2(self, authToken, troveNameList, callVersion = 2):
-	# 1. version 1 has version strings
-	# 2. version 2 has frozen vesions
+    def getTroveVersionList(self, authToken, troveNameList):
 	d = {}
 	for troveName in troveNameList:
 	    if not self.auth.check(authToken, write = False, trove = troveName):
 		raise InsufficientPermission
 
-	    if callVersion == 1:
-		d[troveName] = [ self.fromVersion(x) for x in
-			self.repos.troveStore.iterTroveVersions(troveName) ]
-	    else:
-		d[troveName] = [ self.freezeVersion(x) for x in
-			self.repos.troveStore.iterTroveVersions(troveName) ]
+	    d[troveName] = [ self.freezeVersion(x) for x in
+		    self.repos.troveStore.iterTroveVersions(troveName) ]
 
 	return d
-
-    def getTroveVersionList(self, authToken, troveNameList):
-	return self.getTroveVersionList2(authToken, troveNameList,
-					 callVersion = 1)
 
     def getFilesInTrove(self, authToken, troveName, versionStr, flavor,
                         sortByPath = False, withFiles = False):
@@ -114,8 +104,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return [ (x[0], x[1], self.fromVersion(x[2])) for x in gen ]
 
     def getFileContents(self, authToken, troveName, troveVersion, 
-			   troveFlavor, path):
+			   troveFlavor, path, fileVersion):
 	troveVersion = self.toVersion(troveVersion)
+	fileVersion = self.toVersion(fileVersion)
 	troveFlavor = self.toFlavor(troveFlavor)
 
 	if not self.auth.check(authToken, write = False, trove = troveName,
@@ -127,7 +118,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	for (fileId, tpath, tversion, fileObj) in \
 		self.repos.iterFilesInTrove(troveName, troveVersion, 
 					    troveFlavor, withFiles = True):
-	    if tpath != path: continue
+	    if tpath != path or tversion != fileVersion: continue
 
 	    inF = self.repos.contentsStore.openRawFile(fileObj.contents.sha1())
 
@@ -321,9 +312,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
-        if clientVersion < 0:
+        if clientVersion < 1:
             raise RuntimeError, "client is too old"
-        return 0
+        return 1
 
     def __init__(self, path, tmpPath, urlBase, authDbPath, name,
 		 repositoryMap, commitAction = None):

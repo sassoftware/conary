@@ -83,7 +83,7 @@ class ServerCache:
 	    self.cache[serverName] = server
 
 	    try:
-		if server.checkVersion(0) < 0:
+		if server.checkVersion(1) < 1:
 		    raise repository.OpenError('Server version too old')
 	    except OSError, e:
 		raise repository.OpenError('Error occured opening repository '
@@ -163,7 +163,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                                      branch.asString()) ]
 
     def getTroveVersionList(self, serverName, troveNameList):
-	d = self.c[serverName].getTroveVersionList2(troveNameList)
+	d = self.c[serverName].getTroveVersionList(troveNameList)
 	for troveName, troveVersions in d.iteritems():
 	    d[troveName] = [ self.thawVersion(x) for x in troveVersions ]
 
@@ -303,10 +303,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self.toFile(self.c[version].getFileVersion(fileId,
                                                  self.fromVersion(version)))
 
-    def getFileContents(self, name, version, flavor, path):
-	url = self.c[version].getFileContents(name, 
-		    self.fromVersion(version), self.fromFlavor(flavor),
-		    path)
+    def getFileContents(self, troveName, troveVersion, troveFlavor, path,
+		        fileVersion):
+	# we try to get the file from the trove which originally contained
+	# it since we know that server has the contents; other servers may
+	# not
+	url = self.c[fileVersion].getFileContents(troveName, 
+		    self.fromVersion(troveVersion), 
+		    self.fromFlavor(troveFlavor),
+		    path, self.fromVersion(fileVersion))
 
 	inF = urllib.urlopen(url)
 	(fd, path) = tempfile.mkstemp()

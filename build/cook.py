@@ -369,7 +369,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
             if isinstance(fileObj, files.RegularFile):
                 # it only makes sense to fetch regular files, skip
                 # anything that isn't
-                lcache.addFileHash(path, srcName, srcVersion, None, path)
+                lcache.addFileHash(srcName, srcVersion, None, path, version)
 
     builddir = cfg.buildPath + "/" + recipeObj.name
     use.track(True)

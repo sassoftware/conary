@@ -121,8 +121,18 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
-	return self.troveStore.iterFilesInTrove(troveName, version, flavor,
-                                                sortByPath, withFiles)
+	gen = self.troveStore.iterFilesInTrove(troveName, version, flavor,
+						    sortByPath, withFiles)
+
+	for (fileId, path, version, fileObj) in gen:
+	    if fileObj:
+		yield fileId, path, version, fileObj
+
+	    # if fileObj is None, we need to get the fileObj from a remote
+	    # repository
+
+	    fileObj = self._getLocalOrRemoteFileVersion(fileId, version)
+	    yield fileId, path, version, fileObj
 
     ### File functions
 

@@ -508,7 +508,8 @@ class FilesystemJob:
 			sha1 = baseFile.contents.sha1()
 			baseLineF = repos.getFileContents(pkgCs.getName(),
 					pkgCs.getOldVersion(), pkgCs.getFlavor(),
-					basePkg.getFile(fileId)[0])
+					basePkg.getFile(fileId)[0],
+					basePkg.getFile(fileId)[1])
 
 			baseLines = baseLineF.readlines()
 			del baseLineF
@@ -746,7 +747,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 		if srcFile.hasContents:
 		    theFile = repos.getFileContents(srcPkg.getName(),
-				srcPkg.getVersion(), srcPkg.getFlavor(), srcPath)
+				srcPkg.getVersion(), srcPkg.getFlavor(), 
+				srcPath, srcFileVersion)
 		    srcCont = filecontents.FromFile(theFile)
 
 		(contType, cont) = changeset.fileContentsDiff(srcFile, srcCont,

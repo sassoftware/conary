@@ -451,13 +451,14 @@ class DataStoreRepository:
     def _hasFileContents(self, fileId):
 	return self.contentsStore.hasFile(fileId)
 
-    def getFileContents(self, troveName, troveVersion, troveFlavor, path):
+    def getFileContents(self, troveName, troveVersion, troveFlavor, path,
+			fileVersion):
 	# this could be much more efficient; iterating over the files is
 	# just silly
 	for (fileId, tpath, tversion, fileObj) in \
 		self.iterFilesInTrove(troveName, troveVersion, 
 					    troveFlavor, withFiles = True):
-	    if tpath != path: continue
+	    if tpath != path or tversion != fileVersion: continue
 
 	    inF = self.contentsStore.openFile(fileObj.contents.sha1())
 	    return inF
