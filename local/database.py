@@ -9,6 +9,7 @@ import log
 import os
 import repository
 import update
+import util
 import versions
 
 class Database(repository.LocalRepository):
@@ -70,7 +71,8 @@ class Database(repository.LocalRepository):
 			(contType, cont) = changeset.fileContentsDiff(oldFile, 
 				    oldCont, fileObj.file(), cont)
 
-		    cs.addFileContents(fileId, contType, cont)
+		    cs.addFileContents(fileId, contType, cont, 
+					fileObj.file().isConfig())
 
 	assert(not cs.validate())
 
@@ -157,8 +159,10 @@ class Database(repository.LocalRepository):
 	repository.LocalRepository.close(self)
 
     def open(self, mode):
+	top = util.joinPaths(self.root, self.dbpath)
 	repository.LocalRepository.open(self, mode)
-	self.rollbackCache = self.top + "/rollbacks"
+
+	self.rollbackCache = top + "/rollbacks"
 	self.rollbackStatus = self.rollbackCache + "/status"
 	if not os.path.exists(self.rollbackCache):
 	    os.mkdir(self.rollbackCache)
@@ -254,7 +258,8 @@ class Database(repository.LocalRepository):
 
     def __init__(self, root, path, mode = "r"):
 	self.root = root
-	fullPath = root + "/" + path
+	self.dbpath = path
+	fullPath = root + "/" + path + "/repcache"
 	repository.LocalRepository.__init__(self, fullPath, mode)
 
 # This builds a job which applies both a change set and the local changes
