@@ -967,7 +967,7 @@ class NormalizeInterpreterPaths(policy.Policy):
                 f = file(d, 'r+')
                 l = f.readlines()
                 l.pop(0) # we will reconstruct this line, without extra spaces
-                wordlist = [ x for x in line.split(' ') if x ]
+                wordlist = [ x for x in line.split() ]
                 wordlist.pop(0) # get rid of env
                 fullintpath = util.checkPath(wordlist[0])
                 if fullintpath == None:
