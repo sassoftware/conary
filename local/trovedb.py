@@ -40,7 +40,7 @@ class TroveDatabase:
 	numericId = struct.unpack('!i', trvId)[0]
 	self.trvs['COUNTER'] = struct.pack('!i', numericId + 1)
 	str = "\0".join([trv.getName(), trv.getVersion().freeze(), 
-			 trv.formatString()])
+			 trv.freeze()])
 	self.trvs[trvId] = str
 	self._updateIndicies(trvId, trv, Index.addEntry)
 

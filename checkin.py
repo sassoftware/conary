@@ -32,7 +32,7 @@ class SourceState(package.Package):
 	if self.version:
 	    f.write("version %s\n" % self.version.asString())
 	f.write("branch %s\n" % self.branch.asString())
-	f.write(self.formatString())
+	f.write(self.freeze())
 
     def getBranch(self):
 	return self.branch

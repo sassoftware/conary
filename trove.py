@@ -125,7 +125,7 @@ class Package:
 	    (name, version) = line.split()
 	    self.addPackageVersion(name, versions.VersionFromString(version))
 
-    def formatString(self):
+    def freeze(self):
 	"""
 	Returns a string representing everything about this package, which can
 	later be read by the read() method. The format of the string is:

@@ -418,7 +418,7 @@ class _PackageSetClass(IndexedVersionedFile):
 	return p
 
     def addVersion(self, version, package):
-	IndexedVersionedFile.addVersion(self, version, package.formatString())
+	IndexedVersionedFile.addVersion(self, version, package.freeze())
 
     def fullVersionList(self):
 	branches = self.branchList()
