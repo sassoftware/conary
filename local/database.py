@@ -339,7 +339,7 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	    self.oldPackage(repos.getPackageVersion(name, oldVersion))
 
 	    for fileId in csPkg.getOldFileList():
-		(oldPath, oldFileVersion) = pkg.getFile(fileId)
+		(oldPath, oldFileVersion) = csPkg.getFile(fileId)
 		self.removeFile(fileId, oldFileVersion)
 
 	# for each file which has changed, erase the old version of that
