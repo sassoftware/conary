@@ -306,6 +306,22 @@ class MakePathsInstall(Make):
     keywords = {'installtarget': 'install'}
 
 
+class CompilePython(BuildCommand):
+    template = (
+	"""python -c 'from compileall import *; compile_dir("""
+	""""%%(destdir)s/%%(dir)s", 10, "%%(dir)s")'""")
+
+    def do(self, macros):
+	macros = macros.copy()
+	destdir = macros['destdir']
+	destlen = len(destdir)
+	for arg in self.arglist:
+	    # arg will always have a leading /, so no os.sep needed
+	    for directory in util.braceGlob(destdir+arg %macros):
+		macros['dir'] = directory[destlen:]
+		util.execute(self.command %macros)
+
+
 class _FileAction(BuildAction):
     keywords = {'component': None}
 
@@ -356,6 +372,8 @@ class InstallDesktopfile(BuildCommand, _FileAction):
     keywords = {'vendor': 'net',
 		'categories': None}
 
+    # XXX fixme should this be do, not doBuild?  Probably.
+    # otherwise, need explanation of why use not honored...
     def doBuild(self, recipe):
 	macros = recipe.macros.copy()
         if self.categories:
