@@ -28,8 +28,8 @@ def cook(repos, cfg, recipeFile):
 	    for pkgName in repos.getPackageList(fullName):
 		pkgSet = repos.getPackageSet(pkgName)
 		pkg = pkgSet.getLatestPackage(cfg.defaultbranch)
-		for (fileid, path, version) in pkg.fileList():
-		    fileIdMap[path] = fileid
+		for (fileId, path, version) in pkg.fileList():
+		    fileIdMap[path] = fileId
 
 	ident = IdGen(fileIdMap)
 

@@ -37,6 +37,6 @@ def displayPkgInfo(repos, cfg, pkgName, versionStr):
 	    package.stripNamespace(cfg.packagenamespace, pkgName),
 	    version.asString(cfg.defaultbranch)
 	)
-    for (id, path, version) in pkg.fileList():
+    for (fileId, path, version) in pkg.fileList():
 	print "    %-35s %s" % (path, version.asString(cfg.defaultbranch))
 

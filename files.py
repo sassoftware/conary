@@ -137,8 +137,8 @@ class File(FileMode):
 	# most file types don't need to do this
 	pass
 
-    def __init__(self, id, info = None):
-	self.theId = id
+    def __init__(self, fileId, info = None):
+	self.theId = fileId
 	FileMode.__init__(self, info)
 
 class SymbolicLink(File):
@@ -174,13 +174,13 @@ class SymbolicLink(File):
 	os.symlink(self.theLinkTarget, target)
 	File.restore(self, target)
 
-    def __init__(self, id, info = None):
+    def __init__(self, fileId, info = None):
 	if (info):
 	    (self.theLinkTarget, info) = string.split(info, None, 1)
 	else:
 	    self.theLinkTarget = None
 
-	File.__init__(self, id, info)
+	File.__init__(self, fileId, info)
 
 class Socket(File):
 
@@ -193,8 +193,8 @@ class Socket(File):
     def copy(self, source, target):
 	pass
 
-    def __init__(self, id, info = None):
-	File.__init__(self, id, info)
+    def __init__(self, fileId, info = None):
+	File.__init__(self, fileId, info)
 
 class NamedPipe(File):
 
@@ -210,8 +210,8 @@ class NamedPipe(File):
 	os.mkfifo(target)
 	File.restore(self, target)
 
-    def __init__(self, id, info = None):
-	File.__init__(self, id, info)
+    def __init__(self, fileId, info = None):
+	File.__init__(self, fileId, info)
 
 class Directory(File):
 
@@ -227,8 +227,8 @@ class Directory(File):
 
 	File.restore(self, target)
 
-    def __init__(self, id, info = None):
-	File.__init__(self, id, info)
+    def __init__(self, fileId, info = None):
+	File.__init__(self, fileId, info)
 
 class DeviceFile(File):
 
@@ -261,14 +261,14 @@ class DeviceFile(File):
 	
 	return (self.type, self.major, self.minor)
 
-    def __init__(self, id, info = None):
+    def __init__(self, fileId, info = None):
 	if (info):
 	    (self.type, self.major, self.minor, info) = \
 		    string.split(info, None, 3)
 	    self.major = int(self.major)
 	    self.minor = int(self.minor)
 
-	File.__init__(self, id, info)
+	File.__init__(self, fileId, info)
 
 class RegularFile(File):
 
@@ -307,21 +307,21 @@ class RegularFile(File):
 	repos.newFileContents(self.sha1(), file)
 	file.close()
 
-    def __init__(self, id, info = None):
+    def __init__(self, fileId, info = None):
 	if (info):
 	    (self.thesha1, info) = string.split(info, None, 1)
 	else:
 	    self.thesha1 = None
 
-	File.__init__(self, id, info)
+	File.__init__(self, fileId, info)
 
 class SourceFile(RegularFile):
 
     def infoLine(self):
 	return "src %s %s" % (self.thesha1, File.infoLine(self))
 
-    def __init__(self, id, info = None):
-	RegularFile.__init__(self, id, info)
+    def __init__(self, fileId, info = None):
+	RegularFile.__init__(self, fileId, info)
 
 class FileDB:
 
@@ -375,7 +375,7 @@ class FileDB:
 
 	self.f = versioned.open(f)
 
-def FileFromFilesystem(path, id, type = None):
+def FileFromFilesystem(path, fileId, type = None):
     s = os.lstat(path)
 
     if type == "src":
@@ -409,21 +409,21 @@ def FileFromFilesystem(path, id, type = None):
 
     return f
 
-def FileFromInfoLine(infoLine, id):
+def FileFromInfoLine(infoLine, fileId):
     (type, infoLine) = string.split(infoLine, None, 1)
     if type == "f":
-	return RegularFile(id, infoLine)
+	return RegularFile(fileId, infoLine)
     elif type == "l":
-	return SymbolicLink(id, infoLine)
+	return SymbolicLink(fileId, infoLine)
     elif type == "d":
-	return Directory(id, infoLine)
+	return Directory(fileId, infoLine)
     elif type == "p":
-	return NamedPipe(id, infoLine)
+	return NamedPipe(fileId, infoLine)
     elif type == "v":
-	return DeviceFile(id, infoLine)
+	return DeviceFile(fileId, infoLine)
     elif type == "s":
-	return Socket(id, infoLine)
+	return Socket(fileId, infoLine)
     elif type == "src":
-	return SourceFile(id, infoLine)
+	return SourceFile(fileId, infoLine)
     else:
 	raise KeyError, "bad infoLine %s" % infoLine

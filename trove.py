@@ -12,8 +12,8 @@ import versions
 # this is the repository's idea of a package
 class Package:
 
-    def addFile(self, id, path, version):
-	self.files[path] = (id, path, version)
+    def addFile(self, fileId, path, version):
+	self.files[path] = (fileId, path, version)
 
     def fileList(self):
 	l = []

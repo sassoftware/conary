@@ -11,8 +11,8 @@ class Repository:
     def getPackageSet(self, pkgName, mode = "r"):
 	return package.PackageSet(self.pkgDB, pkgName, mode)
 
-    def getFileDB(self, id):
-	return files.FileDB(self.fileDB, id)
+    def getFileDB(self, fileId):
+	return files.FileDB(self.fileDB, fileId)
 
     def pullFileContents(self, fileId, targetFile):
 	srcFile = self.contentsStore.openFile(fileId)
