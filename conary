@@ -25,7 +25,6 @@ def usage():
     print "usage: srs import <file.rpm>"
     print "       srs pkglist <pkg>"
     print "       srs update  <pkg>"
-    print "       srs commit  <pkg> <version> <root> <filelist>"
     print "       srs cook    <first.recipe> <second.recipe> ..."
     sys.exit(0)
 
@@ -64,12 +63,5 @@ elif (sys.argv[1] == "config"):
 	usage()
     else:
 	cfg.display()
-elif (sys.argv[1] == "commit"):
-    if (len(sys.argv) != 6 or sys.argv[3][0] != "/"):
-	print "usage: srs commit <pkg> <version> <root> <filelist>"
-	sys.exit(1)
-
-    commit.doCommit(cfg.reppath, sys.argv[2], sys.argv[3], sys.argv[4], \
-		    sys.argv[5])
 else:
     usage()
