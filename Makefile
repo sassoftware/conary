@@ -13,7 +13,7 @@ export srsdir = $(prefix)/share/srs
 export bindir = $(prefix)/bin
 export PYTHON = python2.3
 
-SUBDIRS=build local repository test
+SUBDIRS=build local repository test lib
 
 subdirs_rule=
 
