@@ -155,6 +155,13 @@ class Database(repository.LocalRepository):
 	    # build the list of things to commit
 	    fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root)
 	    # remove old packages
+	    errList = fsJob.getErrorList()
+	    if errList:
+		for err in errList: log.error(err)
+		undo.undo()
+		# FIXME need a --force for this
+		#return
+
 	    job.removals(undo)
 	except:
 	    # this won't work it things got too far, but it won't hurt
