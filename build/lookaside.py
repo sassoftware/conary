@@ -97,9 +97,14 @@ def searchAll(cfg, repCache, name, location, srcdirs):
                     createNegativeCacheEntry(cfg, name[5:], location)
                     return None
             except IOError, msg:
-                log.info('Error retreiving %s. %s Retrying in 10 seconds.', name, msg)
-                time.sleep(10)
-                retries += 1
+                # only retry for server busy.
+                if 'ftp error] 421' in msg:
+                    log.info('FTP server busy when retrieving %s.  Retrying in 10 seconds.', name, msg)
+                    time.sleep(10)
+                    retries += 1
+                else:
+                    createNegativeCacheEntry(cfg, name[5:], location)
+                    return None
             except urllib2.URLError:
                 createNegativeCacheEntry(cfg, name[5:], location)
                 return None
