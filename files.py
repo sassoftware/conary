@@ -33,8 +33,13 @@ _STREAM_FLAGS	    = 8
 _STREAM_MTIME	    = 9
 _STREAM_DEPS	    = 10
 
-def _makeTupleSlots(l):
-    return [ x[0] for x in l ] + [ "set" + x[0].capitalize() for x in l ]
+def _makeTupleDict(makeup):
+    d = {}
+    for (i, (name, classType, size)) in enumerate(makeup):
+	d[name] = (1, i)
+	d["set" + name.capitalize()] = (2, i)
+
+    return d
 
 class InfoStream(object):
 
@@ -279,11 +284,6 @@ class TupleStream(InfoStream):
 
 	    idx += size
 
-    def __deepcopy__(self, memo):
-	# trying to copy the lambda this uses causes problems; this
-	# avoids them
-	return self.__class__(self.freeze())
-
     def __init__(self, first = None, *rest):
 	if first == None:
 	    self.items = []
@@ -297,23 +297,28 @@ class TupleStream(InfoStream):
 	    for (i, (name, itemType, size)) in enumerate(self.makeup):
 		self.items.append(itemType(all[i]))
 
-	for (i, (name, itemType, size)) in enumerate(self.makeup):
-	    self.__setattr__(name, lambda num = i: self.items[num].value())
-	    setName = "set" + name.capitalize()
-	    self.__setattr__(setName,
-		lambda val, num = i: self.items[num].set(val))
+    def __getattribute__(self, item):
+	d = InfoStream.__getattribute__(self, "makeupDict")
+	if d.has_key(item):
+	    (methodType, index) = d[item]
+	    if methodType == 1:
+		return self.items[index].value
+	    else:
+		return self.items[index].set
+
+	return InfoStream.__getattribute__(self, item)
 
 class DeviceStream(TupleStream):
 
     makeup = (("major", IntStream, 4), ("minor", IntStream, 4))
-    __slots__ = _makeTupleSlots(makeup)
+    makeupDict = _makeTupleDict(makeup)
     streamId = _STREAM_DEVICE
 
 class RegularFileStream(TupleStream):
 
     makeup = (("size", LongLongStream, 8), ("sha1", StringStream, 40))
-    __slots__ = _makeTupleSlots(makeup)
     streamId = _STREAM_SIZESHA1
+    makeupDict = _makeTupleDict(makeup)
 
 class InodeStream(TupleStream):
 
@@ -324,7 +329,7 @@ class InodeStream(TupleStream):
     # this is permissions, mtime, owner, group
     makeup = (("perms", ShortStream, 2), ("mtime", MtimeStream, 4), 
               ("owner", StringStream, "B"), ("group", StringStream, "B"))
-    __slots__ = _makeTupleSlots(makeup)
+    makeupDict = _makeTupleDict(makeup)
     streamId = _STREAM_INODE
 
     def triplet(self, code, setbit = 0):
