@@ -14,6 +14,7 @@
 
 import deps.arch
 import deps.deps
+import deptable
 import files
 import idtable
 import sqlite3
@@ -408,6 +409,7 @@ class Database:
 	self.targetTable = DBTarget(self.db)
 	self.flavors = DBFlavors(self.db)
 	self.flavorMap = DBFlavorMap(self.db)
+	self.depTables = deptable.DependencyTables(self.db)
         self.db.commit()
 	self.streamCache = {}
 	self.needsCleanup = False
@@ -549,6 +551,8 @@ class Database:
 					    isPresent = False)
 	    self.troveTroves.addItem(troveInstanceId, instanceId)
 
+        self.depTables.add(cu, trove, troveInstanceId)
+
 	return (cu, troveInstanceId)
 
     def addFile(self, troveInfo, fileId, fileObj, path, fileVersion):
@@ -685,6 +689,8 @@ class Database:
 
 	    trv.addFile(decodeFileId(fileId), path, version)
 
+        self.depTables.get(cu, trv, troveInstanceId)
+
 	return trv
 
     def eraseTrove(self, troveName, troveVersion, troveFlavor):
@@ -698,6 +704,7 @@ class Database:
 
 	self.troveFiles.delInstance(troveInstanceId)
 	del self.troveTroves[troveInstanceId]
+        self.depTables.delete(self.db.cursor(), troveInstanceId)
 
 	# mark this trove as not present
 	self.instances.setPresent(troveInstanceId, 0)
@@ -726,6 +733,9 @@ class Database:
 	self.db.commit()
 	self.addVersionCache = {}
 	self.flavorsNeeded = {}
+
+    def depCheck(self, changeSet):
+        return self.depTables.check(changeSet)
 	
     def pathIsOwned(self, path):
 	for instanceId in self.troveFiles.iterPath(path):

@@ -91,6 +91,12 @@ class Dependency:
 
 	return Dependency(self.name, allFlags)
 
+    def getName(self):
+        return self.name
+
+    def getFlags(self):
+        return self.flags.keys()
+
     def __init__(self, name, flags = []):
 	self.name = name
 	if type(flags) == dict:
@@ -256,6 +262,9 @@ class DependencySet:
         return self.members
 
     def union(self, other):
+        if not other:
+            return
+
 	for tag in other.members:
 	    if self.members.has_key(tag):
 		self.members[tag].union(other.members[tag])

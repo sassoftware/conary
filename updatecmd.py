@@ -55,6 +55,9 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
         log.error(e)
     except repository.CommitError, e:
         log.error(e)
+    except database.MissingDependencies, e:
+        print "Dependency check failure:"
+        print "\t" + "\n\t".join(str(e).split("\n"))
 
 def doErase(cfg, itemList, tagScript = None):
     troveList = []

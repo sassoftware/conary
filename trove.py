@@ -209,7 +209,9 @@ class Trove:
 	    return False
 
 	(csg, pcl, fcl) = self.diff(them)
-	return (not pcl) and (not fcl) and (not csg.getOldFileList())
+	return (not pcl) and (not fcl) and (not csg.getOldFileList()) \
+            and self.getRequires() == them.getRequires() \
+            and self.getProvides() == them.getProvides()
 
     def __ne__(self, them):
 	return not self == them
@@ -866,13 +868,19 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	self.provides.set(provides)
 
     def getProvides(self):
-        return self.provides.value()
+        p = self.provides.value()
+        if not p:
+            return None
+        return p
 
     def setRequires(self, requires):
 	self.requires.set(requires)
 
     def getRequires(self):
-        return self.requires.value()
+        r = self.requires.value()
+        if not r:
+            return None
+        return r
 
     def getOldFlavor(self):
         return self.oldFlavor.value()

@@ -232,6 +232,10 @@ class Database(SqlDbRepository):
 	for pkg in cs.iterNewPackageList():
 	    if pkg.getName().endswith(":source"): raise SourcePackageInstall
 
+        #(missingDeps, failedList) = self.db.depCheck(cs)
+        #if missingDeps:
+        #    raise MissingDependencies(failedList)
+
 	tagSet = tags.loadTagDict(self.root + "/etc/conary/tags")
 
 	# Make sure this change set doesn't unintentionally restore troves
@@ -615,3 +619,16 @@ class OpenError(DatabaseError):
     def __init__(self, path, msg):
 	self.path = path
 	self.msg = msg
+
+class MissingDependencies(Exception):
+
+    def __str__(self):
+        l = []
+        for (name, deps) in self.depList:
+            l.append(name + ":")
+            l.append("\t" + "\n\t".join(str(deps).split("\n")))
+
+        return "\n".join(l)
+
+    def __init__(self, depList):
+        self.depList = depList

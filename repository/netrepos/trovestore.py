@@ -14,7 +14,9 @@
 
 import changelog
 import cltable
-import deps.deps
+import copy
+from deps import deps
+from local import deptable
 import instances
 import items
 import files
@@ -78,6 +80,7 @@ class TroveStore:
 	self.versionOps = versionops.SqlVersioning(self.db, self.versionTable,
                                                    self.branchTable)
 	self.flavors = flavors.Flavors(self.db)
+        self.depTables = deptable.DependencyTables(self.db)
         self.db.commit()
         
 	self.streamIdCache = {}
@@ -402,12 +405,14 @@ class TroveStore:
 	    troveFlavorId = flavors[troveFlavor]
 	else:
 	    troveFlavorId = 0
-	#
+
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId, 
 					     troveFlavorId, isPresent = True)
 	assert(not self.troveTroves.has_key(troveInstanceId))
+
+        self.depTables.add(cu, trove, troveInstanceId)
 
         cu.execute("""
 	    INSERT INTO FileStreams SELECT NULL,
@@ -564,6 +569,8 @@ class TroveStore:
 		versionCache[versionId] = version
 
 	    trv.addFile(decodeFileId(fileId), path, version)
+
+        self.depTables.get(cu, trv, troveInstanceId)
 
 	return trv
 
@@ -749,6 +756,7 @@ class TroveStore:
 	    self.needsCleanup = False
 
 	if self.versionOps.needsCleanup:
+	    assert(0)
 	    self.versionTable.removeUnused()
 	    self.branchTable.removeUnused()
 	    self.versionOps.labelMap.removeUnused()
