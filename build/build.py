@@ -177,9 +177,12 @@ class Configure(BuildCommand):
             macros['mkObjdir'] = 'mkdir -p %s; cd %s;' %(objDir, objDir)
 	    macros['configure'] = '../%s' % self.configureName
         else:
+            macros['mkObjdir'] = ''
             macros['configure'] = './%s' % self.configureName
 	if self.subDir:
 	    macros['subDir'] = self.subDir
+	else:
+	    macros['subDir'] = ''
         util.execute(self.command %macros)
 
 class ManualConfigure(Configure):
@@ -281,10 +284,12 @@ class MakeInstall(Make):
 		'installtarget': 'install'}
 
     def do(self, macros):
+	macros = macros.copy()
         if self.rootVar:
-	    macros = macros.copy()
 	    macros.update({'rootVarArgs': '%s=%s'
 	                  %(self.rootVar, macros['destdir'])})
+	else:
+	    macros['rootVarArgs'] = ''
 	Make.do(self, macros)
 
 class MakePathsInstall(Make):
