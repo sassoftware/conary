@@ -101,7 +101,7 @@ class FilesystemJob:
 	self.newFiles.append((target, str, msg))
 
     def preapply(self, tagSet = {}, tagScript = None):
-	# this is run before the change make it do the database
+	# this is run before the change make it to the database
 	rootLen = len(self.root)
 	tagCommands = []
 
