@@ -157,9 +157,10 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                     oldTVersion = oldVersion.trailingRevision()
                 else:
                     # if there is no oldVersion, this is a new trove
-                    new.append("N %s (%s)" % 
-                               (x.getName(), 
-                                newVersion.trailingRevision().asString()))
+                    new.append(("%s (%s)" % 
+                                (x.getName(), 
+                                 newVersion.trailingRevision().asString()),
+				'N'))
                     continue
                     
                 newTVersion = newVersion.trailingRevision()
@@ -174,13 +175,16 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                 else:
                     kind = 'B'
 
-                new.append("%c %s (%s -> %s)" % 
-                                (kind, x.getName(),
-                                 oldTVersion.asString(),
-                                 newTVersion.asString()))
+                new.append(("%s (%s -> %s)" % 
+                                (x.getName(), oldTVersion.asString(),
+                                 newTVersion.asString()), 'N'))
 
-            old = [ (x[0], x.getOldVersion().trailingVersion()) 
+	    new.sort()
+	    new = [ "%s %s" % (x[1], x[0]) for x in new ]
+
+            old = [ "%s (%s)" % (x[0], x[1].trailingRevision().asString()) 
                                 for x in cs.getOldPackageList() ]
+	    old.sort()
             if not new and not old:
                 print "No troves are affected by this update."
             

@@ -4,6 +4,7 @@ Changes in 0.50.9:
   * getSourceVersion now correctly handles branched binaries by looking
     up the branch to find the source component.
   * reimplemented StringStream in C
+  * fixed bugs in --info
 
 Changes in 0.50.8:
   * sort update --info alphabetically, display old versions, and display
