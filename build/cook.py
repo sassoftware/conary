@@ -326,18 +326,20 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     
     cwd = os.getcwd()
     util.mkdirChain(builddir + '/' + recipeObj.mainDir())
-    os.chdir(builddir + '/' + recipeObj.mainDir())
-    repos.close()
+    try:
+	os.chdir(builddir + '/' + recipeObj.mainDir())
+	repos.close()
 
-    util.mkdirChain(cfg.tmpdir)
-    destdir = tempfile.mkdtemp("", "srs-%s-" % recipeObj.name, cfg.tmpdir)
-    recipeObj.doBuild(builddir, destdir)
-    log.info('Processing %s', recipeClass.name)
-    recipeObj.doDestdirProcess() # includes policy
+	util.mkdirChain(cfg.tmpdir)
+	destdir = tempfile.mkdtemp("", "srs-%s-" % recipeObj.name, cfg.tmpdir)
+	recipeObj.doBuild(builddir, destdir)
+	log.info('Processing %s', recipeClass.name)
+	recipeObj.doDestdirProcess() # includes policy
 
-    repos.open("c")
+	repos.open("c")
 
-    os.chdir(cwd)
+    finally:
+	os.chdir(cwd)
     
     packageList = []
 
