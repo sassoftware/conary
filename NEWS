@@ -14,6 +14,7 @@ Changes in 0.50.5:
     the labels that are parents of the current recipe, so if you shadow a 
     recipe, any loadRecipe lines contained in that recipe should still do 
     what you want. 
+  * merge didn't handle files converging
 
 Changes in 0.50.4:
   * Most rollback information is stored as a reference to a repository

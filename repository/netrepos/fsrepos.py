@@ -203,16 +203,17 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 				    [(oldVersion, newVersion)]
 
 	    if not newVersion:
-		# remove this trove and any trove contained in it
-		old = self.getTrove(troveName, oldVersion, oldFlavor)
-		cs.oldPackage(troveName, oldVersion, oldFlavor)
-		for (name, version, flavor) in old.iterTroveList():
-                    # it's possible that a component of a trove
-                    # was erased, make sure that it is installed
-                    if self.hasTrove(name, version, flavor):
-                        troveList.append((name, flavor, version, None, 
-					    absolute))
-		    
+                if oldVersion.branch().label().getHost() != self.name:
+                    externalTroveList.append((troveName, 
+                                         (oldVersion, oldFlavor),
+                                         (None, None), absolute))
+                else:
+                    # remove this trove and any trove contained in it
+                    old = self.getTrove(troveName, oldVersion, oldFlavor)
+                    cs.oldPackage(troveName, oldVersion, oldFlavor)
+                    for (name, version, flavor) in old.iterTroveList():
+                        troveList.append((name, (version, flavor),
+                                                (None, None), absolute))
 		continue
 
             if newVersion.branch().label().getHost() != self.name or \

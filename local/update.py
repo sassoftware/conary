@@ -1107,8 +1107,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 
                     changeSet.addFileContents(pathId, contType, cont, 
                                               f.flags.isConfig())
-            
 
+    # anything left in pathIds has been newly added
     for pathId in pathIds.iterkeys():
 	(path, fileId, version) = newPkg.getFile(pathId)
 
@@ -1119,6 +1119,16 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
             else:
                 realPath = os.getcwd() + "/" + path
                 isAutoSource = False
+
+            if not isinstance(version, versions.NewVersion):
+                srcFile = repos.getFileVersion(pathId, fileId, version)
+                if ignoreAutoSource and srcFile.flags.isAutoSource():
+                    # this is an autosource file which was newly added,
+                    # probably by a merge (if it was added on the command
+                    # line, it's version would be NewVersion)
+                    changeSet.addFile(None, srcFile.fileId(), srcFile.freeze())
+                    newPkg.addFile(pathId, path, version, srcFile.fileId())
+                    continue
         else:
 	    realPath = root + path
 

@@ -575,7 +575,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             (outFd, tmpName) = tempfile.mkstemp()
             outFile = os.fdopen(outFd, "w+")
             os.unlink(tmpName)
-            
+
         if primaryTroveList is None:
             # (name, version, release) list. removed troves aren't primary
             primaryTroveList = [ (x[0], x[2][0], x[2][1]) for x in chgSetList 

@@ -73,10 +73,10 @@ class SourceState(trove.Trove):
 
 	f = open(filename, "w")
 	f.write("name %s\n" % self.getName())
-	if self.version:
-	    f.write("version %s\n" % self.getVersion().freeze())
-        if self.branch:
-	    f.write("branch %s\n" % self.getBranch().freeze())
+        f.write("version %s\n" % self.getVersion().freeze())
+        f.write("branch %s\n" % self.getBranch().freeze())
+        if self.getLastMerged() is not None:
+            f.write("lastmerged %s\n" % self.getLastMerged().freeze())
 
         rc = []
 	rc.append("%d\n" % (len(self.idMap)))
@@ -93,6 +93,12 @@ class SourceState(trove.Trove):
 
     def getBranch(self):
         return self.branch
+
+    def setLastMerged(self, ver = None):
+        self.lastMerged = ver
+
+    def getLastMerged(self):
+        return self.lastMerged
 
     def getRecipeFileName(self):
         # XXX this is not the correct way to solve this problem
@@ -112,12 +118,12 @@ class SourceState(trove.Trove):
 
 	return versionStr
 
-    def __init__(self, name, version, branch):
+    def __init__(self, name, version, branch, lastmerged = None):
 	trove.Trove.__init__(self, name, version, 
                              deps.deps.DependencySet(), None)
         self.branch = branch
         self.pathMap = {}
-
+        self.lastMerged = lastmerged
 
 class CONARYFileMissing(Exception):
     """
@@ -191,6 +197,10 @@ def _verifyAtHead(repos, headPkg, state):
                                               state.getVersion().branch())
     if headVersion != state.getVersion():
         return False
+    if state.getLastMerged():
+        # if we've just merged from the right version, we must be at
+        # head
+        return True
 
     # make sure the files in this directory are based on the same
     # versions as those in the package at head
@@ -404,6 +414,11 @@ def commit(repos, cfg, message):
         newVersion = state.getBranch().createVersion(
                            versions.Revision("%s-0" % recipeVersionStr))
         newVersion.incrementSourceCount()
+    elif state.getLastMerged():
+        newVersion = state.getLastMerged()
+        newVersion = newVersion.createShadow(
+                                    state.getVersion().branch().label())
+        newVersion.incrementSourceCount()
     else:
         d = repos.getTroveVersionsByBranch({ troveName : 
                                              { state.getBranch() : None } } )
@@ -441,7 +456,9 @@ def commit(repos, cfg, message):
 
     (changeSet, ((isDifferent, newState),)) = result
 
-    if not isDifferent:
+    if not isDifferent and state.getLastMerged() is None:
+        # if there are no changes, but this is the result of a
+        # merge, we want to commit anyway
 	log.info("no changes have been made to commit")
 	return
 
@@ -478,6 +495,7 @@ def commit(repos, cfg, message):
     pkgCs.changeChangeLog(cl)
 
     repos.commitChangeSet(changeSet)
+    newState.setLastMerged(None)
     newState.write("CONARY")
 
 def annotate(repos, filename):
@@ -798,9 +816,12 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	sys.stdout.write("Index: %s\n%s\n" %(path, '=' * 68))
 
 	csInfo = changeSet.getFileChange(oldFileId, fileId)
-	print '\n'.join(files.fieldsChanged(csInfo))
+        if csInfo:
+            print '\n'.join(files.fieldsChanged(csInfo))
+        else:
+            print 'version'
 
-	if files.contentsChanged(csInfo):
+	if csInfo and files.contentsChanged(csInfo):
 	    (contType, contents) = changeSet.getFileContents(pathId)
 	    if contType == changeset.ChangedFileTypes.diff:
                 sys.stdout.write('--- %s %s\n+++ %s %s\n'
@@ -920,13 +941,10 @@ def merge(repos):
     newState = newPkgs.next()
     assert(util.assertIteratorAtEnd(newPkgs))
 
+    # this check succeeds if the merge was successful
     if newState.getVersion() == pkgCs.getNewVersion():
-        # create a new branched version - this is the same versions as you
-        # would get when checking out a fresh shadow.
-        branch = state.getVersion().branch()
-        version = branch.createVersion(newState.getVersion().trailingRevision())
-
-	newState.changeVersion(version)
+        newState.setLastMerged(parentHeadVersion)
+        newState.changeVersion(shadowHeadVersion)
 
     newState.write("CONARY")
 
