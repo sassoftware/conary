@@ -39,28 +39,28 @@ def cook(repos, cfg, recipeFile, prep=0):
         srcdirs = [ os.path.dirname(recipeClass.filename), cfg.sourcepath % {'pkgname': name} ]
 	recipeObj = recipeClass(cfg, srcdirs)
 
-	ourBuildDir = cfg.buildpath + "/" + recipeObj.name
+	builddir = cfg.buildpath + "/" + recipeObj.name
 
 	recipeObj.setup()
-	recipeObj.unpackSources(ourBuildDir)
+	recipeObj.unpackSources(builddir)
 
         # if we're only extracting, continue to the next recipe class.
         if prep:
             continue
         
         cwd = os.getcwd()
-        os.chdir(ourBuildDir + '/' + recipeObj.mainDir())
-	recipeObj.doBuild(ourBuildDir)
+        os.chdir(builddir + '/' + recipeObj.mainDir())
+	recipeObj.doBuild(builddir)
 
-	rootDir = "/var/tmp/srs/%s-%d" % (recipeObj.name, int(time.time()))
-        if os.path.exists(rootDir):
-            shutil.rmtree(rootDir)
-        util.mkdirChain(rootDir)
-	recipeObj.doInstall(ourBuildDir, rootDir)
+	destdir = "/var/tmp/srs/%s-%d" % (recipeObj.name, int(time.time()))
+        if os.path.exists(destdir):
+            shutil.rmtree(destdir)
+        util.mkdirChain(destdir)
+	recipeObj.doInstall(builddir, destdir)
         
         os.chdir(cwd)
         
-        recipeObj.packages(rootDir)
+        recipeObj.packages(destdir)
         pkgSet = recipeObj.getPackageSet()
 
         pkgname = cfg.packagenamespace + "/" + recipeObj.name
@@ -70,7 +70,7 @@ def cook(repos, cfg, recipeFile, prep=0):
 	    fileList = []
 
 	    for filePath in buildPkg.keys():
-		realPath = rootDir + filePath
+		realPath = destdir + filePath
 		f = files.FileFromFilesystem(realPath, ident(filePath))
 		fileList.append((f, realPath, filePath))
 
@@ -92,7 +92,7 @@ def cook(repos, cfg, recipeFile, prep=0):
 	commit.finalCommit(repos, cfg, pkgname + "/sources",
 			   recipeObj.version, fileList)
 
-	recipeObj.cleanup(ourBuildDir, rootDir)
+	recipeObj.cleanup(builddir, destdir)
     return built
 
 class IdGen:

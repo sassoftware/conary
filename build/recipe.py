@@ -126,9 +126,9 @@ class Recipe:
     def nameVer(self):
 	return self.name + "-" + self.version
 
-    def cleanup(self, builddir, rootDir):
+    def cleanup(self, builddir, destdir):
 	shutil.rmtree(builddir)
-	shutil.rmtree(rootDir)
+	shutil.rmtree(destdir)
 
     def checkSignatures(self, filepath, file):
         if not self.signatures.has_key(file):
