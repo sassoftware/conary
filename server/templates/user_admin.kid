@@ -7,7 +7,7 @@ from templates import library
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:py="http://naeblis.cx/ns/kid#">
     
     <!-- table of permissions -->
-    <table class="user-admin" id="permissions" py:def="permTable(rows)">
+    <table class="user-admin" id="permissions" py:def="permTable(groupId, rows)">
         <thead>
             <tr>
                 <td style="width: 55%;">Label</td>
@@ -15,26 +15,28 @@ from templates import library
                 <td>Write</td>
                 <td>Capped</td>
                 <td>Admin</td>
+                <td>X</td>
             </tr>
         </thead>
         <tbody>
             <tr py:for="i, row in enumerate(rows)"
                 class="{i % 2 and 'even' or 'odd'}">
                 <?python #
-                if row[0]:
-                    label = row[0]
+                if row[1]:
+                    label = row[1]
                 else:
                     label = "ALL"
-                if row[1]:
-                    item = row[1]
+                if row[3]:
+                    item = row[3]
                 else:
                     item = "ALL"
                 ?> 
                 <td py:content="label"/>
                 <td py:content="item"/>
-                <td py:content="row[2] and 'yes' or 'no'"/>
-                <td py:content="row[3] and 'yes' or 'no'"/>
                 <td py:content="row[4] and 'yes' or 'no'"/>
+                <td py:content="row[5] and 'yes' or 'no'"/>
+                <td py:content="row[6] and 'yes' or 'no'"/>
+                <td><a href="deletePerm?groupId={groupId}&amp;labelId={row[0]}&amp;itemId={row[2]}" title="Delete Permission">X</a></td>
             </tr>
         </tbody>
     </table>
@@ -60,7 +62,11 @@ from templates import library
                     <td><div py:for="group in netAuth.iterGroupsByUserId(user[0])"
                              py:content="group[1]" />
                     </td>
-                    <td style="text-align: right;"><a href="chPassForm?username={user[1]}">Change Password</a> | <u>Groups</u></td>
+                    <td style="text-align: right;">
+                        <a href="chPassForm?username={user[1]}">Change Password</a> | 
+                        <u>Groups</u> | 
+                        <u>Delete</u>
+                    </td>
                 </tr>
             </tbody>
         </table>
@@ -73,7 +79,7 @@ from templates import library
                 <tr py:for="i, group in enumerate(netAuth.iterGroups())"
                     class="{i % 2 and 'even' or 'odd'}">
                     <td><b>{group[1]}</b></td>
-                    <td>{permTable(netAuth.iterPermsByGroupId(group[0]))}</td>
+                    <td>{permTable(group[0], netAuth.iterPermsByGroupId(group[0]))}</td>
                 </tr>
             </tbody>
         </table>

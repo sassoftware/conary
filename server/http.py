@@ -59,6 +59,8 @@ class HttpHandler:
                                (True, True, True)),
              "addPerm":        (self.addPermCmd, "Add Permission",
                                (True, True, True)),
+             "deletePerm":     (self.deletePermCmd, "Delete Permission",
+                               (True, True, True)),
              "addUserForm":    (self.addUserFormCmd, "Add User",            
                                (True, True, True)),
              "addUser":        (self.addUserCmd, "Add User",                
@@ -171,7 +173,6 @@ class HttpHandler:
             try:
                 md = metadata.fetchFreshmeat(fmName)
             except metadata.NoFreshmeatRecord:
-                md = None
                 self.kid_write("error", error = "No Freshmeat record found.")
                 return
         else:
@@ -223,7 +224,17 @@ class HttpHandler:
         self.kid_write("notice", message = "Permission successfully added.",
                                  link = "User Administration",
                                  url = "userlist")
-    
+   
+    def deletePermCmd(self, authToken, fields):
+        groupId = str(fields.getfirst("groupId", ""))
+        labelId = str(fields.getfirst("labelId", ""))
+        itemId = str(fields.getfirst("itemId", ""))
+
+        self.repServer.auth.deletePermission(groupId, labelId, itemId)
+        self.kid_write("notice", message = "Permission deleted.",
+                                 link = "User Administration",
+                                 url = "userlist")
+   
     def addUserFormCmd(self, authToken, fields):
         self.kid_write("add_user")
 
