@@ -30,6 +30,9 @@ class NewVersion(AbstractVersion):
     def freeze(self):
 	return "@NEW@"
 
+    def __init__(self):
+	self.timeStamp = 1
+
 class AbstractBranch:
 
     """
