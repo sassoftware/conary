@@ -109,6 +109,11 @@ class ConaryClient:
                         else:
                             suggMap[troveName] = sugg[depSet]
 
+                        #for choiceList in sugg[depSet]:
+                        #    # pick one from each choiceList
+                        #    choice = choiceList[0]
+
+
 			suggList = [ (x[0], x[1], None) for x in sugg[depSet] ]
 			troves.update(dict.fromkeys(suggList))
 
@@ -141,10 +146,11 @@ class ConaryClient:
 
         @param itemList: List specifying the changes to apply. Each item
         in the list must be a ChangeSetFromFile, the name of a trove to
-        update, or a (name, versionString) tuple. 
+        update, a (name, versionString, flavor) tuple, or a 
         @type itemList: list
         """
         changeSetList = []
+        newItems = []
         finalCs = UpdateChangeSet()
         for item in itemList:
             if isinstance(item, changeset.ChangeSetFromFile):
@@ -164,59 +170,59 @@ class ConaryClient:
                 versionStr = item[1]
                 flavor = item[2]
 
+            #if isinstance(versionStr, versions.Version):
+
+            if isinstance(versionStr, versions.Version):
+                assert(isinstance(flavor, deps.DependencySet))
+                newItems.append((troveName, versionStr, flavor))
             if versionStr and versionStr[0] == '/':
                 # fully qualified versions don't need repository affinity
                 # or the label search path
                 try:
-                    newList = self.repos.findTrove(None, troveName, 
+                    l = self.repos.findTrove(None, troveName, 
                                                    self.cfg.flavor, versionStr,
                                                    withFiles = False,
                                                    affinityDatabase = self.db,
                                                    flavor = flavor)
-
                 except repository.TroveNotFound, e:
-                    # we give an error for this later on
-                    newList = []
+                    raise NoNewTrovesError
+                newItems += [ (x.getName(), x.getVersion(), x.getFlavor())
+                                for x in l ]
             else:
-                newList = self.repos.findTrove(self.cfg.installLabelPath, 
+                l = self.repos.findTrove(self.cfg.installLabelPath, 
                                                troveName, 
                                                self.cfg.flavor, versionStr,
                                                withFiles = False,
                                                affinityDatabase = self.db,
                                                flavor = flavor)
-                    # XXX where does this go now?                    
-                    # updating locally cooked troves needs a label override
-                    #if True in [isinstance(x, versions.CookBranch) or
-                    #            isinstance(x, versions.EmergeBranch)
-                    #            for x in labels]:
-                    #    if not versionStr:
-                    #        raise UpdateError, \
-                    #         "Package %s cooked locally; version, branch, or " \
-                    #         "label must be specified for update" % troveName
-                    #    else:
-                    #        labels = [ None ]
-                    #    
-                    #    pass
+                newItems += [ (x.getName(), x.getVersion(), x.getFlavor())
+                                for x in l ]
+                # XXX where does this go now?                    
+                # updating locally cooked troves needs a label override
+                #if True in [isinstance(x, versions.CookBranch) or
+                #            isinstance(x, versions.EmergeBranch)
+                #            for x in labels]:
+                #    if not versionStr:
+                #        raise UpdateError, \
+                #         "Package %s cooked locally; version, branch, or " \
+                #         "label must be specified for update" % troveName
+                #    else:
+                #        labels = [ None ]
+                #    
+                #    pass
 
-            if keepExisting:
-                for newTrove in newList:
-                    changeSetList.append((newTrove.getName(), (None, None),
-                                (newTrove.getVersion(), newTrove.getFlavor()), 
-                                0))
-                eraseList = []
-            else:
-                newItems = []
-                for newTrove in newList:
-                    newItems.append((newTrove.getName(), newTrove.getVersion(),
-                                     newTrove.getFlavor()))
-
-                # everything which needs to be installed is in this list; if 
-                # it's not here, it's a duplicate
-                outdated, eraseList = self.db.outdatedTroves(newItems)
-                for (name, newVersion, newFlavor), \
-                      (oldName, oldVersion, oldFlavor) in outdated.iteritems():
-                    changeSetList.append((name, (oldVersion, oldFlavor),
-                                                (newVersion, newFlavor), 0))
+        if keepExisting:
+            for (name, version, flavor) in newItems:
+                changeSetList.append((name, (None, None), (version, flavor), 0))
+            eraseList = []
+        else:
+            # everything which needs to be installed is in this list; if 
+            # it's not here, it's a duplicate
+            outdated, eraseList = self.db.outdatedTroves(newItems)
+            for (name, newVersion, newFlavor), \
+                  (oldName, oldVersion, oldFlavor) in outdated.iteritems():
+                changeSetList.append((name, (oldVersion, oldFlavor),
+                                            (newVersion, newFlavor), 0))
 
         if finalCs.empty  and not changeSetList:
             raise NoNewTrovesError
