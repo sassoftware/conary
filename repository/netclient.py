@@ -70,6 +70,9 @@ class _Method(xmlrpclib._Method):
 	    raise repository.DuplicateBranch(exceptionArgs[0])
         elif exceptionName == "MethodNotSupported":
 	    raise repository.MethodNotSupported(exceptionArgs[0])
+        elif exceptionName in "InvalidClientVersion":
+            from netrepos import netserver
+	    raise netserver.InvalidClientVersion, exceptionArgs[0]
         elif exceptionName == "UserAlreadyExists":
             import netrepos
 	    raise UserAlreadyExists(exceptionArgs[0])

@@ -106,9 +106,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	except repository.CommitError, e:
             condRollback()
 	    return (True, ("CommitError", str(e)))
-	except ClientTooOld, e:
+	except InvalidClientVersion, e:
             condRollback()
-	    return (True, ("ClientTooOld", str(e)))
+	    return (True, ("InvalidClientVersion", str(e)))
 	except repository.DuplicateBranch, e:
             condRollback()
 	    return (True, ("DuplicateBranch", str(e)))
@@ -973,8 +973,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    raise InsufficientPermission
 
         if clientVersion not in SERVER_VERSIONS:
-            raise ClientTooOld
-
+            raise InvalidClientVersion, \
+               ("Invalid client version %s.  Server accepts client versions %s"
+                " - download a valid client from www.specifix.com" % \
+                (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
         return SERVER_VERSIONS[-1]
 
     def cacheChangeSets(self):
@@ -1197,9 +1199,5 @@ class CacheSet:
         self.versions = versiontable.VersionTable(self.db)
         self.db.commit()
 
-class ClientTooOld(Exception):
-
-    def __str__(self):
-	return "download a new client from www.specifix.com"
-
+class InvalidClientVersion(Exception):
     pass
