@@ -57,7 +57,9 @@ def usage(rc = 1):
     print "usage: conary branch <newbranch> <branchfrom> [<trove>]"
     print "       conary changeset <pkg> [<oldver>] <newver> <outfile>"
     print '       conary cook [--prep] [--debug-exceptions] [--macros file] '
-    print '                   [--use-flag "<flag> <value>"]+ <file.recipe|troveName>+'
+    print '                   [--use-flag  "<prefix>.<flag> <bool>"]+ '
+    print '                   [--use-macro "<macro> <value>"]+ '
+    print '                   <file.recipe|troveName>+'
     print "       conary emerge       <troveName>+"
     print "       conary commit       <changeset>"
     print "       conary erase        <pkgname> [<version>]"
@@ -84,7 +86,8 @@ def usage(rc = 1):
     print ""
     print "cook flags:    --macros"
     print "               --noclean"
-    print '               --use-flag "<flag> <value>"'
+    print '               --use-flag  "<prefix>.<flag> <bool>"'
+    print '               --use-macro "<macro> <value>"'
     print "               --prep"
     print "               --resume [policy|<lineno>]"
     print "               --debug-exceptions"
@@ -137,6 +140,7 @@ def realMain():
     argDef["debug"] = NO_PARAM
     argDef["debug-exceptions"] = NO_PARAM
     argDef["use-flag"] = MULT_PARAM
+    argDef["use-macro"] = MULT_PARAM
     argDef["full-versions"] = NO_PARAM
     argDef["ids"] = NO_PARAM
     argDef["info"] = NO_PARAM
@@ -228,6 +232,11 @@ def realMain():
 	    for flag in argSet['use-flag']:
 		cfg.configLine(flag)
 	    del argSet['use-flag']
+
+	if argSet.has_key('use-macro'):
+	    for macro in argSet['use-macro']:
+		cfg.configLine('macros'.macro)
+	    del argSet['use-macro']
 
 	if argSet.has_key('prep'):
 	    del argSet['prep']

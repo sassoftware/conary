@@ -132,7 +132,7 @@ branch only for that trove.
 .B \ \ \ \ \ [\fR--resume [<linenum>|policy]] [\fR--use-flag "<flag> True|False"] \fP \e
 .PD 0
 .TP
-.B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>...\fP
+.B \ \ \ \ \ [\fR--use-macro <macro> <string>] \fI<file>\fP.recipe\fI|<component>...\fP
 .PD
 Build a package.  If \fB--prep\fP is specified, the souce code is
 unpacked, but is not built. if \fB--macros\fP is specified, it
@@ -153,6 +153,10 @@ flag, or Flags.<package>.<pkgflag>, where <pkgflag> is a flag defined
 in <package>, or Arch.<archflag>, where <archflag> is a flag defining the 
 current architecture.  <package>, <useflag>, <pkgflag>, and <archflag>
 are case sensitive.
+
+The --use-macro option assigns the given string value to <macro>.  
+The value given overrides any attempt to reset the value later in the 
+recipe.
 .IP 
 If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the
@@ -394,6 +398,16 @@ Multiple maps can be given for a single label. (If no mapping is found,
 .B root
 The path to install files into, normally \fI/\fR.
 Can be overridden by the \fB--root \fI<root>\fR command-line option.
+.TP
+.B Use.<useflag>
+.B Arch.<archflag>
+.B <package>.<packageflag>
+Assigns the given boolean value to the flag. 
+Can be overridden by the \fB--use-flag \fI"<flag> <bool>"\fR command-line option.
+.TP
+.B Macros.<macro>
+Assigns the given string to <macro>, for use in cooking.  Useful especially for setting march, os, target, and parallelmflags.
+Can be overridden by the \fB--use-macro \fI"<macro> <value>"\fR command-line option.  Note that all values are assumed to be strings -- no quotes are necessary around <value> on the command line or in the config file.
 .RE
 .TP 4
 .I /etc/conary
