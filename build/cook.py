@@ -405,12 +405,13 @@ def cookItem(repos, cfg, item, prep=0, macros=()):
 
         recipeClass = loader.getRecipe()
 
-    built = ((),)
+    built = None
     try:
         troves = cookObject(repos, cfg, recipeClass, cfg.defaultbranch,
                             changeSetFile = changeSetFile,
                             prep = prep, macros = macros)
-        built = (tuple(troves), changeSetFile)
+        if troves:
+            built = (tuple(troves), changeSetFile)
     except repository.RepositoryError, e:
         raise CookError(str(e))
 
@@ -446,8 +447,11 @@ def cookCommand(cfg, args, prep, macros):
             except CookError, msg:
 		log.error(str(msg))
                 sys.exit(1)
+            if built is None:
+                # --prep
+                sys.exit(0)
             components, csFile = built
-            for component, version in troves:
+            for component, version in components:
                 print "Created component:", component, version
             if csFile is None:
                 print 'Changeset committed to the repository.'
