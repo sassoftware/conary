@@ -15,7 +15,7 @@ Group files are parsed into group objects, which resolve the package and
 name as specified above; the original group file is preserved for future
 modification. This also allows a group file to be checked out and back
 in again, and have it updated with new head versions of it's components.
-Some groups (notably ones derived from recipies) exist only in their
+Some groups (notably ones derived from recipes) exist only in their
 parsed forms; these groups cannot be checked in or out.
 
 Group files can contain comment lines (which begin with #), and the first
@@ -25,7 +25,7 @@ two lines should read::
     version VERSION
 
 Where the name is a simple package name (not fully qualified) and the
-version is just a version/release.
+version is just a version.
 """
 
 import difflib
