@@ -82,16 +82,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
 	self.send_response(200, 'OK')
 
-def handler(req):
-    req.content_type = "text/xml"
-    req.send_http_header()
-    data = req.read()
-    try:
-        params, method = xmlrpclib.loads(data)
-    except xmlrpclib.ResponseError, e:
-        req.write ( xmlrpclib.dumps(e))
-    return apache.OK
-
 if __name__ == '__main__':
     netRepos = NetworkRepositoryServer(sys.argv[2], FILE_PATH, BASE_URL)
     xmlServer = SRSServer(("", 8000))
