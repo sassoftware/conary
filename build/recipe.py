@@ -137,7 +137,11 @@ class RecipeLoader:
             else:
                 msg += err.text
             raise RecipeFileError(msg)
+        # We need to track Use flags that might be mentioned only
+        # outside of the setup() function.  
+        use.track(True)
         exec code in self.module.__dict__
+        use.track(False)
 
         # all recipes that could be loaded by loadRecipe are loaded;
         # get rid of our references to cfg and repos
