@@ -31,4 +31,6 @@ only removes empty directories and regular files."""
 		           "/etc/cron.daily/tmpwatch", 0755)
 
     def package(self):
+	# XXX /etc should imply config file -- we need package policy
+	# just like we need destdir policy
         self.setConfig('/etc/cron.daily/tmpwatch')
