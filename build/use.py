@@ -646,7 +646,6 @@ def setUsed(usedDict):
     Can be used to store and restore a set of used flags to allow for the 
     separation of loading and setting up of a recipe and cooking that recipe.
     """
-    used = {}
     Arch.setUsed(usedDict['Arch'])
     Use.setUsed(usedDict['Use'])
     LocalFlags.setUsed(usedDict['Flags'])
