@@ -334,10 +334,21 @@ class PackageRecipe(Recipe):
 	for src in self._sources:
 	    f = src.fetch()
 	    if f:
-		files.append(f)
+		if type(f) in (tuple, list):
+		    files.extend(f)
+		else:
+		    files.append(f)
 	return files
 
     def extraSource(self, action):
+	"""
+	extraSource allows you to append a source list item that is
+	not a part of source.py.  Be aware when writing these source
+	list items that you are writing conary internals!  In particular,
+	anything that needs to add a source file to the repository will
+	need to implement fetch(), and all source files will have to be
+	sought using the lookaside cache.
+	"""
         self._sources.append(action)
 
 
@@ -349,6 +360,11 @@ class PackageRecipe(Recipe):
 	    source.doAction()
 
     def extraBuild(self, action):
+	"""
+	extraBuild allows you to append a build list item that is
+	not a part of build.py.  Be aware when writing these build
+	list items that you are writing conary internals!
+	"""
         self._build.append(action)
 
     def doBuild(self, buildPath, root, resume=None):
