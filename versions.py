@@ -135,6 +135,9 @@ class BranchName(AbstractBranch):
 	"""
 	return self.host + '@' + str(self.branch)
 
+    def getHost(self):
+	return self.host
+
     def equal(self, version):
 	"""
 	Compares the BranchName object to another object, and returns
