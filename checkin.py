@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-from build import recipe
+from build import recipe, lookaside
 from local import update
 from repository import changeset
 import cook
@@ -107,7 +107,7 @@ def _verifyAtHead(repos, headPkg, state):
 
     return True
 
-def _getRecipeVersion(recipeFile):
+def _getRecipeLoader(recipeFile):
     # load the recipe; we need this to figure out what version we're building
     try:
         loader = recipe.RecipeLoader(recipeFile)
@@ -122,8 +122,7 @@ def _getRecipeVersion(recipeFile):
 	log.error("unable to load a valid recipe class from %s", recipeFile)
 	return None
 
-    recipeClass = loader.getRecipe()
-    return recipeClass.version
+    return loader
 
 
 def checkout(repos, cfg, dir, name, versionStr = None):
@@ -170,7 +169,7 @@ def checkout(repos, cfg, dir, name, versionStr = None):
 
     state.write(dir + "/SRS")
 
-def commit(repos):
+def commit(repos, cfg):
     try:
         state = SourceStateFromFile("SRS")
     except OSError:
@@ -191,8 +190,19 @@ def commit(repos):
 		      "from the head of the branch; use update")
 	    return
 
-    recipeVersionStr = _getRecipeVersion(state.getRecipeFileName())
-    if not recipeVersionStr: return
+    loader = _getRecipeLoader(state.getRecipeFileName())
+    if loader is None: return
+
+    # fetch all the sources
+    recipeClass = loader.getRecipe()
+    lcache = lookaside.RepositoryCache(repos)
+    srcdirs = [ os.path.dirname(recipeClass.filename),
+		cfg.sourcepath % {'pkgname': recipeClass.name} ]
+    recipeObj = recipeClass(cfg, lcache, srcdirs)
+    recipeObj.setup()
+    files = recipeObj.fetchAllSources()
+    
+    recipeVersionStr = recipeClass.version
 
     if srcPkg:
 	newVersion = helper.nextVersion(recipeVersionStr, srcPkg.getVersion(),

@@ -45,7 +45,7 @@ def sourceCommand(cfg, args, argSet):
 	if argSet or len(args) != 1: return usage()
 	repos = fsrepos.FilesystemRepository(cfg.reppath, "w")
 
-	checkin.commit(repos)
+	checkin.commit(repos, cfg)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = fsrepos.FilesystemRepository(cfg.reppath, "r")
