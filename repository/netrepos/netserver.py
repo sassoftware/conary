@@ -25,6 +25,7 @@ import sqlite3
 import tempfile
 import util
 import xmlshims
+from repository import repository
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -52,6 +53,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    return (True, ("CommitError", str(e)))
 	except ClientTooOld, e:
 	    return (True, ("ClientTooOld", str(e)))
+	except repository.DuplicateBranch, e:
+	    return (True, ("DuplicateBranch", str(e)))
 	except Exception:
 	    import traceback, pdb,sys, string
 	    excInfo = sys.exc_info()

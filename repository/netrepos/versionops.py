@@ -14,6 +14,7 @@
 
 from local import idtable
 import versions
+from repository.repository import DuplicateBranch
 
 class BranchTable(idtable.IdTable):
     def addId(self, branch, parentId):
@@ -320,8 +321,9 @@ class SqlVersioning:
 
 	labelId = self.labels[label]
 
-	assert(not self.labelMap.has_key((itemId, labelId)) or
-	       branchId not in self.labelMap[(itemId, labelId)])
+	if self.labelMap.has_key((itemId, labelId)) and \
+           branchId in self.labelMap[(itemId, labelId)]:
+            raise DuplicateBranch
 	self.labelMap.addItem((itemId, labelId), branchId)
 
 	return branchId

@@ -27,6 +27,8 @@ from repository.repository import AbstractRepository
 from repository.repository import DataStoreRepository
 from repository.repository import ChangeSetJob
 from repository.repository import TroveMissing
+from repository.repository import RepositoryError
+from repository.repository import DuplicateBranch
 from repository import changeset
 from repository import filecontents
 
@@ -191,9 +193,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def createBranch(self, newBranch, where, troveList = []):
 	if newBranch.getHost() != self.name:
-	    log.error("cannot create branch for %s on %s",
+	    raise RepositoryError("cannot create branch for %s on %s",
 		      newBranch.getHost(), self.name)
-	    return False
 	
 	troveList = [ (x, where) for x in troveList ]
 
@@ -238,8 +239,12 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    for trove in troves:
 		branchedVersion = trove.getVersion().fork(newBranch, 
 							  sameVerRel = 1)
-		print troveName
-		self.createTroveBranch(troveName, branchedVersion.branch())
+                try:
+                    self.createTroveBranch(troveName, branchedVersion.branch())
+                except DuplicateBranch:
+                    raise DuplicateBranch("%s already has branch %s"
+                            % (troveName, branchedVersion.branch().asString()))
+
 		trove.changeVersion(branchedVersion)
 
 		# make a copy of this list since we're going to update it
