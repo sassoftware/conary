@@ -21,12 +21,12 @@ class Policy(util.Action):
     that match an exception regexp; do functions must implement
     their own exception regexp handling.
 
-    The following variables apply automatically to the doFile member;
-    classes implementing the do member instead may use them as well,
-    but should use the same rules if they do use them.  All of them
-    have self.macros applied before use.
+    The class variables below apply automatically to the doFile
+    member; classes implementing the do member instead may use them as
+    well, but should use the same rules if they do use them.  All of
+    them have self.macros applied before use.
 
-    @cvar invariantsubtrees: if invariantsubtrees is not empty,
+    @cvar invariantsubtree: if invariantsubtree is not empty,
     then it is a list of subtrees (relative to %(destdir)s) to
     walk INSTEAD of walking the entire %(destdir)s tree.
 
