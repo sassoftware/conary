@@ -1,5 +1,6 @@
 Changes in 0.11.6
   * branches are created as changesets now instead of as a protocol call
+  * merged authdb into primary repository
 
 Changes in 0.11.5
   * Internals reworked to eliminate flavor of None in favor of empty flavor

@@ -29,7 +29,6 @@ BUFFER=1024 * 256
 class ServerConfig(conarycfg.ConfigFile):
 
     defaults = {
-        'authDatabase'      :  None,
         'commitAction'      :  None,
         'repositoryMap'     :  [ conarycfg.STRINGDICT, {} ],
         'repositoryDir'     :  None,
@@ -224,9 +223,6 @@ def handler(req):
         if not cfg.repositoryDir:
             print "error: repositoryDir is required in %s" % req.filename
             return
-        elif not cfg.authDatabase:
-            print "error: authDatabase is required in %s" % req.filename
-            return
         elif not cfg.serverName:
             print "error: serverName is required in %s" % req.filename
             return
@@ -235,7 +231,6 @@ def handler(req):
                                 cfg.repositoryDir,
                                 cfg.tmpDir,
 				urlBase, 
-                                cfg.authDatabase,
                                 cfg.serverName,
                                 cfg.repositoryMap,
 				commitAction = cfg.commitAction,

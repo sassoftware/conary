@@ -262,11 +262,15 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
     def reset(self, authToken, clientVersion):
         import shutil
         from repository.netrepos import fsrepos
-	del self.repos
 	shutil.rmtree(self.repPath + '/contents')
-        os.unlink(self.repPath + '/sqldb')
-	self.repos = fsrepos.FilesystemRepository(self.name, self.repPath,
-						  self.map)
+	os.mkdir(self.repPath + '/contents')
+
+        # cheap trick. sqlite3 doesn't mind zero byte files; just replace
+        # the file with a zero byte one (to change the inode) and reopen
+        open(self.repPath + '/sqldb.new', "w")
+        os.rename(self.repPath + '/sqldb.new', self.repPath + '/sqldb')
+        self.repos.reopen()
+
         return 0
 
 class ServerConfig(ConfigFile):
@@ -282,8 +286,8 @@ class ServerConfig(ConfigFile):
 	self.read(path)
 
 def usage():
-    print "usage: %s repospath authdb reposname [config file]" %sys.argv[0]
-    print "       %s --add-user <username> authdb" %sys.argv[0]
+    print "usage: %s repospath reposname [config file]" %sys.argv[0]
+    print "       %s --add-user <username> repospath" %sys.argv[0]
     sys.exit(1)
 
 def addUser(userName, otherArgs):
@@ -303,7 +307,9 @@ def addUser(userName, otherArgs):
         # chop off the trailing newline
         pw1 = sys.stdin.readline()[:-1]
 
-    na = netauth.NetworkAuthorization(otherArgs[1], None)
+    import sqlite3
+    authdb = sqlite3.connect(otherArgs[1] + '/sqldb')
+    na = netauth.NetworkAuthorization(authdb, None)
 
     na.add(userName, pw1, admin = True)
 
@@ -338,10 +344,10 @@ if __name__ == '__main__':
         print FILE_PATH + " needs to allow full read/write access"
         sys.exit(1)
 
-    if len(otherArgs) == 5:
+    if len(otherArgs) == 4:
         cfg.read(otherArgs.pop())
 
-    if len(otherArgs) != 4 or argSet:
+    if len(otherArgs) != 3 or argSet:
 	usage()
 
     profile = 0
@@ -353,7 +359,7 @@ if __name__ == '__main__':
     baseUrl="http://%s:%s/" % (os.uname()[1], cfg.port)
 
     netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH, 
-			baseUrl, otherArgs[2], otherArgs[3], cfg.repositoryMap)
+			baseUrl, otherArgs[2], cfg.repositoryMap)
     httpHandler = HttpHandler(netRepos)
 
     port = int(cfg.port)

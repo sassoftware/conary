@@ -29,7 +29,6 @@ from repository import repository
 from local import idtable
 from local import sqldb
 from local import versiontable
-from netauth import NetworkAuthorization
 from netauth import InsufficientPermission
 
 SERVER_VERSIONS = [ 20 ]
@@ -56,6 +55,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             method = self.__getattribute__(methodname)
         except AttributeError:
             return (True, ("MethodNotSupported", methodname, ""))
+
         try:
             # the first argument is a version number
 	    r = method(authToken, *args)
@@ -83,9 +83,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             condRollback()
 	    return (True, ("DuplicateBranch", str(e)))
 	#except Exception:
-        #    self.condRollback()
 	#    import traceback, sys, string
         #    import lib.epdb
+        #    lib.epdb.st()
 	#    excInfo = sys.exc_info()
 	#    lines = traceback.format_exception(*excInfo)
 	#    print string.joinfields(lines, "")
@@ -94,7 +94,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	#    raise
 
     def allTroveNames(self, authToken, clientVersion):
-	if not self.auth.check(authToken, write = False):
+	if not self.repos.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
         return [ x for x in self.repos.iterAllTroveNames() ]
@@ -102,7 +102,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def troveNames(self, authToken, clientVersion, label):
         label = self.toLabel(label)
 
-	if not self.auth.check(authToken, write = False, label = label):
+	if not self.repos.auth.check(authToken, write = False, label = label):
 	    raise InsufficientPermission
 
         return [ x for x in self.repos.troveNames(label) ]
@@ -134,13 +134,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return metadata
     
     def hasPackage(self, authToken, clientVersion, pkgName):
-	if not self.auth.check(authToken, write = False, trove = pkgName):
+	if not self.repos.auth.check(authToken, write = False, trove = pkgName):
 	    raise InsufficientPermission
 
 	return self.repos.troveStore.hasTrove(pkgName)
 
     def hasTrove(self, authToken, clientVersion, pkgName, version, flavor):
-	if not self.auth.check(authToken, write = False, trove = pkgName):
+	if not self.repos.auth.check(authToken, write = False, trove = pkgName):
 	    raise InsufficientPermission
 
 	return self.repos.troveStore.hasTrove(pkgName, troveVersion = version,
@@ -149,7 +149,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getTroveVersionList(self, authToken, clientVersion, troveNameList):
 	d = {}
 	for troveName in troveNameList:
-	    if not self.auth.check(authToken, write = False, trove = troveName):
+	    if not self.repos.auth.check(authToken, write = False, 
+                                         trove = troveName):
 		raise InsufficientPermission
 
 	    d[troveName] = [ self.freezeVersion(x) for x in
@@ -160,7 +161,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getFilesInTrove(self, authToken, clientVersion, troveName, versionStr, 
                         flavor, sortByPath = False, withFiles = False):
         version = self.toVersion(versionStr)
-	if not self.auth.check(authToken, write = False, trove = troveName,
+	if not self.repos.auth.check(authToken, write = False, 
+                                     trove = troveName,
 			       label = version.branch().label()):
 	    raise InsufficientPermission
 
@@ -214,7 +216,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         fileLabel = fileVersion.branch().label()
         fileId = self.toFileId(fileId)
 
-	if not self.auth.check(authToken, write = False, label = fileLabel):
+	if not self.repos.auth.check(authToken, write = False, 
+                                     label = fileLabel):
 	    raise InsufficientPermission
 
         fileObj = self.repos.findFileVersion(fileId)
@@ -234,7 +237,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getAllTroveLeafs(self, authToken, clientVersion, troveNames):
 	for troveName in troveNames:
-	    if not self.auth.check(authToken, write = False, trove = troveName):
+	    if not self.repos.auth.check(authToken, write = False, 
+                                         trove = troveName):
 		raise InsufficientPermission
 
 	d = {}
@@ -249,7 +253,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                               labelStr):
 	d = {}
 	for troveName in troveNameList:
-	    if not self.auth.check(authToken, write = False, trove = troveName):
+	    if not self.repos.auth.check(authToken, write = False, 
+                                         trove = troveName):
 		raise InsufficientPermission
 
 	rd = {}
@@ -274,7 +279,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                 labelStr):
 	d = {}
 	for troveName in troveNameList:
-	    if not self.auth.check(authToken, write = False, trove = troveName):
+	    if not self.repos.auth.check(authToken, write = False, 
+                                         trove = troveName):
 		raise InsufficientPermission
 
 	    d[troveName] = [ self.freezeVersion(x) for x in
@@ -308,7 +314,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                               branchStr):
 	branch = self.toBranch(branchStr)
 
-	if not self.auth.check(authToken, write = False, trove = pkgName,
+	if not self.repos.auth.check(authToken, write = False, trove = pkgName,
 			       label = branch.label()):
 	    raise InsufficientPermission
 
@@ -323,8 +329,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                      branchStr):
 	branch = self.toBranch(branchStr)
 
-	if not self.auth.check(authToken, write = False, trove = troveName,
-			       label = branch.label()):
+	if not self.repos.auth.check(authToken, write = False, 
+                                     trove = troveName, label = branch.label()):
 	    raise InsufficientPermission
 
 	return self.repos.troveStore.iterTrovePerFlavorLeafs(troveName, branchStr)
@@ -394,7 +400,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
 	    newVer = self.toVersion(new)
 
-	    if not self.auth.check(authToken, write = False, trove = name,
+	    if not self.repos.auth.check(authToken, write = False, trove = name,
 				   label = newVer.branch().label()):
 		raise InsufficientPermission
 
@@ -431,7 +437,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return urlList, newChgSetList, allFilesNeeded
 
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
-	if not self.auth.check(authToken, write = False):
+	if not self.repos.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
 	requires = {}
@@ -451,7 +457,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def prepareChangeSet(self, authToken, clientVersion):
 	# make sure they have a valid account and permission to commit to
 	# *something*
-	if not self.auth.check(authToken, write = True):
+	if not self.repos.auth.check(authToken, write = True):
 	    raise InsufficientPermission
 
 	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
@@ -477,7 +483,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	items = {}
 	for pkgCs in cs.iterNewPackageList():
 	    items[(pkgCs.getName(), pkgCs.getNewVersion())] = True
-	    if not self.auth.check(authToken, write = True, 
+	    if not self.repos.auth.check(authToken, write = True, 
 			       label = pkgCs.getNewVersion().branch().label(),
 			       trove = pkgCs.getName()):
 		raise InsufficientPermission
@@ -518,7 +524,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return self.fromFile(f)
 
     def checkVersion(self, authToken, clientVersion):
-	if not self.auth.check(authToken, write = False):
+	if not self.repos.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
         if clientVersion not in SERVER_VERSIONS:
@@ -529,17 +535,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def cacheChangeSets(self):
         return isinstance(self.cache, CacheSet)
 
-    def __init__(self, path, tmpPath, urlBase, authDbPath, name,
+    def __init__(self, path, tmpPath, urlBase, name,
 		 repositoryMap, commitAction = None, cacheChangeSets = False):
-	self.repos = fsrepos.FilesystemRepository(name, path, repositoryMap)
 	self.map = repositoryMap
 	self.repPath = path
 	self.tmpPath = tmpPath
 	self.urlBase = urlBase
 	self.name = name
-	self.auth = NetworkAuthorization(authDbPath, name, 
-                                         anonymousReads = True)
 	self.commitAction = commitAction
+
+	self.repos = fsrepos.FilesystemRepository(self.name, self.repPath, 
+                                                  self.map)
 
         if cacheChangeSets:
             self.cache = CacheSet(path + "/cache.sql", tmpPath, 

@@ -61,8 +61,8 @@ class LocalRepVersionTable(versiontable.VersionTable):
 
 class TroveStore:
 
-    def __init__(self, path):
-	self.db = sqlite3.connect(path, timeout = 30000)
+    def __init__(self, db):
+	self.db = db
 
 	cu = self.db.cursor()
 	#cu.execute("PRAGMA temp_store = MEMORY", start_transaction = False)

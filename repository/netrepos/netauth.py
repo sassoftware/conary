@@ -27,11 +27,11 @@ class NetworkAuthorization:
             return False
 
         stmt = """
-            SELECT troveName FROM
+            SELECT item FROM
                (SELECT userId as uuserId FROM Users WHERE user=? AND
                     password=?)
             JOIN Permissions ON uuserId=Permissions.userId
-            LEFT OUTER JOIN TroveNames ON Permissions.troveNameId = TroveNames.troveNameId
+            LEFT OUTER JOIN Items ON Permissions.itemId = Items.itemId
         """
         m = md5.new()
         m.update(authToken[1])
@@ -111,34 +111,35 @@ class NetworkAuthorization:
         for row in cu:
             yield row
 
-    def __init__(self, dbpath, name, anonymousReads = False):
+    def __init__(self, db, name, anonymousReads = False):
         self.name = name
-        self.db = sqlite3.connect(dbpath)
+        self.db = db
         self.anonReads = anonymousReads
         self.reCache = {}
 
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
+
+        commit = False
         
         if "Users" not in tables:
             cu.execute("""CREATE TABLE Users (userId INTEGER PRIMARY KEY,
                                               user STRING UNIQUE,
                                               password STRING)""")
-        if "Labels" not in tables:
-            cu.execute("""CREATE TABLE Labels (labelId INTEGER PRIMARY KEY,
-                                               label STRING UNIQUE)""")
-        if "TroveNames" not in tables:
-            cu.execute("""CREATE TABLE TroveNames (troveNameId INTEGER PRIMARY KEY,
-                                                   troveName STRING UNIQUE)""")
+            commit = True
         if "Permissions" not in tables:
             cu.execute("""CREATE TABLE Permissions (userId INTEGER,
                                                     labelId INTEGER,
-                                                    troveNameId INTEGER,
+                                                    itemId INTEGER,
                                                     write INTEGER,
                                                     admin INTEGER)""")
             cu.execute("""CREATE INDEX PermissionsIdx
-                          ON Permissions(userId, labelId, troveNameId)""")
+                          ON Permissions(userId, labelId, itemId)""")
+            commit = True
+
+        if commit:
+            self.db.commit()
 
 class RepositoryMismatch(Exception):
     pass

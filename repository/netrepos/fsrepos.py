@@ -17,6 +17,7 @@
 from deps import deps
 import os
 from lib import util, stackutil, log
+from netauth import NetworkAuthorization
 import repository
 import repository.netclient
 from repository.repository import AbstractRepository
@@ -27,6 +28,7 @@ from repository.repository import RepositoryError
 from repository.repository import TroveMissing
 from repository import changeset
 from repository import filecontents
+import sqlite3
 import sys
 import trovestore
 import versions
@@ -203,18 +205,28 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	if self.troveStore is not None:
 	    self.close()
 
-	self.troveStore = trovestore.TroveStore(self.sqlDB)
-	sb = os.stat(self.sqlDB)
+        db = sqlite3.connect(self.sqlDbPath)
+	self.troveStore = trovestore.TroveStore(db)
+	sb = os.stat(self.sqlDbPath)
 	self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
 
+	self.auth = NetworkAuthorization(db, self.name, 
+                                         anonymousReads = True)
+
     def reopen(self):
-	sb = os.stat(self.sqlDB)
+	sb = os.stat(self.sqlDbPath)
 
 	sqlDeviceInode = (sb.st_dev, sb.st_ino)
 	if self.sqlDeviceInode != sqlDeviceInode:
 	    del self.troveStore
-	    self.troveStore = trovestore.TroveStore(self.sqlDB)
-	    sb = os.stat(self.sqlDB)
+            del self.auth
+
+            db = sqlite3.connect(self.sqlDbPath)
+	    self.troveStore = trovestore.TroveStore(db)
+            self.auth = NetworkAuthorization(db, self.name, 
+                                             anonymousReads = True)
+
+	    sb = os.stat(self.sqlDbPath)
 	    self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
 
     def commitChangeSet(self, cs, serverName):
@@ -474,7 +486,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	map[name] = self
 	self.reposSet = repository.netclient.NetworkRepositoryClient(map)
 	
-	self.sqlDB = self.top + "/sqldb"
+	self.sqlDbPath = self.top + "/sqldb"
 
 	try:
 	    util.mkdirChain(self.top)
@@ -485,4 +497,3 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	DataStoreRepository.__init__(self, path)
 	AbstractRepository.__init__(self)
-
