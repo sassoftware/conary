@@ -772,7 +772,7 @@ class ReadOnlyChangeSet(ChangeSet):
 
 	for hash in idList:
 	    (tag, str) = self.configCache[hash]
-            csf.addFile(hash, filecontents.FromString(str), "1 diff")
+            csf.addFile(hash, filecontents.FromString(str), "1 " + tag[4:])
 
         next = self._nextFile()
         while next:
