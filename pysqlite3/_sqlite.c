@@ -602,10 +602,9 @@ Register a busy handler.\n\
     and an additional argument (data) that will be passed to the busy\n\
     callback function.\n\
     \n\
-    When the busy callback is invoked, it is sent three arguments. The first\n\
+    When the busy callback is invoked, it is sent two arguments. The first\n\
     argument will be the 'data' that was set as the third argument to\n\
-    sqlite_busy_handler. The second will be the name of the database table\n\
-    or index that SQLite was trying to access and the third one will be the\n\
+    sqlite_busy_handler. The second will be the\n\
     number of times that the library has attempted to access the database\n\
     table or index.";
 
