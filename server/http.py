@@ -18,7 +18,6 @@ import sys
 import kid
 import templates 
 
-from htmlengine import HtmlEngine
 from metadata import MDClass
 from repository.netrepos import netserver
 
@@ -32,7 +31,7 @@ class InvalidServerCommand(ServerError):
 class InsufficientPermission(ServerError):
     str = """Insufficient permission for requested operation."""
 
-class HttpHandler(HtmlEngine):
+class HttpHandler:
     def __init__(self, repServer):
         self.repServer = repServer
         self.troveStore = repServer.troveStore
@@ -55,6 +54,10 @@ class HttpHandler(HtmlEngine):
              # user administration commands
              "userlist":       (self.userlistCmd, "User Administration",    
                                (True, True, True)),
+             "addPermForm":    (self.addPermFormCmd, "Add Permission",
+                               (True, True, True)),
+             "addPerm":        (self.addPermCmd, "Add Permission",
+                               (True, True, True)),
              "addUserForm":    (self.addUserFormCmd, "Add User",            
                                (True, True, True)),
              "addUser":        (self.addUserCmd, "Add User",                
@@ -74,7 +77,7 @@ class HttpHandler(HtmlEngine):
 
     def handleCmd(self, writeFn, cmd, authToken=None, fields=None):
         """Handle either an HTTP POST or GET command."""
-        self.setWriter(writeFn)
+        self.writeFn = writeFn
         if cmd.endswith('/'):
             cmd = cmd[:-1]
 
@@ -193,13 +196,32 @@ class HttpHandler(HtmlEngine):
         self.metadataCmd(authToken, fields, troveName)
         
     def userlistCmd(self, authToken, fields):
-        self.htmlPageTitle("User List")
-        userlist = list(self.repServer.auth.iterUsers())
-        self.htmlUserlist(userlist)
+        self.kid_write("user_admin", netAuth = self.repServer.auth)
 
+    def addPermFormCmd(self, authToken, fields):
+        groups = dict(self.repServer.auth.iterGroups())
+        labels = dict(self.repServer.auth.iterLabels())
+        items = dict(self.repServer.auth.iterItems())
+    
+        self.kid_write("permission", groups=groups, labels=labels, items=items)
+
+    def addPermCmd(self, authToken, fields):
+        groupId = str(fields.getfirst("group", ""))
+        labelId = str(fields.getfirst("label", ""))
+        itemId = str(fields.getfirst("item", ""))
+
+        write = bool(fields.getfirst("write", False))
+        capped = bool(fields.getfirst("capped", False))
+        admin = bool(fields.getfirst("admin", False))
+
+        self.repServer.auth.addPermission(groupId, labelId, itemId,
+                                          write, capped, admin)
+        self.kid_write("notice", message = "Permission successfully added.",
+                                 link = "User Administration",
+                                 url = "userlist")
+    
     def addUserFormCmd(self, authToken, fields):
-        self.htmlPageTitle("Add User")
-        self.htmlAddUserForm()
+        self.kid_write("add_user")
 
     def addUserCmd(self, authToken, fields):
         user = fields["user"].value
@@ -217,19 +239,19 @@ class HttpHandler(HtmlEngine):
         self.repServer.addUser(authToken, 0, user, password)
         self.repServer.addAcl(authToken, 0, user, "", "", write, True, admin)
 
-        self.writeFn("""User added successfully. <a href="userlist">Return</a>""")
+        self.kid_write("notice", message = "User successfully added.",
+                                 link = "User Administration",
+                                 url = "userlist")
         
     def chPassFormCmd(self, authToken, fields):
-        self.htmlPageTitle("Change Password")
-
         if fields.has_key("username"):
             username = fields["username"].value
             askForOld = False
         else:
             username = authToken[0]
             askForOld = True
-            
-        self.htmlChPassForm(username, askForOld)
+        
+        self.kid_write("change_password", username = username, askForOld = askForOld)
         
     def chPassCmd(self, authToken, fields):
         username = fields["username"].value
@@ -246,13 +268,19 @@ class HttpHandler(HtmlEngine):
         p1 = fields["password1"].value
         p2 = fields["password2"].value
 
-        self.htmlPageTitle("Change Password")
         if authToken[1] != oldPassword and authToken[0] == username and not admin:
-            self.writeFn("""<div class="warning">Error: old password is incorrect</div>""")
+            self.kid_write("error", error = "Error: old password is incorrect")
         elif p1 != p2:
-            self.writeFn("""<div class="warning">Error: passwords do not match</div>""")
+            self.kid_write("error", error = "Error: passwords do not match")
         elif oldPassword == p1:
-            self.writeFn("""<div class="warning">Error: old and new passwords identical, not changing.</div>""")
+            self.kid_write("Error: old and new passwords identical, not changing")
         else:
             self.repServer.auth.changePassword(username, p1)
-            self.writeFn("""<div>Password successfully changed.</div>""")
+            if admin:
+                returnLink = ("User Administration", "userlist")
+            else:
+                returnLink = ("Main Menu", "")
+
+            self.kid_write("notice", message = "Password successfully changed",
+                                     link = returnLink[0], url = returnLink[1])
+                                     
