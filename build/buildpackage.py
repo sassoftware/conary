@@ -124,7 +124,8 @@ class BuildPackageGenerator:
 	    if explicitspec.match(path):
 		for autospec in self.auto:
 		    if autospec.match(path):
-			self.packageMap[explicitspec.name][autospec.name].addFile(path)
+			pkg = self.packageMap[explicitspec.name][autospec.name]
+                        pkg.addFile(path)
 			break
 		break
 
