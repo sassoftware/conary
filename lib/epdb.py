@@ -19,6 +19,7 @@ import pdb
 import os
 import re
 import socket
+import string
 import sys
 import tempfile
 import traceback
@@ -27,10 +28,11 @@ class Epdb(pdb.Pdb):
     # epdb will print to here instead of to sys.stdout,
     # and restore stdout when done
     _stdout_proxy = None
-    _exc_type = None
-    _exc_msg = None
 
     def __init__(self):
+        self._exc_type = None
+        self._exc_msg = None
+        self._tb = None
         pdb.Pdb.__init__(self)
         self.prompt = '(Epdb) '
     
@@ -66,8 +68,10 @@ class Epdb(pdb.Pdb):
         sender = os.environ['USER']
         host = socket.getfqdn()
         extracontent = None
-        if self._exc_type:
-            extracontent = '\n'.join(traceback.format_exception_only(self._exc_type, self._exc_msg))
+        if self._tb:
+            lines = traceback.format_exception(self._exc_type, self._exc_msg, 
+                                               self._tb)
+            extracontent = string.joinfields(lines, "")
         stackutil.mailStack(frame, tolist, sender + '@' + host, '[Conary stacktrace]', extracontent)
         print "Mailed stack to %s" % tolist
 
@@ -186,6 +190,7 @@ def post_mortem(t, exc_type=None, exc_msg=None):
     p = Epdb()
     p._exc_type = exc_type
     p._exc_msg = exc_msg
+    p._tb = t
     p.reset()
     while t.tb_next is not None:
         t = t.tb_next

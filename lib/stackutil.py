@@ -18,6 +18,7 @@ import inspect
 import os
 import smtplib
 import sys
+import string
 import tempfile
 import traceback
 import xmlrpclib
@@ -27,11 +28,15 @@ def printTraceBack(tb=None, output=sys.stderr, exc_type=None, exc_msg=None):
         output = open(output, 'w')
     if tb is None:
         tb = sys.exc_info()[2]
+
     if exc_type is not None:
         output.write('Exception: ')
         exc_info = '\n'.join(traceback.format_exception_only(exc_type, exc_msg))
         output.write(exc_info)
         output.write('\n\n')
+
+    lines = traceback.format_exception(exc_type, exc_msg, tb)
+    output.write(string.joinfields(lines, ""))
 
     while tb:
         _printFrame(tb.tb_frame, output=output)
