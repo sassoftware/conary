@@ -179,6 +179,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
 def commit(repos, cfg, message):
     if cfg.name is None or cfg.contact is None:
 	log.error("name and contact information must be set for commits")
+	return
 
     try:
         state = SourceStateFromFile("SRS")
