@@ -976,9 +976,9 @@ class _userData(policy.Policy):
 	self.namemap = {}
 	policy.Policy.__init__(self, *args, **keywords)
         self._publish()
-    def doFile(self, path):
+    def test(self):
         # Ownership does all the work for subclasses of _userData
-        pass
+        return False
 
 
 class User(_userData):
