@@ -173,7 +173,7 @@ class _filterSpec(policy.Policy):
 	    theName = args[0]
 	    for filterexp in args[1:]:
 		self.extraFilters.append((theName, filterexp))
-	policy.Policy.updateArgs(self, [], **keywords)
+	policy.Policy.updateArgs(self, **keywords)
 
 
 class ComponentSpec(_filterSpec):
@@ -183,6 +183,7 @@ class ComponentSpec(_filterSpec):
     baseFilters = (
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
+	('test',      ('%(testdir)s/')),
 	('runtime',   ('%(essentiallibdir)s/security/',
 		       '/lib/security/',
 		       r'%(libdir)s/perl./vendor_perl/', # modules, not shlibs
@@ -216,6 +217,7 @@ class ComponentSpec(_filterSpec):
     def doProcess(self, recipe):
 	compFilters = []
 	self.macros = recipe.macros
+	self.rootdir = self.rootdir % recipe.macros
 
 	# the extras need to come first in order to override decisions
 	# in the base subfilters
@@ -248,6 +250,7 @@ class PackageSpec(_filterSpec):
     def doProcess(self, recipe):
 	pkgFilters = []
 	self.macros = recipe.macros
+	self.rootdir = self.rootdir % self.macros
 
 	for (filteritem) in self.extraFilters:
 	    name = filteritem[0] % self.macros
@@ -328,9 +331,10 @@ class Config(policy.Policy):
 	inclusions = keywords.pop('inclusions', None)
 	if inclusions:
 	    self.inclusions.append(inclusions)
-	policy.Policy.updateArgs(self, [], **keywords)
+	policy.Policy.updateArgs(self, **keywords)
 
     def doProcess(self, recipe):
+	self.rootdir = self.rootdir % recipe.macros
 	self.configFilters = []
 	if self.inclusions:
 	    if not isinstance(self.inclusions, (tuple, list)):
@@ -418,9 +422,10 @@ class TagSpec(policy.Policy):
 		if tagname not in self.excluded:
 		    self.excluded[tagname] = []
 		self.excluded[tagname].append(keywords.pop('exceptions'))
-	policy.Policy.updateArgs(self, [], **keywords)
+	policy.Policy.updateArgs(self, **keywords)
 
     def doProcess(self, recipe):
+	self.rootdir = self.rootdir % recipe.macros
 	self.tagList = []
 	# read the system and %(destdir)s tag databases
 	for directory in (recipe.macros.destdir+'/etc/conary/tags/',
@@ -502,7 +507,7 @@ class ParseManifest(policy.Policy):
 	"""
 	if args:
 	    self.paths.extend(args)
-	policy.Policy.updateArgs(self, [], **keywords)
+	policy.Policy.updateArgs(self, **keywords)
 
     def do(self):
 	for path in self.paths:
@@ -562,7 +567,7 @@ class MakeDevices(policy.Policy):
 	    if l == 6:
 		args.append(0400)
 	    self.devices.append(args)
-	policy.Policy.updateArgs(self, [], **keywords)
+	policy.Policy.updateArgs(self, **keywords)
 
     def do(self):
         for device in self.devices:
@@ -588,6 +593,7 @@ class DanglingSymlinks(policy.Policy):
     # XXX if so, then we'll need exceptions for that too, for things
     # XXX like symlinks into /proc
     def doProcess(self, recipe):
+	self.rootdir = self.rootdir % recipe.macros
 	self.targetFilters = []
 	self.macros = recipe.macros # for filterExpression
 	for targetitem in self.targetexceptions:
@@ -607,7 +613,8 @@ class DanglingSymlinks(policy.Policy):
 	    if abscontents in self.recipe.autopkg.pathMap:
 		pkgMap = self.recipe.autopkg.pkgMap
 		if pkgMap[abscontents] != pkgMap[file] and \
-		   not file.endswith('.so'):
+		   not file.endswith('.so') and \
+		   not pkgMap[file].getName().endswith(':test'):
 		    # warn about suspicious cross-component symlink
 		    log.warning('symlink %s points from package %s to %s',
 				file, pkgMap[file].getName(),
@@ -640,7 +647,7 @@ class AddModes(policy.Policy):
 	if args:
 	    for path in args[1:]:
 		self.fixmodes[path] = args[0]
-	policy.Policy.updateArgs(self, [], **keywords)
+	policy.Policy.updateArgs(self, **keywords)
 
     def doFile(self, path):
 	if path in self.fixmodes:
@@ -714,11 +721,12 @@ class Ownership(policy.Policy):
 	if args:
 	    for filespec in args[2:]:
 		self.filespecs.append((filespec, args[0], args[1]))
-	policy.Policy.updateArgs(self, [], **keywords)
+	policy.Policy.updateArgs(self, **keywords)
 
     def doProcess(self, recipe):
 	# we must NEVER take ownership from the filesystem
 	assert(not self.exceptions)
+	self.rootdir = self.rootdir % recipe.macros
 	self.fileFilters = []
 	for (filespec, user, group) in self.filespecs:
 	    self.fileFilters.append(

@@ -22,7 +22,7 @@ class Filter:
     acts like a regular expression, except that besides matching
     the name, it can also test against file metadata.
     """
-    def __init__(self, regex, macros, setmode=None, unsetmode=None, name=None):
+    def __init__(self, regex, macros, setmode=None, unsetmode=None, name=None, rootdir=None):
 	"""
 	Provide information to match against.
 	@param regex: regular expression(s) to match against pathnames
@@ -57,7 +57,10 @@ class Filter:
 	"""
 	if name:
 	    self.name = name
-	self.destdir = macros['destdir']
+	if rootdir is None:
+	    self.rootdir = macros['destdir']
+	else:
+	    self.rootdir = rootdir
 	self.setmode = setmode
 	self.unsetmode = unsetmode
 	tmplist = []
@@ -97,7 +100,10 @@ class Filter:
 	match = self.re.search(path)
 	if match:
 	    if self.setmode or self.unsetmode:
-		mode = os.lstat(self.destdir + os.sep + path)[stat.ST_MODE]
+		if path[0] == '/':
+		    mode = os.lstat(self.rootdir + path)[stat.ST_MODE]
+		else:
+		    mode = os.lstat(os.path.join(self.rootdir,path))[stat.ST_MODE]
 		if self.setmode is not None:
 		    # if some bit in setmode is not set in mode, no match
 		    if (self.setmode & mode) != self.setmode:

@@ -830,3 +830,31 @@ class MakeDirs(_FileAction):
 	    self.paths = args[0]
 	else:
 	    self.paths = args
+
+class TestCommand(_FileAction):
+    """
+    Specifies the command needed to run the test suite
+    Still not sure how we are going to PARSE what the test suite does...
+    """
+    def do(self, macros):
+	contents = self.contents + '\n'
+	path = self.path
+	fullpath = util.joinPaths(macros['destdir'], path)
+	util.mkdirChain(os.path.dirname(fullpath))
+	f = file(fullpath, 'w')
+	f.write('''#!/bin/sh -x
+# run this script to execute the test suite
+''')
+	f.write(contents)
+	f.close()
+	self.setComponents(path)
+	self.chmod(macros['destdir'], path)
+
+    def __init__(self, recipe, *args, **keywords):
+        _FileAction.__init__(self, recipe, *args, **keywords)
+	if len(args) != 1:
+	    raise TypeError, "TestCommand must be passed the command to be run"
+	self.path = '%(thistestdir)s/conary-test-command' % recipe.macros
+	self.mode=0755
+	self.component = ':test'
+	self.contents = args[0]

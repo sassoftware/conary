@@ -506,7 +506,11 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 
 	built.append((p.getName(), p.getVersion().asString()))
 	packageList.append((p, fileMap))
-	grp.addTrove(p.getName(), p.getVersion(), p.getFlavor())
+	
+	# don't install :test component when you are installing
+	# the package
+	if not p.getName().endswith(':test'):
+	    grp.addTrove(p.getName(), p.getVersion(), p.getFlavor())
 
     grp.setRequires(requires)
     grp.setProvides(provides)

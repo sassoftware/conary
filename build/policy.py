@@ -59,8 +59,12 @@ class Policy(action.RecipeAction):
     keywords = {
         'use': None,
         'exceptions': None,
-	'subtrees': None
+        'inclusions': None,
+	'subtrees': None,
     }
+
+
+    rootdir = '%(destdir)s'
 
     def __init__(self, *args, **keywords):
 	"""
@@ -75,7 +79,9 @@ class Policy(action.RecipeAction):
 	"""
 	# enforce pure virtual status
 	assert(self.__class__ is not Policy)
-	action.RecipeAction.__init__(self, None, *args, **keywords)
+	self.inclusions = args
+	action.RecipeAction.__init__(self, None, [], **keywords)
+
 
     def updateArgs(self, *args, **keywords):
 	"""
@@ -99,7 +105,15 @@ class Policy(action.RecipeAction):
 	    if not self.subtrees:
 		self.subtrees = []
 	    self.subtrees.append(subtrees)
-	self.addArgs(*args, **keywords)
+
+	inclusions = keywords.pop('inclusions', [])
+	if args or inclusions:
+	    if not self.inclusions:
+		self.inclusions = []
+	    self.inclusions.extend(inclusions)
+	    self.inclusions.extend(args)
+
+	self.addArgs(**keywords)
 
     def filterExpression(self, expression, name=None):
 	"""
@@ -116,6 +130,10 @@ class Policy(action.RecipeAction):
 	    while len(expression) < 4:
 		expression.append(None)
 	    expression.append(name)
+	else:
+	    while len(expression) < 5:
+		expression.append(None)
+	expression.append(self.rootdir)
 	return expression
 
     def compileFilters(self, expressionList, filterList):
@@ -134,6 +152,8 @@ class Policy(action.RecipeAction):
 	self.recipe = recipe
 	self.macros = recipe.macros
 
+	self.rootdir = self.rootdir % self.macros
+
 	# is runtime check implemented?
 	if hasattr(self.__class__, 'test'):
 	    if not self.test():
@@ -141,10 +161,6 @@ class Policy(action.RecipeAction):
 
 	# change self.use to be a simple flag
 	self.use = action.checkUse(self.use)
-
-	# compile the inclusions
-	self.inclusionFilters = []
-	self.compileFilters(self.invariantinclusions, self.inclusionFilters)
 
 	# compile the exceptions
 	self.exceptionFilters = []
@@ -154,6 +170,15 @@ class Policy(action.RecipeAction):
 		# turn a plain string into a sequence
 		self.exceptions = (self.exceptions,)
 	    self.compileFilters(self.exceptions, self.exceptionFilters)
+
+	# compile the inclusions
+	self.inclusionFilters = []
+	self.compileFilters(self.invariantinclusions, self.inclusionFilters)
+	if self.inclusions:
+	    if not isinstance(self.inclusions, (tuple, list)):
+		# turn a plain string into a sequence
+		self.inclusions = (self.inclusions,)
+	    self.compileFilters(self.inclusions, self.inclusionFilters)
 
 	# dispatch if/as appropriate
 	if self.use:
@@ -166,13 +191,13 @@ class Policy(action.RecipeAction):
 	    self.invariantsubtrees.append('/')
 	for self.currentsubtree in self.invariantsubtrees:
 	    os.path.walk(
-		('%(destdir)s'+self.currentsubtree) %self.macros,
+		(self.rootdir+self.currentsubtree) %self.macros,
 		self.walkDir, None)
 
     def walkDir(self, ignore, dirname, names):
 	# chop off bit not useful for comparison
-	destdirlen = len(self.macros['destdir'])
-	path=dirname[destdirlen:]
+	rootdirlen = len(self.rootdir)
+	path=dirname[rootdirlen:]
 	for name in names:
 	   thispath = util.normpath(path + os.sep + name)
 	   if self.policyInclusion(thispath) and \
