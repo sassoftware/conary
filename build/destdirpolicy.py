@@ -9,6 +9,7 @@ import os
 import stat
 import policy
 import log
+import magic
 
 """
 Module used by recipes to modify the state of the installed %(destdir)s
@@ -59,8 +60,6 @@ class FixupMultilibPaths(policy.Policy):
     """
     Fix up (and warn) when programs do not know about %(lib) and they
     are supposed to be installing to lib64
-
-    FIXME: should limit itself to ELF objects once Filter evaluates magic
     """
     invariantinclusions = [
 	'.*\.(so.*|a)$',
@@ -83,10 +82,14 @@ class FixupMultilibPaths(policy.Policy):
 	return True
 
     def doFile(self, path):
+	destdir = self.macros['destdir']
+	m = magic.magic(path, destdir)
+	if not m or (m.name != "ELF" and m.name != "ar"):
+	    log.warning("non-executable object with library name %s", path)
+	    return
 	basename = os.path.basename(path)
 	targetdir = self.dirmap[self.currentsubtree %self.macros]
 	target = util.joinPaths(targetdir, basename)
-	destdir = self.macros['destdir']
 	if os.path.exists(destdir + os.sep + target):
 	    raise DestdirPolicyError(
 		"Conflicting library files %s and %s installed" %(
