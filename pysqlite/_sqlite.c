@@ -86,6 +86,16 @@ typedef struct
     int row_count;
 } pysqlrs;
 
+/** A precompiled sql object. */
+typedef struct
+{
+    PyObject_HEAD
+    pysqlc* con;
+    sqlite_vm* p_vm;
+    PyObject* p_col_def_list;
+    int reset;
+} pysqlprecomp;
+
 /** Exception objects */
 
 static PyObject* _sqlite_Warning;
@@ -143,6 +153,7 @@ int sqlite_decode_binary(const unsigned char *in, unsigned char *out);
 static PyObject* _con_get_attr(pysqlc *self, char *attr);
 static PyObject* _con_close(pysqlc *self, PyObject *args);
 static PyObject* _con_execute(pysqlc *self, PyObject *args);
+static PyObject* _con_prepare(pysqlc *self, PyObject *args);
 static PyObject* _con_register_converter(pysqlc* self, PyObject *args, PyObject* kwargs);
 static PyObject* _con_set_expected_types(pysqlc* self, PyObject *args, PyObject* kwargs);
 static PyObject* _con_create_function(pysqlc *self, PyObject *args, PyObject *kwargs);
@@ -157,6 +168,9 @@ static PyObject* _con_set_command_logfile(pysqlc* self, PyObject *args, PyObject
 /** Result set Object Methods */
 static void _rs_dealloc(pysqlrs* self);
 static PyObject* _rs_get_attr(pysqlrs* self, char *attr);
+
+static void _precomp_dealloc(pysqlprecomp* self);
+static PyObject* _precomp_get_attr(pysqlprecomp* self, char *attr);
 
 #ifdef _MSC_VER
 #define staticforward extern
@@ -188,6 +202,19 @@ PyTypeObject pysqlrs_Type =
     (destructor) _rs_dealloc,
     0,
     (getattrfunc) _rs_get_attr,
+    (setattrfunc) NULL,
+};
+
+PyTypeObject pysqlprecomp_Type =
+{
+    PyObject_HEAD_INIT(NULL)
+    0,
+    "Precompiled",
+    sizeof(pysqlprecomp),
+    0,
+    (destructor) _precomp_dealloc,
+    0,
+    (getattrfunc) _precomp_get_attr,
     (setattrfunc) NULL,
 };
 
@@ -1227,286 +1254,384 @@ static PyObject* _con_execute(pysqlc* self, PyObject *args)
     return (PyObject*)p_rset;
 }
 
+static PyObject* _con_prepare(pysqlc* self, PyObject *args)
+{
+    int ret;
+    int record_number;
+    char* sql;
+    pysqlprecomp* p_precomp;
+    char *errmsg;
+    char* buf;
+    char* iterator;
+    char* token;
+    const char* query_tail;
+    PyObject* logfile_writemethod;
+    PyObject* logfile_writeargs;
+
+    record_number = 0;
+
+    if(!PyArg_ParseTuple(args,"s:prepare", &sql))
+    {
+        return NULL;
+    }
+
+    if(self->p_db == 0)
+    {
+        /* There is no open database. */
+        PyErr_SetString(_sqlite_ProgrammingError, "There is no open database.");
+        return NULL;
+    }
+
+    /* Log SQL statement */
+    if (self->command_logfile != Py_None)
+    {
+        logfile_writemethod = PyObject_GetAttrString(self->command_logfile,
+                                                    "write");
+
+        logfile_writeargs = PyTuple_New(1);
+        PyTuple_SetItem(logfile_writeargs, 0, PyString_FromString(sql));
+        PyObject_CallObject(logfile_writemethod, logfile_writeargs);
+        PyTuple_SetItem(logfile_writeargs, 0, PyString_FromString(" (precompile)\n"));
+        PyObject_CallObject(logfile_writemethod, logfile_writeargs);
+
+        Py_DECREF(logfile_writeargs);
+        Py_DECREF(logfile_writemethod);
+
+        if (PyErr_Occurred())
+        {
+            return NULL;
+        }
+    }
+
+    p_precomp = PyObject_New(pysqlprecomp, &pysqlprecomp_Type);
+    if (p_precomp == NULL)
+    {
+        return NULL;
+    }
+    p_precomp->p_col_def_list = PyTuple_New(0);
+    p_precomp->reset = 1;
+
+    Py_INCREF(self);
+    p_precomp->con = self;
+    ret = sqlite_compile(self->p_db, sql, &query_tail, &p_precomp->p_vm, &errmsg);
+    if (*query_tail != '\0') {
+	PyErr_SetString(_sqlite_ProgrammingError,
+			"SQL to be compiled has more than one statement.");
+        Py_DECREF(p_precomp);
+        return NULL;
+    }
+    _seterror(ret, errmsg);
+    
+    if (PyErr_Occurred())
+    {
+        Py_DECREF(p_precomp);
+        return NULL;
+    }
+
+    return (PyObject*)p_precomp;
+}
+
+static PyObject *build_col_def_list(int num_fields, char **p_col_names)
+{
+    PyObject* p_col_def_list;
+    PyObject* p_col_def;
+    PyObject* type_code;
+    char type_name[255];
+    int i, l, j;
+    
+    if ((p_col_def_list = PyTuple_New(num_fields)) == NULL)
+    {
+        return NULL;
+    }
+
+    for (i=0; i < num_fields; i++)
+    {
+        p_col_def = PyTuple_New(7);
+
+        /* 1. Column Name */
+        PyTuple_SetItem(p_col_def, 0, Py_BuildValue("s", p_col_names[i]));
+
+        /* 2. Type code */
+        /* Make a copy of column type. */
+        if (p_col_names[num_fields + i] == NULL)
+        {
+            strcpy(type_name, "TEXT");
+        }
+        else
+        {
+            strncpy(type_name, p_col_names[num_fields + i], sizeof(type_name) - 1);
+        }
+
+        /* Get its length. */
+        l = strlen(type_name);
+
+        /* Convert to uppercase. */
+        for(j=0; j < l; j++)
+        {
+            type_name[j] = toupper(type_name[j]);
+        }
+
+        /* Init/unset value */
+        type_code = NULL;
+
+        /* Try to determine column type. */
+        if (strstr(type_name, "INTERVAL"))
+        {
+            type_code = tc_INTERVAL;
+        }
+        else if (strstr(type_name, "INT"))
+        {
+            type_code = tc_INTEGER;
+        }
+        else if (strstr(type_name, "CHAR")
+              || strstr(type_name, "TEXT"))
+        {
+            type_code = tc_STRING;
+        }
+        else if (strstr(type_name, "UNICODE"))
+        {
+            type_code = tc_UNICODESTRING;
+        }
+        else if (strstr(type_name, "BINARY")
+              || strstr(type_name, "BLOB"))
+        {
+            type_code = tc_BINARY;
+        }
+        else if (strstr(type_name, "FLOAT")
+              || strstr(type_name, "NUMERIC")
+              || strstr(type_name, "NUMBER")
+              || strstr(type_name, "DECIMAL")
+              || strstr(type_name, "REAL")
+              || strstr(type_name, "DOUBLE"))
+        {
+            type_code = tc_FLOAT;
+        }
+        else if (strstr(type_name, "TIMESTAMP"))
+        {
+            type_code = tc_TIMESTAMP;
+        }
+        else if (strstr(type_name, "DATE"))
+        {
+            type_code = tc_DATE;
+        }
+        else if (strstr(type_name, "TIME"))
+        {
+            type_code = tc_TIME;
+        }
+        else if (type_code == NULL)
+        {
+            type_code = Py_None;
+        }
+
+        /* Assign type. */
+        Py_INCREF(type_code);
+        PyTuple_SetItem(p_col_def, 1, type_code);
+
+        /* 3. Display Size */
+        Py_INCREF(Py_None);
+        PyTuple_SetItem(p_col_def, 2, Py_None);
+
+        /* 4. Internal Size */
+        Py_INCREF(Py_None);
+        PyTuple_SetItem(p_col_def, 3, Py_None);
+
+        /* 5. Precision */
+        Py_INCREF(Py_None);
+        PyTuple_SetItem(p_col_def, 4, Py_None);
+
+        /* 6. Scale */
+        Py_INCREF(Py_None);
+        PyTuple_SetItem(p_col_def, 5, Py_None);
+
+        /* 7. NULL Okay */
+        Py_INCREF(Py_None);
+        PyTuple_SetItem(p_col_def, 6, Py_None);
+
+        PyTuple_SetItem(p_col_def_list, i, p_col_def);
+    }
+    return p_col_def_list;
+}
+     
+
+static PyObject *build_row(pysqlc* p_con, int num_fields, char** p_fields,
+			   PyObject* p_col_def_list)
+{
+    PyObject* p_row;
+    PyObject* p_col_def;
+    PyObject* expected_types;
+    PyObject* type_code;
+    PyObject* converters;
+    PyObject* converted;
+    PyObject* expected_type_name;
+    PyObject* callable;
+    PyObject* callable_args;
+    int i;
+
+    expected_types = p_con->expected_types;
+    converters = p_con->converters;
+
+    /* Create a row */
+    p_row = PyTuple_New(num_fields);
+
+    for (i=0; i < num_fields; i++)
+    {
+        /* Store the field value */
+        if(p_fields[i] != 0)
+        {
+            p_col_def = PyTuple_GetItem(p_col_def_list, i);
+
+            type_code = PyTuple_GetItem(p_col_def, 1);
+
+            if (expected_types != Py_None)
+            {
+                if (i < PySequence_Length(expected_types))
+                {
+                    expected_type_name = PySequence_GetItem(expected_types, i);
+                    callable = PyDict_GetItem(converters, expected_type_name);
+                    if (callable == NULL)
+                    {
+                        Py_INCREF(Py_None);
+                        PyTuple_SetItem(p_row, i, Py_None);
+                    }
+                    else
+                    {
+                        callable_args = PyTuple_New(1);
+                        PyTuple_SetItem(callable_args, 0, Py_BuildValue("s", p_fields[i]));
+
+                        converted = PyObject_CallObject(callable, callable_args);
+                        if (PyErr_Occurred())
+                        {
+                            PRINT_OR_CLEAR_ERROR
+                            Py_INCREF(Py_None);
+                            converted = Py_None;
+                        }
+
+                        PyTuple_SetItem(p_row, i, converted);
+
+                        Py_DECREF(callable_args);
+                    }
+                }
+                else
+                {
+                    Py_INCREF(Py_None);
+                    PyTuple_SetItem(p_row, i, Py_None);
+                }
+            }
+            else if (type_code == tc_INTEGER)
+            {
+                PyTuple_SetItem(p_row, i, Py_BuildValue("i", atol(p_fields[i])));
+            }
+            else if (type_code == tc_FLOAT)
+            {
+                PyTuple_SetItem(p_row, i, Py_BuildValue("f", atof(p_fields[i])));
+            }
+            else if (type_code == tc_DATE || type_code == tc_TIME
+                    || type_code == tc_TIMESTAMP || type_code == tc_INTERVAL)
+            {
+                if (type_code == tc_DATE)
+                    expected_type_name = PyString_FromString("date");
+                else if (type_code == tc_TIME)
+                    expected_type_name = PyString_FromString("time");
+                else if (type_code == tc_TIMESTAMP)
+                    expected_type_name = PyString_FromString("timestamp");
+                else if (type_code == tc_INTERVAL)
+                    expected_type_name = PyString_FromString("interval");
+
+                callable = PyDict_GetItem(converters, expected_type_name);
+                if (callable == NULL)
+                {
+                    PyTuple_SetItem(p_row, i, PyString_FromString(p_fields[i]));
+                }
+                else
+                {
+                    callable_args = PyTuple_New(1);
+                    PyTuple_SetItem(callable_args, 0, Py_BuildValue("s", p_fields[i]));
+
+                    converted = PyObject_CallObject(callable, callable_args);
+                    if (PyErr_Occurred())
+                    {
+                        PRINT_OR_CLEAR_ERROR
+                        converted = PyString_FromString(p_fields[i]);
+                    }
+
+                    PyTuple_SetItem(p_row, i, converted);
+
+                    Py_DECREF(callable_args);
+                }
+
+                Py_DECREF(expected_type_name);
+            }
+            else if ((type_code == tc_UNICODESTRING) || (type_code == tc_BINARY))
+            {
+                if (type_code == tc_UNICODESTRING)
+                    expected_type_name = PyString_FromString("unicode");
+                else
+                    expected_type_name = PyString_FromString("binary");
+
+                callable = PyDict_GetItem(converters, expected_type_name);
+
+                if (callable == NULL)
+                {
+                    PyTuple_SetItem(p_row, i, PyString_FromString(p_fields[i]));
+                }
+                else
+                {
+                    callable_args = PyTuple_New(1);
+                    PyTuple_SetItem(callable_args, 0, Py_BuildValue("s", p_fields[i]));
+
+                    converted = PyObject_CallObject(callable, callable_args);
+                    if (PyErr_Occurred())
+                    {
+                        PRINT_OR_CLEAR_ERROR
+                        converted = PyString_FromString(p_fields[i]);
+                    }
+
+                    PyTuple_SetItem(p_row, i, converted);
+
+                    Py_DECREF(callable_args);
+                }
+
+                Py_DECREF(expected_type_name);
+            }
+            else
+            {
+                PyTuple_SetItem(p_row, i, Py_BuildValue("s", p_fields[i]));
+            }
+        }
+        else
+        {
+            /* A NULL field */
+            Py_INCREF(Py_None);
+            PyTuple_SetItem(p_row, i, Py_None);
+        }
+    }
+    return p_row;
+}
+
 int process_record(void* p_data, int num_fields, char** p_fields, char** p_col_names)
 {
     int i;
     pysqlrs* p_rset;
     PyObject* p_row;
-    PyObject* p_col_def;
-
-    int l, j;
-    char type_name[255];
-    PyObject* type_code;
-
-    PyObject* expected_types;
-    PyObject* expected_type_name;
-    PyObject* converters;
-    PyObject* converted;
-    PyObject* callable;
-    PyObject* callable_args;
 
     p_rset = (pysqlrs*)p_data;
     MY_END_ALLOW_THREADS(p_rset->con->tstate)
 
-    expected_types = p_rset->con->expected_types;
-    converters = p_rset->con->converters;
-
     if(p_rset->row_count == 0)
     {
-        if ((p_rset->p_col_def_list = PyTuple_New(num_fields)) == NULL)
-        {
-            PRINT_OR_CLEAR_ERROR
-            MY_BEGIN_ALLOW_THREADS(p_rset->con->tstate)
+	p_rset->p_col_def_list = build_col_def_list(num_fields, p_col_names);
+	if (p_rset->p_col_def_list == NULL) {
+	    PRINT_OR_CLEAR_ERROR;
+	    MY_BEGIN_ALLOW_THREADS(p_rset->con->tstate);
             return 1;
-        }
-
-        for (i=0; i < num_fields; i++)
-        {
-            p_col_def = PyTuple_New(7);
-
-            /* 1. Column Name */
-            PyTuple_SetItem(p_col_def, 0, Py_BuildValue("s", p_col_names[i]));
-
-            /* 2. Type code */
-            /* Make a copy of column type. */
-            if (p_col_names[num_fields + i] == NULL)
-            {
-                strcpy(type_name, "TEXT");
-            }
-            else
-            {
-                strncpy(type_name, p_col_names[num_fields + i], sizeof(type_name) - 1);
-            }
-
-            /* Get its length. */
-            l = strlen(type_name);
-
-            /* Convert to uppercase. */
-            for(j=0; j < l; j++)
-            {
-                type_name[j] = toupper(type_name[j]);
-            }
-
-            /* Init/unset value */
-            type_code = NULL;
-
-            /* Try to determine column type. */
-            if (strstr(type_name, "INTERVAL"))
-            {
-                type_code = tc_INTERVAL;
-            }
-            else if (strstr(type_name, "INT"))
-            {
-                type_code = tc_INTEGER;
-            }
-            else if (strstr(type_name, "CHAR")
-                  || strstr(type_name, "TEXT"))
-            {
-                type_code = tc_STRING;
-            }
-            else if (strstr(type_name, "UNICODE"))
-            {
-                type_code = tc_UNICODESTRING;
-            }
-            else if (strstr(type_name, "BINARY")
-                  || strstr(type_name, "BLOB"))
-            {
-                type_code = tc_BINARY;
-            }
-            else if (strstr(type_name, "FLOAT")
-                  || strstr(type_name, "NUMERIC")
-                  || strstr(type_name, "NUMBER")
-                  || strstr(type_name, "DECIMAL")
-                  || strstr(type_name, "REAL")
-                  || strstr(type_name, "DOUBLE"))
-            {
-                type_code = tc_FLOAT;
-            }
-            else if (strstr(type_name, "TIMESTAMP"))
-            {
-                type_code = tc_TIMESTAMP;
-            }
-            else if (strstr(type_name, "DATE"))
-            {
-                type_code = tc_DATE;
-            }
-            else if (strstr(type_name, "TIME"))
-            {
-                type_code = tc_TIME;
-            }
-            else if (type_code == NULL)
-            {
-                type_code = Py_None;
-            }
-
-            /* Assign type. */
-            Py_INCREF(type_code);
-            PyTuple_SetItem(p_col_def, 1, type_code);
-
-            /* 3. Display Size */
-            Py_INCREF(Py_None);
-            PyTuple_SetItem(p_col_def, 2, Py_None);
-
-            /* 4. Internal Size */
-            Py_INCREF(Py_None);
-            PyTuple_SetItem(p_col_def, 3, Py_None);
-
-            /* 5. Precision */
-            Py_INCREF(Py_None);
-            PyTuple_SetItem(p_col_def, 4, Py_None);
-
-            /* 6. Scale */
-            Py_INCREF(Py_None);
-            PyTuple_SetItem(p_col_def, 5, Py_None);
-
-            /* 7. NULL Okay */
-            Py_INCREF(Py_None);
-            PyTuple_SetItem(p_col_def, 6, Py_None);
-
-            PyTuple_SetItem(p_rset->p_col_def_list, i, p_col_def);
-        }
+	}
     }
 
     if (p_fields != NULL)
     {
-        /* Create a row */
-        p_row = PyTuple_New(num_fields);
-
-        p_rset->row_count++;
-
-        for (i=0; i < num_fields; i++)
-        {
-            /* Store the field value */
-            if(p_fields[i] != 0)
-            {
-                p_col_def = PyTuple_GetItem(p_rset->p_col_def_list, i);
-
-                type_code = PyTuple_GetItem(p_col_def, 1);
-
-                if (expected_types != Py_None)
-                {
-                    if (i < PySequence_Length(expected_types))
-                    {
-                        expected_type_name = PySequence_GetItem(expected_types, i);
-                        callable = PyDict_GetItem(converters, expected_type_name);
-                        if (callable == NULL)
-                        {
-                            Py_INCREF(Py_None);
-                            PyTuple_SetItem(p_row, i, Py_None);
-                        }
-                        else
-                        {
-                            callable_args = PyTuple_New(1);
-                            PyTuple_SetItem(callable_args, 0, Py_BuildValue("s", p_fields[i]));
-
-                            converted = PyObject_CallObject(callable, callable_args);
-                            if (PyErr_Occurred())
-                            {
-                                PRINT_OR_CLEAR_ERROR
-                                Py_INCREF(Py_None);
-                                converted = Py_None;
-                            }
-
-                            PyTuple_SetItem(p_row, i, converted);
-
-                            Py_DECREF(callable_args);
-                        }
-                    }
-                    else
-                    {
-                        Py_INCREF(Py_None);
-                        PyTuple_SetItem(p_row, i, Py_None);
-                    }
-                }
-                else if (type_code == tc_INTEGER)
-                {
-                    PyTuple_SetItem(p_row, i, Py_BuildValue("i", atol(p_fields[i])));
-                }
-                else if (type_code == tc_FLOAT)
-                {
-                    PyTuple_SetItem(p_row, i, Py_BuildValue("f", atof(p_fields[i])));
-                }
-                else if (type_code == tc_DATE || type_code == tc_TIME
-                        || type_code == tc_TIMESTAMP || type_code == tc_INTERVAL)
-                {
-                    if (type_code == tc_DATE)
-                        expected_type_name = PyString_FromString("date");
-                    else if (type_code == tc_TIME)
-                        expected_type_name = PyString_FromString("time");
-                    else if (type_code == tc_TIMESTAMP)
-                        expected_type_name = PyString_FromString("timestamp");
-                    else if (type_code == tc_INTERVAL)
-                        expected_type_name = PyString_FromString("interval");
-
-                    callable = PyDict_GetItem(converters, expected_type_name);
-                    if (callable == NULL)
-                    {
-                        PyTuple_SetItem(p_row, i, PyString_FromString(p_fields[i]));
-                    }
-                    else
-                    {
-                        callable_args = PyTuple_New(1);
-                        PyTuple_SetItem(callable_args, 0, Py_BuildValue("s", p_fields[i]));
-
-                        converted = PyObject_CallObject(callable, callable_args);
-                        if (PyErr_Occurred())
-                        {
-                            PRINT_OR_CLEAR_ERROR
-                            converted = PyString_FromString(p_fields[i]);
-                        }
-
-                        PyTuple_SetItem(p_row, i, converted);
-
-                        Py_DECREF(callable_args);
-                    }
-
-                    Py_DECREF(expected_type_name);
-                }
-                else if ((type_code == tc_UNICODESTRING) || (type_code == tc_BINARY))
-                {
-                    if (type_code == tc_UNICODESTRING)
-                        expected_type_name = PyString_FromString("unicode");
-                    else
-                        expected_type_name = PyString_FromString("binary");
-
-                    callable = PyDict_GetItem(converters, expected_type_name);
-
-                    if (callable == NULL)
-                    {
-                        PyTuple_SetItem(p_row, i, PyString_FromString(p_fields[i]));
-                    }
-                    else
-                    {
-                        callable_args = PyTuple_New(1);
-                        PyTuple_SetItem(callable_args, 0, Py_BuildValue("s", p_fields[i]));
-
-                        converted = PyObject_CallObject(callable, callable_args);
-                        if (PyErr_Occurred())
-                        {
-                            PRINT_OR_CLEAR_ERROR
-                            converted = PyString_FromString(p_fields[i]);
-                        }
-
-                        PyTuple_SetItem(p_row, i, converted);
-
-                        Py_DECREF(callable_args);
-                    }
-
-                    Py_DECREF(expected_type_name);
-                }
-                else
-                {
-                    PyTuple_SetItem(p_row, i, Py_BuildValue("s", p_fields[i]));
-                }
-            }
-            else
-            {
-                /* A NULL field */
-                Py_INCREF(Py_None);
-                PyTuple_SetItem(p_row, i, Py_None);
-            }
-        }
-
+	p_rset->row_count++;
+	p_row = build_row(p_rset->con, num_fields, p_fields,
+			  p_rset->p_col_def_list);
         PyList_Append(p_rset->p_row_list, p_row);
         Py_DECREF(p_row);
     }
@@ -1654,6 +1779,121 @@ static PyObject* sqlite_version_info(PyObject* self, PyObject* args)
     return vi_tuple;
 }
 
+/*------------------------------------------------------------------------------
+** Precompiled SQL Object Implementation
+**------------------------------------------------------------------------------
+*/
+
+static char _precomp_step_doc [] =
+"step()\n\
+Fetch the next row from a precompiled query's vm.";
+
+static PyObject* _precomp_step(pysqlprecomp *self, PyObject *args)
+{
+    int result;
+    int num_fields=0;
+    const char **p_fields=NULL;
+    const char **p_col_names=NULL;    
+
+    result=sqlite_step(self->p_vm, &num_fields, &p_fields, &p_col_names);
+
+    if (result == SQLITE_ROW) {
+	if (self->reset) {
+	    self->p_col_def_list = build_col_def_list(num_fields,
+						      (char **)p_col_names);
+	    if (self->p_col_def_list == NULL) {
+		return NULL;
+	    }
+	    self->reset = 0;
+	}
+	return build_row(self->con, num_fields, (char **)p_fields,
+			 self->p_col_def_list);
+    } else if (result == SQLITE_DONE) {
+	Py_INCREF(Py_None);
+	return Py_None;
+    } else {
+	_seterror(result, NULL);
+	return NULL;
+    }
+}
+
+static char _precomp_reset_doc [] =
+"step()\n\
+Reset the virtual machine associated with a precompiled SQL statement.";
+
+static PyObject* _precomp_reset(pysqlprecomp *self, PyObject *args)
+{
+    char *errmsg;
+    int result;
+    
+    result = sqlite_reset(self->p_vm, &errmsg);
+    if (result != SQLITE_OK) {
+	_seterror(result, errmsg);
+	return NULL;
+    }
+    
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static char _precomp_bind_doc [] =
+"step()\n\
+Bind arguments to a precompiled SQL statement.";
+
+static PyObject* _precomp_bind(pysqlprecomp *self, PyObject *args)
+{
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static struct memberlist _precomp_memberlist[] =
+{
+    {"col_defs", T_OBJECT, offsetof(pysqlprecomp, p_col_def_list), RO},
+    {NULL}
+};
+
+static PyMethodDef _precomp_methods[] =
+{
+    {"step", (PyCFunction) _precomp_step, METH_VARARGS, _precomp_step_doc},
+    {"reset", (PyCFunction) _precomp_reset, METH_VARARGS, _precomp_reset_doc},
+    {"bind", (PyCFunction) _precomp_bind, METH_VARARGS, _precomp_bind_doc},
+    { NULL, NULL}
+};
+
+
+static void
+_precomp_dealloc(pysqlprecomp* self)
+{
+    if(self)
+    {
+	char *errmsg = NULL;
+	int result;
+	if (self->p_vm != NULL) {
+	    result = sqlite_finalize(self->p_vm, &errmsg);
+	    if (result != SQLITE_OK)
+		_seterror(result, errmsg);
+	}
+        Py_DECREF(self->con);
+        PyObject_Del(self);
+    }
+}
+
+static PyObject* _precomp_get_attr(pysqlprecomp *self, char *attr)
+{
+    PyObject *res;
+
+    res = Py_FindMethod(_precomp_methods, (PyObject *) self,attr);
+
+    if(NULL != res)
+    {
+        return res;
+    }
+    else
+    {
+        PyErr_Clear();
+        return PyMember_Get((char *) self, _precomp_memberlist, attr);
+    }
+}
 
 /*------------------------------------------------------------------------------
 ** Module Definitions / Initialization
@@ -1686,6 +1926,7 @@ static PyMethodDef _con_methods[] =
 {
     {"close", (PyCFunction) _con_close, METH_VARARGS, _con_close_doc},
     {"execute",  (PyCFunction)_con_execute, METH_VARARGS},
+    {"prepare",  (PyCFunction)_con_prepare, METH_VARARGS},
     {"register_converter", (PyCFunction)_con_register_converter, METH_VARARGS | METH_KEYWORDS},
     {"set_expected_types", (PyCFunction)_con_set_expected_types, METH_VARARGS | METH_KEYWORDS},
     {"set_command_logfile", (PyCFunction)_con_set_command_logfile, METH_VARARGS | METH_KEYWORDS, _con_set_command_logfile_doc},

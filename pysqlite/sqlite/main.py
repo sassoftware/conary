@@ -160,6 +160,39 @@ def make_PgResultSetClass(description):
 
     return NewClass
 
+class PrecompiledCursor:
+    def __init__(self, conn, sql, rowclass=PgResultSet):
+        self.con = weakref.proxy(conn)
+        self.con.cursors[id(self)] = self
+        self.precomp = self.con.db.prepare(sql)
+        self.rowclass = rowclass
+        self.description = ()
+
+    def fetchone(self):
+        row = self.precomp.step()
+        if self.precomp.col_defs != self.description:
+            self.description = self.precomp.col_defs
+            if issubclass(self.rowclass, PgResultSet):
+                self.rowclass = make_PgResultSetClass(self.description[:])
+        return self.rowclass(row)
+
+    def fetchmany(self, howmany):
+        for i in xrange(howmany):
+            try:
+                yield self.fetchone()
+            except StopIteration:
+                break
+
+    def fetchall(self):
+        while True:
+            try:
+                yield self.fetchone()
+            except StopIteration:
+                break
+
+    def reset(self):
+        self.precomp.reset()
+            
 class Cursor:
     """Abstract cursor class implementing what all cursor classes have in
     common."""
@@ -549,6 +582,10 @@ class Connection:
     def cursor(self):
         self._checkNotClosed("cursor")
         return Cursor(self, self.rowclass)
+
+    def prepare(self, sql):
+        self._checkNotClosed("prepare")
+        return PrecompiledCursor(self, sql)
 
     #
     # Optional DB-API extensions from PEP 0249:
