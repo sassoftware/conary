@@ -756,8 +756,8 @@ class GroupMissing(PackageMissing):
 	"""
 	Initializes a GroupMissing exception.
 
-	@param packageName: package which could not be found
-	@type packageName: str or PackageName
+	@param groupName: package which could not be found
+	@type groupName: str or PackageName
 	@param version: version of the package which does not exist
 	@type version: versions.Version
 	"""

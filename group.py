@@ -70,8 +70,8 @@ class Group:
 
 	@param name: name of the package
 	@type name: str
-	@name: versionList
-	@type: list of versions.Version
+	@param versionList: list of versions to add
+	@type versionList: list of versions.Version
 	"""
 	self.packages[name] = versionList
 
@@ -81,8 +81,8 @@ class Group:
 
 	@param name: name of the package
 	@type name: str
-	@name: version
-	@type: versions.Version
+	@param version: version of the package
+	@type version: versions.Version
 	"""
 	if self.packages.has_key(name):
 	    self.packages[name].append(version)
@@ -503,16 +503,15 @@ class GroupChangeSet:
 	"""
 	Returns a string representation of this change set which can
 	later be parsed by parse(). The representation is formatted
-	as follows:
+	as follows::
+         HEADER
+         <pkgname> <[+-]version>+
+         <specdiff>
 
-	HEADER
-	<pkgname> <[+-]version>+
-	<specdiff>
-
-	Header is one of the following:
-	    SRS GRP ABSTRACT <name> <newversion> <pkgcount>
-	    SRS GRP CHANGESET <name> <oldversion> <newversion> <pkgcount>
-	    SRS GRP NEW <name> <newversion> <pkgcount>
+	Header is one of the following::
+         SRS GRP ABSTRACT <name> <newversion> <pkgcount>
+         SRS GRP CHANGESET <name> <oldversion> <newversion> <pkgcount>
+         SRS GRP NEW <name> <newversion> <pkgcount>
 
 	@rtype: string
 	"""
@@ -562,7 +561,7 @@ class GroupChangeSet:
 	Initializes the object.
 
 	@param name: Name of the group
-	@type param: string or packagename.PackageName
+	@type name: string or packagename.PackageName
 	@param oldVersion: Version which this diff is from, or None
 	@type oldVersion: versions.Version
 	@param newVersion: Version which this diff is to
