@@ -168,11 +168,22 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch, 
 		      macros=()):
     """
-    Just like cookObject(), but only works for objects descended
-    from recipe.GroupRecipe.
+    Turns a group recipe object into a change set. Returns the abstract
+    changeset created, a list of the names of the packages built, and
+    and None (for compatibility with cookPackageObject).
 
-    The parameters and return type are identical to those for
-    cookObject()
+    @param repos: Repository to both look for source files and file id's in.
+    @type repos: repository.Repository
+    @param cfg: srs configuration
+    @type cfg: srscfg.SrsConfiguration
+    @param recipeClass: class which will be instantiated into a recipe
+    @type recipeClass: class descended from recipe.Recipe
+    @param newVersion: version to assign the newly built objects
+    @param buildBranch: the branch the new build will be committed to
+    @type buildBranch: versions.Version
+    @param macros: set of macros for the build
+    @type macros: sequence
+    @rtype: tuple
     """
 
     fullName = cfg.packagenamespace + ":" + recipeClass.name
@@ -195,11 +206,28 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
 def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch, 
 		      prep=True, macros=()):
     """
-    Just like cookObject(), but only works for objects descended
-    from recipe.PackageRecipe.
+    Turns a package recipe object into a change set. Returns the abstract
+    changeset created, a list of the names of the packages built, and
+    and a tuple with a function to call and its arguments, which should
+    be called when the build root for the package can be safely removed
+    (the changeset returned refers to files in that build root, so those
+    files can't be removed until the changeset has been comitted or saved)
 
-    The parameters and return type are identical to those for
-    cookObject()
+    @param repos: Repository to both look for source files and file id's in.
+    @type repos: repository.Repository
+    @param cfg: srs configuration
+    @type cfg: srscfg.SrsConfiguration
+    @param recipeClass: class which will be instantiated into a recipe
+    @type recipeClass: class descended from recipe.Recipe
+    @param newVersion: version to assign the newly built objects
+    @param buildBranch: the branch the new build will be committed to
+    @type buildBranch: versions.Version
+    @param prep: If true, the build stops after the package is unpacked
+    and None is returned instead of a changeset.
+    @type prep: boolean
+    @param macros: set of macros for the build
+    @type macros: sequence
+    @rtype: tuple
     """
 
     repos.open("r")
