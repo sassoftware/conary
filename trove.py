@@ -265,10 +265,10 @@ class PackageFromFile(Package):
 	Package.__init__(self, name)
 	self.read(dataFile)
 
-def stripNamespace(namespace, str):
-    if str[:len(namespace) + 1] == namespace + "/":
-	return str[len(namespace) + 1:]
-    return str
+def stripNamespace(namespace, pkgName):
+    if pkgName.startswith(namespace + "/"):
+	return pkgName[len(namespace) + 1:]
+    return pkgName
 
 # this is a set of all of the versions of a single packages 
 class PackageSet:
