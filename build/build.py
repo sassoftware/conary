@@ -2,6 +2,13 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+"""Module used by recipes to direct the building and installation of
+software packages.
+@var _permmap: A mapping of common integer file modes to their octal
+equivalents.  This is used to check for common mistakes when specifying
+the permissions on files in classes derived from _PutFile.
+"""
+
 import os
 import shutil
 import util
@@ -17,7 +24,7 @@ import string
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
-permmap = {
+_permmap = {
     1755: 01755,
     4755: 04755,
     755: 0755,
@@ -27,7 +34,27 @@ permmap = {
 }
 
 class ShellCommand:
+    """Base class for shell-based commands. ShellCommand is a virtual class
+    and can not be made into a working instance. Only derived classes which
+    define the C{template} static class variable will work properly.
+    @ivar self.command: Shell command to execute. This is built from the
+    C{template} static class variable in derived classes.
+    @type self.command: str
+    @cvar keywords: The keywords and default values accepted by the class at
+    initialization time.
+    @cvar template: The string template used to build the shell command.
+    """
     def __init__(self, *args, **keywords):
+        """Create a new ShellCommand instance that can be used to run
+        a simple shell statement
+        @param args: arguments to __init__ are stored for later substitution
+        in the shell command if it contains %(args)s
+        @param keywords: keywords are replaced in the shell command
+        through dictionary substitution
+        @raise TypeError: If a keyword is passed to __init__ which is not
+        accepted by the class.
+        @rtype: ShellCommand
+        """
         # initialize initialize our keywords to the defaults
         self.__dict__.update(self.keywords)
         # check to make sure that we don't get a keyword we don't expect
@@ -42,9 +69,23 @@ class ShellCommand:
         self.command = self.template % self.__dict__
 
     def doInstall(self, macros):
+        """Method which is used if the ShellCommand instance is invoked 
+        during installation
+        @param macros: macros which will be expanded through dictionary
+        substitution in self.command
+        @type macros: recipe.Macros
+        @return: None
+        @rtype: None"""
         util.execute(self.command %macros)
 
     def doBuild(self, macros):
+        """Method which is used if the ShellCommand instance is invoked 
+        during build
+        @param macros: macros which will be expanded through dictionary
+        substitution in self.command
+        @type macros: recipe.Macros
+        @return: None
+        @rtype: None"""
         util.execute(self.command %macros)
 
 
@@ -70,6 +111,10 @@ class Automake(ShellCommand):
 
 
 class Configure(ShellCommand):
+    """The Configure class runs an autoconf configure script with the
+    default paths as defined by the macro set passed into it when doBuild
+    is invoked.
+    """
     template = (
 	'cd %%(builddir)s; '
 	'%%(mkObjdir)s '
@@ -92,7 +137,18 @@ class Configure(ShellCommand):
 	'  %(args)s')
     keywords = {'preConfigure': '',
                 'objDir': ''}
-    
+
+    def __init__(self, *args, **keywords):
+        """Create a new Configure instance used to run the autoconf configure
+        command with default parameters
+        @keyword mkObjdir: make an object directory before running configure.
+        This is useful for applications which do not support running configure
+        from the same directory as the sources (srcdir != objdir)
+        @keyword preConfigure: Extra shell script which is inserted in front of
+        the configure command.
+        """
+        ShellCommand.__init__(self, *args, **keywords)
+         
     def doBuild(self, macros):
 	macros = macros.copy()
         if self.objDir:
@@ -180,10 +236,10 @@ class _PutFile:
 	    self.fromFiles = fromFiles
 	# notice obviously broken permissions
 	if mode >= 0:
-	    if permmap.has_key(mode):
+	    if _permmap.has_key(mode):
 		print 'odd permission %o, correcting to %o: add initial "0"?' \
-		      %(mode, permmap[mode])
-		mode = permmap[mode]
+		      %(mode, _permmap[mode])
+		mode = _permmap[mode]
 	self.mode = mode
     
 
