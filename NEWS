@@ -1,3 +1,7 @@
+Changes in 0.14.7:
+  * ELF libraries with sonames that have paths in them are now handled
+    sanely, by removing the path (and complaining...)
+
 Changes in 0.14.6:
   * fix for generating changesets between repositories
   * policies that look at shared libraries are now multilib-aware,
