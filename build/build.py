@@ -1056,3 +1056,98 @@ exit $failed
                     self.makeTarget = t
                     self.buildMakeDependencies(util.normpath(self.macros.builddir + os.sep + self.dir), self.command)
 	self.writeTestSuiteScript()
+
+
+class ConsoleHelper(BuildAction):
+    """
+    Set up consolehelper symlinks and control files for an application:
+    C{r.ConsoleHelper(I{linkname}, I{realprogram}, [pamfile=I{path},]
+    [user=I{user(root)},] [session=I{bool},] [fallback=I{bool},]
+    [noxoption=I{optstring},] [otherlines=I{linelist}])}
+
+    The C{I{linkname}} and C{I{realprogram}} paths are relative to
+    the destdir.
+
+    The default C{pamfile} contains auth via C{pam_rootok}, then
+    C{pam_stack service=system-auth} and everything else as
+    C{pam_permit}.  Otherwise, just provide the name of a file,
+    relative to the builddir, to use.
+
+    The C{session}, C{fallback}, and C{noxoption} default to None,
+    which means that no line is generated in the C{console.apps}
+    file.  The C{otherlines} option is the catchall for options
+    otherwise unhandled by C{ConsoleHelper}, and is simply a list
+    of lines of text (no newline characters) to put in the
+    C{console.apps} file.
+    """
+    keywords = {
+        'pamfile': None,
+        'user': 'root',
+        'session': None,
+        'fallback': None,
+        'noxoption': None,
+        'otherlines': None
+    }
+
+    def do(self, macros):
+        self.linkname = self.linkname %macros
+        self.realprogram = self.realprogram %macros
+        programname = os.path.basename(self.linkname)
+
+        dest = macros.destdir+self.linkname
+        if dest.endswith(os.sep):
+            util.mkdirChain(dest)
+        else:
+            util.mkdirChain(os.path.dirname(dest))
+        os.symlink(util.normpath(('%(bindir)s/consolehelper'%macros)),
+                   macros.destdir+self.linkname)
+
+        destpath = '%(destdir)s%(sysconfdir)s/pam.d/' %macros
+        util.mkdirChain(os.path.dirname(destpath))
+        destpath += programname
+        if self.pamfile:
+            util.copyfile(self.pamfile, destpath)
+        else:
+            contents = [
+                '#%PAM-1.0',
+                'auth       sufficient   /lib/security/$ISA/pam_rootok.so',
+                'auth       required     /lib/security/$ISA/pam_stack.so service=system-auth',
+                'account    required     /lib/security/$ISA/pam_permit.so',
+                'session    required     /lib/security/$ISA/pam_permit.so',
+            ]
+            f = file(destpath, 'w')
+            f.writelines([ x+'\n' for x in contents])
+            f.close()
+            os.chmod(destpath, 0644)
+
+
+        destpath = '%(destdir)s%(sysconfdir)s/security/console.apps/' %macros
+        util.mkdirChain(os.path.dirname(destpath))
+        destpath += programname
+        contents = [
+            'PROGRAM='+self.realprogram,
+            'USER='+self.user,
+        ]
+        boolMap = {True: 'true', False: 'false'}
+        if self.session is not None:
+            contents.append('SESSION='+boolMap[self.session])
+        if self.fallback is not None:
+            contents.append('FALLBACK='+boolMap[self.fallback])
+        if self.noxoption is not None:
+            contents.append('NOXOPTION='+self.noxoption)
+        if self.otherlines is not None:
+            contents.extend(self.otherlines)
+            
+        f = file(destpath, 'w')
+        f.writelines([ x+'\n' for x in contents])
+        f.close()
+        os.chmod(destpath, 0644)
+
+    def __init__(self, recipe, *args, **keywords):
+        BuildAction.__init__(self, recipe, **keywords)
+        assert(len(args)==2)
+        self.linkname = args[0]
+        self.realprogram = args[1]
+        # automatically depend on consolehelper
+        # cannot use %(bindir)s here, do not have macros...
+        recipe.Requires('/usr/bin/consolehelper', self.linkname)
