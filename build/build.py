@@ -492,7 +492,7 @@ class MakeDirs(_FileAction):
             for d in dirs:
                 d = d %macros
                 dest = macros['destdir'] + d
-                log.debug('creating directory', dest)
+                log.debug('creating directory %s', dest)
                 util.mkdirChain(dest)
                 if self.mode >= 0:
                     self.chmod(macros['destdir'], d)
