@@ -172,6 +172,8 @@ class DataStore:
 	path = self.hashToPath(hash)
         self.makeDir(path)
 	self.incrementCount(path, fileObj = f)
+        if self.logFile:
+            open(self.logFile, "a").write(path + "\n")
 
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):
@@ -200,7 +202,9 @@ class DataStore:
 	    # in that directory; just ignore it
 	    pass
 
-    def __init__(self, topPath):
+    def __init__(self, topPath, logFile = None):
 	self.top = topPath
+        self.logFile = logFile
+
 	if (not os.path.isdir(self.top)):
 	    raise IOError, ("path is not a directory: %s" % topPath)

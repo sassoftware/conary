@@ -30,6 +30,7 @@ class ServerConfig(conarycfg.ConfigFile):
 
     defaults = {
         'commitAction'      :  None,
+        'logFile'           :  None,
         'repositoryMap'     :  [ conarycfg.STRINGDICT, {} ],
         'repositoryDir'     :  None,
         'serverName'        :  None,
@@ -237,7 +238,8 @@ def handler(req):
                                 cfg.serverName,
                                 cfg.repositoryMap,
 				commitAction = cfg.commitAction,
-                                cacheChangeSets = cfg.cacheChangeSets)
+                                cacheChangeSets = cfg.cacheChangeSets,
+                                logFile = cfg.logFile)
     
     repos = repositories[repName]
     httpHandler = HttpHandler(repos)

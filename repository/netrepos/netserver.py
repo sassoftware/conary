@@ -1043,7 +1043,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
 
         self.repos = fsrepos.FilesystemRepository(self.name, self.troveStore,
-                                                  self.repPath, self.map)
+                                                  self.repPath, self.map,
+                                                  logFile = self.logFile)
 	self.auth = NetworkAuthorization(self.db, self.name)
 
     def reopen(self):
@@ -1064,11 +1065,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             self.repos = fsrepos.FilesystemRepository(self.name, 
                                                       self.troveStore,
-                                                      self.repPath, self.map)
+                                                      self.repPath, self.map,
+                                                      logFile = self.logFile)
             self.auth = NetworkAuthorization(self.db, self.name)
 
     def __init__(self, path, tmpPath, urlBase, name,
-		 repositoryMap, commitAction = None, cacheChangeSets = False):
+		 repositoryMap, commitAction = None, cacheChangeSets = False,
+                 logFile = None):
 	self.map = repositoryMap
 	self.repPath = path
 	self.tmpPath = tmpPath
@@ -1077,6 +1080,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.commitAction = commitAction
         self.sqlDbPath = self.repPath + '/sqldb'
         self.troveStore = None
+        self.logFile = logFile
 
 	try:
 	    util.mkdirChain(self.repPath)

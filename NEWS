@@ -1,3 +1,6 @@
+Changes in 0.13.3
+  * added ability for a contents log file (makes syncing much easier)
+
 Changes in 0.13.2
   * reworked use.py code almost entirely.
   * added /etc/conary/arch directory to contain architecture definition files;

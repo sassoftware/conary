@@ -395,10 +395,10 @@ class DataStoreRepository:
 
         return contentList
 
-    def __init__(self, path):
+    def __init__(self, path, logFile = None):
 	fullPath = path + "/contents"
 	util.mkdirChain(fullPath)
-	self.contentsStore = datastore.DataStore(fullPath)
+	self.contentsStore = datastore.DataStore(fullPath, logFile = logFile)
 
 class ChangeSetJob:
     """

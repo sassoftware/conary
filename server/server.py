@@ -280,6 +280,7 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 class ServerConfig(ConfigFile):
 
     defaults = {
+	'logFile'		:   None,
 	'port'			:   '8000',
 	'repositoryMap'         : [ STRINGDICT, {} ],
 	'tmpFilePath'           : DEFAULT_FILE_PATH,
@@ -294,6 +295,7 @@ def usage():
     print "       %s --add-user <username> repospath" %sys.argv[0]
     print ""
     print "server flags: --config-file <path>"
+    print '              --log-file <path>'
     print '              --map "<from> <to>"'
     print "              --tmp-file-path <path>"
     sys.exit(1)
@@ -328,8 +330,9 @@ def addUser(userName, otherArgs):
 if __name__ == '__main__':
     argDef = {}
     cfgMap = {
-	'port'	: 'port',
-	'map'	: 'repositoryMap',
+	'log-file'	: 'logFile',
+	'map'	        : 'repositoryMap',
+	'port'	        : 'port',
 	'tmp-file-path' : 'tmpFilePath',
     }
 
@@ -375,7 +378,8 @@ if __name__ == '__main__':
     baseUrl="http://%s:%s/" % (os.uname()[1], cfg.port)
 
     netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH, 
-			baseUrl, otherArgs[2], cfg.repositoryMap)
+			baseUrl, otherArgs[2], cfg.repositoryMap,
+                        logFile = cfg.logFile)
     httpHandler = HttpHandler(netRepos)
 
     port = int(cfg.port)

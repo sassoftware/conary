@@ -340,7 +340,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def __del__(self):
 	self.close()
 
-    def __init__(self, name, troveStore, path, repositoryMap):
+    def __init__(self, name, troveStore, path, repositoryMap, logFile = None):
 	self.top = path
 	self.name = name
 	map = dict(repositoryMap)
@@ -351,5 +351,5 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	self.sqlDbPath = self.top + "/sqldb"
 
-	DataStoreRepository.__init__(self, path)
+	DataStoreRepository.__init__(self, path, logFile = logFile)
 	AbstractRepository.__init__(self)
