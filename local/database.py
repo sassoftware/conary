@@ -341,7 +341,10 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 			    newFile.restoreContents())
 
 	# remove paths which are no longer valid
-	for (path, file) in self.staleFileList():
+	list = self.staleFileList()
+	list.sort()
+	list.reverse()
+	for (path, file) in list:
 	    file.remove(root + path)
 
 	# time to remove files from the repository
