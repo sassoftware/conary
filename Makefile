@@ -18,6 +18,7 @@ subdirs_rule=
 
 python_files = __init__.py	\
 	branch.py		\
+	changelog.py		\
 	checkin.py		\
 	commit.py		\
 	cook.py			\

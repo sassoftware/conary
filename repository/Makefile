@@ -3,8 +3,6 @@
 # All rights reserved
 #
 
-SUBDIRS=localrep
-
 python_files = __init__.py	\
 		changeset.py	\
 		filecontents.py	\

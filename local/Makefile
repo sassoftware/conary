@@ -7,7 +7,10 @@ python_files = database.py	\
 		__init__.py	\
 		localrep.py	\
 		sqldb.py	\
-		update.py
+		trovetroves.py	\
+		update.py	\
+		versiontable.py \
+		idtable.py
 
 extra_dist = Makefile
 
