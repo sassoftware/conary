@@ -6,6 +6,7 @@
 import lib.elf
 import os
 import string
+import util
 
 class Magic:
     def __init__(self, path, basedir):
@@ -70,7 +71,7 @@ def magic(path, basedir=''):
 	basedir += '/'
 
     n = basedir+path
-    if os.path.isdir(n) or os.path.islink(n):
+    if not util.isregular(n):
 	return None
 
     f = file(n)
