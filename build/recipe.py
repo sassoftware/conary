@@ -901,7 +901,7 @@ class SingleGroup:
 
         self.addTroveList.append((name, versionStr, flavor, source, byDefault))
 
-    def findTroves(self, cfg, repos, label):
+    def findTroves(self, cfg, repos, labelPath):
         self.size = 0
 
         validSize = True
@@ -915,7 +915,7 @@ class SingleGroup:
             findTroveList.append((name, versionStr, desFlavor))
             flavorMap[flavor] = desFlavor
         try:
-            results = repos.findTroves(label, findTroveList)
+            results = repos.findTroves(labelPath, findTroveList)
         except repository.TroveNotFound, e:
             raise RecipeFileError, str(e)
         for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
@@ -985,7 +985,8 @@ class GroupRecipe(Recipe):
 
     def findTroves(self, groupName = None):
         if groupName is None: groupName = self.name
-        self.groups[groupName].findTroves(self.cfg, self.repos, self.label)
+        self.groups[groupName].findTroves(self.cfg, self.repos, 
+                                          self.labelPath)
 
     def getRequires(self, groupName = None):
         if groupName is None: groupName = self.name
@@ -998,6 +999,9 @@ class GroupRecipe(Recipe):
     def getSize(self, groupName = None):
         if groupName is None: groupName = self.name
         return self.groups[groupName].size
+
+    def setLabelPath(self, *path):
+        self.labelPath = [ versions.Label(x) for x in path ]
 
     def createGroup(self, groupName):
         if self.groups.has_key(groupName):
@@ -1012,7 +1016,7 @@ class GroupRecipe(Recipe):
     def __init__(self, repos, cfg, label, flavor, extraMacros={}):
 	self.repos = repos
 	self.cfg = cfg
-	self.label = label
+	self.labelPath = [ label ]
 	self.flavor = flavor
         self.macros = macros.Macros()
         self.macros.update(extraMacros)

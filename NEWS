@@ -4,6 +4,7 @@ Changes in 0.50.7:
     be consistent, making recipe-provided changes less likely to
     conflict with local configuration changes.
   * groups are no longer allowed to contain redirects
+  * added setLabelPath to group recipe
 
 Changes in 0.50.6:
   * conaryclient.updateChangeSet should have recursed by default
