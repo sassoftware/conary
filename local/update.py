@@ -63,7 +63,9 @@ class FilesystemJob:
     def _singlePackage(self, repos, pkgCs, changeSet, basePkg, fsPkg, root):
 	"""
 	Build up the todo list for applying a single package to the
-	filesystem.
+	filesystem. Returns a package object which represents what will
+	end up in the filsystem after this object's apply() method is
+	called.
 
 	@param repos: the repository the files for basePkg are stored in
 	@type repos: repository.Repository
@@ -191,7 +193,7 @@ class FilesystemJob:
 
 	    # headFileVersion is None for renames
 	    if headFileVersion:
-		# FIXME we should be able to inspect fileChanges directly
+		# FIXME we should be able to inspect headChanges directly
 		# to see if we need to go into the if statement which follows
 		# this rather then having to look up the file from the old
 		# pacakge for every file which has changed
@@ -210,17 +212,36 @@ class FilesystemJob:
 		    (baseFile, baseFileContents) = repos.getFileVersion(fileId, 
 					baseFileVersion, withContents = 1)
 		
-		fileChanges = changeSet.getFileChange(fileId)
+		headChanges = changeSet.getFileChange(fileId)
 		headFile = baseFile.copy()
-		headFile.applyChange(fileChanges)
+		headFile.applyChange(headChanges)
+		fsFile.isConfig(headFile.isConfig())
+		fsChanges = fsFile.diff(baseFile)
 
 	    if (basePkg and headFileVersion
                 and not fsFile.same(headFile, ignoreOwner = True)):
+		# something has changed for the file
+		(conflicts, mergedChanges) = files.mergeChangeLines(
+						headChanges, fsChanges)
+		if mergedChanges and (not conflicts or
+				      files.contentConflict(mergedChanges)):
+		    fsFile.applyChange(mergedChanges, ignoreContents = 1)
+		else:
+		    contentsOkay = False
+		    self.errors.append("file attributes conflict for %s"
+					    % realPath)
+	    else:
+		conflicts = True
+		mergedChanges = None
+
+	    if headFileVersion and headFile.hasContents and \
+	       fsFile.hasContents and fsFile.sha1() != headFile.sha1():
 		# the contents have changed... let's see what to do
 
 		# get the contents if the version on head has contents, and
 		# either
-		#	1. the version from the base package doesn't have contents, or
+		#	1. the version from the base package doesn't have 
+		#	   contents, or
 		#	2. the file changed between head and base
 		# (if both are false, no contents would have been saved for
 		# this file)
@@ -238,7 +259,15 @@ class FilesystemJob:
 		elif fsFile.same(baseFile, ignoreOwner = True):
 		    # the contents changed in just the repository, so take
 		    # those changes
-		    assert(headFileContType == changeset.ChangedFileTypes.file)
+		    if headFileContType == changeset.ChangedFileTypes.diff:
+			baseLines = repos.pullFileContentsObject(
+						baseFile.sha1()).readlines()
+			diff = headFileContents.get().readlines()
+			(newLines, failedHunks) = patch.patch(baseLines, diff)
+			assert(not failedHunks)
+			headFileContents = \
+			    filecontents.FromString("".join(newLines))
+
 		    self._restore(headFile, realPath, headFileContents,
                                   "replacing %s with contents "
                                   "from repository" % realPath)
@@ -269,7 +298,7 @@ class FilesystemJob:
 
 			contentsOkay = 1
 		else:
-		    self.errors.append("files conflict for %s" % realPath)
+		    self.errors.append("file contents conflict for %s" % realPath)
 		    contentsOkay = 0
 
 	    if pathOkay and contentsOkay:
@@ -370,10 +399,11 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
 	if srcPkg and srcPkg.hasFile(fileId):
 	    srcFileVersion = srcPkg.getFile(fileId)[1]
 	    srcFile = repos.getFileVersion(fileId, srcFileVersion)
-	    f = files.FileFromFilesystem(realPath, fileId,
-					 possibleMatch = fileId)
 	else:
-	    f = files.FileFromFilesystem(realPath, fileId)
+	    srcFile = None
+
+	f = files.FileFromFilesystem(realPath, fileId,
+				     possibleMatch = srcFile)
 
 	if path.endswith(".recipe"):
 	    f.isConfig(set = True)
