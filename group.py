@@ -31,11 +31,34 @@ import versions
 
 class Group:
 
+    """
+    Representation of a group of packages.
+    """
+
     def getName(self):
+	"""
+	Returns the fully qualified name of the group.
+
+	@rtype: str
+	"""
 	return self.name
 
     def getVersion(self):
+	"""
+	Returns the fully qualified version of the group.
+
+	@rtype: versions.Version
+	"""
 	return self.version
+
+    def getPackageList(self):
+	"""
+	Returns a list of (packageName, versionList) ordered pairs, listing
+	all of the package in the group, along with their versions. 
+
+	@rtype: list
+	"""
+	return self.packages.items()
 
     def formatString(self):
 	"""
@@ -43,8 +66,6 @@ class Group:
 	can later be read by the GroupFromFile object. The format of
 	the string is:
 
-	NAME
-	VERSION
 	package count
 	PACKAGE1 VERSION1
 	PACKAGE2 VERSION2
@@ -52,17 +73,15 @@ class Group:
 	.
 	.
 	PACKAGEN VERSIONN
-	group file count
 	GROUP FILE
 	"""
-	str = "%s\n%s\n%d\n" % (self.name, self.version.asString(),
-				len(self.packages.keys()))
+	str = "%d\n" % len(self.packages.keys())
 	for pkg in self.packages.keys():
 	    str += pkg + " " +  \
 		   " ".join([v.asString() for v in self.packages[pkg]]) + \
 		   "\n"
 
-	str += "%d\n%s" % (len(self.spec), "".join(self.spec))
+	str += "".join(self.spec)
 
 	return str
 
@@ -74,6 +93,20 @@ class Group:
 	@type ver: versions.Version
 	"""
 	self.version = ver
+
+    def __init__(self):
+	self.packages = {}
+	self.spec = None
+
+class GroupFromTextFile(Group):
+
+    def getSimpleVersion(self):
+	"""
+	Returns the version string defined in a group file.
+
+	@rtype: str
+	"""
+	return self.simpleVersion
 
     def parseFile(self, f, packageNamespace, repos):
 	"""
@@ -116,12 +149,15 @@ class Group:
 	    if not self.name.startswith("group-"):
 		log.error('group names must begin with "group-"')
 		errors = 1
+	    self.name = self.name[6:]
+	    if self.name[0] != ":":
+		self.name = packageNamespace + ":" + self.name
 
 	if lines[1][1][0] != "version":
 	    log.error("group files must contain the version on the first line")
 	    errors = 1
 	else:
-	    simpleVersion = lines[1][1][1]
+	    self.simpleVersion = lines[1][1][1]
 
 	for lineNum, (name, versionStr) in lines[2:]:
 	    if name[0] != ":":
@@ -136,13 +172,20 @@ class Group:
 		    errors = 1
 		    continue
 
-		versionList = repos.getPackageNickList(name, nick)
-		if not versionList:
+		branchList = repos.getPackageNickList(name, nick)
+		if not branchList:
 		    log.error("branch %s does not exist for package %s"
 				% (str(nick), name))
 		    errors = 1
 		else:
+		    versionList = []
+		    for branch in branchList:
+			ver = repos.pkgLatestVersion(name, branch)
+			versionList.append(ver)
+
 		    self.packages[name] = versionList
+
+		print "a:", [ x.asString() for x in versionList ]
 	    else:
 		try:
 		    version = versions.VersionFromString(versionStr)
@@ -159,11 +202,74 @@ class Group:
 		self.packages[name] = [ version ]
 
 	if errors:
-	    return None
+	    raise ParseError
 
-	return simpleVersion
+    def __init__(self, f, packageNamespace, repos):
+	"""
+	Initializes the object; parameters are the same as those
+	to parseFile().
+	"""
 
-    def __init__(self):
-	self.packages = {}
-	self.spec = None
+	Group.__init__(self)
+	self.parseFile(f, packageNamespace, repos)
+
+class GroupFromFile(Group):
+
+    """
+    Creates a group from a file which contains the format described
+    in the comments for Group.formatString()
+    """
+
+    def parseGroup(self, f):
+	"""
+	Initializes the object from the data in f
+
+	@param f: File representation of a group
+	@type f: file-type object
+	"""
+	lines = f.readlines()
+	pkgCount = int(lines[0][:-1])
+	for i in range(1, pkgCount + 1):
+	    line = lines[i]
+	    items = line.split()
+	    name = items[0]
+	    self.packages[name] = []
+	    for versionStr in items[1:]:
+		version = versions.VersionFromString(versionStr)
+		self.packages[name].append(version)
+
+	self.spec = lines[i + 1:]
+
+    def __init__(self, name, f, version):
+	"""
+	Initializes a GroupFromFile() object.
+
+	@param name: Fully qualified name of the group (w/o the group- bit)
+	@type name: str
+	@param f: File representation of a group
+	@type f: file-type object
+	@param version: Fully qualified version of the group
+	@type version: versions.Version()
+	"""
+
+	Group.__init__(self)
+	self.version = version
+	self.name = name
+	self.parseGroup(f)
+
+class GroupError(Exception):
+
+    """
+    Ancestor for all exceptions raised by the group module.
+    """
+
+    pass
+
+class ParseError(GroupError):
+
+    """
+    Indicates that an error occured parsing a group file.
+    """
+
+    pass
 
