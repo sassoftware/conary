@@ -369,6 +369,7 @@ class RemoveNonPackageFiles(policy.Policy):
 	r'\.packlist$',
 	r'\.cvsignore$',
 	r'\.orig$',
+        r'%(sysconfdir)s.*/rc[0-6].d/[KS].*$',
 	'~$',
     ]
 
@@ -678,7 +679,7 @@ class NormalizeInfoPages(policy.Policy):
                                      %(syspath, syspath[:-4]))
 
 
-class NormalizeInitscripts(policy.Policy):
+class NormalizeInitscriptLocation(policy.Policy):
     """
     Puts initscripts in their place, resolving ambiguity about their
     location.
@@ -769,7 +770,7 @@ def DefaultPolicy(recipe):
 	NormalizeCompression(recipe),
 	NormalizeManPages(recipe),
 	NormalizeInfoPages(recipe),
-	NormalizeInitscripts(recipe),
+	NormalizeInitscriptLocation(recipe),
         NormalizeAppDefaults(recipe),
 	RelativeSymlinks(recipe),
     ]
