@@ -435,14 +435,9 @@ class DeviceFile(File):
         util.mkdirChain(os.path.dirname(target))
 
         if journal:
-            global userCache, groupCache
-
-            uid = userCache.lookup(root, self.inode.owner())
-            gid = groupCache.lookup(root, self.inode.group())
-
             journal.mknod(root, target, self.lsTag, self.devt.major(),
                           self.devt.minor(), self.inode.perms(),
-                          uid, gid)
+                          self.inode.owner(), self.inode.group())
         else:
             if self.lsTag == 'c':
                 flags = stat.S_IFCHR
