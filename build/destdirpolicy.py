@@ -762,7 +762,11 @@ class NormalizeInterpreterPaths(policy.Policy):
                 l.pop(0) # we will reconstruct this line, without extra spaces
                 wordlist = [ x for x in line.split(' ') if x ]
                 wordlist.pop(0) # get rid of env
-                wordlist[0] = util.checkPath(wordlist[0])
+                fullintpath = util.checkPath(wordlist[0])
+                if fullintpath == None:
+		    raise DestdirPolicyError("Interpreter %s for file %s not found, could not convert from /usr/bin/env syntax " % (path, wordlist[0]))
+                
+                wordlist[0] = fullintpath
                 l.insert(0, '#!'+" ".join(wordlist)+'\n')
                 f.seek(0)
                 f.truncate(0) # we may have shrunk the file, avoid garbage
