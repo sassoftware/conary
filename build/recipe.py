@@ -16,7 +16,6 @@ import helper
 import imp
 import inspect
 import log
-import lookaside
 import macros
 import os
 import package
@@ -245,6 +244,13 @@ def loadRecipe(file):
     # of the recipe that loaded it, or else it will be destroyed
     callerGlobals[os.path.basename(file).replace('.', '-')] = loader
 
+class _sourceHelper:
+    def __init__(self, theclass, recipe):
+        self.theclass = theclass
+	self.recipe = recipe
+    def __call__(self, *args, **keywords):
+        self.recipe._sources.append(self.theclass(self.recipe, *args, **keywords))
+
 class _recipeHelper:
     def __init__(self, list, theclass):
         self.list = list
@@ -339,8 +345,7 @@ class PackageRecipe(Recipe):
 	"""
         if not name.startswith('_'):
 	    if name.startswith('add'):
-		return _recipeHelper(self._sources,
-				     sources.__dict__[name[3:]])
+		return _sourceHelper(source.__dict__[name[3:]], self)
 	    if name in build.__dict__:
 		return _recipeHelper(self._build, build.__dict__[name])
 	    for (policy, list) in (

@@ -9,11 +9,13 @@ in the correct directory.
 """
 
 import gzip
+import lookaside
 import os
 import rpmhelper
+import util
 
 class _Source:
-    def __init__(self, recipe, sourcename, rpm=None, dir='', keyid=None, use=None):
+    def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None, use=None):
 	self.recipe = recipe
 	self.sourcename = sourcename % recipe.macros
 	self.rpm = rpm % recipe.macros
@@ -27,7 +29,7 @@ class _Source:
 
     def _addSignature(self):
         for suffix in ('sig', 'sign', 'asc'):
-            self.gpg = '%s.%s' %(filename, suffix)
+            self.gpg = '%s.%s' %(self.sourcename, suffix)
             self.localgpgfile = lookaside.searchAll(self.cfg,
 				    self.laReposCache, gpg, 
                                     self.name, self.srcdirs)
@@ -99,10 +101,10 @@ class _Source:
 	    self.sourcename, self.recipe.name, self.recipe.srcdirs)
 
     def fetch(self):
-	if 'filename' not in self.__dict__:
+	if 'sourcename' not in self.__dict__:
 	    return None
 	f = lookaside.findAll(recipe.cfg, recipe.laReposCache,
-			      self.filename, recipe.name, recipe.srcdirs)
+			      self.sourcename, recipe.name, recipe.srcdirs)
 	self._checkSignature(f)
 	return f
 
@@ -122,7 +124,7 @@ class _Source:
 
 
 class Archive(_Source):
-    def __init__(self, recipe, sourcename, rpm=None, dir='', keyid=None, use=None):
+    def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None, use=None):
 	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
 
     def doUnpack(self):
@@ -149,7 +151,7 @@ class Archive(_Source):
 
 
 class Patch(_Source):
-    def __init__(self, recipe, sourcename, rpm=None, dir='', keyid=None,
+    def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None,
 		 use=None, level='1', backup='', macros=False, extraArgs=''):
 	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
 	self.level = level
@@ -187,8 +189,8 @@ class Patch(_Source):
 			 %(provides, f, destDir, self.level, backup, self.extraArgs))
 
 
-class Patch(_Source):
-    def __init__(self, recipe, sourcename, rpm=None, dir='', keyid=None,
+class Source(_Source):
+    def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None,
                   use=None, apply='', macros=False):
 	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
 	self.apply = apply % self.recipe.macros
@@ -205,12 +207,14 @@ class Patch(_Source):
 	if self.applymacros:
 	    log.debug('applying macros to source %s' %f)
 	    pin = file(f)
-	    pout = file(os.sep.join((destDir, os.path.basename(filename))), "w")
+	    pout = file(os.sep.join((destDir,
+				     os.path.basename(self.sourcename))), "w")
 	    pout.write(pin.read()%self.recipe.macros)
 	    pin.close()
 	    pout.close()
 	else:
-	    util.copyfile(f, os.sep.join((destDir, os.path.basename(filename))))
+	    util.copyfile(f, os.sep.join((destDir,
+					  os.path.basename(self.sourcename))))
 	if self.apply:
 	    util.execute(self.apply, destDir)
 
