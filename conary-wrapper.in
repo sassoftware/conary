@@ -7,7 +7,11 @@ for p in $PYTHONORDER; do
 	PYTHON=$p
 	break
     fi
-    echo "ERROR: suitable python not found"
 done
+
+if [ -z "$PYTHON" ]; then
+    echo "ERROR: suitable python not found"
+    exit 1
+fi
 
 $PYTHON @srsdir@/`basename $0` $*
