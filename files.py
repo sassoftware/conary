@@ -120,10 +120,8 @@ class File(FileMode):
     def setOwnerGroup(self, target):
 	if os.getuid(): return
 
-	# root should set the file ownerships properly
-        # XXX ewt: no 'f' variable
-	uid = pwd.getpwnam(f.owner())[2]
-	gid = grp.getgrnam(f.group())[2]
+	uid = pwd.getpwnam(self.owner())[2]
+	gid = grp.getgrnam(self.group())[2]
 
 	# FIXME: this needs to use lchown, which is in 2.3, and
 	# this should happen unconditionally
