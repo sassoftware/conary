@@ -326,7 +326,6 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
-    @param newVersion: version to assign the newly built objects
     @param buildBranch: the branch the new build will be committed to
     @type buildBranch: versions.Version
     @param macros: set of macros for the build

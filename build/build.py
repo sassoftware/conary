@@ -843,13 +843,6 @@ class Replace(BuildAction):
     Remember that python will interpret C{\1}-C{\7} as octal characters;
     you must either escape the backslash: C{\\1} or make the string
     raw by prepending C{r} to the string (e.g. C{r.Replace('(a)', r'\1bc'))}
- 
-    @keyword lines: Determines the lines to which the replacement applies
-    @type lines: tuple (start, end) or int
-    @default lines: all
-    @keyword allowNoChange: do not raise an error if C{I{pattern}} did not apply
-    @type allowNoChange: bool
-    @default allowNoChange: False
     """
         
 
@@ -859,6 +852,15 @@ class Replace(BuildAction):
     octalchars = re.compile('[\1\2\3\4\5\6\7]')
     
     def __init__(self, recipe, *args, **keywords):
+        """
+        @keyword lines: Determines the lines to which the replacement applies
+        @type lines: tuple (start, end) or int
+        @default lines: all
+        @keyword allowNoChange: do not raise an error if C{I{pattern}} did
+                                not apply
+        @type allowNoChange: bool
+        @default allowNoChange: False
+        """
         BuildAction.__init__(self, recipe, **keywords)
         if not args:
 	    self.init_error(TypeError, 'not enough arguments')

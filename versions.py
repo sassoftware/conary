@@ -906,12 +906,8 @@ class Branch(VersionSequence):
 	"""
 	Creates a new shadow from this branch. 
 
-	@param branch: Label of the new shadow
-	@type branch: AbstractLabel
-	@param withVerRel: If set, the new branch is turned into a version
-	on the branch using the same version and release as the original
-	verison.
-	@type withVerRel: boolean
+	@param label: Label of the new shadow
+	@type label: AbstractLabel
 	@rtype: Version 
 	"""
 	assert(isinstance(label, AbstractLabel))
@@ -1030,7 +1026,7 @@ def strToFrozen(verStr, timeStamps):
     @param verStr: Version string
     @type verStr: str
     @param timeStamps: list of timestamps
-    @typpe timeStamps: list of str
+    @type timeStamps: list of str
     """
 
     spl = verStr.split("/")

@@ -45,7 +45,6 @@ class AbstractTroveDatabase:
 	is specified. If only a branch name is given (not a complete label),
 	the repository names from these labels are used as the repository
 	name for the branch name to form a complete label.
-	@type defaultLabel: list of versions.Label
 	@param name: Trove name
 	@type name: str
 	@param flavor: only troves compatible with this flavor will be returned
@@ -74,7 +73,7 @@ class AbstractTroveDatabase:
 	list; the order returns is the same order in the list.
 
 	@param l:
-	@type list:
+	@type l: list
 	@rtype list
 	"""
 	raise NotImplementedError

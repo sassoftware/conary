@@ -881,15 +881,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         @type troveName: str
         @param versionStr: version string from the recipe
         @type versionStr: string
-        @param troveFlavor: flavor of the trove being built
-        @type troveFlavor: deps.deps.DependencySet
+        @param troveFlavors: flavor of the trove being built
+        @type troveFlavors: sequence of deps.deps.DependencySet
         @param currentBranch: branch the new version should be on
         @type currentBranch: versions.Version
         @param binary: true if this version should use the binary build field
         @type binary: boolean
-        @param sourceName: the name of the :source component related to this
-                           trove.  The default is troveName + ':source'
-        @type sourceName: string
         @param alwaysBumpCount: if True, then do not return a version that 
         matches an existing trove, even if their flavors would differentiate 
         them, instead, increase the appropriate count.  
