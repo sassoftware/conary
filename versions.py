@@ -129,26 +129,28 @@ class Version:
 	if not self.isBranch() and not self.isVersion():
 	    raise KeyError, "invalid version set %s" % self
 	
-def VersionFromString(ver, defaultBranch = None):
-    if ver[0] != "/":
-	if not defaultBranch:
-	    raise KeyError, "relative version given without a default branch"
-	ver = defaultBranch.asString() + "/" + ver
+class VersionFromString(Version):
 
-    parts = ver.split("/")
-    del parts[0]	# absolute versions start with a /
+    def __init__(self, ver, defaultBranch = None):
+	if ver[0] != "/":
+	    if not defaultBranch:
+		raise KeyError, "relative version given without a default branch"
+	    ver = defaultBranch.asString() + "/" + ver
 
-    v = []
-    while parts:
-	v.append(BranchName(parts[0]))
+	parts = ver.split("/")
+	del parts[0]	# absolute versions start with a /
 
-	if len(parts) >= 2:
-	    v.append(VersionRelease(parts[1]))
-	    parts = parts[2:]
-	else:
-	    parts = None
+	v = []
+	while parts:
+	    v.append(BranchName(parts[0]))
 
-    return Version(v)
+	    if len(parts) >= 2:
+		v.append(VersionRelease(parts[1]))
+		parts = parts[2:]
+	    else:
+		parts = None
+
+	Version.__init__(self, v)
 	
 def versionSort(list):
     list.sort()
