@@ -308,13 +308,13 @@ def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
     sourcelist = []
     for source in braceGlob(sources):
 	if os.path.isdir(source):
-	    dest = '%s/%s' %(dest, os.path.basename(source))
-	    log.debug('copying [tree] %s to %s', source, dest)
-	    shutil.copytree(source, dest, symlinks)
+	    thisdest = '%s/%s' %(dest, os.path.basename(source))
+	    log.debug('copying [tree] %s to %s', source, thisdest)
+	    shutil.copytree(source, thisdest, symlinks)
 	    if dirmode:
-		os.chmod(dest, dirmode)
+		os.chmod(thisdest, dirmode)
 	    os.path.walk(source, _copyVisit,
-			 (sourcelist, len(source), dest, filemode, dirmode))
+			 (sourcelist, len(source), thisdest, filemode, dirmode))
 	else:
 	    log.debug('copying [file] %s to %s', source, dest)
 	    shutil.copy2(source, dest)
