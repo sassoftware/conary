@@ -14,22 +14,28 @@ _FILE_MAP = "FILEMAP"
 _VERSION_INFO = "VINFO-%s-%s"
 _BRANCH_MAP = "BMAP-%s"
 _CONTENTS = "%s %s"
+_BRANCH_NICK = "BNICK-%s-%s"
 
-# implements a set of versioned files on top of a single hashed db file
-#
-# FileIndexedDatabase provides a list of files present, and stores that
-# list in the _FILE_MAP entry
-#
-# Each file has a mapping of branch names to the head of that branch
-#   stored as _BRANCH_MAP
-# Each file/version pair has an info node which stores a reference to both
-#   the parent and child of that version on the branch; they are stored
-#   as frozen versions to allow them to be properly ordered. It also stores
-#   the frozen version of the version uses info is being stored
-# The contents of each file are stored as _CONTENTS
-#
-# the versions are expected to be Version objects as defined by the versions
-# module
+"""
+implements a set of versioned files on top of a single hashed db file
+
+FileIndexedDatabase provides a list of files present, and stores that
+list in the _FILE_MAP entry
+
+Each file has a mapping of branch names to the head of that branch
+  stored as _BRANCH_MAP. Empty branches have a map entry which maps
+  the branch to the empty string.
+Each file/version pair has an info node which stores a reference to both
+  the parent and child of that version on the branch; they are stored
+  as frozen versions to allow them to be properly ordered. It also stores
+  the frozen version of the version uses info is being stored
+The contents of each file are stored as _CONTENTS
+The _BRANCH_NICK stores a mapping from a branch nickname to a list of
+  all of the versions which that branch maps to.
+
+the versions are expected to be Version objects as defined by the versions
+module
+"""
 
 class FalseFile:
     """
@@ -106,14 +112,23 @@ class VersionedFile:
 	# at the end
 	branchList = self.db[_BRANCH_MAP % self.key].split('\n')[:-1]
 	for mapString in branchList:
-	    (branchString, versionString) = mapString.split()
-	    self.branchMap[branchString] = \
-		versions.ThawVersion(versionString)
+	    if mapString.find(" ") == -1:
+		# empty branch
+		self.branchMap[branchString] = None
+	    else:
+		(branchString, versionString) = mapString.split()
+		self.branchMap[branchString] = \
+		    versions.ThawVersion(versionString)
 
     def _writeBranchMap(self):
-	str = "".join(map(lambda x: "%s %s\n" % 
-					    (x, self.branchMap[x].freeze()), 
-			    self.branchMap.keys()))
+	l = []
+	for (branchStr, versionStr) in self.branchMap.items():
+	    if versionStr:
+		l.append("%s %s\n" % (branchStr, versionStr.freeze()))
+	    else:
+		l.append("%s\n" % branchStr)
+
+	str = "".join(l)
 
 	key = _BRANCH_MAP % self.key
 
@@ -150,7 +165,9 @@ class VersionedFile:
 	self._readBranchMap()
 	branchStr = branch.asString()
 
-	if self.branchMap.has_key(branchStr):
+	if not self.branchMap.has_key(branchStr):
+	    return None
+	elif self.branchMap[branchStr]:
 	    return self.branchMap[branchStr]
 	elif branch.hasParent():
 	    return branch.parentNode()
@@ -230,17 +247,24 @@ class VersionedFile:
 	# find the right position to insert this node; this is quite
 	# efficient for adding at the end of a branch, which is the
 	# normal case
-	if self.branchMap.has_key(branchStr):
+	if self.branchMap.has_key(branchStr) and self.branchMap[branchStr]:
 	    curr = self.branchMap[branchStr]
 	    next = None
 	    while curr and curr.isAfter(version):
 		next = curr
 		curr = self._getVersionInfo(curr)[1]
-	elif not self.createBranches and len(self.branchMap.keys()):
+	elif not self.branchMap.has_key(branchStr) and \
+	     not self.createBranches and len(self.branchMap.keys()):
 	    # the branch doesn't exist, but other branches do, and
 	    # we're not supposed to create branches automatically
 	    raise VersionedFileMissingBranchError(self.key, version.branch())
+	elif not self.branchMap.has_key(branchStr):
+	    # create a new branch
+	    self.createBranch(version.branch())
+	    curr = None
+	    next = None
 	else:
+	    # add the first item to an empty branch
 	    curr = None
 	    next = None
 
@@ -268,6 +292,86 @@ class VersionedFile:
 
 	#self.db.sync()
 
+    def mapBranchNickname(self, nick):
+	"""
+	Returns a list of the branches the given nickname refers to.
+
+	@param nick: Nickname
+	@type nick: versions.BranchName
+	@rtype: list of versions.Version objects, each of which is a branch
+	"""
+
+	key = _BRANCH_NICK % (self.key, str(nick))
+	if self.db.has_key(key):
+	    # cut off the empty item at the end which results from the
+	    # trailing \n
+	    l = self.db[key].split('\n')[:-1]
+	    return [ versions.VersionFromString(x) for x in l ]
+
+	return []
+
+    def _writeBranchNicknameList(self, nick, branchList):
+	"""
+	Saves the list of branches a nickname refers to.
+
+	@param nick: Nickname
+	@type nick: versions.BranchName
+	@param versionList: List of branches nick refers to
+	@type versionList: list of versions.Version object
+	"""
+
+	key = _BRANCH_NICK % (self.key, str(nick))
+	if not branchList:
+	    if self.db.has_key(key):
+		del self.db[key]
+	else:
+	    self.db[key] = "\n".join([x.asString() for x in branchList]) + "\n"
+
+    def eraseBranch(self, branch):
+	"""
+	Removes a branch, which must be empty.
+
+	@param branch: The new branch to remove
+	@type branch: versions.Version
+	"""
+	self._readBranchMap()
+	branchStr = branch.asString()
+	if not self.branchMap.has_key(branchStr):
+	    raise VersionedFileMissingBranchError(self.key, branch)
+
+	del self.branchMap[branchStr]
+	self._writeBranchMap()
+
+	nick = branch.branchNickname()
+	l = self.mapBranchNickname(nick)
+	i = 0
+	for (i, b) in enumerate(l):
+	    if b.equal(branch): 
+		del l[i]
+		break
+
+	# this does the erase if l is empty
+	self._writeBranchNicknameList(nick, l)
+
+	assert(i < (len(l) + 1))
+
+    def createBranch(self, branch):
+	"""
+	Creates a new (empty branch).
+
+	@param branch: The new branch to create
+	@type branch: versions.Version
+	"""
+	self._readBranchMap()
+	branchStr = branch.asString()
+	assert(not self.branchMap.has_key(branchStr))
+
+	nick = branch.branchNickname()
+	branches = self.mapBranchNickname(nick)
+	branches.append(branch)
+	self._writeBranchNicknameList(nick, branches)
+	self.branchMap[branchStr] = ""
+
     def eraseVersion(self, version):
 	"""
         Removes a version of the file.
@@ -278,15 +382,16 @@ class VersionedFile:
 	self._readBranchMap()
 
 	versionStr = version.asString()
-	branchStr = version.branch().asString()
+	branch = version.branch()
+	branchStr = branch.asString()
 
 	(node, prev, next) = self._getVersionInfo(version)
 
 	# if this is the head of the branch we need to move the head back
 	if self.branchMap[branchStr].equal(version):
-	    # we were the only item, so the branch needs to be removed
+	    # we were the only item, so the branch needs to be emptied
 	    if not prev:
-		del self.branchMap[branchStr]
+		self.branchMap[branchStr] = None
 	    else:
 		self.branchMap[branchStr] = prev
 
@@ -340,12 +445,14 @@ class VersionedFile:
 
     def branchList(self):
 	"""
-        Returns a list of all of the branches available.
+        Returns a list of all of the branches available, even if they
+	are empty.
 
         @rtype: list of versions.Version
 	"""
 	self._readBranchMap()
-	return [ x.branch() for x in self.branchMap.values() ]
+
+	return [ versions.VersionFromString(x) for x in self.branchMap.keys() ]
 
     def __init__(self, db, filename, createBranches):
 	self.db = db
