@@ -107,14 +107,32 @@ class ConaryClient:
                     if sugg.has_key(depSet):
                         suggList = []
                         for choiceList in sugg[depSet]:
-                            # pick one from each choiceList
-                            choice = choiceList[0]
-                            suggList.append(choice)
+                            # XXX what if multiple troves are on this branch,
+                            # but with different flavors? we could be
+                            # (much) smarter here
+                            scoredList = []
+                            for choice in choiceList:
+                                try:
+                                    affinityTroves =self.db.findTrove(choice[0])
+                                except repository.TroveNotFound:
+                                    affinityTroves = None
 
-                            if suggMap.has_key(troveName):
-                                suggMap[troveName].append(choice)
-                            else:
-                                suggMap[troveName] = [ choice ]
+                                f = self.cfg.flavor.copy()
+
+                                if affinityTroves:
+                                    f.union(affinityTroves[0].getFlavor(), 
+                                        mergeType = deps.DEP_MERGE_TYPE_PREFS)
+                                scoredList.append((f.score(choice[2]), choice))
+
+                            scoredList.sort()
+                            if scoredList[-1][0] is not  None:
+                                choice = scoredList[-1][1]
+                                suggList.append(choice)
+
+                                if suggMap.has_key(troveName):
+                                    suggMap[troveName].append(choice)
+                                else:
+                                    suggMap[troveName] = [ choice ]
 
 			troves.update(dict.fromkeys(suggList))
 
