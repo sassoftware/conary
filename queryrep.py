@@ -6,6 +6,7 @@
 from repository import repository
 import files
 import log
+import time
 
 _troveFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
@@ -13,21 +14,21 @@ _grpFormat  = "  %-37s %s"
 
 def displayTroves(repos, cfg, all = False, ls = False, ids = False,
                   sha1s = False, leaves = False, fullVersions = False,
-		  trove = "", versionStr = None):
+		  info = False, trove = "", versionStr = None):
     if trove:
 	troves = [ trove ]
     else:
 	# this returns a sorted list
 	troves = [ x for x in repos.iterAllTroveNames() ]
 
-    if versionStr or ls or ids or sha1s:
+    if versionStr or ls or ids or sha1s or info:
 	if all:
 	    log.error("--all cannot be used with queries which display file "
 		      "lists")
 	    return
 	for troveName in troves:
 	    _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-			      fullVersions)
+			      info, fullVersions)
 	    continue
     else:
 	if all:
@@ -89,7 +90,7 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 					      versionStrs[version])
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-		      fullVersions):
+		      info, fullVersions):
     try:
 	troveList = repos.findTrove(cfg.installLabel, troveName, 
 				    cfg.flavor, versionStr)
@@ -123,6 +124,28 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		file = repos.getFileVersion(fileId, version)
 		if file.hasContents:
 		    print "%s %s" % (file.contents.sha1(), path)
+	elif info:
+	    buildTime = time.strftime("%c",
+				time.localtime(version.timeStamps()[-1]))
+	    print "%-30s %s" % \
+		(("Name      : %s" % troveName,
+		 ("Build time: %s" % buildTime)))
+
+	    if fullVersions:
+		print "Version   :", version.asString()
+		print "Label     : %s" % version.branch().label().asString()
+
+	    else:
+		print "%-30s %s" % \
+		    (("Version   : %s" % version.trailingVersion().asString()),
+		     ("Label     : %s" % version.branch().label().asString()))
+
+	    cl = trove.getChangeLog()
+	    if cl:
+		print "Change log: %s (%s)" % (cl.name, cl.contact)
+		lines = cl.message.split("\n")[:-1]
+		for l in lines:
+		    print "    %s" % l
 	else:
 	    if fullVersions or len(troveList) > 1:
 		print _troveFormat % (troveName, version.asString())

@@ -22,7 +22,7 @@ class SrsConfiguration:
 	line = line.strip()
 	if not line or line[0] == '#':
 	    return
-	(key, val) = line.split()
+	(key, val) = line.split(None, 1)
         key = key.lower()
 	if not self.lowerCaseMap.has_key(key):
 	    raise ParseError, ("configuration value %s unknown" % key)
@@ -64,6 +64,8 @@ class SrsConfiguration:
 	self.lookaside = "/var/cache/srs"
 	self.dbPath = "/var/lib/srsdb"
         self.tmpDir = "/var/tmp/"
+	self.name = None
+	self.contact = None
 	self.instructionSet = deps.arch.current()
 
         self.lowerCaseMap = {}

@@ -73,6 +73,7 @@ def usage(rc = 1):
     print "replist flags: --all"
     print "               --full-versions"
     print "               --ids"
+    print "               --info"
     print "               --leaves"
     print "               --ls"
     print "               --sha1s"
@@ -112,9 +113,11 @@ def realMain():
     argDef["debug"] = 0
     argDef["full-versions"] = 0
     argDef["ids"] = 0
+    argDef["info"] = 0
     argDef["leaves"] = 0
     argDef["ls"] = 0
     argDef["macros"] = 1
+    argDef["message"] = 1
     argDef["prep"] = 0
     argDef["profile"] = 0
     argDef["replace-files"] = 0
@@ -316,6 +319,9 @@ def realMain():
 	ids = argSet.has_key('ids')
 	if ids: del argSet['ids']
 
+	info = argSet.has_key('info')
+	if info: del argSet['info']
+
 	sha1s = argSet.has_key('sha1s')
 	if sha1s: del argSet['sha1s']
 
@@ -327,8 +333,8 @@ def realMain():
 	if argSet: return usage()
 
 	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	    args = [repos, cfg, all, ls, ids, sha1s, leaves, fullVersions] + \
-			otherArgs[2:]
+	    args = [repos, cfg, all, ls, ids, sha1s, leaves, fullVersions,
+		    info] + otherArgs[2:]
 	    try:
 		queryrep.displayTroves(*args)
 	    except IOError, msg:

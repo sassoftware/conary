@@ -6,6 +6,7 @@
 from build import recipe, lookaside
 from local import update
 from repository import changeset
+import changelog
 import cook
 import files
 import helper
@@ -175,7 +176,10 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
 
     state.write(workDir + "/SRS")
 
-def commit(repos, cfg):
+def commit(repos, cfg, message):
+    if cfg.name is None or cfg.contact is None:
+	log.error("name and contact information must be set for commits")
+
     try:
         state = SourceStateFromFile("SRS")
     except OSError:
@@ -227,9 +231,18 @@ def commit(repos, cfg):
 
     if not isDifferent:
 	log.info("no changes have been made to commit")
-    else:
-	repos.commitChangeSet(changeSet)
-	newState.write("SRS")
+	return
+
+    cl = changelog.ChangeLog(cfg.name, cfg.contact, message)
+    if message is None and not cl.getMessage():
+	log.error("no change log message was given")
+	return
+
+    pkgCs = changeSet.iterNewPackageList().next()
+    pkgCs.changeChangeLog(cl)
+
+    repos.commitChangeSet(changeSet)
+    newState.write("SRS")
 
 def diff(repos, versionStr = None):
     try:

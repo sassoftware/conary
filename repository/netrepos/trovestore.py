@@ -512,7 +512,7 @@ class TroveStore:
 
 	cu = self.db.cursor()
 	cu.execute("""SELECT instances.instanceId, ChangeLogs.name, 
-			     ChangeLogs.email,
+			     ChangeLogs.contact,
 			     ChangeLogs.message FROM
 		      Instances JOIN Nodes ON 
 		             Instances.itemId=Nodes.itemId AND

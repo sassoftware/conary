@@ -20,6 +20,8 @@ def usage(rc = 1):
     print "       srs source remove <file> [<file2> <file3> ...]"
     print "       srs source rename <oldfile> <newfile>"
     print "       srs source update <version>"
+    print 
+    print "commit flags:   --message <msg>"
     return rc
 
 def sourceCommand(cfg, args, argSet):
@@ -42,10 +44,14 @@ def sourceCommand(cfg, args, argSet):
 	args = [repos, cfg, dir] + args[1:]
 	checkin.checkout(*args)
     elif (args[0] == "commit"):
+	message = argSet.get("message", None)
+	if message is not None:
+	    del argSet['message']
+
 	if argSet or len(args) != 1: return usage()
 	repos = openRepository(cfg.repPath)
 
-	checkin.commit(repos, cfg)
+	checkin.commit(repos, cfg, message)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = openRepository(cfg.repPath)

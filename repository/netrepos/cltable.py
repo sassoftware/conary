@@ -14,7 +14,7 @@ class ChangeLogTable:
             cu.execute("""CREATE TABLE ChangeLogs(
 				nodeId INTEGER UNIQUE,
 				name STR, 
-				email STR, 
+				contact STR, 
 				message STR);
 			""")
 	    cu.execute("INSERT INTO ChangeLogs values(0, NULL, NULL, NULL)")
@@ -22,5 +22,5 @@ class ChangeLogTable:
     def add(self, nodeId, cl):
         cu = self.db.cursor()
         cu.execute("INSERT INTO ChangeLogs VALUES (%d, %s, %s, %s)",
-                   (nodeId, cl.name, cl.email, cl.message))
+                   (nodeId, cl.name, cl.contact, cl.message))
 	return cu.lastrowid

@@ -458,6 +458,9 @@ class TroveChangeSet:
     def changeNewVersion(self, version):
 	self.newVersion = version
 
+    def changeChangeLog(self, cl):
+	self.changeLog = cl
+
     def getOldVersion(self):
 	return self.oldVersion
 
