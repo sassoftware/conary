@@ -222,8 +222,8 @@ class ConaryClient:
         return self._resolveDependencies(finalCs, keepExisting = keepExisting, 
                                          recurse = recurse)
 
-    def applyChangeSet(self, cs, replaceFiles = False,
-                    tagScript = None, keepExisting = None, depCheck = True):
+    def applyChangeSet(self, cs, replaceFiles = False, tagScript = None, 
+                       keepExisting = None):
         assert(isinstance(cs, changeset.ChangeSet))
 
         if cs.isAbsolute():
