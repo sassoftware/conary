@@ -58,10 +58,10 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
                     % (fileNum , total, (fileNum * 100) / total))
 
     def runningPreTagHandlers(self):
-        self._message("Running pretag scripts...")
+        self._message("Running tag pre-scripts...")
 
     def runningPostTagHandlers(self):
-        self._message("Running posttag scripts...")
+        self._message("Running tag post-scripts...")
 
     def __init__(self):
         callbacks.LineOutput.__init__(self)
