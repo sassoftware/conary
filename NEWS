@@ -1,4 +1,5 @@
-Changes in 0.11.11
+Changes in 0.11.10.1
+  * move to python2.4
   * repository caching (which isn't used yet) didn't track the recurse flag
 
 Changes in 0.11.10
