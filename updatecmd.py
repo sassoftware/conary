@@ -26,7 +26,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
             pass
         else:
             if cs.isAbsolute():
-                cs = db.rootChangeSet(cs, cfg.defaultbranch)
+                cs = db.rootChangeSet(cs)
 
 	    list = [ x.getName() for x  in cs.iterNewPackageList() ]
 	    if versionStr:

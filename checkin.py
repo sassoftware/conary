@@ -33,11 +33,7 @@ class SourceState(package.Package):
 	f.write("name %s\n" % self.name)
 	if self.version:
 	    f.write("version %s\n" % self.version.asString())
-	f.write("branch %s\n" % self.branch.asString())
 	f.write(self.freezeFileList())
-
-    def getBranch(self):
-	return self.branch
 
     def changeBranch(self, branch):
 	self.branch = branch
@@ -51,25 +47,24 @@ class SourceState(package.Package):
     def expandVersionStr(self, versionStr):
 	if versionStr[0] == "@":
 	    # get the name of the repository from the current branch
-	    repName = self.getBranch().label().getHost()
+	    repName = self.getVersion().branch().label().getHost()
 	    return repName + versionStr
 	elif versionStr[0] != "/" and versionStr.find("@") == -1:
 	    # non fully-qualified version; make it relative to the current
 	    # branch
-	    return self.getBranch().asString() + "/" + versionStr
+	    return self.getVersion().branch().asString() + "/" + versionStr
 
 	return versionStr
 
-    def __init__(self, name, version, branch):
+    def __init__(self, name, version):
 	package.Package.__init__(self, name, version, None)
-	self.branch = branch
 
 class SourceStateFromFile(SourceState):
 
     def parseFile(self, filename):
 	f = open(filename)
 	rc = [self]
-	for (what, isBranch) in [ ('name', 0), ('version', 1), ('branch', 1) ]:
+	for (what, isBranch) in [ ('name', 0), ('version', 1) ]:
 	    line = f.readline()
 	    fields = line.split()
 	    assert(len(fields) == 2)
@@ -92,7 +87,7 @@ class SourceStateFromFile(SourceState):
 
 def _verifyAtHead(repos, headPkg, state):
     headVersion = repos.getTroveLatestVersion(state.getName(), 
-					 state.getBranch())
+					 state.getVersion().branch())
     if not headVersion == state.getVersion():
 	return False
 
@@ -154,7 +149,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
 
     branch = helper.fullBranchName(cfg.installlabel, trv.getVersion(), 
 				   versionStr)
-    state = SourceState(trv.getName(), trv.getVersion(), branch)
+    state = SourceState(trv.getName(), trv.getVersion())
 
     # it's a shame that findTrove already sent us the trove since we're
     # just going to request it again
@@ -217,7 +212,7 @@ def commit(repos, cfg):
     recipeVersionStr = recipeClass.version
 
     if isinstance(state.getVersion(), versions.NewVersion):
-	branch = state.getBranch()
+	branch = versions.Version([cfg.buildlabel])
     else:
 	branch = state.getVersion().branch()
 
@@ -314,7 +309,8 @@ def updateSrc(repos, versionStr = None):
     baseVersion = state.getVersion()
     
     if not versionStr:
-	headVersion = repos.getTroveLatestVersion(pkgName, state.getBranch())
+	headVersion = repos.getTroveLatestVersion(pkgName, 
+						  state.getVersion().branch())
 	head = repos.getTrove(pkgName, headVersion, None)
 	newBranch = None
 	headVersion = head.getVersion()
@@ -401,7 +397,7 @@ def removeFile(file):
 def newPackage(repos, cfg, name):
     name += ":source"
 
-    state = SourceState(name, versions.NewVersion(), cfg.defaultbranch)
+    state = SourceState(name, versions.NewVersion())
 
     if repos and repos.hasPackage(name):
 	log.error("package %s already exists" % name)

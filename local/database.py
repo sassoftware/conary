@@ -159,7 +159,7 @@ class Database(SqlDbRepository):
 
     # takes an absolute change set and creates a differential change set 
     # against a branch of the repository
-    def rootChangeSet(self, absSet, branch):
+    def rootChangeSet(self, absSet):
 	assert(absSet.isAbsolute())
 
 	# this has an empty source path template, which is only used to
@@ -178,17 +178,31 @@ class Database(SqlDbRepository):
 	for (name, version, flavor) in absSet.getPrimaryPackageList():
 	    cs.addPrimaryPackage(name, version, flavor)
 
-	for newPkg in job.newPackageList():
-	    # FIXME
-	    #
-	    # this shouldn't be against branch, it should be against
-	    # the version of the package already installed on the
-	    # system. unfortunately we can't represent that yet. 
-	    pkgName = newPkg.getName()
-	    oldVersion = self.getTroveLatestVersion(pkgName, branch)
+	oldVersion = None
 
-	    # XXX X this needs to something with flavor to make sure
-	    # we're getting the right one
+	for newPkg in job.newPackageList():
+	    pkgName = newPkg.getName()
+	    oldVersions = self.getPackageVersionList(pkgName)
+	    if len(oldVersions) > 1:
+		# try and pick the one which looks like a good match
+		# for the new version
+		newBranch = newPkg.getNewVersion().branch()
+		for ver in oldVersions:
+		    if ver.branch() == newBranch:
+			# make sure it's the right flavor
+			flavors = self.pkgVersionFlavors(pkgName, ver)
+			if newPkg.getFlavor() in flavors:
+			    oldVersion = ver
+			    break
+
+		if not oldVersion:
+		    raise AmbiguousOperation
+	    elif oldVersions:
+		# make sure it's the right flavor
+		flavors = self.pkgVersionFlavors(pkgName, oldVersions[0])
+		if newPkg.getFlavor() in flavors:
+		    oldVersion = oldVersions[0]
+
 	    if not oldVersion:
 		# new package; the Package.diff() right after this never
 		# sets the absolute flag, so the right thing happens
@@ -578,3 +592,6 @@ class SourcePackageInstall(DatabaseError):
     def __str__(self):
 	return "cannot install a source package onto the local system"
 
+class AmbigiousOperation(DatabaseError):
+
+    pass

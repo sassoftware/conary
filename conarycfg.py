@@ -39,6 +39,8 @@ class SrsConfiguration:
 			   self.defaultbranch.asString())
 	    elif key == "installlabel":
 		self.installlabel = versions.BranchName(self.installlabel)
+	    elif key == "buildlabel":
+		self.buildlabel = versions.BranchName(self.buildlabel)
 	except versions.ParseError, e:
 	    raise ParseError, str(e)
 
@@ -66,6 +68,7 @@ class SrsConfiguration:
 	self.buildpath = "/usr/src/srs/builds"
 	self.defaultbranch = None
 	self.installlabel = None
+	self.buildlabel = None
 	self.lookaside = "/var/cache/srs"
 	self.dbpath = "/var/lib/srsdb"
         self.tmpdir = "/var/tmp/"
