@@ -805,7 +805,7 @@ class ObsoletePaths(policy.Policy):
 	    fullpath = util.joinPaths(d, path)
 	    if os.path.exists(fullpath):
 		self.recipe.reportErrors(
-		    'Path %s should not exist' %file)
+		    'Path %s should not exist' %path)
 
 
 class IgnoredSetuid(policy.Policy):
