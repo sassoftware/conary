@@ -604,8 +604,8 @@ class Database:
 	else:
 	    cu.execute("""
 		UPDATE DBTroveFiles SET instanceId=? WHERE
-		    pathId=? and versionId=?""", troveInstanceId,
-		pathId, versionId)
+		    fileId=? AND pathId=? AND versionId=?""", 
+                    troveInstanceId, fileId, pathId, versionId)
 
     def getFile(self, pathId, fileId, pristine = False):
 	stream = self.troveFiles.getFileByFileId(fileId, 
