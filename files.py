@@ -245,7 +245,7 @@ class DeviceStream(TupleStream):
 class RegularFileStream(TupleStream):
 
     makeup = (("size", LongLongStream, 8), ("flags", ShortStream, 2),
-              ("sha1", StringStream, 20))
+              ("sha1", StringStream, 40))
     streamId = _STREAM_SIZESHA1
 
 class InodeStream(TupleStream):

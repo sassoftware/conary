@@ -90,7 +90,7 @@ class FilesystemRepository(AbstractRepository):
 	file = fileDB.getVersion(version)
 	if withContents:
 	    if file.hasContents:
-		cont = filecontents.FromRepository(self, file.sha1(), 
+		cont = filecontents.FromRepository(self, file.contents.sha1(), 
 						   file.size())
 	    else:
 		cont = None
@@ -124,7 +124,7 @@ class FilesystemRepository(AbstractRepository):
 	if file.hasContents:
 	    if restoreContents:
 		f = contents.get()
-		targetFile = self.contentsStore.newFile(file.sha1())
+		targetFile = self.contentsStore.newFile(file.contents.sha1())
 
 		# if targetFile is None the file is already in the store
 		if targetFile:

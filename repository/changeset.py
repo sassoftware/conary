@@ -293,7 +293,8 @@ class ChangeSet:
 		# members of the local branch, and their contents will be
 		# saved as part of that change set.
 		if origFile.isConfig():
-		    cont = filecontents.FromRepository(db, origFile.sha1(),
+		    cont = filecontents.FromRepository(db, 
+						       origFile.contents.sha1(),
 						       origFile.size())
 		    rollback.addFileContents(fileId,
 					     ChangedFileTypes.file, cont, 1)
@@ -349,8 +350,8 @@ class ChangeSet:
 			rollback.addFileContents(fileId,
 						 ChangedFileTypes.diff, cont, 1)
 		    else:
-			cont = filecontents.FromRepository(db, origFile.sha1(),
-							   origFile.size())
+			cont = filecontents.FromRepository(db, 
+				    origFile.contents.sha1(), origFile.size())
 			rollback.addFileContents(fileId,
 						 ChangedFileTypes.file, cont,
 						 newFile.isConfig())
