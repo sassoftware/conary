@@ -1,0 +1,29 @@
+#!/usr/bin/python
+
+import os
+import sys
+
+if os.path.dirname(sys.argv[0]):
+    if sys.argv[0][0] == "/":
+	fullPath = os.path.dirname(sys.argv[0])
+    else:
+	fullPath = os.getcwd() + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.append(os.path.dirname(fullPath))
+from filecontainer import FileContainer
+
+f = open(sys.argv[1], "r")
+c = FileContainer(f)
+f.close()
+if len(sys.argv) == 2:
+    for n in c.fileList():
+	print n
+else:
+    for file in sys.argv[2:]:
+	print "--", file
+	f = c.getFile(file)
+	sys.stdout.write(f.read())
+	print "---"
+	f.close()
