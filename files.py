@@ -39,9 +39,12 @@ class InfoStream(object):
 
     streamId = _STREAM_INFO
 
+    def copy(self):
+        return self.__class__(self.freeze())
+    
     def freeze(self):
 	raise NotImplementedError
-
+    
     def diff(self, them):
 	raise NotImplementedError
 
@@ -202,9 +205,6 @@ class DependenciesStream(InfoStream):
     __slots__ = 'deps'
     streamId = _STREAM_DEPENDENCIES
 
-    def __deepcopy__(self, memo):
-        return self.__class__(self.freeze())
-
     def value(self):
 	return self.deps
 
@@ -248,10 +248,6 @@ class TupleStream(InfoStream):
 
     def __eq__(self, other):
 	return other.__class__ == self.__class__ and other.items == self.items
-
-    def __deepcopy__(self, memo):
-        # required because copy.deepcopy() does not deal with __slots__
-        return self.__class__(self.freeze())
 
     def freeze(self):
 	rc = []
@@ -540,9 +536,8 @@ class File(object):
     def copy(self):
 	new = copy.deepcopy(self)
         for name, streamClass in self.streamList:
-            stream = self.__getattribute__(name).freeze()
-            newstream = streamClass(stream)
-            new.__setattr__(name, newstream)
+            stream = self.__getattribute__(name).copy()
+            new.__setattr__(name, stream)
         return new
 
     def id(self, new = None):

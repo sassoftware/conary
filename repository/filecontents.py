@@ -22,6 +22,9 @@ class FromRepository(FileContents):
 
     __slots__ = ( "repos", "theSize", "sha1" )
 
+    def copy(self):
+        return self.__class__(self.repos, self.sha1, self.theSize)
+
     def get(self):
 	return self.repos.getFileContents((self.sha1,))[self.sha1]
 
@@ -50,6 +53,9 @@ class FromChangeSet(FileContents):
 
     __slots__ = ( "cs", "fileId" )
 
+    def copy(self):
+        return self.__class__(self.cs, self.fileId)
+
     def get(self):
 	return self.cs.getFileContents(self.fileId)[1].get()
 
@@ -64,7 +70,7 @@ class FromString(FileContents):
 
     __slots__ = "str"
 
-    def __deepcopy__(self, mem):
+    def copy(self):
         return self.__class__(self.str)
 
     def get(self):
@@ -87,6 +93,10 @@ class FromFile(FileContents):
 
     __slots__ = "f"
 
+    def copy(self):
+        # XXX dup the file?
+        return self.__class__(self.f)
+
     def size(self):
 	pos = self.f.tell()
 	size = self.f.seek(0, SEEK_END)
@@ -102,6 +112,9 @@ class FromFile(FileContents):
 class WithFailedHunks(FileContents):
 
     __slots__ = ( "fc", "hunks" )
+
+    def copy(self):
+        return self.__class__(fc, hunks)
 
     def get(self):
 	return self.fc.get()
