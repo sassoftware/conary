@@ -233,8 +233,10 @@ def loadRecipe(file, sourcecomponent=None):
     repos = callerGlobals['repos']
     if sourcecomponent and not sourcecomponent.endswith(':source'):
 	sourcecomponent = sourcecomponent + ':source'
+	# XXX the sourcecomponent argument should go away
+	# and always pull by file name
     else:
-	sourcecomponent = callerGlobals['component']
+	sourcecomponent = file.split('.')[0] + ':source'
     if file[0] != '/':
         recipepath = os.path.dirname(callerGlobals['filename'])
         localfile = recipepath + '/' + file
