@@ -91,7 +91,7 @@ class ConaryClient:
 
             # everything which needs to be installed is in this list; if it's
             # not here, it's a duplicate
-            outdated, eraseList = helper.outdatedTroves(self.db, newItems)
+            outdated, eraseList = self.db.outdatedTroves(newItems)
             for (name, newVersion, newFlavor), \
                     (oldName, oldVersion, oldFlavor) in outdated.iteritems():
                 list.append((name, (oldVersion, oldFlavor),

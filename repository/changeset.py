@@ -19,7 +19,6 @@ import errno
 import filecontainer
 import filecontents
 import files
-import helper
 import os
 import patch
 import repository
@@ -649,7 +648,7 @@ class ChangeSetFromFile(ChangeSet):
 	    items.append((newPkg.getName(), newPkg.getVersion(), 
 			  newPkg.getFlavor()))
 
-	outdated, eraseList = helper.outdatedTroves(db, items)
+	outdated, eraseList = db.outdatedTroves(items)
         # this ignores eraseList, juts like doUpdate does
 
 	for newPkg in job.newPackageList():

@@ -179,58 +179,6 @@ def nextVersion(repos, troveName, versionStr, troveFlavor, currentBranch,
         
     return newVersion
 
-def outdatedTroves(db, l):
-    """
-    For a (troveName, troveVersion, troveFlavor) list return a dict indexed by
-    elements in that list. Each item in the dict is the (troveName,
-    troveVersion, troveFlavor) item for an already installed trove if
-    installing that item doesn't cause a removal, otherwise it is which needs
-    to be removed as part of the update. a (None, None) tuple means the
-    item is new and nothing should be removed while no entry means that the
-    item is already installed.
-    """
-
-    names = {}
-    for (name, version, flavor) in l:
-	names[name] = True
-
-    instList = []
-    for name in names.iterkeys():
-	# get the current troves installed
-	try:
-	    instList += db.findTrove(name)
-	except repository.repository.PackageNotFound, e:
-	    pass
-
-    # now we need to figure out how to match up the version and flavors
-    # pair. a shortcut is to stick the old troves in one group and
-    # the new troves in another group; when we diff those groups
-    # diff tells us how to match them up. anything which doesn't get
-    # a match gets removed. got that? 
-    instGroup = trove.Trove("@update", versions.NewVersion(), 
-			    None, None)
-    for instTrove in instList:
-	instGroup.addTrove(instTrove.getName(), instTrove.getVersion(),
-			   instTrove.getFlavor())
-
-    newGroup = trove.Trove("@update", versions.NewVersion(), 
-			    None, None)
-    for (name, version, flavor) in l:
-	newGroup.addTrove(name, version, flavor)
-
-    trvChgs = newGroup.diff(instGroup)[2]
-
-    resultDict = {}
-    eraseList = []
-    for (name, oldVersion, newVersion, oldFlavor, newFlavor) in trvChgs:
-	if not newVersion:
-	    eraseList.append((name, oldVersion, oldFlavor))
-	else:
-	    resultDict[(name, newVersion, newFlavor)] = (name, oldVersion, 
-							 oldFlavor)
-
-    return resultDict, eraseList
-
 class PackageNotFound(Exception):
 
     def __str__(self):
