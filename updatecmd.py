@@ -46,7 +46,10 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                 sys.exit(1)
             applyList.append(cs)
         else:
-            applyList.append(parseTroveSpec(pkgStr, cfg.flavor))
+            if updateByDefault or pkgStr[0] == '+':
+                applyList.append(parseTroveSpec(pkgStr, cfg.flavor))
+            else:
+                applyList.append(parseTroveSpec(pkgStr, None))
 
     # dedup
     applyList = {}.fromkeys(applyList).keys()
