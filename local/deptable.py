@@ -40,7 +40,7 @@ class DepTable:
     def delId(self, theId):
         assert(type(theId) is int)
         cu = self.db.cursor()
-        cu.execute("DELETE FROM Dependencies WHERE depId=?, theId)
+        cu.execute("DELETE FROM Dependencies WHERE depId=?", theId)
 
     def delDep(self, depClass, dep):
         cu = self.db.cursor()
