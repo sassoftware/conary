@@ -17,7 +17,7 @@ dist_files = $(python_files) $(extra_dist)
 
 all: default-all
 
-install: pyfiles-install
+install: install-subdirs pyfiles-install
 
 dist: default-dist
 
