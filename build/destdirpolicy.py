@@ -334,13 +334,17 @@ class RelativeSymlinks(policy.Policy):
 	if os.path.islink(fullpath):
 	    contents = os.readlink(fullpath)
 	    if contents.startswith('/'):
+		pathlist = util.normpath(path).split('/')
+		contentslist = util.normpath(contents).split('/')
+		while pathlist[0] == contentslist[0]:
+		    pathlist = pathlist[1:]
+		    contentslist = contentslist[1:]
 		os.remove(fullpath)
 		dots = "../"
-		dots *= path.count('/') - 1
-		normpath = util.normpath(dots + contents)
-		# FIXME: make shortest possible relative symlink
-		log.debug('Changing absolute symlink %s to relative symlink %s',
-                          path, normpath)
+		dots *= len(pathlist) - 1
+		normpath = util.normpath(dots + '/'.join(contentslist))
+		log.debug('Changing absolute symlink %s -> %s to relative symlink -> %s',
+                          path, contents, normpath)
 		os.symlink(normpath, fullpath)
 
 
