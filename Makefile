@@ -25,6 +25,7 @@ python_files = __init__.py	\
 	files.py		\
 	fixedglob.py		\
 	importrpm.py		\
+	log.py			\
 	lookaside.py		\
 	package.py		\
 	packagepolicy.py	\
