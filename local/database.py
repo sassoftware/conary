@@ -371,7 +371,7 @@ class DatabaseError(Exception):
     def __init__(self, str = None):
 	self.str = str
 
-class RollbackError(Database):
+class RollbackError(Exception):
 
     """Base class for exceptions related to applying rollbacks"""
 
@@ -380,11 +380,8 @@ class RollbackOrderError(RollbackError):
     """Raised when an attempt is made to apply rollbacks in the
        wrong order"""
 
-    def __repr__(self):
-	return "rollback %s can not be applied out of order" % self.name
-
     def __str__(self):
-	return repr(self)
+	return "rollback %s can not be applied out of order" % self.name
 
     def __init__(self, rollbackName):
 	"""Create new new RollbackOrderError
@@ -397,11 +394,8 @@ class RollbackDoesNotExist(RollbackError):
     """Raised when the system tries to access a rollback which isn't in
        the database"""
 
-    def __repr__(self):
-	return "rollback %s does not exist" % self.name
-
     def __str__(self):
-	return repr(self)
+	return "rollback %s does not exist" % self.name
 
     def __init__(self, rollbackName):
 	"""Create new new RollbackOrderError
