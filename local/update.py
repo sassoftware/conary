@@ -614,6 +614,7 @@ class FilesystemJob:
                 headFile = files.ThawFile(headChanges, fileId)
                 
             fsFile.flags.isConfig(headFile.flags.isConfig())
+            fsFile.flags.isSource(headFile.flags.isSource())
 
             # this is changed to true when the file attributes have changed;
             # this helps us know if we need a restore event
