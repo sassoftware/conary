@@ -32,9 +32,8 @@ def createCacheEntry(cfg, name, location, infile):
     return cachedname
 
 def createNegativeCacheEntry(cfg, name, location):
-    negativeEntry = createCacheName(name, location, 'NEGATIVE/')
+    negativeEntry = createCacheName(cfg, name, location, 'NEGATIVE/')
     open(negativeEntry, "w+").close()
-
 
 def searchCache(cfg, name, location):
     basename = os.path.basename(name)
@@ -46,7 +45,7 @@ def searchCache(cfg, name, location):
 	if os.path.exists(negativeName):
 	    if time.time() > 60*60*24*7 + os.path.getmtime(negativeName):
 		os.remove(negativeName)
-		return searchCache(name, location)
+		return searchCache(cfg, name, location)
 	    return None
 
 	# exact match first, then look for cached responses from other servers
@@ -115,11 +114,6 @@ def findAll(cfg, repcache, name, location, srcdirs):
 	raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT))
     return f
 
-
-class LookAside(file):
-    def __init__(cfg, name, location, srcdirs, buffered=-1):
-	f = findAll(cfg, name, location, srcdirs)
-	file.__init__(self, f, "r", buffered)
 
 class RepositoryCache:
 
