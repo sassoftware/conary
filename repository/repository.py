@@ -157,9 +157,9 @@ class AbstractTroveDatabase:
 
 	return cs
 
-    def findTrove(repos, defaultLabel, name, flavor, versionStr = None):
+    def findTrove(self, defaultLabel, name, flavor, versionStr = None):
 	"""
-	Looks up a package in the given repository based on the name and
+	Looks up a trove in the repository based on the name and
 	version provided. If any errors are occured, PackageNotFound is
 	raised with an appropriate error message. Multiple matches could
 	be found if versionStr refers to a label.
@@ -169,13 +169,13 @@ class AbstractTroveDatabase:
 	the repository name from this label is used as the repository
 	name for the branch name to form a complete label.
 	@type defaultLabel: versions.BranchName
-	@param name: Package name
+	@param name: Trove name
 	@type name: str
 	@param flavor: only troves compatible with this flavor will be returned
 	@type flavor: deps.DependencySet
-	@param versionStr: Package version
+	@param versionStr: Trove version
 	@type versionStr: str
-	@rtype: list of package.Package
+	@rtype: list of package.Trove
 	"""
 	raise NotImplementedError
 
