@@ -12,6 +12,6 @@ The Specifix Repository System
 @group Database/Repository: database, local, repository, versioned
 @group Package/Changeset objects: package, changeset, versions
 @group Package installation/rollback: update, rollbacks
-@group Utility: util, lookaside, rpmhelper, sha1helper, fixedglob, log, enum
+@group Utility: util, lookaside, rpmhelper, sha1helper, fixedglob, log, enum, magic
 @group Files: datastore, files, filecontainer
 """

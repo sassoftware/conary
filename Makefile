@@ -40,6 +40,7 @@ python_files = __init__.py	\
 	srs.py			\
 	updatecmd.py		\
 	util.py			\
+	magic.py		\
 	versioned.py		\
 	versions.py
 
