@@ -102,6 +102,7 @@ def usage(rc = 1):
     print "              --no-resolve"
     print "              --replace-files"
     print "              --resolve"
+    print "              --test"
     return rc
 
 def openRepository(repMap):
@@ -148,6 +149,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
     argDef["target-branch"] = ONE_PARAM
+    argDef["test"] = NO_PARAM
     argDef["version"] = NO_PARAM
 
     try:
@@ -227,6 +229,10 @@ def realMain(cfg, argv=sys.argv):
 	if argSet.has_key('no-deps'):
 	    kwargs['depCheck'] = False
 	    del argSet['no-deps']
+
+	if argSet.has_key('test'):
+	    kwargs['test'] = argSet['test']
+	    del argSet['test']
 
 	if argSet: return usage()
 
@@ -421,6 +427,10 @@ def realMain(cfg, argv=sys.argv):
 	if argSet.has_key('tag-script'):
 	    kwargs['tagScript'] = argSet['tag-script']
 	    del argSet['tag-script']
+
+	if argSet.has_key('test'):
+	    kwargs['test'] = argSet['test']
+	    del argSet['test']
 
 	if argSet: return usage()
 	if len(otherArgs) >=3:

@@ -1,5 +1,6 @@
 Changes in 0.11.3:
   * optimized a sqlite update statement to use indexed columns
+  * added --test to update and erase
 
 Changes in 0.11.2:
   * standalone server was broken by --add-user changes in 0.11.1

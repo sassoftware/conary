@@ -259,7 +259,7 @@ class ConaryClient:
                                 keepExisting = keepExisting)
 
     def applyUpdate(self, theCs, replaceFiles = False, tagScript = None, 
-                    keepExisting = None):
+                    keepExisting = None, test = False):
         assert(isinstance(theCs, changeset.ReadOnlyChangeSet))
         cs = changeset.ReadOnlyChangeSet()
         for (how, what) in theCs.contents:
@@ -272,9 +272,11 @@ class ConaryClient:
 
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
-                                keepExisting = keepExisting)
+                                keepExisting = keepExisting,
+                                test = test)
 
-    def eraseTrove(self, troveList, depCheck = True, tagScript = None):
+    def eraseTrove(self, troveList, depCheck = True, tagScript = None,
+                   test = False):
 	cs = changeset.ChangeSet()
 
         for (troveName, versionStr) in troveList:
@@ -292,7 +294,7 @@ class ConaryClient:
             if cannotResolve:
                 return cannotResolve
             
-	self.db.commitChangeSet(cs, tagScript = tagScript)
+	self.db.commitChangeSet(cs, tagScript = tagScript, test = test)
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):

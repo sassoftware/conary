@@ -232,7 +232,7 @@ class Database(SqlDbRepository):
     # transaction
     def commitChangeSet(self, cs, isRollback = False, toStash = True,
                         replaceFiles = False, tagScript = None,
-			keepExisting = False):
+			keepExisting = False, test = False):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -362,8 +362,10 @@ class Database(SqlDbRepository):
 	    del localChanges
 
 	# run preremove scripts before updating the database, otherwise
-	# the file lists which get sent to them are incorrect
-	fsJob.preapply(tagSet, tagScript)
+	# the file lists which get sent to them are incorrect. skipping
+        # this makes --test a little inaccurate, but life goes on
+        if not test:
+            fsJob.preapply(tagSet, tagScript)
 
 	# Build A->B
 	if toStash:
@@ -377,6 +379,9 @@ class Database(SqlDbRepository):
 	    for err in errList: log.error(err)
 	    # FIXME need a --force for this
 	    return
+
+        if test:
+            return
 
 	fsJob.apply(tagSet, tagScript)
 

@@ -26,7 +26,7 @@ import conaryclient
 
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
-                                  recurse = True):
+                                  recurse = True, test = False):
     client = conaryclient.ConaryClient(cfg)
 
     applyList = []
@@ -87,13 +87,14 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             items.sort()
             print "%s" % (" ".join(items))
 
-        client.applyUpdate(cs, replaceFiles, tagScript, keepExisting)
+        client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,
+                           test = test)
     except conaryclient.UpdateError, e:
         log.error(e)
     except repository.CommitError, e:
         log.error(e)
 
-def doErase(cfg, itemList, tagScript = None, depCheck = True):
+def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False):
     troveList = []
     for item in itemList:
         l = item.split("=")
@@ -110,7 +111,7 @@ def doErase(cfg, itemList, tagScript = None, depCheck = True):
     brokenByErase = []
     try:
         brokenByErase = client.eraseTrove(troveList, tagScript = tagScript, 
-                                          depCheck = depCheck)
+                                          depCheck = depCheck, test = test)
     except repository.PackageNotFound, e:
         log.error(str(e))
 
