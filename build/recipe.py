@@ -12,7 +12,7 @@ import types
 import inspect
 
 def flatten(list):
-    if type(list) != type([]): return [list]
+    if type(list) != types.ListType: return [list]
     if list == []: return list
     return flatten(list[0]) + flatten(list[1:])
 
@@ -85,7 +85,7 @@ class Recipe:
 
     def allSources(self):
 	return self.sources + self.tarballs + self.patches + \
-               flatten(self.signatures)
+               flatten(self.signatures.items())
 
     def mainDir(self, new = None):
 	if new:
