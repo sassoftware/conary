@@ -373,6 +373,8 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 		print str
 		print
 	    else:
+		# this happens for config files w/ don't include trailing
+		# new lines as we don't generate diffs in that case
 		lines = contents.get().readlines()
 		print "@@ -0,0 +1,%d @@" % len(lines)
 		for l in lines:
