@@ -897,7 +897,7 @@ class SingleGroup:
         if flavor is not None:
             flavor = deps.parseFlavor(flavor)
             if flavor is None:
-                raise ValueError, 'invalid flavor %s' % flavor
+                raise ValueError, 'invalid flavor'
 
         self.addTroveList.append((name, versionStr, flavor, source, byDefault))
 
