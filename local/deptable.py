@@ -408,34 +408,36 @@ class DependencyTables:
 
         # check the dependencies for anything which depends on things which
         # we've removed
-        cu.execute("""
-                INSERT INTO TmpRequires SELECT 
-                    DISTINCT Requires.instanceId, Requires.depId, 
-                             Requires.depCount
-                FROM RemovedTroveIds JOIN Provides ON
-                    RemovedTroveIds.troveId == Provides.instanceId
-                JOIN Requires ON
-                    Provides.depId = Requires.depId
-        """, start_transaction = False)
+        #cu.execute("""
+        #        INSERT INTO TmpRequires SELECT 
+        #            DISTINCT Requires.instanceId, Requires.depId, 
+        #                     Requires.depCount
+        #        FROM RemovedTroveIds JOIN Provides ON
+        #            RemovedTroveIds.troveId == Provides.instanceId
+        #        JOIN Requires ON
+        #            Provides.depId = Requires.depId
+        #""", start_transaction = False)
 
-        cu.execute("""
-                INSERT INTO DepCheck SELECT
-                    Requires.instanceId, Dependencies.depId,
-                    Requires.DepCount, 0, Dependencies.class,
-                    Dependencies.name, Dependencies.flag
-                FROM RemovedTroveIds JOIN Provides ON
-                    RemovedTroveIds.troveId == Provides.instanceId
-                JOIN Requires ON
-                    Provides.depId = Requires.depId
-                JOIN Dependencies ON
-                    Dependencies.depId == Requires.depId
-        """, start_transaction = False)
+        #cu.execute("""
+        #        INSERT INTO DepCheck SELECT
+        #            Requires.instanceId, Dependencies.depId,
+        #            Requires.DepCount, 0, Dependencies.class,
+        #            Dependencies.name, Dependencies.flag
+        #        FROM RemovedTroveIds JOIN Provides ON
+        #            RemovedTroveIds.troveId == Provides.instanceId
+        #        JOIN Requires ON
+        #            Provides.depId = Requires.depId
+        #        JOIN Dependencies ON
+        #            Dependencies.depId == Requires.depId
+        #""", start_transaction = False)
 
         # dependencies which could have been resolved by something in
         # RemovedIds, but instead weren't resolved at all are considered
         # "unresolvable" dependencies. (they could be resolved by something
         # in the repository, but that something is being explicitly removed
         # and adding it back would be a bit rude!)
+        import lib
+        lib.epdb.st()
         cu.execute("""
                 SELECT depNum, rsvInstanceId, RemovedTroveIds.troveId FROM
                     (%s) LEFT OUTER JOIN RemovedTroveIds ON
