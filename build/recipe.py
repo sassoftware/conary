@@ -261,7 +261,7 @@ class _policyUpdater:
 	    # we don't yet use args for anything, but if we do
 	    # it will be evaluated at init time and so cannot be
 	    # re-evaluated...
-	    self.list[index] = self.theclass(*args, **keywords)
+	    self.list[self.index] = self.theclass(*args, **keywords)
 
 class Recipe:
     buildRequires = []
