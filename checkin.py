@@ -8,6 +8,7 @@ import cook
 import errno
 import filecontents
 import files
+import helper
 import log
 import os
 import package
@@ -115,39 +116,19 @@ class SourceState:
 	if filename: self.parseFile(filename)
 
 def checkout(repos, cfg, dir, name, versionStr = None):
-    # This doesn't use helper.findPackage as it doesn't want to allow
-    # branches nicknames. Doing so would cause two problems. First, we could
-    # get multiple matches for a single pacakge. Two, even if we got
-    # a single match we wouldn't know where to check in changes. A nickname
-    # branch doesn't work for checkins as it could refer to multiple
-    # branches, even if it doesn't right now.
-    if name[0] != ":":
-	name = cfg.packagenamespace + ":" + name
-    name = name + ":sources"
-
-    if not versionStr:
-	version = cfg.defaultbranch
-    else:
-	if versionStr[0] != "/":
-	    versionStr = cfg.defaultbranch.asString() + "/" + versionStr
-
-	try:
-	    version = versions.VersionFromString(versionStr)
-	except versions.ParseError, e:
-	    log.error("%s: %s" % (versionStr, str(e)))
-	    return
-
-    try:
-	if version.isBranch():
-	    trv = repos.getLatestPackage(name, version)
-	else:
-	    trv = repos.getPackageVersion(name, version)
-    except versioned.MissingBranchError, e:
-	log.error(str(e))
+    # We have to be careful with branch nicknames.  First, we could get
+    # multiple matches for a single package. Two, when a nickname uniquely
+    # identifies a package we still need to make sure the state has the name of
+    # the actual branch since empty branches yield objects whose versions are
+    # on the parent branch.
+    name += ":sources"
+    trvList = helper.findPackage(repos, cfg.packagenamespace, 
+				 cfg.installbranch, name, 
+				 versionStr = versionStr)
+    if len(trvList) > 1:
+	log.error("branch %s matches more then one version", versionStr)
 	return
-    except repository.PackageMissing, e:
-	log.error(str(e))
-	return
+    trv = trvList[0]
 	
     if not dir:
 	dir = trv.getName().split(":")[-2]
@@ -164,7 +145,30 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     state.setTroveName(trv.getName())
     state.setTroveVersion(trv.getVersion())
 
-    if version.isBranch():
+    # if a branch nickname was specified, we need to look up the full branch
+    # name that we're on; the version from the package doesn't tell us this
+    # as it could be the node where the branch was created
+    if not versionStr or (versionStr[0] != "/" and  \
+	# branch nickname was given
+	    (versionStr.find("/") == -1) and versionStr.count("@")):
+	if not versionStr:
+	    nick = cfg.installbranch
+	elif versionStr[0] == "@":
+	    nick = versions.BranchName(cfg.packagenamespace[1:] + 
+						versionStr)
+	else:
+	    nick = versions.BranchName(versionStr)
+
+	version = trv.getVersion()
+
+	if version.branch().branchNickname().equal(nick):
+	    state.setTroveBranch(version)
+	else:
+	    # this must be the node the branch was created at, otherwise
+	    # we'd be on it
+	    v = version.fork(nick, sameVerRel = 0)
+	    state.setTroveBranch(v)
+    elif version.isBranch():
 	state.setTroveBranch(version)
     else:
 	state.setTroveBranch(version.branch())
