@@ -54,6 +54,8 @@ Use = UseClass({
     'readline':		False,
     'ssl':		False,
     'slang':		False,
+    'netpbm':		False,
+    'nptl':		False,
 })
 
 Arch = UseClass({
