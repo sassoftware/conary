@@ -13,6 +13,7 @@
 #
 
 python_files = database.py	\
+		deptable.py	\
 		__init__.py	\
 		localrep.py	\
 		sqldb.py	\
