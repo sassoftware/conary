@@ -1,3 +1,6 @@
+Changes in 0.14.5:
+  * allow groups to contain troves with conflicting flavors
+
 Changes in 0.14.4:
   * several bugs in the 'cvc update' code paths have been fixed
     - it no longer retrieves autosource sources
