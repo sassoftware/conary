@@ -51,6 +51,8 @@ crossMacros = (
     ('headerpath'	, '%(sysroot)s/usr/include')
 )
 
+# XXX TEMPORARY - remove directories such as /usr/include from this
+# list when filesystem package is in place.
 baseAutoSpec = (
     # automatic subpackage names and sets of regexps that define them
     # cannot be a dictionary because it is ordered; first match wins
@@ -59,12 +61,18 @@ baseAutoSpec = (
 	 '\.so',
 	 '.*/include/.*\.h',
 	 '/usr/include/',
+         '/usr/include',
 	 '/usr/share/man/man(2|3)/',
+	 '/usr/share/man/man(2|3)',
 	 '/usr/share/develdoc/',
-	 '/usr/share/aclocal/')),
+	 '/usr/share/develdoc',
+	 '/usr/share/aclocal/',
+         '/usr/share/aclocal')),
     ('lib', ('.*/lib/.*\.so\..*')),
-    ('doc', ('/usr/share/(doc|man|info)/')),
-    ('locale', ('/usr/share/locale/',)),
+    ('doc', ('/usr/share/(doc|man|info)/',
+             '/usr/share/(doc|man|info)')),
+    ('locale', ('/usr/share/locale/',
+                '/usr/share/locale')),
     ('runtime', ('.*',)),
 )
 
