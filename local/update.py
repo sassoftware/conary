@@ -158,6 +158,8 @@ class FilesystemJob:
 	    log.debug(msg)
 
 	contents = None
+        restored = {}           # keep track of what was restored; we may need these
+                                # contents for files with duplicate contents
 	# restore in the same order files appear in the change set
 	self.restores.sort()
 
@@ -186,9 +188,15 @@ class FilesystemJob:
 	    elif fileObj.hasContents:
 		contType, contents = self.changeSet.getFileContents(fileId)
 		assert(contType != changeset.ChangedFileTypes.diff)
+                if contType == changeset.ChangedFileTypes.ptr:
+                    ptrId = contents.get().read()
+                    contents = filecontents.FromFilesystem(restored[ptrId])
 
+            restored[fileId] = target
 	    fileObj.restore(contents, self.root, target, contents != None)
 	    log.debug(msg, target)
+
+        del restored
 
 	paths = self.removes.keys()
 	paths.sort()

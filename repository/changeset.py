@@ -29,7 +29,7 @@ import versions
 
 from StringIO import StringIO
 
-ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff")
+ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff", "ptr")
 
 class FileInfo(streams.TupleStream):
 

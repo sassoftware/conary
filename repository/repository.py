@@ -669,7 +669,8 @@ class ChangeSetJob:
 
 	normalRestoreList.sort()
 	for (fileId, sha1, version, restoreContents) in normalRestoreList:
-	    fileContents = filecontents.FromChangeSet(cs, fileId)
+	    (contType, fileContents) = cs.getFileContents(fileId)
+	    assert(contType == changeset.ChangedFileTypes.file)
 	    self.addFileContents(sha1, version, fileContents, restoreContents,
 				 0)
 
