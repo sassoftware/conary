@@ -457,7 +457,8 @@ class StreamSet(InfoStream):
 	rc = [ "\x01", self.lsTag ]
 	for streamId, (streamType, name) in self.streamDict.iteritems():
 	    d = self.__getattribute__(name).diff(other.__getattribute__(name))
-	    rc.append(struct.pack(self.headerFormat, streamId, len(d)) + d)
+            if len(d):
+                rc.append(struct.pack(self.headerFormat, streamId, len(d)) + d)
 
 	return "".join(rc)
 
