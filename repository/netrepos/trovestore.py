@@ -21,7 +21,7 @@ import instances
 import items
 import files
 import flavors
-import metadata
+from lib import metadata
 import sqlite3
 import trove
 import trovefiles
@@ -494,7 +494,7 @@ class TroveStore:
             return None
        
         metadata = self.metadataTable.get(itemId, versionId, branchId, language)
-        metadata["version"] = versions.VersionFromString(latestVersion)
+        metadata["version"] = versions.VersionFromString(latestVersion).asString()
         return metadata
 
     def hasTrove(self, troveName, troveVersion = None, troveFlavor = 0):
