@@ -476,7 +476,7 @@ class _PutFiles(_FileAction):
 		self._do_one(thissrc, dest, macros)
 	    return
 
-	if not os.path.isdir(source) and os.path.isdir(dest):
+	if os.path.isdir(dest):
 	    dest = util.joinPaths(dest, os.path.basename(source))
 	
 	mode = self.mode
@@ -561,14 +561,15 @@ class InstallSymlinks(_FileAction):
             if source.startswith(os.sep):
                 expand = macros['destdir'] + source
             else:
-                expand = destdir + os.sep + source
+                expand = util.joinPaths(destdir, source)
             sources = fixedglob.glob(expand)
             if not sources and not self.allowDangling:
                 raise TypeError, 'symlink to "%s" would be dangling' %source
             for expanded in sources:
                 if os.sep in source:
-                    expandedSources.append(os.path.dirname(source) + os.sep +
-                                           os.path.basename(expanded))
+                    expandedSources.append(
+			util.joinPaths(os.path.dirname(source),
+				       os.path.basename(expanded)))
                 else:
                     expandedSources.append(os.path.basename(expanded))
         sources = expandedSources
@@ -578,15 +579,18 @@ class InstallSymlinks(_FileAction):
 
         for source in sources:
             if targetIsDir:
-                to = dest + os.sep + os.path.basename(source)
-		self.setComponents(self.toFile %macros + os.sep +
-			           os.path.basename(source))
+                to = util.joinPaths(dest, os.path.basename(source))
+		self.setComponents(
+		    util.joinPaths(self.toFile %macros,
+			           os.path.basename(source)))
             else:
                 to = dest
 		self.setComponents(self.toFile %macros)
 	    if os.path.exists(to) or os.path.islink(to):
 		os.remove(to)
             log.debug('creating symlink %s -> %s' %(to, source))
+	    if source[0] == '.':
+		log.warning('back-referenced symlink %s should probably be replaced by absolute symlink (start with "/" not "..")', source)
 	    os.symlink(util.normpath(source), to)
 
     def __init__(self, *args, **keywords):
@@ -715,7 +719,7 @@ class MakeDirs(_FileAction):
             for d in dirs:
                 d = d %macros
                 dest = macros['destdir'] + d
-                log.debug('creating directory %s', dest)
+                log.debug('creating directory %s', d)
 		self.setComponents(d)
                 util.mkdirChain(dest)
                 self.chmod(macros['destdir'], d)
@@ -726,3 +730,6 @@ class MakeDirs(_FileAction):
 	    self.paths = args[0]
 	else:
 	    self.paths = args
+	for arg in args:
+	    if arg[0] != '/':
+                raise TypeError, 'Directories must start with "/"'
