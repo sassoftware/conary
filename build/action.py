@@ -12,7 +12,7 @@
 # full details.
 #
 
-import epdb
+from lib import epdb
 import log
 import os
 import util
@@ -20,7 +20,7 @@ import sys
 import string
 import tempfile
 import traceback
-import stackutil
+from lib import stackutil
 
 # build.py and policy.py need some common definitions
 

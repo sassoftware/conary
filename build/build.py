@@ -63,7 +63,7 @@ class BuildAction(action.RecipeAction):
 
     def doAction(self):
 	if self.debug:
-	    import epdb
+	    from lib import epdb
 	    epdb.set_trace()
 	if self.use:
 	    if self.linenum is None:
