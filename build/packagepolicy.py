@@ -119,7 +119,7 @@ class Config(policy.Policy):
     Mark only explicit inclusions as config files
     """
     keywords = {
-	'inclusions': None
+	'inclusions': []
     }
 
     def __init__(self, *args, **keywords):
@@ -131,6 +131,14 @@ class Config(policy.Policy):
         """
         policy.Policy.__init__(self, *args, **keywords)
         
+
+    def updateArgs(self, *args, **keywords):
+	"""
+	Config(pathregex(s)...)
+	"""
+	if args:
+	    self.inclusions.extend(args)
+	policy.Policy.updateArgs(self, [], **keywords)
 
     def doProcess(self, recipe):
 	self.configREs = []
