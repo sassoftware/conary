@@ -42,7 +42,7 @@ kidfiles-install:
 	for f in $(kid_files); do \
                 cp -a $$f $(DESTDIR)/$(conarydir)/$(DIR)/$$f; \
         done
-	kidc --strip-dest-dir $(DESTDIR) $(DESTDIR)/$(conarydir)/$(DIR)/ ||:; \
+	kidc --strip-dest-dir $(DESTDIR) $(DESTDIR)/$(conarydir)/$(DIR)/ ||:
 
 dist: default-dist
 

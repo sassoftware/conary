@@ -65,7 +65,7 @@
                 </tr>
                 <tr>
                     <td>Long Description:</td>
-                    <td><textarea style="width: 100%;" name="longDesc" rows="4" cols="60">${metadata.getLongDesc()}</textarea></td>
+                    <td><textarea style="width: 100%;" name="longDesc" rows="4" cols="60">${metadata.getLongDesc()} </textarea></td>
                 </tr>
                 <tr>
                     <td>URLs:</td>
