@@ -324,7 +324,7 @@ class _FileAction(BuildAction):
 	"""
 	XXX fixme
 	A component without a : or with a leading : is relative to the main package name.
-	A component with a trailing : is equivalent to having appended 'doc'
+	A component with a trailing : is a package name
 	"""
 	if type(paths) is str:
 	    paths = (paths,)
