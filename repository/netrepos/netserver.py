@@ -66,7 +66,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_BEST_FLAVOR      = 3     # the best flavor for flavorFilter
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
 
-    def callWrapper(self, methodname, authToken, args):
+    def callWrapper(self, protocol, port, methodname, authToken, args):
 
         def condRollback():
             if self.db.inTransaction:
@@ -74,6 +74,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	# reopens the sqlite db if it's changed
 	self.reopen()
+        self._port = port
+        self._protocol = protocol
 
         try:
             # try and get the method to see if it exists
@@ -119,6 +121,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	#    if sys.stdout.isatty() and sys.stdin.isatty():
 	#	lib.epdb.post_mortem(excInfo[2])
 	#    raise
+
+    def urlBase(self):
+        return self.basicUrl % { 'port' : self._port,
+                                 'protocol' : self._protocol }
 
     def addUser(self, authToken, clientVersion, user, newPassword):
         # adds a new user, with no acls. for now it requires full admin
@@ -812,7 +818,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         os.write(fd, "%s %d\n" % (filePath, size))
         os.close(fd)
 
-        url = os.path.join(self.urlBase, 
+        url = os.path.join(self.urlBase(), 
                            "changeset?%s" % os.path.basename(path)[:-4])
         return url
 
@@ -926,7 +932,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             fileName = os.path.basename(path)
 
-            urlList.append(os.path.join(self.urlBase, 
+            urlList.append(os.path.join(self.urlBase(), 
                                         "changeset?%s" % fileName[:-4]))
 
         return urlList, newChgSetList, allFilesNeeded
@@ -959,12 +965,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	os.close(fd)
 	fileName = os.path.basename(path)
 
-        return os.path.join(self.urlBase, "?%s" % fileName[:-3])
+        return os.path.join(self.urlBase(), "?%s" % fileName[:-3])
 
     def commitChangeSet(self, authToken, clientVersion, url):
-	assert(url.startswith(self.urlBase))
+	assert(url.startswith(self.urlBase()))
 	# +1 strips off the ? from the query url
-	fileName = url[len(self.urlBase) + 1:] + "-in"
+	fileName = url[len(self.urlBase()) + 1:] + "-in"
 	path = "%s/%s" % (self.tmpPath, fileName)
 
 	try:
@@ -989,7 +995,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    return True
 
 	for pkgCs in cs.iterNewPackageList():
-	    d = { 'reppath' : self.urlBase,
+	    d = { 'reppath' : self.urlBase(),
 	    	  'trove' : pkgCs.getName(),
 		  'version' : pkgCs.getNewVersion().asString() }
 	    cmd = self.commitAction % d
@@ -1103,13 +1109,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                                       logFile = self.logFile)
             self.auth = NetworkAuthorization(self.db, self.name)
 
-    def __init__(self, path, tmpPath, urlBase, name,
+    def __init__(self, path, tmpPath, basicUrl, name,
 		 repositoryMap, commitAction = None, cacheChangeSets = False,
                  logFile = None):
 	self.map = repositoryMap
 	self.repPath = path
 	self.tmpPath = tmpPath
-	self.urlBase = urlBase
+	self.basicUrl = basicUrl
 	self.name = name
 	self.commitAction = commitAction
         self.sqlDbPath = self.repPath + '/sqldb'

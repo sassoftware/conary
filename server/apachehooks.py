@@ -34,6 +34,7 @@ class ServerConfig(conarycfg.ConfigFile):
 
     defaults = {
         'commitAction'      :  None,
+        'forceSSL'          :  [ conarycfg.BOOLEAN, False ],
         'logFile'           :  None,
         'repositoryMap'     :  [ conarycfg.STRINGDICT, {} ],
         'repositoryDir'     :  None,
@@ -75,16 +76,25 @@ def checkAuth(req, repos):
             
     return authToken
 
-def post(repos, httpHandler, req):
+def post(port, isSecure, repos, httpHandler, req):
     if req.headers_in['Content-Type'] == "text/xml":
         authToken = getAuth(req, repos)
         if type(authToken) is int:
             return authToken
 
+        if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
+            return apache.HTTP_FORBIDDEN
+
         (params, method) = xmlrpclib.loads(req.read())
 
+        if isSecure:
+            protocol = "https"
+        else:
+            protocol = "http"
+
         try:
-            result = repos.callWrapper(method, authToken, params)
+            result = repos.callWrapper(protocol, port, method, authToken, 
+                                       params)
         except netserver.InsufficientPermission:
             return apache.HTTP_FORBIDDEN
 
@@ -181,7 +191,10 @@ def get(repos, httpHandler, req):
 
     return apache.OK
 
-def putFile(repos, req):
+def putFile(port, isSecure, repos, req):
+    if not isSecure and repos.forceSecure:
+        return apache.HTTP_FORBIDDEN
+
     path = repos.tmpPath + "/" + req.args + "-in"
     size = os.stat(path).st_size
     if size != 0:
@@ -207,11 +220,6 @@ def handler(req):
         cfg = ServerConfig()
         cfg.read(req.filename)
 
-	if req.parsed_uri[apache.URI_PORT]:
-	    port = req.parsed_uri[apache.URI_PORT]
-	else:
-	    port = 80
-
 	if os.path.basename(req.uri) == "changeset":
 	   rest = os.path.dirname(req.uri) + "/"
 	else:
@@ -225,7 +233,8 @@ def handler(req):
 	# and throw away any subdir portion
 	rest = req.uri[:-len(req.path_info)] + '/'
         
-	urlBase = "http://%s:%d" % (req.server.server_hostname, port) + rest
+	urlBase = "%%(protocol)s://%s:%%(port)d" % \
+                        (req.server.server_hostname) + rest
 
         if not cfg.repositoryDir:
             print "error: repositoryDir is required in %s" % req.filename
@@ -243,18 +252,30 @@ def handler(req):
 				commitAction = cfg.commitAction,
                                 cacheChangeSets = cfg.cacheChangeSets,
                                 logFile = cfg.logFile)
+
+	repositories[repName].forceSecure = cfg.forceSSL
     
+    if req.parsed_uri[apache.URI_PORT]:
+        port = req.parsed_uri[apache.URI_PORT]
+        secure = False
+    elif req.parsed_uri[apache.URI_SCHEME] == "https":
+        port = 443
+        secure = True
+    else:
+        port = 80
+        secure = False
+
     repos = repositories[repName]
     httpHandler = HttpHandler(repos)
     
     method = req.method.upper()
 
     if method == "POST":
-	return post(repos, httpHandler, req)
+	return post(port, secure, repos, httpHandler, req)
     elif method == "GET":
 	return get(repos, httpHandler, req)
     elif method == "PUT":
-	return putFile(repos, req)
+	return putFile(port, secure, repos, req)
     else:
 	return apache.HTTP_METHOD_NOT_ALLOWED
 
