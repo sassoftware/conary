@@ -26,9 +26,11 @@ from lib import util
 import os
 import policy
 from lib import log
+from deps import deps
 import stat
 import tags
 import buildpackage
+import files
 import filter
 import destdirpolicy
 
@@ -87,6 +89,21 @@ class FilesInMandir(policy.Policy):
 
     def doFile(self, file):
 	self.recipe.reportErrors("%s is non-directory file in mandir" %file)
+
+
+class BadInterpreterPaths(policy.Policy):
+    """
+    Interpreters must not use relative paths.  There should be no
+    exceptions.
+    """
+    def doFile(self, path):
+        m = self.recipe.magic[path]
+	if m and m.name == 'script':
+            interp = m.contents['interpreter']
+            if interp[0] == '.':
+                self.recipe.reportErrors(
+                    "illegal relative page interpreter %s in %s"
+                    %(interp, path))
 
 
 class ImproperlyShared(policy.Policy):
@@ -997,28 +1014,7 @@ class LinkCount(policy.Policy):
                     "Special file %s has illegal hard links" %path)
 
 
-class _requirements(_addInfo):
-    """
-    Pure virtual base class for Requires/Provides
-    """
-
-    def runInfo(self, path):
-	for info in self.included:
-	    for filt in self.included[info]:
-		if filt.match(path):
-                    # XXX mark a virtual Depends/Requires
-                    pass
-	pkgMap = self.recipe.autopkg.pkgMap
-	if path not in pkgMap:
-	    return
-	pkg = pkgMap[path]
-	f = pkg.getFile(path)
-        self.autoAddOne(path, pkg, f)
-    def autoAddOne(self, path, pkg, f):
-	'pure virtual'
-	pass
-
-class Requires(_requirements):
+class Requires(_addInfo):
     """
     Drives requirement mechanism: to avoid adding requirements for a file,
     such as example shell scripts outside C{%(docdir)s},
@@ -1026,26 +1022,70 @@ class Requires(_requirements):
     and to add a requirement manually,
     C{r.Requires('foo', I{filterexp})}
     """
-    def autoAddOne(self, path, pkg, f):
-        # Only regular files with contents will be in requiresMap
+    invariantexceptions = (
+	'%(docdir)s/',
+    )
+    def runInfo(self, path):
+	pkgMap = self.recipe.autopkg.pkgMap
+	if path not in pkgMap:
+	    return
+	pkg = pkgMap[path]
+	f = pkg.getFile(path)
+        if not (f.hasContents and isinstance(f, files.RegularFile)):
+            return
+
+        # now go through explicit requirements
+	for info in self.included:
+	    for filt in self.included[info]:
+		if filt.match(path):
+                    if info[0] == "/":
+                        depClass = deps.FileDependencies
+                    else: # by process of elimination, must be a trove
+                        depClass = deps.TroveDependencies
+                    self.addRequirement(path, info, pkg, depClass)
+
+        # now check for automatic dependencies besides ELF
+	m = self.recipe.magic[path]
+	if m and m.name == 'script':
+            interp = m.contents['interpreter']
+            if not os.path.exists(interp):
+                # I do not see this interpreter on the system, at least warn
+		log.warning('%s (referenced in %s) missing', interp, path)
+                # N.B. no special handling for env here; if there has been
+                # an exception to NormalizeInterpreterPaths then it is a
+                # real dependency on env
+            self.addRequirement(path, interp, pkg, deps.FileDependencies)
+
+        # finally, package the dependencies up
         if path not in pkg.requiresMap:
             return
         f.requires.set(pkg.requiresMap[path])
         pkg.requires.union(f.requires.value())
 
-class Provides(_requirements):
+    def addRequirement(self, path, file, pkg, depClass):
+        if path not in pkg.requiresMap:
+            # BuildPackage only fills in requiresMap for ELF files; we may
+            # need to create a few more DependencySets.
+            pkg.requiresMap[path] = deps.DependencySet()
+        pkg.requiresMap[path].addDep(depClass, deps.Dependency(file))
+
+
+class Provides(policy.Policy):
     """
     Drives provides mechanism: to avoid marking a file as providing things,
     such as for package-private plugin modules installed in system library
-    directories,
+    directories:
     C{r.Provides(exceptions=I{filterexp})}
-    and to add a provision manually,
-    C{r.Provides('foo', I{filterexp})}
     """
     invariantexceptions = (
 	'%(docdir)s/',
     )
-    def autoAddOne(self, path, pkg, f):
+    def doFile(self, path):
+	pkgMap = self.recipe.autopkg.pkgMap
+	if path not in pkgMap:
+	    return
+	pkg = pkgMap[path]
+	f = pkg.getFile(path)
         # Only regular files with contents will be in providesMap
         if path not in pkg.providesMap:
             return
@@ -1059,8 +1099,6 @@ class Provides(_requirements):
 	    pkg.provides.union(f.provides.value())
 
 
-# There is no manual tagging of flavors, so Flavor does not inherit
-# from _addInfo or _requirements.
 class Flavor(policy.Policy):
     """
     Drives flavor mechanism: to avoid marking a file's flavor:
@@ -1110,6 +1148,7 @@ def DefaultPolicy(recipe):
     return [
 	NonBinariesInBindirs(recipe),
 	FilesInMandir(recipe),
+        BadInterpreterPaths(recipe),
 	ImproperlyShared(recipe),
 	CheckSonames(recipe),
         RequireChkconfig(recipe),

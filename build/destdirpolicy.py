@@ -728,6 +728,39 @@ class NormalizeAppDefaults(policy.Policy):
                         util.joinPaths(x, file))
 
 
+class NormalizeInterpreterPaths(policy.Policy):
+    """
+    Interpreter paths in scripts vary; this policy re-writes the
+    paths, in particular changing indirect calls through env to
+    direct calls; exceptions to this policy should only be made
+    when it is part of the explicit calling convention of a script
+    that the location of the final interpreter depend on the
+    user's C{PATH}:
+    C{r.NormalizeInterpreterPaths(exceptions=I{filterexp})}
+    """
+    def doFile(self, path):
+        m = self.recipe.magic[path]
+	if m and m.name == 'script':
+            interp = m.contents['interpreter']
+            if interp.find('/bin/env') != -1: # finds /usr/bin/env too...
+                line = m.contents['line']
+                # rewrite to not have env
+                d = util.joinPaths(self.recipe.macros.destdir, path)
+                f = file(d, 'r+')
+                l = f.readlines()
+                l.pop(0) # we will reconstruct this line, without extra spaces
+                wordlist = [ x for x in line.split(' ') if x ]
+                wordlist.pop(0) # get rid of env
+                wordlist[0] = util.checkPath(wordlist[0])
+                l.insert(0, '#!'+" ".join(wordlist)+'\n')
+                f.seek(0)
+                f.truncate(0) # we may have shrunk the file, avoid garbage
+                f.writelines(l)
+                f.close()
+                log.warning('changing %s to %s in %s'
+                            %(line, " ".join(wordlist), path))
+
+
 class RelativeSymlinks(policy.Policy):
     """
     Makes all symlinks relative; create absolute symlinks in your
@@ -772,6 +805,7 @@ def DefaultPolicy(recipe):
 	NormalizeInfoPages(recipe),
 	NormalizeInitscriptLocation(recipe),
         NormalizeAppDefaults(recipe),
+        NormalizeInterpreterPaths(recipe),
 	RelativeSymlinks(recipe),
     ]
 

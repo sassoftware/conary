@@ -14,6 +14,7 @@
 
 import elf
 import os
+import re
 import string
 import util
 
@@ -67,6 +68,17 @@ class changeset(Magic):
 	Magic.__init__(self, path, basedir)
 
 
+class script(Magic):
+    interpreterRe = re.compile(r'^#!\s*([^\s]*)')
+    lineRe = re.compile(r'^#!\s*(.*)')
+    def __init__(self, path, basedir='', buffer=''):
+	Magic.__init__(self, path, basedir)
+        m = self.interpreterRe.match(buffer)
+        self.contents['interpreter'] = m.group(1)
+        m = self.lineRe.match(buffer)
+        self.contents['line'] = m.group(1)
+
+
 class ltwrapper(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
@@ -96,10 +108,12 @@ def magic(path, basedir=''):
 	return bzip(path, basedir, b)
     elif len(b) > 4 and b[0:4] == "\xEA\x3F\x81\xBB":
 	return changeset(path, basedir, b)
-    elif b.find(
-	'# This wrapper script should never be moved out of the build directory.\n'
-	'# If it is, it will not operate correctly.') > 0:
-	return ltwrapper(path, basedir, b)
+    elif len(b) > 4 and b[0:2] == "#!":
+        if b.find(
+            '# This wrapper script should never be moved out of the build directory.\n'
+            '# If it is, it will not operate correctly.') > 0:
+            return ltwrapper(path, basedir, b)
+        return script(path, basedir, _line(b))
 
     return None
 
@@ -115,3 +129,6 @@ class magicCache(dict):
 
 def _string(buffer):
     return buffer[:string.find(buffer, '\0')]
+
+def _line(buffer):
+    return buffer[:string.find(buffer, '\n')]

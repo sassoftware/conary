@@ -290,15 +290,17 @@ def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
 
 def checkPath(binary):
     """
-    Examine $PATH to determine if a binary exists
+    Examine $PATH to determine if a binary exists, returns full pathname
+    if it exists; otherwise None.
 
     @todo: expand ~?
     """
     path = os.environ.get('PATH', '')
     for path in path.split(os.pathsep):
-        if os.access(os.path.join(path, binary), os.X_OK):
-            return True
-    return False
+        candidate = os.path.join(path, binary)
+        if os.access(candidate, os.X_OK):
+            return candidate
+    return None
 
 def joinPaths(*args):
     return normpath(os.sep.join(args))
