@@ -1,0 +1,230 @@
+#!/usr/bin/python
+# -*- python -*-
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
+import gobject
+import gtk
+import hotshot.stats
+import sys
+
+class ProfileStat(gobject.GObject):
+    func = None
+    cc = 0
+    nc = 0
+    tt = 0.0
+    ct = 0.0
+    callers = None
+gobject.type_register(ProfileStat)
+
+class Caller(gobject.GObject):
+    func = None
+    nc = 0
+gobject.type_register(Caller)
+
+def compare(a, b):
+    if a < b:
+        return -1
+    if a > b:
+        return 1
+    return 0
+
+def format_float(x):
+    return "%.3f" % x
+
+def set_func(tree, cell, model, iter):
+    info = model.get_value(iter, 0)
+    cell.set_property('text', '%s:%d(%s)' % info.func)
+
+def sort_func(model, iter1, iter2):
+    info1 = model.get_value(iter1, 0)
+    info2 = model.get_value(iter2, 0)
+    return compare(info1.func, info2.func)
+
+def set_num_caller_calls(tree, cell, model, iter):
+    info = model.get_value(iter, 0)
+    cell.set_property('text', str(info.nc))
+
+def set_num_calls(tree, cell, model, iter):
+    info = model.get_value(iter, 0)
+    if info.nc != info.cc:
+        c = '%d/%d' %(info.nc, info.cc)
+    else:
+        c = str(info.nc)
+    cell.set_property('text', c)
+
+def sort_num_calls(model, iter1, iter2):
+    info1 = model.get_value(iter1, 0)
+    info2 = model.get_value(iter2, 0)
+    return compare(info1.nc, info2.nc)
+
+def set_t_time(tree, cell, model, iter):
+    info = model.get_value(iter, 0)
+    cell.set_property('text', format_float(info.tt))
+
+def sort_t_time(model, iter1, iter2):
+    info1 = model.get_value(iter1, 0)
+    info2 = model.get_value(iter2, 0)
+    return compare(info1.tt, info2.tt)
+
+def set_t_time_per_call(tree, cell, model, iter):
+    info = model.get_value(iter, 0)
+    if info.nc != 0:
+        cell.set_property('text', format_float(info.tt/info.nc))
+    else:
+        cell.set_property('text', '')
+
+def sort_t_time_per_call(model, iter1, iter2):
+    info1 = model.get_value(iter1, 0)
+    info2 = model.get_value(iter2, 0)
+    t1 = 0
+    if info1.nc != 0:
+        t1 = info1.tt/info1.nc
+    t2 = 0
+    if info2.nc != 0:
+        t1 = info2.tt/info2.nc
+    return compare(t1, t2)
+
+def set_c_time(tree, cell, model, iter):
+    info = model.get_value(iter, 0)
+    cell.set_property('text', format_float(info.ct))
+
+def sort_c_time(model, iter1, iter2):
+    info1 = model.get_value(iter1, 0)
+    info2 = model.get_value(iter2, 0)
+    return compare(info1.ct, info2.ct)
+
+def set_c_time_per_call(tree, cell, model, iter):
+    info = model.get_value(iter, 0)
+    if info.cc != 0:
+        cell.set_property('text', format_float(info.ct/info.cc))
+    else:
+        cell.set_property('text', '')
+
+def sort_c_time_per_call(model, iter1, iter2):
+    info1 = model.get_value(iter1, 0)
+    info2 = model.get_value(iter2, 0)
+    t1 = 0
+    if info1.cc != 0:
+        t1 = info1.ct/info1.cc
+    t2 = 0
+    if info2.cc != 0:
+        t1 = info2.ct/info2.cc
+    return compare(t1, t2)
+
+def setup_tree_view(treeview, model, cols):
+    renderer = gtk.CellRendererText()
+    for title, set, sort in cols:
+        col = treeview.insert_column_with_data_func(-1, title, renderer, set)
+        col -= 1
+        column = treeview.get_column(col)
+        model.set_sort_func(col, sort)
+        column.set_sort_column_id(col)
+        
+class StatWindow(gtk.Window):
+    def __init__(self):
+        gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
+        self.set_title('Profile viewer')
+        self.connect('destroy', lambda *x: gtk.mainquit())
+        self.set_default_size(700, 400)
+        pane = gtk.VPaned()
+
+        self.funcstore = gtk.ListStore(ProfileStat)
+        self.funcview = gtk.TreeView(self.funcstore)
+
+        self.funcselection = self.funcview.get_selection()
+        self.funcselection.connect("changed", self.display_callers)
+
+        cols = (('Num calls', set_num_calls, sort_num_calls),
+                ('Total Time', set_t_time, sort_t_time),
+                ('Per call', set_t_time_per_call, sort_t_time_per_call),
+                ('Cumulative time', set_c_time, sort_c_time),
+                ('Per call', set_c_time_per_call, sort_c_time_per_call),
+                ('Function', set_func, sort_func))
+        setup_tree_view(self.funcview, self.funcstore, cols)
+        # set to total time, decending
+        self.funcstore.set_sort_column_id(1, gtk.SORT_DESCENDING)
+        
+        sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw.set_size_request(150, 150)
+        sw.add(self.funcview)
+        pane.pack1(sw, gtk.TRUE, gtk.FALSE)
+
+        self.callerstore = gtk.ListStore(Caller)
+        callerview = gtk.TreeView(self.callerstore)
+
+        selection = callerview.get_selection()
+        selection.connect("changed", self.display_function)
+
+        cols = (('Num calls', set_num_caller_calls, sort_num_calls),
+                ('Function', set_func, sort_func))
+        setup_tree_view(callerview, self.callerstore, cols)
+        # set to number of calls, decending
+        self.callerstore.set_sort_column_id(0, gtk.SORT_DESCENDING)
+        
+        sw = gtk.ScrolledWindow()
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw.set_size_request(-1, 150)
+        sw.add(callerview)
+        pane.pack2(sw, gtk.FALSE, gtk.TRUE)
+        
+        self.add(pane)
+
+    def display_callers(self, selection):
+        model, iter = selection.get_selected()
+        if not iter:
+            return
+        info = model.get_value(iter, 0)
+        self.callerstore.clear()
+        for func, nc in info.callers.iteritems():
+            caller = Caller()
+            caller.func = func
+            caller. nc = nc
+            iter = self.callerstore.append()
+            self.callerstore.set(iter, 0, caller)
+
+    def display_function(self, selection):
+        model, iter = selection.get_selected()
+        if not iter:
+            return
+        caller = model.get_value(iter, 0)
+        iter = self.funcstore.get_iter_first()
+        while iter:
+            stat = self.funcstore.get_value(iter, 0)
+            if stat.func == caller.func:
+                self.funcselection.select_iter(iter)
+                path = self.funcstore.get_path(iter)
+                col = self.funcview.get_column(0)
+                self.funcview.scroll_to_cell(path, col, gtk.TRUE, 0.5, 0.5)
+                self.funcview.set_cursor(path, col, gtk.FALSE)
+                break
+            iter = self.funcstore.iter_next(iter)
+        
+    def populate(self, stats):
+        for func, (cc, nc, tt, ct, callers) in stats.stats.iteritems():
+            stat = ProfileStat()
+            stat.func = func
+            stat.cc = cc
+            stat.nc = nc
+            stat.tt = tt
+            stat.ct = ct
+            stat.callers = callers
+            iter = self.funcstore.append()
+            self.funcstore.set(iter, 0, stat)
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print "usage: %s profile-file" %sys.argv[0]
+        sys.exit(1)
+
+    filename = sys.argv[1]
+    stats = hotshot.stats.load(filename)
+
+    app = StatWindow()
+    app.populate(stats)
+    app.show_all()
+    gtk.main()
+    

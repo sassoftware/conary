@@ -1,5 +1,9 @@
 #!/usr/bin/python2.3
-# -*- python -*-
+# -*- mode: python -*-
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
 
 import hotshot.stats
 import sys
