@@ -707,7 +707,8 @@ def fileContentsDiff(oldFile, oldCont, newFile, newCont):
 
 	# XXX difflib (and probably our patch as well) don't work properly
 	# for files w/o trailing newlines
-	if first[-1][-1] == '\n' and second[-1][-1] == '\n':
+	if first and first[-1][-1] == '\n' and \
+		    second and second[-1][-1] == '\n':
 	    diff = difflib.unified_diff(first, second, 
 					newCont.get().readlines(),
 					"old", "new")
