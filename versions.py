@@ -1015,6 +1015,35 @@ def _VersionFromString(ver, defaultBranch = None, frozen = False,
 
     return ver
 
+def strToFrozen(verStr, timeStamps):
+    """
+    Converts a version string to a frozen version by applying the
+    passed array of timestamps (which is an array of *strings*,
+    not numbers). Basically no error checking is done.
+
+    @param verStr: Version string
+    @type verStr: str
+    @param timeStamps: list of timestamps
+    @typpe timeStamps: list of str
+    """
+
+    spl = verStr.split("/")
+    nextIsVer = False
+    ts = 0
+    
+    for i, s in enumerate(spl):
+        if not s:
+            nextIsVer = False
+        elif not nextIsVer:
+            nextIsVer = True
+        else:
+            nextIsVer = False
+            spl[i] = timeStamps[ts] + ":" + s
+            ts += 1
+
+    assert(ts == len(timeStamps))
+    return "/".join(spl)
+
 class VersionsError(Exception):
 
     """
