@@ -23,9 +23,18 @@ otherwise manage software installed on a local system.
 .B pkglist \fIpkgname [version]\fP
 Lists troves installed on the local system.
 .TP
-.B update \fIpkgname version\fP
+.B update [\fIargs\fP] \fIpkgname version\fP
 Updates \fIpkgname\fR from the appropriate repository to match \fIversion,\fR
 upgrading, downgrading, or installing as necessary to do so.
+Arguments include:
+.RS 4
+.TP 4
+.B --keep-existing
+.\" FIXME: add semantics
+.TP
+.B --replace-files
+.\" FIXME: add semantics
+.RE
 .TP
 .B update \fIchangeset\fP
 Applies \fIchangeset\fR to the local system, making whatever changes
@@ -72,8 +81,35 @@ Lists available rollbacks.
 Applies rollback \fIrollback\fP.  (Syntax may change in future versions
 of Conary.)
 .TP
-.B replist \fIpkgname [version]\fP
+.B replist [\fIargs\fP \fIpkgname [version]\fP
 Lists troves in the repository.
+Arguments include
+.RS 4
+.TP 4
+.B --all
+.\" FIXME: document
+.TP
+.B --full-versions
+.\" FIXME: document
+.TP
+.B --ids
+.\" FIXME: document
+.TP
+.B --info
+.\" FIXME: document
+.TP
+.B --leaves
+.\" FIXME: document
+.TP
+.B --ls
+.\" FIXME: document
+.TP
+.B --sha1s
+.\" FIXME: document
+.TP
+.B --tags
+.\" FIXME: document
+.RE
 .\"
 .\"
 .\"
