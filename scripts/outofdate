@@ -47,10 +47,10 @@ def main(argv):
 
     cfg = conarycfg.ConaryConfiguration()
     repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
-    troves = [ x for x in repos.iterAllTroveNames(cfg.installLabel.getHost()) ]
+    troves = [ x for x in repos.iterAllTroveNames(cfg.installLabelPath[0].getHost()) ]
     pkgs = [ p for p in troves if p.find(':') == -1 ]
     sources = [ p for p in troves if p.endswith(':source') ]
-    versions = repos.getTroveLeavesByLabel(pkgs + sources, cfg.installLabel)
+    versions = repos.getTroveLeavesByLabel(pkgs + sources, cfg.installLabelPath[0])
     pkgs.sort()
 
     outofdate = getOutOfDate(pkgs, sources, versions)
