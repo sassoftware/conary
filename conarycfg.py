@@ -21,18 +21,23 @@ class SrsConfiguration:
 	    return
 	(key, val) = line.split()
 	if not self.__dict__.has_key(key):
-	    raise KeyError, ("configuration value %s unknown" % key)
+	    raise ParseError, ("configuration value %s unknown" % key)
 
 	self.__dict__[key] = val
 
-	if key == "defaultbranch":
-	    self.defaultbranch = versions.VersionFromString(self.defaultbranch)
+	try:
+	    if key == "defaultbranch":
+		self.defaultbranch = \
+			versions.VersionFromString(self.defaultbranch)
 
-	    if self.defaultbranch.isVersion():
-		sys.stderr.write("The configured default branch %s specifies " +
-		     "version, not a branch.\n" % self.defaultbranch.asString())
-	elif key == "installbranch":
-	    self.installbranch = versions.BranchName(self.installbranch)
+		if self.defaultbranch.isVersion():
+		    sys.stderr.write("The configured default branch %s " +
+			"specifies version, not a branch.\n" % 
+			   self.defaultbranch.asString())
+	    elif key == "installbranch":
+		self.installbranch = versions.BranchName(self.installbranch)
+	except versions.ParseError, e:
+	    raise ParseError, str(e)
 
     def display(self):
 	keys = self.__dict__.keys()
@@ -62,3 +67,23 @@ class SrsConfiguration:
 
 	self.read("/etc/srsrc")
 	self.read(os.environ["HOME"] + "/" + ".srsrc")
+
+class SrsCfgError(Exception):
+
+    """
+    Ancestor for all exceptions raised by the srscfg module.
+    """
+
+    pass
+
+class ParseError(SrsCfgError):
+
+    """
+    Indicates that an error occured parsing the config file.
+    """
+
+    def __str__(self):
+	return self.str
+
+    def __init__(self, str):
+	self.str = str
