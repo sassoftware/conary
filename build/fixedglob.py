@@ -1,3 +1,8 @@
+#
+# This file is a descendent of the glob.py module distributed as part of
+# python 2.3. As such, it is licensed under the Python Software Foundation 
+# license agreement, which can be found at www.python.org.
+#
 """Filename globbing utility."""
 
 import os
