@@ -702,13 +702,22 @@ def fileChangeSet(fileId, old, new):
 
 def fileContentsDiff(oldFile, oldCont, newFile, newCont):
     if oldFile and oldFile.flags.isConfig() and newFile.flags.isConfig():
-	diff = difflib.unified_diff(oldCont.get().readlines(),
-				    newCont.get().readlines(),
-				    "old", "new")
-	diff.next()
-	diff.next()
-	cont = filecontents.FromString("".join(diff))
-	contType = ChangedFileTypes.diff
+	first = oldCont.get().readlines()
+	second = newCont.get().readlines()
+
+	# XXX difflib (and probably our patch as well) don't work properly
+	# for files w/o trailing newlines
+	if first[-1][-1] == '\n' and second[-1][-1] == '\n':
+	    diff = difflib.unified_diff(first, second, 
+					newCont.get().readlines(),
+					"old", "new")
+	    diff.next()
+	    diff.next()
+	    cont = filecontents.FromString("".join(diff))
+	    contType = ChangedFileTypes.diff
+	else:
+	    cont = filecontents.FromString("\n".join(second))
+	    contType = ChangedFileTypes.file
     else:
 	cont = newCont
 	contType = ChangedFileTypes.file

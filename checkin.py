@@ -361,7 +361,7 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	csInfo = changeSet.getFileChange(fileId)
 	sys.stdout.write('\n'.join(files.fieldsChanged(csInfo)))
 
-        sys.stdout.write('\n--- %s %s\n+++ %s %s'
+        sys.stdout.write('\n--- %s %s\n+++ %s %s\n'
                          %(path, newPackage.getVersion().asString(),
                            path, newVersion.asString()))
         
@@ -370,8 +370,13 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	    if contType == changeset.ChangedFileTypes.diff:
 		lines = contents.get().readlines()
 		str = "".join(lines)
-		print
 		print str
+		print
+	    else:
+		lines = contents.get().readlines()
+		print "@@ -0,0 +1,%d @@" % len(lines)
+		for l in lines:
+		    print "+%s" % l,
 		print
 
     for fileId in pkgCs.getOldFileList():
