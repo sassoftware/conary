@@ -121,27 +121,6 @@ class Database(repository.LocalRepository):
 	for pkg in cs.getNewPackageList():
 	    if pkg.name.endswith(":sources"): raise SourcePackageInstall
 
-	#if not localRollback:
-	#    # create the change set from A->A.local
-	#    list = []
-	#    for pkg in cs.getNewPackageList():
-	#	name = pkg.getName()
-	#	old = pkg.getOldVersion()
-	#	if self.hasPackage(name) and old:
-	#	    branch = old.fork(versions.LocalBranch(), sameVerRel = 0)
-	#	    new = self.pkgLatestVersion(name, branch)
-	#	    assert(new)
-	#	    list.append((name, old, new, 0))
-
-	#    localChanges = self.createChangeSet(list)
-
-	#    # rollbacks have two pieces, B->A and A->A.local; applying
-	#    # both of them gets us back where we started
-	#    inverse = cs.makeRollback(self, configFiles = 1)
-	#    self.addRollback(inverse, localChanges)
-	#else:
-	#    localChanges = localRollback
-
 	if not localRollback:
 	    # create the change set from A->A.local
 	    for newPkg in cs.getNewPackageList():
@@ -160,6 +139,8 @@ class Database(repository.LocalRepository):
 	    fsPkgDict = {}
 	    for (changed, fsPkg) in retList:
 		fsPkgDict[fsPkg.getName()] = fsPkg
+
+	    inverse = cs.makeRollback(self, configFiles = 1)
 	else:
 	    assert(0)
 	    localChanges = localRollback
@@ -180,6 +161,11 @@ class Database(repository.LocalRepository):
 	    # anything either
 	    undo.undo()
 	    raise
+
+	# everything is in the database... save this so we can undo
+	# it later. 
+	if not localRollback:
+	    self.addRollback(inverse, localChanges)
 
 	fsJob.apply()
 
