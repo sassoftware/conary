@@ -67,8 +67,9 @@ class FromFile(FileContents):
 
     def size(self):
 	pos = self.f.tell()
-	size = f.seek(0, SEEK_END)
-	f.seek(pos, SEEK_SET)
+	size = self.f.seek(0, SEEK_END)
+	self.f.seek(pos, SEEK_SET)
+        return size
 
     def get(self):
 	return self.f
