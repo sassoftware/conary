@@ -15,26 +15,6 @@ class Database(repository.LocalRepository):
 
     createBranches = 1
 
-    # If the request is on the local branch, pull the package from the
-    # filesystem
-    def getPackageVersion(self, name, version):
-	if not version.isLocal():
-	    return repository.LocalRepository.getPackageVersion(self, name, 
-								version)
-	parent = version.parent()
-	pkg = repository.LocalRepository.getPackageVersion(self, name, parent)
-	pkg.changeVersion(self.pkgGetFullVersion(pkg.getName(), 
-			  pkg.getVersion()))
-
-	version.timeStamp = 1
-	rc = update.buildLocalChanges(self, [(pkg, pkg, version)])
-	if not rc:
-	    raise DatabaseError, \
-		    "failed to build local package for %s" % pkg.getName()
-
-	assert(len(rc[1]) == 1)
-	return rc[1][0][1]
-
     # takes an abstract change set and creates a differential change set 
     # against a branch of the repository
     def rootChangeSet(self, absSet, branch):
