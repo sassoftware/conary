@@ -53,17 +53,17 @@ class Package:
 	    str = str + ("%s %s %s\n" % (fileId, path, version.asString()))
 	return str
 
-    # returns a dictionary mapping a fileId to a (path, version) pair
+    # returns a dictionary mapping a fileId to a (path, version, pkgName) tuple
     def applyChangeSet(self, repos, pkgCS):
 	fileMap = {}
 
 	for (fileId, path, fileVersion) in pkgCS.getNewFileList():
 	    self.addFile(fileId, path, fileVersion)
-	    fileMap[fileId] = (path, fileVersion)
+	    fileMap[fileId] = (path, fileVersion, self.name)
 
 	for (fileId, path, fileVersion) in pkgCS.getChangedFileList():
 	    self.updateFile(fileId, path, fileVersion)
-	    fileMap[fileId] = (path, fileVersion)
+	    fileMap[fileId] = (path, fileVersion, self.name)
 
 	for fileId in pkgCS.getOldFileList():
 	    self.removeFile(fileId)
