@@ -258,8 +258,8 @@ class Recipe:
 	extractDir = extractDir % self.macros
 	self.sources.append((file, 'tarball', extractDir, use, ()))
 
-    def addPatch(self, file, level='1', backup='', keyid=None, use=None):
-	self._appendSource(file, keyid, 'patch', '', use, (level, backup))
+    def addPatch(self, file, level='1', backup='', extractDir='', keyid=None, use=None):
+	self._appendSource(file, keyid, 'patch', extractDir, use, (level, backup))
 
     def addSource(self, file, keyid=None, extractDir='', apply=None, use=None):
 	self._appendSource(file, keyid, 'source', extractDir, use, (apply))
@@ -350,7 +350,11 @@ class Recipe:
 		    provides = "bzcat"
 		if backup:
 		    backup = '-b -z %s' % backup
-		util.execute('%s %s | patch -d %s -p%s %s' %(provides, f, destDir, level, backup))
+		cd = ''
+		if targetdir:
+		    cd = 'cd %s;' %targetdir
+		util.execute('%s %s %s | patch -d %s -p%s %s'
+		             %(cd, provides, f, destDir, level, backup))
 		continue
 
 	    if filetype == 'source':
