@@ -121,7 +121,7 @@ class Database(repository.LocalRepository):
 	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
 		fileObj = job.getFile(fileId)
 		assert(newVersion.equal(fileObj.version()))
-
+		
 		oldFile = None
 		if oldVersion:
 		    oldFile = self.getFileVersion(fileId, oldVersion)
@@ -133,16 +133,15 @@ class Database(repository.LocalRepository):
 		if hash: 
 		    cs.addFileContents(hash)
 
+	assert(cs.validate())
+
 	return cs
 
     # local changes includes the A->A.local portion of a rollback; if it
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
-    def commitChangeSet(self, cs, localRollback = None, sourcePath = "/"):
+    def commitChangeSet(self, cs, localRollback = None):
 	assert(not cs.isAbstract())
-
-	map = ( ( None, sourcePath + "/" ), )
-	cs.remapPaths(map)
 
 	if not localRollback:
 	    # create the change set from A->A.local
