@@ -46,6 +46,8 @@ Changes in 0.14.4:
     to leave in support for 24 and 25)
   * old code that supported ancient protocol versions has been
     removed from the server
+  * recipes loaded from within recipes follow the label= argument if
+    it is given
 
 Changes in 0.14.3:
   * Fixed usage message to no longer print 1 at bottom; improved option
