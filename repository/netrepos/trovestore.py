@@ -651,9 +651,15 @@ class TroveStore:
     def getFile(self, pathId, fileId):
         cu = self.db.cursor()
         cu.execute("SELECT stream FROM FileStreams WHERE fileId=?", fileId)
-        stream = cu.next()[0]
+        try:
+            stream = cu.next()[0]
+        except StopIteration:
+            KeyError, (pathId, fileId)
 
-        return files.ThawFile(stream, pathId)
+        if stream is not None:
+            return files.ThawFile(stream, pathId)
+        else:
+            return None
 
     def getFiles(self, l):
         # this only needs a list of (pathId, fileId) pairs, but it sometimes
@@ -683,7 +689,11 @@ class TroveStore:
             d = {}
             for rowId, stream in cu:
                 pathId, fileId = lookup[rowId]
-                d[(pathId, fileId)] = files.ThawFile(stream, pathId)
+                if stream is not None:
+                    f = files.ThawFile(stream, pathId)
+                else:
+                    f = None
+                d[(pathId, fileId)] = f
         finally:
             cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
 	return d
