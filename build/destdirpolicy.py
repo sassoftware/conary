@@ -36,13 +36,20 @@ class FixDirModes(policy.Policy):
 	self.recipe.AddModes(mode, path)
 	os.chmod(fullpath, mode | 0700)
 
-class RemoveExtraLibs(policy.Policy):
+class RemoveNonPackageFiles(policy.Policy):
     """
-    Kill .la files and any other similar garbage
+    Remove classes of files that normally should not be packaged.
+    C{RemoveNonPackageFiles(exceptions=I{filterexpression})} to
+    allow one of these files to be included in a package.
     """
     invariantinclusions = [
-	'\.la$',
-	r'%(libdir)s/python.*/site-packages/.*\.a$'
+	r'\.la$',
+	r'%(libdir)s/python.*/site-packages/.*\.a$',
+	r'perllocal\.pod$',
+	r'\.packlist$',
+	r'\.cvsignore$',
+	r'\.orig$',
+	'~$',
     ]
 
     def doFile(self, path):
@@ -118,18 +125,6 @@ class ExecutableLibraries(policy.Policy):
 	    return
 	log.warning('non-executable library %s, changing to mode 0755' %path)
 	os.chmod(fullpath, 0755)
-
-class RemoveBackupFiles(policy.Policy):
-    """
-    Kill editor and patch backup files
-    """
-    invariantinclusions = [
-	'~$',
-	'\.orig$',
-    ]
-
-    def doFile(self, path):
-	util.remove(self.macros['destdir']+path)
 
 class Strip(policy.Policy):
     """
@@ -406,10 +401,9 @@ def DefaultPolicy():
     """
     return [
 	FixDirModes(),
-	RemoveExtraLibs(),
+	RemoveNonPackageFiles(),
 	FixupMultilibPaths(),
 	ExecutableLibraries(),
-	RemoveBackupFiles(),
 	Strip(),
 	NormalizeCompression(),
 	NormalizeManPages(),
