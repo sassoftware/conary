@@ -28,6 +28,7 @@ baseMacros = (
     # paths
     ('prefix'		, '/usr'),
     ('sysconfdir'	, '/etc'),
+    ('initdir'		, '%(sysconfdir)s/rc.d/init.d'), # XXX fixme?
     ('lib'              , 'lib'),  # may be overridden with 'lib64'
     ('exec_prefix'	, '%(prefix)s'),
     ('bindir'		, '%(exec_prefix)s/bin'),
