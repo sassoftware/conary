@@ -94,11 +94,14 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 		if all or leaves:
 		    log.error('No versions for "%s" were found in the '
 			      'repository', troveName)
-		else:
-		    log.error('No versions with labels "%s" for "%s" were '
-			      'found in the repository.', 
-			      " ".join([ x.asString() for x 
-                                            in cfg.installLabelPath ]),
+		elif troveList:
+                    # only display this error if the user has actually 
+                    # requested a specific trove, otherwise, missing
+                    # troves are a result of flavor filtering 
+                    log.error('No versions with labels "%s" for "%s" were '
+                              'found in the repository.', 
+                              " ".join([ x.asString() for x 
+                                       in cfg.installLabelPath ]),
                               troveName)
                 continue
 
