@@ -72,7 +72,7 @@ class ConaryClient:
     def _resolveDependencies(self, cs, keepExisting = None, recurse = True):
         pathIdx = 0
         foundSuggestions = False
-        depList = self.db.depCheck(cs)[1]
+        (depList, cannotResolve) = self.db.depCheck(cs)
         suggMap = {}
 
         while depList and True:
@@ -98,7 +98,7 @@ class ConaryClient:
                                               keepExisting = keepExisting)
                 cs.merge(newCs)
 
-                depList = self.db.depCheck(cs)[1]
+                (depList, cannotResolve) = self.db.depCheck(cs)
 
             if sugg and recurse:
                 pathIdx = 0
@@ -109,11 +109,11 @@ class ConaryClient:
                     foundSuggestions = True
                 if pathIdx == len(self.cfg.installLabelPath):
                     if not foundSuggestions or not recurse:
-                        return (cs, depList, suggMap)
+                        return (cs, depList, suggMap, cannotResolve)
                     pathIdx = 0
                     foundSuggestions = False
 
-        return (cs, depList, suggMap)
+        return (cs, depList, suggMap, cannotResolve)
 
     def _updateChangeSet(self, itemList, keepExisting = None):
         """
@@ -224,7 +224,7 @@ class ConaryClient:
         finalCs = self._updateChangeSet(itemList, keepExisting = keepExisting)
 
         if not resolveDeps:
-            return (finalCs, [], {})
+            return (finalCs, [], {}, [])
 
         return self._resolveDependencies(finalCs, keepExisting = keepExisting, 
                                          recurse = recurse)

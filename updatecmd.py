@@ -52,10 +52,17 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             applyList.append(pkgStr)
 
     try:
-        (cs, depFailures, suggMap) = \
+        (cs, depFailures, suggMap, brokenByErase) = \
             client.updateChangeSet(applyList, recurse = recurse,
                                    resolveDeps = depCheck,
                                    keepExisting = keepExisting)
+
+        if brokenByErase:
+            print "Troves being removed create unresolved dependencies:"
+            for (troveName, depSet) in brokenByErase:
+                print "    %s:\n\t%s" %  \
+                        (troveName, "\n\t".join(str(depSet).split("\n")))
+            return
 
         if depFailures:
             print "The following dependencies could not be resolved:"
@@ -63,7 +70,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                 print "    %s:\n\t%s" %  \
                         (troveName, "\n\t".join(str(depSet).split("\n")))
             return
-        elif not cfg.autoResolve and suggMap:
+        elif (not cfg.autoResolve or brokenByErase) and suggMap:
             print "Additional troves are needed:"
             for (req, suggList) in suggMap.iteritems():
                 print "    %s -> %s" % (req, " ".join([x[0] for x in suggList]))
