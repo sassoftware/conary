@@ -11,7 +11,7 @@ import versions
 
 def ChangeSetCommand(repos, cfg, troveName, outFileName, oldVersionStr, \
 	      newVersionStr):
-    pkgList = repos.findTrove(cfg.installlabel, troveName, cfg.flavor,
+    pkgList = repos.findTrove(cfg.installLabel, troveName, cfg.flavor,
 			      newVersionStr)
     if len(pkgList) > 1:
 	log.error("trove %s has multiple branches named %s",
@@ -20,7 +20,7 @@ def ChangeSetCommand(repos, cfg, troveName, outFileName, oldVersionStr, \
     newVersion = pkgList[0].getVersion()
 
     if (oldVersionStr):
-	pkgList = repos.findTrove(cfg.installlabel, troveName, cfg.flavor,
+	pkgList = repos.findTrove(cfg.installLabel, troveName, cfg.flavor,
 				  oldVersionStr)
 	if len(pkgList) > 1:
 	    log.error("trove %s has multiple branches named %s",

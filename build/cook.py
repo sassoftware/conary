@@ -314,7 +314,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     lcache = lookaside.RepositoryCache(repos)
 
     srcdirs = [ os.path.dirname(recipeClass.filename),
-		cfg.sourcepath % {'pkgname': recipeClass.name} ]
+		cfg.sourcePath % {'pkgname': recipeClass.name} ]
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
 
     # populate the repository source lookaside cache from the :source component
@@ -337,7 +337,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
                 # anything that isn't
                 lcache.addFileHash(path, fileObj.contents.sha1())
 
-    builddir = cfg.buildpath + "/" + recipeObj.name
+    builddir = cfg.buildPath + "/" + recipeObj.name
 
     use.track(True)
     recipeObj.setup()
@@ -352,8 +352,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     try:
 	os.chdir(builddir + '/' + recipeObj.mainDir())
 
-	util.mkdirChain(cfg.tmpdir)
-	destdir = tempfile.mkdtemp("", "srs-%s-" % recipeObj.name, cfg.tmpdir)
+	util.mkdirChain(cfg.tmpDir)
+	destdir = tempfile.mkdtemp("", "srs-%s-" % recipeObj.name, cfg.tmpDir)
 	recipeObj.doBuild(builddir, destdir)
 	log.info('Processing %s', recipeClass.name)
 	recipeObj.doDestdirProcess() # includes policy
@@ -467,7 +467,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}):
 
     built = None
     try:
-        troves = cookObject(repos, cfg, recipeClass, cfg.buildlabel,
+        troves = cookObject(repos, cfg, recipeClass, cfg.buildLabel,
                             changeSetFile = changeSetFile,
                             prep = prep, macros = macros)
         if troves:
@@ -489,7 +489,7 @@ class CookError(Exception):
 
 def cookCommand(cfg, args, prep, macros):
     # this ensures the repository exists
-    repos = helper.openRepository(cfg.reppath)
+    repos = helper.openRepository(cfg.repPath)
 
     for item in args:
         # we want to fork here to isolate changes the recipe might make

@@ -29,10 +29,10 @@ class SrsConfiguration:
 	self.__dict__[key] = val
 
 	try:
-	    if key == "installlabel":
-		self.installlabel = versions.BranchName(self.installlabel)
-	    elif key == "buildlabel":
-		self.buildlabel = versions.BranchName(self.buildlabel)
+	    if key == "installLabel":
+		self.installLabel = versions.BranchName(self.installLabel)
+	    elif key == "buildLabel":
+		self.buildLabel = versions.BranchName(self.buildLabel)
 	except versions.ParseError, e:
 	    raise ParseError, str(e)
 
@@ -54,15 +54,15 @@ class SrsConfiguration:
 		print "%-20s (unknown type)" % (item)
 
     def __init__(self):
-	self.reppath = "/var/lib/srsrep"
+	self.repPath = "/var/lib/srsrep"
 	self.root = "/"
-	self.sourcepath = "/usr/src/srs/sources"
-	self.buildpath = "/usr/src/srs/builds"
-	self.installlabel = None
-	self.buildlabel = None
+	self.sourcePath = "/usr/src/srs/sources"
+	self.buildPath = "/usr/src/srs/builds"
+	self.installLabel = None
+	self.buildLabel = None
 	self.lookaside = "/var/cache/srs"
-	self.dbpath = "/var/lib/srsdb"
-        self.tmpdir = "/var/tmp/"
+	self.dbPath = "/var/lib/srsdb"
+        self.tmpDir = "/var/tmp/"
 	self.instructionSet = deps.arch.current()
 
 	self.flavor = deps.deps.DependencySet()

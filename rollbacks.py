@@ -11,7 +11,7 @@ def listRollbacks(db, cfg):
 	if version.isLocal():
 	    return "local"
 
-	if version.branch().label() == cfg.installlabel:
+	if version.branch().label() == cfg.installLabel:
 	    return version.trailingVersion().asString()
 	return version.asString()
 

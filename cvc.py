@@ -37,18 +37,18 @@ def sourceCommand(cfg, args, argSet):
 	    dir = None
 
 	if argSet or (len(args) < 2 or len(args) > 3): return usage()
-	repos = openRepository(cfg.reppath)
+	repos = openRepository(cfg.repPath)
 
 	args = [repos, cfg, dir] + args[1:]
 	checkin.checkout(*args)
     elif (args[0] == "commit"):
 	if argSet or len(args) != 1: return usage()
-	repos = openRepository(cfg.reppath)
+	repos = openRepository(cfg.repPath)
 
 	checkin.commit(repos, cfg)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
-	repos = openRepository(cfg.reppath)
+	repos = openRepository(cfg.repPath)
 
 	args[0] = repos
 	checkin.diff(*args)
@@ -63,14 +63,14 @@ def sourceCommand(cfg, args, argSet):
 	if len(args) != 2: return usage()
 	
 	try:
-	    repos = openRepository(cfg.reppath)
+	    repos = openRepository(cfg.repPath)
 	except repository.OpenError:
 	    repos = None
 
 	checkin.newPackage(repos, cfg, args[1])
     elif (args[0] == "update"):
 	if argSet or not args or len(args) > 2: return usage()
-	repos = openRepository(cfg.reppath)
+	repos = openRepository(cfg.repPath)
 
 	args[0] = repos
 	checkin.updateSrc(*args)

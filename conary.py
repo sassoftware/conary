@@ -58,7 +58,7 @@ def usage(rc = 1):
     print "commit flags:  --target-branch <branch>"
     print ""
     print 'common flags:  --config "<item> <value>"'
-    print "               --reppath <repository-path>"
+    print "               --repPath <repository-path>"
     print "               --root <root>"
     print ""
     print "pkglist flags: --sha1s"
@@ -97,7 +97,7 @@ def realMain():
     # 1 - arg may occur once, w/ parameter
     # 2 - arg may occur N times, w/ parameter
 
-    cfgMap["reppath"] = "reppath"
+    cfgMap["repPath"] = "repPath"
     cfgMap["root"] = "root"
 
     argDef["all"] = 0
@@ -180,7 +180,7 @@ def realMain():
     elif (otherArgs[1] == "branch"):
 	if argSet: return usage
 	if len(otherArgs) < 4 or len(otherArgs) > 5: return usage()
-	repos = openRepository(cfg.reppath)
+	repos = openRepository(cfg.repPath)
 
 	args = [repos, ] + otherArgs[2:]
 	branch.branch(*args)
@@ -197,7 +197,7 @@ def realMain():
 	    (old, new) = (None, otherArgs[3])
 	    outFile = otherArgs[4]
 
-	repos = openRepository(cfg.reppath)
+	repos = openRepository(cfg.repPath)
 
 	cscmd.ChangeSetCommand(repos, cfg, name, outFile, old, new)
     elif (otherArgs[1] == "commit"):
@@ -206,7 +206,7 @@ def realMain():
 	    targetBranch  = argSet['target-branch']
 	    del argSet['target-branch']
 	if len(otherArgs) < 3: return usage()
-	repos = openRepository(cfg.reppath)
+	repos = openRepository(cfg.repPath)
 	for changeSet in otherArgs[2:]:
 	    commit.doCommit(repos, changeSet, targetBranch)
     elif (otherArgs[1] == "config"):
@@ -236,7 +236,7 @@ def realMain():
     elif (otherArgs[1] == "erase"):
 	if argSet: return usage
 	if len(otherArgs) >= 3 and len(otherArgs) <=4:
-	    db = openDatabase(cfg.root, cfg.dbpath)
+	    db = openDatabase(cfg.root, cfg.dbPath)
 
 	    args = [db, cfg] + otherArgs[2:]
 	    updatecmd.doErase(*args)
@@ -246,7 +246,7 @@ def realMain():
 	if len(otherArgs) != 3 and len(otherArgs) != 3:
 	    return usage()
 
-	repos = openRepository(cfg.reppath)
+	repos = openRepository(cfg.repPath)
 	importrpm.doImport(repos, cfg, otherArgs[2])
     elif (otherArgs[1] == "localcs"):
 	if len(otherArgs) != 4 and len(otherArgs) != 4:
@@ -255,11 +255,11 @@ def realMain():
 	name = otherArgs[2]
 	outFile = otherArgs[3]
 
-	db = database.Database(cfg.root, cfg.dbpath, "r")
+	db = database.Database(cfg.root, cfg.dbPath, "r")
 	cscmd.LocalChangeSetCommand(db, cfg, name, outFile)
     elif (otherArgs[1] == "localcommit"):
 	if len(otherArgs) < 3: return usage()
-	db = database.Database(cfg.root, cfg.dbpath, "c")
+	db = database.Database(cfg.root, cfg.dbPath, "c")
 	for changeSet in otherArgs[2:]:
 	    commit.doLocalCommit(db, changeSet)
     elif (otherArgs[1] == "pkglist"):
@@ -272,7 +272,7 @@ def realMain():
 	sha1s = argSet.has_key('sha1s')
 	if sha1s: del argSet['sha1s']
 
-	db = openDatabase(cfg.root, cfg.dbpath)
+	db = openDatabase(cfg.root, cfg.dbPath)
 
 	if argSet: return usage()
 
@@ -298,7 +298,7 @@ def realMain():
 	sha1s = argSet.has_key('sha1s')
 	if sha1s: del argSet['sha1s']
 
-	repos = openRepository(cfg.reppath)
+	repos = openRepository(cfg.repPath)
 
 	if argSet: return usage()
 
@@ -313,12 +313,12 @@ def realMain():
 	    return usage()
     elif (otherArgs[1] == "rblist"):
 	if argSet: return usage
-	db = openDatabase(cfg.root, cfg.dbpath)
+	db = openDatabase(cfg.root, cfg.dbPath)
 	rollbacks.listRollbacks(db, cfg)
     elif (otherArgs[1] == "remove"):
 	if len(otherArgs) != 3: return usage()
 	if argSet: return usage
-	db = openDatabase(cfg.root, cfg.dbpath)
+	db = openDatabase(cfg.root, cfg.dbPath)
 	fullPath = util.joinPaths(cfg.root, otherArgs[2])
 	if os.path.exists(fullPath):
 	    os.unlink(fullPath)
@@ -327,7 +327,7 @@ def realMain():
 	db.removeFile(otherArgs[2])
     elif (otherArgs[1] == "rollback"):
 	if argSet: return usage
-	db = openDatabase(cfg.root, cfg.dbpath)
+	db = openDatabase(cfg.root, cfg.dbPath)
 	args = [db, cfg] + otherArgs[2:]
 	rollbacks.apply(*args)
     elif (otherArgs[1] == "source" or otherArgs[1] == "src"):
@@ -340,8 +340,8 @@ def realMain():
 	    del argSet['replace-files']
 	if argSet: return usage
 	if len(otherArgs) >=3 and len(otherArgs) <= 4:
-	    repos = openRepository(cfg.reppath)
-	    db = openDatabase(cfg.root, cfg.dbpath)
+	    repos = openRepository(cfg.repPath)
+	    db = openDatabase(cfg.root, cfg.dbPath)
 
 	    args = [repos, db, cfg] + otherArgs[2:]
 	    updatecmd.doUpdate(*args, **kwargs)

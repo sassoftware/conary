@@ -126,7 +126,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
     # We have to be careful with labels
     name += ":source"
     try:
-        trvList = repos.findTrove(cfg.installlabel, name, None,
+        trvList = repos.findTrove(cfg.installLabel, name, None,
 				  versionStr = versionStr)
     except repository.repository.PackageNotFound, e:
         log.error(str(e))
@@ -147,7 +147,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
                       workDir, str(err))
 	    return
 
-    branch = helper.fullBranchName(cfg.installlabel, trv.getVersion(), 
+    branch = helper.fullBranchName(cfg.installLabel, trv.getVersion(), 
 				   versionStr)
     state = SourceState(trv.getName(), trv.getVersion())
 
@@ -204,7 +204,7 @@ def commit(repos, cfg):
     if issubclass(recipeClass, recipe.PackageRecipe):
         lcache = lookaside.RepositoryCache(repos)
         srcdirs = [ os.path.dirname(recipeClass.filename),
-                    cfg.sourcepath % {'pkgname': recipeClass.name} ]
+                    cfg.sourcePath % {'pkgname': recipeClass.name} ]
         recipeObj = recipeClass(cfg, lcache, srcdirs)
         recipeObj.setup()
         files = recipeObj.fetchAllSources()
@@ -212,7 +212,7 @@ def commit(repos, cfg):
     recipeVersionStr = recipeClass.version
 
     if isinstance(state.getVersion(), versions.NewVersion):
-	branch = versions.Version([cfg.buildlabel])
+	branch = versions.Version([cfg.buildLabel])
     else:
 	branch = state.getVersion().branch()
 

@@ -192,7 +192,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
     name = filename[:-len('.recipe')]
 
     try:
-	pkgs = repos.findTrove(cfg.buildlabel, component, None)
+	pkgs = repos.findTrove(cfg.buildLabel, component, None)
 	if len(pkgs) > 1:
 	    raise RecipeFileError("source component %s has multiple versions "
 				  "with label %s", component,
@@ -318,8 +318,8 @@ class PackageRecipe(Recipe):
     def extraBuild(self, action):
         self._build.append(action)
 
-    def doBuild(self, buildpath, root):
-        builddir = os.sep.join((buildpath, self.mainDir()))
+    def doBuild(self, buildPath, root):
+        builddir = os.sep.join((buildPath, self.mainDir()))
 	self.macros.update({'builddir': builddir,
 			    'destdir': root})
 	self.magic = magic.magicCache(root)
