@@ -40,7 +40,7 @@ class SubArchConfig(ConfigFile):
 
     def configLine(self, line, file = "override", lineno = '<No line>'):
         if line.startswith('march '):
-            log.warning('depreciated arcticture flag march found -- '
+            log.warning('deprecated architecture flag march found -- '
                         ' upgrade distro-release')
         else:
             ConfigFile.configLine(self, line, file, lineno)
@@ -70,7 +70,7 @@ class ArchConfig(ConfigFile):
         if self.section:
             self.sections[self.section].configLine(line, file, lineno)
         elif line.startswith('march '):
-            log.warning('depreciated arcticture flag march found -- '
+            log.warning('deprecated architecture flag march found -- '
                         ' upgrade distro-release')
         else:
             ConfigFile.configLine(self, line, file, lineno)
