@@ -908,11 +908,6 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
 	AbstractTroveChangeSet.__init__(self, newStyle)
 
 	lines = buf.split("\n")[:-1]
-	header = lines[0]
-
-	l = header.split()
-
-	pkgType = l[0]
 
 	oldVersion = None
 
