@@ -84,6 +84,7 @@ class RpmHeader:
 
     def has_key(self, tag):
         return self.entries.has_key(tag)
+    __contains__ = has_key
 
     def paths(self):
         paths = self[DIRNAMES]
@@ -130,8 +131,8 @@ class RpmHeader:
 
             count -= 1
 
-        if (count == 1 or count == 0) and dataType != 8:
-            # count isn't set for STRING_TYPE
+        if (count == 1 or count == 0) and dataType == 6:
+            # count isn't set for RPM_STRING_TYPE
             return items[0]
 
         return items
