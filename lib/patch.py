@@ -88,6 +88,7 @@ def patch(oldLines, unifiedDiff):
     i = 0
     last = len(unifiedDiff)
     result = []
+    failedHunks = []
 
     fromLine = 0
     offset = 0
@@ -124,7 +125,8 @@ def patch(oldLines, unifiedDiff):
 
 	conflictCount = best[0]
 	if (hunk.contextCount - conflictCount) < 1:
-	    raise Conflict()
+	    failedHunks.append(hunk)
+	    continue
 
 	offset = best[1]
 	start += offset
@@ -140,7 +142,7 @@ def patch(oldLines, unifiedDiff):
 	result.append(oldLines[fromLine])
 	fromLine = fromLine + 1
 	
-    return result
+    return (result, failedHunks)
 		
 class BadHunkHeader(Exception):
 
