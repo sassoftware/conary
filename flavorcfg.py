@@ -92,7 +92,7 @@ class UseFlagConfig(ConfigFile):
         contents = open(filePath).read().strip()
         if contents.strip() in ('disallowed', 'preferred', 'prefernot', 
                                                            'required'):
-            self.configLine('installFlavor %s' % contents, filePath, 1)
+            self.configLine('sense %s' % contents, filePath, 1)
         else:
             self.read(filePath)
         if self.name is None:
