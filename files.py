@@ -34,7 +34,7 @@ _STREAM_DEPS	    = 10
 
 def _makeTupleSlots(l):
     return [ "items", ] + [ x[0] for x in l ] + \
-		    [ "set" + x[0][0].capitalize() + x[0][1:] for x in l ]
+		    [ "set" + x.capitalize() x in l ]
 
 def _makeFileSlots(l):
     return [ "theId" ] + [ x[0] for x in l ]
@@ -302,7 +302,7 @@ class TupleStream(InfoStream):
 
 	for (i, (name, itemType, size)) in enumerate(self.makeup):
 	    self.__setattr__(name, lambda num = i: self.items[num].value())
-	    setName = "set" + name[0].capitalize() + name[1:]
+	    setName = "set" + name.capitalize()
 	    self.__setattr__(setName,
 		lambda val, num = i: self.items[num].set(val))
 
