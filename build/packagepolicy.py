@@ -442,6 +442,7 @@ class Transient(policy.Policy):
     """
     invariantinclusions = [
 	r'..*\.py(c|o)$',
+        r'..*\.elc$',
     ]
 
     def doFile(self, file):
