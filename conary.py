@@ -46,15 +46,6 @@ from repository import netclient
 
 sys.excepthook = util.genExcepthook()
 
-try:
-    cfg = conarycfg.ConaryConfiguration()
-except conarycfg.ConaryCfgError, e:
-    log.error(str(e))
-    sys.exit(1)
-
-# reset the excepthook (using cfg values for exception settings)
-sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
-
 def usage(rc = 1):
     print "usage: conary changeset <pkg>[=[<oldver>--]<newver>]* <outfile>"
     print "       conary commit       <changeset>"
@@ -110,7 +101,7 @@ def openRepository(repMap):
 def openDatabase(root, path):
     return database.Database(root, path)
 
-def realMain(argv=sys.argv):
+def realMain(cfg, argv=sys.argv):
     argDef = {}
     cfgMap = {}
 
@@ -373,7 +364,19 @@ def realMain(argv=sys.argv):
 
 def main(argv=sys.argv):
     try:
-	realMain(argv)
+        if '--skip-default-config' in argv:
+            argv = argv[:]
+            argv.remove('--skip-default-config')
+            cfg = conarycfg.ConaryConfiguration(False)
+        else:
+            cfg = conarycfg.ConaryConfiguration()
+
+        # reset the excepthook (using cfg values for exception settings)
+        sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
+	realMain(cfg, argv)
+    except conarycfg.ConaryCfgError, e:
+        log.error(str(e))
+        sys.exit(1)
     except xmlrpclib.ProtocolError, e:
 	if e.errcode == 403:
 	    print >> sys.stderr, \
