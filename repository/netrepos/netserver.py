@@ -34,6 +34,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    else:
 		return (True, ("TroveMissing", e.troveName, 
 			self.fromVersion(e.troveVersion)))
+	except repository.CommitError, e:
+	    return (True, ("CommitError", str(e)))
 	except:
 	    raise
 
