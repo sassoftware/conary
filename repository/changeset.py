@@ -345,7 +345,7 @@ class ChangeSet:
 	@param repos: repository which will be committed to
 	@type repos: repository.Repository
 	@param targetBranchLabel: label of the branch to commit to
-	@param targetBranchLabel: versions.BranchName
+	@type targetBranchLabel: versions.BranchName
 	"""
 	assert(not targetBranchLabel.equal(versions.LocalBranch()))
 
