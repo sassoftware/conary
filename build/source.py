@@ -9,6 +9,7 @@ in the correct directory.
 """
 
 import gzip
+import log
 import lookaside
 import os
 import rpmhelper
@@ -121,7 +122,7 @@ class _Source:
 	self.doUnpack()
 
     def doUnpack(self):
-	raise AttributeError, 'Source class %s does not implement doUnpack' %self.__class__.__name__
+	raise NotImplementedError
 
 
 class Archive(_Source):
