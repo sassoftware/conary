@@ -557,9 +557,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                             if flavor == None:
                                 flavor = "none"
 
-                            if not l.has_key(version):
-                                l[version] = []
-                            l[version].append(flavor)
+                            flist = l.setdefault(version, [])
+                            flist.append(flavor)
                         else:
                             l.append(version)
 

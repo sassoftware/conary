@@ -230,11 +230,7 @@ class DependencyClass:
 	    dep = self.members[dep.name].mergeFlags(dep, mergeType = mergeType)
 	    del self.members[dep.name]
 
-	if not dependencyCache.has_key(dep):
-	    dependencyCache[dep] = dep
-	    grpDep = dep
-	else:
-	    grpDep = dependencyCache[dep]
+        grpDep = dependencyCache.setdefault(dep, dep)
 
 	self.members[grpDep.name] = grpDep
 	assert(not self.justOne or len(self.members) == 1)
@@ -291,10 +287,9 @@ class DependencyClass:
                 flags[i] = (flag, FLAG_SENSE_REQUIRED)
 
         d = Dependency(l[0], flags)
-        if not dependencyCache.has_key(d):
-            dependencyCache[d] = d
+        cached = dependencyCache.setdefault(d, d)
 
-        return dependencyCache[d]
+        return cached
     thawDependency = staticmethod(thawDependency)
 
     def __hash__(self):
@@ -371,10 +366,8 @@ class TroveDependencies(DependencyClass):
 
     def thawDependency(frozen):
         d = Dependency(frozen, [])
-        if not dependencyCache.has_key(d):
-            dependencyCache[d] = d
-
-        return dependencyCache[d]
+        cached = dependencyCache.setdefault(d, d)
+        return cached
     thawDependency = staticmethod(thawDependency)
 
 _registerDepClass(TroveDependencies)
@@ -393,10 +386,8 @@ class DependencySet:
 	assert(isinstance(dep, Dependency))
 
 	tag = depClass.tag
-	if not self.members.has_key(tag):
-	    self.members[tag] = depClass()
-
-	self.members[tag].addDep(dep)
+        c = self.members.setdefault(tag, depClass())
+        c.addDep(dep)
 
     def copy(self):
         return copy.deepcopy(self)
