@@ -23,6 +23,7 @@ python_files = __init__.py	\
 	importrpm.py		\
 	lookaside.py		\
 	package.py		\
+	policy.py		\
 	recipe.py		\
 	repository.py		\
 	rollbacks.py		\
