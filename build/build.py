@@ -117,7 +117,7 @@ class InstallFile:
 	for fromFile in self.fromFiles:
 	    thisdest = dest
 	    if dest[-1:] == '/':
-		thisdest = dest + fromFile
+		thisdest = dest + os.path.basename(fromFile)
 	    shutil.copyfile(fromFile, thisdest)
 	    os.chmod(thisdest, self.mode)
 
