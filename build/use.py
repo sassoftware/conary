@@ -278,7 +278,7 @@ and menu entries and the shared mime database at this time.  This flag
 should mediate dependence on implementation of these capabilities.
 """)
 
-Use.ssl = False
+Use.ssl = True
 Use.slang = False
 Use.netpbm = False
 Use.nptl = False
