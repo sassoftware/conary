@@ -81,6 +81,7 @@ install: all install-mkdirs install-subdirs pyfiles-install
 		ln -sf conary-wrapper $(DESTDIR)$(bindir)/$$f; \
 	done
 	install -m 644 conary.1 $(DESTDIR)$(mandir)/man1
+	ln -sf conary.1 $(DESTDIR)$(mandir)/man1/cvc.1
 
 dist: $(dist_files)
 	rm -rf $(DISTDIR)
