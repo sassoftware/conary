@@ -426,14 +426,8 @@ class InstallDocs(BuildAction):
 	self.subdir = subdir
 	self.use = util.checkUse(use)
 
-class MakeDirs(BuildAction):
+class MakeDirs(_FileAction):
     keywords = { 'mode': 0755 }
-
-    # probably should make this common code - use putFiles
-    def _sugidMode(self, path):
-	specialbits = self.mode & 06000
-	if specialbits:
-	    self.recipe.fixmodes[path] = specialbits
 
     def do(self, macros):
         for path in self.paths:
@@ -445,11 +439,10 @@ class MakeDirs(BuildAction):
                 print '+ creating directory', dest
                 util.mkdirChain(dest)
                 if self.mode >= 0:
-                    os.chmod(dest, self.mode)
-                    self._sugidMode(d)
+                    self.chmod(macros['destdir'], d)
 
     def __init__(self, paths, **keywords):
-        BuildAction.__init__(self, paths, **keywords)
+        _FileAction.__init__(self, paths, **keywords)
 	if type(paths) is str:
 	    self.paths = (paths,)
 	else:
