@@ -247,9 +247,9 @@ class Cursor:
 
         if len(parms) == 0:
             # If there are no paramters, just execute the query.
-            #self.rs = self.con.db.execute(SQL)
-            stmt = self.con.db.prepare(SQL)
-            self.rs = stmt.execute()
+            self.rs = self.con.db.execute(SQL)
+            #stmt = self.con.db.prepare(SQL)
+            #self.rs = stmt.execute()
         else:
             #self.rs = self.con.db.execute(SQL % parms)
             stmt = self.con.db.prepare(SQL)
