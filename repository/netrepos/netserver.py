@@ -348,7 +348,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	# understood
         if clientVersion < 3:
             raise ClientTooOld
-        return 1
+
+        return 3
 
     def __init__(self, path, tmpPath, urlBase, authDbPath, name,
 		 repositoryMap, commitAction = None):
