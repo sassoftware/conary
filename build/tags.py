@@ -18,6 +18,8 @@ class TagFile(conarycfg.ConfigFile):
     # lists all legal options for "implements"
     implementsCheck = {'files': ('update', 'preremove', 'remove'),
 		       'self':  ('update', 'preremove')}
+    # ...and "datasource"
+    datasourceCheck = ['args', 'stdin']
 
     def __init__(self, filename, macros = {}):
 	self.defaults = {
@@ -47,6 +49,12 @@ class TagFile(conarycfg.ConfigFile):
 		if val not in self.implementsCheck[key]:
 		    raise conarycfg.ParseError, \
 			'unknown action %s in "implements %s"' %(val, item)
+	if 'datasource' in self.__dict__:
+	    if self.__dict__['datasource'] not in self.datasourceCheck:
+		raise conarycfg.ParseError, \
+		    'unknown datasource option %s: "datasource args|stdin"' \
+		    %self.__dict__['datasource']
+
 
     def filterCB(self, type, key=None, val=None):
 	if not self.macros:
