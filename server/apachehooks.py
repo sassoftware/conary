@@ -122,7 +122,7 @@ def handler(req):
 	    port = 80
 
 	if os.path.basename(req.uri) == "changeset":
-	   rest = os.path.dirname(req.uri)
+	   rest = os.path.dirname(req.uri) + "/"
 	else:
 	   rest = req.uri
 
