@@ -85,10 +85,10 @@ class FilesystemJob:
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
 
-    def apply(self, tagSet = {}, tagScript = None):
-	tagCommands = []
-	runLdconfig = False
+    def preapply(self, tagSet = {}, tagScript = None):
+	# this is run before the change make it do the database
 	rootLen = len(self.root)
+	tagCommands = []
 
 	if self.tagRemoves.has_key('tagdescription'):
 	    for path in self.tagRemoves['tagdescription']:
@@ -101,9 +101,19 @@ class FilesystemJob:
 			break
 
 		if tagInfo:
+		    # this prevents us from trying to run "files add"
 		    del tagSet[tagInfo.tag]
+
+		    if self.tagRemoves.has_key(tagInfo.tag):
+			# we're running "self preremove"; we don't need to
+			# run "files preremove" as well, and we won't be
+			# able to run "files remove"
+			del self.tagRemoves[tagInfo.tag]
+
 		    if "self preremove" in tagInfo.implements:
-			tagCommands.append([ path, "self", "preremove" ])
+			tagCommands.append([ path, "self", "preremove" ] + 
+			   [x for x in 
+				self.repos.iterFilesWithTag(tagInfo.tag) ])
 
 	    del self.tagRemoves['tagdescription']
 
@@ -126,7 +136,12 @@ class FilesystemJob:
 	    else:
 		runTagCommands(self.root, tagCommands)
 
+    def apply(self, tagSet = {}, tagScript = None):
+	# this is run after the changes are in the database (but before
+	# they are committed
 	tagCommands = []
+	runLdconfig = False
+	rootLen = len(self.root)
 
 	for (oldPath, newPath, msg) in self.renames:
 	    os.rename(oldPath, newPath)

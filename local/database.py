@@ -355,6 +355,10 @@ class Database(SqlDbRepository):
 	if not isRollback:
 	    self.addRollback(inverse, localChanges)
 
+	# run preremove scripts before updating the database, otherwise
+	# the file lists which get sent to them are incorrect
+	fsJob.preapply(tagSet, tagScript)
+
 	# Build A->B
 	if toStash:
 	    # this updates the database from the changeset; the change
