@@ -1115,11 +1115,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 for label in labelPath:
                     d = self.getTroveVersionsByLabel([name], label, 
                                              flavorFilter = flavor)
-                    for version in d[name].keys():
+                    for version in d.get(name, {}).keys():
                         if version.trailingVersion() != verRel:
                             del d[name][version]
 
-                    if not d[name]:
+                    if not d.has_key(name):
                         continue
                     elif not acrossRepositories:
                         flavorDict = d
