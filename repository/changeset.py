@@ -154,21 +154,21 @@ class ChangeSet:
 
     # if availableFiles is set, this includes the contents that it can
     # find, but doesn't worry about files which it can't find
-    def invert(self, repos, availableFiles = 0):
+    def makeRollback(self, db, configFiles = 0):
 	assert(not self.abstract)
 	# this is easy to fix if it turns out to be necessary
 	assert(not self.oldPackages)
 
-	inversion = ChangeSetFromRepository(repos)
+	rollback = ChangeSetFromRepository(db)
 
 	for pkgCs in self.getNewPackageList():
 	    if not pkgCs.getOldVersion():
 		# this was a new package, and the inverse of a new
 		# package is an old package
-		inversion.oldPackage(pkgCs.getName(), pkgCs.getNewVersion())
+		rollback.oldPackage(pkgCs.getName(), pkgCs.getNewVersion())
 		continue
 
-	    pkg = repos.getPackageVersion(pkgCs.getName(), 
+	    pkg = db.getPackageVersion(pkgCs.getName(), 
 					  pkgCs.getOldVersion())
 
 	    # this is a modified package and needs to be inverted
@@ -183,14 +183,33 @@ class ChangeSet:
 		(path, version) = pkg.getFile(fileId)
 		invertedPkg.newFile(fileId, path, version)
 
-		origFile = repos.getFileVersion(fileId, version)
-		inversion.addFile(fileId, None, version, origFile.diff(None))
+		origFile = db.getFileVersion(fileId, version)
+		rollback.addFile(fileId, None, version, origFile.diff(None))
 
-		if (not availableFiles) or \
-			    repos.hasFileContents(origFile.sha1()):
-			cont = repository.FileContentsFromRepository(repos, 
-						      origFile.sha1())
-			inversion.addFileContents(origFile.sha1(), cont)
+		# We only have the contents of config files available
+		# from the db. Files which aren't in the db
+		# we'll gather from the filesystem *as long as they have
+		# not changed*. If they have changed, they'll show up as
+		# members of the local branch, and their contents will be
+		# saved as part of that change set.
+		if origFile.isConfig():
+		    cont = repository.FileContentsFromRepository(db, 
+						  origFile.sha1())
+		    rollback.addFileContents(origFile.sha1(), cont)
+		else:
+		    if isinstance(origFile, files.SourceFile):
+			type = "src"
+		    else:
+			type = None
+
+		    fullPath = db.root + path
+
+		    fsFile = files.FileFromFilesystem(fullPath, fileId,
+				type = type, possibleMatch = origFile)
+
+		    if fsFile.same(origFile):
+			cont = repository.FileContentsFromFilesystem(fullPath)
+			rollback.addFileContents(origFile.sha1(), cont)
 
 	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
 		(curPath, curVersion) = pkg.getFile(fileId)
@@ -199,23 +218,45 @@ class ChangeSet:
 		(oldVersion, newVersion, csInfo) = self.files[fileId]
 		assert(curVersion.equal(oldVersion))
 
-		origFile = repos.getFileVersion(fileId, oldVersion)
-		newFile = repos.getFileVersion(fileId, oldVersion)
+		origFile = db.getFileVersion(fileId, oldVersion)
+		newFile = db.getFileVersion(fileId, oldVersion)
 		newFile.applyChange(csInfo)
 
-		inversion.addFile(fileId, newVersion, oldVersion, 
+		rollback.addFile(fileId, newVersion, oldVersion, 
 				  origFile.diff(newFile))
 
-		if origFile.sha1() != newFile.sha1():
-		    if (not availableFiles) or \
-				repos.hasFileContents(origFile.sha1()):
-			cont = repository.FileContentsFromRepository(repos, 
-						      origFile.sha1())
-			inversion.addFileContents(origFile.sha1(), cont)
+		# if a config file has changed between versions, save
+		# it; if it hasn't changed the unmodified version will
+		# still be available from the database when the rollback
+		# gets applied
+		if (origFile.sha1() != newFile.sha1()) and	    \
+		   (origFile.isConfig() or newFile.isConfig()):
+		    cont = repository.FileContentsFromRepository(db, 
+						  origFile.sha1())
+		    rollback.addFileContents(origFile.sha1(), cont)
+		elif origFile.sha1() != newFile.sha1():
+		    # if a file which isn't a config file has changed, and
+		    # the right version of the file is available in the
+		    # filesystem, go ahead and grab it (otherwise we'll
+		    # leave it to the local branch change set to preserver
+		    # the contents)
+		    if isinstance(origFile, files.SourceFile):
+			type = "src"
+		    else:
+			type = None
 
-	    inversion.newPackage(invertedPkg)
+		    fullPath = db.root + curPath
 
-	return inversion
+		    fsFile = files.FileFromFilesystem(fullPath, fileId,
+				type = type, possibleMatch = origFile)
+
+		    if fsFile.same(origFile):
+			cont = repository.FileContentsFromFilesystem(fullPath)
+			rollback.addFileContents(origFile.sha1(), cont)
+
+	    rollback.newPackage(invertedPkg)
+
+	return rollback
 
     def __init__(self):
 	self.newPackages = {}
