@@ -30,6 +30,20 @@ class ShellCommand:
                                  'non-zero status %d' % (command, rc))
 
 
+class Automake(ShellCommand):
+    template = ('cd %%s; aclocal %%s ; autoconf %(autoConfArgs); automake %(autoMakeArgs)'
+                ' %(args)s')
+    keywords = {'autoConfArgs': '--force',
+                'autoMakeArgs': '--copy --force',
+                'm4Dir': ''}
+    
+    def doBuild(self, dir):
+	m4DirArgs = ''
+        if self.m4Dir:
+	    m4DirArgs = '-I %s' %(self.m4Dir)
+        self.execute(self.command % (dir, m4DirArgs))
+
+
 class Configure(ShellCommand):
     template = ('cd %%s; %%s %(preConfigure)s %%s --prefix=/usr '
                 '--sysconfdir=/etc %(args)s')
