@@ -6,7 +6,35 @@ import versions
 import os
 
 class ChangeSet:
+
+    def validate(self):
+	for pkg in self.getPackageList():
+	    # if this is abstract, we can't have any removed or changed files
+	    if not pkg.getOldVersion():
+		assert(not pkg.getChangedFiles())
+		assert(not pkg.getOldFiles())
+
+	    # new and changed files need to have a file entry for the right 
+	    # version along with the contents for files which have any
+	    list = pkg.getNewFileList() + pkg.getChangedFileList()
+	    for (fileId, path, version) in pkg.getNewFileList():
+		assert(self.files.has_key(fileId))
+		(oldVersion, newVersion, info) = self.getFile(fileId)
+		assert(newVersion.equal(version))
+
+		file = files.FileFromInfoLine(info, fileId)
+		if isinstance(file, files.RegularFile) and file.sha1():
+		    assert(self.hasFileContents(file.sha1()))
+
+	    # old files should not have any file entries
+	    for fileId in pkg.getOldFileList():
+		assert(not self.files.has_key(fileId))
+
+
     def getFileContents(self, fileId):
+	raise NotImplementedError
+
+    def hasFileContents(self, fileId):
 	raise NotImplementedError
 
     def addFile(self, fileId, oldVersion, newVersion, csInfo):
@@ -31,6 +59,9 @@ class ChangeSet:
 
     def getFileChange(self, fileId):
 	return self.files[fileId][2]
+
+    def getFile(self, fileId):
+	return self.files[fileId]
 
     def headerAsString(self):
 	str = ""
@@ -66,6 +97,48 @@ class ChangeSet:
 	    os.unlink(outFileName)
 	    raise
 
+    def invert(self, repos):
+	inversion = ChangeSetFromRepository(repos)
+
+	for pkgCs in self.getPackageList():
+	    pkg = repos.getPackageVersion(pkgCs.getName(), 
+					  pkgCs.getOldVersion())
+
+	    invertedPkg = package.PackageChangeSet(pkgCs.getName(), 
+			       pkgCs.getNewVersion(), pkgCs.getOldVersion())
+
+	    for (fileId, path, version) in pkgCs.getNewFileList():
+		invertedPkg.oldFile(fileId)
+
+	    for fileId in pkgCs.getOldFileList():
+		(path, version) = pkg.getFile(fileId)
+		invertedPkg.newFile(fileId, path, version)
+
+		origFile = repos.getFileVersion(fileId, version)
+		inversion.addFile(fileId, None, version, origFile.diff(None))
+		inversion.addFileContents(origFile.sha1())
+
+	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
+		(path, newVersion) = pkg.getFile(fileId)
+		invertedPkg.changedFile(fileId, path, version)
+
+		(oldVersion, ver, csInfo) = pkgCs.getFile(fileId)
+		assert(oldVersion.equal(ver))
+
+		origFile = repos.getFileVersion(fileId, oldVersion)
+		newFile = repos.getFileVersion(fileId, oldVersion)
+		file.setVersion(newVersion)
+		file.applyChange(csInfo)
+
+		inversion.addFile(fileId, newVersion, oldVersion, old.diff(new))
+
+		if origFile.sha1() != newFile.sha1():
+		    inversion.addFileContents(origFile.sha1())
+
+	    inversion.addPackage(invertedPkg)
+
+	return inversion
+
     def __init__(self):
 	assert(self.__class__ != ChangeSet)
 	self.packages = []
@@ -76,6 +149,9 @@ class ChangeSetFromFilesystem(ChangeSet):
 
     def getFileContents(self, fileId):
 	return open(self.fileMap[fileId])
+
+    def hasFileContents(self, fileId):
+	return self.fileMap.has_key(fileId)
 
     def addFilePointer(self, fileId, path):
 	self.fileMap[fileId] = path
@@ -89,6 +165,9 @@ class ChangeSetFromRepository(ChangeSet):
     def getFileContents(self, fileId):
 	return self.repos.pullFileContentsObject(fileId)
 
+    def hasFileContents(self, fileId):
+	return self.repos.hasFileContents(fileId)
+
     def __init__(self, repos):
 	self.repos = repos
 	ChangeSet.__init__(self)
@@ -97,6 +176,9 @@ class ChangeSetFromFile(ChangeSet):
 
     def getFileContents(self, hash):
 	return self.csf.getFile(hash)
+
+    def hasFileContents(self, hash):
+	return self.csf.hasFile(hash)
 
     def read(self, file):
 	f = open(file, "r")
@@ -149,6 +231,7 @@ class ChangeSetFromFile(ChangeSet):
     def __init__(self, file):
 	ChangeSet.__init__(self)
 	self.read(file)
+	self.validate()
 
 # old may be None
 def fileChangeSet(fileId, old, new):
