@@ -501,12 +501,14 @@ class RegularFile(File):
 
                 if os.path.isdir(target):
                     os.rmdir(target)
-		os.rename(tmpname, target)
-		File.restore(self, root, target, journal=journal)
+                os.rename(tmpname, target)
 	    except:
-		os.unlink(tmpname)
-		raise
-
+                # we've not renamed tmpname to target yet, we should
+                # clean up instead of leaving temp files around
+                os.unlink(tmpname)
+                raise
+            
+            File.restore(self, root, target, journal=journal)
 	else:
 	    File.restore(self, root, target, journal=journal)
 
