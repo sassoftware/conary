@@ -58,8 +58,12 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 	    if not versionStrs:
 		short = {}
 		for version in flavors[troveName]:
-		    v = version.branch().label().asString() + '/' + \
-			version.trailingVersion().asString()
+		    if version.hasParent():
+			v = version.branch().label().asString() + '/' + \
+			    version.trailingVersion().asString()
+		    else:
+			v = version.asString()
+
 		    versionStrs[version] = v
 		    if short.has_key(v):
 			versionStrs = {}
