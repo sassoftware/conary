@@ -45,7 +45,7 @@ class Repository:
 	    if old:
 		oldPackageList.append((csPkg.getName(), old))
 		newPkg = pkgSet.getVersion(old)
-		newPkg.setVersion(newVersion)
+		newPkg.changeVersion(newVersion)
 	    else:
 		newPkg = package.Package(csPkg.name, newVersion)
 

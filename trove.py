@@ -12,7 +12,7 @@ class Package:
     def getVersion(self):
         return self.version
     
-    def setVersion(self, version):
+    def changeVersion(self, version):
         self.version = version
     
     def addFile(self, fileId, path, version):
