@@ -142,7 +142,7 @@ def previousVersion(repos, troveName, troveVersion, troveFlavor):
 	    if ver.branch() == newBranch:
 		# make sure it's the right flavor
 		flavors = repos.pkgVersionFlavors(troveName, ver)
-		if newPkg.getFlavor() in flavors:
+		if troveFlavor in flavors:
 		    oldVersion = ver
 		    break
 
@@ -164,6 +164,6 @@ class PackageNotFound(Exception):
     def __init__(self, str):
 	self.msg = str
 
-class AmbigiousOperation(Exception):
+class AmbiguousOperation(Exception):
 
     pass
