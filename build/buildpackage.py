@@ -26,6 +26,9 @@ class BuildPackage(types.DictionaryType):
     def addFile(self, path):
 	self[path] = BuildFile()
 
+    def getName(self):
+	return self.name
+
     def addDirectory(self, path):
 	self[path] = BuildFile()
 
@@ -78,13 +81,15 @@ class PackageSpecInstance:
 
 class PackageSpecSet(dict):
     """An "ordered dictionary" containing PackageSpecInstances"""
-    def __init__(self, auto, explicit):
+    def __init__(self, namePrefix, auto, explicit):
 	"""Storage area for (sub)package definitions; keeps
 	automatic subpackage definitions (like runtime, doc,
 	etc) and explicit subpackage definitions (higher-level
 	subpackages; each automatic subpackage applies to each
 	explicit subpackage.
-	
+
+	@param namePrefix: the prefix to use to build a full name from the
+	subpackage name, such as ":srs.specifixinc.com:tmpwatch"
 	@param auto: automatic subpackage list
 	@type auto: tuple of (name, regex) or (name, (tuple, of
 	regex)) tuples
@@ -101,7 +106,8 @@ class PackageSpecSet(dict):
 	self.packageMap = {}
 	for explicitspec in self.explicit:
 	    for autospec in self.auto:
-		name = self._getname(explicitspec.name, autospec.name)
+		name = self._getname(namePrefix, explicitspec.name, 
+				     autospec.name)
 		self[name] = PackageSpecInstance(BuildPackage(name),
                                                  explicitspec, autospec)
 		self.packageList.append(name)
@@ -109,10 +115,12 @@ class PackageSpecSet(dict):
 		    self.packageMap[explicitspec.name] = {}
 		self.packageMap[explicitspec.name][autospec.name] = self[name]
 
-    def _getname(self, subname, autoname):
-        """Cheap way of saying "if subname, then subname:autoname,
-	otherwise just autoname"."""
-	return string.lstrip(string.join((subname, autoname), ':'), ':')
+    def _getname(self, prefix, subname, autoname):
+        """Returns the full name of the package when subname could be None"""
+	if subname:
+	    return prefix + ":" + subname + ":" + autoname
+	else:
+	    return prefix + ":" + autoname
     
     def add(self, path, autospec, explicitspec):
 	self.packageMap[explicitspec.name][autospec.name].instance.addFile(path)

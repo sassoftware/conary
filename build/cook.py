@@ -2,6 +2,7 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+import buildpackage
 import changeset
 import commit
 import copy
@@ -16,17 +17,16 @@ import tempfile
 import time
 import types
 import util
-import buildpackage
 
 # type could be "src"
 #
 # returns a (pkg, fileMap) tuple
-def createPackage(repos, cfg, destdir, fileList, name, version, ident, 
+def createPackage(repos, cfg, destdir, bldPkg, version, ident, 
 		  pkgtype = "auto"):
     fileMap = {}
-    p = package.Package(name, version)
+    p = package.Package(bldPkg.getName(), version)
 
-    for filePath in fileList:
+    for filePath in bldPkg.keys():
 	if pkgtype == "auto":
 	    realPath = destdir + filePath
 	    targetPath = filePath
@@ -113,16 +113,12 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         
         os.chdir(cwd)
         
-        pkgname = cfg.packagenamespace + ":" + recipeObj.name
-
 	packageList = []
-        recipeObj.packages(destdir)
+        recipeObj.packages(cfg.packagenamespace, destdir)
 
 	for (name, buildPkg) in recipeObj.getPackageSet().packageSet():
-	    fullName = pkgname + ":" + name
-	    (p, fileMap) = createPackage(repos, cfg, destdir, buildPkg.keys(), 
-					 fullName, version, ident, "auto")
-            
+	    (p, fileMap) = createPackage(repos, cfg, destdir, buildPkg,
+					 version, ident, "auto")
             built.append(fullName)
 	    packageList.append((p, fileMap))
 
@@ -138,13 +134,14 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
                 recipes.append(parent.filename)
 
 	srcList = []
+	srcName = cfg.packagenamespace + ":" + recipeObj.name + ":sources"
+	srcBldPkg = buildpackage.BuildPackage(srcName)
 	for file in recipeObj.allSources() + recipes:
             src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
-	    srcList.append(src)
+	    srcBldPkg.addFile(src)
 	
-	(p, fileMap) = createPackage(repos, cfg, destdir, srcList, 
-				     pkgname + ":sources", version, ident, 
-				     "src")
+	(p, fileMap) = createPackage(repos, cfg, destdir, srcBldPkg, version, 
+				     ident, "src")
 	packageList.append((p, fileMap))
 
 	changeSet = changeset.CreateFromFilesystem(packageList)
