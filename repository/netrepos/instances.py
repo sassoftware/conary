@@ -14,6 +14,8 @@
 
 import sqlite
 
+from sha1helper import encodeFileId, decodeFileId
+
 class InstanceTable:
     """
     Generic table for assigning id's to a 3-tuple of IDs.
@@ -124,7 +126,7 @@ class FileStreams:
         tables = [ x[0] for x in cu ]
         if 'FileStreams' not in tables:
             cu.execute("""CREATE TABLE FileStreams(streamId INTEGER PRIMARY KEY,
-						   fileId STR,
+						   fileId BINARY,
 						   versionId INT,
 						   flavorId INT,
                                                    stream BINARY);""")
@@ -146,9 +148,10 @@ class FileStreams:
     def _rowGenerator(self, cu):
         for row in cu:
             yield row[0]
-        
+
     def addStream(self, key, stream):
 	(fileId, versionId, flavorId) = key
+	fileId = encodeFileId(fileId)
         cu = self.db.cursor()
         cu.execute("INSERT INTO FileStreams VALUES (NULL, %s, %d, %d, %s)",
                    (fileId, versionId, flavorId, sqlite.encode(stream)))
@@ -159,14 +162,14 @@ class FileStreams:
         cu = self.db.cursor()
         cu.execute("DELETE FROM FileStreams WHERE "
 			"fileId=%s and versionId=%d",
-                   (fileId, versionId))
+                   (encodeFileId(fileId), versionId))
 
     def has_key(self, key):
 	(fileId, versionId) = key
         cu = self.db.cursor()
         cu.execute("SELECT stream from FileStreams WHERE "
 		    "fileId=%s and versionId=%d",
-                   (fileId, versionId))
+                   (encodeFileId(fileId), versionId))
         row = cu.fetchone()
 	return row is not None
 
@@ -175,7 +178,7 @@ class FileStreams:
         cu = self.db.cursor()
         cu.execute("SELECT stream from FileStreams WHERE "
 		    "fileId=%s and versionId=%d",
-                   (fileId, versionId))
+                   (encodeFileId(fileId), versionId))
         row = cu.fetchone()
         if row is None:
             raise KeyError, key
@@ -186,13 +189,14 @@ class FileStreams:
         cu = self.db.cursor()
         cu.execute("SELECT streamId from FileStreams WHERE "
 		    "fileId=%s and versionId=%d",
-                   (fileId, versionId))
+                   (encodeFileId(fileId), versionId))
         row = cu.fetchone()
         if row is None:
             raise KeyError, key
         return row[0]
 
     def removeUnusedStreams(self):
+	assert(0)
         cu = self.db.cursor()
 	cu.execute("""
 	    DELETE from fileStreams WHERE streamId in 

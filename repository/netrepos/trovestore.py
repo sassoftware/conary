@@ -28,6 +28,8 @@ import versions
 from local import trovetroves
 from local import versiontable
 
+from sha1helper import encodeFileId, decodeFileId
+
 class LocalRepVersionTable(versiontable.VersionTable):
 
     def getId(self, theId, itemId):
@@ -317,7 +319,7 @@ class TroveStore:
 	cu = self.db.cursor()
 
 	cu.execute("""
-	    CREATE TEMPORARY TABLE NewFiles(fileId STRING,
+	    CREATE TEMPORARY TABLE NewFiles(fileId BINARY,
 					    versionId INTEGER,
 					    stream BINARY,
 					    path STRING)
@@ -558,7 +560,7 @@ class TroveStore:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
-	    trv.addFile(fileId, path, version)
+	    trv.addFile(decodeFileId(fileId), path, version)
 
 	return trv
 
@@ -588,6 +590,8 @@ class TroveStore:
 	    if not version:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
+
+	    fileId = decodeFileId(fileId)
 
 	    if withFiles and stream:
 		fileObj = files.ThawFile(stream, fileId)
@@ -664,10 +668,10 @@ class TroveStore:
 	if fileObj:
 	    stream = sqlite.encode(fileObj.freeze())
 	    cu.execute("INSERT INTO NewFiles VALUES(%s, %d, %s, %s)", 
-		       (fileId, versionId, stream, path))
+		       (encodeFileId(fileId), versionId, stream, path))
 	else:
 	    cu.execute("INSERT INTO NewFiles VALUES(%s, %d, NULL, %s)", 
-		       (fileId, versionId, path))
+		       (encodeFileId(fileId), versionId, path))
 
     def getFile(self, fileId, fileVersion):
 	versionId = self.versionTable[fileVersion]
@@ -692,7 +696,8 @@ class TroveStore:
 		verCache[fileVersion] = versionId
 
 	    cu.execute("INSERT INTO getFilesTbl VALUES(NULL, %s, %d)",
-		       (fileId, versionId), start_transaction = False)
+		       (encodeFileId(fileId), versionId), 
+		       start_transaction = False)
 	    lookup[cu.lastrowid] = (fileId, fileVersion)
 
 	cu.execute("""
@@ -713,12 +718,12 @@ class TroveStore:
     def hasFile(self, fileId, fileVersion):
 	versionId = self.versionTable.get(fileVersion, None)
 	if not versionId: return False
-	return self.fileStreams.has_key((fileId, versionId))
+	return self.fileStreams.has_key((encodeFileId(fileId), versionId))
 
     def eraseFile(Self, fileId, fileVersion):
 	# we automatically remove files when no troves reference them. 
 	# cool, huh?
-	pass
+	assert(0)
 
     def begin(self):
 	"""
