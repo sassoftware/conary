@@ -14,10 +14,14 @@ class LocalRepository(FilesystemRepository):
 
     createBranches = 1
 
-    # this is called when a Repository wants to store a file; we never
-    # want to do this; we copy files onto the filesystem after we've
-    # created the LocalBranch
+    def buildJob(self, changeSet):
+	return LocalRepositoryChangeSetJob(self, changeSet)
+
     def storeFileFromContents(self, contents, file, restoreContents):
+	"""
+	this is called when a Repository wants to store a file; we store
+	config files only (since we made to patch them later)
+	"""
 	if file.isConfig():
 	    return FilesystemRepository.storeFileFromContents(self, 
 				contents, file, restoreContents)
@@ -30,16 +34,16 @@ class LocalRepository(FilesystemRepository):
 
 class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 
-    def removals(self, undo):
+    def removals(self):
 	for pkg in self.oldPackageList():
 	    self.repos.erasePackageVersion(pkg.getName(), pkg.getVersion())
-	    undo.removedPackage(pkg)
+	    self.undoObj.removedPackage(pkg)
 
 	for (fileId, fileVersion, fileObj) in self.oldFileList():
 	    self.repos.eraseFileVersion(fileId, fileVersion)
-	    undo.removedFile(fileId, fileVersion, fileObj)
+	    self.undoObj.removedFile(fileId, fileVersion, fileObj)
 
-	undo.reset()
+	self.undoObj.reset()
 	for (fileId, fileVersion, fileObj) in self.oldFileList():
 	    if fileObj.hasContents and fileObj.isConfig():
 		self.repos.removeFileContents(fileObj.sha1())
@@ -56,7 +60,6 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
     # localCs is A->A.local, so it doesn't need retargeting.
     def __init__(self, repos, cs):
 	assert(not cs.isAbstract())
-	
 	fsrepos.ChangeSetJob.__init__(self, repos, cs)
 
 	# remove old versions of the packages which are being added

@@ -25,6 +25,9 @@ class AbstractDatabase(repository.AbstractRepository):
 
 	# this has an empty source path template, which is only used to
 	# construct the eraseFiles list anyway
+	
+	# we don't use repcache.buildJob here as it can't deal with
+	# abstract change sets
 	job = fsrepos.ChangeSetJob(self.repcache, absSet)
 
 	# abstract change sets cannot have eraseLists
@@ -119,12 +122,11 @@ class AbstractDatabase(repository.AbstractRepository):
 
 	# Build and commit A->B
 	if toDatabase:
-	    job = localrep.LocalRepositoryChangeSetJob(self.repcache, cs)
-	    undo = fsrepos.ChangeSetUndo(self.repcache)
+	    job = self.repcache.buildJob(cs)
 
 	try:
 	    # add new packages
-	    if toDatabase: job.commit(undo)
+	    if toDatabase: job.commit()
 	    # build the list of things to commit
             fsJob = update.FilesystemJob(self.repcache, cs, fsPkgDict, 
 					 self.root, flags = flags)
@@ -133,14 +135,14 @@ class AbstractDatabase(repository.AbstractRepository):
 	    if errList:
 		for err in errList: log.error(err)
 		# FIXME need a --force for this
-		undo.undo()                
+		job.undo()
 		return
 
-	    if toDatabase: job.removals(undo)
+	    if toDatabase: job.removals()
 	except:
 	    # this won't work it things got too far, but it won't hurt
 	    # anything either
-	    if toDatabase: undo.undo()
+	    if toDatabase: job.undo()
 	    raise
 
 	# everything is in the database... save this so we can undo
@@ -262,6 +264,10 @@ class AbstractDatabase(repository.AbstractRepository):
 	repository.AbstractRepository.__init__(self)
 
 class Database(AbstractDatabase):
+
+    """
+    A system database which maintains a local repository cache.
+    """
 
     def open(self, mode):
 	AbstractDatabase.open(self, mode)

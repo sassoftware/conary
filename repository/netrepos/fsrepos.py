@@ -363,14 +363,20 @@ class FilesystemRepository(AbstractRepository):
 
 	return cs
 
+    def buildJob(self, changeSet):
+	"""
+	Returns a ChangeSetJob object representing what needs to be done
+	to apply the changeset to this repository.
+	"""
+	return ChangeSetJob(self, changeSet)
+
     def commitChangeSet(self, cs):
-	job = ChangeSetJob(self, cs)
-	undo = ChangeSetUndo(self)
+	job = self.buildJob(cs)
 
 	try:
-	    job.commit(undo)
+	    job.commit()
 	except:
-	    undo.undo()
+	    job.undo()
 	    raise
 
     def close(self):
@@ -546,17 +552,17 @@ class ChangeSetJob:
     def newFileList(self):
 	return self.files.values()
 
-    # the undo object it kept up-to-date with what needs to be done to undo
+    # the undo object is kept up-to-date with what needs to be done to undo
     # the work completed so far; the caller can use a try/except block to
     # cause an undo to happen if an error occurs the change set is needed to
     # access the file contents; it's not used for anything else
-    def commit(self, undo):
+    def commit(self):
 	# commit changes
 	filesToArchive = []
 
 	for newPkg in self.newPackageList():
 	    self.repos.addPackage(newPkg)
-	    undo.addedPackage(newPkg)
+	    self.undoObj.addedPackage(newPkg)
 
 	# we need to do this in order of fileids to make sure we walk
 	# through change set streams in the right order
@@ -568,7 +574,7 @@ class ChangeSetJob:
 
 	    if not self.repos.hasFileVersion(fileId, newFile.version()):
 		self.repos.addFileVersion(fileId, newFile.version(), file)
-		undo.addedFile(newFile)
+		self.undoObj.addedFile(newFile)
 
 		path = newFile.path()
 
@@ -578,15 +584,19 @@ class ChangeSetJob:
 	    # file to multiple locations.
 	    if self.repos.storeFileFromContents(newFile.getContents(), file, 
 						 newFile.restoreContents()):
-		undo.addedFileContents(file.sha1())
+		self.undoObj.addedFileContents(file.sha1())
 
 	# This doesn't actually remove anything! we never allow bits
 	# to get erased from repositories. The database, which is a child
 	# of this object, does allow removals.
+	
+    def undo(self):
+	self.undoObj.undo()
 
     def __init__(self, repos, cs):
 	self.repos = repos
 	self.cs = cs
+	self.undoObj = ChangeSetUndo(repos)
 
 	self.packages = []
 	self.files = {}
