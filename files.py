@@ -305,11 +305,12 @@ class TupleStream(InfoStream):
     def __getattribute__(self, item):
 	d = InfoStream.__getattribute__(self, "makeupDict")
 	if d.has_key(item):
+            items = InfoStream.__getattribute__(self, "items")
 	    (methodType, index) = d[item]
 	    if methodType == 1:
-		return self.items[index].value
+		return items[index].value
 	    else:
-		return self.items[index].set
+		return items[index].set
 
 	return InfoStream.__getattribute__(self, item)
 
