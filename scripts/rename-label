@@ -45,4 +45,7 @@ rename(cu, "conary.specifix.com@spx:devel",
 rename(cu, "conary.specifix.com@spx:linux", 
            "conary.specifix.com@spx:devel")
 
+rename(cu, "contrib.specifix.com@spx:linux", 
+           "contrib.specifix.com@spx:devel")
+
 db.commit()
