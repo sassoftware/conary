@@ -497,14 +497,14 @@ class TroveStore:
 	for branchId in self.versionOps.branchesOfLabel(troveId, label):
 	    yield self.branchTable.getId(branchId)
 
-    def getTrove(self, troveName, troveVersion, troveFlavor):
+    def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True):
 	return self._getTrove(troveName = troveName, 
 			      troveVersion = troveVersion,
-			      troveFlavor = troveFlavor)
+			      troveFlavor = troveFlavor, withFiles = withFiles)
 
     def _getTrove(self, troveName = None, troveNameId = None, 
 		  troveVersion = None, troveVersionId = None,
-		  troveFlavor = 0, troveFlavorId = None):
+		  troveFlavor = 0, troveFlavorId = None, withFiles = True):
 	if not troveNameId:
 	    troveNameId = self.items[troveName]
 	if not troveName:
@@ -556,17 +556,18 @@ class TroveStore:
 
 	    trv.addTrove(name, version, flavor)
 
-	versionCache = {}
-	cu.execute("SELECT fileId, path, versionId FROM "
-		   "TroveFiles NATURAL JOIN FileStreams WHERE instanceId = ?", 
-		   troveInstanceId)
-	for (fileId, path, versionId) in cu:
-	    version = versionCache.get(versionId, None)
-	    if not version:
-		version = self.versionTable.getBareId(versionId)
-		versionCache[versionId] = version
+        if withFiles:
+            versionCache = {}
+            cu.execute("SELECT fileId, path, versionId FROM "
+                   "TroveFiles NATURAL JOIN FileStreams WHERE instanceId = ?", 
+                   troveInstanceId)
+            for (fileId, path, versionId) in cu:
+                version = versionCache.get(versionId, None)
+                if not version:
+                    version = self.versionTable.getBareId(versionId)
+                    versionCache[versionId] = version
 
-	    trv.addFile(fileId, path, version)
+                trv.addFile(fileId, path, version)
 
         self.depTables.get(cu, trv, troveInstanceId)
 

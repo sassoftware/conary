@@ -29,7 +29,7 @@ from local import idtable
 from local import sqldb
 from local import versiontable
 
-SERVER_VERSION=7
+SERVER_VERSIONS=[6,7]
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -277,7 +277,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return self.repos.troveStore.iterTrovePerFlavorLeafs(troveName, branchStr)
 
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse, 
-                     withFiles):
+                     withFiles, withFileContents = None):
+        if clientVersion == 6:
+            withFileContents = withFiles
+            withFiles = True
+
         urlList = []
 
         # XXX all of these cache lookups should be a single operation through a 
@@ -301,7 +305,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             path = self.cache.getEntry(l, withFiles)
             if path is None:
                 cs = self.repos.createChangeSet([ l ], recurse = recurse, 
-                                                withFiles = withFiles)
+                                        withFiles = withFiles,
+                                        withFileContents = withFileContents)
                 path = self.cache.addEntry(l, withFiles)
                 cs.writeToFile(path)
 
@@ -394,10 +399,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
-        if clientVersion != SERVER_VERSION:
+        if clientVersion not in SERVER_VERSIONS:
             raise ClientTooOld
 
-        return SERVER_VERSION
+        return SERVER_VERSIONS[-1]
 
     def cacheChangeSets(self):
         return isinstance(self.cache, CacheSet)

@@ -102,9 +102,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         except KeyError:
             raise TroveMissing(pkgName, branch)
 
-    def getTrove(self, pkgName, version, flavor, pristine = True):
+    def getTrove(self, pkgName, version, flavor, pristine = True,
+                 withFiles = True):
 	try:
-	    return self.troveStore.getTrove(pkgName, version, flavor)
+	    return self.troveStore.getTrove(pkgName, version, flavor,
+                                            withFiles = withFiles)
 	except KeyError:
 	    raise TroveMissing(pkgName, version)
 
@@ -310,13 +312,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         else:
             self.commit()
 
-    def _getLocalOrRemoteTrove(self, troveName, troveVersion, troveFlavor):
+    def _getLocalOrRemoteTrove(self, troveName, troveVersion, troveFlavor,
+                               withFiles = True):
 	# the get trove netclient provides doesn't work with a FilesystemRepository
 	# (it needs to create a change set which gets passed)
 	if troveVersion.branch().label().getHost() == self.name:
-	    return self.getTrove(troveName, troveVersion, troveFlavor)
+	    return self.getTrove(troveName, troveVersion, troveFlavor,
+                                          withFiles = withFiles)
 	else:
-	    return self.reposSet.getTrove(troveName, troveVersion, troveFlavor)
+	    return self.reposSet.getTrove(troveName, troveVersion, troveFlavor,
+                                          withFiles = withFiles)
 
     def _getLocalOrRemoteFileVersions(self, l):
 	# this assumes all of the files are from the same server!
@@ -353,7 +358,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    return self.reposSet.getFileContents(troveName, fileVersion, 
 					      troveFlavor, path, fileVersion)
 
-    def createChangeSet(self, troveList, recurse = True, withFiles = True):
+    def createChangeSet(self, troveList, recurse = True, withFiles = True,
+                        withFileContents = True):
 	"""
 	troveList is a list of (troveName, flavor, oldVersion, newVersion, 
         absolute) tuples. 
@@ -421,11 +427,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    
 		continue
 
-	    new = self._getLocalOrRemoteTrove(troveName, newVersion, newFlavor)
+	    new = self._getLocalOrRemoteTrove(troveName, newVersion, newFlavor,
+                                              withFiles = withFiles)
 	 
 	    if oldVersion:
 		old = self._getLocalOrRemoteTrove(troveName, oldVersion, 
-						  oldFlavor)
+						  oldFlavor,
+                                                  withFiles = withFiles)
 	    else:
 		old = None
 
@@ -491,8 +499,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		# config files to config files; these need to be included
 		# unconditionally so we always have the pristine contents
 		# to include in the local database
-		if withFiles and (hash or (oldFile and newFile.flags.isConfig() 
-					   and not oldFile.flags.isConfig())):
+		if withFileContents and \
+                    (hash or (oldFile and newFile.flags.isConfig() 
+                                      and not oldFile.flags.isConfig())):
 		    if oldFileVersion :
 			oldCont = self.getFileContents(troveName, oldVersion, 
 				    oldFlavor, oldPath, oldFileVersion, 
