@@ -147,8 +147,8 @@ class FileContainerFile:
 	    self.pos = self.end
 	    return self.file.read(count)
 	else:
-	    self.pos = self.pos + bytes
 	    self.file.seek(self.pos)
+	    self.pos = self.pos + bytes
 	    return self.file.read(bytes)
 
     def readlines(self):
