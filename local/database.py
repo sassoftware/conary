@@ -99,7 +99,7 @@ class SqlDbRepository(repository.DataStoreRepository,
 	@type name: str
 	@rtype: list of versions.Version
 	"""
-	return [ x.getVersion() for x in self.db.iterFindByName(name) ]
+	return [ x for x in self.db.iterVersionByName(name) ]
 
     def getFileVersion(self, fileId, version, withContents = 0):
 	file = self.db.getFile(fileId, version, pristine = True)

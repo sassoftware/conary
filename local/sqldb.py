@@ -427,6 +427,13 @@ class Database:
 				 troveFlavorId = flavorId,
 				 pristine = pristine)
 
+    def iterVersionByName(self, name):
+	cu = self.db.cursor()
+	cu.execute("SELECT version FROM DBInstances NATURAL JOIN Versions "
+		   "WHERE troveName=%s AND isPresent = 1", name)
+ 	for (match,) in cu:
+	    yield versions.VersionFromString(match)
+
     def hasByName(self, name):
 	return self.instances.hasName(name)
 
