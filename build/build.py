@@ -2,7 +2,8 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-"""Module used by recipes to direct the building and installation of
+"""
+Module used by recipes to direct the build and installation of
 software packages.
 
 @var _permmap: A mapping of common integer file modes to their octal
