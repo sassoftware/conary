@@ -362,7 +362,7 @@ class IdealRepository(AbstractTroveDatabase):
 		if version.isBranch():
 		    version = self.getTroveLatestVersion(name, version)
 
-		versionDict = { name : [ version] }
+		versionDict = { name : [ version ] }
 	    except TroveMissing, e:  
 		raise PackageNotFound, str(e)
 
