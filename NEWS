@@ -1,5 +1,7 @@
 Changes in 0.14.6:
   * fix for generating changesets between repositories
+  * policies that look at shared libraries are now multilib-aware,
+    fixing shared library permissions and dependency provision
 
 Changes in 0.14.5:
   * allow groups to contain troves with conflicting flavors
