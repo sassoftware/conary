@@ -1,0 +1,232 @@
+.\" Copyright (c) 2004 Specifix, Inc.
+.TH CONARY 1 "13 July 2004" "Specifix, Inc."
+.SH NAME
+conary \- repository-based software configuration manager
+.SH SYNOPSIS
+.B conary \fIcommand \fR[\fI<args>\fR]
+.SH DESCRIPTION
+\fBConary\fR is a software configuration manager that uses distributed,
+network-based, versioned repositories rather than disparate package
+files as its canonical source of data.  Conary uses the repository
+versioning to intelligently merge configuration files, file ownership
+and permissions, and so forth.
+.SH REFERENCE
+.SS "System Management"
+The following \fIcommands\fP are used to install, update, erase, and
+otherwise manage software installed on a local system.
+.TP 4
+.B pkglist \fIpkgname [version]\fP
+Lists troves installed on the local system.
+.TP
+.B update \fIpkgname version\fP
+Updates \fIpkgname\fR from the appropriate repository to match \fIversion,\fR
+upgrading, downgrading, or installing as necessary to do so.
+.TP
+.B update \fIchangeset\fP
+Applies \fIchangeset\fR to the local system, making whatever changes
+to the local system are specified in \fIchangeset.\fR
+.TP
+.B erase \fIpkgname [version]\fP
+Erase all instances of \fIpkgname\fP (or only a specified \fIversion\fP)
+from the local system
+.TP
+.B remove \fIpath\fP
+Remove the file named \fIpath\fP from the system, and record in the
+Conary database that the file has been removed.  After this, doing
+\fBconary update\fP will not replace the file.  (If future versions
+of the component rename the file, the removal will track the rename;
+that is; if you run \fBconary remove /foo/bar\fP and \fI/foo/bar\fP
+is later renamed \fI/foo/blah\fP, when you update to a version of
+the component that now contains \fI/foo/blah\fP instead of
+\fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
+as a new file.)
+.TP
+.B changeset \fIpkg [oldver] newver outfile\fP
+Creates an absolute changeset for \fIpkg newver\fP, or a relative
+changeset between \fIpkg oldver\fP and \fIpkg newver\fP, and stores
+it in outfile.
+.TP
+.B localcs
+.TP
+.B localcommit
+.TP
+.B rblist
+Lists available rollbacks.
+.TP
+.B rollback \fIrollback\fP
+Applies rollback \fIrollback\fP.  (Syntax may change in future versions
+of Conary.)
+.TP
+.B replist \fIpkgname [version]\fP
+Lists troves in the repository.
+.SS "Building Components and Packages"
+.TP 4
+.B branch \fInewbranch branchfrom [trove]\fP
+.TP
+.B cook \fI[\fP--prep\fI] [\fP--macros file\fI] file.recipe\fP
+.TP
+.B commit \fIchangeset\fP
+.TP
+.B conary source \fIsubcommand\fP
+Actions on source directories, \fIexcept for \fBcook\fR, are
+subcommands on \fBconary source\fP.  (The exception is because
+conary can cook directly from the repository; cooking is not
+done only on a checked-out source directory.)
+.RS
+.TP 4
+.B add \fIfile...\fP
+.TP
+checkout ...
+.RE
+.SH JARGON
+Conary introduces new concepts and makes new distinctions.
+.TP 4
+.B Repository
+A network-accessible database that contains files for multiple packages,
+and multiple versions of these packages, on multiple development branches.
+Nothing is ever removed from the repository once it has been added.
+.TP
+.B Files
+Conary tracks files by unique file identifier rather than path name.
+(This allows Conary to track changes to file names.)  A reference to
+a \(lqfile\(rq is not a reference to a path name, but rather to the
+file referenced by the unique file identifier.
+.TP
+.B Troves
+Every collection kept in a repository is generically called a
+\fBtrove\fP.  A trove can contain either files or other troves.
+.TP
+.B Packages and Components
+\fBPackages\fP contain logically-connected collections of files.
+The files are grouped into \fBcomponents\fP, and the components
+are grouped into packages.  Components have a package name, a
+\fB:\fP character, and a component suffix; for example:
+\fBconary:runtime\fP.
+.IP
+Not all components are part of a package.  Some components, such
+as those with a \fBsource\fP or \fBtest\fP suffix, are independent
+components that are related to but not included in a package.
+.TP
+.B Groups and Filesets
+A \fBGroup\fP is an arbitrary collection of other troves, and its
+name starts with \fBgroup-\fP.  A \fBFileset\fP is an arbitrary
+collection of files, and its name starts with \fBfileset-\fP.
+.TP
+.B Labels and Versions
+Conary version strings are a \fB/\fP-separated sequence, normally 
+\fB/\fP-prefixed, of specifiers of the form
+\(lq\fI<label>[\fB/\fI<version>\fB-\fI<release>]\fR\(rq, and
+a \fI<label>\fR follows the form
+\(lq\fI[<repository>]\fB@\fI[<namespace>\fB:\fI]<branchname>\fR\(rq.
+A version string is \fBfully-qualified\fP if it is \fB/\fP-prefixed.
+.RS 4
+.TP 4
+\f(BI<version>\fP
+The upstream version of the package
+.TP
+\f(BI<release>\fP
+A \fI<release>\fP is a \fI<sourcebuild>\fP-\fI<binarybuild>\fP pair
+of numbers, where \fI<sourcebuild>\fP specifies the source package
+the binary came from, and \fI<binarybuild>\fP tells which build of the
+sources is being installed. Source packages have release numbers which
+exclude the -\fI<binarybuild>\fP portion. When new versions of a package
+are cooked, conary will increment the \fI<binarybuild>\fP portion of
+the release number.
+.TP
+\f(BI<branchname>\fP and \fBbranch string\fP
+\fI<branchname>\fP is a simple string that is unique within a namespace.
+A \fBbranch string\fP is a fully-qualified version string without a
+trailing \fI<version>\fP-\fI<release>\fP pair.
+.TP
+\f(BI<label>\fP
+A \fI<label>\fP does not include any leading \fB/\fP character, and
+has the special property of being able to apply to more than one
+branch at once.  Therefore, \fBconary.example.com@local:foo\fP might
+refer to \fIboth\fP of the following at once:
+.br
+/conary.example.com@local:bar/conary.example.com@local:foo
+.br
+/conary.example.com@local:foo
+.br
+A label applies to any branch whose name ends with the label.
+.RE
+.TP
+.B Changesets
+A \fBchangeset\fP is a representation of the changes between two versions
+(a \fBrelative changeset\fP) or the change between nil and a version
+(an \fBabsolute changeset\fP).  Changesets are used internally as the
+main form of communication between the Conary client and the repository,
+and can also live independently as files.
+.SH FILES
+.\" do not put excess space in the file list
+.PD 0
+.TP 4
+.I /etc/conaryrc
+.TP
+.I $HOME/.conaryrc
+The configuration files for Conary; entries in \fI$HOME/.conaryrc\fR
+override entries in \fI/etc/conaryrc,\fR and the \fB\-\-config\fR option
+overrides both configuration files.  Conary configuration items can be
+strings, booleans (\fBTrue\fP or \fBFalse\fP), or mappings
+(\f(BIto from\fP) and can include:
+.PD
+.RS 4
+.TP 4
+.B buildLabel
+The default label for troves during source code operations
+(checkout, diff, etc) and for cooking.
+.TP
+.B buildPath
+The path packages are built under; default \fI/usr/src/conary/builds
+.TP
+.B contact
+The contact name (normally an email address or URL) to put in changelog
+entries when committing changes to source components.
+.TP
+.B cookNewBranches
+Boolean, defaults to False.  Says whether to create new branches when
+cooking already-existing sources.  (Defaults to False to help prevent
+accidentally creating spurious branches that then live forever in the
+repository.)
+.TP
+.B dbPath
+The path to the Conary database on the local system.  It is relative
+to \fBroot\fP (see below) and should normally not be changed.
+.TP
+.B installLabel
+The label to use to install components when an incomplete version is
+specified, to query the repository, and to abbreviate versions when
+displaying them.
+.TP
+.B lookaside
+The transient lookaside cache used only during building, normally
+\fI/var/cache/conary\fR
+.TP
+.B name
+The name used in changelog entries when committing changes to source
+components.
+.TP
+.B repositoryMap
+Maps a hostname from a label to a full URL for a networked repository.
+Multiple maps can be given for a single label. (If no mapping is found,
+\fBhttp://\f(BIhostname\fB/conary/\fR is used as the default map.)
+.TP
+.B root
+The path to install files into, normally \fI/\fR
+.RE
+.TP 4
+.I /var/lib/conarydb/conarydb
+The database file containing all the local system metadata.
+.TP
+.I /var/lib/conarydb/contents
+Original file contents of configuration files Conary tracks.
+.TP
+.I /var/lib/conarydb/rollbacks
+Changeset files representing rollbacks (listed via \fBconary
+rblist\fP).
+.SH BUGS
+There are no bugs, only undocumented features.
+.SH "SEE ALSO"
+http://www.specifixinc.com/
+.\" need URL to intro paper on web site?
+.\" OLS2004 paper when it is publically available
