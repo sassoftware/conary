@@ -128,13 +128,13 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     if not versionStr:
 	version = cfg.defaultbranch
     else:
-	if versionStr != "/":
+	if versionStr[0] != "/":
 	    versionStr = cfg.defaultbranch.asString() + "/" + versionStr
 
 	try:
 	    version = versions.VersionFromString(versionStr)
 	except versions.ParseError, e:
-	    log.error(str(e))
+	    log.error("%s: %s" % (versionStr, str(e)))
 	    return
 
     try:
@@ -220,6 +220,7 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 						state.getTroveBranch())
 
 	srcPkg = repos.getPackageVersion(state.getTroveName(), srcVersion)
+	srcPkg.changeVersion(repos.pkgGetFullVersion(state.getTroveName(), srcVersion))
 
 	if needsHead:
 	    # existing package
@@ -267,15 +268,18 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 	    log.error("all recipes must have the same version")
 	    return
 
+    troveBranch = state.getTroveBranch()
+
     if not srcVersion:
 	# new package
-	newVersion = state.getTroveBranch().copy()
+	newVersion = troveBranch.copy()
 	newVersion.appendVersionRelease(recipeVersionStr, 1)
-    elif srcVersion.trailingVersion().getVersion() == recipeVersionStr:
+    elif srcVersion.trailingVersion().getVersion() == recipeVersionStr and \
+         troveBranch.equal(srcVersion.branch()):
 	newVersion = srcVersion.copy()
 	newVersion.incrementRelease()
     else:
-	newVersion = state.getTroveBranch().copy()
+	newVersion = troveBranch.copy()
 	newVersion.appendVersionRelease(recipeVersionStr, 1)
 
     state.setTroveVersion(newVersion)
