@@ -80,11 +80,6 @@ class UseClass(dict):
             return self[name]
         raise AttributeError, "class %s has no attribute '%s'" % (self.__class__.__name__, name)
 
-    def addFlag(self, name, value):
-        if self.frozen:
-            raise TypeError, 'flags are frozen'
-        self[name] = Flag(value)
-
     def __setattr__(self, name, value):
         initialized = self.__dict__.get('initialized', False)
         if not initialized:
