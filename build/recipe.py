@@ -19,6 +19,7 @@ import inspect
 import log
 import lookaside
 import os
+import package
 import packagepolicy
 import repository
 import rpmhelper
@@ -687,26 +688,7 @@ class GroupRecipe(Recipe):
 
 class FilesetRecipe(Recipe):
 
-    def addFile(self, pattern, component, versionStr = None, recurse = True):
-	"""
-	Adds files which match pattern from version versionStr of component.
-	Pattern is glob-style, with brace expansion. If recurse is set,
-	anything below a directory which matches pattern is also included,
-	and the directory itself does not have to be part of the package.
-	"""
-
-	try:
-	    pkgList = helper.findPackage(self.repos, self.cfg.packagenamespace,
-				     self.branchNick, component, versionStr)
-	except helper.PackageNotFound, e:
-	    raise RecipeFileError, str(e)
-
-	if len(pkgList) == 0:
-	    raise RecipeFileError, "no packages match %s" % component
-	elif len(pkgList) > 1:
-	    raise RecipeFileError, "too many packages match %s" % component
-
-	pkg = pkgList[0]
+    def addFileFromPackage(self, pattern, pkg, recurse):
 	pathMap = {}
 	for (fileId, (pkgPath, version)) in pkg.iterFileList():
 	    pathMap[pkgPath] = (fileId, version)
@@ -736,13 +718,47 @@ class FilesetRecipe(Recipe):
 		matches[path] = pathMap[path]
 
 	if not matches:
-	    raise RecipeFileError, "%s does not exist in version %s of %s" % \
-		(pattern, pkg.getVersion().asString(), pkg.getName())
+	    return False
 
 	for path in matches.keys():
+	    if self.paths.has_key(path):
+		raise RecipeFileError, "%s has been included multiple times" \
+			% path
+
 	    (fileId, version) = matches[path]
 	    self.files[fileId] = (path, version)
+	    self.paths[path] = 1
 
+	return True
+
+    def addFile(self, pattern, component, versionStr = None, recurse = True):
+	"""
+	Adds files which match pattern from version versionStr of component.
+	Pattern is glob-style, with brace expansion. If recurse is set,
+	anything below a directory which matches pattern is also included,
+	and the directory itself does not have to be part of the package.
+	"""
+
+	try:
+	    pkgList = helper.findPackage(self.repos, self.cfg.packagenamespace,
+				     self.branchNick, component, versionStr)
+	except helper.PackageNotFound, e:
+	    raise RecipeFileError, str(e)
+
+	if len(pkgList) == 0:
+	    raise RecipeFileError, "no packages match %s" % component
+	elif len(pkgList) > 1:
+	    raise RecipeFileError, "too many packages match %s" % component
+
+	foundIt = False
+	pkg = pkgList[0]
+	for sub in package.walkPackageSet(self.repos, pkg):
+	    foundIt = foundIt or self.addFileFromPackage(pattern, sub, recurse)
+
+	if not foundIt:
+	    raise RecipeFileError, "%s does not exist in version %s of %s" % \
+		(pattern, pkg.getVersion().asString(), pkg.getName())
+	    
     def iterFileList(self):
 	return self.files.iteritems()
 	    
