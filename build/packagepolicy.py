@@ -142,11 +142,10 @@ class PackageSpec(_filterSpec):
 
 
 def _markConfig(recipe, filename):
-    packages = recipe.autopkg.packages
-    for package in packages.keys():
-	if filename in packages[package]:
-            log.debug('config: %s', filename)
-	    packages[package][filename].flags.isConfig(True)
+    map = recipe.autopkg.pathMap
+    if filename in map:
+	log.debug('config: %s', filename)
+	map[filename].flags.isConfig(True)
 
 class EtcConfig(policy.Policy):
     """
@@ -212,11 +211,10 @@ class InitScript(policy.Policy):
     invariantinclusions = [ '%(initdir)s/.[^/]*$' ]
 
     def _markInitScript(self, filename):
-	packages = self.recipe.autopkg.packages
-	for package in packages.keys():
-	    if filename in packages[package]:
-		log.debug('initscript: %s', filename)
-		packages[package][filename].flags.isInitScript(True)
+	map = self.recipe.autopkg.pathMap
+	if filename in map:
+	    log.debug('initscript: %s', filename)
+	    map[filename].flags.isInitScript(True)
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
@@ -236,11 +234,10 @@ class SharedLibrary(policy.Policy):
     ]
 
     def _markSharedLibrary(self, filename):
-	packages = self.recipe.autopkg.packages
-	for package in packages.keys():
-	    if filename in packages[package]:
-		log.debug('shared library: %s', filename)
-		packages[package][filename].flags.isShLib(True)
+	map = self.recipe.autopkg.pathMap
+	if filename in map:
+	    log.debug('shared library: %s', filename)
+	    map[filename].flags.isShLib(True)
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
@@ -360,11 +357,10 @@ class AddModes(policy.Policy):
     def doFile(self, path):
 	if path in self.fixmodes:
 	    mode = self.fixmodes[path]
-	    packages = self.recipe.autopkg.packages
-	    for package in packages.keys():
-		if path in packages[package]:
-		    log.debug('suid/sgid: %s', path)
-		    packages[package][path].inode.setPerms(mode)
+	    map = self.recipe.autopkg.pathMap
+	    if path in map:
+		log.debug('suid/sgid: %s', path)
+		map[path].inode.setPerms(mode)
 
 
 class Ownership(policy.Policy):
@@ -403,14 +399,13 @@ class Ownership(policy.Policy):
 	self._markOwnership(path, 'root', 'root')
 
     def _markOwnership(self, filename, owner, group):
-	packages = self.recipe.autopkg.packages
-	for package in packages.keys():
-	    if filename in packages[package]:
-		pkgfile = packages[package][filename]
-		if owner:
-		    pkgfile.inode.setOwner(owner)
-		if group:
-		    pkgfile.inode.setGroup(group)
+	map = self.recipe.autopkg.pathMap
+	if filename in map:
+	    pkgfile = map[filename]
+	    if owner:
+		pkgfile.inode.setOwner(owner)
+	    if group:
+		pkgfile.inode.setGroup(group)
 
 
 def DefaultPolicy():
