@@ -57,6 +57,7 @@ baseMacros = (
     ('sysroot'		, ''),
     ('march'		, 'i386'), # "machine arch"
     ('os'		, 'linux'),
+    ('target'		, 'i386-unknown-linux'),
 )
 
 crossMacros = (
@@ -267,63 +268,63 @@ class Recipe:
     buildRequires = []
     runRequires = []
 
-    def _addSignature(self, file, keyid):
+    def _addSignature(self, filename, keyid):
 	# do not search unless a gpg keyid is specified
-	if not keyid or not file:
+	if not keyid or not filename:
 	    return
-	gpg = '%s.sig' %(file)
+	gpg = '%s.sig' %(filename)
 	c = lookaside.searchAll(self.cfg, self.laReposCache, gpg, 
 				self.name, self.srcdirs)
 	if not c:
-	    gpg = '%s.sign' %(file)
+	    gpg = '%s.sign' %(filename)
 	    c = lookaside.searchAll(self.cfg, self.laReposCache,
 				    gpg, self.name, self.srcdirs)
 	if c:
-	    if not self.signatures.has_key(file):
-		self.signatures[file] = []
-	    self.signatures[file].append((gpg, c, keyid))
+	    if not self.signatures.has_key(filename):
+		self.signatures[filename] = []
+	    self.signatures[filename].append((gpg, c, keyid))
 
-    def _appendSource(self, file, keyid, type, extractDir, use, args):
-	file = file % self.macros
+    def _appendSource(self, filename, keyid, type, extractDir, use, args):
+	filename = filename % self.macros
 	extractDir = extractDir % self.macros
-	self.sources.append((file, type, extractDir, use, args))
-	self._addSignature(file, keyid)
+	self.sources.append((filename, type, extractDir, use, args))
+	self._addSignature(filename, keyid)
 
-    def addArchive(self, file, extractDir='', keyid=None, use=None):
-	self._appendSource(file, keyid, 'tarball', extractDir, use, ())
+    def addArchive(self, filename, extractDir='', keyid=None, use=None):
+	self._appendSource(filename, keyid, 'tarball', extractDir, use, ())
 
-    def addArchiveFromRPM(self, rpm, file, extractDir='', use=None):
+    def addArchiveFromRPM(self, rpm, filename, extractDir='', use=None):
 	# no keyid -- what would it apply to?
 	# may choose to check key in RPM package instead?
 	rpm = rpm % self.macros
-	file = file % self.macros
+	filename = filename % self.macros
 	f = lookaside.searchAll(self.cfg, self.laReposCache, 
-			     os.path.basename(file), self.name, self.srcdirs)
+			     os.path.basename(filename), self.name, self.srcdirs)
 	if not f:
 	    r = lookaside.findAll(self.cfg, self.laReposCache, rpm, 
 				  self.name, self.srcdirs)
-	    c = lookaside.createCacheName(self.cfg, file, self.name)
+	    c = lookaside.createCacheName(self.cfg, filename, self.name)
 	    extractSourceFromRPM(r, c)
-	    f = lookaside.findAll(self.cfg, self.laReposCache, file, 
+	    f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
 				  self.name, self.srcdirs)
-	# file already expanded, and no key can be supplied
+	# filename already expanded, and no key can be supplied
 	extractDir = extractDir % self.macros
-	self.sources.append((file, 'tarball', extractDir, use, ()))
+	self.sources.append((filename, 'tarball', extractDir, use, ()))
 
-    def addPatch(self, file, level='1', backup='', extractDir='', keyid=None, use=None, macros=False, extraArgs=''):
-	self._appendSource(file, keyid, 'patch', extractDir, use, (level, backup, macros, extraArgs))
+    def addPatch(self, filename, level='1', backup='', extractDir='', keyid=None, use=None, macros=False, extraArgs=''):
+	self._appendSource(filename, keyid, 'patch', extractDir, use, (level, backup, macros, extraArgs))
 
-    def addSource(self, file, keyid=None, extractDir='', apply=None, use=None):
-	self._appendSource(file, keyid, 'source', extractDir, use, (apply))
+    def addSource(self, filename, keyid=None, extractDir='', apply=None, use=None, macros=False):
+	self._appendSource(filename, keyid, 'source', extractDir, use, (apply, macros))
 
     def addAction(self, action, targetdir='', use=None):
 	self._appendSource('', '', 'action', targetdir, use, (action))
 
     def allSources(self):
         sources = []
-        for (file, filetype, extractDir, use, args) in self.sources:
-	    if file: # no file for an action
-		sources.append(file)
+        for (filename, filetype, extractDir, use, args) in self.sources:
+	    if filename: # no file for an action
+		sources.append(filename)
 	for signaturelist in self.signatures.values():
             for (gpg, cached, keyid) in signaturelist:
                 sources.append(gpg)
@@ -342,12 +343,12 @@ class Recipe:
 	shutil.rmtree(builddir)
 	shutil.rmtree(destdir)
 
-    def checkSignatures(self, filepath, file):
-        if not self.signatures.has_key(file):
+    def checkSignatures(self, filepath, filename):
+        if not self.signatures.has_key(filename):
             return
         if not util.checkPath("gpg"):
             return
-	for (gpg, signature, keyid) in self.signatures[file]:
+	for (gpg, signature, keyid) in self.signatures[filename]:
 	    # FIXME: our own keyring
 	    if os.system("gpg --no-secmem-warning --verify %s %s"
 			  %(signature, filepath)):
@@ -363,7 +364,7 @@ class Recipe:
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
 
-	for (file, filetype, targetdir, use, args) in self.sources:
+	for (filename, filetype, targetdir, use, args) in self.sources:
 
 	    if use != None:
 		if type(use) is not tuple:
@@ -377,9 +378,9 @@ class Recipe:
 		    continue
 
 	    if filetype == 'tarball':
-		f = lookaside.findAll(self.cfg, self.laReposCache, file, 
+		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
 			      self.name, self.srcdirs)
-		self.checkSignatures(f, file)
+		self.checkSignatures(f, filename)
 		if f.endswith(".bz2"):
 		    tarflags = "-jxf"
 		elif f.endswith(".gz") or f.endswith(".tgz"):
@@ -400,19 +401,19 @@ class Recipe:
 
 	    if filetype == 'patch':
 		(level, backup, macros, extraArgs) = args
-		f = lookaside.findAll(self.cfg, self.laReposCache, file, 
+		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
 			      self.name, self.srcdirs)
 		provides = "cat"
-		if file.endswith(".gz"):
+		if filename.endswith(".gz"):
 		    provides = "zcat"
-		elif file.endswith(".bz2"):
+		elif filename.endswith(".bz2"):
 		    provides = "bzcat"
 		if backup:
 		    backup = '-b -z %s' % backup
 		if targetdir:
 		    destDir = "/".join((destDir, targetdir))
 		if macros:
-		    log.debug('applying macros to %s' %f)
+		    log.debug('applying macros to patch %s' %f)
 		    pin = os.popen("%s '%s'" %(provides, f))
 		    log.debug('patch -d %s -p%s %s %s' %(destDir, level, backup, extraArgs))
 		    pout = os.popen('patch -d %s -p%s %s %s'
@@ -426,10 +427,18 @@ class Recipe:
 		continue
 
 	    if filetype == 'source':
-		(apply) = args
-		f = lookaside.findAll(self.cfg, self.laReposCache, file, 
+		(apply, macros) = args
+		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
 				      self.name, self.srcdirs)
-		util.copyfile(f, destDir + "/" + os.path.basename(file))
+		if macros:
+		    log.debug('applying macros to source %s' %f)
+		    pin = file(f)
+		    pout = file(destDir + os.sep + os.path.basename(filename), "w")
+		    pout.write(pin.read()%self.macros)
+		    pin.close()
+		    pout.close()
+		else:
+		    util.copyfile(f, destDir + os.sep + os.path.basename(filename))
 		if apply:
 		    util.execute(apply, destDir)
 		continue
@@ -544,8 +553,9 @@ class Recipe:
 	#     - backup is .backupname suffix (none)
 	#     - macros is boolean: apply self.macros to patch? (False)
 	#     - extraArgs is string of additional patch args ('')
-	#   source: (apply)
+	#   source: (apply, macros)
 	#     - apply is None or command to util.execute(apply)
+	#     - macros is boolean: apply self.macros to patch? (False)
 	#   action: (action)
 	#     - action is the command to execute, in builddir
 	self.signatures = {}
