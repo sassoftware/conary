@@ -47,10 +47,10 @@ class TroveDatabase:
 	entries.
 	"""
 	# FIXME: this could be more efficient
-	self.delTrove(trv.getName(), trv.getVersion())
+	self.delTrove(trv.getName(), trv.getVersion(), forUpdate = True)
 	self.addTrove(trv)
 
-    def delTrove(self, name, version):
+    def delTrove(self, name, version, forUpdate = False):
 	for trvId in self.nameIdx.iterGetEntries(name):
 	    trv = self._getPackage(trvId)
 
@@ -60,24 +60,25 @@ class TroveDatabase:
 	    del self.trvs[trvId]
 	    self._updateIndicies(trvId, trv, Index.delEntry)
 
+	if forUpdate:
+	    return
+
 	for trvId in self.partofIdx.iterGetEntries(name):
 	    trv = self._getPackage(trvId)
-	    foundOne = False
-	    removeList = []
+	    updateTrove = False
 	    for (inclName, versionList) in trv.iterPackageList():
 		if inclName == name: 
 		    for inclVersion in versionList:
 			if inclVersion.equal(version):
-			    foundOne = True
+			    updateTrove = True
 			    trv.delPackageVersion(name, version, 
 						  missingOkay = False)
 			    break
 		    break
 
-	    if foundOne:
+	    if updateTrove:
 		self.updateTrove(trv)
-	    else:
-		log.warning("%s not found in %s", name, trv.getName())
+		foundOne = True
 
     def getAllTroveNames(self):
 	return self.nameIdx.keys()
@@ -91,6 +92,18 @@ class TroveDatabase:
 	@rtype: list of package.Trove
 	"""
 	for trvId in self.nameIdx.iterGetEntries(name):
+	    trv = self._getPackage(trvId)
+	    yield trv
+
+    def iterFindByPath(self, path):
+	"""
+	Returns all of the troves containing a particular path.
+
+	@param name: name of the trove
+	@type name: str
+	@rtype: list of package.Trove
+	"""
+	for trvId in self.pathIdx.iterGetEntries(path):
 	    trv = self._getPackage(trvId)
 	    yield trv
 
