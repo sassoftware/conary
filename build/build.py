@@ -33,6 +33,7 @@ class BuildAction(util.Action):
     keywords = {
         'use': None
     }
+
     def __init__(self, *args, **keywords):
 	"""
 	@keyword use: Optional argument; Use flag(s) telling whether
@@ -382,22 +383,24 @@ class _PutFiles(_FileAction):
 		self.setComponents(thisdest[destlen:])
                 self.chmod(macros['destdir'], thisdest[destlen:])
 
-    def __init__(self, fromFiles, toFile, **keywords):
+    def __init__(self, *args, **keywords):
         _FileAction.__init__(self, **keywords)
-	self.toFile = toFile
-	if type(fromFiles) is str:
-	    self.fromFiles = (fromFiles,)
-	else:
-	    self.fromFiles = fromFiles
+	split = len(args) - 1
+	self.fromFiles = args[:split]
+	self.toFile = args[split]
+	# raise error while we can still tell what is wrong...
+	if len(self.fromFiles) > 1:
+	    if not self.toFile.endswith('/') or os.path.isdir(self.toFile):
+		raise TypeError, 'too many targets for non-directory %s' %self.toFile
 
 class InstallFiles(_PutFiles):
     """
     This class installs files from the builddir to the destdir.
     """
+    keywords = { 'mode': 0644 }
 
-    def __init__(self, fromFiles, toFile, mode=0644, **keywords):
-	_PutFiles.__init__(self, fromFiles, toFile, **keywords)
-        self.mode = mode
+    def __init__(self, *args, **keywords):
+	_PutFiles.__init__(self, *args, **keywords)
 	self.source = ''
 	self.move = 0
 
@@ -405,8 +408,8 @@ class MoveFiles(_PutFiles):
     """
     This class moves files within the destdir.
     """
-    def __init__(self, fromFiles, toFile, **keywords):
-	_PutFiles.__init__(self, fromFiles, toFile, **keywords)
+    def __init__(self, *args, **keywords):
+	_PutFiles.__init__(self, *args, **keywords)
 	self.source = '%(destdir)s'
 	self.move = 1
 
@@ -433,9 +436,6 @@ class InstallSymlinks(_FileAction):
             destdir = dest
         else:
             destdir = os.path.dirname(dest)
-
-        if type(self.fromFiles) is str:
-            self.fromFiles = (self.fromFiles,)
 
         sources = []
         for fromFile in self.fromFiles:
@@ -476,7 +476,7 @@ class InstallSymlinks(_FileAction):
             log.debug('creating symlink %s -> %s' %(to, source))
 	    os.symlink(util.normpath(source), to)
 
-    def __init__(self, fromFiles, toFile, **keywords):
+    def __init__(self, *args, **keywords):
         """
         Create a new InstallSymlinks instance
 
@@ -489,19 +489,21 @@ class InstallSymlinks(_FileAction):
         creation of dangling symlinks
         @type allowDangling: bool
         """
-        _FileAction.__init__(self, fromFiles, toFile, **keywords)
-	# raise error early
-	if type(fromFiles) is not str:
-	    if not toFile.endswith('/') or os.path.isdir(toFile):
-		raise TypeError, 'too many targets for non-directory %s' %toFile
-	self.fromFiles = fromFiles
-	self.toFile = toFile
+        _FileAction.__init__(self, *args, **keywords)
+	split = len(args) - 1
+	self.fromFiles = args[:split]
+	self.toFile = args[split]
+	# raise error while we can still tell what is wrong...
+	if len(self.fromFiles) > 1:
+	    if not self.toFile.endswith('/') or os.path.isdir(self.toFile):
+		raise TypeError, 'too many targets for non-directory %s' %self.toFile
 
 class RemoveFiles(BuildAction):
     """
     The RemoveFiles class removes files from within the destdir
     """
     keywords = { 'recursive': False }
+
     def do(self, macros):
 	for filespec in self.filespecs:
 	    if self.recursive:
