@@ -174,6 +174,21 @@ class Version:
 	self.versions.append(VersionRelease("%s-%d" % (version, release)))
 	self.timeStamp = time.time()
 
+    def appendVersionReleaseObject(self, verRel):
+	"""
+	Converts a branch to a version. The version/release passed in
+	are appended to the branch this object represented. The time
+	stamp is reset as a new version has been created.
+
+	@param version: object for the version and release
+	@type version: VersionRelease
+	@param release: release number
+	@type release: int
+	"""
+	assert(self.isBranch())
+	self.versions.append(verRel)
+	self.timeStamp = time.time()
+
     def incrementVersionRelease(self):
 	"""
 	The release number for the final element in the version is
