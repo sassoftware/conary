@@ -73,7 +73,7 @@ def usage(rc = 1):
     print "update flags: --replace-files"
     return rc
 
-def openRepository(path)
+def openRepository(path):
     try:
         return helper.openRepository(path)
     except repository.repository.OpenError, e:
