@@ -239,7 +239,7 @@ class _FileAction(BuildAction):
 	    if self.mode & 06000:
 		self.recipe.fixmodes[path] = self.mode
 	
-class SetMode(_FileAction):
+class SetModes(_FileAction):
     def __init__(self, path, mode):
 	self.mode = mode
 	if type(path) is string:
