@@ -33,6 +33,9 @@ class NewVersion(AbstractVersion):
     def freeze(self):
 	return "@NEW@"
 
+    def isLocal(self):
+	return False
+
     def __init__(self):
 	self.timeStamp = 1
 
