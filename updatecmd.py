@@ -32,7 +32,8 @@ def doUpdate(dbpath, root, pkgName):
 
 	f.copy(source, target)
 
-	if (f.__class__ != files.SymbolicLink):
+	if (f.__class__ != files.SymbolicLink and
+		f.__class__ != files.Socket):
 	    os.chmod(target, f.perms())
 
 	    if not os.getuid():
