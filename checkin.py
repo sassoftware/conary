@@ -287,6 +287,10 @@ def diff(repos, versionStr = None):
 	csInfo = changeSet.getFileChange(fileId)
 	sys.stdout.write('\n'.join(files.fieldsChanged(csInfo)))
 
+        sys.stdout.write('\n--- %s %s\n+++ %s %s'
+                         %(path, state.getVersion().asString(),
+                           path, newVersion.asString()))
+        
 	if files.contentsChanged(csInfo):
 	    (contType, contents) = changeSet.getFileContents(fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
