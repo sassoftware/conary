@@ -439,6 +439,14 @@ class FilesystemJob:
 	         not fsFile.metadataEqual(headFile, ignoreOwnerGroup = noIds):
 		# something has changed for the file
 		if flags & MERGE:
+		    if noIds:
+			# we don't want to merge owner/group ids in
+			# this case (something other than owner/group
+			# # changed, such as size).  simply take the
+			# head values
+			baseFile.inode.setOwner(headFile.inode.owner())
+			baseFile.inode.setGroup(headFile.inode.group())
+
 		    conflicts = fsFile.twm(headChanges, baseFile, 
 					   skip = "contents")
 		    if not conflicts:
