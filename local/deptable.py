@@ -17,30 +17,44 @@ from deps import deps
 NO_FLAG_MAGIC = '-*none*-'
 
 class DepTable:
-    def __init__(self, db):
+    def __init__(self, db, name, isTemp = False):
+        if isTemp:
+            tmp = "TEMPORARY"
+        else:
+            tmp = ""
+
         cu = db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if 'Dependencies' not in tables:
-            cu.execute("""CREATE TABLE Dependencies(depId integer primary key,
-                                                    class integer,
-                                                    name str,
-                                                    flag str
-                                                    )""")
-            cu.execute("""CREATE INDEX DependenciesIdx ON Dependencies(
-                                                    class, name, flag)""")
+            cu.execute("""CREATE %s TABLE %s(depId integer primary key,
+                                          class integer,
+                                          name str,
+                                          flag str
+                                         )""" % (tmp, name),
+                       start_transaction = (not isTemp))
+            cu.execute("CREATE INDEX %sIdx ON %s(class, name, flag)" % 
+                       (name, name), start_transaction = (not tmp))
 
 class DepUser:
-    def __init__(self, db, name):
+    def __init__(self, db, name, isTemp = False):
+        if isTemp:
+            tmp = "TEMPORARY"
+        else:
+            tmp = ""
+
         cu = db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if name not in tables:
-            cu.execute("""CREATE TABLE %s(instanceId integer,
+            cu.execute("""CREATE %s TABLE %s(instanceId integer,
                                           depId integer
-                                         )""" % name)
-            cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name))
-            cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name))
+                                         )""" % (tmp, name),
+                       start_transaction = (not isTemp))
+            cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
+                       start_transaction = (not isTemp))
+            cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name),
+                       start_transaction = (not isTemp))
 
 class DependencyTables:
 
@@ -347,6 +361,6 @@ class DependencyTables:
 
     def __init__(self, db):
         self.db = db
-        DepTable(db)
+        DepTable(db, "Dependencies")
         DepUser(db, 'Provides')
         DepUser(db, 'Requires')
