@@ -312,7 +312,7 @@ class Recipe:
     def getPackageSet(self):
         return self.packageSet
 
-    def __init__(self, cfg, laReposCache, srcdirs):
+    def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
 	self.tarballs = []
 	self.patches = []
 	self.sources = []
@@ -326,3 +326,5 @@ class Recipe:
 	self.macros = Macros()
 	self.addMacros = self.macros.addMacros
 	self.addMacros(baseMacros)
+	if extraMacros:
+	    self.addMacros(extraMacros)
