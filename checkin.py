@@ -91,6 +91,45 @@ class SourceStateFromFile(SourceState):
 
 	self.parseFile(file)
 
+def _verifyAtHead(repos, headPkg, state):
+    headVersion = repos.pkgLatestVersion(state.getName(), 
+					 state.getBranch())
+    if not headVersion.equal(state.getVersion()):
+	return False
+
+    # make sure the files in this directory are based on the same
+    # versions as those in the package at head
+    bail = 0
+    for (fileId, (path, version)) in state.iterFileList():
+	if isinstance(version, versions.NewVersion):
+	    assert(not headPkg.hasFile(fileId))
+	    # new file, it shouldn't be in the old package at all
+	else:
+	    srcFileVersion = headPkg.getFile(fileId)[1]
+	    if not version.equal(srcFileVersion):
+		return False
+
+    return True
+
+def _getRecipeVersion(recipeFile):
+    # load the recipe; we need this to figure out what version we're building
+    try:
+        loader = recipe.RecipeLoader(recipeFile)
+    except recipe.RecipeFileError, e:
+	log.error("unable to load recipe file %s: %s",
+                  state.getRecipeFileName(), str(e))
+        return None
+    
+    if not loader:
+	log.error("unable to load a valid recipe class from %s",
+                  state.getRecipeFileName())
+	return None
+
+    assert(len(loader.values()) == 1)
+    recipeClass = loader.values()[0]
+
+    return recipeClass.version
+
 def checkout(repos, cfg, dir, name, versionStr = None):
     # We have to be careful with branch nicknames.  First, we could get
     # multiple matches for a single package. Two, when a nickname uniquely
@@ -177,59 +216,16 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 
 	if needsHead:
 	    # existing package
-	    headVersion = repos.pkgLatestVersion(state.getName(), 
-						 state.getBranch())
-	    if not headVersion.equal(state.getVersion()):
-		log.error("working version (%s) is different from the head " +
-			  "of the branch (%s); use update", 
-			  state.getVersion().asString(), 
-			  srcVersion.asString())
+	    if not _verifyAtHead(repos, srcPkg, state):
+		log.error("contents of working directory are not all "
+			  "from the head of the branch; use update")
 		return
 
-	    # make sure the files in this directory are based on the same
-	    # versions as those in the package at head
-	    bail = 0
-	    for (fileId, (path, version)) in state.iterFileList():
-		if isinstance(version, versions.NewVersion):
-		    assert(not srcPkg.hasFile(fileId))
-		    # new file, it shouldn't be in the old package at all
-		else:
-		    srcFileVersion = srcPkg.getFile(fileId)[1]
-		    if not version.equal(srcFileVersion):
-			log.error("%s is not at head; use update" % path)
-			bail = 1
-	
-	    if bail: return
+    recipeVersionStr = _getRecipeVersion(state.getRecipeFileName())
+    if not recipeVersionStr: return
 
-    # load the recipe; we need this to figure out what version we're building
-    try:
-        loader = recipe.RecipeLoader(state.getRecipeFileName())
-    except recipe.RecipeFileError, e:
-	log.error("unable to load recipe file %s: %s",
-                  state.getRecipeFileName(), str(e))
-        return
-    
-    if not loader:
-	log.error("unable to load a valid recipe class from %s",
-                  state.getRecipeFileName())
-	return
-
-    assert(len(loader.values()) == 1)
-    recipeClass = loader.values()[0]
-    recipeVersionStr = recipeClass.version
-    troveBranch = state.getBranch()
-
-    if not srcVersion:
-	# new package
-	newVersion = troveBranch.copy()
-	newVersion.appendVersionRelease(recipeVersionStr, 1)
-    elif srcVersion.trailingVersion().getVersion() == recipeVersionStr and \
-         troveBranch.equal(srcVersion.branch()):
-	newVersion = srcVersion.copy()
-	newVersion.incrementRelease()
-    else:
-	newVersion = troveBranch.copy()
-	newVersion.appendVersionRelease(recipeVersionStr, 1)
+    newVersion = helper.nextVersion(recipeVersionStr, srcVersion, 
+				    state.getBranch(), binary = False)
 
     state.changeVersion(newVersion)
 
@@ -355,8 +351,9 @@ def diff(repos, versionStr = None):
 	csInfo = changeSet.getFileChange(fileId)
 	print "    %s" % csInfo
 
+	fileType = csInfo.split()[0]
 	sha1 = csInfo.split()[1]
-	if sha1 != "-":
+	if fileType == "f" and sha1 != "-":
 	    (contType, contents) = changeSet.getFileContents(fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
 		lines = contents.get().readlines()
@@ -495,10 +492,10 @@ def update(repos, versionStr = None):
 		log.error("new file %s conflicts with file on head of branch"
 				% realPath)
 		contentsOkay = 0
-	    elif headFile.sha1() == baseFile.sha1():
+	    elif headFile.same(baseFile, ignoreOwner = True):
 		# it changed in just the filesystem, so leave that change
 		log.info("preserving new contents of %s" % realPath)
-	    elif fsFile.sha1() == baseFile.sha1():
+	    elif fsFile.same(baseFile, ignoreOwner = True):
 		# the contents changed in just the repository, so take
 		# those changes
 		log.info("replacing %s with contents from repository" % realPath)
@@ -535,7 +532,7 @@ def update(repos, versionStr = None):
 
 		    contentsOkay = 1
 	    else:
-		log.error("contents conflict for %s" % realPath)
+		log.error("files conflict for %s" % realPath)
 		contentsOkay = 0
 
 	if pathOkay and contentsOkay:
@@ -557,7 +554,9 @@ def update(repos, versionStr = None):
 def addFile(file):
     state = SourceStateFromFile("SRS")
 
-    if not os.path.exists(file):
+    try:
+	os.lstat(file)
+    except OSError:
 	log.error("files must be created before they can be added")
 	return
 
