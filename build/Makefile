@@ -15,6 +15,7 @@
 python_files = __init__.py	\
 	action.py		\
 	build.py		\
+	buildinfo.py		\
 	buildpackage.py		\
 	destdirpolicy.py	\
 	filter.py 		\
