@@ -691,6 +691,7 @@ class _GroupOrRedirectRecipe(Recipe):
     def findTroves(self):
         self.size = 0
 
+        validSize = True
         for (name, versionStr, flavor, source) in self.addTroveList:
             try:
                 desFlavor = self.cfg.buildFlavor.copy()
@@ -718,7 +719,18 @@ class _GroupOrRedirectRecipe(Recipe):
                 if (v, f) not in l:
                     l.append((v,f))
                 self.troveVersionFlavors[name] = l
-                self.size += trove.getSize()
+                # XXX this code is to deal with troves that existed 
+                # before troveInfo was added
+                if validSize:
+                    size = trove.getSize()
+                    # allow older changesets that are missing size
+                    # info to be added (of course, this will make the size
+                    if size is not None:
+                        self.size += trove.getSize()
+                    else:
+                        validSize = False
+        if not validSize:
+            self.size = None
 
     def getTroveList(self):
 	return self.troveVersionFlavors
