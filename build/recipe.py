@@ -435,6 +435,20 @@ class PackageRecipe(Recipe):
 			      %(signature, filepath)):
 		    raise RuntimeError, "GPG signature %s failed" %(signature)
 
+    def fetchAllSources(self):
+        """
+        returns a list of file locations for all the sources in
+        the package recipe
+        """
+        files = []
+	for (filename, filetype, targetdir, use, args) in self.sources:
+	    if filetype in ('tarball', 'patch', 'source'):
+		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
+                                      self.name, self.srcdirs)
+		self.checkSignatures(f, filename)
+                files.append(f)
+        return files
+
     def unpackSources(self, builddir):
         self.addMacros('maindir', self.theMainDir)
         if os.path.exists(builddir):
