@@ -218,11 +218,11 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		print _troveFormat % (trove.getName(), 
                                   troveVersion.trailingRevision().asString())
 
-	    for (troveName, ver, flavor) in trove.iterTroveList():
+	    for (name, ver, flavor) in sorted(trove.iterTroveList()):
 		if fullVersions or ver.branch() != troveVersion.branch():
-		    print _grpFormat % (troveName, ver.asString())
+		    print _grpFormat % (name, ver.asString())
 		else:
-		    print _grpFormat % (troveName, 
+		    print _grpFormat % (name, 
 					ver.trailingRevision().asString())
 
 	    iter = repos.iterFilesInTrove(troveName, troveVersion, troveFlavor,
