@@ -16,6 +16,9 @@ class ChangeSet:
     def getPackageList(self):
 	return self.packages
 
+    def addFileContents(self, hash):
+	self.fileContents.append(hash)
+
     def getFileList(self):
 	return self.files.items()
 
@@ -43,7 +46,7 @@ class ChangeSet:
 	
 	return str
 
-    def writeToFile(self, fileList, outFileName):
+    def writeToFile(self, outFileName):
 	try:
 	    outFile = open(outFileName, "w+")
 	    csf = filecontainer.FileContainer(outFile)
@@ -51,7 +54,7 @@ class ChangeSet:
 
 	    csf.addFile("SRSCHANGESET", self.headerAsString(), "")
 
-	    for hash in fileList:
+	    for hash in self.fileContents:
 		f = self.getFileContents(hash)
 		csf.addFile(hash, f, "")
 		f.close()
@@ -64,6 +67,7 @@ class ChangeSet:
     def __init__(self):
 	self.packages = []
 	self.files = {}
+	self.fileContents = []
 	pass
 
 class ChangeSetFromFilesystem(ChangeSet):
@@ -185,10 +189,9 @@ def CreateFromFilesystem(pkgList, version):
     return cs
 
 # packageList is a list of (pkgName, oldVersion, newVersion) tuples
-def CreateFromRepository(repos, packageList, outFileName):
+def CreateFromRepository(repos, packageList):
 
     cs = ChangeSetFromRepository(repos)
-    hashList = []
 
     for (packageName, oldVersion, newVersion) in packageList:
 	pkgSet = repos.getPackageSet(packageName)
@@ -214,7 +217,7 @@ def CreateFromRepository(repos, packageList, outFileName):
 	    (filecs, hash) = fileChangeSet(fileId, oldFile, newFile)
 
 	    cs.addFile(fileId, oldVersion, newVersion, filecs)
-	    if hash: hashList.append(hash)
+	    if hash: cs.addFileContents(hash)
 
     return cs
 
@@ -235,5 +238,5 @@ def ChangeSetCommand(repos, cfg, packageName, outFileName, oldVersionStr, \
     for name in repos.getPackageList(packageName):
 	list.append((name, oldVersion, newVersion))
 
-    cs = CreateFromRepository(repos, list, outFileName)
-    cs.writeToFile(hashList, outFileName)
+    cs = CreateFromRepository(repos, list)
+    cs.writeToFile(outFileName)
