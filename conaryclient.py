@@ -164,14 +164,15 @@ class ConaryClient:
                     labels = {}.fromkeys(labels).keys()
                     
                     # updating locally cooked troves needs a label override
-                    if True or not versionStr:
-                        if True in [isinstance(x, versions.CookBranch) or
-                                    isinstance(x, versions.EmergeBranch)
-                                    for x in labels]:
+                    if True in [isinstance(x, versions.CookBranch) or
+                                isinstance(x, versions.EmergeBranch)
+                                for x in labels]:
+                        if True or not versionStr:
                             raise UpdateError, \
                              "Package %s cooked locally; version, branch, or " \
                              "label must be specified for update" % troveName
-                        labels = [ None ]
+                        else:
+                            labels = [ None ]
                         
                 else:
                     labels = self.cfg.installLabelPath

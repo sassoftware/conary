@@ -1,3 +1,12 @@
+Changes in 0.10.4:
+  * Bug fixes for updating from absolute change sets (which basically
+    just didn't work for troves which contained config files)
+  * Bug fixes for distributed branching
+  * The database is used for fetching trove information (but not yet
+    file information) when the client constructs change sets across
+    distributed branches
+  * various other bug fixes
+
 Changes in 0.10.3:
   * this version introduces changes to the network protocol for
     obtaining file contents and changeset generation. The client
