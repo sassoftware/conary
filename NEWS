@@ -19,7 +19,9 @@ Changes in 0.14.11:
     the repository.
   * Local systems store config files in sql tables now
   * Unsynchronized updates work for packages and groups
+  * added --exclude-troves and excludeTroves conaryrc entry
 
+>>>>>>> 1.162.2.1
 Changes in 0.14.10:
   * FlavorMap sense wasn't set right for base instruction set
 

@@ -32,6 +32,12 @@ match the optional \fIversion\fP (otherwise the most recent version which
 matches the \fBinstall-label\fP) and applies the changesets contained in any
 \fIchange-files\fP given.
 .RS 4
+.TP
+.B \-\-exclude-troves \fIregexp-list\fR
+Any recursively-included troves whose name matches one or more of the
+regular expression in (the space separated) \fIregexp-list\fR will not be
+newly installed. If they are already installed, they will be updated
+normally.
 .TP 4
 .B \-\-keep-existing
 When applying a changeset, do not remove any existing versions of

@@ -179,10 +179,16 @@ class ConaryClient:
                     oldItem = (name, troveCs.getOldVersion(), 
                                troveCs.getOldFlavor())
                     if not oldItem[1]: 
-                        # it's new -- it can stay
-                        continue
-
-                    if not self.db.hasTrove(*oldItem):
+                        # it's new -- it can stay as long as it isn't
+                        # already installed and isn't in the exclude list
+                        if self.db.hasTrove(name, version, flavor):
+                            cs.delNewPackage(name, version, flavor)
+                        else:
+                            for reStr, regExp in self.cfg.excludeTroves:
+                                if regExp.match(name):
+                                    cs.delNewPackage(name, version, flavor)
+                                    break
+                    elif not self.db.hasTrove(*oldItem):
                         cs.delNewPackage(name, version, flavor)
                     elif self.db.hasTrove(name, version, flavor):
                         cs.delNewPackage(name, version, flavor)

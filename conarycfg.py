@@ -23,6 +23,8 @@ import deps.arch
 import deps.deps
 from build import use
 from lib import log,util
+import re
+import sre_constants
 import versions
 
 
@@ -36,7 +38,9 @@ import versions
     EXEC, 
     STRINGPATH, 
     FLAVOR,
-    INT) = range(11)
+    INT,
+    REGEXPLIST
+) = range(12)
 
 BOOLEAN=BOOL
 
@@ -123,6 +127,14 @@ class ConfigFile:
                     self.__dict__[key].append(versions.Label(labelStr))
                 except versions.ParseError, e:
                     raise versions.ParseError, str(e)
+	elif type == REGEXPLIST:
+            self.__dict__[key] = []
+            for regexpStr in val.split():
+                try:
+                    self.__dict__[key].append(
+                                        (regexpStr, re.compile(regexpStr)))
+                except sre_constants.error, e:
+                    raise versions.ParseError, str(e)
 	elif type == BOOL:
 	    if isinstance(val, bool):
 		self.__dict__[key] = val
@@ -142,6 +154,8 @@ class ConfigFile:
             out.write("%-25s %s\n" % (key, self.__dict__[key].asString()))
         elif type == LABELLIST:
             out.write("%-25s %s\n" % (key, " ".join([x.asString() for x in self.__dict__[key]])))
+        elif type == REGEXPLIST:
+            out.write("%-25s %s\n" % (key, " ".join([x[0] for x in self.__dict__[key]])))
         elif type == STRINGPATH:
             out.write("%-25s %s\n" % (key, ":".join(self.__dict__[key])))
         elif type == STRINGDICT:
@@ -240,6 +254,7 @@ class ConaryConfiguration(ConfigFile):
 	'dbPath'		: '/var/lib/conarydb',
 	'debugRecipeExceptions' : [ BOOL, False ], 
 	'dumpStackOnError'      : [ BOOL, True ], 
+        'excludeTroves'         : [ REGEXPLIST, [] ],
         'flavor'                : [ FLAVOR, deps.deps.DependencySet() ],
 	'installLabelPath'	: [ LABELLIST, [] ],
 	'lookaside'		: '/var/cache/conary',

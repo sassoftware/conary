@@ -104,7 +104,8 @@ def usage(rc = 1):
     print "                --show-changes"
     print "                --tags"
     print ""
-    print "update flags:   --just-db"
+    print "update flags:   --exclude-troves <patterns>"
+    print "                --just-db"
     print "                --keep-existing"
     print "                --no-deps"
     print "                --no-deps-recurse"
@@ -129,6 +130,7 @@ def realMain(cfg, argv=sys.argv):
     cfgMap = {}
 
     cfgMap["build-label"] = "buildLabel"
+    cfgMap["exclude-troves"] = "excludeTroves"
     cfgMap["root"] = "root"
 
     (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
