@@ -20,11 +20,14 @@ ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff")
 
 class FileInfo(files.TupleStream):
 
+    __slots__ = []
+
     # fileId, oldVersion, newVersion, csInfo
     makeup = (("fileId", files.StringStream, 40), 
 	      ("oldVersion", files.StringStream, "!H"),
 	      ("newVersion", files.StringStream, "!H"), 
 	      ("csInfo", files.StringStream, "B"))
+    makeupDict = files._makeTupleDict(makeup)
 
 class ChangeSet:
 
