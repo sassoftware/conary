@@ -37,23 +37,10 @@ def _createPackage(repos, branch, bldPkg, ident):
     fileMap = {}
     p = package.Package(bldPkg.getName(), bldPkg.getVersion())
 
-    for (path, buildFile) in bldPkg.items():
-        realPath = buildFile.getRealPath()
+    for (path, f) in bldPkg.items():
 	(fileId, fileVersion) = ident(path)
-        if isinstance(buildFile, buildpackage._BuildDeviceFile):
-            f = files.ThawFile(buildFile.freeze(), fileId)
-        elif realPath:
-            f = files.FileFromFilesystem(realPath, fileId)
-	    # setuid or setgid must be set explicitly in buildFile
-	    # XXX there must be a better way
-	    f.inode.setPerms(f.inode.perms() & 01777)
-        else:
-            raise CookError("unable to create file object for package")
+	f.id(fileId)
 
-        # set ownership, flags, etc
-        f.inode.merge(buildFile.inode)
-	f.flags.merge(buildFile.flags)
-        
         if not fileVersion:
 	    p.addFile(f.id(), path, bldPkg.getVersion())
 	else:
@@ -63,7 +50,7 @@ def _createPackage(repos, branch, bldPkg, ident):
 	    else:
 		p.addFile(f.id(), path, bldPkg.getVersion())
 
-        fileMap[f.id()] = (f, realPath, path)
+        fileMap[f.id()] = (f, f.realPath, path)
 
     return (p, fileMap)
 

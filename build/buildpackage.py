@@ -15,46 +15,23 @@ import re
 import os
 import files
 
-class BuildFile(files.File):
-    """
-    Represents the build-time view of a file. This includes all of the
-    base file information (the inode information and dependencies) along
-    with the file's path. The file's dependencies are calculated right
-    here.
-    """
-    def getRealPath(self):
-        return self.realPath
-
-    def __init__(self, realPath):
-        files.File.__init__(self, None)
-        self.realPath = realPath
-
-class _BuildDeviceFile(files.DeviceFile, BuildFile):
-    def __init__(self, major, minor, owner, group, perms):
-        BuildFile.__init__(self, None)
-
-	self.devt.setMajor(major)
-	self.devt.setMinor(minor)
-	self.inode.setOwner(owner)
-	self.inode.setGroup(group)
-	self.inode.setPerms(perms)
-	self.inode.setMtime(0)
-	self.flags.set(0)
-
-class BuildBlockDeviceFile(_BuildDeviceFile):
-
-    lsTag = "b"
-        
-class BuildCharacterDeviceFile(_BuildDeviceFile):
-
-    lsTag = "c"
-
 def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     if devtype == "b":
-	return BuildBlockDeviceFile(major, minor, owner, group, perms)
+	f = files.BlockDeviceFile(None)
     elif devtype == "c":
-	return BuildCharacterDeviceFile(major, minor, owner, group, perms)
-    raise AssertionError
+	f = files.CharacterDevice(None)
+    else:
+	raise AssertionError
+
+    f.devt.setMajor(major)
+    f.devt.setMinor(minor)
+    f.inode.setOwner(owner)
+    f.inode.setGroup(group)
+    f.inode.setPerms(perms)
+    f.inode.setMtime(0)
+    f.flags.set(0)
+
+    return f
 
 class BuildPackage(dict):
 
@@ -67,7 +44,11 @@ class BuildPackage(dict):
         used to obtain the contents of the file when creating a changeset
         to commit to the repository
         """
-	self[path] = BuildFile(realPath)
+	f = files.FileFromFilesystem(realPath, None)
+	f.inode.setPerms(f.inode.perms() & 01777)
+	# blech.
+	f.realPath = realPath
+	self[path] = f
 
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
@@ -76,6 +57,8 @@ class BuildPackage(dict):
 
         @param path: the destination of the device node in the package
         """
+	# blech.
+	f.realPath = None
 	self[path] = BuildDeviceFile(devtype, major, minor, owner, group, perms)
 
     def getName(self):
