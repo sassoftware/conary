@@ -322,7 +322,10 @@ class FilesystemRepository(AbstractRepository):
 		old = self.getPackageVersion(packageName, oldVersion)
 		cs.oldPackage(packageName, oldVersion)
 		for (name, version) in old.iterPackageList():
-		    packageList.append((name, version, None, absolute))
+                    # it's possible that a component of a package
+                    # was erased, make sure that it is installed
+                    if self.hasPackageVersion(name, version):
+                        packageList.append((name, version, None, absolute))
 		    
 		continue
 		    
