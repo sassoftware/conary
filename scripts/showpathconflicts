@@ -14,8 +14,10 @@
 # full details.
 #
 
-""" Shows those paths on your local system that are owned by multiple 
-    packages """
+"""
+Shows those paths on your local system that are owned by multiple 
+components
+"""
 
 import os
 import sys
