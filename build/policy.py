@@ -107,18 +107,27 @@ class Policy(action.RecipeAction):
 	if exceptions:
 	    if not self.exceptions:
 		self.exceptions = []
-	    self.exceptions.append(exceptions)
+            if type(exceptions) in (list, tuple):
+                self.exceptions.extend(exceptions)
+            else:
+	        self.exceptions.append(exceptions)
 	subtrees = keywords.pop('subtrees', None)
 	if subtrees:
 	    if not self.subtrees:
 		self.subtrees = []
-	    self.subtrees.append(subtrees)
+            if type(subtrees) in (list, tuple):
+	        self.subtrees.extend(subtrees)
+            else:
+	        self.subtrees.append(subtrees)
 
 	inclusions = keywords.pop('inclusions', [])
 	if args or inclusions:
 	    if not self.inclusions:
 		self.inclusions = []
-	    self.inclusions.extend(inclusions)
+            if type(inclusions) in (list, tuple):
+	        self.inclusions.extend(inclusions)
+            else:
+	        self.inclusions.append(inclusions)
 	    self.inclusions.extend(args)
 
 	self.addArgs(**keywords)
