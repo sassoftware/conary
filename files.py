@@ -182,6 +182,7 @@ class NamedPipe(File):
 
     def copy(self, source, target):
 	if not os.path.exists(target):
+	    # FIXME os.mknod is in 2.3
 	    os.system("mknod %s p" % target)
 
     def __init__(self, path, version = None, info = None):

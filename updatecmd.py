@@ -3,6 +3,8 @@ import files
 import os.path
 import util
 import shutil
+import pwd
+import grp
 
 def doUpdate(DBPATH, root, pkgName):
     pkgSet = package.PackageSet(DBPATH, pkgName)
@@ -24,3 +26,11 @@ def doUpdate(DBPATH, root, pkgName):
 
 	f.copy(source, target)
 	os.chmod(target, f.perms())
+
+	if not os.getuid():
+	    # root should set the file ownerships properly
+	    uid = pwd.getpwnam(f.owner())[2]
+	    gid = grp.getgrnam(f.group())[2]
+
+	    # FIXME: this needs to use lchown, which is in 2.3
+	    os.chown(target, uid, gid)

@@ -29,7 +29,6 @@ def finalCommit(DBPATH, pkgName, version, root, fileList):
 	    dest = fileDB + "/" + file.dir() + "/" + file.name() + ".contents" 
 
 	    util.mkdirChain(dest)
-	    print file.path()
 	    dest = dest + "/" + file.uniqueName()
 	    shutil.copyfile(root + "/" + file.path(), dest)
 
