@@ -23,6 +23,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    raise InsufficientPermission
 
 	newBranch = self.toLabel(newBranch)
+
 	if kind == 'v':
 	    location = self.toVersion(frozenLocation)
 	elif kind == 'l':
@@ -30,8 +31,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	else:
 	    return 0
 
-	self.repos.createBranch(newBranch, location, troveList)
-	return 1
+	return self.repos.createBranch(newBranch, location, troveList)
 
     def hasPackage(self, authToken, pkgName):
 	if not self.auth.check(authToken, write = False, trove = pkgName):

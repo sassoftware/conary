@@ -162,6 +162,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	self.close()
 
     def createBranch(self, newBranch, where, troveList = []):
+	if newBranch.getHost() != self.name:
+	    log.error("cannot create branch for %s on %s",
+		      newBranch.getHost(), self.name)
+	    return False
+	
 	troveList = [ (x, where) for x in troveList ]
 
 	branchedTroves = {}
@@ -221,6 +226,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
         # commit branch to the repository
         self.commit()
+
+	return True
 		    
     def open(self):
 	if self.troveStore is not None:
