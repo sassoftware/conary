@@ -62,7 +62,7 @@ def checkAuth(req, repos):
     if not req.headers_in.has_key('Authorization'):
         return None
     else:
-        authToken = self.getAuth()
+        authToken = getAuth(req, repos)
         if type(authToken) != tuple:
             return authToken
 
@@ -119,6 +119,9 @@ def get(repos, httpHandler, req):
     fields = util.FieldStorage(req)
    
     if cmd != "changeset":
+	# we need to redo this with a trailing / for the root menu to work
+	cmd = os.path.basename(req.uri)
+
         if httpHandler.requiresAuth(cmd):
             authToken = checkAuth(req, repos)
             if not authToken:

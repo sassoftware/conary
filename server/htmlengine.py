@@ -225,8 +225,8 @@ Choose a branch: %s
         self.writeFn("""
 <p>Welcome to the Conary Repository.</p>
 <ul>
-<li><a href="/metadata">Metadata Management</a></li>
-<li><a href="/userlist">User Administration</a></li>
+<li><a href="metadata">Metadata Management</a></li>
+<li><a href="userlist">User Administration</a></li>
 </ul>
 """)
 
