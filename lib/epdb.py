@@ -72,7 +72,8 @@ class Epdb(pdb.Pdb):
             lines = traceback.format_exception(self._exc_type, self._exc_msg, 
                                                self._tb)
             extracontent = string.joinfields(lines, "")
-        stackutil.mailStack(frame, tolist, sender + '@' + host, '[Conary stacktrace]', extracontent)
+        stackutil.mailStack(frame, tolist, sender + '@' + host, subject,
+                            extracontent)
         print "Mailed stack to %s" % tolist
 
 
