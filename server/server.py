@@ -37,6 +37,31 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 				self.troveStore.iterAllTroveLeafs(troveName) ]
 	return d
 
+    def getTroveLeavesByLabel(self, troveNameList, labelStr):
+	d = {}
+	for troveName in troveNameList:
+	    d[troveName] = [ x for x in
+			     self.troveStore.iterTroveLeafsByLabel(troveName,
+								   labelStr) ]
+
+	return d
+
+    def getTroveVersionFlavors(self, troveDict):
+	newD = {}
+	for (troveName, versionList) in troveDict.iteritems():
+	    innerD = {}
+	    for versionStr in versionList:
+		innerD[versionStr] = [ self.fromFlavor(x) for x in 
+		    self.troveStore.iterTroveFlavors(troveName, 
+						 self.toVersion(versionStr)) ]
+	    newD[troveName] = innerD
+
+	return newD
+
+    def pkgLatestVersion(self, pkgName, branchStr):
+	return self.troveStore.troveLatestVersion(pkgName, 
+						  self.fromVersion(branchStr))
+
 netRepos = NetworkRepositoryServer(sys.argv[2], "r")
 
 server = SRSServer(("localhost", 8000))
