@@ -8,6 +8,7 @@ Changes in 0.14.13:
   * The first argument to the Requires and TagSpec commands can now have
     macros interpolated, as in r.Requires('%(bindir)s/foo', ...)
   * Groups can have requirements now
+  * protocol-level getFileContents works on multiple files simultaneously
 
 Changes in 0.14.12:
   * The shadow command looks at buildLabel instead of following
