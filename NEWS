@@ -1,3 +1,6 @@
+Changes in 0.10.12:
+  * changed getFileContents() to not need trove name or trove version
+
 Changes in 0.10.11:
   * reworked how absolute change sets get converted to relative change
     sets for better efficiency
