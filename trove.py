@@ -144,9 +144,13 @@ def Auto(name, root):
 
 def autoVisit(arg, dir, files):
     (root, buildPkg, manPkg) = arg
+    dir = dir[len(root):]
 
     for file in files:
-	path = dir[len(root):] + "/" + file
+        if dir:
+            path = dir + '/' + file
+        else:
+            path = '/' + file
 	if not os.path.isdir(path):
 	    if path[:15] == "/usr/share/man/":
 		manPkg.addFile(path)

@@ -36,7 +36,12 @@ elif (sys.argv[1] == "cook"):
     for file in sys.argv[2:]:
         if file[0] != '/':
             file = "%s/%s" % (os.getcwd(), file)
-	cook.cook(repos, cfg, file)
+        pid = os.fork()
+        if not pid:
+            cook.cook(repos, cfg, file)
+        else:
+            (id, status) = os.waitpid(pid, 0);
+                
 elif (sys.argv[1] == "pkglist"):
     if len(sys.argv) >= 2 and len(sys.argv) <= 4:
 	args = [repos, cfg] + sys.argv[2:]

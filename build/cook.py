@@ -12,6 +12,7 @@ import sha1helper
 
 def cook(repos, cfg, recipeFile):
     classList = recipe.RecipeLoader(recipeFile)
+    built = []
 
     if recipeFile[0] != "/":
 	raise IOError, "recipe file names must be absolute paths"
@@ -37,12 +38,12 @@ def cook(repos, cfg, recipeFile):
 
 	srcdirs = [ os.path.dirname(recipeFile), cfg.sourcepath % d ]
 
-	recp = theClass()
+	recp = theClass(srcdirs)
 
 	ourBuildDir = cfg.buildpath + "/" + recp.name
 
 	recp.setup()
-	recp.unpackSources(srcdirs, ourBuildDir)
+	recp.unpackSources(ourBuildDir)
 	recp.doBuild(ourBuildDir)
 
 	rootDir = "/var/tmp/srs/%s-%d" % (recp.name, int(time.time()))
@@ -52,7 +53,10 @@ def cook(repos, cfg, recipeFile):
         recp.packages(rootDir)
         pkgSet = recp.getPackageSet()
 
+        pkgname = cfg.packagenamespace + "/" + recp.name
+
 	for (name, buildPkg) in pkgSet.packageSet():
+            built.append(pkgname + "/" + name)
 	    fileList = []
 
 	    for filePath in buildPkg.keys():
@@ -60,9 +64,8 @@ def cook(repos, cfg, recipeFile):
 		f = files.FileFromFilesystem(realPath, id(filePath))
 		fileList.append((f, realPath, filePath))
 
-	    commit.finalCommit(repos, cfg, 
-			   cfg.packagenamespace + "/" + recp.name + "/" + name, 
-			   recp.version, fileList)
+	    commit.finalCommit(repos, cfg, pkgname + "/" + name, recp.version,
+			       fileList)
 
 	recipeName = os.path.basename(recipeFile)
 	f = files.FileFromFilesystem(recipeFile, id(recipeName), type = "src")
@@ -74,11 +77,11 @@ def cook(repos, cfg, recipeFile):
 	    f = files.FileFromFilesystem(src, id(srcName), type = "src")
 	    fileList.append((f, src, srcName))
 
-	commit.finalCommit(repos, cfg, 
-			   cfg.packagenamespace + "/" + recp.name + "/sources",
+	commit.finalCommit(repos, cfg, pkgname + "/sources",
 			   recp.version, fileList)
 
 	recp.cleanup(ourBuildDir, rootDir)
+    return built
 
 class idgen:
 
