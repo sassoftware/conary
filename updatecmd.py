@@ -72,7 +72,10 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                   depsRecurse = True, test = False,
                                   justDatabase = False, recurse = True,
                                   info = False, updateByDefault = True,
-                                  callback = UpdateCallback()):
+                                  callback = None):
+    if not callback:
+        callback = callbacks.UpdateCallback()
+
     client = conaryclient.ConaryClient(cfg)
 
     applyList = []

@@ -216,6 +216,7 @@ def realMain(cfg, argv=sys.argv):
     elif (otherArgs[1] == "changeset"):
         kwargs = {}
         kwargs['recurse'] = not(argSet.has_key('no-recurse'))
+        kwargs['callback'] = updatecmd.UpdateCallback()
         if not kwargs['recurse']:
             del argSet['no-recurse']
             
@@ -444,6 +445,7 @@ def realMain(cfg, argv=sys.argv):
                                         deps=showDeps)
     elif (otherArgs[1] == "update" or otherArgs[1] == "erase"):
 	kwargs = {}
+        kwargs['callback'] = updatecmd.UpdateCallback()
 
 	if argSet.has_key('replace-files'):
 	    kwargs['replaceFiles'] = True

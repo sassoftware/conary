@@ -446,9 +446,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                   callback = callback)
 
     def createChangeSetFile(self, list, fName, recurse = True,
-                            primaryTroveList = None):
+                            primaryTroveList = None, callback = None):
 	self._getChangeSet(list, target = fName, recurse = recurse,
-                           primaryTroveList = primaryTroveList)
+                           primaryTroveList = primaryTroveList,
+                           callback = callback)
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
 		      withFileContents = True, target = None,

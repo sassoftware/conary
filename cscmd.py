@@ -16,9 +16,11 @@ from lib import log
 from local import update
 from repository import repository
 from updatecmd import parseTroveSpec
+from updatecmd import UpdateCallback
 import versions
 
-def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True):
+def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True,
+                     callback = None):
     primaryCsList = []
 
     for item in troveList:
@@ -109,7 +111,8 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True):
                    not troveCs.getOldVersion()))
 
     repos.createChangeSetFile(fullCsList, outFileName, recurse = False,
-                              primaryTroveList = primaryList)
+                              primaryTroveList = primaryList,
+                              callback = callback)
 
 def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     try:
