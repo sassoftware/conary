@@ -318,6 +318,27 @@ class Version:
 	"""
 	return ("%.3f:" % self.timeStamp) + self.asString(defaultBranch)
 
+    def freezeTimestamp(self):
+	"""
+	Returns a binary representation of the files timestamp, which can
+	be later used to restore the timestamp to the string'ified version
+	of a version object.
+
+	@rtype: str
+	"""
+	assert(self.timeStamp)
+	return "%.3f" % self.timeStamp
+
+    def thawTimestamp(self, str):
+	"""
+	Parses a frozen timesamp (from freezeTimestamp), and makes it
+	the timestamp for this version.
+
+	@param str: The frozen timestamp
+	@type str: string
+	"""
+	self.timeStamp = float(str)
+
     def isBranch(self):
 	"""
 	Tests whether or not the current object is a branch.

@@ -22,8 +22,11 @@ The contents of each file are stored as _CONTENTS.
 The _BRANCH_NICK stores a mapping from a branch nickname to a list of
 all of the versions to which that branch maps.
 
+The _VERSION_INFO builds a linked list of versions for a file.
+
 The versions are expected to be Version objects as defined by the versions
-module.
+module. The frozen version is written into the database along with the
+file itself (the objects are newline separated).
 """
 
 import __builtin__
@@ -141,16 +144,24 @@ class VersionedFile:
 
     def getVersion(self, version):
 	"""
-        Returns the specified version of the file.
+        Returns the specified version of the file. As a side effect,
+	if the timestamp of the version parameter is set to match the
+	timestamp from the version in the file.
 
         @param version: The version to retrieve.
         @type version: versions.Version
         @return: File-like object allowing read-only access to the
         requested version of the file.
-        @rtype: FalseFile
+        @rtype: file-like 
 	"""
 
-	return FalseFile(self.db[_CONTENTS % (self.key, version.asString())])
+	item = self.db[_CONTENTS % (self.key, version.asString())]
+	(timeStr, str) = item.split("\n", 1)
+	del item
+
+	version.thawTimestamp(timeStr)
+
+	return FalseFile(str)
 
     def findLatestVersion(self, branch):
 	"""
@@ -175,22 +186,6 @@ class VersionedFile:
 	assert(branch.hasParent())
 	return branch.parentNode()
 
-    # converts a version to one w/ a timestamp
-    def getFullVersion(self, version):
-	"""
-        This class uses version strings as the index, but full version
-        strings include a time stamp to allow sorting. This method
-        lets a version w/o a time stamp be converted to a complete
-        version object.
-
-        @param version: Incomplete version
-        @type version: versions.Version
-        @return: Complete version object which matches the version parameter
-        @rtype: versions.Version
-	"""
-
-	return self._getVersionInfo(version)[0]
-
     def _getVersionInfo(self, version):
 	s = self.db[_VERSION_INFO % (self.key, version.asString())]
 	l = s.split()
@@ -207,7 +202,7 @@ class VersionedFile:
 	else:
 	    next = versions.ThawVersion(l[2])
 
-	return (v, previous, next)
+	return (previous, next)
 
     def _writeVersionInfo(self, node, parent, child):
 	vStr = node.freeze()
@@ -236,6 +231,7 @@ class VersionedFile:
         @param data: The contents of the new version of the file
         @type data: str or file-type object
 	"""
+	assert(version.timeStamp)
 	self._readBranchMap()
 
 	versionStr = version.asString()
@@ -253,7 +249,7 @@ class VersionedFile:
 	    next = None
 	    while curr and curr.isAfter(version):
 		next = curr
-		curr = self._getVersionInfo(curr)[1]
+		curr = self._getVersionInfo(curr)[0]
 	elif not self.branchMap.has_key(branchStr) and \
 	     not self.createBranches and len(self.branchMap.keys()):
 	    # the branch doesn't exist, but other branches do, and
@@ -278,13 +274,14 @@ class VersionedFile:
 	# this is (node, newParent, newChild)
 	self._writeVersionInfo(version, curr, next)
 	if curr:
-	    (node, parent, child) = self._getVersionInfo(curr)
+	    (parent, child) = self._getVersionInfo(curr)
 	    self._writeVersionInfo(curr, parent, version)
 	if next:
-	    (node, parent, child) = self._getVersionInfo(next)
+	    (parent, child) = self._getVersionInfo(next)
 	    self._writeVersionInfo(next, version, child)
 
-	self.db[_CONTENTS % (self.key, versionStr)] = data
+	fullEntry = version.freezeTimestamp() + "\n" + data
+	self.db[_CONTENTS % (self.key, versionStr)] = fullEntry
 
 	# if this is the new head of the branch, update the branch map
 	if not next:
@@ -390,7 +387,7 @@ class VersionedFile:
 	branchStr = branch.asString()
 	retValue = False
 
-	(node, prev, next) = self._getVersionInfo(version)
+	(prev, next) = self._getVersionInfo(version)
 
 	# if this is the head of the branch we need to move the head back
 	if self.branchMap[branchStr].equal(version):
@@ -409,11 +406,11 @@ class VersionedFile:
 	    self._writeBranchMap()
 
 	if prev:
-	    thePrev = self._getVersionInfo(prev)[1]
+	    thePrev = self._getVersionInfo(prev)[0]
 	    self._writeVersionInfo(prev, thePrev, next)
 	
 	if next:
-	    theNext = self._getVersionInfo(next)[2]
+	    theNext = self._getVersionInfo(next)[1]
 	    self._writeVersionInfo(next, prev, theNext)
 
 	del self.db[_CONTENTS % (self.key, versionStr)]
@@ -452,7 +449,7 @@ class VersionedFile:
 	list = []
 	while curr:
 	    list.append(curr)
-	    curr = self._getVersionInfo(curr)[1]
+	    curr = self._getVersionInfo(curr)[0]
 	
 	return list
 

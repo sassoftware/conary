@@ -454,13 +454,8 @@ class ChangeSetFromRepository(ChangeSet):
     def newPackage(self, pkg):
 	# add the time stamps to the package version numbers
 	if pkg.getOldVersion():
-	    if not pkg.getOldVersion().timeStamp:
-		pkg.changeOldVersion(self.repos.pkgGetFullVersion(pkg.getName(),
-							       pkg.getOldVersion()))
-
-	if not pkg.getNewVersion().timeStamp:
-	    pkg.changeNewVersion(self.repos.pkgGetFullVersion(pkg.getName(),
-							   pkg.getNewVersion()))
+	    assert(pkg.getOldVersion().timeStamp)
+	assert(pkg.getNewVersion().timeStamp)
 	ChangeSet.newPackage(self, pkg)
 
     def __init__(self, repos):
@@ -685,7 +680,6 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
 	    else:
 		dupFilter[name] = [ ver ]
 	    pkg = db.getPackageVersion(name, ver)
-	    pkg.changeVersion(db.pkgGetFullVersion(pkg.getName(), pkg.getVersion()))
 	    ver = ver.fork(versions.LocalBranch(), sameVerRel = 1)
 	    list.append((pkg, pkg, ver))
 	    

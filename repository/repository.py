@@ -15,9 +15,6 @@ class AbstractRepository:
     def hasPackage(self, pkg):
 	raise NotImplemented
 
-    def pkgGetFullVersion(self, pkgName, version):
-	raise NotImplemented
-
     def hasPackageVersion(self, pkgName, version):
 	raise NotImplemented
 

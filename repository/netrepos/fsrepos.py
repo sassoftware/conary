@@ -45,9 +45,6 @@ class FilesystemRepository(AbstractRepository):
     def hasPackage(self, pkg):
 	return self.pkgDB.hasFile(pkg)
 
-    def pkgGetFullVersion(self, pkgName, version):
-	return self._getPackageSet(pkgName).getFullVersion(version)
-
     def hasPackageVersion(self, pkgName, version):
 	return self._getPackageSet(pkgName).hasVersion(version)
 
@@ -326,7 +323,6 @@ class FilesystemRepository(AbstractRepository):
 		cs.oldPackage(packageName, oldVersion)
 		for (name, verList) in old.getPackageList():
 		    for ver in verList:
-			ver = self.pkgGetFullVersion(name, ver)
 			packageList.append((name, ver, None, abstract))
 		    
 		continue

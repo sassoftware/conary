@@ -181,9 +181,6 @@ def commit(repos):
 	srcPkg = None
     else:
 	srcPkg = repos.getPackageVersion(state.getName(), state.getVersion())
-	# update the version to one w/ a timestamp
-	srcPkg.changeVersion(repos.pkgGetFullVersion(state.getName(), 
-			     srcPkg.getVersion()))
 
 	if not _verifyAtHead(repos, srcPkg, state):
 	    log.error("contents of working directory are not all "
@@ -230,10 +227,6 @@ def diff(repos, versionStr = None):
     else:
 	oldPackage = repos.getPackageVersion(state.getName(), 
 					     state.getVersion())
-
-    # update the version to one w/ a timestamp
-    oldPackage.changeVersion(repos.pkgGetFullVersion(state.getName(), 
-			     oldPackage.getVersion()))
 
     result = update.buildLocalChanges(repos, [(state, oldPackage, 
 					       versions.NewVersion())])
