@@ -2,30 +2,15 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+import changeset
+import commit
 import files
 import sys
 import versions
 import os
 import util
 
-def update(repos, cfg, pkg, mainPackageName):
-    if cfg.root == "/":
-	print "using srs to update to your actual system is dumb."
-	sys.exit(0)
-
-    for (fileId, path, version) in pkg.fileList():
-	infoFile = repos.getFileDB(fileId)
-	f = infoFile.getVersion(version)
-
-	if f.__class__ == files.SourceFile:
-	    d = {}
-	    d['pkgname'] = mainPackageName
-
-	    path = (cfg.sourcepath) % d + "/" + path
-
-	f.restore(repos, cfg.root + path)
-
-def doUpdate(repos, cfg, pkg, versionStr = None):
+def doUpdate(repos, db, cfg, pkg, versionStr = None):
     if not os.path.exists(cfg.root):
         util.mkdirChain(cfg.root)
     
@@ -36,9 +21,9 @@ def doUpdate(repos, cfg, pkg, versionStr = None):
 	versionStr = cfg.defaultbranch.asString() + "/" + versionStr
 
     if versionStr:
-	version = versions.VersionFromString(versionStr)
+	newVersion = versions.VersionFromString(versionStr)
     else:
-	version = None
+	newVersion = None
 
     list = []
     bail = 0
@@ -46,27 +31,28 @@ def doUpdate(repos, cfg, pkg, versionStr = None):
     for pkgName in repos.getPackageList(pkg):
 	pkgSet = repos.getPackageSet(pkgName)
 
-	if not version:
-	    version = pkgSet.getLatestVersion(cfg.defaultbranch)
-	if not pkgSet.hasVersion(version):
+	if not newVersion:
+	    newVersion = pkgSet.getLatestVersion(cfg.defaultbranch)
+
+	if not pkgSet.hasVersion(newVersion):
 	    sys.stderr.write("package %s does not contain version %s\n" %
 				 (pkgName, version.asString()))
 	    bail = 1
 	else:
-	    pkg = pkgSet.getVersion(version)
-	    list.append(pkg)
+	    list.append((pkgName, None, newVersion))
 
 	# sources are only in source packages, which are always
 	# named <pkgname>/<source>
 	#
 	# this means we can parse a simple name of the package
-	# out of the full package identifier
+	# out of the full package identifier (we need this for
+	# installing source packages, whose path can depend on the
+	# name of the package being installed)
 	if pkgName.endswith('/sources'):
 	    mainPackageName = pkgName.rstrip('/sources')
 
     if bail:
 	return
 
-    for pkg in list:
-	doUpdate(repos, cfg, pkg, mainPackageName)
-
+    cs = changeset.CreateFromRepository(repos, list)
+    commit.commitChangeSet(db, cfg, cs)
