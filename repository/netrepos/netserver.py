@@ -47,11 +47,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    else:
 		return (True, ("TroveMissing", e.troveName, 
 			self.fromVersion(e.version)))
-	except repository.CommitError, e:
-	    return (True, ("CommitError", str(e)))
+	#except repository.CommitError, e:
+	#    return (True, ("CommitError", str(e)))
 	except ClientTooOld, e:
 	    return (True, ("ClientTooOld", str(e)))
-	except:
+	except Exception:
+	    import traceback, pdb,sys, string
+	    excInfo = sys.exc_info()
+	    lines = traceback.format_exception(*excInfo)
+	    print string.joinfields(lines, "")
+	    if sys.stdout.isatty() and sys.stdin.isatty():
+		pdb.post_mortem(excInfo[2])
 	    raise
 
     def allTroveNames(self, authToken):
@@ -295,7 +301,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	try:
 	    cs = changeset.ChangeSetFromFile(path)
 	finally:
-	    pass
 	    os.unlink(path)
 
 	# walk through all of the branches this change set commits to

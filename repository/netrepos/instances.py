@@ -35,10 +35,15 @@ class InstanceTable:
 		               Instances(itemId, versionId, flavorId);
 			""")
 
-    def addId(self, itemId, versionId, flavorId):
+    def addId(self, itemId, versionId, flavorId, isPresent = True):
+	if isPresent:
+	    isPresent = 1
+	else:
+	    isPresent = 0
+
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Instances VALUES (NULL, %d, %d, %d, 1)",
-                   (itemId, versionId, flavorId))
+        cu.execute("INSERT INTO Instances VALUES (NULL, %d, %d, %d, %s)",
+                   (itemId, versionId, flavorId, isPresent))
 	return cu.lastrowid
 
     def delId(self, theId):

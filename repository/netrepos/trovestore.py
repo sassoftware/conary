@@ -96,10 +96,14 @@ class TroveStore:
 
 	return theId
 
-    def getInstanceId(self, itemId, versionId, flavorId):
+    def getInstanceId(self, itemId, versionId, flavorId, isPresent = True):
 	theId = self.instances.get((itemId, versionId, flavorId), None)
 	if theId == None:
-	    theId = self.instances.addId(itemId, versionId, flavorId)
+	    theId = self.instances.addId(itemId, versionId, flavorId,
+					 isPresent = isPresent)
+	elif isPresent:
+	    # XXX we shouldn't have to do this unconditionally
+	    self.instances.setPresent(theId, 1)
 
 	return theId
 
@@ -311,7 +315,22 @@ class TroveStore:
 	return self.items.iterkeys()
 
     def addTrove(self, trove):
+	cu = self.db.cursor()
+
+	cu.execute("""
+	    CREATE TEMPORARY TABLE NewFiles(fileId STRING,
+					    versionId INTEGER,
+					    stream BINARY,
+					    path STRING)
+	""")
+
+	self.fileVersionCache = {}
+	
+	return (cu, trove)
+
+    def addTroveDone(self, troveInfo):
 	versionCache = {}
+	(cu, trove) = troveInfo
 
 	troveVersion = trove.getVersion()
 	troveItemId = self.getItemId(trove.getName())
@@ -332,8 +351,6 @@ class TroveStore:
 		self.changeLogs.add(nodeId, trove.getChangeLog())
 
 	troveFlavor = trove.getFlavor()
-
-	cu = self.db.cursor()
 
 	# start off by creating the flavors we need; we could combine this
 	# to some extent with the file table creation below, but there are
@@ -391,48 +408,14 @@ class TroveStore:
 	# the instance may already exist (it could be referenced by a package
 	# which has already been added)
 	troveInstanceId = self.getInstanceId(troveItemId, troveVersionId, 
-					     troveFlavorId)
+					     troveFlavorId, isPresent = True)
 	assert(not self.troveTroves.has_key(troveInstanceId))
-
-	# this table could well have incorrect flavorId and stream
-	# information, but it will be right for new files, and that's
-	# all that matters (since existing files don't get updated
-	# in the FileStreams table)
-	cu.execute("""
-	    CREATE TEMPORARY TABLE NewFiles(instanceId INTEGER, 
-					    fileId STRING,
-					    versionId INTEGER,
-					    flavorId INTEGER,
-					    stream BINARY,
-					    path STRING)
-	""")
-	
-	for (fileId, path, version) in trove.iterFileList():
-	    fileObj = self.filesToAdd.get((fileId, version), None)
-
-	    stream = None
-	    flavorId = 0
-
-	    if fileObj:
-		del self.filesToAdd[(fileId, version)]
-		stream = sqlite.encode(fileObj.freeze())
-
-		if fileObj.hasContents:
-		    flavor = fileObj.flavor.value()
-		    if flavor:
-			flavorId = flavors[flavor]
-
-	    versionId = self.getVersionId(version, versionCache)
-
-	    cu.execute("""
-		INSERT INTO NewFiles VALUES(%d, %s, %d, %d, %s, %s)
-	    """, (troveInstanceId, fileId, versionId, flavorId, stream, path))
 
         cu.execute("""
 	    INSERT INTO FileStreams SELECT NULL,
 					   NewFiles.fileId,
 					   NewFiles.versionId,
-					   NewFiles.flavorId,
+					   0,
 					   NewFiles.stream
 		FROM NewFiles LEFT OUTER JOIN FileStreams ON
 		    NewFiles.fileId = FileStreams.fileId AND
@@ -440,13 +423,13 @@ class TroveStore:
 		WHERE FileStreams.streamId is NULL
                 """)
         cu.execute("""
-	    INSERT INTO TroveFiles SELECT NewFiles.instanceId,
+	    INSERT INTO TroveFiles SELECT %d,
 					  FileStreams.streamId,
 					  NewFiles.path
 		FROM NewFiles JOIN FileStreams ON
 		    NewFiles.fileId = FileStreams.fileId AND
 		    NewFiles.versionId = FileStreams.versionId
-                    """)
+                    """, troveInstanceId)
         cu.execute("DROP TABLE NewFiles")
 
 	for (name, version, flavor) in trove.iterTroveList():
@@ -457,34 +440,11 @@ class TroveStore:
 	    else:
 		flavorId = 0
 
-	    instanceId = self.getInstanceId(itemId, versionId, flavorId)
+	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
+					    isPresent = False)
 	    self.troveTroves.addItem(troveInstanceId, instanceId)
 
-    def eraseTrove(self, troveName, troveVersion, troveFlavor):
-	assert(0)
-	# the garbage collection isn't right
-
-	troveItemId = self.items[troveName]
-	troveVersionId = self.versionTable[troveVersion]
-	troveFlavorId = self.flavors[troveFlavor]
-	troveInstanceId = self.instances[(troveItemId, troveVersionId, 
-					  troveFlavorId)]
-
-	del self.troveFiles[troveInstanceId]
-	del self.troveTroves[troveInstanceId]
-
-	# mark this trove as not present
-	self.instances.setPresent(troveInstanceId, 0)
-	self.needsCleanup = True
-
-	self.versionOps.eraseVersion(troveItemId, troveVersionId)
-
-	verStr = troveVersion.asString()
-	left = verStr + '/'
-	right = verStr + '0'
-
-	# XXX if this is the base of any branches, we need to erase the heads
-	# of those branches as well. this shouldn't be hard?
+	del self.fileVersionCache 
 
     def hasTrove(self, troveName, troveVersion = None, troveFlavor = 0):
 	if not troveVersion:
@@ -705,8 +665,17 @@ class TroveStore:
 
 	return fullList
 	    
-    def addFile(self, fileObj, fileVersion):
-	self.filesToAdd[(fileObj.id(), fileVersion)] = fileObj
+    def addFile(self, troveInfo, fileId, fileObj, path, fileVersion):
+	cu = troveInfo[0]
+	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
+
+	if fileObj:
+	    stream = sqlite.encode(fileObj.freeze())
+	    cu.execute("INSERT INTO NewFiles VALUES(%s, %d, %s, %s)", 
+		       (fileId, versionId, stream, path))
+	else:
+	    cu.execute("INSERT INTO NewFiles VALUES(%s, %d, NULL, %s)", 
+		       (fileId, versionId, path))
 
     def getFile(self, fileId, fileVersion):
 	versionId = self.versionTable[fileVersion]

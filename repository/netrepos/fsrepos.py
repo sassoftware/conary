@@ -111,10 +111,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	self.troveStore.eraseTrove(pkgName, version, flavor)
 
     def addTrove(self, pkg):
-	self.troveStore.addTrove(pkg)
+	return self.troveStore.addTrove(pkg)
+
+    def addTroveDone(self, pkg):
+	self.troveStore.addTroveDone(pkg)
 
     def addPackage(self, pkg):
-	self.troveStore.addTrove(pkg)
+	return self.troveStore.addTrove(pkg)
+
+    def addPackageDone(self, pkgId):
+	self.troveStore.addTroveDone(pkgId)
 
     def commit(self):
 	self.troveStore.commit()
@@ -170,10 +176,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def getFileVersions(self, l):
 	return self.troveStore.getFiles(l)
 
-    def addFileVersion(self, fileId, version, file):
+    def addFileVersion(self, troveInfo, fileId, fileObj, path, fileVersion):
 	# don't add duplicated to this repository
-	if not self.troveStore.hasFile(fileId, version):
-	    self.troveStore.addFile(file, version)
+	#if not self.troveStore.hasFile(fileObj.id(), fileVersion):
+	self.troveStore.addFile(troveInfo, fileId, fileObj, path, fileVersion)
 
     def eraseFileVersion(self, fileId, version):
 	self.troveStore.eraseFile(fileId, version)
@@ -244,7 +250,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    trove.delTrove(name, version, flavor, False)
 		    trove.addTrove(name, branchedVersion, flavor)
 
-		self.addTrove(trove)
+		troveInfo = self.addTrove(trove)
+		for (fileId, path, version) in trove.iterFileList():
+		    self.addFileVersion(troveInfo, fileId, None, path, version)
+		self.addTroveDone(troveInfo)
 
         # commit branch to the repository
         self.commit()
