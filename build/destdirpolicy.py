@@ -294,12 +294,12 @@ class NormalizeInfoPages(policy.Policy):
 		    if not m:
 			# not compressed
 			util.execute('gzip -n -9 %s' %syspath)
-		    if m.name == 'gzip' and \
+		    elif m.name == 'gzip' and \
 		       (m.contents['compression'] != '9' or \
 		        'name' in m.contents):
 			util.execute('gunzip %s; gzip -n -9 %s',
 				     syspath, syspath[:-3])
-		    if m.name == 'bzip':
+		    elif m.name == 'bzip':
 			# should use gzip instead
 			util.execute('bunzip2 %s; gzip -n -9 %s',
 				     syspath, syspath[:-4])
