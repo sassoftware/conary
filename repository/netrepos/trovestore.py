@@ -650,7 +650,7 @@ class TroveStore:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
-	    if withFiles and stream:
+	    if withFiles:
 		yield (fileId, path, version, stream)
 	    else:
 		yield (fileId, path, version)
