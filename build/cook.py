@@ -475,7 +475,6 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	targetVersion = targetVersion.fork(targetLabel)
 	targetVersion.trailingVersion().incrementBuildCount()
 
-
     # build up the name->fileid mapping so we reuse fileids wherever
     # possible; we do this by looking in the database for the latest
     # packages for each flavor available on the branch and recursing
@@ -490,10 +489,21 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
         if main not in grpMap:
             grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
 
-        try:
-            versionList = repos.getTroveFlavorsLatestVersion(main, buildBranch)
-        except repository.PackageNotFound:
-            versionList = []
+        searchBranch = buildBranch
+        versionList = []
+        while not versionList and searchBranch:
+            try:
+                versionList = repos.getTroveFlavorsLatestVersion(main, 
+                                                                 searchBranch)
+            except repository.PackageNotFound:
+                pass
+
+            if not versionList:
+                if searchBranch.hasParent():
+                    searchBranch = searchBranch.parentNode().branch()
+                else:
+                    searchBranch = None
+
         troveList = [ (main, x[0], x[1]) for x in versionList ]
         while troveList:
             troves = repos.getTroves(troveList)
