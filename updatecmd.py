@@ -28,6 +28,8 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
 
     applyList = []
 
+    if type(pkgList) is str:
+        pkgList = ( pkgList, )
     for pkgStr in pkgList:
         if os.path.exists(pkgStr) and os.path.isfile(pkgStr):
             cs = changeset.ChangeSetFromFile(pkgStr)
