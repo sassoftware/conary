@@ -25,14 +25,73 @@ def usage():
     print "       srs pkglist <pkg> <version>"
     print "       srs update  <pkg> <version>"
     print "       srs cook    <first.recipe> <second.recipe> ..."
+    print ""
+    print "common flags: --branch <defaultbranch>"
+    print '              --config "<item> <value>"'
+    print "              --root <root>"
     sys.exit(0)
 
-if (len(sys.argv) < 2):
+otherArgs = [ sys.argv[0] ]
+argSet = {}
+argDef = {}
+cfgMap = {}
+# 0 - arg may occur, no parameter
+# 1 - arg may occur once, w/ parameter
+# 2 - arg may occur N times, w/ parameter
+
+cfgMap["branch"] = "defaultBranch"
+cfgMap["root"] = "root"
+
+argDef["config"] = 2
+
+for arg in cfgMap.keys():
+    argDef[arg] = 1
+
+i = 1
+while i < len(sys.argv):
+    if sys.argv[i][:2] != "--":
+	otherArgs.append(sys.argv[i])
+    else:
+	arg = sys.argv[i][2:]
+	if not argDef.has_key(arg): usage
+
+	if not argDef[arg]:
+	    argSet[arg] = 1
+	else:
+	    # the argument takes a parameter
+	    i = i + 1
+	    if i >= len(sys.argv): usage
+
+	    if argDef[arg] == 1:
+		# exactly one parameter is allowd
+		if argSet.has_key(arg): usage
+		argSet[arg] = sys.argv[i]
+	    else:
+		# multiple parameters may occur
+		if argSet.has_key(arg):
+		    argSet[arg].append(sys.argv[i])
+		else:
+		    argSet[arg] = [sys.argv[i]]
+
+    i = i + 1
+
+if argSet.has_key('config'):
+    for param in argSet['config']:
+	cfg.configLine(param)
+
+    del argSet['config']
+
+for (arg, name) in cfgMap.items():
+    if argSet.has_key(arg):
+	cfg.configLine("%s %s" % (name, argSet[arg]))
+	del argSet[arg]
+
+if (len(otherArgs) < 2):
     usage()
-elif (sys.argv[1] == "import"):
+elif (otherArgs[1] == "import"):
     print "this is broken"
-elif (sys.argv[1] == "cook"):
-    for file in sys.argv[2:]:
+elif (otherArgs[1] == "cook"):
+    for file in otherArgs[2:]:
         if file[0] != '/':
             file = "%s/%s" % (os.getcwd(), file)
         # we want to fork here to isolate changes the recipe might make
@@ -43,20 +102,20 @@ elif (sys.argv[1] == "cook"):
         else:
             (id, status) = os.waitpid(pid, 0);
                 
-elif (sys.argv[1] == "pkglist"):
-    if len(sys.argv) >= 2 and len(sys.argv) <= 4:
-	args = [repos, cfg] + sys.argv[2:]
+elif (otherArgs[1] == "pkglist"):
+    if len(otherArgs) >= 2 and len(otherArgs) <= 4:
+	args = [repos, cfg] + otherArgs[2:]
 	apply(display.displayPkgs, args)
     else:
 	usage()
-elif (sys.argv[1] == "update"):
-    if len(sys.argv) >=3 and len(sys.argv) <= 4:
-	args = [repos, cfg] + sys.argv[2:]
+elif (otherArgs[1] == "update"):
+    if len(otherArgs) >=3 and len(otherArgs) <= 4:
+	args = [repos, cfg] + otherArgs[2:]
 	apply(update.update, args)
     else:
 	usage()
-elif (sys.argv[1] == "config"):
-    if (len(sys.argv) > 2):
+elif (otherArgs[1] == "config"):
+    if (len(otherArgs) > 2):
 	usage()
     else:
 	cfg.display()
