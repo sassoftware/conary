@@ -359,6 +359,48 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             return (serverJobs, ourJobList)
 
+        def _cvtTroveList(l):
+            new = []
+            for (name, (oldV, oldF), (newV, newF)) in l:
+                if oldV == 0:
+                    oldV = None
+                    oldF = None
+                else:
+                    oldV = self.toVersion(oldV)
+                    oldF = self.toFlavor(oldF)
+
+                newV = self.toVersion(newV)
+                newF = self.toFlavor(newV)
+
+                new.append((name, (oldV, oldF), (newV, newF)))
+
+            return new
+
+        def _cvtFileList(l):
+            new = []
+            for (fileId, troveName, (oldTroveV, oldFileV),
+                                    (newTroveV, newFileV)) in l:
+                if oldTroveV == 0:
+                    oldTroveV = None
+                    oldFileV = None
+                    oldTroveF = None
+                else:
+                    oldTroveV = self.toVersion(oldTroveV)
+                    oldFileV = self.toVersion(oldFileV)
+                    oldTroveF = self.toFlavor(oldTroveF)
+
+                newTroveV = self.toVersion(newTroveV)
+                newFileV = self.toVersion(newFileV)
+                newTroveF = self.toFlavor(newTroveF)
+
+                fileId = self.toFileId(fileId)
+
+                new.append((fileId, troveName, 
+                               (oldTroveV, oldTroveF, oldFileV),
+                               (newTroveV, newTroveF, newFileV)))
+
+            return new
+
         cs = None
         firstPath = target
         scheduledSet = {}
@@ -380,6 +422,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 (urlList, extraTroveList, extraFileList) = \
                     self.c[serverName].getChangeSet(job, recurse, 
                                                 withFiles, withFileContents)
+
+                extraTroveList = _cvtTroveList(extraTroveList)
+                extraFileList = _cvtFileList(extraFileList)
 
                 for url in urlList:
                     inF = urllib.urlopen(url)
@@ -436,8 +481,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 (pkgChgSet, newFilesNeeded, pkgsNeeded) = \
                                 new.diff(old, absolute = absolute) 
-                filesNeeded += [ (troveName, newVersion, newFlavor, x) for x in 
-                                    newFilesNeeded ]
+                # newFilesNeeded = [ (fileId, oldFileVersion, newFileVersion) ]
+                filesNeeded += [ (x[0], troveName, 
+                        (oldVersion, oldFlavor, x[1]),
+                        (newVersion, newFlavor, x[2])) for x in newFilesNeeded ]
 
                 if recurse:
                     for (otherTroveName, otherOldVersion, otherNewVersion, 
@@ -457,9 +504,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         if withFiles and filesNeeded:
             need = []
-            for (troveName, troveVersion, troveFlavor, 
-                    (fileId, oldFileVersion, newFileVersion, 
-                     oldPath, newPath)) in filesNeeded:
+            for (fileId, troveName, 
+                        (oldTroveVersion, oldTroveFlavor, oldFileVersion),
+                        (newTroveVersion, newTroveFlavor, newFileVersion)) \
+                                in filesNeeded:
                 if oldFileVersion:
                     need.append((fileId, oldFileVersion))
                 need.append((fileId, newFileVersion))
@@ -469,9 +517,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             for (key, fileObj) in zip(need, fileObjs):
                 fileDict[key] = fileObj
 
-            for (troveName, troveVersion, troveFlavor, 
-                    (fileId, oldFileVersion, newFileVersion, 
-                     oldPath, newPath)) in filesNeeded:
+            for (fileId, troveName, (oldTroveVersion, oldFileVersion),
+                                    (newTroveVersion, newFileVersion)) \
+                                in filesNeeded:
                 if oldFileVersion:
                     oldFileObj = fileDict[(fileId, oldFileVersion)]
                 else:
@@ -486,8 +534,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                    filecs)
 
                 if withFileContents and hash:
-                    cont = self.getFileContents(troveName, troveVersion, 
-                                            troveFlavor, fileId, newFileVersion)
+                    cont = self.getFileContents(troveName, newTroveVersion, 
+                                        newTroveFlavor, fileId, newFileVersion)
                     internalCs.addFileContents(fileId, 
                                    repository.changeset.ChangedFileTypes.file, 
                                    cont, 

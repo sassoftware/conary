@@ -44,6 +44,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	# reopens the sqlite db if it's changed
 	self.repos.reopen()
 
+        print methodname
+
         try:
             # try and get the method to see if it exists
             method = self.__getattribute__(methodname)
@@ -71,15 +73,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    return (True, ("ClientTooOld", str(e)))
 	except repository.DuplicateBranch, e:
 	    return (True, ("DuplicateBranch", str(e)))
-	except Exception:
-	    import traceback, sys, string
-            import lib.epdb
-	    excInfo = sys.exc_info()
-	    lines = traceback.format_exception(*excInfo)
-	    print string.joinfields(lines, "")
-	    if sys.stdout.isatty() and sys.stdin.isatty():
-		lib.epdb.post_mortem(excInfo[2])
-	    raise
+	#except Exception:
+	#    import traceback, sys, string
+        #    import lib.epdb
+	#    excInfo = sys.exc_info()
+	#    lines = traceback.format_exception(*excInfo)
+	#    print string.joinfields(lines, "")
+	#    if sys.stdout.isatty() and sys.stdin.isatty():
+	#	lib.epdb.post_mortem(excInfo[2])
+	#    raise
 
     def allTroveNames(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
@@ -346,6 +348,49 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse, 
                      withFiles, withFileContents = None):
+
+        def _cvtTroveList(l):
+            new = []
+            for (name, (oldV, oldF), (newV, newF), absolute) in l:
+                if oldV:
+                    oldV = self.fromVersion(oldV)
+                    oldF = self.fromFlavor(oldF)
+                else:
+                    oldV = '0'
+                    oldF = '0'
+
+                newV = self.fromVersion(newV)
+                newF = self.fromFlavor(newF)
+
+                new.append((name, (oldV, oldF), (newV, newF), absolute))
+
+            return new
+
+        def _cvtFileList(l):
+            new = []
+            for (fileId, troveName, (oldTroveV, oldTroveF, oldFileV), 
+                                    (newTroveV, newTroveF, newFileV)) in l:
+                if oldTroveV:
+                    oldTroveV = self.fromVersion(oldTroveV)
+                    oldFileV = self.fromVersion(oldFileV)
+                    oldTroveF = self.fromFlavor(oldTroveF)
+                else:
+                    oldTroveV = 0
+                    oldFileV = 0
+                    oldTroveV = 0
+
+                newTroveV = self.fromVersion(newTroveV)
+                newFileV = self.fromVersion(newFileV)
+                newTroveF = self.fromFlavor(newTroveF)
+
+                fileId = self.fromFileId(fileId)
+
+                new.append((fileId, troveName, 
+                               (oldTroveV, oldTroveF, oldFileV),
+                               (newTroveV, newTroveF, newFileV)))
+
+            return new
+
         if clientVersion == 6:
             withFileContents = withFiles
             withFiles = True
@@ -380,8 +425,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                         withFiles = withFiles,
                                         withFileContents = withFileContents)
                 path = self.cache.addEntry(l, withFiles)
-                newChgSetList += trovesNeeded
-                allFilesNeeded += filesNeeded
+
+                newChgSetList += _cvtTroveList(trovesNeeded)
+                allFilesNeeded += _cvtFileList(filesNeeded)
                 cs.writeToFile(path)
 
             fileName = os.path.basename(path)

@@ -712,7 +712,7 @@ class ReadOnlyChangeSet(ChangeSet):
 	    self.newPackage(pkgChgSet)
             filesNeeded.sort()
 
-	    for (fileId, oldVersion, newVersion, oldPath, newPath) in filesNeeded:
+	    for (fileId, oldVersion, newVersion) in filesNeeded:
 		(fileObj, fileVersion) = job.getFile(fileId)
 		assert(newVersion == fileVersion)
 		
@@ -899,7 +899,7 @@ def CreateFromFilesystem(pkgList):
 	(pkgChgSet, filesNeeded, pkgsNeeded) = pkg.diff(None, absolute = 1)
 	cs.newPackage(pkgChgSet)
 
-	for (fileId, oldVersion, newVersion, oldPath, path) in filesNeeded:
+	for (fileId, oldVersion, newVersion) in filesNeeded:
 	    (file, realPath, filePath) = fileMap[fileId]
 	    (filecs, hash) = fileChangeSet(fileId, None, file)
 	    cs.addFile(fileId, oldVersion, newVersion, filecs)

@@ -439,20 +439,19 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    serverIdx = {}
             getList = []
             newFilesNeeded = []
-	    for (fileId, oldFileVersion, newFileVersion, oldPath, newPath) in \
-                                                            filesNeeded:
+
+	    for (fileId, oldFileVersion, newFileVersion) in filesNeeded:
                 # if either the old or new file version is on a different
                 # repository, creating this diff is someone else's problem
                 if newFileVersion.branch().label().getHost() != self.name or \
                    (oldFileVersion and
                     oldFileVersion.branch().label().getHost() != self.name):
-                    externalFileList.append((fileId, oldFileVersion,
-                                             newFileVersion, oldPath,
-                                             newPath))
+                    externalFileList.append((fileId, troveName,
+                                     (oldVersion, oldFlavor, oldFileVersion),
+                                     (newVersion, newFlavor, newFileVersion)))
                 else:
                     newFilesNeeded.append((fileId, oldFileVersion,
-                                             newFileVersion, oldPath,
-                                             newPath))
+                                             newFileVersion))
                     if oldFileVersion:
                         getList.append((fileId, oldFileVersion))
                     getList.append((fileId, newFileVersion))
@@ -470,8 +469,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             filesNeeded.reverse()
 
             ptrTable = {}
-	    for (fileId, oldFileVersion, newFileVersion, oldPath, newPath) in \
-								filesNeeded:
+	    for (fileId, oldFileVersion, newFileVersion) in filesNeeded:
 		oldFile = None
 		if oldFileVersion:
 		    oldFile = idIdx[(fileId, oldFileVersion)]
