@@ -424,6 +424,9 @@ class Desktopfile(BuildCommand, _FileAction):
     def doBuild(self, recipe):
 	if not Use.desktop or not self.use:
 	    return
+	if 'desktop-file-utils:runtime' not in recipe.buildRequires:
+	    # Unfortunately, we really cannot do this automagically
+	    log.error("Must add 'desktop-file-utils:runtime to buildRequires")
 	macros = recipe.macros.copy()
         if self.category:
 	    macros['category'] = '--add-category "%s"' %self.category
