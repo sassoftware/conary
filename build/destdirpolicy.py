@@ -645,7 +645,7 @@ class Strip(policy.Policy):
                 # need to be able to read and write the file to strip it
                 oldmode = mode
 		os.chmod(fullpath, mode|0600)
-            if self.debuginfo and m.name == 'ELF':
+            if self.debuginfo and m.name == 'ELF' and not path.endswith('.o'):
 
                 dir=os.path.dirname(path)
                 b=os.path.basename(path)
@@ -668,9 +668,10 @@ class Strip(policy.Policy):
                     self.dm.strip, debuglibpath, fullpath))
 
             else:
-                if m.name == 'ar':
+                if m.name == 'ar' or path.endswith('.o'):
                     # just in case strip is eu-strip, which segfaults
-                    # whenever it touches an ar archive...
+                    # whenever it touches an ar archive, and seems to 
+                    # break some .o files
                     util.execute('%(strip-archive)s -g ' %self.dm +fullpath)
                 else:
                     util.execute('%(strip)s -g ' %self.dm +fullpath)
