@@ -129,7 +129,12 @@ class Flag(dict):
         """
         assert(other._name == self._name)
         # RHS value (other) is propogated 
-        new = Flag(value=other._value, name=other._name, parent=parent)
+        # use other's value unless it is not set, in which case
+        # use our value
+        value = other._value
+        if value is None:
+            value = self._value
+        new = Flag(value=value, name=other._name, parent=parent)
         # overrides and usedFlags are combined
         # from both
         new._overrides = self._overrides.copy()
@@ -142,12 +147,12 @@ class Flag(dict):
                 # if the flag is in both self and other sets, recurse
                 new[key] = self[key]._addEquivalentFlagSets(other[key], new)
             else:
-                new[key] = self[key].deepCopy()
+                new[key] = self[key].deepCopy(new)
         
         for key in other.keys():
             if key in self:
                 continue
-            new[key] = other[key].deepCopy()
+            new[key] = other[key].deepCopy(new)
         return new
 
     def __add__(self, other):
@@ -169,6 +174,8 @@ class Flag(dict):
         """ -Flag -- negates all flags in a flag set.  Converts to a
             flag set if necessary """
         if self._name != '__GLOBAL__':
+            #import lib
+            #lib.epdb.st()
             new = self.asSet()
         else:
             new = self.deepCopy()
@@ -198,7 +205,7 @@ class Flag(dict):
     def getUsedSet(self):
         """ Create a flag set based on used flags """
         flagSet = nullSet()
-        for flagName,flag in self.getUsed().iteritems():
+        for flag in self.getUsed().itervalues():
             if not flag:
                 flag = -flag
             flagSet = flagSet + flag
@@ -272,8 +279,6 @@ class Flag(dict):
         # XXX this code should probably disappear with the reworking of 
         # flavors and their relationship with deps, but for now, 
         # it is very handy
-        #import lib.epdb
-        #lib.epdb.set_trace()
         set = deps.DependencySet()
         useflagsets = []
         if self._name != '__GLOBAL__':
@@ -305,11 +310,8 @@ class Flag(dict):
             topflag = self
         cur = self
         while cur != topflag:
-            print cur._name
             namelist.insert(0, cur._name)
             cur = cur._parent
-        if cur:
-            namelist.insert(0, cur._name)
         name = ".".join(namelist)
         if prefix:
             name = '.'.join((prefix, name))
