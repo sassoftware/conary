@@ -769,6 +769,32 @@ class ExcludeDirectories(policy.Policy):
 	del self.recipe.autopkg.pathMap[path]
 
 
+class _requirements(policy.Policy):
+    def doFile(self, path):
+	pkgMap = self.recipe.autopkg.pkgMap
+	if path not in pkgMap:
+	    return
+	pkg = pkgMap[path]
+	f = pkg.getFile(path)
+	if f.hasContents:
+	    self.addOne(path, pkg, f)
+    def addOne(self, path, pkg, f):
+	'pure virtual'
+	pass
+
+class Requires(_requirements):
+    def addOne(self, path, pkg, f):
+	pkg.requires.union(f.requires.value())
+
+class Provides(_requirements):
+    def addOne(self, path, pkg, f):
+	pkg.provides.union(f.provides.value())
+
+class Flavor(_requirements):
+    def addOne(self, path, pkg, f):
+	pkg.flavor.union(f.flavor.value())
+
+
 
 class reportErrors(policy.Policy):
     """
@@ -822,6 +848,9 @@ def DefaultPolicy():
 	IgnoredSetuid(),
 	Ownership(),
 	ExcludeDirectories(),
+	Requires(),
+	Provides(),
+	Flavor(),
 	reportErrors(),
     ]
 

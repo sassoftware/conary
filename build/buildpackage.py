@@ -77,11 +77,6 @@ class BuildPackage(dict):
         to commit to the repository
         """
 	f = files.FileFromFilesystem(realPath, None, buildDeps = True)
-        if f.hasContents:
-            self.requires.union(f.requires.value())
-            self.provides.union(f.provides.value())
-            self.flavor.union(f.flavor.value())
-        
 	f.inode.setPerms(f.inode.perms() & 01777)
 	self[path] = (realPath, f)
 
@@ -105,7 +100,7 @@ class BuildPackage(dict):
         """
         Return the name of the BuildPackage
 
-        @returns: name of the BuildPackag
+        @returns: name of the BuildPackage
         @rtype: str
         """
 	return self.name
@@ -154,8 +149,11 @@ class AutoBuildPackage:
     def _getname(self, pkgname, compname):
         return string.join((pkgname, compname), ':')
 
-    def findPackage(self, path):
-        """Return the BuildPackage that matches the path"""
+    def _findPackage(self, path):
+        """
+	Return the BuildPackage that matches the path.
+	Should be called only once per path to add an entry to self.pkgMap
+	"""
 	for main in self.pkgFilters:
 	    if main.match(path):
 		for comp in self.compFilters:
@@ -172,7 +170,7 @@ class AutoBuildPackage:
         @type path: str
         @rtype: None
         """
-        pkg = self.findPackage(path)
+        pkg = self._findPackage(path)
         pkg.addFile(path, realPath)
 	self.pathMap[path] = pkg.getFile(path)
 	self.pkgMap[path] = pkg
@@ -183,7 +181,7 @@ class AutoBuildPackage:
         Add a device to the correct BuildPackage instance by matching
         the file name against the package and component filters
         """
-        pkg = self.findPackage(path)
+        pkg = self._findPackage(path)
         pkg.addDevice(path, devtype, major, minor, owner, group, perms)
 	self.pathMap[path] = pkg.getFile(path)
 	self.pkgMap[path] = pkg
