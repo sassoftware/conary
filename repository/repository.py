@@ -5,6 +5,8 @@
 
 # implements the SRS system repository
 
+import changeset
+import copy
 import datastore
 import fcntl
 import files
@@ -105,6 +107,40 @@ class Repository:
 		pkgSet.eraseVersion(newVersion)
 
 	    raise 
+
+    # packageList is a list of (pkgName, oldVersion, newVersion) tuples
+    def createChangeSet(self, packageList):
+
+	cs = changeset.ChangeSetFromRepository(self)
+
+	for (packageName, oldVersion, newVersion) in packageList:
+	    pkgSet = self.getPackageSet(packageName)
+
+	    new = pkgSet.getVersion(newVersion)
+	 
+	    if oldVersion:
+		old = pkgSet.getVersion(oldVersion)
+	    else:
+		old = None
+
+	    (pkgChgSet, filesNeeded) = new.diff(old, oldVersion, newVersion)
+	    cs.addPackage(pkgChgSet)
+
+	    for (fileId, oldVersion, newVersion) in filesNeeded:
+		filedb = self.getFileDB(fileId)
+
+		oldFile = None
+		if oldVersion:
+		    oldFile = filedb.getVersion(oldVersion)
+		newFile = filedb.getVersion(newVersion)
+
+		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
+							 newFile)
+
+		cs.addFile(fileId, oldVersion, newVersion, filecs)
+		if hash: cs.addFileContents(hash)
+
+	return cs
 
     def getPackageSet(self, pkgName, mode = 0):
 	return package.PackageSet(self.pkgDB, pkgName)

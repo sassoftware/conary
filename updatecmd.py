@@ -56,6 +56,6 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	if bail:
 	    return
 
-	cs = changeset.CreateFromRepository(repos, list)
+	cs = repos.createChangeSet(list)
 
     db.commitChangeSet(cfg.sourcepath, cs)

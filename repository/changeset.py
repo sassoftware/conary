@@ -190,39 +190,6 @@ def CreateFromFilesystem(pkgList):
 
     return cs
 
-# packageList is a list of (pkgName, oldVersion, newVersion) tuples
-def CreateFromRepository(repos, packageList):
-
-    cs = ChangeSetFromRepository(repos)
-
-    for (packageName, oldVersion, newVersion) in packageList:
-	pkgSet = repos.getPackageSet(packageName)
-
-	new = pkgSet.getVersion(newVersion)
-     
-	if oldVersion:
-	    old = pkgSet.getVersion(oldVersion)
-	else:
-	    old = None
-
-	(pkgChgSet, filesNeeded) = new.diff(old, oldVersion, newVersion)
-	cs.addPackage(pkgChgSet)
-
-	for (fileId, oldVersion, newVersion) in filesNeeded:
-	    filedb = repos.getFileDB(fileId)
-
-	    oldFile = None
-	    if oldVersion:
-		oldFile = filedb.getVersion(oldVersion)
-	    newFile = filedb.getVersion(newVersion)
-
-	    (filecs, hash) = fileChangeSet(fileId, oldFile, newFile)
-
-	    cs.addFile(fileId, oldVersion, newVersion, filecs)
-	    if hash: cs.addFileContents(hash)
-
-    return cs
-
 def ChangeSetCommand(repos, cfg, packageName, outFileName, oldVersionStr, \
 	      newVersionStr):
     if packageName[0] != ":":
@@ -240,5 +207,5 @@ def ChangeSetCommand(repos, cfg, packageName, outFileName, oldVersionStr, \
     for name in repos.getPackageList(packageName):
 	list.append((name, oldVersion, newVersion))
 
-    cs = CreateFromRepository(repos, list)
+    cs = repos.createChangeSet(list)
     cs.writeToFile(outFileName)
