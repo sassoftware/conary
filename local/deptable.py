@@ -52,7 +52,8 @@ class DependencyTables:
                                               isProvides BOOL,
                                               class INTEGER,
                                               name STRING,
-                                              flag STRING)""" % name)
+                                              flag STRING)""" % name,
+                   start_transaction = False)
 
     def _populateTmpTable(self, cu, name, depList, troveNum, requires, 
                           provides):
@@ -73,13 +74,15 @@ class DependencyTables:
                                                 "?, ?, ?)" % name,
                                        (troveNum, len(depList), len(flags), 
                                         isProvides, classId, 
-                                        depName, flag))
+                                        depName, flag),
+                                       start_transaction = False)
                     else:
                         cu.execute(    "INSERT INTO %s VALUES(?, ?, ?, ?, "
                                                 "?, ?, ?)" % name,
                                        (troveNum, len(depList), 1, 
                                         isProvides, classId, 
-                                        depName, NO_FLAG_MAGIC))
+                                        depName, NO_FLAG_MAGIC),
+                                       startTransaction = False)
 
                 if not isProvides:
                     depList.append((troveNum, classId, dep))
@@ -104,7 +107,7 @@ class DependencyTables:
                             %(tmpName)s.flag == %(depTable)s.flag
                         WHERE
                             %(depTable)s.depId is NULL
-                    """ % substDict)
+                    """ % substDict, startTransaction = False)
 
         cu.execute("""INSERT INTO %(reqTable)s 
                     SELECT %(tmpName)s.troveId, depId FROM
@@ -113,7 +116,8 @@ class DependencyTables:
                             %(tmpName)s.name == %(depTable)s.name AND
                             %(tmpName)s.flag == %(depTable)s.flag
                         WHERE
-                            %(tmpName)s.isProvides == 0""" % substDict)
+                            %(tmpName)s.isProvides == 0""" % substDict,
+                   start_transaction = False)
 
         cu.execute("""INSERT INTO %(provTable)s SELECT 
                             %(tmpName)s.troveId, depId FROM
@@ -122,7 +126,8 @@ class DependencyTables:
                             %(tmpName)s.name == %(depTable)s.name AND
                             %(tmpName)s.flag == %(depTable)s.flag
                         WHERE
-                            %(tmpName)s.isProvides == 1""" % substDict)
+                            %(tmpName)s.isProvides == 1""" % substDict,
+                   start_transaction = False)
 
     def get(self, cu, trv, troveId):
         for (tblName, setFn) in (('Requires', trv.setRequires),
@@ -153,13 +158,15 @@ class DependencyTables:
                 setFn(depSet)
 
     def add(self, cu, trove, troveId):
+        # XXX this should assert() that we're in a transaction, but I
+        # need msw to tell me how to check that
         self._createTmpTable(cu, "NeededDeps")
         self._populateTmpTable(cu, "NeededDeps", [], troveId, 
                                trove.getRequires(), trove.getProvides())
         self._mergeTmpTable(cu, "NeededDeps", "Dependencies", "Requires", 
                             "Provides")
 
-        cu.execute("DROP TABLE NeededDeps")
+        cu.execute("DROP TABLE NeededDeps", start_transaction = False)
 
     def delete(self, cu, troveId):
         cu.execute("CREATE TEMPORARY TABLE suspectDepsOrig(depId integer)")
@@ -229,7 +236,8 @@ class DependencyTables:
 
             cu.execute("INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)",
                        (-i - 1, 0, 1, True, deps.DEP_CLASS_TROVES, 
-                        trvCs.getName(), NO_FLAG_MAGIC))
+                        trvCs.getName(), NO_FLAG_MAGIC), 
+                       start_transaction = False)
 
         if not failedSets:
             self.db.rollback()
@@ -237,7 +245,7 @@ class DependencyTables:
 
         self._mergeTmpTable(cu, "DepCheck", "Dependencies", "Requires",
                             "Provides")
-        cu.execute(self._resolveStmt())
+        cu.execute(self._resolveStmt(), start_transaction = False)
 
         for (depNum, instanceId) in cu:
             depList[depNum] = None
