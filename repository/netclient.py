@@ -404,8 +404,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             return new
 
         def _getLocalTroves(troveList):
-            return ([], troveList)
-            
+            if not self.localRep or not troveList:
+                return ([], troveList)
+
+            matches = self.localRep.getTroves(troveList)
+
+            got = []
+            need = []
+
+            for trove, req in zip(matches, troveList):
+                if trove:
+                    got.append(trove)
+                else:
+                    need.append(req)
+
+            return (got, need)
 
         if not chgSetList:
             # no need to work hard to find this out

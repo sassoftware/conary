@@ -657,7 +657,7 @@ class Database:
         for (idx, instanceId) in cu:
             r[idx] = self._getTrove(pristine, troveInstanceId = instanceId)
 
-        cu.execute("DROP TABLE getTrovesTbl")
+        cu.execute("DROP TABLE getTrovesTbl", start_transaction = False)
 
         return r
 

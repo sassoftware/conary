@@ -66,7 +66,8 @@ class ConaryClient:
         cfg.installLabel = cfg.installLabelPath[0]
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
-        self.repos = NetworkRepositoryClient(cfg.repositoryMap)
+        self.repos = NetworkRepositoryClient(cfg.repositoryMap,
+                                             localRepository = self.db)
 
     def _resolveDependencies(self, cs, keepExisting = None, recurse = True):
         pathIdx = 0
