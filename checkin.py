@@ -13,7 +13,7 @@ import util
 import versioned
 import versions
 
-def checkin(repos, cfg, file):
+def checkin(repos, cfg):
     f = open(file, "r")
 
     try:
@@ -90,4 +90,9 @@ def checkout(repos, cfg, name, versionStr = None):
 
     f = open(dir + "/" + "SRS", "w")
     f.write("name %s\n" % ":".join(trv.getName().split(":")[:-1]))
-    f.write("version %s\n" % version.asString())
+    f.write("version %s\n" % trv.getVersion().asString())
+
+    if version.isBranch():
+	f.write("branch %s\n" % version.asString())
+    else:
+	f.write("branch %s\n" % version.branch().asString())
