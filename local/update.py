@@ -290,8 +290,7 @@ class FilesystemJob:
 		# FIXME we should be able to inspect headChanges directly
 		# to see if we need to go into the if statement which follows
 		# this rather then having to look up the file from the old
-		# pacakge for every file which has changed
-	    
+		# package for every file which has changed
 		fsFile = files.FileFromFilesystem(realPath, fileId)
 		
 		if not basePkg.hasFile(fileId):
@@ -320,7 +319,8 @@ class FilesystemJob:
 		# something has changed for the file
 		if flags & MERGE:
 		    # XXX X for all we know, headChanges is empty!
-		    conflicts = fsFile.twm(headChanges, baseFile)
+		    conflicts = fsFile.twm(headChanges, baseFile, 
+					   skip = "contents")
 		    # XXX X what if just the contents changed?
 		    if not conflicts:
 			attributesChanged = True
@@ -363,7 +363,7 @@ class FilesystemJob:
 		# XXX X this needs to ignore the owner for source packages, but
 		# not for binary packages!
 		if (flags & REPLACEFILES) or (not flags & MERGE) or \
-				fsFile == baseFile:
+				fsFile.contents == baseFile.contents:
 		    # the contents changed in just the repository, so take
 		    # those changes
 		    if headFileContType == changeset.ChangedFileTypes.diff:
