@@ -32,12 +32,11 @@ _CONTENTS = "%s %s"
 # module
 
 class FalseFile:
-
-    """Provides a File-like object wohse contents come from a string passed
-       to FalseFile at creation. Only a subset of normal file operations
-       are suppored.
     """
-
+    Provides a File-like object wohse contents come from a string passed
+    to FalseFile at creation. Only a subset of normal file operations
+    are suppored.
+    """
     def seek(self, count, whence = 0):
 	if whence == 0:
 	    self.pos = count
@@ -78,11 +77,12 @@ class FalseFile:
 	del self.contents
 
     def __init__(self, contents):
-	"""Create a FalseFile instance.
-
-	   @param contents: The value to make available through a file-like
-	   interface.
-	   @type contents: str
+	"""
+        Create a FalseFile instance.
+        
+        @param contents: The value to make available through a file-like
+            interface.
+        @type contents: str
 	"""
 
 	self.contents = contents
@@ -90,11 +90,10 @@ class FalseFile:
 	self.pos = 0
 
 class VersionedFile:
-
-    """Provides a verison-controlled file interface via a dbhash object
-       which can be shared with other VersionedFile instances. 
     """
-
+    Provides a verison-controlled file interface via a dbhash object
+    which can be shared with other VersionedFile instances. 
+    """
     # the branch map maps a fully qualified branch version to the latest
     # version on that branch; it's formatted as [<branch> <version>\n]+
     def _readBranchMap(self):
@@ -124,24 +123,26 @@ class VersionedFile:
 	    self.db[_BRANCH_MAP % self.key] = str
 
     def getVersion(self, version):
-	"""Returns the specified version of the file.
+	"""
+        Returns the specified version of the file.
 
-	    @param version: The version to retrieve.
-	    @type version: versions.Version
-	    @return: File-like object allowing read-only access to the
-	    requested version of the file.
-	    @rtype: FalseFile
+        @param version: The version to retrieve.
+        @type version: versions.Version
+        @return: File-like object allowing read-only access to the
+        requested version of the file.
+        @rtype: FalseFile
 	"""
 
 	return FalseFile(self.db[_CONTENTS % (self.key, version.asString())])
 
     def findLatestVersion(self, branch):
-	"""Finds the version of the head of a branch.
+	"""
+        Finds the version of the head of a branch.
 	
-	    @param branch: The verison to find the head of
-	    @type branch: versions.Version
-	    @return: The version at the head of the branch
-	    @rtype: versions.Version
+        @param branch: The verison to find the head of
+        @type branch: versions.Version
+        @return: The version at the head of the branch
+        @rtype: versions.Version
 	"""
 	self._readBranchMap()
 
@@ -153,15 +154,16 @@ class VersionedFile:
 
     # converts a version to one w/ a timestamp
     def getFullVersion(self, version):
-	"""This class uses version strings as the index, but full version
-	   strings include a time stamp to allow sorting. This method
-	   lets a version w/o a time stamp be converted to a complete
-	   version object.
+	"""
+        This class uses version strings as the index, but full version
+        strings include a time stamp to allow sorting. This method
+        lets a version w/o a time stamp be converted to a complete
+        version object.
 
-	   @param version: Incomplete version
-	   @type version: versions.Version
-	   @return: Complete version object which matches the version parameter
-	   @rtype: versions.Version
+        @param version: Incomplete version
+        @type version: versions.Version
+        @return: Complete version object which matches the version parameter
+        @rtype: versions.Version
 	"""
 
 	return self._getVersionInfo(version)[0]
@@ -201,14 +203,15 @@ class VersionedFile:
 	    "%s %s %s" % (vStr, pStr, cStr)
 
     def addVersion(self, version, data):
-	"""Adds a new version of the file. The new addition gets placed 
-	   on the proper branch in the position determined by the version's 
-	   time stamp
+	"""
+        Adds a new version of the file. The new addition gets placed 
+        on the proper branch in the position determined by the version's 
+        time stamp
 
-	    @param version: Version to add
-	    @type version: versions.Version
-	    @param data: The contents of the new version of the file
-	    @type data: str or file-type object
+        @param version: Version to add
+        @type version: versions.Version
+        @param data: The contents of the new version of the file
+        @type data: str or file-type object
 	"""
 	self._readBranchMap()
 
@@ -257,10 +260,11 @@ class VersionedFile:
 	#self.db.sync()
 
     def eraseVersion(self, version):
-	"""Removes a version of the file.
+	"""
+        Removes a version of the file.
 
-	    @param version: The version of the file to remove
-	    @type version: versions.Version
+        @param version: The version of the file to remove
+        @type version: versions.Version
 	"""
 	self._readBranchMap()
 
@@ -293,21 +297,23 @@ class VersionedFile:
 	#self.db.sync()
 
     def hasVersion(self, version):
-	"""Tells whether or not a particular version of the file exists.
+	"""
+        Tells whether or not a particular version of the file exists.
 
-	    @param version: The version of the file to remove
-	    @type version: versions.Version
+        @param version: The version of the file to remove
+        @type version: versions.Version
 	"""
 	return self.db.has_key(_VERSION_INFO % (self.key, version.asString()))
 
     def versionList(self, branch):
-	"""Finds all of the versions of a file on a particular branch.
+	"""
+        Finds all of the versions of a file on a particular branch.
 
-	    @param branch: The branch whose versions will be found
-	    @type branch: versions.Version
-	    @return: A list of all of the versions present on the branch,
-	    sorted from newest to oldest.
-	    @rtype: list of versions.Version
+        @param branch: The branch whose versions will be found
+        @type branch: versions.Version
+        @return: A list of all of the versions present on the branch,
+        sorted from newest to oldest.
+        @rtype: list of versions.Version
 	"""
 	self._readBranchMap()
 
@@ -320,7 +326,8 @@ class VersionedFile:
 	return list
 
     def branchList(self):
-	"""Returns a list of all of the branches available.
+	"""
+        Returns a list of all of the branches available.
 
         @rtype: list of versions.Version
 	"""
@@ -333,16 +340,18 @@ class VersionedFile:
 	self.branchMap = None
 
 class Database:
-
-    """Provides a set of VersionedFile objects which share a single
-       dbhash file."""
+    """
+    Provides a set of VersionedFile objects which share a single
+    dbhash file.
+    """
 
     def openFile(self, file):
-	"""Returns a paricular VersionedFile object.
+	"""
+        Returns a paricular VersionedFile object.
 
-	    @param file: File name
-	    @type file: str
-	    @rtype: VersionedFile
+        @param file: File name
+        @type file: str
+        @rtype: VersionedFile
 	"""
 	return VersionedFile(self.db, file)
 
@@ -358,16 +367,17 @@ class Database:
 	self.db = dbhash.open(path, mode)
 
 class FileIndexedDatabase(Database):
-
-    """Provides a set of VersionedFile objects on a single dbhash file
-       and maintains a list of all of the files present in the database."""
-
+    """
+    Provides a set of VersionedFile objects on a single dbhash file
+    and maintains a list of all of the files present in the database.
+    """
     def openFile(self, file):
-	"""Returns a paricular VersionedFile object.
+	"""
+        Returns a paricular VersionedFile object.
 
-	    @param file: File name
-	    @type file: str
-	    @rtype: VersionedFile
+        @param file: File name
+        @type file: str
+        @rtype: VersionedFile
 	"""
 	if not self.files.has_key(file):
 	    self.files[file] = 1
@@ -376,11 +386,12 @@ class FileIndexedDatabase(Database):
 	return Database.openFile(self, file)
 
     def hasFile(self, file):
-	"""Tells whether a file name exists in the database.
+	"""
+        Tells whether a file name exists in the database.
 
-	    @param file: File name
-	    @type file: str
-	    @rtype: boolean
+        @param file: File name
+        @type file: str
+        @rtype: boolean
 	"""
 	return self.files.has_key(file)
 
@@ -398,9 +409,10 @@ class FileIndexedDatabase(Database):
 	#self.db.sync()
 
     def fileList(self):
-	"""Returns a list of all of the files in the databaes.
+	"""
+        Returns a list of all of the files in the databaes.
 
-	    @rtype: list of str
+        @rtype: list of str
 	"""
 	return self.files.keys()
 
