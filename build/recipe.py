@@ -76,8 +76,8 @@ baseMacros = {
     'tagdatadir'        : '%(datadir)s/conary/tags',
     'testdir'	        : '%(localstatedir)s/conary/tests',
     'thistestdir'	: '%(testdir)s/%(name)s-%(version)s',
-    'debuglibdir'       : '%(libdir)s/debug',
-    'debugsrcdir'       : '%(prefix)s/src/debug',
+    'debuglibdir'       : '/usr/lib/debug', # no %(prefix)s or %(lib)s!
+    'debugsrcdir'       : '/usr/src/debug', # no %(prefix)s!
     # special component prefixes that the whole system needs to share
     'krbprefix'		: '%(exec_prefix)s/kerberos',
     'x11prefix'		: '%(exec_prefix)s/X11R6',
