@@ -11,21 +11,6 @@ import repository
 import update
 import versions
 
-# Many comments in this file only make sense if you consider the case
-# where something is being updated from version A to B, and the local
-# branches are called A.local and B.local; this terminology is used throughout
-# the comments in this file
-
-# Every item which is inserted into the database really goes in twice;
-# once as is, and then a LocalBranch is immediately created which reflects
-# what's in the file system. The "as is" copy doesn't include data for
-# any file except configuration files (which means while they can be used
-# as the source for a change set, they can't be used as the target)
-#
-# The LocalBranch for each item in the database has normal header information,
-# but the on-disk files are the real source of information on the package,
-# including file types, hashes, etc
-
 class Database(repository.LocalRepository):
 
     createBranches = 1
