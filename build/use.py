@@ -40,12 +40,19 @@ Use = UseClass({
     'gnat':		False,
     'selinux':		False,
     'pam':		True,
-    'tcl':		False,
-    'tk':		False,
     'dietlibc':		False,
     'bootstrap':	False,
-    'readline':		True,
-    'ssl':		True,
+    'python':		True,	# XXX should this even be an option?
+    # temporarily disabled until we build appropriate packages
+    'perl':		False,
+    'tcl':		False,
+    'tk':		False,
+    'X':		False,
+    'gtk':		False,
+    'gnome':		False,
+    'kde':		False,
+    'readline':		False,
+    'ssl':		False,
 })
 
 Arch = UseClass({
