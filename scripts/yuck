@@ -137,7 +137,10 @@ def main(argv):
             continue
         for pkg in branchDbPkgs:
             dbVersions = branchPkgs[branch][pkg]
-            repoVersions = versionList[pkg].keys()
+            try:
+                repoVersions = versionList[pkg].keys()
+            except KeyError:
+                repoVersions = []
             # only look for updates to this version on the same branch
             for lv in dbVersions:
                 if not repoVersions:
