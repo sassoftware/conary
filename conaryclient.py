@@ -158,6 +158,7 @@ class ConaryClient:
             if type(item) == str:
                 troveName = item
                 versionStr = None
+                flavor = None
             else:
                 troveName = item[0]
                 versionStr = item[1]
