@@ -1,3 +1,11 @@
+Changes in 0.11.10
+  * changed flavor tracking when loadRecipe() is used to only track
+    flavors in loaded recipes that are superclasses of the recipe
+    class in the loading recipe.  (e.g. loading python.recipe to get
+    the distribution python version will not add all of the python
+    recipe's flavor information to the loading recipe class, as long
+    as the loading recipe does not subclass the Python class.)
+
 Changes in 0.11.9
   * change the order of permissions setting (chmod after chown)
     because some versions of the Linux kernel remove setuid/gid bits
