@@ -23,12 +23,9 @@ build and source management.
 The following \fBcommands\fP are used to install, update, erase, and
 otherwise manage software installed on a local system.
 .TP 4
-.B query \fItrovename\fP[=\fIversion\fP]*\fP
-Lists troves installed on the local system.
-.TP 4
-.B query \fI\-\-path <path>\fP
-Lists the package that owns the specified absolute path.  This may be
-specified multiple times to query the owner of multiple paths.
+.B query \fItrovename\fP[=\fIversion\fP]*\fP [\fI\-\-path <path>\fP]*
+Lists troves installed on the local system. Any number of trove names or
+absolute paths may be given.
 .TP
 .B update [\fIargs\fP] <\fItrovename\fP[=\fIversion\fP]>* <\fIchangeset-file\fP>*
 Updates the trove \fItrovename\fR from the appropriate repository to 
@@ -60,7 +57,7 @@ the component that now contains \fI/foo/blah\fP instead of
 \fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
 as a new file.)
 .TP
-.B changeset \fItrovename [oldver] newver outfile\fP
+.B changeset \fItrovename\fP[=[\fIoldver\fP--]\fInewver\fP]+ \fIoutfile\fP
 Creates an absolute changeset for \fItrovename newver\fP, or a relative
 changeset between \fItrovename oldver\fP and \fItrovename newver\fP, and stores
 it in outfile.

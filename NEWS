@@ -1,3 +1,7 @@
+Changes in 0.8.4:
+ * changeset command now generates changesets for multiple troves spread
+   across multiple repositories
+
 Changes in 0.8.3:
  * Man page updates.
  * The "conary query" command now accepts multiple arguments for

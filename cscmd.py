@@ -17,32 +17,61 @@ from repository import repository
 from lib import log
 import versions
 
-def ChangeSetCommand(repos, cfg, troveName, outFileName, oldVersionStr, \
-	      newVersionStr):
-    pkgList = repos.findTrove(cfg.installLabel, troveName, cfg.flavor,
-			      newVersionStr)
-    if len(pkgList) > 1:
-	log.error("trove %s has multiple branches named %s",
-		  troveName, newVersionStr)
+def ChangeSetCommand(repos, cfg, troveList, outFileName):
+    list = []
 
-    newVersion = pkgList[0].getVersion()
-    newFlavor = pkgList[0].getFlavor()
+    for item in troveList:
+        l = item.split("=")
+        if len(l) == 1:
+            newVersionStr = None
+            oldVersionStr = None
+            troveName = item
+        elif len(l) != 2:
+            log.error("one = expected in '%s' argument to changeset", item)
+            return
+        else:
+            troveName = l[0]
+            l = l[1].split("--")
+            if len(l) == 1:
+                newVersionStr = l[0]
+                oldVersionStr = None
+            elif len(l) == 2:
+                oldVersionStr = l[0]
+                newVersionStr = l[1]
+            else:
+                log.error("only one -- is allowed in '%s' argument to "
+                          "changeset", item)
+                return
 
-    if (oldVersionStr):
-	pkgList = repos.findTrove(cfg.installLabel, troveName, pkgList[0].getFlavor(),
-				  oldVersionStr)
-	if len(pkgList) > 1:
-	    log.error("trove %s has multiple branches named %s",
-		      troveName, oldVersionStr)
+        pkgList = repos.findTrove(cfg.installLabelPath, troveName, cfg.flavor,
+                                  newVersionStr)
+        if len(pkgList) > 1:
+            if newVersionStr:
+                log.error("trove %s has multiple branches named %s",
+                          troveName, newVersionStr)
+            else:
+                log.error("trove %s has too many branches on installLabelPath",
+                          troveName)
 
-	oldVersion = pkgList[0].getVersion()
-	oldFlavor = pkgList[0].getFlavor()
-    else:
-	oldVersion = None
-	oldFlavor = None
+        newVersion = pkgList[0].getVersion()
+        newFlavor = pkgList[0].getFlavor()
 
-    list = [(troveName, (oldVersion, oldFlavor), (newVersion, newFlavor),
-	     not oldVersion)]
+        if (oldVersionStr):
+            pkgList = repos.findTrove(cfg.installLabelPath, troveName, 
+                                      pkgList[0].getFlavor(), oldVersionStr)
+            if len(pkgList) > 1:
+                log.error("trove %s has multiple branches named %s",
+                          troveName, oldVersionStr)
+
+            oldVersion = pkgList[0].getVersion()
+            oldFlavor = pkgList[0].getFlavor()
+        else:
+            oldVersion = None
+            oldFlavor = None
+
+        list.append((troveName, (oldVersion, oldFlavor), 
+                                (newVersion, newFlavor),
+                    not oldVersion))
 
     repos.createChangeSetFile(list, outFileName)
 

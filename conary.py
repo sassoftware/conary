@@ -56,7 +56,7 @@ except conarycfg.ConaryCfgError, e:
 sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
 
 def usage(rc = 1):
-    print "usage: conary changeset <pkg> [<oldver>] <newver> <outfile>"
+    print "usage: conary changeset <pkg>[=[<oldver>--]<newver>]* <outfile>"
     print "       conary commit       <changeset>"
     print "       conary emerge       <troveName>+"
     print "       conary erase        <pkgname> [<version>]"
@@ -177,21 +177,15 @@ def realMain(argv=sys.argv):
     if (len(otherArgs) < 2):
 	return usage()
     elif (otherArgs[1] == "changeset"):
-	# current usage is "package file oldversion newversion"
-	if len(otherArgs) != 5 and len(otherArgs) != 6:
+	if len(otherArgs) < 4:
 	    return usage()
 
-	name = otherArgs[2]
-	if len(otherArgs) == 6:
-	    (old, new) = (otherArgs[3], otherArgs[4])
-	    outFile = otherArgs[5]
-	else:
-	    (old, new) = (None, otherArgs[3])
-	    outFile = otherArgs[4]
+        outFile = otherArgs[-1]
+        del otherArgs[-1]
 
 	repos = openRepository(cfg.repositoryMap)
 
-	cscmd.ChangeSetCommand(repos, cfg, name, outFile, old, new)
+	cscmd.ChangeSetCommand(repos, cfg, otherArgs[2:], outFile)
     elif (otherArgs[1] == "commit"):
 	targetBranch = None
 	if argSet.has_key('target-branch'):

@@ -372,7 +372,7 @@ class IdealRepository(AbstractTroveDatabase):
             versionDict = { name : [] }
             for label in labelPath:
                 d = self.getTroveLeavesByLabel([name], label)
-                if not d:
+                if not d[name]:
                     continue
                 elif not acrossRepositories:
                     versionDict = d
@@ -382,8 +382,9 @@ class IdealRepository(AbstractTroveDatabase):
                         versionDict[name] += versionList
 
 	    if not versionDict[name]:
-		raise PackageNotFound, "branch %s does not exist for " \
-                            "package %s" % (label.asString(), name)
+		raise PackageNotFound, "branches %s do not exist for " \
+                            "package %s" % \
+                            ([ x.asString() for x in labelPath ], name)
 	elif versionStr[0] != "/" and versionStr.find("/") == -1:
 	    # version/release was given
 	    try:
