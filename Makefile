@@ -85,7 +85,6 @@ install: all install-mkdirs install-subdirs pyfiles-install
 	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
 	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
 	install -m 755 conary-wrapper $(DESTDIR)$(bindir)
-	install -m 755 scripts/rpm2cpio $(DESTDIR)$()
 	for f in $(bin_files) rpm2cpio; do \
 		ln -sf conary-wrapper $(DESTDIR)$(bindir)/$$f; \
 	done
