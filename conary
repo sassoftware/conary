@@ -18,7 +18,7 @@ import rollbacks
 import srscfg
 import srcctl
 import sys
-import update
+import updatecmd
 import util
 
 if sys.version_info < (2, 3):
@@ -221,7 +221,7 @@ elif (otherArgs[1] == "update"):
 	db = database.Database(cfg.root, cfg.dbpath, "c")
 
 	args = [repos, db, cfg] + otherArgs[2:]
-	update.doUpdate(*args)
+	updatecmd.doUpdate(*args)
     else:
 	usage()
 elif (otherArgs[1] == "usage"):
