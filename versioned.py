@@ -259,7 +259,7 @@ class VersionedFile:
     def eraseVersion(self, version):
 	"""Removes a version of the file.
 
-	    @param version; The version of the file to remove
+	    @param version: The version of the file to remove
 	    @type version: versions.Version
 	"""
 	self._readBranchMap()
@@ -295,7 +295,7 @@ class VersionedFile:
     def hasVersion(self, version):
 	"""Tells whether or not a particular version of the file exists.
 
-	    @param version; The version of the file to remove
+	    @param version: The version of the file to remove
 	    @type version: versions.Version
 	"""
 	return self.db.has_key(_VERSION_INFO % (self.key, version.asString()))
