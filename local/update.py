@@ -23,7 +23,6 @@ import os
 import package
 import patch
 import stat
-import sys
 import util
 import versions
 

@@ -8,7 +8,6 @@ import enum
 import filecontainer
 import filecontents
 import files
-import log
 import os
 import package
 import patch
