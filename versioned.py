@@ -374,6 +374,7 @@ class VersionedFile:
 	branches.append(branch)
 	self._writeBranchNicknameList(nick, branches)
 	self.branchMap[branchStr] = ""
+	self._writeBranchMap()
 
     def eraseVersion(self, version):
 	"""
