@@ -45,9 +45,12 @@ class NoNewTrovesError(UpdateError):
 
 class UpdateChangeSet(changeset.MergeableChangeSet):
 
-    def merge(self, cs, src):
+    def merge(self, cs, src = None):
         changeset.MergeableChangeSet.merge(self, cs)
-        self.contents.append(src)
+        if isinstance(cs, UpdateChangeSet):
+            self.contents += cs.contents
+        else:
+            self.contents.append(src)
         self.empty = False
 
     def __init__(self, *args):
@@ -94,7 +97,7 @@ class ConaryClient:
                 troves = troves.keys()
                 newCs = self._updateChangeSet(troves, 
                                               keepExisting = keepExisting)
-                cs.merge(newCs, (self.repos.createChangeSet, troves))
+                cs.merge(newCs)
 
                 depList = self.db.depCheck(cs)[1]
 
@@ -239,6 +242,7 @@ class ConaryClient:
         cs = changeset.MergeableChangeSet()
         for (how, what) in theCs.contents:
             if how == self.repos.createChangeSet:
+                print "WHAT", what
                 newCs = self.repos.createChangeSet(what)
                 cs.merge(newCs)
             else:
