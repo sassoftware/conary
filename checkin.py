@@ -187,16 +187,17 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
 	if not fileObj.hasContents:
 	    fileObj.restore(None, '/', fullPath, 1)
 	else:
+	    assert(fileObj.id() == fileId)
 	    if fileObj.flags.isConfig():
-		earlyRestore.append((fileId, ('/', fullPath, 1)))
+		earlyRestore.append((fileId, fileObj, ('/', fullPath, 1)))
 	    else:
-		lateRestore.append((fileId, ('/', fullPath, 1)))
+		lateRestore.append((fileId, fileObj, ('/', fullPath, 1)))
 
     earlyRestore.sort()
     lateRestore.sort()
 
-    for fileId, tup in earlyRestore + lateRestore:
-	contents = cs.getFileContents(fileId)[1]
+    for fileId, fileObj, tup in earlyRestore + lateRestore:
+	contents = cs.getFileContents(fileObj.id())[1]
 	fileObj.restore(*((contents,) + tup))
 
     state.write(workDir + "/CONARY")
