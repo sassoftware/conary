@@ -106,15 +106,15 @@ class BuildPackageGenerator:
 		self.packageMap[explicitspec][autospec] = package
 
     def _getname(self, prefix, subname, autoname):
-        """Returns the full name of the package when subname could be None"""
+        """Return the full name of the package when subname could be None"""
 	if subname:
 	    return string.join((prefix, subname, autoname), ':')
 	else:
 	    return string.join((prefix, autoname), ':')
     
     def addPath(self, path):
-        """addPath takes a pathname and adds it to the correct BuildPackage
-        instance given the explicit/auto spec matches
+        """Add a path to the correct BuildPackage instance by matching
+        the file name against the the explicit and auto specs
         @param path: path to add to the BuildPackage
         @type path: str
         @rtype: None
@@ -129,8 +129,8 @@ class BuildPackageGenerator:
 		break
 
     def packageSet(self):
-        """packageSet examines the packages created by the generator and
-        only returns those which have files in them
+        """examine the packages created by the generator and
+        only return those which have files in them
         @return: list of BuildPackages instances
         @rtype: list
         """
@@ -142,7 +142,7 @@ class BuildPackageGenerator:
             
     def walk(self, root):
         """traverse the directory tree specified by @C{root}, adding entries
-        to the BuildPackages as we go
+        to the BuildPackages
         @param root: root of path to walk
         @type root: str
         @rtype: None
