@@ -49,13 +49,13 @@ class FileInfo(streams.TupleStream):
 	      ("csInfo", streams.StringStream, "B"))
 
     def oldFileId(self):
-        return self.items[0].value()
+        return self.items[0]()
 
     def newFileId(self):
-        return self.items[1].value()
+        return self.items[1]()
 
     def csInfo(self):
-        return self.items[2].value()
+        return self.items[2]()
 
     def __init__(self, first, newFileId = None, chg = None):
 	if newFileId is None:

@@ -590,25 +590,25 @@ class Trove:
         return self.troveInfo
 
     def getSize(self):
-        return self.troveInfo.size.value()
+        return self.troveInfo.size()
 
     def setSize(self, sz):
         return self.troveInfo.size.set(sz)
 
     def getSourceName(self):
-        return self.troveInfo.sourceName.value()
+        return self.troveInfo.sourceName()
 
     def setSourceName(self, nm):
         return self.troveInfo.sourceName.set(nm)
 
     def getBuildTime(self):
-        return self.troveInfo.buildTime.value()
+        return self.troveInfo.buildTime()
 
     def setBuildTime(self, nm):
         return self.troveInfo.buildTime.set(nm)
 
     def getConaryVersion(self):
-        return self.troveInfo.conaryVersion.value()
+        return self.troveInfo.conaryVersion()
 
     def setConaryVersion(self, ver):
         return self.troveInfo.conaryVersion.set(ver)
@@ -842,7 +842,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
     """
 
     def isAbsolute(self):
-	return self.tcsType.value() == _TCS_TYPE_ABSOLUTE
+	return self.tcsType() == _TCS_TYPE_ABSOLUTE
 
     def newFile(self, pathId, path, fileId, version):
 	self.newFiles.append((pathId, path, fileId, version))
@@ -857,10 +857,10 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	return self.oldFiles
 
     def getName(self):
-	return self.name.value()
+	return self.name()
 
     def getTroveInfoDiff(self):
-        return self.troveInfoDiff.value()
+        return self.troveInfoDiff()
 
     def getChangeLog(self):
 	return self.changeLog
@@ -875,10 +875,10 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	self.changeLog = cl
 
     def getOldVersion(self):
-	return self.oldVersion.value()
+	return self.oldVersion()
 
     def getNewVersion(self):
-	return self.newVersion.value()
+	return self.newVersion()
 
     # path and/or version can be None
     def changedFile(self, pathId, path, fileId, version):
@@ -990,7 +990,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
             fileobj = files.ThawFile(change, pathId)
             
 	    if isinstance(fileobj, files.SymbolicLink):
-		name = "%s -> %s" % (path, fileobj.target.value())
+		name = "%s -> %s" % (path, fileobj.target())
 	    else:
 		name = path
 	    
@@ -1027,10 +1027,10 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         self.isRedirect.set(val)
 
     def getIsRedirect(self):
-        return self.isRedirect.value()
+        return self.isRedirect()
 
     def getProvides(self):
-        p = self.provides.value()
+        p = self.provides()
         if not p:
             return None
         return p
@@ -1039,16 +1039,16 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	self.requires.set(requires)
 
     def getRequires(self):
-        r = self.requires.value()
+        r = self.requires()
         if not r:
             return None
         return r
 
     def getOldFlavor(self):
-        return self.oldFlavor.value()
+        return self.oldFlavor()
 
     def getNewFlavor(self):
-        return self.newFlavor.value()
+        return self.newFlavor()
 
 class TroveChangeSet(AbstractTroveChangeSet):
 
@@ -1084,7 +1084,7 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
 	# we can't represent the different between an empty flavor and
         # no flavor; the oldFlavor is the only place this matters, and
         # we can infer the answer from oldVersion
-        if self.oldVersion.value() is None:
+        if self.oldVersion() is None:
 	    self.oldFlavor.set(None)
 	
 class TroveError(Exception):

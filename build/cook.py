@@ -476,7 +476,7 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
             size += fileObj.contents.size()
 
 	if fileObj.hasContents:
-	    flavor.union(fileObj.flavor.value())
+	    flavor.union(fileObj.flavor())
 	changeSet.addFile(None, fileId, fileObj.freeze())
 
 	# since the file is already in the repository (we just got it from

@@ -120,7 +120,7 @@ def printFile(fileObj, path, prefix='', verbose=True, tags=False, sha1s=False,
     id = ''
 
     if verbose and isinstance(fileObj, files.SymbolicLink):
-        name = "%s -> %s" % (path, fileObj.target.value())
+        name = "%s -> %s" % (path, fileObj.target())
     else:
         name = path
     if tags and fileObj.tags:

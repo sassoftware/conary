@@ -58,7 +58,7 @@ class NumericStream(InfoStream):
     def __deepcopy__(self, mem):
         return self.__class__.thaw(self, self.freeze())
 
-    def value(self):
+    def __call__(self):
 	return self.val
 
     def set(self, val):
@@ -111,15 +111,9 @@ class ByteStream(NumericStream):
 
     format = "!B"
 
-class ShortStream(NumericStream):
-
-    format = "!H"
-
-class IntStream(NumericStream):
-
-    __slots__ = ( "val", )
-
-    format = "!I"
+from lib import cstreams
+IntStream = cstreams.IntStream
+ShortStream = cstreams.ShortStream
 
 class MtimeStream(NumericStream):
 
@@ -145,7 +139,7 @@ class StringStream(InfoStream):
 
     __slots__ = "s"
 
-    def value(self):
+    def __call__(self):
 	return self.s
 
     def set(self, val):
@@ -153,9 +147,6 @@ class StringStream(InfoStream):
 	self.s = val
 
     def freeze(self, skipSet = None):
-	return self.s
-
-    def asString(self):
 	return self.s
 
     def diff(self, them):
@@ -239,7 +230,7 @@ class FrozenVersionStream(InfoStream):
 
     __slots__ = "v"
 
-    def value(self):
+    def __call__(self):
 	return self.v
 
     def set(self, val):
@@ -287,7 +278,7 @@ class DependenciesStream(InfoStream):
 
     __slots__ = 'deps'
 
-    def value(self):
+    def __call__(self):
 	return self.deps
 
     def set(self, val):

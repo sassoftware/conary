@@ -1387,7 +1387,7 @@ class Requires(_addInfo):
         if path not in pkg.requiresMap:
             return
         f.requires.set(pkg.requiresMap[path])
-        pkg.requires.union(f.requires.value())
+        pkg.requires.union(f.requires())
     
     def _markManualRequirement(self, info, path, pkg):
         if self._checkInclusion(info, path):
@@ -1490,7 +1490,7 @@ class Provides(policy.Policy):
             if path not in pkg.providesMap:
                 return
             f.provides.set(pkg.providesMap[path])
-            pkg.provides.union(f.provides.value())
+            pkg.provides.union(f.provides())
 
         elif path in pkg.providesMap:
             del pkg.providesMap[path]
@@ -1588,7 +1588,7 @@ class Flavor(policy.Policy):
         # all troves need to share the same flavor so that we can
         # distinguish them later
         for pkg in pkgMap.values():
-            pkg.flavor.union(f.flavor.value())
+            pkg.flavor.union(f.flavor())
 
 
 

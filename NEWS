@@ -1,3 +1,7 @@
+Changes in 0.50.5:
+  * Streams return their value through __call__ instead of value()
+  * Reimplemented ShortStream and IntStream in C
+
 Changes in 0.50.4:
   * Most rollback information is stored as a reference to a repository
     instead of storing full rollback data on the local system. The

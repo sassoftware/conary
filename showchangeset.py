@@ -186,14 +186,14 @@ def printChangedFile(indent, f, path, oldF, oldPath, tags=False, sha1s=False, pa
     mode = owner = group = size = time = name = ''
     if path != None:
         if isinstance(f, files.SymbolicLink):
-            name = "%s -> %s" % (path, f.target.value())
+            name = "%s -> %s" % (path, f.target())
         else:
             name = path
     elif isinstance(f, files.SymbolicLink):
         if not isinstance(oldF, files.SymbolicLink):
-            name = "%s -> %s" % (oldPath, f.target.value())
-        elif f.target.value() != oldF.target.value():
-                name = "%s -> %s" % (oldPath, f.target.value())
+            name = "%s -> %s" % (oldPath, f.target())
+        elif f.target() != oldF.target():
+                name = "%s -> %s" % (oldPath, f.target())
     space = ''
     if pathIds and pathId:
         space += ' '*33

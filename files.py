@@ -59,13 +59,13 @@ class DeviceStream(streams.TupleStream):
     makeup = (("major", streams.IntStream, 4), ("minor", streams.IntStream, 4))
 
     def major(self):
-        return self.items[0].value()
+        return self.items[0]()
 
     def setMajor(self, value):
         return self.items[0].set(value)
 
     def minor(self):
-        return self.items[1].value()
+        return self.items[1]()
 
     def setMinor(self, value):
         return self.items[1].set(value)
@@ -121,13 +121,13 @@ class RegularFileStream(streams.TupleStream):
 	      ("sha1", streams.Sha1Stream, 20))
 
     def size(self):
-        return self.items[0].value()
+        return self.items[0]()
 
     def setSize(self, value):
         return self.items[0].set(value)
 
     def sha1(self):
-        return self.items[1].value()
+        return self.items[1]()
 
     def setSha1(self, value):
         return self.items[1].set(value)
@@ -147,25 +147,25 @@ class InodeStream(streams.TupleStream):
 	      ("group", streams.StringStream, "B"))
 
     def perms(self):
-        return self.items[0].value()
+        return self.items[0]()
 
     def setPerms(self, value):
         return self.items[0].set(value)
 
     def mtime(self):
-        return self.items[1].value()
+        return self.items[1]()
 
     def setMtime(self, value):
         return self.items[1].set(value)
 
     def owner(self):
-        return self.items[2].value()
+        return self.items[2]()
 
     def setOwner(self, value):
         return self.items[2].set(value)
 
     def group(self):
-        return self.items[3].value()
+        return self.items[3]()
 
     def setGroup(self, value):
         self.items[3].set(value)
@@ -232,9 +232,10 @@ class InodeStream(streams.TupleStream):
 
     eq = __eq__
 
-class FlagsStream(streams.IntStream):
+class FlagsStream(streams.NumericStream):
 
     __slots__ = "val"
+    format = "!I"
 
     def isConfig(self, set = None):
 	return self._isFlag(_FILE_FLAG_CONFIG, set)
@@ -384,13 +385,13 @@ class SymbolicLink(File):
     __slots__ = [ "target", "requires" ]
 
     def sizeString(self):
-	return "%8d" % len(self.target.value())
+	return "%8d" % len(self.target())
 
     def restore(self, fileContents, root, target, journal=None):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         util.mkdirChain(os.path.dirname(target))
-	os.symlink(self.target.value(), target)
+	os.symlink(self.target(), target)
         # utime() follows symlinks and Linux currently does not implement
         # lutimes()
 	File.restore(self, root, target, skipMtime=True, journal=journal)
@@ -579,7 +580,7 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False):
 		     and (not s.st_size or
 			  (possibleMatch.hasContents and
 			   s.st_size == possibleMatch.contents.size())):
-        f.flags.set(possibleMatch.flags.value())
+        f.flags.set(possibleMatch.flags())
         return possibleMatch
 
     if needsSha1:

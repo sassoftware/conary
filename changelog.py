@@ -28,27 +28,27 @@ class AbstractChangeLog(streams.TupleStream):
 	       ("message", streams.StringStream, "!H") )
 
     def getName(self):
-	return self.items[0].value()
+	return self.items[0]()
 
     def setName(self, value):
 	return self.items[0].set(value)
 
     def getContact(self):
-	return self.items[1].value()
+	return self.items[1]()
 
     def setContact(self, value):
 	return self.items[1].set(value)
 
     def getMessage(self):
-	return self.items[2].value()
+	return self.items[2]()
 
     def setMessage(self, value):
 	assert(not value or value[-1] == '\n')
 	return self.items[2].set(value)
 
     def freeze(self, skipSet = None):
-	if self.items[0].value() or self.items[1].value() or \
-	   self.items[2].value():
+	if self.items[0]() or self.items[1]() or \
+	   self.items[2]():
 	    return streams.TupleStream.freeze(self)
 	else:
 	    return ""

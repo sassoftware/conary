@@ -26,11 +26,12 @@ python_files=	    __init__.py		\
 		    stackutil.py	\
 		    util.py
 
-python_modules=elfmodule.so miscmodule.so
+python_modules=elfmodule.so miscmodule.so cstreamsmodule.so
 elfmodule_objs=elf.o
 miscmodule_objs=misc.o
-generated_files=$(elfmodule_objs) $(miscmodule_objs) $(python_modules)
-dist_files = $(python_files) elf.c misc.c Makefile
+cstreamsmodule_objs=cstreams.o
+generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules)
+dist_files = $(python_files) elf.c misc.c cstreams.c Makefile
 
 
 all: $(python_modules)
@@ -39,6 +40,9 @@ elfmodule.so: $(elfmodule_objs)
 	$(CC) -shared -o $@ $< -lelf
 
 miscmodule.so: $(miscmodule_objs)
+	$(CC) -shared -o $@ $< -lelf
+
+cstreamsmodule.so: $(cstreamsmodule_objs)
 	$(CC) -shared -o $@ $< -lelf
 
 install: pyfiles-install

@@ -235,8 +235,8 @@ class FilesystemJob:
                 fileObj.restore(contents, self.root, target, journal=journal)
                 del delayedRestores[match[0]]
 
-                if fileObj.hasContents and fileObj.linkGroup.value():
-                    linkGroup = fileObj.linkGroup.value()
+                if fileObj.hasContents and fileObj.linkGroup():
+                    linkGroup = fileObj.linkGroup()
                     self.linkGroups[linkGroup] = target
 
                 continue
@@ -254,11 +254,11 @@ class FilesystemJob:
                     # take the config file from the local database
                     contents = self.repos.getFileContents(
                                     [ (None, None, fileObj) ])[0]
-                elif fileObj.linkGroup.value() and \
-                        self.linkGroups.has_key(fileObj.linkGroup.value()):
+                elif fileObj.linkGroup() and \
+                        self.linkGroups.has_key(fileObj.linkGroup()):
                     # this creates links whose target we already know
                     # (because it was already present or already restored)
-                    if self._createLink(fileObj.linkGroup.value(), target):
+                    if self._createLink(fileObj.linkGroup(), target):
                         continue
                 else:
                     contType, contents = self.changeSet.getFileContents(pathId)
@@ -281,8 +281,8 @@ class FilesystemJob:
                 ptrTargets[pathId] = target
 	    log.debug(msg, target)
 
-            if fileObj.hasContents and fileObj.linkGroup.value():
-                linkGroup = fileObj.linkGroup.value()
+            if fileObj.hasContents and fileObj.linkGroup():
+                linkGroup = fileObj.linkGroup()
                 self.linkGroups[linkGroup] = target
 
 	for (pathId, fileObj, target, msg, ptrId) in delayedRestores:
@@ -293,13 +293,13 @@ class FilesystemJob:
             # yet (it could be in the delayedRestore list itself). that's
             # fine; we just restore the contents here and make the links
             # for everything else
-            if fileObj.linkGroup.value():
-                linkGroup = fileObj.linkGroup.value()
+            if fileObj.linkGroup():
+                linkGroup = fileObj.linkGroup()
                 if self.linkGroups.has_key(linkGroup):
-                    if self._createLink(fileObj.linkGroup.value(), target):
+                    if self._createLink(fileObj.linkGroup(), target):
                         continue
                 else:
-                    linkGroup = fileObj.linkGroup.value()
+                    linkGroup = fileObj.linkGroup()
                     self.linkGroups[linkGroup] = target
 
             fileObj.restore(filecontents.FromFilesystem(ptrTargets[ptrId]),
@@ -646,7 +646,7 @@ class FilesystemJob:
             # link groups come from the database; they aren't inferred from
             # the filesystem
             if fsFile.hasContents and baseFile.hasContents:
-                fsFile.linkGroup.set(baseFile.linkGroup.value())
+                fsFile.linkGroup.set(baseFile.linkGroup())
 
             # now assemble what the file is supposed to look like on head
             headChanges = changeSet.getFileChange(baseFileId, headFileId)
@@ -834,11 +834,11 @@ class FilesystemJob:
 		else:
 		    self.errors.append("file contents conflict for %s" % realPath)
 		    contentsOkay = False
-            elif headFile.hasContents and headFile.linkGroup.value():
+            elif headFile.hasContents and headFile.linkGroup():
                 # the contents haven't changed, but the link group has changed.
                 # we want to let files in that link group hard link to this file
                 # (if appropriate)
-                self._registerLinkGroup(headFile.linkGroup.value(), realPath)
+                self._registerLinkGroup(headFile.linkGroup(), realPath)
 
 	    if attributesChanged and not beenRestored:
 		self._restore(fsFile, realPath, 
@@ -1064,16 +1064,16 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 
         # the link group doesn't change due to local mods
         if srcFile.hasContents and f.hasContents:
-            f.linkGroup.set(srcFile.linkGroup.value())
+            f.linkGroup.set(srcFile.linkGroup())
 
         # these values are not picked up from the local system
         if hasattr(f, 'requires') and hasattr(srcFile, 'requires'):
-            f.requires.set(srcFile.requires.value())
+            f.requires.set(srcFile.requires())
         if srcFile.hasContents and f.hasContents:
-            f.provides.set(srcFile.provides.value())
-        f.flags.set(srcFile.flags.value())
+            f.provides.set(srcFile.provides())
+        f.flags.set(srcFile.flags())
         if srcFile.hasContents and f.hasContents:
-            f.flavor.set(srcFile.flavor.value())
+            f.flavor.set(srcFile.flavor())
         f.tags = srcFile.tags.copy()
 
 	extension = path.split(".")[-1]
