@@ -11,6 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import traceback
+
 from metadata import MDClass
 from fmtroves import TroveCategories, LicenseCategories
 
@@ -25,6 +27,13 @@ div.formHeader {
 
 div.warning {
     color: red;
+}
+
+div.tbHeader {
+    font-size: 150%;
+    color: white;
+    background-color: red;
+    font-weight: bold;
 }
 
 h2 {
@@ -99,7 +108,7 @@ hr {
 </body></html>""")
 
     def htmlPickTrove(self, troveList=[], action="chooseBranch"):
-        troveSelection = self._genSelect(troveList, "troveNameList", size=12, expand="50%")
+        troveSelection = self.makeSelect(troveList, "troveNameList", size=12, expand="50%")
 
         self.writeFn("""
 <form action="/%s" method="post">
@@ -110,7 +119,7 @@ hr {
         """ % (action, troveSelection))
        
     def htmlPickBranch(self, troveName, branchList, action="getMetadata"):
-        branchSelection = self._genSelect(branchList, "branch")
+        branchSelection = self.makeSelect(branchList, "branch")
 
         self.writeFn("""
 <form method="post" action="%s">
@@ -235,6 +244,15 @@ Choose a branch: %s
         s += """</select>"""
 
         return s
+
+    def stackTrace(self, wfile):
+        self.setWriter(wfile.write)
+        self.htmlHeader("Server Error")
+        wfile.write("""<div class="tbHeader">Server Error</div>""")
+        wfile.write("<pre>")
+        traceback.print_exc(file = wfile)
+        wfile.write("</pre>")
+        self.htmlFooter()
 
     def setWriter(self, writeFn):
         self.writeFn = writeFn

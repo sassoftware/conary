@@ -17,6 +17,13 @@ import xml.parsers.expat
 from htmlengine import HtmlEngine
 from metadata import MDClass
 
+class ServerError(Exception):
+    def __str__(self):
+        return self.str
+        
+class InvalidServerCommand(ServerError):
+    str = """Invalid command passed to server."""
+
 class HttpHandler(HtmlEngine):
     def __init__(self, repServer):
         self.repServer = repServer
@@ -39,8 +46,7 @@ class HttpHandler(HtmlEngine):
             handler = self.commands[cmd][0]
             pageTitle = self.commands[cmd][1]
         else:
-            handler = self.invalidCmd
-            pageTitle = "Invalid Command"
+            raise InvalidServerCommand
 
         self.htmlHeader(pageTitle)
         handler(authToken, fields)
