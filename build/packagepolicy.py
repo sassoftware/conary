@@ -1177,7 +1177,9 @@ class Requires(_addInfo):
     such as example shell scripts outside C{%(docdir)s},
     C{r.Requires(exceptions=I{filterexp})}
     and to add a requirement manually,
-    C{r.Requires('foo', I{filterexp})}
+    C{r.Requires('I{foo}', I{filterexp})} where C{'I{foo}'} can be
+    C{'I{/path/to/file}'} or C{'I{packagename}:I{component}'} (components
+    are the only troves that can be required).
     """
     invariantexceptions = (
 	'%(docdir)s/',
