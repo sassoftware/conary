@@ -34,7 +34,7 @@ class SourceState(package.Trove):
 	f = open(filename, "w")
 	f.write("name %s\n" % self.name)
 	if self.version:
-	    f.write("version %s\n" % self.version.asString())
+	    f.write("version %s\n" % self.version.freeze())
 	f.write(self.freezeFileList())
 
     def changeBranch(self, branch):
@@ -72,7 +72,7 @@ class SourceStateFromFile(SourceState):
 	    assert(len(fields) == 2)
 	    assert(fields[0] == what)
 	    if isBranch:
-		rc.append(versions.VersionFromString(fields[1]))
+		rc.append(versions.ThawVersion(fields[1]))
 	    else:
 		rc.append(fields[1])
 
