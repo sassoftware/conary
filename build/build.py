@@ -136,7 +136,7 @@ class Automake(BuildCommand):
 
 class Configure(BuildCommand):
     """Runs an autoconf configure script, giving it the default paths as
-    defined by the macro set: C{r.Configure()}
+    defined by the macro set: C{r.Configure(I{extra args})}
     
     It provides many common arguments, set correctly to
     values provided by system macros.  If any of these arguments do
@@ -207,7 +207,7 @@ class ManualConfigure(Configure):
     """
     Works exactly like the C{Configure} class,
     except that all the arguments to the configure script have to be
-    provided explicitly: C{r.ManualConfigure('--limited-args')}
+    provided explicitly: C{r.ManualConfigure(I{'--limited-args'})}
 
     No arguments are given beyond those explicitly provided.
     """
@@ -217,7 +217,7 @@ class ManualConfigure(Configure):
 
 class Make(BuildCommand):
     """
-    Runs the make utility with system defaults: C{r.Make('makeargs')}
+    Runs the make utility with system defaults: C{r.Make(I{makeargs})}
 
     It sets C{CFLAGS}, C{LDFLAGS}, C{CXXFLAGS}, etc. as environment
     variables to the system defaults, and also uses the system default
@@ -279,7 +279,7 @@ class MakeParallelSubdir(Make):
     """
     Runs the make utility like C{Make}, but with system default for
     parallelmflags only applied to sub-make processes:
-    C{r.MakeParallelSubdir('makeargs')}
+    C{r.MakeParallelSubdir(I{makeargs})}
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
@@ -292,7 +292,7 @@ class MakeParallelSubdir(Make):
 class MakeInstall(Make):
     """
     Like the Make class, except that it automatically sets C{DESTDIR}
-    and provides the C{install} target: C{r.MakeInstall('makeargs')}
+    and provides the C{install} target: C{r.MakeInstall(I{makeargs})}
 
     If your package does not have C{DESTDIR} or an analog, use 
     C{MakePathsInstall} instead, or as a last option, C{Make}.
@@ -321,7 +321,7 @@ class MakePathsInstall(Make):
     Used when there is no single functional C{DESTDIR} or similar definition,
     but enough of the de-facto standard variables (C{prefix}, C{bindir}, etc)
     are honored by the Makefile to make a destdir installation successful:
-    C{r.MakePathsInstall('makeargs')}
+    C{r.MakePathsInstall(I{makeargs})}
     """
     template = (
 	'cd %%(builddir)s/%(subDir)s; '
@@ -350,7 +350,7 @@ class MakePathsInstall(Make):
 class CompilePython(BuildCommand):
     """
     Builds compiled and optimized compiled python files:
-    C{r.CompilePython('/dir1', '/dir2')}
+    C{r.CompilePython(I{/dir1}, I{/dir2})}
     """
     template = (
 	"""python -c 'from compileall import *; compile_dir("""
@@ -372,7 +372,7 @@ class CompilePython(BuildCommand):
 
 class Ldconfig(BuildCommand):
     """
-    Runs C{ldconfig}: C{r.Ldconfig('/dir1')}
+    Runs C{ldconfig}: C{r.Ldconfig(I{/dir1})}
 
     Used mainly when a package does not set up all the appropriate
     symlinks for a library.  Conary packages should include all the
@@ -438,7 +438,7 @@ class Desktopfile(BuildCommand, _FileAction):
     """
     Used to provide category (and vendor, if necessary) for files in
     C{/usr/share/applications/}, if the target has enabled building
-    desktop files: C{r.Desktopfile('filename')}
+    desktop files: C{r.Desktopfile(I{filename})}
 
     It also enforces proper build requirements for desktop files.
     """
