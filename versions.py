@@ -225,10 +225,8 @@ class Version:
 	are appended to the branch this object represented. The time
 	stamp is reset as a new version has been created.
 
-	@param version: object for the version and release
-	@type version: VersionRelease
-	@param release: release number
-	@type release: int
+	@param verRel: object for the version and release
+	@type verRel: VersionRelease
 	"""
 	assert(self.isBranch())
 	self.versions.append(verRel)
