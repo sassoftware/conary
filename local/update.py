@@ -40,7 +40,7 @@ class FilesystemJob:
 
     def _restore(self, fileObj, target, contents, msg):
 	self.restores.append((fileObj, target, contents, msg))
-	self.runLdconfig = 1 | fileObj.isShLib()
+	self.runLdconfig = self.runLdconfig | fileObj.isShLib()
 
     def _remove(self, fileObj, target, msg):
 	self.removes[target] = (fileObj, msg)
