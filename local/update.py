@@ -31,6 +31,7 @@ import files
 from lib import log
 import os
 from lib import patch
+from lib import sha1helper
 import stat
 import sys
 import tempfile
@@ -762,9 +763,14 @@ class FilesystemJob:
 			diff = headFileContents.get().readlines()
 			(newLines, failedHunks) = patch.patch(baseLines, diff)
 			assert(not failedHunks)
-			headFileContents = \
-			    filecontents.FromString("".join(newLines))
+                        newContents = "".join(newLines)
+			headFileContents = filecontents.FromString(newContents)
 
+                        # now set the sha1 and size of the fsFile's
+                        # contents to match what will be on the system
+                        # once this is applied
+                        fsFile.contents.setSha1(sha1helper.sha1String(newContents))
+                        fsFile.contents.setSize(len(newContents))
 			self._restore(fsFile, realPath, 
 				      "replacing %s with contents "
 				      "from repository",
@@ -773,6 +779,7 @@ class FilesystemJob:
                         # switch the fsFile to the sha1 for the new file
                         if fsFile.hasContents:
                             fsFile.contents.setSha1(headFile.contents.sha1())
+                            fsFile.contents.setSize(headFile.contents.size())
 			self._restore(fsFile, realPath, 
 				      "replacing %s with contents "
 				      "from repository")
@@ -807,6 +814,7 @@ class FilesystemJob:
 			(newLines, failedHunks) = patch.patch(cur, diff)
 
 			cont = filecontents.FromString("".join(newLines))
+                        # XXX update fsFile.contents.{sha1,size}?
 			self._restore(fsFile, realPath, 
 			      "merging changes from repository into %s",
 			      contentsOverride = cont)
