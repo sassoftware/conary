@@ -15,6 +15,7 @@ the permissions on files in classes derived from _PutFile.
 import os
 import util
 import string
+import glob
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
@@ -32,7 +33,7 @@ class BuildAction(util.Action):
 	"""
 	@param use: Optional argument; Use flag(s) telling whether
 	to actually perform the action.
-	@type use: None, Use flag, or tuple/list of Use flags
+	@type use: None, Use flag, or sequence of Use flags
 	"""
 	# enforce pure virtual status
         assert(self.__class__ is not BuildCommand)
@@ -133,8 +134,10 @@ class Configure(BuildCommand):
 		'subDir': ''}
 
     def __init__(self, *args, **keywords):
-        """Create a new Configure instance used to run the autoconf configure
+        """
+        Create a new Configure instance used to run the autoconf configure
         command with default parameters
+
         @keyword objDir: make an object directory before running configure.
         This is useful for applications which do not support running configure
         from the same directory as the sources (srcdir != objdir)
@@ -231,16 +234,18 @@ class _PutFiles(BuildAction):
 	for fromFile in self.fromFiles:
 	    sources = (self.source + fromFile) %macros
 	    sourcelist = util.braceGlob(sources)
-	    if dest[-1:] != '/' and len(sourcelist) > 1:
-		raise TypeError, 'singleton destination %s requires singleton source'
+	    if not os.path.isdir(dest) and len(sourcelist) > 1:
+		raise TypeError, 'multiple files specified, but destination "%s" is not a directory'
 	    for source in sourcelist:
 		thisdest = dest
-		if dest[-1:] == '/':
+                if os.path.isdir(dest):
 		    thisdest = dest + os.path.basename(source)
+
 		if self.move:
 		    util.rename(source, thisdest)
 		else:
 		    util.copyfile(source, thisdest)
+
 		if self.mode >= 0:
 		    os.chmod(thisdest, self.mode)
 
@@ -273,44 +278,90 @@ class MoveFiles(_PutFiles):
 	self.move = 1
 
 class InstallSymlinks(BuildAction):
-
+    """
+    The InstallSymlinks class create symlinks.  Multiple symlinks
+    can be created if the destination path is a directory.  The
+    destination path is determined to be a directory if it already
+    exists or if the path ends with the directory separator character
+    ("/" on UNIX systems)
+    """
     def do(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
-	util.mkdirChain(os.path.dirname(dest))
 
-	if self.toFile.endswith('/'):
-	    # only if toFiles ends in / can fromFile be brace-expanded
-	    if type(self.fromFiles) is str:
-		self.fromFiles = (self.fromFiles,)
-	    sources = []
-	    for fromFile in self.fromFiles:
-		sources.extend(util.braceExpand(fromFile %macros))
+        if dest.endswith(os.sep):
+            util.mkdirChain(dest)
+        else:
+            util.mkdirChain(os.path.dirname(dest))
 
-	if type(self.fromFiles) is str:
-	    if self.toFile.endswith('/'):
-		dest = dest + os.path.basename(self.fromFiles)
-            source = self.fromFiles %macros
-	    print '+ creating symlink %s -> %s' %(dest, source)
-	    if os.path.exists(dest) or os.path.islink(dest):
-		os.remove(dest)
-	    os.symlink(source, dest)
-	    return
+        targetIsDir = os.path.isdir(dest)
+        if targetIsDir:
+            destdir = dest
+        else:
+            destdir = os.path.dirname(dest)
 
-	for source in sources:
-	    dest = macros['destdir'] + (self.toFile + os.path.basename(source)) %macros 
-	    print '+ creating symlink %s -> %s' %(dest, source)
-	    if os.path.exists(dest) or os.path.islink(dest):
-		os.remove(dest)
-	    os.symlink(source, dest)
+        if type(self.fromFiles) is str:
+            self.fromFiles = (self.fromFiles,)
 
-    def __init__(self, fromFiles, toFile, use=None):
+        sources = []
+        for fromFile in self.fromFiles:
+            sources.extend(util.braceExpand(fromFile %macros))
+
+        # do glob expansion and path verification on all of the source paths
+        expandedSources = []
+        for source in sources:
+            # if the symlink contains a /, concatenate in order to glob
+            if source.startswith(os.sep):
+                expand = macros['destdir'] + source
+            else:
+                expand = destdir + os.sep + source
+            sources = glob.glob(expand)
+            if not sources and not self.allowDangling:
+                raise TypeError, 'symlink to "%s" would be dangling' %source
+            for expanded in sources:
+                if os.sep in source:
+                    expandedSources.append(os.path.dirname(source) + os.sep +
+                                           os.path.basename(expanded))
+                else:
+                    expandedSources.append(os.path.basename(expanded))
+        sources = expandedSources
+        
+        if len(sources) > 1 and not targetIsDir:
+            raise TypeError, 'creating multiple symlinks, but destination is not a directory'
+
+        for source in sources:
+            if targetIsDir:
+                to = dest + os.sep + os.path.basename(source)
+            else:
+                to = dest
+	    if os.path.exists(to) or os.path.islink(to):
+		os.remove(to)
+            print '+ creating symlink %s -> %s' %(to, source)
+	    os.symlink(source, to)
+
+    def __init__(self, fromFiles, toFile, use=None, allowDangling=False):
+        """
+        Create a new InstallSymlinks instance
+
+        @param fromFiles: paths(s) to which symlink(s) will be created
+        @type fromFiles: str or sequence of str
+        @param toFile: path to create the symlink, or a directory in which
+                       to create multiple symlinks
+        @type toFile: str
+	@param use: Optional argument; Use flag(s) telling whether
+	to actually perform the action.
+	@type use: None, Use flag, or sequence of Use flags
+        @param allowDangling: Optional argument; set to True to allow the
+        creation of dangling symlinks
+        @type allowDangling: bool
+        """
 	# raise error early
 	if type(fromFiles) is not str:
-	    if not toFile.endswith('/'):
+	    if not toFile.endswith('/') or os.path.isdir(toFile):
 		raise TypeError, 'too many targets for non-directory %s' %toFile
 	self.fromFiles = fromFiles
 	self.toFile = toFile
 	self.use = util.checkUse(use)
+        self.allowDangling = allowDangling
 
 class RemoveFiles(BuildAction):
 
