@@ -126,7 +126,7 @@ def magic(path, basedir=''):
             '# If it is, it will not operate correctly.') > 0:
             return ltwrapper(path, basedir, b)
         return script(path, basedir, _line(b))
-    elif len(b) > 4 and b[128:130] == "PE":
+    elif len(b) > 130 and b[128:130] == "PE":
         return CIL(path, basedir, b)
 
     return None
