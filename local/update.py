@@ -323,13 +323,12 @@ class FilesystemJob:
 		    if not conflicts:
 			attributesChanged = True
 		    else:
-			assert(0)
 			contentsOkay = False
 			self.errors.append("file attributes conflict for %s"
 						% realPath)
 		else:
 		    # this forces the change to apply
-		    fsFile.twm(headChanges, fsFile)
+		    fsFile.twm(headChanges, fsFile, skip = "contents")
 		    attributesChanged = True
 
 	    else:
