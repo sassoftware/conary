@@ -34,8 +34,11 @@ baseMacros = (
     ('lib'              , 'lib'),  # may be overridden with 'lib64'
     ('exec_prefix'	, '%(prefix)s'),
     ('bindir'		, '%(exec_prefix)s/bin'),
+    ('essentialbindir'	, '/bin'),
     ('sbindir'		, '%(exec_prefix)s/sbin'),
+    ('essentialsbindir'	, '/sbin'),
     ('libdir'		, '%(exec_prefix)s/%(lib)s'),
+    ('essentiallibdir'	, '/%(lib)s'),
     ('libexecdir'	, '%(exec_prefix)s/libexec'),
     ('localstatedir'	, '%(prefix)s/var'),
     ('sharedstatedir'	, '%(prefix)s/com'),
