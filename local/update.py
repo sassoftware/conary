@@ -24,24 +24,41 @@ class FilesystemJob:
     This is kept very simple to mimize the chance of mistakes or errors.
     """
 
-    def _rename(self, oldPath, newPath):
-	self.renames.append((oldPath, newPath))
+    def _rename(self, oldPath, newPath, msg):
+	self.renames.append((oldPath, newPath, msg))
 
-    def _restore(self, fileObj, target, contents):
-	self.restores.append((fileObj, target, contents))
+    def _restore(self, fileObj, target, contents, msg):
+	self.restores.append((fileObj, target, contents, msg))
 
-    def _remove(self, fileObj, target):
-	self.removes.append((fileObj, target))
+    def _remove(self, fileObj, target, msg):
+	self.removes.append((fileObj, target, msg))
+
+    def _createFile(self, target, str, msg):
+	self.newFiles.append((target, str, msg))
 
     def apply(self):
-	for (oldPath, newPath) in self.renames:
+	for (oldPath, newPath, msg) in self.renames:
 	    os.rename(oldPath, newPath)
+	    log.debug(msg)
 
-	for (fileObj, target, contents) in self.restores:
+	for (fileObj, target, contents, msg) in self.restores:
 	    fileObj.restore(contents, target, 1)
+	    log.debug(msg)
 
-	for (fileObj, target) in self.removes:
+	for (fileObj, target, msg) in self.removes:
 	    fileObj.remove(target)
+
+	for (target, str, msg) in self.newFiles:
+	    f = open(target, "w")
+	    f.write(str)
+	    f.close()
+	    log.debug(msg)
+
+    def getErrorList(self):
+	return self.errors
+
+    def getNewPackageList(self):
+	return self.newPackages
 
     def _singlePackage(self, repos, pkgCs, changeSet, basePkg, fsPkg, root):
 	"""
@@ -86,8 +103,8 @@ class FilesystemJob:
 		s = os.lstat(headRealPath)
 		if not isinstance(headFile, files.Directory) or \
 		   not stat.S_ISDIR(s.st_mode):
-		    log.error("%s is in the way of a newly created file" % 
-			      headRealPath)
+		    self.errors.append("%s is in the way of a newly " +
+			      "created file" % headRealPath)
 		    fullyUpdated = 0
 
 		# FIXME: this isn't the right directory handling
@@ -96,13 +113,13 @@ class FilesystemJob:
 	    except OSError:
 		pass
 
-	    log.debug("creating %s" % headRealPath)
 
 	    if headFile.hasContents:
 		headFileContents = changeSet.getFileContents(fileId)[1]
 	    else:
 		headFileContents = None
-	    self._restore(headFile, headRealPath, headFileContents)
+	    self._restore(headFile, headRealPath, headFileContents,
+	                  "creating %s" % headRealPath)
 	    fsPkg.addFile(fileId, headPath, headFileVersion)
 
 	for fileId in pkgCs.getOldFileList():
@@ -130,12 +147,11 @@ class FilesystemJob:
 	    oldFile = repos.getFileVersion(fileId, version)
 
 	    if not oldFile.same(localFile, ignoreOwner = True):
-		log.error("%s has changed but has been removed on head" % path)
+		self.errors.append("%s has changed but has been removed " +
+				   "on head" % path)
 		continue
 
-	    log.debug("removing %s" % path)	
-
-	    self._remove(oldFile, realPath)
+	    self._remove(oldFile, realPath, "removing %s" % path)	
 	    fsPkg.removeFile(fileId)
 
 	for (fileId, headPath, headFileVersion) in pkgCs.getChangedFileList():
@@ -160,15 +176,15 @@ class FilesystemJob:
 
 		if fsPath == basePath:
 		    # the path changed in the repository, propage that change
-		    log.debug("renaming %s to %s" % (fsPath, headPath))
-		    self._rename(rootFixup + fsPath, rootFixup + headPath)
+		    self._rename(rootFixup + fsPath, rootFixup + headPath,
+		                 "renaming %s to %s" % (fsPath, headPath))
 
 		    fsPkg.addFile(fileId, headPath, fsVersion)
 		    finalPath = headPath
 		else:
 		    pathOkay = 0
 		    finalPath = fsPath	# let updates work still
-		    log.error("path conflict for %s (%s on head)" % 
+		    self.errors.append("path conflict for %s (%s on head)" % 
 			      (fsPath, headPath))
 
 	    realPath = rootFixup + finalPath
@@ -186,8 +202,8 @@ class FilesystemJob:
 		    # a file which was not in the base package was created
 		    # on both the head of the branch and in the filesystem;
 		    # this can happen during source management
-		    log.error("new file %s conflicts with file on head of branch"
-				    % realPath)
+		    self.errors.append("new file %s conflicts with file on " +
+				    "head of branch" % realPath)
 		    contentsOkay = 0
 		else:
 		    baseFileVersion = basePkg.getFile(fileId)[1]
@@ -222,36 +238,36 @@ class FilesystemJob:
 		elif fsFile.same(baseFile, ignoreOwner = True):
 		    # the contents changed in just the repository, so take
 		    # those changes
-		    log.debug("replacing %s with contents from repository" % 
-				    realPath)
 		    assert(headFileContType == changeset.ChangedFileTypes.file)
-		    self._restore(headFile, realPath, headFileContents)
+		    self._restore(headFile, realPath, headFileContents,
+		       "replacing %s with contents from repository" % realPath)
 		elif fsFile.isConfig() or headFile.isConfig():
 		    # it changed in both the filesystem and the repository; our
 		    # only hope is to generate a patch for what changed in the
 		    # repository and try and apply it here
 		    if headFileContType != changeset.ChangedFileTypes.diff:
-			log.error("contents conflict for %s" % realPath)
+			self.errors.append("unexpected content type for %s" % 
+						realPath)
 			contentsOkay = 0
 		    else:
-			log.debug("merging changes from repository into %s" % realPath)
-			diff = headFileContents.get().readlines()
 			cur = open(realPath, "r").readlines()
+			diff = headFileContents.get().readlines()
 			(newLines, failedHunks) = patch.patch(cur, diff)
-
-			f = open(realPath, "w")
-			f.write("".join(newLines))
+				
+			self._createFile(realPath, "".join(newLines),
+			      "merging changes from repository into %s" % 
+			      realPath)
 
 			if failedHunks:
-			    log.warning("conflicts from merging changes from " +
-				"head into %s saved as %s.conflicts" % 
-				(realPath, realPath))
-			    failedHunks.write(realPath + ".conflicts", 
-					      "current", "head")
+			    self._createFile(realPath + ".conflicts", 
+				     failedHunks.asString(),
+			             "conflicts from merging changes from " +
+				     "head into %s saved as %s.conflicts" % 
+				     (realPath, realPath))
 
 			contentsOkay = 1
 		else:
-		    log.error("files conflict for %s" % realPath)
+		    self.errors.append("files conflict for %s" % realPath)
 		    contentsOkay = 0
 
 	    if pathOkay and contentsOkay:
@@ -268,9 +284,6 @@ class FilesystemJob:
 	    fsPkg.changeVersion(pkgCs.getNewVersion())
 
 	return fsPkg
-
-    def getNewPackageList(self):
-	return self.newPackages
 
     def __init__(self, repos, changeSet, fsPkgDict, root):
 	"""
@@ -292,6 +305,8 @@ class FilesystemJob:
 	self.restores = []
 	self.removes = []
 	self.newPackages = []
+	self.errors = []
+	self.newFiles = []
 
 	for pkgCs in changeSet.getNewPackageList():
 	    # skip over empty change sets
