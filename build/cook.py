@@ -13,13 +13,13 @@ from build import *
 import deps.deps
 from repository import changeset
 from repository import filecontents
+from repository import repository
 import files
 import helper
 import log
 from build import lookaside, use
 import os
 import package
-import repository
 import resource
 import sha1helper
 import signal
@@ -41,7 +41,11 @@ def _createComponent(repos, branch, bldPkg, ident):
     p.setProvides(bldPkg.provides)
 
     for (path, (realPath, f)) in bldPkg.iteritems():
-	(fileId, fileVersion) = ident(path)
+        if isinstance(f, files.RegularFile):
+            flavor = f.flavor
+        else:
+            flavor = None
+        (fileId, fileVersion) = ident(path, flavor)
 	f.id(fileId)
 
         if not fileVersion:
@@ -63,13 +67,15 @@ def _createComponent(repos, branch, bldPkg, ident):
     return (p, fileMap)
 
 class _IdGen:
-    def __call__(self, path):
-	if self.map.has_key(path):
-	    return self.map[path]
+    def __call__(self, path, flavor):
+	if self.map.has_key((path, flavor)):
+	    return self.map[(path, flavor)]
 
-	hash = sha1helper.hashString("%s %f %s" % (path, time.time(), 
-							self.noise))
-	self.map[path] = (hash, None)
+        if flavor is not None:
+            flavor = flavor.freeze()
+	hash = sha1helper.hashString("%s %f %s %s" % (path, time.time(), 
+                                                      self.noise, flavor))
+	self.map[(path, flavor)] = (hash, None)
 	return (hash, None)
 
     def __init__(self, map=None):
@@ -82,27 +88,14 @@ class _IdGen:
         else:
             self.map = map
 
-    def populate(self, repos, lcache, pkg):
+    def populate(self, repos, pkg):
 	# Find the files and ids which were owned by the last version of
-	# this package on the branch. We also construct an object which
-	# lets us look for source files this build needs inside of the
-	# repository
-        isSource = pkg.getName().endswith(':source')
-	for (fileId, path, version) in pkg.iterFileList():
-            # don't include fileIds from the :source component in
-            # the id hash
-            if not isSource:
-                self.map[path] = (fileId, version)
-	    if path[0] != "/":
-		# we might need to retrieve this source file
-		# to enable a build, so we need to find the
-		# sha1 hash of it since that's how it's indexed
-		# in the file store
-		f = repos.getFileVersion(fileId, version)
-                # it only makes sense to fetch regular files, skip
-                # anything that isn't
-                if isinstance(f, files.RegularFile):
-                    lcache.addFileHash(path, f.contents.sha1())
+	# this package on the branch.
+        for f in repos.iterFilesInTrove(pkg.getName(), pkg.getVersion(),
+                                        pkg.getFlavor(), withFiles=True):
+            fileId, path, version, fileObj = f
+            self.map[(path, fileObj.flavor)] = (fileId, version)
+# -------------------- public below this line -------------------------
 
 def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None, 
 	       prep=True, macros={}):
@@ -203,7 +196,7 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     for (name, versionList) in recipeObj.getTroveList().iteritems():
 	d[name] = versionList
 
-    d = repos.getTroveVersionFlavors(d)
+    d = repos.getTroveFlavorsVersion(d)
 
     for (name, subd) in d.iteritems():
 	for (v, flavorList) in subd.iteritems():
@@ -306,27 +299,25 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 		cfg.sourcepath % {'pkgname': recipeClass.name} ]
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
 
-    # build up the name->fileid mapping so we reuse fileids wherever
-    # possible; we do this by looking in the database for a pacakge
-    # with the same name as the recipe and recursing through it's
-    # subpackages; this mechanism continues to work as subpackages
-    # come and go. this has to happen early as we build up the entries
-    # for the source lookaside cache simultaneously
-
-    ident = _IdGen()
-    for pkgName in (fullName, fullName + ':source'):
-        if repos.hasPackage(pkgName):
-            pkgList = [ (pkgName, 
-                        repos.getTroveLatestVersion(pkgName, buildBranch),
-			None) ]
-            while pkgList:
-                (name, version, flavor) = pkgList[0]
-                del pkgList[0]
-                if not version: continue
-
-                pkg = repos.getTrove(name, version, flavor)
-                pkgList += [ x for x in pkg.iterTroveList() ]
-                ident.populate(repos, lcache, pkg)
+    # populate the repository source lookaside cache from the :source component
+    srcName = fullName + ':source'
+    try:
+        srcVersion = repos.getTroveLatestVersion(srcName, buildBranch)
+    except repository.PackageMissing:
+        srcVersion = None
+    if srcVersion:
+        for f in repos.iterFilesInTrove(srcName, srcVersion, None,
+                                        withFiles=True):
+            fileId, path, version, fileObj = f
+            assert(path[0] != "/")
+            # we might need to retrieve this source file
+            # to enable a build, so we need to find the
+            # sha1 hash of it since that's how it's indexed
+            # in the file store
+            if isinstance(fileObj, files.RegularFile):
+                # it only makes sense to fetch regular files, skip
+                # anything that isn't
+                lcache.addFileHash(path, fileObj.contents.sha1())
 
     builddir = cfg.buildpath + "/" + recipeObj.name
 
@@ -365,6 +356,25 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 
     pkgList = []
 
+    # build up the name->fileid mapping so we reuse fileids wherever
+    # possible; we do this by looking in the database for a trove
+    # with the same name as the recipe and recursing through it's
+    # subpackages; this mechanism continues to work as subpackages
+    # come and go.
+    ident = _IdGen()
+    try:
+        versionList = repos.getTroveFlavorsLatestVersion(grpName, buildBranch)
+    except repository.PackageNotFound:
+        versionList = []
+    troveList = [ (grpName, x[0], x[1]) for x in versionList ]
+    #print "got trovelist", troveList
+    while troveList:
+        troves = repos.getTroves(troveList)
+        troveList = []
+        for trove in troves:
+            ident.populate(repos, trove)
+            troveList += [ x for x in pkg.iterTroveList() ]
+
     for buildPkg in recipeObj.getPackages(newVersion):
 	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, ident)
 
@@ -391,8 +401,6 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     changeSet.newPackage(grpDiff)
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
-
-# -------------------- public below this line -------------------------
 
 def cookItem(repos, cfg, item, prep=0, macros={}):
     """
@@ -447,7 +455,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}):
                             prep = prep, macros = macros)
         if troves:
             built = (tuple(troves), changeSetFile)
-    except repository.repository.RepositoryError, e:
+    except repository.RepositoryError, e:
         raise CookError(str(e))
 
     return built
@@ -522,4 +530,4 @@ def cookCommand(cfg, args, prep, macros):
 def makeFileId(*args):
     assert(args)
     str = "".join(args)
-    return _IdGen()(str)[0]
+    return _IdGen()(str, None)[0]
