@@ -456,6 +456,26 @@ class PackageChangeSet:
 	    self.packages[name] = []
 	self.packages[name].append(('+', version))
 
+    def updateChangedPackage(self, name, old, new):
+	"""
+	Removes package name, version old from the changed list and
+	adds package name, version new to the list (with the same 
+	change type).
+
+	@param name: name of the package
+	@type name: str
+	@param old: version to remove from the changed list
+	@type old: versions.VersionString
+	@param new: version to add to the changed list
+	@type new: versions.VersionString
+	"""
+	for (theName, list) in self.packages.iteritems():
+	    if theName != name: continue
+	    for (i, (change, ver)) in enumerate(list):
+		if ver.equal(old):
+		    list[i] = (change, new)
+		    return
+
     def oldPackageVersion(self, name, version):
 	"""
 	Adds a version of a package which appeared in oldVersion.
