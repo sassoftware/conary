@@ -44,6 +44,7 @@ python_files = __init__.py	\
 	queryrep.py		\
 	rollbacks.py		\
 	rpmhelper.py		\
+        showchangeset.py        \
 	streams.py		\
 	trove.py		\
 	updatecmd.py		\
