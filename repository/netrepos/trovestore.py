@@ -584,7 +584,7 @@ class TroveStore:
 	l += [ x for x in cu ]
 	for i, (version, timeStamps, flavor) in enumerate(l):
 	    if latest.has_key(flavor):
-		deleteList.append(i)
+		deleteList.append(latest[flavor])
 
 	    latest[flavor] = i
 	    fullList.append((version, timeStamps, flavor))
