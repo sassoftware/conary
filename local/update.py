@@ -101,8 +101,8 @@ class FilesystemJob:
 
 	    try:
 		s = os.lstat(headRealPath)
-		if not isinstance(headFile, files.Directory) or \
-		   not stat.S_ISDIR(s.st_mode):
+		if (not isinstance(headFile, files.Directory)
+                    or not stat.S_ISDIR(s.st_mode)):
 		    self.errors.append("%s is in the way of a newly " 
                                        "created file" % headRealPath)
 		    fullyUpdated = 0
@@ -185,7 +185,7 @@ class FilesystemJob:
 		    pathOkay = 0
 		    finalPath = fsPath	# let updates work still
 		    self.errors.append("path conflict for %s (%s on head)" % 
-			      (fsPath, headPath))
+                                       (fsPath, headPath))
 
 	    realPath = rootFixup + finalPath
 
@@ -203,7 +203,7 @@ class FilesystemJob:
 		    # on both the head of the branch and in the filesystem;
 		    # this can happen during source management
 		    self.errors.append("new file %s conflicts with file on "
-				    "head of branch" % realPath)
+                                       "head of branch" % realPath)
 		    contentsOkay = 0
 		else:
 		    baseFileVersion = basePkg.getFile(fileId)[1]
@@ -214,8 +214,8 @@ class FilesystemJob:
 		headFile = baseFile.copy()
 		headFile.applyChange(fileChanges)
 
-	    if basePkg and headFileVersion and not \
-			fsFile.same(headFile, ignoreOwner = True):
+	    if (basePkg and headFileVersion
+                and not fsFile.same(headFile, ignoreOwner = True)):
 		# the contents have changed... let's see what to do
 
 		# get the contents if the version on head has contents, and
@@ -224,9 +224,9 @@ class FilesystemJob:
 		#	2. the file changed between head and base
 		# (if both are false, no contents would have been saved for
 		# this file)
-		if headFile.hasContents and  \
-		      (not baseFile.hasContents or 
-		       headFile.sha1() != baseFile.sha1()):
+		if (headFile.hasContents
+                    and (not baseFile.hasContents
+                         or headFile.sha1() != baseFile.sha1())):
 		    (headFileContType, headFileContents) = \
 			    changeSet.getFileContents(fileId)
 		else:
@@ -240,7 +240,8 @@ class FilesystemJob:
 		    # those changes
 		    assert(headFileContType == changeset.ChangedFileTypes.file)
 		    self._restore(headFile, realPath, headFileContents,
-		       "replacing %s with contents from repository" % realPath)
+                                  "replacing %s with contents "
+                                  "from repository" % realPath)
 		elif fsFile.isConfig() or headFile.isConfig():
 		    # it changed in both the filesystem and the repository; our
 		    # only hope is to generate a patch for what changed in the
@@ -259,11 +260,12 @@ class FilesystemJob:
 			      realPath)
 
 			if failedHunks:
-			    self._createFile(realPath + ".conflicts", 
-				     failedHunks.asString(),
-			             "conflicts from merging changes from " 
-				     "head into %s saved as %s.conflicts" % 
-				     (realPath, realPath))
+			    self._createFile(
+                                realPath + ".conflicts", 
+                                failedHunks.asString(),
+                                "conflicts from merging changes from " 
+                                "head into %s saved as %s.conflicts" % 
+                                (realPath, realPath))
 
 			contentsOkay = 1
 		else:
@@ -310,8 +312,8 @@ class FilesystemJob:
 
 	for pkgCs in changeSet.getNewPackageList():
 	    # skip over empty change sets
-	    if not pkgCs.getNewFileList() and not pkgCs.getOldFileList() and \
-	       not pkgCs.getChangedFileList():
+	    if (not pkgCs.getNewFileList() and not pkgCs.getOldFileList()
+                and not pkgCs.getChangedFileList()):
 		continue
 
 	    name = pkgCs.getName()
@@ -403,7 +405,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
 	    if hash:
 		newCont = filecontents.FromFilesystem(realPath)
 		(contType, cont) = changeset.fileContentsDiff(oldFile, oldCont,
-					f, newCont)
+                                                              f, newCont)
 						
 		changeSet.addFileContents(fileId, contType, cont)
 
@@ -411,8 +413,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
     assert(not pkgsNeeded)
     changeSet.newPackage(csPkg)
 
-    if csPkg.getOldFileList() or csPkg.getChangedFileList() or \
-       csPkg.getNewFileList():
+    if (csPkg.getOldFileList() or csPkg.getChangedFileList()
+        or csPkg.getNewFileList()):
 	foundDifference = 1
     else:
 	foundDifference = 0
