@@ -196,20 +196,20 @@ class ChangeSet(streams.LargeStreamSet):
 	return self.oldPackages
 
     def configFileIsDiff(self, fileId):
-        (tag, cont) = self.earlyFileContents.get(fileId, (None, None))
+        (tag, cont) = self.configCache.get(fileId, (None, None))
         return tag == ChangedFileTypes.diff
 
-    def addFileContents(self, fileId, contType, contents, sortEarly):
-	if sortEarly:
-	    self.earlyFileContents[fileId] = (contType, contents)
+    def addFileContents(self, fileId, contType, contents, cfgFile):
+	if cfgFile:
+	    self.configCache[fileId] = (contType, contents)
 	else:
-	    self.lateFileContents[fileId] = (contType, contents)
+	    self.fileContents[fileId] = (contType, contents)
 
     def getFileContents(self, fileId, withSize = False):
-	if self.lateFileContents.has_key(fileId):
-	    cont = self.lateFileContents[fileId]
+	if self.fileContents.has_key(fileId):
+	    cont = self.fileContents[fileId]
 	else:
-	    cont = self.earlyFileContents[fileId]
+	    cont = self.configCache[fileId]
 
 	if not withSize:
 	    return cont
@@ -281,8 +281,8 @@ class ChangeSet(streams.LargeStreamSet):
                 csf.addFile(hash, f, tag + contType[4:])
 
     def writeAllContents(self, csf):
-	self.writeContents(csf, self.earlyFileContents, True)
-	self.writeContents(csf, self.lateFileContents, False)
+	self.writeContents(csf, self.configCache, True)
+	self.writeContents(csf, self.fileContents, False)
 
     def writeToFile(self, outFileName):
 	try:
@@ -551,8 +551,8 @@ class ChangeSet(streams.LargeStreamSet):
 
     def __init__(self, data = None):
 	streams.LargeStreamSet.__init__(self, data)
-	self.earlyFileContents = {}
-	self.lateFileContents = {}
+	self.configCache = {}
+	self.fileContents = {}
 	self.absolute = 0
 	self.local = 0
 
@@ -575,7 +575,7 @@ class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 	self.absCS = absCS
 	ChangeSet.__init__(self)
 
-class MergeableChangeSet(ChangeSet):
+class ReadOnlyChangeSet(ChangeSet):
 
     def fileQueueCmp(a, b):
         if a[1][0] == "1" and b[1][0] == "0":
@@ -617,9 +617,14 @@ class MergeableChangeSet(ChangeSet):
         name = None
 	if self.configCache.has_key(fileId):
             name = fileId
-	    (tag, str) = self.configCache[fileId]
-	    cont = filecontents.FromString(str)
-	    size = len(str)
+	    (tag, contents) = self.configCache[fileId]
+
+            if type(contents) == str:
+                cont = filecontents.FromString(str)
+                size = len(str)
+            else:
+                cont = contents
+                size = contents.size()
 	else:
             self.filesRead = True
 
@@ -752,19 +757,23 @@ class MergeableChangeSet(ChangeSet):
             next = self._nextFile()
 
     def merge(self, otherCs):
-        assert(isinstance(otherCs, MergeableChangeSet))
-        assert(not self.lastCsf)
-        assert(not otherCs.lastCsf)
-
         self.configCache.update(otherCs.configCache)
         self.files.update(otherCs.files)
         self.primaryTroveList += otherCs.primaryTroveList
         self.newPackages.update(otherCs.newPackages)
         self.oldPackages += otherCs.oldPackages
 
-        for entry in otherCs.fileQueue:
-            util.tupleListBsearchInsert(self.fileQueue, entry, 
-                                        self.fileQueueCmp)
+        if isinstance(otherCs, ReadOnlyChangeSet):
+            assert(not self.lastCsf)
+            assert(not otherCs.lastCsf)
+
+            for entry in otherCs.fileQueue:
+                util.tupleListBsearchInsert(self.fileQueue, entry, 
+                                            self.fileQueueCmp)
+        else:
+            assert(isinstance(otherCs, ChangeSet))
+            # XXX
+            self.configCache.update(otherCs.fileContents)
 
     def __init__(self, data = None):
 	ChangeSet.__init__(self, data = data)
@@ -774,7 +783,7 @@ class MergeableChangeSet(ChangeSet):
         self.lastCsf = None
         self.fileQueue = []
 
-class ChangeSetFromFile(MergeableChangeSet):
+class ChangeSetFromFile(ReadOnlyChangeSet):
 
     def __init__(self, fileName, skipValidate = 1):
 	f = open(fileName, "r")
@@ -785,7 +794,7 @@ class ChangeSetFromFile(MergeableChangeSet):
         assert(name == "CONARYCHANGESET")
 
 	start = control.read()
-	MergeableChangeSet.__init__(self, data = start)
+	ReadOnlyChangeSet.__init__(self, data = start)
 
 	for trvCs in self.newPackages.itervalues():
 	    if trvCs.isAbsolute():

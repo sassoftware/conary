@@ -43,10 +43,10 @@ class NoNewTrovesError(UpdateError):
     def __str__(self):
         return "no new troves were found"
 
-class UpdateChangeSet(changeset.MergeableChangeSet):
+class UpdateChangeSet(changeset.ReadOnlyChangeSet):
 
     def merge(self, cs, src = None):
-        changeset.MergeableChangeSet.merge(self, cs)
+        changeset.ReadOnlyChangeSet.merge(self, cs)
         if isinstance(cs, UpdateChangeSet):
             self.contents += cs.contents
         else:
@@ -54,7 +54,7 @@ class UpdateChangeSet(changeset.MergeableChangeSet):
         self.empty = False
 
     def __init__(self, *args):
-        changeset.MergeableChangeSet.__init__(self, *args)
+        changeset.ReadOnlyChangeSet.__init__(self, *args)
         self.contents = []
         self.empty = True
 
@@ -239,8 +239,8 @@ class ConaryClient:
 
     def applyUpdate(self, theCs, replaceFiles = False, tagScript = None, 
                     keepExisting = None):
-        assert(isinstance(theCs, changeset.MergeableChangeSet))
-        cs = changeset.MergeableChangeSet()
+        assert(isinstance(theCs, changeset.ReadOnlyChangeSet))
+        cs = changeset.ReadOnlyChangeSet()
         for (how, what) in theCs.contents:
             if how == self.repos.createChangeSet:
                 newCs = self.repos.createChangeSet(what)
