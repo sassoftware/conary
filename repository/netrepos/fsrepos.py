@@ -270,6 +270,18 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
 
     def commitChangeSet(self, cs):
+	# let's make sure commiting this change set is a sane thing to attempt
+	for pkg in cs.iterNewPackageList():
+	    v = pkg.getNewVersion()
+	    label = v.branch().label()
+	    if isinstance(label, versions.EmergeBranch):
+		raise repository.repository.CommitError, \
+		    "can not commit items on localhost@local:EMERGE"
+	    
+	    if isinstance(label, versions.CookBranch):
+		raise repository.repository.CommitError, \
+		    "can not commit items on localhost@local:COOK"
+	    
         self.troveStore.begin()
         try:
             # a little odd that creating a class instance has the side
