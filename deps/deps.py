@@ -213,7 +213,9 @@ class UseDependency(DependencyClass):
 
     tag = DEP_CLASS_USE
     tagName = "use"
-    exactMatch = True
+    # XXX this is a hack to avoid throwing out troves in the repos that
+    # have a Use flag flavor.
+    exactMatch = False
     justOne = True
 _registerDepClass(UseDependency)
 
@@ -230,6 +232,9 @@ class DependencySet:
 
     def satisfies(self, other):
 	for tag in other.members:
+            # XXX might not be the right semantic for exactMatch
+            if not other.members[tag].exactMatch:
+                continue
 	    if not self.members.has_key(tag): 
 		return False
 	    if not self.members[tag].satisfies(other.members[tag]): 
