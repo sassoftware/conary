@@ -527,18 +527,28 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
         r = self.cur.fetchone()
         self.assertEqual(r[0], True,
                          "Value is is %s, it should be True."  %r[0])
+        self.assertEqual(type(r[0]), bool,
+                         "Type is is %s, it should be <bool>."  %type(r[0]))
         r = self.cur.fetchone()
         self.assertEqual(r[0], False,
                          'Value is is %s, it should be False.'  %r[0])
+        self.assertEqual(type(r[0]), bool,
+                         "Type is is %s, it should be <bool>."  %type(r[0]))
         r = self.cur.fetchone()
         self.assertEqual(r[0], True,
                          "Value is is %s, it should be True."  %r[0])
+        self.assertEqual(type(r[0]), bool,
+                         "Type is is %s, it should be <bool>."  %type(r[0]))
         r = self.cur.fetchone()
         self.assertEqual(r[0], False,
                          'Value is is %s, it should be False.'  %r[0])
+        self.assertEqual(type(r[0]), bool,
+                         "Type is is %s, it should be <bool>."  %type(r[0]))
         r = self.cur.fetchone()
         self.assertEqual(r[0], True,
                          "Value is is %s, it should be True."  %r[0])
+        self.assertEqual(type(r[0]), bool,
+                         "Type is is %s, it should be <bool>."  %type(r[0]))
 
 
 def suite():
