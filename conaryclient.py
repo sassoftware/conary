@@ -109,7 +109,7 @@ class ConaryClient:
                         else:
                             suggMap[troveName] = sugg[depSet]
 
-			suggList = [ (x[0], x[1]) for x in sugg[depSet] ]
+			suggList = [ (x[0], x[1], None) for x in sugg[depSet] ]
 			troves.update(dict.fromkeys(suggList))
 
                 troves = troves.keys()
