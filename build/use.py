@@ -219,6 +219,7 @@ Use.tk = False
 Use.X = False
 Use.gtk = False
 Use.gnome = False
+Use.qt = False
 Use.kde = False
 Use.xfce = False
 Use.gd = False
