@@ -556,7 +556,7 @@ def FileFromFilesystem(path, fileId, type = None, possibleMatch = None):
 	f = CharacterDevice(fileId)
 	f.majorMinor(s.st_rdev >> 8, s.st_rdev & 0xff)
     else:
-	raise TypeError, "unsupported file type for %s" % path
+        raise FilesError("unsupported file type for %s" % path)
 
     f.perms(s.st_mode & 07777)
     f.owner(pwd.getpwuid(s.st_uid)[0])
@@ -596,4 +596,14 @@ def FileFromInfoLine(infoLine, fileId):
     elif type == "src":
 	return SourceFile(fileId, infoLine)
     else:
-	raise KeyError, "bad infoLine %s" % infoLine
+	raise FilesError("bad infoLine %s" % infoLine)
+
+class FilesError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __repr__(self):
+	return self.msg
+
+    def __str__(self):
+	return repr(self)
