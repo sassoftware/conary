@@ -101,4 +101,8 @@ def _getStringValue(val):
             rval = val
         return rval
     except Exception, e:
-        return '<Exception occured while converting %s to string: %s' %(repr(val), e)
+        try:
+            return '<Exception occured while converting %s to string: %s' %(repr(val), e)
+        except Exception, e:
+            return '<Exception occured while converting to repr: %s' %(e)
+
