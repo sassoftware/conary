@@ -97,7 +97,7 @@ def getrealhost(host):
 class Transport(xmlrpclib.Transport):
 
     # override?
-    user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by specifixinc.com)" % xmlrpclib.__version__
+    user_agent =  "xmlrpclib.py/%s (www.pythonware.com modified by Specifix, Inc.)" % xmlrpclib.__version__
 
     def request(self, host, handler, request_body, verbose=0):
 	self.verbose = verbose

@@ -726,6 +726,6 @@ class CacheSet:
 class ClientTooOld(Exception):
 
     def __str__(self):
-	return "download a new client from www.specifixinc.com"
+	return "download a new client from www.specifix.com"
 
     pass

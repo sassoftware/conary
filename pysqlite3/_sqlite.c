@@ -14,7 +14,7 @@
 **                     Gerhard Häring <gh@ghaering.de>
 **
 **                    Copyright (c) 2004  Specifix, Inc.
-**                                        Matt Wilson <msw@specifixinc.com>
+**                                        Matt Wilson <msw@specifix.com>
 **
 ** All Rights Reserved
 **
