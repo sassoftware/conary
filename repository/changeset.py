@@ -245,8 +245,8 @@ class ChangeSetFromRepository(ChangeSet):
 class ChangeSetFromAbstractChangeSet(ChangeSet):
 
     def addFileContents(self, hash):
-	return ChangeSet.addFileContents(hash, 
-			    repostitory.FileContentsFromChangeSet(cs, hash))
+	return ChangeSet.addFileContents(self, hash, 
+		    repository.FileContentsFromChangeSet(self.absCS, hash))
 
     def __init__(self, absCS):
 	self.absCS = absCS
