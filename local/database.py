@@ -120,16 +120,18 @@ class AbstractDatabase(repository.AbstractRepository):
 	    inverse = cs.makeRollback(self.repcache, configFiles = 1)
             flags |= update.MERGE
 
-	# Build and commit A->B
+	# Build A->B
 	if toDatabase:
 	    job = self.repcache.buildJob(cs)
+
+	# build the list of changes to the filesystem
+	fsJob = update.FilesystemJob(self.repcache, cs, fsPkgDict, 
+				     self.root, flags = flags)
 
 	try:
 	    # add new packages
 	    if toDatabase: job.commit()
-	    # build the list of things to commit
-            fsJob = update.FilesystemJob(self.repcache, cs, fsPkgDict, 
-					 self.root, flags = flags)
+
 	    # remove old packages
 	    errList = fsJob.getErrorList()
 	    if errList:
