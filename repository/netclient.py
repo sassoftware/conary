@@ -265,7 +265,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def createChangeSet(self, list):
 	return self._getChangeSet(list)
 
-    def _getChangeSet(self, chgSetList, recurse = True, withFiles = True):
+    def createChangeSetFile(self, list, fName):
+	self._getChangeSet(list, target = fName)
+
+    def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
+		      target = None):
 	l = []
 	serverName = None
 	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
@@ -291,15 +295,23 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	# XXX we shouldn't need to copy this locally most of the time
 	inF = urllib.urlopen(url)
-	(outFd, name) = tempfile.mkstemp()
-	outF = os.fdopen(outFd, "w")
+	if not target:
+	    (outFd, name) = tempfile.mkstemp()
+	    outF = os.fdopen(outFd, "w")
+	else:
+	    outF = open(target, "w")
+
 	try:
 	    util.copyfileobj(inF, outF)
             outF.close()
-	    cs = repository.changeset.ChangeSetFromFile(name)
+	    if not target:
+		cs = repository.changeset.ChangeSetFromFile(name)
+	    else:
+		cs = None
 	finally:
 	    inF.close()
-	    os.unlink(name)
+	    if not target:
+		os.unlink(name)
 
 	return cs
 

@@ -44,8 +44,7 @@ def ChangeSetCommand(repos, cfg, troveName, outFileName, oldVersionStr, \
     list = [(troveName, (oldVersion, oldFlavor), (newVersion, newFlavor),
 	     not oldVersion)]
 
-    cs = repos.createChangeSet(list)
-    cs.writeToFile(outFileName)
+    repos.createChangeSetFile(list, outFileName)
 
 def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     try:
