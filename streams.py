@@ -43,12 +43,6 @@ class InfoStream(object):
     def diff(self, them):
 	raise NotImplementedError
 
-    def set(self, val):
-	raise NotImplementedError
-
-    def merge(self, val):
-	raise NotImplementedError
-
     def twm(self, diff, base):
 	"""
 	Performs a three way merge. Base is the original information,
@@ -409,7 +403,7 @@ def streamSetDictToList(d):
 
     return l
 
-class StreamSet(object):
+class StreamSet(InfoStream):
 
     def __init__(self, data = None):
 	for streamType, name in self.streamDict.itervalues():
