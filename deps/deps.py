@@ -146,6 +146,21 @@ class Dependency(BaseDependency):
 	"""
         return self.score(required) is not False
 
+    def intersection(self, other):
+        intFlags = {}
+        for (flag, sense) in other.flags.iteritems():
+            if flag in self.flags and self.flags[flag] == sense:
+                intFlags[flag] = sense
+        return Dependency(self.name, intFlags)
+
+    def difference(self, other):
+        diffFlags = self.flags.copy()
+        for flag in other.flags:
+            if flag in self.flags:
+                del diffFlags[flag]
+        return Dependency(self.name, diffFlags)
+
+
     def mergeFlags(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
 	"""
 	Returns a new Dependency which merges the flags from the two
@@ -264,6 +279,22 @@ class DependencyClass:
 	for otherdep in other.members.itervalues():
 	    # calling this for duplicates is a noop
 	    self.addDep(otherdep, mergeType = mergeType)
+
+    def intersection(self, other):
+        newDepClass = self.__class__()
+	for tag, dep in self.members.iteritems():
+            if tag in other.members:
+                newDepClass.addDep(dep.intersection(other.members[tag]))
+        return newDepClass
+
+    def difference(self, other):
+        newDepClass = self.__class__()
+	for tag, dep in self.members.iteritems():
+            if tag in other.members:
+                newDepClass.addDep(dep.difference(other.members[tag]))
+            else:
+                newDepClass.addDep(dep)
+        return newDepClass
 
     def getDeps(self):
         l = self.members.items()
@@ -426,6 +457,22 @@ class DependencySet:
                                         mergeType = mergeType)
 	    else:
 		self.members[tag] = copy.deepcopy(other.members[tag])
+
+    def intersection(self, other):
+        newDep = DependencySet()
+        for tag, depClass in self.members.iteritems():
+            if tag in other.members:
+                newDep.members[depClass.tag] = depClass.intersection(other.members[tag])
+        return newDep
+
+    def difference(self, other):
+        newDep = DependencySet()
+        for tag, depClass in self.members.iteritems():
+            if tag in other.members:
+                newDep.members[tag] = depClass.difference(other.members[tag])
+            else:
+                newDep.members[tag] = copy.deepcopy(depClass)
+        return newDep
 
     def __eq__(self, other):
         if other is None:
@@ -613,6 +660,25 @@ def parseFlavor(s, mergeBase = None):
             set.addDep(UseDependency, useSet)
 
     return set
+
+def flavorDifferences(flavors):
+    """ Takes a set of flavors, returns a dict of flavors such that 
+        the value of a flavor's dict entry is a flavor that includes 
+        only the information that differentiates that flavor from others
+        in the set
+    """
+    diffs = {}
+    base = flavors[0].copy()
+    # the intersection of all the flavors will provide the largest common
+    # flavor that is shared between all the flavors given
+    for flavor in flavors[1:]:
+        base = base.intersection(flavor)
+    # remove the common flavor bits
+    for flavor in flavors:
+        diffs[flavor] = flavor.difference(base)
+    return diffs
+
+
 
 dependencyCache = util.ObjectCache()
 
