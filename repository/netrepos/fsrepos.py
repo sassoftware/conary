@@ -238,6 +238,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    for trove in troves:
 		branchedVersion = trove.getVersion().fork(newBranch, 
 							  sameVerRel = 1)
+		print troveName
 		self.createTroveBranch(troveName, branchedVersion.branch())
 		trove.changeVersion(branchedVersion)
 
@@ -255,8 +256,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    self.addFileVersion(troveInfo, fileId, None, path, version)
 		self.addTroveDone(troveInfo)
 
-        # commit branch to the repository
-        self.commit()
+		# commit branch to the repository
+		self.commit()
 
 	return True
 		    
@@ -353,8 +354,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	if newVersion == None then the trove is being removed
 	"""
 	cs = changeset.ChangeSetFromRepository(self)
-	for (name, flavor, v1, v2, absolute) in troveList:
-	    cs.addPrimaryPackage(name, v2, flavor)
+	for (name, (oldV, oldFlavor), (newV, newFlavor), absolute) in troveList:
+	    cs.addPrimaryPackage(name, newV, newFlavor)
 
 	dupFilter = {}
 
@@ -364,16 +365,18 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	# don't use a for in here since we grow troveList inside of
 	# this loop
 	while troveList:
-	    (troveName, flavor, oldVersion, newVersion, absolute) = \
+	    (troveName, (oldVersion, oldFlavor), 
+		        (newVersion, newFlavor), absolute) = \
 		troveList[0]
 	    del troveList[0]
 
 	    # make sure we haven't already generated this changeset; since
 	    # troves can be included from other troves we could try
 	    # to generate quite a few duplicates
-	    if dupFilter.has_key((troveName, flavor)):
+	    if dupFilter.has_key((troveName, oldFlavor, newFlavor)):
 		match = False
-		for (otherOld, otherNew) in dupFilter[(troveName, flavor)]:
+		for (otherOld, otherNew) in \
+				dupFilter[(troveName, oldFlavor, newFlavor)]:
 		    if not otherOld and not oldVersion:
 			same = True
 		    elif not otherOld and oldVersion:
@@ -389,14 +392,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		
 		if match: continue
 
-		dupFilter[(troveName, flavor)].append((oldVersion, newVersion))
+		dupFilter[(troveName, oldFlavor, newFlavor)].append(
+				    (oldVersion, newVersion))
 	    else:
-		dupFilter[(troveName, flavor)] = [(oldVersion, newVersion)]
+		dupFilter[(troveName, oldFlavor, newFlavor)] = \
+				    [(oldVersion, newVersion)]
 
 	    if not newVersion:
 		# remove this trove and any trove contained in it
-		old = self.getTrove(troveName, oldVersion, flavor)
-		cs.oldPackage(troveName, oldVersion, flavor)
+		old = self.getTrove(troveName, oldVersion, oldFlavor)
+		cs.oldPackage(troveName, oldVersion, oldFlavor)
 		for (name, version, flavor) in old.iterTroveList():
                     # it's possible that a component of a trove
                     # was erased, make sure that it is installed
@@ -406,10 +411,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    
 		continue
 
-	    new = self._getLocalOrRemoteTrove(troveName, newVersion, flavor)
+	    new = self._getLocalOrRemoteTrove(troveName, newVersion, newFlavor)
 	 
 	    if oldVersion:
-		old = self._getLocalOrRemoteTrove(troveName, oldVersion, flavor)
+		old = self._getLocalOrRemoteTrove(troveName, oldVersion, 
+						  oldFlavor)
 	    else:
 		old = None
 
@@ -417,8 +423,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 				new.diff(old, absolute = absolute)
 
 	    if recurse:
-		for (pkgName, old, new, flavor) in pkgsNeeded:
-		    troveList.append((pkgName, flavor, old, new, absolute))
+		for (pkgName, old, new, oldFlavor, newFlavor) in pkgsNeeded:
+		    troveList.append((pkgName, (old, oldFlavor),
+					       (new, newFlavor), absolute))
 
 	    cs.newPackage(pkgChgSet)
 
@@ -469,11 +476,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 					   and not oldFile.flags.isConfig())):
 		    if oldFileVersion :
 			oldCont = self.getFileContents(troveName, oldVersion, 
-				    flavor, oldPath, oldFileVersion, 
+				    oldFlavor, oldPath, oldFileVersion, 
 				    fileObj = oldFile)
 
 		    newCont = self.getFileContents(troveName, newVersion, 
-				    flavor, newPath, newFileVersion, 
+				    newFlavor, newPath, newFileVersion, 
 				    fileObj = newFile)
 
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 

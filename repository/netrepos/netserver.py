@@ -253,7 +253,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getChangeSet(self, authToken, chgSetList, recurse, withFiles):
 	l = []
-	for (name, flavor, old, new, absolute) in chgSetList:
+	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
 	    newVer = self.toVersion(new)
 
 	    if not self.auth.check(authToken, write = False, trove = name,
@@ -261,11 +261,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 		raise InsufficientPermission
 
 	    if old == 0:
-		l.append((name, self.toFlavor(flavor), None,
-			 self.toVersion(new), absolute))
+		l.append((name, 
+			 (None, None),
+			 (self.toVersion(new), self.toFlavor(newFlavor)),
+			 absolute))
 	    else:
-		l.append((name, self.toFlavor(flavor), self.toVersion(old),
-			 self.toVersion(new), absolute))
+		l.append((name, 
+			 (self.toVersion(old), self.toFlavor(oldFlavor)),
+			 (self.toVersion(new), self.toFlavor(newFlavor)),
+			 absolute))
 
 	cs = self.repos.createChangeSet(l, recurse = recurse, 
 					withFiles = withFiles)
@@ -342,7 +346,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	# we need clientVersion of at least 2 for our changesets to be
 	# understood
-        if clientVersion < 2:
+        if clientVersion < 3:
             raise ClientTooOld
         return 1
 
