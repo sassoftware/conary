@@ -5,6 +5,7 @@ Changes in 0.13.3
     (which gets called when either the tag description or the tag handler gets
     updated)
   * "description preremove" tag action replaced with "handler preremove"
+  * sources get committed automatically
 
 Changes in 0.13.2
   * reworked use.py code almost entirely.

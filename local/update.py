@@ -528,6 +528,11 @@ class FilesystemJob:
 
 	    headFile = files.ThawFile(changeSet.getFileChange(None, headFileId), pathId)
 
+            # these files are placed directly into the lookaside at build
+            # time; we don't worry about them
+            if headFile.flags.isAutoSource():
+                continue
+
             try:
                 s = os.lstat(headRealPath)
                 # if this file is a directory and the file on the file
@@ -918,7 +923,7 @@ class FilesystemJob:
 
 def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
                   withFileContents=True, forceSha1=False, 
-                  ignoreTransient=False):
+                  ignoreTransient=False, ignoreAutoSource = False):
     """
     Populates a change set against the files in the filesystem and builds
     a package object which describes the files installed.  The return
@@ -947,6 +952,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
     @type forceSha1: bool
     @param ignoreTransient: ignore transient files 
     @type ignoreTransient: bool
+    @param ignoreAutoSource: ignore automatically added source files 
+    @type ignoreAutoSource: bool
     """
 
     noIds = ((flags & IGNOREUGIDS) != 0)
@@ -977,16 +984,29 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
     isSrcPkg = curPkg.getName().endswith(':source')
 
     for (pathId, srcPath, srcFileId, srcFileVersion) in fileList:
-	# file disappeared
+	# files which disappear don't need to make it into newPkg
 	if not pathIds.has_key(pathId): continue
-
-	(path, fileId, version) = newPkg.getFile(pathId)
 	del pathIds[pathId]
 
-	if path[0] == '/':
+	srcFile = repos.getFileVersion(pathId, srcFileId, srcFileVersion)
+
+        # transient files never show up in in local changesets...
+        if ignoreTransient and srcFile.flags.isTransient():
+            continue
+        elif ignoreAutoSource and srcFile.flags.isAutoSource():
+            continue
+
+	(path, fileId, version) = newPkg.getFile(pathId)
+
+        if isSrcPkg:
+            if path in curPkg.pathMap:
+                realPath = curPkg.pathMap[path]
+                isAutoSource = True
+            else:
+                realPath = os.getcwd() + "/" + path
+                isAutoSource = False
+        else:
 	    realPath = root + path
-	else:
-	    realPath = os.getcwd() + "/" + path
 
 	try:
 	    os.lstat(realPath)
@@ -1003,12 +1023,6 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
             newPkg.removeFile(pathId)
             continue
 
-	srcFile = repos.getFileVersion(pathId, srcFileId, srcFileVersion)
-
-        # transient files never show up in in local changesets...
-        if ignoreTransient and srcFile.flags.isTransient():
-            continue
-
         if forceSha1:
             possibleMatch = None
         else:
@@ -1019,6 +1033,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 
 	if isSrcPkg:
 	    f.flags.isSource(set = True)
+            f.flags.isAutoSource(set = isAutoSource)
+            assert(srcFile.flags.isAutoSource() == f.flags.isAutoSource())
 
         # the link group doesn't change due to local mods
         if srcFile.hasContents and f.hasContents:
@@ -1070,10 +1086,15 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
     for pathId in pathIds.iterkeys():
 	(path, fileId, version) = newPkg.getFile(pathId)
 
-	if path[0] == '/':
+        if isSrcPkg:
+            if path in curPkg.pathMap:
+                realPath = curPkg.pathMap[path]
+                isAutoSource = True
+            else:
+                realPath = os.getcwd() + "/" + path
+                isAutoSource = False
+        else:
 	    realPath = root + path
-	else:
-	    realPath = os.getcwd() + "/" + path
 
 	# if we're committing against head, this better be a new file.
 	# if we're generating a diff against someplace else, it might not 
@@ -1085,6 +1106,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 	extension = path.split(".")[-1]
 	if isSrcPkg:
             f.flags.isSource(set = True)
+            f.flags.isAutoSource(set = isAutoSource)
             if extension not in nonCfgExt:
                 f.flags.isConfig(set = True)
 
@@ -1111,7 +1133,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
     return (foundDifference, newPkg)
 
 def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
-                                  forceSha1 = False, ignoreTransient=False):
+                                  forceSha1 = False, ignoreTransient=False,
+                                  ignoreAutoSource = False):
     """
     Builds a change set against a set of files currently installed and
     builds a package object which describes the files installed.  The
@@ -1133,16 +1156,19 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
     @type forceSha1: bool
     @param ignoreTransient: ignore transient files 
     @type ignoreTransient: bool
-
+    @param ignoreAutoSource: ignore automatically added source files 
+    @type ignoreAutoSource: bool
     """
 
     changeSet = changeset.ChangeSet()
     returnList = []
     for (curPkg, srcPkg, newVersion, flags) in pkgList:
 	result = _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, 
-			       root, flags, withFileContents=withFileContents,
-                               forceSha1=forceSha1, 
-                               ignoreTransient=ignoreTransient)
+			       root, flags, 
+                               withFileContents = withFileContents,
+                               forceSha1 = forceSha1, 
+                               ignoreTransient = ignoreTransient,
+                               ignoreAutoSource = ignoreAutoSource)
         if result is None:
             # an error occurred
             return None

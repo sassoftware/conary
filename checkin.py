@@ -39,6 +39,9 @@ import versions
 
 class SourceState(trove.Trove):
 
+    def setPathMap(self, map):
+        self.pathMap = map
+
     def removeFilePath(self, file):
 	for (pathId, path, fileId, version) in self.iterFileList():
 	    if path == file: 
@@ -110,6 +113,7 @@ class SourceState(trove.Trove):
 	trove.Trove.__init__(self, name, version, 
                              deps.deps.DependencySet(), None)
         self.branch = branch
+        self.pathMap = {}
 
 class SourceStateFromFile(SourceState):
 
@@ -237,7 +241,10 @@ def checkout(repos, cfg, workDir, name):
 	fullPath = workDir + "/" + path
 
 	state.addFile(pathId, path, version, fileId)
+
 	fileObj = files.ThawFile(cs.getFileChange(None, fileId), pathId)
+        if fileObj.flags.isAutoSource():
+            continue
 
 	if not fileObj.hasContents:
 	    fileObj.restore(None, '/', fullPath)
@@ -293,8 +300,14 @@ def commit(repos, cfg, message):
     loader = _getRecipeLoader(cfg, repos, state.getRecipeFileName())
     if loader is None: return
 
+    srcMap = {}
+    cwd = os.getcwd()
+
     # fetch all the sources
     recipeClass = loader.getRecipe()
+    srcFiles = {}
+
+    # don't download sources for groups or filesets
     if issubclass(recipeClass, recipe.PackageRecipe):
         lcache = lookaside.RepositoryCache(repos)
         srcdirs = [ os.path.dirname(recipeClass.filename),
@@ -304,9 +317,43 @@ def commit(repos, cfg, message):
         level = log.getVerbosity()
         log.setVerbosity(log.INFO)
         recipeObj.setup()
-        recipeObj.fetchAllSources()
+        srcFiles = recipeObj.fetchAllSources()
         log.setVerbosity(level)
-        
+
+        for fullPath in srcFiles:
+            # the loader makes sure the basenames are unique
+            base = os.path.basename(fullPath)
+            for (pathId, path, fileId, version) in state.iterFileList():
+                if path == base: break
+
+            if path != base:
+                # new file -- we need to do an implicit add
+                if os.path.dirname(fullPath) == cwd:
+                    # files in the cwd have to be explicitly added
+                    log.error('%s (in current directory) must be added with '
+                              'cvc add' % base)
+                    return
+
+                pathId = cook.makeFileId(os.getcwd(), base)
+                state.addFile(pathId, base, versions.NewVersion(), "0" * 20)
+
+            srcMap[base] = fullPath
+
+    # now remove old files. this is done separately in case the recipe type
+    # changed (a package changing to a redirect, for example)
+    if srcPkg:
+        existingFiles = repos.getFileVersions( 
+                [ (x[0], x[2], x[3]) for x in srcPkg.iterFileList() ] )
+        for f in existingFiles:
+            if not f.flags.isAutoSource(): continue
+            path = srcPkg.getFile(f.pathId())[0]
+
+            if path not in srcMap:
+                # the file doesn't exist anymore
+                state.removeFilePath(path)
+
+    state.setPathMap(srcMap)
+
     recipeVersionStr = recipeClass.version
 
     branch = state.getBranch()
@@ -657,7 +704,7 @@ def diff(repos, versionStr = None):
 
     result = update.buildLocalChanges(repos, 
 	    [(state, oldPackage, versions.NewVersion(), update.IGNOREUGIDS)],
-            forceSha1=True)
+            forceSha1=True, ignoreAutoSource = True)
     if not result: return
 
     (changeSet, ((isDifferent, newState),)) = result

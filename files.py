@@ -38,7 +38,7 @@ _FILE_FLAG_UNUSED2 = 1 << 3
 _FILE_FLAG_TRANSIENT = 1 << 4
 _FILE_FLAG_SOURCEFILE = 1 << 5
 # files which were added to source components by conary rather then by
-# the user. this isn't used yet, just reserved.
+# the user.
 _FILE_FLAG_AUTOSOURCE = 1 << 6	
 
 FILE_STREAM_CONTENTS        = 1
@@ -244,6 +244,9 @@ class FlagsStream(streams.IntStream):
 
     def isSource(self, set = None):
 	return self._isFlag(_FILE_FLAG_SOURCEFILE, set)
+
+    def isAutoSource(self, set = None):
+	return self._isFlag(_FILE_FLAG_AUTOSOURCE, set)
 
     def isTransient(self, set = None):
 	return self._isFlag(_FILE_FLAG_TRANSIENT, set)

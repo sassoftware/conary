@@ -85,7 +85,6 @@ class Trove:
 
     def getFile(self, pathId):
         x = self.idMap[pathId]
-        # put the fileId in the middle
 	return (x[0], x[1], x[2])
 
     def hasFile(self, pathId):
