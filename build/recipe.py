@@ -101,7 +101,7 @@ class Recipe:
             sources.append(tarball)
         for (patch, level, backup) in self.patches:
             sources.append(patch)
-	return sources + self.sources + flatten(self.signatures.items())
+	return sources + self.sources + flatten(self.signatures.values())
 
     def mainDir(self, new = None):
 	if new:
