@@ -15,9 +15,11 @@
 
 """ Extended pdb """
 import stackutil
+import rlcompleter
 import pdb
 import os
 import re
+import readline
 import socket
 import string
 import sys
@@ -35,6 +37,7 @@ class Epdb(pdb.Pdb):
         self._tb = None
         self._config = {}
         pdb.Pdb.__init__(self)
+        self._completer = rlcompleter.Completer()
         self.prompt = '(Epdb) '
     
     def do_savestack(self, path):
@@ -238,6 +241,18 @@ class Epdb(pdb.Pdb):
         self.switch_stdout()
         pdb.Pdb.user_exception(self, frame, exc_info)
 
+    # from cmd.py, override completion to match on local variables
+    def complete(self, text, state):
+        allvars = {}
+        globals = self.curframe.f_globals.copy()
+        locals = self.curframe.f_locals.copy()
+        allvars.update(globals)
+        allvars.update(locals)
+        self._completer.namespace = allvars
+        self._completer.use_main_ns = 0
+        matches = self._completer.complete(text, state)
+        return matches
+        
 def beingTraced():
     frame = sys._getframe(0)
     while frame:
