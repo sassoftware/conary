@@ -516,10 +516,10 @@ class IndexedVersionedFile(VersionedFile):
     """
     def eraseVersion(self, version):
 	if VersionedFile.eraseVersion(self, version):
-	    self.db.eraseFile(self.key)
+	    self.dbObject.eraseFile(self.key)
 
     def __init__(self, db, filename, createBranches, database):
-	self.db = database
+	self.dbObject = database
 	VersionedFile.__init__(self, db, filename, createBranches)
 
 class FileIndexedDatabase(Database):
