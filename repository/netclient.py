@@ -1092,7 +1092,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         if (version.trailingRevision().getVersion() \
                                                             != versionStr):
                             del flavorDict[name][version]
-                    if flavorDict[name]:
+                    if name in flavorDict and flavorDict[name]:
                         version = sorted(flavorDict[name].iterkeys())[-1]
                         flavorDict[name] = {version: flavorDict[name][version]}
             else:
@@ -1112,7 +1112,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                             if version.trailingRevision().getVersion() \
                                                             != versionStr:
                                 del d[name][version]
-                        if d[name]:
+                        if name in d and d[name]:
                             version = sorted(d[name].iterkeys())[-1]
                             d[name] = {version: d[name][version]}
                     if not d.has_key(name):
