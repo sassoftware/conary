@@ -469,8 +469,15 @@ class FilesystemJob:
             
             # now assemble what the file is supposed to look like on head
             headChanges = changeSet.getFileChange(fileId)
-            headFile = baseFile.copy()
-            headFile.twm(headChanges, headFile)
+            if headChanges[0] == '\x01':
+                # the file was stored as a diff
+                headFile = baseFile.copy()
+                headFile.twm(headChanges, headFile)
+            else:
+                # the file was stored frozen. this happens when the file
+                # type changed between versions
+                headFile = files.ThawFile(headChanges, fileId)
+                
             fsFile.flags.isConfig(headFile.flags.isConfig())
             fsChanges = fsFile.diff(baseFile)
 
@@ -478,7 +485,39 @@ class FilesystemJob:
             # this helps us know if we need a restore event
 	    attributesChanged = False
 
-	    if not fsFile.metadataEqual(headFile, ignoreOwnerGroup = noIds):
+            # this forces the file to be restored, with contents
+            forceUpdate = False
+
+            # handle file types changing. this is dealt with as a bit
+            # of an exception
+            fileTypeError = False
+            if baseFile.lsTag != headFile.lsTag:
+                # the file type changed between versions. 
+                if flags & REPLACEFILES or baseFile.lsTag == fsFile.lsTag:
+                    attributesChanged = True
+                    fsFile = headFile
+                    forceUpdate = True
+                elif baseFile.lsTag != fsFile.lsTag:
+                    fileTypeError = True
+            elif baseFile.lsTag != fsFile.lsTag:
+                # the user changed the file type. we could try and
+                # merge things a bit more intelligently then we do
+                # here, but it probably isn't worth the effor
+                if flags & REPLACEFILES:
+                    attributesChanged = True
+                    fsFile = headFile
+                    forceUpdate = True
+                else:
+                    fileTypeError = True
+
+            if fileTypeError:
+                self.errors.append("file type of %s changed" % finalPath)
+                continue
+
+            # if we're forcing an update, we don't need to merge this
+            # stuff
+	    if not forceUpdate and \
+               not fsFile.metadataEqual(headFile, ignoreOwnerGroup = noIds):
 		# some of the attributes have changed for this file; try
                 # and merge
 		if flags & MERGE:
@@ -505,12 +544,15 @@ class FilesystemJob:
 
 	    beenRestored = False
 
-	    if headFile.hasContents and \
-	       fsFile.hasContents and \
-	       fsFile.contents.sha1() != headFile.contents.sha1() and \
-	       headFile.contents.sha1() != baseFile.contents.sha1():
+	    if forceUpdate or (
+                   headFile.hasContents and \
+                   fsFile.hasContents and \
+                   fsFile.contents.sha1() != headFile.contents.sha1() and \
+                   headFile.contents.sha1() != baseFile.contents.sha1()
+                ):
 
-		if (flags & REPLACEFILES) or (not flags & MERGE) or \
+		if forceUpdate or (flags & REPLACEFILES) or \
+                        (not flags & MERGE) or \
 			headFile.flags.isTransient() or \
 			fsFile.contents == baseFile.contents:
 
