@@ -68,6 +68,7 @@ def usage(rc = 1):
     print "replist flags: --all"
     print "               --sha1s"
     print "               --ids"
+    print "               --leaves"
     print "               --ls"
     print ""
     print "update flags: --replace-files"
@@ -104,6 +105,7 @@ def realMain():
     argDef["config"] = 2
     argDef["debug"] = 0
     argDef["ids"] = 0
+    argDef["leaves"] = 0
     argDef["ls"] = 0
     argDef["macros"] = 1
     argDef["prep"] = 0
@@ -298,12 +300,15 @@ def realMain():
 	sha1s = argSet.has_key('sha1s')
 	if sha1s: del argSet['sha1s']
 
+	leaves = argSet.has_key('leaves')
+	if leaves: del argSet['leaves']
+
 	repos = openRepository(cfg.repPath)
 
 	if argSet: return usage()
 
 	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	    args = [repos, cfg, all, ls, ids, sha1s] + otherArgs[2:]
+	    args = [repos, cfg, all, ls, ids, sha1s, leaves] + otherArgs[2:]
 	    try:
 		queryrep.displayTroves(*args)
 	    except IOError, msg:

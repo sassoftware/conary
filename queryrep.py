@@ -12,7 +12,7 @@ _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
 def displayTroves(repos, cfg, all = False, ls = False, ids = False,
-                  sha1s = False, trove = "", versionStr = None):
+                  sha1s = False, leaves = False, trove = "", versionStr = None):
     if trove:
 	troves = [ trove ]
     else:
@@ -30,8 +30,10 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
     else:
 	if all:
 	    versions = repos.getTroveVersionList(troves)
-	else:
+	elif leaves:
             versions = repos.getAllTroveLeafs(troves)
+	else:
+            versions = repos.getTroveLeavesByLabel(troves, cfg.installLabel)
 
 	flavors = repos.getTroveVersionFlavors(versions)
 
