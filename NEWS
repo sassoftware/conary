@@ -1,4 +1,4 @@
-Changes in 0.14.13:
+Changes in 0.15.0:
   * Redirections work
   * Sped up group generation
   * Troves which reference other troves (groups and packages) can now specify
