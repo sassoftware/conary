@@ -702,10 +702,10 @@ class ChangeSetFromFile(ChangeSet):
             tag = 'cft-' + tagInfo.split()[1]
 
             # cache all config file contents
-            #if tag != ChangedFileTypes.diff:
-                #break
-            if tagInfo[0] == '0':
+            if tag != ChangedFileTypes.diff:
                 break
+            #if tagInfo[0] == "1":
+                #break
 
             cont = filecontents.FromFile(f)
             str = cont.get().read()
