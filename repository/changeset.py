@@ -70,16 +70,16 @@ class ChangeSet:
     def headerAsString(self):
 	rc = ""
 	for pkg in self.getPackageList():
-            rc += pkg.asString()
+            rc += pkg.freeze()
 	
 	for (fileId, (oldVersion, newVersion, csInfo)) in self.getFileList():
 	    if oldVersion:
-		oldStr = oldVersion.asString()
+		oldStr = oldVersion.freeze()
 	    else:
 		oldStr = "(none)"
 
 	    rc += "SRS FILE CHANGESET %s %s %s\n%s\n" % \
-			    (fileId, oldStr, newVersion.asString(), csInfo)
+			    (fileId, oldStr, newVersion.freeze(), csInfo)
 	
 	return rc
 
@@ -219,9 +219,9 @@ class ChangeSetFromFile(ChangeSet):
 		    # abstract change set
 		    oldVersion = None
 		else:
-		    oldVersion = versions.VersionFromString(oldVerStr)
+		    oldVersion = versions.ThawVersion(oldVerStr)
 
-		newVersion = versions.VersionFromString(newVerStr)
+		newVersion = versions.ThawVersion(newVerStr)
 		lineCount = int(lineCount)
 
 		pkg = package.PackageChangeSet(pkgName, oldVersion, newVersion)

@@ -175,7 +175,7 @@ class PackageChangeSet:
 	    if version == "-":
 		version = None
 	    else:
-		version = versions.VersionFromString(version)
+		version = versions.ThawVersion(version)
 
 	    if path == "-":
 		path = None
@@ -204,14 +204,14 @@ class PackageChangeSet:
 	for fileId in self.oldFiles:
 	    f.write("\tremoved %s(.*)%s\n" % (fileId[:6], fileId[-6:]))
 
-    def asString(self):
+    def freeze(self):
 	rc = ""
 
 	for id in self.getOldFileList():
 	    rc += "-%s\n" % id
 
 	for (id, path, version) in self.getNewFileList():
-	    rc += "+%s %s %s\n" % (id, path, version.asString())
+	    rc += "+%s %s %s\n" % (id, path, version.freeze())
 
 	for (id, path, version) in self.getChangedFileList():
 	    rc += "~%s " % id
@@ -221,17 +221,17 @@ class PackageChangeSet:
 		rc += "-"
 
 	    if version:
-		rc += " " + version.asString() + "\n"
+		rc += " " + version.freeze() + "\n"
 	    else:
 		rc += " -\n"
 
 	if self.oldVersion:
-	    oldVerStr = self.oldVersion.asString()
+	    oldVerStr = self.oldVersion.freeze()
 	else:
 	    oldVerStr = "(none)"
 
 	hdr = "SRS PKG CHANGESET %s %s %s %d\n" % \
-		  (self.name, oldVerStr, self.newVersion.asString(), 
+		  (self.name, oldVerStr, self.newVersion.freeze(), 
 		   rc.count("\n"))
 	return hdr + rc	
     
