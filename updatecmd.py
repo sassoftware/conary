@@ -56,6 +56,11 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 	    list.append((pkg.getName(), pkg.getFlavor(), currentVersion, 
 			 pkg.getVersion(), 0))
 
+
+        if not list:
+            log.warning("no new troves were found")
+            return
+
 	cs = repos.createChangeSet(list)
 	list = [ x[0] for x in list ]
 
