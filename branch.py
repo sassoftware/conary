@@ -21,6 +21,8 @@ def branch(repos, packageNamespace, branchName, branchFrom, troveName = None):
 	    branchSource = versions.VersionFromString(branchFrom)
 	else:
 	    branchSource = versions.BranchName(branchFrom)
+	    if branchSource[0] == "@":
+		branchSource = packageNamespace[1:] + branchSource
     except versions.ParseError, e:
 	log.error(str(e))
 	return
