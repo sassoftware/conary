@@ -173,7 +173,7 @@ class Configure(BuildCommand):
 	' --sharedstatedir=%%(sharedstatedir)s'
 	' --mandir=%%(mandir)s'
 	' --infodir=%%(infodir)s'
-        ' %(bootstrapFlags)s'
+        ' %%(bootstrapFlags)s'
 	'  %(args)s')
     keywords = {'preConfigure': '',
 		'configureName': 'configure',
