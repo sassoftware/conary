@@ -10,8 +10,9 @@ import types
 import string
 import re
 import os
+import files
 
-class BuildFile:
+class BuildFile(files.FileMode):
     def getRealPath(self):
         return self.realPath
 
@@ -19,33 +20,23 @@ class BuildFile:
         return self.type
 
     def __init__(self, realPath, type):
+        files.FileMode.__init__(self)
         self.realPath = realPath
         self.type = type
 
-class BuildDeviceFile(BuildFile):
-    def getRealPath(self):
-        return self.realPath
-
-    def getType(self):
-        return self.type
-
-    def infoLine(self):
-        # type major minor perms owner group size mtime
-        return "%c %d %d 0%o %s %s 0 0" % (self.devtype, self.major,
-                                           self.minor, self.perms,
-                                           self.owner, self.group)
-
+class BuildDeviceFile(files.DeviceFile, BuildFile):
     def __init__(self, devtype, major, minor, owner, group, perms):
-        self.type = "auto"
-        self.realPath = None
+        BuildFile.__init__(self, None, "auto")
 
-        self.devtype = devtype
+        self.infoTag = devtype
         self.major = major
         self.minor = minor
-        self.owner = owner
-        self.group = group
-        self.perms = perms
-
+        self.theOwner = owner
+        self.theGroup = group
+        self.thePerms = perms
+        self.theSize = 0
+        self.theMtime = 0
+        
 class BuildPackage(types.DictionaryType):
 
     def addFile(self, path, realPath, type="auto"):
