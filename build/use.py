@@ -41,8 +41,11 @@ Use = UseClass({
     'selinux':		False,
     'pam':		True,
     'tcl':		False,
+    'tk':		False,
     'dietlibc':		False,
     'bootstrap':	False,
+    'readline':		True,
+    'ssl':		True,
 })
 
 Arch = UseClass({
