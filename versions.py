@@ -5,8 +5,9 @@
 
 # classes for version structures and strings
 
-import string
 import copy
+import time
+import string
 
 class AbstractVersion:
 
@@ -73,11 +74,13 @@ class Version:
     def appendVersionRelease(self, version, release):
 	assert(self.isBranch())
 	self.versions.append(VersionRelease("%s-%d" % (version, release)))
+	self.timeStamp = time.time()
 
     def incrementVersionRelease(self):
 	assert(self.isVersion())
 	
 	self.versions[-1].incrementRelease()
+	self.timeStamp = time.time()
 
     def trailingVersion(self):
 	assert(self.isVersion())
@@ -95,17 +98,18 @@ class Version:
     def equal(self, other):
 	return self.listsEqual(self.versions, other)
 
-    #def __str__(self):
-	#return self.asString()
-
     def asString(self, defaultBranch = None):
 	if defaultBranch and self.onBranch(defaultBranch):
 	    return "%s" % self.versions[-1]
+	else:
+	    s = ""
+	    for version in self.versions:
+		s = s + ("/%s" % version)
 
-	s = ""
-	for version in self.versions:
-	    s = s + ("/%s" % version)
 	return s
+
+    def freeze(self, defaultBranch = None):
+	return ("%.3f:" % self.timeStamp) + self.asString(defaultBranch)
 
     def isBranch(self):
 	return isinstance(self.versions[-1], BranchName)
@@ -116,7 +120,7 @@ class Version:
 
     def branch(self):
 	assert(not self.isBranch())
-	return Version(self.versions[:-1])
+	return Version(self.versions[:-1], 0)
 
     def isVersion(self):
 	return isinstance(self.versions[-1], VersionRelease)
@@ -124,17 +128,11 @@ class Version:
     def copy(self):
         return copy.deepcopy(self)
 
-    def __init__(self, versionList):
-	self.versions = versionList
-	if not self.isBranch() and not self.isVersion():
-	    raise KeyError, "invalid version set %s" % self
-	
-class VersionFromString(Version):
-
-    def __init__(self, ver, defaultBranch = None):
+    def parseVersionString(self, ver):
 	if ver[0] != "/":
 	    if not defaultBranch:
-		raise KeyError, "relative version given without a default branch"
+		raise KeyError, "relative version given without a default " \
+			        "branch"
 	    ver = defaultBranch.asString() + "/" + ver
 
 	parts = ver.split("/")
@@ -150,7 +148,31 @@ class VersionFromString(Version):
 	    else:
 		parts = None
 
-	Version.__init__(self, v)
+	return v
+
+    def __init__(self, versionList, timeStamp):
+	self.versions = versionList
+	self.timeStamp = timeStamp
+	
+class ThawVersion(Version):
+
+    def __init__(self, fullString):
+	(timeStr, ver) = fullString.split(":")
+
+	timeVal = float(timeStr)
+	v = self.parseVersionString(ver)
+
+	Version.__init__(self, v, timeVal)
+
+class VersionFromString(Version):
+
+    def __init__(self, ver, defaultBranch = None):
+	if ver[0] != "/":
+	    ver = defaultBranch.asString() + "/" + ver
+
+	v = self.parseVersionString(ver)
+
+	Version.__init__(self, v, 0)
 	
 def versionSort(list):
     list.sort()
