@@ -267,7 +267,7 @@ def _markConfig(recipe, filename, fullpath):
 	lastchar = f.read(1)
 	f.close()
 	if lastchar != '\n':
-	    recipe.reportErrors("config file %s missing trailing newline" %file)
+	    recipe.reportErrors("config file %s missing trailing newline" %filename)
     recipe.autopkg.pathMap[filename].flags.isConfig(True)
 
 class EtcConfig(policy.Policy):
