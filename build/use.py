@@ -42,14 +42,14 @@ class Flag(dict):
     def _set(self, value):
         self._value = value
 
-    def _values(self):
-	return self.copy()
-
     def __repr__(self):
 	if self._value == None:
 	    # top-level flag, no point in printing out None...
 	    return repr(self.copy())
-        return repr(self._value)
+	if self.values():
+	    return repr(self._value) + ': ' + repr(self.copy())
+	else:
+	    return repr(self._value)
 
     def __ror__(self, other):
         if type(other) is Flag:
@@ -292,30 +292,41 @@ if __doc__ is not None:
 @var Arch: Set of architectures defined for this build, with their boolean status.
 The Arch flags have the following meanings:
 """
+
+# All Arch flags default to False; deps/arch.py sets any that should be
+# True to True
 Arch = Flag(showdefaults=False)
-Arch.i386 = False
-Arch.i486 = False
-Arch.i586 = False
-Arch.i686 = True
-Arch.i686.cmov = True
-Arch.i686.sse = True
-Arch.i686.sse2 = True
-Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686
-Arch.x86.setShortDoc('True if any IA32 architecture is set')
-Arch.x86_64 = False
+# Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686 | Arch.x86_64
+Arch.x86 = True
+Arch.x86.setShortDoc('True if any IA32-compatible architecture is set')
+Arch.x86.i386 = False
+Arch.x86.i486 = False
+Arch.x86.i586 = False
+Arch.x86.i686 = True
+Arch.x86.x86_64 = False
+Arch.x86.cmov = False
+Arch.x86.sse = False
+Arch.x86.sse2 = False
+Arch.x86.mmx = False
+Arch.x86.threednow = False # '3dnow' is an illegal identifier name
 Arch.sparc = False
-Arch.sparc64 = False
+Arch.sparc.sparc64 = False
 Arch.ppc = False
-Arch.ppc64 = False
+Arch.ppc.ppc64 = False
 Arch.ia64 = False
 Arch.s390 = False
-Arch.s390x = False
-Arch.s390_all = Arch.s390 | Arch.s390x
-Arch.s390_all.setShortDoc('True if s390 or s390x is set')
-Arch.LE = Arch.x86 | Arch.x86_64 | Arch.ia64
+Arch.s390.s390x = False
+Arch.alpha = False
+# Arch.LE = Arch.x86 | Arch.ia64
+Arch.LE = True
 Arch.LE.setShortDoc('True if current architecture is little-endian')
-Arch.BE = Arch.sparc | Arch.sparc64 | Arch.ppc | Arch.ppc64 | Arch.s390_all
+# Arch.BE = Arch.sparc | Arch.ppc | Arch.s390
+Arch.BE = False
 Arch.BE.setShortDoc('True if current architecture is big-endian')
+Arch.bits32= True
+Arch.bits32.setShortDoc('True if the current architecture is 32-bit')
+Arch.bits64 = False
+Arch.bits64.setShortDoc('True if the current architecture is 64-bit')
 Arch._freeze()
 _addDocs(Arch)
 
