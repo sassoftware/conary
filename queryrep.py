@@ -113,9 +113,11 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 		    log.error('No versions for "%s" were found in the '
 			      'repository', troveName)
 		else:
-		    log.error('No versions with label "%s" for "%s" were '
+		    log.error('No versions with labels "%s" for "%s" were '
 			      'found in the repository.', 
-			      cfg.installLabel.asString(), troveName)
+			      " ".join([ x.asString() for x 
+                                            in cfg.installLabelPath ]),
+                              troveName)
                 continue
 
 	    versionStrs = {}

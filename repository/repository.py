@@ -384,7 +384,8 @@ class IdealRepository(AbstractTroveDatabase):
 	    if not versionDict[name]:
 		raise PackageNotFound, "branches %s do not exist for " \
                             "package %s" % \
-                            ([ x.asString() for x in labelPath ], name)
+                            (" ".join([ x.asString() for x in labelPath ]), 
+                            name)
 	elif versionStr[0] != "/" and versionStr.find("/") == -1:
 	    # version/release was given
 	    try:
