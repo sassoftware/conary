@@ -366,7 +366,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if flavorIndices:
             assert(withFlavors)
             if len(flavorIndices) > 1:
-                # if ther eis only one flavor we don't need to join based on
+                # if there is only one flavor we don't need to join based on
                 # the gtvlTbl.flavorId (which is good, since it may not exist)
                 extraJoin = """ffFlavor.flavorId = gtvlTbl.flavorId
                       AND
