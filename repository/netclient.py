@@ -692,6 +692,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             inF = urllib.urlopen(url)
 
             if tmpFile:
+		# make sure we append to the end (creating the gzip file
+		# object does a certain amount of seeking through the
+		# nested file object which we need to undo
+		tmpFile.seek(0, 2)
                 start = tmpFile.tell()
                 outF = tmpFile
             else:
@@ -702,10 +706,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             size = util.copyfileobj(inF, outF)
             del inF
 
-            outF.seek(0)
-
             if tmpFile:
                 outF = util.SeekableNestedFile(tmpFile, size, start)
+	    else:
+		outF.seek(0)
 
             gzfile = gzip.GzipFile(fileobj = outF)
             gzfile.fullSize = util.gzipFileSize(outF)
