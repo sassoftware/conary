@@ -194,6 +194,28 @@ class FilesystemJob:
 
         extraContents = []
 
+	paths = self.removes.keys()
+	paths.sort()
+	paths.reverse()
+	for target in paths:
+	    (fileObj, msg) = self.removes[target]
+
+	    # don't worry about files which don't exist
+	    try:
+		os.lstat(target)
+	    except OSError, e:
+		if e.errno == errno.ENOENT:
+		    log.warning("%s has already been removed" % 
+				    target[len(self.root):])
+		else:
+		    log.error("%s could not be removed: %s" % 
+				    (target, e.strerror))
+		    raise
+	    else:
+		fileObj.remove(target)
+
+	    log.debug(msg, target)
+
         restoreIndex = 0
         j = 0
         while restoreIndex < len(restores):
@@ -292,28 +314,6 @@ class FilesystemJob:
 
         del delayedRestores
 
-	paths = self.removes.keys()
-	paths.sort()
-	paths.reverse()
-	for target in paths:
-	    (fileObj, msg) = self.removes[target]
-
-	    # don't worry about files which don't exist
-	    try:
-		os.lstat(target)
-	    except OSError, e:
-		if e.errno == errno.ENOENT:
-		    log.warning("%s has already been removed" % 
-				    target[len(self.root):])
-		else:
-		    log.error("%s could not be removed: %s" % 
-				    (target, e.strerror))
-		    raise
-	    else:
-		fileObj.remove(target)
-
-	    log.debug(msg, target)
-
 	for (target, str, msg) in self.newFiles:
             try:
                 os.unlink(target)
@@ -396,101 +396,8 @@ class FilesystemJob:
     def getDirectoryCountSet(self):
 	return self.directorySet
 
-    def _singleTrove(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
+    def _handleRemoves(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
 		       flags):
-	"""
-	Build up the todo list for applying a single package to the
-	filesystem. Returns a package object which represents what will
-	end up in the filsystem after this object's apply() method is
-	called.
-
-	@param repos: the repository the files for basePkg are stored in
-	@type repos: repository.Repository
-	@param pkgCs: the package changeset to apply to the filesystem
-	@type pkgCs: trove.PackageChangeSet
-	@param changeSet: the changeset pkgCs is part of
-	@type changeSet: changeset.ChangeSet
-	@param basePkg: the package the stuff in the filesystem came from
-	@type basePkg: trove.Package
-	@param fsPkg: the package representing what's in the filesystem now
-	@type fsPkg: trove.Package
-	@param root: root directory to apply changes to (this is ignored for
-	source management, which uses the cwd)
-	@type root: str
-	@param flags: flags which modify update behavior.  See L{update}
-        module variable summary for flags definitions.
-	@type flags: int bitfield
-	@rtype: trove.Package
-	"""
-	if basePkg:
-	    assert(pkgCs.getOldVersion() == basePkg.getVersion())
-	cwd = os.getcwd()
-
-        # fully updated tracks whether any errors have occured; if no
-        # errors occur, fsPkg gets updated to the new version of the trove
-        # this doesn't matter for binary stuff, just source management
-	fullyUpdated = True
-
-	if (flags & IGNOREUGIDS) or os.getuid():
-	    noIds = True
-            # XXX this keeps attributes from being properly merged. we
-            # need a better fix (twm needs to be made much more flexible)
-            twmSkipList = [ "contents", "inode" ]
-	else:
-	    noIds = False
-            twmSkipList = [ "contents" ]
-
-	if fsPkg:
-	    fsPkg = fsPkg.copy()
-	else:
-	    fsPkg = trove.Trove(pkgCs.getName(), versions.NewVersion(),
-				pkgCs.getNewFlavor(), pkgCs.getChangeLog())
-
-	fsPkg.mergeTroveListChanges(pkgCs.iterChangedTroves(),
-				    redundantOkay = True)
-
-        # Create new files. If the files we are about to create already
-        # exist, it's an error.
-	for (fileId, headPath, headFileVersion) in pkgCs.getNewFileList():
-	    if headPath[0] == '/':
-		headRealPath = root + headPath
-	    else:
-		headRealPath = cwd + "/" + headPath
-
-	    headFile = files.ThawFile(changeSet.getFileChange(fileId), fileId)
-
-            try:
-                s = os.lstat(headRealPath)
-                # if this file is a directory and the file on the file
-                # system is a directory, we're OK
-                if (isinstance(headFile, files.Directory)
-                    and stat.S_ISDIR(s.st_mode)):
-		    # if nobody else owns this directory, set the ownership
-		    # and permissions from this trove. FIXME: if it is
-		    # already owned, we just assume those permissions are
-		    # right
-		    if repos.pathIsOwned(headPath):
-			continue
-                elif (not isinstance(headFile, files.Directory)
-                      and stat.S_ISDIR(s.st_mode)
-                      and os.listdir(headRealPath)):
-                    # this is a non-empty directory that's in the way of
-                    # a new file.  Even --replace-files can't help here
-                    self.errors.append("non-empty directory %s is in "
-                                       "the way of a newly created "
-                                       "file" % headRealPath)
-                elif not flags & REPLACEFILES:
-                    self.errors.append("%s is in the way of a newly " 
-                                       "created file" % headRealPath)
-                    fullyUpdated = False
-                    continue
-            except OSError:
-                # the path doesn't exist, carry on with the restore
-                pass
-
-	    self._restore(headFile, headRealPath, "creating %s")
-	    fsPkg.addFile(fileId, headPath, headFileVersion)
-
         # Remove old files. if the files have already been removed, just
         # mention that fact and continue. Don't erase files which
         # have changed contents.
@@ -535,6 +442,92 @@ class FilesystemJob:
 
 	    self._remove(oldFile, realPath, "removing %s")
 	    fsPkg.removeFile(fileId)
+
+    def _singleTrove(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
+		       flags):
+	"""
+	Build up the todo list for applying a single package to the
+	filesystem. 
+
+	@param repos: the repository the files for basePkg are stored in
+	@type repos: repository.Repository
+	@param pkgCs: the package changeset to apply to the filesystem
+	@type pkgCs: trove.PackageChangeSet
+	@param changeSet: the changeset pkgCs is part of
+	@type changeSet: changeset.ChangeSet
+	@param basePkg: the package the stuff in the filesystem came from
+	@type basePkg: trove.Package
+	@param fsPkg: the package representing what's in the filesystem now.
+        it is updated to represent what will be in the filesystem for this
+        trove if apply() is used.
+	@type fsPkg: trove.Package
+	@param root: root directory to apply changes to (this is ignored for
+	source management, which uses the cwd)
+	@type root: str
+	@param flags: flags which modify update behavior.  See L{update}
+        module variable summary for flags definitions.
+	@type flags: int bitfield
+	"""
+	if basePkg:
+	    assert(pkgCs.getOldVersion() == basePkg.getVersion())
+	cwd = os.getcwd()
+
+        # fully updated tracks whether any errors have occured; if no
+        # errors occur, fsPkg gets updated to the new version of the trove
+        # this doesn't matter for binary stuff, just source management
+	fullyUpdated = True
+
+	if (flags & IGNOREUGIDS) or os.getuid():
+	    noIds = True
+            # XXX this keeps attributes from being properly merged. we
+            # need a better fix (twm needs to be made much more flexible)
+            twmSkipList = [ "contents", "inode" ]
+	else:
+	    noIds = False
+            twmSkipList = [ "contents" ]
+
+        # Create new files. If the files we are about to create already
+        # exist, it's an error.
+	for (fileId, headPath, headFileVersion) in pkgCs.getNewFileList():
+	    if headPath[0] == '/':
+		headRealPath = root + headPath
+	    else:
+		headRealPath = cwd + "/" + headPath
+
+	    headFile = files.ThawFile(changeSet.getFileChange(fileId), fileId)
+
+            try:
+                s = os.lstat(headRealPath)
+                # if this file is a directory and the file on the file
+                # system is a directory, we're OK
+                if (isinstance(headFile, files.Directory)
+                    and stat.S_ISDIR(s.st_mode)):
+		    # if nobody else owns this directory, set the ownership
+		    # and permissions from this trove. FIXME: if it is
+		    # already owned, we just assume those permissions are
+		    # right
+		    if repos.pathIsOwned(headPath):
+			continue
+                elif (not isinstance(headFile, files.Directory)
+                      and stat.S_ISDIR(s.st_mode)
+                      and os.listdir(headRealPath)):
+                    # this is a non-empty directory that's in the way of
+                    # a new file.  Even --replace-files can't help here
+                    self.errors.append("non-empty directory %s is in "
+                                       "the way of a newly created "
+                                       "file" % headRealPath)
+                elif (not flags & REPLACEFILES and
+                      not self.removes.has_key(headRealPath)):
+                    self.errors.append("%s is in the way of a newly " 
+                                       "created file" % headRealPath)
+                    fullyUpdated = False
+                    continue
+            except OSError:
+                # the path doesn't exist, carry on with the restore
+                pass
+
+	    self._restore(headFile, headRealPath, "creating %s")
+	    fsPkg.addFile(fileId, headPath, headFileVersion)
 
         # Handle files which have changed betweeen versions. This is by
         # far the most complicated case.
@@ -818,7 +811,6 @@ class FilesystemJob:
 	self.renames = []
 	self.restores = []
 	self.removes = {}
-	self.newPackages = []
 	self.oldPackages = []
 	self.errors = []
 	self.newFiles = []
@@ -831,22 +823,51 @@ class FilesystemJob:
         self.linkGroups = {}
 	self.repos = repos
 
+        pkgList = []
+
 	for pkgCs in changeSet.iterNewPackageList():
-	    name = pkgCs.getName()
-	    old = pkgCs.getOldVersion()
+            old = pkgCs.getOldVersion()
 	    if old:
 		localVer = old.fork(versions.LocalBranch(), sameVerRel = 1)
-		basePkg = repos.getTrove(name, old, pkgCs.getOldFlavor())
-		pkg = self._singleTrove(repos, pkgCs, changeSet, basePkg, 
-				      fsPkgDict[(name, localVer)], root, flags)
+                newFsPkg = fsPkgDict[(pkgCs.getName(), localVer)].copy()
+            else:
+                newFsPkg = trove.Trove(pkgCs.getName(), versions.NewVersion(),
+                                    pkgCs.getNewFlavor(), pkgCs.getChangeLog())
+
+            pkgList.append((pkgCs, newFsPkg))
+
+	for (pkgCs, newFsPkg) in pkgList:
+	    old = pkgCs.getOldVersion()
+
+	    if old:
+		basePkg = repos.getTrove(pkgCs.getName(), old, 
+                                         pkgCs.getOldFlavor())
+	    else:
+                basePkg = None
+
+            self._handleRemoves(repos, pkgCs, changeSet, basePkg,
+                                      newFsPkg, root, flags)
+
+	for (pkgCs, newFsPkg) in pkgList:
+	    old = pkgCs.getOldVersion()
+
+	    if old:
+		basePkg = repos.getTrove(pkgCs.getName(), old, 
+                                         pkgCs.getOldFlavor())
 		self.oldPackages.append((basePkg.getName(), 
 					 basePkg.getVersion(),
 					 basePkg.getFlavor()))
 	    else:
-		pkg = self._singleTrove(repos, pkgCs, changeSet, None, 
-					  None, root, flags)
+                basePkg = None
 
-	    self.newPackages.append(pkg)
+            self._singleTrove(repos, pkgCs, changeSet, basePkg,
+                                      newFsPkg, root, flags)
+
+            newFsPkg.mergeTroveListChanges(pkgCs.iterChangedTroves(),
+                                           redundantOkay = True)
+
+        pkgList = [ x[1] for x in pkgList ]
+        self.newPackages = pkgList
 
 	if flags & KEEPEXISTING:
 	    return
