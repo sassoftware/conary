@@ -112,9 +112,15 @@ def main(argv):
                 troveName, troveVersion, flavor = getTroveInfo(sqldb, instanceId)
                 fileVersion = sqldb.versionTable.getBareId(versionId)
                 print troveName, troveVersion.asString(), path, \
-                      '(sha1: %s)' %h, 'missing from data store'
-                neededFiles.append((f.fileId(), fileVersion))
-                neededSha1s.append(h)
+                      '(sha1: %s)' %h, 'missing from data store',
+                if (fileVersion.isLocal() or fileVersion.isEmerge()
+                    or fileVersion.isLocalCook()):
+                    print ('but this trove was built locally so the contents '
+                           'can not be restored'),
+                else:
+                    neededFiles.append((f.fileId(), fileVersion))
+                    neededSha1s.append(h)
+                print
             else:
                 # excellent, not missing the contents.  let's count
                 # how many instances we have
