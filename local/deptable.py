@@ -333,7 +333,7 @@ class DependencyTables:
         createDepUserTable(cu, 'TmpRequires', isTemp = True)
 
         cu.execute("""
-                CREATE VIEW providesBranch AS 
+                CREATE TEMPORARY VIEW providesBranch AS 
                     SELECT provides.depId AS depId,
                            provides.instanceId AS instanceId FROM 
                     LabelMap JOIN Nodes ON
