@@ -263,6 +263,9 @@ class Database:
     def openFile(self, file):
 	return VersionedFile(self.db, file)
 
+    def close(self):
+	self.db.close()
+
     def __init__(self, path):
 	# FIXME: this needs locking
 	self.db = dbhash.open(path, "c")
