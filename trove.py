@@ -218,22 +218,22 @@ class PackageChangeSet:
 	rc = ""
 
 	for id in self.getOldFileList():
-	    rc = rc + "-%s\n" % id
+	    rc += "-%s\n" % id
 
 	for (id, path, version) in self.getNewFileList():
-	    rc = rc + "+%s %s %s\n" % (id, path, version.asString())
+	    rc += "+%s %s %s\n" % (id, path, version.asString())
 
 	for (id, path, version) in self.getChangedFileList():
-	    rc = rc + "~%s " % id
+	    rc += "~%s " % id
 	    if path:
-		rc = rc + path
+		rc += path
 	    else:
-		rc = rc + "-"
+		rc += "-"
 
 	    if version:
-		rc = rc + " " + version.asString() + "\n"
+		rc += " " + version.asString() + "\n"
 	    else:
-		rc = rc = " -\n"
+		rc += " -\n"
 
 	if self.oldVersion:
 	    oldVerStr = self.oldVersion.asString()
