@@ -1,12 +1,14 @@
 Changes in 0.14.12:
-  * shadow command looks at buildLabel instead of following
+  * The shadow command looks at buildLabel instead of following
     installLabelPath
   * In some cases, troves with an incompatible flavor were chosen when
     --resolve was used. The proper flavor is now used, or the
     dependency is reported as unsatisfiable.
-  * more multilib fixes: several more instancese of %(lib)s were moved
-    out of the default specification for generic components like
-    :runtime and :devel.
+  * Several more instances of %(lib)s were moved out of the default
+    specification for generic components like :runtime and :devel for
+    better multilib support.
+  * Policy now helps ensure that :python components are either
+    architecture-neutral or multilib-friendly.
 
 Changes in 0.14.11:
   * Local systems store config files in sql tables now.  Use

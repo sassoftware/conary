@@ -117,6 +117,41 @@ class BadInterpreterPaths(policy.Policy):
                     %(interp, path, m.contents['line']))
 
 
+class NonMultilibPython(policy.Policy):
+    invariantsubtrees = [
+        '%(libdir)s/',
+        '%(prefix)s/lib/',
+    ]
+    invariantinclusions = [
+        ',*/python.*/site-packages/.*',
+    ]
+    def __init__(self, *args, **keywords):
+        self.foundlib = False
+        self.foundlib64 = False
+        self.reported = False
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def test(self):
+	if self.macros.lib == 'lib':
+	    # no need to do anything
+	    return False
+        return True
+
+    def doFile(self, path):
+        if self.reported:
+            return
+        if self.currentsubtree == '%(libdir)s/':
+            self.foundlib64 = path
+        else:
+            self.foundlib = path
+        if self.foundlib64 and self.foundlib and not self.reported:
+            self.recipe.reportErrors(
+                'python packages may install in /usr/lib or /usr/lib64,'
+                ' but not both: at least %s and %s both exist' %(
+                self.foundlib, self.foundlib64))
+            self.reported = True
+
+
 class ImproperlyShared(policy.Policy):
     """
     The C{%(datadir)s} directory (normally /usr/share) is intended for
@@ -1514,6 +1549,7 @@ def DefaultPolicy(recipe):
 	NonBinariesInBindirs(recipe),
 	FilesInMandir(recipe),
         BadInterpreterPaths(recipe),
+        NonMultilibPython(recipe),
 	ImproperlyShared(recipe),
 	CheckSonames(recipe),
         RequireChkconfig(recipe),
