@@ -388,7 +388,7 @@ class recipeBuilder:
             "        # RPMs may not follow conary rules for config files for",
             "        # each file in /etc, so we'll stick to only files marked",
             "        # as config files in the RPM proper",
-            "        r.EtcConfig(exceptions='.*'",
+            "        r.EtcConfig(exceptions='.*')",
         ]
 
         users = {}
@@ -405,10 +405,10 @@ class recipeBuilder:
             self.rpmHeader[rpmhelper.FILEFLAGS],
             self.rpmHeader[rpmhelper.FILEUSERNAME],
             self.rpmHeader[rpmhelper.FILEGROUPNAME]):
-            escaped_path = util.literalRegex(path)
+            escaped_path = util.literalRegex(util.normpath(path))
             if username != 'root' or groupname != 'root':
                 self.recipe.append(
-                    "        r.Ownership('%s', '%s', '%s')"
+                    "        r.Ownership('%s', '%s', r'%s')"
                     %(username, groupname, escaped_path))
                 if username != 'root':
                     if username not in users:
@@ -423,7 +423,7 @@ class recipeBuilder:
                    or groupname != 'root':
                     info_directories[path] = (mode, username, groupname)
                     self.recipe.append(
-                        "        r.ExcludeDirectories(exceptions='%s')"
+                        "        r.ExcludeDirectories(exceptions=r'%s')"
                         %escaped_path)
                     included_directories.append(path)
                     continue
@@ -440,26 +440,26 @@ class recipeBuilder:
                 minor = rdev & 0xff | (rdev >> 12) & 0xffffff00
                 major = (rdev >> 8) & 0xfff
                 self.recipe.append(
-                    "        r.MakeDevices('%s', '%s', '%d', '%d', '%s', '%s', '0%o')"%
+                    "        r.MakeDevices(r'%s', '%s', '%d', '%d', '%s', '%s', '0%o')"%
                     (escaped_path, type, major, minor, username, groupname,
                      mode&0777))
                 continue
             
-            if mode & 7000:
+            if mode & 07000:
                 self.recipe.append(
-                    "        r.SetModes('%s', 0%o)"%(escaped_path, mode))
+                    "        r.SetModes(r'%s', 0%o)"%(escaped_path, mode & 07777))
 
             if flags & 1:
                 # config file
                 self.recipe.append(
-                    "        r.Config('%s')" %escaped_path)
+                    "        r.Config(r'%s')" %escaped_path)
 
 
         for dir in directories:
             if dir not in filled_directories and \
                dir not in included_directories:
                 self.recipe.append(
-                    "        r.ExcludeDirectories(exceptions='%s')"
+                    "        r.ExcludeDirectories(exceptions=r'%s')"
                     % util.literalRegex(dir))
 
         
