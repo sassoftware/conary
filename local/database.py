@@ -321,7 +321,6 @@ class Database(SqlDbRepository):
 	    fsPkgDict[(fsPkg.getName(), fsPkg.getVersion())] = fsPkg
 
 	if not isRollback:
-            localRollbacks = True
             if localRollbacks:
                 inverse = cs.makeRollback(self, configFiles = 1)
             else:
