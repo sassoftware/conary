@@ -153,27 +153,27 @@ class BuildPackage(dict):
         """
 	return self.name
 
-    def getUserMap():
+    def getUserMap(self):
         """
         Dict mapping user names to tuples of C{(preferred_uid, groupname,
         preferred_groupid, homedir, comment, shell)}
         """
         return self.recipe.usermap
 
-    def getUserGroupMap():
+    def getUserGroupMap(self):
         """
         Reverse map from group name to user name for groups created as part
         of a user definition.
         """
         return self.recipe.usergrpmap
 
-    def getGroupMap():
+    def getGroupMap(self):
         """
         Dict mapping group names to preferred_groupid
         """
         return self.recipe.groupmap
 
-    def getSuppGroupMap():
+    def getSuppGroupMap(self):
         """
         Dict mapping user names to C{(group, preferred_groupid)} tuples
         """
