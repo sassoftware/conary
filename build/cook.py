@@ -121,6 +121,13 @@ class _IdGen:
                 assert(self.map[path][0] == pathId)
             self.map[path] = (pathId, version, fileStream)
 
+    def merge(self, idDict):
+        # merges the ids contained in idDict into this object; existing
+        # id's are preferred
+        newD = dict( (x[0], (x[1], None, None)) for x in idDict.iteritems() )
+        newD.update(self.map)
+        self.map = newD
+
     def populate(self, repos, troveList):
 	# Find the files and ids which were owned by the last version of
 	# this package on the branch.
@@ -533,14 +540,8 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
     buildTime = time.time()
 
-    # build up the name->fileid mapping so we reuse fileids wherever
-    # possible; we do this by looking in the database for the latest
-    # packages for each flavor available on the branch and recursing
-    # through their subpackages; this mechanism continues to work as
-    # packages and subpackages come and go.
-    packageList = []
+    # create all of the package troves we need
     grpMap = {}
-    ident = _IdGen()
     for buildPkg in bldList:
         compName = buildPkg.getName()
         main, comp = compName.split(':')
@@ -551,33 +552,41 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             grpMap[main].setBuildTime(buildTime)
             grpMap[main].setConaryVersion(constants.version)
 
-        # XXX this used to be buildBranch, which would not be on targetLabel
-        # if given.  Does that mean that this search will fail and not
-        # find the desired ids?
-        searchBranch = targetVersion.branch()
-        if targetLabel:
-            searchBranch = searchBranch.parentBranch()
-        versionDict = []
-        while not versionDict and searchBranch:
-            # this gives us the latest version of each flavor available
-            # on the branch
+    # look up the pathids used by our immediate predecessor troves.
+    ident = _IdGen()
 
-            versionDict = repos.getTroveLeavesByBranch(
-                                { main : { searchBranch : None }})
+    searchBranch = targetVersion.branch()
+    if targetLabel:
+        # this keeps cook and emerge branchs from showing up
+        searchBranch = searchBranch.parentBranch()
 
-            if not versionDict:
-                if searchBranch.hasParentBranch():
-                    searchBranch = searchBranch.parentBranch()
-                else:
-                    searchBranch = None
+    versionDict = dict( [ (x, { searchBranch : None } ) for x in grpMap ] )
+    versionDict = repos.getTroveLeavesByBranch(versionDict)
 
-        troveList = []
-        if versionDict:
-            for (ver, flavors) in versionDict[main].iteritems():
-                troveList += [ (main, ver, x) for x in flavors ]
+    if not versionDict and searchBranch.hasParentBranch():
+        # there was no match on this branch; look uphill
+        searchBranch = searchBranch.parentBranch()
+        versionDict = dict( [ (x, { searchBranch : None } ) for x in grpMap ] )
+        versionDict = repos.getTroveLeavesByBranch(versionDict)
 
-        ident.populate(repos, troveList)
+    troveList = []
+    for main in versionDict:
+        for (ver, flavors) in versionDict[main].iteritems():
+            troveList += [ (main, ver, x) for x in flavors ]
 
+    ident.populate(repos, troveList)
+
+    # this adds any other pathids we might need
+    while True:
+        d = repos.getPackageBranchPathIds(recipeClass.name + ':source',
+                                          searchBranch)
+        ident.merge(d)
+
+        if not searchBranch.hasParentBranch():
+            break
+        searchBranch = searchBranch.parentBranch()
+
+    packageList = []
     for buildPkg in bldList:
         compName = buildPkg.getName()
         main, comp = compName.split(':')

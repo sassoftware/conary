@@ -1,3 +1,10 @@
+Changes in 0.14.9:
+  * Shadow branches didn't return parent branches properly. This caused
+    incorrect pathId's to show up on cook on shallow shadows.
+  * Reworked the code which looks up pathIds to take advantage of a new
+    server call (getPackageBranchPathIds) so it's faster and looks on
+    both the full branch, and full parent branches
+
 Changes in 0.14.8:
   * Fixed bug where streams for commits on distributed branches didn't always
     get set properly
