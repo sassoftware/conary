@@ -80,13 +80,9 @@ class FileMode:
 	else:
 	    return time.strftime("%b %e  %Y", timeSet)
 
-    def perms(self, new = None, addbits = None):
+    def perms(self, new = None):
 	if (new != None and new != "-"):
 	    self.thePerms = new
-	
-	if addbits:
-	    # primarily useful for adding setuid/setgid bits
-	    self.thePerms &= addbits
 
 	return self.thePerms
 

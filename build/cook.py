@@ -52,6 +52,8 @@ def _createPackage(repos, cfg, bldPkg, ident):
         elif realPath:
             f = files.FileFromFilesystem(realPath, ident(path), 
                                          type = buildFile.getType())
+	    # setuid or setgid must be set explicitly in buildFile
+	    f.thePerms &= 01777
         else:
             raise CookError("unable to create file object for package")
 

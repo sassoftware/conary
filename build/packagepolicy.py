@@ -127,7 +127,7 @@ class AddModes(policy.Policy):
 	    for package in packages.keys():
 		if packages[package].has_key(path):
 		    print 'suid/sgid:', path
-		    packages[package][path].perms(addbits=mode)
+		    packages[package][path].perms(mode)
 
 
 def DefaultPolicy():

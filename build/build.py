@@ -227,12 +227,25 @@ class InstallDesktopfile(BuildCommand):
 	BuildCommand.doBuild(self, macros)
 
 
-class _PutFiles(BuildAction):
-    def _sugidMode(self, path):
-	specialbits = self.mode & 06000
-	if specialbits:
-	    self.recipe.fixmodes[path] = specialbits
+class _FileAction(BuildAction):
+    def chmod(self, destdir, path):
+	if self.mode >= 0:
+	    os.chmod(destdir+os.sep+path, self.mode & 01777)
+	    if self.mode & 06000:
+		self.recipe.fixmodes[path] = self.mode
+	
+class SetMode(_FileAction):
+    def __init__(self, path, mode):
+	self.mode = mode
+	if type(path) is string:
+	    path = (path,)
+	self.paths = path
 
+    def do(self, macros):
+	for path in self.paths:
+	    self.chmod(macros['destdir'], path)
+
+class _PutFiles(_FileAction):
     def do(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 	destlen = len(macros['destdir'])
@@ -254,8 +267,7 @@ class _PutFiles(BuildAction):
 		    util.copyfile(source, thisdest)
 
 		if self.mode >= 0:
-		    os.chmod(thisdest, self.mode)
-		    self._sugidMode(thisdest[destlen:])
+		    self.chmod(macros['destdir'], thisdest[destlen:])
 
     def __init__(self, fromFiles, toFile, mode, use):
 	self.toFile = toFile

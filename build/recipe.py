@@ -444,18 +444,6 @@ class Recipe:
     def getDevices(self):
         return self._devices
 
-    def setUid(self, path):
-	if path in self.fixmodes:
-	    self.fixmodes[path] &= 04000
-	else:
-	    self.fixmodes[path] = 04000
-
-    def setGid(self, path):
-	if path in self.fixmodes:
-	    self.fixmodes[path] &= 02000
-	else:
-	    self.fixmodes[path] = 02000
-
     def packages(self, namePrefix, version, root):
         # by default, everything that hasn't matched a pattern in the
         # main package filter goes in the package named self.name
