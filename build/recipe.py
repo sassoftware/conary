@@ -240,7 +240,7 @@ class _policyUpdater:
 	if not args:
 	    # we can just update the existing object
 	    for key in keywords.keys():
-		if not self.theobject.__dict__.has_key(key):
+		if key not in self.theobject.__dict__:
 		    raise TypeError, (
 			'no such key %s in %s'
 			    %(key, self.theobject.__class__.__name__))
@@ -299,8 +299,8 @@ class Recipe:
 	extractDir = extractDir % self.macros
 	self.sources.append((file, 'tarball', extractDir, use, ()))
 
-    def addPatch(self, file, level='1', backup='', extractDir='', keyid=None, use=None):
-	self._appendSource(file, keyid, 'patch', extractDir, use, (level, backup))
+    def addPatch(self, file, level='1', backup='', extractDir='', keyid=None, use=None, macros=False):
+	self._appendSource(file, keyid, 'patch', extractDir, use, (level, backup, macros))
 
     def addSource(self, file, keyid=None, extractDir='', apply=None, use=None):
 	self._appendSource(file, keyid, 'source', extractDir, use, (apply))
@@ -384,7 +384,7 @@ class Recipe:
 	    util.mkdirChain(destDir)
 
 	    if filetype == 'patch':
-		(level, backup) = args
+		(level, backup, macros) = args
 		f = lookaside.findAll(self.cfg, self.laReposCache, file, 
 			      self.name, self.srcdirs)
 		provides = "cat"
@@ -396,8 +396,18 @@ class Recipe:
 		    backup = '-b -z %s' % backup
 		if targetdir:
 		    destDir = "/".join((destDir, targetdir))
-		util.execute('%s %s | patch -d %s -p%s %s'
-		             %(provides, f, destDir, level, backup))
+		if macros:
+		    print '+ applying macros to %s' %f
+		    pin = os.popen('%s %s' %(provides, f))
+		    print '+ patch -d %s -p%s %s' %(destDir, level, backup)
+		    pout = os.popen('patch -d %s -p%s %s'
+		                    %(destDir, level, backup), 'w')
+		    pout.write(pin.read()%self.macros)
+		    pin.close()
+		    pout.close()
+		else:
+		    util.execute('%s %s | patch -d %s -p%s %s'
+				 %(provides, f, destDir, level, backup))
 		continue
 
 	    if filetype == 'source':
@@ -415,11 +425,6 @@ class Recipe:
 	               ('destdir', root))
         if self.build is None:
             pass
-	if self.build == []:
-	    print '\n\n\n'
-	    print ' +++ default build rules DEPRECATED, please set build rules explicitly! +++'
-	    print '\n\n\n'
-	    self.build = self.defaultbuild
         elif isinstance(self.build, str):
             util.execute(self.build %self.macros)
         elif isinstance(self.build, (tuple, list)):
@@ -516,8 +521,9 @@ class Recipe:
 	#   they all have to be True in order to apply it
 	# - args is filetype-specific:
 	#   patch: (level, backup)
-	#     - level is -p<level>
-	#     - backup is .backupname suffix
+	#     - level is -p<level> (1)
+	#     - backup is .backupname suffix (none)
+	#     - macros is boolean: apply self.macros to patch? (False)
 	#   source: (apply)
 	#     - apply is None or command to util.execute(apply)
 	self.signatures = {}
@@ -527,8 +533,6 @@ class Recipe:
 	self.laReposCache = laReposCache
 	self.srcdirs = srcdirs
 	self.theMainDir = self.name + "-" + self.version
-	# what needs to be done to get from sources to an installed tree
-	self.defaultbuild = [build.Make(), build.MakeInstall()]
 	self.build = []
 	# what needs to be done to massage the installed tree
         self.process = []
