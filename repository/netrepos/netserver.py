@@ -1057,7 +1057,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             del self.repos
             del self.db
 
-            self.db = sqlite3.connect(self.sqlDbPath)
+            self.db = sqlite3.connect(self.sqlDbPath, timeout=30000)
 	    self.troveStore = trovestore.TroveStore(self.db)
 
 	    sb = os.stat(self.sqlDbPath)
