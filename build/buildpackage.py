@@ -126,8 +126,8 @@ class BuildPackage(dict):
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
 	    if depClass == 'soname':
                 assert(abi)
-		curClass = deps.SonameDependencies
-                flags.append((abi[1], deps.FLAG_SENSE_REQUIRED))
+                curClass = deps.SonameDependencies
+                flags.extend((x, deps.FLAG_SENSE_REQUIRED) for x in abi[1])
                 dep = deps.Dependency(abi[0] + "/" + main, flags)
 	    elif depClass == 'abi':
 		curClass = deps.AbiDependency
