@@ -125,7 +125,11 @@ class FilesystemJob:
 		if not pid:
 		    os.chdir(self.root)
 		    os.chroot(self.root)
-		    os.execl(p, p)
+                    try:
+                        # XXX add a test case for an invalid ldconfig binary
+                        os.execl(p, p)
+                    except:
+                        pass
 		    os._exit(1)
 		(id, status) = os.waitpid(pid, 0)
 		if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
@@ -145,8 +149,11 @@ class FilesystemJob:
 		    if not pid:
 			os.chdir(self.root)
 			os.chroot(self.root)
-			os.execl(p, p, "--add", name)
-			os._exit(1)
+                        # XXX add a test case for an invalid checkconfig binary
+                        try:
+                            os.execl(p, p, "--add", name)
+                        except:
+                            os._exit(1)
 		    (id, status) = os.waitpid(pid, 0)
 		    if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
 			log.error("chkconfig failed")
