@@ -5,6 +5,12 @@
 # All rights reserved
 #
 
+
+import sys
+if sys.version_info < (2, 3):
+    print "error: python 2.3 or greater is requried"
+    sys.exit(1)
+
 import options
 import branch
 import commit
@@ -21,14 +27,9 @@ import repository
 import rollbacks
 import conarycfg
 import srcctl
-import sys
 import updatecmd
 import util
 import xmlrpclib
-
-if sys.version_info < (2, 3):
-    print "error: python 2.3 or greater is requried"
-    sys.exit(1)
 
 sys.excepthook = util.excepthook
 
