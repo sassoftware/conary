@@ -7,6 +7,8 @@ import grp
 import shutil
 import util
 import stat
+import pwd
+import grp
 
 class FileMode:
 
@@ -127,11 +129,27 @@ class File(FileMode):
     def infoLine(self):
 	return FileMode.infoLine(self)
 
-    def copy(self):
-	raise "method should be provided by derivative classes"
+    def restore(self, reppath, srcpath, root):
+	self.chmod(root)
 
-    def chmod(self, path):
-	os.chmod(path, self.thePerms)
+    def chmod(self, root):
+	os.chmod(root + self.path(), self.thePerms)
+
+    def setOwnerGroup(self, root):
+	if os.getuid(): return
+
+	# root should set the file ownerships properly
+	uid = pwd.getpwnam(f.owner())[2]
+	gid = grp.getgrnam(f.group())[2]
+
+	# FIXME: this needs to use lchown, which is in 2.3, and
+	# this should happen unconditionally
+	os.chown(root + self.path(), uid, gid)
+
+    # copies a files contents into the repository, if necessary
+    def archive(self, reppath, path):
+	# most file types don't need to do this
+	pass
 
     def __init__(self, path, newVersion = None, info = None):
 	self.path(path)
@@ -157,12 +175,20 @@ class SymbolicLink(File):
 
 	return 0
 
-    def chmod(self, path):
+    def chmod(self, root, path):
 	# chmod() on a symlink follows the symlink
 	pass
 
-    def copy(self, source, target):
+    def setOwnerGroup(self, root, path):
+	# chmod() on a symlink follows the symlink
+	pass
+
+    def restore(self, reppath, srcpath, root):
+	target = root + self.path()
 	os.symlink(self.theLinkTarget, target)
+
+	# this doesn't actually do anything for a symlink
+	File.restore(self, reppath, srcpath, root)
 
     def __init__(self, path, version = None, info = None):
 	if (info):
@@ -194,9 +220,12 @@ class NamedPipe(File):
     def compare(self, other):
 	return File.compare(self, other)
 
-    def copy(self, source, target):
+    def restore(self, reppath, srcpath, root):
+	target = root + self.path()
 	if not os.path.exists(target):
 	    os.mkfifo(target)
+
+	File.restore(self, reppath, srcpath, root)
 
     def __init__(self, path, version = None, info = None):
 	File.__init__(self, path, version, info)
@@ -209,9 +238,12 @@ class Directory(File):
     def compare(self, other):
 	return File.compare(self, other)
 
-    def copy(self, source, target):
+    def restore(self, reppath, srcpath, root):
+	target = root + self.path()
 	if not os.path.exists(target):
 	    os.mkdir(target)
+
+	File.restore(self, reppath, srcpath, root)
 
     def __init__(self, path, version = None, info = None):
 	File.__init__(self, path, version, info)
@@ -229,11 +261,14 @@ class DeviceFile(File):
 	
 	return 0
 
-    def copy(self, source, target):
+    def restore(self, reppath, srcpath, root):
+	target = root + self.path()
 	if not os.path.exists(target):
 	    # FIXME os.mknod is in 2.3
 	    os.system("mknod %s %c %d %d" % (target, self.type, self.major,
 					    self.minor))
+
+	File.restore(self, reppath, srcpath, root)
 
     def majorMinor(self, type = None, major = None, minor = None):
 	if type:
@@ -269,8 +304,18 @@ class RegularFile(File):
 
 	return 0
 
-    def copy(self, source, target):
+    def restore(self, reppath, srcpath, root):
+	source = reppath + "/files" + self.path() + ".contents/" + \
+		   self.uniqueName() 
+	target = root + self.path()
 	shutil.copyfile(source, target)
+	File.restore(self, reppath, srcpath, root)
+
+    def archive(self, reppath):
+	dest = reppath + "/files" + self.path() + ".contents"
+	util.mkdirChain(dest)
+	dest = dest + "/" + self.uniqueName()
+	shutil.copyfile(root + "/" + file.path(), dest)
 
     def __init__(self, path, version = None, info = None):
 	if (info):

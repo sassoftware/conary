@@ -30,17 +30,4 @@ def doUpdate(reppath, root, pkgName):
 	dir = os.path.split(target)[0]
 	util.mkdirChain(dir)
 
-	f.copy(source, target)
-
-	if (f.__class__ != files.SymbolicLink and
-		f.__class__ != files.Socket):
-	    os.chmod(target, f.perms())
-
-	    if not os.getuid():
-		# root should set the file ownerships properly
-		uid = pwd.getpwnam(f.owner())[2]
-		gid = grp.getgrnam(f.group())[2]
-
-		# FIXME: this needs to use lchown, which is in 2.3, and
-		# this should happen unconditionally
-		os.chown(target, uid, gid)
+	f.restore(reppath, None, root)
