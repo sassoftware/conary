@@ -222,6 +222,9 @@ class File(FileMode):
 
 	return self.theId
 
+    def remove(self, target):
+	os.unlink(target)
+
     def restore(self, target, skipContents, skipMtime = 0):
 	self.chmod(target)
 	self.setOwnerGroup(target)
@@ -357,6 +360,9 @@ class Directory(File):
 
 	File.restore(self, target, skipContents)
 
+    def remove(self, target):
+	os.rmdir(target)
+
     def __init__(self, fileId, info = None):
 	File.__init__(self, fileId, info, infoTag = "d")
 
@@ -477,9 +483,6 @@ class RegularFile(File):
 	File.restore(self, target, skipContents)
 
     def archive(self, repos, file):
-	if repos.hasFileContents(self.sha1()):
-	    return
-
 	repos.newFileContents(self.sha1(), file)
 
     def applyChangeLine(self, line):
