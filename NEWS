@@ -13,7 +13,7 @@ Changes in 0.14.0
   * the repository code now uses a 30 second timeout when attempting to
     access the database
   * Have architectures control their march values in the architecture
-     config files.
+    config files.
   * add Arch.getCurrentArch() to get the major architecture that is in use
     during a build
 
