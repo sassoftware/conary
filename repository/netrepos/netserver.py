@@ -1,6 +1,7 @@
 from repository import changeset
 from repository import fsrepos
 import filecontainer
+import md5
 import os
 import sqlite
 import tempfile
@@ -189,7 +190,9 @@ class NetworkAuthorization:
 		    password=%s) 
 	    JOIN Permissions ON uuserId=Permissions.userId
 	""" 
-	params = authToken
+	m = md5.new()
+	m.update(authToken[1])
+	params = (authToken[0], m.hexdigest())
 
 	if label or trove:
 	    stmt += " WHERE "
