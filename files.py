@@ -281,13 +281,7 @@ class TupleStream(InfoStream):
 	    for (i, (name, itemType, size)) in enumerate(self.makeup):
 		self.items.append(itemType(all[i]))
 
-	print "----"
-	print self.makeup
-	print self.items
-	print first
 	for (i, (name, itemType, size)) in enumerate(self.makeup):
-	    print "I", i
-	    print self.items[i]
 	    self.__dict__[name] = lambda num = i: self.items[num].value()
 	    setName = "set" + name[0].capitalize() + name[1:]
 	    self.__dict__[setName] = \
@@ -702,8 +696,8 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
 	f = NamedPipe(fileId)
     elif (stat.S_ISBLK(s.st_mode)):
 	f = BlockDevice(fileId)
-	f.devt.major(s.st_rdev >> 8)
-	f.devt.minor(s.st_rdev & 0xff)
+	f.devt.setMajor(s.st_rdev >> 8)
+	f.devt.setMinor(s.st_rdev & 0xff)
     elif (stat.S_ISCHR(s.st_mode)):
 	f = CharacterDevice(fileId)
 	f.devt.major(s.st_rdev >> 8)
