@@ -159,7 +159,7 @@ Arch.addFlag('x86', Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686)
 Arch._freeze()
 
 __doc__ += """
-@type Arch: ArchClass
+@type Arch: UseClass
 @var Arch: Set of architectures defined for this build, with their boolean status
 The Arch flags have the following meanings:
 """
