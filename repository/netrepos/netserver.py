@@ -591,7 +591,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   versionType = self._GTL_VERSION_TYPE_LABEL)
 
     def getTroveVersionList(self, authToken, clientVersion, troveNameFlavors,
-                            flavorFilter = None):
+                            flavorFilter = 0):
         if clientVersion >= 23:
             troveFilter = {}
 
@@ -606,9 +606,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             if troveNameFlavors:
                 troveFilter = {}.fromkeys(troveNameFlavors, 
-                                            { None : flavorFilter })
+                                            { None : [ flavorFilter ] })
             else:
-                troveFilter = { None : { None : flavorFilter } } 
+                troveFilter = { None : { None : [ 0 ] } } 
             
         return self._getTroveList(authToken, clientVersion, troveFilter,
                                   withVersions = True, withFlavors = True)
@@ -689,7 +689,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return d
 
     def getAllTroveLeaves(self, authToken, clientVersion, troveNameFlavors,
-                          flavorFilter = None):
+                          flavorFilter = 0):
         if clientVersion >= 23:
             troveFilter = {}
 
@@ -704,9 +704,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             if troveNameFlavors:
                 troveFilter = {}.fromkeys(troveNameFlavors, 
-                                            { None : flavorFilter })
+                                            { None : [ flavorFilter ] })
             else:
-                troveFilter = { None : { None : flavorFilter } } 
+                troveFilter = { None : { None : [ flavorFilter ] } } 
             
         return self._getTroveList(authToken, clientVersion, troveFilter,
                                   withVersions = True, 
