@@ -26,6 +26,16 @@ class SourceState:
     directories.
     """
 
+    def expandVersionStr(self, versionStr):
+	if versionStr[0] == "@":
+	    # get the name of the repository from the current branch
+	    repName = self.getTroveBranch().branchNickname().getHost()
+	    return repName + versionStr
+	elif versionStr[0] != "/" and versionStr.find("@") == -1:
+	    # non fully-qualified version; make it relative to the current
+	    # branch
+	    return self.getTroveBranch().asString() + "/" + versionStr
+
     def addFile(self, fileId, path, version):
 	self.files[fileId] = (path, version)
 
@@ -160,7 +170,7 @@ def checkout(repos, cfg, dir, name, versionStr = None):
 
     state.write(dir + "/SRS")
 
-def buildChangeSet(repos, srcVersion = None, needsHead = False):
+def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
     """
     Builds a change set against the sources in the current directory and
     builds an in-core state object as if these changes were committed. If
@@ -171,6 +181,8 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 
     @param repos: Repository this directory is against.
     @type repos: repository.Repository
+    @param state: Current state object
+    @type state: SourceState
     @param srcVersion: Version in the repository to generate the change ste
     against
     @type srcVersion: versions.Version
@@ -179,12 +191,6 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
     @type needsHead: Boolean
     @rtype: (boolean, SourceState, changeset.ChangeSet, package.Package)
     """
-
-    if not os.path.isfile("SRS"):
-	log.error("SRS file must exist in the current directory for source commands")
-	return
-
-    state = SourceState("SRS")
 
     if not state.getTroveVersion():
 	# new package, so it shouldn't exist yet
@@ -197,15 +203,17 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 	srcPkg = None
     else:
 	if not srcVersion:
-	    srcVersion = repos.pkgLatestVersion(state.getTroveName(), 
-						state.getTroveBranch())
+	    srcVersion = state.getTroveVersion()
 
 	srcPkg = repos.getPackageVersion(state.getTroveName(), srcVersion)
-	srcPkg.changeVersion(repos.pkgGetFullVersion(state.getTroveName(), srcVersion))
+	srcPkg.changeVersion(repos.pkgGetFullVersion(state.getTroveName(), 
+			     srcVersion))
 
 	if needsHead:
 	    # existing package
-	    if not srcVersion.equal(state.getTroveVersion()):
+	    headVersion = repos.pkgLatestVersion(state.getTroveName(), 
+						 state.getTroveBranch())
+	    if not headVersion.equal(state.getTroveVersion()):
 		log.error("working version (%s) is different from the head " +
 			  "of the branch (%s); use update", 
 			  state.getTroveVersion().asString(), 
@@ -278,7 +286,11 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 	if path.endswith(".recipe"):
 	    f.isConfig(set = True)
 
-	if not version:
+	if not srcPkg.hasFile(fileId):
+	    # if we're committing against head, this better be a new file.
+	    # if we're generating a diff against someplace else, it might not 
+	    # be.
+	    assert(not needsHead or not version)
 	    # new file, so this is easy
 	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
 	    state.addFile(fileId, path, newVersion)
@@ -290,16 +302,14 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 	    foundDifference = 1
 	    continue
 
-	duplicateVersion = cook.checkBranchForDuplicate(repos, 
-						    state.getTroveBranch(), f)
-        if not duplicateVersion:
+	oldVersion = srcPkg.getFile(fileId)[1]	
+	(oldFile, oldCont) = repos.getFileVersion(fileId, oldVersion,
+						  withContents = 1)
+        if not f.same(oldFile):
 	    foundDifference = 1
 	    pkg.addFile(fileId, path, newVersion)
 	    state.addFile(fileId, path, newVersion)
 
-	    oldVersion = srcPkg.getFile(fileId)[1]
-	    (oldFile, oldCont) = repos.getFileVersion(fileId, oldVersion,
-						      withContents = 1)
 	    (filecs, hash) = changeset.fileChangeSet(fileId, oldFile, f)
 	    changeSet.addFile(fileId, oldVersion, newVersion, filecs)
 	    if hash:
@@ -310,7 +320,7 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 		changeSet.addFileContents(fileId, contType, cont)
 				   
 	else:
-	    pkg.addFile(f.id(), path, duplicateVersion)
+	    pkg.addFile(f.id(), path, oldVersion)
 
     (csPkg, filesNeeded, pkgsNeeded) = pkg.diff(srcPkg)
     assert(not pkgsNeeded)
@@ -322,8 +332,14 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
     return (foundDifference, state, changeSet, srcPkg)
 
 def commit(repos):
+    if not os.path.isfile("SRS"):
+	log.error("SRS file must exist in the current directory for source commands")
+	return
+
+    state = SourceState("SRS")
+
     # we need to commit based on changes to the head of a branch
-    result = buildChangeSet(repos, needsHead = True)
+    result = buildChangeSet(repos, state, needsHead = True)
     if not result: return
 
     (isDifferent, state, changeSet, oldPackage) = result
@@ -334,8 +350,27 @@ def commit(repos):
 	repos.commitChangeSet(changeSet)
 	state.write("SRS")
 
-def diff(repos):
-    result = buildChangeSet(repos)
+def diff(repos, versionStr = None):
+    if not os.path.isfile("SRS"):
+	log.error("SRS file must exist in the current directory for source commands")
+	return
+
+    state = SourceState("SRS")
+
+    if versionStr:
+	versionStr = state.expandVersionStr(versionStr)
+
+	pkgList = helper.findPackage(repos, None, None, state.getTroveName(), 
+				     versionStr)
+	if len(pkgList) > 1:
+	    log.error("%s specifies multiple versions" % versionStr)
+	    return
+
+	srcVersion = pkgList[0].getVersion()
+    else:
+	srcVersion = None
+
+    result = buildChangeSet(repos, state, srcVersion = srcVersion)
     if not result: return
 
     (changed, state, changeSet, oldPackage) = result
@@ -344,7 +379,6 @@ def diff(repos):
     packageChanges = changeSet.getNewPackageList()
     assert(len(packageChanges) == 1)
     pkgCs = packageChanges[0]
-
 
     for (fileId, path, newVersion) in pkgCs.getNewFileList():
 	print "%s: new" % path
@@ -397,14 +431,7 @@ def update(repos, versionStr = None):
 	    log.info("working directory is already based on head of branch")
 	    return
     else:
-	if versionStr[0] == "@":
-	    # get the name of the repository from the current branch
-	    repName = state.getTroveBranch().branchNick().getHost()
-	    versionStr = repName + versionStr
-	elif versionStr[0] != "/" and versionStr.find("@") == -1:
-	    # non fully-qualified version; make it relative to the current
-	    # branch
-	    versionStr = state.getTroveBranch().asString() + "/" + versionStr
+	versionStr = state.expandVersionStr(versionStr)
 
 	pkgList = helper.findPackage(repos, None, None, pkgName, versionStr)
 	if len(pkgList) > 1:
