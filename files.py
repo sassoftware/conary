@@ -17,6 +17,8 @@ import socket
 import log
 
 _FILE_FLAG_CONFIG = 1 << 0
+_FILE_FLAG_INITSCRIPT = 1 << 1
+_FILE_FLAG_SHLIB = 1 << 3
 
 class FileMode:
     def merge(self, mode):
@@ -133,16 +135,25 @@ class FileMode:
         else:
             return 0
 
-    def isConfig(self, set = None):
+    def _isFlag(self, flag, set):
 	if set != None:
             if self.theFlags is None:
                 self.theFlags = 0x0
 	    if set:
-		self.theFlags |= _FILE_FLAG_CONFIG
+		self.theFlags |= flag
 	    else:
-		self.theFlags &= ~(_FILE_FLAG_CONFIG)
+		self.theFlags &= ~(flag)
 
-	return (self.theFlags and self.theFlags & _FILE_FLAG_CONFIG)
+	return (self.theFlags and self.theFlags & flag)
+
+    def isConfig(self, set = None):
+	return self._isFlag(_FILE_FLAG_CONFIG, set)
+
+    def isInitScript(self, set = None):
+	return self._isFlag(_FILE_FLAG_INITSCRIPT, set)
+
+    def isShLib(self, set = None):
+	return self._isFlag(_FILE_FLAG_SHLIB, set)
 
     def infoLine(self):
 	return "0%o %s %s %s %s 0x%x" % (self.thePerms, self.theOwner, 

@@ -157,6 +157,50 @@ class Config(policy.Policy):
 		    _markConfig(self.recipe, file)
 
 
+class InitScript(policy.Policy):
+    """
+    Mark initscripts as such so that chkconfig will be run.
+    By default, every file in %(initdir)s is marked as an initscript.
+    """
+    invariantinclusions = [ '%(initdir)s/.[^/]*$' ]
+
+    def _markInitScript(self, filename):
+	packages = self.recipe.autopkg.packages
+	for package in packages.keys():
+	    if filename in packages[package]:
+		log.debug('initscript: %s', filename)
+		packages[package][filename].isInitScript(True)
+
+    def doFile(self, file):
+	fullpath = ('%(destdir)s/'+file) %self.macros
+	if os.path.isfile(fullpath) and not os.path.islink(fullpath):
+	    self._markInitScript(file)
+
+
+class SharedLibrary(policy.Policy):
+    """
+    Mark system shared libaries as such so that ldconfig will be run.
+    """
+    invariantinclusions = [
+	'(%(essentiallibdir)s|%(libdir)s|%(prefix)s/X11R6/%(lib)s|'
+	'%(prefix)s/kerberos/%(lib)s|'
+	'%(prefix)s/local/%(lib)s|%(libdir)s/qt.*/lib|'
+	'%(libdir)s/(mysql|sane))/..*\.so\.'
+    ]
+
+    def _markSharedLibrary(self, filename):
+	packages = self.recipe.autopkg.packages
+	for package in packages.keys():
+	    if filename in packages[package]:
+		log.debug('shared library: %s', filename)
+		packages[package][filename].isShLib(True)
+
+    def doFile(self, file):
+	fullpath = ('%(destdir)s/'+file) %self.macros
+	if os.path.isfile(fullpath) and not os.path.islink(fullpath):
+	    self._markSharedLibrary(file)
+
+
 class ParseManifest(policy.Policy):
     """
     Parse a file containing a manifest intended for RPM, finding the
@@ -332,6 +376,8 @@ def DefaultPolicy():
 	PackageSpec(),
 	EtcConfig(),
 	Config(),
+	InitScript(),
+	SharedLibrary(),
 	ParseManifest(),
 	MakeDevices(),
 	AddModes(),
