@@ -439,29 +439,30 @@ class TroveFinder:
     """
 
     def findTroves(self, repos, troveSpecs, allowMissing=False):
-        for troveSpec in troveSpecs:
-            self.addQuery(troveSpec)
-
         finalMap = {}
-        missing = {}
 
-        for query in self.query.values():
-            query.findAll(repos, missing, finalMap)
-            query.reset()
-
-        if missing and not allowMissing:
-            if len(missing) > 1:
-                missingMsgs = [ missing[x] for x in troveSpecs if x in missing]
-                raise repository.TroveNotFound, '%d troves not found:\n%s\n' \
-                        % (len(missing), '\n'.join(x for x in missingMsgs))
-            else:
-                raise repository.TroveNotFound, missing.values()[0]
-
-        remaining = self.remaining
-        if remaining:
+        while troveSpecs:
             self.remaining = []
-            findTroveMap = self.findTroves(repos, remaining, allowMissing)
-            finalMap.update(findTroveMap)
+
+            for troveSpec in troveSpecs:
+                self.addQuery(troveSpec)
+
+            missing = {}
+
+            for query in self.query.values():
+                query.findAll(repos, missing, finalMap)
+                query.reset()
+
+            if missing and not allowMissing:
+                if len(missing) > 1:
+                    missingMsgs = [ missing[x] for x in troveSpecs if x in missing]
+                    raise repository.TroveNotFound, '%d troves not found:\n%s\n' \
+                            % (len(missing), '\n'.join(x for x in missingMsgs))
+                else:
+                    raise repository.TroveNotFound, missing.values()[0]
+
+            troveSpecs = self.remaining
+
         return finalMap
 
     def addQuery(self, troveTup):
