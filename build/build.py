@@ -342,12 +342,14 @@ class SetModes(_FileAction):
     file modes in the destdir.
     """
     
-    def __init__(self, path, mode, **keywords):
+    def __init__(self, *args, **keywords):
         _FileAction.__init__(self, **keywords) 
-	if type(path) is str:
-	    path = (path,)
-	self.paths = path
-        self.mode = mode
+	split = len(args) - 1
+	self.paths = args[:split]
+	self.mode = args[split]
+	# raise error while we can still tell what is wrong...
+	if type(self.mode) is not int:
+	    raise TypeError, 'mode %s is not integer' %str(self.mode)
 
     def do(self, macros):
 	files = []
@@ -531,7 +533,7 @@ class InstallDocs(_FileAction):
 	destlen = len(macros['destdir'])
 	if self.subdir:
 	    macros['subdir'] = '/%s' % self.subdir
-	base = '%(docdir)s/%(name)s-%(version)s/%(subdir)s/' %macros
+	base = '%(thisdocdir)s/%(subdir)s/' %macros
 	dest = '%(destdir)s'%macros + base
 	util.mkdirChain(os.path.dirname(dest))
 	for path in self.paths:

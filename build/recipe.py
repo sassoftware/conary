@@ -48,6 +48,7 @@ baseMacros = (
     ('mandir'		, '%(datadir)s/man'),
     ('infodir'		, '%(datadir)s/info'),
     ('docdir'		, '%(datadir)s/doc'),
+    ('thisdocdir'       , '%(docdir)s/%(name)s-%(version)s'),
     # arguments/flags (empty ones are for documentation; non-existant = empty)
     ('cc'		, 'gcc'),
     ('cflags'           , '-O2'),
