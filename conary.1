@@ -11,8 +11,13 @@ files as its canonical source of data.  Conary uses the repository
 versioning to intelligently merge configuration files, file ownership
 and permissions, and so forth.
 .SH REFERENCE
+Conary has several common command-line arguments, all of which modify 
+configuration entries and are documented with other configuration
+entries.  The rest of its command-line arguments are specific to
+which conary \fBcommand\fP you are running, and are documented with
+the commands.
 .SS "System Management"
-The following \fIcommands\fP are used to install, update, erase, and
+The following \fBcommands\fP are used to install, update, erase, and
 otherwise manage software installed on a local system.
 .TP 4
 .B pkglist \fIpkgname [version]\fP
@@ -88,9 +93,11 @@ it must be a recipe file and the package will be cooked from the
 filesystem.  Otherwise, it must name a repository component and
 the package will be cooked from the repository.
 .TP
-.B commit \fIchangeset\fP
+.B commit \fIchangeset\fP [--target-branch \fI<branch>\fP]
 Commits a changeset to the repository.  This is not a reversible
-operation, so take care.
+operation, so take care.  The \fB--target-branch\fP option
+is only appropriate when you commit a \fBlocal changeset\fP
+to a repository.
 .TP
 .B conary source \fIsubcommand\fP
 Actions on source components, \fIexcept for \fBcook\fR, are
@@ -264,16 +271,18 @@ Coming soon to a man page near you!
 .TP
 .I $HOME/.conaryrc
 The configuration files for Conary; entries in \fI$HOME/.conaryrc\fR
-override entries in \fI/etc/conaryrc,\fR and the \fB\-\-config\fR option
-overrides both configuration files.  Conary configuration items can be
-strings, booleans (\fBTrue\fP or \fBFalse\fP), or mappings
-(\f(BIto from\fP) and can include:
+override entries in \fI/etc/conaryrc,\fR and command-line options
+(including the \fB\-\-config\fR option) override both configuration
+files.  Conary configuration items can be strings, booleans
+(\fBTrue\fP or \fBFalse\fP), or mappings (\f(BIto from\fP) and
+can include:
 .PD
 .RS 4
 .TP 4
 .B buildLabel
 The default label for troves during source code operations
-(checkout, diff, etc) and for cooking.
+(checkout, diff, etc) and for cooking.  Can be overridden by
+the \fB--build-label \fI<label>\fR command-line option.
 .TP
 .B buildPath
 The path packages are built under; default \fI/usr/src/conary/builds
@@ -296,6 +305,7 @@ to \fBroot\fP (see below) and should normally not be changed.
 The label to use to install components when an incomplete version is
 specified, to query the repository, and to abbreviate versions when
 displaying them.
+Can be overridden by the \fB--install-label \fI<label>\fR command-line option.
 .TP
 .B lookaside
 The transient lookaside cache used only during building, normally
@@ -311,9 +321,21 @@ Multiple maps can be given for a single label. (If no mapping is found,
 \fBhttp://\f(BIhostname\fB/conary/\fR is used as the default map.)
 .TP
 .B root
-The path to install files into, normally \fI/\fR
+The path to install files into, normally \fI/\fR.
+Can be overridden by the \fB--root \fI<root>\fR command-line option.
 .RE
 .TP 4
+.I /etc/conary
+Contains all local configuration for Conary except for the conaryrc file.
+.TP
+.I /etc/conary/tags/
+Tagdescription files describing dynamic tags.
+.\" FIXME: need a man page describing the tagdescription file format.
+.TP
+.I /usr/libexec/conary/tags/
+Taghandler files implementing dynamic tags.
+.\" FIXME: need a man page describing the taghandler calling convention.
+.TP
 .I /var/lib/conarydb/conarydb
 The database file containing all the local system metadata.
 .TP
