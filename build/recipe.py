@@ -318,17 +318,17 @@ class Recipe:
                 destdir = builddir
             util.execute("tar -C %s %s %s" % (destdir, tarflags, f))
 	
+	destDir = builddir + "/" + self.theMainDir
+	util.mkdirChain(destDir)
+
 	for file in self.sources:
             f = lookaside.findAll(self.cfg, self.laReposCache, file, 
 				  self.name, self.srcdirs)
-	    destDir = builddir + "/" + self.theMainDir
-	    util.mkdirChain(destDir)
-	    shutil.copyfile(f, destDir + "/" + file)
+	    shutil.copyfile(f, destDir + "/" + os.path.basename(file))
 
 	for (file, level, backup) in self.patches:
             # XXX handle .gz/.bz2 patch files
             f = util.findFile(file, self.srcdirs)
-	    destDir = builddir + "/" + self.theMainDir
             if backup:
                 backup = '-b -z %s' % backup
             util.execute('patch -d %s -p%s %s < %s' %(destDir, level, backup, f))
