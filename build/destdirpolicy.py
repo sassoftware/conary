@@ -150,7 +150,7 @@ class NormalizeManPages(policy.Policy):
     def _sosymlink(self, dirname, names):
 	for name in names:
 	    path = dirname + os.sep + name
-	    if os.path.exists and not os.path.isdir(path) \
+	    if os.path.exists(path) and not os.path.isdir(path) \
 	       and not os.path.islink(path) \
 	       and not name.endswith('.gz'):
 		# if only .so, change to symlink
@@ -227,6 +227,30 @@ class NormalizeInfoPages(policy.Policy):
 			syspath = syspath[:-3]
 		    util.execute('gzip -n -9 %s' %syspath)
 
+
+class NormalizeInitscripts(policy.Policy):
+    """
+    Move all initscripts from /etc/rc.d/init.d/ to their official location
+    (if, as is true for the default settings, /etc/rc.d/init.d isn't their
+    official location, that is).
+    """
+    invariantinclusions = [ '/etc/rc.d/init.d/' ]
+
+    def doFile(self, path):
+	if self.macros['initdir'] != '/etc/rc.d/init.d':
+	    basename = os.path.basename(path)
+	    target = util.joinPaths(self.macros['initdir'], basename)
+	    if os.path.exists(self.macros['destdir'] + os.sep + target):
+		raise DestdirPolicyError(
+		    "Conflicting initscripts %s and %s installed" %(
+			path, target))
+	    util.mkdirChain(self.macros['destdir'] + os.sep +
+			    self.macros['initdir'])
+	    util.copytree(self.macros['destdir'] + path,
+	                  self.macros['destdir'] + target)
+	    os.remove(self.macros['destdir'] + path)
+
+
 class RelativeSymlinks(policy.Policy):
     """
     Make all symlinks relative
@@ -259,5 +283,10 @@ def DefaultPolicy():
 	NormalizeBzip(),
 	NormalizeManPages(),
 	NormalizeInfoPages(),
+	NormalizeInitscripts(),
 	RelativeSymlinks(),
     ]
+
+
+class DestdirPolicyError(policy.PolicyError):
+    pass
