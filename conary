@@ -10,6 +10,7 @@ import commit
 import cook
 import database
 import display
+import log
 import os
 import repository
 import rollbacks
@@ -170,9 +171,9 @@ elif (otherArgs[1] == "cook"):
             os.tcsetpgrp(0, os.getpgrp())
 	    repos = repository.LocalRepository(cfg.reppath, "r")
             try:
-                built = cook.cook(repos, cfg, file, prep=prep, macros=macros)
+                built = cook.doCook(repos, cfg, file, prep=prep, macros=macros)
             except cook.CookError, msg:
-                sys.stderr.write(str(msg))
+		log.error(str(msg))
                 sys.exit(1)
             for (pkg, version) in built:
                 print "Committed", pkg, version, "to the repository"
