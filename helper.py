@@ -8,6 +8,7 @@ Simple functions used throughout srs.
 """
 
 import repository
+import versions
 
 def findPackage(repos, packageNamespace, defaultBranch, name, 
 		versionStr = None, forceGroup = 0):
