@@ -2,6 +2,9 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+import deps
+import deps.arch
+import deps.deps
 import os
 import versions
 import sys
@@ -62,6 +65,13 @@ class SrsConfiguration:
 	self.lookaside = "/var/cache/srs"
 	self.dbpath = "/var/lib/srsdb"
         self.tmpdir = "/var/tmp/"
+	self.instructionSet = deps.arch.current()
+
+	self.flavor = deps.deps.DependencySet()
+	self.flavor.addDep(deps.deps.InstructionSetDependency, 
+			   self.instructionSet)
+
+
 	self.defaultbranch = versions.VersionFromString("/localhost@local:head")
 
 	self.read("/etc/srsrc")
