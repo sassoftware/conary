@@ -34,6 +34,8 @@ class OptionError(Exception):
 def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
     otherArgs = [ argv[0] ]
     argSet = {}
+    # don't mangle the command line
+    argv = argv[:]
 
     for arg in cfgMap.keys():
 	argDef[arg] = 1
@@ -42,8 +44,21 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
     while i < len(argv):
 	if argv[i][:2] != "--":
 	    otherArgs.append(argv[i])
+        # stop processing args after --
+        elif argv[i] == '--':
+                otherArgs.extend(argv[i+1:])
+                break
 	else:
-	    arg = argv[i][2:]
+            arg = argv[i][2:]
+            arg_parts = arg.split('=', 1)
+            if len(arg_parts) > 1:
+                arg = arg_parts[0]
+                # don't allow --foo=bar arg if foo doesn't exist
+                # or doesn't take an arg.
+                if not argDef.has_key(arg) and argDef[arg] != NO_PARAM:
+                    raise OptionError(usage())
+                argv[i] = arg
+                argv.insert(i+1, arg_parts[1])
 	    if not argDef.has_key(arg): raise OptionError(usage())
 
 	    if argDef[arg] == NO_PARAM:
@@ -51,21 +66,18 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 	    elif argDef[arg] == OPT_PARAM:
 		# max one setting
 		if argSet.has_key(arg): raise OptionError(usage())
-		# no following arg
-		# XXX hack -- assume that last the last 
-		# arg is a file name and not a parameter
-		# to this function
-		if i+2 >= len(argv): 
+		if i >= len(argv): 
 		    argSet[arg] = True
-		    i = i + 1
-		    continue
-		next_arg = argv[i+1]
-		if next_arg[0:2] != '--':
-		    argSet[arg] = next_arg
-		    i = i + 2
-		    continue
-		else:
-		    argSet[arg] = True
+                else:
+                    next_arg = argv[i+1]
+                    if next_arg == '':
+                        argSet[arg] = True
+                        i = i + 1
+                    elif next_arg[0:2] == '--': 
+                        argSet[arg] = True
+                    else:
+                        argSet[arg] = next_arg
+                        i = i + 1
 	    else:
 		# the argument takes a parameter
 		i = i + 1
