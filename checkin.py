@@ -191,6 +191,7 @@ def _buildChangeSet(repos, state, srcPkg):
     @type state: SourceState
     @param srcPkg: Package to generate the change set against
     @type srcPkg: package.Package
+    """
 
     recipeVersionStr = _getRecipeVersion(state.getRecipeFileName())
     if not recipeVersionStr: return
