@@ -402,22 +402,65 @@ class FixupMultilibPaths(policy.Policy):
 	return True
 
     def doFile(self, path):
+	destdir = self.macros.destdir
+        fullpath = util.joinPaths(destdir, path)
+        mode = os.lstat(fullpath)[stat.ST_MODE]
 	m = self.recipe.magic[path]
-	if not m or (m.name != "ELF" and m.name != "ar"):
-	    log.warning("non-executable object with library name %s", path)
+	if stat.S_ISREG(mode) and (
+            not m or (m.name != "ELF" and m.name != "ar")):
+	    log.warning("non-object file with library name %s", path)
 	    return
 	basename = os.path.basename(path)
 	targetdir = self.dirmap[self.currentsubtree %self.macros]
 	target = util.joinPaths(targetdir, basename)
-	destdir = self.macros.destdir
 	if os.path.exists(util.joinPaths(destdir, target)):
 	    raise DestdirPolicyError(
 		"Conflicting library files %s and %s installed" %(
 		    path, target))
 	log.warning('Multilib error: file %s found in wrong directory,'
 		    ' attempting to fix...' %path)
-	util.mkdirChain(destdir + targetdir)
-	util.rename(destdir + path, destdir + target)
+        util.mkdirChain(destdir + targetdir)
+        if stat.S_ISREG(mode):
+            util.rename(destdir + path, destdir + target)
+        else:
+            # we should have a symlink that may need the contents changed
+            contents = os.readlink(fullpath)
+            if contents.find('/') == -1:
+                # simply rename
+                util.rename(destdir + path, destdir + target)
+            else:
+                # need to change the contents of the symlink to point to
+                # the new location of the real file
+                contentdir = os.path.dirname(contents)
+                contenttarget = os.path.basename(contents)
+                olddir = os.path.dirname(path)
+                if contentdir.startswith('/'):
+                    # absolute path
+                    if contentdir == olddir:
+                        # no need for a path at all, change to local relative
+                        os.symlink(contenttarget, destdir + target)
+                        os.remove(fullpath)
+                        return
+                if not contentdir.startswith('.'):
+                    raise DestdirPolicyError(
+                        'Multilib: cannot fix relative path %s in %s -> %s\n'
+                        'Library files should be in %s'
+                        %(contentdir, path, contents, targetdir))
+                # now deal with ..
+                # first, check for relative path that resolves to same dir
+                i = contentdir.find(olddir)
+                if i != -1:
+                    dotlist = contentdir[:i].split('/')
+                    dirlist = contentdir[i+1:].split('/')
+                    if len(dotlist) == len(dirlist):
+                        # no need for a path at all, change to local relative
+                        os.symlink(contenttarget, destdir + target)
+                        os.remove(fullpath)
+                        return
+                raise DestdirPolicyError(
+                        'Multilib: cannot fix relative path %s in %s -> %s\n'
+                        'Library files should be in %s'
+                        %(contentdir, path, contents, targetdir))
 
 class ExecutableLibraries(policy.Policy):
     """
