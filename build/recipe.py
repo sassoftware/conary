@@ -88,8 +88,12 @@ class Recipe:
 	self.addSignature(file)
 
     def allSources(self):
-	return self.sources + self.tarballs + self.patches + \
-               flatten(self.signatures.items())
+        sources = []
+        for (tarball, extractdir) in self.tarballs:
+            sources.append(tarball)
+        for (patch, level, backup) in self.patches:
+            sources.append(patch)
+	return sources + self.sources + flatten(self.signatures.items())
 
     def mainDir(self, new = None):
 	if new:
