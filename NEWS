@@ -1,3 +1,10 @@
+Changes in 0.9.2:
+ * Bug fixes:
+   * Applying changesets that have more than one hard link groups
+     sharing the same contents sha1 works now.
+ * Build changes:
+   * Recipes can now create new top level packages.
+
 Changes in 0.9.1:
  * Bug fixes:
    * Applying a changeset that has a flavor which is a superset of the
