@@ -51,6 +51,11 @@ class OpenedFile:
 	self.container.addFile(versionStr, data, "%.3f" % time.time())
 	self.versionMap[versionStr] = version
 
+    # only lets you erase the last version added
+    def eraseVersion(self, version):
+	self.container.delFile(version.asString())
+	del self.versionMap[version.asString()]
+
     def hasVersion(self, version):
 	return self.versionMap.has_key(version.asString())
 
