@@ -1,3 +1,14 @@
+Changes in 0.10.2:
+  * the repository code is now included in the main conary source
+    archive
+  * "conary showchangeset" produces a more user-friendly output
+  * large responses from the repository server are now compressed
+  * the protocol for getFileContents() changed to take a fileId
+    instead of the file's path.  The repository code can still handle
+    old requests, but the client code now requires the latest
+    repository code.
+  * bug fixes
+
 Changes in 0.10.1:
   * when applying a changeset, dependency failures are resolved by
     querying servers in the installLabelPath
