@@ -346,6 +346,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return cs
 
+    def resolveDependencies(self, label, depList):
+        l = [ self.fromDepSet(x) for x in depList ]
+        d = self.c[label].getDepSuggestions(self.fromLabel(label), l)
+        r = {}
+        for (key, val) in d.iteritems():
+            r[self.toDepSet(key)] = val
+
+        return r
+
     def getFileVersion(self, fileId, version):
         return self.toFile(self.c[version].getFileVersion(
 				   self.fromFileId(fileId), 

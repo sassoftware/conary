@@ -51,8 +51,20 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
             applyList.append(pkgStr)
             
     try:
-        client.updateTrove(applyList, replaceFiles, tagScript, keepExisting,
-                           depCheck)
+        cs = client.updateTroveCreateChangeSet(applyList, replaceFiles, 
+                            tagScript, keepExisting, depCheck)
+        #depFailures = client.checkDependencies(cs)
+        #missingDeps = [ x[1] for x in depFailures ]
+        #res = client.resolveDependencies(missingDeps)
+        #for dep in missingDeps:
+        #    if res.has_key(dep):
+        #        print dep, res[dep]
+        #    else:
+        #        print dep, "NONE"
+
+
+        client.updateTrove(cs, replaceFiles, tagScript, keepExisting,
+                           #depCheck)
     except conaryclient.UpdateError, e:
         log.error(e)
     except repository.CommitError, e:

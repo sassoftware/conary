@@ -216,6 +216,9 @@ class Database(SqlDbRepository):
 
         return resultDict, eraseList
 
+    def depCheck(self, cs):
+        return self.db.depCheck(cs)
+
     # local changes includes the A->A.local portion of a rollback; if it
     # doesn't exist we need to compute that and save a rollback for this
     # transaction

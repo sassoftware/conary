@@ -55,7 +55,14 @@ class ConaryClient:
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
 
-    def updateTrove(self, itemList, replaceFiles = False,
+    def checkDependencies(self, changeSet):
+        return self.db.depCheck(changeSet)[1]
+
+    def resolveDependencies(self, depList):
+        return self.repos.resolveDependencies(self.cfg.installLabelPath[0],
+                                              depList)
+
+    def updateTroveCreateChangeSet(self, itemList, replaceFiles = False,
                     tagScript = None, keepExisting = None, depCheck = True):
         """
         Updates a trove on the local system to the latest version 
@@ -158,7 +165,11 @@ class ConaryClient:
             else:
                 finalCs = cs
 
-        self.db.commitChangeSet(finalCs, replaceFiles = replaceFiles,
+        return finalCs
+
+    def updateTrove(self, theCs, replaceFiles = False,
+                    tagScript = None, keepExisting = None, depCheck = True):
+        self.db.commitChangeSet(theCs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
                                 keepExisting = keepExisting,
                                 depCheck = depCheck)
