@@ -328,8 +328,10 @@ class Source(_Source):
 	    be replaced with the current setting of C{recipe.macros.cflags}.
 	    Defaults to False.
         @keyword mode: If set, provides the mode to set on the file.
-	@keyword dest: If set, provides the name of the file in the build
-	    directory.  Do not specify directory information here as well 
+	@keyword dest: If set, provides the target name of the file in
+            the build directory.  A full pathname can be used. Absolute
+            directories will be considered relative to c{%(builddir)s},
+            but do not specify directory information here as well 
             as in the dir keyword; use one or the other.  Useful mainly 
             when fetching the file from an source outside your direct 
             control, such as a URL to a third-party web site, or copying 
