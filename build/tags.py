@@ -29,6 +29,7 @@ class TagFile(conarycfg.ConfigFile):
 	    'include'		: [ conarycfg.CALLBACK, self.filterCB ],
 	}
 	self.tag = os.path.basename(filename)
+	self.tagFile = filename
 	self.macros = macros
 	self.filterlist = []
 	conarycfg.ConfigFile.__init__(self)

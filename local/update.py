@@ -95,15 +95,15 @@ class FilesystemJob:
 		path = path[rootLen:]
 		tagInfo = None	
 		for ti in tagSet.itervalues():
-		    if ti.file == path: 
+		    if ti.tagFile[:rootLen] == self.root and \
+		       ti.tagFile[rootLen:] == path: 
 			tagInfo = ti
 			break
 
 		if tagInfo:
 		    del tagSet[tagInfo.tag]
 		    if "self preremove" in tagInfo.implements:
-			tagCommands.append([ path[rootLen:], "self", 
-					     "preremove" ])
+			tagCommands.append([ path, "self", "preremove" ])
 
 	    del self.tagRemoves['tagdescription']
 
