@@ -297,7 +297,7 @@ class _FileAction(BuildAction):
 		self.recipe.PackageSpec(package, path)
 	
 
-class InstallDesktopfile(_FileAction):
+class InstallDesktopfile(BuildCommand, _FileAction):
     """
     The InstallDesktopfile class should be used to provide categories
     (and vendor, if necessary) for files in /usr/share/applications/
