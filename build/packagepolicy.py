@@ -758,11 +758,12 @@ class ExcludeDirectories(policy.Policy):
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
 
     def doFile(self, path):
-	s = os.lstat(self.recipe.macros.destdir + os.sep + path)
+	fullpath = self.recipe.macros.destdir + os.sep + path
+	s = os.lstat(fullpath)
 	mode = s[stat.ST_MODE]
 	if mode & 0777 != 0755:
 	    log.debug('excluding directory %s with mode %o', path, mode&0777)
-	elif s[stat.ST_NLINK] == 2:
+	elif not os.listdir(fullpath):
 	    log.debug('excluding empty directory %s', path)
 	del self.recipe.autopkg.pkgMap[path][path]
 	del self.recipe.autopkg.pkgMap[path]
