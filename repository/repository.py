@@ -5,6 +5,10 @@
 
 # defines the SRS system repository
 
+import changeset
+import datastore
+import util
+
 class AbstractRepository:
     #
     ### Package access functions
@@ -117,8 +121,171 @@ class AbstractRepository:
     def getFileVersion(self, fileId, version, path = None, withContents = 0):
 	raise NotImplementedError
 
+    def iterFilesInTrove(self, trove, sortByPath = False, withFiles = False):
+	raise NotImplementedError
+
+    def buildJob(self, changeSet):
+	raise NotImplementedError
+
+    def storeFileFromContents(self, contents, file, restoreContents):
+	raise NotImplementedError
+
+    def addFileVersion(self, fileId, version, file):
+	raise NotImplementedError
+
+    def addPackage(self, pkg):
+	raise NotImplementedError
+
+    def commit(self):
+	raise NotImplementedError
+
+    def eraseFileVersion(self, fileId, version):
+	raise NotImplementedError
+
+    def erasePackageVersion(self, pkgName, version):
+	raise NotImplementedError
+
+    def createChangeSet(self, packageList):
+	"""
+	packageList is a list of (pkgName, oldVersion, newVersion, absolute) 
+	tuples. 
+
+	if oldVersion == None and absolute == 0, then the package is assumed
+	to be new for the purposes of the change set
+
+	if newVersion == None then the package is being removed
+	"""
+	cs = changeset.ChangeSetFromRepository(self)
+	for (name, v1, v2, absolute) in packageList:
+	    cs.addPrimaryPackage(name, v2)
+
+	dupFilter = {}
+
+	# don't use a for in here since we grow packageList inside of
+	# this loop
+	packageCounter = 0
+	while packageCounter < len(packageList):
+	    (packageName, oldVersion, newVersion, absolute) = \
+		packageList[packageCounter]
+	    packageCounter += 1
+
+	    # make sure we haven't already generated this changeset; since
+	    # packages can be included from other packages we could try
+	    # to generate quite a few duplicates
+	    if dupFilter.has_key(packageName):
+		match = False
+		for (otherOld, otherNew) in dupFilter[packageName]:
+		    if not otherOld and not oldVersion:
+			same = True
+		    elif not otherOld and oldVersion:
+			same = False
+		    elif otherOld and not oldVersion:
+			same = False
+		    else:
+			same = otherOld == newVersion
+
+		    if same and otherNew == newVersion:
+			match = True
+			break
+		
+		if match: continue
+
+		dupFilter[packageName].append((oldVersion, newVersion))
+	    else:
+		dupFilter[packageName] = [ (oldVersion, newVersion) ]
+
+	    if not newVersion:
+		# remove this package and any subpackages
+		old = self.getPackageVersion(packageName, oldVersion)
+		cs.oldPackage(packageName, oldVersion)
+		for (name, version) in old.iterPackageList():
+                    # it's possible that a component of a package
+                    # was erased, make sure that it is installed
+                    if self.hasPackageVersion(name, version):
+                        packageList.append((name, version, None, absolute))
+		    
+		continue
+		    
+	    new = self.getPackageVersion(packageName, newVersion)
+	 
+	    if oldVersion:
+		old = self.getPackageVersion(packageName, oldVersion)
+	    else:
+		old = None
+
+	    (pkgChgSet, filesNeeded, pkgsNeeded) = \
+				new.diff(old, absolute = absolute)
+
+	    for (pkgName, old, new) in pkgsNeeded:
+		packageList.append((pkgName, old, new, absolute))
+
+	    cs.newPackage(pkgChgSet)
+
+	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
+		if oldVersion:
+		    (oldFile, oldCont) = self.getFileVersion(fileId, 
+				oldVersion, path = newPath, withContents = 1)
+		else:
+		    oldFile = None
+		    oldCont = None
+
+		(newFile, newCont) = self.getFileVersion(fileId, newVersion,
+					    path = newPath, withContents = 1)
+
+		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
+							 newFile)
+
+		cs.addFile(fileId, oldVersion, newVersion, filecs)
+
+		if hash:
+		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
+						oldCont, newFile, newCont)
+		    cs.addFileContents(fileId, contType, cont, 
+				       newFile.flags.isConfig())
+
+	return cs
+
     def __init__(self):
 	assert(self.__class__ != AbstractRepository)
+
+class DataStoreRepository(AbstractRepository):
+
+    def storeFileFromContents(self, contents, file, restoreContents):
+	if file.hasContents:
+	    if restoreContents:
+		f = contents.get()
+		targetFile = self.contentsStore.newFile(file.contents.sha1())
+
+		# if targetFile is None the file is already in the store
+		if targetFile:
+		    util.copyfileobj(f, targetFile)
+		    targetFile.close()
+	    else:
+		# the file doesn't have any contents, so it must exist
+		# in the data store already; we still need to increment
+		# the reference count for it
+		self.contentsStore.addFileReference(file.contents.sha1())
+
+	    return 1
+	
+	return 0
+
+    def removeFileContents(self, sha1):
+	self.contentsStore.removeFile(sha1)
+
+    def pullFileContentsObject(self, fileId):
+	return self.contentsStore.openFile(fileId)
+
+    def hasFileContents(self, fileId):
+	return self.contentsStore.hasFile(fileId)
+
+    def hasPackageVersion(self, pkgName, version):
+	return self.contentsStore.hasFile(fileId)
+
+    def __init__(self, path):
+	fullPath = path + "/contents"
+	util.mkdirChain(fullPath)
+	self.contentsStore = datastore.DataStore(fullPath)
 
 class RepositoryError(Exception):
     """Base class for exceptions from the system repository"""

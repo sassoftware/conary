@@ -23,6 +23,9 @@ class AbstractVersion(object):
     def __init__(self):
 	pass
 
+    def __ne__(self, them):
+	return not self.__eq__(them)
+
 class NewVersion(AbstractVersion):
 
     """
@@ -59,6 +62,9 @@ class AbstractBranch(object):
 
     def __init__(self):
 	pass
+
+    def __ne__(self, them):
+	return not self.__eq__(them)
 
 class VersionRelease(AbstractVersion):
 
@@ -259,7 +265,7 @@ class LocalBranch(BranchName):
     def __init__(self):
 	BranchName.__init__(self, "localhost@local:LOCAL")
 
-class Version(object):
+class Version(AbstractVersion):
 
     """
     Class representing a version. Versions are a list of AbstractBranch,
@@ -269,7 +275,7 @@ class Version(object):
     ordering.
     """
 
-    __slots__ = ( "versions", "timeStamp", "__weakref__" )
+    __slots__ = ( "versions", "timeStamp" )
 
     def appendVersionRelease(self, version, release):
 	"""

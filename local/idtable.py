@@ -7,17 +7,18 @@ class IdTable:
     """
     Generic table for assigning id's to simple items.
     """
-    def __init__(self, db, name):
+    def __init__(self, db, tableName, keyName, strName):
         self.db = db
-        self.name = name
-	self.capName = self.name.capitalize()
+	self.tableName = tableName;
+	self.keyName = keyName;
+	self.strName = strName;
         
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
-        if '%ss' % self.capName not in tables:
-            cu.execute("CREATE TABLE %ss(%sId integer primary key, %s str unique)"
-                       %(self.capName, name, name))
+        if tableName not in tables:
+            cu.execute("CREATE TABLE %s(%s integer primary key, %s str unique)"
+                       %(self.tableName, self.keyName, self.strName))
 	    self.initTable()
 
     def initTable(self):
@@ -25,20 +26,20 @@ class IdTable:
     
     def addId(self, item):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO %ss VALUES (NULL, %%s)"
-                   %(self.capName, ), (item,))
+        cu.execute("INSERT INTO %s VALUES (NULL, %%s)"
+                   %(self.tableName, ), (item,))
 	return cu.lastrowid
 
     def delId(self, theId):
         assert(type(theId) is int)
         cu = self.db.cursor()
-        cu.execute("DELETE FROM %ss WHERE %sId=%%d"
-                   %(self.capName, self.name), (theId,))
+        cu.execute("DELETE FROM %s WHERE %s=%%d"
+                   %(self.tableName, self.keyName), (theId,))
 
     def getId(self, theId):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %ss WHERE %sId=%%s"
-                   %(self.name, self.capName, self.name), (theId,))
+        cu.execute("SELECT %s FROM %s WHERE %s=%%d"
+                   %(self.strName, self.tableName, self.keyName), (theId,))
 	try:
 	    return cu.next()[0]
 	except StopIteration:
@@ -46,20 +47,20 @@ class IdTable:
 
     def has_key(self, item):
         cu = self.db.cursor()
-        cu.execute("SELECT %sId FROM %ss WHERE %s=%%s"
-                   %(self.name, self.capName, self.name), (item,))
+        cu.execute("SELECT %s FROM %s WHERE %s=%%s"
+                   %(self.keyName, self.tableName, self.strName), (item,))
 	return not(cu.fetchone() == None)
 
     def __delitem__(self, item):
         assert(type(item) is str)
         cu = self.db.cursor()
-        cu.execute("DELETE FROM %ss WHERE %s=%%s"
-                   %(self.capName, self.name), (item,))
+        cu.execute("DELETE FROM %s WHERE %s=%%s"
+                   %(self.tableName, self.strName), item)
 
     def __getitem__(self, item):
         cu = self.db.cursor()
-        cu.execute("SELECT %sId FROM %ss WHERE %s=%%s"
-                   %(self.name, self.capName, self.name), (item,))
+        cu.execute("SELECT %s FROM %s WHERE %s=%%s"
+                   %(self.keyName, self.tableName, self.strName), (item,))
 	try:
 	    return cu.next()[0]
 	except StopIteration:
@@ -67,8 +68,8 @@ class IdTable:
 
     def get(self, item, defValue):
         cu = self.db.cursor()
-        cu.execute("SELECT %sId FROM %ss WHERE %s=%%s"
-                   %(self.name, self.capName, self.name), (item,))
+        cu.execute("SELECT %s FROM %s WHERE %s=%%s"
+                   %(self.keyName, self.tableName, self.strName), (item,))
 	item = cu.fetchone()
 	if not item:
 	    return defValue
@@ -76,20 +77,20 @@ class IdTable:
 
     def iterkeys(self):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %ss" %(self.name, self.capName))
+        cu.execute("SELECT %s FROM %s" %(self.strName, self.tableName))
         for row in cu:
             yield row[0]
 
     def itervalues(self):
         cu = self.db.cursor()
-        cu.execute("SELECT %sId FROM %ss" %(self.name, self.capName))
+        cu.execute("SELECT %s FROM %s" %(self.keyName, self.tableName))
         for row in cu:
             yield row[0]
 
     def iteritems(self):
         cu = self.db.cursor()
-        cu.execute("SELECT %s, %sId FROM %ss" 
-		   %(self.name, self.name, self.capName))
+        cu.execute("SELECT %s, %s FROM %s" 
+		   %(self.strName, self.keyName, self.tableName))
         for row in cu:
             yield row
 

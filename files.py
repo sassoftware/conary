@@ -15,7 +15,7 @@ import socket
 import struct
 import log
 
-from deps import filedeps
+from deps import filedeps, deps
 
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_INITSCRIPT = 1 << 1
@@ -31,15 +31,7 @@ _STREAM_SIZESHA1    = 6
 _STREAM_INODE	    = 7
 _STREAM_FLAGS	    = 8
 _STREAM_MTIME	    = 9
-_STREAM_DEPS	    = 10
-
-def _makeTupleDict(makeup):
-    d = {}
-    for (i, (name, classType, size)) in enumerate(makeup):
-	d[name] = (1, i)
-	d["set" + name.capitalize()] = (2, i)
-
-    return d
+_STREAM_DEPENDENCIES = 10
 
 class InfoStream(object):
 
@@ -68,8 +60,11 @@ class InfoStream(object):
 	"""
 	raise NotImplementedError
 
-    def __eq__(self):
+    def __eq__(self, them):
 	raise NotImplementedError
+
+    def __ne__(self, them):
+	return not self.__eq__(them)
 
 class NumericStream(InfoStream):
 
@@ -164,6 +159,7 @@ class StringStream(InfoStream):
 	return self.s
 
     def set(self, val):
+        assert(type(val) is str)
 	self.s = val
 
     def merge(self, other):
@@ -195,8 +191,69 @@ class StringStream(InfoStream):
 	return other.__class__ == self.__class__ and \
 	       self.s == other.s
 
-    def __init__(self, s = None):
+    def __init__(self, s = ''):
 	self.thaw(s)
+
+class DependenciesStream(InfoStream):
+    """
+    Stores list of strings; used for requires/provides lists
+    """
+
+    __slots__ = 'deps'
+    streamId = _STREAM_DEPENDENCIES
+
+    def __deepcopy__(self, memo):
+        return self.__class__(self.freeze())
+
+    def value(self):
+	return self.deps
+
+    def set(self, val):
+	self.deps = val
+
+    def merge(self, other):
+        self.deps = other.deps
+
+    def freeze(self):
+        if self.deps is None:
+            return ''
+        rc = []
+        for tag, depclass in self.deps.getDepClasses().items():
+            for dep in depclass.getDeps():
+                rc.append('%d %s' %(tag, dep.freeze()))
+        return '\n'.join(rc)
+
+    def diff(self, them):
+	if self.deps != them.deps:
+	    return self.freeze()
+
+	return ''
+
+    def thaw(self, frz):
+        l = frz.split('\n')
+        depSet = deps.DependencySet()
+        for line in l:
+            if not line:
+                continue
+            tag, frozen = line.split(' ', 1)
+            tag = int(tag)
+            depSet.addDep(deps.dependencyClasses[tag],
+                          deps.ThawDependency(frozen))
+	self.deps = depSet
+        
+    def twm(self, diff, base):
+	if not diff: return False
+
+        self.thaw(diff)
+        return True
+
+    def __eq__(self, other):
+	return other.__class__ == self.__class__ and self.deps == other.deps
+
+    def __init__(self, dep = ''):
+        assert(type(dep) is str)
+        self.deps = None
+        self.thaw(dep)
 
 class TupleStream(InfoStream):
 
@@ -206,17 +263,18 @@ class TupleStream(InfoStream):
 	return other.__class__ == self.__class__ and other.items == self.items
 
     def __deepcopy__(self, memo):
-        # trying to copy the lambda this uses causes problems; this
-        # avoids them
+        # required because copy.deepcopy() does not deal with __slots__
         return self.__class__(self.freeze())
 
     def freeze(self):
 	rc = []
-	for (i, (name, itemType, size)) in enumerate(self.makeup):
-	    if type(size) == int or (i + 1 == len(self.makeup)):
-		rc.append(self.items[i].freeze())
+	items = self.items
+	makeup = self.makeup
+	for (i, (name, itemType, size)) in enumerate(makeup):
+	    if type(size) == int or (i + 1 == len(makeup)):
+		rc.append(items[i].freeze())
 	    else:
-		s = self.items[i].freeze()
+		s = items[i].freeze()
 		rc.append(struct.pack(size, len(s)) + s)
 
 	return "".join(rc)
@@ -267,13 +325,14 @@ class TupleStream(InfoStream):
 	return conflicts
 
     def thaw(self, s):
-	self.items = []
+	items = []
+	makeup = self.makeup
 	idx = 0
-	for (i, (name, itemType, size)) in enumerate(self.makeup):
+	for (i, (name, itemType, size)) in enumerate(makeup):
 	    if type(size) == int:
-		self.items.append(itemType(s[idx:idx + size]))
-	    elif (i + 1) == len(self.makeup):
-		self.items.append(itemType(s[idx:]))
+		items.append(itemType(s[idx:idx + size]))
+	    elif (i + 1) == len(makeup):
+		items.append(itemType(s[idx:]))
 		size = 0
 	    else:
 		if size == "B":
@@ -285,50 +344,65 @@ class TupleStream(InfoStream):
 		else:
 		    raise AssertionError
 
-		self.items.append(itemType(s[idx:idx + size]))
+		items.append(itemType(s[idx:idx + size]))
 
 	    idx += size
 
+	self.items = items
+
     def __init__(self, first = None, *rest):
 	if first == None:
-	    self.items = []
+	    items = []
 	    for (i, (name, itemType, size)) in enumerate(self.makeup):
-		self.items.append(itemType())
+		items.append(itemType())
+	    self.items = items
 	elif type(first) == str and not rest:
 	    self.thaw(first)
 	else:
 	    all = (first, ) + rest
-	    self.items = []
+	    items = []
 	    for (i, (name, itemType, size)) in enumerate(self.makeup):
-		self.items.append(itemType(all[i]))
-
-    def __getattribute__(self, item):
-	d = InfoStream.__getattribute__(self, "makeupDict")
-	if d.has_key(item):
-            items = InfoStream.__getattribute__(self, "items")
-	    (methodType, index) = d[item]
-	    if methodType == 1:
-		return items[index].value
-	    else:
-		return items[index].set
-
-	return InfoStream.__getattribute__(self, item)
+		items.append(itemType(all[i]))
+	    self.items = items
 
 class DeviceStream(TupleStream):
 
     __slots__ = []
 
     makeup = (("major", IntStream, 4), ("minor", IntStream, 4))
-    makeupDict = _makeTupleDict(makeup)
     streamId = _STREAM_DEVICE
+
+    def major(self):
+        return self.items[0].value()
+
+    def setMajor(self, value):
+        return self.items[0].set(value)
+
+    def minor(self):
+        return self.items[1].value()
+
+    def setMinor(self, value):
+        return self.items[1].set(value)
 
 class RegularFileStream(TupleStream):
 
     __slots__ = []
 
     makeup = (("size", LongLongStream, 8), ("sha1", StringStream, 40))
+
+    def size(self):
+        return self.items[0].value()
+
+    def setSize(self, value):
+        return self.items[0].set(value)
+
+    def sha1(self):
+        return self.items[1].value()
+
+    def setSha1(self, value):
+        return self.items[1].set(value)
+    
     streamId = _STREAM_SIZESHA1
-    makeupDict = _makeTupleDict(makeup)
 
 class InodeStream(TupleStream):
 
@@ -341,9 +415,32 @@ class InodeStream(TupleStream):
     # this is permissions, mtime, owner, group
     makeup = (("perms", ShortStream, 2), ("mtime", MtimeStream, 4), 
               ("owner", StringStream, "B"), ("group", StringStream, "B"))
-    makeupDict = _makeTupleDict(makeup)
     streamId = _STREAM_INODE
 
+    def perms(self):
+        return self.items[0].value()
+
+    def setPerms(self, value):
+        return self.items[0].set(value)
+
+    def mtime(self):
+        return self.items[1].value()
+
+    def setMtime(self, value):
+        return self.items[1].set(value)
+
+    def owner(self):
+        return self.items[2].value()
+
+    def setOwner(self, value):
+        return self.items[2].set(value)
+
+    def group(self):
+        return self.items[3].value()
+
+    def setGroup(self, value):
+        self.items[3].set(value)
+        
     def triplet(self, code, setbit = 0):
 	l = [ "-", "-", "-" ]
 	if code & 4:
@@ -500,7 +597,9 @@ class File(object):
 	else:
 	    # skip over the file type for now
 	    i = 1
+            dataLen = len(data)
 	    for (name, streamType) in self.streamList:
+                assert(i < dataLen)
 		(streamId, size) = struct.unpack("!BH", data[i:i+3])
 		assert(streamId == streamType.streamId)
 		i += 3
@@ -554,6 +653,9 @@ class File(object):
 
 	return True
 
+    def __ne__(self, other):
+	return not self.__eq__(other)
+
     def metadataEqual(self, other, ignoreOwnerGroup):
 	if not ignoreOwnerGroup:
 	    return self == other
@@ -574,12 +676,6 @@ class File(object):
 	    s = self.__getattribute__(name).freeze()
 	    rc.append(struct.pack("!BH", streamType.streamId, len(s)) + s)
 	return "".join(rc)
-
-    def setDependency(self, requires):
-	self.requires = requires
-
-    def setProvides(self, provides):
-	self.provides = provides
 
     def __init__(self, fileId, streamData = None):
         assert(self.__class__ is not File)
@@ -686,8 +782,11 @@ class CharacterDevice(DeviceFile):
     
 class RegularFile(File):
 
-    streamList = File.streamList + (('contents', RegularFileStream ),)
-    __slots__ = ('contents', 'provides', 'requires')
+    streamList = File.streamList + (('contents', RegularFileStream),
+                                    ('provides', DependenciesStream),
+                                    ('requires', DependenciesStream),
+                                    ('isnSet', StringStream))
+    __slots__ = ('contents', 'provides', 'requires', 'isnSet')
 
     lsTag = "-"
     hasContents = 1
@@ -714,8 +813,6 @@ class RegularFile(File):
 	File.restore(self, target, restoreContents)
 
     def __init__(self, *args, **kargs):
-	self.provides = None
-	self.requires = None
 	File.__init__(self, *args, **kargs)
 
 def FileFromFilesystem(path, fileId, possibleMatch = None, buildDeps = False):
@@ -768,10 +865,9 @@ def FileFromFilesystem(path, fileId, possibleMatch = None, buildDeps = False):
 		     and f.inode.mtime() == possibleMatch.inode.mtime() \
 		     and (not s.st_size or
 			  (possibleMatch.hasContents and
-			   s.st_size == possibleMatch.contents.size())
-			 ):
-	    f.flags.set(possibleMatch.flags.value())
-	    return possibleMatch
+			   s.st_size == possibleMatch.contents.size())):
+        f.flags.set(possibleMatch.flags.value())
+        return possibleMatch
 
     if needsSha1:
 	sha1 = sha1helper.hashFile(path)
@@ -780,8 +876,10 @@ def FileFromFilesystem(path, fileId, possibleMatch = None, buildDeps = False):
     if buildDeps and f.hasContents and isinstance(f, RegularFile):
 	result = filedeps.findFileDependencies(path)
 	if result != None:
-	    f.setDependency(result[0])
-	    f.setProvides(result[1])
+	    f.requires.set(result[0])
+	    f.provides.set(result[1])
+
+        f.isnSet.set(filedeps.findFileInstructionSet(path))
 
     return f
 

@@ -8,42 +8,38 @@ from repository import repository
 
 from repository.fsrepos import FilesystemRepository
 
-# This builds a job which applies both a change set and the local changes
-# which are needed.
-class LocalRepository(FilesystemRepository):
-
-    createBranches = 1
-
-    def buildJob(self, changeSet):
-	return LocalRepositoryChangeSetJob(self, changeSet)
-
-    def storeFileFromContents(self, contents, file, restoreContents):
-	"""
-	this is called when a Repository wants to store a file; we store
-	config files only (since we made to patch them later)
-	"""
-	if file.flags.isConfig():
-	    return FilesystemRepository.storeFileFromContents(self, 
-				contents, file, restoreContents)
-
-    def __init__(self, root, path, mode = "r"):
-	self.root = root
-	self.dbpath = path
-	fullPath = root + "/" + path + "/stash"
-	FilesystemRepository.__init__(self, fullPath, mode)
-
 class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 
-    def removals(self):
-	for pkg in self.oldPackageList():
-	    self.repos.erasePackageVersion(pkg.getName(), pkg.getVersion())
+    """
+    Removals have to be batched (for now at least); if we do them too
+    soon the code which merges into the filesystem won't be able to get
+    to the old version of things.
+    """
 
-	for (fileId, fileVersion, fileObj) in self.oldFileList():
-	    self.repos.eraseFileVersion(fileId, fileVersion)
+    def addPackage(self, pkg):
+	pkgCs = self.cs.getNewPackageVersion(pkg.getName(), pkg.getVersion())
+	old = pkgCs.getOldVersion()
+	self.repos.addPackage(pkg, oldVersion = old)
 
-	for (fileId, fileVersion, fileObj) in self.oldFileList():
-	    if fileObj.hasContents and fileObj.flags.isConfig():
-		self.repos.removeFileContents(fileObj.contents.sha1())
+    def oldPackage(self, pkg):
+	self.oldPackages.append(pkg)
+
+    def oldPackageList(self):
+	return self.oldPackages
+
+    def oldFile(self, fileId, fileVersion, fileObj):
+	self.oldFiles.append((fileId, fileVersion, fileObj))
+
+    def oldFileList(self):
+	return self.oldFiles
+
+    def addFile(self, fileObject):
+	fsrepos.ChangeSetJob.addFile(self, fileObject)
+
+	fileId = fileObject.fileId()
+	oldVersion = self.cs.getFileOldVersion(fileId)
+	if oldVersion:
+	    self.removeFile(fileId, oldVersion)
 
     # remove the specified file 
     def removeFile(self, fileId, version):
@@ -56,9 +52,15 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
     # localCs is A->A.local, so it doesn't need retargeting.
     def __init__(self, repos, cs):
 	assert(not cs.isAbsolute())
-	fsrepos.ChangeSetJob.__init__(self, repos, cs)
 
-	# remove old versions of the packages which are being added
+	self.cs = cs
+	self.repos = repos
+	self.oldPackages = []
+	self.oldFiles = []
+
+	# remove old versions of the packages which are being added. this has
+	# to be done before FilesystemRepository.__init__() is called, as
+	# it munges the database so we can no longer get to the old packages
 	# 
 	# while we're here, package change sets may mark some files as removed;
 	# we need to remember to remove those files, and make the paths for
@@ -85,12 +87,14 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 		(oldPath, oldFileVersion) = oldPkg.getFile(fileId)
 		self.removeFile(fileId, oldFileVersion)
 
-	# for each file which has changed, erase the old version of that
-	# file from the repository
-	for f in self.newFileList():
-	    oldVersion = cs.getFileOldVersion(f.fileId())
-	    if not oldVersion:
-		# this is a new file; there is no old version to erase
-		continue
+	fsrepos.ChangeSetJob.__init__(self, repos, cs)
 
-	    self.removeFile(f.fileId(), oldVersion)
+	for pkg in self.oldPackageList():
+	    self.repos.erasePackageVersion(pkg.getName(), pkg.getVersion())
+
+	for (fileId, fileVersion, fileObj) in self.oldFileList():
+	    self.repos.eraseFileVersion(fileId, fileVersion)
+
+	for (fileId, fileVersion, fileObj) in self.oldFileList():
+	    if fileObj.hasContents and fileObj.flags.isConfig():
+		self.repos.removeFileContents(fileObj.contents.sha1())

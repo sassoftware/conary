@@ -7,7 +7,7 @@ import idtable
 
 class Items(idtable.IdTable):
     def __init__(self, db):
-        idtable.IdTable.__init__(self, db, 'item')
+        idtable.IdTable.__init__(self, db, 'Items', 'itemId', 'item')
 
     def removeUnused(self):
 	cu = self.db.cursor()

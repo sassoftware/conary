@@ -58,6 +58,17 @@ class FilesystemJob:
 	    else:
 		self.directorySet[dir] = 1
 
+    def userRemoval(self, troveName, troveVersion, fileId):
+	if not self.userRemovals.has_key((troveName, troveVersion)):
+	    self.userRemovals[(troveName, troveVersion)] = [ fileId ]
+	else:
+	    self.userRemovals.append(fileId)
+
+    def iterUserRemovals(self):
+	for ((troveName, troveVersion), fileIdList) in \
+					    self.userRemovals.iteritems():
+	    yield (troveName, troveVersion, fileIdList)
+
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
 
@@ -265,6 +276,8 @@ class FilesystemJob:
 	    if not fsPkg.hasFile(fileId):
 		# the file was removed from the local system; this change
 		# wins
+		self.userRemoval(pkgCs.getName(), pkgCs.getNewVersion(),
+				 fileId)
 		continue
 
 	    (fsPath, fsVersion) = fsPkg.getFile(fileId)
@@ -484,6 +497,7 @@ class FilesystemJob:
 	self.initScripts = []
 	self.changeSet = changeSet
 	self.directorySet = {}
+	self.userRemovals = {}
 
 	for pkgCs in changeSet.iterNewPackageList():
 	    name = pkgCs.getName()
@@ -538,7 +552,27 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     newPkg = curPkg.copy()
     newPkg.changeVersion(newVersion)
 
+    fileIds = {}
     for (fileId, path, version) in newPkg.iterFileList():
+	fileIds[fileId] = True
+
+    """
+    Iterating over the files in newPkg would be much more natural then
+    iterating over the ones in the old package, and then going through
+    newPkg to find what we missed. However, doing it the hard way lets
+    us use iterTroveFiles(), which is much faster.
+    """
+    if srcPkg:
+	iter = repos.iterFilesInTrove(srcPkg, withFiles = True)
+    else:
+	iter = []
+    for (fileId, srcPath, srcFileVersion, srcFile) in iter:
+	# file disappeared
+	if not fileIds.has_key(fileId): continue
+
+	(path, version) = newPkg.getFile(fileId)
+	del fileIds[fileId]
+
 	if path[0] == '/':
 	    realPath = root + path
 	else:
@@ -551,11 +585,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 		% path)
 	    return None
 
-	if srcPkg and srcPkg.hasFile(fileId):
-	    srcFileVersion = srcPkg.getFile(fileId)[1]
-	    srcFile = repos.getFileVersion(fileId, srcFileVersion)
-	else:
-	    srcFile = None
+	if srcFile.hasContents:
+	    srcCont = repos.getFileContents(srcFile)
 
 	f = files.FileFromFilesystem(realPath, fileId,
 				     possibleMatch = srcFile)
@@ -563,37 +594,46 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	if path.endswith(".recipe"):
 	    f.flags.isConfig(set = True)
 
-	if not srcPkg or not srcPkg.hasFile(fileId):
-	    # if we're committing against head, this better be a new file.
-	    # if we're generating a diff against someplace else, it might not 
-	    # be.
-	    assert(srcPkg or isinstance(version, versions.NewVersion))
-	    # new file, so this is easy
-	    changeSet.addFile(fileId, None, newVersion, f.freeze())
+	if not f.metadataEqual(srcFile, ignoreOwnerGroup = noIds):
 	    newPkg.addFile(fileId, path, newVersion)
 
-	    if f.hasContents:
-		newCont = filecontents.FromFilesystem(realPath)
-		changeSet.addFileContents(fileId,
-					  changeset.ChangedFileTypes.file,
-					  newCont, f.flags.isConfig())
-	    continue
-
-	oldVersion = srcPkg.getFile(fileId)[1]	
-	(oldFile, oldCont) = repos.getFileVersion(fileId, oldVersion,
-						  withContents = 1)
-	if not f.metadataEqual(oldFile, ignoreOwnerGroup = noIds):
-	    newPkg.addFile(fileId, path, newVersion)
-
-	    (filecs, hash) = changeset.fileChangeSet(fileId, oldFile, f)
-	    changeSet.addFile(fileId, oldVersion, newVersion, filecs)
+	    (filecs, hash) = changeset.fileChangeSet(fileId, srcFile, f)
+	    changeSet.addFile(fileId, srcFileVersion, newVersion, filecs)
 	    if hash:
 		newCont = filecontents.FromFilesystem(realPath)
-		(contType, cont) = changeset.fileContentsDiff(oldFile, oldCont,
+		(contType, cont) = changeset.fileContentsDiff(srcFile, srcCont,
                                                               f, newCont)
 						
 		changeSet.addFileContents(fileId, contType, cont, 
 					  f.flags.isConfig())
+
+    for fileId in fileIds.iterkeys():
+	(path, version) = newPkg.getFile(fileId)
+
+	if path[0] == '/':
+	    realPath = root + path
+	else:
+	    realPath = os.getcwd() + "/" + path
+
+	# if we're committing against head, this better be a new file.
+	# if we're generating a diff against someplace else, it might not 
+	# be.
+	assert(srcPkg or isinstance(version, versions.NewVersion))
+
+	f = files.FileFromFilesystem(realPath, fileId)
+
+	if path.endswith(".recipe"):
+	    f.flags.isConfig(set = True)
+
+	# new file, so this part is easy
+	changeSet.addFile(fileId, None, newVersion, f.freeze())
+	newPkg.addFile(fileId, path, newVersion)
+
+	if f.hasContents:
+	    newCont = filecontents.FromFilesystem(realPath)
+	    changeSet.addFileContents(fileId,
+				      changeset.ChangedFileTypes.file,
+				      newCont, f.flags.isConfig())
 
     (csPkg, filesNeeded, pkgsNeeded) = newPkg.diff(srcPkg)
     assert(not pkgsNeeded)

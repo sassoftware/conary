@@ -3,13 +3,19 @@
 # All rights reserved
 #
 
-DEP_CLASS_ABI	    = 0
-DEP_CLASS_IS	    = 1
-DEP_CLASS_SONAME    = 2
-DEP_CLASS_FILES	    = 3
-DEP_CLASS_TROVES    = 4
-
 import util
+
+DEP_CLASS_ABI		= 0
+DEP_CLASS_IS		= 1
+DEP_CLASS_SONAME	= 2
+DEP_CLASS_FILES		= 3
+DEP_CLASS_TROVES	= 4
+
+dependencyClasses = {}
+
+def _registerDepClass(classObj):
+    global dependencyClasses
+    dependencyClasses[classObj.tag] = classObj
 
 class Dependency:
 
@@ -125,6 +131,10 @@ class DependencyClass:
 	    # calling this for duplicates is a noop
 	    self.addDep(otherdep)
 
+    def getDeps(self):
+        for name, dep in self.members.iteritems():
+            yield dep
+
     def __hash__(self):
 	val = self.tag
 	for dep in self.members.itervalues():
@@ -135,6 +145,9 @@ class DependencyClass:
     def __eq__(self, other):
 	return self.tag == other.tag and \
 	       self.members == other.members
+
+    def __ne__(self, other):
+        return not self == other
 
     def __str__(self):
 	return "\n".join([ "%s: %s" % (self.tagName, dep) 
@@ -149,6 +162,7 @@ class AbiDependency(DependencyClass):
     tagName = "abi"
     exactMatch = True
     justOne = True
+_registerDepClass(AbiDependency)
 
 class InstructionSetDependency(DependencyClass):
 
@@ -156,6 +170,7 @@ class InstructionSetDependency(DependencyClass):
     tagName = "is"
     exactMatch = False
     justOne = True
+_registerDepClass(InstructionSetDependency)
 
 class SonameDependencies(DependencyClass):
 
@@ -163,6 +178,7 @@ class SonameDependencies(DependencyClass):
     tagName = "soname"
     exactMatch = True
     justOne = False
+_registerDepClass(SonameDependencies)
 
 class FileDependencies(DependencyClass):
 
@@ -170,6 +186,7 @@ class FileDependencies(DependencyClass):
     tagName = "file"
     exactMatch = True
     justOne = False
+_registerDepClass(FileDependencies)
 
 class TroveDependencies(DependencyClass):
 
@@ -177,6 +194,7 @@ class TroveDependencies(DependencyClass):
     tagName = "trove"
     exactMatch = True
     justOne = False
+_registerDepClass(TroveDependencies)
 
 class DependencySet:
 
@@ -198,12 +216,27 @@ class DependencySet:
 
 	return True
 
+    def getDepClasses(self):
+        return self.members
+
     def union(self, other):
 	for tag in other.members:
 	    if self.members.has_key(tag):
 		self.members[tag].union(other.members[tag])
 	    else:
 		self.members[tag] = other.members[tag]
+
+    def __eq__(self, other):
+	for tag in other.members:
+	    if not self.members.has_key(tag): 
+		return False
+	    if not self.members[tag] == other.members[tag]:
+		return False
+
+	return True
+
+    def __ne__(self, other):
+        return not self == other
 
     def __str__(self):
 	return "\n".join([ str(x) for x in self.members.itervalues()])

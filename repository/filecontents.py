@@ -64,11 +64,21 @@ class FromString(FileContents):
 
     __slots__ = "str"
 
+    def __deepcopy__(self, mem):
+        return self.__class__(self.str)
+
     def get(self):
 	return StringIO(self.str)
 
     def size(self):
 	return len(self.str)
+
+    def __eq__(self, other):
+        if type(other) is str:
+            return self.str == str
+        if isinstance(other, FromString):
+            return self.str == other.str
+        return False
 
     def __init__(self, str):
 	self.str = str

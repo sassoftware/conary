@@ -28,7 +28,30 @@ class FileInfo(files.TupleStream):
 	      ("oldVersion", files.StringStream, "!H"),
 	      ("newVersion", files.StringStream, "!H"), 
 	      ("csInfo", files.StringStream, "B"))
-    makeupDict = files._makeTupleDict(makeup)
+
+    def fileId(self):
+        return self.items[0].value()
+
+    def setFileId(self, value):
+        return self.items[0].set(value)
+
+    def oldVersion(self):
+        return self.items[1].value()
+
+    def setOldVersion(self, version):
+        return self.items[1].set(value)
+
+    def newVersion(self):
+        return self.items[2].value()
+
+    def setNewVersion(self, version):
+        return self.items[2].set(value)
+
+    def csInfo(self):
+        return self.items[3].value()
+
+    def setCsInfo(self, version):
+        return self.items[3].set(value)
 
 class ChangeSet:
 
@@ -143,12 +166,6 @@ class ChangeSet:
 
     def hasFile(self, fileId):
 	return self.files.has_key(fileId)
-
-    def remapPaths(self, map):
-	for pkgCs in self.newPackages.itervalues():
-	    dict = { 'pkgname' : pkgCs.getName().split(":")[0],
-		     'label'   : str(pkgCs.getNewVersion().branch().label()) }
-	    pkgCs.remapPaths(map, dict)
 
     def formatToFile(self, cfg, f):
 	f.write("primary packages:\n")

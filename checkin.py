@@ -131,7 +131,7 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     # identifies a package we still need to make sure the state has the name of
     # the actual branch since empty branches yield objects whose versions are
     # on the parent branch.
-    name += ":sources"
+    name += ":source"
     try:
         trvList = helper.findPackage(repos, cfg.installbranch, name, 
                                      versionStr = versionStr)
@@ -380,7 +380,7 @@ def removeFile(file):
     state.write("SRS")
 
 def newPackage(repos, cfg, name):
-    name += ":sources"
+    name += ":source"
 
     state = SourceState(name, versions.NewVersion(), cfg.defaultbranch)
 

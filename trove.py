@@ -224,7 +224,10 @@ class Package:
 	    return False
 
 	(csg, pcl, fcl) = self.diff(them)
-	return (not pcl) and (not fcl)
+	return (not pcl) and (not fcl) and (not csg.getOldFileList())
+
+    def __ne__(self, them):
+	return not self == them
 
     def diff(self, them, absolute = 0):
 	"""
@@ -496,7 +499,13 @@ class PackageChangeSet:
 	f.write("%s\n" % self.newVersion.asString(cfg.defaultbranch))
 
 	for (fileId, path, version) in self.newFiles:
-	    f.write("\tadded %s (%s(.*)%s)\n" % (path, fileId[:6], fileId[-6:]))
+	    #f.write("\tadded (%s(.*)%s)\n" % (fileId[:6], fileId[-6:]))
+            change = changeSet.getFileChange(fileId)
+            fileobj = files.ThawFile(change, fileId)
+            print "\t%s    1 %-8s %-8s %s %s %s" % \
+                  (fileobj.modeString(), fileobj.inode.owner(),
+                   fileobj.inode.group(), fileobj.sizeString(),
+                   fileobj.timeString(), path)
 
 	for (fileId, path, version) in self.changedFiles:
 	    if path:
@@ -505,7 +514,7 @@ class PackageChangeSet:
 	    else:
 		f.write("\tchanged %s\n" % fileId)
 	    change = changeSet.getFileChange(fileId)
-	    print "\t\t%s" % " ".join(files.fieldsChanged(change))
+	    f.write("\t\t%s\n" % " ".join(files.fieldsChanged(change)))
 
 	for fileId in self.oldFiles:
 	    f.write("\tremoved %s(.*)%s\n" % (fileId[:6], fileId[-6:]))
@@ -513,29 +522,6 @@ class PackageChangeSet:
 	for name in self.packages.keys():
 	    list = [ x[0] + x[1].asString(cfg.defaultbranch) for x in self.packages[name] ]
 	    f.write("\t" + name + " " + " ".join(list) + "\n")
-
-    def remapSinglePath(self, path, map, dict):
-	# the first item in map remaps source packages, which are present
-	# without a leading /
-	newPath = path
-
-	if path[0] != "/":
-	    prefix = map[0][1] % dict
-	    newPath = prefix + path
-	else:
-	    for (prefix, newPrefix) in map[1:]:
-		if path.startswith(prefix):
-		    newPath = newPrefix + path[len(prefix):]
-
-	return newPath
-
-    def remapPaths(self, map, dict):
-	for filelist in (self.changedFiles, self.newFiles):
-            for i, path in enumerate(filelist):
-                if path[1]:
-		    newPath = self.remapSinglePath(path[1], map, dict)
-		    if newPath != path[1]:
-			filelist[i] = (path[0], newPath, path[2])
 
     def freeze(self):
 	"""

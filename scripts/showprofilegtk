@@ -125,9 +125,9 @@ def setup_tree_view(treeview, model, cols):
         column.set_sort_column_id(col)
         
 class StatWindow(gtk.Window):
-    def __init__(self):
+    def __init__(self, filename):
         gtk.Window.__init__(self, gtk.WINDOW_TOPLEVEL)
-        self.set_title('Profile viewer')
+        self.set_title('Profile viewer: %s' %filename)
         self.connect('destroy', lambda *x: gtk.mainquit())
         self.set_default_size(700, 400)
         pane = gtk.VPaned()
@@ -228,7 +228,7 @@ if __name__ == '__main__':
     else:    
         stats = hotshot.stats.load(filename)
 
-    app = StatWindow()
+    app = StatWindow(filename)
     app.populate(stats)
     app.show_all()
     gtk.main()

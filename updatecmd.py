@@ -16,19 +16,15 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
     if not os.path.exists(cfg.root):
         util.mkdirChain(cfg.root)
 
-    map = ( ( None, cfg.sourcepath + "/" ), )
-    
     if os.path.exists(pkg) and os.path.isfile(pkg):
 	# there is a file, try to read it as a changeset file
 
         try:
             cs = changeset.ChangeSetFromFile(pkg)
-        except KeyError:
+        except:
             # invalid changeset file
             pass
         else:
-	    cs.remapPaths(map)
-
             if cs.isAbsolute():
                 cs = db.rootChangeSet(cs, cfg.defaultbranch)
 
@@ -75,8 +71,6 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 	    list.append((pkg.getName(), currentVersion, pkg.getVersion(), 0))
 
 	cs = repos.createChangeSet(list)
-	cs.remapPaths(map)
-
 	list = [ x[0] for x in list ]
 
     try:
@@ -98,5 +92,5 @@ def doErase(db, cfg, pkg, versionStr = None):
     for pkg in pkgList:
 	list.append((pkg.getName(), pkg.getVersion(), None, False))
 
-    cs = db.stash.createChangeSet(list)
+    cs = db.createChangeSet(list)
     db.commitChangeSet(cs)

@@ -9,30 +9,59 @@ from repository import fsrepos
 import log
 import localrep
 import os
-import trovedb
 from repository import repository
+import sqldb
 import update
 import util
 import versions
 
-class AbstractDatabase(repository.AbstractRepository):
+class RootChangeSetJob(fsrepos.ChangeSetJob):
 
-    # XXX some of these interfaces are horribly inefficient as we have
-    # to instantiate a full package object to do anything... 
-    # FilesystemRepository has the same problem
+    def addPackage(self, pkg):
+	self.packages.append(pkg)
+
+    def newPackageList(self):
+	return self.packages
+
+    def oldPackage(self, pkg):
+	self.oldPackages.append(pkg)
+
+    def oldPackageList(self):
+	return self.oldPackages
+
+    def oldFile(self, fileId, fileVersion, fileObj):
+	self.oldFiles.append((fileId, fileVersion, fileObj))
+
+    def oldFileList(self):
+	return self.oldFiles
+
+    def addFile(self, fileObject):
+	self.files[fileObject.fileId()] = fileObject
+
+    def getFile(self, fileId):
+	return self.files[fileId]
+
+    def newFileList(self):
+	return self.files.keys()
+
+    def __init__(self, repos, absCs):
+	self.packages = []
+	self.oldPackages = []
+	self.oldFiles = []
+	self.files = {}
+	fsrepos.ChangeSetJob.__init__(self, repos, absCs)
+
+class SqlDbRepository(repository.DataStoreRepository):
 
     def iterAllTroveNames(self):
-	return self.troveDb.iterAllTroveNames()
+	return self.db.iterAllTroveNames()
 
     def getPackageBranchList(self, name):
 	return [ x.getVersion().branch() for x in 
-		    self.troveDb.iterFindByName(name)]
+		    self.db.iterFindByName(name)]
 
     def getPackageVersion(self, name, version, pristine = False):
-	if pristine:
-	    return self.stash.getPackageVersion(name, version)
-
-	l = [ x for x in self.troveDb.iterFindByName(name)
+	l = [ x for x in self.db.iterFindByName(name, pristine = pristine)
 		 if version == x.getVersion()]
 	if not l:
 	    raise repository.PackageMissing(name, version)
@@ -40,32 +69,106 @@ class AbstractDatabase(repository.AbstractRepository):
 	return l[0]
 
     def pkgLatestVersion(self, name, branch):
-	return [ x.getVersion() for x in self.troveDb.iterFindByName(name)
-		     if branch == x.getVersion().branch()][0]
+	l = [ x.getVersion() for x in self.db.iterFindByName(name)
+		     if branch == x.getVersion().branch()]
+	if not l:
+	    return None
+
+	return l[0]
 
     def hasPackage(self, name):
-	return self.troveDb.hasByName(name)
+	return self.db.hasByName(name)
+
+    def hasPackageVersion(self, pkgName, version):
+	for x in self.db.iterFindByName(pkgName):
+	     if version == x.getVersion():
+		return True
+
+	return False
 
     def branchesOfTroveLabel(self, name, label):
 	rc = []
-	for x in self.troveDb.iterFindByName(name):
+	for x in self.db.iterFindByName(name):
 	    b = x.getVersion().branch()
 	    if b.label() == label:
 		rc.append(b)
 
 	return rc
 
-    def getLatestPackage(self, name, branch):
-	return [ x for x in self.troveDb.iterFindByName(name)
+    def getLatestPackage(self, name, branch, pristine = False):
+	return [ x for x in self.db.iterFindByName(name, pristine = pristine)
 		     if branch == x.getVersion().branch()][0]
 
     def getPackageVersionList(self, name):
-	return [ x.getVersion() for x in self.troveDb.iterFindByName(name) ]
+	return [ x.getVersion() for x in self.db.iterFindByName(name) ]
 
-    def getFileVersion(self, fileId, version, path = None, 
-		       withContents = False):
-	return self.stash.getFileVersion(fileId, version, 
-					 withContents = withContents)
+    def getFileVersion(self, fileId, version, path = None, withContents = 0):
+	file = self.db.getFile(fileId, version, pristine = True)
+	if withContents:
+	    if file.hasContents:
+		cont = filecontents.FromRepository(self, file.contents.sha1(), 
+						   file.contents.size())
+	    else:
+		cont = None
+
+	    return (file, cont)
+
+	return file
+
+    def getFileContents(self, file):
+	return filecontents.FromRepository(self, file.contents.sha1(), 
+					   file.contents.size())
+
+    def iterFilesInTrove(self, trove, sortByPath = False, withFiles = False,
+			 pristine = False):
+	return self.db.iterFilesInTrove(trove, sortByPath = sortByPath, 
+				withFiles = withFiles, pristine = pristine)
+
+    def buildJob(self, changeSet):
+	return localrep.LocalRepositoryChangeSetJob(self, changeSet)
+
+    def storeFileFromContents(self, contents, file, restoreContents):
+	"""
+	this is called when a Repository wants to store a file; we store
+	config files only (since we made to patch them later)
+	"""
+	if file.flags.isConfig():
+	    return repository.DataStoreRepository.storeFileFromContents(self, 
+				contents, file, restoreContents)
+
+    def addFileVersion(self, fileId, version, file):
+	self.db.addFile(file, version)
+
+    def addPackage(self, pkg, oldVersion = None):
+	self.db.addTrove(pkg, oldVersion = oldVersion)
+
+    def commit(self):
+	self.db.commit()
+
+    def close(self):
+	self.db.close()
+
+    def erasePackageVersion(self, pkgName, version):
+	self.db.eraseTrove(pkgName, version)
+
+    def eraseFileVersion(self, fileId, version):
+	# files get removed with their troves
+	pass
+
+    def __init__(self, path):
+	repository.DataStoreRepository.__init__(self, path)
+	self.db = sqldb.Database(path + "/sql")
+
+class AbstractDatabase(SqlDbRepository):
+
+    # XXX some of these interfaces are horribly inefficient as we have
+    # to instantiate a full package object to do anything... 
+    # FilesystemRepository has the same problem
+
+    def iterFilesInTrove(self, trove, sortByPath = False, withFiles = False):
+	return SqlDbRepository.iterFilesInTrove(self, trove, 
+			sortByPath = sortByPath, withFiles = withFiles, 
+			pristine = False)
 
     # takes an absolute change set and creates a differential change set 
     # against a branch of the repository
@@ -75,9 +178,9 @@ class AbstractDatabase(repository.AbstractRepository):
 	# this has an empty source path template, which is only used to
 	# construct the eraseFiles list anyway
 	
-	# we don't use stash.buildJob here as it can't deal with
+	# we don't use our buildJob here as it can't deal with
 	# absolute change sets
-	job = fsrepos.ChangeSetJob(self.stash, absSet)
+	job = RootChangeSetJob(self, absSet)
 
 	# absolute change sets cannot have eraseLists
 	#assert(not eraseList)
@@ -95,13 +198,14 @@ class AbstractDatabase(repository.AbstractRepository):
 	    # the version of the package already installed on the
 	    # system. unfortunately we can't represent that yet. 
 	    pkgName = newPkg.getName()
-	    oldVersion = self.stash.pkgLatestVersion(pkgName, branch)
+	    oldVersion = self.pkgLatestVersion(pkgName, branch)
 	    if not oldVersion:
 		# new package; the Package.diff() right after this never
 		# sets the absolute flag, so the right thing happens
 		old = None
 	    else:
-		old = self.stash.getPackageVersion(pkgName, oldVersion)
+		old = self.getPackageVersion(pkgName, oldVersion, 
+					     pristine = True)
 
 	    # we ignore pkgsNeeded; it doesn't mean much in this case
 	    (pkgChgSet, filesNeeded, pkgsNeeded) =	    \
@@ -114,7 +218,7 @@ class AbstractDatabase(repository.AbstractRepository):
 		
 		oldFile = None
 		if oldVersion:
-		    (oldFile, oldCont) = self.stash.getFileVersion(fileId, 
+		    (oldFile, oldCont) = self.getFileVersion(fileId, 
 					    oldVersion, withContents = 1)
 
 		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
@@ -146,7 +250,7 @@ class AbstractDatabase(repository.AbstractRepository):
             flags |= update.REPLACEFILES
 
 	for pkg in cs.iterNewPackageList():
-	    if pkg.getName().endswith(":sources"): raise SourcePackageInstall
+	    if pkg.getName().endswith(":source"): raise SourcePackageInstall
 
 	# Make sure this change set doesn't unintentionally restore troves
 	# which have been removed.  take a look at which packages were removed
@@ -183,15 +287,14 @@ class AbstractDatabase(repository.AbstractRepository):
 	for newPkg in cs.iterNewPackageList():
 	    name = newPkg.getName()
 	    old = newPkg.getOldVersion()
-	    if self.stash.hasPackage(name) and old:
+	    if self.hasPackage(name) and old:
 		ver = old.fork(versions.LocalBranch(), sameVerRel = 1)
 		pkg = self.getPackageVersion(name, old)
 		origPkg = self.getPackageVersion(name, old, pristine = 1)
 		assert(pkg)
 		pkgList.append((pkg, origPkg, ver))
 
-	result = update.buildLocalChanges(self.stash, pkgList, 
-					  root = self.root)
+	result = update.buildLocalChanges(self, pkgList, root = self.root)
 	if not result: return
 
 	(localChanges, retList) = result
@@ -203,13 +306,9 @@ class AbstractDatabase(repository.AbstractRepository):
 	    inverse = cs.makeRollback(self, configFiles = 1)
             flags |= update.MERGE
 
-	# Build A->B
-	if toStash:
-	    job = self.stash.buildJob(cs)
-
 	# build the list of changes to the filesystem
-	fsJob = update.FilesystemJob(self.stash, cs, fsPkgDict, 
-				     self.root, flags = flags)
+	fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root, 
+				     flags = flags)
 
 	# look through the directories which have had files removed and
 	# see if we can remove the directories as well
@@ -242,17 +341,18 @@ class AbstractDatabase(repository.AbstractRepository):
 
 	# -------- database and system are updated below this line ---------
 
-	# add new packages
-	if toStash: job.commit()
+	# Build A->B
+	if toStash:
+	    # this updates the database from the changeset; the change
+	    # isn't committed until the self.commit below
+	    # an object for historical reasons
+	    self.buildJob(cs)
 
-	# remove old packages
 	errList = fsJob.getErrorList()
 	if errList:
 	    for err in errList: log.error(err)
 	    # FIXME need a --force for this
 	    return
-
-	if toStash: job.removals()
 
 	# everything is in the database... save this so we can undo
 	# it later. 
@@ -261,18 +361,19 @@ class AbstractDatabase(repository.AbstractRepository):
 
 	fsJob.apply()
 
-	self.stash.commit()
+	for (troveName, troveVersion, fileIdList) in fsJob.iterUserRemovals():
+	    self.db.removeFilesFromTrove(troveName, troveVersion, fileIdList)
 
-	# it would be nice if this could be undone on failure
-	for pkg in fsJob.iterNewPackageList():
-	    if not pkg.getVersion().isLocal():
-		self.troveDb.addTrove(pkg)
 	for (name, version) in fsJob.getOldPackageList():
-	    if not version.isLocal():
-		self.troveDb.delTrove(name, version)
+	    if toStash:
+		# if to stash if false, we're restoring the local
+		# branch of a rollback
+		self.db.eraseTrove(name, version)
+
+	self.commit()
 
 	# finally, remove old directories. right now this has to be done
-	# after the trovedb has been updated
+	# after the sqldb has been updated
 	list = directoryCandidates.keys()
 	list.sort()
 	list.reverse()
@@ -285,8 +386,8 @@ class AbstractDatabase(repository.AbstractRepository):
 	    relativePath = path[len(self.root):]
 	    if relativePath[0] != '/': relativePath = '/' + relativePath
 	    
-	    if self.troveDb.pathIsOwned(relativePath):
-		list = [ x for x in self.troveDb.iterFindByPath(path)]
+	    if self.db.pathIsOwned(relativePath):
+		list = [ x for x in self.db.iterFindByPath(path)]
 		keep[os.path.dirname(path)] = True
 		continue
 
@@ -296,40 +397,15 @@ class AbstractDatabase(repository.AbstractRepository):
 	if not multipleMatches:
 	    # make sure there aren't too many
 	    count = 0
-	    for trv in self.troveDb.iterFindByPath(path):
+	    for trv in self.db.iterFindByPath(path):
 		count += 1
 		if count > 1: 
 		    raise DatabaseError, "multiple troves own %s" % path
 
-	for trv in self.troveDb.iterFindByPath(path):
-	    rmList = []
-	    for (fileId, trvPath, version) in trv.iterFileList():
-		if path == trvPath:
-		    rmList.append(fileId)
+	for trv in self.db.iterFindByPath(path):
+	    self.db.removeFileFromTrove(trv, path)
 
-	    for fileId in rmList:
-		trv.removeFile(fileId)
-
-	    self.troveDb.updateTrove(trv)
-
-    def open(self, mode):
-	top = util.joinPaths(self.root, self.dbpath)
-
-	self.rollbackCache = top + "/rollbacks"
-	self.rollbackStatus = self.rollbackCache + "/status"
-	if not os.path.exists(self.rollbackCache) and mode == "c":
-	    util.mkdirChain(self.rollbackCache)
-	if not os.path.exists(self.rollbackStatus):
-	    self.firstRollback = 0
-	    self.lastRollback = -1
-	    self.writeRollbackStatus()
-	else:
-	    self.readRollbackStatus()
-
-	self.troveDb = trovedb.TroveDatabase(top, mode)
-
-    def close(self):
-	self.troveDb = None
+	self.db.commit()
 
     def addRollback(self, reposChangeset, localChangeset):
 	rpFn = self.rollbackCache + ("/rb.r.%d" % (self.lastRollback + 1))
@@ -414,12 +490,24 @@ class AbstractDatabase(repository.AbstractRepository):
 	    self.commitChangeSet(localCs, isRollback = True, toStash = False)
 	    self.removeRollback(name)
 
-    def __init__(self, root, path, mode = "r"):
+    def __init__(self, root, path):
 	assert(self.__class__ != AbstractDatabase)
 	self.root = root
-	self.dbpath = path
-	self.open(mode)
-	repository.AbstractRepository.__init__(self)
+
+	top = util.joinPaths(root, path)
+
+	self.rollbackCache = top + "/rollbacks"
+	self.rollbackStatus = self.rollbackCache + "/status"
+	if not os.path.exists(self.rollbackCache):
+	    util.mkdirChain(self.rollbackCache)
+	if not os.path.exists(self.rollbackStatus):
+	    self.firstRollback = 0
+	    self.lastRollback = -1
+	    self.writeRollbackStatus()
+	else:
+	    self.readRollbackStatus()
+
+	SqlDbRepository.__init__(self, root + path + "/local.sql")
 
 class Database(AbstractDatabase):
 
@@ -427,16 +515,8 @@ class Database(AbstractDatabase):
     A system database which maintains a local repository cache.
     """
 
-    def open(self, mode):
-	AbstractDatabase.open(self, mode)
-	self.stash = localrep.LocalRepository(self.root, self.dbpath, mode)
-
-    def close(self):
-	AbstractDatabase.close(self)
-	self.stash = None
-
     def __init__(self, root, path, mode = "r"):
-	AbstractDatabase.__init__(self, root, path, mode)
+	AbstractDatabase.__init__(self, root, path)
 
 # Exception classes
 

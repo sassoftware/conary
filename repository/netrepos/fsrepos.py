@@ -7,7 +7,6 @@
 
 import changeset
 import copy
-import datastore
 import fcntl
 import filecontents
 import files
@@ -20,10 +19,10 @@ import util
 import versions
 import bsddb
 
-from repository import AbstractRepository
+from repository import DataStoreRepository
 from localrep import trovestore
 
-class FilesystemRepository(AbstractRepository):
+class FilesystemRepository(DataStoreRepository):
 
     createBranches = 1
 
@@ -44,7 +43,7 @@ class FilesystemRepository(AbstractRepository):
     def getLatestPackage(self, pkgName, branch):
 	return self.troveStore.getLatestTrove(pkgName, branch)
 
-    def getPackageVersion(self, pkgName, version):
+    def getPackageVersion(self, pkgName, version, pristine = True):
 	try:
 	    return self.troveStore.getTrove(pkgName, version)
 	except KeyError:
@@ -92,11 +91,14 @@ class FilesystemRepository(AbstractRepository):
 
 	return file
 
+    def getFileContents(self, file):
+	return filecontents.FromRepository(self, file.contents.sha1(), 
+					   file.contents.size())
+	
     def addFileVersion(self, fileId, version, file):
-	self.troveStore.addFile(file, version)
-
-    def hasFileVersion(self, fileId, version):
-	self.troveStore.hasFile(fileId, version)
+	# don't add duplicated to this repository
+	if not self.troveStore.hasFile(fileId, version):
+	    self.troveStore.addFile(file, version)
 
     def eraseFileVersion(self, fileId, version):
 	self.troveStore.eraseFile(fileId, version)
@@ -105,35 +107,6 @@ class FilesystemRepository(AbstractRepository):
 
     def __del__(self):
 	self.close()
-
-    def storeFileFromContents(self, contents, file, restoreContents):
-	if file.hasContents:
-	    if restoreContents:
-		f = contents.get()
-		targetFile = self.contentsStore.newFile(file.contents.sha1())
-
-		# if targetFile is None the file is already in the store
-		if targetFile:
-		    util.copyfileobj(f, targetFile)
-		    targetFile.close()
-	    else:
-		# the file doesn't have any contents, so it must exist
-		# in the data store already; we still need to increment
-		# the reference count for it
-		self.contentsStore.addFileReference(file.contents.sha1())
-
-	    return 1
-	
-	return 0
-
-    def removeFileContents(self, sha1):
-	self.contentsStore.removeFile(sha1)
-
-    def pullFileContentsObject(self, fileId):
-	return self.contentsStore.openFile(fileId)
-
-    def hasFileContents(self, fileId):
-	return self.contentsStore.hasFile(fileId)
 
     def createBranch(self, newBranch, where, troveName = None):
 	"""
@@ -239,106 +212,6 @@ class FilesystemRepository(AbstractRepository):
 
 	self.mode = mode
 
-    def createChangeSet(self, packageList):
-	"""
-	packageList is a list of (pkgName, oldVersion, newVersion, absolute) 
-	tuples. 
-
-	if oldVersion == None and absolute == 0, then the package is assumed
-	to be new for the purposes of the change set
-
-	if newVersion == None then the package is being removed
-	"""
-	cs = changeset.ChangeSetFromRepository(self)
-	for (name, v1, v2, absolute) in packageList:
-	    cs.addPrimaryPackage(name, v2)
-
-	dupFilter = {}
-
-	# don't use a for in here since we grow packageList inside of
-	# this loop
-	packageCounter = 0
-	while packageCounter < len(packageList):
-	    (packageName, oldVersion, newVersion, absolute) = \
-		packageList[packageCounter]
-	    packageCounter += 1
-
-	    # make sure we haven't already generated this changeset; since
-	    # packages can be included from other packages we could try
-	    # to generate quite a few duplicates
-	    if dupFilter.has_key(packageName):
-		match = False
-		for (otherOld, otherNew) in dupFilter[packageName]:
-		    if not otherOld and not oldVersion:
-			same = True
-		    elif not otherOld and oldVersion:
-			same = False
-		    elif otherOld and not oldVersion:
-			same = False
-		    else:
-			same = otherOld == newVersion
-
-		    if same and otherNew == newVersion:
-			match = True
-			break
-		
-		if match: continue
-
-		dupFilter[packageName].append((oldVersion, newVersion))
-	    else:
-		dupFilter[packageName] = [ (oldVersion, newVersion) ]
-
-	    if not newVersion:
-		# remove this package and any subpackages
-		old = self.getPackageVersion(packageName, oldVersion)
-		cs.oldPackage(packageName, oldVersion)
-		for (name, version) in old.iterPackageList():
-                    # it's possible that a component of a package
-                    # was erased, make sure that it is installed
-                    if self.hasPackageVersion(name, version):
-                        packageList.append((name, version, None, absolute))
-		    
-		continue
-		    
-	    new = self.getPackageVersion(packageName, newVersion)
-	 
-	    if oldVersion:
-		old = self.getPackageVersion(packageName, oldVersion)
-	    else:
-		old = None
-
-	    (pkgChgSet, filesNeeded, pkgsNeeded) = \
-				new.diff(old, absolute = absolute)
-
-	    for (pkgName, old, new) in pkgsNeeded:
-		packageList.append((pkgName, old, new, absolute))
-
-	    cs.newPackage(pkgChgSet)
-
-	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
-		if oldVersion:
-		    (oldFile, oldCont) = self.getFileVersion(fileId, 
-				oldVersion, path = newPath, withContents = 1)
-		else:
-		    oldFile = None
-		    oldCont = None
-
-		(newFile, newCont) = self.getFileVersion(fileId, newVersion,
-					    path = newPath, withContents = 1)
-
-		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
-							 newFile)
-
-		cs.addFile(fileId, oldVersion, newVersion, filecs)
-
-		if hash:
-		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
-						oldCont, newFile, newCont)
-		    cs.addFileContents(fileId, contType, cont, 
-				       newFile.flags.isConfig())
-
-	return cs
-
     def buildJob(self, changeSet):
 	"""
 	Returns a ChangeSetJob object representing what needs to be done
@@ -348,7 +221,6 @@ class FilesystemRepository(AbstractRepository):
 
     def commitChangeSet(self, cs):
 	job = self.buildJob(cs)
-	job.commit()
 	self.commit()
 
     def close(self):
@@ -363,19 +235,16 @@ class FilesystemRepository(AbstractRepository):
 	self.top = path
 	self.troveStore = None
 	
-	self.contentsDB = self.top + "/contents"
 	self.sqlDB = self.top + "/sqldb"
 
 	try:
-	    util.mkdirChain(self.contentsDB)
+	    util.mkdirChain(self.top)
 	except OSError, e:
 	    raise repository.OpenError(str(e))
 	    
-	self.contentsStore = datastore.DataStore(self.contentsDB)
-
         self.open(mode)
 
-	AbstractRepository.__init__(self)
+	DataStoreRepository.__init__(self, path)
 
 class ChangeSetJobFile(object):
 
@@ -426,82 +295,44 @@ class ChangeSetJobFile(object):
 	self.thePath = path
 	self.theFileId = fileId
 
-# ChangeSetJob provides a to-do list for applying a change set; file
-# remappings should have been applied to the change set before it gets
-# this far
 class ChangeSetJob:
+    """
+    ChangeSetJob provides a to-do list for applying a change set; file
+    remappings should have been applied to the change set before it gets
+    this far. Derivative classes can override these methods to change the
+    behavior; for example, if addPackage is overridden no pacakges will
+    make it to the database. The same holds for oldFile.
+    """
 
     def addPackage(self, pkg):
-	self.packages.append(pkg)
-
-    def newPackageList(self):
-	return self.packages
+	self.repos.addPackage(pkg)
 
     def oldPackage(self, pkg):
-	self.oldPackages.append(pkg)
-
-    def oldPackageList(self):
-	return self.oldPackages
+	pass
 
     def oldFile(self, fileId, fileVersion, fileObj):
-	self.oldFiles.append((fileId, fileVersion, fileObj))
-
-    def oldFileList(self):
-	return self.oldFiles
+	pass
 
     def addFile(self, fileObject):
-	self.files[fileObject.fileId()] = fileObject
-	self.filePaths[fileObject.path] = 1
+	newFile = fileObject
+	file = newFile.file()
+	fileId = fileObject.fileId()
 
-    def getFile(self, fileId):
-	return self.files[fileId]
+	# duplicates are filtered out (as necessary) by addFileVersion
+	self.repos.addFileVersion(fileId, newFile.version(), file)
 
-    def containsFilePath(self, path):
-	return self.filePaths.has_key(path)
+	# Note that the order doesn't matter, we're just copying
+	# files into the repository. Restore the file pointer to
+	# the beginning of the file as we may want to commit this
+	# file to multiple locations.
+	self.repos.storeFileFromContents(newFile.getContents(), file, 
+					 newFile.restoreContents())
 
-    def newFileList(self):
-	return self.files.values()
-
-    def commit(self):
-	# commit changes
-	filesToArchive = []
-
-	# we need to do this in order of fileids to make sure we walk
-	# through change set streams in the right order
-	fileIds = self.files.keys()
-	fileIds.sort()
-	for fileId in fileIds:
-	    newFile = self.files[fileId]
-	    file = newFile.file()
-
-	    if not self.repos.hasFileVersion(fileId, newFile.version()):
-		self.repos.addFileVersion(fileId, newFile.version(), file)
-
-		path = newFile.path()
-
-	    # Note that the order doesn't matter, we're just copying
-	    # files into the repository. Restore the file pointer to
-	    # the beginning of the file as we may want to commit this
-	    # file to multiple locations.
-	    self.repos.storeFileFromContents(newFile.getContents(), file, 
-					     newFile.restoreContents())
-
-	for newPkg in self.newPackageList():
-	    self.repos.addPackage(newPkg)
-
-	# This doesn't actually remove anything! we never allow bits
-	# to get erased from repositories. The database, which is a child
-	# of this object, does allow removals.
-	
     def __init__(self, repos, cs):
 	self.repos = repos
 	self.cs = cs
 
-	self.packages = []
-	self.files = {}
-	self.filePaths = {}
-	self.oldPackages = []
-	self.oldFiles = []
+	self.packagesToCommit = []
 
 	fileMap = {}
 
@@ -521,19 +352,23 @@ class ChangeSetJob:
 			    (newVersion.asString(), csPkg.getName())
 
 	    if old:
-		newPkg = repos.getPackageVersion(pkgName, old)
+		newPkg = repos.getPackageVersion(pkgName, old, pristine = True)
 		newPkg.changeVersion(newVersion)
 	    else:
 		newPkg = package.Package(csPkg.name, newVersion)
 
 	    newFileMap = newPkg.applyChangeSet(csPkg)
 
-	    self.addPackage(newPkg)
+	    self.packagesToCommit.append(newPkg)
 	    fileMap.update(newFileMap)
 
 	# Create the file objects we'll need for the commit. This handles
 	# files which were added and files which have changed
-	for (fileId, (oldVer, newVer, diff)) in cs.getFileList():
+	list = cs.getFileList()
+	# sort this by fileid to ensure we pull files from the change
+	# set in the right order
+	list.sort()
+	for (fileId, (oldVer, newVer, diff)) in list:
 	    restoreContents = 1
 	    if oldVer:
 		oldfile = repos.getFileVersion(fileId, oldVer)
@@ -584,3 +419,7 @@ class ChangeSetJob:
 	    for (fileId, path, version) in pkg.iterFileList():
 		file = self.repos.getFileVersion(fileId, version)
 		self.oldFile(fileId, version, file)
+
+	for newPkg in self.packagesToCommit:
+	    self.addPackage(newPkg)
+

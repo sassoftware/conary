@@ -85,9 +85,9 @@ class _IdGen:
 	# this package on the branch. We also construct an object which
 	# lets us look for source files this build needs inside of the
 	# repository
-        isSource = pkg.getName().endswith(':sources')
+        isSource = pkg.getName().endswith(':source')
 	for (fileId, path, version) in pkg.iterFileList():
-            # don't include fileIds from the :sources component in
+            # don't include fileIds from the :source component in
             # the id hash
             if not isSource:
                 self.map[path] = (fileId, version)
@@ -302,7 +302,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     # for the source lookaside cache simultaneously
 
     ident = _IdGen()
-    for pkgName in (fullName, fullName + ':sources'):
+    for pkgName in (fullName, fullName + ':source'):
         if repos.hasPackage(pkgName):
             pkgList = [ (pkgName, 
                         repos.pkgLatestVersion(pkgName, buildBranch)) ]
@@ -349,7 +349,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 	packageList.append((p, fileMap))
 
     # build the group before the source package is added to the 
-    # packageList; the package's group doesn't include sources
+    # packageList; the package's group doesn't include :source
     grpName = recipeClass.name
     grp = package.Package(grpName, newVersion)
     for (pkg, map) in packageList:
@@ -370,7 +370,7 @@ def cookItem(repos, cfg, item, prep=0, macros=()):
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
     the result is saved. If that's not the case, the item is taken to
-    be the name of a package, and the recipe is pulled from the :sources
+    be the name of a package, and the recipe is pulled from the :source
     component, built, and committed to the repository.
 
     @param repos: Repository to use for building

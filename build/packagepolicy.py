@@ -134,7 +134,7 @@ class ComponentSpec(_filterSpec):
 	# in the base subfilters
 	for (filteritem) in self.extraFilters + list(self.baseFilters):
 	    name = filteritem[0] % self.macros
-	    assert(name != 'sources')
+	    assert(name != 'source')
 	    filterargs = self.filterExpression(filteritem[1:], name=name)
 	    compFilters.append(filter.Filter(*filterargs))
 

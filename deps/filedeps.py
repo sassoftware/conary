@@ -31,3 +31,15 @@ def findFileDependencies(path):
 	rc.append(set)
 
     return rc
+
+def findFileInstructionSet(path):
+    results = lib.elf.inspect(path)
+    if results is None:
+        return ''
+    for depClass, main, flags in results[0]:
+        if depClass == 'abi':
+            if main == 'x86':
+                return deps.Dependency('i386', []).freeze()
+            return deps.Dependency(main, []).freeze()
+
+    raise AssertionError

@@ -19,6 +19,8 @@ else:
 sys.path.append(os.path.dirname(fullPath))
 from repository.changeset import ChangeSetFromFile
 import srscfg
+import util
+sys.excepthook = util.excepthook
 
 cfg = srscfg.SrsConfiguration()
 

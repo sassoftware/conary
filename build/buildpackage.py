@@ -183,20 +183,19 @@ class AutoBuildPackage:
         @type root: str
         @rtype: None
         """
-        os.path.walk(root, _autoVisit, (root, self))
+        os.path.walk(root, self._autoVisit, root)
 
-def _autoVisit(arg, dir, files):
-    """
-    Helper function called by os.path.walk() when AutoBuildPackage.walk()
-    is called
-    """
-    (root, autopkg) = arg
-    dir = dir[len(root):]
+    def _autoVisit(self, root, dir, files):
+        """
+        Helper function called by os.path.walk() when AutoBuildPackage.walk()
+        is called
+        """
+        dir = dir[len(root):]
 
-    for file in files:
-        if dir:
-            path = dir + '/' + file
-        else:
-            path = '/' + file
+        for file in files:
+            if dir:
+                path = dir + '/' + file
+            else:
+                path = '/' + file
 
-        autopkg.addFile(path, root + path)
+            self.addFile(path, root + path)

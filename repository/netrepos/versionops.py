@@ -32,7 +32,7 @@ class VersionTable:
 	try:
 	    return cu.next()[0]
 	except StopIteration:
-            raise KeyError, version
+            raise KeyError, versionId
 
     def addId(self, version):
         cu = self.db.cursor()
@@ -140,14 +140,14 @@ class BranchTable(idtable.IdTable):
                 (SELECT LabelMap.LabelId FROM LabelMap LEFT OUTER JOIN
                     Latest ON LabelMap.branchId = Latest.branchId
                     WHERE Latest.versionId IS NULL);
-	    DELETE FROM Branchs WHERE branchId IN 
-		(SELECT branchId from Branchs LEFT OUTER JOIN 
+	    DELETE FROM Branches WHERE branchId IN 
+		(SELECT branchId from Branches LEFT OUTER JOIN 
 		    (SELECT branchId AS fooId from LabelMap)
-		ON Branchs.branchId = fooId WHERE fooId is NULL);
+		ON Branches.branchId = fooId WHERE fooId is NULL);
 	    """)
 
     def __init__(self, db):
-        idtable.IdTable.__init__(self, db, 'branch')
+        idtable.IdTable.__init__(self, db, 'branches', 'branchId', 'branch')
 
 class LabelTable(idtable.IdTable):
 
@@ -173,7 +173,7 @@ class LabelTable(idtable.IdTable):
 	raise NotImplementedError
 
     def __init__(self, db):
-        idtable.IdTable.__init__(self, db, 'label')
+        idtable.IdTable.__init__(self, db, 'Labels', 'labelId', 'label')
 
 class LatestTable(idtable.IdPairMapping):
     def __init__(self, db):

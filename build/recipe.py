@@ -259,8 +259,8 @@ class RecipeLoader:
             pass
 
 def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
-    if not component.endswith(':sources'):
-        component += ":sources"
+    if not component.endswith(':source'):
+        component += ":source"
     name = filename[:-len('.recipe')]
 
     try:
@@ -269,7 +269,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
         raise RecipeFileError, 'cannot find source component %s' % component
 
     srcFileInfo = None
-    for (fileId, path, version) in sourceComponent.iterFileList():
+    for (fileId, path, version) in repos.iterFilesInTrove(sourceComponent):
         if path == filename:
             srcFileInfo = (fileId, version)
             break
