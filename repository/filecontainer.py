@@ -52,6 +52,9 @@ import types
 import string
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
+SEEK_SET = 0
+SEEK_CUR = 1
+SEEK_END = 2
 
 # this file doesn't let itself get closed until it's ref count goes
 # to zero; normal files don't do this, and we don't want our FileIsh
@@ -63,7 +66,7 @@ class PersistentFile:
 	# ho-hum
 	pass
 
-    def seek(self, pos, whence = 0):
+    def seek(self, pos, whence = SEEK_SET):
 	return self.f.seek(pos, whence)
 
     def __del__(self):
@@ -124,12 +127,12 @@ class FileContainerFile:
     def close(self):
 	del self.file
 
-    def seek(self, count, whence = 0):
-	if whence == 0:
+    def seek(self, count, whence = SEEK_SET):
+	if whence == SEEK_SET:
 	    self.pos = self.beginning + count
-	elif whence == 1:
+	elif whence == SEEK_CUR:
 	    self.pos = self.pos + count
-	elif whence == 2:
+	elif whence == SEEK_END:
 	    self.pos = self.end + count
 	else:
 	    raise IOError, "invalid whence for seek"
@@ -138,6 +141,9 @@ class FileContainerFile:
 	    self.pos = self.beginning
 	elif self.pos > self.end:
 	    self.pos = self.end
+
+    def tell(self):
+        return self.pos - self.beginning
 
     def read(self, bytes = -1):
 	if bytes < 0 or (self.end - self.pos) <= bytes:
@@ -183,12 +189,12 @@ class FileContainer:
     def readTable(self):
 	# seeks 4 bytes from the end of the file where the length
 	# of the table is stored
-	self.file.seek(-8, 2)
+	self.file.seek(-8, SEEK_END)
 	tableLen = self.file.read(8)
 	(tableLen, entryCount) = struct.unpack("!ii", tableLen)
 
 	# seek to the start of the file table
-	self.file.seek(-8 - tableLen, 2)
+	self.file.seek(-8 - tableLen, SEEK_END)
 	self.tableOffset = self.file.tell()
 	while (entryCount):
 	    entry = FileTableEntryFromFile(self.file)
@@ -326,7 +332,7 @@ class FileContainer:
 	# this keeps us from closing the file
 	self.persist = PersistentFile(self.file)
 
-	self.file.seek(0, 2)
+	self.file.seek(0, SEEK_END)
 	self.entries = {}
 	if not self.file.tell():
 	    self.initializeTable()
