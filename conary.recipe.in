@@ -15,3 +15,5 @@ class Srs(PackageRecipe):
 	self.addArchive("srs-%(version)s.tar.bz2")
 	self.Make()
 	self.MakeInstall()
+	# temporary
+	self.ImproperlyShared(exceptions='%(datadir)s/.*')
