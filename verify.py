@@ -15,6 +15,7 @@
 Provides the output for the "conary verify" command
 """
 
+from deps import deps
 import display
 import files
 from lib import log
@@ -48,10 +49,19 @@ def verify(troveNameList, db, cfg, all=False):
             for trove in db.findTrove(troveName, versionStr):
                 if not flavor or trove.getFlavor().satisfies(flavor):
                     verifyTrove(trove, db, cfg)
-        except repository.PackageNotFound:
+        except repository.TroveNotFound:
             if versionStr:
-                log.error("version %s of trove %s is not installed",
-                          versionStr, troveName)
+                if flavor:
+                    flavorStr = deps.formatFlavor(flavor)
+                    log.error("version %s with flavor '%s' of trove %s is not"
+                              " installed", versionStr, flavorStr, troveName)
+                else:
+                    log.error("version %s of trove %s is not installed", 
+                                                      versionStr, troveName)
+            elif flavor:
+                flavorStr = deps.formatFlavor(flavor)
+                log.error("flavor '%s' of trove %s is not installed", 
+                                                          flavorStr, troveName)
             else:
                 log.error("trove %s is not installed", troveName)
 
