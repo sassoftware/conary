@@ -104,7 +104,7 @@ class Version:
 
     def onBranch(self, branch):
 	if self.isBranch(): return 0
-	return self.compareList(self.versions[:-1], branch)
+	return self.listsEqual(self.versions[:-1], branch)
 
     def isVersion(self):
 	return (len(self.versions) % 3) == 0
