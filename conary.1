@@ -315,13 +315,15 @@ A \fBGroup\fP is an arbitrary collection of other troves, and its
 name starts with \fBgroup-\fP.  A \fBFileset\fP is an arbitrary
 collection of files, and its name starts with \fBfileset-\fP.
 .TP
-.B Labels and Versions
+.B Labels, Versions, and Branchnames
 Conary version strings are a \fB/\fP-separated sequence, normally 
 \fB/\fP-prefixed, of specifiers of the form
 \(lq\fI<label>[\fB/\fI<version>\fB-\fI<release>]\fR\(rq, and
 a \fI<label>\fR follows the form
-\(lq\fI[<repository>]\fB@\fI[<namespace>\fB:\fI]<branchname>\fR\(rq.
+\(lq\fI[<repository>]\fB@\fI[<namespace>\fB:\fI]<tag>\fR\(rq.
 A version string is \fBfully-qualified\fP if it is \fB/\fP-prefixed.
+The \fI<namespace>\fB:\fI<tag>\fR pair is generally seen together,
+and is called a \fBBranchname\fP.
 .RS 4
 .TP 4
 \f(BI<version>\fP
@@ -336,8 +338,8 @@ exclude the -\fI<binarybuild>\fP portion. When new versions of a package
 are cooked, conary will increment the \fI<binarybuild>\fP portion of
 the release number.
 .TP
-\f(BI<branchname>\fP and \fBbranch string\fP
-\fI<branchname>\fP is a simple string that is unique within a namespace.
+\f(BI<tag>\fP and \fBbranch string\fP
+\fI<tag>\fP is a simple string that is unique within a namespace.
 A \fBbranch string\fP is a fully-qualified version string without a
 trailing \fI<version>\fP-\fI<release>\fP pair.
 .TP
@@ -402,10 +404,10 @@ entries when committing changes to source components.
 The path to the Conary database on the local system.  It is relative
 to \fBroot\fP (see below) and should normally not be changed.
 .TP
-.B installLabel
-The label to use to install components when an incomplete version is
-specified, to query the repository, and to abbreviate versions when
-displaying them.
+.B installLabelPath
+The ordered path of labels to use when an incomplete version is
+specified to install package, query the repository, and abbreviate
+versions when displaying them.
 Can be overridden by the \fB\-\-install-label \fI<label>\fR command-line option.
 .TP
 .B lookaside
