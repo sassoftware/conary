@@ -23,6 +23,7 @@ import helper
 import os
 import patch
 import repository
+import sha1helper
 import streams
 import struct
 import trove
@@ -683,7 +684,8 @@ class ChangeSetFromFile(ChangeSet):
 
                 # we have reached the end, without finding our fileId
                 if rc is None:
-                    raise KeyError, 'fileId %s is not in the changeset' %fileId
+                    raise KeyError, 'fileId %s is not in the changeset' % \
+                                    sha1helper.sha1ToString(fileId)
 
                 name, tagInfo, f, size = rc
                 
