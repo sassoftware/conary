@@ -74,9 +74,13 @@ class HttpRequests(SimpleHTTPRequestHandler):
         return path
 
     def do_GET(self):
-        if self.path == '/':
+        base = os.path.basename(self.path).split('?')[0]
+        
+        if base != 'changeset':
             self.wfile.write("HTTP/1.0 200 OK\n")
-            netRepos.handleGet(self.wfile, self.path)
+            self.wfile.write("Content-Type: text/html\n")
+            self.wfile.write("\n")
+            netRepos.handleGet(self.wfile.write, base)
         else:
             self.cleanup = None
             SimpleHTTPRequestHandler.do_GET(self)
@@ -114,9 +118,12 @@ class HttpRequests(SimpleHTTPRequestHandler):
         
     def handleCgi(self, authToken):
         self.wfile.write("HTTP/1.0 200 OK\n")
+        self.wfile.write("Content-Type: text/html\n")
+        self.wfile.write("\n")
         c = cgi.FieldStorage(fp = self.rfile, headers = self.headers, 
                              environ = { 'REQUEST_METHOD' : 'POST' })
-        netRepos.handlePost(self.wfile, authToken, self.path, c)
+        netRepos.handlePost(self.wfile.write, authToken, 
+                            os.path.basename(self.path), c)
 
     def handleXml(self, authToken):
 	contentLength = int(self.headers['Content-Length'])

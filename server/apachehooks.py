@@ -13,6 +13,7 @@
 # 
 
 from mod_python import apache
+from mod_python import util
 import base64
 import os
 import xmlrpclib
@@ -34,7 +35,7 @@ class ServerConfig(conarycfg.ConfigFile):
         'cacheChangeSets'   :  [ conarycfg.BOOLEAN, False ],
     }
 
-def xmlPost(repos, req):
+def post(repos, req):
     if not req.headers_in.has_key('Authorization'):
 	user = None
 	pw = None
@@ -55,20 +56,30 @@ def xmlPost(repos, req):
 
     authToken = (user, pw)
 
-    (params, method) = xmlrpclib.loads(req.read())
+    if req.headers_in['Content-Type'] == "text/xml":
+        (params, method) = xmlrpclib.loads(req.read())
 
-    try:
-	result = repos.callWrapper(method, authToken, params)
-    except netserver.InsufficientPermission:
-	return apache.HTTP_FORBIDDEN
+        try:
+            result = repos.callWrapper(method, authToken, params)
+        except netserver.InsufficientPermission:
+            return apache.HTTP_FORBIDDEN
 
-    resp = xmlrpclib.dumps((result,), methodresponse=1)
-    req.content_type = "text/xml"
-    req.write(resp) 
+        resp = xmlrpclib.dumps((result,), methodresponse=1)
+        req.content_type = "text/xml"
+        req.write(resp) 
+    else:
+        req.content_type = "text/html"
+        repos.handlePost(req.write, authToken, os.path.basename(req.uri), 
+                         util.FieldStorage(req))
 
     return apache.OK
 
 def getFile(repos, req):
+    if os.path.basename(req.uri) != "changeset":
+        req.content_type = "text/html"
+        repos.handleGet(req.write, os.path.basename(req.uri))
+        return apache.OK
+
     path = repos.tmpPath + "/" + req.args + "-out"
     size = os.stat(path).st_size
     req.content_type = "application/x-conary-change-set"
@@ -94,7 +105,7 @@ def putFile(repos, req):
     return apache.OK
 
 def handler(req):
-    repName = os.path.dirname(req.filename)
+    repName = os.path.basename(req.filename)
 
     if not repositories.has_key(repName):
         cfg = ServerConfig()
@@ -129,11 +140,13 @@ def handler(req):
 
     repos = repositories[repName]
 
-    if req.method == "POST" and req.headers_in['Content-Type'] == "text/xml":
-	return xmlPost(repos, req)
-    elif req.method == "GET":
+    method = req.method.upper()
+
+    if method == "POST":
+	return post(repos, req)
+    elif method == "GET":
 	return getFile(repos, req)
-    elif req.method == "PUT":
+    elif method == "PUT":
 	return putFile(repos, req)
     else:
 	return apache.METHOD_NOT_ALLOWED

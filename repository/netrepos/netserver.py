@@ -369,7 +369,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             fileName = os.path.basename(path)
 
-            urlList.append("%s?%s" % (self.urlBase, fileName[:-4]))
+            urlList.append(os.path.join(self.urlBase, 
+                                        "changeset?%s" % fileName[:-4]))
 
         return urlList
 
@@ -464,25 +465,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def cacheChangeSets(self):
         return isinstance(self.cache, CacheSet)
 
-    def handleGet(self, outFile, path):
-        outFile.write("Content-Type: text/html\n")
-        outFile.write("\n")
-        outFile.write("""
+    def handleGet(self, writeFn, path):
+        writeFn("""
 <html>
 <head>
-       <title>Form Example</title>
+       <title>Form Example (for '%s')</title>
 </head>
 <body>
-<FORM action="globals.php" method=POST>
+<FORM action="action" method=POST>
 Type a string: <input type="text" name="myString">
 </body>
 </html>
-""")
+""" % path)
 
-    def handlePost(self, outFile, authToken, path, fields):
-        outFile.write("Content-Type: text/html\n")
-        outFile.write("\n")
-        outFile.write("""
+    def handlePost(self, writeFn, authToken, path, fields):
+        writeFn("""
 <html>
 <head>
        <title>Response Example</title>
@@ -490,9 +487,11 @@ Type a string: <input type="text" name="myString">
 <body>
 <p>
 You typed: '%s'.
+<p>
+Form url is: '%s'.
 </body>
 </html>
-""" % fields['myString'].value)
+""" % (fields['myString'].value, path))
 
     def __init__(self, path, tmpPath, urlBase, authDbPath, name,
 		 repositoryMap, commitAction = None, cacheChangeSets = False):
