@@ -159,23 +159,35 @@ class Recipe:
                 backup = '-b -z %s' % backup
             os.system('patch -d %s -p%s %s < %s' %(destDir, level, backup, f))
 
-    def doBuild(self, builddir):
+    def doBuild(self, buildpath):
+        builddir = buildpath + "/" + self.mainDir()
         if self.build is None:
             pass
+        elif type(self.build) is str:
+            os.system(self.build % {'builddir':builddir})
         elif type(self.build) == types.TupleType:
 	    for bld in self.build:
-		bld.doBuild(builddir + "/" + self.mainDir())
+                if type(bld) is str:
+                    os.system(bld % {'builddir':builddir})
+                else:
+                    bld.doBuild(builddir)
 	else:
-	    self.build.doBuild(builddir + "/" + self.mainDir())
+	    self.build.doBuild(builddir)
 
-    def doInstall(self, builddir, root):
+    def doInstall(self, buildpath, root):
+        builddir = buildpath + "/" + self.mainDir()
         if self.install is None:
             pass
+        elif type(self.install) is str:
+            os.system(self.install % {'builddir':builddir, 'destdir':root})
 	elif type(self.install) == types.TupleType:
 	    for inst in self.install:
-		inst.doInstall(builddir + "/" + self.mainDir(), root)
+                if type(inst) is str:
+                    os.system(inst % {'builddir':builddir, 'destdir':root})
+                else:
+                    inst.doInstall(builddir, root)
 	else:
-	    self.install.doInstall(builddir + "/" + self.mainDir(), root)
+	    self.install.doInstall(builddir, root)
 
     def packages(self, root):
         self.packageSet = package.Auto(self.name, root)
