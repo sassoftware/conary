@@ -96,7 +96,7 @@ class VersionRelease(AbstractVersion):
 	    rc = self.version + '-' + str(self.release)
 
 	if self.buildCount != None:
-	    rc += ".%d" % self.buildCount
+	    rc += "-%d" % self.buildCount
 
 	if frozen:
 	    rc = self.freezeTimestamp() + ":" + rc
@@ -200,7 +200,7 @@ class VersionRelease(AbstractVersion):
 
 	    fullRelease = value[cut + 1:]
 
-	cut = fullRelease.find(".") 
+	cut = fullRelease.find("-") 
 	if cut != -1:
 	    self.release = fullRelease[:cut]
 	    self.buildCount = fullRelease[cut + 1:]
