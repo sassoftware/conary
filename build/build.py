@@ -4,6 +4,7 @@
 #
 """Module used by recipes to direct the building and installation of
 software packages.
+
 @var _permmap: A mapping of common integer file modes to their octal
 equivalents.  This is used to check for common mistakes when specifying
 the permissions on files in classes derived from _PutFile.
@@ -13,14 +14,6 @@ import os
 import shutil
 import util
 import string
-
-# Note: when creating templates, be aware that they are evaulated
-# twice, in the context of two different dictionaries.
-#  o  keys from keywords should have a # single %, as should "args".
-#  o  keys passed in through the macros argument will need %% to
-#     escape them for delayed evaluation.  This will include at
-#     least %%(builddir)s for all, and doInstall will also get
-#     %%(destdir)s
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
@@ -37,6 +30,15 @@ class ShellCommand:
     """Base class for shell-based commands. ShellCommand is a virtual class
     and can not be made into a working instance. Only derived classes which
     define the C{template} static class variable will work properly.
+
+    Note: when creating templates, be aware that they are evaulated
+    twice, in the context of two different dictionaries.
+     - keys from keywords should have a # single %, as should "args".
+     - keys passed in through the macros argument will need %% to
+       escape them for delayed evaluation.  This will include at
+       least %%(builddir)s for all, and doInstall will also get
+       %%(destdir)s
+    
     @ivar self.command: Shell command to execute. This is built from the
     C{template} static class variable in derived classes.
     @type self.command: str
