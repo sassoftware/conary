@@ -42,11 +42,12 @@ Skip dependency resolution and errors.
 .TP
 .B \-\-resolve
 Attempt to automatically resolve all dependencies
-Can be made the default option by FIXME.
+Can be made the default option by setting the autoResolve flag in conaryrc.
 .TP
 .B \-\-no-resolve
 Do not resolve dependencies, only print out any dependency failures.
-Unless \-\-resolve has been made the default by FIXME, \-\-no-resolve
+Unless \-\-resolve has been made the default by setting the
+autoResolve flag in conaryrc, \-\-no-resolve
 is the default behavior.
 .TP
 .B \-\-no-deps-recurse
@@ -409,6 +410,13 @@ can include:
 .PD
 .RS 4
 .TP 4
+.B autoResolve
+If autoResolve is True, the conary update command will automatically
+resolve dependencies (unless the \-\-no-resolve option is provided).
+If it is false, the conary update command will not
+resolve dependencies, unless the \-\-resolve option is provided.
+The autoResolve option is False by default.
+.TP
 .B buildLabel
 The default label for troves during source code operations
 (checkout, diff, etc) and for cooking.  Can be overridden by
