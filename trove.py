@@ -487,7 +487,7 @@ class Trove:
 	    # the diff. if we can't do that and only one version of this
 	    # package is being obsoleted, use that for the diff. if we
 	    # can't do that either, throw up our hands in a fit of pique
-	    
+
 	    for version in newVersionList:
 		branch = version.branch()
 		if version.hasParent():
@@ -495,29 +495,50 @@ class Trove:
 		else:
 		    parent = None
 
-		if len(oldVersionList) == 1:
+		if not oldVersionList:
+		    # no nice match, that's too bad
+		    pkgList.append((name, None, version, None, newFlavor))
+		elif len(oldVersionList) == 1:
 		    pkgList.append((name, oldVersionList[0], version, 
 				    oldFlavor, newFlavor))
+		    del oldVersionList[0]
 		else:
 		    sameBranch = None
 		    parentNode = None
+		    childNode = None
+		    childBranch = None
 
 		    for other in oldVersionList:
 			if other.branch() == branch:
 			    sameBranch = other
 			if parent and other == parent:
 			    parentNode = other
+			if other.hasParent():
+			    if other.parent() == version:
+				childNode = other
+			    if other.parent().branch() == branch:
+				childBranch = other
 
-		    if sameBranch:
-			pkgList.append((name, sameBranch, version, 
-					oldFlavor, newFlavor))
-		    elif parentNode:
-			pkgList.append((name, parentNode, version, 
+		    # none is a sentinel
+		    priority = [ sameBranch, parentNode, childNode, 
+				 childBranch, None ]
+
+		    for match in priority:
+			if match is not None:
+			    break
+
+		    if match is not None:
+			oldVersionList.remove(match)
+			pkgList.append((name, match, version, 
 					oldFlavor, newFlavor))
 		    else:
 			# Here's the fit of pique. This shouldn't happen
 			# except for the most ill-formed of groups.
 			raise IOError, "ick. yuck. blech. ptooey."
+
+	    # remove old versions which didn't get matches
+	    for oldVersion in oldVersionList:
+		pkgList.append((name, oldVersion, None, oldFlavor, None))
 
 	return (chgSet, filesNeeded, pkgList)
 

@@ -221,11 +221,15 @@ def outdatedTroves(db, l):
     trvChgs = newGroup.diff(instGroup)[2]
 
     resultDict = {}
+    eraseList = []
     for (name, oldVersion, newVersion, oldFlavor, newFlavor) in trvChgs:
-	resultDict[(name, newVersion, newFlavor)] = (name, oldVersion, 
-						     oldFlavor)
+	if not newVersion:
+	    eraseList.append((name, oldVersion, oldFlavor))
+	else:
+	    resultDict[(name, newVersion, newFlavor)] = (name, oldVersion, 
+							 oldFlavor)
 
-    return resultDict
+    return resultDict, eraseList
 
 class PackageNotFound(Exception):
 

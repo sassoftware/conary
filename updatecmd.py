@@ -55,6 +55,8 @@ def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
 				 "Conary change set is being installed.\n")
 		return 1
 
+	    eraseList = []
+
     if not cs:
         # so far no changeset (either the path didn't exist or we could not
         # read it
@@ -72,14 +74,12 @@ def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
 
 	# everything which needs to be installed is in this list; if it's
 	# not here, it's a duplicate
-	outdated = helper.outdatedTroves(db, newItems)
+	outdated, eraseList = helper.outdatedTroves(db, newItems)
 	list = []
-	for newItem in newItems:
-	    (name, newVersion, newFlavor) = newItem
-	    if outdated.has_key(newItem):
-		(oldVersion, oldFlavor) = outdated[newItem][1:3]
-		list.append((name, (oldVersion, oldFlavor),
-				   (newVersion, newFlavor), 0))
+	for (name, newVersion, newFlavor), (oldName, oldVersion, oldFlavor) in \
+		outdated.iteritems():
+	    list.append((name, (oldVersion, oldFlavor),
+			       (newVersion, newFlavor), 0))
 
         if not list:
             log.warning("no new troves were found")
@@ -99,6 +99,9 @@ def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
 	log.error(e)
     except repository.CommitError, e:
 	log.error(e)
+
+    if eraseList:
+	db.eraseTroves(eraseList, tagScript = tagScript)
 
 def doErase(db, cfg, pkg, versionStr = None, tagScript = None):
     try:
