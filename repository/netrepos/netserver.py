@@ -44,8 +44,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	# reopens the sqlite db if it's changed
 	self.repos.reopen()
 
-        print methodname
-
         try:
             # try and get the method to see if it exists
             method = self.__getattribute__(methodname)
