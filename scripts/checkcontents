@@ -39,21 +39,21 @@ import files
 from lib import options, sha1helper, util
 from repository import netclient
 import sqlite3
-from local import sqldb
+from local import database
 
 def usage():
     print 'usage: %s [--root rootpath] [--repair]' %sys.argv[0]
 
 def getTroveInfo(db, instanceId):
     "return troveName, version, and flavor for a given db's instanceId"
-    cu = db.db.cursor()
+    cu = db.db.db.cursor()
     cu.execute('SELECT troveName, flavor FROM DBInstances '
                '    INNER JOIN DBFlavors '
                '        ON DBInstances.flavorId = DBFlavors.flavorId '
                'WHERE instanceId=?', (instanceId))
     troveName, frozenFlavor = cu.next()
     flavor = deps.deps.ThawDependencySet(frozenFlavor)
-    version = db.instances.getVersion(instanceId)
+    version = db.db.instances.getVersion(instanceId)
     return troveName, version, flavor
 
 def main(argv):
@@ -74,10 +74,7 @@ def main(argv):
     repair = argSet.has_key('repair')
 
     dbPath = os.sep.join((cfg.root, cfg.dbPath, 'conarydb'))
-    db = sqldb.Database(dbPath)
-
-    contentsPath = os.sep.join((cfg.root, cfg.dbPath, 'contents'))
-    contentsStore = datastore.DataStore(contentsPath)
+    db = database.Database(cfg.root, cfg.dbPath)
 
     # list of needed (fileId, fileVersion) tuples
     neededFiles = []
@@ -86,7 +83,7 @@ def main(argv):
     sha1Counts = {}
 
     # loop over all the files in the database
-    cu = db.db.cursor()
+    cu = db.db.db.cursor()
     cu.execute('SELECT streamId, pathId, path, versionId, instanceId, stream '
                'FROM DBTroveFiles')
     for streamId, pathId, path, versionId, instanceId, stream in cu:
@@ -95,10 +92,10 @@ def main(argv):
         # data store
         if f.flags.isConfig():
             h = sha1helper.sha1ToString(f.contents.sha1())
-            if not contentsStore.hasFile(h):
+            if not db.contentsStore.hasFile(h):
                 # uh-oh, we're missing contents. print an error and make note
                 troveName, troveVersion, flavor = getTroveInfo(db, instanceId)
-                fileVersion = db.versionTable.getBareId(versionId)
+                fileVersion = db.db.versionTable.getBareId(versionId)
                 print troveName, troveVersion.asString(), path, \
                       '(sha1: %s)' %h, 'missing from data store'
                 neededFiles.append((f.fileId(), fileVersion))
@@ -109,25 +106,16 @@ def main(argv):
                 sha1Counts[h] = sha1Counts.get(h, 0) + 1
 
     for h, count in sha1Counts.iteritems():
-        path = contentsStore.hashToPath(h)
-        realCount = contentsStore.readCount(path)
+        realCount = cu.execute('SELECT count from DataStore WHERE hash=?',
+                               h).next()[0]
         if realCount != count:
-            print ('count file incorrect for %s. '
-                   'expected %d got %d' %(h, count, realCount))
+            print ('count incorrect for %s. '
+                   'expected %d got %d' %(h, count, realCount)),
             if repair:
-                if count == 0:
-                    # this can't happen
-                    raise AssertionError
-                elif count == 1:
-                    # remove the link incorrect count file
-                    os.unlink(path + '#')
-                else:
-                    # write the correct value to the count file
-                    # NOTE - there's no locking here, we're assuming
-                    # that no one else is using the data store
-                    f = open(path + '#', 'w')
-                    f.write('%d\n' %count)
-                    f.close()
+                cu.execute('UPDATE DataStore set count=? where hash=?',
+                           (count, h))
+                print 'fixed.',
+            print
 
     if repair:
         # set up a network client using the repositoryMap - hopefully
@@ -139,11 +127,12 @@ def main(argv):
         # we're missing
         for fileObj, h in zip(contents, neededSha1s):
             # save the contents we got in the datastore
-            contentsStore.addFile(fileObj.get(), h)
+            db.contentsStore.addFile(fileObj.get(), h)
             # double check that the contents sha1 matches what we expect
-            h2 = sha1helper.sha1String(contentsStore.openFile(h).read())
+            h2 = sha1helper.sha1String(db.contentsStore.openFile(h).read())
             h2 = sha1helper.sha1ToString(h2)
             assert(h == h2)
+        db.commit()
                 
 if __name__ == '__main__':
     main(sys.argv)
