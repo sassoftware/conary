@@ -516,7 +516,7 @@ class CacheSet:
 
                 self.db.close()
                 os.unlink(dbpath)
-                self.db = sqlite3.connect(dbpath)
+                self.db = sqlite3.connect(dbpath, timeout = 30000)
                 tables = []
 
         if "CacheContents" not in tables:
