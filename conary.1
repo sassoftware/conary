@@ -23,11 +23,11 @@ build and source management.
 The following \fBcommands\fP are used to install, update, erase, and
 otherwise manage software installed on a local system.
 .TP 4
-.B query \fItrovename\fP[=\fIversion\fP]*\fP [\fI\-\-path <path>\fP]*
+.B query \fItrovename\fP[=\fIversion\fP][[flavor]]*\fP [\fI\-\-path <path>\fP]*
 Lists troves installed on the local system. Any number of trove names or
 absolute paths may be given.
 .TP
-.B update [\fIargs\fP] <\fItrovename\fP[=\fIversion\fP]>* <\fIchangeset-file\fP>*
+.B update [\fIargs\fP] <\fItrovename\fP[=\fIversion\fP][[flavor]]>* <\fIchangeset-file\fP>*
 Updates the trove \fItrovename\fR from the appropriate repository to 
 match the optional \fIversion\fP (otherwise the most recent version which 
 matches the \fBinstall-label\fP) and applies the changesets contained in any
@@ -81,7 +81,7 @@ Perform all actions up to the point of writing to the filesystem.
 .RE
 .TP
 .TP
-.B erase \fItrovename\fP[=\fRversion]\fP+
+.B erase \fItrovename\fP[=\fRversion][[flavor]]\fP+
 Erase all instances of \fItrovename\fP (or only a specified \fIversion\fP)
 from the local system.
 .RS 4
@@ -150,7 +150,7 @@ Lists available rollbacks.
 Applies rollback \fIrollback\fP.  (Syntax may change in future versions
 of Conary.)
 .TP
-.B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP]]*
+.B repquery [\fIargs\fP] [\fItrovename\fP[=\fIversion\fP][[flavor]]]*
 Lists troves in the repository.
 Arguments include
 .RS 4
