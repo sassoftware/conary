@@ -350,7 +350,7 @@ class PackageSpec(_filterSpec):
     def updateArgs(self, *args, **keywords):
         # keep a list of packages filtered for in PackageSpec in the recipe
         if args:
-            newPackage = args[0]
+            newPackage = args[0] % self.recipe.macros
             self.recipe.packages[newPackage] = True
         _filterSpec.updateArgs(self, *args, **keywords)
 
