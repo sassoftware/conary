@@ -86,7 +86,7 @@ class ImproperlyShared(policy.Policy):
 
     def doFile(self, file):
         m = self.recipe.magic[file]
-	if m
+	if m:
 	    if m.name == "ELF":
 		self.recipe.reportErrors(
 		    "Architecture-specific file %s in shared data directory" %file)
@@ -816,6 +816,9 @@ class ExcludeDirectories(policy.Policy):
 
 
 class _requirements(policy.Policy):
+    """
+    Pure virtual base class for Requires/Provides/Flavor
+    """
     def doFile(self, path):
 	pkgMap = self.recipe.autopkg.pkgMap
 	if path not in pkgMap:
@@ -829,14 +832,26 @@ class _requirements(policy.Policy):
 	pass
 
 class Requires(_requirements):
+    """
+    Drives requirement mechanism: to avoid adding requirements for a file:
+    C{r.Requires(exceptions=I{filterexp})}
+    """
     def addOne(self, path, pkg, f):
 	pkg.requires.union(f.requires.value())
 
 class Provides(_requirements):
+    """
+    Drives provides mechanism: to avoid marking a file as providing things:
+    C{r.Provides(exceptions=I{filterexp})}
+    """
     def addOne(self, path, pkg, f):
 	pkg.provides.union(f.provides.value())
 
 class Flavor(_requirements):
+    """
+    Drives flavor mechanism: to avoid marking a file's flavor:
+    C{r.Flavor(exceptions=I{filterexp})}
+    """
     def addOne(self, path, pkg, f):
 	pkg.flavor.union(f.flavor.value())
 
