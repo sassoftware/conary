@@ -58,13 +58,13 @@ def magic(path, basedir=''):
     f = file(basedir+path)
     b = f.read(4096)
     f.close()
-    if _char(b[0]) == 0x7f and b[1:4] == "ELF":
+    if len(b) > 4 and _char(b[0]) == 0x7f and b[1:4] == "ELF":
 	return ELF(path, basedir, b)
-    elif b[0:6] == "!<arch>":
+    elif len(b) > 7 and b[0:6] == "!<arch>":
 	return ar(path, basedir, b)
-    elif _char(b[0]) == 0x1f and _char(b[1]) == 0x8b:
+    elif len(b) > 2 and _char(b[0]) == 0x1f and _char(b[1]) == 0x8b:
 	return gzip(path, basedir, b)
-    elif b[0:2] == "BZh":
+    elif len(b) > 3 and b[0:2] == "BZh":
 	return bzip(path, basedir, b)
 
 # internal helpers
