@@ -60,6 +60,7 @@ baseMacros = (
     # arguments/flags (empty ones are for documentation; non-existant = empty)
     ('cc'		, 'gcc'),
     ('cflags'           , '-O2'), # -g when we have debuginfo
+    ('cppflags'		, ''), # just for providing in recipes
     ('ldflags'		, ''), # -g when we have debuginfo
     ('mflags'		, ''),
     ('parallelmflags'   , ''),
@@ -90,9 +91,11 @@ class Macros(dict):
  	dict.__setitem__(self, name, value % d)
         
     # we want keys that don't exist to default to empty strings
+    # but warn so that we can catch bugs
     def __getitem__(self, name):
 	if name in self:
 	    return dict.__getitem__(self, name) %self
+	log.warning('name %s does not exist in macros', name)
 	return ''
     
     def addMacros(self, *macroSet):
