@@ -323,6 +323,7 @@ _con_close(pysqlc *self)
 static void
 set_result(sqlite3_context* context, PyObject *obj)
 {
+	/* bools are derived from int, no need to check for it explicitly */
 	if (PyInt_Check(obj)) {
 		sqlite3_result_int(context, PyInt_AsLong(obj));
 	}
@@ -1129,7 +1130,6 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 				*p = toupper(*p);
 				p++;
 			}
-
 			text = sqlite3_column_text(self->p_stmt, i);
 			if (text == NULL) {
 				Py_INCREF(Py_None);
@@ -1144,6 +1144,11 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 				else
 					PyTuple_SetItem(row, i,
 							PyInt_FromLong(lval));
+			}
+			else if (!strcmp(ctype, "BOOL")) {
+				len = sqlite3_column_int(self->p_stmt, i);
+				PyTuple_SetItem(row, i,
+						PyBool_FromLong(len));
 			}
 			else if (!strcmp(ctype, "FLOAT")) {
 				dval = sqlite3_column_double(self->p_stmt, i);
@@ -1271,6 +1276,7 @@ _stmt_bind(pysqlstmt *self, PyObject *args)
 	}
 
 	rc = -1;
+	/* bools are derived from int, no need to handle it explicitly */
 	if (PyInt_Check(obj)) {
 		rc = sqlite3_bind_int(self->p_stmt, idx, PyInt_AsLong(obj));
 	}

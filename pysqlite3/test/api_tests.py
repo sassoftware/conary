@@ -515,6 +515,32 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
         self.assertEqual(r[0], "",
                          'Value is is %s, it should be "".'  %r[0])
 
+    def CheckBool(self):
+        """Test whether a Bool is returned when expected."""
+        self.cur.execute('create table test(a bool)')
+        self.cur.execute('insert into test(a) values (?)', True)
+        self.cur.execute('insert into test(a) values (?)', False)
+        self.cur.execute('insert into test(a) values (1)')
+        self.cur.execute('insert into test(a) values (0)')
+        self.cur.execute('insert into test(a) values (100)')        
+        self.cur.execute('select * from test')
+        r = self.cur.fetchone()
+        self.assertEqual(r[0], True,
+                         "Value is is %s, it should be True."  %r[0])
+        r = self.cur.fetchone()
+        self.assertEqual(r[0], False,
+                         'Value is is %s, it should be False.'  %r[0])
+        r = self.cur.fetchone()
+        self.assertEqual(r[0], True,
+                         "Value is is %s, it should be True."  %r[0])
+        r = self.cur.fetchone()
+        self.assertEqual(r[0], False,
+                         'Value is is %s, it should be False.'  %r[0])
+        r = self.cur.fetchone()
+        self.assertEqual(r[0], True,
+                         "Value is is %s, it should be True."  %r[0])
+
+
 def suite():
     dbapi_suite = unittest.makeSuite(DBAPICompliance, "Check")
     module_suite = unittest.makeSuite(moduleTestCases, "Check")
