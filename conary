@@ -151,6 +151,7 @@ elif (otherArgs[1] == "changeset"):
 
     changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
 elif (otherArgs[1] == "commit"):
+    if len(otherArgs) < 3: usage()
     repos = repository.LocalRepository(cfg.reppath, "c")
     for changeSet in otherArgs[2:]:
 	commit.doCommit(repos, cfg, changeSet)
