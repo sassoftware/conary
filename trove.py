@@ -413,7 +413,6 @@ class Package:
 		    parent = version.parent()
 		else:
 		    parent = None
-		found = 0
 
 		if len(removed[name]) == 1:
 		    pkgList.append((name, removed[name][0], version))
@@ -548,7 +547,6 @@ class PackageChangeSet:
 	elif action == "p":
 	    fields = line[2:].split()
 	    name = fields[0]
-	    verList = []
 	    for item in fields[1:]:
 		op = item[0]
 		v = versions.ThawVersion(item[1:])
@@ -598,7 +596,6 @@ class PackageChangeSet:
 	newPath = path
 
 	if path[0] != "/":
-	    shortName = self.name.split(':')[-2]
 	    prefix = map[0][1] % dict
 	    newPath = prefix + path
 	else:
