@@ -22,6 +22,7 @@ configuration sufficient to build.
 
 """
 from deps import deps
+from lib import log
 
 class Flag(dict):
     """
@@ -45,6 +46,7 @@ class Flag(dict):
         self._track = track
         self._used = False
 	self._overrides = {}
+	self._deprecated = {}
         self._createOnAccess = createOnAccess
         self._required = required
         # this must be set last
@@ -235,6 +237,15 @@ class Flag(dict):
                 curflag[key]._value = value._value
             curflag[key]._used = True
 
+    def fullName(self):
+        """ Return the name a user would use to access this flag """
+        cursor = self
+        namelist = [ ] 
+        while cursor is not None:
+            namelist.append(cursor._name)
+            cursor = cursor._parent
+        return '.'.join(reversed(namelist))
+
     def trackUsed(self, val):
         self._track = val
         for flag in self.iterkeys():
@@ -380,6 +391,8 @@ class Flag(dict):
         if name in self:
             flag = self[name]
             return flag
+        if name in self._deprecated:
+            return self._deprecated[name]
         elif self._createOnAccess:
             # flag doesn't exist, add it
             flag =  Flag(value=None, name=name, parent=self,
@@ -412,6 +425,29 @@ class Flag(dict):
             self[name] = Flag(value=value, name=name, parent=self,
                               createOnAccess=self._createOnAccess,
                               track=self._track)
+    def addDeprecated(self, name, newFlag=None):
+        self._deprecated[name] = DeprecatedFlag(newFlag, name=name, parent=self)
+
+class DeprecatedFlag(Flag):
+    def __init__(self, newFlag, *args, **kw):
+        self._newFlag = newFlag
+        Flag.__init__(self, *args, **kw)
+
+    def alert(self):
+        if self._newFlag is not None:
+            log.warning("Flag %s is deprecated, use %s instead" % 
+                        (self.fullName(), self._newFlag.fullName()))
+        else:
+            raise RuntimeError, "Flag %s no longer exists" % self.fullName()
+
+    def __nonzero__(self):
+        self.alert()
+        return self._newFlag.__nonzero__()
+
+    def __repr__(self):
+        self.alert()
+        return self._newFlag.__repr__()
+
 
 def nullSet():
     return Flag(value=None, name='__GLOBAL__')
@@ -619,17 +655,25 @@ Arch.x86.i386 = False
 Arch.x86.i486 = False
 Arch.x86.i586 = False
 Arch.x86.i686 = True
-Arch.x86.x86_64 = False
-Arch.x86.x86_64.setShortDoc('x86_64 base 64-bit extensions')
-Arch.x86.amd64 = False
-Arch.x86.amd64.setShortDoc('x86_64 with base AMD64 extensions')
-Arch.x86.em64t = False
-Arch.x86.em64t.setShortDoc('x86_64 with base EM64T extensions')
 Arch.x86.cmov = True
 Arch.x86.sse = False
 Arch.x86.sse2 = False
 Arch.x86.mmx = False
 Arch.x86.threednow = False # '3dnow' is an illegal identifier name
+
+Arch.x86_64 = False
+Arch.x86_64.setShortDoc('x86_64 base 64-bit extensions')
+Arch.x86_64.amd64 = False
+Arch.x86_64.amd64.setShortDoc('x86_64 with base AMD64 extensions')
+Arch.x86_64.em64t = False
+Arch.x86_64.em64t.setShortDoc('x86_64 with base EM64T extensions')
+Arch.x86_64.sse3 = False
+
+# we used to support Arch.x86.x86_64, has been changed to Arch.x86_64
+Arch.x86.addDeprecated('x86_64', Arch.x86_64)
+Arch.x86.x86_64.setShortDoc('Deprecated - Use Arch.x86_64 instead')
+
+
 Arch.sparc = False
 Arch.sparc.sparc64 = False
 Arch.ppc = False
