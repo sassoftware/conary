@@ -236,6 +236,8 @@ class ComponentSpec(_filterSpec):
     """
     Determines which component each file is in:
     C{r.ComponentSpec(I{componentname}, I{filterexp}...)}
+    or
+    C{r.ComponentSpec(I{packagename:component}, I{filterexp}...)}
 
     This class includes the filter expressions that specify the default
     assignment of files to components.
@@ -282,10 +284,16 @@ class ComponentSpec(_filterSpec):
 	# the extras need to come first in order to override decisions
 	# in the base subfilters
 	for (filteritem) in self.extraFilters + list(self.baseFilters):
+            main = ''
 	    name = filteritem[0] % self.macros
+            if ':' in name:
+                main, name = name.split(':')
 	    assert(name != 'source')
 	    filterargs = self.filterExpression(filteritem[1:], name=name)
 	    compFilters.append(filter.Filter(*filterargs))
+            if main:
+                # we've got a package as well as a component, pass it on
+                recipe.PackageSpec(main, filteritem[1:])
 	# by default, everything that hasn't matched a filter pattern yet
 	# goes in the catchall component ('runtime' by default)
 	compFilters.append(filter.Filter('.*', self.macros, name=self.catchall))
@@ -296,9 +304,7 @@ class ComponentSpec(_filterSpec):
 class PackageSpec(_filterSpec):
     """
     Determines which package (and optionally also component) each file is in:
-    C{r.ComponentSpec(I{packagename}, I{filterexp}...)}
-    or
-    C{r.ComponentSpec(I{packagename:component}, I{filterexp}...)}
+    C{r.PackageSpec(I{packagename}, I{filterexp}...)}
     """
     keywords = { 'compFilters': None }
 
