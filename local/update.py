@@ -597,7 +597,6 @@ class FilesystemJob:
                 headFile = files.ThawFile(headChanges, fileId)
                 
             fsFile.flags.isConfig(headFile.flags.isConfig())
-            fsChanges = fsFile.diff(baseFile)
 
             # this is changed to true when the file attributes have changed;
             # this helps us know if we need a restore event
