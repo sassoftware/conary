@@ -113,6 +113,7 @@ def usage(rc = 1):
     print "                 --keep-existing"
     print "                 --no-deps"
     print "                 --no-deps-recurse"
+    print "                 --no-recurse"
     print "                 --no-resolve"
     print "                 --replace-files"
     print "                 --resolve"
@@ -469,7 +470,7 @@ def realMain(cfg, argv=sys.argv):
 	    del argSet['no-resolve']
 
 	if argSet.has_key('no-deps-recurse'):
-	    kwargs['recurse'] = False
+	    kwargs['depsRecurse'] = False
 	    del argSet['no-deps-recurse']
 
 	if argSet.has_key('just-db'):

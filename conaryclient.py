@@ -103,7 +103,7 @@ class ConaryClient:
 
 	cs.rootChangeSet(self.db, outdated)
 
-    def _resolveDependencies(self, cs, keepExisting = None, recurse = True):
+    def _resolveDependencies(self, cs, keepExisting = None, depsRecurse = True):
         pathIdx = 0
         foundSuggestions = False
         (depList, cannotResolve) = self.db.depCheck(cs)
@@ -157,7 +157,7 @@ class ConaryClient:
 
                     (depList, cannotResolve) = self.db.depCheck(cs)
 
-            if troves and recurse:
+            if troves and depsRecurse:
                 pathIdx = 0
                 foundSuggestions = False
             else:
@@ -165,7 +165,7 @@ class ConaryClient:
                 if troves:
                     foundSuggestions = True
                 if pathIdx == len(self.cfg.installLabelPath):
-                    if not foundSuggestions or not recurse:
+                    if not foundSuggestions or not depsRecurse:
                         return (cs, depList, suggMap, cannotResolve)
                     pathIdx = 0
                     foundSuggestions = False
@@ -387,7 +387,7 @@ class ConaryClient:
         return finalCs
 
     def updateChangeSet(self, itemList, keepExisting = False,
-                        recurse = True, resolveDeps = True, test = False):
+                        depsRecurse = True, resolveDeps = True, test = False):
         if not test:
             self._prepareRoot()
 
@@ -397,7 +397,7 @@ class ConaryClient:
             return (finalCs, [], {}, [])
 
         return self._resolveDependencies(finalCs, keepExisting = keepExisting, 
-                                         recurse = recurse)
+                                         depsRecurse = depsRecurse)
 
     def applyUpdate(self, theCs, replaceFiles = False, tagScript = None, 
                     keepExisting = None, test = False, justDatabase = False,

@@ -27,7 +27,7 @@ import sys
 
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
-                                  recurse = True, test = False,
+                                  depsRecurse = True, test = False,
                                   justDatabase = False):
     client = conaryclient.ConaryClient(cfg)
 
@@ -52,7 +52,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
 
     try:
         (cs, depFailures, suggMap, brokenByErase) = \
-            client.updateChangeSet(applyList, recurse = recurse,
+            client.updateChangeSet(applyList, depsRecurse = depsRecurse,
                                    resolveDeps = depCheck,
                                    keepExisting = keepExisting,
                                    test = test)
