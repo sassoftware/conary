@@ -75,7 +75,7 @@ class Database(repository.LocalRepository):
 	    if len(l) == 1:
 		del self.fileIdMap[key]
 	    else:
-		del l[l.index(pathToFile)]
+		l.remove(pathToFile)
 		self.fileIdMap[key] = "\n".join(l)
 
 	    if file.isConfig():
@@ -86,7 +86,7 @@ class Database(repository.LocalRepository):
 	if isinstance(file, files.RegularFile):
 	    key = file.sha1()
 	    if self.fileIdMap.has_key(key):
-		self.fileIdMap[key] += pathToFile
+		self.fileIdMap[key] += "\n" + pathToFile
 	    else:
 		self.fileIdMap[key] = pathToFile
 
