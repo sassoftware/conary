@@ -17,6 +17,7 @@ python_files = __init__.py	\
 	build.py		\
 	buildinfo.py		\
 	buildpackage.py		\
+	cook.py			\
 	destdirpolicy.py	\
 	filter.py 		\
 	fixedglob.py		\

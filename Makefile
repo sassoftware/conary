@@ -35,15 +35,10 @@ python_files = __init__.py	\
 	conarycfg.py		\
 	conaryclient.py		\
 	constants.py		\
-	cook.py			\
 	cscmd.py		\
 	datastore.py		\
 	display.py		\
-	enum.py			\
-	epdb.py			\
-	filecontainer.py	\
 	files.py		\
-	helper.py		\
 	importrpm.py		\
 	log.py			\
 	magic.py		\
@@ -54,7 +49,6 @@ python_files = __init__.py	\
 	rpmhelper.py		\
 	sha1helper.py		\
 	srcctl.py		\
-	stackutil.py		\
 	streams.py		\
 	trove.py		\
 	updatecmd.py		\
