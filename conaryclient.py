@@ -155,7 +155,7 @@ class ConaryClient:
                                                    withFiles = False)
                 except repository.PackageNotFound, e:
                     # we give an error for this later on
-                    pass
+                    newList = []
             else:
                 if self.db.hasPackage(troveName):
                     labels = [ x.getVersion().branch().label()
