@@ -91,6 +91,11 @@ class ltwrapper(Magic):
 	Magic.__init__(self, path, basedir)
 
 
+class CIL(Magic):
+    def __init__(self, path, basedir='', buffer=''):
+	Magic.__init__(self, path, basedir)
+
+
 def magic(path, basedir=''):
     """
     Returns a magic class with information about the file mentioned
@@ -121,6 +126,8 @@ def magic(path, basedir=''):
             '# If it is, it will not operate correctly.') > 0:
             return ltwrapper(path, basedir, b)
         return script(path, basedir, _line(b))
+    elif len(b) > 4 and b[128:130] == "PE":
+        return CIL(path, basedir, b)
 
     return None
 
