@@ -28,7 +28,7 @@ python_files=	    __init__.py		\
 python_modules=elfmodule.so miscmodule.so
 elfmodule_objs=elf.o
 miscmodule_objs=misc.o
-generated_files=$(elfmodule_objs) $(python_modules)
+generated_files=$(elfmodule_objs) $(miscmodule_objs) $(python_modules)
 dist_files = $(python_files) elf.c misc.c Makefile
 
 
