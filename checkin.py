@@ -226,12 +226,11 @@ def _buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 
     newVersion = helper.nextVersion(recipeVersionStr, srcVersion, 
 				    state.getBranch(), binary = False)
-    state.changeVersion(newVersion)
-
+    newState = state.copy()
+    newState.changeVersion(newVersion)
     changeSet = changeset.ChangeSet()
-    foundDifference = 0
 
-    for (fileId, (path, version)) in state.iterFileList():
+    for (fileId, (path, version)) in newState.iterFileList():
 	realPath = os.getcwd() + "/" + path
 
 	f = files.FileFromFilesystem(realPath, fileId)
@@ -246,23 +245,20 @@ def _buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 	    assert(needsHead and isinstance(version, versions.NewVersion))
 	    # new file, so this is easy
 	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
-	    state.addFile(fileId, path, newVersion)
+	    newState.addFile(fileId, path, newVersion)
 
 	    if f.hasContents:
 		newCont = filecontents.FromFilesystem(realPath)
 		changeSet.addFileContents(fileId,
 					  changeset.ChangedFileTypes.file,
 					  newCont)
-
-	    foundDifference = 1
 	    continue
 
 	oldVersion = srcPkg.getFile(fileId)[1]	
 	(oldFile, oldCont) = repos.getFileVersion(fileId, oldVersion,
 						  withContents = 1)
         if not f.same(oldFile, ignoreOwner = True):
-	    foundDifference = 1
-	    state.addFile(fileId, path, newVersion)
+	    newState.addFile(fileId, path, newVersion)
 
 	    (filecs, hash) = changeset.fileChangeSet(fileId, oldFile, f)
 	    changeSet.addFile(fileId, oldVersion, newVersion, filecs)
@@ -273,14 +269,17 @@ def _buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 						
 		changeSet.addFileContents(fileId, contType, cont)
 
-    (csPkg, filesNeeded, pkgsNeeded) = state.diff(srcPkg)
+    (csPkg, filesNeeded, pkgsNeeded) = newState.diff(srcPkg)
     assert(not pkgsNeeded)
     changeSet.newPackage(csPkg)
 
-    if csPkg.getOldFileList() or csPkg.getChangedFileList():
+    if csPkg.getOldFileList() or csPkg.getChangedFileList() or \
+       csPkg.getNewFileList():
 	foundDifference = 1
+    else:
+	foundDifference = 0
 
-    return (foundDifference, state, changeSet, srcPkg)
+    return (foundDifference, newState, changeSet, srcPkg)
 
 def commit(repos):
     state = SourceStateFromFile("SRS")
@@ -289,13 +288,13 @@ def commit(repos):
     result = _buildChangeSet(repos, state, needsHead = True)
     if not result: return
 
-    (isDifferent, state, changeSet, oldPackage) = result
+    (isDifferent, newState, changeSet, oldPackage) = result
 
     if not isDifferent:
 	log.info("no changes have been made to commit")
     else:
 	repos.commitChangeSet(changeSet)
-	state.write("SRS")
+	newState.write("SRS")
 
 def diff(repos, versionStr = None):
     state = SourceStateFromFile("SRS")
@@ -316,7 +315,7 @@ def diff(repos, versionStr = None):
     result = _buildChangeSet(repos, state, srcVersion = srcVersion)
     if not result: return
 
-    (changed, state, changeSet, oldPackage) = result
+    (changed, newState, changeSet, oldPackage) = result
     if not changed: return
 
     packageChanges = changeSet.getNewPackageList()
