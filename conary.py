@@ -240,6 +240,10 @@ def realMain(cfg, argv=sys.argv):
 	    kwargs['depCheck'] = False
 	    del argSet['no-deps']
 
+	if argSet.has_key('just-db'):
+	    kwargs['justDatabase'] = False
+	    del argSet['just-db']
+
 	if argSet.has_key('test'):
 	    kwargs['test'] = argSet['test']
 	    del argSet['test']

@@ -281,7 +281,7 @@ class ConaryClient:
                                 test = test, justDatabase = justDatabase)
 
     def eraseTrove(self, troveList, depCheck = True, tagScript = None,
-                   test = False):
+                   test = False, justDatabase = False):
 	cs = changeset.ChangeSet()
 
         for (troveName, versionStr) in troveList:
@@ -299,7 +299,8 @@ class ConaryClient:
             if cannotResolve:
                 return cannotResolve
             
-	self.db.commitChangeSet(cs, tagScript = tagScript, test = test)
+	self.db.commitChangeSet(cs, tagScript = tagScript, test = test,
+                                justDatabase = justDatabase)
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):

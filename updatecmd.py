@@ -96,7 +96,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
     except repository.CommitError, e:
         log.error(e)
 
-def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False):
+def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False,
+            justDatabase = False):
     troveList = []
     for item in itemList:
         l = item.split("=")
@@ -113,7 +114,8 @@ def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False):
     brokenByErase = []
     try:
         brokenByErase = client.eraseTrove(troveList, tagScript = tagScript, 
-                                          depCheck = depCheck, test = test)
+                                          depCheck = depCheck, test = test,
+                                          justDatabase = justDatabase)
     except repository.PackageNotFound, e:
         log.error(str(e))
 
