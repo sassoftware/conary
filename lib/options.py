@@ -83,6 +83,10 @@ def processArgs(argDef, cfgMap, cfg, usage):
 			argSet[arg] = [sys.argv[i]]
 	i = i + 1
 
+    if 'config-file' in argSet:
+	cfg.read(argSet['config-file'])
+	del argSet['config-file']
+	
     if argSet.has_key('config'):
 	for param in argSet['config']:
 	    cfg.configLine(param)

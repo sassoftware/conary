@@ -77,6 +77,7 @@ def usage(rc = 1):
     print "commit flags:  --target-branch <branch>"
     print ""
     print 'common flags:  --build-label <label>'
+    print '               --config-file <path>'
     print '               --config "<item> <value>"'
     print '               --install-label <label>'
     print "               --root <root>"
@@ -132,6 +133,7 @@ def realMain():
 
     argDef["all"] = NO_PARAM
     argDef["config"] = MULT_PARAM
+    argDef["config-file"] = ONE_PARAM
     argDef["debug"] = NO_PARAM
     argDef["debug-exceptions"] = NO_PARAM
     argDef["use-flag"] = MULT_PARAM
@@ -179,7 +181,7 @@ def realMain():
     if (len(otherArgs) < 2):
 	return usage()
     elif (otherArgs[1] == "branch"):
-	if argSet: return usage
+	if argSet: return usage()
 	if len(otherArgs) < 4 or len(otherArgs) > 5: return usage()
 	repos = openRepository(cfg.repositoryMap)
 
@@ -211,7 +213,7 @@ def realMain():
 	for changeSet in otherArgs[2:]:
 	    commit.doCommit(repos, changeSet, targetBranch)
     elif (otherArgs[1] == "config"):
-	if argSet: return usage
+	if argSet: return usage()
 	if (len(otherArgs) > 2):
 	    return usage()
 	else:
@@ -381,12 +383,12 @@ def realMain():
 	else:
 	    return usage()
     elif (otherArgs[1] == "rblist"):
-	if argSet: return usage
+	if argSet: return usage()
 	db = openDatabase(cfg.root, cfg.dbPath)
 	rollbacks.listRollbacks(db, cfg)
     elif (otherArgs[1] == "remove"):
 	if len(otherArgs) != 3: return usage()
-	if argSet: return usage
+	if argSet: return usage()
 	db = openDatabase(cfg.root, cfg.dbPath)
 	fullPath = util.joinPaths(cfg.root, otherArgs[2])
 	if os.path.exists(fullPath):
@@ -395,7 +397,7 @@ def realMain():
 	    log.warning("%s has already been removed", fullPath)
 	db.removeFile(otherArgs[2])
     elif (otherArgs[1] == "rollback"):
-	if argSet: return usage
+	if argSet: return usage()
 	db = openDatabase(cfg.root, cfg.dbPath)
 	args = [db, cfg] + otherArgs[2:]
 	rollbacks.apply(*args)
@@ -423,7 +425,7 @@ def realMain():
 	    kwargs['tagScript'] = argSet['tag-script']
 	    del argSet['tag-script']
 
-	if argSet: return usage
+	if argSet: return usage()
 	if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	    repos = openRepository(cfg.repositoryMap)
 
