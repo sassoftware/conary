@@ -88,25 +88,25 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
             else:
                 fn = repos.getAllTroveLeafs
 
-            versions = {}
+            versiondict = {}
             for host, names in repositories.iteritems():
                 d = fn(host, names)
                 for (name, verList) in d.iteritems():
-                    if not versions.has_key(name):
-                        versions[name] = verList
+                    if not versiondict.has_key(name):
+                        versiondict[name] = verList
                     else:
-                        versions[name] += (verList)
+                        versiondict[name] += (verList)
 	else:
-            versions = {}
+            versiondict = {}
             for label in cfg.installLabelPath:
                 d = repos.getTroveLeavesByLabel([ x[0] for x in troves], label)
                 for (name, verList) in d.iteritems():
-                    if not versions.has_key(name):
-                        versions[name] = verList
+                    if not versiondict.has_key(name):
+                        versiondict[name] = verList
                     else:
-                        versions[name] += (verList)
+                        versiondict[name] += (verList)
 
-	flavors = repos.getTroveVersionFlavors(versions)
+	flavors = repos.getTroveVersionFlavors(versiondict)
 
 	for troveName, versionStr in troves:
             if not flavors[troveName]:
