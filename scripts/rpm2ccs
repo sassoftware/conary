@@ -50,7 +50,7 @@ quotesRe = re.compile(r'[ \t]*"?(.*)"?[ \t]*')
 # remove redirection
 redirectionRe = re.compile(r'2?>.*')
 
-(PRE, POST, PREUN, POSTUN) = range(0,3)
+(PRE, POST, PREUN, POSTUN) = range(0,4)
 
 
 class taghandlerBuilder:
@@ -90,7 +90,7 @@ class taghandlerBuilder:
                 if 'RPM_INSTALL_PREFIX' in postScript:
                     self.warnRelocation('post')
                     postScript = None
-                if 'ld.so.conf' in postScript
+                if 'ld.so.conf' in postScript:
                     self.warnLdSoConf('post')
 
         preUn = None
@@ -99,7 +99,7 @@ class taghandlerBuilder:
             if 'RPM_INSTALL_PREFIX' in preUn:
                 self.warnRelocation('preun')
                 preUn = None
-            if 'ld.so.conf' in preUn
+            if 'ld.so.conf' in preUn:
                 self.warnLdSoConf('post')
                         
 
@@ -117,7 +117,7 @@ class taghandlerBuilder:
                 if 'RPM_INSTALL_PREFIX' in postUn:
                     self.warnRelocation('postun')
                     postUn = None
-                if 'ld.so.conf' in preUn
+                if 'ld.so.conf' in postUn:
                     self.warnLdSoConf('postun')
 
 
@@ -223,7 +223,7 @@ class taghandlerBuilder:
                 if 'useradd' in args[index]:
                     # skip program name, hope no one puts user name there
                     pass
-                elif args[index][0] == in 'refmMknop':
+                elif args[index][0] in 'refmMknop':
                     # we ignore these options
                     pass
                 elif args[index][0] == 'c':
@@ -259,7 +259,7 @@ class taghandlerBuilder:
                 if 'groupadd' in args[index]:
                     # skip program name, hope no one puts group name there
                     pass
-                elif args[index][0] == in 'rof':
+                elif args[index][0] in 'rof':
                     # we ignore these options
                     pass
                 elif args[index][0] == 'g':
@@ -429,7 +429,7 @@ class recipeBuilder:
             if stat.S_ISCHR(mode) or stat.S_ISBLK(mode):
                 if stat.S_ISCHR(mode):
                     type='c'
-                else
+                else:
                     type='b'
                 # this is correct for 32-bit device number
                 # RPM does not provide 64-bit device number
