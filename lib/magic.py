@@ -13,7 +13,7 @@ class Magic:
 	self.path = path
 	self.basedir = basedir
 	self.contents = {}
-
+	self.name = self.__class__.__name__
 
 
 class ELF(Magic):
