@@ -897,7 +897,6 @@ def runTagCommands(root, cmdList):
 		os.execv(cmd[0], cmd)
 	    except Exception, e:
 		sys.stderr.write('%s\n' %e)
-		pass
 	    os._exit(1)
 
 	(id, status) = os.waitpid(pid, 0)
