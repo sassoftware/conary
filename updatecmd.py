@@ -47,6 +47,9 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
         else:
             applyList.append(parseTroveSpec(pkgStr, cfg.flavor))
 
+    # dedup
+    applyList = {}.fromkeys(applyList).keys()
+
     try:
         (cs, depFailures, suggMap, brokenByErase) = \
             client.updateChangeSet(applyList, recurse = recurse,
@@ -100,6 +103,8 @@ def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False,
     client = conaryclient.ConaryClient(cfg=cfg)
 
     troveList = [ parseTroveSpec(item, cfg.flavor) for item in itemList ]
+    # dedup
+    troveList = {}.fromkeys(troveList).keys()
 
     brokenByErase = []
     try:

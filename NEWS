@@ -2,6 +2,7 @@ Changes in 0.14.5:
   * allow groups to contain troves with conflicting flavors
   * make repository-side change set caching less buggy
   * fix config files changing to symlinks
+  * allow duplicate items to be specified for erase and update
 
 Changes in 0.14.4:
   * several bugs in the 'cvc update' code paths have been fixed
