@@ -15,4 +15,7 @@ preventing files from growing ad nauseum"""
 
     def setup(self):
 	self.addTarball("%s-%s.tar.gz" % (self.name, self.version))
-	self.install = build.MakeInstall(rootVar = "ROOT")
+	self.addSource("crond-tmpwatch")
+	self.install = (build.MakeInstall(rootVar = "ROOT"),
+			build.InstallFile("crond-tmpwatch", 
+					  "/etc/cron.daily/tmpwatch", 0755))
