@@ -607,19 +607,17 @@ class ChangeSetJob:
 
 		# we already have the contents of this file... we can go
 		# ahead and restore it reusing those contents
-       # XXX commenting this out breaks filesets
-#		if repos._hasFileContents(fileObj.contents.sha1()):
+		if repos._hasFileContents(fileObj.contents.sha1()):
 		    # if we already have the file in the data store we can
 		    # get the contents from there
-## 		    fileContents = filecontents.FromDataStore(
-## 				     repos.contentsStore, 
-## 				     fileObj.contents.sha1(), 
-## 				     fileObj.contents.size())
-## 		    contType = changeset.ChangedFileTypes.file
-## 		    self.addFileContents(fileObj.contents.sha1(), newVersion, 
-## 					 fileContents, restoreContents, 
-## 					 fileObj.flags.isConfig())
-
+   		    fileContents = filecontents.FromDataStore(
+ 				     repos.contentsStore, 
+ 				     fileObj.contents.sha1(), 
+ 				     fileObj.contents.size())
+ 		    contType = changeset.ChangedFileTypes.file
+ 		    self.addFileContents(fileObj.contents.sha1(), newVersion, 
+ 					 fileContents, restoreContents, 
+ 					 fileObj.flags.isConfig())
 		elif fileObj.flags.isConfig():
 		    tup = (fileId, fileObj, oldPath, oldfile, pkgName,
 			   oldTroveVersion, troveFlavor, newVersion, 
