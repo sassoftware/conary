@@ -76,6 +76,10 @@ class Flag(dict):
         else:
             return "%s: %s" % (self._fullName(), self._value)
 
+    def setShortDoc(self, doc):
+        # XXX we don't do anything with this documentation currently.
+        self._shortDoc = doc
+
     def _set(self, value=True):
         self._value = value
 
