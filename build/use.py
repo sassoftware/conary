@@ -290,7 +290,7 @@ for embedded targets.
 
 Use.buildtests = True
 Use.buildtests.setShortDoc('Build test suites')
-Use.builddocs.setLongDoc("""
+Use.buildtests.setLongDoc("""
 Conary supports the installation of build-time test suites in a
 manner that allows them to be run later, using the installed
 package.  However, testsuites often require the compilation of
