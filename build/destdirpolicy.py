@@ -39,13 +39,21 @@ from lib import magic
 
 # used in multiple places, should be maintained in one place
 # probably needs to migrate to some form of configuration
+# need lib and %(lib)s bits for multilib
 librarydirs = [
     '%(libdir)s/',
+    '%(prefix)s/lib/',
     '%(essentiallibdir)s/',
+    '/lib/',
     '%(krbprefix)s/%(lib)s/',
+    '%(krbprefix)s/lib/',
     '%(x11prefix)s/%(lib)s/',
+    '%(x11prefix)s/lib/',
     '%(prefix)s/local/%(lib)s/',
+    '%(prefix)s/local/lib/',
 ]
+# now uniq for non-multilib systems
+librarydirs = sorted({}.fromkeys(librarydirs).keys())
 
 class TestSuiteLinks(policy.Policy):
     """
