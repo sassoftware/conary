@@ -16,6 +16,8 @@ Module used by recipes to direct the build and installation of
 software packages.  Classes from this module are not used directly;
 instead, they are used through eponymous interfaces in recipe.
 
+The class descriptions contain usage examples for quick reference.
+
 @var _permmap: A mapping of common integer file modes to their octal
 equivalents.  This is used to check for common mistakes when specifying
 the permissions on files in classes derived from _PutFile.
@@ -47,6 +49,9 @@ class BuildAction(action.RecipeAction):
 
     def __init__(self, recipe, *args, **keywords):
 	"""
+	Pure virtual class which inherits from action.RecipeAction but
+	passes macros to the C{do()} method.
+
 	@keyword use: Optional argument; Use flag(s) telling whether
 	to actually perform the action.
 	@type use: None, Use flag, or sequence of Use flags
@@ -54,7 +59,6 @@ class BuildAction(action.RecipeAction):
 	# enforce pure virtual status
         assert(self.__class__ is not BuildAction)
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
-	# change self.use to be a simple flag
 
     def doAction(self):
 	if self.use:
@@ -99,13 +103,16 @@ class BuildCommand(BuildAction, action.ShellCommand):
 
 class Run(BuildCommand):
     """
-    Just run a command with simple macro substitution
+    Run a shell command with simple macro substitution: C{r.Run('echo foo')}
     """
     template = "%(args)s"
 
 
 class Automake(BuildCommand):
-    # note: no use of %(args)s -- which command would it apply to?
+    """
+    Re-runs aclocal, autoconf, and automake: C{r.Automake()}
+    """
+    # note: no use of %(args)s -- to which command would it apply?
     template = ('cd %%(builddir)s/%(subDir)s; '
                 'aclocal %%(m4DirArgs)s %(aclocalArgs)s; '
 		'%(preAutoconf)s autoconf %(autoConfArgs)s; '
@@ -128,11 +135,12 @@ class Automake(BuildCommand):
 
 
 class Configure(BuildCommand):
-    """The Configure class runs an autoconf configure script with the
-    default paths as defined by the macro set passed into it when doAction
-    is invoked.  It provides many common arguments, set correctly to
+    """Runs an autoconf configure script, giving it the default paths as
+    defined by the macro set: C{r.Configure()}
+    
+    It provides many common arguments, set correctly to
     values provided by system macros.  If any of these arguments do
-    not work for a program, then use the ManualConfigure class instead.
+    not work for a program, then use the C{ManualConfigure} class instead.
     """
     # note that template is NOT a tuple, () is used merely to group strings
     # to avoid trailing \ characters on every line
@@ -197,9 +205,11 @@ class Configure(BuildCommand):
 
 class ManualConfigure(Configure):
     """
-    The ManualConfigure class works exactly like the configure class,
+    Works exactly like the C{Configure} class,
     except that all the arguments to the configure script have to be
-    provided explicitly.
+    provided explicitly: C{r.ManualConfigure('--limited-args')}
+
+    No arguments are given beyond those explicitly provided.
     """
     template = ('cd %%(builddir)s/%%(subDir)s; '
                 '%%(mkObjdir)s '
@@ -207,21 +217,23 @@ class ManualConfigure(Configure):
 
 class Make(BuildCommand):
     """
-    The Make class runs the make utility with CFLAGS, LDFLAGS, and
-    CXXFLAGS set as environment variables to the system defaults, with
-    system default for mflags and parallelmflags.
+    Runs the make utility with system defaults: C{r.Make('makeargs')}
 
-    If the package Makefile explicitly sets the *FLAGS variables,
+    It sets C{CFLAGS}, C{LDFLAGS}, C{CXXFLAGS}, etc. as environment
+    variables to the system defaults, and also uses the system default
+    for C{mflags} and C{parallelmflags}.
+
+    If the package Makefile explicitly sets the *C{FLAGS} variables,
     then if you want to change them you will have to override them,
-    either explicitly in the recipe with self.Make('CFLAGS="%(cflags)s"'),
+    either explicitly in the recipe with C{r.Make('CFLAGS="%(cflags)s"')},
     etc., or forcing them all to the system defaults by passing in the
-    forceFlags=True argument.
+    C{forceFlags=True} argument.
 
     If your package does not build correctly with parallelized make,
-    you should disable parallel make by using self.disableParallelMake()
+    you should disable parallel make by using C{r.disableParallelMake()}
     in your recipe.  If your package can do parallel builds but needs some
-    other mechanism, then you can modify parallelmflags as necessary in
-    your recipe.  You can use self.MakeParallelSubdir() if the top-level
+    other mechanism, then you can modify C{parallelmflags} as necessary in
+    your recipe.  You can use C{r.MakeParallelSubdir()} if the top-level
     make is unable to handle parallelization but all subdirectories are.
     """
     # Passing environment variables to Make makes them defined if
@@ -265,9 +277,9 @@ class Make(BuildCommand):
 
 class MakeParallelSubdir(Make):
     """
-    The MakeParallelSubdir class runs the make utility with CFLAGS
-    and CXXFLAGS set to system defaults, with system default for
-    parallelmflags only applied to sub-make processes.
+    Runs the make utility like C{Make}, but with system default for
+    parallelmflags only applied to sub-make processes:
+    C{r.MakeParallelSubdir('makeargs')}
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
@@ -279,10 +291,11 @@ class MakeParallelSubdir(Make):
 
 class MakeInstall(Make):
     """
-    The MakeInstall class is like the Make class, except that it
-    automatically sets DESTDIR.  If your package does not have
-    DESTDIR or an analog, use the MakePathsInstall class instead,
-    or as a last option, the Make class.
+    Like the Make class, except that it automatically sets C{DESTDIR}
+    and provides the C{install} target: C{r.MakeInstall('makeargs')}
+
+    If your package does not have C{DESTDIR} or an analog, use 
+    C{MakePathsInstall} instead, or as a last option, C{Make}.
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
@@ -305,10 +318,10 @@ class MakeInstall(Make):
 
 class MakePathsInstall(Make):
     """
-    The MakePathsInstall class is used when there is no single functional
-    DESTDIR or similar definition, but enough of the de-facto standard 
-    variables (prefix, bindir, etc) are honored by the Makefile to make
-    a destdir installation successful.
+    Used when there is no single functional C{DESTDIR} or similar definition,
+    but enough of the de-facto standard variables (C{prefix}, C{bindir}, etc)
+    are honored by the Makefile to make a destdir installation successful:
+    C{r.MakePathsInstall('makeargs')}
     """
     template = (
 	'cd %%(builddir)s/%(subDir)s; '
@@ -336,7 +349,8 @@ class MakePathsInstall(Make):
 
 class CompilePython(BuildCommand):
     """
-    Build compiled and optimized compiled python files.
+    Builds compiled and optimized compiled python files:
+    C{r.CompilePython('/dir1', '/dir2')}
     """
     template = (
 	"""python -c 'from compileall import *; compile_dir("""
@@ -358,7 +372,13 @@ class CompilePython(BuildCommand):
 
 class Ldconfig(BuildCommand):
     """
-    Run ldconfig in a directory or directories
+    Runs C{ldconfig}: C{r.Ldconfig('/dir1')}
+
+    Used mainly when a package does not set up all the appropriate
+    symlinks for a library.  Conary packages should include all the
+    appropriate symlinks in the packages.  This is not a replacement
+    for marking a file as a shared library; C{ldconfig} still needs
+    to be run after libraries are installed.
     """
     template = '%%(essentialsbindir)s/ldconfig -n %%(destdir)s/%(args)s'
 
@@ -416,9 +436,11 @@ class _FileAction(BuildAction):
 
 class Desktopfile(BuildCommand, _FileAction):
     """
-    The Desktopfile class should be used to provide category
-    (and vendor, if necessary) for files in /usr/share/applications/,
-    if the target has enabled building desktop files.
+    Used to provide category (and vendor, if necessary) for files in
+    C{/usr/share/applications/}, if the target has enabled building
+    desktop files: C{r.Desktopfile('filename')}
+
+    It also enforces proper build requirements for desktop files.
     """
     template = ('cd %%(builddir)s; '
 		'desktop-file-validate %(args)s ; '
@@ -448,10 +470,9 @@ class Desktopfile(BuildCommand, _FileAction):
 
 class Environment(BuildAction):
     """
-    Set an environment variable after all macros are available.
-
-    Call C{Environment('I{VARIABLE}', 'I{value}')} for each
-    environment variable you need to set.
+    Set an environment variable after all macros have been set;
+    for each environment variable you need to set, call:
+    C{r.Environment('I{VARIABLE}', 'I{value}')}
     """
     def __init__(self, recipe, *args, **keywords):
 	assert(len(args)==2)
@@ -464,6 +485,9 @@ class Environment(BuildAction):
 
 class SetModes(_FileAction):
     """
+    Sets modes on files in the %(destdir)s:
+    C{r.SetModes(I{file}[, I{file} ...], I{mode})}
+
     In order for a file to be setuid in the repository, it needs to
     have its mode explicitly provided in the recipe.  If any file
     installation class that provides a mode is used, that will be
@@ -473,8 +497,6 @@ class SetModes(_FileAction):
 
     In addition, of course, it can be used to change arbitrary
     file modes in the destdir.
-
-    Call C{SetModes(file[, file ...], mode)}
     """
     
     def __init__(self, recipe, *args, **keywords):
@@ -559,7 +581,11 @@ class _PutFiles(_FileAction):
 
 class Install(_PutFiles):
     """
-    This class installs files from the builddir to the destdir.
+    Installs files from C{%(builddir)s} to C{%(destdir)s}:
+    C{r.Install(I{srcfile}, I{destfile})}
+
+    Note that a trailing C{/} on destfile means to create the directory
+    if necessary.
     """
     keywords = { 'mode': -2 }
 
@@ -570,7 +596,11 @@ class Install(_PutFiles):
 
 class Copy(_PutFiles):
     """
-    This class copies files within the destdir.
+    Copies files within C{%(destdir)s}:
+    C{r.Copy(I{srcfile}, I{destfile})}
+
+    Note that a trailing C{/} on destfile means to create the directory
+    if necessary.
     """
     def __init__(self, recipe, *args, **keywords):
 	_PutFiles.__init__(self, recipe, *args, **keywords)
@@ -579,7 +609,11 @@ class Copy(_PutFiles):
 
 class Move(_PutFiles):
     """
-    This class moves files within the destdir.
+    Moves files within C{%(destdir)s}:
+    C{r.Move(I{srcname}, I{destname})}
+
+    Note that a trailing C{/} on destfile means to create the directory
+    if necessary.
     """
     def __init__(self, recipe, *args, **keywords):
 	_PutFiles.__init__(self, recipe, *args, **keywords)
@@ -588,11 +622,11 @@ class Move(_PutFiles):
 
 class Symlink(_FileAction):
     """
-    The Symlink class create symlinks.  Multiple symlinks
-    can be created if the destination path is a directory.  The
-    destination path is determined to be a directory if it already
-    exists or if the path ends with the directory separator character
-    ("/" on UNIX systems)
+    Create symbolic links: C{c.Symlink(I{contents}, I{destfile})}
+    
+    Multiple symlinks can be created if the destination path is a directory.
+    The destination path is determined to be a directory if it already
+    exists or if the path ends with a C{/} character.
     """
     keywords = { 'allowDangling': False }
 
@@ -679,10 +713,12 @@ class Symlink(_FileAction):
 
 class Link(_FileAction):
     """
-    Install a hard link.  Much more limited than a symlink, hard links
-    are only permitted within the same directory, you cannot create a
-    hard link to a directory.  Use symlinks in preference to hard links
-    unless it is ABSOLUTELY necessary to use a hard link!
+    Install a hard link (discouraged): C{r.Link(I{newname(s)}, I{existingname})}
+    
+    Much more limited than a symlink, hard links are only permitted
+    within the same directory, you cannot create a hard link into another
+    directory.  Use symlinks in preference to hard links unless it is
+    ABSOLUTELY necessary to use a hard link!
     """
     def do(self, macros):
 	d = macros['destdir']
@@ -714,7 +750,7 @@ class Link(_FileAction):
 
 class Remove(BuildAction):
     """
-    The Remove class removes files from within the destdir
+    Removes files from within the C{%(destdir)s}: C{r.Remove(I{filename(s)})}
     """
     keywords = { 'recursive': False }
 
@@ -735,8 +771,8 @@ class Remove(BuildAction):
 
 class Doc(_FileAction):
     """
-    The Doc class installs documentation files from the builddir
-    into the destdir in the appropriate directory.
+    Installs documentation files from the C{%(builddir)s}
+    into C{%(destdir)s/%(thisdocdir)s}: C{r.Doc(I{file(s)})}
     """
     keywords = {'subdir':  '',
 		'mode': 0644,
@@ -767,11 +803,12 @@ class Doc(_FileAction):
 
 class Create(_FileAction):
     """
-    The Create class puts a file in the destdir.  Without C{contents}
-    specified it is rather like C{touch}; with C{contents} specified it
-    is more like C{cat > foo <<EOF ... EOF}.  If C{contents} is not
-    empty, then a newline will be implicitly appended unless C{contents}
-    already ends in a newline.
+    Creates a file in C{%(destdir)s}: C{r.Create(I{emptyfile})}
+    
+    Without C{contents} specified it is rather like C{touch foo};
+    with C{contents} specified it is more like C{cat > foo <<EOF ... EOF}.
+    If C{contents} is not empty, then a newline will be implicitly
+    appended unless C{contents} already ends in a newline.
     """
     keywords = {'contents': '',
 		'macros': True,
@@ -806,8 +843,10 @@ class Create(_FileAction):
 
 class MakeDirs(_FileAction):
     """
-    The MakeDirs class creates directories in destdir
-    Set component only if the package should be responsible for the directory
+    Creates directories in C{%(destdir)s}: C{r.MakeDirs(I{dir(s)})}
+
+    Set C{component} only if the package should be responsible for
+    the directory.
     """
     keywords = { 'mode': 0755 }
 
@@ -833,6 +872,9 @@ class MakeDirs(_FileAction):
 	    self.paths = args
 
 class TestSuite(_FileAction):
+    """
+    FIXME: needs to be documented!
+    """
 
     idnum = 0
     keywords = {'ignore'    : [],
