@@ -16,6 +16,12 @@ import os
 import files
 
 class BuildFile(files.File):
+    """
+    Represents the build-time view of a file. This includes all of the
+    base file information (the inode information and dependencies) along
+    with the file's path. The file's dependencies are calculated right
+    here.
+    """
     def getRealPath(self):
         return self.realPath
 
