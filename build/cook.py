@@ -11,13 +11,14 @@ import util
 import sha1helper
 import lookaside
 import shutil
+import types
 
 def cook(repos, cfg, recipeFile):
-    classList = recipe.RecipeLoader(recipeFile)
+    if type(recipeFile) is types.ClassType:
+        classList = [(recipeFile.__name__, recipeFile)]
+    else:
+        classList = recipe.RecipeLoader(recipeFile)
     built = []
-
-    if recipeFile[0] != "/":
-	raise IOError, "recipe file names must be absolute paths"
 
     for (name, recipeClass) in classList.items():
 	print "Building", name
@@ -35,7 +36,7 @@ def cook(repos, cfg, recipeFile):
 
 	ident = IdGen(fileIdMap)
 
-        srcdirs = [ os.path.dirname(recipeFile), cfg.sourcepath % {'pkgname': name} ]
+        srcdirs = [ os.path.dirname(recipeClass.filename), cfg.sourcepath % {'pkgname': name} ]
 	recipeObj = recipeClass(cfg, srcdirs)
 
 	ourBuildDir = cfg.buildpath + "/" + recipeObj.name
@@ -73,10 +74,10 @@ def cook(repos, cfg, recipeFile):
                                recipeObj.version, fileList)
 
         # XXX include recipe files loaded by a recipe to derive
-	recipeName = os.path.basename(recipeFile)
-	f = files.FileFromFilesystem(recipeFile, ident(recipeName),
+	recipeName = os.path.basename(recipeClass.filename)
+	f = files.FileFromFilesystem(recipeClass.filename, ident(recipeName),
                                      type = "src")
-	fileList = [ (f, recipeFile, recipeName) ]
+	fileList = [ (f, recipeClass.filename, recipeName) ]
 
 	for file in recipeObj.allSources():
             src = lookaside.findAll(cfg, file, recipeObj.name, srcdirs)

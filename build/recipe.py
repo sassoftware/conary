@@ -19,6 +19,9 @@ def flatten(list):
 
 class RecipeLoader(types.DictionaryType):
     def __init__(self, file):
+        if file[0] != "/":
+            raise IOError, "recipe file names must be absolute paths"
+
         self.file = os.path.basename(file).replace('.', '-')
         self.module = imp.new_module(self.file)
         sys.modules[self.file] = self.module
@@ -39,6 +42,7 @@ class RecipeLoader(types.DictionaryType):
                 if value.__dict__.has_key('ignore'):
                     continue
                 if len(value.__bases__) > 0 and 'name' in dir(value):
+                    value.__dict__['filename'] = file
                     self[key] = value
 
     def __del__(self):
@@ -63,6 +67,8 @@ def loadRecipe(file):
         callerGlobals[os.path.basename(file).replace('.', '-')] = recipes
         
 class Recipe:
+    buildRequires = []
+    runRequires = []
 
     def addSignature(self, file, keyid):
 	# do not search unless a gpg keyid is specified
