@@ -14,8 +14,7 @@
 
 python_files =	__init__.py	\
 		arch.py		\
-		deps.py		\
-		filedeps.py
+		deps.py
 
 extra_dist = Makefile
 
