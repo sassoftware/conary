@@ -17,7 +17,8 @@ Changes in 0.50.1:
   * redirections to troves w/ older versions already installed didn't work
   * the pathId generation code has changed.  For cooked troves, the
     pathId will be the same for any particular version of a path.
-    Though code should not depend on this behavior.
+    Code must not depend on this behavior, however; it may change in the
+    future.
 
 Changes in 0.50.0:
   * Redirections work
