@@ -12,10 +12,12 @@
 # full details.
 # 
 
+import base64
 from repository import changeset
 from repository import repository
 from localrep import fsrepos
 from lib import log
+import files
 import md5
 import os
 import re
@@ -29,7 +31,7 @@ from local import idtable
 from local import sqldb
 from local import versiontable
 
-SERVER_VERSIONS=[6,7]
+SERVER_VERSIONS=[6,7,8]
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -136,20 +138,56 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                                self.toFlavor(flavor),
                                                sortByPath, 
                                                withFiles) 
-        if withFiles:
-	    l = []
-	    for (fileId, filePath, fileVersion, fileObj) in gen:
-		if fileObj is None:
-		    fileObj = self.repos.getFileVersion(fileId, fileVersion)
+        verDict = {}
+        verList = []
+        dirDict = {}
+        dirList = []
+        l = []
 
-		l.append((self.fromFileId(fileId), filePath, 
-			  self.fromVersion(fileVersion), 
-			  self.fromFile(fileObj)))
-        else:
-            l = [ (self.fromFileId(x[0]), x[1], self.fromVersion(x[2])) 
-			    for x in gen ]
+        for tup in gen:
+            (fileId, filePath, fileVersion) = tup[0:3]
+            if withFiles:
+                fileStream = tup[3]
+                if fileStream is None:
+                    fileObj = self.repos.getFileVersion(fileId, fileVersion)
+                    fileStream = fileObj.freeze()
 
-	return l
+            dir = os.path.dirname(filePath)
+            fileName = os.path.basename(filePath)
+
+            dirNum = dirDict.get(dir, None)
+            if dirNum is None:
+                dirNum = len(dirDict)
+                dirDict[dir] = dirNum
+                dirList.append(dir)
+
+            verNum = verDict.get(fileVersion, None)
+            if verNum is None:
+                verNum = len(verDict)
+                verDict[fileVersion] = verNum
+                verList.append(self.fromVersion(fileVersion))
+
+            if clientVersion in [6,7]:
+                if withFiles:
+                    fileObj = files.ThawFile(fileStream, fileId)
+                    l.append((self.fromFileId(fileId), filePath, 
+                              self.fromVersion(fileVersion), 
+                              self.fromFile(fileObj)))
+                else:
+                    l.append((self.fromFileId(fileId), filePath, 
+                              self.fromVersion(fileVersion)))
+            else:
+                if withFiles:
+                    l.append((base64.encodestring(fileId), dirNum, fileName, 
+                              verNum, base64.encodestring(fileStream)))
+                else:
+                    l.append((base64.encodestring(fileId), dirNum, fileName, 
+                              verNum))
+
+        if clientVersion in [6,7]:
+            return l
+
+	return l, verList, dirList
 
     def getFileContents(self, authToken, clientVersion, troveName, 
                             troveVersion, troveFlavor, path, fileVersion):
@@ -163,10 +201,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	# this could be much more efficient; iterating over the files is
 	# just silly
-	for (fileId, tpath, tversion, fileObj) in \
+	for (fileId, tpath, tversion, fileStream) in \
 		self.repos.iterFilesInTrove(troveName, troveVersion, 
 					    troveFlavor, withFiles = True):
 	    if tpath != path or tversion != fileVersion: continue
+
+            fileObj = files.ThawFile(fileStream, fileId)
 
 	    inF = self.repos.contentsStore.openRawFile(
 			    sha1helper.sha1ToString(fileObj.contents.sha1()))

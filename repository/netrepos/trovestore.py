@@ -601,10 +601,7 @@ class TroveStore:
 		versionCache[versionId] = version
 
 	    if withFiles and stream:
-		fileObj = files.ThawFile(stream, fileId)
-		yield (fileId, path, version, fileObj)
-	    elif withFiles:
-		yield (fileId, path, version, None)
+		yield (fileId, path, version, stream)
 	    else:
 		yield (fileId, path, version)
 
