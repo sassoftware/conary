@@ -233,6 +233,7 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
     int fd;
     Elf * elf;
     int rc;
+    char magic[4];
 
     if (!PyArg_ParseTuple(args, "s", &fileName))
 	return NULL;
@@ -243,10 +244,25 @@ static PyObject * inspect(PyObject *self, PyObject *args) {
 	return NULL;
     }
 
-    elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
-    if (!elf) {
+    if (read(fd, magic, sizeof(magic)) != 4) {
+	PyErr_SetFromErrno(PyExc_IOError);
+	close(fd);
+	return NULL;
+    }
+
+    if (magic[0] != 0x7f || magic[1] != 0x45 || magic[2] != 0x4c ||
+	magic[3] != 0x46) {
+	close(fd);
 	Py_INCREF(Py_None);
 	return Py_None;
+    }
+
+    lseek(fd, 0, 0);
+
+    elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
+    if (!elf) {
+	PyErr_SetString(ElfError, "error initializing elf file");
+	return NULL;
     }
 
     reqList = PyList_New(0);
@@ -271,7 +287,8 @@ PyMODINIT_FUNC
 initelf(void)
 {
     ElfError = PyErr_NewException("elf.error", NULL, NULL);
-    Py_InitModule("elf", ElfMethods);
+    Py_InitModule3("elf", ElfMethods, 
+		   "provides access to elf shared library dependencies");
     elf_version(EV_CURRENT);
 
 }
