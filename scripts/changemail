@@ -23,8 +23,8 @@ fi
 usage ()
 {
     (echo "Usage: changemail --repmap <repmap> --trove <trove> --version <version> "
-     echo "                 --email <email>"
-     echo "       changemail --repmap <repmap> <trove> <version> <email>"
+     echo "                  --email <email> [--email <email>...]"
+     echo "       changemail --repmap <repmap> <trove> <version> <email(s)>"
      echo "(using command $CONARY)"
     ) 1>&2
     exit 1
@@ -49,7 +49,7 @@ while [ $# -gt 0 ] ; do
 	    ;;
 	--email)
 	    shift
-	    email=$1
+	    email="$email $1"
 	    shift
 	    ;;
 	--version)
@@ -62,20 +62,25 @@ while [ $# -gt 0 ] ; do
 		trove=$1
 	    elif [ -z "$version" ] ; then
 		version=$1
-	    elif [ -z "$email" ] ; then
-		email=$1
 	    else
-		usage
+		email="$email $1"
 	    fi
 	    shift
 	    ;;
     esac
 done
 
+TMP=$(mktemp /tmp/changemail.XXXXXX) || exit 1
+
+
 if [ $(echo -n $trove | tail -c7) == ":source" ]; then
-    $CONARY src rdiff $repMapArg "$repMap" $trove -1 $version | \
-	    mail -s "$trove $version" $email
+    $CONARY src rdiff $repMapArg "$repMap" $trove -1 $version > $TMP
 elif ! echo $trove | grep -s : > /dev/null; then
-    echo "${trove} ($version) has been built into the repository" | \
-	    mail -s "$trove $version" $email
+    echo "${trove} ($version) has been built into the repository" > $TMP
 fi
+
+for address in $email; do
+    mail -s "$trove $version" $address < $TMP
+done
+
+rm -f $TMP
