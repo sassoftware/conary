@@ -698,7 +698,6 @@ class Database:
 
     def removeFileFromTrove(self, trove, path):
 	versionId = self.versionTable[trove.getVersion()]
-        flavor = trove.getFlavor()
         flavorId = self.flavors[trove.getFlavor()]
 	instanceId = self.instances[(trove.getName(), versionId, flavorId)]
 	self.troveFiles.removePath(instanceId, path)
