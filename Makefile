@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-.PHONY: clean bootstrap deps.dot
+.PHONY: clean bootstrap deps.dot pychecker
 
 clean:
 	rm -f *~ .#*
@@ -17,3 +17,6 @@ bootstrap:
 
 deps.dot:
 	./srs-bootstrap --dot `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` > deps.dot
+
+pychecker:
+	pychecker *.py
