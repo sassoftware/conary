@@ -11,7 +11,7 @@ CREATE TABLE Permissions (userId INTEGER,
 		          labelId INTEGER,
 		          troveNameId INTEGER,
 			  write INTEGER,
-                          superUser INTEGER);
+                          admin INTEGER);
 CREATE INDEX PermissionsIdx ON Permissions(userId, labelId, troveNameId);
 
 COMMIT;

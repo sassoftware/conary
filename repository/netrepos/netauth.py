@@ -16,11 +16,11 @@ import sqlite3
 import re
 
 class NetworkAuthorization:
-    def check(self, authToken, write = False, superUser = False, label = None, trove = None):
+    def check(self, authToken, write = False, admin = False, label = None, trove = None):
         if label and label.getHost() != self.name:
             raise RepositoryMismatch
 
-        if not write and not superUser and self.anonReads:
+        if not write and not admin and self.anonReads:
             return True
 
         if not authToken[0]:
@@ -46,7 +46,7 @@ class NetworkAuthorization:
         if write:
             where.append("write=1")
 
-        if superUser:
+        if admin:
             where.append("admin=1")
 
         if where:
@@ -82,7 +82,7 @@ class NetworkAuthorization:
         row = cu.fetchone()
         return row[0]
 
-    def add(self, user, password, write=True, superUser=False):
+    def add(self, user, password, write=True, admin=False):
         cu = self.db.cursor()
         
         m = md5.new()
@@ -91,7 +91,7 @@ class NetworkAuthorization:
         userId = cu.lastrowid
 
         cu.execute("INSERT INTO Permissions VALUES (?, Null, Null, ?, ?)",
-                   userId, write, superUser)
+                   userId, write, admin)
         self.db.commit()
 
     def iterUsers(self):

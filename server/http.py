@@ -33,7 +33,7 @@ class HttpHandler(HtmlEngine):
         self.troveStore = repServer.repos.troveStore
         
         # "command name": (command handler, page title, 
-        #       (requires auth, requires write access, requires superuser))
+        #       (requires auth, requires write access, requires admin))
         self.commands = {
                          # metadata commands
              "":               (self.mainpage, "Conary Repository",         
@@ -77,7 +77,7 @@ class HttpHandler(HtmlEngine):
 
         needWrite = self.commands[cmd][2][1]
         needSuper = self.commands[cmd][2][2]
-        if not self.repServer.auth.check(authToken, write=needWrite, superUser=needSuper):
+        if not self.repServer.auth.check(authToken, write=needWrite, admin=admin):
             raise InsufficientPermission
 
         if cmd == "":
@@ -193,10 +193,10 @@ class HttpHandler(HtmlEngine):
         else:
             write = False
 
-        if fields.has_key("super"):
-            superUser = True
+        if fields.has_key("admin"):
+            admin = True
         else:
-            superUser = False
-        self.repServer.auth.add(user, password, write=write, superUser=superUser)
+            admin = False
+        self.repServer.auth.add(user, password, write=write, admin=admin)
         self.writeFn("""User added successfully. <a href="userlist">Return</a>""")
         

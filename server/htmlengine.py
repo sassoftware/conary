@@ -112,14 +112,14 @@ tr.header {
     def htmlFooter(self, alreadyHome=False):
         self.writeFn("<hr />")
         if not alreadyHome:
-            self.writeFn("""<a href="/">Home</a>""")
+            self.writeFn("""<a href="../">Home</a>""")
         self.writeFn("</body></html>")
 
     def htmlPickTrove(self, troveList=[], action="chooseBranch"):
         troveSelection = self.makeSelect(troveList, "troveNameList", size=12, expand="50%")
 
         self.writeFn("""
-<form action="/%s" method="post">
+<form action="%s" method="post">
 <p><div class="formHeader">Pick a trove:</div>%s</p>
 <p><div class="formHeader">Or enter a trove name:</div><input type="text" name="troveName"></p>
 <p><input type="submit"></p>
@@ -207,13 +207,13 @@ Choose a branch: %s
 <table cellpadding="4">
 <tr class="header"><td>Username</td><td>Write access</td></tr>
 """)
-        for user, id, write, super in userlist:
+        for user, id, write, admin in userlist:
             if write:
                 permStr = "Read/Write"
             else:
                 permStr = "Read-Only"
-            if super:
-                permStr += " (superuser)"
+            if admin:
+                permStr += " (admin)"
             self.writeFn("<tr><td>%s</td><td>%s</td></tr>\n" % (user, permStr))
 
         self.writeFn("</table>")
@@ -237,7 +237,18 @@ Choose a branch: %s
 <tr><td>Username:</td><td><input type="text" name="user"></td></tr>
 <tr><td>Password:</td><td><input type="password" name="password"></td></tr>
 <tr><td>Write access:</td><td><input type="checkbox" name="write"></td></tr>
-<tr><td>Superuser:</td><td><input type="checkbox" name="super"></td></tr>
+<tr><td>Admin access:</td><td><input type="checkbox" name="admin"></td></tr>
+</table>
+<p><input type="submit"></p>
+</form>
+""")
+
+    def htmlChPassForm(self):
+        self.writeFn("""
+<form method="post" action="chPass">
+<table>
+<tr><td>New Password:</td><td><input type="text" name="password1"></td></tr>
+<tr><td>Again:</td><td><input type="password" name="password2"></td></tr>
 </table>
 <p><input type="submit"></p>
 </form>
