@@ -166,10 +166,13 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		      info, tags, deps, fullVersions):
+    needFiles = ls or ids or sha1s
+
     try:
 	troveList = repos.findTrove(cfg.installLabelPath, troveName, 
 				    cfg.flavor, versionStr,
-                                    acrossRepositories = True)
+                                    acrossRepositories = True,
+                                    withFiles = needFiles)
     except repository.PackageNotFound, e:
 	log.error(str(e))
 	return

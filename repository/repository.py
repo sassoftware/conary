@@ -33,7 +33,7 @@ class AbstractTroveDatabase:
 	raise NotImplementedError
 
     def findTrove(self, labelPath, name, flavor, versionStr = None,
-                  acrossRepositories = False):
+                  acrossRepositories = False, withFiles = True):
 	"""
 	Looks up a trove in the repository based on the name and
 	version provided. If any errors occur, PackageNotFound is
@@ -55,6 +55,8 @@ class AbstractTroveDatabase:
         from a single repository (the first one with a match). if this is
         set it continues searching through all repositories
         @type acrossRepositories: boolean
+        @param withFiles: File information is only returned if this is True
+        @type withFiles: boolean
 	@rtype: list of trove.Trove
 	"""
 	raise NotImplementedError
@@ -331,7 +333,7 @@ class IdealRepository(AbstractTroveDatabase):
 	raise NotImplementedError
 
     def findTrove(self, labelPath, name, targetFlavor, versionStr = None,
-                  acrossRepositories = False):
+                  acrossRepositories = False, withFiles = True):
 	assert(not targetFlavor or 
 	       isinstance(targetFlavor, deps.deps.DependencySet))
 
@@ -443,7 +445,7 @@ class IdealRepository(AbstractTroveDatabase):
 	if not pkgList:
 	    raise PackageNotFound, "trove %s does not exist" % name
 
-	pkgList = self.getTroves(pkgList)
+	pkgList = self.getTroves(pkgList, withFiles = withFiles)
 
 	return pkgList
 

@@ -258,7 +258,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	for (name, version, flavor) in troves:
 	    chgSetList.append((name, (None, None), (version, flavor), True))
 	
-	cs = self._getChangeSet(chgSetList, recurse = False, withFiles = False)
+	cs = self._getChangeSet(chgSetList, recurse = False, 
+                                withFileContents = False)
 
 	l = []
         # walk the list so we can return the troves in the same order
@@ -283,7 +284,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	self._getChangeSet(list, target = fName)
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
-		      target = None):
+		      withFileContents = True, target = None):
         jobList = {}
 	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
             serverName = new.branch().label().getHost()
@@ -309,7 +310,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             target = None
 
         for serverName, job in jobList.iteritems():
-            urlList = self.c[serverName].getChangeSet(job, recurse, withFiles)
+            urlList = self.c[serverName].getChangeSet(job, recurse, withFiles,
+                                                      withFileContents)
 
             if len(urlList) > 1 and target:
                 origTarget = target
