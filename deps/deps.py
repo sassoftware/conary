@@ -211,7 +211,10 @@ class DependencyClass:
 	    self.addDep(otherdep)
 
     def getDeps(self):
-        for name, dep in self.members.iteritems():
+        l = self.members.items()
+        # sort by name
+        l.sort()
+        for name, dep in l:
             yield dep
 
     def thawDependency(frozen):
