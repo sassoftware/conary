@@ -610,6 +610,10 @@ class PackageRecipe(Recipe):
                 continue
                 break
             versionMatches = []
+            if versionStr and versionStr.find('@') == -1:
+                if versionStr.find(':') == -1:
+                    log.warning('Deprecated buildreq format.  Use '
+                                ' foo=:tag, not foo=tag')
             for trove in troves:
                 if versionStr is None:
                     versionMatches.append(trove) 
@@ -619,9 +623,6 @@ class PackageRecipe(Recipe):
                     if versionStr[0] == ':' or versionStr.find(':') == -1:
                         if versionStr[0] == ':':
                             versionStr = versionStr[1:]
-                        else:
-                            log.warning('Deprecated buildreq format.  Use '
-                                        ' foo=:label, not foo=label')
                         if label.getLabel() == versionStr:
                             versionMatches.append(trove)
                         continue
