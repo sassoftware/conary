@@ -614,8 +614,13 @@ class ChangeSetJob:
                         if oldVersion:
                             oldfile = repos.getFileVersion(pathId, oldFileId,
                                                            oldVersion)
-                            fileObj = oldfile.copy()
-                            fileObj.twm(diff, oldfile)
+                            if diff[0] == "\x01":
+                                # stored as a diff (so the file type didn't
+                                # change)
+                                fileObj = oldfile.copy()
+                                fileObj.twm(diff, oldfile)
+                            else:
+                                fileObj = files.ThawFile(diff, pathId)
 
                             if fileObj.hasContents and oldfile.hasContents and \
                                fileObj.contents.sha1() == oldfile.contents.sha1() and \

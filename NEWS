@@ -1,6 +1,7 @@
 Changes in 0.11.11
   * when a trove is installed for the first time, it comes from a single
     repository
+  * didn't handle file types changing on update
 
 Changes in 0.11.10
   * changed flavor tracking when loadRecipe() is used to only track

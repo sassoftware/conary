@@ -349,10 +349,14 @@ class ChangeSet(streams.LargeStreamSet):
 		    invertedPkg.changedFile(pathId, None, curFileId, curVersion)
 
                 csInfo = self.files[(curFileId, newFileId)]
+                origFile = db.getFileVersion(pathId, curFileId, curVersion)
 
-		origFile = db.getFileVersion(pathId, curFileId, curVersion)
-		newFile = origFile.copy()
-		newFile.twm(csInfo, origFile)
+                if csInfo[0] == "\x01":
+                    # this is a diff, not an absolute change
+                    newFile = origFile.copy()
+                    newFile.twm(csInfo, origFile)
+                else:
+                    newFile = files.ThawFile(csInfo, pathId)
 
 		rollback.addFile(newFileId, curFileId, origFile.diff(newFile))
 
@@ -364,8 +368,8 @@ class ChangeSet(streams.LargeStreamSet):
 		# still be available from the database when the rollback
 		# gets applied. We may be able to get away with just reversing
 		# a diff rather then saving the full contents
-		if (origFile.contents.sha1() != newFile.contents.sha1()) and \
-		   origFile.flags.isConfig():
+		if origFile.flags.isConfig() and \
+                        (origFile.contents.sha1() != newFile.contents.sha1()):
                     if self.configFileIsDiff(newFile.pathId()):
                         (contType, cont) = self.getFileContents(newFile.pathId())
 			f = cont.get()
@@ -381,7 +385,8 @@ class ChangeSet(streams.LargeStreamSet):
 			rollback.addFileContents(pathId,
 						 ChangedFileTypes.file, cont,
 						 newFile.flags.isConfig())
-		elif origFile.contents.sha1() != newFile.contents.sha1():
+		elif origFile.hasContents and newFile.hasContents and \
+                            origFile.contents.sha1() != newFile.contents.sha1():
 		    # this file changed, so we need the contents
 		    fullPath = db.root + curPath
 		    fsFile = files.FileFromFilesystem(fullPath, pathId,
