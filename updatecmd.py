@@ -58,7 +58,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	    else:
 		currentVersion = None
 
-	    list.append = [(pkg.getName(), currentVersion, pkg.getVersion(), 0)]
+	    list.append((pkg.getName(), currentVersion, pkg.getVersion(), 0))
 
 	cs = repos.createChangeSet(list)
 	cs.remapPaths(map)
