@@ -418,7 +418,6 @@ class FilesystemJob:
 	    if flags & MERGE:
 		try:
 		    # don't remove files if they've been changed locally
-                    # XXX change to not calculate sha1 in this case
 		    localFile = files.FileFromFilesystem(realPath, fileId)
 		except OSError, exc:
 		    # it's okay if the file is missing, it means we all agree
