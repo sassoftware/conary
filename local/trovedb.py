@@ -104,6 +104,9 @@ class TroveDatabase:
 	    trv = self._getPackage(trvId)
 	    yield trv
 
+    def pathIsOwned(self, path):
+	return self.pathIdx.has_key(path)
+
     def hasByName(self, name):
 	return self.nameIdx.has_key(name)
 

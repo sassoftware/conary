@@ -48,7 +48,16 @@ class FilesystemJob:
 	    self.initScripts.append(target)
 
     def _remove(self, fileObj, target, msg):
-	self.removes[target] = (fileObj, msg)
+	if isinstance(fileObj, files.Directory):
+	    if not self.directorySet.has_key(target):
+		self.directorySet[target] = 0
+	else:
+	    self.removes[target] = (fileObj, msg)
+	    dir = os.path.dirname(target)
+	    if self.directorySet.has_key(dir):
+		self.directorySet[dir] += 1
+	    else:
+		self.directorySet[dir] = 1
 
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
@@ -140,6 +149,9 @@ class FilesystemJob:
 
     def getOldPackageList(self):
 	return self.oldPackages
+
+    def getDirectoryCountSet(self):
+	return self.directorySet
 
     def _singlePackage(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
 		       flags):
@@ -472,6 +484,7 @@ class FilesystemJob:
 	self.root = root
 	self.initScripts = []
 	self.changeSet = changeSet
+	self.directorySet = {}
 
 	for pkgCs in changeSet.iterNewPackageList():
 	    name = pkgCs.getName()

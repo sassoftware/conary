@@ -211,6 +211,35 @@ class AbstractDatabase(repository.AbstractRepository):
 	fsJob = update.FilesystemJob(self.stash, cs, fsPkgDict, 
 				     self.root, flags = flags)
 
+	# look through the directories which have had files removed and
+	# see if we can remove the directories as well
+	set = fsJob.getDirectoryCountSet()
+	list = set.keys()
+	list.sort()
+	list.reverse()
+	directoryCandidates = {}
+	while (list):
+	    path = list[0]
+	    del list[0]
+	    entries = len(os.listdir(path))
+	    entries -= set[path]
+
+	    # listdir excludes . and ..
+	    if (entries) != 0: continue
+
+	    directoryCandidates[path] = True
+
+	    parent = os.path.dirname(path)
+	    if set.has_key(parent):
+		set[parent] += 1
+	    else:
+		set[parent] = 1
+		list.append(parent)
+		# insertion is linear, sort is n log n
+		# oh well.
+		list.sort()
+		list.reverse()
+
 	# -------- database and system are updated below this line ---------
 
 	try:
@@ -241,9 +270,32 @@ class AbstractDatabase(repository.AbstractRepository):
 
 	# it would be nice if this could be undone on failure
 	for pkg in fsJob.iterNewPackageList():
-	    self.troveDb.addTrove(pkg)
+	    if not pkg.getVersion().isLocal():
+		self.troveDb.addTrove(pkg)
 	for (name, version) in fsJob.getOldPackageList():
-	    self.troveDb.delTrove(name, version)
+	    if not version.isLocal():
+		self.troveDb.delTrove(name, version)
+
+	# finally, remove old directories. right now this has to be done
+	# after the trovedb has been updated
+	list = directoryCandidates.keys()
+	list.sort()
+	list.reverse()
+	keep = {}
+	for path in list:
+	    if keep.has_key(path):
+		keep[os.path.dirname(path)] = True
+		continue
+
+	    relativePath = path[len(self.root):]
+	    if relativePath[0] != '/': relativePath = '/' + relativePath
+	    
+	    if self.troveDb.pathIsOwned(relativePath):
+		list = [ x for x in self.troveDb.iterFindByPath(path)]
+		keep[os.path.dirname(path)] = True
+		continue
+
+	    os.rmdir(path)
 
     def removeFile(self, path, multipleMatches = False):
 	if not multipleMatches:
