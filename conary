@@ -29,10 +29,11 @@ def usage():
     print ""
     print "common flags:  --branch <defaultbranch>"
     print '               --config "<item> <value>"'
-    print "               --repos <repository-path>"
+    print "               --reppath <repository-path>"
     print "               --root <root>"
     print ""
     print "pkglist flags: --all"
+    print "               --repos"
     sys.exit(0)
 
 otherArgs = [ sys.argv[0] ]
@@ -44,12 +45,13 @@ cfgMap = {}
 # 2 - arg may occur N times, w/ parameter
 
 cfgMap["branch"] = "defaultbranch"
-cfgMap["repos"] = "reppath"
+cfgMap["reppath"] = "reppath"
 cfgMap["root"] = "root"
 
 argDef["config"] = 2
 argDef["all"] = 0
 argDef["prep"] = 0
+argDef["repos"] = 0
 
 for arg in cfgMap.keys():
     argDef[arg] = 1
@@ -153,10 +155,17 @@ elif (otherArgs[1] == "cook"):
 elif (otherArgs[1] == "pkglist"):
     all = argSet.has_key('all')
     if all: del argSet['all']
+
+    if argSet.has_key('repos'):
+	queryRepos = repos
+	del argSet['repos']
+    else:
+	queryRepos = db
+
     if argSet: usage
 
     if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	args = [repos, cfg, all] + otherArgs[2:]
+	args = [queryRepos, cfg, all] + otherArgs[2:]
 	display.displayPkgs(*args)
     else:
 	usage()
