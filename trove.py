@@ -347,7 +347,9 @@ class PackageSpec:
 	self.regexp = re.compile(regexp)
 
     def match(self, string):
-	return self.regexp.match(string)
+	# search instead of match in order to not automatically
+	# front-anchor searches
+	return self.regexp.search(string)
 
 class PackageSpecInstance:
     """An instance of a spec formed by the conjugation of a expspec and
