@@ -38,4 +38,4 @@ if len(sys.argv) > 2:
 	sys.stdout.write("".join(final.readlines()))
 else:
     db = versioned.FileIndexedDatabase(sys.argv[1], "r")
-    print "\n".join(db.fileList())
+    print "\n".join(db.iterFileList())

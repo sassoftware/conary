@@ -23,7 +23,7 @@ f = open(sys.argv[1], "r")
 c = FileContainer(f)
 f.close()
 if len(sys.argv) == 2:
-    for n in c.fileList():
+    for n in c.iterFileList():
 	print "%s (%s)" % (n, c.getTag(n))
 elif len(sys.argv) == 3:
     f = c.getFile(sys.argv[2])

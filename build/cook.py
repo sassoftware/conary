@@ -306,14 +306,14 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     ident = _IdGen()
     if repos.hasPackage(fullName):
 	pkgList = [ (fullName, 
-		    [repos.pkgLatestVersion(fullName, buildBranch)]) ]
+		    repos.pkgLatestVersion(fullName, buildBranch)) ]
 	while pkgList:
-	    (name, versionList) = pkgList[0]
+	    (name, version) = pkgList[0]
 	    del pkgList[0]
-	    for version in versionList:
-		pkg = repos.getPackageVersion(name, version)
-		pkgList += pkg.getPackageList()
-		ident.populate(repos, lcache, pkg)
+
+	    pkg = repos.getPackageVersion(name, version)
+	    pkgList += [ x for x in pkg.iterPackageList() ]
+	    ident.populate(repos, lcache, pkg)
 
     if repos.hasPackage(srcName):
 	pkg = repos.getLatestPackage(srcName, buildBranch)
@@ -355,7 +355,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     grpName = recipeClass.name
     grp = package.Package(grpName, newVersion)
     for (pkg, map) in packageList:
-	grp.addPackage(pkg.getName(), [ pkg.getVersion() ])
+	grp.addPackageVersion(pkg.getName(), pkg.getVersion())
 
     changeSet = changeset.CreateFromFilesystem(packageList)
     changeSet.addPrimaryPackage(grpName, newVersion)

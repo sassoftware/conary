@@ -171,22 +171,12 @@ class AbstractDatabase(repository.AbstractRepository):
 					      pristine = True)
 	    changed = self.getPackageVersion(name, oldVersion)
 
-	    # this is obviously horrible
-	    for (subName, subList) in pristine.iterPackageList():
-		for subVersion in subList:
-		    for (otherName, otherList) in changed.iterPackageList():
-			for otherVersion in otherList:
-			    match = False
-			    if otherName == subName and \
-				    otherVersion == subVersion:
-				match = True
-				break
+	    for (subName, subVersion) in pristine.iterPackageList():
+		if not changed.hasPackageVersion(subName, subVersion):
+		    remove[(subName, version)] = True
 
-			    if not match:
-				remove[subName] = True
-
-	for name in remove.iterkeys():
-	    cs.delNewPackage(name)
+	for (name, version) in remove.iterkeys():
+	    cs.delNewPackage(name, version)
 
 	# create the change set from A->A.local
 	pkgList = []

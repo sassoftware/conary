@@ -218,7 +218,7 @@ class FilesystemRepository(AbstractRepository):
 		    branchedVersion = version.fork(newBranch, sameVerRel = 0)
 		    self.createFileBranch(fileId, branchedVersion)
 
-		for (name, version) in pkg.getPackageList():
+		for (name, version) in pkg.iterPackageList():
 		    troveList.append((name, version))
 		    
     def open(self, mode):
@@ -319,9 +319,8 @@ class FilesystemRepository(AbstractRepository):
 		# remove this package and any subpackages
 		old = self.getPackageVersion(packageName, oldVersion)
 		cs.oldPackage(packageName, oldVersion)
-		for (name, verList) in old.getPackageList():
-		    for ver in verList:
-			packageList.append((name, ver, None, abstract))
+		for (name, version) in old.iterPackageList():
+		    packageList.append((name, version, None, abstract))
 		    
 		continue
 		    

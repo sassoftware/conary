@@ -91,9 +91,8 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids):
 	else:
 	    print _pkgFormat % (pkgName, version.asString(cfg.defaultbranch))
 
-	    for (pkgName, verList) in pkg.getPackageList():
-		for ver in verList:
-		    print _grpFormat % (pkgName, ver.asString(cfg.defaultbranch))
+	    for (pkgName, ver) in pkg.iterPackageList():
+		print _grpFormat % (pkgName, ver.asString(cfg.defaultbranch))
 
 	    fileL = [ (x[1], x[0], x[2]) for x in pkg.iterFileList() ]
 	    fileL.sort()

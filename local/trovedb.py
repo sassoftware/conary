@@ -25,7 +25,10 @@ class TroveDatabase:
 	for (fileId, path, version) in trv.iterFileList():
 	    method(self.pathIdx, trvId, path)
 
-	for (name, versionList) in trv.iterPackageList():
+	done = {}
+	for (name, version) in trv.iterPackageList():
+	    if done.has_key(name): return
+	    done[name] = True
 	    method(self.partofIdx, trvId, name)
 
     def addTrove(self, trv):
@@ -66,22 +69,16 @@ class TroveDatabase:
 	for trvId in self.partofIdx.iterGetEntries(name):
 	    trv = self._getPackage(trvId)
 	    updateTrove = False
-	    for (inclName, versionList) in trv.iterPackageList():
-		if inclName == name: 
-		    for inclVersion in versionList:
-			if inclVersion == version:
-			    updateTrove = True
-			    trv.delPackageVersion(name, version, 
-						  missingOkay = False)
-			    break
-		    break
 
-	    if updateTrove:
+	    if trv.hasPackageVersion(name, version):
+		updateTrove = True
+		trv.delPackageVersion(name, version, 
+				      missingOkay = False)
 		self.updateTrove(trv)
-		foundOne = True
 
     def iterAllTroveNames(self):
-	return self.nameIdx.iterkeys()
+	for name in self.nameIdx.keys():
+	    yield name
 
     def iterFindByName(self, name):
 	"""

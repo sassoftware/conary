@@ -74,30 +74,7 @@ class Package:
 	@param version: version of the package
 	@type version: versions.Version
 	"""
-	if self.packages.has_key(name):
-	    i = 0
-	    for ver in self.packages[name]:
-		if ver == version: break
-		i = i + 1
-
-	    if i == len(self.packages[name]):
-		self.packages[name].append(version)
-	    elif not redundantOkay:
-		# FIXME, this isn't the right thing to do
-		raise IOError
-	else:
-	    self.packages[name] = [ version ]
-
-    def addPackage(self, name, versionList):
-	"""
-	Adds a set of versions for a package.
-
-	@param name: name of the package
-	@type name: str
-	@param versionList: list of versions to add
-	@type versionList: list of versions.Version
-	"""
-	self.packages[name] = versionList
+	self.packages[(name, version)] = True
 
     def delPackageVersion(self, name, version, missingOkay):
 	"""
@@ -111,33 +88,25 @@ class Package:
 	part of this trove?
 	@type missingOkay: boolean
 	"""
-	for i, ver in enumerate(self.packages[name]):
-	    if ver == version: break
-	if i != len(self.packages[name]):
-	    del(self.packages[name][i])
-	    if not self.packages[name]:
-		del self.packages[name]
-	elif not missingOkay:
+	if self.packages.has_key((name, version)):
+	    del self.packages[(name, version)]
+	elif missingOkay:
+	    pass
+	else:
 	    # FIXME, this isn't the right thing to do
-	    raise IOError
+	    raise KeyError
 
-    def getPackageList(self):
+    def iterPackageList(self):
 	"""
-	Returns a list of (packageName, versionList) ordered pairs, listing
+	Returns a generator for (packageName, version) ordered pairs, listing
 	all of the package in the group, along with their versions. 
 
 	@rtype: list
 	"""
-	return self.packages.items()
+	return self.packages.iterkeys()
 
-    def iterPackageList(self):
-	"""
-	Returns a generator for (packageName, versionList) ordered pairs, 
-	listing all of the package in the group, along with their versions. 
-
-	@rtype: list
-	"""
-	return self.packages.iteritems()
+    def hasPackageVersion(self, name, version):
+	return self.packages.has_key((name, version))
 
     def read(self, dataFile):
 	lines = dataFile.readlines()
@@ -156,12 +125,8 @@ class Package:
 	    self.addFile(fileId, path, version)
 
 	for line in lines[fileEnd:pkgEnd]:
-	    items = line.split()
-	    name = items[0]
-	    self.packages[name] = []
-	    for versionStr in items[1:]:
-		version = versions.VersionFromString(versionStr)
-		self.addPackageVersion(name, version)
+	    (name, version) = line.split()
+	    self.addPackageVersion(name, versions.VersionFromString(version))
 
     def formatString(self):
 	"""
@@ -192,9 +157,8 @@ class Package:
         rc += [ "%s %s %s\n" % (x[0], x[1][0], x[1][1].freeze())
                 for x in self.idMap.iteritems() ]
 
-	for pkg, versions in self.packages.iteritems():
-	    rc.append("%s %s\n" %(pkg,
-                                  " ".join([v.asString() for v in versions])))
+	rc += [ "%s %s\n" % (x[0], x[1].asString()) for x in 
+				    self.packages.iterkeys() ]
 	return "".join(rc)
 
     # returns a dictionary mapping a fileId to a (path, version, pkgName) tuple
@@ -325,49 +289,26 @@ class Package:
 		chgSet.changedFile(id, newPath, newVersion)
 
 	# now handle the packages we include
-	names = {}
-	list = self.packages.keys()
-	if them:
-	    list += them.packages.keys()
-
-	for name in list:
-	    names[name] = 1
-
 	added = {}
 	removed = {}
 
-	for name in names.keys():
-	    if self.packages.has_key(name):
-		ourVersions = self.packages[name]
+	for key in self.packages.iterkeys():
+	    if them and them.packages.has_key(key): continue
+
+	    (name, version) = key
+	    chgSet.newPackageVersion(name, version)
+	    if added.has_key(name):
+		added[name].append(version)
 	    else:
-		ourVersions = []
+		added[name] = [ version ]
 
-	    if them and them.packages.has_key(name):
-		theirVersions = them.packages[name]
-	    else:
-		theirVersions = []
+	if them:
+	    for key in them.packages.iterkeys():
+		if self.packages.has_key(key): continue
 
-	    for (i, version) in enumerate(ourVersions):
-		match = 0 
-		for (j, v) in enumerate(theirVersions):
-		    if v == version:
-			match = 1
-			break
-
-		if match:
-		    # same version exists in both groups
-		    del theirVersions[j]
-		else:
-		    # this is a new package
-		    chgSet.newPackageVersion(name, version)
-		    if (added.has_key(name)):
-			added[name].append(version)
-		    else:
-			added[name] = [ version ]
-
-	    for version in theirVersions:
+		(name, version) = key
 		chgSet.oldPackageVersion(name, version)
-		if (removed.has_key(name)):
+		if removed.has_key(name):
 		    removed[name].append(version)
 		else:
 		    removed[name] = [ version ]
@@ -725,9 +666,8 @@ def walkPackageSet(repos, pkg):
     seen = { pkg.getName() : [ pkg.getVersion().asString() ] }
 
     list = []
-    for (name, versionList) in pkg.iterPackageList():
-	for version in versionList:
-	    list.append((name, version))
+    for (name, version) in pkg.iterPackageList():
+	list.append((name, version))
 
     while list:
 	(name, version) = list[0]
@@ -749,9 +689,8 @@ def walkPackageSet(repos, pkg):
 
 	yield pkg
 
-	for (pkg, verList) in pkg.iterPackageList():
-	    for version in verList:
-		list.append((pkg, version))
+	for (pkg, version) in pkg.iterPackageList():
+	    list.append((pkg, version))
 
 class PackageError(Exception):
 
