@@ -256,11 +256,20 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	else:
 	    return self.reposSet.getFileVersion(fileId, fileVersion)
 
-    def _getLocalOrRemoteFileContents(self, name, troveVersion, troveFlavor, path):
+    def _getLocalOrRemoteFileVersions(self, l):
+	d = {}
+	for (fileId, fileVersion) in l:
+	    d[(fileId, fileVersion)] = self._getLocalOrRemoteFileVersion(
+					    fileId, fileVersion)
+
+	return d
+
+    def _getLocalOrRemoteFileContents(self, name, troveVersion, troveFlavor, 
+				      path, sha1):
 	# the get trove netclient provides doesn't work with a FilesystemRepository
 	# (it needs to create a change set which gets passed)
 	if troveVersion.branch().label().getHost() == self.name:
-	    return self.getFileContents(name, troveVersion, troveFlavor, path)
+	    return self._getFileObject(sha1)
 	else:
 	    return self.repos.getFileContents(name, troveVersion, troveFlavor, path)
 
@@ -344,11 +353,34 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	    cs.newPackage(pkgChgSet)
 
+	    # sort the set of files we need into bins based on the server
+	    # name
+	    serverIdx = {}
+	    for (fileId, oldFileVersion, newFileVersion, oldPath, newPath) in \
+									filesNeeded:
+		if oldFileVersion:
+		    serverName = oldFileVersion.branch().label().getHost()
+		    if serverIdx.has_key(serverName):
+			serverIdx[serverName].append((fileId, oldFileVersion))
+		    else:
+			serverIdx[serverName] = [ (fileId, oldFileVersion) ]
+
+		serverName = newFileVersion.branch().label().getHost()
+		if serverIdx.has_key(serverName):
+		    serverIdx[serverName].append((fileId, newFileVersion))
+		else:
+		    serverIdx[serverName] = [ (fileId, newFileVersion) ]
+
+	    idIdx = {}
+	    for serverName, l in serverIdx.iteritems():
+		allFiles = self._getLocalOrRemoteFileVersions(l)
+		idIdx.update(allFiles)
+
 	    for (fileId, oldFileVersion, newFileVersion, oldPath, newPath) in \
 									filesNeeded:
 		oldFile = None
 		if oldFileVersion:
-		    oldFile = self._getLocalOrRemoteFileVersion(fileId, oldFileVersion)
+		    oldFile = idIdx[(fileId, oldFileVersion)]
 
 		oldCont = None
 		newCont = None
@@ -362,12 +394,14 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		if hash and withFiles:
 		    if oldFileVersion :
 			f = self._getLocalOrRemoteFileContents(troveName, 
-						oldVersion, flavor, oldPath)
+						oldVersion, flavor, oldPath,
+						oldFile.contents.sha1())
 			assert(f)
 			oldCont = filecontents.FromGzFile(f)
 
-		    f = self._getLocalOrRemoteFileContents(troveName, newVersion, 
-							   flavor, newPath)
+		    f = self._getLocalOrRemoteFileContents(troveName, 
+						newVersion, flavor, newPath,
+						newFile.contents.sha1())
 		    newCont = filecontents.FromGzFile(f)
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
