@@ -219,7 +219,7 @@ def checkout(repos, cfg, workDir, name):
         log.error(str(e))
         return
     if len(trvList) > 1:
-	log.error("branch %s matches more then one version", versionStr)
+	log.error("branch %s matches more than one version", versionStr)
 	return
     trvInfo = trvList[0]
 	
