@@ -412,7 +412,7 @@ class Desktopfile(BuildCommand, _FileAction):
     if the target has enabled building desktop files.
     """
     template = ('cd %%(builddir)s; '
-		'desktop-file-validate %(args)s; '
+		'desktop-file-validate %(args)s && '
 		'desktop-file-install --vendor %(vendor)s'
 		' --dir %%(destdir)s/%%(datadir)s/applications'
 		' %%(category)s'
