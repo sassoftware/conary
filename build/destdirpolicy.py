@@ -426,8 +426,10 @@ class FixupMultilibPaths(policy.Policy):
 	target = util.joinPaths(targetdir, basename)
         fulltarget = util.joinPaths(destdir, target)
         if os.path.exists(fulltarget):
+            tmode = os.lstat(fulltarget)[stat.ST_MODE]
             tm = self.recipe.magic[target]
-            if ('abi' in m.contents and 'abi' in tm.contents 
+            if (stat.S_ISREG(mode) and stat.S_ISREG(tmode) and
+                'abi' in m.contents and 'abi' in tm.contents 
                 and m.contents['abi'] != tm.contents['abi']):
                 # path and target both exist and are of different abis.
                 # This means that this is actually a multilib package
