@@ -265,13 +265,14 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	return d
 
     def _getLocalOrRemoteFileContents(self, name, troveVersion, troveFlavor, 
-				      path, sha1):
+				      path, sha1, size):
 	# the get trove netclient provides doesn't work with a FilesystemRepository
 	# (it needs to create a change set which gets passed)
 	if troveVersion.branch().label().getHost() == self.name:
-	    return self._getFileObject(sha1)
+	    return filecontents.FromDataStore(self.contentsStore, sha1, size)
 	else:
-	    return self.repos.getFileContents(name, troveVersion, troveFlavor, path)
+	    f = self.repos.getFileContents(name, troveVersion, troveFlavor, path)
+	    return filecontents.FromGzFile(f)
 
     def createChangeSet(self, troveList, recurse = True, withFiles = True):
 	"""
@@ -393,16 +394,15 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 		if hash and withFiles:
 		    if oldFileVersion :
-			f = self._getLocalOrRemoteFileContents(troveName, 
+			oldCont = self._getLocalOrRemoteFileContents(troveName, 
 						oldVersion, flavor, oldPath,
-						oldFile.contents.sha1())
-			assert(f)
-			oldCont = filecontents.FromGzFile(f)
+						oldFile.contents.sha1(),
+						oldFile.contents.size())
 
-		    f = self._getLocalOrRemoteFileContents(troveName, 
+		    newCont = self._getLocalOrRemoteFileContents(troveName, 
 						newVersion, flavor, newPath,
-						newFile.contents.sha1())
-		    newCont = filecontents.FromGzFile(f)
+						newFile.contents.sha1(),
+						newFile.contents.size())
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
 
