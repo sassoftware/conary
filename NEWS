@@ -5,7 +5,7 @@ Changes in 0.14.4:
     - the fileids in CONARY files are now correct after an update
   * several bugs in error handling have been fixed
   * several docstrings have been fixed
-  * packagepolicy now automatically adds file requirements for files
+  * packagepolicy now automatically adds usermode:runtime requirement to files
     that are dangling symlinks to consolehelper
   * the templating engine for the web interface to the server has been
     changed to kid
