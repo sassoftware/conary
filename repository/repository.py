@@ -168,7 +168,7 @@ class LocalRepository(Repository):
 	Creates a branch for the troves in the repository. This
 	operations is recursive, with any required troves and files
 	also getting branched. Duplicate branches can be created,
-	but only if one of the following is true::
+	but only if one of the following is true:
 	 
 	  1. where specifies a particular version to branch from
 	  2. the branch does not yet exist and where is a branch nickname which matches multiple existing branches
