@@ -172,6 +172,20 @@ class SymbolicLink(File):
 
 	File.__init__(self, path, version, info)
 
+class Socket(File):
+
+    def infoLine(self):
+	return "s %s" % (File.infoLine(self))
+
+    def compare(self, other):
+	return File.compare(self, other)
+
+    def copy(self, source, target):
+	pass
+
+    def __init__(self, path, version = None, info = None):
+	File.__init__(self, path, version, info)
+
 class NamedPipe(File):
 
     def infoLine(self):
@@ -326,6 +340,8 @@ def FileFromFilesystem(root, path):
 	f.linkTarget(os.readlink(root + path))
     elif (stat.S_ISDIR(s.st_mode)):
 	f = Directory(path)
+    elif (stat.S_ISSOCK(s.st_mode)):
+	f = Socket(path)
     elif (stat.S_ISFIFO(s.st_mode)):
 	f = NamedPipe(path)
     elif (stat.S_ISBLK(s.st_mode)):
@@ -356,5 +372,7 @@ def FileFromInfoLine(path, version, infoLine):
 	return NamedPipe(path, version, infoLine)
     elif type == "v":
 	return DeviceFile(path, version, infoLine)
+    elif type == "s":
+	return Socket(path, version, infoLine)
     else:
 	raise KeyError, "bad infoLine %s" % infoLine
