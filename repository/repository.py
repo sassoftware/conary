@@ -153,9 +153,12 @@ class LocalRepository(Repository):
 	if self.pkgDB:
 	    self.close()
 
-	self.lockfd = os.open(self.top + "/lock", os.O_CREAT | os.O_RDWR)
+        flags = os.O_RDONLY
+        if mode != 'r':
+            flags |= os.O_CREAT | os.O_RDWR
+	self.lockfd = os.open(self.top + '/lock', flags)
 
-	if mode == "r":
+	if mode == 'r':
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_SH)
 	else:
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
