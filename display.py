@@ -5,7 +5,7 @@
 import files
 import log
 import package
-import packagename
+#import packagename
 import versions
 
 from packagename import PackageName
@@ -15,12 +15,13 @@ _fileFormat = "    %-35s %s"
 _grpFormat  = "%-39s %s"
 
 def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
-    if pkg and pkg[0] != ":":
-	pkg = PackageName(cfg.packagenamespace + ":" + pkg)
-    else:
-	pkg = PackageName(pkg)
+    #if pkg and pkg[0] != ":":
+	#pkg = PackageName(cfg.packagenamespace + ":" + pkg)
+    #else:
+	#pkg = PackageName(pkg)
 
-    if pkg.isGroup():
+    #if pkg.isGroup():
+    if 0:
 	if not repos.hasGroup(pkg):
 	    log.error("group %s can not be found" % 
 			pkg.getName())
