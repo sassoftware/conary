@@ -22,9 +22,7 @@ export conarydir = $(prefix)/share/conary
 export bindir = $(prefix)/bin
 export mandir = $(prefix)/share/man
 
-SUBDIRS=build local repository lib pysqlite3 deps
-
-subdirs_rule=
+SUBDIRS=build local repository server lib pysqlite3 deps
 
 python_files = __init__.py	\
 	branch.py		\
@@ -66,9 +64,7 @@ generated_files = conary-wrapper *.pyo *.pyc
 
 .PHONY: clean dist install subdirs
 
-
-subdirs:
-	for d in $(SUBDIRS); do make -C $$d DIR=$$d || exit 1; done
+subdirs: default-subdirs
 
 conary-wrapper: conary-wrapper.in
 	sed s,@conarydir@,$(conarydir),g $< > $@

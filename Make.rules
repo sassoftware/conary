@@ -41,6 +41,9 @@ default-clean: clean-subdirs
 default-test:
 	$(TESTSUITE) *.py
 
+default-subdirs:
+	for d in $(SUBDIRS); do make -C $$d DIR=$$d || exit 1; done
+
 clean-subdirs:
 ifdef SUBDIRS
 	for d in $(SUBDIRS); do make -C $$d DIR=$(DIR)/$$d clean || exit 1; done
