@@ -51,7 +51,7 @@ class TestSuiteLinks(policy.Policy):
     """
     Indicate extra files to link into the test directory:
     C{r.TestSuiteLinks(I{%(thisdocdir)s/README})} or 
-    C{r.TestSuiteLinks(fileMap={I{<builddir_path>}: I{<destdir_path>}})}.
+    C{r.TestSuiteLinks(fileMap={I{<builddir_path>}:: I{<destdir_path>}})}.
 
     Files listed in the first filterexp can override standard exclusions;
     currently, document, man, info, and init directories.  
