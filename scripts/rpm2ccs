@@ -1,0 +1,231 @@
+#!/usr/bin/python2.4
+# -*- mode: python -*-
+#
+# Copyright (c) 2005 Specifix, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+import gzip
+import os
+import sys
+import tempfile
+
+binPath = os.path.dirname(sys.argv[0]) 
+if binPath and os.path.exists(binPath + "/../conary-wrapper"):
+    sys.path.append(os.path.realpath(binPath + "/.."))
+else:
+    sys.path.append("/usr/share/conary")
+
+import checkin
+import conarycfg
+import rpmhelper
+import repository
+
+from build import cook
+from lib import util
+from repository.netclient import NetworkRepositoryClient
+
+class recipeBuilder:
+    def __init__(self, packagename, rpmfile, rpmname):
+        self.recipename = packagename + '.recipe'
+        # get information from RPM
+        self.rpmdata = {}
+        self.rpmdata['packagename'] = packagename
+        self.rpmdata['version'] = '1.2.3_1' # XXX we will want to include RPM revision info
+        self.rpmdata['rpmname'] = os.path.basename(rpmname)
+
+        # XXX write recipe, any needed taghandlers
+        self.recipe = '''
+class %(packagename)s(PackageRecipe):
+    name = '%(packagename)s'
+    version = '%(version)s'
+    def setup(r):
+        r.addArchive('%(rpmname)s', dir='/')
+        r.ComponentSpec('runtime', '.*')
+''' % self.rpmdata
+
+        # XXX add any User/Group bits needed for this recipe -- guess from
+        # current system first, then by trying to parse any adduser/group
+        # lines
+
+    def name(self):
+        return self.recipename
+
+    def append(self, data):
+        self.recipe += data
+    
+    def write(self):
+        f = open(self.recipename, 'w')
+        f.write(self.recipe)
+        f.close()
+
+class taghandlerBuilder:
+    def __init__(self, packagename, recipe):
+        self.packagename = packagename
+        self.recipe = recipe
+        # XXX these should come from recipe info
+        preScript = None
+        triggers = None
+        postScript = None
+        preUn = None
+        postUn = None
+
+        if preScript:
+            print 'Conary does not implement pre scripts.'
+            print 'Most pre scripts add users/groups, which conary does'
+            print 'using r.User() and r.Group(); you may need to use the'
+            print '--recipe option and manually modify or add r.User()'
+            print 'and/or r.Group() lines.'
+        if triggers:
+            print 'Conary does not implement triggers at all.'
+            print 'Most triggers are workarounds for old bugs.'
+            print 'You will have to look at the triggers and implement the'
+            print 'necessary semantics differently for Conary.'
+        if postScript:
+            self.postscript(postScript)
+        if preUn:
+            self.preun(preUn)
+        if postUn:
+            self.postun(postUn)
+
+    def postscript(self, postScript):
+        pass
+    def preun(self, preUn):
+        pass
+    def postun(self, postUn):
+        pass
+    def exists(self):
+        pass
+    def writefiles(self):
+        # XXX write taghandler and tagdescription
+        self.taghandlername = self.packagename+'.taghandler'
+        self.tagdescriptionname = self.packagename+'foo.tagdescription'
+    def taghandler(self):
+        return self.taghandlername
+    def tagdescription(self):
+        return self.tagdescriptionname
+    def recipelines(self):
+        return """
+        r.addSource('"""+self.taghandlername+"""', dir='%(taghandlerdir)s', dest='%(name)s')
+        r.addSource('"""+self.tagdescriptionname+"""', dir='%(tagdescriptiondir)s', dest='%(name)s')
+"""
+
+
+def usage():
+    print "\n".join((
+        'Usage: rpm2ccs [options] <rpmpackage>',
+        'Options: --recipe|--changeset|--update',
+        '           --recipe just writes a recipe',
+        '           --changeset (default) creates a changeset',
+        '           --update cooks and updates a changeset on the local system',
+        '         --ignore-scripts ignores RPM scripts, relying instead on',
+        "           Conary's automated policy for all actions",
+        '         --noclean keeps conary from cleaning up after the build',
+        '         --commit tells conary to commit changes to the repository',
+        '',
+        ))
+    return 1
+
+(RECIPE, CHANGESET, UPDATE) = range(0,3)
+
+def main(argv):
+    if len(argv) < 2:
+        return usage()
+    rpmname = argv[-1]
+    if rpmname[0] != '/':
+        rpmname = os.sep.join((os.getcwd(), rpmname))
+    try:
+        rpmfile = file(rpmname, 'r')
+    except:
+        return usage()
+
+    cfg = conarycfg.ConaryConfiguration()
+    repos = NetworkRepositoryClient(cfg.repositoryMap)
+
+    create = CHANGESET
+    if '--recipe' in argv:
+        create = RECIPE
+    elif '--changeset' in argv:
+        create = CHANGESET
+    elif '--update' in argv:
+        create = UPDATE
+    
+    packageScripts = True
+    if '--ignore-scripts' in argv:
+        packageScripts = False
+
+    cfg.noClean = False
+    if '--noclean' in argv:
+        cfg.noClean = True
+
+    commitWork=False
+    if '--commit' in argv:
+        commitWork=True
+
+    sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
+
+    # XXX get packagename from RPM
+    packagebasename = 'moin'
+    packagename = 'rpm_'+packagebasename
+
+    dir = tempfile.mkdtemp('', ''.join(('rpm2ccs-', packagebasename, '-')))
+    os.chdir(dir)
+
+    packagedir = util.joinPaths(dir, packagename)
+
+    try:
+        # if it is already in the repository, pull it out
+        repos.findTrove(cfg.buildLabel, packagename+':source', None, None)
+        checkin.checkout(repos, cfg, packagedir, packagename)
+    except repository.repository.TroveNotFound:
+        checkin.newPackage(repos, cfg, packagename)
+
+    os.chdir(packagedir)
+
+    recipe = recipeBuilder(packagename, rpmfile, rpmname)
+
+    if packageScripts:
+        tag = taghandlerBuilder(packagename, recipe)
+        if tag.exists():
+            tag.writefiles()
+            checkin.addFiles(tag.taghandler())
+            checkin.addFiles(tag.tagdescription())
+            recipe.append(tag.recipelines())
+
+    recipe.write()
+    checkin.addFiles((recipe.name(),))
+    util.copyfile(rpmname,
+                  util.joinPaths(packagedir, os.path.basename(rpmname)))
+    checkin.addFiles((rpmname,))
+
+
+
+    if create == RECIPE:
+        print 'Recipe and any other necessary files in %s' % packagedir
+        return 0
+
+
+    if commitWork:
+        checkin.commit(repos, cfg, None, True)
+        cook.cookCommand(cfg, (packagename,), False, {}, resume=False)
+        if cfg.noClean:
+            print 'Not deleting working directory %s' % dir
+        else:
+            util.rmtree(dir)
+
+    else:
+        cook.cookCommand(cfg, (recipe.name(),), False, {}, resume=False)
+        print 'Changeset and other files in %s' % packagedir
+        
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
