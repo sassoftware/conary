@@ -4,7 +4,7 @@
 #
 
 import database
-import package
+import log
 import sys
 
 def listRollbacks(db, cfg):
@@ -44,4 +44,5 @@ def apply(db, cfg, *names):
     try:
 	db.applyRollbackList(names)
     except database.RollbackError, e:
-	sys.stderr.write("%s\n" % repr(e))	
+	log.error("%s", e)
+	sys.exit(1)
