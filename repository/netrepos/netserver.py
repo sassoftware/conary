@@ -38,11 +38,20 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     # 1. Internal server error (unknown exception)
     # 2. netserver.InsufficientPermission
 
-    def callWrapper(self, method, authToken, args):
+    def callWrapper(self, methodname, authToken, args):
 	# reopens the sqlite db if it's changed
 	self.repos.reopen()
 
-	try:
+        try:
+            # try and get the method to see if it exists
+            method = self.__getattribute__(methodname)
+        except:
+            return (True, ("MethodNotSupported", methodname, ""))
+        try:
+            # the first argument is a version number
+	    r = method(authToken, *args)
+	    return (False, r)
+
             # the first argument is a version number
 	    r = self.__getattribute__(method)(authToken, *args)
 	    return (False, r)
