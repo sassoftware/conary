@@ -33,7 +33,7 @@ from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExi
 import trovestore
 import versions
 
-SERVER_VERSIONS = [ 24, 25, 26 ]
+SERVER_VERSIONS = [ 26 ]
 CACHE_SCHEMA_VERSION = 11
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -917,10 +917,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             urlList.append(os.path.join(self.urlBase, 
                                         "changeset?%s" % fileName[:-4]))
 
-        if clientVersion < 10:
-            return urlList
-        else:
-            return urlList, newChgSetList, allFilesNeeded
+        return urlList, newChgSetList, allFilesNeeded
 
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
 	if not self.auth.check(authToken, write = False):
@@ -935,19 +932,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	sugDict = self.troveStore.resolveRequirements(label, requires.keys())
 
         result = {}
-        if clientVersion == 24:
-            for (key, val) in sugDict.iteritems():
-                # make a default choice (flavors are returned for this
-                # old version), and the version can't have timestamps here
-                result[requires[key]] = [ (x[0],
-                    versions.ThawVersion(x[1]).asString()) for x in val[0] ]
-        else:
-            for (key, val) in sugDict.iteritems():
-                result[requires[key]] = val
+        for (key, val) in sugDict.iteritems():
+            result[requires[key]] = val
                 
-        #for (key, val) in sugDict.iteritems():
-        #    result[requires[key]] = val
-
         return result
 
     def prepareChangeSet(self, authToken, clientVersion):
