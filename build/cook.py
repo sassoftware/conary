@@ -40,8 +40,8 @@ def _createPackage(repos, branch, bldPkg, ident):
     for (path, buildFile) in bldPkg.items():
         realPath = buildFile.getRealPath()
 	(fileId, fileVersion) = ident(path)
-        if isinstance(buildFile, buildpackage.BuildDeviceFile):
-            f = files.FileFromInfoLine(buildFile.infoLine(), fileId)
+        if isinstance(buildFile, buildpackage._BuildDeviceFile):
+            f = files.ThawFile(buildFile.freeze(), fileId)
         elif realPath:
             f = files.FileFromFilesystem(realPath, fileId,
                                          requireSymbolicOwnership=True)

@@ -374,9 +374,9 @@ class Ownership(policy.Policy):
 	    if filename in packages[package]:
 		pkgfile = packages[package][filename]
 		if owner:
-		    pkgfile.theOwner = owner
+		    pkgfile.inode.setOwner(owner)
 		if group:
-		    pkgfile.theGroup = group
+		    pkgfile.inode.setGroup(group)
 
 
 def DefaultPolicy():

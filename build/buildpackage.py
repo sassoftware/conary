@@ -19,30 +19,39 @@ class BuildFile(files.File):
     def getRealPath(self):
         return self.realPath
 
-    def getType(self):
-        return self.type
-
-    def __init__(self, realPath, type):
+    def __init__(self, realPath):
         files.File.__init__(self, None)
         self.realPath = realPath
-        self.type = type
 
-class BuildDeviceFile(files.DeviceFile, BuildFile):
+class _BuildDeviceFile(files.DeviceFile, BuildFile):
     def __init__(self, devtype, major, minor, owner, group, perms):
-        BuildFile.__init__(self, None, "auto")
+        BuildFile.__init__(self, None)
 
-        self.infoTag = devtype
-        self.major = major
-        self.minor = minor
-        self.theOwner = owner
-        self.theGroup = group
-        self.thePerms = perms
-        self.theSize = 0
-        self.theMtime = 0
+	self.devt.major.set(major)
+	self.devt.minor.set(minor)
+	self.inode.setOwner(owner)
+	self.inode.setGroup(group)
+	self.inode.setPerms(perms)
+	self.inode.setMtime(0)
+
+class BuildBlockDeviceFile(_BuildDeviceFile):
+
+    lsTag = "b"
         
+class BuildCharacterBlockFile(_BuildDeviceFile):
+
+    lsTag = "c"
+
+def BuildDeviceFile(self, devtype, major, minor, owner, group, perms):
+    if devtype == "b":
+	return BuildBlockDeviceFile(major, minor, owner, group, perms)
+    elif devtype == "c":
+	return BuildCharacterDeviceFile(major, minor, owner, group, perms)
+    assert(0)
+
 class BuildPackage(dict):
 
-    def addFile(self, path, realPath, type="auto"):
+    def addFile(self, path, realPath):
         """
         Add a file to the build package
 
@@ -52,7 +61,7 @@ class BuildPackage(dict):
         to commit to the repository
         @param type: type of file.  Use "src" for source files.
         """
-	self[path] = BuildFile(realPath, type)
+	self[path] = BuildFile(realPath)
 
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
