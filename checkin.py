@@ -115,30 +115,6 @@ class SourceState:
 	self.troveVersion = None
 	if filename: self.parseFile(filename)
 
-def checkin(repos, cfg, file):
-    f = open(file, "r")
-
-    try:
-	grp = package.GroupFromTextFile(f, cfg.packagenamespace, repos)
-    except package.ParseError:
-	return
-
-    simpleVer = grp.getSimpleVersion()
-
-    ver = repos.pkgLatestVersion(grp.getName(), cfg.defaultbranch)
-    if not ver:
-	ver = cfg.defaultbranch.copy()
-	ver.appendVersionRelease(simpleVer, 1)
-    elif ver.trailingVersion().getVersion() == simpleVer:
-	ver.incrementVersionRelease()
-    else:
-	ver = ver.branch()
-	ver.appendVersionRelease(simpleVer, 1)
-
-    grp.changeVersion(ver)
-    changeSet = changeset.CreateFromFilesystem( [ (grp, {}) ] )
-    repos.commitChangeSet(changeSet)
-
 def checkout(repos, cfg, dir, name, versionStr = None):
     # This doesn't use helper.findPackage as it doesn't want to allow
     # branches nicknames. Doing so would cause two problems. First, we could
@@ -299,7 +275,7 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 	newVersion.appendVersionRelease(recipeVersionStr, 1)
     elif srcVersion.trailingVersion().getVersion() == recipeVersionStr:
 	newVersion = srcVersion.copy()
-	newVersion.incrementVersionRelease()
+	newVersion.incrementRelease()
     else:
 	newVersion = state.getTroveBranch().copy()
 	newVersion.appendVersionRelease(recipeVersionStr, 1)
