@@ -38,14 +38,8 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
     else:
 	# this returns a sorted list
         troves = []
-        hosts = {}
         for label in cfg.installLabelPath:
-            host = label.getHost()
-            if hosts.has_key(host):
-                continue
-            hosts[host] = True
-
-            troves += [ (x, None) for x in repos.iterAllTroveNames(host) ]
+            troves += [ (x, None) for x in repos.troveNames(label) ]
 
     if hasVersions or ls or ids or sha1s or info or tags or deps:
 	if all:

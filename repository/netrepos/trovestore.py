@@ -322,6 +322,26 @@ class TroveStore:
         for (item,) in cu:
             yield item
 
+    def troveNames(self, label):
+        cu = self.db.cursor()
+        cu.execute("""SELECT DISTINCT item FROM 
+                            Labels JOIN LabelMap ON
+                                Labels.labelId = LabelMap.labelId
+                            JOIN Branches ON
+                                LabelMap.branchId = Branches.branchId
+                            JOIN Nodes ON
+                                Branches.branchId = Nodes.branchId
+                            JOIN Instances ON
+                                Nodes.versionId = Instances.versionId
+                            JOIN Items ON
+                                Instances.itemId = Items.itemId
+                            WHERE
+                                Labels.label=? AND isPresent=1
+                    """, label.asString())
+
+        for (item,) in cu:
+            yield item
+
     def addTrove(self, trove):
 	cu = self.db.cursor()
 

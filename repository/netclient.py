@@ -35,7 +35,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=10
+CLIENT_VERSION=11
 
 class _Method(xmlrpclib._Method):
 
@@ -162,9 +162,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             
         return self.c[branch].getMetadata(troveName, branch.freeze(), language, version)
 
-    def iterAllTroveNames(self, serverName):
-	for name in self.c[serverName].allTroveNames():
-	    yield name
+    def troveNames(self, label):
+	return self.c[label].troveNames(self.fromLabel(label))
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):

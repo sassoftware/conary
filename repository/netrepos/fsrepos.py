@@ -45,6 +45,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	a = self.troveStore.iterTroveNames()
 	return a
 
+    def troveNames(self, label):
+	a = self.troveStore.troveNames(label)
+	return a
+
     def getAllTroveLeafs(self, troveNameList):
 	d = {}
 	for (troveName, troveLeafList) in \

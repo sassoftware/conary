@@ -32,7 +32,7 @@ from local import versiontable
 from netauth import NetworkAuthorization
 from netauth import InsufficientPermission
 
-SERVER_VERSIONS=[6,7,8,9,10]
+SERVER_VERSIONS=[6,7,8,9,10,11]
 CACHE_SCHEMA_VERSION=10
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -97,7 +97,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
-	return [ x for x in self.iterAllTroveNames(authToken, clientVersion) ]
+        return [ x for x in self.repos.iterAllTroveNames() ]
+
+    def troveNames(self, authToken, clientVersion, label):
+        label = self.toLabel(label)
+
+	if not self.auth.check(authToken, write = False, label = label):
+	    raise InsufficientPermission
+
+        return [ x for x in self.repos.troveNames(label) ]
 
     def createBranch(self, authToken, clientVersion, newBranch, kind, 
                      frozenLocation, troveList):
@@ -448,12 +456,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return urlList
         else:
             return urlList, newChgSetList, allFilesNeeded
-
-    def iterAllTroveNames(self, authToken, clientVersion):
-	if not self.auth.check(authToken, write = False):
-	    raise InsufficientPermission
-
-	return self.repos.iterAllTroveNames()
 
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
 	if not self.auth.check(authToken, write = False):
