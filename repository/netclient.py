@@ -135,19 +135,26 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return rc[0]
 
-    def getTroves(self, troveNames):
+    def getTroves(self, troves):
 	chgSetList = []
-	for (name, version, flavor) in troveNames:
+	for (name, version, flavor) in troves:
 	    chgSetList.append((name, flavor, None, version, True))
 	
 	cs = self._getChangeSet(chgSetList, recurse = False, withFiles = False)
 
 	l = []
-	for pkgCs in cs.iterNewPackageList():
-	    p = package.Trove(pkgCs.getName(), pkgCs.getOldVersion(),
-			      pkgCs.getFlavor(), pkgCs.getChangeLog())
-	    p.applyChangeSet(pkgCs)
-	    l.append(p)
+        # walk the list so we can return the troves in the same order
+        for (name, version, flavor) in troves:
+            try:
+                pkgCs = cs.getNewPackageVersion(name, version, flavor)
+            except KeyError:
+                l.append(None)
+                continue
+            
+            t = package.Trove(pkgCs.getName(), pkgCs.getOldVersion(),
+                              pkgCs.getFlavor(), pkgCs.getChangeLog())
+            t.applyChangeSet(pkgCs)
+            l.append(t)
 
 	return l
 
