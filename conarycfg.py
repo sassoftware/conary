@@ -9,7 +9,7 @@ import deps.deps
 import os
 import versions
 
-STRING, BOOL, LABEL, STRINGDICT, STRINGLIST = range(5)
+STRING, BOOL, LABEL, STRINGDICT, STRINGLIST, CALLBACK = range(6)
 
 class ConfigFile:
 
@@ -44,6 +44,8 @@ class ConfigFile:
 	    self.__dict__[key][idx] = val
 	elif type == STRINGLIST:
 	    self.__dict__[key].append(val)
+	elif type == CALLBACK:
+	    self.__dict__[key]('set', key, val)
 	elif type == LABEL:
 	    try:
 		self.__dict__[key] = versions.BranchName(val)
@@ -76,6 +78,8 @@ class ConfigFile:
 		idxs.sort()
 		for idx in idxs:
 		    print "%-25s %-25s %s" % (item, idx, d[idx])
+	    elif t == CALLBACK:
+		self.__dict__[item]('display')
 	    elif t == BOOL:
 		print "%-25s %s" % (item, bool(self.__dict__[item]))
 	    else:

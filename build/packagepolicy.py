@@ -8,6 +8,7 @@ import os
 import policy
 import log
 import stat
+import tags
 import buildpackage
 import filter
 
@@ -329,41 +330,6 @@ class Config(policy.Policy):
 		    _markConfig(self.recipe, file, fullpath)
 
 
-class InitScript(policy.Policy):
-    """
-    Mark initscripts as such so that chkconfig will be run.
-    By default, every file in %(initdir)s is marked as an initscript.
-    """
-    invariantinclusions = [ '%(initdir)s/.[^/]*$' ]
-
-    def _markInitScript(self, filename):
-	log.debug('initscript: %s', filename)
-	self.recipe.autopkg.pathMap[filename].tags.set("initscript")
-
-    def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    self._markInitScript(file)
-
-
-class GconfSchema(policy.Policy):
-    """
-    Mark gconf schema files as such so that gconftool-2 will be run.
-    By default, every file in %(sysconfdir)s/gconf/schemas/ is marked
-    as a gconf schema file.
-    """
-    invariantinclusions = [ '%(sysconfdir)s/gconf/schemas/[^/]*$' ]
-
-    def _markGconfSchema(self, filename):
-	log.debug('gconf schema: %s', filename)
-	self.recipe.autopkg.pathMap[filename].tags.set("gconf2schema")
-
-    def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    self._markGconfSchema(file)
-
-
 class SharedLibrary(policy.Policy):
     """
     Mark system shared libaries as such so that ldconfig will be run.
@@ -389,6 +355,54 @@ class SharedLibrary(policy.Policy):
 	if os.path.isfile(fullpath) and util.isregular(fullpath) and \
 	   self.recipe.magic[file].name == 'ELF':
 	    self._markSharedLibrary(file)
+
+
+class InitScript(policy.Policy):
+    """
+    Mark initscripts as such so that chkconfig will be run.
+    By default, every file in %(initdir)s is marked as an initscript.
+    """
+    invariantinclusions = [ '%(initdir)s/.[^/]*$' ]
+
+    def _markInitScript(self, filename):
+	log.debug('initscript: %s', filename)
+	self.recipe.autopkg.pathMap[filename].tags.set("initscript")
+
+    def doFile(self, file):
+	fullpath = ('%(destdir)s/'+file) %self.macros
+	if os.path.isfile(fullpath) and util.isregular(fullpath):
+	    self._markInitScript(file)
+
+
+class Tags(policy.Policy):
+    """
+    Apply tags defined by tag descriptions in both the current system
+    and %(destdir)s to all the files in %(destdir)s.
+    """
+    def doProcess(self, recipe):
+	self.tagList = []
+	# read the system and %(destdir)s tag databases
+	for directory in (recipe.macros.destdir+'/etc/conary/tags/',
+			  '/etc/conary/tags/'):
+	    if os.path.isdir(directory):
+		for filename in os.listdir(directory):
+		    path = util.joinPaths(directory, filename)
+		    self.tagList.append(tags.TagFile(path, recipe.macros))
+	policy.Policy.doProcess(self, recipe)
+
+    def doFile(self, file):
+	fullpath = self.recipe.macros.destdir+file
+	if not os.path.isfile(fullpath) or not util.isregular(fullpath):
+	    return
+	# XXX need an exception/opt-in system here
+	for tag in self.tagList:
+	    if tag.match(file):
+		if tag.name:
+		    name = tag.name
+		else:
+		    name = tag.tag
+		log.debug('%s: %s', name, file)
+		self.recipe.autopkg.pathMap[file].tags.set(tag.tag)
 
 
 class ParseManifest(policy.Policy):
@@ -725,9 +739,9 @@ def DefaultPolicy():
 	PackageSpec(),
 	EtcConfig(),
 	Config(),
-	InitScript(),
-	GconfSchema(),
 	SharedLibrary(),
+	InitScript(),
+	Tags(),
 	ParseManifest(),
 	MakeDevices(),
 	DanglingSymlinks(),
