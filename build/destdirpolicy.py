@@ -90,7 +90,7 @@ class FixupMultilibPaths(policy.Policy):
 	target = util.joinPaths(targetdir, basename)
 	destdir = self.macros.destdir
 	if os.path.exists(util.joinPaths(destdir, target)):
-	    raise DestdirPolicyError(
+	    self.error( DestdirPolicyError,
 		"Conflicting library files %s and %s installed" %(
 		    path, target))
 	log.warning('Multilib error: file %s found in wrong directory,'
@@ -362,7 +362,7 @@ class NormalizeInitscripts(policy.Policy):
 	basename = os.path.basename(path)
 	target = util.joinPaths(self.macros['initdir'], basename)
 	if os.path.exists(self.macros['destdir'] + os.sep + target):
-	    raise DestdirPolicyError(
+	    self.error(DestdirPolicyError,
 		"Conflicting initscripts %s and %s installed" %(
 		    path, target))
 	util.mkdirChain(self.macros['destdir'] + os.sep +

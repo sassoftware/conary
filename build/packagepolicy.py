@@ -706,7 +706,7 @@ class reportErrors(policy.Policy):
 	if self.warnings:
 	    for warning in self.warnings:
 		log.error(warning)
-	    raise PackagePolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.warnings)
+	    self.error(PackagePolicyError, 'Package Policy errors found:\n%s' %"\n".join(self.warnings))
 
 
 
