@@ -513,7 +513,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     @param srcPkg: Package to generate the change set against
     @type srcPkg: package.Package
     @param newVersion: version to use for the newly created package
-    @type newVersion
+    @type newVersion: versions.NewVersion
     @param root: root directory the files are in (ignored for sources, which
     are assumed to be in the current directory)
     @type root: str
@@ -597,11 +597,11 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 def buildLocalChanges(repos, pkgList, root = "", flags = 0):
     """
-    Builds a change set against a set of files currently installed
-    and builds a package objects which describes the files installed.
-    The return is a changeset and a list of tuples, each with a boolean 
-    saying if anything changed for a package a package reflecting what's
-    in the filesystem for that package.
+    Builds a change set against a set of files currently installed and
+    builds a package object which describes the files installed.  The
+    return is a changeset and a list of tuples, each with a boolean
+    saying if anything changed for a package reflecting what's in the
+    filesystem for that package.
 
     @param repos: Repository this directory is against.
     @type repos: repository.Repository
