@@ -51,15 +51,33 @@ hr {
         </style>
         <script language="javascript">
             function append(selId, inputId) {
-                sel = document.getElementById(selId)
+                sel = document.getElementById(selId);
                 text = document.getElementById(inputId).value;
-                sel.options[sel.length] = new Option(text, text);
-                document.getElementById(inputId).value="";
+                
+                if(text != "") {
+                    sel.options[sel.length] = new Option(text, text);
+                    document.getElementById(inputId).value="";
+                }
             }
 
             function removeSelected(selId) {
                 sel = document.getElementById(selId);
                 sel.remove(sel.selectedIndex);
+            }
+
+            function selectAll(selId) {
+                sel = document.getElementById(selId);
+                for (i=0; i < sel.length; i++) {
+                    sel.options[i].selected = true;
+                }
+            }        
+
+            function updateMetadata() {
+                alert("updating");
+                selectAll('urlList');
+                selectAll('licenseList');
+                selectAll('categoryList');
+                document.getElementById('submitButton').submit();
             }
         </script> 
     </head>
@@ -96,11 +114,15 @@ Choose a branch: %s
         self.writeFn("""<h2>%s</h2>""" % title)
 
     # XXX this is just a placeholder for a real editor
-    def htmlMetadataEditor(self, troveName, branchStr, metadata):
+    def htmlMetadataEditor(self, troveName, branch, metadata):
+        branchStr = branch.asString()
+        branchFrz = branch.freeze()
+    
         self.writeFn("""
 <h2>Metadata for %s</h2>
 <h4>Branch: %s</h4>
 <h4>Metadata version: %s</h4>
+<form method="post" action="updateMetadata">
 <table style="width: 100%%;">
 <tr><td>Short Description:</td><td><input style="width: 50%%;" type="text" name="shortDesc" value="%s" /></td></tr>
 <tr><td>Long Description:</td><td><textarea style="width: 50%%;" name="longDesc" rows="4" cols="60">%s</textarea></td></tr>
@@ -108,26 +130,40 @@ Choose a branch: %s
 <tr><td>Licenses:</td><td>%s<br /> %s</td></tr>
 <tr><td>Categories:</td><td>%s<br />%s</td></tr>
 </table>
+<p><button id="submitButton" onClick="javascript:updateMetadata();">Save Changes</button></p>
+<input type="hidden" name="branch" value="%s" />
+<input type="hidden" name="troveName" value="%s" />
+</form>
 """ %   (troveName, branchStr, metadata["version"].trailingVersion().asString(),
          metadata[MDClass.SHORT_DESC][0],
          metadata[MDClass.LONG_DESC][0],
-         self._genSelect(metadata[MDClass.URL], "urlList", size=4, expand=True),
+         self._genSelect(metadata[MDClass.URL], "urlList", size=4, expand=True, multiple=True),
          self._genSelectAppender("newUrl", "urlList"),
-         self._genSelect(metadata[MDClass.LICENSE], "licenseList", size=4, expand=True),
+         self._genSelect(metadata[MDClass.LICENSE], "licenseList", size=4, expand=True, multiple=True),
          self._genSelectAppender("newLicense", "licenseList"),
-         self._genSelect(metadata[MDClass.CATEGORY], "categoryList", size=4, expand=True),
-         self._genSelectAppender("newCategory", "categoryList")))
+         self._genSelect(metadata[MDClass.CATEGORY], "categoryList", size=4, expand=True, multiple=True),
+         self._genSelectAppender("newCategory", "categoryList"),
+         branchFrz, troveName)
+         )
+
+ 
+    def htmlUpdateSuccessful(self, troveName, branchStr):
+        self.writeFn("""Successfully updated %s's metadata on branch %s.""" 
+            % (troveName, branchStr))
+
 
     def _genSelectAppender(self, name, selectionName):
+        """Generates an input box and add/remove button pair to manage a list of arbitrary
+           items in a selection."""
         inputId = name + "Input"
         s = """
 <input type="text" name="%s" id="%s" />
-<button onClick="javascript:append('%s', '%s');">Add</button>
-<button onClick="javascript:removeSelected('%s');">Remove</button>""" %\
+<input type="button" onClick="javascript:append('%s', '%s');" value="Add" />
+<input type="button" onClick="javascript:removeSelected('%s');" value="Remove" />""" %\
             (name, inputId, selectionName, inputId, selectionName)
         return s
 
-    def _genSelect(self, items, name, default=None, size=1, expand=False):
+    def _genSelect(self, items, name, default=None, size=1, expand=False, multiple=False):
         """Generate a html <select> dropdown or selection list based on a dictionary or a list.
            If 'items' is a dictionary, use the dictionary value as the option value, and display
            the key to the user. If 'items' is a list, use the list item for both."""
@@ -135,7 +171,13 @@ Choose a branch: %s
             style = """width: 50%;"""
         else:
             style = ""
-        s = """<select name="%s" id="%s" size="%d" style="%s">\n""" % (name, name, size, style)
+
+        if multiple:
+            multiple = "multiple"
+        else:
+            multiple = ""
+            
+        s = """<select name="%s" id="%s" %s size="%d" style="%s">\n""" % (name, name, multiple, size, style)
 
         # generate [(data, friendlyName), ...)] from either a list or a dict
         if isinstance(items, list):

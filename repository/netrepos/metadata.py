@@ -70,6 +70,9 @@ class MetadataTable:
                 cu.execute("""
                     INSERT INTO MetadataItems (metadataId, class, data, language)
                     VALUES(?, ?, ?, ?)""", mdId, mdClass, d, language)
+
+        # XXX should I be calling commit here?
+        self.db.commit()
         return mdId
 
     def get(self, itemId, versionId, branchId, language="C"):
@@ -92,7 +95,7 @@ class MetadataTable:
 
         # create a dictionary of metadata classes
         # each key points to a list of metadata items
-        items = {}
+        items = {MDClass.URL: [], MDClass.LICENSE: [], MDClass.CATEGORY: []}
         for mdClass, data in cu:
             if not items.has_key(mdClass):
                 items[mdClass] = []

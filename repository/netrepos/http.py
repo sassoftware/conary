@@ -23,7 +23,8 @@ class HttpHandler(HtmlEngine):
         self.commands = {
                          "metadata":            (self.metadataCmd, "View Metadata"),
                          "chooseBranch":        (self.chooseBranchCmd, "View Metadata"),
-                         "getMetadata":         (self.getMetadataCmd, "View Metadata")
+                         "getMetadata":         (self.getMetadataCmd, "View Metadata"),
+                         "updateMetadata":      (self.updateMetadataCmd, "Metadata Updated"),
                         }
         
     def handleCmd(self, writeFn, cmd, authToken=None, fields=None):
@@ -63,7 +64,7 @@ class HttpHandler(HtmlEngine):
             branches[branchName] = branch
 
         if len(branches) == 1:
-            self._getMetadataCmd(troveName, branches.values()[0])
+            self._getMetadata(troveName, branches.values()[0])
             return
 
         self.htmlPageTitle("Please choose a branch:")
@@ -73,14 +74,30 @@ class HttpHandler(HtmlEngine):
         troveName = fields['troveName'].value
         branch = fields['branch'].value
 
-        self._getMetadataCmd(troveName, branch)
+        self._getMetadata(troveName, branch)
 
-    def _getMetadataCmd(self, troveName, branch):
+    def _getMetadata(self, troveName, branch):
         branch = self.repServer.thawVersion(branch)
         md = self.troveStore.getMetadata(troveName, branch)
 
-        self.htmlMetadataEditor(troveName, branch.asString(), md)
+        self.htmlMetadataEditor(troveName, branch, md)
 
+    def updateMetadataCmd(self, authToken, fields):
+        branch = self.repServer.thawVersion(fields["branch"].value)
+        troveName = fields["troveName"].value
+
+        self.troveStore.updateMetadata(troveName, branch,
+            fields["shortDesc"].value,
+            fields["longDesc"].value,
+            fields.getlist("urlList"),
+            fields.getlist("licenseList"),
+            fields.getlist("categoryList"),
+            "C"
+        )
+
+        self.htmlPageTitle("Update Successful")
+        self.htmlUpdateSuccessful(troveName, branch.asString())
+        
     def invalidCmd(self, authToken, fields):
         # XXX this is a fake server error, we should raise an exception
         # and handle it upstream instead of calling this
