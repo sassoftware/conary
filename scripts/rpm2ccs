@@ -574,7 +574,7 @@ def main(argv):
     checkin.addFiles((recipe.name(),), ignoreExisting=True)
     util.copyfile(rpmname,
                   util.joinPaths(packagedir, os.path.basename(rpmname)))
-    checkin.addFiles((rpmname,), ignoreExisting=True)
+    checkin.addFiles((os.path.basename(rpmname),), ignoreExisting=True)
 
 
     if create == RECIPE:
