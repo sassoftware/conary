@@ -64,12 +64,12 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
                         (troveName, "\n\t".join(str(depSet).split("\n")))
             return
         elif not cfg.autoResolve and suggMap:
-            print "Additional packages are needed for the install"
+            print "Additional troves are needed for the install"
             for (req, suggList) in suggMap.iteritems():
                 print "    %s -> %s" % (req, " ".join([x[0] for x in suggList]))
             return
         elif suggMap:
-            print "Installing extra packages for dependency resolution"
+            print "Installing extra troves for dependency resolution"
             print "    %s" % " ".join(suggMap.iterkeys())
 
         client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,
