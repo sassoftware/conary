@@ -29,6 +29,9 @@ def flags_i686():
 
     return deps.Dependency('x86')
 
+def flags_mips64():
+    return deps.Dependency('mipseb', [ 'mips64' ])
+
 def current():
     return currentArch
 
