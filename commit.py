@@ -3,9 +3,6 @@
 # All rights reserved
 #
 import package
-import files
-import shutil
-import string
 import copy
 
 # version is a short package version, not an SRS version string
