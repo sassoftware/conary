@@ -113,10 +113,10 @@ elif (otherArgs[1] == "changeset"):
 	(old, new) = (None, otherArgs[3])
 	outFile = otherArgs[4]
 
-    repos = repository.Repository(cfg.reppath, "w")
+    repos = repository.Repository(cfg.reppath, "c")
     changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
 elif (otherArgs[1] == "commit"):
-    repos = repository.Repository(cfg.reppath, "w")
+    repos = repository.Repository(cfg.reppath, "c")
     for changeSet in otherArgs[2:]:
 	commit.doCommit(repos, cfg, changeSet)
 elif (otherArgs[1] == "cook"):
