@@ -32,19 +32,29 @@ class HttpHandler(HtmlEngine):
         self.repServer = repServer
         self.troveStore = repServer.repos.troveStore
         
-        # "command name": (command handler, page title, (requires auth, requires write access, requires superuser))
+        # "command name": (command handler, page title, 
+        #       (requires auth, requires write access, requires superuser))
         self.commands = {
                          # metadata commands
-                         "":                    (self.mainpage, "Conary Repository",         (True, True, False)),
-                         "metadata":            (self.metadataCmd, "View Metadata",          (True, True, False)),
-                         "chooseBranch":        (self.chooseBranchCmd, "View Metadata",      (True, True, False)),
-                         "getMetadata":         (self.getMetadataCmd, "View Metadata",       (True, True, False)),
-                         "updateMetadata":      (self.updateMetadataCmd, "Metadata Updated", (True, True, False)),
-                         # user administration commands
-                         "userlist":            (self.userlistCmd, "User Administration",    (True, True, True)),
-                         "addUserForm":         (self.addUserFormCmd, "Add User",            (True, True, True)),
-                         "addUser":             (self.addUserCmd, "Add User",                (True, True, True)),
-                         "test":                (self.test, "Testing",                       (True, True, False)),
+             "":               (self.mainpage, "Conary Repository",         
+                               (True, True, False)),
+             "metadata":       (self.metadataCmd, "View Metadata",          
+                               (True, True, False)),
+             "chooseBranch":   (self.chooseBranchCmd, "View Metadata",      
+                               (True, True, False)),
+             "getMetadata":    (self.getMetadataCmd, "View Metadata",       
+                               (True, True, False)),
+             "updateMetadata": (self.updateMetadataCmd, "Metadata Updated", 
+                               (True, True, False)),
+             # user administration commands
+             "userlist":       (self.userlistCmd, "User Administration",    
+                               (True, True, True)),
+             "addUserForm":    (self.addUserFormCmd, "Add User",            
+                               (True, True, True)),
+             "addUser":        (self.addUserCmd, "Add User",                
+                               (True, True, True)),
+             "test":           (self.test, "Testing",                       
+                               (True, True, False)),
                         }
 
     def requiresAuth(self, cmd):

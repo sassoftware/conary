@@ -140,6 +140,13 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 os.unlink(items[0][0])
 
     def do_POST(self):
+        if self.headers.get('Content-Type', '') == 'text/xml':
+            authToken = self.getAuth()
+            if authToken is None:
+                return
+            
+            return self.handleXml(authToken)
+
         cmd = os.path.basename(self.path)
         if httpHandler.requiresAuth(cmd):
             authToken = self.checkAuth()
@@ -147,9 +154,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 return
         else:
             authToken = (None, None)
-            
-        if self.headers.get('Content-Type', '') == 'text/xml':
-            return self.handleXml(authToken)
+
         try: 
             self.send_response(200)
             self.send_header("Content-type", "text/html")
@@ -159,28 +164,35 @@ class HttpRequests(SimpleHTTPRequestHandler):
             httpHandler.handleCmd(self.wfile.write, cmd, authToken, c)
         except:
             self.traceback()
+
+    def getAuth(self):
+        info = self.headers.get('Authorization', None)
+        if info is None:
+            return (None, None)
+        info = info.split()
+
+        try:
+            authString = base64.decodestring(info[1])
+        except:
+            self.send_response(400)
+            return None
+
+        if authString.count(":") != 1:
+            self.send_response(400)
+            return None
+            
+        authToken = authString.split(":")
+
+        return authToken
     
     def checkAuth(self):
  	if not self.headers.has_key('Authorization'):
             self.requestAuth()
             return None
 	else:
-	    info = self.headers['Authorization'].split()
-	    if len(info) != 2 or info[0] != "Basic":
-		self.send_response(400)
-		return None
-    
-	    try:
-		authString = base64.decodestring(info[1])
-	    except:
-		self.send_response(400)
-		return None
-
-	    if authString.count(":") != 1:
-		self.send_response(400)
-		return None
-		
-	    authToken = authString.split(":")
+            authToken = self.getAuth()
+            if authToken is None:
+                return
             
             # verify that the user/password actually exists in the database
             if not netRepos.auth.checkUserPass(authToken):

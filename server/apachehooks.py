@@ -38,23 +38,33 @@ class ServerConfig(conarycfg.ConfigFile):
         'cacheChangeSets'   :  [ conarycfg.BOOLEAN, False ],
     }
 
+def getAuth(req, repos):
+    if not 'Authorization' in req.headers_in:
+        return (None, None)
+
+    info = req.headers_in['Authorization'].split()
+    if len(info) != 2 or info[0] != "Basic":
+        return apache.HTTP_BAD_REQUEST
+
+    try:
+        authString = base64.decodestring(info[1])
+    except:
+        return apache.HTTP_BAD_REQUEST
+
+    if authString.count(":") != 1:
+        return apache.HTTP_BAD_REQUEST
+        
+    authToken = authString.split(":")
+
+    return authToken
+
 def checkAuth(req, repos):
     if not req.headers_in.has_key('Authorization'):
         return None
     else:
-	info = req.headers_in['Authorization'].split()
-	if len(info) != 2 or info[0] != "Basic":
-	    return apache.HTTP_BAD_REQUEST
-
-	try:
-	    authString = base64.decodestring(info[1])
-	except:
-	    return apache.HTTP_BAD_REQUEST
-
-	if authString.count(":") != 1:
-	    return apache.HTTP_BAD_REQUEST
-	    
-	authToken = authString.split(":")
+        authToken = self.getAuth()
+        if type(authToken) != tuple:
+            return authToken
 
         if not repos.auth.checkUserPass(authToken):
             return None
@@ -62,16 +72,11 @@ def checkAuth(req, repos):
     return authToken
 
 def post(repos, httpHandler, req):
-    cmd = os.path.basename(req.uri)
-    if httpHandler.requiresAuth(cmd):
-        authToken = checkAuth(req, repos)
-        if not authToken:
-            req.err_headers_out['WWW-Authenticate'] = 'Basic realm="Conary Repository"'
-            return apache.HTTP_UNAUTHORIZED
-    else:
-        authToken = (None, None)
-    
     if req.headers_in['Content-Type'] == "text/xml":
+        authToken = getAuth(req, repos)
+        if type(authToken) is int:
+            return authToken
+
         (params, method) = xmlrpclib.loads(req.read())
 
         try:
@@ -87,6 +92,16 @@ def post(repos, httpHandler, req):
             resp = zlib.compress(resp, 5)
         req.write(resp) 
     else:
+        cmd = os.path.basename(req.uri)
+        if httpHandler.requiresAuth(cmd):
+            authToken = checkAuth(req, repos)
+            if type(authToken) is int or authToken is None or authToken[0] is None:
+                req.err_headers_out['WWW-Authenticate'] = \
+                                    'Basic realm="Conary Repository"'
+                return apache.HTTP_UNAUTHORIZED
+        else:
+            authToken = (None, None)
+    
         req.content_type = "text/html"
         try:
             httpHandler.handleCmd(req.write, cmd, authToken,
