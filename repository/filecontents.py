@@ -114,7 +114,7 @@ class WithFailedHunks(FileContents):
     __slots__ = ( "fc", "hunks" )
 
     def copy(self):
-        return self.__class__(fc, hunks)
+        return self.__class__(self.fc, self.hunks)
 
     def get(self):
 	return self.fc.get()
