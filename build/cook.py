@@ -20,6 +20,7 @@ from build import lookaside
 import os
 import package
 import repository
+import resource
 import sha1helper
 import signal
 import sys
@@ -441,6 +442,8 @@ def cookCommand(cfg, args, prep, macros):
             os.tcsetpgrp(0, os.getpgrp())
 	    # make sure we do not accidentally make files group-writeable
 	    os.umask(0022)
+	    # and if we do not create core files we will not package them
+	    resource.setrlimit(resource.RLIMIT_CORE, (0,0))
 	    repos = fsrepos.FilesystemRepository(cfg.reppath, "r")
             try:
                 built = cookItem(repos, cfg, item, prep=prep, macros=macros)
