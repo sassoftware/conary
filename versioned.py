@@ -153,7 +153,7 @@ class VersionedFile:
 
 	self.writeVersionMap()
 	self.writeBranchMap()
-	self.db.sync()
+	#self.db.sync()
 
     def eraseVersion(self, version):
 	self.readVersionMap()
@@ -162,7 +162,7 @@ class VersionedFile:
 	del self.db[_CONTENTS % (self.key, versionStr)]
 	del self.versionMap[versionStr]
 	self.writeVersionMap()
-	self.db.sync()
+	#self.db.sync()
 
     def hasVersion(self, version):
 	self.readVersionMap()
@@ -213,7 +213,7 @@ class FileIndexedDatabase(Database):
     def writeMap(self):
 	map = string.join(self.files.keys(), '\n')
 	self.db[_FILE_MAP] = map
-	self.db.sync()
+	#self.db.sync()
 
     def fileList(self):
 	return self.files.keys()
