@@ -32,7 +32,9 @@ The file format is::
   total # of bytes in file tables
 
 Each file table entry looks like::
-  length of entry (4 bytes), not including these 4 bytes
+
+  lengt
+  of entry (4 bytes), not including these 4 bytes
   length of file name (4 bytes)
   file name 
   file offset (4 bytes)
@@ -45,55 +47,45 @@ This could, and probably should, be reimplemented using tar as the
 underlying format and the file table stored as a magic file at the end.
 """
 
-import struct
+import gzip
 import os
+import string
+import struct
 import sys
 import types
-import string
+import util
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
 SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
 
-# this file doesn't let itself get closed until it's ref count goes
-# to zero; normal files don't do this, and we don't want our FileIsh
-# objects to disappear when the FileContainer does. This only bothers
-# with the methods we happen to care about here.
-class PersistentFile:
-
-    def close(self):
-	# ho-hum
-	pass
-
-    def seek(self, pos, whence = SEEK_SET):
-	return self.f.seek(pos, whence)
-
-    def __del__(self):
-	self.f.close()
-
-    def read(self, bytes = -1):
-	return self.f.read(bytes)
-
-    def __init__(self, f):
-	self.f = f
-
 class FileTableEntry:
 
     def write(self, file):
-	rc = struct.pack("!i", len(self.name)) + self.name
-        rc += struct.pack("!i", self.offset)
-        rc += struct.pack("!i", self.size)
-	rc += struct.pack("!i", len(self.data)) + self.data
-	l = len(rc)
-	rc = struct.pack("!i", l) + rc
+	rc = (struct.pack("!i", len(self.name)) + self.name +
+	      struct.pack("!i", self.offset) +
+	      struct.pack("!i", self.size) +
+	      struct.pack("!i", len(self.data)) + self.data)
+	rc = struct.pack("!i", len(rc)) + rc
+	assert(len(rc) == self.tableSize())
 	return file.write(rc)
 
-    def __init__(self, name, offset, size, data):
+    def tableSize(self):
+	return len(self.name) + len(self.data) + 20 
+
+    def setOffset(self, new):
+	self.offset = new
+
+    def writeContents(self, dest):
+	util.copyfileobj(self.src, dest)
+
+    def __init__(self, name, offset, size, data, src):
 	self.offset = offset
 	self.size = size
 	self.name = name
 	self.data = data
+	self.src = src
 
 class FileTableEntryFromFile(FileTableEntry):
 
@@ -125,35 +117,15 @@ class FileTableEntryFromFile(FileTableEntry):
 class FileContainerFile:
 
     def close(self):
-	del self.file
-
-    def seek(self, count, whence = SEEK_SET):
-	if whence == SEEK_SET:
-	    self.pos = self.beginning + count
-	elif whence == SEEK_CUR:
-	    self.pos = self.pos + count
-	elif whence == SEEK_END:
-	    self.pos = self.end + count
-	else:
-	    raise IOError, "invalid whence for seek"
-
-	if self.pos < self.beginning:
-	    self.pos = self.beginning
-	elif self.pos > self.end:
-	    self.pos = self.end
-
-    def tell(self):
-        return self.pos - self.beginning
+	pass
 
     def read(self, bytes = -1):
 	if bytes < 0 or (self.end - self.pos) <= bytes:
 	    # return the rest of the file
 	    count = self.end - self.pos
-	    self.file.seek(self.pos)
 	    self.pos = self.end
 	    return self.file.read(count)
 	else:
-	    self.file.seek(self.pos)
 	    self.pos = self.pos + bytes
 	    return self.file.read(bytes)
 
@@ -165,133 +137,94 @@ class FileContainerFile:
 	for item in list[:-1]:
 	    list2.append(item + "\n")
 	return list2
-	    
-    def __init__(self, file, offset, size):
+
+    def __init__(self, file, size):
 	self.file = file
-	self.beginning = offset
 	self.size = size
-	self.end = self.beginning + self.size
-	self.pos = self.beginning
+	self.end = self.size
+	self.pos = 0
 
 class FileContainer:
 
-    # only called when self.file refers to an empty file
-    def initializeTable(self):
-	rc = FILE_CONTAINER_MAGIC
-
-	# length of the table, in bytes
-	rc = rc + struct.pack("!ii", 0, 0)
-
-	self.file.write(rc)
-	self.file.flush()
-	self.tableOffset = 4
-
     def readTable(self):
-	# seeks 4 bytes from the end of the file where the length
-	# of the table is stored
-	self.file.seek(-8, SEEK_END)
-	tableLen = self.file.read(8)
+	magic = self.file.read(4)
+	if len(magic) != 4 or magic != FILE_CONTAINER_MAGIC:
+	    raise KeyError, "bad file container magic"
+
+	self.gzfile = gzip.GzipFile(None, "rb", None, self.file)
+
+	tableLen = self.gzfile.read(8)
 	(tableLen, entryCount) = struct.unpack("!ii", tableLen)
 
-	# seek to the start of the file table
-	self.file.seek(-8 - tableLen, SEEK_END)
-	self.tableOffset = self.file.tell()
 	while (entryCount):
-	    entry = FileTableEntryFromFile(self.file)
+	    entry = FileTableEntryFromFile(self.gzfile)
 	    self.entries[entry.name] = entry
 	    entryCount = entryCount - 1
 
-    def cork(self):
-        # prevents file table entries from being written until uncork()
-        # is called
-        self.corked = True
+	self.contentsStart = self.gzfile.tell()
 
-    def uncork(self):
-        # writes out the file table and allows file table entries to
-        # be written again
-        self.corked = False
-        self.writeTable()
+    def close(self):
+	if not self.mutable:
+	    self.file = None
+	    return
 
-    def writeTable(self, newEntry = None):
-	# writes out the table of contents at the current
-	# position in the file (which should be the end!), including
-	# newEntry if it's defined
-	#
-	# this should be used carefully w/ a proper try/finally outside
-	# of the invocation to prevent corruption
-	pos = self.file.tell()
-        if self.corked:
-            self.tableOffset = pos
-            return
-	for entry in self.entries.values():
-	    entry.write(self.file)
-	count = len(self.entries.keys())
-	if newEntry:
-	    newEntry.write(self.file)
-	    count = count + 1
-	newpos = self.file.tell()
-	size = newpos - pos
-        rc = struct.pack("!ii", size, count)
-	self.file.write(rc)
-	self.file.flush()
-	self.tableOffset = pos
-    
-    # adds a new file to the container
-    # if data is a string, it's used as the data for the file
-    # if it's not a string, it should be a file and the entire
-    # contents of that file are copied into the container 
-    def addFile(self, fileName, data, tableData):
-	try:
-	    self.file.seek(self.tableOffset)
-	    size = 0
-	    if type(data) == types.StringType:
-		self.file.write(data)
-		size = len(data)
-	    else:
-		buf = data.read(1024 * 64)
-		while len(buf):
-		    size = size + len(buf)
-		    self.file.write(buf)
-		    buf = data.read(1024 * 64)
-
-	    entry = FileTableEntry(fileName, self.tableOffset, size, tableData)
-
-	    self.writeTable(entry)
-	    self.entries[fileName] = entry
-	except:
-	    # if something went wrong revert the change
-	    self.file.seek(self.tableOffset)
-	    self.writeTable()
-	    self.file.truncate()
-
-	    e = sys.exc_info()
-	    raise e[0], e[1], e[2]
-
-
-    def delFile(self, fileName):
-	# Erases the file named fileName from the container if it's the
-	# last file. if it's not, an exception is generated. There is no
-	# way to know what the last file in the container is; this is meant
-	# solely to allow changes to be reverted if other parts of a
-	# transaction fail
-	offset = self.entries[fileName].offset
-	size = self.entries[fileName].size
-	if (offset + size) != self.tableOffset:
-	    raise IOError, "only the last file may be removed"
-
-	self.file.seek(offset)
-	del self.entries[fileName]
-	self.writeTable()
+	self.file.seek(SEEK_SET, 0)
 	self.file.truncate()
+	self.file.write(FILE_CONTAINER_MAGIC)
+
+	rest = gzip.GzipFile(None, "wb", 9, self.file)
+
+	count = len(self.entries.keys())
+
+	size = 0
+	offset = 0			# relative to the end of the table
+	for name in self.order:
+	    entry = self.entries[name]
+	    entry.setOffset(offset)
+	    size = entry.tableSize()
+	    offset += entry.size
+
+        rest.write(struct.pack("!ii", size, count))
+
+	for name in self.order:
+	    entry = self.entries[name]
+	    entry.write(rest)
+
+	for name in self.order:
+	    entry = self.entries[name]
+	    entry.writeContents(rest)
+
+	rest.close()
+	self.file = None
+    
+    def addFile(self, fileName, fileObj, tableData, fileSize):
+	assert(self.mutable)
+	entry = FileTableEntry(fileName, -1, fileSize, tableData, fileObj)
+	self.entries[fileName] = entry
+	self.order.append(fileName)
 
     def getFile(self, fileName):
 	# returns a file-ish object for accessing a member of the
 	# container in read-only mode. the object provides a very
 	# small number of functions
+	assert(not self.mutable)
+
 	if not self.entries.has_key(fileName):
 	    raise KeyError, ("file %s is not in the collection") % fileName
+
 	entry = self.entries[fileName]
-	return FileContainerFile(self.persist, entry.offset, entry.size)
+
+	pos = self.gzfile.tell()
+	offset = entry.offset + self.contentsStart
+	if (pos != offset):
+	    assert(pos < offset)
+	    self.gzfile.seek(offset)	    # this is always SEEK_SET
+	    assert(self.gzfile.tell() == offset)
+
+	return FileContainerFile(self.gzfile, entry.size)
+
+    def getSize(self, fileName):
+	return self.entries[fileName].size
 
     def getTag(self, fileName):
 	if not self.entries.has_key(fileName):
@@ -301,19 +234,6 @@ class FileContainer:
     def hasFile(self, hash):
 	return self.entries.has_key(hash)
 
-    def updateTag(self, fileName, newTag):
-	if not self.entries.has_key(fileName):
-	    raise KeyError, ("file %s is not in the collection") % fileName
-	self.entries[fileName].data = newTag
-	self.writeTable()
-	
-    # existing file objects coninue to work
-    def close(self):
-	# we don't close the file; we let the destructor of self.persist
-	# do that for us
-	self.file = None
-	del self.persist
-
     def __del__(self):
 	if self.file:
 	    self.close()
@@ -321,28 +241,30 @@ class FileContainer:
     def fileList(self):
 	return self.entries.keys()
 
+    def iterFileList(self):
+	return self.entries.iterkeys()
+
     # file is a python file object which refers to the file container
     # if that file is empty (size 0) the file container is immediately
     # initialized. we make our own copy of the file so the caller can
     # close it if they like
     def __init__(self, file):
-        self.corked = False
 	# make our own copy of this file which nobody can close underneath us
 	self.file = os.fdopen(os.dup(file.fileno()), file.mode)
-	# this keeps us from closing the file
-	self.persist = PersistentFile(self.file)
 
 	self.file.seek(0, SEEK_END)
 	self.entries = {}
 	if not self.file.tell():
-	    self.initializeTable()
+	    self.order = []
+	    self.mutable = True
 	else:
-	    # check the magic
-	    self.file.seek(0)
-	    magic = self.file.read(4)
-	    if magic != FILE_CONTAINER_MAGIC:
+	    self.file.seek(0, SEEK_SET)
+	    try:
+		self.readTable()
+	    except:
 		self.file.close()
-		raise KeyError, "bad file container magic"
-	    self.readTable()
+		self.file = None
+		raise
+	    self.mutable = False
 	
 

@@ -38,8 +38,9 @@ class FilesystemJob:
     def _rename(self, oldPath, newPath, msg):
 	self.renames.append((oldPath, newPath, msg))
 
-    def _restore(self, fileObj, target, contents, msg):
-	self.restores.append((fileObj, target, contents, msg))
+    def _restore(self, fileObj, target, msg, contentsOverride = ""):
+	self.restores.append((fileObj.id(), fileObj, target, contentsOverride, 
+			      msg))
 	self.runLdconfig = self.runLdconfig | fileObj.isShLib()
 	if fileObj.isInitScript() and not os.path.exists(target):
 	    self.initScripts.append(target)
@@ -55,7 +56,16 @@ class FilesystemJob:
 	    os.rename(oldPath, newPath)
 	    log.debug(msg)
 
-	for (fileObj, target, contents, msg) in self.restores:
+	contents = None
+	# restore in the same order files appear in the change set
+	self.restores.sort()
+	for (fileId, fileObj, target, override, msg) in self.restores:
+	    # None means "don't restore contents"; "" means "take the
+	    # contents from the change set"
+	    if override != "":
+		contents = override
+	    elif fileObj.hasContents:
+		contents = self.changeSet.getFileContents(fileId)[1]
 	    fileObj.restore(contents, target, contents != None)
 	    log.debug(msg)
 
@@ -182,12 +192,7 @@ class FilesystemJob:
                 # the path doesn't exist, carry on with the restore
                 pass
 
-	    if headFile.hasContents:
-		headFileContents = changeSet.getFileContents(fileId)[1]
-	    else:
-		headFileContents = None
-	    self._restore(headFile, headRealPath, headFileContents,
-	                  "creating %s" % headRealPath)
+	    self._restore(headFile, headRealPath, "creating %s" % headRealPath)
 
 	    fsPkg.addFile(fileId, headPath, headFileVersion)
 
@@ -326,10 +331,9 @@ class FilesystemJob:
 		if (headFile.hasContents
                     and (not baseFile.hasContents
                          or headFile.sha1() != baseFile.sha1())):
-		    (headFileContType, headFileContents) = \
-			    changeSet.getFileContents(fileId)
+		    headFileContType = changeSet.getFileContentsType(fileId)
 		else:
-		    headFileContents = None
+		    headFileContType = None
 
 		if (flags & REPLACEFILES) or (not flags & MERGE) or \
 				fsFile.same(baseFile, ignoreOwner = True):
@@ -338,15 +342,22 @@ class FilesystemJob:
 		    if headFileContType == changeset.ChangedFileTypes.diff:
 			baseLines = repos.pullFileContentsObject(
 						baseFile.sha1()).readlines()
+			headFileContents = changeSet.getFileContents(fileId)[1]
 			diff = headFileContents.get().readlines()
 			(newLines, failedHunks) = patch.patch(baseLines, diff)
 			assert(not failedHunks)
 			headFileContents = \
 			    filecontents.FromString("".join(newLines))
 
-		    self._restore(fsFile, realPath, headFileContents,
-                                  "replacing %s with contents "
-                                  "from repository" % realPath)
+			self._restore(fsFile, realPath, 
+				      "replacing %s with contents "
+				      "from repository" % realPath,
+				      contentsOverride = headFileContents)
+		    else:
+			self._restore(fsFile, realPath, 
+				      "replacing %s with contents "
+				      "from repository" % realPath)
+
 		    beenRestored = True
 		elif headFile.same(baseFile, ignoreOwner = True):
 		    # it changed in just the filesystem, so leave that change
@@ -361,13 +372,15 @@ class FilesystemJob:
 			contentsOkay = 0
 		    else:
 			cur = open(realPath, "r").readlines()
+			headFileContents = changeSet.getFileContents(fileId)[1]
 			diff = headFileContents.get().readlines()
 			(newLines, failedHunks) = patch.patch(cur, diff)
 
 			cont = filecontents.FromString("".join(newLines))
-			self._restore(fsFile, realPath, cont,
+			self._restore(fsFile, realPath, 
 			      "merging changes from repository into %s" % 
-			      realPath)
+			      realPath,
+			      contentsOverride = cont)
 			beenRestored = True
 
 			if failedHunks:
@@ -387,9 +400,9 @@ class FilesystemJob:
 		self.mustRunLdconfig()
 
 	    if attributesChanged and not beenRestored:
-		self._restore(fsFile, realPath, None,
-		      "merging changes from repository into %s" % 
-		      realPath)
+		self._restore(fsFile, realPath, 
+		      "merging changes from repository into %s" % realPath,
+		      contentsOverride = None)
 
 	    if pathOkay and contentsOkay:
 		# XXX this doesn't even attempt to merge file permissions
@@ -434,6 +447,7 @@ class FilesystemJob:
 	self.runLdconfig = False
 	self.root = root
 	self.initScripts = []
+	self.changeSet = changeSet
 
 	for pkgCs in changeSet.getNewPackageList():
 	    # skip over empty change sets
@@ -524,7 +538,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
 		newCont = filecontents.FromFilesystem(realPath)
 		changeSet.addFileContents(fileId,
 					  changeset.ChangedFileTypes.file,
-					  newCont)
+					  newCont, f.isConfig())
 	    continue
 
 	oldVersion = srcPkg.getFile(fileId)[1]	
@@ -540,7 +554,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
 		(contType, cont) = changeset.fileContentsDiff(oldFile, oldCont,
                                                               f, newCont)
 						
-		changeSet.addFileContents(fileId, contType, cont)
+		changeSet.addFileContents(fileId, contType, cont, f.isConfig())
 
     (csPkg, filesNeeded, pkgsNeeded) = newPkg.diff(srcPkg)
     assert(not pkgsNeeded)

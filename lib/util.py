@@ -279,7 +279,14 @@ def copyfile(sources, dest):
 	shutil.copy2(source, dest)
 
 def copyfileobj(source, dest):
-    shutil.copyfileobj(source, dest, 128 * 1024)
+    total = 0
+    buf = source.read(128 * 1024)
+    while buf:
+	total += len(buf)
+	dest.write(buf)
+	buf = source.read(128 * 1024)
+
+    return total
 
 def rename(sources, dest):
     for source in braceGlob(sources):

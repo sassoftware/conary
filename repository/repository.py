@@ -96,7 +96,8 @@ class Repository:
 	file = fileDB.getVersion(version)
 	if withContents:
 	    if file.hasContents:
-		cont = filecontents.FromRepository(self, file.sha1())
+		cont = filecontents.FromRepository(self, file.sha1(), 
+						   file.size())
 	    else:
 		cont = None
 
@@ -142,7 +143,6 @@ class LocalRepository(Repository):
 		# if targetFile is None the file is already in the store
 		if targetFile:
 		    util.copyfileobj(f, targetFile)
-		    f.seek(0)
 		    targetFile.close()
 	    else:
 		# the file doesn't have any contents, so it must exist
@@ -372,7 +372,8 @@ class LocalRepository(Repository):
 		if hash:
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
-		    cs.addFileContents(fileId, contType, cont)
+		    cs.addFileContents(fileId, contType, cont, 
+				       newFile.isConfig())
 
 	return cs
 
@@ -497,14 +498,22 @@ class ChangeSetJobFile:
 	return copy.deepcopy(self)
 
     def getContents(self):
-	return self.fileContents
+	if self.fileContents == "":
+	    return None
+	elif self.fileContents:
+	    return self.fileContents
+	
+	return self.changeSet.getFileContents(self.theFileId)[1]
 
-    def __init__(self, fileId, file, version, path, fileContents,
-		 restoreContents):
+    # overrideContents = None means use contents from changeset
+    # overrideContents = "" means there are no contents
+    def __init__(self, changeSet, fileId, file, version, path, 
+		 overrideContents, restoreContents):
 	self.theVersion = version
 	self.theFile = file
 	self.theRestoreContents = restoreContents
-	self.fileContents = fileContents
+	self.fileContents = overrideContents
+	self.changeSet = changeSet
 	self.thePath = path
 	self.theFileId = fileId
 
@@ -563,9 +572,13 @@ class ChangeSetJob:
 	    self.repos.addPackage(newPkg)
 	    undo.addedPackage(newPkg)
 
-	for newFile in self.newFileList():
+	# we need to do this in order of fileids to make sure we walk
+	# through change set streams in the right order
+	fileIds = self.files.keys()
+	fileIds.sort()
+	for fileId in fileIds:
+	    newFile = self.files[fileId]
 	    file = newFile.file()
-	    fileId = newFile.fileId()
 
 	    if not self.repos.hasFileVersion(fileId, newFile.version()):
 		self.repos.addFileVersion(fileId, newFile.version(), file)
@@ -644,8 +657,10 @@ class ChangeSetJob:
 	    assert(newVer.equal(fileMap[fileId][1]))
 
 	    if file.hasContents and restoreContents:
-		(contType, fileContents) = cs.getFileContents(fileId)
+		fileContents = None
+		contType = cs.getFileContentsType(fileId)
 		if contType == changeset.ChangedFileTypes.diff:
+		    (contType, fileContents) = cs.getFileContents(fileId)
 		    # the content for this file is in the form of a diff,
 		    # which we need to apply against the file in the repository
 		    assert(oldVer)
@@ -659,10 +674,12 @@ class ChangeSetJob:
 			fileContents = filecontents.WithFailedHunks(
 					    fileContents, failedHunks)
 	    else:
-		fileContents = None
+		# this means there are no contents to restore (None
+		# means get the contents from the change set)
+		fileContents = ""
 
 	    path = fileMap[fileId][0]
-	    self.addFile(ChangeSetJobFile(fileId, file, newVer, path, 
+	    self.addFile(ChangeSetJobFile(cs, fileId, file, newVer, path, 
 					  fileContents, restoreContents))
 
 	for (pkgName, version) in cs.getOldPackageList():

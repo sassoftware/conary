@@ -26,7 +26,6 @@ The versions are expected to be Version objects as defined by the versions
 module.
 """
 
-from filecontainer import FileContainer
 import __builtin__
 import time
 import string

@@ -531,7 +531,9 @@ class PackageChangeSet:
 		    self.newPackageVersion(name, v)
 		else: # op == "-"
 		    self.oldPackageVersion(name, v)
-
+	
+	# this makes our order match the order in the changeset
+	self.changedFiles.sort()
 
     def formatToFile(self, changeSet, cfg, f):
 	f.write("%s " % self.name)

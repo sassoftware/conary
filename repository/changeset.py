@@ -15,6 +15,7 @@ import package
 import patch
 import repository
 import update
+import versioned
 import versions
 
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff")
@@ -89,14 +90,24 @@ class ChangeSet:
     def getOldPackageList(self):
 	return self.oldPackages
 
-    def addFileContents(self, fileId, contType, contents):
-	self.fileContents[fileId] = (contType, contents)
+    def addFileContents(self, fileId, contType, contents, sortEarly):
+	if sortEarly:
+	    self.earlyFileContents[fileId] = (contType, contents)
+	else:
+	    self.lateFileContents[fileId] = (contType, contents)
 
     def getFileContents(self, fileId):
-	return self.fileContents[fileId]
+	if self.lateFileContents.has_key(fileId):
+	    return self.lateFileContents[fileId]
+
+	return self.earlyFileContents[fileId]
+
+    def getFileContentsType(self, fileId):
+	return self.getFileContents(fileId)[0]
 
     def hasFileContents(self, hash):
-	return self.fileContents.has_key(hash)
+	return self.earlyFileContents.has_key(hash) or \
+	        self.lateFileContents.has_key(hash)
 
     def addFile(self, fileId, oldVersion, newVersion, csInfo):
 	assert(not oldVersion or oldVersion.timeStamp)
@@ -110,6 +121,9 @@ class ChangeSet:
 
     def getFileList(self):
 	return self.files.items()
+
+    def getFile(self, fileId):
+	return self.files[fileId]
 
     def hasFile(self, fileId):
 	return self.files.has_key(fileId)
@@ -160,18 +174,32 @@ class ChangeSet:
 	
 	return "".join(rc)
 
+    def writeContents(self, csf, contents, early):
+	# these are kept sorted so we know which one comes next
+	idList = contents.keys()
+	idList.sort()
+
+	if early:
+	    tag = "1 "
+	else:
+	    tag = "0 "
+
+	for hash in idList:
+	    (contType, f) = contents[hash]
+	    csf.addFile(hash, f.get(), tag + contType[4:], f.size())
+
     def writeToFile(self, outFileName):
 	try:
 	    outFile = open(outFileName, "w+")
 	    csf = filecontainer.FileContainer(outFile)
 	    outFile.close()
 
-	    csf.addFile("SRSCHANGESET", self.headerAsString(), "")
+	    str = self.headerAsString()
+	    csf.addFile("SRSCHANGESET", 
+			versioned.FalseFile(str), "", len(str))
 
-            csf.cork()
-	    for (hash, (contType, f)) in self.fileContents.iteritems():
-		csf.addFile(hash, f.get(), contType[4:])
-            csf.uncork()
+	    self.writeContents(csf, self.earlyFileContents, True)
+	    self.writeContents(csf, self.lateFileContents, False)
 
 	    csf.close()
 	except:
@@ -227,9 +255,10 @@ class ChangeSet:
 		# members of the local branch, and their contents will be
 		# saved as part of that change set.
 		if origFile.isConfig():
-		    cont = filecontents.FromRepository(db, origFile.sha1())
+		    cont = filecontents.FromRepository(db, origFile.sha1(),
+						       origFile.size())
 		    rollback.addFileContents(fileId,
-					     ChangedFileTypes.file, cont)
+					     ChangedFileTypes.file, cont, 1)
 		else:
 		    if isinstance(origFile, files.SourceFile):
 			type = "src"
@@ -244,7 +273,7 @@ class ChangeSet:
 		    if fsFile.same(origFile):
 			cont = filecontents.FromFilesystem(fullPath)
 			rollback.addFileContents(fileId,
-						 ChangedFileTypes.file, cont)
+						 ChangedFileTypes.file, cont, 0)
 
 	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
 		(curPath, curVersion) = pkg.getFile(fileId)
@@ -281,11 +310,13 @@ class ChangeSet:
 			f.seek(0)
 			cont = filecontents.FromString(diff)
 			rollback.addFileContents(fileId,
-						 ChangedFileTypes.diff, cont)
+						 ChangedFileTypes.diff, cont, 1)
 		    else:
-			cont = filecontents.FromRepository(db, origFile.sha1())
+			cont = filecontents.FromRepository(db, origFile.sha1(),
+							   origFile.size())
 			rollback.addFileContents(fileId,
-						 ChangedFileTypes.file, cont)
+						 ChangedFileTypes.file, cont,
+						 newFile.isConfig())
 		elif origFile.sha1() != newFile.sha1():
 		    # this file changed, so we need the contents
 		    if isinstance(origFile, files.SourceFile):
@@ -307,7 +338,9 @@ class ChangeSet:
 			cont = filecontents.FromString("")
 
 		    rollback.addFileContents(fileId,
-					     ChangedFileTypes.file, cont)
+					     ChangedFileTypes.file, cont,
+					     origFile.isConfig() or
+					     newFile.isConfig())
 
 	    rollback.newPackage(invertedPkg)
 
@@ -333,7 +366,8 @@ class ChangeSet:
 			cont = filecontents.FromString("")
 
 		    rollback.addFileContents(fileId,
-					     ChangedFileTypes.file, cont)
+					     ChangedFileTypes.file, cont,
+					     fsFile.isConfig())
 
 	return rollback
 
@@ -410,7 +444,8 @@ class ChangeSet:
 	self.newPackages = {}
 	self.oldPackages = []
 	self.files = {}
-	self.fileContents = {}
+	self.earlyFileContents = {}
+	self.lateFileContents = {}
 	self.abstract = 0
 	self.local = 0
 
@@ -440,10 +475,23 @@ class ChangeSetFromAbstractChangeSet(ChangeSet):
 
 class ChangeSetFromFile(ChangeSet):
 
-    def getFileContents(self, fileId):
-	f = self.csf.getFile(fileId)
-	tag = "cft-" + self.csf.getTag(fileId)
+    def getFileSize(self, fileId):
+	return self.csf.getSize(fileId)
 
+    def getFileContentsType(self, fileId):
+	tagInfo = self.csf.getTag(fileId).split()
+	return "cft-" + tagInfo[1]
+
+    def getFileContents(self, fileId):
+	if self.configCache.has_key(fileId):
+	    (tag, str) = self.configCache[fileId]
+	    return (tag, filecontents.FromString(str))
+
+	f = self.csf.getFile(fileId)
+	tagInfo = self.csf.getTag(fileId).split()
+	tag = "cft-" + tagInfo[1]
+
+	assert(tagInfo[0] == "0")
 	return (tag, filecontents.FromFile(f))
 
     def hasFileContents(self, hash):
@@ -508,8 +556,24 @@ class ChangeSetFromFile(ChangeSet):
 
 	    header = control.read()
 
+	# pull in the config files
+	idList = []
+	for fileId in self.csf.iterFileList():
+	    if fileId == "SRSCHANGESET": continue
+	    tags = self.csf.getTag(fileId)
+	    if tags.startswith("0 "): continue
+	    idList.append(fileId)
+	
+	idList.sort()
+
+	for fileId in idList:
+	    tags = self.csf.getTag(fileId)
+	    tag = "cft-" + tags.split()[1]
+	    self.configCache[fileId] = (tag, self.csf.getFile(fileId).read())
+
     def __init__(self, file, justContentsForConfig = 0, skipValidate = 1):
 	ChangeSet.__init__(self)
+	self.configCache = {}
 	self.read(file)
 	if not skipValidate:
 	    self.validate(justContentsForConfig)
@@ -567,7 +631,8 @@ def CreateFromFilesystem(pkgList):
 
 	    if hash:
 		cs.addFileContents(fileId, ChangedFileTypes.file,
-			  filecontents.FromFilesystem(realPath))
+			  filecontents.FromFilesystem(realPath),
+			  file.isConfig())
 
     return cs
 
