@@ -203,8 +203,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def prepareChangeSet(self, authToken):
 	# make sure they have a valid account and permission to commit to
 	# *something*
-	#import pdb
-	#pdb.set_trace()
 	if not self.auth.check(authToken, write = True):
 	    raise InsufficientPermission
 
@@ -237,6 +235,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	self.repos.commitChangeSet(cs)
 
+	if not self.commitAction:
+	    return True
+
+	for pkgCs in cs.iterNewPackageList():
+	    if not pkgCs.getName().endswith(":source"): continue
+
+	    d = { 'reppath' : self.urlBase,
+	    	  'trove' : pkgCs.getName(),
+		  'version' : pkgCs.getNewVersion().asString() }
+	    cmd = self.commitAction % d
+	    os.system(cmd)
+
 	return True
 
     def getFileVersion(self, authToken, fileId, version, withContents = 0):
@@ -253,11 +263,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise RuntimeError, "client is too old"
         return 0
 
-    def __init__(self, path, tmpPath, urlBase, authDbPath):
+    def __init__(self, path, tmpPath, urlBase, authDbPath,
+		 commitAction = None):
 	self.repos = fsrepos.FilesystemRepository(path)
+	self.repPath = path
 	self.tmpPath = tmpPath
 	self.urlBase = urlBase
-	self.auth = NetworkAuthorization(authDbPath)
+	self.auth = NetworkAuthorization(authDbPath, anonymousReads = True)
+	self.commitAction = commitAction
 
 class NetworkAuthorization:
 
@@ -303,7 +316,7 @@ class NetworkAuthorization:
 
     def __init__(self, dbpath, anonymousReads = False):
 	self.db = sqlite.connect(dbpath)
-	self.anonReads = False
+	self.anonReads = anonymousReads
 
 class InsufficientPermission(Exception):
 

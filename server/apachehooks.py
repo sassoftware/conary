@@ -82,9 +82,15 @@ def handler(req):
 	
 	urlBase += req.uri
 
+	if d.has_key('commitaction'):
+	    commitAction = d['commitaction']
+	else:
+	    commitAction = None
+
 	repositories[repName] = netserver.NetworkRepositoryServer(
 				d['reppath'], d['tmppath'], 
-				urlBase, d['authpath'])
+				urlBase, d['authpath'],
+				commitAction = commitAction)
 
     repos = repositories[repName]
 
