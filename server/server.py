@@ -67,7 +67,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
     def do_POST(self):
 	if not self.headers.has_key('Authorization'):
-	    user = "anonymous"
+	    user = None
 	    pw = None
 	else:
 	    info = self.headers['Authorization'].split()
