@@ -221,7 +221,7 @@ class AbiDependency(DependencyClass):
     tag = DEP_CLASS_ABI
     tagName = "abi"
     exactMatch = True
-    justOne = True
+    justOne = False
     depClass = Dependency
 _registerDepClass(AbiDependency)
 
