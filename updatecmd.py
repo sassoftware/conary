@@ -5,6 +5,7 @@
 import changeset
 import log
 import os
+import package
 import repository
 import sys
 import util
@@ -54,11 +55,13 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	bail = 0
 
 	if not repos.hasPackage(pkg):
-            log.error("repository does not contain a package called %s" % pkg)
+            log.error("repository does not contain a package called %s" % 
+		      (package.stripNamespace(cfg.packagenamespace, pkg)))
 	    bail = 1
 	elif not repos.hasPackageVersion(pkg, newVersion):
 	    log.error("package %s does not contain version %s" %
-				 (pkg, newVersion.asString()))
+		      (package.stripNamespace(cfg.packagenamespace, pkg), 
+		      newVersion.asString(cfg.defaultbranch)))
 	    bail = 1
 	else:
 	    if not newVersion:
