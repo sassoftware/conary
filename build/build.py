@@ -454,7 +454,7 @@ class _PutFiles(_FileAction):
 
     def do(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
-	destlen = len(macros['destdir'])
+	self.destlen = len(macros['destdir'])
 	util.mkdirChain(os.path.dirname(dest))
 
 	for fromFile in self.fromFiles:
@@ -463,21 +463,21 @@ class _PutFiles(_FileAction):
 	    if not os.path.isdir(dest) and len(sourcelist) > 1:
 		raise TypeError, 'multiple files specified, but destination "%s" is not a directory' %dest
 	    for source in sourcelist:
-		self._do_one(source, dest, destlen, macros)
+		self._do_one(source, dest, macros)
 
-    def _do_one(self, source, dest, destlen, macros):
+    def _do_one(self, source, dest, macros):
 	if os.path.isdir(source) and not self.move:
-	    srcbase = os.path.basename(source)
-	    dest = dest+os.sep+srcbase
-	    destlen += len(os.sep) + len(srcbase)
+	    # deep copy of target dir
+	    # foo/bar/a -> /blah should give /blah/a rather than /blah/foo/bar/a
+	    dest = util.joinPaths(dest, os.path.basename(source))
 	    util.mkdirChain(dest)
 	    for sourcefile in os.listdir(source):
-		thissrc = source+os.sep+sourcefile
-		self._do_one(thissrc, dest, destlen, macros)
+		thissrc = util.joinPaths(source, sourcefile)
+		self._do_one(thissrc, dest, macros)
 	    return
 
-	if os.path.isdir(dest):
-	    dest = dest + os.path.basename(source)
+	if not os.path.isdir(source) and os.path.isdir(dest):
+	    dest = util.joinPaths(dest, os.path.basename(source))
 	
 	mode = self.mode
 	if mode == -2:
@@ -492,8 +492,8 @@ class _PutFiles(_FileAction):
 	    util.rename(source, dest)
 	else:
 	    util.copyfile(source, dest)
-	self.setComponents(dest[destlen:])
-	self.chmod(macros['destdir'], dest[destlen:], mode=mode)
+	self.setComponents(dest[self.destlen:])
+	self.chmod(macros['destdir'], dest[self.destlen:], mode=mode)
 	
 
     def __init__(self, *args, **keywords):
