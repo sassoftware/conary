@@ -216,7 +216,7 @@ def main(argv):
         missing = []
         repoMap = {}
         for label in cfg.installLabelPath:
-            repopkgs = [ x for x in repos.iterAllTroveNames(label.getHost()) if x.find(':') == -1 and not (x.startswith('cross-') or x.startswith('bootstrap-')) ]
+            repopkgs = [ x for x in repos.troveNames(label) if x.find(':') == -1 and not (x.startswith('cross-') or x.startswith('bootstrap-')) ]
             for pkg in repopkgs:
                 if pkg not in repoMap:
                     repoMap[pkg] = label
