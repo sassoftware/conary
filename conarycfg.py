@@ -19,6 +19,6 @@ class SrsConfiguration:
 	self.root = "/"
 	self.sourcepath = "/usr/src/srs"
 
-	self.read(os.environ["HOME"] + "/" + ".srsrc")
 	self.read("/etc/srsrc")
+	self.read(os.environ["HOME"] + "/" + ".srsrc")
 	
