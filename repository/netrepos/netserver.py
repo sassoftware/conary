@@ -2,6 +2,7 @@ from repository import changeset
 from repository import fsrepos
 import filecontainer
 import os
+import sqlite
 import tempfile
 import xmlshims
 
@@ -126,6 +127,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return self.repos.iterAllTroveNames()
 
     def prepareChangeSet(self, authToken):
+	# make sure they have a valid account and permission to commit to
+	# *something*
+	if not self.auth.check(authToken, write = True):
+	    raise InsufficientPermission
+
 	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
 	os.close(fd)
 	fileName = os.path.basename(path)
@@ -142,6 +148,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    pass
 	    os.unlink(path)
 
+	# walk through all of the branches this change set commits to
+	# and make sure the user has enough permissions for the operation
+	items = {}
+	for pkgCs in cs.iterNewPackageList():
+	    items[(pkgCs.getName(), pkgCs.getNewVersion())] = True
+	    if not self.auth.check(authToken, write = True, 
+			       label = pkgCs.getNewVersion().branch().label(),
+			       trove = pkgCs.getName()):
+		raise InsufficientPermissions
+
 	self.repos.commitChangeSet(cs)
 
 	return True
@@ -155,8 +171,49 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise RuntimeError, "client is too old"
         return 0
 
-    def __init__(self, path, tmpPath, urlBase):
+    def __init__(self, path, tmpPath, urlBase, authDbPath):
 	self.repos = fsrepos.FilesystemRepository(path)
 	self.tmpPath = tmpPath
 	self.urlBase = urlBase
+	self.auth = NetworkAuthorization(authDbPath)
 
+class NetworkAuthorization:
+
+    def check(self, authToken, write = False, label = None, trove = None):
+	if not authToken[0]:
+	    return False
+
+	stmt = """
+	    SELECT count(*) FROM
+	       (SELECT userId as uuserId FROM Users WHERE user=%s AND 
+		    password=%s) 
+	    JOIN Permissions ON uuserId=Permissions.userId
+	""" 
+	params = authToken
+
+	if label or trove:
+	    stmt += " WHERE "
+
+	if label:
+	    stmt += " labelId=(SELECT labelId FROM Labels WHERE " \
+			    "label=%s) OR labelId is Null" 
+	    params += (label.asString(),)
+	if trove:
+	    if label:
+		stmt += " AND "
+	    stmt += " troveNameId=(SELECT troveNameId FROM TroveNames WHERE " \
+			    "troveName=%s) OR troveNameId is Null" 
+	    params += (trove,)
+
+	cu = self.db.cursor()
+	cu.execute(stmt, params)
+	result = cu.fetchone()[0]
+
+	return result != 0
+
+    def __init__(self, dbpath):
+	self.db = sqlite.connect(dbpath)
+
+class InsufficientPermission(Exception):
+
+    pass

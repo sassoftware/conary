@@ -36,7 +36,13 @@ def xmlPost(req):
     authToken = (user, pw)
 
     (params, method) = xmlrpclib.loads(req.read())
-    result = netRepos.__class__.__dict__[method](netRepos, authToken, *params)
+
+    try:
+	result = netRepos.__class__.__dict__[method](netRepos, authToken, 
+						     *params)
+    except netserver.InsufficientPermission:
+	return apache.FORBIDDEN
+
     resp = xmlrpclib.dumps((result,), methodresponse=1)
     req.content_type = "text/xml"
     req.write(resp) 

@@ -16,12 +16,13 @@ import urllib
 from BaseHTTPServer import HTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
-if len(sys.argv) != 3:
-    print "needs path to srs and to the repository"
+if len(sys.argv) != 4:
+    print "needs path to srs, the repository, and the authorization database"
     sys.exit(1)
 
 sys.path.append(sys.argv[1])
 
+import netserver
 from netserver import NetworkRepositoryServer
 
 FILE_PATH="/tmp/conary-server"
@@ -95,6 +96,9 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	try:
 	    result = netRepos.__class__.__dict__[method](netRepos, authToken,
 							 *params)
+	except netserver.InsufficientPermission:
+	    self.send_response(403)
+	    return
 	except:
 	    self.send_response(500)
 	    return
@@ -128,7 +132,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	self.send_response(200, 'OK')
 
 if __name__ == '__main__':
-    netRepos = NetworkRepositoryServer(sys.argv[2], FILE_PATH, BASE_URL)
+    netRepos = NetworkRepositoryServer(sys.argv[2], FILE_PATH, BASE_URL,
+				       sys.argv[3])
 
     httpServer = HTTPServer(("", 8000), HttpRequests)
 
