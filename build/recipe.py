@@ -405,7 +405,7 @@ class Recipe:
 		    destDir = "/".join((destDir, targetdir))
 		if macros:
 		    print '+ applying macros to %s' %f
-		    pin = os.popen('%s %s' %(provides, f))
+		    pin = os.popen("%s '%s'" %(provides, f))
 		    print '+ patch -d %s -p%s %s %s' %(destDir, level, backup, extraArgs)
 		    pout = os.popen('patch -d %s -p%s %s %s'
 		                    %(destDir, level, backup, extraArgs), 'w')
@@ -413,7 +413,7 @@ class Recipe:
 		    pin.close()
 		    pout.close()
 		else:
-		    util.execute('%s %s | patch -d %s -p%s %s %s'
+		    util.execute("%s '%s' | patch -d %s -p%s %s %s"
 				 %(provides, f, destDir, level, backup, extraArgs))
 		continue
 
