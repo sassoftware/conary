@@ -19,7 +19,7 @@ static PyObject * ElfError;
 
 static PyMethodDef ElfMethods[] = {
     { "inspect", inspect, METH_VARARGS, 
-	"inspect an ELF file for depdencency information" },
+	"inspect an ELF file for dependency information" },
     { NULL, NULL, 0, NULL }
 };
 
