@@ -93,11 +93,11 @@ def excepthook(type, value, tb):
     lines = traceback.format_exception(type, value, tb)
     (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
     output = os.fdopen(tbfd, 'w')
-    stackutil.printTraceBack(tb, output)
+    stackutil.printTraceBack(tb, output, type, value)
     print "*** Note *** An extended traceback has been saved to %s " % path
     print string.joinfields(lines, "")
     if sys.stdout.isatty() and sys.stdin.isatty():
-        epdb.post_mortem(tb)
+        epdb.post_mortem(tb, type, value)
     else:
         sys.exit(1)
 
