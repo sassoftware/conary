@@ -1,11 +1,17 @@
 #!/bin/bash
 
-if [ ! -f authdb ]; then
-    sqlite authdb < schema
+if [ -n "$3" ]; then
+    authdb=$3
+else
+    authdb=authdb
+fi
+
+if [ ! -f $authdb ]; then
+    sqlite $authdb < schema
 fi
 
 pw=`echo -n $2 | md5sum | awk '{print $1}'`
 
-echo "insert into users values (Null, '$1', '${pw}');" | sqlite authdb
-echo "insert into permissions values ((select userId from users where user='$1'),Null,Null,1);" | sqlite authdb
+echo "insert into users values (Null, '$1', '${pw}');" | sqlite $authdb
+echo "insert into permissions values ((select userId from users where user='$1'),Null,Null,1);" | sqlite $authdb
 
