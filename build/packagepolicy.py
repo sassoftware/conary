@@ -332,7 +332,7 @@ class Transient(policy.Policy):
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    log.debug('transient: %s', file)
-	    self.recipe.autopkg.pathMap[file].flags.isConfig(True)
+	    self.recipe.autopkg.pathMap[file].flags.isTransient(True)
 
 
 class SharedLibrary(policy.Policy):
