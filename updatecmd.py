@@ -80,11 +80,13 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             items = {}
             for suggList in suggMap.itervalues():
                 # remove duplicates
-                items.update(dict.fromkeys([x[0] for x in suggList]))
+                items.update(dict.fromkeys([(x[0], x[1]) for x in suggList]))
 
             items = items.keys()
             items.sort()
-            print "%s" % (" ".join(items))
+            print "%s" % (" ".join(["%s(%s)" % 
+                           (x[0], x[1].trailingVersion().asString())
+                           for x in items]))
 
         client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,
                            test = test, justDatabase = justDatabase)
