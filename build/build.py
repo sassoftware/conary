@@ -71,8 +71,7 @@ class BuildAction(action.RecipeAction):
 	    else:
                 self.recipe.buildinfo.lastline = self.linenum
 		oldexcepthook = sys.excepthook
-		sys.excepthook = action.excepthook
-		action.actionobject = self
+		sys.excepthook = action.genExcepthook(self)
 		self.do(self.recipe.macros)
 		sys.excepthook = oldexcepthook
 

@@ -46,13 +46,16 @@ import versions
 import xmlrpclib
 from repository import netclient
 
-sys.excepthook = util.excepthook
+sys.excepthook = util.genExcepthook()
 
 try:
     cfg = conarycfg.ConaryConfiguration()
 except conarycfg.ConaryCfgError, e:
     log.error(str(e))
     sys.exit(1)
+
+# reset the excepthook (using cfg values for exception settings)
+sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
 
 def usage(rc = 1):
     print "usage: conary branch <newbranch> <branchfrom> [<trove>]"

@@ -88,19 +88,27 @@ def searchFile(file, searchdirs, error=None):
 def findFile(file, searchdirs):
     return searchFile(file, searchdirs, error=1)
 
-def excepthook(type, value, tb):
-    sys.excepthook = sys.__excepthook__
-    lines = traceback.format_exception(type, value, tb)
-    (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
-    output = os.fdopen(tbfd, 'w')
-    stackutil.printTraceBack(tb, output, type, value)
-    output.close()
-    print "*** Note *** An extended traceback has been saved to %s " % path
-    print string.joinfields(lines, "")
-    if sys.stdout.isatty() and sys.stdin.isatty():
-        epdb.post_mortem(tb, type, value)
-    else:
-        sys.exit(1)
+def genExcepthook(dumpStack=True):
+    def excepthook(type, value, tb):
+        sys.excepthook = sys.__excepthook__
+        lines = traceback.format_exception(type, value, tb)
+        if dumpStack:
+            try:
+                (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
+                output = os.fdopen(tbfd, 'w')
+                stackutil.printTraceBack(tb, output, type, value)
+                output.close()
+                print "*** Note *** An extended traceback has been saved to %s " % path
+            except Exception, msg:
+                log.warning("Could not write extended traceback: %s" % msg)
+        print string.joinfields(lines, "")
+        if sys.stdout.isatty() and sys.stdin.isatty():
+            epdb.post_mortem(tb, type, value)
+        else:
+            sys.exit(1)
+    return excepthook
+
+
 
 def _handle_rc(rc, cmd):
     if rc:

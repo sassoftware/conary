@@ -148,6 +148,7 @@ class ConaryConfiguration(ConfigFile):
 	'contact'		: None,
 	'dbPath'		: '/var/lib/conarydb',
 	'debugRecipeExceptions' : [ BOOL, False ], 
+	'dumpStackOnError'      : [ BOOL, True ], 
 	'installLabel'		: [ LABEL,	 None ],
 	'instructionSet'	: deps.arch.current(),
 	'lookaside'		: '/var/cache/conary',

@@ -106,42 +106,44 @@ class Action:
         # copy the keywords into our dict, overwriting the defaults
         self.__dict__.update(keywords)
 
-def excepthook(type, exc_msg, tb):
-    sys.excepthook = sys.__excepthook__
-    global actionobject
-    self = actionobject
-    if actionobject.recipe.cfg.debugRecipeExceptions:
-	lines = traceback.format_exception(type, exc_msg, tb)
-	print string.joinfields(lines, "")
-    if self.linenum is not None:
-	prefix = "%s:%s:" % (self.file, self.linenum)
-	prefix_len = len(prefix)
-	if str(exc_msg)[:prefix_len] != prefix:
-	    exc_message = "%s:%s: %s: %s" % (self.file, self.linenum, 
-					  type.__name__, exc_msg)
-	print exc_message
+def genExcepthook(self):
+    def excepthook(type, exc_msg, tb):
+        cfg = self.recipe.cfg
+        sys.excepthook = sys.__excepthook__
+        if cfg.debugRecipeExceptions:
+            lines = traceback.format_exception(type, exc_msg, tb)
+            print string.joinfields(lines, "")
+        if self.linenum is not None:
+            prefix = "%s:%s:" % (self.file, self.linenum)
+            prefix_len = len(prefix)
+            if str(exc_msg)[:prefix_len] != prefix:
+                exc_message = "%s:%s: %s: %s" % (self.file, self.linenum, 
+                                              type.__name__, exc_msg)
+            print exc_message
 
-    try:
-        buildinfo = self.recipe.buildinfo
-        buildinfo.error = exc_message
-        buildinfo.file = self.file
-        buildinfo.lastline = self.linenum
-        buildinfo.stop()
-    except:
-        log.warning("could not write out to buildinfo")
+        try:
+            buildinfo = self.recipe.buildinfo
+            buildinfo.error = exc_message
+            buildinfo.file = self.file
+            buildinfo.lastline = self.linenum
+            buildinfo.stop()
+        except:
+            log.warning("could not write out to buildinfo")
 
-    try:
-        (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
-        output = os.fdopen(tbfd, 'w')
-        stackutil.printTraceBack(tb, output, type, exc_msg)
-        log.info("** NOTE ** Extended traceback written to %s\n" % path)
-    except Exception, msg:
-        log.warning("Could not write extended traceback: %s" % msg)
-    if actionobject.recipe.cfg.debugRecipeExceptions and sys.stdout.isatty() \
-					         and sys.stdin.isatty():
-        epdb.post_mortem(tb, type, exc_msg)
-    else:
-	sys.exit(1)
+        if cfg.dumpStackOnError:
+            try:
+                (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
+                output = os.fdopen(tbfd, 'w')
+                stackutil.printTraceBack(tb, output, type, exc_msg)
+                log.info("** NOTE ** Extended traceback written to %s\n" % path)
+            except Exception, msg:
+                log.warning("Could not write extended traceback: %s" % msg)
+        if cfg.debugRecipeExceptions and sys.stdout.isatty() \
+                                     and sys.stdin.isatty():
+            epdb.post_mortem(tb, type, exc_msg)
+        else:
+            sys.exit(1)
+    return excepthook
 
 
 class RecipeAction(Action):
@@ -166,7 +168,6 @@ class RecipeAction(Action):
         
     # virtual method for actually executing the action
     def doAction(self):
-	global actionobject
 	if self.debug:
 	    epdb.set_trace()
 	if self.use:
@@ -174,8 +175,7 @@ class RecipeAction(Action):
 		self.do()
 	    else:
 		oldexcepthook = sys.excepthook
-		sys.excepthook = excepthook
-		actionobject = self
+		sys.excepthook = genExcepthook(self)
                 self.recipe.buildinfo.lastline = self.linenum
 		self.do()
 		sys.excepthook = oldexcepthook
