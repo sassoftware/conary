@@ -49,6 +49,7 @@ python_files = __init__.py	\
 	streams.py		\
 	trove.py		\
 	updatecmd.py		\
+	verify.py		\
 	versions.py
 
 bin_files = conary cvc cvcdesc
