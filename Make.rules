@@ -7,7 +7,21 @@
 pyfiles-install:
 	mkdir -p $(DESTDIR)$(srsdir)
 	for f in $(python_files) $(bin_files); do \
-		mkdir -p `dirname $(DESTDIR)$(srsdir)/$$f`; \
-		cp -a $$f $(DESTDIR)$(srsdir)/$$f; \
+		mkdir -p `dirname $(DESTDIR)/$(srsdir)/$(DIR)/$$f`; \
+		cp -a $$f $(DESTDIR)/$(srsdir)/$(DIR)/$$f; \
 	done
 
+default-dist:
+	for f in $(dist_files); do \
+		mkdir -p $(DISTDIR)/$(DIR)/`dirname $$f`; \
+		cp -a $$f $(DISTDIR)/$(DIR)/$$f; \
+	done
+
+default-install:
+	echo "nothing to install"
+
+default-all:
+	echo "nothing to build"
+
+default-clean:
+	rm -f *~ .#* *.pyo *.pyc

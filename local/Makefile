@@ -3,10 +3,18 @@ python_files = database.py	\
 		localrep.py	\
 		trovedb.py	\
 		update.py
-all:
-	echo "nothing to build"
+
+extra_dist = Makefile
+
+dist_files = $(python_files) $(extra_dist)
+
+all: default-install
 
 install: pyfiles-install
+
+dist: default-dist
+
+clean: default-clean
 
 include ../Make.rules
 

@@ -5,14 +5,15 @@
 
 all: subdirs srs-wrapper srs.recipe
 
-VERSION = 0.1
-distdir = srs-$(VERSION)
-prefix = /usr
-srsdir = $(prefix)/share/srs
-bindir = $(prefix)/bin
-PYTHON = python2.3
+export VERSION = 0.1
+export TOPDIR = $(shell pwd)
+export DISTDIR = $(TOPDIR)/srs-$(VERSION)
+export prefix = /usr
+export srsdir = $(prefix)/share/srs
+export bindir = $(prefix)/bin
+export PYTHON = python2.3
 
-SUBDIRS=build local repository
+SUBDIRS=build local repository test
 
 subdirs_rule=
 
@@ -45,7 +46,7 @@ python_files = __init__.py	\
 
 example_files = examples/tmpwatch.recipe
 bin_files = srs srs-bootstrap
-extra_files = srs.recipe.in srs.recipe srs-wrapper.in Makefile test/*.py
+extra_files = srs.recipe.in srs.recipe srs-wrapper.in Makefile Make.rules
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
 generated_files = srs-wrapper srs.recipe *.pyo *.pyc 
@@ -54,7 +55,7 @@ generated_files = srs-wrapper srs.recipe *.pyo *.pyc
 
 
 subdirs:
-	for d in $(SUBDIRS); do make -C $$d || exit 1; done
+	for d in $(SUBDIRS); do make -C $$d DIR=$$d || exit 1; done
 
 srs-wrapper: srs-wrapper.in
 	sed s,@srsdir@,$(srsdir),g $< > $@
@@ -65,7 +66,7 @@ srs.recipe: srs.recipe.in
 
 install: all pyfiles-install
 	mkdir -p $(DESTDIR)$(bindir)
-	for d in $(SUBDIRS); do make -C $$d install || exit 1; done
+	for d in $(SUBDIRS); do make -C $$d DIR=$$d install || exit 1; done
 	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(srsdir)', ddir='$(srsdir)', quiet=1)"
 	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(srsdir)', ddir='$(srsdir)', quiet=1)"
 	install -m 755 srs-wrapper $(DESTDIR)$(bindir)
@@ -74,20 +75,22 @@ install: all pyfiles-install
 	done
 
 dist: $(dist_files)
-	rm -rf $(distdir)
-	mkdir $(distdir)
+	rm -rf $(DISTDIR)
+	mkdir $(DISTDIR)
+	for d in $(SUBDIRS); do make -C $$d DIR=$$d dist || exit 1; done
 	for f in $(dist_files); do \
-		mkdir -p $(distdir)/`dirname $$f`; \
-		cp -a $$f $(distdir)/$$f; \
+		mkdir -p $(DISTDIR)/`dirname $$f`; \
+		cp -a $$f $(DISTDIR)/$$f; \
 	done
-	tar cjf $(distdir).tar.bz2 $(distdir)
-	rm -rf $(distdir)
+	tar cjf $(DISTDIR).tar.bz2 srs-$(VERSION)
+	rm -rf $(DISTDIR)
 
 distcheck:
 	@echo Possible missing files:
 	@(ls *py; for f in $(python_files); do echo $$f; done) | sort | uniq -u
 
 clean:
+	for d in $(SUBDIRS); do make -C $$d DIR=$$d clean || exit 1; done
 	rm -f *~ .#* $(generated_files)
 
 bootstrap:

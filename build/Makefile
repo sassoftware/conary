@@ -9,10 +9,17 @@ python_files = __init__.py	\
 		recipe.py	\
 		use.py		\
 
-all:
-	echo "nothing to build"
+extra_dist = Makefile
+
+dist_files = $(python_files) $(extra_dist)
+
+all: default-all
 
 install: pyfiles-install
+
+dist: default-dist
+
+clean: default-clean
 
 include ../Make.rules
 
