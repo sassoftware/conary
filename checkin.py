@@ -115,6 +115,15 @@ class SourceState(trove.Trove):
         self.branch = branch
         self.pathMap = {}
 
+
+class CONARYFileMissing(Exception):
+    """
+    This exception is raised when the CONARY file specified does not
+    exist
+    """
+    def __str__(self):
+        return 'CONARY state file does not exist.'
+
 class SourceStateFromFile(SourceState):
 
     def readFileList(self, dataFile):
@@ -150,8 +159,7 @@ class SourceStateFromFile(SourceState):
 
     def __init__(self, file):
 	if not os.path.isfile(file):
-	    log.error("CONARY file must exist in the current directory for source commands")
-	    raise OSError  # XXX
+	    raise CONARYFileMissing
 
 	self.parseFile(file)
 
@@ -268,10 +276,7 @@ def commit(repos, cfg, message):
 	log.error("name and contact information must be set for commits")
 	return
 
-    try:
-        state = SourceStateFromFile("CONARY")
-    except OSError:
-        return
+    state = SourceStateFromFile("CONARY")
 
     troveName = state.getName()
 
@@ -444,10 +449,7 @@ def commit(repos, cfg, message):
     newState.write("CONARY")
 
 def annotate(repos, filename):
-    try:
-        state = SourceStateFromFile("CONARY")
-    except OSError:
-        return
+    state = SourceStateFromFile("CONARY")
     curVersion = state.getVersion()
     branch = state.getBranch()
     troveName = state.getName()
@@ -685,10 +687,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     _showChangeSet(repos, cs, old, new)
 
 def diff(repos, versionStr = None):
-    try:
-        state = SourceStateFromFile("CONARY")
-    except OSError:
-        return
+    state = SourceStateFromFile("CONARY")
 
     if state.getVersion() == versions.NewVersion():
 	log.error("no versions have been committed")
@@ -788,10 +787,7 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	print "%s: removed" % path
 	
 def updateSrc(repos, versionStr = None):
-    try:
-        state = SourceStateFromFile("CONARY")
-    except OSError:
-        return
+    state = SourceStateFromFile("CONARY")
     pkgName = state.getName()
     baseVersion = state.getVersion()
     
@@ -940,11 +936,7 @@ def addFiles(fileList, ignoreExisting=False):
     state.write("CONARY")
 
 def removeFile(file):
-    try:
-        state = SourceStateFromFile("CONARY")
-    except OSError:
-        return
-
+    state = SourceStateFromFile("CONARY")
     if not state.removeFilePath(file):
 	log.error("file %s is not under management" % file)
 
@@ -978,11 +970,7 @@ def newPackage(repos, cfg, name):
     state.write(dir + "/" + "CONARY")
 
 def renameFile(oldName, newName):
-    try:
-        state = SourceStateFromFile("CONARY")
-    except OSError:
-        return
-
+    state = SourceStateFromFile("CONARY")
     if not os.path.exists(oldName):
 	log.error("%s does not exist or is not a regular file" % oldName)
 	return
@@ -1005,11 +993,7 @@ def renameFile(oldName, newName):
     log.error("file %s is not under management" % oldName)
 
 def showLog(repos, branch = None):
-    try:
-        state = SourceStateFromFile("CONARY")
-    except OSError:
-        return
-
+    state = SourceStateFromFile("CONARY")
     if not branch:
 	branch = state.getBranch()
     else:
