@@ -346,8 +346,14 @@ class ChangeSet:
 
 		    if fsFile == origFile:
 			cont = filecontents.FromFilesystem(fullPath)
-			rollback.addFileContents(fileId,
-						 ChangedFileTypes.file, cont, 0)
+		    else:
+			# a file which was removed in this changeset is
+			# missing from the files; we need to to put an
+			# empty file in here so we can apply the rollback
+			cont = filecontents.FromString("")
+
+		    rollback.addFileContents(fileId, ChangedFileTypes.file, 
+					     cont, 0)
 
 	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
 		if not pkg.hasFile(fileId):
