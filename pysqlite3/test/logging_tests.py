@@ -52,14 +52,14 @@ class CommandLoggingTests(unittest.TestCase, testsupport.TestSupport):
 
         expected_output = ";\n".join([
             "BEGIN", "CREATE TABLE TEST(FOO INTEGER)",
-            "INSERT INTO TEST(FOO) VALUES (5)",
+            "INSERT INTO TEST(FOO) VALUES (?)",
             "ROLLBACK"]) + ";\n"
 
         self.cnx = sqlite.connect(self.getfilename(),
             command_logfile=logger)
         cu = self.cnx.cursor()
         cu.execute("CREATE TABLE TEST(FOO INTEGER)")
-        cu.execute("INSERT INTO TEST(FOO) VALUES (%i)", (5,))
+        cu.execute("INSERT INTO TEST(FOO) VALUES (?)", (5,))
         self.cnx.rollback()
 
         logger.seek(0)

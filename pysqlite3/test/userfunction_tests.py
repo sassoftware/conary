@@ -106,7 +106,7 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
 
     def CheckIntFunction(self):
         self.cur.execute("create table test (a)")
-        self.cur.execute("insert into test(a) values (%s)", 5)
+        self.cur.execute("insert into test(a) values (?)", 5)
         self.cur.execute("-- types int")
         self.cur.execute("select intreturner(a) as a from test")
         res = self.cur.fetchone()
@@ -117,7 +117,7 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
 
     def CheckFloatFunction(self):
         self.cur.execute("create table test (a)")
-        self.cur.execute("insert into test(a) values (%s)", 5.0)
+        self.cur.execute("insert into test(a) values (?)", 5.0)
         self.cur.execute("-- types float")
         self.cur.execute("select floatreturner(a) as a from test")
         res = self.cur.fetchone()
@@ -129,7 +129,7 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
     def CheckStringFunction(self):
         mystr = "test"
         self.cur.execute("create table test (a)")
-        self.cur.execute("insert into test(a) values (%s)", mystr)
+        self.cur.execute("insert into test(a) values (?)", mystr)
         self.cur.execute("-- types str")
         self.cur.execute("select stringreturner(a) as a from test")
         res = self.cur.fetchone()
@@ -141,7 +141,7 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
     def CheckNullFunction(self):
         mystr = "test"
         self.cur.execute("create table test (a)")
-        self.cur.execute("insert into test(a) values (%s)", mystr)
+        self.cur.execute("insert into test(a) values (?)", mystr)
         self.cur.execute("-- types str")
         self.cur.execute("select nullreturner(a) as a from test")
         res = self.cur.fetchone()
@@ -160,7 +160,7 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
     def CheckExceptionFunction(self):
         mystr = "test"
         self.cur.execute("create table test (a)")
-        self.cur.execute("insert into test(a) values (%s)", mystr)
+        self.cur.execute("insert into test(a) values (?)", mystr)
         self.cur.execute("-- types str")
         try:
             self.cur.execute("select exceptionreturner(a) as a from test")
@@ -171,7 +171,7 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
 
     def CheckAggregateBasic(self):
         self.cur.execute("create table test (a)")
-        self.cur.executemany("insert into test(a) values (%s)", [(10,), (20,), (30,)])
+        self.cur.executemany("insert into test(a) values (?)", [(10,), (20,), (30,)])
         self.cur.execute("-- types int")
         self.cur.execute("select mysum(a) as sum from test")
         res = self.cur.fetchone()
@@ -182,7 +182,7 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
 
     def CheckAggregateReturnNull(self):
         self.cur.execute("create table test (a)")
-        self.cur.executemany("insert into test(a) values (%s)", [(10,), (20,), (30,)])
+        self.cur.executemany("insert into test(a) values (?)", [(10,), (20,), (30,)])
         self.cur.execute("-- types int")
         self.cur.execute("select mysumreturnnull(a) as sum from test")
         res = self.cur.fetchone()
@@ -191,7 +191,7 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
 
     def CheckAggregateStepException(self):
         self.cur.execute("create table test (a)")
-        self.cur.executemany("insert into test(a) values (%s)", [(10,), (20,), (30,)])
+        self.cur.executemany("insert into test(a) values (?)", [(10,), (20,), (30,)])
         self.cur.execute("-- types int")
         try:
             self.cur.execute("select mysumstepexception(a) as sum from test")
@@ -202,7 +202,7 @@ class UserFunctions(unittest.TestCase, testsupport.TestSupport):
 
     def CheckAggregateFinalizeException(self):
         self.cur.execute("create table test (a)")
-        self.cur.executemany("insert into test(a) values (%s)", [(10,), (20,), (30,)])
+        self.cur.executemany("insert into test(a) values (?)", [(10,), (20,), (30,)])
         self.cur.execute("-- types int")
         try:
             self.cur.execute("select mysumfinalizeexception(a) as sum from test")

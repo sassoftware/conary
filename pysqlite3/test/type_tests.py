@@ -85,7 +85,7 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
     def CheckExpectedTypesCustomTypes(self):
         value = MyType(10)
         self.cur.execute("create table test (a)")
-        self.cur.execute("insert into test(a) values (%s)", value)
+        self.cur.execute("insert into test(a) values (?)", value)
         self.cur.execute("-- types mytype")
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
@@ -98,7 +98,7 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
     def CheckNewQuoteMethod(self):
         value = MyTypeNew(10)
         self.cur.execute("create table test (a integer)")
-        self.cur.execute("insert into test(a) values (%s)", value)
+        self.cur.execute("insert into test(a) values (?)", value)
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
 
@@ -108,7 +108,7 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
     def CheckExpectedTypesCustomTypesNull(self):
         value = None
         self.cur.execute("create table test (a)")
-        self.cur.execute("insert into test(a) values (%s)", value)
+        self.cur.execute("insert into test(a) values (?)", value)
         self.cur.execute("-- types mytype")
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
@@ -135,7 +135,7 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
             dtd = DateTimeDelta(0, 0, 0, 1)
 
             self.cur.execute("create table test (t timestamp)")
-            self.cur.execute("insert into test(t) values (%s)", (dt,))
+            self.cur.execute("insert into test(t) values (?)", (dt,))
             self.cur.execute("select t from test")
             res = self.cur.fetchone()
 
@@ -145,7 +145,7 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
 
             self.cur.execute("drop table test")
             self.cur.execute("create table test(i interval)")
-            self.cur.execute("insert into test(i) values (%s)", (dtd,))
+            self.cur.execute("insert into test(i) values (?)", (dtd,))
             self.cur.execute("select i from test")
             res = self.cur.fetchone()
 
@@ -171,7 +171,7 @@ class UnicodeTestsLatin1(unittest.TestCase, testsupport.TestSupport):
     def CheckGetSameBack(self):
         test_str = unicode("÷sterreich", "latin1")
         self.cur.execute("create table test (a UNICODE)")
-        self.cur.execute("insert into test(a) values (%s)", test_str)
+        self.cur.execute("insert into test(a) values (?)", test_str)
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
         self.failUnlessEqual(type(test_str), type(res.a),
@@ -200,7 +200,7 @@ class UnicodeTestsUtf8(unittest.TestCase, testsupport.TestSupport):
         test_str = unicode("–ü–†–ï–ó–ò–î–ï–ù–¢ –†–û–°–°–ò–ô–°–ö–û–ô –§–ï–î–ï–†–ê–¶–ò–ò √ñsterreich", "utf-8")
 
         self.cur.execute("create table test (a UNICODE)")
-        self.cur.execute("insert into test(a) values (%s)", test_str)
+        self.cur.execute("insert into test(a) values (?)", test_str)
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
         self.failUnlessEqual(type(test_str), type(res.a),
@@ -230,7 +230,7 @@ class UnicodeTestsKOI8R(unittest.TestCase, testsupport.TestSupport):
         test_str = unicode("ÚÂ˙È‰ÂÓÙ ÚÔÛÛÈÍÛÎÔÍ ÊÂ‰ÂÚ·„ÈÈ", "koi8-r")
 
         self.cur.execute("create table test (a UNICODE)")
-        self.cur.execute("insert into test(a) values (%s)", test_str)
+        self.cur.execute("insert into test(a) values (?)", test_str)
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
         self.failUnlessEqual(type(test_str), type(res.a),
@@ -256,7 +256,7 @@ class SQLiteBuiltinTypeSupport(unittest.TestCase, testsupport.TestSupport):
 
     def CheckInt(self):
         self.cur.execute("create table test (a INTEGER)")
-        self.cur.execute("insert into test(a) values (%s)", 5)
+        self.cur.execute("insert into test(a) values (?)", 5)
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
         self.failUnlessEqual(type(5), type(res.a),
@@ -265,7 +265,7 @@ class SQLiteBuiltinTypeSupport(unittest.TestCase, testsupport.TestSupport):
 
     def CheckFloat(self):
         self.cur.execute("create table test (a FLOAT)")
-        self.cur.execute("insert into test(a) values (%s)", 5.7)
+        self.cur.execute("insert into test(a) values(?)", 5.7)
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
         self.failUnlessEqual(type(5.7), type(res.a),
@@ -274,7 +274,7 @@ class SQLiteBuiltinTypeSupport(unittest.TestCase, testsupport.TestSupport):
 
     def CheckString(self):
         self.cur.execute("create table test (a VARCHAR(20))")
-        self.cur.execute("insert into test(a) values (%s)", "foo")
+        self.cur.execute("insert into test(a) values (?)", "foo")
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
         self.failUnlessEqual(type("foo"), type(res.a),
@@ -284,7 +284,7 @@ class SQLiteBuiltinTypeSupport(unittest.TestCase, testsupport.TestSupport):
     def CheckBinary(self):
         bindata = "".join([chr(x) for x in range(256)])
         self.cur.execute("create table test(b BINARY)")
-        self.cur.execute("insert into test(b) values (%s)", sqlite.Binary(bindata))
+        self.cur.execute("insert into test(b) values(?)", sqlite.Binary(bindata))
         self.cur.execute("select b from test")
         res = self.cur.fetchone()
         self.failUnlessEqual(bindata, res.b, "Binary roundtrip didn't produce original string")
@@ -294,7 +294,7 @@ class SQLiteBuiltinTypeSupport(unittest.TestCase, testsupport.TestSupport):
         def CheckDate(self):
             self.cur.execute("create table test (a DATE)")
             d = DateFrom("2002-05-07")
-            self.cur.execute("insert into test(a) values (%s)", d)
+            self.cur.execute("insert into test(a) values(?)", d)
             self.cur.execute("select a from test")
             res = self.cur.fetchone()
             if res.a != d:
@@ -303,7 +303,7 @@ class SQLiteBuiltinTypeSupport(unittest.TestCase, testsupport.TestSupport):
         def CheckTime(self):
             self.cur.execute("create table test (a TIME)")
             t = TimeFrom("22:15:00")
-            self.cur.execute("insert into test(a) values (%s)", t)
+            self.cur.execute("insert into test(a) values(?)", t)
             self.cur.execute("select a from test")
             res = self.cur.fetchone()
             if res.a != t:
@@ -312,7 +312,7 @@ class SQLiteBuiltinTypeSupport(unittest.TestCase, testsupport.TestSupport):
         def CheckTimestamp(self):
             self.cur.execute("create table test (a TIMESTAMP)")
             d = DateFrom("2002-05-07 22:15:00")
-            self.cur.execute("insert into test(a) values (%s)", d)
+            self.cur.execute("insert into test(a) values(?)", d)
             self.cur.execute("select a from test")
             res = self.cur.fetchone()
             if res.a != d:
@@ -321,7 +321,7 @@ class SQLiteBuiltinTypeSupport(unittest.TestCase, testsupport.TestSupport):
         def CheckInterval(self):
             self.cur.execute("create table test (a INTERVAL)")
             d = DateTimeDeltaFrom("02:00:00")
-            self.cur.execute("insert into test(a) values (%s)", d)
+            self.cur.execute("insert into test(a) values(?)", d)
             self.cur.execute("select a from test")
             res = self.cur.fetchone()
             if res.a != d:

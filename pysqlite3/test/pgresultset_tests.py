@@ -25,7 +25,7 @@ class PgResultSetTests(unittest.TestCase, testsupport.TestSupport):
             pass
 
         self.cur.execute("CREATE TABLE TEST (id, name, age)")
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (%s, %s, %s)",
+        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
                             (5, 'Alice', 29))
         self.cur.execute("-- types int, str, int")
         self.cur.execute("SELECT id, name, age FROM TEST")
@@ -135,7 +135,7 @@ class TupleResultTests(unittest.TestCase, testsupport.TestSupport):
             pass
 
         self.cur.execute("CREATE TABLE TEST (id, name, age)")
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (%s, %s, %s)",
+        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
                             (5, 'Alice', 29))
         self.cur.execute("-- types int, str, int")
         self.cur.execute("SELECT id, name, age FROM TEST")
@@ -148,11 +148,11 @@ class TupleResultTests(unittest.TestCase, testsupport.TestSupport):
             pass
 
         self.cur.execute("CREATE TABLE TEST (id, name, age)")
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (%s, %s, %s)",
+        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
                             (5, 'Alice', 29))
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (%s, %s, %s)",
+        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
                             (5, 'Alice', 29))
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (%s, %s, %s)",
+        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
                             (5, 'Alice', 29))
         self.cur.execute("-- types int, str, int")
         self.cur.execute("SELECT id, name, age FROM TEST")
@@ -165,11 +165,11 @@ class TupleResultTests(unittest.TestCase, testsupport.TestSupport):
             pass
 
         self.cur.execute("CREATE TABLE TEST (id, name, age)")
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (%s, %s, %s)",
+        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
                             (5, 'Alice', 29))
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (%s, %s, %s)",
+        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
                             (5, 'Alice', 29))
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (%s, %s, %s)",
+        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
                             (5, 'Alice', 29))
         self.cur.execute("-- types int, str, int")
         self.cur.execute("SELECT id, name, age FROM TEST")
