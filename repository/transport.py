@@ -76,6 +76,15 @@ class XMLOpener(urllib.FancyURLopener):
         else:
 	    raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
 
+def getrealhost(self, host):
+    """ Slice off username/passwd and portnum """
+    atpoint = host.find('@') + 1
+    colpoint = host.rfind(':')
+    if colpoint == -1:
+	return host[atpoint:]
+    else:
+	return host[atpoint:colpoint]
+
 
 class Transport(xmlrpclib.Transport):
 
@@ -84,11 +93,14 @@ class Transport(xmlrpclib.Transport):
 
     def request(self, host, handler, request_body, verbose=0):
 	self.verbose = verbose
+
 	# turn off proxy for localhost
-	if host == 'localhost':
+	realhost = getrealhost(host)
+	if realhost == 'localhost':
 	    opener = XMLOpener({})
 	else:
 	    opener = XMLOpener()
+
 	opener.addheaders = []
 	host, extra_headers, x509 = self.get_host_info(host)
 	opener.addheader('Host', host)
