@@ -103,7 +103,8 @@ to a repository.
 .B emerge \fI<component>...\fP
 Builds the recipe for the given component (which it finds using the
 \fIbuildLabel\fP) onto the \fBlocalhost@local:EMERGE\fP branch
-and updates the local system to the new build.
+and updates the local system to the new build. Dependency checks are
+not performed.
 .TP
 .B rblist
 Lists available rollbacks.
