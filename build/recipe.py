@@ -114,7 +114,8 @@ def setupRecipeDict(d, filename):
     d['filename'] = filename
 
 class RecipeLoader:
-    def __init__(self, filename, cfg=None, repos=None, component=None):
+    def __init__(self, filename, cfg=None, repos=None, component=None,
+                 label=None):
         self.recipes = {}
         
         if filename[0] != "/":
@@ -138,6 +139,7 @@ class RecipeLoader:
         self.module.__dict__['cfg'] = cfg
         self.module.__dict__['repos'] = repos
         self.module.__dict__['component'] = component
+        self.module.__dict__['label'] = label
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -158,6 +160,7 @@ class RecipeLoader:
         del self.module.__dict__['cfg']
         del self.module.__dict__['repos']
         del self.module.__dict__['component']
+        del self.module.__dict__['label']
 
         found = False
         for (name, obj) in self.module.__dict__.items():
@@ -291,7 +294,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     del outF
 
     try:
-        loader = RecipeLoader(recipeFile, cfg, repos, component)
+        loader = RecipeLoader(recipeFile, cfg, repos, component, label)
     finally:
         os.unlink(recipeFile)
     recipe = loader.getRecipe()
@@ -304,6 +307,10 @@ def loadRecipe(file, sourcecomponent=None, label=None):
     callerGlobals = inspect.stack()[1][0].f_globals
     cfg = callerGlobals['cfg']
     repos = callerGlobals['repos']
+    if label is None:
+        # if a label is not specified, use the label from the last loaded
+        # recipe
+        label = callerGlobals['label']
 
     if sourcecomponent and not sourcecomponent.endswith(':source'):
 	sourcecomponent = sourcecomponent + ':source'
