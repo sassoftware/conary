@@ -28,6 +28,8 @@ import tempfile
 import util
 import versions
 
+from build import tags
+
 MERGE = 1 << 0
 REPLACEFILES = 1 << 1
 IGNOREUGIDS = 1 << 2
@@ -44,13 +46,11 @@ class FilesystemJob:
     def _restore(self, fileObj, target, msg, contentsOverride = ""):
 	self.restores.append((fileObj.id(), fileObj, target, contentsOverride, 
 			      msg))
-	# hacks until we have generic tag trigger scripts
-	if 'shlib' in fileObj.tags and not os.path.exists(target):
-	    self.sharedLibraries.append(target)
-	if 'initscript' in fileObj.tags and not os.path.exists(target):
-	    self.initScripts.append(target)
-	if 'gconf2schema' in fileObj.tags and not os.path.exists(target):
-	    self.gconfSchema.append(target)
+	for tag in fileObj.tags:
+	    if self.tagActions.has_key(tag):
+		self.tagActions[tag].append(target)
+	    else:
+		self.tagActions[tag] = [ target ]
 
     def _remove(self, fileObj, target, msg):
 	if isinstance(fileObj, files.Directory):
@@ -78,7 +78,7 @@ class FilesystemJob:
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
 
-    def apply(self):
+    def apply(self, tagSet, tagScript):
 	for (oldPath, newPath, msg) in self.renames:
 	    os.rename(oldPath, newPath)
 	    log.debug(msg)
@@ -123,7 +123,7 @@ class FilesystemJob:
 	    f.close()
 	    log.warning(msg)
 
-	if self.sharedLibraries:
+	if self.tagActions.has_key('shlib'):
 	    p = "/sbin/ldconfig"
 	    if os.getuid():
 		log.warning("ldconfig skipped (insufficient permissions)")
@@ -142,7 +142,7 @@ class FilesystemJob:
 		ldsolines = []
 	    newlines = []
 	    rootlen = len(self.root)
-	    for path in self.sharedLibraries:
+	    for path in self.tagActions['shlib']:
 		dirname = os.path.dirname(path)[rootlen:]
 		dirline = dirname+'\n'
 		if dirline not in ldsolines:
@@ -182,14 +182,16 @@ class FilesystemJob:
 		if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
 		    log.error("ldconfig failed")
 
-	if self.initScripts:
+	    del self.tagActions['shlib']
+
+	if self.tagActions.has_key('initscript'):
 	    p = "/sbin/chkconfig"
 	    if os.getuid():
 		log.warning("chkconfig skipped (insufficient permissions)")
 	    elif os.access(util.joinPaths(self.root, p), os.X_OK) != True:
 		log.error("/sbin/chkconfig is not available")
 	    else:
-		for path in self.initScripts:
+		for path in self.tagActions['initscript']:
 		    name = os.path.basename(path)
 		    log.debug("running chkconfig --add %s", name)
 		    pid = os.fork()
@@ -205,41 +207,47 @@ class FilesystemJob:
 		    if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
 			log.error("chkconfig failed")
 
-	if self.gconfSchema:
-	    p = "/usr/bin/gconftool-2"
-	    if os.getuid():
-		log.warning("gconftool skipped (insufficient permissions to chroot)")
-	    elif os.access(util.joinPaths(self.root, p), os.X_OK) != True:
-		log.error("/usr/bin/gconftool-2 is not available")
-	    else:
-		try:
-		    gin = util.popen("gconftool-2 --get-default-source")
-		    gconvEnv = gin.read()[:-1] #chop
-		    gin.close()
-		except:
-		    log.error("gconftool-2 --get-default-source failed")
-		    # XXX is it right to use this default in this case?
-		    gconvEnv = 'xml::/etc/gconf/gconf.xml.defaults'
-		for path in self.gconfSchema:
-		    log.debug("running gconftool-2 --makefile-install-rule %s", path)
-		    pid = os.fork()
-		    if not pid:
-			os.chdir(self.root)
-			os.chroot(self.root)
-			os.environ['GCONF_CONFIG_SOURCE'] = gconvEnv
-                        try:
-			    # >/dev/null
-			    sys.stdout.flush()
-			    null = os.open('/dev/null', os.O_WRONLY)
-			    os.dup2(null, sys.stdout.fileno())
-			    os.close(null)
-                            os.execl(p, p, "--makefile-install-rule", path)
-                        except:
-                            os._exit(1)
-		    (id, status) = os.waitpid(pid, 0)
-		    if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
-			log.error("gconftool-2 failed")
+	    del self.tagActions['initscript']
 
+	tagCommands = []
+
+	if self.tagActions.has_key('tagdescription'):
+	    for path in self.tagActions['tagdescription']:
+		# these are new tag action files which we need to run for
+		# the first time. we run them against everything in the database
+		# which has this tag, which includes the files we've just
+		# installed
+
+		tagInfo = tags.TagFile(path, {})
+		path = path[len(self.root):]
+		
+		# don't run these twice
+		if self.tagActions.has_key(tagInfo.name):
+		    del self.tagActions[tagInfo.name]
+
+		cmd = [ path, "self", "update" ] + \
+			[x for x in self.repos.iterFilesWithTag(tagInfo.name)]
+		tagCommands.append(cmd)
+
+		tagSet[tagInfo.name] = tagInfo
+
+	    del self.tagActions['tagdescription']
+
+	rootLen = len(self.root)
+
+	for (tag, l) in self.tagActions:
+	    tagInfo = tagSet.get(tag, None)
+	    if tagInfo is None: continue
+
+	    cmd = [ tagInfo.file, "files", "update" ] + \
+		[ x[rootLen:] for x in l ]
+
+	    tagCommands.append(cmd)
+
+	if tagScript:
+	    f = open(tagScript, "a")
+	    f.write("\n".join([" ".join(x) for x in tagCommands]))
+	    f.write("\n")
 
     def getErrorList(self):
 	return self.errors
@@ -601,13 +609,12 @@ class FilesystemJob:
 	self.oldPackages = []
 	self.errors = []
 	self.newFiles = []
-	self.sharedLibraries = []
 	self.root = root
-	self.initScripts = []
-	self.gconfSchema = []
 	self.changeSet = changeSet
 	self.directorySet = {}
 	self.userRemovals = {}
+	self.tagActions = {}
+	self.repos = repos
 
 	for pkgCs in changeSet.iterNewPackageList():
 	    name = pkgCs.getName()

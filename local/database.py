@@ -14,6 +14,7 @@ import sqldb
 import update
 import util
 import versions
+from build import tags
 
 class RootChangeSetJob(repository.ChangeSetJob):
 
@@ -121,6 +122,9 @@ class SqlDbRepository(repository.DataStoreRepository,
                                         sortByPath = sortByPath, 
                                         withFiles = withFiles,
                                         pristine = pristine)
+
+    def iterFilesWithTag(self, tag):
+	return self.db.iterFilesWithTag(tag)
 
     def addFileVersion(self, fileId, version, file):
 	self.db.addFile(file, version)
@@ -236,7 +240,7 @@ class Database(SqlDbRepository):
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
     def commitChangeSet(self, cs, isRollback = False, toStash = True,
-                        replaceFiles = False):
+                        replaceFiles = False, tagScript = None):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -244,6 +248,8 @@ class Database(SqlDbRepository):
 
 	for pkg in cs.iterNewPackageList():
 	    if pkg.getName().endswith(":source"): raise SourcePackageInstall
+
+	tagSet = tags.loadTagDict("/etc/conary/tags")
 
 	# Make sure this change set doesn't unintentionally restore troves
 	# which have been removed.  take a look at which packages were removed
@@ -299,7 +305,6 @@ class Database(SqlDbRepository):
 	    inverse = cs.makeRollback(self, configFiles = 1)
             flags |= update.MERGE
 
-	# build the list of changes to the filesystem
 	fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root, 
 				     flags = flags)
 
@@ -353,7 +358,7 @@ class Database(SqlDbRepository):
 	    # FIXME need a --force for this
 	    return
 
-	fsJob.apply()
+	fsJob.apply(tagSet, tagScript)
 
 	for (troveName, troveVersion, troveFlavor, fileIdList) in fsJob.iterUserRemovals():
 	    self.db.removeFilesFromTrove(troveName, troveVersion, troveFlavor, fileIdList)

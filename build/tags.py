@@ -15,7 +15,7 @@ EXCLUDE, INCLUDE = range(2)
 
 class TagFile(conarycfg.ConfigFile):
 
-    def __init__(self, filename, macros):
+    def __init__(self, filename, macros = {}):
 	self.defaults = {
 	    'file'		: '',
 	    'name'		: '', 
@@ -55,3 +55,14 @@ class TagFile(conarycfg.ConfigFile):
 		else:
 		    return True
 	return False
+
+def loadTagDict(dirPath):
+    d = {}
+    try:
+	files = os.listdir(dirPath)
+    except OSError:
+	return {}
+
+    for path in files:
+	c = TagFile(path)
+	d[c.name] = c

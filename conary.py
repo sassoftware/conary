@@ -128,6 +128,7 @@ def realMain():
     argDef["profile"] = 0
     argDef["replace-files"] = 0
     argDef["sha1s"] = 0
+    argDef["tag-script"] = 1
     argDef["tags"] = 0
     argDef["target-branch"] = 1
 
@@ -378,10 +379,16 @@ def realMain():
 	return srcctl.sourceCommand(cfg, otherArgs[2:], argSet)
     elif (otherArgs[1] == "update"):
 	kwargs = {}
+
 	replaceFiles = argSet.has_key('replace-files')
 	if replaceFiles:
 	    kwargs['replaceFiles'] = True
 	    del argSet['replace-files']
+
+	if argSet.has_key('tag-script'):
+	    kwargs['tagScript'] = argSet['tag-script']
+	    del argSet['tag-script']
+
 	if argSet: return usage
 	if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	    repos = openRepository(cfg.repositoryMap)
