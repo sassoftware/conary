@@ -4,7 +4,6 @@
 #
 import buildpackage
 import changeset
-import commit
 import copy
 import files
 import lookaside
@@ -13,7 +12,6 @@ import package
 import recipe
 import sha1helper
 import shutil
-import tempfile
 import time
 import types
 import util
@@ -144,7 +142,6 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
             if not parent.filename in recipes:
                 recipes.append(parent.filename)
 
-	srcList = []
 	srcName = cfg.packagenamespace + ":" + recipeObj.name + ":sources"
 	srcBldPkg = buildpackage.BuildPackage(srcName, version)
 	for file in recipeObj.allSources() + recipes:
