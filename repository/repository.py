@@ -288,21 +288,6 @@ class IdealRepository(AbstractTroveDatabase):
 	"""
 	raise NotImplementedError
 
-    def getTroveFlavorsLatestVersion(self, troveName, branch):
-	"""
-	Returns a list of the most recent version for each flavor of a
-        trove available on a particular branch. If that branch doesn't
-        exist for the trove, an empty list is returned. The list is sorted
-	by version, with earlier versions first. The versions returned
-	by this function include time stamps.
-
-	@param troveName: trove name
-	@type troveName: str
-	@param branch: branch
-	@type branch: versions.Version
-	@rtype: list of (versions.Version, flavor) tuples
-	"""
-	raise NotImplementedError
 
     def getAllTroveFlavors(self, troveDict):
 	"""

@@ -349,6 +349,14 @@ class ConaryClient:
         return md
 
     def createBranch(self, newBranch, where, troveList = []):
+        return self._createBranchOrShadow(newBranch, where, troveList, 
+                                     shadow = False)
+
+    def createShadow(self, newBranch, where, troveList = []):
+        return self._createBranchOrShadow(newBranch, where, troveList, 
+                                     shadow = True)
+
+    def _createBranchOrShadow(self, newBranch, where, troveList, shadow):
         cs = changeset.ChangeSet()
 
 	troveList = [ (x, where) for x in troveList ]
@@ -404,8 +412,13 @@ class ConaryClient:
 
 	    for trove in troves:
                 troveName = trove.getName()
-		branchedVersion = trove.getVersion().createBranch(newBranch, 
-							         withVerRel = 1)
+                if shadow:
+                    branchedVersion = \
+                        trove.getVersion().createShadow(newBranch)
+                else:
+                    branchedVersion = \
+                        trove.getVersion().createBranch(newBranch, 
+                                                        withVerRel = 1)
 
                 branchedTrove = trove.copy()
 		branchedTrove.changeVersion(branchedVersion)
@@ -413,8 +426,11 @@ class ConaryClient:
 		for (name, version, flavor) in trove.iterTroveList():
 		    troveList.append((name, version))
 
-		    branchedVersion = version.createBranch(newBranch, 
-                                                           withVerRel = 1)
+                    if shadow:
+                        branchedVersion = version.createShadow(newBranch)
+                    else:
+                        branchedVersion = version.createBranch(newBranch, 
+                                                               withVerRel = 1)
 		    branchedTrove.delTrove(name, version, flavor,
                                            missingOkay = False)
 		    branchedTrove.addTrove(name, branchedVersion, flavor)

@@ -470,8 +470,8 @@ class Trove:
 
 	    for version in newVersionList:
 		branch = version.branch()
-		if version.hasParent():
-		    parent = version.parent()
+		if branch.hasParentBranch():
+		    parent = branch.parentBranch()
 		else:
 		    parent = None
 
@@ -484,7 +484,7 @@ class Trove:
 		    del oldVersionList[0]
 		else:
 		    sameBranch = None
-		    parentNode = None
+		    parentVersion = None
 		    childNode = None
 		    childBranch = None
 
@@ -492,15 +492,16 @@ class Trove:
 			if other.branch() == branch:
 			    sameBranch = other
 			if parent and other == parent:
-			    parentNode = other
-			if other.hasParent():
-			    if other.parent() == version:
+			    parentVersion = other
+			if other.hasParentVersion():
+			    if other.parentVersion() == version:
 				childNode = other
-			    if other.parent().branch() == branch:
-				childBranch = other
+                        if other.branch().hasParentBranch():
+                            if other.branch().parentBranch() == branch:
+                                childBranch = other
 
 		    # none is a sentinel
-		    priority = [ sameBranch, parentNode, childNode, 
+		    priority = [ sameBranch, parentVersion, childNode, 
 				 childBranch, None ]
 
 		    for match in priority:

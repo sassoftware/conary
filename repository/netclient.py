@@ -289,13 +289,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return self._mergeTroveQuery({}, d)
 
-    def getTroveFlavorsLatestVersion(self, troveName, branch):
-	return [ (versions.VersionFromString(x[0], 
-			timeStamps = [ float(z) for z in x[1].split(":")]),
-		  self.toFlavor(x[2])) for x in 
-                 self.c[branch].getTroveFlavorsLatestVersion(troveName, 
-                                                     branch.asString()) ]
-
     def getTroveVersionList(self, serverName, troveNameList):
         req = {}
         for name, flavors in troveNameList.iteritems():
@@ -888,18 +881,29 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         @param sourceName: the name of the :source component related to this
                            trove.  The default is troveName + ':source'
         @type sourceName: string
-        @param alwaysBumpCount: if True, the do not return a version that 
+        @param alwaysBumpCount: if True, then do not return a version that 
         matches an existing trove, even if their flavors would differentiate 
         them, instead, increase the appropriate count.  
         @type alwaysBumpCount: bool
         """
 
-        currentVersions = self.getTroveFlavorsLatestVersion(troveName, 
-                                                             currentBranch)
+        currentVersions = []
+
+        d = self.getTroveVersionsByBranch(
+                        { troveName : { currentBranch : None } })
+        if d.has_key(troveName):
+            # this mimics the result of an old call which was sorted
+            # earliest to latest, and provides currentVersion as
+            # a set of (version, flavor) tuples
+            for ver in sorted(d[troveName].keys(), versions.Version.compare):
+                currentVersions += [ (ver, x) for x in d[troveName][ver] ]
+
+        del d
 
         assert(troveFlavors is not None)
         if not isinstance(troveFlavors, (list, tuple)):
             troveFlavors = (troveFlavors,)
+
         # find the latest version of this trove and the latest version of
         # this flavor of this trove
         latestForFlavor = None
@@ -907,7 +911,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # this works because currentVersions is sorted earliest to latest
         for (version, flavor) in currentVersions:
             if flavor in troveFlavors:
-                if not latestForFlavor or flavor.isAfter(latestForFlavor):
+                if not latestForFlavor or version.isAfter(latestForFlavor):
                     latestForFlavor = version
             latest = version
 
@@ -938,34 +942,38 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     return latest
 
         if latest is None or latest.trailingVersion().getVersion() != versionStr:
-            # new package or package uses new upstream version
-            newVersion = currentBranch.createVersion(
-                        versions.VersionRelease("%s-1" % versionStr))
-            newVersionBranch = newVersion.branch()
-
             # this is a good guess, but it could be wrong since the same version
             # can appear at discountinuous points in the tree. it would be
             # better if this search was done on the server (it could be much
             # more efficient), but this works for now
-            allVersions = self.getTroveVersionsByLabel([ troveName ],
-                                                 newVersionBranch.label())
+            allVersions = self.getTroveVersionsByBranch(
+                        { troveName : { currentBranch : None } })
+
             lastOnBranch = None
-            if allVersions.has_key(troveName):
-                for version in allVersions[troveName]:
-                    if version.branch() == newVersionBranch and \
-                        (version.trailingVersion() == 
-                                newVersion.trailingVersion()) and \
-                        (not lastOnBranch or version.isAfter(lastOnBranch)):
-                        lastOnBranch = version
+            for version in allVersions.get(troveName, []):
+                if (version.trailingVersion().getVersion() == 
+                            versionStr) and \
+                    (not lastOnBranch or version.isAfter(lastOnBranch)):
+                    lastOnBranch = version
 
             if lastOnBranch:
                 newVersion = lastOnBranch.copy()
+            else:
+                # new package or package uses new upstream version. we
+                # use -0 here and let the increment method figure out where
+                # the 1 goes (this gets things right for shadows)
                 if binary:
-                    newVersion.incrementBuildCount()
+                    newVersion = currentBranch.createVersion(
+                                versions.VersionRelease("%s-1-0" % versionStr))
                 else:
-                    newVersion.incrementRelease()
-            elif binary:
+                    newVersion = currentBranch.createVersion(
+                                versions.VersionRelease("%s-0" % versionStr))
+
+            if binary:
                 newVersion.incrementBuildCount()
+            else:
+                newVersion.incrementRelease()
+
         elif (latestForFlavor != latest) and not alwaysBumpCount:
             # this is a flavor that does not exist at the latest
             # version on the branch.  Reuse the latest version to sync up.

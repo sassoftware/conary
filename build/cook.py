@@ -208,17 +208,20 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 	    vers = repos.getTroveLeavesByLabel([srcName], 
                                   buildLabel).get(srcName, {}).keys()
 
-	if len(vers) > 1:
-	    raise CookError('Multiple branches labeled %s exist for '
-			    'trove %s' % (fullName, buildLabel.asString))
-	elif not len(vers):
+        # turn the list of versions into a list of unique branches
+        branches = {}.fromkeys([ x.branch() for x in vers ]).keys()
+
+	if not branches:
             # create the label. not crazy about always doing this (we 
             # used to only create it if it didn't already exist, but
             # with acls that logic doesn't work anymore; we can't tell
             # if it exists on a branch we're not allowed to see or not)
             buildBranch = versions.Branch([buildLabel])
+	elif len(branches) > 1:
+	    raise CookError('Multiple branches labeled %s exist for '
+			    'trove %s' % (fullName, buildLabel.asString()))
 	else:
-	    buildBranch = vers[0].branch()
+	    buildBranch = branches[0]
 
 	# hack
 	for version in buildBranch.versions:
@@ -552,7 +555,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     if targetLabel:
 	targetVersion = targetVersion.createBranch(targetLabel, 
                                                    withVerRel = True)
-	targetVersion.trailingVersion().incrementBuildCount()
+	targetVersion.incrementBuildCount()
 
     # build up the name->fileid mapping so we reuse fileids wherever
     # possible; we do this by looking in the database for the latest
@@ -569,21 +572,24 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
             grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
 
         searchBranch = buildBranch
-        versionList = []
-        while not versionList and searchBranch:
-            try:
-                versionList = repos.getTroveFlavorsLatestVersion(main, 
-                                                                 searchBranch)
-            except repository.TroveNotFound:
-                pass
+        versionDict = []
+        while not versionDict and searchBranch:
+            # this gives us the latest version of each flavor available
+            # on the branch
+            versionDict = repos.getTroveLeavesByBranch(
+                                { main : { searchBranch : None }})
 
-            if not versionList:
-                if searchBranch.hasParent():
-                    searchBranch = searchBranch.parentNode().branch()
+            if not versionDict:
+                if searchBranch.hasParentBranch():
+                    searchBranch = searchBranch.parentBranch()
                 else:
                     searchBranch = None
 
-        troveList = [ (main, x[0], x[1]) for x in versionList ]
+        troveList = []
+        if versionDict:
+            for (ver, flavors) in versionDict[main].iteritems():
+                troveList += [ (main, ver, x) for x in flavors ]
+
         ident.populate(repos, troveList)
 
     for buildPkg in bldList:

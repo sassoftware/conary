@@ -452,8 +452,8 @@ class TroveStore:
             if versionId:
                 versionId = versionId[0]
             else:
-                if branch.hasParent():
-                    branch = branch.parentNode().branch()
+                if branch.hasParentBranch():
+                    branch = branch.parentBranch()
                 else:
                     return None
             
@@ -610,66 +610,6 @@ class TroveStore:
 	    else:
 		yield (pathId, path, fileId, version)
 
-    def iterTrovePerFlavorLeaves(self, troveName, branch):
-	# this needs to return a list sorted by version, from oldest to
-	# newest
-
-	# find out what flavors are provided by the head of the branch
-	# found yet
-	cu = self.db.cursor()
-	l = []
-
-	if branch.count("/") > 2:
-	    branchObj = versions.VersionFromString(branch)
-	    parent = branchObj.parentNode()
-	    brVersion = branchObj.createVersion(parent.trailingVersion())
-
-	    cu.execute("""
-		SELECT DISTINCT Nodes.timeStamps, Flavors.flavor 
-		    FROM Items JOIN Instances 
-		JOIN Flavors JOIN versions ON 
-		    items.itemId = instances.itemId AND 
-		    versions.versionId = instances.versionId AND 
-		    flavors.flavorId = instances.flavorId 
-		JOIN Nodes ON
-		    Nodes.itemId = instances.itemId AND
-		    Nodes.versionId = instances.versionId
-		WHERE item=? AND version=?""", troveName, parent.asString())
-
-	    l = [ (brVersion.asString(), x[0], x[1]) for x in cu ]
-
-	    del parent
-	    del brVersion
-
-	cu.execute("""
-	   SELECT Versions.version, Nodes.timeStamps, Flavors.flavor FROM 
-		Nodes JOIN Instances ON Nodes.itemId=Instances.itemId AND 
-				        Nodes.versionId=Instances.versionId 
-		      JOIN Versions ON Instances.versionId=Versions.versionId
-		      JOIN Flavors ON Instances.flavorId = Flavors.flavorId
-	   WHERE Nodes.itemId=(SELECT itemId FROM Items WHERE item=?)
-	     AND branchId=(SELECT branchId FROM Branches WHERE branch=?)
-	   ORDER BY finalTimeStamp
-	""", troveName, branch)
-
-	latest = {}	
-	deleteList = []
-	fullList = []
-	l += [ x for x in cu ]
-	for i, (version, timeStamps, flavor) in enumerate(l):
-	    if latest.has_key(flavor):
-		deleteList.append(latest[flavor])
-
-	    latest[flavor] = i
-	    fullList.append((version, timeStamps, flavor))
-
-	deleteList.sort()
-	deleteList.reverse()
-	for i in deleteList:
-	    del fullList[i]
-
-	return fullList
-	    
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion):
 	cu = troveInfo[0]
 	versionId = self.getVersionId(fileVersion, self.fileVersionCache)

@@ -72,7 +72,7 @@ class DisplayCache:
             short = {}
             passed = True
             for version in versionList:
-                if version.hasParent():
+                if version.hasParentVersion():
                     v = version.branch().label().asString() + '/' + \
                         version.trailingVersion().asString()
                 else:

@@ -21,6 +21,8 @@ import copy
 import time
 import weakref
 
+staticLabelTable = {}
+
 class AbstractVersion(object):
 
     """
@@ -55,6 +57,70 @@ class AbstractLabel(object):
     def __ne__(self, them):
 	return not self.__eq__(them)
 
+class SerialNumber(object):
+
+    """
+    Provides source and binary serial numbers.
+    """
+
+    __slots__ = ( "numList" )
+
+    def __cmp__(self, other):
+        if self.__class__ != other.__class__:
+            return False
+
+        i = 0
+        for i in range(min(len(self.numList), len(other.numList))):
+            if self.numList[i] < other.numList[i]:
+                return -1
+            elif self.numList[i] > other.numList[i]:
+                return 1
+
+        if len(self.numList) < len(other.numList):
+            return -1
+        elif len(self.numList) > len(other.numList):
+            return 1
+
+        return 0
+
+    def __eq__(self, other):
+        if self.__class__ != other.__class__:
+            return False
+
+        return self.numList == other.numList
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __str__(self):
+        return ".".join((str(x) for x in self.numList))
+
+    def __hash__(self):
+        hashVal = 0
+        for item in self.numList:
+            hashVal ^= hash(item) << 7
+
+        return hashVal
+
+    def shadowCount(self):
+        return len(self.numList) - 1
+
+    def truncateShadowCount(self, count):
+        count += 1
+
+        if len(self.numList) > count:
+            self.numList = self.numList[:count]
+
+    def increment(self, listLen):
+        self.numList += [ 0 ] * ((listLen + 1) - len(self.numList))
+        self.numList[-1] += 1
+
+    def __deepcopy__(self, mem):
+	return SerialNumber(str(self))
+
+    def __init__(self, value):
+        self.numList = [ int(x) for x in value.split(".") ]
+
 class VersionRelease(AbstractVersion):
 
     """
@@ -83,7 +149,7 @@ class VersionRelease(AbstractVersion):
 
 	if self.buildCount != None:
 	    if rc:
-		rc += "-%d" % self.buildCount
+		rc += "-%s" % self.buildCount
 	    else:
 		rc = str(self.buildCount)
 
@@ -119,17 +185,37 @@ class VersionRelease(AbstractVersion):
     def getVersion(self):
 	"""
 	Returns the version string of a version/release pair.
+
+        @rtype: str
 	"""
 
 	return self.version
 
     def getRelease(self):
 	"""
-	Returns the release number of a version/release pair.
+	Returns the source SerialNumber object of a version/release pair.
 
-        @rtype: int
+        @rtype: SerialNumber
 	"""
 	return self.release
+
+    def getBuildCount(self):
+	"""
+	Returns the build SerialNumber object of a version/release pair.
+
+        @rtype: SerialNumber
+	"""
+	return self.buildCount
+
+    def shadowCount(self):
+        i = self.release.shadowCount()
+        if i:
+            return i
+
+        if self.buildCount:
+            return self.buildCount.shadowCount()
+
+        return 0
 
     def __eq__(self, version):
 	if (type(self) == type(version) and self.version == version.version
@@ -141,22 +227,20 @@ class VersionRelease(AbstractVersion):
     def __hash__(self):
 	return hash(self.version) ^ hash(self.release) ^ hash(self.buildCount)
 
-    def incrementRelease(self):
+    def incrementRelease(self, shadowLength):
 	"""
 	Incremements the release number.
 	"""
-	self.release += 1
+	self.release.increment(shadowLength)
 	self.timeStamp = time.time()
 
-    def incrementBuildCount(self):
+    def setBuildCount(self, buildCount):
 	"""
 	Incremements the build count
 	"""
-	if self.buildCount:
-	    self.buildCount += 1
-	else:
-	    self.buildCount = 1
+	self.buildCount = buildCount
 
+    def resetTimeStamp(self):
 	self.timeStamp = time.time()
 
     def __init__(self, value, template = None, frozen = False):
@@ -222,13 +306,13 @@ class VersionRelease(AbstractVersion):
 
 	if release is not None:
 	    try:
-		self.release = int(release)
+		self.release = SerialNumber(release)
 	    except:
 		raise ParseError, \
 		    ("release numbers must be all numeric: %s" % release)
 	if buildCount is not None:
 	    try:
-		self.buildCount = int(buildCount)
+		self.buildCount = SerialNumber(buildCount)
 	    except:
 		raise ParseError, \
 		    ("build count numbers must be all numeric: %s" % buildCount)
@@ -303,7 +387,7 @@ class Label(AbstractLabel):
 	if at > colon:
 	    raise ParseError, "@ sign must occur before a colon"
 
-	if value.find(":") == -1:
+	if colon == -1:
 	    if not template:
 		raise ParseError, "colon expected before branch name"
 	    
@@ -326,32 +410,38 @@ class Label(AbstractLabel):
 	if not self.branch:
 	    raise ParseError, ("branch tag not be empty: %s" % value)
 
-class LocalBranch(Label):
+class StaticLabel(Label):
+
+    def __init__(self):
+	Label.__init__(self, self.name)
+
+class LocalBranch(StaticLabel):
 
     """
     Class defining the local branch.
     """
 
-    def __init__(self):
-	Label.__init__(self, "local@local:LOCAL")
+    name = "local@local:LOCAL"
 
-class EmergeBranch(Label):
-
-    """
-    Class defining the emerge branch.
-    """
-
-    def __init__(self):
-	Label.__init__(self, "local@local:EMERGE")
-
-class CookBranch(Label):
+class EmergeBranch(StaticLabel):
 
     """
     Class defining the emerge branch.
     """
 
-    def __init__(self):
-	Label.__init__(self, "local@local:COOK")
+    name = "local@local:EMERGE"
+
+class CookBranch(StaticLabel):
+
+    """
+    Class defining the emerge branch.
+    """
+
+    name = "local@local:COOK"
+
+staticLabelTable[LocalBranch.name] = LocalBranch
+staticLabelTable[EmergeBranch.name] = EmergeBranch
+staticLabelTable[CookBranch.name] = CookBranch
 
 class VersionSequence(object):
 
@@ -404,7 +494,8 @@ class VersionSequence(object):
 	@rtype: str
 	"""
 	l = self.versions
-	s = "/"
+        # this creates a leading /
+        strL = [ '' ]
 
         assert(defaultBranch is None or isinstance(defaultBranch, Branch))
 
@@ -412,16 +503,28 @@ class VersionSequence(object):
 	    start = Branch(self.versions[0:len(defaultBranch.versions)])
 	    if start == defaultBranch:
 		l = self.versions[len(defaultBranch.versions):]
-		s = ""
+		strL = []
 
-	oneAgo = None
-	twoAgo = None
-	for version in l:
-	    s = s + ("%s/" % version.asString(twoAgo, frozen = frozen))
-	    twoAgo = oneAgo
-	    oneAgo = version
+        lastLabel = None
+        lastVersion = None
+        expectLabel = isinstance(l[0], Label)
 
-	return s[:-1]
+        for verPart in l:
+            if expectLabel:
+                strL.append(verPart.asString(lastLabel, frozen = frozen))
+                lastLabel = verPart
+                expectLabel = False
+            elif isinstance(verPart, Label):
+                # shadow
+                strL.append('')
+                strL.append(verPart.asString(lastLabel, frozen = frozen))
+                lastLabel = verPart
+            else:
+                strL.append(verPart.asString(lastVersion, frozen = frozen))
+                lastVersion = verPart
+                expectLabel = True
+                
+	return "/".join(strL)
 
     def freeze(self):
 	"""
@@ -442,28 +545,17 @@ class VersionSequence(object):
 
         return copy.deepcopy(self)
 
-    def hasParent(self):
-	"""
-	Tests whether or not the current branch or version has a parent.
-	True for all versions other then those on trunks.
-
-	@rtype: boolean
-	"""
-	return(len(self.versions) >= 3)
-
     def timeStamps(self):
-	res = []
-	for verRel in self.versions[1::2]:
-	    res.append(verRel.timeStamp)
-
-	return res
+        return [ x.timeStamp for x in self.versions if 
+                                            isinstance(x, AbstractVersion)]
 
     def setTimeStamps(self, timeStamps):
-	count = 1
-	for stamp in timeStamps:
-	    self.versions[count].timeStamp = stamp
-	    count += 2
-
+        i = 0
+        for item in self.versions:
+            if isinstance(item, AbstractVersion):
+                item.timeStamp = timeStamps[i]
+                i += 1
+            
     def __init__(self, versionList):
         """
         Creates a Version object from a list of AbstractLabel and
@@ -507,19 +599,143 @@ class Version(VersionSequence):
 
     __slots__ = ()
 
+    def shadowLength(self):
+        """
+        Returns the shadow-depth since the last branch.
+
+        @rtype: int
+        """
+        count = 0
+        expectVersion = False
+
+        iter = reversed(self.versions)
+        iter.next()
+        
+        for item in iter:
+            if expectVersion and isinstance(item, AbstractVersion):
+                return count
+            elif expectVersion:
+                count += 1
+            else:
+                expectVersion = True
+
+        return count
+
+    def canonicalVersion(self):
+        # returns the canonical version for this version. if this is a
+        # shadow of a version, we return that original version
+        v = self.copy()
+        
+        release = v.trailingVersion()
+        shadowCount = release.release.shadowCount()
+        if release.buildCount and \
+                release.buildCount.shadowCount() > shadowCount:
+            shadowCount = release.buildCount.shadowCount()
+
+        stripCount = v.shadowLength() - shadowCount
+        for i in range(stripCount):
+            v = v.parentVersion()
+
+        return v
+
+    def hasParentVersion(self):
+        # things which have parent versions are:
+        #   1. sources which were branched or shadows
+        #   2. binaries which were branched or shadowed
+        #
+        # built binaries don't have parent versions
+
+        if len(self.versions) < 3:
+            # too short
+            return False
+
+        if self.versions[-1].buildCount is None:
+            return True
+
+        # find the previous VersionRelease object. If the shadow counts are
+        # the same, this is a direct child
+        iter = reversed(self.versions)
+        # this skips the first one
+        item = iter.next()
+        item = iter.next()
+        try:
+            while not isinstance(item, AbstractVersion):
+                item = iter.next()
+        except StopIteration:
+            return False
+
+        if item.buildCount and \
+            item.buildCount.shadowCount() == \
+                self.versions[-1].buildCount.shadowCount():
+            return True
+
+        return False
+
+    def parentVersion(self):
+	"""
+	Returns the parent version of this version. Undoes shadowing and
+        such to find it.
+
+	@rtype: Version
+	"""
+        assert(self.hasParentVersion())
+
+        # if this is a branch, finding the parent is easy
+        if isinstance(self.versions[-3], AbstractVersion):
+            return Version(self.versions[:-2])
+
+        # this is a shadow. work a bit harder
+        items = self.versions[:-2] + [ self.versions[-1].copy() ]
+
+        shadowCount = self.shadowLength() - 1
+        items[-1].release.truncateShadowCount(shadowCount)
+        if items[-1].buildCount:
+            items[-1].buildCount.truncateShadowCount(shadowCount)
+
+	return Version(items)
+
     def incrementRelease(self):
 	"""
 	The release number for the final element in the version is
 	incremented by one and the time stamp is reset.
 	"""
-	self.versions[-1].incrementRelease()
+	self.versions[-1].incrementRelease(self.shadowLength())
 
     def incrementBuildCount(self):
 	"""
 	The build count number for the final element in the version is
 	incremented by one and the time stamp is reset.
 	"""
-	self.versions[-1].incrementBuildCount()
+	self.versions[-1].incrementBuildCount(self.shadowLength())
+
+    def incrementBuildCount(self):
+	"""
+	Incremements the build count
+	"""
+        # if the source count is the right length for this shadow
+        # depth, just increment the build count (without lengthing
+        # it). if the source count is too short, make the build count
+        # the right length for this shadow
+        shadowLength = self.shadowLength()
+
+        sourceCount = self.versions[-1].getRelease()
+        buildCount = self.versions[-1].getBuildCount()
+
+        if sourceCount.shadowCount() == shadowLength:
+            if buildCount:
+                buildCount.increment(buildCount.shadowCount())
+            else:
+                buildCount = SerialNumber('1')
+                self.versions[-1].setBuildCount(buildCount)
+        else:
+            if buildCount:
+                buildCount.increment(shadowLength)
+            else:
+                buildCount = SerialNumber(
+                            ".".join([ '0' ] * shadowLength + [ '1' ] ))
+                self.versions[-1].setBuildCount(buildCount)
+
+        self.versions[-1].resetTimeStamp()
 
     def trailingVersion(self):
 	"""
@@ -545,16 +761,6 @@ class Version(VersionSequence):
 	@rtype: Version
 	"""
 	return Branch(self.versions[:-1])
-
-    def parent(self):
-	"""
-	Returns the parent version for this version (the version this
-	object's branch branched from.
-
-	@rtype: Version
-	"""
-	assert(len(self.versions) > 3)
-	return Version(self.versions[:-2])
 
     def isAfter(self, other):
 	"""
@@ -589,9 +795,25 @@ class Version(VersionSequence):
 
 	if withVerRel:
 	    newlist.append(self.versions[-1].copy())
-            return Version(self.versions + newlist)
+            return Version(copy.deepcopy(self.versions + newlist))
 
-        return Branch(self.versions + newlist)
+        return Branch(copy.deepcopy(self.versions + newlist))
+
+    def createShadow(self, label):
+	"""
+	Creates a new shadow from this version. 
+
+	@param label: Branch to create for this version
+	@type label: AbstractLabel
+	@rtype: Version 
+	"""
+	assert(isinstance(label, AbstractLabel))
+
+        newRelease = self.versions[-1].copy()
+	newRelease.timeStamp = time.time()
+
+        newList = self.versions[:-1] + [ label ] + [ newRelease ]
+        return Version(copy.deepcopy(newList))
 
     def getSourceBranch(self):
         """ Takes a binary branch and returns its associated source branch.
@@ -624,16 +846,14 @@ class Version(VersionSequence):
         getBinaryBranch converts from the former to the latter.  Always returns
         a copy of the branch, even when the two are equal.
         """
-        v = self.copy()
-        p = v.branch()
+        newV = self.copy()
+        v = newV
 
-        if p.hasParent():
-            p = p.parentNode()
-            p.trailingVersion().buildCount = 0
-            while p.hasParent():
-                p = p.parent()
-                p.trailingVersion().buildCount = 0
-        return v
+        while v.hasParentVersion():
+            v = v.parentVersion()
+            v.trailingVersion().buildCount = 0
+
+        return newV
 
 class Branch(VersionSequence):
 
@@ -651,14 +871,22 @@ class Branch(VersionSequence):
 	"""
 	return self.versions[-1]
 
-    def parentNode(self):
+    def parentBranch(self):
 	"""
-	Returns the parent version of a branch.
+	Returns the parent branch of a branch.
 
 	@rtype: Version
 	"""
-	assert(len(self.versions) >= 3)
-	return Version(self.versions[:-1])
+        items = self.versions[:-1]
+        if isinstance(items[-1], VersionRelease):
+            del items[-1]
+
+        assert(items)
+
+	return Branch(items)
+
+    def hasParentBranch(self):
+        return len(self.versions) > 2
 
     def createVersion(self, verRel):
 	"""
@@ -673,6 +901,23 @@ class Branch(VersionSequence):
 	verRel.timeStamp = time.time()
         return Version(self.versions + [ verRel ])
 
+    def createShadow(self, label):
+	"""
+	Creates a new shadow from this branch. 
+
+	@param branch: Label of the new shadow
+	@type branch: AbstractLabel
+	@param withVerRel: If set, the new branch is turned into a version
+	on the branch using the same version and release as the original
+	verison.
+	@type withVerRel: boolean
+	@rtype: Version 
+	"""
+	assert(isinstance(label, AbstractLabel))
+
+	newlist = [ label ]
+        return Branch(self.versions + newlist)
+
 def _parseVersionString(ver, frozen):
     """
     Converts a string representation of a version into a VersionRelease
@@ -681,35 +926,6 @@ def _parseVersionString(ver, frozen):
     @param ver: version string
     @type ver: str
     """
-    parts = ver.split("/")
-    del parts[0]	# absolute versions start with a /
-
-    v = []
-    lastVersion = None
-    lastBranch = None
-    while parts:
-        lastBranch = Label(parts[0], template = lastBranch)
-        if lastBranch.asString() == "local@local:LOCAL":
-            lastBranch = None
-            v.append(LocalBranch())
-        elif lastBranch.asString() == "local@local:COOK":
-            lastBranch = None
-            v.append(CookBranch())
-        elif lastBranch.asString() == "local@local:EMERGE":
-            lastBranch = None
-            v.append(EmergeBranch())
-        else:
-            v.append(lastBranch)
-
-        if len(parts) >= 2:
-            lastVersion = VersionRelease(parts[1], template = lastVersion,
-                                         frozen = frozen)
-            v.append(lastVersion)
-            parts = parts[2:]
-        else:
-            parts = None
-
-    return v
 	
 def ThawVersion(ver):
     if ver == "@NEW@":
@@ -753,14 +969,54 @@ def _VersionFromString(ver, defaultBranch = None, frozen = False,
     if ver[0] != "/":
         ver = defaultBranch.asString() + "/" + ver
 
-    vList = _parseVersionString(ver, frozen = frozen)
+    parts = ver.split("/")
+    del parts[0]	# absolute versions start with a /
 
-    if len(vList) % 2 == 0:
+    vList = []
+    lastVersion = None
+    lastBranch = None
+    expectLabel = True
+    justShadowed = False
+
+    for part in parts:
+        if expectLabel:
+            lastBranch = Label(part, template = lastBranch)
+
+            staticLabelClass = staticLabelTable.get(lastBranch.asString(), None)
+            if staticLabelClass is not None:
+                lastBranch = None
+                vList.append(staticLabelClass())
+            else:
+                vList.append(lastBranch)
+            expectLabel = False
+
+            if justShadowed:
+                justShadowed = False
+            else:
+                shadowCount = 0
+        elif not part:
+            # blank before a shadow
+            expectLabel = True
+            shadowCount += 1
+            justShadowed = True
+        else:
+            expectLabel = True
+
+            lastVersion = VersionRelease(part, template = lastVersion,
+                                         frozen = frozen)
+            if lastVersion.shadowCount() > shadowCount:
+                raise ParseError, "two many shadow serial numbers in '%s'" \
+                        % part
+            vList.append(lastVersion)
+            parts = parts[2:]
+
+    if isinstance(vList[-1], AbstractVersion):
         ver = Version(vList)
     else:
         ver = Branch(vList)
 
-    ver.setTimeStamps(timeStamps)
+    if timeStamps:
+        ver.setTimeStamps(timeStamps)
 
     return ver
 

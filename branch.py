@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 #
-# Copyright (c) 2004 Specifix, Inc.
+# Copyright (c) 2005 Specifix, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -13,14 +13,14 @@
 # full details.
 #
 """
-Implements branch command line functionality.
+Implements branch and shadow command line functionality.
 """
 
 import conaryclient
 import versions
 from lib import log
 
-def branch(cfg, branchName, branchFrom, troveName = None):
+def branch(cfg, branchName, branchFrom, troveName = None, makeShadow = False):
     try:
 	newBranch = versions.Label(branchName)
 
@@ -34,6 +34,10 @@ def branch(cfg, branchName, branchFrom, troveName = None):
 
     client = conaryclient.ConaryClient(cfg)
 
-    dups = client.createBranch(newBranch, branchSource, [troveName])
+    if makeShadow:
+        dups = client.createShadow(newBranch, branchSource, [troveName])
+    else:
+        dups = client.createBranch(newBranch, branchSource, [troveName])
+
     for (name, branch) in dups:
         log.warning("%s already has branch %s", name, branch.asString())

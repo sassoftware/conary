@@ -306,7 +306,7 @@ def addUser(userName, otherArgs):
         from getpass import getpass
 
         pw1 = getpass('Password:')
-        pw2 = getpass('Reenter password :')
+        pw2 = getpass('Reenter password:')
 
         if pw1 != pw2:
             print "Passwords do not match."

@@ -61,7 +61,7 @@ class BranchTable(idtable.IdTable):
         if 'Branches' not in tables:
             cu.execute("CREATE TABLE Branches(branchId integer primary key,"
 					     "branch str unique,"
-					     "parentNode integer)")
+					     "parentVersion integer)")
 	    self.initTable()
 
 class LabelTable(idtable.IdTable):
@@ -182,13 +182,6 @@ class SqlVersioning:
     def branchesOfItem(self, itemId):
 	return self.labelMap.branchesByItem(itemId)
 
-    def latestOnBranch(self, itemId, branchId, flavorId):
-	versionId = self.latest.get((itemId, branchId, flavorId), None)
-        if versionId is None:
-            branch = self.branchTable.getId(branchId)
-            return self.versionTable[branch.parentNode()]
-        return versionId
-
     def hasVersion(self, itemId, versionId):
 	return self.nodes.hasItemId(itemId)
 
@@ -244,20 +237,10 @@ class SqlVersioning:
 	"""
 	Creates a new branch for the given node. 
 	"""
-	assert(not branch.hasParent() or 
-	       min(branch.parentNode().timeStamps()) > 0)
 	label = branch.label()
 	branchId = self.branchTable.get(branch, None)
 	if not branchId:
-	    if branch.hasParent():
-		parent = branch.parentNode()
-		parentId = self.versionTable.get(parent, None)
-		if parentId is None:
-		    parentId = self.versionTable.addId(parent)
-	    else:
-		parentId = 0
-
-	    branchId = self.branchTable.addId(branch, parentId)
+	    branchId = self.branchTable.addId(branch, 0)
 	    if not self.labels.has_key(label):
 		self.labels.addId(label)
 

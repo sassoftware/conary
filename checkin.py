@@ -69,6 +69,8 @@ class SourceState(trove.Trove):
 	f.write("name %s\n" % self.getName())
 	if self.version:
 	    f.write("version %s\n" % self.getVersion().freeze())
+        if self.branch:
+	    f.write("branch %s\n" % self.getBranch().freeze())
 
         rc = []
 	rc.append("%d\n" % (len(self.idMap)))
@@ -82,6 +84,9 @@ class SourceState(trove.Trove):
 
     def changeBranch(self, branch):
 	self.branch = branch
+
+    def getBranch(self):
+        return self.branch
 
     def getRecipeFileName(self):
         # XXX this is not the correct way to solve this problem
@@ -101,9 +106,10 @@ class SourceState(trove.Trove):
 
 	return versionStr
 
-    def __init__(self, name, version):
+    def __init__(self, name, version, branch):
 	trove.Trove.__init__(self, name, version, 
                              deps.deps.DependencySet(), None)
+        self.branch = branch
 
 class SourceStateFromFile(SourceState):
 
@@ -124,12 +130,12 @@ class SourceStateFromFile(SourceState):
     def parseFile(self, filename):
 	f = open(filename)
 	rc = [self]
-	for (what, isBranch) in [ ('name', 0), ('version', 1) ]:
+        for (what, isVer) in [ ('name', 0), ('version', 1), ('branch', 1) ]:
 	    line = f.readline()
 	    fields = line.split()
 	    assert(len(fields) == 2)
 	    assert(fields[0] == what)
-	    if isBranch:
+	    if isVer:
 		rc.append(versions.ThawVersion(fields[1]))
 	    else:
 		rc.append(fields[1])
@@ -146,13 +152,11 @@ class SourceStateFromFile(SourceState):
 	self.parseFile(file)
 
 def _verifyAtHead(repos, headPkg, state):
-    headVersion = repos.getTroveLatestVersion(state.getName(), 
-					 state.getVersion().branch())
-    if not headVersion == state.getVersion():
-	return False
+    # we consider ourselves to be at head as long as the file versions
+    # we're based on our correct. we don't care what version we're actually
+    # at (since the version in CONARY may not be on the right branch, version
+    # checks would be tricky)
 
-    # make sure the files in this directory are based on the same
-    # versions as those in the package at head
     for (pathId, path, fileId, version) in state.iterFileList():
 	if isinstance(version, versions.NewVersion):
 	    assert(not headPkg.hasFile(pathId))
@@ -213,9 +217,9 @@ def checkout(repos, cfg, workDir, name):
                       workDir, str(err))
 	    return
 
-    branch = fullLabel(cfg.buildLabel, trv.getVersion(), 
-				   versionStr)
-    state = SourceState(trv.getName(), trv.getVersion())
+    branch = fullLabel(cfg.buildLabel, trv.getVersion(), versionStr)
+    state = SourceState(trv.getName(), trv.getVersion(), 
+                        trv.getVersion().branch())
 
     # it's a shame that findTrove already sent us the trove since we're
     # just going to request it again
@@ -265,17 +269,20 @@ def commit(repos, cfg, message, sourceCheck = False):
     except OSError:
         return
 
+    troveName = state.getName()
+
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
         name = state.getName()
         if repos.getTroveLeavesByLabel([name], cfg.buildLabel).get(name, []):
 	    log.error("%s is marked as a new package but it " 
-		      "already exists" % state.getName())
+		      "already exists" % troveName)
 	    return
 	srcPkg = None
         del name
     else:
-	srcPkg = repos.getTrove(state.getName(), state.getVersion(),
+	srcPkg = repos.getTrove(troveName, 
+                                state.getVersion().canonicalVersion(),
                                 deps.deps.DependencySet())
 
 	if not _verifyAtHead(repos, srcPkg, state):
@@ -297,20 +304,47 @@ def commit(repos, cfg, message, sourceCheck = False):
             recipeObj.populateLcache()
             log.setVerbosity(1)
             recipeObj.setup()
-            files = recipeObj.fetchAllSources()
+            recipeObj.fetchAllSources()
             log.setVerbosity(0)
         
     recipeVersionStr = recipeClass.version
 
+    branch = state.getBranch()
+
+    # repos.nextVersion seems like a good idea, but it doesn't know how to
+    # handle shadow merges. this is easier than teaching it
     if isinstance(state.getVersion(), versions.NewVersion):
-	branch = versions.Branch([cfg.buildLabel])
+        # increment it like this to get it right on shadows
+        newVersion = state.getBranch().createVersion(
+                           versions.VersionRelease("%s-0" % recipeVersionStr))
+        newVersion.incrementRelease()
     else:
-	branch = state.getVersion().branch()
+        d = repos.getTroveVersionsByBranch({ troveName : 
+                                             { state.getBranch() : None } } )
+        versionList = d.get(troveName, {}).keys()
+        versionList.sort(versions.Version.compare)
 
-    newVersion = repos.nextVersion(state.getName(), recipeVersionStr, 
-				   deps.deps.DependencySet(), branch, 
-                                   binary = False)
+        if state.getVersion().trailingVersion().getVersion() != \
+                                    recipeVersionStr:
+            for ver in reversed(versionList):
+                if ver.trailingVersion().getVersion() == recipeVersionStr:
+                    break
 
+            if ver.trailingVersion().getVersion() == recipeVersionStr:
+                newVersion = ver.copy()
+            else:
+                newVersion = state.getBranch().createVersion(
+                           versions.VersionRelease("%s-0" % recipeVersionStr))
+        else:
+            newVersion = state.getVersion().copy()
+
+        newVersion.incrementRelease()
+        if troveName in d:
+            while newVersion in versionList:
+                newVersion.incrementRelease()
+
+        del d
+            
     result = update.buildLocalChanges(repos, 
 		    [(state, srcPkg, newVersion, update.IGNOREUGIDS)],
                     forceSha1=True)
@@ -331,6 +365,21 @@ def commit(repos, cfg, message, sourceCheck = False):
 	return
 
     pkgCs = changeSet.iterNewPackageList().next()
+
+    if pkgCs.getOldVersion() is not None and \
+            pkgCs.getOldVersion().branch().label().getHost() != \
+            pkgCs.getNewVersion().branch().label().getHost():
+        # we can't commit across hosts, so just make an absolute change
+        # set instead (yeah, a bit of a hack). this can happen on shadows
+        fileMap = {}
+        for (pathId, path, fileId, version) in state.iterFileList():
+            fullPath = os.path.join(os.getcwd(), path)
+            fileObj = files.FileFromFilesystem(fullPath, pathId)
+            fileMap[pathId] = (fileObj, fullPath, path)
+            
+        changeSet = changeset.CreateFromFilesystem([ (newState, fileMap) ])
+        pkgCs = changeSet.iterNewPackageList().next()
+
     pkgCs.changeChangeLog(cl)
 
     repos.commitChangeSet(changeSet)
@@ -342,11 +391,11 @@ def annotate(repos, filename):
     except OSError:
         return
     curVersion = state.getVersion()
-    branch = state.getVersion().branch()
-    label = branch.label()
+    branch = state.getBranch()
     troveName = state.getName()
 
-    labelVerList = repos.getTroveVersionsByLabel([troveName], label)[troveName]
+    labelVerList = repos.getTroveVersionsByBranch(
+                        {troveName: { branch : None}})[troveName]
     labelVerList = labelVerList.keys()
     # sort verList into ascending order (first commit is first in list)
     labelVerList.sort(versions.Version.compare)
@@ -444,14 +493,17 @@ def annotate(repos, filename):
             
         # there are still unmatched lines, and there is a parent branch,  
         # so search the parent branch for matches
-        if not verList and branch.hasParent():
+        if not verList and branch.hasParentBranch():
             switchedBranches = True
-            curVersion = branch.parentNode()
-            branch = curVersion.branch()
+            branch = branch.parentBranch()
             label = branch.label()
             if branch not in branchVerList:
-                labelVerList = repos.getTroveVersionsByLabel([troveName], label)[troveName]
-                for ver in labelVerList:
+                labelVerList = repos.getTroveVersionsByBranch(
+                        { troveName : { branch : None }})[troveName]
+                keys = labelVerList.keys()
+                keys.sort(versions.Version.compare)
+
+                for ver in keys:
                     b = ver.branch()
                     if b not in branchVerList:
                         branchVerList[b] = []
@@ -560,7 +612,8 @@ def diff(repos, versionStr = None):
 
 	oldPackage = pkgList[0]
     else:
-	oldPackage = repos.getTrove(state.getName(), state.getVersion(), 
+	oldPackage = repos.getTrove(state.getName(), 
+                                    state.getVersion().canonicalVersion(), 
                                     deps.deps.DependencySet())
 
     result = update.buildLocalChanges(repos, 
@@ -644,8 +697,7 @@ def updateSrc(repos, versionStr = None):
     baseVersion = state.getVersion()
     
     if not versionStr:
-	headVersion = repos.getTroveLatestVersion(pkgName, 
-						  state.getVersion().branch())
+	headVersion = repos.getTroveLatestVersion(pkgName, state.getBranch())
 	head = repos.getTrove(pkgName, headVersion, 
                               deps.deps.DependencySet())
 	newBranch = None
@@ -696,6 +748,58 @@ def updateSrc(repos, versionStr = None):
 
     if newState.getVersion() == pkgCs.getNewVersion() and newBranch:
 	newState.changeBranch(newBranch)
+
+    newState.write("CONARY")
+
+def merge(repos):
+    # merges the head of the current shadow with the head of the branch
+    # it shadowed from
+    try:
+        state = SourceStateFromFile("CONARY")
+    except OSError:
+        return
+
+    troveName = state.getName()
+
+    # make sure the current version is at head
+    shadowHeadVersion = repos.getTroveLatestVersion(troveName, 
+                                                    state.getBranch())
+    if state.getVersion() != shadowHeadVersion:
+        log.info("working directory is already based on head of branch")
+        return
+
+    parentHeadVersion = repos.getTroveLatestVersion(troveName, 
+                                  state.getBranch().parentBranch())
+    parentRootVersion = state.getVersion().parentVersion()
+
+    changeSet = repos.createChangeSet([(troveName, 
+                            (parentRootVersion, deps.deps.DependencySet()), 
+                            (parentHeadVersion, deps.deps.DependencySet()), 
+                            0)])
+
+    # make sure there are changes to apply
+    packageChanges = changeSet.iterNewPackageList()
+    pkgCs = packageChanges.next()
+    assert(util.assertIteratorAtEnd(packageChanges))
+
+    localVer = parentRootVersion.createBranch(versions.LocalBranch(), 
+                                               withVerRel = 1)
+    fsJob = update.FilesystemJob(repos, changeSet, 
+				 { (state.getName(), localVer) : state }, "",
+				 flags = update.IGNOREUGIDS | update.MERGE)
+    errList = fsJob.getErrorList()
+    if errList:
+	for err in errList: log.error(err)
+    fsJob.apply()
+
+    newPkgs = fsJob.iterNewPackageList()
+    newState = newPkgs.next()
+    assert(util.assertIteratorAtEnd(newPkgs))
+
+    if newState.getVersion() == pkgCs.getNewVersion():
+        branch = state.getVersion().branch()
+        version = branch.createVersion(newState.getVersion().trailingVersion())
+	newState.changeVersion(version)
 
     newState.write("CONARY")
 
@@ -753,7 +857,10 @@ def removeFile(file):
 def newPackage(repos, cfg, name):
     name += ":source"
 
-    state = SourceState(name, versions.NewVersion())
+    # XXX this should really allow a --build-branch or something; we can't
+    # create new packages on branches this way
+    branch = versions.Branch([cfg.buildLabel])
+    state = SourceState(name, versions.NewVersion(), branch)
 
     # see if this package exists on our build branch
     if repos and repos.getTroveLeavesByLabel([name], 
@@ -805,7 +912,7 @@ def showLog(repos, branch = None):
         return
 
     if not branch:
-	branch = state.getVersion().branch()
+	branch = state.getBranch()
     else:
 	if branch[0] != '/':
 	    log.error("branch name expected instead of %s" % branch)

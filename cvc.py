@@ -54,6 +54,7 @@ def usage(rc = 1):
     print "       cvc rdiff <name> <oldver> <newver>"
     print "       cvc remove <file> [<file2> <file3> ...]"
     print "       cvc rename <oldfile> <newfile>"
+    print "       cvc shadow <newshadow> <shadowfrom> [<trove>]"
     print "       cvc update <version>"
     print 
     print 'common flags:  --build-label <label>'
@@ -140,12 +141,14 @@ def sourceCommand(cfg, args, argSet):
 
 	args = [repos, cfg, dir] + args[1:]
 	checkin.checkout(*args)
-    elif (args[0] == "branch"):
+    elif (args[0] == "branch" or args[0] == "shadow"):
         if argSet: return usage()
         if len(args) != 4: return usage()
 
+        extraArgs = { 'makeShadow' : (args[0] == "shadow") }
+
         args = [cfg, ] + args[1:]
-        branch.branch(*args)
+        branch.branch(*args, **extraArgs)
     elif (args[0] == "commit"):
 	message = argSet.get("message", None)
         sourceCheck = True
@@ -200,6 +203,11 @@ def sourceCommand(cfg, args, argSet):
 	    repos = None
 
 	checkin.newPackage(repos, cfg, args[1])
+    elif (args[0] == "merge"):
+	if argSet or not args or len(args) > 1: return usage()
+	repos = NetworkRepositoryClient(cfg.repositoryMap)
+        
+	checkin.merge(repos)
     elif (args[0] == "update"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)

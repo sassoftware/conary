@@ -51,24 +51,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     #      which has any allowed flavor
     # _GET_TROVE_VERY_LATEST/_GET_TROVE_ALL_FLAVORS
     #      returns all flavors available for the latest version of the
-    #      trove which has an allowed flavor (UNSUPPORTED)
+    #      trove which has an allowed flavor
     # _GET_TROVE_VERY_LATEST/_GET_TROVE_BEST_FLAVOR
     #      returns the best flavor for the latest version of the trove
     #      which has at least one allowed flavor
-    #
-    # _GET_TROVE_ALL_LATEST/_GET_TROVE_ALLOWED_FLAVOR
-    #      returns all the allowed flavors for each version of the trove
-    #      which is a leaf for at least one allowed flavor. this is probably
-    #      not useful (UNSUPPORTED)
-    # _GET_TROVE_ALL_LATEST/_GET_TROVE_ALL_FLAVORS
-    #      returns all the flavors for each version of the trove
-    #      which is a leaf for at least one allowed flavor. this is probably
-    #      not useful (UNSUPPORTED)
-    # _GET_TROVE_ALL_LATEST/_GET_TROVE_BEST_FLAVORS
-    #      returns all of the flavors available for all versions
     _GET_TROVE_ALL_VERSIONS = 1
-    _GET_TROVE_ALL_LATEST   = 2         # latest of each flavor
-    _GET_TROVE_VERY_LATEST  = 3         # latest of any flavor
+    _GET_TROVE_VERY_LATEST  = 2         # latest of any flavor
 
     _GET_TROVE_NO_FLAVOR        = 1     # no flavor info is returned
     _GET_TROVE_ALL_FLAVORS      = 2     # all flavors (no scoring)
@@ -167,7 +155,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def getMetadata(self, authToken, clientVersion,
                     troveList, language):
         metadata = {}
-        
+
         # XXX optimize this to one SQL query downstream
         for troveName, branch, version in troveList:
             branch = self.toBranch(branch)
@@ -226,7 +214,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                versionType == self._GTL_VERSION_TYPE_BRANCH or
                versionType == self._GTL_VERSION_TYPE_VERSION or
                versionType == self._GTL_VERSION_TYPE_LABEL)
-        assert(latestFilter != self._GET_TROVE_ALL_LATEST)
 
         if troveSpecs:
             # populate flavorIndices with all of the flavor lookups we
@@ -485,8 +472,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         d = {}
                         troveVersions[troveName] = d
 
+                    if flavorFilter == self._GET_TROVE_BEST_FLAVOR:
+                        flavorIdentifier = localFlavorId
+                    else:
+                        flavorIdentifier = flavor
+
                     lastTimestamp, lastFlavorScore = d.get(
-                            (branchId, localFlavorId), (0, -500000))[0:2]
+                            (branchId, flavorIdentifier), (0, -500000))[0:2]
                     # this rule implements "later is better"; we've already
                     # thrown out incompatible troves, so whatever is left
                     # is at least compatible; within compatible, newer
@@ -494,7 +486,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     if (flavorFilter == self._GET_TROVE_BEST_FLAVOR and 
                                 flavorScore > lastFlavorScore) or \
                                 finalTimestamp > lastTimestamp:
-                        d[(branchId, localFlavorId)] = \
+                        d[(branchId, flavorIdentifier)] = \
                             (finalTimestamp, flavorScore, versionStr, 
                              timeStamps, flavor)
                 elif flavorFilter == self._GET_TROVE_BEST_FLAVOR:
@@ -829,16 +821,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 						     self.toBranch(branchStr)))
         except KeyError:
             return 0
-
-    def getTroveFlavorsLatestVersion(self, authToken, clientVersion, troveName, 
-                                     branchStr):
-	branch = self.toBranch(branchStr)
-
-	if not self.auth.check(authToken, write = False, 
-                                     trove = troveName, label = branch.label()):
-	    raise InsufficientPermission
-
-	return self.troveStore.iterTrovePerFlavorLeaves(troveName, branchStr)
 
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse, 
                      withFiles, withFileContents = None):
