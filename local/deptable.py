@@ -399,9 +399,6 @@ class DependencyTables:
         # this works against a database, not a repository
         cu = self.db.cursor()
 
-        import lib
-        lib.epdb.st()
-
         self._createTmpTable(cu, "DepCheck")
         createDepTable(cu, 'TmpDependencies', isTemp = True)
         cu.execute("CREATE TEMPORARY VIEW AllDeps AS SELECT * FROM "
