@@ -25,11 +25,8 @@ class Repository:
 
     createBranches = 1
 
-    # XXX these str() are hacks to allow PackageName objects to be used
-    # interchangeably with strings for the time being
-
     def _getPackageSet(self, name):
-	return _PackageSet(self.pkgDB, str(name))
+	return _PackageSet(self.pkgDB, name)
 
     def _getFileDB(self, fileId):
 	return _FileDB(self.fileDB, fileId)
@@ -52,9 +49,8 @@ class Repository:
 
 	return list
 
-    # XXX this str() is to allow a migration to PackageName
     def hasPackage(self, pkg):
-	return self.pkgDB.hasFile(str(pkg))
+	return self.pkgDB.hasFile(pkg)
 
     def pkgGetFullVersion(self, pkgName, version):
 	return self._getPackageSet(pkgName).getFullVersion(version)
@@ -197,46 +193,29 @@ class LocalRepository(Repository):
 
 	self.mode = mode
 
-    def createChangeSet(self, fullList):
+    def createChangeSet(self, packageList):
 	"""
-	fullList is a list of (pkgName, oldVersion, newVersion, abstract) 
-	tuples. pkgName must be of type PackageName
+	packageList is a list of (pkgName, oldVersion, newVersion, abstract) 
+	tuples. 
 
 	if oldVersion == None and abstract == 0, then the package is assumed
 	to be new for the purposes of the change set
 	"""
 	cs = changeset.ChangeSetFromRepository(self)
 
-	# split fullList into two lists, one for groups and one for
-	# versions
-	packageList = []
-	groupList = []
-	for (packageName, oldVersion, newVersion, abstract) in fullList:
-	    if packageName.isGroup():
-		groupList.append((packageName, oldVersion, newVersion, 
-				  abstract))
-	    else:
-		packageList.append((packageName, oldVersion, newVersion, 
-				    abstract))
-
-	for (groupName, oldVersion, newVersion, abstract) in groupList:
-	    new = self.getGroupVersion(groupName, newVersion)
-
-	    if oldVersion:
-		old = self.getGroupVersion(groupName, oldVersion)
-	    else:
-		old = None
-
-	    (grpChgSet, pkgsReqd) = new.diff(old, abstract = abstract)
-	    cs.newGroup(grpChgSet)
-
-	    # while we're adding packages make sure we aren't adding
-	    for (pkgName, old, new) in pkgsReqd:
-		packageList.append((pkgName, old, new, abstract))
-
 	dupFilter = {}
-	for (packageName, oldVersion, newVersion, abstract) in packageList:
-	    # make sure we haven't already generated this changeset
+
+	# don't use a for in here since we grow packageList inside of
+	# this loop
+	packageCounter = 0
+	while packageCounter < len(packageList):
+	    (packageName, oldVersion, newVersion, abstract) = \
+		packageList[packageCounter]
+	    packageCounter += 1
+
+	    # make sure we haven't already generated this changeset; since
+	    # packages can be included from other packages we could try
+	    # to generate quite a few duplicates
 	    if dupFilter.has_key(packageName):
 		match = False
 		for (otherOld, otherNew) in dupFilter[packageName]:
@@ -254,6 +233,10 @@ class LocalRepository(Repository):
 			break
 		
 		if match: continue
+
+		dupFilter[packageName].append((oldVersion, newVersion))
+	    else:
+		dupFilter[packageName] = [ (oldVersion, newVersion) ]
 		    
 	    new = self.getPackageVersion(packageName, newVersion)
 	 
@@ -262,12 +245,11 @@ class LocalRepository(Repository):
 	    else:
 		old = None
 
-	    (pkgChgSet, filesNeeded) = new.diff(old, abstract = abstract)
+	    (pkgChgSet, filesNeeded, pkgsNeeded) = \
+				new.diff(old, abstract = abstract)
 
-	    # there were no changes. this is a bad idea right now as
-	    # we depend on these empty change sets to get local branches
-	    # created on update
-	    #if not filesNeeded: continue
+	    for (pkgName, old, new) in pkgsNeeded:
+		packageList.append((pkgName, old, new, abstract))
 
 	    cs.newPackage(pkgChgSet)
 
@@ -391,31 +373,6 @@ class _FileDBClass(VersionedFile):
 def _FileDB(db, fileId):
     return db.openFile(fileId, fileClass = _FileDBClass)
 
-class _GroupSetClass(VersionedFile):
-
-    def getVersion(self, version):
-	f1 = VersionedFile.getVersion(self, version)
-	p = group.GroupFromFile(self.name, f1, version)
-	f1.close()
-	return p
-
-    def addVersion(self, version, group):
-	VersionedFile.addVersion(self, version, group.formatString())
-
-    def getLatestGroup(self, branch):
-	ver = self.findLatestVersion(branch)
-	if not ver:
-	    raise GroupMissing(self.name, branch)
-
-	return self.getVersion(ver)
-
-    def __init__(self, db, name, createBranches):
-	VersionedFile.__init__(self, db, name, createBranches)
-	self.name = name
-
-def _GroupSet(db, fileId):
-    return db.openFile(fileId, fileClass = _GroupSetClass)
-
 class ChangeSetJobFile:
 
     def version(self):
@@ -458,18 +415,6 @@ class ChangeSetJobFile:
 # remappings should have been applied to the change set before it gets
 # this far
 class ChangeSetJob:
-
-    def addGroup(self, grp):
-	self.groups.append(grp)
-
-    def newGroupList(self):
-	return self.groups
-
-    def oldGroup(self, grp):
-	self.oldGroups.append(grp)
-
-    def oldGroupList(self):
-	return self.oldGroups
 
     def addPackage(self, pkg):
 	self.packages.append(pkg)
@@ -517,10 +462,6 @@ class ChangeSetJob:
 	# commit changes
 	filesToArchive = []
 
-	for newGrp in self.newGroupList():
-	    self.repos.addGroup(newGrp)
-	    undo.addedGroup(newGrp)
-
 	for newPkg in self.newPackageList():
 	    self.repos.addPackage(newPkg)
 	    undo.addedPackage(newPkg)
@@ -557,8 +498,6 @@ class ChangeSetJob:
 	self.oldPackages = []
 	self.oldFiles = []
 	self.staleFiles = []
-	self.groups = []
-	self.oldGroups = []
 
 	fileMap = {}
 
@@ -659,9 +598,6 @@ class ChangeSetUndo:
 	for pkg in self.pkgsDone:
 	    self.repos.erasePackageVersion(pkg.getName(), pkg.getVersion())
 
-	for grp in self.groupsDone:
-	    self.repos.eraseGroupVersion(grp.getName(), grp.getVersion())
-
 	for sha1 in self.filesStored:
 	    self.repos.removeFileContents(sha1)
 
@@ -669,9 +605,6 @@ class ChangeSetUndo:
 
     def addedPackage(self, pkg):
 	self.pkgsDone.append(pkg)
-
-    def addedGroup(self, grp):
-	self.groupsDone.append(grp)
 
     def addedFile(self, file):
 	self.filesDone.append(file)
@@ -726,24 +659,10 @@ class PackageMissing(RepositoryError):
 	Initializes a PackageMissing exception.
 
 	@param packageName: package which could not be found
-	@type packageName: str or PackageName
+	@type packageName: str
 	@param version: version of the package which does not exist
 	@type version: versions.Version
 	"""
-	self.packageName = str(packageName)
+	self.packageName = packageName
 	self.version = version
 	self.type = "package"
-
-class GroupMissing(PackageMissing):
-
-    def __init__(self, groupName, version):
-	"""
-	Initializes a GroupMissing exception.
-
-	@param groupName: package which could not be found
-	@type groupName: str or PackageName
-	@param version: version of the package which does not exist
-	@type version: versions.Version
-	"""
-	PackageMissing.__init__(groupName, version)
-	self.type = "group"
