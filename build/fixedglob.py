@@ -30,7 +30,9 @@ def glob(pathname):
 		try:
 		    os.lstat(name)
 		except OSError, err:
-		    if err.errno != errno.ENOENT:
+                    # if the file does not exist, or if an element of the
+                    # path to the file is not a directory, ignore the error
+                    if err.errno != errno.ENOENT and err.errno != errno.ENOTDIR:
 			raise
 		else:
 		    result.append(name)
