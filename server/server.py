@@ -22,13 +22,13 @@ if not os.environ.has_key('CONARY_PATH'):
 
 sys.path.append(os.environ['CONARY_PATH'])
 
+import netserver
 from netserver import NetworkRepositoryServer
 from conarycfg import ConfigFile
 from conarycfg import STRINGDICT
 import options
 
 FILE_PATH="/tmp/conary-server"
-BASE_URL="http://%s:8000/" % os.uname()[1]
 
 #class SRSServer(SimpleXMLRPCServer):
 
@@ -171,7 +171,9 @@ if __name__ == '__main__':
         prof = hotshot.Profile('server.prof')
         prof.start()
 
-    netRepos = NetworkRepositoryServer(otherArgs[1], FILE_PATH, BASE_URL,
+    baseUrl="http://%s:%s/" % (os.uname()[1], cfg.port)
+
+    netRepos = NetworkRepositoryServer(otherArgs[1], FILE_PATH, baseUrl,
 				       otherArgs[2], otherArgs[3],
 				       cfg.repositoryMap)
 

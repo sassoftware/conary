@@ -271,14 +271,18 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	return d
 
-    def _getLocalOrRemoteFileContents(self, name, troveVersion, troveFlavor, 
-				      path, sha1, size):
-	# the get trove netclient provides doesn't work with a FilesystemRepository
-	# (it needs to create a change set which gets passed)
-	if troveVersion.branch().label().getHost() == self.name:
+    def _getLocalOrRemoteFileContents(self, troveName, troveVersion, troveFlavor, 
+				      path, fileVersion, sha1, size):
+	# the get trove netclient provides doesn't work with a 
+	# FilesystemRepository (it needs to create a change set which gets 
+	# passed)
+	if fileVersion.branch().label().getHost() == self.name:
 	    return filecontents.FromDataStore(self.contentsStore, sha1, size)
 	else:
-	    f = self.repos.getFileContents(name, troveVersion, troveFlavor, path)
+	    # a bit of sleight of hand here... we look for this file in
+	    # the trove it was first built in
+	    f = self.reposSet.getFileContents(troveName, fileVersion, 
+					      troveFlavor, path)
 	    return filecontents.FromGzFile(f)
 
     def createChangeSet(self, troveList, recurse = True, withFiles = True):
@@ -384,8 +388,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		allFiles = self._getLocalOrRemoteFileVersions(l)
 		idIdx.update(allFiles)
 
+	    import pdb
+	    pdb.set_trace()
+
 	    for (fileId, oldFileVersion, newFileVersion, oldPath, newPath) in \
-									filesNeeded:
+								filesNeeded:
 		oldFile = None
 		if oldFileVersion:
 		    oldFile = idIdx[(fileId, oldFileVersion)]
@@ -393,9 +400,11 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		oldCont = None
 		newCont = None
 
-		newFile = self._getLocalOrRemoteFileVersion(fileId, newFileVersion)
+		newFile = self._getLocalOrRemoteFileVersion(fileId, 
+							    newFileVersion)
 
-		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, newFile)
+		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
+							 newFile)
 
 		cs.addFile(fileId, oldFileVersion, newFileVersion, filecs)
 
@@ -403,11 +412,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    if oldFileVersion :
 			oldCont = self._getLocalOrRemoteFileContents(troveName, 
 						oldVersion, flavor, oldPath,
+						oldFileVersion,
 						oldFile.contents.sha1(),
 						oldFile.contents.size())
 
 		    newCont = self._getLocalOrRemoteFileContents(troveName, 
 						newVersion, flavor, newPath,
+						newFileVersion,
 						newFile.contents.sha1(),
 						newFile.contents.size())
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
