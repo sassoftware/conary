@@ -263,8 +263,13 @@ class Database:
     def openFile(self, file):
 	return VersionedFile(self.db, file)
 
+    def __del__(self):
+        self.close()
+
     def close(self):
-	self.db.close()
+        if self.db is not None:
+            self.db.close()
+            self.db = None
 
     def __init__(self, path, mode = "r"):
 	self.db = dbhash.open(path, mode)
