@@ -46,6 +46,7 @@ class XMLOpener(urllib.FancyURLopener):
             urltype, rest = urllib.splittype(selector)
             url = rest
             user_passwd = None
+            # XXX proxy broken with https
             if urltype.lower() != 'http':
                 realhost = None
             else:
