@@ -617,11 +617,10 @@ class PackageChangeSet:
 	"""
 	Returns a string representation of this change set which can
 	later be parsed by parse(). The representation begins with a
-	header:
+	header::
 
          SRS PKG ABSTRACT <name> <newversion> <linecount> <diffcount>
-         SRS PKG CHANGESET <name> <oldversion> <newversion> <linecount>
-	    <diffcount>
+         SRS PKG CHANGESET <name> <oldversion> <newversion> <linecount> <diffcount>
          SRS PKG NEW <name> <newversion> <linecount> <diffcount>
 
 	It is followed by <linecount> lines, each of which specifies a

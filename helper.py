@@ -23,11 +23,11 @@ def findPackage(repos, packageNamespace, defaultBranch, name,
     @param packageNamespace: Default namespace for the package
     @type packageNamespace: str
     @param defaultBranch: Default branch if just a version/release is given
-    @type packageNamespace: versions.Version
+    @type defaultBranch: versions.Version
     @param name: Package name
     @type name: str
     @param versionStr: Package version
-    @type version: str
+    @type versionStr: str
     @param forceGroup: If true the name should specify a group
     @type forceGroup: boolean
     @rtype: list of package.Package
