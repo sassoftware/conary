@@ -78,6 +78,7 @@ def usage(rc = 1):
     print "               --sha1s"
     print ""
     print "repquery flags: --all"
+    print "                --deps"    
     print "                --full-versions"
     print "                --ids"
     print "                --info"
