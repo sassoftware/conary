@@ -22,6 +22,7 @@ import os
 import package
 import patch
 import repository
+import streams
 import struct
 import versions
 
@@ -29,15 +30,15 @@ from StringIO import StringIO
 
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff")
 
-class FileInfo(files.TupleStream):
+class FileInfo(streams.TupleStream):
 
     __slots__ = []
 
     # fileId, oldVersion, newVersion, csInfo
-    makeup = (("fileId", files.StringStream, 40), 
-	      ("oldVersion", files.StringStream, "!H"),
-	      ("newVersion", files.StringStream, "!H"), 
-	      ("csInfo", files.StringStream, "B"))
+    makeup = (("fileId", streams.StringStream, 40), 
+	      ("oldVersion", streams.StringStream, "!H"),
+	      ("newVersion", streams.StringStream, "!H"), 
+	      ("csInfo", streams.StringStream, "B"))
 
     def fileId(self):
         return self.items[0].value()

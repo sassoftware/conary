@@ -48,6 +48,7 @@ python_files = __init__.py	\
 	rollbacks.py		\
 	rpmhelper.py		\
 	sha1helper.py		\
+	streams.py		\
 	srcctl.py		\
 	conarycfg.py		\
 	conary.py			\

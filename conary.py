@@ -59,7 +59,7 @@ def usage(rc = 1):
     print "       conary erase        <pkgname> [<version>]"
     print "       conary localcs      <pkg> <outfile>"
     print "       conary localcommit  <changeset>"
-    print "       conary pkgquery     <pkgname> [<version>]"
+    print "       conary query        <pkgname> [<version>]"
     print "       conary remove       <path>"
     print "       conary repquery     <pkgname> [<version>]"
     print "       conary rblist"
@@ -282,9 +282,11 @@ def realMain():
 	for changeSet in otherArgs[2:]:
 	    commit.doLocalCommit(db, changeSet)
     elif (otherArgs[1] == "pkgquery") or (otherArgs[1] == "pq") \
+	or (otherArgs[1] == "query") or (otherArgs[1] == "q") \
 	or (otherArgs[1] == "pkglist"):
-	if otherArgs[1] == "pkglist":
-	    log.warning("Outdated syntax: use pkgquery or pq")
+	if otherArgs[1] != "query" and otherArgs[1] != "q":
+	    log.warning("Outdated syntax: use query (or just q)")
+
 	if argSet.has_key('path'):
 	    path = argSet['path']
 	    del argSet['path']
@@ -313,13 +315,14 @@ def realMain():
 		display.displayTroves(*args)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
-		sys.exit(1)
+		return 1
 	else:
 	    return usage()
     elif (otherArgs[1] == "repquery") or (otherArgs[1] == "rq") \
 	    or (otherArgs[1] == "replist"):
 	if otherArgs[1] == "replist":
-	    log.warning("Outdated syntax: use repquery or rq")
+	    log.error("Outdated syntax: use repquery or rq")
+	    return 1
 	all = argSet.has_key('all')
 	if all: del argSet['all']
 
