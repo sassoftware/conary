@@ -110,7 +110,11 @@ class RecipeAction(Action):
     # virtual method for actually executing the action
     def doAction(self):
 	if self.use:
-	    self.do()
+	    try:
+		self.do()
+	    except Exception:
+		self.handle_exception()
+
 
     def do(self):
 	pass
@@ -145,10 +149,31 @@ class RecipeAction(Action):
 	if not self.file:
 	    self.file = '<None>'
 
-    def error(self, type, msg):
+    def init_error(self, type, msg):
+	"""
+	    use in action __init__ to add lineno to exceptions
+	    raised.  Usually this is handled automatically, 
+	    but it is (almost) impossible to wrap init calls.
+	    Actually, this probably could be done by changing 
+	    recipe helper, but until that is done use this funciton
+	"""
+	
 	raise type, "%s:%s: %s: %s" % (self.file, self.linenum,
 					   type.__name__, msg)
 
+    def handle_exception(self):
+	if self.linenum is None:
+	    raise exc_type, exc_message
+	# Avoid duplicating file/name prefix
+	exc_type = sys.exc_info()[0]
+	exc_msg = sys.exc_info()[1]
+	prefix = "%s:%s:" % (self.file, self.linenum)
+	prefix_len = len(prefix)
+	if str(exc_msg)[:prefix_len] == prefix:
+	    raise exc_type, exc_message
+	else:
+	    raise exc_type, "%s:%s: %s: %s" % (self.file, self.linenum, 
+				          exc_type.__name__, exc_msg)
 
 
 # XXX look at ShellCommand versus Action

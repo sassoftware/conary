@@ -49,7 +49,10 @@ class BuildAction(action.RecipeAction):
 
     def doAction(self):
 	if self.use:
-	    self.do(self.recipe.macros)
+	    try:
+		self.do(self.recipe.macros)
+	    except Exception:
+		self.handle_exception()
 
     def do(self, macros):
         """
@@ -58,7 +61,7 @@ class BuildAction(action.RecipeAction):
         @param macros: macro set to be used for expansion
         @type macros: macros.Macros
         """
-        self.error(AssertionError, "do method not implemented")
+        raise AssertionError, "do method not implemented"
 
 
 class BuildCommand(BuildAction, action.ShellCommand):
@@ -471,7 +474,7 @@ class SetModes(_FileAction):
 	self.mode = args[split]
 	# raise error while we can still tell what is wrong...
 	if type(self.mode) is not int:
-	    self.error(TypeError, 'mode %s is not integer' % str(self.mode))
+	    self.init_error(TypeError, 'mode %s is not integer' % str(self.mode))
 
     def do(self, macros):
 	files = []
@@ -490,7 +493,7 @@ class _PutFiles(_FileAction):
     def do(self, macros):
 	reldest = self.toFile % macros
 	if reldest[0] != '/':
-	    self.error(TypeError, 'Inappropriately relative destination %s: destination must start with "/"' % reldest)
+	    raise TypeError, 'Inappropriately relative destination %s: destination must start with "/"' % reldest
 	dest = macros['destdir'] + reldest
 	self.destlen = len(macros['destdir'])
 	util.mkdirChain(os.path.dirname(dest))
@@ -499,7 +502,7 @@ class _PutFiles(_FileAction):
 	    sources = (self.source + fromFile) %macros
 	    sourcelist = util.braceGlob(sources)
 	    if not os.path.isdir(dest) and len(sourcelist) > 1:
-		self.error(TypeError, 'multiple files specified, but destination "%s" is not a directory' %dest)
+		raise TypeError, 'multiple files specified, but destination "%s" is not a directory' %dest
 	    for source in sourcelist:
 		self._do_one(source, dest, macros)
 
@@ -542,7 +545,7 @@ class _PutFiles(_FileAction):
 	# raise error while we can still tell what is wrong...
 	if len(self.fromFiles) > 1:
 	    if not self.toFile.endswith('/') or os.path.isdir(self.toFile):
-		self.error(TypeError, 'too many targets for non-directory %s' %self.toFile)
+		raise TypeError, 'too many targets for non-directory %s' %self.toFile
 
 class Install(_PutFiles):
     """
@@ -611,7 +614,7 @@ class Symlink(_FileAction):
                 expand = util.joinPaths(destdir, source)
             sources = fixedglob.glob(expand)
             if not sources and not self.allowDangling:
-                self.error(TypeError, 'symlink to "%s" would be dangling' %source)
+                raise TypeError, 'symlink to "%s" would be dangling' %source
             for expanded in sources:
                 if os.sep in source:
                     expandedSources.append(
@@ -622,7 +625,7 @@ class Symlink(_FileAction):
         sources = expandedSources
         
         if len(sources) > 1 and not targetIsDir:
-            self.error(TypeError, 'creating multiple symlinks, but destination is not a directory')
+            raise TypeError, 'creating multiple symlinks, but destination is not a directory'
 
         for source in sources:
             if targetIsDir:
@@ -659,10 +662,10 @@ class Symlink(_FileAction):
 	self.toFile = args[split]
 	# raise error while we can still tell what is wrong...
 	if not self.fromFiles:
-	    self.error(TypeError, 'not enough arguments')
+	    self.init_error(TypeError, 'not enough arguments')
 	if len(self.fromFiles) > 1:
 	    if not self.toFile.endswith('/') or os.path.isdir(self.toFile):
-		self.error(TypeError, 'too many targets for non-directory %s' %self.toFile)
+		self.init_error(TypeError, 'too many targets for non-directory %s' %self.toFile)
 
 class Link(_FileAction):
     """
@@ -675,8 +678,7 @@ class Link(_FileAction):
 	d = macros['destdir']
 	e = util.joinPaths(d, self.existingpath)
 	if not os.path.exists(e):
-	    self.error(TypeError,
-		'hardlink target %s does not exist' %self.existingpath)
+	    raise TypeError, 'hardlink target %s does not exist' %self.existingpath
 	for name in self.newnames:
 	    newpath = util.joinPaths(self.basedir, name)
 	    n = util.joinPaths(d, newpath)
@@ -697,7 +699,7 @@ class Link(_FileAction):
 	# raise error while we can still tell what is wrong...
 	for name in self.newnames:
 	    if name.find('/') != -1:
-		self.error(TypeError, 'hardlink %s crosses directories' %name)
+		self.init_error(TypeError, 'hardlink %s crosses directories' %name)
 	self.basedir = os.path.dirname(self.existingpath)
 
 class Remove(BuildAction):
@@ -805,7 +807,7 @@ class MakeDirs(_FileAction):
             dirs = util.braceExpand(path)
             for d in dirs:
 		if d[0] != '/':
-		    self.error(TypeError, 'Inappropriately relative directory %s: directories must start with "/"' %d)
+		    raise TypeError, 'Inappropriately relative directory %s: directories must start with "/"' %d
                 d = d %macros
                 dest = macros['destdir'] + d
                 log.debug('creating directory %s', d)
