@@ -956,11 +956,11 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 				srcPkg.getVersion(), srcPkg.getFlavor(), 
 				srcPath, srcFileVersion)
 
-		(contType, cont) = changeset.fileContentsDiff(srcFile, srcCont,
-                                                              f, newCont)
+                    (contType, cont) = changeset.fileContentsDiff(srcFile, srcCont,
+                                                                  f, newCont)
 
-		changeSet.addFileContents(fileId, contType, cont, 
-					  f.flags.isConfig())
+                    changeSet.addFileContents(fileId, contType, cont, 
+                                              f.flags.isConfig())
             
 
     for fileId in fileIds.iterkeys():
