@@ -32,16 +32,16 @@ class Flag(dict):
 
     Magic is used to make the initialization of the object easy.
     """
-    def __init__(self, value=None, name=None, showdefaults=True, ref=None, 
-                 createOnAccess=False, required=True):
+    def __init__(self, value=None, name=None, showdefaults=True, parent=None, 
+                 createOnAccess=False, required=True, track=False):
 	self._showdefaults = showdefaults
         self._value = value
         self._short = ""
         self._long = ""
-        self._ref = ref
+        self._parent = parent
         self._name = name
 	self._frozen = False
-        self._track = False
+        self._track = track
         self._usedFlags = {}
 	self._overrides = {}
         self._createOnAccess = createOnAccess
@@ -111,8 +111,9 @@ class Flag(dict):
             self[key]._set(bool(value))
         else:
             # override flag values that haven't been entered yet
-            self[key] = Flag(value=value, name=key, ref=self,
-                createOnAccess=self._createOnAccess, required=self._required)
+            self[key] = Flag(value=value, name=key, parent=self,
+                createOnAccess=self._createOnAccess, required=self._required,
+                track=self._track)
 	self._overrides[key] = value
 
     def __delattr__(self, key):
@@ -121,14 +122,14 @@ class Flag(dict):
 	    raise TypeError, 'flags are frozen'
         del self[key]
 
-    def _addEquivalentFlagSets(self, other):
+    def _addEquivalentFlagSets(self, other, parent=None):
         """ Add together two sets of flags or flag sets, assuming that 
             the sets being added have the same name and context,
             and differ only in value or in child flags.
         """
         assert(other._name == self._name)
         # RHS value (other) is propogated 
-        new = Flag(value=other._value, name=other._name)
+        new = Flag(value=other._value, name=other._name, parent=parent)
         # overrides and usedFlags are combined
         # from both
         new._overrides = self._overrides.copy()
@@ -139,7 +140,7 @@ class Flag(dict):
         for key in self.keys():
             if key in other:
                 # if the flag is in both self and other sets, recurse
-                new[key] = self[key]._addEquivalentFlagSets(other[key])
+                new[key] = self[key]._addEquivalentFlagSets(other[key], new)
             else:
                 new[key] = self[key].deepCopy()
         
@@ -188,7 +189,11 @@ class Flag(dict):
         return new
 
     def getUsed(self):
-        return self._usedFlags
+        d = self._usedFlags.copy()
+        for flagname, flag in self.iteritems():
+            for usedFlag, subflag in flag.getUsed().iteritems():
+                d['.'.join((flagname, usedFlag))] = subflag
+        return d
 
     def getUsedSet(self):
         """ Create a flag set based on used flags """
@@ -204,18 +209,20 @@ class Flag(dict):
 
     def trackUsed(self, val):
         self._track = val
+        for flag in self.iterkeys():
+            self[flag].trackUsed(val)
 
     def resetUsed(self):
         self._usedFlags.clear()
 
     
-    def deepCopy(self, ref=None):
+    def deepCopy(self, parent=None):
         """ Create a copy of a flag set, creating new Flag instances
             for all children """
         new = Flag(value=self._value, name=self._name,
-                   showdefaults=self._showdefaults, ref=ref,
+                   showdefaults=self._showdefaults, parent=parent,
                    createOnAccess=self._createOnAccess,
-                   required=self._required)
+                   required=self._required, track=self._track)
         new._overrides = self._overrides.copy()
         new._usedFlags = self._usedFlags.copy()
         new._track = self._track
@@ -235,27 +242,27 @@ class Flag(dict):
         if self._name == '__GLOBAL__':
             return self
         top = parent = Flag(value=None, name=self._name)
-        cursor = self._ref
+        cursor = self._parent
         while cursor is not None:
             child = parent
             parent = Flag(value=None, name=cursor._name)
             parent[child._name] = child
-            child._ref = parent
-            cursor = cursor._ref
+            child._parent = parent
+            cursor = cursor._parent
         # Use, Arch, etc Flag instances don't have/need a parent
         # named __GLOBAL__ but sets containing both Use and Arch
         # need a higher level to connect them.
         if parent._name != '__GLOBAL__':
             child = parent
             parent = Flag(value=None, name='__GLOBAL__')
-            child._ref = parent
+            child._parent = parent
             parent[child._name] = child
 
         # b) set the value of any child flags passed in 
         #    to True
         if flags:
             for flag in flags:
-                top[flag] = Flag(value=True, name=flag, ref=top)
+                top[flag] = Flag(value=True, name=flag, parent=top)
         else:
             top._value = True
         return parent
@@ -265,6 +272,8 @@ class Flag(dict):
         # XXX this code should probably disappear with the reworking of 
         # flavors and their relationship with deps, but for now, 
         # it is very handy
+        #import lib.epdb
+        #lib.epdb.set_trace()
         set = deps.DependencySet()
         useflagsets = []
         if self._name != '__GLOBAL__':
@@ -273,36 +282,48 @@ class Flag(dict):
             useflagsets.append(self['Use'])
         if 'Flags' in self:
             useflagsets.append(self['Flags'])
-        stringDeps = []
-        for flagset in useflagsets:
-            for flag in flagset.iterkeys():
-                stringDeps.extend(flagset[flag].toDepStrings())
-        dep = deps.Dependency('use', stringDeps)
-        set.addDep(deps.UseDependency, dep)
-        stringDeps = []
+        if useflagsets:
+            stringDeps = []
+            for flagset in useflagsets:
+                for flag in flagset.iterkeys():
+                    stringDeps.extend(flagset[flag].toDepStrings())
+            dep = deps.Dependency('use', stringDeps)
+            set.addDep(deps.UseDependency, dep)
         if 'Arch' in self:
-            for flag in self['Arch'].iterkeys():
-                stringDeps.extend(self['Arch'][flag].toDepStrings())
-            dep = deps.Dependency('is', stringDeps)
-            set.addDep(deps.InstructionSetDependency, dep)
+            for arch, topflag in self['Arch'].iteritems():
+                stringDeps = []
+                for subarch, flag in topflag.iteritems():
+                    stringDeps.extend(flag.toDepStrings(topflag=topflag))
+                dep = deps.Dependency(arch, stringDeps)
+                set.addDep(deps.InstructionSetDependency, dep)
         return set
 
-    def toDepStrings(self, prefix=None):
+    def toDepStrings(self, prefix=None, topflag=None):
         strings = []
+        namelist = []
+        if topflag is None:
+            topflag = self
+        cur = self
+        while cur != topflag:
+            print cur._name
+            namelist.insert(0, cur._name)
+            cur = cur._parent
+        if cur:
+            namelist.insert(0, cur._name)
+        name = ".".join(namelist)
         if prefix:
-            prefix = '.'.join([prefix, self._name])
-        else:
-            prefix = self._name
+            name = '.'.join((prefix, name))
         if self._value is not None:
             if self._value:
                 if self._required:
-                    strings.append(prefix)
+                    strings.append(name)
                 else:
-                    strings.append('~' + prefix)
+                    strings.append('~' + name)
             else:
-                strings.append('~!' + prefix)
+                strings.append('~!' + name)
         for subflag in self.iterkeys():
-            strings.extend(self[subflag].toDepStrings(prefix=prefix))
+            strings.extend(
+                self[subflag].toDepStrings(prefix=prefix, topflag=topflag))
         return strings
 
     def __setitem__(self, key, value):
@@ -324,7 +345,10 @@ class Flag(dict):
             return flag
         elif self._createOnAccess:
             # flag doesn't exist, add it
-            self[name] = Flag(value=None, name=name, ref=self, createOnAccess=True)
+            self[name] = Flag(value=None, name=name, parent=self,
+                              createOnAccess=True, track=self._track)
+            if self._track:
+                self._usedFlags[name] = flag
             return self[name]
         raise AttributeError, "class %s has no attribute '%s'" % (self.__class__.__name__, name)
 
@@ -346,7 +370,9 @@ class Flag(dict):
                 return
             self[name]._set(value)
         else:
-            self[name] = Flag(value=value, name=name, ref=self, createOnAccess=self._createOnAccess)
+            self[name] = Flag(value=value, name=name, parent=self,
+                              createOnAccess=self._createOnAccess,
+                              track=self._track)
 
 def nullSet():
     return Flag(value=None, name='__GLOBAL__')
