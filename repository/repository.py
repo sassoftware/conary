@@ -32,8 +32,9 @@ class AbstractTroveDatabase:
     def commitChangeSet(self, cs):
 	raise NotImplementedError
 
-    def findTrove(self, labelPath, name, flavor, versionStr = None,
-                  acrossRepositories = False, withFiles = True):
+    def findTrove(self, labelPath, (name, versionstr, flavor), 
+                  defaultFlavor = None,
+                  acrossRepositories = False, affinityDatabase = None):
 	"""
 	Looks up a trove in the repository based on the name and
 	version provided. If any errors occur, TroveNotFound is
@@ -47,16 +48,14 @@ class AbstractTroveDatabase:
 	name for the branch name to form a complete label.
 	@param name: Trove name
 	@type name: str
-	@param flavor: only troves compatible with this flavor will be returned
-	@type flavor: deps.DependencySet
 	@param versionStr: Trove version
 	@type versionStr: str
+	@param flavor: only troves compatible with this flavor will be returned
+	@type flavor: deps.DependencySet
         @param acrossRepositories: normally findTrove only returns matches
         from a single repository (the first one with a match). if this is
         set it continues searching through all repositories
         @type acrossRepositories: boolean
-        @param withFiles: File information is only returned if this is True
-        @type withFiles: boolean
 	@rtype: list of (troveName, troveVersion, troveFlavor)
 	"""
 	raise NotImplementedError

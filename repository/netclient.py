@@ -329,6 +329,17 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 						label.asString(),
                                                 self.fromFlavor(flavorFilter))
         return self._mergeTroveQuery({}, d)
+
+    def _getTroveLeavesByLabel(self, troveSpecs, bestFlavor = False):
+        res = {}
+        for name, labelDict in troveSpecs.iteritems():
+            for label, flavors in labelDict.iteritems():
+                for flavor in flavors:
+                    d = self.getTroveLeavesByLabel([name], label,
+                                                   flavorFilter=flavor)
+                    self.queryMerge(res, d)
+        return res
+
 	
     def getTroveVersionsByLabel(self, troveNameList, label, 
                                 flavorFilter = None):
@@ -336,6 +347,17 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 						  label.asString(),
                                                   self.fromFlavor(flavorFilter))
         return self._mergeTroveQuery({}, d)
+
+    def _getTroveVersionsByLabel(self, troveSpecs, bestFlavor = False):
+        res = {}
+        for name, labelDict in troveSpecs.iteritems():
+            for label, flavors in labelDict.iteritems():
+                for flavor in flavors:
+                    d = self.getTroveVersionsByLabel([name], label,
+                                                     flavorFilter=flavor)
+                    self.queryMerge(res, d)
+        return res
+
 	
     def getTroveVersionFlavors(self, troveDict, bestFlavor = False):
 
@@ -952,262 +974,496 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return result
 
-    def findTrove(self, labelPath, name, defaultFlavor, versionStr = None,
+    def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossRepositories = False, 
-                  affinityDatabase = None, flavor = None):
-	assert(not defaultFlavor or 
-	       isinstance(defaultFlavor, deps.DependencySet))
+                  affinityDatabase = None):
+        from deps.deps import overrideFlavor
+        results = {}
+        remaining = []
+        affinityTroveMap = {}
+        byBranch = {}
+        byBranchNoFlavor = {}
+        byBranchMap = {}
+        byVersion = {}
+        byVersionNoFlavor = {}
+        byVersionMap = {}
+        byLabel = {}
+        byLabelMap = {}
+        verRelLabel = {}
+        verRelLabelMap = {}
+        verRelBranch = {}
+        verRelBranchMap = {}
 
-        if not type(labelPath) == list:
+        if labelPath and not type(labelPath) == list:
             labelPath = [ labelPath ]
 
-	if not labelPath:
-	    # if we don't have a label path, we need a fully qualified
-	    # version string; make sure have it
-	    if versionStr[0] != "/" and (versionStr.find("/") != -1 or
-					 versionStr.find("@") == -1):
-		raise repository.TroveNotFound, \
-		    "fully qualified version or label " + \
-		    "expected instead of %s" % versionStr
+        # two step process:
+        # 1. iterate through all trove specs, sorting them by request type
+        # 2. for each request type, find the resulting troves, and 
+        #    store an entry in finalMap from the trove spec to the result.
+        # Note: because we want to be able to keep pointers from the 
+        # requested trove spec to its resulting troves, we cannot handle 
+        # requests of the same type for the same trove name gracefully.
+        # Instead, we collect all such duplicate troves in the remaining
+        # list, and call findTroves again with such values.  Thus, findTroves
+        # offers absolutely 0 savings for cases where you request the same
+        # trove twice.
 
-        if affinityDatabase and affinityDatabase.hasPackage(name):
-            affinityTroves = affinityDatabase.findTrove(None, name)
-        else:
-            affinityTroves = []
+        # potential time savings:
+        # * replace affinityDatabase.findTrove
+        # * others? 
 
-        if not versionStr:
-            query = {}
-            if affinityTroves:
-                query[name] = {}
-                for afName, afVersion, afFlavor in affinityTroves:
-                    # XXX what if multiple troves are on this branch,
-                    # but with different flavors?
+        # duplicate code:
+        # there's still duplicate code hanging around here, with minute 
+        # differences dividing the handling of affinity troves in different
+        # places.  It's possible that some of this duplicate code could be
+        # removed.
 
-                    if flavor is not None:
-                        f = flavor
-                    else:
-                        f = defaultFlavor.copy()
-                        f.union(afFlavor,
-                                     mergeType = deps.DEP_MERGE_TYPE_PREFS)
+        # affinityTroves/flavor:
+        # it's not clear that affinityTroves are used the same way everywhere
+        # when you are grabbing by label, affinityTrove flavors are only 
+        # considered relevant if they match name and label.  But if you 
+        # grab by branch, only name is important.
 
-                    branch = afVersion.branch()
+        ######### Step 1 - sorting by request type
+        for tup in troves:
 
-                    if not query[name].has_key(branch):
-                        query[name][branch] = [ f ]
-                    else:
-                        query[name][branch].append(f)
+            name, versionStr, flavor = tup 
+            if not labelPath:
+                # if we don't have a label path, we need a fully qualified
+                # version string; make sure have it
+                if versionStr[0] != "/" and (versionStr.find("/") != -1 or
+                                             versionStr.find("@") == -1):
+                    raise repository.TroveNotFound, \
+                        "fully qualified version or label " + \
+                        "expected instead of %s" % versionStr
 
-            if query:
-                flavorDict = self.getTroveLeavesByBranch(query, 
-                                                         bestFlavor = True)
+            if affinityDatabase:
+                try:
+                    affinityTroves = affinityDatabase.findTrove(None, name)
+                except repository.TroveNotFound:
+                    affinityTroves = []
             else:
-                flavorDict = { name : {} }
-                if flavor is None:
-                    flavor = defaultFlavor
+                affinityTroves = []
+            # set up flavor for all cases except when 
+            # 1. there is no flavor and 2. there are affinity troves
+            if flavor is not None:
+                f = flavor
+            elif not affinityTroves:
+                f = defaultFlavor
+            else:
+                f = None
 
-                for label in labelPath:
-                    d = self.getTroveLeavesByLabel([name], label, 
-                                             flavorFilter = flavor)
-
-                    if not d.has_key(name):
+            if not versionStr:
+                # 1.1 - no version specified
+                # if we've got affinity troves, search on the branches
+                # of the troves.
+                # otherwise, search on  the installLabels
+                if affinityTroves:
+                    if name in byBranch:
+                        remaining.append(tup)
                         continue
-                    elif not acrossRepositories:
-                        flavorDict = d
-                        break
-                    else:
-                        self.queryMerge(flavorDict, d)
-        elif (versionStr[0] != "/" and (versionStr.find("/") == -1)  \
-             and (versionStr.count("@") or versionStr[0] == ':')):
-            # a version is a label if
-            #   1. it doesn't being with / (it isn't fully qualified)
-            #   2. it only has one element (no /)
-            #   3. it contains an @ sign
-	    # either the supplied version is a label, or we need to get the
-            # branch from the affinity db, or or we're going to use
-	    # the default labelPath
-            if versionStr[0] == ":":
-                repositories = [(x.getHost(), x.getNamespace()) \
-                                                        for x in labelPath ]
-                labelPath = []
-                for serverName, namespace in repositories:
-                    labelPath.append(versions.Label("%s@%s%s" % 
-                                        (serverName, namespace, versionStr)))
-            elif versionStr[0] != "@":
-		try:
-		    label = versions.Label(versionStr)
-                    labelPath = [ label ]
-		except versions.ParseError:
-		    raise repository.TroveNotFound, "invalid version %s" % versionStr
-            else:
-                # just a branch name was specified
-                repositories = [ x.getHost() for x in labelPath ]
-                labelPath = []
-                for serverName in repositories:
-                    labelPath.append(versions.Label("%s%s" % 
-                                                    (serverName, versionStr)))
-
-            flavorDict = { name : {} }
-            for label in labelPath:
-                if flavor is not None:
-                    finalFlavor = flavor
+                    byBranch[name] = {}
+                    byBranchMap[name] = tup
+                    for dummy, afVersion, afFlavor in affinityTroves:
+                        if not flavor:
+                            f = overrideFlavor(defaultFlavor, afFlavor, 
+                                       mergeType = deps.DEP_MERGE_TYPE_PREFS)
+                        branch = afVersion.branch()
+                        byBranch[name].setdefault(afVersion.branch(),
+                                                                  []).append(f)
                 else:
-                    flavors = []
-                    for (afName, afVersion, afFlavor) in affinityTroves:
-                        if afVersion.branch().label() == label:
-                            flavors.append(afFlavor)
-
-                    if not flavors:
-                        finalFlavor = defaultFlavor
+                    if name in byLabel:
+                        remaining.append(tup)
+                        continue
+                    byLabelMap[name] = tup
+                    if acrossRepositories:
+                        byLabel[name] = [dict.fromkeys(labelPath, [f])]
                     else:
-                        # make sure the flavors are the same; otherwise
-                        # fall back to the default flavor
+                        byLabel[name] = []
+                        for label in labelPath:
+                            byLabel[name].append({label :  [f]})
+            elif versionStr[0] == '/':
+                # 1.2 - version or branch specified
+                # in both cases, we need to split the troves depending on 
+                # whether there is any flavor associated with the trove.
+                # If the flavor is None, the bestFlavor option to 
+                # getTroveVersionFlavors or getTroveLeavesByBranch must 
+                # not be passed, on pain of raising an assertion on the server
+                # so we split into four cases.
+                # flavor might be modified by affinity troves.
+                try:
+                    version = versions.VersionFromString(versionStr)
+                except versions.ParseError, e:
+                    raise repository.TroveNotFound, str(e)
+                if isinstance(version, versions.Branch):
+                    d = byBranch
+                    dNoFlavor = byBranchNoFlavor
+                    mapD = byBranchMap
+                else:
+                    d = byVersion
+                    dNoFlavor = byVersionNoFlavor
+                    mapD = byVersionMap
+
+                if flavor is None:
+                    if affinityTroves:
+                        flavors = [x[2] for x in affinityTroves]
                         f = flavors[0]
                         for otherFlavor in flavors:
                             if otherFlavor != f:
                                 f = defaultFlavor
                                 break
-
-                        finalFlavor = defaultFlavor.copy()
-                        finalFlavor.union(f, 
-                                      mergeType = deps.DEP_MERGE_TYPE_PREFS)
-            
-                d = self.getTroveLeavesByLabel([name], label, 
-                                               flavorFilter = finalFlavor)
-                if not d.get(name, None):
-                    continue
-                elif not acrossRepositories:
-                    flavorDict = d
-                    break
-                else:
-                    self.queryMerge(flavorDict, d)
-        elif versionStr[0] != "/" and versionStr.find("/") == -1:
-	    # version or version/release was given. look in the affinityDatabase
-            # for the branches to look on
-	    try:
-		verRel = versions.Revision(versionStr)
-	    except versions.ParseError, e:
-                verRel = None
-            query = {}
-            if affinityTroves:
-                query[name] = {}
-                for (afName, afVersion, afFlavor) in affinityTroves:
-                    # XXX what if multiple troves are on this label,
-                    # but with different flavors?
-
-                    if flavor is not None:
-                        f = flavor
-                    else:
-                        f = defaultFlavor.copy()
-                        f.union(afFlavor,
-                                mergeType = deps.DEP_MERGE_TYPE_PREFS)
-
-                    query[name][afVersion.branch()] = [ f ]
-
-            if query:
-                flavorDict = self.getTroveVersionsByBranch(query, 
-                                                           bestFlavor = True)
-
-                if verRel is not None:
-                    for version in flavorDict[name].keys():
-                        if version.trailingRevision() != verRel:
-                            del flavorDict[name][version]
-                else:
-                    for version in flavorDict[name].keys():
-                        if (version.trailingRevision().getVersion() \
-                                                            != versionStr):
-                            del flavorDict[name][version]
-                    if name in flavorDict and flavorDict[name]:
-                        version = sorted(flavorDict[name].iterkeys())[-1]
-                        flavorDict[name] = {version: flavorDict[name][version]}
-            else:
-                flavorDict = { name : {} }
-                if flavor is None:
-                    flavor = defaultFlavor
-
-                for label in labelPath:
-                    d = self.getTroveVersionsByLabel([name], label, 
-                                             flavorFilter = flavor)
-                    if verRel is not None:
-                        for version in d.get(name, {}).keys():
-                            if version.trailingRevision() != verRel:
-                                del d[name][version]
-                    else:
-                        for version in d.get(name, {}).keys():
-                            if version.trailingRevision().getVersion() \
-                                                            != versionStr:
-                                del d[name][version]
-                        if name in d and d[name]:
-                            version = sorted(d[name].iterkeys())[-1]
-                            d[name] = {version: d[name][version]}
-                    if not d.has_key(name):
+                        f = overrideFlavor(defaultFlavor, f, 
+                                    mergeType = deps.DEP_MERGE_TYPE_PREFS)
+                    if f is None:
+                        dNoFlavor[name] = { version : [None]}
+                        mapD[name] = tup
                         continue
-                    elif not acrossRepositories:
-                        flavorDict = d
-                        break
+                if name in d:
+                    remaining.append(tup)
+                    continue
+                d[name] = { version : [f]}
+                mapD[name] = tup
+            elif versionStr.find('/') != -1:
+                # if we've got a version string, and it doesn't start with a
+                # /, no / is allowed
+                raise repository.TroveNotFound, \
+                        "incomplete version string %s not allowed"
+            elif versionStr[0] in ('@', ':') or versionStr.count('@'):
+                # 1.3, 1.4, 1.5 - label, tag, or branchName given.
+                # all three of these cases are very similar -- they 
+                # modify the labelPath in some way, and then search 
+                # for the trove along that modified path.  
+                # if acrossRepositories is given, all labels will be searched,
+                # if not, the results on the first label to return a result 
+                # will be used.
+                if name in byLabel:
+                    remaining.append(tup)
+                    continue
+                byLabelMap[name] = tup
+                # First, modify the label path => new label path
+                if versionStr[0] == ":":
+                    repositories = [(x.getHost(), x.getNamespace()) \
+                                                            for x in labelPath ]
+                    newLabelPath = []
+                    for serverName, namespace in repositories:
+                        newLabelPath.append(versions.Label("%s@%s%s" %
+                                           (serverName, namespace, versionStr)))
+                elif versionStr[0] == '@':
+                    # just a branch name was specified
+                    repositories = [ x.getHost() for x in labelPath ]
+                    newLabelPath = []
+                    for serverName in repositories:
+                        newLabelPath.append(versions.Label("%s%s" %
+                                                     (serverName, versionStr)))
+                else:
+                    try:
+                        label = versions.Label(versionStr)
+                        newLabelPath = [ label ]
+                    except versions.ParseError:
+                        raise repository.TroveNotFound, \
+                                            "invalid version %s" % versionStr
+
+                # set up the query for getTroveLeavesByLabel.
+                # this query is a little special.  
+                # if acrossRepositories is not given, we do not want to search
+                # all of the labels at once, we want to search them one by
+                # one until one returns (although it might be the case that 
+                # timing shows that it's better to search all at once, even
+                # if the searches on some of the labels are wasted)
+                # so, in that case, we create a list of queries for 
+                # getTroveLeavesByLabel.  If acrossRepositories is given,
+                # the list is one element containing all of the queries
+                # for all labels.
+                if not flavor and affinityTroves:
+                    if acrossRepositories:
+                        # d is the label : flavor dict for this trove
+                        d = {}
+                        byLabel[name] = [d]
                     else:
-                        self.queryMerge(flavorDict, d)
-	elif versionStr[0] != "/":
-	    # partial version string, we don't support this
-	    raise repository.TroveNotFound, \
-		"incomplete version string %s not allowed" % versionStr
-	else:
-	    try:
-		version = versions.VersionFromString(versionStr)
-	    except versions.ParseError, e:
-		raise repository.TroveNotFound, str(e)
+                        # lst is a list of {label : flavor} dicts for this trove
+                        lst = []
+                        byLabel[name] = lst    
 
-            if isinstance(version, versions.Branch):
-                fn = self.getTroveLeavesByBranch
+                    for label in newLabelPath:  
+                        flavors = []
+                        for (afName, afVersion, afFlavor) in affinityTroves:
+                            if afVersion.branch().label() == label:
+                                flavors.append(afFlavor)
+                        if not flavors:
+                            f = defaultFlavor
+                        else:
+                            f = flavors[0]
+                            for otherFlavor in flavors:
+                                if otherFlavor != f:
+                                    f = defaultFlavor
+                                    break
+                            f = overrideFlavor(defaultFlavor, f, 
+                                       mergeType = deps.DEP_MERGE_TYPE_PREFS)
+                        if acrossRepositories:
+                            # acrossRepositories - 
+                            # mesh this query into d
+                            d[label] = [f] 
+                        else:
+                            # not acrossRepositories - 
+                            # append this query onto lst
+                            lst.append({label :  [f]})
+                elif acrossRepositories:
+                    # acrossRepositories but no affinityTroves - we know the
+                    # value of f beforehand so we can just create one dict
+                    byLabel[name] = [dict.fromkeys(newLabelPath, [f])]
+                else:
+                    lst = []
+                    byLabel[name] = lst
+                    for label in newLabelPath:
+                        lst.append({label :  [f]})
+
             else:
-                fn = self.getTroveVersionFlavors
+                # 1.6 - trove version string or trailing revision given
+                # this case is most similar to the no version case, 
+                # except that instead of desiring the leaf on each label/branch,
+                # we wish to filter by the trailingRevision instead.
+                # if there are affinity troves, we use their branches as 
+                # the desired branches to search, otherwise, search all 
+                # the labelPath as in 1.3-1.5
+                if affinityTroves:
+                    if name in verRelBranch:
+                        remaining.append(tup)
+                        continue
+                    verRelBranch[name] = {}
+                    for dummy, afVersion, afFlavor in affinityTroves:
+                        # XXX matches no version given code
+                        if not flavor:
+                            f = overrideFlavor(defaultFlavor, afFlavor, 
+                                       mergeType = deps.DEP_MERGE_TYPE_PREFS)
+                        branch = afVersion.branch()
+                        verRelBranch[name].setdefault(afVersion.branch(), 
+                                                                  []).append(f)
+                    verRelBranchMap[name] = tup
+                elif name in verRelLabel:
+                    remaining.append(tup)
+                    continue
+                elif acrossRepositories:
+                    verRelLabel[name] = [dict.fromkeys(labelPath, [f])]
+                    verRelLabelMap[name] = tup
+                else:
+                    verRelLabelMap[name] = tup
+                    verRelLabel[name] = []
+                    for label in labelPath:
+                        verRelLabel[name].append({label :  [f]})
 
-            if flavor is not None:
-                finalFlavor = flavor
-            elif affinityTroves:
-                flavors = [ x[2] for x in affinityTroves ]
-                f = flavors[0]
-                for otherFlavor in flavors:
-                    if otherFlavor != f:
-                        f = defaultFlavor
-                        break
+        # Step 2.  Actually send requests.
+        missing = []
+        finalMap = {}
 
-                finalFlavor = defaultFlavor.copy()
-                finalFlavor.union(f, mergeType = deps.DEP_MERGE_TYPE_PREFS)
+        if byBranch:
+            res = self.getTroveLeavesByBranch(byBranch, bestFlavor=True)
+            for name in byBranch:
+                if name not in res or not res[name]:
+                    missing.append(byBranchMap[name])
+                    continue
+                pkgList = []
+                for version, flavorList in res[name].iteritems():
+                    pkgList.extend((name, version, f) for f in flavorList)
+                finalMap[byBranchMap[name]] = pkgList
+            del byBranch
+
+        if byBranchNoFlavor:
+            res = self.getTroveLeavesByBranch(byBranchNoFlavorj, 
+                                              bestFlavor=False)
+            for name in byBranchNoFlavor:
+                if name not in res or not res[name]:
+                    missing.append(byBranchNoFlavorMap[name])
+                    continue
+                pkgList = []
+                for version, flavorList in res[name].iteritems():
+                    pkgList.extend((name, version, f) for f in flavorList)
+                finalMap[byBranchMap[name]] = pkgList
+            del byBranchNoFlavor
+        del byBranchMap
+        if byVersion:
+            res = self.getTroveVersionFlavors(byVersion, bestFlavor=True)
+            for name in byVersion:
+                if name not in res or not res[name]:
+                    missing.append(byVersionMap[name])
+                    continue
+                pkgList = []
+                for version, flavorList in res[name].iteritems():
+                    pkgList.extend((name, version, f) for f in flavorList)
+                finalMap[byVersionMap[name]] = pkgList
+            del byVersion
+
+        if byVersionNoFlavor:
+            res = self.getTroveVersionFlavors(byVersionNoFlavor, 
+                                              bestFlavor=False)
+            for name in byVersionNoFlavor:
+                if name not in res or not res[name]:
+                    missing.append(byVersionNoFlavorMap[name])
+                    continue
+                pkgList = []
+                for version, flavorList in res[name].iteritems():
+                    pkgList.extend((name, version, f) for f in flavorList)
+                finalMap[byVersionMap[name]] = pkgList
+            del byVersionNoFlavor
+        del byVersionMap
+
+        if verRelBranch:
+            res = self.getTroveVersionsByBranch(verRelBranch, bestFlavor=True)
+            for name in verRelBranch:
+                versionStr = verRelBranchMap[name][1]
+                try:
+                    verRel = versions.Revision(versionStr)
+                except versions.ParseError, e:
+                    verRel = None
+                found = False
+                for version in reversed(sorted(res[name].iterkeys())):
+                    if verRel:
+                        if version.trailingRevision() != verRel:
+                            continue
+                    else:
+                        if version.trailingRevision().version != versionStr:
+                            continue
+                    found = True
+                    pkgList = [(name, version, x) \
+                                    for x in res[name][version]]
+                    finalMap[verRelBranchMap[name]] = pkgList
+                    break
+                if not found:
+                    missing.append(verRelBranchMap[name])
+            del verRelBranch
+        if byLabel:
+            index = 0
+            while byLabel:
+                query = {}
+                for name in byLabel.keys():
+                    try:
+                        req = byLabel[name][index]
+                    except IndexError:
+                        missing.append(byLabelMap[name])
+                        del byLabel[name]
+                        continue
+                    else:
+                        query[name] = req
+                res = self._getTroveLeavesByLabel(query, bestFlavor=True)
+
+                for name in res:
+                    if not res[name]:
+                        continue
+                    del byLabel[name]
+                    pkgList = []
+                    for version, flavorList in res[name].iteritems():
+                        pkgList.extend((name, version, f) for f in flavorList)
+                    finalMap[byLabelMap[name]] = pkgList
+                index +=1
+            del byLabel
+            del byLabelMap
+            del query
+        if verRelLabel:
+            index = 0
+            while verRelLabel:
+                query = {}
+                for name in verRelLabel.keys():
+                    try:
+                        req = verRelLabel[name][index]
+                    except IndexError:
+                        missing.append(verRelLabelMap[name])
+                        del verRelLabel[name]
+                        continue
+                    query[name] = req
+                res = self._getTroveVersionsByLabel(query, bestFlavor=True)
+
+                for name in res:
+                    if not res[name]:
+                        continue
+                    versionStr = verRelLabelMap[name][1]
+                    try:
+                        verRel = versions.Revision(versionStr)
+                    except versions.ParseError, e:
+                        verRel = None
+                    if acrossRepositories:
+                        vByLabel = {}
+                        for version in res[name]:
+                            vByLabel.setdefault(version.branch().label(),
+                                                            []).append(version)
+                        pkgList  = []
+                        for label in vByLabel:
+                            for version in reversed(sorted(vByLabel[label])):
+                                if verRel:
+                                    if version.trailingRevision() != verRel:
+                                        continue
+                                else:
+                                    if version.trailingRevision().version \
+                                                                != versionStr:
+                                        continue
+                                pkgList.extend((name, version, x) \
+                                                for x in res[name][version])
+                                break
+                        if not pkgList:
+                            missing.append(verRelLabelMap[name])
+                        else:
+                            finalMap[verRelLabelMap[name]] = pkgList
+                            del verRelLabel[name]
+                    else:
+                        for version in reversed(sorted(res[name].iterkeys())):
+                            if verRel:
+                                if version.trailingRevision() != verRel:
+                                    continue
+                            else:
+                                if version.trailingRevision().version \
+                                                                != versionStr:
+                                    continue
+                            del verRelLabel[name]
+                            pkgList = [(name, version, x) \
+                                            for x in res[name][version]]
+                            finalMap[verRelLabelMap[name]] = pkgList
+                            break
+                index += 1
+
+            del verRelLabel
+            del verRelLabelMap
+            del query
+        if missing:
+            import updatecmd
+            raise repository.TroveNotFound, 'Troves %s not found' % \
+                                   [updatecmd.toTroveSpec(*x) for x in missing]
+
+        if remaining: 
+            findTroveMap = self.findTroves(labelPath, remaining, defaultFlavor, 
+                                           acrossRepositories,
+                                           affinityDatabase)
+            finalMap.update(findTroveMap)
+        return finalMap
+
+
+    def findTrove(self, labelPath, (name, versionStr, flavor), 
+                  defaultFlavor=None, acrossRepositories = False, 
+                  affinityDatabase = None):
+        if labelPath and not isinstance(labelPath, list):
+            labelPath = [labelPath]
+        try:
+            res = self.findTroves(labelPath, ((name, versionStr, flavor),),
+                                  defaultFlavor, acrossRepositories, 
+                                  affinityDatabase)
+        except repository.TroveNotFound, msg:
+            if not versionStr:
+                raise repository.TroveNotFound,\
+                    ("%s was not on found on path %s" \
+                     % (name, ', '.join(x.asString() for x in labelPath)))
+            elif labelPath:
+                raise repository.TroveNotFound,\
+                    ("version %s of %s was not on found on path %s" \
+                     % (versionStr, name, 
+                        ', '.join(x.asString() for x in labelPath)))
             else:
-                finalFlavor = defaultFlavor
+                raise repository.TroveNotFound,\
+                    ("version %s of %s was not on found" % (versionStr, name))
+                        
 
-            # we're not allowed to ask for the bestFlavor if the 
-            # defaultFlavor is None
-            bestFlavor = finalFlavor is not None
+                
 
-            flavorDict = fn({ name : { version : [ finalFlavor ] } },
-                            bestFlavor = bestFlavor)
 
-            if not flavorDict.has_key(name):
-                flavorDict[name] = {}
-
-        if not flavorDict.has_key(name) or not flavorDict[name]:
-            if not labelPath or not labelPath[0]:
-                raise repository.TroveNotFound, "trove %s not found" % name
-            elif versionStr:
-                raise repository.TroveNotFound, \
-                    "version %s of %s was not on found on path %s" % \
-                    (versionStr, name, " ".join([x.asString() for x in 
-                        labelPath]))
-            else:
-                raise repository.TroveNotFound, \
-                    "%s was not on found on path %s" % \
-                    (name, " ".join([x.asString() for x in labelPath]))
-
-	pkgList = []
-	for version, flavorList in flavorDict[name].iteritems():
-            pkgList += [ (name, version, f) for f in flavorList ]
-
-	if not pkgList:
-	    raise repository.TroveNotFound, "trove %s does not exist" % name
-
-	return pkgList
-
+        return res[(name, versionStr, flavor)]
+	    
     def _commit(self, chgSet, fName):
 	serverName = None
 	for pkg in chgSet.iterNewPackageList():

@@ -326,19 +326,18 @@ class ConaryClient:
                 # fully qualified versions don't need repository affinity
                 # or the label search path
                 try:
-                    l = self.repos.findTrove(None, troveName, 
-                                                   self.cfg.flavor, versionStr,
-                                                   affinityDatabase = self.db,
-                                                   flavor = flavor)
+                    l = self.repos.findTrove(None, 
+                                              (troveName, versionStr, flavor), 
+                                              self.cfg.flavor, 
+                                              affinityDatabase = self.db)
                 except repository.TroveNotFound, e:
                     raise NoNewTrovesError
                 newItems += l
             else:
                 l = self.repos.findTrove(self.cfg.installLabelPath, 
-                                               troveName, 
-                                               self.cfg.flavor, versionStr,
-                                               affinityDatabase = self.db,
-                                               flavor = flavor)
+                                          (troveName, versionStr, flavor),
+                                          self.cfg.flavor, 
+                                          affinityDatabase = self.db)
                 newItems += l
                 # XXX where does this go now?                    
                 # updating locally cooked troves needs a label override

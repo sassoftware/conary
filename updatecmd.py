@@ -147,6 +147,14 @@ def parseTroveSpec(specStr, defaultFlavor):
 
     return (name, versionSpec, flavor)
 
+def toTroveSpec(name, versionStr, flavor):
+    disp = [name]
+    if versionStr:
+        disp.extend(('=', versionStr))
+    if flavor:
+        disp.extend(('[', deps.formatFlavor(flavor), ']'))
+    return ''.join(disp)
+
 class TroveSpecError(Exception):
 
     pass

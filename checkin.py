@@ -211,8 +211,7 @@ def checkout(repos, cfg, workDir, name):
         name = parts[0]
     name += ":source"
     try:
-        trvList = repos.findTrove(cfg.buildLabel, name, None,
-				  versionStr = versionStr)
+        trvList = repos.findTrove(cfg.buildLabel, (name, versionStr, None))
     except repository.repository.TroveNotFound, e:
         log.error(str(e))
         return
@@ -641,7 +640,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     if not troveName.endswith(":source"):
 	troveName += ":source"
 
-    new = repos.findTrove(buildLabel, troveName, None, versionStr = newVersion)
+    new = repos.findTrove(buildLabel, (troveName, newVersion, None)) 
     if len(new) > 1:
 	log.error("%s matches multiple versions" % newVersion)
 	return
@@ -670,8 +669,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 	    oldV = branchList[-count]
 	    old = (troveName, oldV, deps.deps.DependencySet())
     except ValueError:
-	old = repos.findTrove(buildLabel, troveName, None, 
-			      versionStr = oldVersion)
+	old = repos.findTrove(buildLabel, (troveName, oldVersion, None)) 
 	if len(old) > 1:
 	    log.error("%s matches multiple versions" % oldVersion)
 	    return
@@ -700,8 +698,7 @@ def diff(repos, versionStr = None):
 	versionStr = state.expandVersionStr(versionStr)
 
         try:
-            pkgList = repos.findTrove(None, state.getName(), None,
-                                      versionStr = versionStr)
+            pkgList = repos.findTrove(None, (state.getName(), versionStr, None))
         except repository.repository.TroveNotFound, e:
             log.error("Unable to find source component %s with version %s: %s",
                       state.getName(), versionStr, str(e))
@@ -807,8 +804,7 @@ def updateSrc(repos, versionStr = None):
 	versionStr = state.expandVersionStr(versionStr)
 
         try:
-            pkgList = repos.findTrove(None, pkgName, None,
-                                      versionStr = versionStr)
+            pkgList = repos.findTrove(None, (pkgName, versionStr, None))
         except repository.repository.TroveNotFound:
 	    log.error("Unable to find source component %s with version %s"
                       % (pkgName, versionStr))

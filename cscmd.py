@@ -39,11 +39,9 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True):
             (troveName, newVersionStr, newFlavor) = parseTroveSpec(l[1],
                                                         cfg.flavor)
 
-        if newFlavor is None:
-            newFlavor = cfg.flavor
-
-        troveList = repos.findTrove(cfg.installLabelPath, troveName, newFlavor,
-                                    newVersionStr)
+        troveList = repos.findTrove(cfg.installLabelPath, 
+                                    (troveName, newVersionStr, newFlavor),
+                                    cfg.flavor)
         if len(troveList) > 1:
             if newVersionStr:
                 log.error("trove %s has multiple branches named %s",
@@ -56,11 +54,9 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True):
         newFlavor = troveList[0][2]
 
         if oldVersionStr:
-            if oldFlavor is None:
-                oldFlavor = cfg.flavor
-
-            troveList = repos.findTrove(cfg.installLabelPath, troveName, 
-                                        oldFlavor, oldVersionStr)
+            troveList = repos.findTrove(cfg.installLabelPath, 
+                                        (troveName, oldVersionStr, oldFlavor),
+                                        cfg.flavor)
             if len(troveList) > 1:
                 log.error("trove %s has multiple branches named %s",
                           troveName, oldVersionStr)

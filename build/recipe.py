@@ -303,8 +303,8 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
                 label = versions.Label(label)
 
     try:
-	pkgs = repos.findTrove(label, component, deps.DependencySet(), 
-                               versionStr)
+	pkgs = repos.findTrove(label, 
+                               (component, versionStr, deps.DependencySet()))
 	if len(pkgs) > 1:
 	    raise RecipeFileError("source component %s has multiple versions "
 				  "with label %s" %(component,
@@ -815,16 +815,21 @@ class GroupRecipe(Recipe):
 
         validSize = True
         troveList = []
+        flavorMap = {}
+        findTroveList = []
         for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
-            try:
-                desFlavor = self.cfg.buildFlavor.copy()
-                assert(isinstance(flavor, deps.DependencySet) or flavor is None)
-                if flavor is not None:
-                    desFlavor = deps.overrideFlavor(desFlavor, flavor)
-                pkgList = self.repos.findTrove(self.label, name, desFlavor,
-                                               versionStr = versionStr)
-            except repository.TroveNotFound, e:
-                raise RecipeFileError, str(e)
+            desFlavor = self.cfg.buildFlavor.copy()
+            if flavor is not None:
+                desFlavor = deps.overrideFlavor(desFlavor, flavor)
+            findTroveList.append((name, versionStr, desFlavor))
+            flavorMap[flavor] = desFlavor
+        try:
+            results = self.repos.findTroves(self.label, findTroveList)
+        except repository.TroveNotFound, e:
+            raise RecipeFileError, str(e)
+        for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
+            desFlavor = flavorMap[flavor]
+            pkgList = results[name, versionStr, desFlavor]
             assert(len(pkgList) == 1)
             troveList.append((pkgList[0], byDefault))
             assert(desFlavor.score(pkgList[0][2]) is not False)
@@ -896,8 +901,8 @@ class RedirectRecipe(Recipe):
                 desFlavor = self.cfg.buildFlavor.copy()
                 if flavor is not None:
                     desFlavor.union(flavor, deps.DEP_MERGE_TYPE_OVERRIDE)
-                pkgList = self.repos.findTrove(self.label, name, desFlavor,
-                                               versionStr = versionStr)
+                pkgList = self.repos.findTrove(self.label, 
+                                               (name, versionStr, desFlavor))
             except repository.TroveNotFound, e:
                 raise RecipeFileError, str(e)
 
@@ -1020,8 +1025,8 @@ class FilesetRecipe(Recipe):
 	    remap = [ remap ]
 
 	try:
-	    pkgList = self.repos.findTrove(self.label, component, self.flavor,
-					   versionStr = versionStr)
+	    pkgList = self.repos.findTrove(self.label, 
+                                           (component, versionStr, self.flavor))
 	except repository.TroveNotFound, e:
 	    raise RecipeFileError, str(e)
 

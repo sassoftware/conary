@@ -553,7 +553,7 @@ def ThawDependencySet(frz):
         depSet.addDep(depClass, depClass.thawDependency(frozen))
     return depSet
 
-def overrideFlavor(oldFlavor, newFlavor):
+def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
     """ 
     Performs overrides of flavors as expected when the new flavor is 
     specified by a user -- the user's flavor overrides use flags, and 
@@ -564,7 +564,7 @@ def overrideFlavor(oldFlavor, newFlavor):
     if (DEP_CLASS_IS in flavor.getDepClasses() 
         and DEP_CLASS_IS in newFlavor.getDepClasses()):
         del flavor.members[DEP_CLASS_IS]
-    flavor.union(newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE)
+    flavor.union(newFlavor, mergeType=mergeType)
     return flavor
 
 def formatFlavor(flavor):
