@@ -19,6 +19,7 @@ import errno
 import filecontainer
 import filecontents
 import files
+import helper
 import os
 import patch
 import repository
@@ -155,6 +156,93 @@ class ChangeSet(streams.LargeStreamSet):
 
     def isLocal(self):
 	return self.local
+
+    def rootChangeSet(self, db, keepExisting):
+	assert(self.absolute)
+
+	# this has an empty source path template, which is only used to
+	# construct the eraseFiles list anyway
+	
+	# we don't use our localrep.ChangeSetJob here as it can't deal with
+	# absolute change sets
+	job = RootChangeSetJob(db, self)
+
+	# absolute change sets cannot have eraseLists
+	#assert(not eraseList)
+	#assert(not eraseFiles)
+
+        # these get rebuilt
+        self.primaryTroveList = []
+        self.files = {}
+        self.oldPackages = []           # since we ignore eraseList below, this
+                                        # is always empty
+	items = []
+	for newPkg in job.newPackageList():
+	    items.append((newPkg.getName(), newPkg.getVersion(), 
+			  newPkg.getFlavor()))
+
+	outdated, eraseList = helper.outdatedTroves(db, items)
+        # this ignores eraseList, juts like doUpdate does
+
+	for newPkg in job.newPackageList():
+	    pkgName = newPkg.getName()
+	    newVersion = newPkg.getVersion()
+	    newFlavor = newPkg.getFlavor()
+
+	    key = (pkgName, newVersion, newFlavor)
+	    if not outdated.has_key(key):
+		log.warning("package %s %s is already installed -- skipping",
+			    pkgName, newVersion.asString())
+		continue
+
+            if keepExisting:
+                oldVersion = None
+                oldFlavor = None
+            else:
+                (oldVersion, oldFlavor) = outdated[key][1:3]
+
+	    if not oldVersion:
+		# new package; the Package.diff() right after this never
+		# sets the absolute flag, so the right thing happens
+		old = None
+	    else:
+		old = db.getTrove(pkgName, oldVersion, oldFlavor,
+					     pristine = True)
+
+	    # we ignore pkgsNeeded; it doesn't mean much in this case
+	    (pkgChgSet, filesNeeded, pkgsNeeded) = newPkg.diff(old, 
+                                                               absolute = 0)
+	    self.newPackage(pkgChgSet)
+            filesNeeded.sort()
+
+	    for (fileId, oldVersion, newVersion, oldPath, newPath) in filesNeeded:
+		(fileObj, fileVersion) = job.getFile(fileId)
+		assert(newVersion == fileVersion)
+		
+		oldFile = None
+		if oldVersion:
+		    (oldFile, oldCont) = db.getFileVersion(fileId, 
+					    oldVersion, withContents = 1)
+
+		(filecs, hash) = fileChangeSet(fileId, oldFile, fileObj)
+
+		self.addFile(fileId, oldVersion, newVersion, filecs)
+
+		if hash and oldVersion and \
+                        oldFile.flags.isConfig() and fileObj.flags.isConfig():
+		    contType = ChangedFileTypes.file
+		    cont = filecontents.FromChangeSet(self, fileId)
+		    if oldVersion:
+			(contType, cont) = fileContentsDiff(oldFile, oldCont, 
+                                                            fileObj, cont)
+
+                    if contType == ChangedFileTypes.diff:
+                        # XXX this only actually works for ChangeSetFromFile
+                        self.configCache[fileId] = (contType, cont.get().read())
+                        #cs.addFileContents(fileId, contType, cont, 
+                    #			fileObj.flags.isConfig())
+
+        self.absolute = False
 
     def addPrimaryPackage(self, name, version, flavor):
 	self.primaryTroveList.append((name, version, flavor))
@@ -760,4 +848,48 @@ def CreateFromFilesystem(pkgList):
 			  file.flags.isConfig())
 
     return cs
+
+class RootChangeSetJob(repository.ChangeSetJob):
+
+    storeOnlyConfigFiles = True
+
+    def addPackage(self, pkg):
+	self.packages.append(pkg)
+
+    def newPackageList(self):
+	return self.packages
+
+    def oldPackage(self, pkg):
+	self.oldPackages.append(pkg)
+
+    def oldPackageList(self):
+	return self.oldPackages
+
+    def oldFile(self, fileId, fileVersion, fileObj):
+	self.oldFiles.append((fileId, fileVersion, fileObj))
+
+    def oldFileList(self):
+	return self.oldFiles
+
+    def addFile(self, troveID, fileId, fileObj, path, version):
+	if fileObj:
+	    self.files[fileId] = (fileObj.freeze(), version)
+
+    def addFileContents(self, fileObj, newVer, fileContents, restoreContents,
+			isConfig):
+	pass
+
+    def getFile(self, fileId):
+	info = self.files[fileId]
+        return (files.ThawFile(info[0], fileId), info[1])
+
+    def newFileList(self):
+	return self.files.keys()
+
+    def __init__(self, repos, absCs):
+	self.packages = []
+	self.oldPackages = []
+	self.oldFiles = []
+	self.files = {}
+	repository.ChangeSetJob.__init__(self, repos, absCs)
 
