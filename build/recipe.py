@@ -97,6 +97,7 @@ crossMacros = {
 
 def setupRecipeDict(d, filename):
     exec 'from build import build' in d
+    exec 'from build import action' in d
     exec 'from build.recipe import PackageRecipe' in d
     exec 'from build.recipe import GroupRecipe' in d
     exec 'from build.recipe import FilesetRecipe' in d
@@ -335,6 +336,10 @@ class PackageRecipe(Recipe):
 	    if f:
 		files.append(f)
 	return files
+
+    def extraSource(self, action):
+        self._sources.append(action)
+
 
     def unpackSources(self, builddir):
 	self.macros.builddir = builddir
