@@ -12,9 +12,21 @@
 # full details.
 #
 """
-Module used by recipes to modify the state of the installed %(destdir)s.
+Module used by recipes to modify the state of the installed C{%(destdir)s}.
 Classes from this module are not used directly; instead, they are accessed
 through eponymous interfaces in recipe.
+
+Each policy object is instantiated once per recipe, and each reference to
+the policy object's name passes information to the existing instance.
+The policy objects do their work in the same order for every recipe.
+
+Not all policy objects are directly used in recipes.  Those that are
+provide examples in their summaries.
+
+Most policies can be passed keyword arguments C{exceptions=I{filterexp}}
+to remove a file from consideration and C{inclusions=I{filterexp}} to list
+a file as explicitly included.  Most policies default to all the files
+they would need to apply to, so C{exceptions} is the most common.
 """
 
 import util
@@ -27,11 +39,12 @@ import magic
 
 
 class TestSuiteLinks(policy.Policy):
-
-    """ Create symlinks into a 'test build' directory, which mirrors
-	the build directory, except that all executables/configs/etc
-	in the 'test build' directory are symlinks to the installed 
-	versions where possible """
+    """
+    Create symlinks into a 'test build' directory, which mirrors
+    the build directory, except that all executables/configs/etc
+    in the 'test build' directory are symlinks to the installed 
+    versions where possible.
+    """
 
     keywords = { 'build': None,
 		 'fileMap' : {}
@@ -118,10 +131,11 @@ class TestSuiteLinks(policy.Policy):
 
 
     def doFile(self, path):
-	""" Create a directory structure in testdir that mirrors 
-	    builddir, except that where ever there is a file in 
-	    builddir that was installed to destdir, create a link
-	    to that installed file instead of copying it
+	"""
+	Create a directory structure in testdir that mirrors 
+	builddir, except that where ever there is a file in 
+	builddir that was installed to destdir, create a link
+	to that installed file instead of copying it
 	"""
 	fullpath = self.macros.destdir + path
 
@@ -165,9 +179,11 @@ class TestSuiteLinks(policy.Policy):
 
 
     def betterLink(self, newpath, testpath, buildpath):
-	""" determines whether destdir file pointed to by newpath
-	    is a better match with the buildpath  file in question
-	    than the current file at testpath """
+	""" 
+	determines whether destdir file pointed to by newpath
+	is a better match with the buildpath  file in question
+	than the current file at testpath
+	"""
 	# sample test: duplicates behavior in findRightfile
 	#newsize = os.stat(newpath)[stat.ST_SIZE]
 	#buildsize = os.stat(buildpath)[stat.ST_SIZE]
@@ -178,9 +194,11 @@ class TestSuiteLinks(policy.Policy):
 	return False
 
     def findRightFile(self, fullpath, fileName, dirList):
-	""" Search for the best match for the the current file.
-	    Match fullpath against %(builddir)/dir/fileName for each dir 
-	    in dirList """
+	"""
+	Search for the best match for the the current file.
+	Match fullpath against %(builddir)/dir/fileName for each dir 
+	in dirList
+	"""
 	
 	# XXX need to cache size/diff info
 	exactMatchPossible = True
@@ -220,6 +238,9 @@ class TestSuiteLinks(policy.Policy):
 
 #XXX this is a builddir policy
 class TestSuiteFiles(policy.Policy):
+    """
+    XXX This still needs to be documented.
+    """
 
     rootdir = '%(builddir)s'
     buildTestSuite = None
@@ -290,6 +311,10 @@ class TestSuiteFiles(policy.Policy):
 	
 class FixDirModes(policy.Policy):
     """
+    Modifies directory permissions that would otherwise prevent
+    Conary from packaging C{%(destdir)s} as non-root; not invoked
+    from recipes.
+
     Any directories that do not have user read/write/execute must be
     fixed up now so that we can traverse the tree in following policy,
     packaging, and removing the tree after building.
@@ -310,9 +335,9 @@ class FixDirModes(policy.Policy):
 
 class RemoveNonPackageFiles(policy.Policy):
     """
-    Remove classes of files that normally should not be packaged.
-    C{RemoveNonPackageFiles(exceptions=I{filterexpression})} to
-    allow one of these files to be included in a package.
+    Remove classes of files that normally should not be packaged;
+    C{r.RemoveNonPackageFiles(exceptions=I{filterexpression})}
+    allows one of these files to be included in a package.
     """
     invariantinclusions = [
 	r'\.la$',
@@ -329,8 +354,8 @@ class RemoveNonPackageFiles(policy.Policy):
 
 class FixupMultilibPaths(policy.Policy):
     """
-    Fix up (and warn) when programs do not know about %(lib) and they
-    are supposed to be installing to lib64
+    Fix up (and warn) when programs do not know about C{%(lib)s} and they
+    are supposed to be installing to C{lib64} but install to C{lib} instead.
     """
     invariantinclusions = [
 	'.*\.(so.*|a)$',
@@ -372,8 +397,9 @@ class FixupMultilibPaths(policy.Policy):
 
 class ExecutableLibraries(policy.Policy):
     """
-    The ldconfig program will complain if libraries do not have have
-    executable bits set.  Let's avoid that.
+    The C{ldconfig} program will complain if libraries do not have have
+    executable bits set; this policy changes the mode and warns that
+    it has done so.
     """
     # keep invariants in sync with SharedLibrary
     invariantsubtrees = [
@@ -400,9 +426,11 @@ class ExecutableLibraries(policy.Policy):
 
 class Strip(policy.Policy):
     """
-    strip executables
-    XXX system policy on whether to create debuginfo packages
+    Strips executables and libraries of debugging information.
+    May (depending on configuration) save the debugging information
+    for future use.
     """
+    # XXX system policy on whether to create debuginfo packages
     invariantinclusions = [
 	('%(bindir)s/', None, stat.S_IFDIR),
 	('%(essentialbindir)s/', None, stat.S_IFDIR),
@@ -427,10 +455,15 @@ class Strip(policy.Policy):
 
 class NormalizeCompression(policy.Policy):
     """
-    re-gzip .gz files with -9 -n, and .bz2 files with -9, to get maximum
+    Compresses files with maximum compression and without data that can
+    change from invocation to invocation;
+    C{r.NormalizeCompression(exceptions=I{filterexp}} to disable this
+    policy for a file.
+
+    Recompresses .gz files with -9 -n, and .bz2 files with -9, to get maximum
     compression and avoid meaningless changes overpopulating the database.
-    Ignore man/info pages, we'll get them separately while fixing
-    up other things
+    Ignores man/info pages, as we get them separately while making other
+    changes to man/info pages later.
     """
     invariantexceptions = [
 	'%(mandir)s/man.*/',
@@ -444,6 +477,7 @@ class NormalizeCompression(policy.Policy):
 	if not m:
 	    return
 	p = self.macros.destdir+path
+	# XXX if foo and foo.gz both occur, this is bad -- fix it!
 	if m.name == 'gzip' and \
 	   (m.contents['compression'] != '9' or 'name' in m.contents):
 	    util.execute('gunzip %s; gzip -n -9 %s' %(p, p[:-3]))
@@ -452,17 +486,14 @@ class NormalizeCompression(policy.Policy):
 
 class NormalizeManPages(policy.Policy):
     """
-    Make all man pages follow sane system policy
+    Make all man pages follow sane system policy; not called from recipes,
+    as there are no exceptions, period.
      - Fix all man pages' contents:
-       - remove '/?%(destdir)s' from all man pages
-       - '.so foo.n' becomes a symlink to foo.n
+       - remove instances of C{/?%(destdir)s} from all man pages
+       - C{.so foo.n} becomes a symlink to foo.n
      - (re)compress all man pages with gzip -n -9
      - change all symlinks to point to .gz (if they don't already)
      - make all man pages be mode 644
-    Exceptions to this policy are ill-defined and thus are not
-    currently honored.  Any suggestion that this policy should
-    honor inclusion/exception needs to include statements of
-    precise semantics in that case...
     """
     def _uncompress(self, dirname, names):
 	for name in names:
@@ -590,7 +621,9 @@ class NormalizeManPages(policy.Policy):
 
 class NormalizeInfoPages(policy.Policy):
     """
-    properly compress info files and remove dir file
+    Properly compress info files and remove dir file; only recipe invocation is
+    C{r.NormalizeInfoPages(r.macros.infodir+'/dir')} in the one recipe that
+    should own the info dir file.
     """
     def do(self):
 	dir = self.macros['infodir']+'/dir'
@@ -621,7 +654,10 @@ class NormalizeInfoPages(policy.Policy):
 
 class NormalizeInitscripts(policy.Policy):
     """
-    Move all initscripts from /etc/rc.d/init.d/ to their official location
+    Puts initscripts in their place, resolving ambiguity about their
+    location.
+
+    Moves all initscripts from /etc/rc.d/init.d/ to their official location
     (if, as is true for the default settings, /etc/rc.d/init.d isn't their
     official location, that is).
     """
@@ -645,7 +681,9 @@ class NormalizeInitscripts(policy.Policy):
 
 class RelativeSymlinks(policy.Policy):
     """
-    Make all symlinks relative
+    Makes all symlinks relative; create absolute symlinks in your
+    recipes, and this will create minimal relative symlinks from them;
+    C{r.RelativeSymlinks(exceptions=I{filterexp})}
     """
     def doFile(self, path):
 	fullpath = self.macros['destdir']+path
@@ -668,8 +706,7 @@ class RelativeSymlinks(policy.Policy):
 
 def DefaultPolicy():
     """
-    Return a list of actions that expresses the default policy.
-    A recipe can then modify this list if necessary.
+    Returns a list of actions that expresses the default policy.
     """
     return [
 	TestSuiteLinks(),
