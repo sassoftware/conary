@@ -351,6 +351,7 @@ class Recipe:
 	self.autoSpecList = []
 	for spec in baseAutoSpec:
 	    self.autoSpecList.append(package.PackageSpec(spec[0], spec[1]))
+	# "None" will be replaced by explicit subpackage list
 	self.packageSpecSet = package.PackageSpecSet(self.autoSpecList, None)
         self.packageSet = package.Auto(self.name, root, self.packageSpecSet)
 

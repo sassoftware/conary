@@ -353,39 +353,52 @@ class PackageSpec:
 	return self.regexp.match(string)
 
 class PackageSpecInstance:
-    """An instance of a spec formed by the conjugation of a subspec and
+    """An instance of a spec formed by the conjugation of a expspec and
     an autospec"""
-    def __init__(self, instance, subspec, autospec):
+    def __init__(self, instance, expspec, autospec):
 	self.instance = instance
-	self.subspec  = subspec
+	self.expspec  = expspec
 	self.autospec = autospec
 
 class PackageSpecSet(dict):
-    """An "ordered dictionary" containing PackageSpecs"""
-    def __init__(self, auto, subs):
+    """An "ordered dictionary" containing PackageSpecInstances"""
+    def __init__(self, auto, exps):
+	"""Storage area for (sub)package definitions; keeps
+	automatic subpackage definitions (like runtime, doc,
+	etc) and explicit subpackage definitions (higher-level
+	subpackages; each automatic subpackage applies to each
+	explicit subpackage.
+	
+	@param auto: automatic subpackage list
+	@type auto: tuple of (name, regex) or (name, (tuple, of
+	regex)) tuples
+	@param exps: explicit subpackage list
+	@type exps: tuple of (name, regex) or (name, (tuple, of
+	regex)) tuples
+	"""
 	self.auto = auto
-	if subs:
-	    self.subs = subs
+	if exps:
+	    self.exps = exps
 	else:
-	    self.subs = (PackageSpec('', '.*'), )
+	    self.exps = (PackageSpec('', '.*'), )
 	self.packageList = []
 	self.packageMap = {}
-	for subspec in self.subs:
+	for expspec in self.exps:
 	    for autospec in self.auto:
-		name = self._getname(subspec.name, autospec.name)
-		self[name] = PackageSpecInstance(BuildPackage(name), subspec, autospec)
+		name = self._getname(expspec.name, autospec.name)
+		self[name] = PackageSpecInstance(BuildPackage(name), expspec, autospec)
 		self.packageList.append(name)
-		if not self.packageMap.has_key(subspec.name):
-		    self.packageMap[subspec.name] = {}
-		self.packageMap[subspec.name][autospec.name] = self[name]
+		if not self.packageMap.has_key(expspec.name):
+		    self.packageMap[expspec.name] = {}
+		self.packageMap[expspec.name][autospec.name] = self[name]
 
     def _getname(self, subname, autoname):
 	"""Cheap way of saying "if subname, then subname/autoname,
 	otherwise just autoname"""
 	return string.lstrip(string.join((subname, autoname), '/'), '/')
     
-    def add(self, path, subspec, autospec):
-	self.packageMap[subspec.name][autospec.name].instance.addFile(path)
+    def add(self, path, autospec, expspec):
+	self.packageMap[expspec.name][autospec.name].instance.addFile(path)
 
 
 def Auto(name, root, specSet):
@@ -409,10 +422,10 @@ def autoVisit(arg, dir, files):
         else:
             path = '/' + file
 	
-	for subspec in specSet.subs:
-	    if subspec.match(path):
+	for expspec in specSet.exps:
+	    if expspec.match(path):
 		for autospec in specSet.auto:
 		    if autospec.match(path):
-			specSet.add(path, subspec, autospec)
+			specSet.add(path, autospec, expspec)
 			break
 		break
