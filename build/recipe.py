@@ -412,6 +412,7 @@ class PackageRecipe(Recipe):
 		    backup = '-b -z %s' % backup
 		if targetdir:
 		    destDir = "/".join((destDir, targetdir))
+		    util.mkdirChain(destDir)
 		if macros:
 		    log.debug('applying macros to patch %s' %f)
 		    pin = os.popen("%s '%s'" %(provides, f))
