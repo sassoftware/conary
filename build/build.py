@@ -173,10 +173,12 @@ class Configure(BuildCommand):
 	' --sharedstatedir=%%(sharedstatedir)s'
 	' --mandir=%%(mandir)s'
 	' --infodir=%%(infodir)s'
+        ' %(bootstrapFlags)s'
 	'  %(args)s')
     keywords = {'preConfigure': '',
 		'configureName': 'configure',
                 'objDir': '',
+                'bootstrapFlags': '--target=%(target)s --host=%(target)s --build=%(build)s',
 		'subDir': ''}
 
     def __init__(self, recipe, *args, **keywords):
@@ -205,6 +207,10 @@ class Configure(BuildCommand):
         else:
             macros.mkObjdir = ''
             macros.configure = './%s' % self.configureName
+        if Use.bootstrap:
+            macros.bootstrapFlags = self.bootstrapFlags
+        else:
+            macros.bootstrapFlags = ''
 	if self.subDir:
 	    macros.subDir = self.subDir
 	else:
