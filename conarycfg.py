@@ -47,6 +47,7 @@ class SrsConfiguration:
 	self.defaultbranch = None
 	self.lookaside = "/var/cache/srs"
 	self.dbpath = "/var/lib/srsdb"
+        self.tmpdir = "/var/tmp/"
 	self.defaultbranch = versions.VersionFromString("/localhost@local")
 
 	self.read("/etc/srsrc")
