@@ -20,7 +20,6 @@ def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
 	else:
 	    if all:
 		l = repos.getPackageVersionList(pkgName)
-		versions.versionSort(l)
 	    else:
                 version = repos.pkgLatestVersion(pkgName, cfg.defaultbranch)
                 if version:
