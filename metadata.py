@@ -33,6 +33,13 @@ class MDClass:
     LICENSE = 3
     CATEGORY = 4
 
+    # mapping from enum id to real name
+    className = {SHORT_DESC: "shortDesc",
+                 LONG_DESC:  "longDesc",
+                 URL:        "url",
+                 LICENSE:    "license",
+                 CATEGORY:   "category"}
+                  
 class MetadataTable:
     def __init__(self, db):
         self.db = db
@@ -95,7 +102,8 @@ class MetadataTable:
             metadataId = metadataId[0]
         else:
             return None
-            
+           
+        # URL, LICENSE, and CATEGORY are not translated
         cu.execute("""SELECT class, data FROM MetadataItems
                       WHERE metadataId=? and (language=?
                             OR class IN (?, ?, ?))""",
@@ -105,11 +113,14 @@ class MetadataTable:
 
         # create a dictionary of metadata classes
         # each key points to a list of metadata items
-        items = {str(MDClass.URL): [], str(MDClass.LICENSE): [], str(MDClass.CATEGORY): []}
+                 
+        items = {}
+        for className in MDClass.className.values():
+            items[className] = []
+            
         for mdClass, data in cu:
-            if not items.has_key(str(mdClass)):
-                items[str(mdClass)] = []
-            items[str(mdClass)].append(data)
+            className = MDClass.className[mdClass]
+            items[className].append(data)
 
         return items
 
@@ -144,21 +155,21 @@ def fetchFreshmeat(troveName):
 
     doc = xml.dom.minidom.parse(url)
     metadata = {}
-    metadata[0] = [doc.getElementsByTagName("desc_short")[0].childNodes[0].data]
-    metadata[1] = [doc.getElementsByTagName("desc_full")[0].childNodes[0].data]
-    metadata[2] = [resolveUrl(doc.getElementsByTagName("url_homepage")[0].childNodes[0].data)]
-    metadata[3] = []
-    metadata[4] = []
+    metadata["shortDesc"] = [doc.getElementsByTagName("desc_short")[0].childNodes[0].data]
+    metadata["longDesc"] = [doc.getElementsByTagName("desc_full")[0].childNodes[0].data]
+    metadata["url"] = [resolveUrl(doc.getElementsByTagName("url_homepage")[0].childNodes[0].data)]
+    metadata["license"] = []
+    metadata["category"] = []
 
     for node in doc.getElementsByTagName("trove_id"):
         id = node.childNodes[0].data
         if id in LicenseCategories:
             name = LicenseCategories[id]
-            metadata[3].append(name)
+            metadata["license"].append(name)
         else:
             name = TroveCategories[id]
             if name.startswith('Topic ::'):
-                metadata[4].append(name)
+                metadata["category"].append(name)
 
     return metadata
 

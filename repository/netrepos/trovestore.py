@@ -487,14 +487,14 @@ class TroveStore:
         #     surely someone does something similar someplace else...
         latestVersion = self.metadataTable.getLatestVersion(itemId, branchId)
         if language == "C":
-            if latestVersion:
+            if latestVersion: # a version exists, increment it
                 version = versions.VersionFromString(latestVersion)
                 version.incrementRelease()
-                self.versionTable.addId(version)
-            else:
+            else: # otherwise make a new version
                 version = versions._VersionFromString("1-1", defaultBranch=branch)
-                if not self.versionTable.get(version, None):
-                    self.versionTable.addId(version)
+
+            if not self.versionTable.get(version, None):
+                self.versionTable.addId(version)
         else: # if this is a translation, update the current version
             if not latestVersion:
                 raise KeyError, troveName
