@@ -22,7 +22,7 @@ class UseClass(dict):
     Immutable dictionary
     """
     def __init__(self, d):
-	self.frozen = 0
+	self.frozen = False
 	self.update(d)
 
     def _freeze(self):
@@ -48,20 +48,22 @@ Use = UseClass({
     'dietlibc':		False,
     'bootstrap':	False,
     'python':		True,	# XXX should this even be an option?
+    'perl':		True,
+    'readline':		True,
+    'gdbm':		True,
+    # flags to use for special situations
+    'builddocs':	True,	# embedded targets should have False
     # temporarily disabled until we build appropriate packages
-    'perl':		False,
     'tcl':		False,
     'tk':		False,
     'X':		False,
     'gtk':		False,
     'gnome':		False,
     'kde':		False,
-    'readline':		False,
     'ssl':		False,
     'slang':		False,
     'netpbm':		False,
     'nptl':		False,
-    'gdbm':		False,
 })
 Use._freeze()
 
