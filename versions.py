@@ -363,7 +363,7 @@ class LocalBranch(BranchName):
     """
 
     def __init__(self):
-	BranchName.__init__(self, "localhost@local:LOCAL")
+	BranchName.__init__(self, "local@local:LOCAL")
 
 class EmergeBranch(BranchName):
 
@@ -372,7 +372,7 @@ class EmergeBranch(BranchName):
     """
 
     def __init__(self):
-	BranchName.__init__(self, "localhost@local:EMERGE")
+	BranchName.__init__(self, "local@local:EMERGE")
 
 class CookBranch(BranchName):
 
@@ -381,7 +381,7 @@ class CookBranch(BranchName):
     """
 
     def __init__(self):
-	BranchName.__init__(self, "localhost@local:COOK")
+	BranchName.__init__(self, "local@local:COOK")
 
 class Version(AbstractVersion):
 
@@ -678,13 +678,13 @@ class Version(AbstractVersion):
 	lastBranch = None
 	while parts:
 	    lastBranch = BranchName(parts[0], template = lastBranch)
-	    if lastBranch.asString() == "localhost@local:LOCAL":
+	    if lastBranch.asString() == "local@local:LOCAL":
 		lastBranch = None
 		v.append(LocalBranch())
-	    elif lastBranch.asString() == "localhost@local:COOK":
+	    elif lastBranch.asString() == "local@local:COOK":
 		lastBranch = None
 		v.append(CookBranch())
-	    elif lastBranch.asString() == "localhost@local:EMERGE":
+	    elif lastBranch.asString() == "local@local:EMERGE":
 		lastBranch = None
 		v.append(EmergeBranch())
 	    else:
