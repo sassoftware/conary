@@ -51,9 +51,12 @@ def findPackage(repos, packageNamespace, defaultNick, name,
 	    raise PackageNotFound,  \
 		    "only groups may be checked out of the repository"
 
-    if (not versionStr or versionStr[0] != "/") and (not defaultNick):
-	raise PackageNotFound, \
-	    "fully qualified version or branch nickname expected"
+    if not defaultNick:
+	if versionStr[0] != "/" and (versionStr.find("/") != -1 or
+				     versionStr.find("@") == -1):
+	    raise PackageNotFound, \
+		"fully qualified version or branch nickname " + \
+		"expected instead of %s" % versionStr
 
     # a version is a branch nickname if
     #   1. it doesn't being with / (it isn't fully qualified)
