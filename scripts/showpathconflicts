@@ -14,6 +14,9 @@
 # full details.
 #
 
+""" Shows those paths on your local system that are owned by multiple 
+    packages """
+
 import os
 import sys
 if os.path.dirname(sys.argv[0]):
