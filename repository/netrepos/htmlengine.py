@@ -73,6 +73,12 @@ hr {
                 }
             }        
 
+            function setValue(selId, entryId) {
+                sel = document.getElementById(selId);
+                entry = document.getElementById(entryId);
+                entry.value = sel.options[sel.selectedIndex].value;
+            }
+
             function updateMetadata() {
                 alert("updating");
                 selectAll('urlList');
@@ -90,7 +96,7 @@ hr {
 </body></html>""")
 
     def htmlPickTrove(self, troveList=[], action="chooseBranch"):
-        troveSelection = self._genSelect(troveList, "troveNameList", size=12, expand=True)
+        troveSelection = self._genSelect(troveList, "troveNameList", size=12, expand="50%")
 
         self.writeFn("""
 <form action="/%s" method="post">
@@ -135,14 +141,14 @@ Choose a branch: %s
 <h4>Branch: %s</h4>
 <h4>Metadata revision: %s</h4>
 <form method="post" action="updateMetadata">
-<table style="width: 100%%;">
-<tr><td>Short Description:</td><td><input style="width: 50%%;" type="text" name="shortDesc" value="%s" /></td></tr>
-<tr><td>Long Description:</td><td><textarea style="width: 50%%;" name="longDesc" rows="4" cols="60">%s</textarea></td></tr>
+<table style="width: 100%%;" cellpadding="8">
+<tr><td>Short Description:</td><td><input style="width: 53%%;" type="text" name="shortDesc" value="%s" /></td></tr>
+<tr><td>Long Description:</td><td><textarea style="width: 53%%;" name="longDesc" rows="4" cols="60">%s</textarea></td></tr>
 <tr><td>URLs:</td><td>%s<br />%s</td></tr>
 <tr><td>Licenses:</td><td>%s<br />%s</td></tr>
 <tr><td>Categories:</td><td>%s<br />%s</td></tr>
 </table>
-<p><button id="submitButton" onClick="javascript:updateMetadata();">Save Changes</button></p>
+<p><button id="submitButton" onclick="javascript:updateMetadata();">Save Changes</button></p>
 <input type="hidden" name="branch" value="%s" />
 <input type="hidden" name="troveName" value="%s" />
 </form>
@@ -150,11 +156,12 @@ Choose a branch: %s
 """ %   (troveName, branchStr, versionStr,
          metadata[MDClass.SHORT_DESC][0],
          metadata[MDClass.LONG_DESC][0],
-         self.makeSelect(metadata[MDClass.URL], "urlList", size=4, expand=True, multiple=True),
+         self.makeSelect(metadata[MDClass.URL], "urlList", size=4,
+                         expand="53%", multiple=True, onClick="setValue('urlList', 'newUrl')"),
          self.makeSelectAppender("newUrl", "urlList"),
-         self.makeSelect(metadata[MDClass.LICENSE], "licenseList", size=4, expand=True, multiple=True),
+         self.makeSelect(metadata[MDClass.LICENSE], "licenseList", size=4, expand="53%", multiple=True),
          self.makeSelectAppenderList("newLicense", "licenseList", licenses),
-         self.makeSelect(metadata[MDClass.CATEGORY], "categoryList", size=4, expand=True, multiple=True),
+         self.makeSelect(metadata[MDClass.CATEGORY], "categoryList", size=4, expand="53%", multiple=True),
          self.makeSelectAppenderList("newCategory", "categoryList", categories), 
          branchFrz, troveName)
          )
@@ -176,12 +183,11 @@ Choose a branch: %s
     def makeSelectAppender(self, name, selectionName):
         """Generates an input box and add/remove button pair to manage a list of arbitrary
            items in a selection."""
-        inputId = name + "Input"
         s = """
-<input type="text" name="%s" id="%s" />
-<input type="button" onClick="javascript:append('%s', '%s');" value="Add" />
-<input type="button" onClick="javascript:removeSelected('%s');" value="Remove" />""" %\
-            (name, inputId, selectionName, inputId, selectionName)
+<input style="width: 40%%;" type="text" name="%s" id="%s" />
+<input style="width: 6%%;" type="button" onclick="javascript:append('%s', '%s');" value="Add" />
+<input style="width: 6%%;" type="button" onclick="javascript:removeSelected('%s');" value="Remove" />""" %\
+            (name, name, selectionName, name, selectionName)
         return s
 
     def makeSelectAppenderList(self, name, selectionName, items):
@@ -189,20 +195,20 @@ Choose a branch: %s
            items in a selection."""
         inputId = name + "Select"
 
-        s = self.makeSelect(items, inputId, expand=True)
+        s = self.makeSelect(items, inputId, expand="40%")
         s += """
-<input type="button" onClick="javascript:append('%s', '%s');" value="Add" />
-<input type="button" onClick="javascript:removeSelected('%s');" value="Remove" />
+<input style="width: 6%%;" type="button" onclick="javascript:append('%s', '%s');" value="Add" />
+<input style="width: 6%%;" type="button" onclick="javascript:removeSelected('%s');" value="Remove" />
 """ %\
             (selectionName, inputId, selectionName)
         return s
 
-    def makeSelect(self, items, name, default=None, size=1, expand=False, multiple=False):
+    def makeSelect(self, items, name, default=None, size=1, expand=False, multiple=False, onClick=""):
         """Generate a html <select> dropdown or selection list based on a dictionary or a list.
            If 'items' is a dictionary, use the dictionary value as the option value, and display
            the key to the user. If 'items' is a list, use the list item for both."""
         if expand:
-            style = """width: 50%;"""
+            style = """width: %s;""" % expand
         else:
             style = ""
 
@@ -211,7 +217,8 @@ Choose a branch: %s
         else:
             multiple = ""
             
-        s = """<select name="%s" id="%s" %s size="%d" style="%s">\n""" % (name, name, multiple, size, style)
+        s = """<select onclick="javascript:%s;" name="%s" id="%s" %s size="%d" style="%s">\n""" %\
+            (onClick, name, name, multiple, size, style)
 
         # generate [(data, friendlyName), ...)] from either a list or a dict
         if isinstance(items, list):
