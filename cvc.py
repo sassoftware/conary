@@ -17,6 +17,7 @@ def usage(rc = 1):
     print "       srs source commit"
     print "       srs source diff"
     print "       srs source newpkg <name>"
+    print "       srs source rdiff <name> <oldver> <newver>"
     print "       srs source remove <file> [<file2> <file3> ...]"
     print "       srs source rename <oldfile> <newfile>"
     print "       srs source update <version>"
@@ -58,6 +59,12 @@ def sourceCommand(cfg, args, argSet):
 
 	args[0] = repos
 	checkin.diff(*args)
+    elif (args[0] == "rdiff"):
+	if argSet or len(args) != 4: return usage()
+	repos = openRepository(cfg.repPath)
+
+	args[0] = repos
+	checkin.rdiff(repos, cfg.buildLabel,  *args[1:])
     elif (args[0] == "remove"):
 	if len(args) < 2: return usage()
         for f in args[1:]:

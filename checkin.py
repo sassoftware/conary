@@ -247,6 +247,27 @@ def commit(repos, cfg, message):
     repos.commitChangeSet(changeSet)
     newState.write("SRS")
 
+def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
+    if not troveName.endswith(":source"):
+	troveName += ":source"
+
+    old = repos.findTrove(buildLabel, troveName, None, versionStr = oldVersion)
+    if len(old) > 1:
+	log.error("%s matches multiple versions" % oldVersion)
+	return
+    old = old[0]
+
+    new = repos.findTrove(buildLabel, troveName, None, versionStr = newVersion)
+    if len(new) > 1:
+	log.error("%s matches multiple versions" % newVersion)
+	return
+    new = new[0]
+
+    cs = repos.createChangeSet([(troveName, None, old.getVersion(), 
+				 new.getVersion(), False)])
+
+    _showChangeSet(cs, old, new)
+
 def diff(repos, versionStr = None):
     try:
         state = SourceStateFromFile("SRS")
@@ -277,7 +298,9 @@ def diff(repos, versionStr = None):
 
     (changeSet, ((isDifferent, newState),)) = result
     if not isDifferent: return
+    _showChangeSet(changeSet, oldPackage, state)
 
+def _showChangeSet(changeSet, oldPackage, newPackage):
     packageChanges = changeSet.iterNewPackageList()
     pkgCs = packageChanges.next()
     assert(util.assertIteratorAtEnd(packageChanges))
@@ -304,7 +327,7 @@ def diff(repos, versionStr = None):
 	sys.stdout.write('\n'.join(files.fieldsChanged(csInfo)))
 
         sys.stdout.write('\n--- %s %s\n+++ %s %s'
-                         %(path, state.getVersion().asString(),
+                         %(path, newPackage.getVersion().asString(),
                            path, newVersion.asString()))
         
 	if files.contentsChanged(csInfo):
