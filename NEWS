@@ -1,6 +1,7 @@
 Changes in 0.11.6
   * branches are created as changesets now instead of as a protocol call
   * merged authdb into primary repository
+  * fix for rdiff (broken by flavor rework in 0.11.5)
 
 Changes in 0.11.5
   * Internals reworked to eliminate flavor of None in favor of empty flavor
