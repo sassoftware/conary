@@ -27,8 +27,9 @@ class TagFile(conarycfg.ConfigFile):
 
     # lists all legal options for "implements"
     implementsCheck = {'files': ('update', 'preremove', 'remove'),
-		       'self':  ('update', 'preremove'),
 		       'handler':  ('update', 'preremove'),
+                       # note: description deprecated below
+		       'description':  ('update', 'preremove'),
                       }
     # ...and "datasource"
     datasourceCheck = ['args', 'stdin']
@@ -56,7 +57,7 @@ class TagFile(conarycfg.ConfigFile):
 			'missing type/action in "implements %s"' %item
 		key, val = item.split(" ")
                 # deal with self->handler protocol change
-                if key == 'self' or key == 'description':
+                if key == 'description':
                     if warn:
                         # at cook time
                         raise conarycfg.ParseError, \
