@@ -12,7 +12,7 @@
 # full details.
 #
 """
-Provides the output for the "conary repquery" command
+Provides the output for the "conary showcs" command
 """
 
 import display
@@ -23,8 +23,6 @@ from repository import repository
 import sys
 
 from lib.sha1helper import sha1ToString
-
-
 
 def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,  
                      info=False, fullVersions=False, showChanges=False):
@@ -66,8 +64,8 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
         first = True
         for pkg in troves:
             trove = cs.newPackages[pkg]
-            # only print the header if we are going to print some more information
-            # or it is a primary trove in the changeset
+            # only print the header if we are going to print some more
+            # information or it is a primary trove in the changeset
             if (pkg in cs.primaryTroveList) or trove.newFiles:
                 displayTroveHeader(trove, indent, displayC, fullVersions)
             else:
@@ -85,31 +83,37 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                 # the local DB and then from the repository
                 try:
                     oldTrove = db.getTrove(trove.getName(), 
-                                            trove.getOldVersion(), trove.getOldFlavor())
+                                           trove.getOldVersion(), 
+                                           trove.getOldFlavor())
                     troveLoc = db
                 except repository.TroveMissing:
                     try:
-                        oldTrove = repos.getTrove(trove.getName(), trove.getOldVersion(), 
+                        oldTrove = repos.getTrove(trove.getName(), 
+                                                  trove.getOldVersion(), 
                                                   trove.getOldFlavor())
                         troveLoc = repos
                     except repository.TroveMissing:
-                        print ("*** WARNING: Cannot find changeset trove %s on local system, or in"
-                              " repository list,"
-                              " not printing information about this trove") % trove.getName()
+                        log.warning("cannot find changeset trove %s on "
+                              "local system, or in repository list;"
+                              "not printing information about this "
+                              "trove", % trove.getName())
                         continue
                 for (fileId, path, version) in trove.changedFiles:
-                    # XXX we don't know where to actually get the new file version
-                    # from -- it may not actually be anywhere if it is a local changeset
+                    # XXX we don't know where to actually get the new file
+                    # version from -- it may not actually be anywhere if it is
+                    # a local changeset
                     fileObj = troveLoc.getFileVersion(fileId, version)
                     if showChanges:
                         (oldPath, oldVersion) = oldTrove.getFile(fileId)
                         oldFileObj = troveLoc.getFileVersion(fileId, oldVersion)
-                        printChangedFile(indent, fileObj, path, oldFileObj, oldPath)
+                        printChangedFile(indent, fileObj, path, oldFileObj, 
+                                        oldPath)
                     else:
                         if path is None:
                             (oldPath, oldVersion) = oldTrove.getFile(fileId)
                             path = oldPath
-                        display.printFile(fileObj, path, prefix=indent + 'Mod  ')
+                        display.printFile(fileObj, path, 
+                                          prefix=indent + 'Mod  ')
                     printedData = True
                 prefix = indent + 'Del  '
                 for fileId in trove.oldFiles:
@@ -162,7 +166,8 @@ def displayTroveHeader(trove, indent, displayC, fullVersions):
         verFrom = " (from %s)" % displayC[troveName,trove.getOldVersion()]
     else:
         verFrom =  " (new) "
-    print "%-30s %-15s" % (indent + troveName, displayC[troveName, version] + verFrom)
+    print "%-30s %-15s" % (indent + troveName, 
+                           displayC[troveName, version] + verFrom)
     if trove.getOldFlavor() != trove.getNewFlavor():
         if trove.getOldFlavor():
             depformat('Old Flavor', trove.getOldFlavor())
@@ -191,33 +196,35 @@ def includeChildTroves(cs, troves):
                 troves.append((subTroveName, version, flavor))
 
 def getTroves(cs, troveList):
+    if not troveList:
+        return (cs.getPrimaryPackagList(), False)
+
     hasVersions = False
-    if troveList:
-        troveDefs = []
-        for item in troveList:
-            i = item.find("=") 
-            if i == -1:
-                troveDefs.append((item, None))
-            else:
-                hasVersions = True
-                l = item.split("=")
-                if len(l) > 2:
-                    log.error("bad version string: %s", "=".join(l[1:]))
-                    return
-                troveDefs.append(tuple(l))
-        for (troveName, version, flavor) in cs.primaryTroveList:
-            troves = []
-            for pkg in cs.newPackages.iterkeys():
-                if pkg[0] == troveDefs[0][0]:
-                    if not troveDefs[0][1]:
-                        troves = [pkg]
-                        break
-                    elif pkg[1].trailingVersion().asString()  == troveDefs[0][1]:
-                        troves = [pkg]
-                        break
-            if not troves:
-                print "No such troves %s in changeset" % troveList 
-    else:
-        troves = cs.primaryTroveList
+    troveDefs = []
+    for item in troveList:
+        i = item.find("=") 
+        if i == -1:
+            troveDefs.append((item, None))
+        else:
+            hasVersions = True
+            l = item.split("=")
+            if len(l) > 2:
+                log.error("bad version string: %s", "=".join(l[1:]))
+                return
+            troveDefs.append(tuple(l))
+
+    for (troveName, version, flavor) in cs.getPrimaryPackageList():
+        troves = []
+        for pkg in cs.newPackages.iterkeys():
+            if pkg[0] == troveDefs[0][0]:
+                if not troveDefs[0][1]:
+                    troves = [pkg]
+                    break
+                elif pkg[1].trailingVersion().asString() == troveDefs[0][1]:
+                    troves = [pkg]
+                    break
+        if not troves:
+            print "No such troves %s in changeset" % troveList 
+
     return (troves, hasVersions)
 
