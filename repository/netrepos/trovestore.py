@@ -28,6 +28,7 @@ import trovefiles
 import versionops
 import versions
 
+from local import troveinfo
 from local import trovetroves
 from local import versiontable
 
@@ -82,6 +83,7 @@ class TroveStore:
         flavors.FlavorScores(self.db)
         self.depTables = deptable.DependencyTables(self.db)
         self.metadataTable = metadata.MetadataTable(self.db)
+        self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
         self.db.commit()
         
 	self.streamIdCache = {}
@@ -403,6 +405,8 @@ class TroveStore:
 					    isPresent = False)
 	    self.troveTroves.addItem(troveInstanceId, instanceId)
 
+        self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
+
 	del self.fileVersionCache 
 
     def updateMetadata(self, troveName, branch, shortDesc, longDesc,
@@ -567,6 +571,7 @@ class TroveStore:
                 trv.addFile(pathId, path, version, fileId)
 
         self.depTables.get(cu, trv, troveInstanceId)
+        self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
 
 	return trv
 

@@ -683,6 +683,8 @@ class _GroupOrRedirectRecipe(Recipe):
         self.addTroveList.append((name, versionStr, flavor, source))
 
     def findTroves(self):
+        self.size = 0
+
         for (name, versionStr, flavor, source) in self.addTroveList:
             try:
                 desFlavor = self.cfg.buildFlavor.copy()
@@ -710,6 +712,7 @@ class _GroupOrRedirectRecipe(Recipe):
                 if (v, f) not in l:
                     l.append((v,f))
                 self.troveVersionFlavors[name] = l
+                self.size += trove.getSize()
 
     def getTroveList(self):
 	return self.troveVersionFlavors

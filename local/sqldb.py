@@ -19,6 +19,7 @@ import files
 import idtable
 import sqlite3
 import trove
+import troveinfo
 import trovetroves
 import versions
 import versiontable
@@ -391,6 +392,7 @@ class Database:
 	self.flavors = DBFlavors(self.db)
 	self.flavorMap = DBFlavorMap(self.db)
 	self.depTables = deptable.DependencyTables(self.db)
+	self.troveInfoTable = troveinfo.TroveInfoTable(self.db)
         if self.db.inTransaction:
             self.db.commit()
 	self.needsCleanup = False
@@ -593,6 +595,7 @@ class Database:
 	    self.troveTroves.addItem(troveInstanceId, instanceId)
 
         self.depTables.add(cu, trove, troveInstanceId)
+        self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
 
 	return (cu, troveInstanceId)
 
@@ -781,6 +784,7 @@ class Database:
 	    trv.addFile(pathId, path, version, fileId)
 
         self.depTables.get(cu, trv, troveInstanceId)
+        self.troveInfoTable.getInfo(cu, trv, troveInstanceId)
 
 	return trv
 

@@ -52,6 +52,8 @@ def _createComponent(repos, branch, bldPkg, newVersion, ident):
         linkGroupId = sha1helper.sha1String("\n".join(pathList))
         linkGroups.update({}.fromkeys(pathList, linkGroupId))
 
+    size = 0
+
     for (path, (realPath, f)) in bldPkg.iteritems():
         if isinstance(f, files.RegularFile):
             flavor = f.flavor.deps
@@ -78,6 +80,11 @@ def _createComponent(repos, branch, bldPkg, newVersion, ident):
 		p.addFile(f.pathId(), path, newVersion, f.fileId())
 
         fileMap[f.pathId()] = (f, realPath, path)
+
+        if f.hasContents:
+            size += f.contents.size()
+
+    p.setSize(size)
 
     return (p, fileMap)
 
@@ -373,6 +380,9 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
 	targetVersion.incrementBuildCount()
 
     grp.changeVersion(targetVersion)
+    grp.setBuildTime(time.time())
+    grp.setSourceName(fullName + ':recipe')
+    grp.setSize(recipeObj.size)
 
     grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet = changeset.ChangeSet()
@@ -419,9 +429,13 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 
     l = []
     flavor = deps.deps.DependencySet()
+    size = 0
     for (pathId, path, fileId, version) in recipeObj.iterFileList():
 	fileObj = repos.getFileVersion(pathId, fileId, version)
 	l.append((pathId, path, version, fileId))
+        if fileObj.hasContents:
+            size += fileObj.contents.size()
+
 	if fileObj.hasContents:
 	    flavor.union(fileObj.flavor.value())
 	changeSet.addFile(None, fileId, fileObj.freeze())
@@ -443,8 +457,13 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 	targetVersion.trailingRevision().incrementBuildCount()
 
     fileset = trove.Trove(fullName, targetVersion, flavor, None)
+
     for (pathId, path, version, fileId) in l:
 	fileset.addFile(pathId, path, version, fileId)
+
+    fileset.setBuildTime(time.time())
+    fileset.setSourceName(fullName + ':recipe')
+    fileset.setSize(size)
 
     filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newPackage(filesetDiff)
@@ -575,6 +594,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
                                                    withVerRel = True)
 	targetVersion.incrementBuildCount()
 
+    buildTime = time.time()
+
     # build up the name->fileid mapping so we reuse fileids wherever
     # possible; we do this by looking in the database for the latest
     # packages for each flavor available on the branch and recursing
@@ -588,6 +609,9 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
         main, comp = compName.split(':')
         if main not in grpMap:
             grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
+            grpMap[main].setSize(0)
+            grpMap[main].setSourceName(recipeClass.name + ':source')
+            grpMap[main].setBuildTime(buildTime)
 
         searchBranch = buildBranch
         versionDict = []
@@ -620,11 +644,14 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 
 	built.append((compName, p.getVersion().asString(), p.getFlavor()))
 	packageList.append((p, fileMap))
+        p.setSourceName(recipeClass.name + ':source')
+        p.setBuildTime(buildTime)
 	
 	# don't install :test component when you are installing
 	# the package
 	if not comp in recipeObj.getUnpackagedComponentNames():
 	    grp.addTrove(compName, p.getVersion(), p.getFlavor() or None)
+            grp.setSize(grp.getSize() + p.getSize())
 
     changeSet = changeset.CreateFromFilesystem(packageList)
     for packageName in grpMap:

@@ -161,8 +161,17 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                     display.printFile(fObj, path, verbose=ls, tags=tags, 
                                       sha1s=sha1s, pathId=pathId, pathIds=ids)
 	elif info:
-	    buildTime = time.strftime("%c",
-				time.localtime(version.timeStamps()[-1]))
+            if trove.getBuildTime():
+                buildTime = time.strftime("%c",
+                                    time.localtime(trove.getBuildTime()))
+            else:
+                buildTime = "(unknown)"
+
+            if trove.getSize():
+                size = "%s" % trove.getSize()
+            else:
+                size = "(unknown)"
+
 	    print "%-30s %s" % \
 		(("Name      : %s" % trove.getName(),
 		 ("Build time: %s" % buildTime)))
@@ -176,12 +185,14 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		    (("Version   : %s" % version.trailingRevision().asString()),
 		     ("Label     : %s" % version.branch().label().asString()))
 
+            print "Size      : %s" % size
+
             if sourceTrove:
                 metadata.showDetails(repos, cfg, sourceTrove.getName(), version.branch())
 
                 cl = sourceTrove.getChangeLog()
                 if cl:
-                    print "Changelog: %s (%s)" % (cl.getName(), cl.getContact())
+                    print "Change log: %s (%s)" % (cl.getName(), cl.getContact())
                     lines = cl.getMessage().split("\n")[:-1]
                     for l in lines:
                         print "    " + l

@@ -573,6 +573,24 @@ class Trove:
     def getTroveInfo(self):
         return self.troveInfo
 
+    def getSize(self):
+        return self.troveInfo.size.value()
+
+    def setSize(self, sz):
+        return self.troveInfo.size.set(sz)
+
+    def getSourceName(self):
+        return self.troveInfo.sourceName.value()
+
+    def setSourceName(self, nm):
+        return self.troveInfo.sourceName.set(nm)
+
+    def getBuildTime(self):
+        return self.troveInfo.buildTime.value()
+
+    def setBuildTime(self, nm):
+        return self.troveInfo.buildTime.set(nm)
+
     def __init__(self, name, version, flavor, changeLog, isRedirect = False):
         assert(flavor is not None)
 	self.idMap = {}
@@ -661,12 +679,14 @@ class OldFileStream(list, streams.InfoStream):
 
 _TROVEINFO_TAG_SIZE        = 0
 _TROVEINFO_TAG_SOURCENAME  = 1
+_TROVEINFO_TAG_BUILDTIME   = 2
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
     streamDict = {
         _TROVEINFO_TAG_SIZE       : ( streams.LongLongStream, 'size'       ),
-        _TROVEINFO_TAG_SOURCENAME : ( streams.StringStream  , 'sourceName' )
+        _TROVEINFO_TAG_SOURCENAME : ( streams.StringStream,   'sourceName' ),
+        _TROVEINFO_TAG_BUILDTIME  : ( streams.LongLongStream, 'buildTime'  ),
     }
 
 class ReferencedFileList(list, streams.InfoStream):

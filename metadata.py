@@ -282,7 +282,6 @@ def showDetails(repos, cfg, troveName, branch):
         wrapped = wrapper.wrap(md.getLongDesc())
         wrappedDesc = "\n".join(wrapped)
 
-        print "Size      : %-25s" % str(0)
         for l in md.getLicenses():
             print "License   : %s" % l
         for c in md.getCategories():

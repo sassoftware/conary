@@ -280,13 +280,12 @@ def commit(repos, cfg, message):
 
     if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
-        name = state.getName()
-        if repos.getTroveLeavesByLabel([name], cfg.buildLabel).get(name, []):
+        if repos.getTroveLeavesByBranch(
+        { troveName : { state.getBranch() : None } }).get(troveName, None):
 	    log.error("%s is marked as a new package but it " 
 		      "already exists" % troveName)
 	    return
 	srcPkg = None
-        del name
     else:
 	srcPkg = repos.getTrove(troveName, 
                                 state.getVersion().canonicalVersion(),

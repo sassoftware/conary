@@ -33,7 +33,7 @@ from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExi
 import trovestore
 import versions
 
-SERVER_VERSIONS = [ 24, 25 ]
+SERVER_VERSIONS = [ 24, 25, 26 ]
 CACHE_SCHEMA_VERSION = 11
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):

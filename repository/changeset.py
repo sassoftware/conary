@@ -131,6 +131,8 @@ class ChangeSet(streams.LargeStreamSet):
         _STREAM_CS_FILES   :(ChangeSetFileDict,		  "files"            ),
     }
 
+    ignoreUnknown = True
+
     def isAbsolute(self):
 	return self.absolute
 
@@ -282,7 +284,7 @@ class ChangeSet(streams.LargeStreamSet):
 			      pkgCs.getOldFlavor())
 
             newTroveInfo = pkg.getTroveInfo().copy()
-            newTroveInfo.twm(pkgCs.getTroveInfoDiff(), pkg)
+            newTroveInfo.twm(pkgCs.getTroveInfoDiff(), newTroveInfo)
             newTroveInfoDiff = pkg.getTroveInfo().diff(newTroveInfo)
 
 	    # this is a modified package and needs to be inverted
