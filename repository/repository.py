@@ -274,10 +274,10 @@ class _PackageSetClass(VersionedFile):
 	VersionedFile.addVersion(self, version, package.formatString())
 
     def fullVersionList(self):
-	branches = self.f.branchList()
+	branches = self.branchList()
 	rc = []
 	for branch in branches:
-	    rc += self.f.versionList(branch)
+	    rc += self.versionList(branch)
 
 	return rc
 
