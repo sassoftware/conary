@@ -177,7 +177,14 @@ class FilesystemJob:
                     self.linkGroups[linkGroup] = target
                 else:
                     try:
-                        os.link(linkPath, target)
+                        name = os.path.basename(target)
+                        path = os.path.dirname(target)
+                        util.mkdirChain(path)
+                        tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
+                        os.close(tmpfd)
+                        os.remove(tmpname)
+                        os.link(linkPath, tmpname)
+                        os.rename(tmpname, target)
                         continue
                     except OSError, e:
                         if e.errno != errno.EXDEV:
