@@ -1148,7 +1148,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         del flavorDict[name][version]
             else:
                 flavorDict = { name : {} }
-                if flavor is not None:
+                if flavor is None:
                     flavor = defaultFlavor
 
                 for label in labelPath:
