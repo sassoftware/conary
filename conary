@@ -35,6 +35,8 @@ elif (sys.argv[1] == "cook"):
     for file in sys.argv[2:]:
         if file[0] != '/':
             file = "%s/%s" % (os.getcwd(), file)
+        # we want to fork here to isolate changes the recipe might make
+        # in the environment (such as environment variables)
         pid = os.fork()
         if not pid:
             cook.cook(repos, cfg, file)
