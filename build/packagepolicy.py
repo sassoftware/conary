@@ -113,8 +113,8 @@ class BadInterpreterPaths(policy.Policy):
                     "missing interpreter in %s" % path)
             elif interp[0] != '/':
                 self.recipe.reportErrors(
-                    "illegal relative interpreter path %s in %s"
-                    %(interp, path))
+                    "illegal relative interpreter path %s in %s (%s)"
+                    %(interp, path, m.contents['line']))
 
 
 class ImproperlyShared(policy.Policy):
