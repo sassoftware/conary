@@ -11,7 +11,6 @@ resulting packages to the repository.
 import buildpackage
 import changeset
 import files
-import group
 import log
 import lookaside
 import os
@@ -219,15 +218,15 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
 	(p, fileMap) = _createPackage(repos, buildBranch, srcBldPkg, ident)
 	packageList.append((p, fileMap))
 
-	grp = group.Group()
-	grp.setName(cfg.packagenamespace + ":" + recipeClass.name)
-	grp.setVersion(version)
+	grpName = cfg.packagenamespace + ":" + recipeClass.name
+	grp = package.Package(grpName, version)
 	for (pkg, map) in packageList:
 	    grp.addPackage(pkg.getName(), [ pkg.getVersion() ])
 
 	changeSet = changeset.CreateFromFilesystem(packageList)
-	(grpDiff, grpList) = grp.diff(None, abstract = 1)
-	changeSet.newGroup(grpDiff)
+	grpDiff = grp.diff(None, abstract = 1)[0]
+
+	changeSet.newPackage(grpDiff)
 
 	repos.commitChangeSet(changeSet)
 
