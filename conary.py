@@ -241,7 +241,7 @@ def realMain(cfg, argv=sys.argv):
 	    del argSet['no-deps']
 
 	if argSet.has_key('just-db'):
-	    kwargs['justDatabase'] = False
+	    kwargs['justDatabase'] = True 
 	    del argSet['just-db']
 
 	if argSet.has_key('test'):
@@ -446,7 +446,7 @@ def realMain(cfg, argv=sys.argv):
 	    del argSet['no-deps-recurse']
 
 	if argSet.has_key('just-db'):
-	    kwargs['justDatabase'] = False
+	    kwargs['justDatabase'] = True
 	    del argSet['just-db']
 
 	keepExisting = argSet.has_key('keep-existing')
