@@ -42,7 +42,6 @@ python_files = __init__.py	\
 	importrpm.py		\
 	log.py			\
 	magic.py		\
-	options.py		\
 	patch.py		\
 	queryrep.py		\
 	rollbacks.py		\
