@@ -112,11 +112,15 @@ class FilesystemJob:
 	    log.debug(msg)
 
 	for (target, str, msg) in self.newFiles:
-	    os.unlink(target)
+            try:
+                os.unlink(target)
+            except OSError, e:
+                if e.errno != errno.ENOENT:
+                    raise
 	    f = open(target, "w")
 	    f.write(str)
 	    f.close()
-	    log.debug(msg)
+	    log.warning(msg)
 
 	if self.sharedLibraries:
 	    p = "/sbin/ldconfig"
@@ -527,7 +531,7 @@ class FilesystemJob:
 			if failedHunks:
 			    self._createFile(
                                 realPath + ".conflicts", 
-                                failedHunks.asString(),
+                                "".join([x.asString() for x in failedHunks]),
                                 "conflicts from merging changes from " 
                                 "head into %s saved as %s.conflicts" % 
                                 (realPath, realPath))
