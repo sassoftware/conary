@@ -4,6 +4,7 @@ Changes in 0.11.2:
     dependency failures
   * changed how dependencies are frozen to make the order deterministic
     (so fileId's don't change around)
+  * added a database version to the database schema
 
 Changes in 0.11.1:
   * erasing troves enforces dependencies -- this requires a database 

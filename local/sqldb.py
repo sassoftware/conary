@@ -383,8 +383,11 @@ class DBFlavorMap(idtable.IdMapping):
 
 class Database:
 
+    schemaVersion = 1
+
     def __init__(self, path):
 	self.db = sqlite3.connect(path)
+
         try:
             self.db._begin()
         except sqlite3.ProgrammingError, e:
@@ -393,6 +396,14 @@ class Database:
             # conary is being run as a non-root user
             if str(e) != 'attempt to write a readonly database':
                 raise
+
+        if not self.versionCheck():
+            raise OldDatabaseSchema, \
+                    "The Conary database on this system "           \
+                    "is too old. For information on how to\n"       \
+                    "conver this database, please visit "           \
+                    "http://wiki.specifix.com/ConaryConversion."
+
 	self.troveTroves = trovetroves.TroveTroves(self.db)
 	self.troveFiles = DBTroveFiles(self.db)
 	self.instances = DBInstanceTable(self.db)
@@ -411,6 +422,29 @@ class Database:
         if not self.db.closed:
             self.db.close()
         del self.db
+
+    def versionCheck(self):
+        cu = self.db.cursor()
+        count = cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
+                           "name='DatabaseVersion'").next()[0]
+        if count == 0:
+            # if DatabaseVersion does not exist, but any other tables do exist,
+            # then the database version is old
+            count = cu.execute("SELECT count(*) FROM sqlite_master").next()[0]
+            if count:
+                import lib
+                lib.epdb.st()
+                return False
+
+            cu.execute("CREATE TABLE DatabaseVersion (version INTEGER)")
+            cu.execute("INSERT INTO DatabaseVersion VALUES (?)", 
+                       self.schemaVersion)
+        else:
+            version = cu.execute("SELECT * FROM DatabaseVersion").next()[0]
+            if version != self.schemaVersion:
+                return False
+
+        return True
 
     def iterAllTroveNames(self):
 	return self.instances.iterNames()
@@ -871,3 +905,7 @@ class Database:
 
     def close(self):
 	self.db.close()
+
+class OldDatabaseSchema(Exception):
+
+    pass
