@@ -113,6 +113,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
             continue
         
         cwd = os.getcwd()
+        util.mkdirChain(builddir + '/' + recipeObj.mainDir())
         os.chdir(builddir + '/' + recipeObj.mainDir())
 	repos.close()
 
