@@ -42,6 +42,9 @@ def cook(repos, cfg, recipeFile):
 
 	recipeObj.setup()
 	recipeObj.unpackSources(ourBuildDir)
+        
+        cwd = os.getcwd()
+        os.chdir(ourBuildDir + '/' + recipeObj.mainDir())
 	recipeObj.doBuild(ourBuildDir)
 
 	rootDir = "/var/tmp/srs/%s-%d" % (recipeObj.name, int(time.time()))
@@ -49,7 +52,9 @@ def cook(repos, cfg, recipeFile):
             shutil.rmtree(rootDir)
         util.mkdirChain(rootDir)
 	recipeObj.doInstall(ourBuildDir, rootDir)
-
+        
+        os.chdir(cwd)
+        
         recipeObj.packages(rootDir)
         pkgSet = recipeObj.getPackageSet()
 
