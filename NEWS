@@ -3,6 +3,7 @@ Changes in 0.14.0
     (making changesets somewhat less brittle)
   * fixed bug in source handling with non-recipe files in the local directory
   * added framework for generic trove information
+  * checkout no longer pulls all sources from the repository
   * used new trove info framework to store the source trove, build time,
     total file size, and version of conary used when building binary
     troves.
