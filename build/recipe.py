@@ -54,6 +54,8 @@ baseMacros = {
     'infodir'		: '%(datadir)s/info',
     'docdir'		: '%(datadir)s/doc',
     'thisdocdir'        : '%(docdir)s/%(name)s-%(version)s',
+    'tagdescriptiondir' : '%(sysconfdir)s/conary/tags',
+    'taghandlerdir'     : '%(libexecdir)s/conary/tags',
     # special component prefixes that the whole system needs to share
     'krbprefix'		: '%(exec_prefix)s/kerberos',
     'x11prefix'		: '%(exec_prefix)s/X11R6',
