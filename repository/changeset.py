@@ -581,25 +581,23 @@ class ChangeSetFromFile(ChangeSet):
 
     def getFileContents(self, fileId, withSize = False):
 	if self.configCache.has_key(fileId):
+            name = fileId
 	    (tag, str) = self.configCache[fileId]
 	    cont = filecontents.FromString(str)
 	    size = len(str)
 	else:
             self.filesRead = True
 
-            while True:
-                if self.nextFile:
-                    rc = self.nextFile
-                    self.nextFile = None
-                else:
-                    rc = self.csf.getNextFile()
+            if not self.fileQueue:
+                next = self.csf.getNextFile()
+                if next:
+                    self.fileQueue.append(next + (self.csf,))
 
-                # we have reached the end, without finding our fileId
-                if rc is None:
-                    raise KeyError, 'fileId %s is not in the changeset' % \
-                                    sha1helper.sha1ToString(fileId)
+            while self.fileQueue:
+                rc = self.fileQueue[0]
+                del self.fileQueue[0]
 
-                name, tagInfo, f, size = rc
+                name, tagInfo, f, size, csf = rc
                 
                 # if we found the fileId we're looking for, or the fileId
                 # we got is a config file, cache or break out of the loop
@@ -608,21 +606,21 @@ class ChangeSetFromFile(ChangeSet):
                     tag = 'cft-' + tagInfo.split()[1]
                     cont = filecontents.FromFile(f)
 
-                    # cache all config file contents
-                    #if tagInfo[0] == '1':
-                    #    str = cont.get().read()
-                    #    size = len(str)
-                    #    self.configCache[name] = (tag, str)
-                    #    cont = filecontents.FromString(str)
-                    
                     # we found the one we're looking for, break out
                     if name == fileId:
                         break
 
-	if withSize:
-	    return (tag, cont, size)
-	else:
-	    return (tag, cont)
+                next = csf.getNextFile()
+                if next:
+                    self.fileQueue.append(next + (csf,))
+
+        if name != fileId:
+            raise KeyError, 'fileId %s is not in the changeset' % \
+                            sha1helper.sha1ToString(fileId)
+        elif withSize:
+            return (tag, cont, size)
+        else:
+            return (tag, cont)
 
     def rootChangeSet(self, db, keepExisting):
 	assert(self.absolute)
@@ -704,10 +702,7 @@ class ChangeSetFromFile(ChangeSet):
                                                             fileObj, cont)
 
                     if contType == ChangedFileTypes.diff:
-                        # XXX this only actually works for ChangeSetFromFile
                         self.configCache[fileId] = (contType, cont.get().read())
-                        #cs.addFileContents(fileId, contType, cont, 
-                    #			fileObj.flags.isConfig())
 
         self.absolute = False
 
@@ -715,6 +710,9 @@ class ChangeSetFromFile(ChangeSet):
         # diffs go out, then we write out whatever contents are left
         assert(not self.filesRead)
         self.filesRead = True
+
+        # XXX this needs fixing
+        assert(0)
 
         idList = self.configCache.keys()
         idList.sort()
@@ -724,9 +722,9 @@ class ChangeSetFromFile(ChangeSet):
             csf.addFile(hash, filecontents.FromString(str), "1 diff")
 
         while True:
-            if self.nextFile:
-                rc = self.nextFile
-                self.nextFile = None
+            if self.fileQueue:
+                rc = self.fileQueue[0]
+                del self.fileQueue[0]
             else:
                 rc = self.csf.getNextFile()
 
@@ -770,8 +768,6 @@ class ChangeSetFromFile(ChangeSet):
             # cache all config file contents
             if tag != ChangedFileTypes.diff:
                 break
-            #if tagInfo[0] == "0":
-                #break
 
             cont = filecontents.FromFile(f)
             str = cont.get().read()
@@ -781,7 +777,8 @@ class ChangeSetFromFile(ChangeSet):
 
             nextFile = self.csf.getNextFile()
 
-        self.nextFile = nextFile
+        if nextFile:
+            self.fileQueue = [ nextFile + (self.csf,) ]
 
 # old may be None
 def fileChangeSet(fileId, old, new):
