@@ -434,13 +434,32 @@ class ArchCollection(Collection):
                 for flag in child._iterAll():
                     yield flag
 
-    def _getMarch(self):
-        """ return the appropriate march flag for the currently set 
+    def _getUnameArch(self):
+        """ return the appropriate unameArch for the currently set 
             build flags.
         """
-        for majarch in self.itervalues():
-            if majarch._get():
-                return majarch._getMarch()
+        arch = self.getCurrentArch()
+        if arch is None:
+            return None
+        return arch._getArchMacro('unameArch')
+
+    def _getTargetArch(self):
+        """ return the appropriate targetArch for the currently set 
+            build flags.
+        """
+        arch = self.getCurrentArch()
+        if arch is None:
+            return None
+        return arch._getArchMacro('targetArch')
+
+    def _getOptFlags(self):
+        """ return the appropriate optimization flags for the currently set 
+            build flags.
+        """
+        arch = self.getCurrentArch()
+        if arch is None:
+            return None
+        return arch._getArchMacro('optFlags')
 
     def getCurrentArch(self):
         for majarch in self.itervalues():
@@ -449,20 +468,23 @@ class ArchCollection(Collection):
 
 class MajorArch(CollectionWithFlag):
     
-    def __init__(self, name, parent, track=False, archProps=None, march=None):
+    def __init__(self, name, parent, track=False, archProps=None, 
+                 unameArch=None, targetArch=None, optFlags=''):
         if archProps:
             self._archProps = archProps.copy()
         else:
             self._archProps = {}
-        self._march = march
+        self._unameArch = unameArch
+        self._targetArch = targetArch
+        self._optFlags = optFlags
         self._collectionType = SubArch
         CollectionWithFlag.__init__(self, name, parent, track=track)
 
-    def _getMarch(self):
+    def _getArchMacro(self, key):
         for subArch in self.itervalues():
-            if subArch._get() and subArch._march:
-                return subArch._march
-        return self._march
+            if subArch._get() and getattr(subArch, '_' + key) is not None:
+                return getattr(subArch, '_' + key)
+        return getattr(self, '_' + key)
 
     def _getNonExistantKey(self, key):
         if self._strictMode:
@@ -507,12 +529,15 @@ class MajorArch(CollectionWithFlag):
 
 class SubArch(Flag):
 
-    def __init__(self, name, parent, track=False, subsumes=None, march=None):
+    def __init__(self, name, parent, track=False, subsumes=None, 
+                 targetArch=None, unameArch=None, optFlags=None):
         if not subsumes:
             self._subsumes = []
         else:
             self._subsumes = subsumes
-        self._march = march
+        self._unameArch = unameArch
+        self._targetArch = targetArch
+        self._optFlags = optFlags
         Flag.__init__(self, name, parent, required=True, track=track)
 
     def _toDependency(self):

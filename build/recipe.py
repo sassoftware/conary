@@ -77,15 +77,15 @@ baseMacros = {
     'cc'		: 'gcc',
     'cxx'		: 'g++',
     'cxxflags'          : '',    # cxx specific flags
-    'cflags'            : '-O2', # -g when we have debuginfo
+    'optflags'          : '-O2', # -g when we have debuginfo
+    'cflags'            : '%(optflags)s ', 
     'cppflags'		: '', # just for providing in recipes
     'ldflags'		: '', # -g when we have debuginfo
-    'mflags'		: '',
+    'mflags'		: '', # make flags
     'parallelmflags'    : '',
     'sysroot'		: '',
-    'march'		: 'i386', # "machine arch"
     'os'		: 'linux',
-    'target'		: '%(march)s-unknown-linux',
+    'target'		: '%(targetarch)s-unknown-linux',
     'strip'		: 'strip',
     'buildbranch'       : '',
     'buildlabel'        : '',
@@ -656,9 +656,16 @@ class PackageRecipe(Recipe):
 	self.macros.update(baseMacros)
         # allow for architecture not to be set -- this could happen 
         # when storing the recipe e.g. 
-        march = use.Arch._getMarch()
-        if march:
-            self.macros.march = march
+        targetArch = use.Arch._getTargetArch()
+        if targetArch is not None:
+            self.macros.targetarch = targetArch
+        unameArch = use.Arch._getUnameArch()
+        if unameArch is not None:
+            self.macros.unamearch = unameArch
+        optFlags = use.Arch._getOptFlags()
+        if optFlags is not None:
+            self.macros.optflags = optFlags
+
 	for key in cfg.macroKeys():
 	    self.macros._override(key, cfg['macros.' + key])
 	self.macros.name = self.name
@@ -696,12 +703,7 @@ class _GroupOrRedirectRecipe(Recipe):
             try:
                 desFlavor = self.cfg.buildFlavor.copy()
                 if flavor is not None:
-                    # specified flavor overrides the default build flavor
-                    if isinstance(flavor, use.Flag):
-                        flavor = flavor.toDependency()
-                    # XXX we likely should not accept multiple types
-                    # of flavors, it's not a good API
-                    elif (isinstance(flavor, deps.DependencySet) or
+                    if (isinstance(flavor, deps.DependencySet) or
                           flavor is None):
                         # nothing needs to be done
                         pass
@@ -712,23 +714,25 @@ class _GroupOrRedirectRecipe(Recipe):
                                                versionStr = versionStr)
             except repository.TroveNotFound, e:
                 raise RecipeFileError, str(e)
-            for trove in pkgList:
-                v = trove.getVersion()
-                f = trove.getFlavor()
-                l = self.troveVersionFlavors.get(name, [])
-                if (v, f) not in l:
-                    l.append((v,f))
-                self.troveVersionFlavors[name] = l
-                # XXX this code is to deal with troves that existed 
-                # before troveInfo was added
-                if validSize:
-                    size = trove.getSize()
-                    # allow older changesets that are missing size
-                    # info to be added (of course, this will make the size
-                    if size is not None:
-                        self.size += trove.getSize()
-                    else:
-                        validSize = False
+            assert(len(pkgList) == 1)
+            trove = pkgList[0]
+            v = trove.getVersion()
+            f = trove.getFlavor()
+            l = self.troveVersionFlavors.get(name, [])
+            if (v, f) not in l:
+                l.append((v,f))
+            self.troveVersionFlavors[name] = l
+            # XXX this code is to deal with troves that existed 
+            # before troveInfo was added
+            if validSize:
+                size = trove.getSize()
+                # allow older changesets that are missing size
+                # info to be added ( this will make the size
+                # invalid, so don't store it)
+                if size is not None:
+                    self.size += trove.getSize()
+                else:
+                    validSize = False
         if not validSize:
             self.size = None
 

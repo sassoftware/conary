@@ -19,6 +19,7 @@ import os.path
 from build import use
 from conarycfg import ConfigFile, STRING, STRINGDICT, BOOL, ParseError
 import deps.deps
+from lib import log
 
 # XXX hack -- need a better way to add to list of config types
 FLAGSENSE = 2222
@@ -32,8 +33,17 @@ class SubArchConfig(ConfigFile):
 	'buildRequired'	        : [ BOOL,   True ],
 	'shortDoc'	        : [ STRING, '' ],
 	'longDoc'	        : [ STRING, '' ],
-	'march'	                : [ STRING, None ],
+	'unameArch'	        : [ STRING, None ],
+	'targetArch'	        : [ STRING, None ],
+	'optFlags'	        : [ STRING, None ],
     } 
+
+    def configLine(self, line, file = "override", lineno = '<No line>'):
+        if line.startswith('march '):
+            log.warning('depreciated arcticture flag march found -- '
+                        ' upgrade distro-release')
+        else:
+            ConfigFile.configLine(self, line, file, lineno)
 
 
 class ArchConfig(ConfigFile):
@@ -42,11 +52,13 @@ class ArchConfig(ConfigFile):
 
     defaults = {
 	'name'	                : [ STRING, None ],
-	'march'	                : [ STRING, None ],
 	'buildName'	        : [ STRING, None ],
 	'shortDoc'	        : [ STRING, '' ],
 	'longDoc'	        : [ STRING, '' ],
         'archProp'              : [ BOOLDICT, {} ],
+	'unameArch'	        : [ STRING, None ],
+	'targetArch'	        : [ STRING, None ],
+	'optFlags'	        : [ STRING, '' ],
     } 
 
 
@@ -57,6 +69,9 @@ class ArchConfig(ConfigFile):
             return
         if self.section:
             self.sections[self.section].configLine(line, file, lineno)
+        elif line.startswith('march '):
+            log.warning('depreciated arcticture flag march found -- '
+                        ' upgrade distro-release')
         else:
             ConfigFile.configLine(self, line, file, lineno)
 
@@ -96,11 +111,14 @@ class ArchConfig(ConfigFile):
 
 
     def addArchFlags(self):
-        if not self.march:
-            self.march = self.name
+        if not self.unameArch:
+            self.unameArch = self.name
+        if not self.targetArch:
+            self.targetArch = self.name
         use.Arch._addFlag(self.name, archProps = self.archProp, 
-                                            march=self.march)
-                                     
+                          unameArch=self.unameArch, 
+                          targetArch=self.targetArch, 
+                          optFlags=self.optFlags)
         for subArchName in self.sections:
             subArch = self.sections[subArchName]
             subArch.name = subArchName
@@ -112,10 +130,11 @@ class ArchConfig(ConfigFile):
                     continue
                 newSubsumes.append(item)
             subArch.subsumes = newSubsumes
-
             use.Arch[self.name]._addFlag(subArch.name,
                                          subsumes=subArch.subsumes, 
-                                         march=subArch.march)
+                                         unameArch=subArch.unameArch,
+                                         targetArch=subArch.targetArch,
+                                         optFlags=subArch.optFlags)
             if subArch.buildName and subArch.buildName != subArch.name:
                 use.Arch[self.name]._addAlias(subArch.name, subArch.buildName)
 

@@ -1,6 +1,7 @@
 Changes in 0.14.7:
   * ELF libraries with sonames that have paths in them are now handled
     sanely, by removing the path (and complaining...)
+  * split march into targetArch and unameArch -- requires a new distro-release
 
 Changes in 0.14.6:
   * fix for generating changesets between repositories
