@@ -126,6 +126,15 @@ def searchAll(cfg, repCache, name, location, srcdirs):
             except urllib2.URLError:
                 createNegativeCacheEntry(cfg, name[5:], location)
                 return None
+            except socket.error, err:
+                num, msg = err
+                if num == errno.ECONNRESET:
+                    log.info('Connection Reset by FTP server while retrieving %s.  Retrying in 10 seconds.', name, msg)
+                    time.sleep(10)
+                    retries += 1
+                else:
+                    createNegativeCacheEntry(cfg, name[5:], location)
+                    return None
             except IOError, msg:
                 # only retry for server busy.
                 if 'ftp error] 421' in msg:
