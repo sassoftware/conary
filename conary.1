@@ -205,11 +205,12 @@ and package-specific flags for this instantiaton.   The format for
 flag, or Flags.<package>.<pkgflag>, where <pkgflag> is a flag defined
 in <package>, or Arch.<archflag>, where <archflag> is a flag defining the 
 current architecture.  <package>, <useflag>, <pkgflag>, and <archflag>
-are case sensitive.
+are case sensitive.  Note that the flag and its boolean value must be 
+enclosed in quotes, e.g. \-\-use-flag "Flags.kernel.smp False"
 
 The \-\-use-macro option assigns the given string value to <macro>.  
 The value given overrides any attempt to reset the value later in the 
-recipe.
+recipe.  The macro and its boolean value must be enclosed in quotes.
 .IP 
 If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the
