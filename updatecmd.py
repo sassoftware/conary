@@ -31,6 +31,9 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
                 if newcs:
                     cs = newcs
 
+	    list = []
+	    list = map(lambda x: list.append(x), cs.getPackageList())
+
     if not cs:
         # so far no changeset (either the path didn't exist or we could not
         # read it
@@ -71,6 +74,13 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
             return
 
 	cs = repos.createChangeSet(list)
+
+	# permute the list into a list of just package names
+	list = map(lambda x: x[0], list)
+
+    # create a change set between what is in the database and what is
+    # on the disk
+    localChanges = changeset.CreateAgainstLocal(cfg, db, list)
 
     if cs.isAbstract():
 	db.commitChangeSet(cfg.sourcepath, cs, eraseOld = 0)
