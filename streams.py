@@ -189,10 +189,6 @@ class Md5Stream(StringStream):
 	assert(len(self.s) == 16)
 	return self.s
 
-    def asString(self):
-	assert(0)
-	return "%08x%08x%08x%08x" % struct.unpack("!4I", self.s)
-
     def thaw(self, data):
 	if data:
 	    assert(len(data) == 16)
@@ -218,10 +214,6 @@ class Sha1Stream(StringStream):
     def freeze(self, skipSet = None):
 	assert(len(self.s) == 20)
 	return self.s
-
-    def asString(self):
-	assert(0)
-	return "%08x%08x%08x%08x%08x" % struct.unpack("!5I", self.s)
 
     def thaw(self, data):
 	if data:
