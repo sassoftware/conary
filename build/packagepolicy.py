@@ -188,7 +188,7 @@ class EtcConfig(policy.Policy):
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.isfile(fullpath) and not os.path.islink(fullpath):
+	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    _markConfig(self.recipe, file)
 
 
@@ -233,7 +233,7 @@ class Config(policy.Policy):
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.isfile(fullpath) and not os.path.islink(fullpath):
+	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    for configFilter in self.configFilters:
 		if configFilter.match(file):
 		    _markConfig(self.recipe, file)
@@ -252,7 +252,7 @@ class InitScript(policy.Policy):
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.isfile(fullpath) and not os.path.islink(fullpath):
+	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    self._markInitScript(file)
 
 
@@ -273,7 +273,7 @@ class SharedLibrary(policy.Policy):
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.isfile(fullpath) and not os.path.islink(fullpath):
+	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    self._markSharedLibrary(file)
 
 
