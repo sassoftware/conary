@@ -196,6 +196,10 @@ class FilesystemJob:
 		    cmd = [ path, "self", "update" ] + \
 			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)]
 		    tagCommands.append(cmd)
+		elif "files update" in tagInfo.implements:
+		    cmd = [ path, "files", "update" ] + \
+			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)]
+		    tagCommands.append(cmd)
 
 		tagSet[tagInfo.tag] = tagInfo
 
