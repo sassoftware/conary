@@ -359,6 +359,8 @@ class _FileAction(BuildAction):
 		    self.recipe.AddModes(mode, path)
 	    if isdir and mode != 0755:
 		self.recipe.ExcludeDirectories(exceptions=path)
+	    # set explicitly, do not warn
+	    self.recipe.WarnWriteable(exceptions=path)
 
     def setComponents(self, paths):
 	"""

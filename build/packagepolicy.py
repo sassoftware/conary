@@ -388,27 +388,11 @@ class AddModes(policy.Policy):
 
     def doFile(self, path):
 	if path in self.fixmodes:
-	    log.debug('suid/sgid: %s', path)
 	    mode = self.fixmodes[path]
+	    # set explicitly, do not warn
+	    self.recipe.WarnWriteable(exceptions=path)
+	    log.debug('suid/sgid: %s mode 0%o', path, mode & 07777)
 	    self.recipe.autopkg.pathMap[path].inode.setPerms(mode)
-
-
-class WarnWriteable(policy.Policy):
-    """
-    Unless a mode has been set explicitly (i.e. with SetModes), warn
-    about group- or other-writeable files.
-    """
-    # Needs to run after AddModes in order to access the pathMap
-    def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.islink(fullpath):
-	    return
-	mode = os.lstat(self.macros['destdir'] + os.sep + file)[stat.ST_MODE]
-	if mode & 022:
-	    # do we need to warn?
-	    if self.recipe.autopkg.pathMap[file].inode.perms():
-		log.warning('Possibly inappropriately writeable permission'
-			    ' 0%o for file %s', mode & 0777, file)
 
 
 class Ownership(policy.Policy):
@@ -472,6 +456,29 @@ class ExcludeDirectories(policy.Policy):
 	del self.recipe.autopkg.pkgMap[path][path]
 	del self.recipe.autopkg.pkgMap[path]
 	del self.recipe.autopkg.pathMap[path]
+
+
+class WarnWriteable(policy.Policy):
+    """
+    Unless a mode has been set explicitly (i.e. with SetModes), warn
+    about group- or other-writeable files.
+    """
+    # Needs to run after AddModes in order to access the pathMap
+    def doFile(self, file):
+	fullpath = ('%(destdir)s/'+file) %self.macros
+	if os.path.islink(fullpath):
+	    return
+	if file not in self.recipe.autopkg.pathMap:
+	    # directory has been deleted
+	    return
+	mode = os.lstat(fullpath)[stat.ST_MODE]
+	if mode & 022:
+	    if stat.S_ISDIR(mode):
+		type = "directory"
+	    else:
+		type = "file"
+	    log.warning('Possibly inappropriately writeable permission'
+			' 0%o for %s %s', mode & 0777, type, file)
 
 
 def DefaultPolicy():
