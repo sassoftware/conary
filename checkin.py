@@ -805,7 +805,7 @@ def showLog(repos, branch = None):
     l = []
     for version in verList:
 	if version.branch() != branch: return
-	l.append((troveName, version, None))
+	l.append((troveName, version, deps.deps.DependencySet()))
 
     print "Name  :", troveName
     print "Branch:", branch.asString()
