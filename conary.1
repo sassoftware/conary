@@ -150,7 +150,9 @@ The --use-flag option can be used to override the default Use flags
 and package-specific flags for this instantiaton.   The format for
 <flag> may be Use.<useflag>, where <useflag> is a system-wide Use 
 flag, or Flags.<package>.<pkgflag>, where <pkgflag> is a flag defined
-in <package>.  <package>, <useflag>, <pkgflag> are case sensitive.
+in <package>, or Arch.<archflag>, where <archflag> is a flag defining the 
+current architecture.  <package>, <useflag>, <pkgflag>, and <archflag>
+are case sensitive.
 .IP 
 If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the
@@ -345,9 +347,11 @@ Coming soon to a man page near you!
 .I $HOME/.conaryrc
 The configuration files for Conary; entries in \fI$HOME/.conaryrc\fR
 override entries in \fI/etc/conaryrc,\fR and command-line options
-(including the \fB\-\-config\fR option) override both configuration
-files.  Conary configuration items can be strings, booleans
-(\fBTrue\fP or \fBFalse\fP), or mappings (\f(BIto from\fP) and
+(including the \fB\-\-config\fR option, which allows you to override
+one line in the config file, and the --config-file option, which 
+reads in an additional, supplied config file) override both 
+configuration files.  Conary configuration items can be strings,
+booleans (\fBTrue\fP or \fBFalse\fP), or mappings (\f(BIto from\fP) and
 can include:
 .PD
 .RS 4
