@@ -1,8 +1,23 @@
+# -*- mode: python -*-
+#
+# Copyright (c) 2005 Specifix, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
 import os.path
 
 #conary
 from build import use
-from conarycfg import ConfigFile, STRING, STRINGDICT, BOOL
+from conarycfg import ConfigFile, STRING, STRINGDICT, BOOL, ParseError
 import deps.deps
 
 # XXX hack -- need a better way to add to list of config types
@@ -130,7 +145,7 @@ class UseFlagConfig(ConfigFile):
             self.name = name
         assert(self.name == name)
 
-    def setValue(self, key, val, type=None, file="override"):
+    def setValue(self, key, val, type=None, filePath="override"):
 	if type == None:
 	    type = self.types[key]
         if type == FLAGSENSE:
@@ -147,7 +162,7 @@ class UseFlagConfig(ConfigFile):
                 raise ParseError, ("%s: unknown use value %s") % (filePath, val)
             self.__dict__[key] = sense
         else:
-            ConfigFile.setValue(self, key, val, type, file)
+            ConfigFile.setValue(self, key, val, type, filePath)
 
     def displayKey(self, key, value, type, out):
         if type == FLAGSENSE:
