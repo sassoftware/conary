@@ -15,7 +15,7 @@
 import base64
 from repository import changeset
 from repository import repository
-from localrep import fsrepos
+import fsrepos
 from lib import log
 import files
 import md5
