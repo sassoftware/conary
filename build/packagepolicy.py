@@ -217,6 +217,50 @@ class AddModes(policy.Policy):
 		    log.debug('suid/sgid: %s', path)
 		    packages[package][path].perms(mode)
 
+class Ownership(policy.Policy):
+    """
+    Set user and group ownership of files.  The default is
+    root:root
+    """
+    def __init__(self, *args, **keywords):
+	self.filespecs = []
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+	"""
+	Ownership(user, group, filespec(s)...)
+	"""
+	if args:
+	    for filespec in args[2:]:
+		self.filespecs.append((filespec, args[0], args[1]))
+	policy.Policy.updateArgs(self, [], **keywords)
+
+    def doProcess(self, recipe):
+	# we must NEVER take ownership from the filesystem
+	assert(not self.exceptions)
+	self.fileREs = []
+	for (filespec, user, group) in self.filespecs:
+	    self.fileREs = (re.compile(filespec %recipe.macros), user, group)
+	del self.filespecs
+	policy.Policy.doProcess(self, recipe)
+
+    def doFile(self, path):
+	for (regex, owner, group) in self.fileREs:
+	    if regex.search(path):
+		self._markOwnership(path, owner, group)
+		return
+	self._markOwnership(path, 'root', 'root')
+
+    def _markOwnership(self, filename, owner, group):
+	packages = self.recipe.autopkg.packages
+	for package in packages.keys():
+	    if filename in packages[package]:
+		pkgfile = packages[package][filename]
+		if owner:
+		    pkgfile.theOwner = owner
+		if group:
+		    pkgfile.theGroup = group
+
 
 def DefaultPolicy():
     """
@@ -231,4 +275,5 @@ def DefaultPolicy():
 	ParseManifest(),
 	MakeDevices(),
 	AddModes(),
+	Ownership(),
     ]
