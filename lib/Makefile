@@ -27,7 +27,7 @@ python_files=	    __init__.py		\
 python_modules=elfmodule.so miscmodule.so cstreamsmodule.so
 elfmodule_objs=elf.o
 miscmodule_objs=misc.o
-cstreamsmodule_objs=cstreams.o streamset.o stringstream.o
+cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
 generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules)
 dist_files = $(python_files) elf.c misc.c cstreams.c Makefile
 
