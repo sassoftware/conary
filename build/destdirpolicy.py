@@ -47,7 +47,6 @@ class TestSuiteLinks(policy.Policy):
 			    '%(testdir)s',
 			    '%(testdir)s/' ]
 
-    testSearch = re.compile('[tT][eE][sS][tT]')
     buildTestSuite = None
 
     def updateArgs(self, *args, **keywords):
@@ -65,16 +64,15 @@ class TestSuiteLinks(policy.Policy):
 	policy.Policy.updateArgs(self, *args, **keywords)
 
     def do(self):
-	if self.buildTestSuite is False:
+	if not self.buildTestSuite:
 	    self.recipe.TestSuiteFiles(build=False)
 	    return
 	
-	# expand macros
+	# expand macros in fileMap
 	newFileMap = {}
 	for (buildfile, destfile) in self.fileMap.iteritems():
 	    newFileMap[util.normpath(buildfile % self.macros)] = destfile % self.macros
 	self.fileMap = newFileMap
-
 
 	self.builddirfiles = {}
 	self.builddirlinks = {} 
@@ -89,47 +87,41 @@ class TestSuiteLinks(policy.Policy):
 		fullpath = os.path.join(root, file)
 
 		if os.path.islink(fullpath):
-		# symlink handling
+		    # symlink handling:
+		    # change to absolute link and add to symlink list
 		    contents = os.readlink(fullpath)
-
-		    #first change to absolute link
 		    if contents[0] != '/':
 			contents = util.normpath(os.path.join(root, contents))[builddirlen:]
-
-		    # then add to symlink list
 		    if contents not in self.builddirlinks:
 			self.builddirlinks[contents] = []
 		    self.builddirlinks[contents].append(os.path.join(realDir, file))
-		    continue
+		else:
+		    # add to regular file list
+		    if file not in self.builddirfiles:
+			self.builddirfiles[file] = []
+		    self.builddirfiles[file].append(realDir)
 
-		# regular file handling
-		if file not in self.builddirfiles:
-		    self.builddirfiles[file] = []
-		self.builddirfiles[file].append(realDir)
+	
+	if self.buildTestSuite:
+	    for (buildfile, destfile) in self.fileMap.iteritems():
+		target = destfile
+		link = util.normpath('%(destdir)s%(thistestdir)s/' % self.macros + buildfile)
+		util.mkdirChain(os.path.dirname(link))
+		os.symlink(target, link)
 
-		# only build test suite if we find a file with test in name
-		if self.buildTestSuite is None and self.testSearch.search(realDir + file):
-		    self.buildTestSuite = True
-
-	if not self.buildTestSuite:
+	    self.recipe.TestSuiteFiles(build=True)
+	    self.recipe.TestSuiteFiles(builddirlinks=self.builddirlinks)
+	    policy.Policy.do(self)
+	else:
 	    self.recipe.TestSuiteFiles(build=False)
 	    return
-	
-	# okay 
-	for (buildfile, destfile) in self.fileMap.iteritems():
-	    target = destfile
-	    link = util.normpath('%(destdir)s%(thistestdir)s/' % self.macros + buildfile)
-	    util.mkdirChain(os.path.dirname(link))
-	    os.symlink(target, link)
 
-	self.recipe.TestSuiteFiles(build=True)
-	self.recipe.TestSuiteFiles(builddirlinks=self.builddirlinks)
-	policy.Policy.do(self)
 
     def doFile(self, path):
 	""" Create a directory structure in testdir that mirrors 
 	    builddir, except that where ever there is a file in 
-	    builddir that was installed to destdir.  
+	    builddir that was installed to destdir, create a link
+	    to that installed file instead of copying it
 	"""
 	fullpath = self.macros.destdir + path
 

@@ -853,8 +853,10 @@ class TestCommand(_FileAction):
     def __init__(self, recipe, *args, **keywords):
         _FileAction.__init__(self, recipe, *args, **keywords)
 	if len(args) != 1:
-	    raise TypeError, "TestCommand must be passed the command to be run"
+	    raise TypeError, ("TestCommand must be passed a set of shell "
+		    "commands which will execute this package's test suite")
 	self.path = '%(thistestdir)s/conary-test-command' % recipe.macros
 	self.mode=0755
 	self.component = ':test'
 	self.contents = args[0]
+	recipe.TestSuiteLinks(build=True)
