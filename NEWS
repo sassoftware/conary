@@ -31,6 +31,9 @@ Changes in 0.50.4:
   * when using --keep-existing, the install label path and install flavor
     are used to determine which version to install instead of using affinity 
     to install something close to what you already have.   
+  * a bug that prevented a changeset from applying to the system when
+    the changeset removed a component from a package and the component
+    is not installed on the system has been fixed.
 
 Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 
