@@ -51,7 +51,13 @@ class Recipe:
     def nameVer(self):
 	return self.name + "-" + self.version
 
+    def cleanup(self, builddir, rootDir):
+	shutil.rmtree(builddir)
+	shutil.rmtree(rootDir)
+
     def unpackSources(self, srcdirs, builddir):
+	if os.path.exists(builddir):
+	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
 	for file in self.tarballs:
             f = util.findFile(file, srcdirs)
