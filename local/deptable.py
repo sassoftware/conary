@@ -228,7 +228,7 @@ class DependencyTables:
         return """
                 SELECT depCheck.depNum as depNum,
                         %(provides)s.instanceId as rsvInstanceId
-                    FROM %(requires)s LEFT OUTER JOIN %(provides)s ON
+                    FROM %(requires)s JOIN %(provides)s ON
                         %(requires)s.depId == %(provides)s.depId
                     JOIN %(deptable)s ON
                         %(requires)s.depId == %(deptable)s.depId
@@ -238,9 +238,7 @@ class DependencyTables:
                         %(deptable)s.name == DepCheck.name AND
                         %(deptable)s.flag == DepCheck.flag
                     WHERE
-                        %(requires)s.instanceId < 0 
-                        AND %(provides)s.depId is not NULL
-                        AND NOT DepCheck.isProvides
+                        NOT DepCheck.isProvides
                     GROUP BY
                         DepCheck.depNum,
                         %(provides)s.instanceId
