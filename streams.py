@@ -142,7 +142,7 @@ class StringStream(InfoStream):
 	return self.s
 
     def set(self, val):
-        assert(type(val) is str)
+        assert(not val or type(val) is str)
 	self.s = val
 
     def freeze(self):
