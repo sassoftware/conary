@@ -1,3 +1,8 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 from mod_python import apache
 import base64
 import os

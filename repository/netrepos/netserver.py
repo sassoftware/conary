@@ -1,3 +1,8 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 from repository import changeset
 from repository import repository
 from localrep import fsrepos
