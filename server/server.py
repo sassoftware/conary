@@ -190,17 +190,15 @@ class ServerConfig(ConfigFile):
 	'repositoryMap'         : [ STRINGDICT, {} ],
     }
 
-    def __init__(self):
+    def __init__(self, path="serverrc"):
 	ConfigFile.__init__(self)
-	self.read("serverrc")
+	self.read(path)
 
 def usage():
-    print "usage message goes here"
+    print "usage: %s repospath authdb reposname [config file]" %sys.argv[0]
     sys.exit(1)
 
 if __name__ == '__main__':
-    cfg = ServerConfig()
-
     argDef = {}
     cfgMap = {
 	'port'	: 'port',
@@ -211,11 +209,15 @@ if __name__ == '__main__':
 	print FILE_PATH + " needs to be a directory"
 	sys.exit(1)
 
+    cfg = ServerConfig()
+
     argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
 
+    if len(otherArgs) == 5:
+        cfg.read(otherArgs.pop())
+
     if len(otherArgs) != 4:
-	print "needs path to the repository, and authorization database, and the name of this repository"
-	sys.exit(1)
+	usage()
 
     profile = 0
     if profile:
