@@ -20,7 +20,7 @@ class _Source:
 	self.recipe = recipe
 	self.sourcename = sourcename % recipe.macros
 	self.rpm = rpm % recipe.macros
-	self.dir = dir % recipe.macros
+	self.dir = dir # delay evaluation until unpacking
 	self.use = use
 	if keyid:
 	    self.keyid = keyid
@@ -122,6 +122,7 @@ class _Source:
 		    # do not apply this
 		    return
 	self.builddir = builddir
+	self.dir = self.dir % self.recipe.macros
 	self.doUnpack()
 
     def doUnpack(self):
