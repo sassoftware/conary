@@ -991,7 +991,7 @@ def _VersionFromString(ver, defaultBranch = None, frozen = False,
             lastVersion = Revision(part, template = lastVersion,
                                          frozen = frozen)
             if lastVersion.shadowCount() > shadowCount:
-                raise ParseError, "two many shadow serial numbers in '%s'" \
+                raise ParseError, "too many shadow serial numbers in '%s'" \
                         % part
             vList.append(lastVersion)
             parts = parts[2:]
