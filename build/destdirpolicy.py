@@ -244,11 +244,24 @@ class NormalizeManPages(policy.Policy):
 		if len(lines) == 1:
 		    match = self.soexp.search(lines[0][:-1]) # chop-chop
 		    if match:
-			# .so is relative to %(mandir)s, so add ../
-			log.debug('replacing %s (%s) with symlink ../%s',
-                                  name, match.group(0), match.group(1))
-			os.remove(path)
-			os.symlink(util.normpath('../'+match.group(1)), path)
+			section = os.path.basename(os.path.dirname(path))
+			matchlist = match.group(1).split('/')
+			if len(matchlist) == 1 or matchlist[0] == section:
+			    # no directory specified
+			    log.debug('replacing %s (%s) with symlink %s',
+				      name, match.group(0),
+				      os.path.basename(match.group(1)))
+			    os.remove(path)
+			    os.symlink(util.normpath(
+				os.path.basename(match.group(1))), path)
+			else:
+			    # .so is relative to %(mandir)s and the other
+			    # man page is in a different dir, so add ../
+			    log.debug('replacing %s (%s) with symlink ../%s',
+				      name, match.group(0), match.group(1))
+			    os.remove(path)
+			    os.symlink(util.normpath('../'+match.group(1)),
+				       path)
 
     def _compress(self, dirname, names):
 	for name in names:
