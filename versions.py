@@ -294,6 +294,12 @@ class Revision(AbstractRevision):
 	if value.find(":") != -1:
 	    raise ParseError, "version/release pairs may not contain colons"
 
+	if value.find(",") != -1:
+	    raise ParseError, "version/release pairs may not contain commas"
+
+	if value.find(" ") != -1:
+	    raise ParseError, "version/release pairs may not contain spaces"
+
 	if value.find("@") != -1:
 	    raise ParseError, "version/release pairs may not contain @ signs"
 
