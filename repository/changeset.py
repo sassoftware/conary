@@ -156,39 +156,6 @@ class ChangeSet(streams.LargeStreamSet):
     def isLocal(self):
 	return self.local
 
-    def validate(self, justContentsForConfig = 0):
-	for pkg in self.iterNewPackageList():
-	    # if this is absolute, we can't have any removed or changed files
-	    if not pkg.getOldVersion():
-		assert(not pkg.getChangedFileList())
-		assert(not pkg.getOldFileList())
-
-	    list = pkg.getNewFileList() + pkg.getChangedFileList()
-
-	    # new and changed files need to have a file entry for the right 
-	    # version along with the contents for files which have any
-	    for (fileId, path, version) in list:
-		assert(self.files.has_key(fileId))
-		(oldVersion, newVersion, info) = self.files[fileId]
-		assert(newVersion == version)
-
-		l = info.split()
-		if (l[0] == "src" or l[0] == "f") and l[1] != "-":
-		    if justContentsForConfig:
-			if l[-1] == "-":
-			    # XXX just hope for the best?
-			    pass
-			else:
-			    flags = int(l[-1], 16)
-			    if flags & files._FILE_FLAG_CONFIG:
-				assert(self.hasFileContents(l[1]))
-		    else:
-			assert(self.hasFileContents(fileId))
-
-	    # old files should not have any file entries
-	    for fileId in pkg.getOldFileList():
-		assert(not self.files.has_key(fileId))
-
     def addPrimaryPackage(self, name, version, flavor):
 	self.primaryTroveList.append((name, version, flavor))
 
@@ -245,10 +212,6 @@ class ChangeSet(streams.LargeStreamSet):
 	    return cont
 
 	return cont + (cont.size(), )
-
-    def hasFileContents(self, hash):
-	return self.earlyFileContents.has_key(hash) or \
-	        self.lateFileContents.has_key(hash)
 
     def addFile(self, fileId, oldVersion, newVersion, csInfo):
 	self.files[fileId] = (oldVersion, newVersion, csInfo)
@@ -611,9 +574,6 @@ class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 
 class ChangeSetFromFile(ChangeSet):
 
-    def getFileSize(self, fileId):
-	return self.csf.getSize(fileId)
-
     def configFileIsDiff(self, fileId):
         (tag, str) = self.configCache.get(fileId, (None, None))
         return tag == ChangedFileTypes.diff
@@ -662,9 +622,6 @@ class ChangeSetFromFile(ChangeSet):
 	else:
 	    return (tag, cont)
 
-    def hasFileContents(self, hash):
-	return self.csf.hasFile(hash)
-
     def writeAllContents(self, csf):
         # diffs go out, then we write out whatever contents are left
         assert(not self.filesRead)
@@ -690,7 +647,7 @@ class ChangeSetFromFile(ChangeSet):
             name, tagInfo, f, size = rc
             csf.addFile(name, filecontents.Fromfile(f, size = size), tagInfo)
 
-    def __init__(self, file, justContentsForConfig = 0, skipValidate = 1):
+    def __init__(self, file, skipValidate = 1):
 	f = open(file, "r")
 	self.csf = filecontainer.FileContainer(f)
 	f.close()
@@ -713,9 +670,6 @@ class ChangeSetFromFile(ChangeSet):
 
 	self.configCache = {}
         self.filesRead = False
-
-	if not skipValidate:
-	    self.validate(justContentsForConfig)
 
         # load the diff cache
         nextFile = self.csf.getNextFile()

@@ -285,8 +285,6 @@ class Database(SqlDbRepository):
 		    cs.addFileContents(fileId, contType, cont, 
 					fileObj.flags.isConfig())
 
-	assert(not cs.validate())
-
 	return cs
 
     # local changes includes the A->A.local portion of a rollback; if it
@@ -555,8 +553,7 @@ class Database(SqlDbRepository):
 	rc = []
 	for ch in [ "r", "l" ]:
 	    name = self.rollbackCache + "/" + "rb.%c.%d" % (ch, num)
-	    rc.append(changeset.ChangeSetFromFile(name,
-						  justContentsForConfig = 1))
+	    rc.append(changeset.ChangeSetFromFile(name))
 
 	return rc
 

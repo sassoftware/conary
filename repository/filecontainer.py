@@ -257,12 +257,6 @@ class FileContainer:
 	tag = self.gzfile.read(tagLen)
 	return (name, tag, size)
 	
-    def getSize(self, fileName):
-	return self.entries[fileName].size
-
-    def hasFile(self, hash):
-	return self.entries.has_key(hash)
-
     def __del__(self):
 	if self.file:
 	    self.close()
