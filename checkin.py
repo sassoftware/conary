@@ -324,13 +324,19 @@ def annotate(repos, filename):
         state = SourceStateFromFile("CONARY")
     except OSError:
         return
+    curVersion = state.getVersion()
     branch = state.getVersion().branch()
     label = branch.label()
     troveName = state.getName()
     # verList is in ascending order (first commit is first in list)
-    verList = repos.getTroveVersionsByLabel([troveName], label)[troveName]
-    verList.reverse()
-
+    labelVerList = repos.getTroveVersionsByLabel([troveName], label)[troveName]
+    switchedBranches = False
+    branchVerList = {}
+    for ver in labelVerList:
+        b = ver.branch()
+        if b not in branchVerList:
+            branchVerList[b] = []
+        branchVerList[b].append(ver)
     
     found = False
     for (fileId, name, someFileV) in state.iterFileList():
@@ -357,64 +363,80 @@ def annotate(repos, filename):
                  
     s = difflib.SequenceMatcher(None)
     newV = newTrove = newLines = newFileV = newContact = None
+    
+    verList = [ v for v in branchVerList[branch] if not v.isAfter(curVersion) ]
 
-    for oldV in verList: 
-        if oldV.branch() != branch:
-            continue
-
+    while verList:
+        oldV = verList.pop()
+        print "Version = %s" % oldV.asString() 
         oldTrove = repos.getTrove(troveName, oldV, None)
 
-        found = False
         try:
             name, oldFileV = oldTrove.getFile(fileId)
         except KeyError:
             # this file doesn't exist from this version forward
             break
 
-        if oldFileV == newFileV:
-            continue
-        oldFile = repos.getFileContents(troveName, oldV, None, 
-                                        filename, oldFileV)
-        oldLines = oldFile.get().readlines()
-        oldContact = oldTrove.changeLog.getName()
-        if newV == None:
-            # initialization case -- set up finalLines 
-            # and lineMap
-            index = 0
-            for line in oldLines:
-                finalLines.append([line, None])
-                lineMap[index] = index 
-                index = index + 1
-            unmatchedLines = index
-        else:
-            s.set_seqs(oldLines, newLines)
-            blocks = s.get_matching_blocks()
-            laststartnew = 0
-            laststartold = 0
-            for (startold, startnew, lines) in blocks:
-                for i in range(laststartnew, startnew):
-                    # for each line where the two versions of the
-                    # file do not match, if that line maps back to
-                    # a line in finalLines, mark is as changed here
-                    if lineMap.get(i,None) is not None:
-                        finalLines[lineMap[i]][1] = (newV, newContact)
-                        lineMap[i] = None
-                        unmatchedLines = unmatchedLines - 1
-                laststartnew = startnew + lines
+        if oldFileV != newFileV:
+            oldFile = repos.getFileContents(troveName, oldV, None, 
+                                            filename, oldFileV)
+            oldLines = oldFile.get().readlines()
+            oldContact = oldTrove.changeLog.getName()
+            if newV == None:
+                # initialization case -- set up finalLines 
+                # and lineMap
+                index = 0
+                for line in oldLines:
+                    finalLines.append([line, None])
+                    lineMap[index] = index 
+                    index = index + 1
+                unmatchedLines = index
+            else:
+                s.set_seqs(oldLines, newLines)
+                blocks = s.get_matching_blocks()
+                laststartnew = 0
+                laststartold = 0
+                for (startold, startnew, lines) in blocks:
+                    for i in range(laststartnew, startnew):
+                        # for each line where the two versions of the
+                        # file do not match, if that line maps back to
+                        # a line in finalLines, mark is as changed here
+                        if lineMap.get(i,None) is not None:
+                            finalLines[lineMap[i]][1] = (newV, newContact)
+                            lineMap[i] = None
+                            unmatchedLines = unmatchedLines - 1
+                    laststartnew = startnew + lines
 
-            if unmatchedLines == 0:
-                break
+                if unmatchedLines == 0:
+                    break
 
-            # update the linemap for places where the files are
-            # the same.
-            for (startold, startnew, lines) in blocks:
-                if startold == startnew:
-                    continue
-                for i in range(0, lines):
-                    if lineMap.get(startnew + i, None) is not None:
-                        lineMap[startold + i] = lineMap[startnew + i]
-        (newV, newTrove, newContact) = (oldV, oldTrove, oldContact)
-        (newFileV, newLines) = (oldFileV, oldLines)
+                # update the linemap for places where the files are
+                # the same.
+                for (startold, startnew, lines) in blocks:
+                    if startold == startnew:
+                        continue
+                    for i in range(0, lines):
+                        if lineMap.get(startnew + i, None) is not None:
+                            lineMap[startold + i] = lineMap[startnew + i]
+            (newV, newTrove, newContact) = (oldV, oldTrove, oldContact)
+            (newFileV, newLines) = (oldFileV, oldLines)
+            
+        # there are still unmatched lines, and there is a parent branch,  
+        # so search the parent branch for matches
+        if not verList and branch.hasParent():
+            switchedBranches = True
+            curVersion = branch.parentNode()
+            branch = curVersion.branch()
+            print "Switching to branch %s" % branch.asString()
+            label = branch.label()
+            if branch not in branchVerList:
+                labelVerList = repos.getTroveVersionsByLabel([troveName], label)[troveName]
+                for ver in labelVerList:
+                    b = ver.branch()
+                    if b not in branchVerList:
+                        branchVerList[b] = []
+                    branchVerList[b].append(ver)
+            verList = [ v for v in  branchVerList[branch] if not v.isAfter(curVersion)]
 
     if unmatchedLines > 0:
         # these lines are in the original version of the file
@@ -422,12 +444,27 @@ def annotate(repos, filename):
             if line[1] is None:
                 line[1] = (oldV, oldContact)
 
+    # we have to do some preprocessing try to line up the code w/ long 
+    # branch names, otherwise te output is (even more) unreadable
+    maxV = 0
+    maxN= 0
     for line in finalLines:
-        tv = line[1][0].trailingVersion()
+        version = line[1][0]
+        name = line[1][1]
+        maxV = max(maxV, len(version.asString(defaultBranch=branch)))
+        maxN = max(maxN, len(name))
+
+    for line in finalLines:
+        version = line[1][0]
+        tv = version.trailingVersion()
         name = line[1][1]
         date = time.strftime('%x', time.localtime(tv.timeStamp))
-        info = ''.join(['(',name,'\t',date,'):'])
-        print tv.asString(), info, line[0],
+        info = '(%-*s %s):' % (maxN, name, date) 
+        versionStr = version.asString(defaultBranch=branch)
+        # since the line is not necessary starting at a tabstop,
+        # lines might not line up 
+        line[0] = line[0].replace('\t', ' ' * 8)
+        print "%-*s %s %s" % (maxV, version.asString(defaultBranch=branch), info, line[0]),
 
 def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     if not troveName.endswith(":source"):
