@@ -31,7 +31,7 @@ baseMacros = (
     ('localstatedir'	, '%(prefix)s/var'),
     ('sharedstatedir'	, '%(prefix)s/com'),
     ('includedir'	, '%(prefix)s/include'),
-    ('datadir'		, '/usr/share'),
+    ('datadir'		, '%(prefix)s/share'),
     ('mandir'		, '%(datadir)s/man'),
     ('infodir'		, '%(datadir)s/info'),
     ('docdir'		, '%(datadir)s/doc'),
