@@ -62,4 +62,4 @@ if not globals().has_key("logger"):
     formatter = logging.Formatter('%(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.WARNING)
