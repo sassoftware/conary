@@ -195,10 +195,12 @@ class PackageChangeSet:
 
     def formatToFile(self, changeSet, cfg, f):
 	f.write("%s " % self.name)
-	if self.oldVersion:
+	if self.isAbstract():
+	    f.write("abstract ")
+	elif self.oldVersion:
 	    f.write("from %s to " % self.oldVersion.asString(cfg.defaultbranch))
 	else:
-	    f.write("abstract ")
+	    f.write("new ")
 	f.write("%s\n" % self.newVersion.asString(cfg.defaultbranch))
 
 	for (fileId, path, version) in self.newFiles:
