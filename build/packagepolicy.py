@@ -457,7 +457,11 @@ class Ownership(policy.Policy):
 
     def updateArgs(self, *args, **keywords):
 	"""
-	Ownership(user, group, filespec(s)...)
+	call as::
+	  Ownership(user, group, filespec(s)...)
+	List them in order, most specific first, ending with most
+	general; the filespecs will be matched in the order that
+	you provide them.
 	"""
 	if args:
 	    for filespec in args[2:]:
