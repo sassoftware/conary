@@ -174,9 +174,9 @@ class FileContainer:
 	if len(version) != 2:
 	    raise BadContainer, "invalid container version"
 	version = struct.unpack("!H", version)[0]
-	if version != FILE_CONTAINER_VERSION and version != 1:
-	    raise BadContainer, "unknown file container version %d" % version
-	self.version = version
+	if version != FILE_CONTAINER_VERSION:
+	    raise BadContainer, "unsupported file container version %d" % \
+			version
 
 	self.gzfile = gzip.GzipFile(None, "rb", None, self.file)
 
@@ -226,36 +226,19 @@ class FileContainer:
 	util.copyfileobj(fileObj, self.rest)
 
     def getNextFile(self):
-	if self.version == 1:
-	    self.lastFetched += 1
-	    if self.lastFetched == len(self.entryOrder): 
-		return None
+	eatCount = self.next - self.gzfile.tell()
 
-	    entry = self.entries[self.entryOrder[self.lastFetched]] 
-	    size = entry.size
-	    tag = entry.data
-	    name = entry.name
+	# in case the file wasn't completely read in (it may have
+	# already been in the repository, for example)
+	while eatCount > self.bufSize:
+	    self.gzfile.read(self.bufSize)
+	    eatCount -= self.bufSize
+	self.gzfile.read(eatCount)
 
-	    pos = self.gzfile.tell()
-	    offset = entry.offset + self.contentsStart
-	    if (pos != offset):
-		assert(pos < offset)
-		self.gzfile.seek(offset)	    # this is always SEEK_SET
-		assert(self.gzfile.tell() == offset)
-	else:
-	    eatCount = self.next - self.gzfile.tell()
+	name, tag, size = self.nextFile()
 
-	    # in case the file wasn't completely read in (it may have
-	    # already been in the repository, for example)
-	    while eatCount > self.bufSize:
-		self.gzfile.read(self.bufSize)
-		eatCount -= self.bufSize
-	    self.gzfile.read(eatCount)
-
-	    name, tag, size = self.nextFile()
-
-	    if name is None:
-		return None
+	if name is None:
+	    return None
 
 	fcf = FileContainerFile(self.gzfile, size)
 	self.next = self.gzfile.tell() + size
@@ -268,43 +251,26 @@ class FileContainer:
 	# small number of functions
 	assert(not self.mutable)
 
-	if self.version == 1:
-	    if not self.entries.has_key(fileName):
-		raise KeyError, ("file %s is not in the collection") % fileName
+	eatCount = self.next - self.gzfile.tell()
 
-	    entry = self.entries[fileName]
-	    self.lastFetched = self.entryOrder.index(fileName)
+	# in case the file wasn't completely read in (it may have
+	# already been in the repository, for example)
+	while eatCount > self.bufSize:
+	    self.gzfile.read(self.bufSize)
+	    eatCount -= self.bufSize
+	self.gzfile.read(eatCount)
 
-	    pos = self.gzfile.tell()
-	    offset = entry.offset + self.contentsStart
-	    if (pos != offset):
-		assert(pos < offset)
-		self.gzfile.seek(offset)	    # this is always SEEK_SET
-		assert(self.gzfile.tell() == offset)
-
-	    size = entry.size
-	    tag = entry.data
-	else:
-	    eatCount = self.next - self.gzfile.tell()
-
-	    # in case the file wasn't completely read in (it may have
-	    # already been in the repository, for example)
-	    while eatCount > self.bufSize:
+	name, tag, size = self.nextFile()
+	while (name and name != fileName):
+	    while size > self.bufSize:
 		self.gzfile.read(self.bufSize)
-		eatCount -= self.bufSize
-	    self.gzfile.read(eatCount)
+		size -= self.bufSize
+	    self.gzfile.read(size)
 
 	    name, tag, size = self.nextFile()
-	    while (name and name != fileName):
-		while size > self.bufSize:
-		    self.gzfile.read(self.bufSize)
-		    size -= self.bufSize
-		self.gzfile.read(size)
 
-		name, tag, size = self.nextFile()
-
-	    if not name:
-		raise KeyError, ("file %s is not in the collection") % fileName
+	if not name:
+	    raise KeyError, ("file %s is not in the collection") % fileName
 
 	fcf = FileContainerFile(self.gzfile, size)
 	self.next = self.gzfile.tell() + size

@@ -627,8 +627,7 @@ class ChangeSetFromFile(ChangeSet):
 	    elif header.startswith("PKG "):
 		size = int(header.split()[1])
 		buf = control.read(size)
-		lines = buf.split("\n")[:-1]
-		pkg = trove.ThawTroveChangeSet(lines)
+		pkg = trove.ThawTroveChangeSet(buf)
 		self.newPackage(pkg)
 	    elif header.startswith("FILES "):
 		size = int(header.split()[1])

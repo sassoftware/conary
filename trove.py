@@ -888,7 +888,8 @@ class ThawTroveChangeSet(TroveChangeSet):
 	# this makes our order match the order in the changeset
 	self.changedFiles.sort()
 
-    def __init__(self, lines):
+    def __init__(self, buf):
+	lines = buf.split("\n")[:-1]
 	header = lines[0]
 
 	l = header.split()
@@ -912,16 +913,8 @@ class ThawTroveChangeSet(TroveChangeSet):
 	newFlavor = None
 	for i, l in enumerate(lines[1:4]):
 	    if l.startswith("FLAVOR "):
-		lst = l.split(' ')
-
-		### for backwards compatibility
-		if len(lst) == 2:
-		    oldFlavorStr = lst[1]
-		    newFlavorStr = oldFlavorStr
-		elif len(lst) == 3:
-		    oldFlavorStr, newFlavorStr = lst[1:3]
-		else:
-		    assert(0)
+		lst = l.split(' ', 2)
+		oldFlavorStr, newFlavorStr = lst[1:3]
 
 		if oldFlavorStr != "-":
 		    oldFlavor = deps.ThawDependencySet(oldFlavorStr)
