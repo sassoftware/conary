@@ -178,14 +178,14 @@ class ConfigFile:
                 hdr = item
                 for item in flavorList:
                     if len(str) + len(item) > 40:
-                        print "%-25s %s" % (hdr, str)
+                        out.write("%-25s %s\n" % (hdr, str))
                         str = ""
                         hdr = ""
                     str += item + ","
 
                 # chop off the trailing ,
                 str = str[:-1]
-                print "%-25s %s" % (hdr, str)
+                out.write("%-25s %s\n" % (hdr, str))
 	    elif t == BOOL:
 		out.write("%-25s %s\n" % (item, bool(self.__dict__[item])))
 	    else:

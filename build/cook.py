@@ -658,7 +658,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 
 	srcName = recipeClass.name + ":source"
 	versionDict = repos.getTroveLeavesByLabel([srcName], cfg.buildLabel)
-	versionList = versionDict.get(srcName, [])
+	versionList = versionDict.get(srcName, {}).keys()
         sourceVersion = None
         if versionList:
             maxVersion = versionList[0]
