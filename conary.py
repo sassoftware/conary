@@ -83,7 +83,8 @@ def usage(rc = 1):
     print "               --sha1s"
     print "               --tags"
     print ""
-    print "update flags: --replace-files"
+    print "update flags: --keep-existing"
+    print "              --replace-files"
     return rc
 
 def openRepository(repMap):
@@ -116,6 +117,7 @@ def realMain():
     argDef["full-versions"] = 0
     argDef["ids"] = 0
     argDef["info"] = 0
+    argDef["keep-existing"] = 0
     argDef["leaves"] = 0
     argDef["ls"] = 0
     argDef["macros"] = 1
@@ -336,6 +338,11 @@ def realMain():
 	if replaceFiles:
 	    kwargs['replaceFiles'] = True
 	    del argSet['replace-files']
+
+	replaceFiles = argSet.has_key('keep-existing')
+	if keepExisting:
+	    kwargs['keepExisting'] = True
+	    del argSet['keep-existing']
 
 	if argSet.has_key('tag-script'):
 	    kwargs['tagScript'] = argSet['tag-script']

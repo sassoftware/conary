@@ -12,7 +12,7 @@ import sys
 import util
 
 def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False,
-	     tagScript = None):
+	     tagScript = None, keepExisting = False):
     cs = None
     if not os.path.exists(cfg.root):
         util.mkdirChain(cfg.root)
@@ -71,7 +71,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False,
 
     try:
 	db.commitChangeSet(cs, replaceFiles = replaceFiles, 
-			   tagScript = tagScript)
+			   tagScript = tagScript, keepExisting = keepExisting)
     except database.SourcePackageInstall, e:
 	log.error(e)
     except repository.CommitError, e:

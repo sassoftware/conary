@@ -246,7 +246,8 @@ class Database(SqlDbRepository):
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
     def commitChangeSet(self, cs, isRollback = False, toStash = True,
-                        replaceFiles = False, tagScript = None):
+                        replaceFiles = False, tagScript = None,
+			keepExisting = True):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -356,7 +357,7 @@ class Database(SqlDbRepository):
 	    # this updates the database from the changeset; the change
 	    # isn't committed until the self.commit below
 	    # an object for historical reasons
-	    localrep.LocalRepositoryChangeSetJob(self, cs)
+	    localrep.LocalRepositoryChangeSetJob(self, cs, keepExisting)
 
 	errList = fsJob.getErrorList()
 	if errList:
