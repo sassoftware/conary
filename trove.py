@@ -55,7 +55,7 @@ class Package:
     def formatString(self):
 	rc = ""
 	for (fileId, path, version) in self.files.values():
-	    rc += ("%s %s %s\n" % (fileId, path, version.asString()))
+	    rc += ("%s %s %s\n" % (fileId, path, version.freeze()))
 	return rc
 
     # returns a dictionary mapping a fileId to a (path, version, pkgName) tuple
@@ -198,7 +198,7 @@ class PackageChangeSet:
 	for (fileId, path, version) in self.newFiles:
 	    f.write("\tadded %s (%s(.*)%s)\n" % (path, fileId[:6], fileId[-6:]))
 	for (fileId, path, version) in self.changedFiles:
-	    f.write("\tchanged %s\n" % path)
+	    f.write("\tchanged %s\n" % fileId)
 	    change = changeSet.getFileChange(fileId)
 	    print "\t\t%s" % change
 	for fileId in self.oldFiles:
@@ -248,7 +248,7 @@ class PackageFromFile(Package):
     def read(self, dataFile):
 	for line in dataFile.readLines():
 	    (fileId, path, version) = line.split()
-	    version = versions.VersionFromString(version)
+	    version = versions.ThawVersion(version)
 	    self.addFile(fileId, path, version)
 
     def __init__(self, name, dataFile, version):
