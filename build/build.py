@@ -222,9 +222,11 @@ class Configure(BuildCommand):
         if self.objDir:
 	    objDir = self.objDir %macros
             macros.mkObjdir = 'mkdir -p %s; cd %s;' %(objDir, objDir)
+            macros.cdObjdir = 'cd %s;' %objDir
 	    macros.configure = '../%s' % self.configureName
         else:
             macros.mkObjdir = ''
+            macros.cdObjdir = ''
             macros.configure = './%s' % self.configureName
         # using the get method avoids adding bootstrap flag to tracked flags
         # (if the flag is really significant, it will be checked elsewhere)
@@ -232,7 +234,20 @@ class Configure(BuildCommand):
             macros.bootstrapFlags = self.bootstrapFlags
         else:
             macros.bootstrapFlags = ''
-        util.execute(self.command %macros)
+        try:
+            util.execute(self.command %macros)
+        except RuntimeError, info:
+            if not sys.stdout.isatty():
+                # When conary is being scripted, logs might be
+                # redirected to a file, and it might be easier to
+                # see config.log output in that logfile than by
+                # inspecting the build directory
+                # Each file line will have the filename prepended
+                # The "|| :" makes it OK if there is no config.log
+                util.execute('cd %(actionDir)s; %(cdObjdir)s'
+                             'find . -name config.log | xargs grep -H . || :'
+                             %macros)
+            raise
 
 class ManualConfigure(Configure):
     """
