@@ -7,9 +7,13 @@ Changes in 0.12.2
   * rdiff changes for 0.12.0 broke negative numbers for oldVersion
   * rdiff diff'd based on label instead of branch
   * update has flavor affinity now
-  * flavors can now be specified on the command line for update
+  * flavors can now be specified on the command line for update and erase
   * unspecified flavor flags got scores of zero, which was wrong
   * added python code for flavor scoring (useful for the client)
+  * repository queries didn't work properly when looking for multiple flavors
+    of a single version
+  * fix for updating multiple flavors of a single version of a trove
+    simultaneously
 
 Changes in 0.12.1
   * repquery and query always showed dependency information

@@ -998,7 +998,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         f = defaultFlavor.copy()
                         f.union(trove.getFlavor(), 
                                      mergeType = deps.DEP_MERGE_TYPE_PREFS)
-                    query[name][trove.getVersion().branch()] = [ f ]
+
+                    branch = trove.getVersion().branch()
+
+                    if not query[name].has_key(branch):
+                        query[name][branch] = [ f ]
+                    else:
+                        query[name][branch].append(f)
 
             if query:
                 flavorDict = self.getTroveLeavesByBranch(query, 

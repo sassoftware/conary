@@ -291,6 +291,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             """
 
         getList = [ 'Items.item', 'permittedTrove', 'salt', 'password' ]
+        if dropTroveTable:
+            getList.append('gtvlTbl.flavorId')
+        else:
+            getList.append('0')
         argList = [ authToken[0] ]
 
         if withVersions:
@@ -400,7 +404,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         #    (ffFlavor.sense is NULL AND
                         #     FlavorScores.request = 0)
                         #)
-            grouping = "GROUP BY instanceId, aclId"
+
+            if dropTroveTable:
+                grouping = "GROUP BY instanceId, aclId, gtvlTbl.flavorId"
+            else:
+                grouping = "GROUP BY instanceId, aclId"
+
             getList.append("SUM(FlavorScores.value) as flavorScore")
             flavorScoreCheck = "HAVING flavorScore > -500000"
         else:
@@ -449,7 +458,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         troveNames = []
         troveVersions = {}
 
-        for (troveName, troveNamePattern, salt, password, versionStr, 
+        for (troveName, troveNamePattern, salt, password, 
+             localFlavorId, versionStr, 
              timeStamps, branchId, finalTimestamp, flavor, flavorScore) in cu:
             if flavorScore is None:
                 flavorScore = 0
@@ -475,8 +485,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         d = {}
                         troveVersions[troveName] = d
 
-                    lastTimestamp, lastFlavorScore = d.get(branchId, 
-                                                           (0, -500000))[0:2]
+                    lastTimestamp, lastFlavorScore = d.get(
+                            (branchId, localFlavorId), (0, -500000))[0:2]
                     # this rule implements "later is better"; we've already
                     # thrown out incompatible troves, so whatever is left
                     # is at least compatible; within compatible, newer
@@ -484,8 +494,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     if (flavorFilter == self._GET_TROVE_BEST_FLAVOR and 
                                 flavorScore > lastFlavorScore) or \
                                 finalTimestamp > lastTimestamp:
-                        d[branchId] = (finalTimestamp, flavorScore, versionStr, 
-                                        timeStamps, flavor)
+                        d[(branchId, localFlavorId)] = \
+                            (finalTimestamp, flavorScore, versionStr, 
+                             timeStamps, flavor)
                 elif flavorFilter == self._GET_TROVE_BEST_FLAVOR:
                     assert(latestFilter == self._GET_TROVE_ALL_VERSIONS)
                     assert(withFlavors)
@@ -495,12 +506,13 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         d = {}
                         troveVersions[troveName] = d
 
-                    lastTimestamp, lastFlavorScore = d.get(versionStr, 
-                                                           (0, -500000))[0:2]
+                    lastTimestamp, lastFlavorScore = d.get(
+                            (versionStr, localFlavorId), (0, -500000))[0:2]
 
                     if (flavorScore > lastFlavorScore):
-                        d[versionStr] = (finalTimestamp, flavorScore, 
-                                         versionStr, timeStamps, flavor)
+                        d[(versionStr, localFlavorId)] = \
+                            (finalTimestamp, flavorScore, versionStr, 
+                             timeStamps, flavor)
                 else:
                     # if _GET_TROVE_ALL_VERSIONS is used, withFlavors must
                     # be specified (or the various latest versions can't
@@ -552,7 +564,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         if withFlavors:
                             if flavor == None:
                                 flavor = "none"
-                            l[version] = [ flavor ]
+
+                            if not l.has_key(version):
+                                l[version] = []
+                            l[version].append(flavor)
                         else:
                             l.append(version)
 
