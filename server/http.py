@@ -35,7 +35,7 @@ class HttpHandler(HtmlEngine):
         # "command name": (command handler, page title, 
         #       (requires auth, requires write access, requires admin))
         self.commands = {
-                         # metadata commands
+             # metadata commands
              "":               (self.mainpage, "Conary Repository",         
                                (True, True, False)),
              "metadata":       (self.metadataCmd, "View Metadata",          
@@ -53,6 +53,11 @@ class HttpHandler(HtmlEngine):
                                (True, True, True)),
              "addUser":        (self.addUserCmd, "Add User",                
                                (True, True, True)),
+             # change password commands
+             "chPassForm":     (self.chPassFormCmd, "Change Password",
+                               (True, False, False)),
+             "chPass":         (self.chPassCmd, "Change Password",
+                               (True, False, False)),
              "test":           (self.test, "Testing",                       
                                (True, True, False)),
                         }
@@ -200,3 +205,17 @@ class HttpHandler(HtmlEngine):
         self.repServer.auth.add(user, password, write=write, admin=admin)
         self.writeFn("""User added successfully. <a href="userlist">Return</a>""")
         
+    def chPassFormCmd(self, authToken, fields):
+        self.htmlPageTitle("Change Password")
+        self.htmlChPassForm()
+        
+    def chPassCmd(self, authToken, fields):
+        p1 = fields["password1"].value
+        p2 = fields["password2"].value
+
+        self.htmlPageTitle("Change Password")
+        if p1 != p2:
+            self.writeFn("""<div class="warning">Error: passwords do not match</div>""")
+        else:
+            self.repServer.auth.changePassword(authToken[0], p1)
+            self.writeFn("""<div>Password successfully changed.</div>""")

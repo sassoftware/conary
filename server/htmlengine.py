@@ -227,6 +227,7 @@ Choose a branch: %s
 <ul>
 <li><a href="metadata">Metadata Management</a></li>
 <li><a href="userlist">User Administration</a></li>
+<li><a href="chPassForm">Change Password</a></li>
 </ul>
 """)
 
@@ -247,7 +248,7 @@ Choose a branch: %s
         self.writeFn("""
 <form method="post" action="chPass">
 <table>
-<tr><td>New Password:</td><td><input type="text" name="password1"></td></tr>
+<tr><td>New Password:</td><td><input type="password" name="password1"></td></tr>
 <tr><td>Again:</td><td><input type="password" name="password2"></td></tr>
 </table>
 <p><input type="submit"></p>
