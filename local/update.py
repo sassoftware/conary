@@ -515,7 +515,8 @@ class FilesystemJob:
             
 	    # don't worry about metadata changes, just content changes
 	    if oldFile.hasContents and localFile and localFile.hasContents and \
-			oldFile.contents != localFile.contents:
+			oldFile.contents != localFile.contents and \
+                        not oldFile.flags.isTransient():
 		log.warning("%s has changed but has been removed "
 				   "on head", path)
 
