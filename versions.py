@@ -75,6 +75,8 @@ class VersionRelease(AbstractVersion):
 	@param value: String representation of a VersionRelease
 	@type value: string
 	"""
+	if value.find("@") != -1:
+	    raise ParseError, "version/release pairs may not contain @ signs"
 	cut = value.find("-")
 	if cut == -1:
 	    raise ParseError, ("version/release pair was expected")
