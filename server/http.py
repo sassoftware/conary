@@ -138,7 +138,7 @@ class HttpHandler(HtmlEngine):
             branches[branch] = branchName
 
         if len(branches) == 1:
-            self._getMetadata(troveName, branches.keys()[0], source)
+            self._getMetadata(fields, troveName, branches.keys()[0], source)
             return
 
         self.htmlPageTitle("Please choose a branch:")
@@ -152,15 +152,16 @@ class HttpHandler(HtmlEngine):
         else:
             source = None
 
-        self._getMetadata(troveName, branch, source)
+        self._getMetadata(fields, troveName, branch, source)
 
-    def _getMetadata(self, troveName, branch, source=None):
+    def _getMetadata(self, fields, troveName, branch, source=None):
         branch = self.repServer.thawVersion(branch)
 
         self.htmlPageTitle("Metadata for %s" % troveName)
         if source == "freshmeat":
+            fmName = fields["freshmeatName"].value
             try:
-                md = metadata.fetchFreshmeat(troveName[:-7])
+                md = metadata.fetchFreshmeat(fmName)
             except xml.parsers.expat.ExpatError:
                 md = None
                 self.htmlWarning("No Freshmeat record found.")

@@ -201,8 +201,9 @@ Choose a branch: %s
 <input type="hidden" name="troveName" value="%s" />
 <input type="hidden" name="source" value="freshmeat" />
 <input type="submit" value="Fetch from Freshmeat" />
+<p>Freshmeat project name: <input type="text" name="freshmeatName" value="%s" /></p>
 </form>
-"""     % (branchFrz, troveName))
+"""     % (branchFrz, troveName, troveName[:-7]))
 
         self.writeFn("""
 <form method="post" action="metadata">
