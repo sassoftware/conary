@@ -43,12 +43,12 @@ class NonBinariesInBindirs(policy.Policy):
 	d = self.macros['destdir']
 	mode = os.lstat(util.joinPaths(d, file))[stat.ST_MODE]
 	if not mode & 0111:
-	    raise PackagePolicyError(
+	    self.recipe.reportErrors(
 		"%s has mode 0%o with no executable permission in bindir"
 		%(file, mode))
 	m = self.recipe.magic[file]
 	if m and m.name == 'ltwrapper':
-	    raise PackagePolicyError(
+	    self.recipe.reportErrors(
 		"%s is a build-only libtool wrapper script" %file)
 
 
@@ -61,7 +61,7 @@ class FilesInMandir(policy.Policy):
     invariantinclusions = [ ('%(mandir)s/[^/][^/]*$', None, stat.S_IFDIR) ]
 
     def doFile(self, file):
-	raise PackagePolicyError("%s is non-directory file in mandir" %file)
+	self.recipe.reportErrors("%s is non-directory file in mandir" %file)
 
 
 class ImproperlyShared(policy.Policy):
@@ -75,7 +75,7 @@ class ImproperlyShared(policy.Policy):
     def doFile(self, file):
         m = self.recipe.magic[file]
 	if m and m.name == "ELF":
-	    raise PackagePolicyError(
+	    self.recipe.reportErrors(
 		"Architecture-specific file %s in shared data directory" %file)
 
 
@@ -115,7 +115,7 @@ class DanglingSymlinks(policy.Policy):
 			log.debug('allowing special dangling symlink %s -> %s',
 				  file, contents)
 			return
-		raise PackagePolicyError(
+		self.recipe.reportErrors(
 		    "Dangling symlink: %s points to non-existant %s"
 		    %(file, contents))
 
@@ -170,6 +170,29 @@ class CheckSonames(policy.Policy):
 		log.warning("%s implies %s, which does not exist --"
 			    " use Ldconfig('%s')?", path, s,
 			    os.path.dirname(path))
+
+# collect all the packaging errors -- must come after all the other
+# package error classes
+
+class reportErrors(policy.Policy):
+    """
+    This class is used to pull together all package errors in the
+    sanity-checking rules that come above it.  Do not call it
+    directly; it is for internal use only!
+    """
+    def __init__(self, *args, **keywords):
+	self.warnings = []
+	policy.Policy.__init__(self, *args, **keywords)
+    def updateArgs(self, *args, **keywords):
+	"""
+	Called once, with printf-style arguments, for each warning.
+	"""
+	self.warnings.append(args[0] %args[1:])
+    def do(self):
+	if self.warnings:
+	    for warning in self.warnings:
+		log.error(warning)
+	    raise PackagePolicyError, 'Package Policy errors found'
 
 
 # now the packaging classes
@@ -629,6 +652,7 @@ def DefaultPolicy():
 	ImproperlyShared(),
 	DanglingSymlinks(),
 	CheckSonames(),
+	reportErrors(),
 	ComponentSpec(),
 	PackageSpec(),
 	EtcConfig(),
