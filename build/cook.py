@@ -204,7 +204,8 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     includedSet = recipeObj.getTroveList()
     grp = package.Package(fullName, newVersion)
     for (name, versionList) in includedSet.iteritems():
-	grp.addPackage(name, versionList)
+        for v in versionList:
+            grp.addPackageVersion(name, v)
 
     grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet = changeset.ChangeSet()
