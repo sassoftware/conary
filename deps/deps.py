@@ -12,6 +12,7 @@
 # full details.
 #
 
+import copy
 import util
 
 DEP_CLASS_ABI		= 0
@@ -259,7 +260,7 @@ class DependencySet:
 	    if self.members.has_key(tag):
 		self.members[tag].union(other.members[tag])
 	    else:
-		self.members[tag] = other.members[tag]
+		self.members[tag] = copy.deepcopy(other.members[tag])
 
     def __eq__(self, other):
         if other is None:
