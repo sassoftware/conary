@@ -42,7 +42,7 @@ def _checkBranchForDuplicate(repos, fileId, branch, file):
 # type could be "src"
 #
 # returns a (pkg, fileMap) tuple
-def _createPackage(repos, cfg, bldPkg, ident):
+def _createPackage(repos, branch, bldPkg, ident):
     fileMap = {}
     p = package.Package(bldPkg.getName(), bldPkg.getVersion())
 
@@ -62,8 +62,7 @@ def _createPackage(repos, cfg, bldPkg, ident):
         # set ownership, flags, etc
         f.merge(buildFile)
         
-	duplicateVersion = _checkBranchForDuplicate(repos, f.id(),
-                                                    cfg.defaultbranch, f)
+	duplicateVersion = _checkBranchForDuplicate(repos, f.id(), branch, f)
         if not duplicateVersion:
 	    p.addFile(f.id(), path, bldPkg.getVersion())
 	else:
@@ -93,16 +92,15 @@ class _IdGen:
         else:
             self.map = map
 
-    def populate(self, cfg, repos, lcache, name):
+    def populate(self, branch, repos, lcache, fullName):
 	# Find the files and ids which were owned by the last version of
 	# this package on the branch. We also construct an object which
 	# lets us look for source files this build needs inside of the
 	# repository
 	fileIdMap = {}
-	fullName = cfg.packagenamespace + ":" + name
 	pkg = None
 	for pkgName in repos.getPackageList(fullName):
-	    pkg = repos.getLatestPackage(pkgName, cfg.defaultbranch)
+	    pkg = repos.getLatestPackage(pkgName, branch)
 	    for (fileId, path, version) in pkg.fileList():
 		fileIdMap[path] = fileId
 		if path[0] != "/":
@@ -120,6 +118,8 @@ class _IdGen:
 def cook(repos, cfg, recipeFile, prep=0, macros=()):
     repos.open("r")
 
+    buildBranch = cfg.defaultbranch
+
     if type(recipeFile) is types.ClassType:
         classList = {recipeFile.__name__: recipeFile}
     else:
@@ -136,7 +136,8 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	lcache = lookaside.RepositoryCache(repos)
 
 	ident = _IdGen()
-        ident.populate(cfg, repos, lcache, recipeClass.name)
+        ident.populate(buildBranch, repos, lcache, 
+		       cfg.packagenamespace + ":" + recipeClass.name)
 
         srcdirs = [ os.path.dirname(recipeClass.filename),
                     cfg.sourcepath % {'pkgname': recipeClass.name} ]
@@ -147,7 +148,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	if nameList:
 	    # if this package/version exists already, increment the
 	    # existing revision
-	    version = repos.pkgLatestVersion(nameList[0], cfg.defaultbranch)
+	    version = repos.pkgLatestVersion(nameList[0], buildBranch)
 	    if version and recipeObj.version == version.trailingVersion():
 		version = version.copy()
 		version.incrementVersionRelease()
@@ -156,7 +157,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
 	# this package/version doesn't exist yet
 	if not version:
-	    version = cfg.defaultbranch.copy()
+	    version = buildBranch.copy()
 	    version.appendVersionRelease(recipeObj.version, 1)
 
 	builddir = cfg.buildpath + "/" + recipeObj.name
@@ -189,7 +190,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         recipeObj.packages(cfg.packagenamespace, version, destdir)
 
 	for buildPkg in recipeObj.getPackages():
-	    (p, fileMap) = _createPackage(repos, cfg, buildPkg, ident)
+	    (p, fileMap) = _createPackage(repos, buildBranch, buildPkg, ident)
             built.append((p.getName(), p.getVersion().asString()))
 	    packageList.append((p, fileMap))
 
@@ -213,7 +214,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         for recipeFile in recipes:
             srcBldPkg[os.path.basename(recipeFile)].isConfig(True)
 
-	(p, fileMap) = _createPackage(repos, cfg, srcBldPkg, ident)
+	(p, fileMap) = _createPackage(repos, buildBranch, srcBldPkg, ident)
 	packageList.append((p, fileMap))
 
 	changeSet = changeset.CreateFromFilesystem(packageList)
