@@ -520,7 +520,7 @@ class InstallDocs(_FileAction):
 	if self.subdir:
 	    macros['subdir'] = '/%s' % self.subdir
 	base = '%(docdir)s/%(name)s-%(version)s/%(subdir)s/' %macros
-	dest = '%(destdir)s/'%macros + base
+	dest = '%(destdir)s'%macros + base
 	util.mkdirChain(os.path.dirname(dest))
 	for path in self.paths:
 	    for newpath in util.copytree(path %macros, dest, True):
