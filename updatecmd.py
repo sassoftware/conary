@@ -34,7 +34,6 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 				 "SRS change set is being installed.\n")
 		return 1
 
-
     if not cs:
         # so far no changeset (either the path didn't exist or we could not
         # read it
@@ -47,6 +46,9 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 
 	list = []
 	for pkg in pkgList:
+	    if db.hasTrove(pkg.getName(), pkg.getVersion(), pkg.getFlavor()):
+		continue
+
 	    currentVersion = helper.previousVersion(db, pkg.getName(),
 						    pkg.getVersion(),
 						    pkg.getFlavor())
@@ -56,6 +58,10 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 
 	cs = repos.createChangeSet(list)
 	list = [ x[0] for x in list ]
+
+    if not list:
+	log.warning("no new troves were found")
+	return
 
     try:
 	db.commitChangeSet(cs, replaceFiles=replaceFiles)
