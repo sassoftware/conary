@@ -43,14 +43,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                           (pkgStr, msg))
                 sys.exit(1)
             applyList.append(cs)
-        elif pkgStr.find("=") >= 0:
-            l = pkgStr.split("=")
-            if len(l) != 2:
-                log.error("too many ='s in %s", pkgStr)
-                return 1
-            applyList.append((l[0], l[1]))
         else:
-            applyList.append(pkgStr)
+            applyList.append(parseTroveSpec(pkgStr))
 
     try:
         (cs, depFailures, suggMap, brokenByErase) = \
@@ -98,18 +92,9 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
 
 def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False,
             justDatabase = False):
-    troveList = []
-    for item in itemList:
-        l = item.split("=")
-        if len(l) == 1:
-            troveList.append((l[0], None))
-        elif len(l) == 2:
-            troveList.append((l[0], l[1]))
-        else:
-            log.error("too many ='s in %s", item)
-            return 1
-
     client = conaryclient.ConaryClient(cfg=cfg)
+
+    troveList = [ parseTroveSpec(item) for item in itemList ]
 
     brokenByErase = []
     try:
@@ -125,3 +110,32 @@ def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False,
             print "    %s:\n\t%s" %  \
                     (troveName, "\n\t".join(str(depSet).split("\n")))
         return 1
+
+def parseTroveSpec(specStr):
+    if specStr.find('[') > 0 and specStr[-1] == ']':
+        specStr = specStr[:-1]
+        l = specStr.split('[')
+        if len(l) != 2:
+            raise TroveSpecError, "bad trove spec %s]" % specStr
+        specStr, flavorSpec = l
+        flavor = deps.parseFlavor(flavorSpec)
+        if flavor is None:
+            raise TroveSpecError, "bad flavor [%s]" % flavorSpec
+    else:
+        flavor = None
+
+    if specStr.find("=") >= 0:
+        l = specStr.split("=")
+        if len(l) != 2:
+            log.error("too many ='s in %s", pkgStr)
+            return 1
+        name, versionSpec = l
+    else:
+        name = specStr
+        versionSpec = None
+
+    return (name, versionSpec, flavor)
+
+class TroveSpecError(Exception):
+
+    pass

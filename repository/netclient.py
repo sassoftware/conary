@@ -963,7 +963,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def findTrove(self, labelPath, name, defaultFlavor, versionStr = None,
                   acrossRepositories = False, withFiles = True,
-                  affinityDatabase = None):
+                  affinityDatabase = None, flavorStr = None):
 	assert(not defaultFlavor or 
 	       isinstance(defaultFlavor, deps.DependencySet))
 

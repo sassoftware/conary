@@ -161,6 +161,7 @@ class ConaryClient:
             else:
                 troveName = item[0]
                 versionStr = item[1]
+                flavor = item[1]
 
             if versionStr and versionStr[0] == '/':
                 # fully qualified versions don't need repository affinity
@@ -266,7 +267,7 @@ class ConaryClient:
                    test = False, justDatabase = False):
 	cs = changeset.ChangeSet()
 
-        for (troveName, versionStr) in troveList:
+        for (troveName, versionStr, flavor) in troveList:
             troves = self.db.findTrove(troveName, versionStr)
 
             for outerTrove in troves:
