@@ -202,7 +202,7 @@ class VersionedFile:
 	self.db[_VERSION_INFO % (self.key, node.asString())] = \
 	    "%s %s %s" % (vStr, pStr, cStr)
 
-    def addVersion(self, version, data, createBranch = 0):
+    def addVersion(self, version, data):
 	"""
         Adds a new version of the file. The new addition gets placed 
         on the proper branch in the position determined by the version's 
@@ -231,7 +231,7 @@ class VersionedFile:
 	    while curr and curr.isAfter(version):
 		next = curr
 		curr = self._getVersionInfo(curr)[1]
-	elif not createBranch:
+	elif not self.createBranches:
 	    raise VersionedFileMissingBranchError, version.branch()
 	else:
 	    curr = None
@@ -340,6 +340,7 @@ class VersionedFile:
 	self.db = db
 	self.key = filename
 	self.branchMap = None
+	self.createBranches = 1
 
 class Database:
     """
