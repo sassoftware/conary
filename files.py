@@ -5,7 +5,7 @@
 import string
 import os
 import versioned
-import md5sum
+import sha1helper
 import pwd
 import grp
 import shutil
@@ -135,7 +135,7 @@ class File(FileMode):
 	return self.theVersion
 
     def uniqueName(self):
-	return md5sum.md5str(self.path)
+	return sha1helper.hashString(self.path)
 
     def infoLine(self):
 	return FileMode.infoLine(self)
@@ -300,20 +300,20 @@ class DeviceFile(File):
 
 class RegularFile(File):
 
-    def md5(self, md5 = None):
-	if (md5 != None):
-	    self.themd5 = md5
+    def sha1(self, sha1 = None):
+	if (sha1 != None):
+	    self.thesha1 = sha1
 
-	return self.themd5
+	return self.thesha1
 
     def uniqueName(self):
-	return self.themd5
+	return self.thesha1
 
     def infoLine(self):
-	return "f %s %s" % (self.themd5, File.infoLine(self))
+	return "f %s %s" % (self.thesha1, File.infoLine(self))
 
     def compare(self, other):
-	if self.themd5 == other.themd5:
+	if self.thesha1 == other.thesha1:
 	    return File.compare(self, other)
 
 	return 0
@@ -348,9 +348,9 @@ class RegularFile(File):
 
     def __init__(self, path, version = None, info = None):
 	if (info):
-	    (self.themd5, info) = string.split(info, None, 1)
+	    (self.thesha1, info) = string.split(info, None, 1)
 	else:
-	    self.themd5 = None
+	    self.thesha1 = None
 
 	File.__init__(self, path, version, info)
 
@@ -367,7 +367,7 @@ class SourceFile(RegularFile):
 	return reppath + "/sources/" + self.fileName()
 
     def infoLine(self):
-	return "src %s %s" % (self.themd5, File.infoLine(self))
+	return "src %s %s" % (self.thesha1, File.infoLine(self))
 
     def __init__(self, pkgName, path, version = None, info = None):
 	self.pkgName = pkgName
@@ -434,10 +434,10 @@ def FileFromFilesystem(pkgName, root, path, type = "auto"):
 
     if (type == "src"):
 	f = SourceFile(pkgName, path)
-	f.md5(md5sum.md5sum(root + path))
+	f.sha1(sha1helper.hashFile(root + path))
     elif (stat.S_ISREG(s.st_mode)):
 	f = RegularFile(path)
-	f.md5(md5sum.md5sum(root + path))
+	f.sha1(sha1helper.hashFile(root + path))
     elif (stat.S_ISLNK(s.st_mode)):
 	f = SymbolicLink(path)
 	f.linkTarget(os.readlink(root + path))
