@@ -705,8 +705,7 @@ class Doc(_FileAction):
     The Doc class installs documentation files from the builddir
     into the destdir in the appropriate directory.
     """
-    keywords = {'devel' :  False,
-                'subdir':  '',
+    keywords = {'subdir':  '',
 		'mode': 0644,
 		'dirmode': 0755}
     
