@@ -188,7 +188,7 @@ class Trove:
 	self.changeFlavor(pkgCS.getNewFlavor())
 
         if pkgCS.isAbsolute():
-            self.troveInfo.thaw(pkgCS.getTroveInfoDiff())
+            self.troveInfo = TroveInfo(pkgCS.getTroveInfoDiff())
         else:
             self.troveInfo.twm(pkgCS.getTroveInfoDiff(), self.troveInfo)
 
