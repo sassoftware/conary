@@ -388,7 +388,7 @@ class DependencyTables:
                 if flag == NO_FLAG_MAGIC:
                     flags = []
                 else:
-                    flags = [ flag ]
+                    flags = [ (flag, deps.FLAG_SENSE_REQUIRED) ]
 
                 failedSets[troveName].addDep(deps.dependencyClasses[depClass],
                             deps.Dependency(depName, flags))
