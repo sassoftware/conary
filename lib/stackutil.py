@@ -16,13 +16,22 @@
 
 import inspect
 import os
+import smtplib
 import sys
+import tempfile
+import traceback
 
-def printTraceBack(tb=None, output=sys.stderr):
+def printTraceBack(tb=None, output=sys.stderr, exc_type=None, exc_msg=None):
     if isinstance(output, str):
         output = open(output, 'w')
     if tb is None:
         tb = sys.exc_info()[2]
+    if exc_type is not None:
+        output.write('Exception: ')
+        exc_info = '\n'.join(traceback.format_exception_only(exc_type, exc_msg))
+        output.write(exc_info)
+        output.write('\n\n')
+
     while tb:
         _printFrame(tb.tb_frame, output=output)
         tb = tb.tb_next
@@ -50,6 +59,20 @@ def printStack(frame=0, output=sys.stderr):
         output.write("*************************************\n")
         _printFrame(frame, output)
         frame = frame.f_back
+
+def mailStack(frame, recips, sender, subject, extracontent=None):
+    file = tempfile.TemporaryFile()
+    file.write('Subject: ' +  subject + '\n\n')
+    if extracontent:
+        file.write(extracontent)
+    printStack(frame, file)
+    server = smtplib.SMTP('localhost')
+    file.seek(0)
+    server.sendmail(sender,
+                    recips,
+                    file.read())
+    server.close()
+    file.close()
 
 def _printFrame(f, output=sys.stderr):
     c = f.f_code

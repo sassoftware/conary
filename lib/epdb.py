@@ -18,10 +18,18 @@ import stackutil
 import pdb
 import os
 import re
+import socket
 import sys
 import tempfile
+import traceback
 
 class Epdb(pdb.Pdb):
+    # epdb will print to here instead of to sys.stdout,
+    # and restore stdout when done
+    _stdout_proxy = None
+    _exc_type = None
+    _exc_msg = None
+
     def __init__(self):
         pdb.Pdb.__init__(self)
         self.prompt = '(Epdb) '
@@ -43,6 +51,26 @@ class Epdb(pdb.Pdb):
             output = open(path, 'w')
         stackutil.printStack(frame, output)
         print "Stack saved to %s" % path
+
+    def do_mailstack(self, arg):
+        tolist = arg.split()
+        subject = '[Conary Stacktrace]'
+        if 'stack' in self.__dict__:
+            # when we're saving we always 
+            # start from the top
+            frame = self.stack[-1][0]
+        else:
+            frame = sys._getframe(1)
+            while frame.f_globals['__name__'] in ('epdb', 'pdb', 'bdb', 'cmd'):
+                frame = frame.f_back
+        sender = os.environ['USER']
+        host = socket.getfqdn()
+        extracontent = None
+        if self._exc_type:
+            extracontent = '\n'.join(traceback.format_exception_only(self._exc_type, self._exc_msg))
+        stackutil.mailStack(frame, tolist, sender + '@' + host, '[Conary stacktrace]', extracontent)
+        print "Mailed stack to %s" % tolist
+
 
     def do_printstack(self, arg):
         if 'stack' in self.__dict__:
@@ -99,11 +127,65 @@ class Epdb(pdb.Pdb):
 
     do_l = do_list
 
+    def interaction(self, frame, traceback):
+        pdb.Pdb.interaction(self, frame, traceback)
+        if not self._stdout_proxy is None:
+            sys.stdout.flush()
+            # now we reset stdout to be the whatever it was before
+            os.dup2(self.__old_stdout, sys.stdout.fileno())
+
+    def switch_stdout(self):
+        if not self._stdout_proxy is None:
+            sys.stdout.flush()
+            # old_stdout points to whereever stdout was 
+            # when called (maybe to file?)
+            self.__old_stdout = os.dup(sys.stdout.fileno())
+            # now we copy whatever te proxy points to to 1
+            os.dup2(self._stdout_proxy, sys.stdout.fileno())
+        return
+
+    # bdb hooks
+    def user_call(self, frame, argument_list):
+        """This method is called when there is the remote possibility
+        that we ever need to stop in this function."""
+        if self.stop_here(frame):
+            self.switch_stdout()
+            pdb.Pdb.user_call(self, frame, argument_list)
+
+    def user_line(self, frame):
+        """This function is called when we stop or break at this line."""
+        self.switch_stdout()
+        pdb.Pdb.user_line(self, frame)
+
+    def user_return(self, frame, return_value):
+        """This function is called when a return trap is set here."""
+        self.switch_stdout()
+        pdb.Pdb.user_return(self, frame, return_value)
+
+    def user_exception(self, frame, exc_info):
+        """This function is called if an exception occurs,
+        but only if we are to stop at or just below this level."""
+        self.switch_stdout()
+        pdb.Pdb.user_exception(self, frame, exc_info)
+
+def beingTraced():
+    frame = sys._getframe(0)
+    while frame:
+        if not frame.f_trace is None:
+            return True
+        frame = frame.f_back
+    return False
+
 def set_trace():
     Epdb().set_trace()
 
-def post_mortem(t):
+def set_stdout_proxy(fdno):
+    Epdb._stdout_proxy = fdno
+
+def post_mortem(t, exc_type=None, exc_msg=None):
     p = Epdb()
+    p._exc_type = exc_type
+    p._exc_msg = exc_msg
     p.reset()
     while t.tb_next is not None:
         t = t.tb_next
