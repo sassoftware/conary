@@ -79,6 +79,7 @@ typedef struct
 	PyObject* command_logfile;
 	PyThreadState *tstate;
 	int timeout;
+	PyObject* busy_data;
 } pysqlc;
 
 /** a statement object. */
@@ -106,7 +107,7 @@ static PyObject* _sqlite_InternalError;
 static PyObject* _sqlite_ProgrammingError;
 static PyObject* _sqlite_NotSupportedError;
 
-static int debug_callbacks = 0;
+static int debug_callbacks = 1;
 
 #define PRINT_OR_CLEAR_ERROR \
 	if (debug_callbacks) \
@@ -198,39 +199,14 @@ _con_dealloc(pysqlc* self)
 			free((void*)self->database_name);
 			self->database_name = NULL;
 		}
-	
+
+		Py_XDECREF(self->busy_data);
+		
 		Py_DECREF(self->command_logfile);
 	
 		PyObject_Del(self);
 	}
 }
-
-static int busy_wait(int timeout,   /* Maximum amount of time to wait */
-		     int count      /* Number of times table has been busy */)
-{
-	static const char delays[] =
-		{ 1, 2, 5, 10, 15, 20, 25, 25,  25,  50,  50,  50, 100};
-	static const short int totals[] =
-		{ 0, 1, 3,  8, 18, 33, 53, 78, 103, 128, 178, 228, 287};
-# define NDELAY (sizeof(delays)/sizeof(delays[0]))
-	int delay, prior;
-	
-	if (count <= NDELAY){
-		delay = delays[count-1];
-		prior = totals[count-1];
-	}
-	else {
-		delay = delays[NDELAY-1];
-		prior = totals[NDELAY-1] + delay*(count-NDELAY-1);
-	}
-	if (prior + delay > timeout) {
-		delay = timeout - prior;
-		if (delay<=0) return 0;
-	}
-	usleep(delay * 1000);
-	return 1;
-}
-
 
 static const char *
 ctype_to_str(int ctype)
@@ -303,6 +279,8 @@ pysqlite_connect(PyObject *self, PyObject *args, PyObject *kwargs)
 	/* Set the thread state to NULL */
 	obj->tstate = NULL;
 	obj->timeout = 0;
+	obj->busy_data = NULL;
+	
 	
 	Py_INCREF(Py_None);
 	obj->command_logfile = Py_None;
@@ -422,9 +400,9 @@ function_callback(sqlite3_context *context, int argc, sqlite3_value **argv)
 	userdata = (PyObject*)sqlite3_user_data(context);
 	func = PyTuple_GetItem(userdata, 0);
 	con = (pysqlc*)PyTuple_GetItem(userdata, 1);
-	MY_END_ALLOW_THREADS(con->tstate)
+	MY_END_ALLOW_THREADS(con->tstate);
 
-		args = PyTuple_New(argc);
+	args = PyTuple_New(argc);
 	for (i = 0; i < argc; i++) {
 		const char *s = sqlite3_value_text(argv[i]);
 		if (s == NULL) {
@@ -586,9 +564,9 @@ sqlite_busy_handler_callback(void* void_data, int num_busy)
 	userdata = PyTuple_GetItem(data, 1);
 	con = (pysqlc*)PyTuple_GetItem(data, 2);
 
-	MY_END_ALLOW_THREADS(con->tstate)
+	MY_END_ALLOW_THREADS(con->tstate);
 
-		args = PyTuple_New(3);
+	args = PyTuple_New(2);
 	PyTuple_SetItem(args, 0, userdata);
 	PyTuple_SetItem(args, 1, PyInt_FromLong((long)num_busy));
 
@@ -645,6 +623,11 @@ _con_sqlite_busy_handler(pysqlc* self, PyObject *args, PyObject* kwargs)
 		return NULL;
 	}
 
+	/* dereference old callback (if any) */
+	if (self->busy_data != NULL) {
+		Py_DECREF(self->busy_data);
+	}
+	
 	if ((userdata = PyTuple_New(3)) == NULL)
 		return NULL;
 
@@ -658,6 +641,8 @@ _con_sqlite_busy_handler(pysqlc* self, PyObject *args, PyObject* kwargs)
 	sqlite3_busy_handler(self->p_db, &sqlite_busy_handler_callback,
 			     userdata);
 
+	self->busy_data = userdata;
+	
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -1111,6 +1096,37 @@ sqlite_version_info(PyObject* self)
 **----------------------------------------------------------------------------
 */
 
+static int busy_wait(pysqlc *con,
+		     int count      /* Number of times table has been busy */)
+{
+	static const char delays[] =
+		{ 1, 2, 5, 10, 15, 20, 25, 25,  25,  50,  50,  50, 100};
+	static const short int totals[] =
+		{ 0, 1, 3,  8, 18, 33, 53, 78, 103, 128, 178, 228, 287};
+# define NDELAY (sizeof(delays)/sizeof(delays[0]))
+	int delay, prior;
+
+	/* if there is a busy callback function, use it */
+	if (con->busy_data != NULL) {
+		return sqlite_busy_handler_callback(con->busy_data, count);
+	}
+	
+	if (count <= NDELAY){
+		delay = delays[count-1];
+		prior = totals[count-1];
+	}
+	else {
+		delay = delays[NDELAY-1];
+		prior = totals[NDELAY-1] + delay*(count-NDELAY-1);
+	}
+	if (prior + delay > con->timeout) {
+		delay = con->timeout - prior;
+		if (delay<=0) return 0;
+	}
+	usleep(delay * 1000);
+	return 1;
+}
+
 static char _stmt_step_doc [] =
 "step()\n\
 Fetch the next row from a the statement.";
@@ -1129,12 +1145,12 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 		return NULL;
 	}
 
+	MY_BEGIN_ALLOW_THREADS(self->con->tstate);
 	do {
-		MY_BEGIN_ALLOW_THREADS(self->con->tstate);
 		result = sqlite3_step(self->p_stmt);
-		MY_END_ALLOW_THREADS(self->con->tstate);
-	} while (result == SQLITE_BUSY && busy_wait(self->con->timeout,
+	} while (result == SQLITE_BUSY && busy_wait(self->con,
 						    busy_count++));
+	MY_END_ALLOW_THREADS(self->con->tstate);
 					 
 	if (result == SQLITE_ROW) {
 		long long int lval;
