@@ -68,7 +68,7 @@ class FilesystemRepository(AbstractRepository):
 	ps = self._getPackageSet(pkg.getName())
 	ps.addVersion(pkg.getVersion(), pkg)
 
-    def getPackageNickList(self, pkgName, nick):
+    def getPackageLabelBranches(self, pkgName, nick):
 	return self._getPackageSet(pkgName).mapBranchNickname(nick)
 
     def getPackageVersionList(self, pkgName):
@@ -85,10 +85,6 @@ class FilesystemRepository(AbstractRepository):
 
     ### File functions
 
-    def fileLatestVersion(self, fileId, branch):
-	fileDB = self._getFileDB(fileId)
-	return fileDB.findLatestVersion(branch)
-	
     def getFileVersion(self, fileId, version, path = None, withContents = 0):
 	fileDB = self._getFileDB(fileId)
 	file = fileDB.getVersion(version)
@@ -205,7 +201,7 @@ class FilesystemRepository(AbstractRepository):
 	    if isinstance(location, versions.Version):
 		list.append(location)
 	    else:
-		branchList = self.getPackageNickList(troveName, location)
+		branchList = self.getPackageLabelBranches(troveName, location)
 		for branch in branchList:
 		    v = self.pkgLatestVersion(troveName, branch)
 		    list.append(v)
