@@ -507,18 +507,18 @@ class Version(AbstractVersion):
 	@type defaultBranch: Version
 	@rtype: str
 	"""
-	list = self.versions
+	l = self.versions
 	s = "/"
 
 	if defaultBranch and len(defaultBranch.versions) < len(self.versions):
 	    start = Version(self.versions[0:len(defaultBranch.versions)])
 	    if start == defaultBranch:
-		list = self.versions[len(defaultBranch.versions):]
+		l = self.versions[len(defaultBranch.versions):]
 		s = ""
 
 	oneAgo = None
 	twoAgo = None
-	for version in list:
+	for version in l:
 	    s = s + ("%s/" % version.asString(twoAgo, frozen = frozen))
 	    twoAgo = oneAgo
 	    oneAgo = version
