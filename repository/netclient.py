@@ -330,17 +330,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         #   5. Download any extra files (and create any extra diffs)
         #   which step 2 couldn't do for us.
 
-        cs = None
-        mergedChangeSets = False
-        firstPath = target
-
-        while chgSetList:
-            # split the chgSetList into jobs for each server and one
-            # for this client
+        def _separateJobList(jobList):
             serverJobs = {}
             ourJobList = []
             for (troveName, (old, oldFlavor), (new, newFlavor), absolute) in \
-                    chgSetList:
+                    jobList:
                 serverName = new.branch().label().getHost()
                 if not serverJobs.has_key(serverName):
                     serverJobs[serverName] = []
@@ -363,15 +357,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                self.fromFlavor(newFlavor)),
                               absolute))
 
+            return (serverJobs, ourJobList)
+
+        cs = None
+        firstPath = target
+
+        while chgSetList:
+            # split the chgSetList into jobs for each server and one
+            # for this client
+            (serverJobs, ourJobLst) = _separateJobList(chgSetList)
+
             chgSetList = []
 
             for serverName, job in serverJobs.iteritems():
                 urlList = self.c[serverName].getChangeSet(job, recurse, 
                                                 withFiles, withFileContents)
-
-                if len(urlList) > 1 and target:
-                    origTarget = target
-                    target = None
 
                 for url in urlList:
                     inF = urllib.urlopen(url)
@@ -379,35 +379,35 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     if firstPath:
                         tmpName = firstPath
                         outF = open(firstPath, "w")
-                        firstPath = None
-                        doUnlink = False
                     else:
                         (outFd, tmpName) = tempfile.mkstemp()
                         outF = os.fdopen(outFd, "w")
-                        doUnlink = True
 
                     try:
                         util.copyfileobj(inF, outF)
+
+                        inF.close()
                         outF.close()
-                        if not target:
+
+                        if not firstPath:
                             newCs = repository.changeset.ChangeSetFromFile(
                                             tmpName)
+                            os.unlink(tmpName)
+
                             if not cs:
                                 cs = newCs
                             else:
                                 cs.merge(newCs)
-                                mergedChangeSets = True
                         else:
-                            cs = None
-                    finally:
-                        inF.close()
-                        if doUnlink:
+                            firstPath = None
+                    except:
+                        if os.path.exists(tmpName):
                             os.unlink(tmpName)
+                        raise
 
-            serverJob = {}
-
-        if target and mergedChangeSets:
-            os.unlink(target)
+        if target and cs:
+            newCs = repository.changeset.ChangeSetFromFile(target)
+            cs.merge(newCs)
             cs.writeToFile(target)
             cs = None
 
