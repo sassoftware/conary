@@ -535,9 +535,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                    filecs)
 
                 if withFileContents and hash:
-                    if filesNeeded:
-                        import pdb
-                        pdb.set_trace()
                     # pull the contents from the trove it was originall
                     # built in
                     cont = self.getFileContents(troveName, newFileVersion,
@@ -555,7 +552,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if target and cs:
             if not firstPath:
                 newCs = repository.changeset.ChangeSetFromFile(target)
-                cs.merge(newCs)
+                # doing the merge this way works even if cs is from internalCs
+                newCs.merge(cs)
+                cs = newCs
 
             if internalCs:
                 cs.merge(internalCs)

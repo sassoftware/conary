@@ -138,6 +138,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	log.debug("creating branch %s for %s", branch.asString(), pkgName)
         return self.troveStore.createTroveBranch(pkgName, branch)
 
+    def findFileVersion(self, troveName, troveVersion, fileId, fileVersion):
+        return self.troveStore.findFileVersion(troveName, troveVersion,
+                                               fileId, fileVersion)
+
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
 	gen = self.troveStore.iterFilesInTrove(troveName, version, flavor,

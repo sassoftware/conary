@@ -220,34 +220,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	troveVersion = self.toVersion(troveVersion)
 	fileVersion = self.toVersion(fileVersion)
-	troveFlavor = self.toFlavor(troveFlavor)
 
 	if not self.auth.check(authToken, write = False, trove = troveName,
 			       label = troveVersion.branch().label()):
 	    raise InsufficientPermission
 
-	# this could be much more efficient; iterating over the files is
-	# just silly
-	for (tFileId, tpath, tversion, fileStream) in \
-		self.repos.iterFilesInTrove(troveName, troveVersion, 
-					    troveFlavor, withFiles = True):
-            if tversion != fileVersion: continue
-            if fileId and tFileId != fileId: continue
-            if path and tpath != path: continue
+        fileObj = self.repos.findFileVersion(troveName, troveVersion,
+                                             fileId, fileVersion)
 
-            fileObj = files.ThawFile(fileStream, fileId)
+        inF = self.repos.contentsStore.openRawFile(
+                        sha1helper.sha1ToString(fileObj.contents.sha1()))
 
-	    inF = self.repos.contentsStore.openRawFile(
-			    sha1helper.sha1ToString(fileObj.contents.sha1()))
+        (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
+                                      suffix = '.cf-out')
+        outF = os.fdopen(fd, "w")
+        util.copyfileobj(inF, outF)
 
-	    (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
-					  suffix = '.cf-out')
-	    outF = os.fdopen(fd, "w")
-	    util.copyfileobj(inF, outF)
-
-            url = os.path.join(self.urlBase, 
-                               "changeset?%s" % os.path.basename(path)[:-4])
-	    return url
+        url = os.path.join(self.urlBase, 
+                           "changeset?%s" % os.path.basename(path)[:-4])
+        return url
 
     def getAllTroveLeafs(self, authToken, clientVersion, troveNames):
 	for troveName in troveNames:

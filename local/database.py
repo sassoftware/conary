@@ -89,6 +89,10 @@ class SqlDbRepository(repository.DataStoreRepository,
 
 	return file
 
+    def findFileVersion(self, troveName, troveVersion, fileId, fileVersion):
+        return self.db.findFileVersion(troveName, troveVersion,
+                                       fileId, fileVersion)
+
     def getFileVersions(self, l):
 	return self.db.iterFiles(l)
 
