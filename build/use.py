@@ -158,7 +158,7 @@ class Collection(dict):
         if alias in self or alias in self._attrs:
             raise RuntimeError, 'alias is already set'
         elif self[realKey]._alias:
-            raise RuntimeError, 'key %s already has an alias' % key
+            raise RuntimeError, 'key %s already has an alias' % realKey
         else:
 	    self._setAttr(alias, self[realKey])
             self[realKey]._alias = alias
