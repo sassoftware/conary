@@ -51,7 +51,7 @@ class FalseFile:
 	return self.contents[oldpos:self.pos]
 
     def readLines(self):
-	list = string.split(self.read(), "\n")
+	list = self.read().split('\n')
 	list2 = []
 
 	# cut off the last element (which wasn't newline terminated anyway)
@@ -76,10 +76,10 @@ class VersionedFile:
 	    return
 
 	# chop off the emptry string which gets created after the final \n
-	versionList = string.split(self.db[_VERSION_MAP % self.key], '\n')[:-1]
+	versionList = self.db[_VERSION_MAP % self.key].split('\n')[:-1]
 
 	for mapString in versionList:
-	    (versionString, versionTime) = string.split(mapString)
+	    (versionString, versionTime) = mapString.split()
 	    self.versionMap[versionString] = \
 		(versions.VersionFromString(versionString), float(versionTime))
 
@@ -181,7 +181,7 @@ class FileIndexedDatabase(Database):
 
 	if self.db.has_key(_FILE_MAP):
 	    map = self.db[_FILE_MAP]
-	    for line in string.split(map, '\n'):
+	    for line in map.split('\n'):
 		self.files[line] = 1
 
     def writeMap(self):

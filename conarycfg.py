@@ -3,8 +3,6 @@
 # All rights reserved
 #
 import os
-import string
-import types
 import versions
 import sys
 
@@ -18,7 +16,7 @@ class SrsConfiguration:
 	    f.close()
 
     def configLine(self, line):
-	(key, val) = string.split(line)
+	(key, val) = line.split()
 	if not self.__dict__.has_key(key):
 	    raise KeyError, ("configuration value %s unknown" % key)
 
@@ -28,7 +26,7 @@ class SrsConfiguration:
 	keys = self.__dict__.keys()
 	keys.sort()
 	for item in keys:
-	    if type(self.__dict__[item]) == types.StringType:
+	    if type(self.__dict__[item]) is str:
 		print "%-20s %s" % (item, self.__dict__[item])
 	    elif self.__dict__[item].__class__ == versions.Version:
 		print "%-20s %s" % (item, self.__dict__[item].asString())

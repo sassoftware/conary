@@ -1,7 +1,11 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 import filecontainer
 import files
 import package
-import string
 import versions
 import os
 
@@ -194,8 +198,7 @@ class ChangeSetFromFile(ChangeSet):
 	    i = i + 1
 
 	    if header.startswith("SRS PKG CHANGESET "):
-		(pkgName, oldVerStr, newVerStr, lineCount) = \
-			string.split(header)[3:7]
+		(pkgName, oldVerStr, newVerStr, lineCount) = header.split()[3:7]
 
 		if oldVerStr == "(none)":
 		    # abstract change set
@@ -215,7 +218,7 @@ class ChangeSetFromFile(ChangeSet):
 
 		self.addPackage(pkg)
 	    elif header.startswith("SRS FILE CHANGESET "):
-		(fileId, oldVerStr, newVerStr) = string.split(header)[3:6]
+		(fileId, oldVerStr, newVerStr) = header.split()[3:6]
 		if oldVerStr == "(none)":
 		    oldVersion = None
 		else:

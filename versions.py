@@ -61,7 +61,7 @@ class BranchName(AbstractVersion):
     def __init__(self, value):
 	# throws an exception if no @ is found
 	#cut = value.index("@")
-	(self.host, self.branch) = string.split(value, "@", 1)
+	(self.host, self.branch) = value.split("@", 1)
 	#self.host = value[:cut]
 	#self.branch = value[cut + 1:]
 	if self.branch.find("@") != -1:
@@ -125,13 +125,13 @@ class Version:
 	if not self.isBranch() and not self.isVersion():
 	    raise KeyError, "invalid version set %s" % self
 	
-def VersionFromString(str, defaultBranch = None):
-    if str[0] != "/":
+def VersionFromString(ver, defaultBranch = None):
+    if ver[0] != "/":
 	if not defaultBranch:
 	    raise KeyError, "relative version given without a default branch"
-	str = defaultBranch.asString() + "/" + str
+	ver = defaultBranch.asString() + "/" + ver
 
-    parts = string.split(str, "/")
+    parts = ver.split("/")
     del parts[0]	# absolute versions start with a /
 
     v = []

@@ -115,8 +115,8 @@ class FileMode:
 	if not them:
 	    return self.infoLine()
 
-	selfLine = string.split(self.infoLine())
-	themLine = string.split(them.infoLine())
+	selfLine = self.infoLine().split()
+	themLine = them.infoLine().split()
 
 	if selfLine[0] == themLine[0] and len(selfLine) == len(themLine):
 	    rc = selfLine[0]
@@ -140,7 +140,7 @@ class FileMode:
 	return 0
 
     def applyChangeLine(self, line):
-	(p, o, g, s, m) = string.split(line)
+	(p, o, g, s, m) = line.split()
 	if p == "-": 
 	    p = None
 	else:
@@ -212,7 +212,7 @@ class File(FileMode):
     # returns 1 if the change worked, 0 if the file changed too much for
     # the change to apply (which means this is a different file type)
     def applyChange(self, line):
-	(tag, line) = string.split(line, None, 1)
+	(tag, line) = line.split(None, 1)
 	assert(tag == self.infoTag)
 	self.applyChangeLine(line)
 
@@ -258,7 +258,7 @@ class SymbolicLink(File):
 	File.restore(self, target)
 
     def applyChangeLine(self, line):
-	(target, line) = string.split(line, None, 1)
+	(target, line) = line.split(None, 1)
 	self.linkTarget(target)
 	File.applyChangeLine(self, line)
 
@@ -350,7 +350,7 @@ class DeviceFile(File):
 	return (self.type, self.major, self.minor)
 
     def applyChangeLine(self, line):
-	(ma, mi, line) = string.split(line, None, 2)
+	(ma, mi, line) = line.split(None, 2)
 
 	if ma == "-":
 	    ma = None
@@ -428,7 +428,7 @@ class RegularFile(File):
 	repos.newFileContents(self.sha1(), file)
 
     def applyChangeLine(self, line):
-	(sha, line) = string.split(line, None, 1)
+	(sha, line) = line.split(None, 1)
 	self.sha1(sha)
 	File.applyChangeLine(self, line)
 
@@ -483,7 +483,7 @@ def FileFromFilesystem(path, fileId, type = None):
     return f
 
 def FileFromInfoLine(infoLine, fileId):
-    (type, infoLine) = string.split(infoLine, None, 1)
+    (type, infoLine) = infoLine.split(None, 1)
     if type == "f":
 	return RegularFile(fileId, infoLine)
     elif type == "l":

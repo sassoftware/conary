@@ -2,7 +2,6 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-import string
 import versions
 
 # this is the repository's idea of a package
@@ -171,7 +170,7 @@ class PackageChangeSet:
 	action = line[0]
 
 	if action == "+" or action == "~":
-	    (fileId, path, version) = string.split(line[1:])
+	    (fileId, path, version) = line[1:].split()
 
 	    if version == "-":
 		version = None
@@ -248,7 +247,7 @@ class PackageFromFile(Package):
 
     def read(self, dataFile):
 	for line in dataFile.readLines():
-	    (fileId, path, version) = string.split(line)
+	    (fileId, path, version) = line.split()
 	    version = versions.VersionFromString(version)
 	    self.addFile(fileId, path, version)
 

@@ -151,7 +151,7 @@ class FileContainerFile:
 	    return self.file.read(count)
 
     def readLines(self):
-	list = string.split(self.read(), "\n")
+	list = self.read().split('\n')
 	list2 = []
 
 	# cut off the last element (which wasn't newline terminated anyway)

@@ -11,7 +11,6 @@ import fcntl
 import files
 import os
 import package
-import string
 import util
 import versioned
 
@@ -90,7 +89,7 @@ class Repository:
 	    for pathInPkg in pathsToArchive:
 		(file, path, pkgName) = filesToArchive[pathInPkg]
 		if isinstance(file, files.SourceFile):
-		    basePkgName = string.split(pkgName, ':')[-2]
+		    basePkgName = pkgName.split(':')[-2]
 		    d = { 'pkgname' : basePkgName }
 		    path = (sourcePathTemplate) % d + "/" + path
 
