@@ -54,13 +54,13 @@ bin_files = srs srs-bootstrap
 extra_files = srs.recipe.in srs.recipe srs Makefile test/*.py
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
-generated_files = srs.final srs.recipe *.pyo *.pyc 
+generated_files = srs-wrapper srs.recipe *.pyo *.pyc 
 
 .PHONY: clean bootstrap deps.dot pychecker dist install test debug-test
 
-all: srs-final srs.recipe
+all: srs-wrapper srs.recipe
 
-srs-final: srs
+srs-wrapper: srs-wrapper.in
 	sed s,@srsdir@,$(srsdir),g $< > $@
 	chmod 755 $@
 
@@ -72,9 +72,9 @@ install: all
 	for f in $(python_files) $(bin_files); do \
 		cp -a $$f $(srsdir)/$$f; \
 	done
-	install -m 755 srs-final $(bindir)
+	install -m 755 srs-wrapper $(bindir)
 	for f in $(bin_files); do \
-		ln -sf srs-final $(bindir)/$$f; \
+		ln -sf srs-wrapper $(bindir)/$$f; \
 	done
 
 dist: $(dist_files)

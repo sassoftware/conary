@@ -1,28 +1,12 @@
-#!/bin/sh
+#!/usr/bin/env python2.3
+# -*- python -*-
 #
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
 
-DIR=`echo $0 | sed 's,/[^/]*$,,'`
-if [ -n "$DIR" ]; then
-    PYTHON=""
-else
-    DIR=@srsdir@
-fi
+import srs
+import sys
 
-PYTHONORDER="/usr/lib/srs/python/bin/python2.3 python2.3 python23 python"
-
-for p in $PYTHONORDER; do
-    if type $p > /dev/null 2>&1; then
-	PYTHON=$p
-	break
-    fi
-done
-
-if [ -z "$PYTHON" ]; then
-    echo "ERROR: suitable python not found"
-    exit 1
-fi
-
-$PYTHON $DIR/srs.py $*
+if __name__ == "__main__":
+    sys.exit(srs.main())
