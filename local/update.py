@@ -222,20 +222,20 @@ class FilesystemJob:
 		path = path[len(self.root):]
 		
 		# don't run these twice
-		if self.tagActions.has_key(tagInfo.name):
-		    del self.tagActions[tagInfo.name]
+		if self.tagActions.has_key(tagInfo.tag):
+		    del self.tagActions[tagInfo.tag]
 
 		cmd = [ path, "self", "update" ] + \
-			[x for x in self.repos.iterFilesWithTag(tagInfo.name)]
+			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)]
 		tagCommands.append(cmd)
 
-		tagSet[tagInfo.name] = tagInfo
+		tagSet[tagInfo.tag] = tagInfo
 
 	    del self.tagActions['tagdescription']
 
 	rootLen = len(self.root)
 
-	for (tag, l) in self.tagActions:
+	for (tag, l) in self.tagActions.iteritems():
 	    tagInfo = tagSet.get(tag, None)
 	    if tagInfo is None: continue
 
