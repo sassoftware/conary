@@ -884,7 +884,7 @@ class FilesystemJob:
 		self._remove(fileObj, root + path, "removing %s")
 
 def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
-                  withFileContents=True):
+                  withFileContents=True, forceSha1=False):
     """
     Populates a change set against the files in the filesystem and builds
     a package object which describes the files installed.  The return
@@ -907,6 +907,10 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
     @type root: str
     @param flags: (IGNOREUGIDS|MISSINGFILESOKAY) or zero
     @type flags: int
+    @param forceSha1: disallows the use of inode information to avoid
+                      checking the sha1 of the file if the inode information 
+                      matches exactly.
+    @type forceSha1: bool
     """
 
     noIds = ((flags & IGNOREUGIDS) != 0)
@@ -965,8 +969,13 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 
 	srcFile = repos.getFileVersion(pathId, srcFileId, srcFileVersion)
 
+        if forceSha1:
+            possibleMatch = None
+        else:
+            possibleMatch = srcFile
+
 	f = files.FileFromFilesystem(realPath, pathId,
-				     possibleMatch = srcFile)
+				     possibleMatch = possibleMatch)
 
 	if isSrcPkg:
 	    f.flags.isSource(set = True)
@@ -1051,7 +1060,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 
     return (foundDifference, newPkg)
 
-def buildLocalChanges(repos, pkgList, root = "", withFileContents=True):
+def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
+                                                      forceSha1 = False):
     """
     Builds a change set against a set of files currently installed and
     builds a package object which describes the files installed.  The
@@ -1067,13 +1077,18 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True):
     @param root: root directory the files are in (ignored for sources, which
     are assumed to be in the current directory)
     @type root: str
+    @param forceSha1: disallows the use of inode information to avoid
+                      checking the sha1 of the file if the inode information 
+                      matches exactly.
+    @type forceSha1: bool
     """
 
     changeSet = changeset.ChangeSet()
     returnList = []
     for (curPkg, srcPkg, newVersion, flags) in pkgList:
 	result = _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, 
-			       root, flags, withFileContents=withFileContents)
+			       root, flags, withFileContents=withFileContents,
+                               forceSha1=forceSha1)
         if result is None:
             # an error occurred
             return None

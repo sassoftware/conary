@@ -63,7 +63,7 @@ def verifyTrove(trove, db, cfg):
         list.append((pkg, origPkg, ver, 0))
 	    
     result = update.buildLocalChanges(db, list, root = cfg.root, 
-                                                withFileContents=False)
+                                      withFileContents=False, forceSha1=True)
     if not result: return
     cs = result[0]
 
