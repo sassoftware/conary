@@ -729,7 +729,7 @@ def matchFileOnDirPath(curpath, pathdir):
     pathdirs = pathdir.split('/')[1:]
     lp = len(pathdirs)
     # Cut off matching file elements from the ends of the two paths
-    for x in range(1, min(len(filedirs, pathdirs))):
+    for x in range(1, min(len(filedirs), len(pathdirs))):
         # XXX this will not work if you have 
         # /usr/foo/foo/filename.py
         if filedirs[-1] == pathdirs[-x]:
