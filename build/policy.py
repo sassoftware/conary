@@ -23,7 +23,8 @@ class Policy(util.Action):
     def __init__(self, *args, **keywords):
 	"""
 	@param exceptions: Optional argument; regexp(s) specifying
-	files to ignore while taking the policy action.
+	files to ignore while taking the policy action.  It will be
+	interpolated against recipe macros before being used.
 	@type exceptions: None, regular expression string, or
 	tuple/list of regular expressions
 	@param use: Optional argument; Use flag(s) telling whether
@@ -38,15 +39,6 @@ class Policy(util.Action):
 	    'exceptions': None
 	}
 	util.Action.__init__(self, *args, **keywords)
-	# change self.use to be a simple flag
-	self.use = util.checkUse(self.use)
-	# compile the exceptions
-	self.exceptionREs = []
-	if self.exceptions:
-	    if isinstance(self.exceptions, (tuple, list)):
-		self.exceptions = (self.exceptions,)
-	    for exception in self.exceptions:
-		self.exceptionREs.append(re.compile(exception))
 
     def doProcess(self, recipe):
 	"""
@@ -59,7 +51,19 @@ class Policy(util.Action):
 	"""
 	self.recipe = recipe
 	self.macros = recipe.macros
-	print locals()
+
+	# change self.use to be a simple flag
+	self.use = util.checkUse(self.use)
+
+	# compile the exceptions
+	self.exceptionREs = []
+	if self.exceptions:
+	    if not isinstance(self.exceptions, (tuple, list)):
+		self.exceptions = (self.exceptions,)
+	    for exception in self.exceptions:
+		self.exceptionREs.append(re.compile(exception %self.macros))
+
+	# dispatch if/as appropriate
 	if self.use:
 	    if self.__class__.__dict__.has_key('do'):
 		self.do()
@@ -72,6 +76,7 @@ class Policy(util.Action):
 def _policyException(policyObj, filespec):
     for re in policyObj.exceptionREs:
 	if re.search(filespec):
+	    print filespec
 	    return True
     return False
     
@@ -128,10 +133,11 @@ class NormalizeInfoPages(Policy):
     compress info files and remove dir file (unless is exception)
     """
     def do(self):
-	dir = self.macros['destdir']+self.macros['infodir']+'/dir'
-	if os.path.exists(dir):
+	dir = self.macros['infodir']+'/dir'
+	fsdir = self.macros['destdir']+dir
+	if os.path.exists(fsdir):
 	    if not _policyException(self, dir):
-		util.remove(dir)
+		util.remove(fsdir)
 	# XXX finish the job!
 
 class RemoveTimeStamps(Policy):

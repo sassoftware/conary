@@ -433,12 +433,24 @@ class Recipe:
     def __getattr__(self, name):
 	"""
 	Allows us to dynamically suck in namespace of other modules
-	with modifications.  For now, we make the public namespace
-	of the build module accessible, and put build objects on
-	the build list automatically.
+	with modifications.
+	 - The public namespace of the build module is accessible,
+	   and build objects are created and put on the build list
+	   automatically when they are referenced.
+	 - The public namespace of the policy module is accessible;
+	   build objects that are already on the process list are returned,
+	   build objects that are not on the process list are added to
+	   it like build objects are added to the build list.
 	"""
-        if not name.startswith('_') and build.__dict__.has_key(name):
-            return _recipeHelper(self.build, build.__dict__[name])
+        if not name.startswith('_'):
+	    if build.__dict__.has_key(name):
+		return _recipeHelper(self.build, build.__dict__[name])
+	    if policy.__dict__.has_key(name):
+		policyClass = policy.__dict__[name]
+		for policyObj in self.process:
+		    if isinstance(policyObj, policyClass):
+			return policyObj
+		return _recipeHelper(self.policy, policyClass)
         return self.__dict__[name]
     
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
