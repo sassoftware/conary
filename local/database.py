@@ -151,7 +151,7 @@ class Database(repository.LocalRepository):
 
 	localChanges = self.createChangeSet(list)
 
-	job = DatabaseChangeSetJob(self, cs)
+	job = DatabaseChangeSetJob(self, cs, localChanges)
 	undo = DatabaseChangeSetUndo(self)
 
 	if makeRollback:
@@ -334,7 +334,7 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	if not self.containsFilePath(path):
 	    self.addStaleFile(path, fileObj)
 
-    def __init__(self, repos, cs):
+    def __init__(self, repos, cs, localCs):
 	repository.ChangeSetJob.__init__(self, repos, cs)
 
 	# list of packages which need to be removed
@@ -342,14 +342,17 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	self.oldFiles = []
 	self.staleFiles = []
 
-	# Make local branches for each package and let them get committed 
-	# with the rest of this change set; note that the local branch
-	# of the package uses the local branch of the files
+	# Make sure each package has a local branch; some may have been
+	# created in localCs, and we'd prefer to use that one. Each
+	# local branch uses exclusively local files; the magic in
+	# Database.getFileVersion() makes that work out fine
 	#
 	# iterate over a copy of this list as the real list keeps
-	# growing through the loop
+	# growing throughout the loop
 	list = self.newPackageList()[:]
 	for newPkg in list:
+	    if localCs.hasNewPackage(newPkg.getName()):
+		branchPkg = localCs.getNewPackage(newPkg.getName())
 	    branchPkg = newPkg.copy()
 	    ver = branchPkg.getVersion().fork(versions.LocalBranch(), 
 					      sameVerRel = 1)
