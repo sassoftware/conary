@@ -44,18 +44,14 @@ class Action:
     def __init__(self, *args, **keywords):
         assert(self.__class__ is not Action)
         # initialize initialize our keywords to the defaults
+	# keywords will be set in subclass init before calling down
 	if not self.__dict__.has_key('commonkeywords'):
 	    self.commonkeywords = {}
 	self.__dict__.update(self.commonkeywords)
-	# unfortunately, self.__dict__ isn't populated with
-	# class data until AFTER __init__ is called, so I
-	# can't use self.__dict__.has_key('keywords')
-	# like I can for commonkeywords which is set in
-	# __init__ of a subclass
-	try:
-	    self.__dict__.update(self.keywords)
-	except:
-	    pass
+	# keywords will be in the class object, not the instance
+	if not self.__class__.__dict__.has_key('keywords'):
+	    self.keywords = {}
+	self.__dict__.update(self.keywords)
         # check to make sure that we don't get a keyword we don't expect
         for key in keywords.keys():
             if key not in self.keywords.keys() and \
@@ -119,7 +115,7 @@ def _searchVisit(arg, dirname, names):
     file = arg[0]
     path = arg[1]
     testname = '%s/%s' %(dirname, file)
-    if os.path.exists(testname):
+    if file in names:
 	path[0] = testname
 	del names
 
