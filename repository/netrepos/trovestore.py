@@ -173,7 +173,7 @@ class TroveStore:
         try:
             return versions.VersionFromString(cu.next()[0])
         except StopIteration:
-            raise KeyError, troveName, branch
+            raise KeyError, (troveName, branch)
 
     def iterTroveLeafsByLabel(self, troveName, labelStr):
 	cu = self.db.cursor()
