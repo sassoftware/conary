@@ -351,9 +351,12 @@ class File(streams.StreamSet):
 class SymbolicLink(File):
 
     lsTag = "l"
-    streamDict = { FILE_STREAM_TARGET : (streams.StringStream, "target") }
+    streamDict = {
+        FILE_STREAM_TARGET : (streams.StringStream, "target"),
+        FILE_STREAM_REQUIRES : (streams.DependenciesStream, 'requires'  ),
+    }
     streamDict.update(File.streamDict)
-    __slots__ = "target"
+    __slots__ = [ "target", "requires" ]
 
     def sizeString(self):
 	return "%8d" % len(self.target.value())
@@ -501,13 +504,13 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False):
         owner = pwd.getpwuid(s.st_uid)[0]
     except KeyError, msg:
 	raise FilesError(
-	    "Error mapping uid %d to user name: %s" %(s.st_uid, msg))
+	    "Error mapping uid %d to user name for file %s: %s" %(s.st_uid, path, msg))
 
     try:
         group = grp.getgrgid(s.st_gid)[0]
     except KeyError, msg:
 	raise FilesError(
-	    "Error mapping gid %d to group name: %s" %(s.st_gid, msg))
+	    "Error mapping gid %d to group name for file %s: %s" %(s.st_gid, path, msg))
 
     needsSha1 = 0
     inode = InodeStream(s.st_mode & 07777, s.st_mtime, owner, group)

@@ -1188,7 +1188,8 @@ class Requires(_addInfo):
 	    return
 	pkg = pkgMap[path]
 	f = pkg.getFile(path)
-        if not (f.hasContents and isinstance(f, files.RegularFile)):
+        if not (f.hasContents and isinstance(f, files.RegularFile)) and \
+           not isinstance(f, files.SymbolicLink):
             return
 
         # now go through explicit requirements
