@@ -53,10 +53,10 @@ class Package:
 	return self.idMap[fileId]
 
     def formatString(self):
-	str = ""
+	rc = ""
 	for (fileId, path, version) in self.files.values():
-	    str = str + ("%s %s %s\n" % (fileId, path, version.asString()))
-	return str
+	    rc += ("%s %s %s\n" % (fileId, path, version.asString()))
+	return rc
 
     # returns a dictionary mapping a fileId to a (path, version, pkgName) tuple
     def applyChangeSet(self, pkgCS):

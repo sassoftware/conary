@@ -84,10 +84,10 @@ class VersionedFile:
 		(versions.VersionFromString(versionString), float(versionTime))
 
     def writeMap(self):
-	str = ""
+	rc = ""
 	for (versionString, (version, time)) in self.versionMap.items():
-	    str = str + "%s %.3f\n" % (versionString, time)
-	self.db[_VERSION_MAP % self.key] = str
+	    rc += "%s %.3f\n" % (versionString, time)
+	self.db[_VERSION_MAP % self.key] = rc
 
     def getVersion(self, version):
 	return FalseFile(self.db[_CONTENTS % (self.key, version.asString())])
@@ -115,7 +115,7 @@ class VersionedFile:
 
 	versionStr = version.asString()
 
-	if type(data) != types.StringType:
+	if type(data) is not str:
 	    data = data.read()
 	self.db[_CONTENTS % (self.key, versionStr)] = data
 	self.versionMap[versionStr] = (version, time.time())

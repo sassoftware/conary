@@ -68,9 +68,9 @@ class ChangeSet:
 	return self.files[fileId]
 
     def headerAsString(self):
-	str = ""
+	rc = ""
 	for pkg in self.getPackageList():
-	    str = str + pkg.asString()
+            rc += pkg.asString()
 	
 	for (fileId, (oldVersion, newVersion, csInfo)) in self.getFileList():
 	    if oldVersion:
@@ -78,10 +78,10 @@ class ChangeSet:
 	    else:
 		oldStr = "(none)"
 
-	    str = str + "SRS FILE CHANGESET %s %s %s\n%s\n" % \
+	    rc += "SRS FILE CHANGESET %s %s %s\n%s\n" % \
 			    (fileId, oldStr, newVersion.asString(), csInfo)
 	
-	return str
+	return rc
 
     def writeToFile(self, outFileName):
 	try:

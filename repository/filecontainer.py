@@ -77,13 +77,13 @@ class PersistentFile:
 class FileTableEntry:
 
     def write(self, file):
-	str = struct.pack("!i", len(self.name)) + self.name
-	str = str + struct.pack("!i", self.offset)
-	str = str + struct.pack("!i", self.size)
-	str = str + struct.pack("!i", len(self.data)) + self.data
+	rc = struct.pack("!i", len(self.name)) + self.name
+        rc += struct.pack("!i", self.offset)
+        rc += struct.pack("!i", self.size)
+	rc += struct.pack("!i", len(self.data)) + self.data
 	l = len(str)
-	str = struct.pack("!i", l) + str
-	return file.write(str)
+	rc += struct.pack("!i", l) + rc
+	return file.write(rc)
 
     def __init__(self, name, offset, size, data):
 	self.offset = offset
@@ -170,12 +170,12 @@ class FileContainer:
 
     # only called when self.file refers to an empty file
     def initializeTable(self):
-	str = FILE_CONTAINER_MAGIC
+	rc = FILE_CONTAINER_MAGIC
 
 	# length of the table, in bytes
-	str = str + struct.pack("!ii", 0, 0)
+	rc = rc + struct.pack("!ii", 0, 0)
 
-	self.file.write(str)
+	self.file.write(rc)
 	self.file.flush()
 	self.tableOffset = 4
 
@@ -210,8 +210,8 @@ class FileContainer:
 	    count = count + 1
 	newpos = self.file.tell()
 	size = newpos - pos
-	str = struct.pack("!ii", size, count)
-	self.file.write(str)
+        rc = struct.pack("!ii", size, count)
+	self.file.write(rc)
 	self.file.flush()
 	self.tableOffset = pos
     
