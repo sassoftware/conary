@@ -24,6 +24,8 @@ class UseClass(dict):
     def __init__(self, d):
 	self.freeze = 0
 	self.update(d)
+
+    def _freeze(self):
 	self.freeze = 1
 
     def __setitem__(self, key, value):
@@ -58,6 +60,7 @@ Use = UseClass({
     'nptl':		False,
     'gdbm':		False,
 })
+Use._freeze()
 
 Arch = UseClass({
     'i386':		True,
@@ -72,3 +75,5 @@ Arch = UseClass({
     's390':		False,
     's390x':		False,
 })
+Arch['x86'] = (Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686)
+Arch._freeze()
