@@ -82,9 +82,11 @@ class Flag(dict):
 	    return repr(self._value)
 
     def __eq__(self, other):
-        if isinstance(other, Flag):
-            other = bool(other)
-        return bool(self) == other
+        if not isinstance(other, (Flag, bool)):
+            # if other is not a bool or a flag, don't even try to 
+            # check equivalency
+            return False
+        return bool(self) == bool(other)
 
     def __ne__(self, other):
         return not self.__eq__(other)
