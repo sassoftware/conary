@@ -11,7 +11,8 @@ import types
 import dbhash
 
 _FILE_MAP = "FILEMAP"
-_VERSION_MAP = "MAP-%s"
+_VERSION_MAP = "VMAP-%s"
+_BRANCH_MAP = "BMAP-%s"
 _CONTENTS = "%s %s"
 
 # implements a simple versioned file on top of a FileContainer; the version
@@ -70,7 +71,7 @@ class FalseFile:
 class VersionedFile:
 
     def readVersionMap(self):
-	if self.versionMap: return
+	if self.versionMap != None: return
 
 	self.versionMap = {}
 
@@ -85,42 +86,66 @@ class VersionedFile:
 	    self.versionMap[versionString] = \
 		(versions.VersionFromString(versionString), float(versionTime))
 
-    def writeMap(self):
+    def writeVersionMap(self):
 	rc = ""
 	for (versionString, (version, time)) in self.versionMap.items():
 	    rc += "%s %.3f\n" % (versionString, time)
 	self.db[_VERSION_MAP % self.key] = rc
+
+    # the branch map maps a fully qualified branch version to the latest
+    # version on that branch; it's formatted as [<branch> <version>\n]+
+    def readBranchMap(self):
+	if self.branchMap: return
+
+	self.branchMap = {}
+	if not self.db.has_key(_BRANCH_MAP % self.key): return
+
+	# the last entry has a \n, so splitting at \n creates an empty item
+	# at the end
+	branchList = self.db[_BRANCH_MAP % self.key].split('\n')[:-1]
+	for mapString in branchList:
+	    (branchString, versionString) = mapString.split()
+	    self.branchMap[branchString] = \
+		versions.VersionFromString(versionString)
+
+    def writeBranchMap(self):
+	str = "".join(map(lambda x: "%s %s\n" % 
+					    (x, self.branchMap[x].asString()), 
+			    self.branchMap.keys()))
+	self.db[_BRANCH_MAP % self.key] = str
 
     def getVersion(self, version):
 	return FalseFile(self.db[_CONTENTS % (self.key, version.asString())])
 
     def findLatestVersion(self, branch):
 	matchesByTime = {}
-	self.readVersionMap()
+	self.readBranchMap()
 
-	for (verString, (version, time)) in self.versionMap.items():
-	    if version.onBranch(branch):
-		matchesByTime[time] = version
-	l = matchesByTime.keys()
-	l.sort()
-	if not l:
-	    return None
+	branchStr = branch.asString()
 
-	return matchesByTime[l[-1]]
+	if not self.branchMap.has_key(branchStr): return None
+
+	return self.branchMap[branchStr]
 
     # data can be a string, which is written into the new version, or
     # a file-type object, whose contents are copied into the new version
+    #
+    # the new addition becomes the latest version on the branch
     def addVersion(self, version, data):
 	self.readVersionMap()
+	self.readBranchMap()
 
 	versionStr = version.asString()
+	branchStr = version.branch().asString()
 
 	if type(data) is not str:
 	    data = data.read()
 	self.db[_CONTENTS % (self.key, versionStr)] = data
 	self.versionMap[versionStr] = (version, time.time())
-	self.writeMap()
+	self.branchMap[branchStr] = version
 
+	self.writeVersionMap()
+	self.writeBranchMap()
 	self.db.sync()
 
     def eraseVersion(self, version):
@@ -129,7 +154,7 @@ class VersionedFile:
 	versionStr = version.asString()
 	del self.db[_CONTENTS % (self.key, versionStr)]
 	del self.versionMap[versionStr]
-	self.writeMap()
+	self.writeVersionMap()
 	self.db.sync()
 
     def hasVersion(self, version):
@@ -150,6 +175,7 @@ class VersionedFile:
 	self.db = db
 	self.key = filename
 	self.versionMap = None
+	self.branchMap = None
 
 class Database:
 
