@@ -15,6 +15,10 @@ EXCLUDE, INCLUDE = range(2)
 
 class TagFile(conarycfg.ConfigFile):
 
+    # lists all legal options for "implements"
+    implementsCheck = {'files': ('update', 'preremove', 'remove'),
+		       'self':  ('update', 'preremove')}
+
     def __init__(self, filename, macros = {}):
 	self.defaults = {
 	    'file'		: '',
@@ -29,6 +33,15 @@ class TagFile(conarycfg.ConfigFile):
 	self.filterlist = []
 	conarycfg.ConfigFile.__init__(self)
 	self.read(filename, exception=True)
+	if 'implements' in self.__dict__:
+	    for item in self.__dict__['implements']:
+		key, val = item.split(" ")
+		if key not in self.implementsCheck:
+		    raise conarycfg.ParseError, 'unknown type %s in %s' %(
+			key, item)
+		if val not in self.implementsCheck[key]:
+		    raise conarycfg.ParseError, 'unknown action %s in %s' %(
+			val, item)
 
     def filterCB(self, type, key=None, val=None):
 	if not self.macros:
