@@ -170,7 +170,7 @@ class FilesystemJob:
         elif a[0] < b[0]:
             return -1
         else:
-            return 0
+            return 1
 
     ptrCmp = staticmethod(ptrCmp)
 
