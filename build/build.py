@@ -995,7 +995,7 @@ exit $failed
     def mungeMakefiles(self, dir, command):
 	# special processing on automake test suites
 	makefile = dir + '/Makefile'
-	makeTarget = self.makeTarget
+        makeTarget = self.makeTarget
 
 	#cmd = r"grep ^%s: %s | sed -e 's/^%s://' " % (makeTarget, makefile, makeTarget)
 	#dependencies = util.popen(cmd).read()
@@ -1016,9 +1016,15 @@ exit $failed
 	self.macros.dir = self.dir
 	self.macros.command = self.command
 	self.writeCommandScript()
-	command = self.command
+	command = self.command % macros
 	if command[:4] == 'make':
-	    self.makeTarget = command[5:]
 	    self.mungeMakeCommand()
-	    self.mungeMakefiles(util.normpath(self.macros.builddir + os.sep + self.dir), self.command)
+            potentialTargets  = command[5:].split()
+            targets = []
+            for t in potentialTargets:
+                if t.find('=') == -1:
+                    targets.append(t)
+            for t in targets:
+                self.makeTarget = t
+	        self.mungeMakefiles(util.normpath(self.macros.builddir + os.sep + self.dir), self.command)
 	self.writeTestSuiteScript()
