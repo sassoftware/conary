@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-import database
+from local import database
 import log
 import package
 import sys

@@ -13,7 +13,7 @@ import log
 import os
 import package
 import sys
-import update
+from local import update
 import util
 import versioned
 import versions

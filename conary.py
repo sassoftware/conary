@@ -9,7 +9,7 @@ import branch
 from repository import changeset
 import commit
 import cook
-import database
+from local import database
 import display
 from repository import fsrepos
 import log

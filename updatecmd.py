@@ -3,7 +3,7 @@
 # All rights reserved
 #
 from repository import changeset
-import database
+from local import database
 import helper
 import log
 import os

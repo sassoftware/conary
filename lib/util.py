@@ -10,7 +10,7 @@ import sys
 import traceback
 import pdb
 import exceptions
-import fixedglob
+from build import fixedglob
 import shutil
 import string
 import log

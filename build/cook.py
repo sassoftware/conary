@@ -16,7 +16,7 @@ import files
 from repository import fsrepos
 import helper
 import log
-import lookaside
+from build import lookaside
 import os
 import package
 import repository
