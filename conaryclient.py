@@ -68,9 +68,6 @@ class ConaryClient:
         """
         self._prepareRoot()
 
-        import pdb
-        pdb.set_trace()
-
         changeSetList = []
         finalCs = None
         for item in itemList:
