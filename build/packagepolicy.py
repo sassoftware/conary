@@ -275,9 +275,18 @@ class EtcConfig(policy.Policy):
     """
     Mark all files below /etc as config files
     """
-    invariantsubtrees = [ '%(sysconfdir)s' ]
+    invariantsubtrees = [ '%(sysconfdir)s', '%(taghandlerdir)s']
 
     def doFile(self, file):
+        m = self.recipe.magic[file]
+	if m and m.name == "ELF":
+	    # an ELF file cannot be a config file, some programs put
+	    # ELF files under /etc (X, for example), and tag handlers
+	    # can be ELF or shell scripts; we just want tag handlers
+	    # to be config files if they are shell scripts.
+	    # Just in case it was not intentional, warn...
+	    log.debug('ELF file %s found in config directory', file)
+	    return
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    _markConfig(self.recipe, file, fullpath)
