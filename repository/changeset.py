@@ -72,6 +72,7 @@ class ChangeSet:
 	new = csPkg.getNewVersion()
 	assert(not old or old.timeStamp)
 	assert(new.timeStamp)
+	assert(not self.newPackages.has_key(csPkg.getName()))
 
 	self.newPackages[csPkg.getName()] = csPkg
 
@@ -79,6 +80,9 @@ class ChangeSet:
 	    self.abstract = 1
 	if (old and old.isLocal()) or new.isLocal():
 	    self.local = 1
+
+    def delNewPackage(self, name):
+	del self.newPackages[name]
 
     def oldPackage(self, name, version):
 	assert(version.timeStamp)
