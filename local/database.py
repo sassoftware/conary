@@ -142,7 +142,10 @@ class Database(repository.LocalRepository):
 
 	return cs
 
-    def commitChangeSet(self, cs, makeRollback = 1, sourcePath = "/"):
+    # local changes includes the A->A.local portion of a rollback; if it
+    # doesn't exist we need to compute that and save a rollback for this
+    # transaction
+    def commitChangeSet(self, cs, localRollback = None, sourcePath = "/"):
 	assert(not cs.isAbstract())
 
 	map = ( ( None, sourcePath + "/" ), )
@@ -159,13 +162,14 @@ class Database(repository.LocalRepository):
 		list.append((name, old, new, 0))
 
 	localChanges = self.createChangeSet(list)
-	localChanges.writeToFile("foo")
 
-	#if makeRollback:
+	#if not localRollback:
 	#    # rollbacks have two pieces, B->A and A->A.local; applying
 	#    # both of them gets us back where we started
 	#    inverse = cs.invert(self, availableFiles = 1)
 	#    self.addRollback(inverse, localChanges)
+	#else:
+	#    localChanges = localRollback
 
 	# Build and commit A->B
 	job = repository.ChangeSetJob(self, cs)
@@ -216,11 +220,11 @@ class Database(repository.LocalRepository):
 	else:
 	    self.readRollbackStatus()
 
-    def addRollback(self, dbChangeset, localChangeset):
-	dbFn = self.rollbackCache + ("/r.d.%d" % (self.lastRollback + 1))
-	dbChangeset.writeToFile(dbFn)
+    def addRollback(self, reposChangeset, localChangeset):
+	rpFn = self.rollbackCache + ("/rb.r.%d" % (self.lastRollback + 1))
+	reposChangeset.writeToFile(rpFn)
 
-	localFn = self.rollbackCache + ("/r.l.%d" % (self.lastRollback + 1))
+	localFn = self.rollbackCache + ("/rb.l.%d" % (self.lastRollback + 1))
 	localChangeset.writeToFile(localFn)
 
 	self.lastRollback += 1
@@ -274,8 +278,8 @@ class Database(repository.LocalRepository):
 	num = int(name[2:])
 
 	rc = []
-	for ch in [ "d", "l" ]:
-	    name = self.rollbackCache + "/" + "r.%c.%d" % (ch, num)
+	for ch in [ "r", "l" ]:
+	    name = self.rollbackCache + "/" + "rb.%c.%d" % (ch, num)
 	    rc.append(changeset.ChangeSetFromFile(name,
 						  justContentsForConfig = 1))
 
@@ -293,8 +297,8 @@ class Database(repository.LocalRepository):
 	    last -= 1
 
 	for name in names:
-	    cs = self.getRollback(name)
-	    self.commitChangeSet(cs, makeRollback = 0)
+	    (repostCs, localCs) = self.getRollback(name)
+	    self.commitChangeSet(repostCs, localRollback = localCs)
 	    self.removeRollback(name)
 
     def __init__(self, root, path, mode = "r"):
@@ -376,7 +380,7 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	if not origJob.containsFilePath(path):
 	    self.addStaleFile(path, fileObj)
 
-    def __init__(self, repos, localCs, origJob):
+    def __init__(self, repos, localCs, origJob, retargetLocal = 0):
 	# list of packages which need to be removed
 	self.oldPackages = []
 	self.oldFiles = []
