@@ -316,6 +316,9 @@ def updateSrc(repos, versionStr = None):
 
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { state.getName() : state }, "" )
+    errList = fsJob.getErrorList()
+    if errList:
+	for err in errList: log.error(err)
     fsJob.apply()
     newPkgs = fsJob.getNewPackageList()
     assert(len(newPkgs) == 1)
