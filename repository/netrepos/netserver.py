@@ -45,7 +45,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         try:
             # try and get the method to see if it exists
             method = self.__getattribute__(methodname)
-        except:
+        except AttributeError:
             return (True, ("MethodNotSupported", methodname, ""))
         try:
             # the first argument is a version number
