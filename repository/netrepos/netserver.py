@@ -331,8 +331,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    return True
 
 	for pkgCs in cs.iterNewPackageList():
-	    if not pkgCs.getName().endswith(":source"): continue
-
 	    d = { 'reppath' : self.urlBase,
 	    	  'trove' : pkgCs.getName(),
 		  'version' : pkgCs.getNewVersion().asString() }
