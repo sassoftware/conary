@@ -263,7 +263,15 @@ class InstallSymlink:
     def doInstall(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 	util.mkdirChain(os.path.dirname(dest))
+
 	if self.toFile.endswith('/'):
+	    # only if toFiles ends in / can fromFile be brace-expanded
+	    if type(self.fromFiles) is str:
+		self.fromFiles = (self.fromFiles,)
+	    sources = []
+	    for fromFile in self.fromFiles:
+		sources.extend(util.braceExpand(fromFile %macros))
+	else:
 	    if os.path.exists(dest) or os.path.islink(dest):
 		os.remove(dest)
 
@@ -274,12 +282,9 @@ class InstallSymlink:
 	    os.symlink(self.fromFiles %macros, dest)
 	    return
 
-	for fromFile in self.fromFiles:
-	    # only if toFiles ends in / can fromFile be brace-expanded
-	    sources = braceExpand(fromFile %macros)
-	    for source in sources:
-		print '+ creating symlink from %s to %s' %(dest, source)
-		os.symlink(source, dest+os.path.basename(source))
+	for source in sources:
+	    print '+ creating symlink from %s to %s' %(dest, source)
+	    os.symlink(source, dest+os.path.basename(source))
 
     def __init__(self, fromFiles, toFile):
 	# raise error early
