@@ -47,7 +47,7 @@ def searchCache(cfg, name, location):
 	    if time.time() > 60*60*24*7 + os.path.getmtime(negativeName):
 		os.remove(negativeName)
 		return searchCache(cfg, name, location)
-	    return None
+	    return -1
 
 	# exact match first, then look for cached responses from other servers
 	positiveName = '%s/%s/%s' %(cfg.lookaside, location, name[5:])
@@ -82,9 +82,9 @@ def searchAll(cfg, repCache, name, location, srcdirs):
     if f: return f
 
     f = searchCache(cfg, name, location)
-    if f: return f
+    if f and f != -1: return f
 
-    if name.startswith("http://") or name.startswith("ftp://"):
+    if (name.startswith("http://") or name.startswith("ftp://")) and f != -1:
         log.info('Downloading %s...', name)
         retries = 0
         url = None
