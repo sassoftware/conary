@@ -27,7 +27,7 @@ class UseClass(dict):
 	self.freeze = 1
 
     def __setitem__(self, key, value):
-	if freeze:
+	if self.freeze:
 	    raise TypeError, 'cannot modify immutable dictionary FIXME reference'
 	dict.__setitem__(self, key, value)
 
