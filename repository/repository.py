@@ -16,7 +16,7 @@ class AbstractTroveDatabase:
     def commitChangeSet(self, cs):
 	raise NotImplementedError
 
-    def createBranch(self, newBranch, where, troveName = None):
+    def createBranch(self, newBranch, where, troveList = []):
 	"""
 	Creates a branch for the troves in the repository. This
 	operations is recursive, with any required troves and files
@@ -43,6 +43,7 @@ class AbstractTroveDatabase:
 	troves in the repository should be branched.
 	@type troveName: str
 	"""
+	raise NotImplementedError
 
     def createChangeSet(self, packageList, recurse = True, withFiles = True):
 	"""
