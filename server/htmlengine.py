@@ -13,7 +13,7 @@
 #
 import traceback
 
-from metadata import MDClass
+from lib.metadata import MDClass
 from fmtroves import TroveCategories, LicenseCategories
 
 class HtmlEngine:

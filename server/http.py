@@ -11,11 +11,11 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-import metadata
+from lib import metadata
 import xml.parsers.expat
 
 from htmlengine import HtmlEngine
-from metadata import MDClass
+from lib.metadata import MDClass
 
 class ServerError(Exception):
     def __str__(self):
@@ -30,12 +30,19 @@ class HttpHandler(HtmlEngine):
         self.troveStore = repServer.repos.troveStore
         
         self.commands = {
-                         "metadata":            (self.metadataCmd, "View Metadata"),
-                         "chooseBranch":        (self.chooseBranchCmd, "View Metadata"),
-                         "getMetadata":         (self.getMetadataCmd, "View Metadata"),
-                         "updateMetadata":      (self.updateMetadataCmd, "Metadata Updated"),
+                         "metadata":            (self.metadataCmd, "View Metadata", False),
+                         "chooseBranch":        (self.chooseBranchCmd, "View Metadata", True),
+                         "getMetadata":         (self.getMetadataCmd, "View Metadata", True),
+                         "updateMetadata":      (self.updateMetadataCmd, "Metadata Updated", True),
+                         "test":                (self.test, "Testing", True),
                         }
-        
+
+    def requiresAuth(self, cmd):
+        if cmd in self.commands:
+            return self.commands[cmd][2]
+        else:
+            return True
+
     def handleCmd(self, writeFn, cmd, authToken=None, fields=None):
         """Handle either an HTTP POST or GET command."""
         self.setWriter(writeFn)
@@ -51,6 +58,11 @@ class HttpHandler(HtmlEngine):
         self.htmlHeader(pageTitle)
         handler(authToken, fields)
         self.htmlFooter()
+
+    def test(self, authToken, fields):
+        self.htmlPageTitle("Testing")
+        self.writeFn("<pre>Authentication token: " + str(authToken))
+        self.writeFn("\n\nFields: " + str(fields) + "</pre>")
 
     def metadataCmd(self, authToken, fields):
         troveList = [x for x in self.repServer.repos.iterAllTroveNames() if x.endswith(':source')]
