@@ -178,15 +178,26 @@ class Make(BuildCommand):
     The Make class runs the make utility with CFLAGS and CXXFLAGS set
     to system defaults, with system default for mflags and parallelmflags.
     This means, among other things, that if your package does not build
-    correctly with parallelized make, you should override the
-    parallelmflags macro in your package.
+    correctly with parallelized make, you should disable parallel
+    make by using self.disableParallelMake() in your recipe.
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
                 ' %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
                 'subDir': ''}
-    
+
+class MakeParallelSubdir(Make):
+    """
+    The MakeParallelSubdir class runs the make utility with CFLAGS
+    and CXXFLAGS set to system defaults, with system default for
+    parallelmflags only applied to sub-make processes.
+    """
+    template = ('cd %%(builddir)s/%(subDir)s; '
+	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+                ' %(preMake)s make %%(mflags)s '
+                ' MAKE="make %%(mflags)s %%(parallelmflags)s" %(args)s')
+
 class MakeInstall(Make):
     """
     The MakeInstall class is like the Make class, except that it
