@@ -100,7 +100,7 @@ class BadInterpreterPaths(policy.Policy):
         m = self.recipe.magic[path]
 	if m and m.name == 'script':
             interp = m.contents['interpreter']
-            if interp[0] == '.':
+            if interp[0] != '/':
                 self.recipe.reportErrors(
                     "illegal relative page interpreter %s in %s"
                     %(interp, path))
