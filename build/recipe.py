@@ -381,7 +381,7 @@ class Recipe:
 		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
 			      self.name, self.srcdirs)
 		self.checkSignatures(f, filename)
-		if f.endswith(".bz2"):
+		if f.endswith(".bz2") or f.endswith(".tbz2"):
 		    tarflags = "-jxf"
 		elif f.endswith(".gz") or f.endswith(".tgz"):
 		    tarflags = "-zxf"
@@ -430,6 +430,8 @@ class Recipe:
 		(apply, macros) = args
 		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
 				      self.name, self.srcdirs)
+		if targetdir:
+		    destDir = "/".join((destDir, targetdir))
 		if macros:
 		    log.debug('applying macros to source %s' %f)
 		    pin = file(f)
