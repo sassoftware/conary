@@ -103,8 +103,10 @@ def main(argv):
     cfg = conarycfg.ConaryConfiguration()
     repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
     db = database.Database(cfg.root, cfg.dbPath)
-    dbpkgs = [ x for x in db.iterAllTroveNames() if x.find(':') == -1 ]
-    dbVersions = {}
+    dbTroves = dict.fromkeys(db.iterAllTroveNames())
+    dbpkgs = dict.fromkeys(x for x in dbTroves if x.find(':') == -1)
+    dbComps = [ x for x in dbTroves if x.split(':')[0] not in dbpkgs ]
+    dbpkgs = dbpkgs.keys() + dbComps
     branchPkgs = {}
     for pkg in dbpkgs:
         if pkg in updateExceptions:
