@@ -20,6 +20,7 @@ class Macros(dict):
     def __init__(self, macros={}, shadow=False):
 	self.__tracked = {}
 	self.__track = False
+	self.__overrides = {}
 	if shadow:
 	    self.__macros = macros
 	else:
@@ -45,12 +46,21 @@ class Macros(dict):
         # expand our old value when defining the new value
  	dict.__setitem__(self, name, value % d)
 
+    # overrides allow you to set a macro value at the command line
+    # or in a config file and use it despite the value being 
+    # set subsequently within the recipe
+    
+    def _override(self, key, value):
+	self.__overrides[key] = value
+
     def __setattr__(self, name, value):
 	self.__setitem__(name, value)
 
     def __getitem__(self, name):
 	if name[:7] == '_Macros':
 	    return dict.__getitem__(self, name)
+	if name in self.__overrides:
+	    return self.__overrides[name]
 	if not name in self:
 	    # update on access
 	    # okay for this to fail bc of no __macros

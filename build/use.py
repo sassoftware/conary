@@ -372,10 +372,8 @@ def track(arg):
     LocalFlags.trackUsed(arg)
 
 def overrideFlags(config, pkgname):
-    Use._thaw()
     for key in config.useKeys():
 	Use._override(key, config['Use.' + key])
-
     for key in config.archKeys():
 	flags = key.split('.')
 	lastflag = flags[-1]
@@ -388,5 +386,3 @@ def overrideFlags(config, pkgname):
     prefix = 'Flags.%s.' % pkgname
     for key in config.pkgKeys(pkgname):
 	LocalFlags._override(key, config[prefix + key])
-
-    Use._freeze()

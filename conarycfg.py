@@ -148,6 +148,7 @@ class ConaryConfiguration(ConfigFile):
     pkgflags = {}
     useflags = {}
     archflags = {}
+    macroflags = {}
    
     def __init__(self):
 	ConfigFile.__init__(self)
@@ -165,7 +166,7 @@ class ConaryConfiguration(ConfigFile):
 	if key.find('.') != -1:
 	    directive,arg = key.split('.', 1)
 	    directive = directive.lower()
-	    if directive in ('use', 'flags', 'arch'):
+	    if directive in ('use', 'flags', 'arch', 'macros'):
 		return self.checkFlagKey(directive, arg)
 	return ConfigFile.checkKey(self, key)
 	
@@ -176,9 +177,12 @@ class ConaryConfiguration(ConfigFile):
 	    else:
 		self.useflags[key] = True
 		return ('Use.' + key, BOOL)
+	if directive == 'macros':
+	    self.macroflags[key] = True
+	    return ('macros.' + key, STRING)
 	elif directive == 'arch':
 	    dicts = key.split('.')
-	    key = dicts[-1]
+	    flag = dicts[-1]
 	    dicts = dicts[:-1]
 	    curdict = self.archflags
 	    for subdict in dicts:
@@ -186,10 +190,10 @@ class ConaryConfiguration(ConfigFile):
 		    # flag value, subflags
 		    curdict[subdict] = [ None, {} ]
 		curdict = curdict[subdict][1]
-	    if key in curdict:
-		curdict[key][0] = True
+	    if flag in curdict:
+		curdict[flag][0] = True
 	    else:
-		curdict[key] = [ True, {} ]
+		curdict[flag] = [ True, {} ]
 	    return ('Arch.' + key, BOOL)
 	elif directive == 'flags':
 	    if key.find('.') == -1:
@@ -213,11 +217,14 @@ class ConaryConfiguration(ConfigFile):
     def archKeys(self):
 	return self._archKeys('', self.archflags)
 
+    def pkgKeys(self, pkg):
+	return self.pkgflags.get(pkg, {}).keys()
+
     def useKeys(self):
 	return self.useflags.keys()
 
-    def pkgKeys(self, pkg):
-	return self.pkgflags.get(pkg, {}).keys()
+    def macroKeys(self):
+	return self.macroflags.keys()
 
 class ConaryCfgError(Exception):
 
