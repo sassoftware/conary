@@ -44,12 +44,12 @@ class SourceState(package.Package):
     def changeBranch(self, branch):
 	self.branch = branch
 
-    def getRecipeFileNames(self):
-	list = []
-	for (fileId, (path, version)) in self.iterFileList():
-	    if path.endswith(".recipe"): list.append(os.getcwd() + '/' + path)
-
-	return list
+    def getRecipeFileName(self):
+        # XXX this is not the correct way to solve this problem
+        # assumes a fully qualified trove name
+        fields = self.getName().split(':')
+        name = fields[-2]
+        return os.path.join(os.getcwd(), name + '.recipe')
 
     def expandVersionStr(self, versionStr):
 	if versionStr[0] == "@":
@@ -98,9 +98,13 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     # the actual branch since empty branches yield objects whose versions are
     # on the parent branch.
     name += ":sources"
-    trvList = helper.findPackage(repos, cfg.packagenamespace, 
-				 cfg.installbranch, name, 
-				 versionStr = versionStr)
+    try:
+        trvList = helper.findPackage(repos, cfg.packagenamespace, 
+                                     cfg.installbranch, name, 
+                                     versionStr = versionStr)
+    except helper.PackageNotFound, e:
+        log.error(str(e))
+        return
     if len(trvList) > 1:
 	log.error("branch %s matches more then one version", versionStr)
 	return
@@ -203,26 +207,20 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 
     # load the recipe; we need this to figure out what version we're building
     try:
-	recipeFiles = state.getRecipeFileNames()
-	classes = {}
-	for filename in recipeFiles:
-	    newClasses = recipe.RecipeLoader(filename)
-	    classes.update(newClasses)
-    except recipe.RecipeFileError, msg:
-	raise cook.CookError(str(msg))
-
-    if not classes:
-	log.error("no recipe files were found")
+        loader = recipe.RecipeLoader(state.getRecipeFileName())
+    except recipe.RecipeFileError, e:
+	log.error("unable to load recipe file %s: %s",
+                  state.getRecipeFileName(), str(e))
+        return
+    
+    if not loader:
+	log.error("unable to load a valid recipe class from %s",
+                  state.getRecipeFileName())
 	return
 
-    recipeVersionStr = None
-    for className in classes.iterkeys():
-	if not recipeVersionStr:
-	    recipeVersionStr = classes[className].version
-	elif recipeVersionStr != classes[className].version:
-	    log.error("all recipes must have the same version")
-	    return
-
+    assert(len(loader.values()) == 1)
+    recipeClass = loader.values()[0]
+    recipeVersionStr = recipeClass.version
     troveBranch = state.getBranch()
 
     if not srcVersion:
