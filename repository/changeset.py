@@ -224,7 +224,7 @@ class ChangeSet:
 
 	for hash in idList:
 	    (contType, f) = contents[hash]
-	    csf.addFile(hash, f.get(), tag + contType[4:], f.size())
+	    csf.addFile(hash, f, tag + contType[4:], f.size())
 
     def writeToFile(self, outFileName):
 	try:

@@ -49,6 +49,7 @@ Each file table entry looks like::
 """
 
 import gzip
+import filecontents
 import os
 import string
 import struct
@@ -80,7 +81,10 @@ class FileTableEntry:
 	self.offset = new
 
     def writeContents(self, dest):
-	util.copyfileobj(self.src, dest)
+	if isinstance(self.src, filecontents.FileContents):
+	    util.copyfileobj(self.src.get(), dest)
+	else:
+	    util.copyfileobj(self.src, dest)
 
     def __init__(self, name, offset, size, data, src):
 	self.offset = offset
