@@ -17,7 +17,7 @@ CFLAGS=-Wall -I$(PYINCLUDE) -fPIC
 python_files=	    __init__.py		\
 		    enum.py		\
 		    epdb.py		\
-		    erlcompiler.py	\
+		    erlcompleter.py	\
 		    log.py		\
 		    magic.py		\
                     metadata.py         \
