@@ -1,6 +1,6 @@
 Changes in 0.13.3
   * added ability for a contents log file (makes syncing much easier)
-  * file tags got lost when files were updated (!)
+  * file tags weren't used on updates
   * "description update" tag action replaced with "handler update"
     (which gets called when either the tag description or the tag handler gets
     updated)
