@@ -477,8 +477,17 @@ class Strip(policy.Policy):
 	# for archives as well as elf files
 	if (m.name == "ELF" and m.contents['hasDebug']) or \
 	   (m.name == "ar"):
+            oldmode = None
+            fullpath = self.macros['destdir']+path
+            mode = os.lstat(fullpath)[stat.ST_MODE]
+            if not mode & 0600:
+                # need to be able to read and write the file to strip it
+                oldmode = mode
+		os.chmod(fullpath, mode|0600)
 	    util.execute('%(strip)s -g ' %self.macros +self.macros.destdir+path)
             del self.recipe.magic[path]
+            if oldmode is not None:
+                os.chmod(fullpath, oldmode)
 
 
 class NormalizeCompression(policy.Policy):
