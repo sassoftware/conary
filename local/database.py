@@ -16,8 +16,14 @@ class Database(repository.LocalRepository):
     def rootChangeSet(self, absSet, branch):
 	assert(absSet.isAbstract())
 
-	(pkgList, fileList, fileMap, oldFileList, oldPackageList) = \
-	    self._buildChangeSetJob(absSet)
+	# this has an empty source path template, which is only used to
+	# construct the eraseFiles list anyway
+	(pkgList, fileList, fileMap, oldFileList, oldPackageList, 
+	    eraseList, eraseFiles) = self._buildChangeSetJob("", absSet)
+
+	# abstract change sets cannot have eraseLists
+	assert(not eraseList)
+	assert(not eraseFiles)
 
 	cs = changeset.ChangeSetFromAbstractChangeSet(absSet)
 
@@ -34,8 +40,9 @@ class Database(repository.LocalRepository):
 	    # system. unfortunately we can't represent that yet. 
 	    oldVersion = self.pkgLatestVersion(pkgName, branch)
 	    if not oldVersion:
-		# FIXME
-		return None
+		# new package; the Package.diff() right after this never
+		# sets the abstract flag, so the right thing happens
+		old = None
 	    else:
 		old = self.getPackageVersion(pkgName, oldVersion)
 
@@ -60,10 +67,28 @@ class Database(repository.LocalRepository):
 
 	return cs
 
+    def removeFile(self, file, pathToFile):
+	file.remove(self.root + pathToFile)
+	if isinstance(file, files.RegularFile):
+	    key = file.sha1()
+	    l = self.fileIdMap[key].split("\n")
+	    if len(l) == 1:
+		del self.fileIdMap[key]
+	    else:
+		del l[l.index(pathToFile)]
+		self.fileIdMap[key] = "\n".join(l)
+
+	    if file.isConfig():
+		self.contentsStore.removeFile(file.sha1())
+
     def storeFileFromChangeset(self, chgSet, file, pathToFile, skipContents):
 	file.restore(chgSet, self.root + pathToFile, skipContents)
 	if isinstance(file, files.RegularFile):
-	    self.fileIdMap[file.sha1()] = pathToFile
+	    key = file.sha1()
+	    if self.fileIdMap.has_key(key):
+		self.fileIdMap[key] += pathToFile
+	    else:
+		self.fileIdMap[key] = pathToFile
 
 	    # archive config files; we might want them later
 	    if file.isConfig():
@@ -72,11 +97,13 @@ class Database(repository.LocalRepository):
 		f.close()
 
     def pullFileContents(self, fileId, targetFile):
-	srcFile = open(self.root + self.fileIdMap[fileId], "r")
+	srcFile = self.pullFileContentsObject(fileId)
 	targetFile.write(srcFile.read())
 	srcFile.close()
 
     def pullFileContentsObject(self, fileId):
+	# just pick the first path; we don't care which one we use
+	path = self.fileIdMap[fileId].split('\n')[0]
 	return open(self.root + self.fileIdMap[fileId], "r")
 
     def close(self):
@@ -157,7 +184,7 @@ class Database(repository.LocalRepository):
 	last = self.lastRollback
 	for name in names:
 	    if not self.hasRollback(name):
-		raise KeyError(name)
+		raise RollbackDoesNotExist(name)
 
 	    num = int(name[2:])
 	    if num != last:
@@ -195,4 +222,21 @@ class RollbackOrderError(RollbackError):
 	"""Create new new RollbackOrderError
 	@param rollbackName: string represeting the name of the rollback
 	which was trying to be applied out of order"""
+	self.name = rollbackName
+
+class RollbackDoesNotExist(RollbackError):
+
+    """Raised when the system tries to access a rollback which isn't in
+       the database"""
+
+    def __repr__(self):
+	return "rollback %s does not exist" % self.name
+
+    def __str__(self):
+	return repr(self)
+
+    def __init__(self, rollbackName):
+	"""Create new new RollbackOrderError
+	@param rollbackName: string represeting the name of the rollback
+	which does not exist"""
 	self.name = rollbackName
