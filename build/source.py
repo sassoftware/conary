@@ -376,6 +376,8 @@ class Action(action.RecipeAction):
 	    util.mkdirChain(destDir)
 	util.execute(self.action %self.recipe.macros, destDir)
 
+    def fetch(self): 
+	return None
 
 def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     assert targetfile or directory
