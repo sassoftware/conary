@@ -64,7 +64,7 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
                         (troveName, "\n\t".join(str(depSet).split("\n")))
             return
         elif not cfg.autoResolve and suggMap:
-            print "Additional troves are needed for the install"
+            print "Additional troves are needed:"
             for (req, suggList) in suggMap.iteritems():
                 print "    %s -> %s" % (req, " ".join([x[0] for x in suggList]))
             return
