@@ -132,7 +132,7 @@ def _addShortDoc(baseobj, obj, keys, level=1):
         __doc__ += ' '*(2*level) + '- B{C{%s}}: %s%s.\n'% (key, dflt, desc)
 	newkeys = flag.keys()
 	if newkeys:
-	    newkeys.sort
+	    newkeys.sort()
 	    _addShortDoc(baseobj, flag, newkeys, level=level+1)
 
 def _addLongDoc(baseobj, obj, keys, prefix=''):
@@ -143,7 +143,7 @@ def _addLongDoc(baseobj, obj, keys, prefix=''):
             __doc__ += 'B{C{'+key+'}}: ' + flag._long + '\n\n'
 	newkeys = flag.keys()
 	if newkeys:
-	    newkeys.sort
+	    newkeys.sort()
 	    if prefix:
 		newprefix = '%s.%s' %(prefix, key)
 	    else:
