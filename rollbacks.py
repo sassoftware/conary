@@ -3,7 +3,7 @@ import package
 
 def listRollbacks(db, cfg):
     for rollbackName in db.getRollbackList():
-	print "%s:" % os.path.basename(rollbackName)
+	print "%s:" % rollbackName
 
 	rb = db.getRollback(rollbackName)
 

@@ -333,12 +333,12 @@ class Database(Repository):
 
 	list = []
 	for i in range(first, last + 1):
-	    list.append(self.rollbackCache + "/r.%d" % i)
+	    list.append("r.%d" % i)
 
 	return list
 
     def getRollback(self, file):
-	return changeset.ChangeSetFromFile(file)
+	return changeset.ChangeSetFromFile(self.rollbackCache + "/" + file)
 
     def __init__(self, root, path, mode = "c"):
 	self.root = root
