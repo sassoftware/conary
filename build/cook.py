@@ -155,7 +155,7 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 	ret = cookFilesetObject(repos, cfg, recipeClass, 
                                 newVersion, buildBranch, macros = macros)
     else:
-	assert(0)
+        raise AssertionError
 
     # cook*Object returns None if using prep
     if ret is None:
