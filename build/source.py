@@ -36,6 +36,9 @@ class _Source:
                                     self.recipe.name, self.recipe.srcdirs)
 	    if self.localgpgfile:
 		return
+	if not self.localgpgfile:
+	    log.warning('No GPG signature file found for %s', self.sourcename)
+	    del self.localgpgfile
 
     def _checkSignature(self, filepath):
 	if 'localgpgfile' not in self.__dict__:
