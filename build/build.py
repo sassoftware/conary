@@ -527,7 +527,7 @@ class InstallDocs(_FileAction):
 		self.setComponents(newpath[destlen:])
 
     def __init__(self, *args, **keywords):
-        BuildAction.__init__(self, *args, **keywords)
+        _FileAction.__init__(self, *args, **keywords)
 	if type(args[0]) is tuple:
 	    self.paths = args[0]
 	else:
