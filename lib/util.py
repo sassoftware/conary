@@ -242,3 +242,15 @@ def copytree(sources, dest, symlinks=False):
 	else:
 	    print '+ copying [file] %s to %s' %(source, dest)
 	    shutil.copy2(source, dest)
+
+def checkPath(binary):
+    """
+    Examine $PATH to determine if a binary exists
+
+    @todo: expand ~?
+    """
+    path = os.environ.get('PATH', '')
+    for path in path.split(os.pathsep):
+        if os.access(os.path.join(path, binary), os.X_OK):
+            return True
+    return False

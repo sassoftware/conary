@@ -328,6 +328,8 @@ class Recipe:
     def checkSignatures(self, filepath, file):
         if not self.signatures.has_key(file):
             return
+        if not util.checkPath("gpg"):
+            return
 	for (gpg, signature, keyid) in self.signatures[file]:
 	    # FIXME: our own keyring
 	    if os.system("gpg --no-secmem-warning --verify %s %s"
