@@ -37,7 +37,7 @@ class TroveTroves:
         cu = self.db.cursor()
 	
         cu.execute("SELECT includedId FROM TroveTroves "
-			    "WHERE instanceId=%d", (key,))
+			    "WHERE instanceId=?", (key,))
 		   
 	item = cu.fetchone()	
 	return item != None
@@ -45,13 +45,13 @@ class TroveTroves:
     def __delitem__(self, key):
         cu = self.db.cursor()
 	
-        cu.execute("DELETE from TroveTroves WHERE instanceId=%d", key)
+        cu.execute("DELETE from TroveTroves WHERE instanceId=?", key)
 
     def __getitem__(self, key):
         cu = self.db.cursor()
 	
         cu.execute("SELECT includedId FROM TroveTroves "
-			    "WHERE instanceId=%d", (key,))
+			    "WHERE instanceId=?", (key,))
 
 	for match in cu:
 	    yield match[0]
@@ -60,7 +60,7 @@ class TroveTroves:
         cu = self.db.cursor()
 	
         cu.execute("SELECT instanceId FROM TroveTroves "
-			    "WHERE includedId=%d", (key,))
+			    "WHERE includedId=?", (key,))
 
 	for match in cu:
 	    yield match[0]
@@ -69,10 +69,10 @@ class TroveTroves:
         cu = self.db.cursor()
 	
         cu.execute("SELECT instanceId FROM TroveTroves "
-			    "WHERE includedId=%d", (key,))
+			    "WHERE includedId=?", (key,))
 
 	return cu.fetchone() is not None
 
     def addItem(self, key, val):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO TroveTroves VALUES (%d, %d)", (key, val))
+        cu.execute("INSERT INTO TroveTroves VALUES (?, ?)", (key, val))

@@ -66,7 +66,7 @@ class DBTroveFiles:
     def __getitem__(self, instanceId):
 	cu = self.db.cursor()
 	cu.execute("SELECT path, stream FROM DBTroveFiles "
-		   "WHERE instanceId=%s and isPresent=1", instanceId)
+		   "WHERE instanceId=? and isPresent=1", instanceId)
 	for match in cu:
 	    yield match
 
@@ -75,10 +75,10 @@ class DBTroveFiles:
 
 	if justPresent:
 	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE instanceId=%s and isPresent=1", instanceId)
+		       "WHERE instanceId=? and isPresent=1", instanceId)
 	else:
 	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE instanceId=%s", instanceId)
+		       "WHERE instanceId=?", instanceId)
 
 	for match in cu:
 	    yield match
@@ -86,17 +86,17 @@ class DBTroveFiles:
     def delInstance(self, instanceId):
         cu = self.db.cursor()
 	
-        cu.execute("DELETE from DBTroveFiles WHERE instanceId=%s", instanceId)
+        cu.execute("DELETE from DBTroveFiles WHERE instanceId=?", instanceId)
 
     def hasFileId(self, fileId, versionId, pristine):
 	cu = self.db.cursor()
 	fileId = encodeFileId(fileId)
 	if pristine:
 	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE fileId=%s AND versionId = %d", fileId, versionId)
+		       "WHERE fileId=? AND versionId = ?", fileId, versionId)
 	else:
 	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE fileId=%s AND versionId = %d "
+		       "WHERE fileId=? AND versionId = ? "
 		       "AND isPresent=1", fileId, versionId)
 	return cu.fetchone() != None
 
@@ -105,11 +105,11 @@ class DBTroveFiles:
 	fileId = encodeFileId(fileId)
 	if justPresent:
 	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE fileId=%s AND versionId=%d AND isPresent = 1", 
+		       "WHERE fileId=? AND versionId=? AND isPresent = 1", 
 		       fileId, versionId)
 	else:
 	    cu.execute("SELECT path, stream FROM DBTroveFiles "
-		       "WHERE fileId=%s AND versionId=%d",
+		       "WHERE fileId=? AND versionId=?",
 		       fileId, versionId)
 	# there could be multiple matches, but they should all be redundant
 	try:
@@ -121,36 +121,36 @@ class DBTroveFiles:
 	fileId = encodeFileId(fileId)
         cu = self.db.cursor()
         cu.execute("""
-	    INSERT INTO DBTroveFiles VALUES (NULL, %s, %d, %s, %d, %d, %s)
+	    INSERT INTO DBTroveFiles VALUES (NULL, ?, ?, ?, ?, ?, ?)
 	""",
 	   (fileId, versionId, path, instanceId, 1, sqlite3.encode(stream)))
 
 	streamId = cu.lastrowid
 
 	for tag in tags:
-	    cu.execute("INSERT INTO DBFileTags VALUES (%d, %d)",
+	    cu.execute("INSERT INTO DBFileTags VALUES (?, ?)",
 		       streamId, self.tags[tag])
 
     def updateItem(self, instanceId, fileId, oldVersionId, newVersionId, 
 		   newStream, tags):
 	fileId = encodeFileId(fileId)
         cu = self.db.cursor()
-	cu.execute("UPDATE DBTroveFiles SET versionId=%d, stream=%s "
-		   "WHERE fileId=%s AND versionId=%d AND instanceId=%d",
+	cu.execute("UPDATE DBTroveFiles SET versionId=?, stream=? "
+		   "WHERE fileId=? AND versionId=? AND instanceId=?",
 		   newVersionId, sqlite3.encode(newStream), fileId, 
 		   oldVersionId, instanceId)
 
     def iterPath(self, path):
         cu = self.db.cursor()
 	cu.execute("SELECT instanceId FROM DBTroveFiles WHERE "
-		   "isPresent=1 AND path=%s", path)
+		   "isPresent=1 AND path=?", path)
 	for instanceId in cu:
 	    yield instanceId[0]
 
     def removePath(self, instanceId, path):
         cu = self.db.cursor()
-	cu.execute("UPDATE DBTroveFiles SET isPresent=0 WHERE path=%s "
-		   "AND instanceId=%d", (path, instanceId))
+	cu.execute("UPDATE DBTroveFiles SET isPresent=0 WHERE path=? "
+		   "AND instanceId=?", (path, instanceId))
 
     def removeFileIds(self, instanceId, fileIdList, forReal = False):
 	fileIdListStr = ",".join(["'%s'" % encodeFileId(x) for x in fileIdList])
@@ -177,7 +177,7 @@ class DBTroveFiles:
 		Tags JOIN DBFileTags ON Tags.tagId = DBFileTags.tagId
 		     JOIN DBTroveFiles ON DBFileTags.streamId = 
 						    DBTroveFiles.streamId
-		WHERE tag=%s ORDER BY DBTroveFiles.path
+		WHERE tag=? ORDER BY DBTroveFiles.path
 	""", tag)
 
 	for path, in cu:
@@ -217,14 +217,14 @@ class DBInstanceTable:
     def hasName(self, name):
 	cu = self.db.cursor()
 	cu.execute("SELECT instanceId FROM DBInstances "
-		   "WHERE troveName=%s AND isPresent=1", 
+		   "WHERE troveName=? AND isPresent=1", 
 		   name)
 	return cu.fetchone() != None
 
     def iterByName(self, name):
 	cu = self.db.cursor()
 	cu.execute("SELECT instanceId, versionId, troveName, flavorId FROM "
-		   "DBInstances WHERE troveName=%s AND isPresent=1", name)
+		   "DBInstances WHERE troveName=? AND isPresent=1", name)
  	for match in cu:
 	    yield match
 
@@ -237,8 +237,8 @@ class DBInstanceTable:
 	    isPresent = 0
 
         cu = self.db.cursor()
-        cu.execute("INSERT INTO DBInstances VALUES (NULL, %s, %d, %d, "
-						   "%s, %d)",
+        cu.execute("INSERT INTO DBInstances VALUES (NULL, ?, ?, ?, "
+						   "?, ?)",
                    (troveName, versionId, flavorId, 
 		    ":".join([ "%.3f" % x for x in timeStamps]), isPresent))
 	return cu.lastrowid
@@ -246,7 +246,7 @@ class DBInstanceTable:
     def delId(self, theId):
         assert(type(theId) is int)
         cu = self.db.cursor()
-        cu.execute("DELETE FROM DBInstances WHERE instanceId=%d", theId)
+        cu.execute("DELETE FROM DBInstances WHERE instanceId=?", theId)
 
     def getId(self, theId, justPresent = True):
         cu = self.db.cursor()
@@ -257,7 +257,7 @@ class DBInstanceTable:
 	    pres = ""
 
         cu.execute("SELECT troveName, versionId, flavorId, isPresent "
-		   "FROM DBInstances WHERE instanceId=%%d %s" % pres, theId)
+		   "FROM DBInstances WHERE instanceId=? %s" % pres, theId)
 	try:
 	    return cu.next()
 	except StopIteration:
@@ -266,8 +266,8 @@ class DBInstanceTable:
     def isPresent(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT isPresent FROM DBInstances WHERE "
-			"troveName=%s AND versionId=%d AND "
-			"flavorId=%d", item)
+			"troveName=? AND versionId=? AND "
+			"flavorId=?", item)
 
 	val = cu.fetchone()
 	if not val:
@@ -278,7 +278,7 @@ class DBInstanceTable:
     def idIsPresent(self, instanceId):
         cu = self.db.cursor()
         cu.execute("SELECT isPresent FROM DBInstances WHERE "
-			"instanceId=%d", instanceId)
+			"instanceId=?", instanceId)
 
 	val = cu.fetchone()
 	if not val:
@@ -288,21 +288,21 @@ class DBInstanceTable:
 
     def setPresent(self, theId, val):
         cu = self.db.cursor()
-	cu.execute("UPDATE DBInstances SET isPresent=%%d WHERE instanceId=%d" 
+	cu.execute("UPDATE DBInstances SET isPresent=? WHERE instanceId=%d" 
 			% theId, val)
 
     def has_key(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM DBInstances WHERE "
-			"troveName=%s AND versionId=%d AND "
-			"flavorId=%d", item)
+			"troveName=? AND versionId=? AND "
+			"flavorId=?", item)
 	return not(cu.fetchone() == None)
 
     def __getitem__(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM DBInstances WHERE "
-			"troveName=%s AND versionId=%d AND "
-			"flavorId=%d", item)
+			"troveName=? AND versionId=? AND "
+			"flavorId=?", item)
 	try:
 	    return cu.next()[0]
 	except StopIteration:
@@ -317,8 +317,8 @@ class DBInstanceTable:
 	    pres = ""
 
         cu.execute("SELECT instanceId FROM DBInstances WHERE "
-			"troveName=%%s AND versionId=%%d AND "
-			"flavorId=%%d%s" % pres, item)
+			"troveName=? AND versionId=? AND "
+			"flavorId=? %s" % pres, item)
 	item = cu.fetchone()
 	if not item:
 	    return defValue
@@ -329,7 +329,7 @@ class DBInstanceTable:
         cu.execute("""SELECT version, timeStamps FROM DBInstances
 		      JOIN Versions ON 
 			    DBInstances.versionId = Versions.versionId
-		      WHERE instanceId=%d""", instanceId)
+		      WHERE instanceId=?""", instanceId)
 	try:
 	    (s, t) = cu.next()
 	    v = versions.VersionFromString(s)
@@ -356,7 +356,7 @@ class DBTarget:
 
 	    insSet = deps.arch.current()
 	    for flag in insSet.flags:
-		cu.execute("INSERT INTO DBTarget VALUES (%s,%s)", 
+		cu.execute("INSERT INTO DBTarget VALUES (?,?)", 
 			   insSet.name, flag)
 
 class DBFlavors(idtable.IdTable):
@@ -439,7 +439,7 @@ class Database:
     def iterVersionByName(self, name):
 	cu = self.db.cursor()
 	cu.execute("SELECT version FROM DBInstances NATURAL JOIN Versions "
-		   "WHERE troveName=%s AND isPresent=1", name)
+		   "WHERE troveName=? AND isPresent=1", name)
  	for (match,) in cu:
 	    yield versions.VersionFromString(match)
 
@@ -490,7 +490,7 @@ class Database:
 	    cu.execute("CREATE TEMPORARY TABLE flavorsNeeded(empty INTEGER, "
 							    "flavor STRING)")
 	    for flavor in self.flavorsNeeded.keys():
-		cu.execute("INSERT INTO flavorsNeeded VALUES(%s, %s)", 
+		cu.execute("INSERT INTO flavorsNeeded VALUES(?, ?)", 
 			   None, flavor.freeze())
 	    cu.execute("""INSERT INTO DBFlavors 
 			  SELECT flavorsNeeded.empty, flavorsNeeded.flavor
@@ -567,8 +567,8 @@ class Database:
 	else:
 	    pass
 	    cu.execute("""
-		UPDATE DBTroveFiles SET instanceId=%s WHERE
-		    fileId=%s and versionId=%d""", troveInstanceId,
+		UPDATE DBTroveFiles SET instanceId=? WHERE
+		    fileId=? and versionId=?""", troveInstanceId,
 		encodeFileId(fileId), versionId)
 
     def getFile(self, fileId, fileVersion, pristine = False):
@@ -592,7 +592,7 @@ class Database:
 		vs = version.asString()
 		versionStrs[version] = vs
 
-	    cu.execute("INSERT INTO getFilesTbl VALUES (%s, %s)", 
+	    cu.execute("INSERT INTO getFilesTbl VALUES (?, ?)", 
 		       encodeFileId(fileId), vs,
 		       start_transaction = False)
 	del versionStrs
@@ -657,7 +657,7 @@ class Database:
 		TroveTroves JOIN DBInstances JOIN DBFlavors ON 
 		    TroveTroves.includedId = DBInstances.instanceId AND
 		    DBFlavors.flavorId = DBInstances.flavorId 
-		WHERE TroveTroves.instanceId = %d
+		WHERE TroveTroves.instanceId = ?
 	""", troveInstanceId)
 
 	versionCache = {}
@@ -677,7 +677,7 @@ class Database:
 
 	cu = self.db.cursor()
 	cu.execute("SELECT fileId, path, versionId, isPresent FROM "
-		   "DBTroveFiles WHERE instanceId = %d", troveInstanceId)
+		   "DBTroveFiles WHERE instanceId = ?", troveInstanceId)
 	for (fileId, path, versionId, isPresent) in cu:
 	    if not pristine and not isPresent:
 		continue
@@ -783,11 +783,11 @@ class Database:
 
 	if pristine:
 	    cu.execute("SELECT fileId, path, versionId, stream FROM "
-		       "DBTroveFiles WHERE instanceId = %%d "
+		       "DBTroveFiles WHERE instanceId = ? "
 		       "%s" % sort, troveInstanceId)
 	else:
 	    cu.execute("SELECT fileId, path, versionId, stream FROM "
-		       "DBTroveFiles WHERE instanceId = %%d "
+		       "DBTroveFiles WHERE instanceId = ? "
 		       "AND isPresent=1 %s" % sort, troveInstanceId)
 
 	versionCache = {}

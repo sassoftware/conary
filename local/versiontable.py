@@ -29,19 +29,19 @@ class VersionTable:
         if 'Versions' not in tables:
             cu.execute("CREATE TABLE Versions(versionId INTEGER PRIMARY KEY,"
 		       "version STR UNIQUE)")
-	    cu.execute("INSERT INTO Versions VALUES (%d, NULL)", 
+	    cu.execute("INSERT INTO Versions VALUES (?, NULL)", 
 			self.noVersion)
 
     def addId(self, version):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Versions VALUES (NULL, %s)",
+        cu.execute("INSERT INTO Versions VALUES (NULL, ?)",
 		   version.asString())
 	return cu.lastrowid
 
     def delId(self, theId):
         assert(type(theId) is int)
         cu = self.db.cursor()
-        cu.execute("DELETE FROM Versions WHERE versionId=%d", theId)
+        cu.execute("DELETE FROM Versions WHERE versionId=?", theId)
 
     def _makeVersion(self, str, timeStamps):
 	v = versions.VersionFromString(str)
@@ -54,7 +54,7 @@ class VersionTable:
 	"""
         cu = self.db.cursor()
         cu.execute("""SELECT version FROM Versions
-		      WHERE Versions.versionId=%d""", theId)
+		      WHERE Versions.versionId=?""", theId)
 	try:
 	    (s, ) = cu.next()
 	    return versions.VersionFromString(s)
@@ -63,13 +63,13 @@ class VersionTable:
 
     def has_key(self, version):
         cu = self.db.cursor()
-        cu.execute("SELECT versionId FROM Versions WHERE version=%s",
+        cu.execute("SELECT versionId FROM Versions WHERE version=?",
                    version.asString())
 	return not(cu.fetchone() == None)
 
     def __delitem__(self, version):
         cu = self.db.cursor()
-        cu.execute("DELETE FROM Versions WHERE version=%s", version.asString())
+        cu.execute("DELETE FROM Versions WHERE version=?", version.asString())
 
     def __getitem__(self, version):
 	v = self.get(version, None)
@@ -80,7 +80,7 @@ class VersionTable:
 
     def get(self, version, defValue):
         cu = self.db.cursor()
-        cu.execute("SELECT versionId FROM Versions WHERE version=%s", 
+        cu.execute("SELECT versionId FROM Versions WHERE version=?", 
 		   version.asString())
 
 	item = cu.fetchone()

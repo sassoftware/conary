@@ -82,12 +82,6 @@ class RegularFileStream(streams.TupleStream):
     def setSha1(self, value):
         return self.items[1].set(value)
 
-class OldRegularFileStream(streams.TupleStream):
-
-    __slots__ = []
-    makeup = (("size", streams.LongLongStream, 8), 
-	      ("sha1", streams.StringStream, 40))
-    
 class InodeStream(streams.TupleStream):
 
     __slots__ = []

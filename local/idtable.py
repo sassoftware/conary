@@ -35,19 +35,19 @@ class IdTable:
     
     def addId(self, item):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO %s VALUES (NULL, %%s)"
+        cu.execute("INSERT INTO %s VALUES (NULL, ?)"
                    %(self.tableName, ), (item,))
 	return cu.lastrowid
 
     def delId(self, theId):
         assert(type(theId) is int)
         cu = self.db.cursor()
-        cu.execute("DELETE FROM %s WHERE %s=%%d"
+        cu.execute("DELETE FROM %s WHERE %s=?"
                    %(self.tableName, self.keyName), (theId,))
 
     def getId(self, theId):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=%%d"
+        cu.execute("SELECT %s FROM %s WHERE %s=?"
                    %(self.strName, self.tableName, self.keyName), (theId,))
 	try:
 	    return cu.next()[0]
@@ -56,19 +56,19 @@ class IdTable:
 
     def has_key(self, item):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=%%s"
+        cu.execute("SELECT %s FROM %s WHERE %s=?"
                    %(self.keyName, self.tableName, self.strName), (item,))
 	return not(cu.fetchone() == None)
 
     def __delitem__(self, item):
         assert(type(item) is str)
         cu = self.db.cursor()
-        cu.execute("DELETE FROM %s WHERE %s=%%s"
+        cu.execute("DELETE FROM %s WHERE %s=?"
                    %(self.tableName, self.strName), item)
 
     def __getitem__(self, item):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=%%s"
+        cu.execute("SELECT %s FROM %s WHERE %s=?"
                    %(self.keyName, self.tableName, self.strName), (item,))
 	try:
 	    return cu.next()[0]
@@ -77,7 +77,7 @@ class IdTable:
 
     def get(self, item, defValue):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=%%s"
+        cu.execute("SELECT %s FROM %s WHERE %s=?"
                    %(self.keyName, self.tableName, self.strName), (item,))
 	item = cu.fetchone()
 	if not item:
@@ -189,7 +189,7 @@ class IdPairMapping:
 	(first, second) = key
 
         cu = self.db.cursor()
-        cu.execute("INSERT INTO %s VALUES (%%d, %%d, %%d)"
+        cu.execute("INSERT INTO %s VALUES (?, ?, ?)"
 		   % (self.tableName),
                    (first, second, val))
 
@@ -198,7 +198,7 @@ class IdPairMapping:
 
         cu = self.db.cursor()
 	
-        cu.execute("SELECT %s FROM %s WHERE %s=%%d AND %s=%%d"
+        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
                    % (self.item, self.tableName, self.tup1, self.tup2),
 		   (first, second))
 	try:
@@ -211,7 +211,7 @@ class IdPairMapping:
 
         cu = self.db.cursor()
 	
-        cu.execute("SELECT %s FROM %s WHERE %s=%%d AND %s=%%d"
+        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
                    % (self.item, self.tableName, self.tup1, self.tup2),
 		   (first, second))
 	item = cu.fetchone()	
@@ -224,7 +224,7 @@ class IdPairMapping:
 
         cu = self.db.cursor()
 	
-        cu.execute("SELECT %s FROM %s WHERE %s=%%d AND %s=%%d"
+        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
                    % (self.item, self.tableName, self.tup1, self.tup2),
 		   (first, second))
 	item = cu.fetchone()	
@@ -232,7 +232,7 @@ class IdPairMapping:
 
     def tup2InTable(self, val):
         cu = self.db.cursor()
-        cu.execute("SELECT %s FROM %s WHERE %s=%%d"
+        cu.execute("SELECT %s FROM %s WHERE %s=?"
                    % (self.item, self.tableName, self.tup2),
 		   (val))
 	item = cu.fetchone()	
@@ -243,7 +243,7 @@ class IdPairMapping:
 
         cu = self.db.cursor()
 	
-        cu.execute("DELETE FROM %s WHERE %s=%%d AND %s=%%d"
+        cu.execute("DELETE FROM %s WHERE %s=? AND %s=?"
                    % (self.tableName, self.tup1, self.tup2),
 		   (first, second))
 
@@ -267,14 +267,14 @@ class IdMapping:
 
     def __setitem__(self, key, val):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO %s VALUES (%%d, %%d)"
+        cu.execute("INSERT INTO %s VALUES (?, ?)"
 		   % (self.tableName),
                    (key, val))
 
     def __getitem__(self, key):
         cu = self.db.cursor()
 	
-        cu.execute("SELECT %s FROM %s WHERE %s=%%s"
+        cu.execute("SELECT %s FROM %s WHERE %s=?"
                    % (self.item, self.tableName, self.key),
 		   key)
 	try:
@@ -285,7 +285,7 @@ class IdMapping:
     def get(self, key, defValue):
         cu = self.db.cursor()
 	
-        cu.execute("SELECT %s FROM %s WHERE %s=%%s"
+        cu.execute("SELECT %s FROM %s WHERE %s=?"
                    % (self.item, self.tableName, self.key),
 		   key)
 	item = cu.fetchone()	
@@ -296,7 +296,7 @@ class IdMapping:
     def has_key(self, key):
         cu = self.db.cursor()
 	
-        cu.execute("SELECT %s FROM %s WHERE %s=%%s"
+        cu.execute("SELECT %s FROM %s WHERE %s=?"
                    % (self.item, self.tableName, self.key),
 		   key)
 	item = cu.fetchone()	
@@ -305,7 +305,7 @@ class IdMapping:
     def __delitem__(self, key):
         cu = self.db.cursor()
 	
-        cu.execute("DELETE FROM %s WHERE %s=%%s"
+        cu.execute("DELETE FROM %s WHERE %s=?"
                    % (self.tableName, self.key),
 		   key)
 
@@ -326,7 +326,7 @@ class IdPairSet(IdPairMapping):
 
         cu = self.db.cursor()
 	
-        cu.execute("SELECT %s FROM %s WHERE %s=%%s AND %s=%%s"
+        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
                    % (self.item, self.tableName, self.tup1, self.tup2),
 		   (first, second))
 
@@ -338,7 +338,7 @@ class IdPairSet(IdPairMapping):
     def getByFirst(self, first):
         cu = self.db.cursor()
 	
-        cu.execute("SELECT %s FROM %s WHERE %s=%%s"
+        cu.execute("SELECT %s FROM %s WHERE %s=?"
                    % (self.item, self.tableName, self.tup1),
 		   first)
 
@@ -358,6 +358,6 @@ class IdPairSet(IdPairMapping):
 
         cu = self.db.cursor()
 	
-        cu.execute("DELETE FROM %s WHERE %s=%%s AND %s=%%s AND %s=%%s"
+        cu.execute("DELETE FROM %s WHERE %s=? AND %s=? AND %s=?"
                    % (self.tableName, self.tup1, self.tup2, self.item),
 		   (first, second, val))
