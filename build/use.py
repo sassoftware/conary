@@ -111,57 +111,55 @@ __doc__ += """
 The Use flags have the following meanings:
 """
 Use = UseClass()
-Use.addFlag('pcre', True)
+Use.pcre = True
 Use.pcre.setLongDoc('Use the Perl-compatible regex library')
 Use.pcre.setLongDoc('This is a long description.  It has a lot of words, '
                     'background, etc.  blah blah blah')
-Use.addFlag('gcj', True)
+Use.gcj = True
 Use.gcj.setShortDoc('Include gcj (Java) support in gcc; use gcj to enable Java')
-Use.addFlag('gnat', False)
-Use.addFlag('selinux', False)
-Use.addFlag('pam', True)
-Use.addFlag('dietlibc', False)
-Use.addFlag('bootstrap', False)
-Use.addFlag('python', True)
-Use.addFlag('perl', True)
-Use.addFlag('readline', True)
-Use.addFlag('gdbm', True)
+Use.gnat = False
+Use.selinux = False
+Use.pam = True
+Use.dietlibc = False
+Use.bootstrap = False
+Use.python = True
+Use.perl = True
+Use.readline = True
+Use.gdbm = True
 # flags to use for special situations
-Use.addFlag('builddocs', True)	# embedded targets should have False
+Use.builddocs = True	# embedded targets should have False
 # temporarily disabled until we build appropriate packages
-Use.addFlag('tcl', False)
-Use.addFlag('tk', False)
-Use.addFlag('X', False)
-Use.addFlag('gtk', False)
-Use.addFlag('gnome', False)
-Use.addFlag('kde', False)
-Use.addFlag('ssl', False)
-Use.addFlag('slang', False)
-Use.addFlag('netpbm', False)
-Use.addFlag('nptl', False)
+Use.tcl = False
+Use.tk = False
+Use.X = False
+Use.gtk = False
+Use.gnome = False
+Use.kde = False
+Use.ssl = False
+Use.slang = False
+Use.netpbm = False
+Use.nptl = False
 Use._freeze()
-
 _addDocs(Use)
-
-Arch = UseClass()
-Arch.addFlag('i386', True)
-Arch.addFlag('i486', True)
-Arch.addFlag('i586', True)
-Arch.addFlag('i686', True)
-Arch.addFlag('x86_64', False)
-Arch.addFlag('sparc', False)
-Arch.addFlag('sparc64', False)
-Arch.addFlag('ppc64', False)
-Arch.addFlag('ia64', False)
-Arch.addFlag('s390', False)
-Arch.addFlag('s390x', False)
-Arch.addFlag('x86', Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686)
-Arch._freeze()
 
 __doc__ += """
 @type Arch: UseClass
 @var Arch: Set of architectures defined for this build, with their boolean status
 The Arch flags have the following meanings:
 """
+Arch = UseClass()
+Arch.i386 = True
+Arch.i486 = True
+Arch.i586 = True
+Arch.i686 = True
+Arch.x86_64 = False
+Arch.sparc = False
+Arch.sparc64 = False
+Arch.ppc64 = False
+Arch.ia64 = False
+Arch.s390 = False
+Arch.s390x = False
+Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686
+Arch._freeze()
 _addDocs(Arch)
 
