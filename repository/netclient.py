@@ -300,37 +300,45 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			  absolute))
 
         cs = None
+        mergedChangeSets = False
         if len(jobList) > 1:
             origTarget = target
+            mergedChangeSets = True
             target = None
 
         for serverName, job in jobList.iteritems():
-            url = self.c[serverName].getChangeSet(job, recurse, withFiles)
+            urlList = self.c[serverName].getChangeSet(job, recurse, withFiles)
 
-            inF = urllib.urlopen(url)
-            if not target:
-                (outFd, name) = tempfile.mkstemp()
-                outF = os.fdopen(outFd, "w")
-            else:
-                outF = open(target, "w")
+            if len(urlList) > 1 and target:
+                origTarget = target
+                target = None
+                mergedChangeSets = True
 
-            try:
-                util.copyfileobj(inF, outF)
-                outF.close()
+            for url in urlList:
+                inF = urllib.urlopen(url)
                 if not target:
-                    newCs = repository.changeset.ChangeSetFromFile(name)
-                    if not cs:
-                        cs = newCs
-                    else:
-                        cs.merge(newCs)
+                    (outFd, name) = tempfile.mkstemp()
+                    outF = os.fdopen(outFd, "w")
                 else:
-                    cs = None
-            finally:
-                inF.close()
-                if not target:
-                    os.unlink(name)
+                    outF = open(target, "w")
 
-        if len(jobList) > 1 and origTarget:
+                try:
+                    util.copyfileobj(inF, outF)
+                    outF.close()
+                    if not target:
+                        newCs = repository.changeset.ChangeSetFromFile(name)
+                        if not cs:
+                            cs = newCs
+                        else:
+                            cs.merge(newCs)
+                    else:
+                        cs = None
+                finally:
+                    inF.close()
+                    if not target:
+                        os.unlink(name)
+
+        if mergedChangeSets:
             cs.writeToFile(origTarget)
             cs = None
 
