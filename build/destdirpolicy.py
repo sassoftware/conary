@@ -753,6 +753,8 @@ class NormalizeInterpreterPaths(policy.Policy):
     user's C{PATH}:
     C{r.NormalizeInterpreterPaths(exceptions=I{filterexp})}
     """
+    invariantexceptions = [ '%(thisdocdir)s/', ]
+
     def doFile(self, path):
 	d = self.macros['destdir']
 	mode = os.lstat(util.joinPaths(d, path))[stat.ST_MODE]

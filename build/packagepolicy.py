@@ -94,8 +94,10 @@ class FilesInMandir(policy.Policy):
 class BadInterpreterPaths(policy.Policy):
     """
     Interpreters must not use relative paths.  There should be no
-    exceptions.
+    exceptions outside of %(thisdocdir)s.
     """
+    invariantexceptions = [ '%(thisdocdir)s/', ]
+
     def doFile(self, path):
 	d = self.macros['destdir']
 	mode = os.lstat(util.joinPaths(d, path))[stat.ST_MODE]
