@@ -42,12 +42,17 @@ def _createPackage(repos, branch, bldPkg, ident):
 	f.id(fileId)
 
         if not fileVersion:
+            # no existing versions for this path
 	    p.addFile(f.id(), path, bldPkg.getVersion())
 	else:
 	    oldFile = repos.getFileVersion(f.id(), fileVersion)
+            # check to see if the file we have now is the same as the
+            # file in the previous version of the file (modes, contents, etc)
 	    if oldFile == f:
+                # if it's the same, use old version
 		p.addFile(f.id(), path, fileVersion)
 	    else:
+                # otherwise use the new version
 		p.addFile(f.id(), path, bldPkg.getVersion())
 
         fileMap[f.id()] = (f, realPath, path)
@@ -277,7 +282,6 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 
     built = []
     fullName = recipeClass.name
-    srcName = fullName + ":sources"
 
     lcache = lookaside.RepositoryCache(repos)
 
@@ -303,10 +307,6 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 	    pkg = repos.getPackageVersion(name, version)
 	    pkgList += [ x for x in pkg.iterPackageList() ]
 	    ident.populate(repos, lcache, pkg)
-
-    if repos.hasPackage(srcName):
-	pkg = repos.getLatestPackage(srcName, buildBranch)
-	ident.populate(repos, lcache, pkg)
 
     builddir = cfg.buildpath + "/" + recipeObj.name
 
