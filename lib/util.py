@@ -12,6 +12,7 @@
 # full details.
 #
 
+import bdb
 from build import fixedglob
 import epdb
 import errno
@@ -90,6 +91,8 @@ def findFile(file, searchdirs):
 
 def genExcepthook(dumpStack=True, debugCtrlC=False):
     def excepthook(type, value, tb):
+        if type is bdb.BdbQuit:
+            sys.exit(1)
         sys.excepthook = sys.__excepthook__
         if type == KeyboardInterrupt and not debugCtrlC:
             sys.exit(1)
