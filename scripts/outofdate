@@ -31,22 +31,47 @@ import util
 import helper
 sys.excepthook = util.excepthook
 
-cfg = conarycfg.ConaryConfiguration()
+def usage():
+    print "Usage: localoutofdate [--missing]"
+    return 1
 
-repos = helper.openRepository(cfg.repositoryMap)
-troves = [ x for x in repos.iterAllTroveNames(cfg.installLabel.getHost()) ]
-pkgs = [ p for p in troves if p.find(':') == -1 ]
-sources = [ p for p in troves if p.endswith(':source') ]
-versions = repos.getTroveLeavesByLabel(pkgs + sources, cfg.installLabel)
+def main(argv):
+    listMissing = False
+    args = argv[1:]
+    for arg in args:
+        if arg == '--missing':
+            listMissing = True
+        else:
+            return usage()
+        args.remove(arg)
 
+    cfg = conarycfg.ConaryConfiguration()
+    repos = helper.openRepository(cfg.repositoryMap)
+    troves = [ x for x in repos.iterAllTroveNames(cfg.installLabel.getHost()) ]
+    pkgs = [ p for p in troves if p.find(':') == -1 ]
+    sources = [ p for p in troves if p.endswith(':source') ]
+    versions = repos.getTroveLeavesByLabel(pkgs + sources, cfg.installLabel)
+    pkgs.sort()
 
-pkgs.sort()
-for pkg in pkgs:
-    sourcepkg = pkg + ':source'
-    if pkg in versions and sourcepkg in versions: 
-	v = versions[pkg][0]
-	sv = versions[sourcepkg][0]
-	vt = v.trailingVersion()
-	svt = sv.trailingVersion()
-	if (v.branch(),vt.getVersion(),vt.getRelease()) != (v.branch(),svt.getVersion(),svt.getRelease()):
-		print "%-35s%-25s%-20s" % (pkg, vt.asString(), svt.asString())
+    for pkg in pkgs:
+        sourcepkg = pkg + ':source'
+        if pkg in versions and sourcepkg in versions: 
+            v = versions[pkg][0]
+            sv = versions[sourcepkg][0]
+            vt = v.trailingVersion()
+            svt = sv.trailingVersion()
+            if (v.branch(),vt.getVersion(),vt.getRelease()) != (v.branch(),svt.getVersion(),svt.getRelease()):
+                    print "%-35s%-25s%-20s" % (pkg, vt.asString(), svt.asString())
+                
+    if listMissing:
+        missing = []
+        for source in sources:
+            pkg = source.split(':')[0]
+            if pkg not in versions:
+                missing.append(pkg)
+
+        print "Missing packages: %s" % missing
+    return 0
+                
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
