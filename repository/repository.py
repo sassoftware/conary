@@ -24,6 +24,9 @@ class Repository:
 	targetFile.write(srcFile.read())
 	srcFile.close()
 
+    def pullFileContentsObject(self, fileId):
+	return self.contentsStore.openFile(fileId)
+
     def newFileContents(self, fileId, srcFile):
 	targetFile = self.contentsStore.newFile(fileId)
 	targetFile.write(srcFile.read())

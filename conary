@@ -98,16 +98,18 @@ elif (otherArgs[1] == "import"):
     print "this is broken"
 elif (otherArgs[1] == "changeset"):
     # current usage is "package oldversion newversion"
-    if len(otherArgs) != 5 and len(otherArgs) != 4:
+    if len(otherArgs) != 5 and len(otherArgs) != 6:
 	usage()
 
     name = otherArgs[2]
-    if len(otherArgs) == 5:
+    if len(otherArgs) == 6:
 	(old, new) = (otherArgs[3], otherArgs[4])
+	outFile = otherArgs[5]
     else:
 	(old, new) = (None, otherArgs[3])
+	outFile = otherArgs[4]
 
-    changeset.ChangeSet(repos, cfg, name, sys.stdout, old, new)
+    changeset.ChangeSet(repos, cfg, name, outFile, old, new)
 elif (otherArgs[1] == "cook"):
     prep = 0
     if argSet.has_key('prep'):

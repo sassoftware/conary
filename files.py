@@ -376,15 +376,22 @@ class FileDB:
 
 	new = self.getVersion(newVersion)
 
-	rc = "SRS FILE CHANGESET %s\n" % (self.fileId)
-
 	if old and old.__class__ == new.__class__:
-	    rc = rc + new.diff(old)
+	    diff = new.diff(old)
+	    if isinstance(new, RegularFile) and isinstance(old, RegularFile) \
+	       and new.sha1() != old.sha1():
+		hash = new.sha1()
+	    else:
+		hash = None
 	else:
 	    # different classes
-	    rc = rc + new.infoLine() + "\n"
+	    diff = new.infoLine() + "\n"
+	    hash = new.sha1()
 
-	return rc
+	rc = "SRS FILE CHANGESET %s\n" % (self.fileId) + diff
+
+
+	return (rc, hash)
 
     def __del__(self):
 	self.close()

@@ -1,6 +1,8 @@
+import filecontainer
 import versions
 
-def ChangeSet(repos, cfg, packageName, f, oldVersionStr, newVersionStr):
+def ChangeSet(repos, cfg, packageName, outFileName, oldVersionStr, \
+	      newVersionStr):
     if packageName[0] != "/":
 	packageName = cfg.packagenamespace + "/" + packageName
 
@@ -15,10 +17,22 @@ def ChangeSet(repos, cfg, packageName, f, oldVersionStr, newVersionStr):
     else:
 	(cs, filesNeeded) = pkgSet.changeSet(None, newVersion)
 
+    hashList = []
     for (id, oldVersion, newVersion) in filesNeeded:
 	filedb = repos.getFileDB(id)
-	cs = cs + filedb.changeSet(oldVersion, newVersion)
+	(filecs, hash) = filedb.changeSet(oldVersion, newVersion)
+	cs = cs + filecs
+	if hash: hashList.append(hash)
 
-    import sys
-    sys.stdout.write(cs)
-	
+    outFile = open(outFileName, "w+")
+    csf = filecontainer.FileContainer(outFile)
+    outFile.close()
+
+    csf.addFile("SRSCHANGESET", cs, "")
+
+    for hash in hashList:
+	f = repos.pullFileContentsObject(hash)
+	csf.addFile(hash, f, "")
+	f.close()
+
+    csf.close()
