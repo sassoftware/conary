@@ -199,7 +199,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
 
     for path in pathList:
         for trove in db.iterTrovesByPath(path):
-	    _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions)
+	    _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags)
 
     for (troveName, versionStr) in troveNames:
         try:
