@@ -2,16 +2,53 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-import recipe
-import time
-import files
+import changeset
 import commit
-import os
-import util
-import sha1helper
+import copy
+import files
 import lookaside
+import os
+import package
+import recipe
+import sha1helper
 import shutil
+import tempfile
+import time
 import types
+import util
+
+# type could be "src"
+def createPackage(repos, cfg, destdir, fileList, version, ident, 
+		  pkgtype = "auto"):
+    fileMap = {}
+    p = package.Package(version)
+
+    for filePath in fileList:
+	if pkgtype == "auto":
+	    realPath = destdir + filePath
+	    targetPath = filePath
+	else:
+	    realPath = filePath
+	    targetPath = os.path.basename(filePath)
+
+	file = files.FileFromFilesystem(realPath, ident(targetPath), 
+					type = pkgtype)
+
+	infoFile = repos.getFileDB(file.id())
+
+	duplicateVersion = \
+	    infoFile.checkBranchForDuplicate(cfg.defaultbranch, file)
+	if not duplicateVersion:
+	    p.addFile(file.id(), targetPath, version)
+	else:
+	    p.addFile(file.id(), targetPath, duplicateVersion)
+
+	if (pkgtype == "src"):
+	    fileMap[file.id()] = (file, realPath, targetPath)
+	else:
+	    fileMap[file.id()] = (file, realPath, targetPath)
+
+    return (p, fileMap)
 
 def cook(repos, cfg, recipeFile, prep=0, macros=()):
     if type(recipeFile) is types.ClassType:
@@ -30,25 +67,43 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	fileIdMap = {}
 	fullName = cfg.packagenamespace + "/" + recipeClass.name
 	lcache = lookaside.RepositoryCache(repos)
-	if repos.hasPackage(fullName):
-	    for pkgName in repos.getPackageList(fullName):
-		pkgSet = repos.getPackageSet(pkgName)
-		pkg = pkgSet.getLatestPackage(cfg.defaultbranch)
-		for (fileId, path, version) in pkg.fileList():
-		    fileIdMap[path] = fileId
-		    if path[0] != "/":
-			# we might need to retrieve this source file
-			# to enable a build, so we need to find the
-			# sha1 hash of it since that's how it's indexed
-			# in the file store
-			filedb = repos.getFileDB(fileId)
-			file = filedb.getVersion(version)
-			lcache.addFileHash(path, file.sha1())
+	pkg = None
+	for pkgName in repos.getPackageList(fullName):
+	    pkgSet = repos.getPackageSet(pkgName)
+	    pkg = pkgSet.getLatestPackage(cfg.defaultbranch)
+	    for (fileId, path, version) in pkg.fileList():
+		fileIdMap[path] = fileId
+		if path[0] != "/":
+		    # we might need to retrieve this source file
+		    # to enable a build, so we need to find the
+		    # sha1 hash of it since that's how it's indexed
+		    # in the file store
+		    filedb = repos.getFileDB(fileId)
+		    file = filedb.getVersion(version)
+		    lcache.addFileHash(path, file.sha1())
 
 	ident = IdGen(fileIdMap)
 
         srcdirs = [ os.path.dirname(recipeClass.filename), cfg.sourcepath % {'pkgname': recipeClass.name} ]
 	recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
+
+	nameList = repos.getPackageList(fullName)
+	version = None
+	if nameList:
+	    # if this package/version exists already, increment the
+	    # existing revision
+	    pkgSet = repos.getPackageSet(nameList[0])
+	    version = pkgSet.getLatestVersion(cfg.defaultbranch)
+	    if version and recipeObj.version == version.trailingVersion():
+		version = copy.deepcopy(version)
+		version.incrementVersionRelease()
+	    else:
+		version = None
+
+	# this package/version doesn't exist yet
+	if not version:
+	    version = copy.deepcopy(cfg.defaultbranch)
+	    version.appendVersionRelease(recipeObj.version, 1)
 
 	builddir = cfg.buildpath + "/" + recipeObj.name
 
@@ -71,39 +126,39 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         
         os.chdir(cwd)
         
-        recipeObj.packages(destdir)
-        pkgSet = recipeObj.getPackageSet()
-
         pkgname = cfg.packagenamespace + "/" + recipeObj.name
 
-	for (name, buildPkg) in pkgSet.packageSet():
+	packageList = []
+        recipeObj.packages(destdir)
+
+	for (name, buildPkg) in recipeObj.getPackageSet().packageSet():
+	    (p, fileMap) = createPackage(repos, cfg, destdir, buildPkg.keys(), 
+				         version, ident, "auto")
+
             built.append(pkgname + "/" + name)
-	    fileList = []
+	    packageList.append((pkgname + "/" + name, p, fileMap))
 
-	    for filePath in buildPkg.keys():
-		realPath = destdir + filePath
-		f = files.FileFromFilesystem(realPath, ident(filePath))
-		fileList.append((f, realPath, filePath))
-
-	    commit.finalCommit(repos, cfg, pkgname + "/" + name,
-                               recipeObj.version, fileList)
-
-        # XXX include recipe files loaded by a recipe to derive
-	recipeName = os.path.basename(recipeClass.filename)
-	f = files.FileFromFilesystem(recipeClass.filename, ident(recipeName),
-                                     type = "src")
-	fileList = [ (f, recipeClass.filename, recipeName) ]
-
-	for file in recipeObj.allSources():
+	srcList = []
+	for file in recipeObj.allSources() + [ recipeClass.filename ]:
             src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
-	    srcName = os.path.basename(src)
-	    f = files.FileFromFilesystem(src, ident(srcName), type = "src")
-	    fileList.append((f, src, srcName))
+	    srcList.append(src)
+	
+	(p, fileMap) = createPackage(repos, cfg, destdir, srcList, version, 
+				     ident, "src")
+	packageList.append((pkgname + "/sources", p, fileMap))
 
-	commit.finalCommit(repos, cfg, pkgname + "/sources",
-			   recipeObj.version, fileList)
+	# FIXME this needs to use a proper mkstemp
+	csfile = tempfile.mktemp()
+
+	try:
+	    changeset.CreateFromFilesystem(packageList, version, csfile)
+	    commit.commitChangeSet(repos, cfg, csfile)
+	finally:
+	    if os.path.exists(csfile):
+		os.unlink(csfile)
 
 	recipeObj.cleanup(builddir, destdir)
+
     return built
 
 class IdGen:
@@ -112,8 +167,10 @@ class IdGen:
 	if self.map.has_key(path):
 	    return self.map[path]
 
-	return sha1helper.hashString("%s %f %s" % (path, time.time(), 
-						    self.noise))
+	hash = sha1helper.hashString("%s %f %s" % (path, time.time(), 
+							self.noise))
+	self.map[path] = hash
+	return hash
 
     def __init__(self, map):
 	# file ids need to be unique. we include the time and path when
