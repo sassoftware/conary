@@ -309,11 +309,13 @@ and put it in directory \fI<dir>\fP if specified, and directory
 \fI<trove>\fP otherwise.  Fetches the most recent version
 specified by \fBbuildLabel\fP unless \fI<version>\fP is specified.
 .TP
-.B commit [\-\-message \fI<message>\fP]
+.B commit [\-\-message \fI<message>\fP] [\fR\-\-no-source-check\fP]\fP
 Different from \fBconary commit\fP, \fBcvc commit\fP
 commits all the changes in the source directory to the repository. 
 It will ask for a changelog message unless one is passed on the
-command line with \fB\-\-message\fP.
+command line with \fB\-\-message\fP.  The existence of all sources
+referenced in the recipe will verified unless \fB\-\-no-source-check\fP
+is passed on the command line.
 .TP
 .B describe \fI<xml file>\fP
 Update the metadata of the source trove in the current source directory

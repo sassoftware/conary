@@ -72,8 +72,8 @@ def usage(rc = 1):
     print "               --target-branch <branch>"
     print '               --use-flag "<flag> <value>"'
     print ""
-    print "commit flags:   --message <msg>"
-    
+    print "commit flags:  --message <msg>"
+    print "               --no-source-check"
     return rc
 
 def realMain(cfg, argv=sys.argv):
@@ -90,10 +90,9 @@ def realMain(cfg, argv=sys.argv):
     argDef["debug"] = NO_PARAM
     argDef["debug-exceptions"] = NO_PARAM
     argDef["dir"] = ONE_PARAM
-    argDef["use-flag"] = MULT_PARAM
-    argDef["use-macro"] = MULT_PARAM
     argDef["macros"] = ONE_PARAM
     argDef["message"] = ONE_PARAM
+    argDef["no-source-check"] = NO_PARAM
     argDef["noclean"] = NO_PARAM
     argDef["prep"] = NO_PARAM
     argDef["profile"] = NO_PARAM
@@ -103,10 +102,11 @@ def realMain(cfg, argv=sys.argv):
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
     argDef["target-branch"] = ONE_PARAM
+    argDef["use-flag"] = MULT_PARAM
+    argDef["use-macro"] = MULT_PARAM
     argDef["version"] = NO_PARAM
 
     argDef.update(argDef)
-
     try:
         argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
                                                 argv=argv)
@@ -149,13 +149,18 @@ def sourceCommand(cfg, args, argSet):
         branch.branch(*args)
     elif (args[0] == "commit"):
 	message = argSet.get("message", None)
+        sourceCheck = True
+        if argSet.has_key("no-source-check"):
+            sourceCheck = False
+            del argSet['no-source-check']
+
 	if message is not None:
 	    del argSet['message']
 
 	if argSet or len(args) != 1: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
-	checkin.commit(repos, cfg, message)
+	checkin.commit(repos, cfg, message, sourceCheck = sourceCheck)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
