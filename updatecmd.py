@@ -16,6 +16,8 @@ from local import database
 from lib import log
 import os
 from repository import repository
+from repository.filecontainer import BadContainer
+import sys
 from lib import util
 import conaryclient
 
@@ -32,7 +34,11 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
         pkgList = ( pkgList, )
     for pkgStr in pkgList:
         if os.path.exists(pkgStr) and os.path.isfile(pkgStr):
-            cs = changeset.ChangeSetFromFile(pkgStr)
+            try:
+                cs = changeset.ChangeSetFromFile(pkgStr)
+            except BadContainer, msg:
+                log.error("'%s' is not a valid conary changset: %s" % (pkgStr, msg))
+                sys.exit(1)
             applyList.append(cs)
         elif pkgStr.find("=") >= 0:
             l = pkgStr.split("=")
