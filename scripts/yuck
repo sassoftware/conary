@@ -33,23 +33,59 @@ import conarycfg
 from local import database
 import helper
 import util
+
+
+def usage():
+    print "Usage: localoutofdate [--missing]"
+    return 1
+
 sys.excepthook = util.excepthook
 
-cfg = conarycfg.ConaryConfiguration()
 
-repos = helper.openRepository(cfg.repositoryMap)
-db = database.Database(cfg.root, cfg.dbPath)
+def main(argv):
+    listMissing = False
+    args = argv[1:]
+    for arg in args:
+        if arg == '--missing':
+            listMissing = True
+        else:
+            return usage()
+        args.remove(arg)
 
-pkgs = [ x for x in db.iterAllTroveNames() if x.find(':') == -1 ]
-pkgs.sort()
-versions = repos.getTroveLeavesByLabel(pkgs, cfg.installLabel)
+    cfg = conarycfg.ConaryConfiguration()
+    repos = helper.openRepository(cfg.repositoryMap)
+    db = database.Database(cfg.root, cfg.dbPath)
+    dbpkgs = [ x for x in db.iterAllTroveNames() if x.find(':') == -1 ]
+    dbpkgs.sort()
+    versions = repos.getTroveLeavesByLabel(dbpkgs, cfg.installLabel)
 
-for pkg in pkgs:
-    if not versions[pkg]:
-	continue
-    v = versions[pkg][0]
-    lv = db.getTroveVersionList(pkg)[0]
-    vt = v.trailingVersion()
-    lvt = lv.trailingVersion()
-    if (v.branch(),vt.getVersion(),vt.getRelease(),vt.buildCount) != (lv.branch(),lvt.getVersion(),lvt.getRelease(),lvt.buildCount):
-	print "%-35s%-25s%-20s" % (pkg, lvt.asString(), vt.asString())
+    for pkg in dbpkgs:
+        if not versions[pkg]:
+            continue
+        v = versions[pkg][0]
+        lv = db.getTroveVersionList(pkg)[0]
+        vt = v.trailingVersion()
+        lvt = lv.trailingVersion()
+        if (v.branch(),vt.getVersion(),vt.getRelease(),vt.buildCount) != (lv.branch(),lvt.getVersion(),lvt.getRelease(),lvt.buildCount):
+            print "%-35s%-25s%-20s" % (pkg, lvt.asString(), vt.asString())
+
+    if listMissing:
+        
+        missing = []
+        repopkgs = [ x for x in repos.iterAllTroveNames(cfg.installLabel.getHost()) if x.find(':') == -1 and not (x.startswith('cross-') or x.startswith('bootstrap-')) ]
+        for pkg in repopkgs:
+            if not dbpkgs:
+                missing.append(pkg)
+                continue
+            elif pkg != dbpkgs[0]:
+                while dbpkgs and dbpkgs[0] < pkg:
+                    del dbpkgs[0]
+                if not dbpkgs or pkg != dbpkgs[0]: 
+                    missing.append(pkg)
+            else: 
+                del dbpkgs[0]
+        print "Missing packages: %s" % missing
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
