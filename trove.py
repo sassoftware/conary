@@ -8,6 +8,7 @@ import string
 import types
 import util
 import versions
+import re
 
 # this is the repository's idea of a package
 class Package:
@@ -268,28 +269,80 @@ class BuildPackageSet:
 	self.name = name
 	self.pkgs = {}
 
+develRE = None
+libRE = None
+manRE = None
+docRE = None
+develdocRE = None
+
 def Auto(name, root):
     runtime = BuildPackage("runtime")
-    mans = BuildPackage("man")
-    os.path.walk(root, autoVisit, (root, runtime, mans))
+    devel = BuildPackage("devel")
+    lib = BuildPackage("lib")
+    man = BuildPackage("man")
+    doc = BuildPackage("doc")
+    develdoc = BuildPackage("develdoc")
+    global develRE
+    global libRE
+    global manRE
+    global docRE
+    global develdocRE
+    if not develRE:
+	develRE=re.compile(
+	    '(.*\.a$)|'
+	    '(.*\.so$)|'
+	    '(.*/include/.*\.h$)|'
+	    '(/usr/include/.*)|'
+	    '(^/usr/share/man/man(2|3))'
+	)
+    if not libRE:
+	libRE= re.compile('.*/lib/.*\.so\.')
+    if not manRE:
+	manRE= re.compile('^/usr/share/man/')
+    if not docRE:
+	docRE= re.compile('^/usr/share/doc/')
+    if not develdocRE:
+	develdocRE= re.compile('^/usr/share/develdoc/')
+    os.path.walk(root, autoVisit, (root, runtime, devel, lib, man, doc, develdoc))
 
     set = BuildPackageSet(name)
     set.addPackage(runtime)
-    if mans.keys():
-	set.addPackage(mans)
+    if devel.keys():
+	set.addPackage(devel)
+    if lib.keys():
+	set.addPackage(lib)
+    if man.keys():
+	set.addPackage(man)
+    if doc.keys():
+	set.addPackage(doc)
+    if develdoc.keys():
+	set.addPackage(develdoc)
     
     return set
 
 def autoVisit(arg, dir, files):
-    (root, buildPkg, manPkg) = arg
+    (root, runtimePkg, develPkg, libPkg, manPkg, docPkg, develdocPkg) = arg
     dir = dir[len(root):]
+    global develRE
+    global libRE
+    global manRE
+    global docRE
+    global develdocRE
 
     for file in files:
         if dir:
             path = dir + '/' + file
         else:
             path = '/' + file
-        if path.startswith('/usr/share/man/'):
+        if develRE.match(path):
+            develPkg.addFile(path)
+        elif libRE.match(path):    # XXX controversial?
+            libPkg.addFile(path)
+        elif manRE.match(path):
             manPkg.addFile(path)
+        elif docRE.match(path):
+            docPkg.addFile(path)
+        elif develdocRE.match(path):
+            develdocPkg.addFile(path)
         else:
-            buildPkg.addFile(path)
+            runtimePkg.addFile(path)
