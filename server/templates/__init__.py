@@ -13,4 +13,3 @@
 #
 import kid
 kid.enable_import()
-import library
