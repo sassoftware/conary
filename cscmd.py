@@ -4,7 +4,7 @@
 #
 
 from local import update
-import helper
+from repository import repository
 import log
 import package
 import versions
@@ -27,7 +27,7 @@ def ChangeSetCommand(repos, cfg, pkgName, outFileName, oldVersionStr, \
 def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     try:
 	pkgList = db.findTrove(pkgName, None)
-    except repository.repository.PackageNotFound, e:
+    except repository.PackageNotFound, e:
 	log.error(e)
 	return
 
