@@ -152,10 +152,11 @@ class RecipeAction(Action):
 	    if self.linenum is None:
 		self.do()
 	    else:
+		oldexcepthook = sys.excepthook
 		sys.excepthook = excepthook
 		actionobject = self
 		self.do()
-		sys.excepthook = sys.__excepthook__
+		sys.excepthook = oldexcepthook
 
 
     def do(self):

@@ -66,10 +66,11 @@ class BuildAction(action.RecipeAction):
 	    if self.linenum is None:
 		self.do(self.recipe.macros)
 	    else:
+		oldexcepthook = sys.excepthook
 		sys.excepthook = action.excepthook
 		action.actionobject = self
 		self.do(self.recipe.macros)
-		sys.excepthook = sys.__excepthook__
+		sys.excepthook = oldexcepthook
 
     def do(self, macros):
         """
