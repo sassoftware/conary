@@ -166,13 +166,11 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		      info, tags, deps, fullVersions):
-    needFiles = ls or ids or sha1s
-
     try:
 	troveList = repos.findTrove(cfg.installLabelPath, troveName, 
 				    cfg.flavor, versionStr,
                                     acrossRepositories = True,
-                                    withFiles = needFiles)
+                                    withFiles = False)
     except repository.PackageNotFound, e:
 	log.error(str(e))
 	return
@@ -257,9 +255,10 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		    print _grpFormat % (troveName, 
 					ver.trailingVersion().asString())
 
-	    fileL = [ (x[1], x[0], x[2]) for x in trove.iterFileList() ]
-	    fileL.sort()
-	    for (path, fileId, ver) in fileL:
+	    iter = repos.iterFilesInTrove(trove.getName(), trove.getVersion(),
+                                          trove.getFlavor(), sortByPath = True, 
+					  withFiles = False)
+	    for (fileId, path, ver) in iter:
 		if fullVersions or ver.branch() != version.branch():
 		    print _fileFormat % (path, ver.asString())
 		else:
