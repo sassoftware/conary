@@ -16,6 +16,8 @@ Provides the output for the "conary query" command
 """
 
 import files
+import os
+from lib import util
 from lib import log
 
 from lib.sha1helper import sha1ToString
@@ -116,6 +118,9 @@ def printFile(fileObj, path, prefix=''):
 def displayTroves(db, troveNameList = [], pathList = [], ls = False, 
                   ids = False, sha1s = False, fullVersions = False, 
                   tags = False):
+
+    pathList = [os.path.abspath(util.normpath(x)) for x in pathList]
+
     troveNames = []
     hasVersions = False
     for item in troveNameList:
