@@ -28,21 +28,28 @@ def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
     if not os.path.exists(cfg.root):
         util.mkdirChain(cfg.root)
 
+    import time
+    start = time.time()
+
     if os.path.exists(pkg) and os.path.isfile(pkg):
 	# there is a file, try to read it as a changeset file
 
         try:
+	    print "loading", int(time.time() - start)
             cs = changeset.ChangeSetFromFile(pkg)
-        except:
+	    print "-done", int(time.time() - start)
+        except KeyError:
             # invalid changeset file
             pass
         else:
             if cs.isAbsolute():
+		print "rooting", int(time.time() - start)
                 try:
                     cs = db.rootChangeSet(cs)
                 except repository.CommitError, e:
                     sys.stderr.write("%s\n" %str(e))
                     return 1
+		print "-done", int(time.time() - start)
 
 	    list = [ x.getName() for x  in cs.iterNewPackageList() ]
 	    if versionStr:
@@ -85,8 +92,10 @@ def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
 	return
 
     try:
+	print "committing", int(time.time() - start)
 	db.commitChangeSet(cs, replaceFiles = replaceFiles, 
 			   tagScript = tagScript, keepExisting = keepExisting)
+	print "-done", int(time.time() - start)
     except database.SourcePackageInstall, e:
 	log.error(e)
     except repository.CommitError, e:

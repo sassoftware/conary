@@ -618,6 +618,36 @@ class Database:
 						 justPresent = not pristine)[1]
 	return files.ThawFile(stream, fileId)
 
+    def iterFiles(self, l):
+	cu = self.db.cursor()
+
+	cu.execute("""
+	    CREATE TEMPORARY TABLE getFilesTbl(fileId STRING, version STR)
+	""", start_transaction = False)
+
+	versionStrs = {}
+	for (fileId, version) in l:
+	    if versionStrs.has_key(version):
+		vs = versionStrs[version]
+	    else:
+		vs = version.asString()
+		versionStrs[version] = vs
+
+	    cu.execute("INSERT INTO getFilesTbl VALUES (%s, %s)", fileId, vs,
+		       start_transaction = False)
+	del versionStrs
+
+	cu.execute("""
+	    SELECT getFilesTbl.fileId, stream FROM getFilesTbl JOIN Versions ON
+		    getFilesTbl.version = Versions.version
+		JOIN DBTroveFiles ON
+		    getFilesTbl.fileId = DBTroveFiles.fileId AND
+		    Versions.versionId == DBTroveFiles.versionId
+	""")
+
+	for (fileId, stream) in cu:
+	    yield files.ThawFile(stream, fileId)
+
     def getTrove(self, troveName, troveVersion, troveFlavor, pristine = False):
 	return self._getTrove(troveName = troveName, 
 			      troveVersion = troveVersion, 

@@ -40,14 +40,15 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     def oldFileList(self):
 	return self.oldFiles
 
-    def addFile(self, fileObject):
-	repository.ChangeSetJob.addFile(self, fileObject, 
-			 storeContents = fileObject.file().flags.isConfig())
+    def addFile(self, cs, fileObj, newVer, path, fileContents, 
+		restoreContents):
+	repository.ChangeSetJob.addFile(self, cs, fileObj, newVer, path,
+			 fileContents, restoreContents,
+			 storeContents = fileObj.flags.isConfig())
 
-	fileId = fileObject.fileId()
-	oldVersion = self.cs.getFileOldVersion(fileId)
+	oldVersion = self.cs.getFileOldVersion(fileObj.id())
 	if oldVersion:
-	    self.removeFile(fileId, oldVersion)
+	    self.removeFile(fileObj.id(), oldVersion)
 
     # remove the specified file 
     def removeFile(self, fileId, version):

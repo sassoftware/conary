@@ -317,3 +317,7 @@ def gzipFileSize(f):
     size = struct.unpack("<i", size)[0]
 
     return size
+
+def xzip(l1, l2):
+    for x in l1:
+	yield (x, l2.next())

@@ -59,6 +59,17 @@ class AbstractTroveDatabase:
 	"""
 	raise NotImplementedError
 
+    def getFileVersions(self, l):
+	"""
+	Returns the file objects for the (fileId, version) pairs in
+	list; the order returns is the same order in the list.
+
+	@param l:
+	@type list:
+	@rtype list
+	"""
+	raise NotImplementedError
+
     def getFileContents(self, troveName, troveVersion, troveFlavor, path,
 			fileObj = None):
 	"""
@@ -440,8 +451,7 @@ class DataStoreRepository:
     def _storeFileFromContents(self, contents, file, restoreContents):
 	if file.hasContents:
 	    if restoreContents:
-		f = contents.get()
-		self.contentsStore.addFile(f, file.contents.sha1())
+		self.contentsStore.addFile(contents.get(), file.contents.sha1())
 	    else:
 		# the file doesn't have any contents, so it must exist
 		# in the data store already; we still need to increment
@@ -531,55 +541,6 @@ class TroveMissing(RepositoryError):
         else:
             self.type = 'package'
 
-class ChangeSetJobFile(object):
-
-    __slots__ = [ "theVersion" , "theFile", "theRestoreContents",
-		  "fileContents", "changeSet", "thePath", "theFileId" ]
-
-    def version(self):
-	return self.theVersion
-
-    def changeVersion(self, ver):
-	self.theVersion = ver
-
-    def restoreContents(self):
-	return self.theRestoreContents
-
-    def file(self):
-	return self.theFile
-
-    def changeFile(self, fileObj):
-	self.theFile = fileObj
-
-    def path(self):
-	return self.thePath
-
-    def fileId(self):
-	return self.theFileId
-
-    def copy(self):
-	return copy.deepcopy(self)
-
-    def getContents(self):
-	if self.fileContents == "":
-	    return None
-	elif self.fileContents:
-	    return self.fileContents
-	
-	return self.changeSet.getFileContents(self.theFileId)[1]
-
-    # overrideContents = None means use contents from changeset
-    # overrideContents = "" means there are no contents
-    def __init__(self, changeSet, fileId, file, version, path, 
-		 overrideContents, restoreContents):
-	self.theVersion = version
-	self.theFile = file
-	self.theRestoreContents = restoreContents
-	self.fileContents = overrideContents
-	self.changeSet = changeSet
-	self.thePath = path
-	self.theFileId = fileId
-
 class ChangeSetJob:
     """
     ChangeSetJob provides a to-do list for applying a change set; file
@@ -598,20 +559,23 @@ class ChangeSetJob:
     def oldFile(self, fileId, fileVersion, fileObj):
 	pass
 
-    def addFile(self, newFile, storeContents = True):
-	file = newFile.file()
-	fileId = newFile.fileId()
-
+    def addFile(self, cs, fileObj, fileVersion, path, fileContents, 
+		restoreContents, storeContents = True):
 	# duplicates are filtered out (as necessary) by addFileVersion
-	self.repos.addFileVersion(fileId, newFile.version(), file)
+	self.repos.addFileVersion(fileObj.id(), fileVersion, fileObj)
 
 	# Note that the order doesn't matter, we're just copying
 	# files into the repository. Restore the file pointer to
 	# the beginning of the file as we may want to commit this
 	# file to multiple locations.
 	if storeContents:
-	    self.repos._storeFileFromContents(newFile.getContents(), file, 
-					      newFile.restoreContents())
+	    if fileContents == "":
+		fileContents = None
+	    elif not fileContents:
+		fileContents = cs.getFileContents(fileObj.id())[1]
+
+	    self.repos._storeFileFromContents(fileContents, fileObj, 
+					      restoreContents)
 
     def __init__(self, repos, cs):
 	self.repos = repos
@@ -625,6 +589,7 @@ class ChangeSetJob:
 	# file objects which map up with them are created later, but
 	# we do need a map from fileId to the path and version of the
 	# file we need, so build up a dictionary with that information
+	print "\t\ta"
 	for csPkg in cs.iterNewPackageList():
 	    newVersion = csPkg.getNewVersion()
 	    old = csPkg.getOldVersion()
@@ -650,12 +615,15 @@ class ChangeSetJob:
 	    self.packagesToCommit.append(newPkg)
 	    fileMap.update(newFileMap)
 
+	print "\t\tb"
+
 	# Create the file objects we'll need for the commit. This handles
 	# files which were added and files which have changed
 	list = cs.getFileList()
 	# sort this by fileid to ensure we pull files from the change
 	# set in the right order
 	list.sort()
+
 	for (fileId, (oldVer, newVer, diff)) in list:
 	    restoreContents = 1
 	    if oldVer:
@@ -715,8 +683,9 @@ class ChangeSetJob:
 		fileContents = ""
 
 	    path = fileMap[fileId][0]
-	    self.addFile(ChangeSetJobFile(cs, fileId, file, newVer, path, 
-					  fileContents, restoreContents))
+	    self.addFile(cs, file, newVer, path, fileContents, restoreContents)
+
+	print "\t\tc"
 
 	for (pkgName, version, flavor) in cs.getOldPackageList():
 	    pkg = self.repos.getTrove(pkgName, version, flavor)
@@ -726,5 +695,9 @@ class ChangeSetJob:
 		file = self.repos.getFileVersion(fileId, version)
 		self.oldFile(fileId, version, file)
 
+	print "\t\td"
+
 	for newPkg in self.packagesToCommit:
 	    self.addPackage(newPkg)
+
+	print "\t\te"

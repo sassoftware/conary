@@ -46,8 +46,9 @@ class RootChangeSetJob(repository.ChangeSetJob):
     def oldFileList(self):
 	return self.oldFiles
 
-    def addFile(self, fileObject):
-	self.files[fileObject.fileId()] = fileObject
+    def addFile(self, cs, fileObj, newVer, path, fileContents, 
+		restoreContents):
+	self.files[fileObj.id()] = (fileObj, newVer)
 
     def getFile(self, fileId):
 	return self.files[fileId]
@@ -124,6 +125,9 @@ class SqlDbRepository(repository.DataStoreRepository,
 	    return (file, cont)
 
 	return file
+
+    def getFileVersions(self, l):
+	return self.db.iterFiles(l)
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False,
@@ -231,8 +235,8 @@ class Database(SqlDbRepository):
 	    cs.newPackage(pkgChgSet)
 
 	    for (fileId, oldVersion, newVersion, oldPath, newPath) in filesNeeded:
-		fileObj = job.getFile(fileId)
-		assert(newVersion == fileObj.version())
+		(fileObj, fileVersion) = job.getFile(fileId)
+		assert(newVersion == fileVersion)
 		
 		oldFile = None
 		if oldVersion:
@@ -240,7 +244,7 @@ class Database(SqlDbRepository):
 					    oldVersion, withContents = 1)
 
 		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
-							 fileObj.file())
+							 fileObj)
 
 		cs.addFile(fileId, oldVersion, newVersion, filecs)
 		if hash: 
@@ -248,10 +252,10 @@ class Database(SqlDbRepository):
 		    cont = filecontents.FromChangeSet(absSet, fileId)
 		    if oldVersion:
 			(contType, cont) = changeset.fileContentsDiff(oldFile, 
-				    oldCont, fileObj.file(), cont)
+				    oldCont, fileObj, cont)
 
 		    cs.addFileContents(fileId, contType, cont, 
-					fileObj.file().flags.isConfig())
+					fileObj.flags.isConfig())
 
 	assert(not cs.validate())
 
@@ -267,6 +271,9 @@ class Database(SqlDbRepository):
         flags = 0
         if replaceFiles:
             flags |= update.REPLACEFILES
+
+	import time
+	start = time.time()
 
 	for pkg in cs.iterNewPackageList():
 	    if pkg.getName().endswith(":source"): raise SourcePackageInstall
@@ -323,7 +330,9 @@ class Database(SqlDbRepository):
 	    pkgList.append((pkg, origPkg, localVersion, 
 			    update.MISSINGFILESOKAY))
 
+	print "\tlocal changes", int(time.time() - start)
 	result = update.buildLocalChanges(self, pkgList, root = self.root)
+	print "\t-done", int(time.time() - start)
 	if not result: return
 
 	(localChanges, retList) = result
@@ -331,12 +340,16 @@ class Database(SqlDbRepository):
 	for (changed, fsPkg) in retList:
 	    fsPkgDict[(fsPkg.getName(), fsPkg.getVersion())] = fsPkg
 
+	print "\tmaking rollback", int(time.time() - start)
 	if not isRollback:
 	    inverse = cs.makeRollback(self, configFiles = 1)
             flags |= update.MERGE
+	print "\t-done", int(time.time() - start)
 
+	print "\tfsjob", int(time.time() - start)
 	fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root, 
 				     flags = flags)
+	print "\t-done", int(time.time() - start)
 
 	# look through the directories which have had files removed and
 	# see if we can remove the directories as well
@@ -378,8 +391,10 @@ class Database(SqlDbRepository):
 	# XXX we have to do this before files get removed from the database,
 	# which is a bit unfortunate since this rollback isn't actually
 	# valid until a bit later
+	print "\twriting rollback", int(time.time() - start)
 	if not isRollback:
 	    self.addRollback(inverse, localChanges)
+	print "\t-done", int(time.time() - start)
 
 	# run preremove scripts before updating the database, otherwise
 	# the file lists which get sent to them are incorrect
@@ -390,7 +405,9 @@ class Database(SqlDbRepository):
 	    # this updates the database from the changeset; the change
 	    # isn't committed until the self.commit below
 	    # an object for historical reasons
+	    print "\tcsj", int(time.time() - start)
 	    localrep.LocalRepositoryChangeSetJob(self, cs, keepExisting)
+	    print "\t-done", int(time.time() - start)
 
 	errList = fsJob.getErrorList()
 	if errList:
@@ -398,7 +415,9 @@ class Database(SqlDbRepository):
 	    # FIXME need a --force for this
 	    return
 
+	print "\tfsJob.apply", int(time.time() - start)
 	fsJob.apply(tagSet, tagScript)
+	print "\t-done", int(time.time() - start)
 
 	for (troveName, troveVersion, troveFlavor, fileIdList) in fsJob.iterUserRemovals():
 	    self.db.removeFilesFromTrove(troveName, troveVersion, troveFlavor, fileIdList)
