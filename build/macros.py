@@ -35,7 +35,7 @@ class Macros(dict):
             self[key] = item
     
     def __setitem__(self, name, value):
-	if name[:7] == '_Macros':
+	if name.startswith('_Macros'):
 	    dict.__setitem__(self, name, value)
 	    return
         # '.' in name reserved for getting alternative representations
@@ -55,21 +55,21 @@ class Macros(dict):
     # overrides allow you to set a macro value at the command line
     # or in a config file and use it despite the value being 
     # set subsequently within the recipe
-    
-    def _override(self, key, value):
+     
+   def _override(self, key, value):
 	self.__overrides[key] = value
 
     def __setattr__(self, name, value):
 	self.__setitem__(name, value)
 
     def __getitem__(self, name):
-	if name[:7] == '_Macros':
+	if name.startswith('_Macros'):
 	    return dict.__getitem__(self, name)
         repmethod = None
-        dot = name.find('.')
-        if dot != -1:
-            repmethod = name[dot+1:]
-            name = name[:dot]
+        parts = name.split('.', 1)
+        if len(parts) > 1:
+            repmethod = parts[1]
+            name = parts[0]
 	if name in self.__overrides:
 	    return self.__repmethod(self.__overrides[name], repmethod)
 	if not name in self:
