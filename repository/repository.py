@@ -144,19 +144,20 @@ class Repository:
 
 	    raise 
 
-	# at this point the new version is in the repository, and we
-	# can't undo that anymore. if erasing the old version fails, we
-	# need to just commit the inverse change set; fortunately erasing
-	# rarely fails
-	for (fileId, version) in oldFileList:
-	    filesDB = self._getFileDB(fileId)
-	    filesDB.eraseVersion(version)
-	    filesDB.close()
+	if eraseOld:
+	    # at this point the new version is in the repository, and we
+	    # can't undo that anymore. if erasing the old version fails, we
+	    # need to just commit the inverse change set; fortunately erasing
+	    # rarely fails
+	    for (fileId, version) in oldFileList:
+		filesDB = self._getFileDB(fileId)
+		filesDB.eraseVersion(version)
+		filesDB.close()
 
-	for (pkgName, pkgVersion) in oldPackageList:
-	    pkgSet = self._getPackageSet(pkgName)
-	    pkgSet.eraseVersion(pkgVersion)
-	    pkgSet.close()
+	    for (pkgName, pkgVersion) in oldPackageList:
+		pkgSet = self._getPackageSet(pkgName)
+		pkgSet.eraseVersion(pkgVersion)
+		pkgSet.close()
 
     # packageList is a list of (pkgName, oldVersion, newVersion) tuples
     def createChangeSet(self, packageList):
@@ -203,7 +204,7 @@ class Repository:
 
 	# we want to look up file objects by fileId
 	idToFile = {}
-	for (fileId, fileVersion, file) in fileList:
+	for (fileId, fileVersion, file, saveContents) in fileList:
 	    idToFile[fileId] = (fileVersion, file)
 
 	for (pkgName, newPkg, newVersion) in pkgList:
