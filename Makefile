@@ -60,6 +60,7 @@ extra_files = \
 	NEWS			\
 	conary-wrapper.in	\
 	conary.1		\
+	cvc.1			\
         cvcdesc.1               \
 	constants.py.in
 
@@ -90,8 +91,8 @@ install: all install-mkdirs install-subdirs pyfiles-install
 		ln -sf conary-wrapper $(DESTDIR)$(bindir)/$$f; \
 	done
 	install -m 644 conary.1 $(DESTDIR)$(mandir)/man1
+	install -m 644 cvc.1 $(DESTDIR)$(mandir)/man1
 	install -m 644 cvcdesc.1 $(DESTDIR)$(mandir)/man1
-	ln -sf conary.1 $(DESTDIR)$(mandir)/man1/cvc.1
 
 dist: $(dist_files)
 	if ! grep "^Changes in $(VERSION)" NEWS > /dev/null 2>&1; then \

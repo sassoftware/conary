@@ -3,6 +3,7 @@ Changes in 0.14.8:
     get set properly
   * reworked findTrove() in repository to return (name, version, flavor)
     tuples instead of full troves
+  * Split conary.1 into conary.1 and cvc.1
 
 Changes in 0.14.7:
   * ELF libraries with sonames that have paths in them are now handled

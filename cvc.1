@@ -1,0 +1,209 @@
+.\" Copyright (c) 2004-2005 Specifix, Inc.
+.TH CVC 1 "11 February 2005" "Specifix, Inc."
+.SH NAME
+cvc \- Conary source management
+.SH SYNOPSIS
+.B cvc \fIcommand \fR[\fI<args>\fR]
+.SH DESCRIPTION
+\fBConary\fR is a software configuration manager that uses distributed,
+network-based, versioned repositories rather than disparate package
+files as its canonical source of data.  Conary uses the repository
+versioning to intelligently merge configuration files, file ownership
+and permissions, and so forth.  The \fIC\fPonary \fIv\fPersion
+\fIc\fPontrol program, called \fBcvc\fP, handles build and source
+management, and is responsible for all changes to the repository.
+.SH REFERENCE
+cvc has several common command-line arguments, all of which modify 
+configuration entries and are documented with other configuration
+entries.  The rest of its command-line arguments are specific to
+which cvc \fBcommand\fP you are running, and are documented with
+the commands.
+.SS "Building Components and Packages"
+A source component is checked out into a \fBsource directory\fP
+with the \fBcheckout\fP command, or a source component and
+source directory are created with the \fBcvc newpkg\fP subcommand.
+Then the contents of the source directory are modified with other
+subcommands, and the changes to the source component are then
+committed to the repository with the \fBcvc commit\fP subcommand.
+Only the \fBcvc commit\fP command modifies the repository; the
+rest of the commands either query the repository for information
+about a source package or schedule a change to be applied to the
+repository by the next \fBcvc commit\fP command.
+.PP
+The default branch on which each of these commands operates
+is specified by the \fBbuildLabel\fP configuration entry
+(see below).
+.PP
+The following \fBcommands\fP to \fBcvc\fP are used to create,
+modify, and cook source components:
+.TP 4
+.B cook \fI[\fR\-\-prep\fI] [\fR--macros file\fI] \e
+.PD 0
+.TP
+.B \ \ \ \ \ [\fR\-\-target-branch \fI<branch>\fP] \e
+.PD 0
+.TP
+.B \ \ \ \ \ [\fR\-\-resume [<linenums>|policy]] \e
+.PD 0
+.TP
+.B \ \ \ \ \ [\fR\-\-use-flavor <flavor>] \e
+.PD 0
+.TP
+.B \ \ \ \ \ [\fR\-\-use-macro <macro> <string>] \e
+.PD 0
+.TP
+.B \ \ \ \ \ [\fR\-\-no-clean] [\fR\-\-unknown-flags] \e
+.PD 0
+.TP
+.B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>...
+.PD
+
+Build a package.  If \fB\-\-prep\fP is specified, the souce code is
+unpacked, but is not built. if \fB\-\-macros\fP is specified, it
+names a file containing macro definitions to apply to the recipe
+macro set.  
+.IP
+If \fB\-\-resume <linenums>\fP is specified, 
+conary will cook the specified line numbers of the recipe.  The format of
+<linenums> is any number of pairs of n or n:m 
+separated by commas, where n and m are line numbers in the recipe.  
+If the initial line number in a pair is left off, leaving :m, 
+conary will begin cooking from the beginning of the file.  
+If the final line number is left off, leaving n:, conary will cook
+until the end 
+of the file, run all the policy, and create a changeset.  A \-\-resume n without
+a colon is equivalent to n:n, if there are other ranges given to \-\-resume,
+or n: if it is the only argument given to \-\-resume.  All resume line 
+numbers must be provided in increasing order.
+
+If \fB\-\-resume\fP is specified with no parameter,
+the recipe will be recooked from the line of last failure.  
+If \fB\-\-resume policy\fP is specified, the policy will be rechecked 
+from the last build; this only works if the destdir still exists,
+either because of a policy error or because the \fB\-\-no-clean\fP option
+was provided.
+
+Example: cvc cook \-\-resume 5:10,15,35:
+
+Note that the \fB\-\-resume\fP option may
+be used only with local recipe files, not source components being
+built directly from a repository.
+.IP 
+The \-\-use-flavor option can be used to override the default Use flags, 
+package-specific flags, and arch Flags  for this instantiaton.   
+The format is exactly as it is shown in conary config flavors.  The 
+flavor specified here overrides flavors specified in the buildFlavor
+config option.
+.IP
+The \-\-use-macro option assigns the given string value to <macro>.  
+The value given overrides any attempt to reset the value later in the 
+recipe.  The macro and its boolean value must be enclosed in quotes.
+.IP 
+The \-\-no-clean option does not clean up the build directories
+after the build is complete, even if the build is successful.
+This can be useful for rerunning policy for a complete build using 
+\-\-resume, or for examining the completed build directories.
+.IP 
+If the thing to be cooked ends in \fB.recipe\fP, then
+it must be a recipe file and the package will be cooked from the
+filesystem.  Otherwise, it must name a repository component and
+the package will be cooked from the repository.
+.IP
+Conary will build a changeset that is relative to the current
+\fBbuildLabel\fP unless the \fB\-\-target-branch\fP option is
+specified.
+.TP 4
+.B add \fIfile...\fP
+Adds all the files listed on the command line to the source
+component.
+.TP
+.B annotate \fI<file>\fP
+Show the version, date, and author of each of the lines in \fI<file>.
+\fI<file> must be a file in a conary source dir.
+.TP
+.B branch \fInewbranch [\fItrovename\fP[=\fIversion\fP][[flavor]]]*
+Creates a new branch in the repository, relative to branch
+\fIbranchfrom\fP. The \fBtrovename\fR, and any troves it references 
+are recursively branched. If \fB-\-sources\fR is specified, the source
+troves for each binary trove is branched instead of the binary trove.
+.TP
+.B checkout [\-\-dir \fI<dir>\fP] \fI<trove\fP[=\fIversion\fP]>\fP
+Check the \fI<trove>\fB:source\fR component out of the repository
+and put it in directory \fI<dir>\fP if specified, and directory
+\fI<trove>\fP otherwise.  Fetches the most recent version
+specified by \fBbuildLabel\fP unless \fI<version>\fP is specified.
+.TP
+.B commit [\-\-message \fI<message>\fP]\fP
+Different from \fBconary commit\fP, \fBcvc commit\fP
+commits all the changes in the source directory to the repository. 
+It will ask for a changelog message unless one is passed on the
+command line with \fB\-\-message\fP.  
+.TP
+.B describe \fI<xml file>\fP
+Update the metadata of the source trove in the current source directory
+based on the contents of \fI<xml file>\fP.
+.TP
+.B diff
+Show (in a slightly extended unified diff format) the changes that
+have been made in the current source directory since the last
+\fBcvc commit\fP
+(or, if no commit, since the source component was checked out).
+.TP
+.B log [\fI<branch>\fP]
+Prints the log messages for the branch specified by \fBbuildLabel\fP,
+or for \fI<branch>\fP if specified.
+.TP
+.B newpkg \fI<name>\fP
+Creates a new package.  This modifies the repository, and is
+irreversable, so use this command with care.
+.TP
+.B rdiff \fI<name> <oldver> <newver>\fP
+This source command operates only on the repository, not on a
+source directory.  It creates a diff between two versions of
+a source trove from the repository.
+.TP
+.B remove \fI<filename>...\fP
+Unlike \(lq\fBcvs remove\fP\(rq, \fBcvc remove\fP both removes
+the file from the filesystem and marks it to be removed from the next
+version checked into the repository at the next \fBcvc commit\fP.
+.TP
+.B rename \fI<oldname> <newname>\fP
+Renames the file \fI<oldname>\fP to \fI<newname>\fP on the filesystem,
+and marks it to be removed from the repository at the next
+\fBcvc commit\fP.
+.TP
+.B update [\fI<version>\fP]
+Updates the current source directory to the latest version, or to
+\fI<version>\fP if specified.  Merges changes when possible.
+.RE
+.\"
+.\"
+.\"
+.SH EXAMPLES
+.TP 4
+.B Branching
+cvc branch conary.example.com@spx:example-foo conary.specifix.com@spx:devel foo:source
+.br
+This creates a branch in the conary.example.com repository of the
+foo:source trove, based on the version of foo in the main specifix repository.
+You can now check out this branch and work on it:
+.br
+cvc checkout --build-label conary.example.com@spx:example-foo foo
+.br
+Committing changes to that copy of foo:source will go into the
+conary.example.com repository on the spx:example-foo branch.
+.P
+More examples coming soon to a man page near you!
+.\"
+.\"
+.\"
+.SH BUGS
+There are no bugs, only undocumented features.  You can report
+undocumented features at http://bugs.specifix.com/
+.\"
+.\"
+.\"
+.SH "SEE ALSO"
+conary(1)
+.br
+cvcdesc(1)
