@@ -31,19 +31,22 @@ class ShellCommand:
 
 
 class Configure(ShellCommand):
-    template = ('cd %%s; %(preConfigure)s ./configure --prefix=/usr '
+    template = ('cd %%s; %%s %(preConfigure)s %%s --prefix=/usr '
                 '--sysconfdir=/etc %(args)s')
-    keywords = {'preConfigure': ''}
+    keywords = {'preConfigure': '',
+                'objDir': ''}
     
     def doBuild(self, dir):
-        self.execute(self.command % dir)
+        if self.objDir:
+            configure = '../configure'
+            mkObjdir = 'mkdir -p %s; cd %s;' %(self.objDir, self.objDir)
+        else:
+            configure = './configure'
+            mkObjdir = ''
+        self.execute(self.command % (dir, mkObjdir, configure))
 
 class ManualConfigure(Configure):
-    template = 'cd %%s; %(preConfigure)s ./configure %(args)s'
-
-class ObjdirConfigure(Configure):
-    template = ('cd %%s; mkdir obj; cd obj; %(preConfigure)s '
-                '../configure %(args)s')
+    template = 'cd %%s; %%s %(preConfigure)s %%s %(args)s'
 
 class Make(ShellCommand):
     template = 'cd %%s; %(preMake)s make %(args)s'
