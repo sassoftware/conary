@@ -258,6 +258,9 @@ class StringsStream(InfoStream):
     def merge(self, other):
         self.l = other.l
 
+    def __iter__(self):
+	return self.l.__iter__()
+
     def freeze(self):
         if self.l is None:
             return ''
