@@ -16,6 +16,7 @@ import patch
 import recipe
 import repository
 import sys
+import update
 import util
 import versioned
 import versions
@@ -366,7 +367,7 @@ def diff(repos, versionStr = None):
 	path = oldPackage.getFile(fileId)[0]
 	print "%s: removed" % path
 	
-def update(repos, versionStr = None):
+def updateSrc(repos, versionStr = None):
     state = SourceStateFromFile("SRS")
     pkgName = state.getName()
     baseVersion = state.getVersion()
@@ -395,158 +396,16 @@ def update(repos, versionStr = None):
     packageChanges = changeSet.getNewPackageList()
     assert(len(packageChanges) == 1)
     pkgCs = packageChanges[0]
+
     basePkg = repos.getPackageVersion(state.getName(), 
 				      state.getVersion())
 
-    fullyUpdated = 1
-    cwd = os.getcwd()
+    newState = update._applyPackageChangeSet(repos, pkgCs, basePkg, state, None)
 
-    for (fileId, headPath, headFileVersion) in pkgCs.getNewFileList():
-	# this gets broken links right
-	try:
-	    os.lstat(headPath)
-	    log.error("%s is in the way of a newly created file" % headPath)
-	    fullyUpdated = 0
-	    continue
-	except:
-	    pass
+    if newState.getVersion().equal(pkgCs.getNewVersion()) and newBranch:
+	newState.changeBranch(newBranch)
 
-	log.info("creating %s" % headPath)
-	(headFile, headFileContents) = \
-		repos.getFileVersion(fileId, headFileVersion, withContents = 1)
-	headFile.restore(headFileContents, cwd + '/' + headPath, 1)
-	state.addFile(fileId, headPath, headFileVersion)
-
-    for fileId in pkgCs.getOldFileList():
-	(path, version) = basePkg.getFile(fileId)
-	if not state.hasFile(fileId):
-	    log.info("%s has already been removed" % path)
-	    continue
-
-	# don't remove files if they've been changed locally
-	try:
-	    localFile = files.FileFromFilesystem(path, fileId)
-	except OSError, exc:
-	    # it's okay if the file is missing, it just means we all agree
-	    if exc.errno == errno.ENOENT:
-		state.removeFile(fileId)
-		continue
-	    else:
-		raise
-
-	oldFile = repos.getFileVersion(fileId, version)
-
-	if not oldFile.same(localFile, ignoreOwner = True):
-	    log.error("%s has changed but has been removed on head" % path)
-	    continue
-
-	log.info("removing %s" % path)	
-
-	os.unlink(path)
-	state.removeFile(fileId)
-
-    for (fileId, headPath, headFileVersion) in pkgCs.getChangedFileList():
-	(fsPath, fsVersion) = state.getFile(fileId)
-	pathOkay = 1
-	contentsOkay = 1
-	realPath = fsPath
-	# if headPath is none, the name hasn't changed in the repository
-	if headPath and headPath != fsPath:
-	    # the paths are different; if one of them matches the one
-	    # from the old package, take the other one as it is the one
-	    # which changed
-	    if basePkg.hasFile(fileId):
-		basePath = basePkg.getFile(fileId)[0]
-	    else:
-		basePath = None
-
-	    if fsPath == basePath:
-		# the path changed in the repository, propage that change
-		log.info("renaming %s to %s" % (fsPath, headPath))
-		os.rename(fsPath, headPath)
-		state.addFile(fileId, headPath, fsVersion)
-		realPath = headPath
-	    else:
-		pathOkay = 0
-		realPath = fsPath	# let updates work still
-		log.error("path conflict for %s (%s on head)" % 
-			  (fsPath, headPath))
-	
-	# headFileVersion is None for renames
-	if headFileVersion:
-	    fsFile = files.FileFromFilesystem(realPath, fileId)
-	    (headFile, headFileContents) = \
-		    repos.getFileVersion(fileId, headFileVersion, 
-					 withContents = 1)
-
-	if headFileVersion and not fsFile.same(headFile, ignoreOwner = True):
-	    # the contents have changed... let's see what to do
-	    if basePkg.hasFile(fileId):
-		baseFileVersion = basePkg.getFile(fileId)[1]
-		(baseFile, baseFileContents) = repos.getFileVersion(fileId, 
-				    baseFileVersion, withContents = 1)
-	    else:
-		baseFile = None
-
-	    if not baseFile:
-		log.error("new file %s conflicts with file on head of branch"
-				% realPath)
-		contentsOkay = 0
-	    elif headFile.same(baseFile, ignoreOwner = True):
-		# it changed in just the filesystem, so leave that change
-		log.info("preserving new contents of %s" % realPath)
-	    elif fsFile.same(baseFile, ignoreOwner = True):
-		# the contents changed in just the repository, so take
-		# those changes
-		log.info("replacing %s with contents from repository" % 
-				realPath)
-		baseFile.restore(baseContents, realPath, 1)
-	    elif fsFile.isConfig() or headFile.isConfig():
-		# it changed in both the filesystem and the repository; our
-		# only hope is to generate a patch for what changed in the
-		# repository and try and apply it here
-		(contType, cont) = changeset.fileContentsDiff(
-			baseFile, baseFileContents,
-			headFile, headFileContents)
-		if contType != changeset.ChangedFileTypes.diff:
-		    log.error("contents conflict for %s" % realPath)
-		    contentsOkay = 0
-		else:
-		    log.info("merging changes from repository into %s" % realPath)
-		    diff = cont.get().readlines()
-		    cur = open(realPath, "r").readlines()
-		    (newLines, failedHunks) = patch.patch(cur, diff)
-
-		    f = open(realPath, "w")
-		    f.write("".join(newLines))
-
-		    if failedHunks:
-			log.warning("conflicts from merging changes from " +
-			    "head into %s saved as %s.conflicts" % 
-			    (realPath, realPath))
-			failedHunks.write(realPath + ".conflicts", 
-					  "current", "head")
-
-		    contentsOkay = 1
-	    else:
-		log.error("files conflict for %s" % realPath)
-		contentsOkay = 0
-
-	if pathOkay and contentsOkay:
-	    # XXX this doesn't even attempt to merge file permissions
-	    # and such; the good part of that is differing owners don't
-	    # break things
-	    if not headFileVersion:
-		headFileVersion = state.getFile(fileId)[1]
-	    state.addFile(fileId, realPath, headFileVersion)
-	else:
-	    fullyUpdated = 0
-
-    if fullyUpdated:
-	state.changeVersion(headVersion)
-	if newBranch: state.changeBranch(newBranch)
-
-    state.write("SRS")
+    newState.write("SRS")
 
 def addFile(file):
     state = SourceStateFromFile("SRS")
