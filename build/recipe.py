@@ -12,17 +12,16 @@ import build
 import buildpackage
 import destdirpolicy
 import errno
-import gzip
 import helper
 import imp
 import inspect
 import log
 import lookaside
+import macros
 import os
 import package
 import packagepolicy
 from repository import repository
-import rpmhelper
 import shutil
 import sys
 import tempfile
@@ -78,37 +77,6 @@ crossMacros = {
     'sysroot'		: '%(prefix)s/sys-root',
     'headerpath'	: '%(sysroot)s/usr/include',
 }
-
-class Macros(dict):
-    def __setitem__(self, name, value):
-        # only expand references to ourself
-        d = {name: self.get(name)}
-        # escape any macros in the new value
-        value = value.replace('%', '%%')
-        # unescape references to ourself
-        value = value.replace('%%%%(%s)s' %name, '%%(%s)s'%name)
-        # expand our old value when defining the new value
- 	dict.__setitem__(self, name, value % d)
-
-    def __setattr__(self, name, value):
-	self.__setitem__(name, value)
-        
-    # we want keys that don't exist to default to empty strings
-    # but warn so that we can catch bugs
-    def __getitem__(self, name):
-	if name in self:
-	    return dict.__getitem__(self, name) %self
-	log.warning('name %s does not exist in macros', name)
-	return ''
-
-    def __getattr__(self, name):
-	return self.__getitem__(name)
-    
-    def copy(self):
-	new = Macros()
-	new.update(self)
-	return new
-
 
 def _extractSourceFromRPM(rpm, targetfile):
     filename = os.path.basename(targetfile)
@@ -663,7 +631,7 @@ class PackageRecipe(Recipe):
 	self._build = []
         self.destdirPolicy = destdirpolicy.DefaultPolicy()
         self.packagePolicy = packagepolicy.DefaultPolicy()
-	self.macros = Macros()
+	self.macros = macros.Macros()
 	self.macros.update(baseMacros)
 	self.macros['name'] = self.name
 	self.macros['version'] = self.version

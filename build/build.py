@@ -60,7 +60,7 @@ class BuildAction(util.Action):
         Do the build action
 
         @param macros: macro set to be used for expansion
-        @type macros: recipe.Macros
+        @type macros: macros.Macros
         """
         raise AssertionError, "do method not implemented"
 
@@ -82,7 +82,7 @@ class BuildCommand(BuildAction, util.ShellCommand):
         during build
         @param macros: macros which will be expanded through dictionary
         substitution in self.command
-        @type macros: recipe.Macros
+        @type macros: macros.Macros
         @return: None
         @rtype: None
 	"""
