@@ -29,9 +29,9 @@ from lib import util
 from deps import filedeps, deps
 
 _FILE_FLAG_CONFIG = 1 << 0
-# the following three are a legacy from before tag handlers; all repositories
+_FILE_FLAG_PATH_DEPENDENCY_TARGET = 1 << 1
+# the following two are a legacy from before tag handlers; all repositories
 # and databases have been purged of them, so it can be used at will
-_FILE_FLAG_UNUSED0 = 1 << 1
 _FILE_FLAG_UNUSED1 = 1 << 2
 _FILE_FLAG_UNUSED2 = 1 << 3
 # transient contents that may have modified contents overwritten
@@ -244,6 +244,9 @@ class FlagsStream(streams.IntStream):
 
     def isConfig(self, set = None):
 	return self._isFlag(_FILE_FLAG_CONFIG, set)
+
+    def isPathDependencyTarget(self, set = None):
+	return self._isFlag(_FILE_FLAG_PATH_DEPENDENCY_TARGET, set)
 
     def isSource(self, set = None):
 	return self._isFlag(_FILE_FLAG_SOURCEFILE, set)

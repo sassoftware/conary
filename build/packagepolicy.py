@@ -1109,28 +1109,96 @@ class Provides(policy.Policy):
     Drives provides mechanism: to avoid marking a file as providing things,
     such as for package-private plugin modules installed in system library
     directories:
-    C{r.Provides(exceptions=I{filterexp})}
+    C{r.Provides(exceptions=I{filterexp})} or
+    C{r.Provides(I{provision}, I{filterexp}...)}
+    A C{I{provision}} may be a file, soname or an ABI; a C{I{provision}} that
+    starts with 'file' is a file, one that starts with 'soname:' is a
+    soname, and one that starts with 'abi:' is an ABI.  Other prefixes are
+    reserved.
     """
     invariantexceptions = (
 	'%(docdir)s/',
     )
+
+    def __init__(self, *args, **keywords):
+	self.provisions = []
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+	if args:
+	    for filespec in args[1:]:
+		self.provisions.append((filespec, args[0]))
+        else:
+            policy.Policy.updateArgs(self, **keywords)
+
+    def doProcess(self, recipe):
+	self.rootdir = self.rootdir % recipe.macros
+	self.fileFilters = []
+	for (filespec, provision) in self.provisions:
+	    self.fileFilters.append(
+		(filter.Filter(filespec, recipe.macros), provision))
+	del self.provisions
+	policy.Policy.doProcess(self, recipe)
+
     def doFile(self, path):
 	pkgMap = self.recipe.autopkg.pkgMap
 	if path not in pkgMap:
 	    return
 	pkg = pkgMap[path]
 	f = pkg.getFile(path)
-        # Only regular files with contents will be in providesMap
-        if path not in pkg.providesMap:
+        if not f.hasContents or not isinstance(f, files.RegularFile):
+            # only regular files can provide
             return
-	m = self.recipe.magic[path]
-	if m and m.name == 'ELF' and 'soname' not in m.contents:
-	    return
+
 	fullpath = self.recipe.macros.destdir + path
 	mode = os.lstat(fullpath)[stat.ST_MODE]
-	if mode & 0111:
-            f.provides.set(pkg.providesMap[path])
-	    pkg.provides.union(f.provides.value())
+	m = self.recipe.magic[path]
+	if path in pkg.providesMap and m and m.name == 'ELF' and \
+           'soname' in m.contents and not mode & 0111:
+            # libraries must be executable -- see other policy
+	    del pkg.providesMap[path]
+
+	for (filter, provision) in self.fileFilters:
+	    if filter.match(path):
+		self._markProvides(path, provision, pkg, m, f)
+
+        if path not in pkg.providesMap:
+            return
+        f.provides.set(pkg.providesMap[path])
+        pkg.provides.union(f.provides.value())
+        # Because paths can change, individual files do not provide their
+        # paths.  However, within a trove, a file does provide its name.
+        # Therefore, we have to handle this case a bit differently.
+        if f.flags.isPathDependencyTarget():
+            pkg.provides.addDep(deps.FileDependencies, deps.Dependency(path))
+
+    def _markProvides(self, path, provision, pkg, m, f):
+        if path not in pkg.providesMap:
+            # BuildPackage only fills in providesMap for ELF files; we may
+            # need to create a few more DependencySets.
+            pkg.providesMap[path] = deps.DependencySet()
+
+        if provision.startswith("soname:"):
+            if m.name != 'ELF':
+                # Only ELF files can provide sonames.
+                # This is for libraries that don't really include a soname,
+                # but programs linked against them require a soname
+                main = provision[7:].strip()
+                abi = m.contents['abi']
+                pkg.providesMap[path].addDep(deps.SonameDependencies,
+                    deps.Dependency('/'.join((abi[0], main)), abi[1]))
+
+        if provision.startswith("abi:"):
+            abistring = provision[4:].strip()
+            op = abistring.index('(')
+            abi = abistring[:op]
+            flags = abistring[op+1:-1].split()
+            pkg.providesMap[path].addDep(deps.AbiDependency,
+                deps.Dependency(abi, flags))
+
+        if provision.startswith("file"):
+            # can't actually specify what to provide, just that it provides...
+            f.flags.isPathDependencyTarget(True)
 
 
 class Flavor(policy.Policy):

@@ -17,10 +17,11 @@ from lib import util
 
 DEP_CLASS_ABI		= 0
 DEP_CLASS_IS		= 1
-DEP_CLASS_SONAME	= 2
+DEP_CLASS_OLD_SONAME	= 2
 DEP_CLASS_FILES		= 3
 DEP_CLASS_TROVES	= 4
 DEP_CLASS_USE		= 5
+DEP_CLASS_SONAME	= 6
 
 dependencyClasses = {}
 
@@ -28,8 +29,7 @@ def _registerDepClass(classObj):
     global dependencyClasses
     dependencyClasses[classObj.tag] = classObj
 
-class Dependency:
-
+class BaseDependency:
     """
     Implements a single dependency. This is relative to a DependencyClass,
     which is part of a DependencySet. Dependency Sets can be frozen and
@@ -38,6 +38,35 @@ class Dependency:
     These are hashable, directly comparable, and implement a satisfies()
     method.
     """
+
+    def __hash__(self):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        raise NotImplementedError
+
+    def __str__(self):
+        raise NotImplementedError
+
+    def freeze(self):
+        raise NotImplementedError
+
+    def satisfies(self, required):
+        raise NotImplementedError
+
+    def mergeFlags(self, other):
+        raise NotImplementedError
+
+    def getName(self):
+        raise NotImplementedError
+
+    def getFlags(self):
+        raise NotImplementedError
+
+    def __init__(self):
+        raise NotImplementedError
+
+class Dependency(BaseDependency):
 
     def __hash__(self):
 	val = hash(self.name)
@@ -92,10 +121,10 @@ class Dependency:
 	return Dependency(self.name, allFlags)
 
     def getName(self):
-        return self.name
+        return (self.name,)
 
     def getFlags(self):
-        return self.flags.keys()
+        return (self.flags.keys(),)
 
     def __init__(self, name, flags = []):
 	self.name = name
@@ -120,6 +149,8 @@ def ThawDependency(frozen):
 class DependencyClass:
 
     def addDep(self, dep):
+        assert(dep.__class__ == self.depClass)
+
 	if self.members.has_key(dep.name):
 	    # this is a little faster then doing all of the work when
 	    # we could otherwise avoid it
@@ -191,6 +222,7 @@ class AbiDependency(DependencyClass):
     tagName = "abi"
     exactMatch = True
     justOne = True
+    depClass = Dependency
 _registerDepClass(AbiDependency)
 
 class InstructionSetDependency(DependencyClass):
@@ -199,7 +231,17 @@ class InstructionSetDependency(DependencyClass):
     tagName = "is"
     exactMatch = True
     justOne = True
+    depClass = Dependency
 _registerDepClass(InstructionSetDependency)
+
+class OldSonameDependencies(DependencyClass):
+
+    tag = DEP_CLASS_OLD_SONAME
+    tagName = "oldsoname"
+    exactMatch = True
+    justOne = False
+    depClass = Dependency
+_registerDepClass(OldSonameDependencies)
 
 class SonameDependencies(DependencyClass):
 
@@ -207,6 +249,7 @@ class SonameDependencies(DependencyClass):
     tagName = "soname"
     exactMatch = True
     justOne = False
+    depClass = Dependency
 _registerDepClass(SonameDependencies)
 
 class FileDependencies(DependencyClass):
@@ -215,6 +258,7 @@ class FileDependencies(DependencyClass):
     tagName = "file"
     exactMatch = True
     justOne = False
+    depClass = Dependency
 _registerDepClass(FileDependencies)
 
 class TroveDependencies(DependencyClass):
@@ -223,6 +267,7 @@ class TroveDependencies(DependencyClass):
     tagName = "trove"
     exactMatch = True
     justOne = False
+    depClass = Dependency
 _registerDepClass(TroveDependencies)
 
 class UseDependency(DependencyClass):
@@ -233,6 +278,7 @@ class UseDependency(DependencyClass):
     # have a Use flag flavor.
     exactMatch = False
     justOne = True
+    depClass = Dependency
 _registerDepClass(UseDependency)
 
 class DependencySet:

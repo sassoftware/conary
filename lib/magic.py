@@ -31,9 +31,13 @@ class ELF(Magic):
 	Magic.__init__(self, path, basedir)
 	self.contents['stripped'] = elf.stripped(basedir+path)
 	self.contents['hasDebug'] = elf.hasDebug(basedir+path)
-	provides = elf.inspect(basedir+path)[1]
-	if provides:
-	    self.contents['soname'] = provides[0][1]
+	requires, provides = elf.inspect(basedir+path)
+        for req in requires:
+            if req[0] == 'abi':
+                self.contents['abi'] = req[1:]
+        for prov in provides:
+            if prov[0] == 'soname':
+                self.contents['soname'] = prov[1]
 
 
 class ar(Magic):

@@ -14,8 +14,6 @@
 
 import sqlite3
 
-from lib.sha1helper import encodeFileId, decodeFileId, encodeStream, decodeStream
-
 class InstanceTable:
     """
     Generic table for assigning id's to a 3-tuple of IDs.
@@ -151,10 +149,9 @@ class FileStreams:
         # XXX this method is no longer used.  trovestore handles inserting
         # the filestreams itself.
 	(fileId, versionId) = key
-	fileId = encodeFileId(fileId)
         cu = self.db.cursor()
         cu.execute("INSERT INTO FileStreams VALUES (NULL, ?, ?, ?)",
-                   (fileId, versionId, encodeStream(stream)))
+                   (fileId, versionId, stream))
 	return cu.lastrowid
         
     def __delitem__(self, key):
@@ -162,14 +159,14 @@ class FileStreams:
         cu = self.db.cursor()
         cu.execute("DELETE FROM FileStreams WHERE "
 			"fileId=? and versionId=?",
-                   (encodeFileId(fileId), versionId))
+                   (fileId, versionId))
 
     def has_key(self, key):
 	(fileId, versionId) = key
         cu = self.db.cursor()
         cu.execute("SELECT stream from FileStreams WHERE "
 		    "fileId=? and versionId=?",
-                   (encodeFileId(fileId), versionId))
+                   (fileId, versionId))
         row = cu.fetchone()
 	return row is not None
 
@@ -178,18 +175,18 @@ class FileStreams:
         cu = self.db.cursor()
         cu.execute("SELECT stream from FileStreams WHERE "
 		    "fileId=? and versionId=?",
-                   (encodeFileId(fileId), versionId))
+                   (fileId, versionId))
         row = cu.fetchone()
         if row is None:
             raise KeyError, key
-        return decodeStream(row[0])
+        return row[0]
 
     def getStreamId(self, key):
 	(fileId, versionId) = key
         cu = self.db.cursor()
         cu.execute("SELECT streamId from FileStreams WHERE "
 		    "fileId=? and versionId=?",
-                   (encodeFileId(fileId), versionId))
+                   (fileId, versionId))
         row = cu.fetchone()
         if row is None:
             raise KeyError, key

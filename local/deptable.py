@@ -14,6 +14,8 @@
 
 from deps import deps
 
+NO_FLAG_MAGIC = '-*none*-'
+
 class DepTable:
     def __init__(self, db):
         cu = db.cursor()
@@ -25,6 +27,8 @@ class DepTable:
                                                     name str,
                                                     flag str
                                                     )""")
+            cu.execute("""CREATE INDEX DependenciesIdx ON Dependencies(
+                                                    class, name, flag)""")
 
 class DepUser:
     def __init__(self, db, name):
@@ -36,18 +40,22 @@ class DepUser:
                                           depId integer
                                          )""" % name)
             cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name))
+            cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name))
 
 class DependencyTables:
 
     def _createTmpTable(self, cu, name):
         cu.execute("""CREATE TEMPORARY TABLE %s(
-                                              troveId int,
-                                              isProvides bool,
-                                              class integer,
-                                              name string,
-                                              flag string)""" % name)
+                                              troveId INT,
+                                              depNum INT,
+                                              flagCount INT,
+                                              isProvides BOOL,
+                                              class INTEGER,
+                                              name STRING,
+                                              flag STRING)""" % name)
 
-    def _populateTmpTable(self, cu, name, troveNum, requires, provides):
+    def _populateTmpTable(self, cu, name, depList, troveNum, requires, 
+                          provides):
         allDeps = []
         if requires:
             allDeps += [ (False, x) for x in 
@@ -58,17 +66,23 @@ class DependencyTables:
 
         for (isProvides, (classId, depClass)) in allDeps:
             for dep in depClass.getDeps():
-                flags = dep.getFlags()
-                if flags:
-                    for flag in flags:
-                        cu.execute("INSERT INTO %s VALUES(?, ?, ?, ?, ?)"
-                                        % name,
-                                   (troveNum, isProvides, classId, 
-                                    dep.getName(), flag))
-                else:
-                    cu.execute("INSERT INTO %s VALUES(?, ?, ?, ?, '')"
-                                        % name, 
-                               (troveNum, isProvides, classId, dep.getName()))
+                for (depName, flags) in zip(dep.getName(), dep.getFlags()):
+                    if flags:
+                        for flag in flags:
+                            cu.execute("INSERT INTO %s VALUES(?, ?, ?, ?, "
+                                                "?, ?, ?)" % name,
+                                       (troveNum, len(depList), len(flags), 
+                                        isProvides, classId, 
+                                        depName, flag))
+                    else:
+                        cu.execute(    "INSERT INTO %s VALUES(?, ?, ?, ?, "
+                                                "?, ?, ?)" % name,
+                                       (troveNum, len(depList), 1, 
+                                        isProvides, classId, 
+                                        depName, NO_FLAG_MAGIC))
+
+                if not isProvides:
+                    depList.append((troveNum, classId, dep))
 
     def _mergeTmpTable(self, cu, name):
         substDict = { 'name' : name }
@@ -123,7 +137,7 @@ class DependencyTables:
                         
                     last = (classId, name)
                     flags = []
-                    if flag:
+                    if flag != NO_FLAG_MAGIC:
                         flags.append(flag)
                     
             if last:
@@ -133,8 +147,8 @@ class DependencyTables:
 
     def add(self, cu, trove, troveId):
         self._createTmpTable(cu, "NeededDeps")
-        self._populateTmpTable(cu, "NeededDeps", troveId, trove.getRequires(), 
-                               trove.getProvides())
+        self._populateTmpTable(cu, "NeededDeps", [], troveId, 
+                               trove.getRequires(), trove.getProvides())
         self._mergeTmpTable(cu, "NeededDeps")
 
         cu.execute("DROP TABLE NeededDeps")
@@ -152,15 +166,44 @@ class DependencyTables:
         cu.execute("DROP TABLE suspectDepsOrig")
 
         cu.execute("""DELETE FROM Dependencies WHERE depId IN 
-                (SELECT suspectDeps.depId FROM suspectDeps LEFT OUTER JOIN 
+                (SELECT DISTINCT suspectDeps.depId FROM suspectDeps 
+                 LEFT OUTER JOIN 
                     (SELECT depId AS depId1,
-                            instanceId as instanceId1 FROM Requires UNION 
+                            instanceId AS instanceId1 FROM Requires UNION 
                      SELECT depId AS depId1,
-                            instanceId as instanceId1 FROM Provides)
+                            instanceId AS instanceId1 FROM Provides)
                     ON suspectDeps.depId = depId1
-                 WHERE instanceId1 is NULL)""")
+                 WHERE instanceId1 IS NULL)""")
 
         cu.execute("DROP TABLE suspectDeps")
+
+    def _resolve(self, cu):
+        cu.execute("""
+            SELECT depNum, instanceId FROM
+                (SELECT COUNT(DepCheck.troveId) as matchCount,
+                        DepCheck.flagCount as neededCount,
+                        DepCheck.depNum as depNum,
+                        Provides.instanceId as instanceId
+                    FROM Requires LEFT OUTER JOIN Provides ON
+                        Requires.depId == Provides.depId
+                    JOIN Dependencies ON
+                        Requires.depId == Dependencies.depId
+                    JOIN DepCheck ON
+                        Requires.instanceId == DepCheck.troveId AND
+                        Dependencies.class == DepCheck.class AND
+                        Dependencies.name == DepCheck.name AND
+                        Dependencies.flag == DepCheck.flag
+                    WHERE
+                        Requires.instanceId < 0 AND Provides.depId is not NULL
+                        AND NOT DepCheck.isProvides
+                    GROUP BY
+                        DepCheck.depNum,
+                        Provides.instanceId
+                 )
+                WHERE 
+                    matchCount == neededCount
+                """)
+
 
     def check(self, changeSet):
         # XXX
@@ -170,77 +213,50 @@ class DependencyTables:
         cu = self.db.cursor()
 
         self._createTmpTable(cu, "DepCheck")
-        i = None
+        depList = []
+        failedSets = []
         for i, trvCs in enumerate(changeSet.iterNewPackageList()):
-            self._populateTmpTable(cu, "DepCheck", -i - 1, trvCs.getRequires(), 
+            failedSets.append((trvCs.getName(), None, None))
+            self._populateTmpTable(cu, "DepCheck", depList, -i - 1, 
+                                   trvCs.getRequires(), 
                                    trvCs.getProvides())
-            cu.execute("INSERT INTO DepCheck VALUES(?, 1, ?, ?, '')",
-                       (i, deps.DEP_CLASS_TROVES, trvCs.getName()))
-        if i is None:
+
+            cu.execute("INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)",
+                       (-i - 1, 0, 1, True, deps.DEP_CLASS_TROVES, 
+                        trvCs.getName(), NO_FLAG_MAGIC))
+
+        if not failedSets:
             self.db.rollback()
             return (False, [])
 
-        failedSets = [ None ] * (i + 1)
-
         self._mergeTmpTable(cu, "DepCheck")
+        self._resolve(cu)
 
-        cu.execute("""SELECT Requires.instanceId,
-                             Dependencies.class,
-                             Dependencies.name,
-                             Dependencies.flag
-                FROM Requires LEFT OUTER JOIN Provides ON
-                    Requires.depId == Provides.depId
-                JOIN Dependencies ON
-                    Requires.depId == Dependencies.depId
-                WHERE
-                    Provides.depId is NULL AND Requires.instanceId < 0
-                ORDER BY 
-                    Requires.instanceId DESC,
-                    Dependencies.class ASC,
-                    Dependencies.name ASC""")
-
-        last = None
-        for (instanceId, classId, name, flag) in cu:
-            if classId == deps.DEP_CLASS_ABI or \
-               classId == deps.DEP_CLASS_FILES:
-                continue
-
-            instanceId = -instanceId
-
-            flags = []
-            depSet = deps.DependencySet()
-
-            if (instanceId, classId, name) == last:
-                flags.append(flag)
-            else:
-                if last:
-                    lastIdx = last[0] - 1
-                    if failedSets[lastIdx] is None:
-                        failedSets[lastIdx] = deps.DependencySet()
-
-                    failedSets[lastIdx].addDep(deps.dependencyClasses[last[1]],
-                                  deps.Dependency(last[2], flags))
-                    
-                last = (instanceId, classId, name)
-                flags = []
-                if flag:
-                    flags.append(flag)
-                    
-            if last:
-                lastIdx = last[0] - 1
-
-                if failedSets[lastIdx] is None:
-                    failedSets[lastIdx] = deps.DependencySet()
-
-                failedSets[lastIdx].addDep(deps.dependencyClasses[last[1]],
-                              deps.Dependency(last[2], flags))
+        for (depNum, instanceId) in cu:
+            depList[depNum] = None
 
         missingDeps = False
-        failedList = []
-        for i, trvCs in enumerate(changeSet.iterNewPackageList()):
-            if failedSets[i] is not None:
+        for depInfo in depList:
+            if depInfo is not None:
+                (troveIndex, classId, dep) = depInfo
+
+                if classId in [ deps.DEP_CLASS_ABI, deps.DEP_CLASS_FILES ]:
+                    continue
+
                 missingDeps = True
-                failedList.append((trvCs.getName(), failedSets[i]))
+                troveIndex = -(troveIndex + 1)
+
+                if failedSets[troveIndex][2] is None:
+                    failedSets[troveIndex] = (failedSets[troveIndex][0],
+                                              failedSets[troveIndex][1],
+                                              deps.DependencySet())
+                failedSets[troveIndex][2].addDep(
+                                deps.dependencyClasses[classId], dep)
+
+        failedList = []
+        for (name, classId, depSet) in failedSets:
+            if depSet is not None:
+                failedList.append((name, depSet))
 
         # no need to drop the DepCheck table since we're rolling this whole
         # transaction back anyway

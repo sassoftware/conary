@@ -326,7 +326,8 @@ class FilesystemJob:
 	    log.warning(msg)
 
 	if self.tagUpdates.has_key('shlib'):
-	    shlibAction(self.root, self.tagUpdates['shlib'])
+	    shlibAction(self.root, self.tagUpdates['shlib'],
+                        tagScript = tagScript)
 	    del self.tagUpdates['shlib']
 	elif runLdconfig:
 	    # override to force ldconfig to run on shlib removal
@@ -1077,11 +1078,8 @@ def buildLocalChanges(repos, pkgList, root = ""):
 
     return (changeSet, returnList)
 
-def shlibAction(root, shlibList):
+def shlibAction(root, shlibList, tagScript = None):
     p = "/sbin/ldconfig"
-
-    if os.getuid():
-	log.warning("ldconfig skipped (insufficient permissions)")
 
     # write any needed entries in ld.so.conf before running ldconfig
     sysetc = util.joinPaths(root, '/etc')
@@ -1123,7 +1121,10 @@ def shlibAction(root, shlibList):
 	    os.unlink(ldsotmpname)
 	    raise
 
-    if os.getuid():
+    if tagScript is not None:
+        f = open(tagScript, "a")
+        f.write("/sbin/ldconfig\n")
+    elif os.getuid():
 	log.warning("ldconfig skipped (insufficient permissions)")
     elif os.access(util.joinPaths(root, p), os.X_OK) != True:
 	log.error("/sbin/ldconfig is not available")

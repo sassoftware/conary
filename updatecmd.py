@@ -25,7 +25,7 @@ import conaryclient
 # conary client
 
 def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None, 
-                                  keepExisting = False):
+                                  keepExisting = False, depCheck = True):
     client = conaryclient.ConaryClient(repos, cfg)
 
     applyList = []
@@ -37,7 +37,8 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
             try:
                 cs = changeset.ChangeSetFromFile(pkgStr)
             except BadContainer, msg:
-                log.error("'%s' is not a valid conary changset: %s" % (pkgStr, msg))
+                log.error("'%s' is not a valid conary changset: %s" % 
+                          (pkgStr, msg))
                 sys.exit(1)
             applyList.append(cs)
         elif pkgStr.find("=") >= 0:
@@ -50,7 +51,8 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
             applyList.append(pkgStr)
             
     try:
-        client.updateTrove(applyList, replaceFiles, tagScript, keepExisting)
+        client.updateTrove(applyList, replaceFiles, tagScript, keepExisting,
+                           depCheck)
     except conaryclient.UpdateError, e:
         log.error(e)
     except repository.CommitError, e:

@@ -30,8 +30,6 @@ import versions
 from local import trovetroves
 from local import versiontable
 
-from lib.sha1helper import encodeFileId, decodeFileId, encodeStream, decodeStream
-
 class LocalRepVersionTable(versiontable.VersionTable):
 
     def getId(self, theId, itemId):
@@ -568,7 +566,7 @@ class TroveStore:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
-	    trv.addFile(decodeFileId(fileId), path, version)
+	    trv.addFile(fileId, path, version)
 
         self.depTables.get(cu, trv, troveInstanceId)
 
@@ -596,13 +594,10 @@ class TroveStore:
 
 	versionCache = {}
 	for (fileId, path, versionId, stream) in cu:
-            stream = decodeStream(stream)
 	    version = versionCache.get(versionId, None)
 	    if not version:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
-
-	    fileId = decodeFileId(fileId)
 
 	    if withFiles and stream:
 		fileObj = files.ThawFile(stream, fileId)
@@ -677,12 +672,12 @@ class TroveStore:
 	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
 
 	if fileObj:
-	    stream = encodeStream(fileObj.freeze())
+	    stream = fileObj.freeze()
 	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?)", 
-		       (encodeFileId(fileId), versionId, stream, path))
+		       (fileId, versionId, stream, path))
 	else:
 	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, NULL, ?)", 
-		       (encodeFileId(fileId), versionId, path))
+		       (fileId, versionId, path))
 
     def getFile(self, fileId, fileVersion):
 	versionId = self.versionTable[fileVersion]
@@ -707,7 +702,7 @@ class TroveStore:
 		verCache[fileVersion] = versionId
 
 	    cu.execute("INSERT INTO getFilesTbl VALUES(NULL, ?, ?)",
-		       (encodeFileId(fileId), versionId), 
+		       (fileId, versionId), 
 		       start_transaction = False)
 	    lookup[cu.lastrowid] = (fileId, fileVersion)
 
@@ -720,7 +715,6 @@ class TroveStore:
 	d = {}
 	for rowId, stream in cu:
 	    fileId, version = lookup[rowId]
-            stream = decodeStream(stream)
 	    d[(fileId, version)] = files.ThawFile(stream, fileId)
 
 	cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
@@ -730,7 +724,7 @@ class TroveStore:
     def hasFile(self, fileId, fileVersion):
 	versionId = self.versionTable.get(fileVersion, None)
 	if not versionId: return False
-	return self.fileStreams.has_key((encodeFileId(fileId), versionId))
+	return self.fileStreams.has_key((fileId, versionId))
 
     def eraseFile(Self, fileId, fileVersion):
 	# we automatically remove files when no troves reference them. 

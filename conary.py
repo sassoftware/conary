@@ -87,6 +87,7 @@ def usage(rc = 1):
     print "                --tags"
     print ""
     print "update flags: --keep-existing"
+    print "              --no-deps"
     print "              --replace-files"
     return rc
 
@@ -119,6 +120,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["info"] = NO_PARAM
     argDef["install-label"] = MULT_PARAM
     argDef["keep-existing"] = NO_PARAM
+    argDef["no-deps"] = NO_PARAM
     argDef["leaves"] = NO_PARAM
     argDef["path"] = MULT_PARAM
     argDef["ls"] = NO_PARAM
@@ -332,6 +334,11 @@ def realMain(cfg, argv=sys.argv):
 	if replaceFiles:
 	    kwargs['replaceFiles'] = True
 	    del argSet['replace-files']
+
+	noDeps = argSet.has_key('no-deps')
+	if noDeps:
+	    kwargs['depCheck'] = False
+	    del argSet['no-deps']
 
 	keepExisting = argSet.has_key('keep-existing')
 	if keepExisting:

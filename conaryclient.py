@@ -56,7 +56,7 @@ class ConaryClient:
         self.db = database.Database(cfg.root, cfg.dbPath)
 
     def updateTrove(self, itemList, replaceFiles = False,
-                    tagScript = None, keepExisting = None):
+                    tagScript = None, keepExisting = None, depCheck = True):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -160,7 +160,8 @@ class ConaryClient:
 
         self.db.commitChangeSet(finalCs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
-                                keepExisting = keepExisting)
+                                keepExisting = keepExisting,
+                                depCheck = depCheck)
 
     def eraseTrove(self, troveList, tagScript = None):
         list = []

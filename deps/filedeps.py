@@ -25,18 +25,27 @@ def findFileDependencies(path):
 	return None
 
     rc = []
+
+    abi = None
+    for (depClass, main, flags) in results[0]:
+        if depClass == 'abi':
+            abi = (main, flags)
+            break
     
     for depList in results:
 	set = deps.DependencySet()
 	for (depClass, main, flags) in depList:
 	    if depClass == 'soname':
+                assert(abi)
 		curClass = deps.SonameDependencies
+                dep = deps.Dependency(abi[0] + "/" + main, abi[1] + flags)
 	    elif depClass == 'abi':
 		curClass = deps.AbiDependency
+                dep = deps.Dependency(main, flags)
 	    else:
 		assert(0)
 
-	    set.addDep(curClass, deps.Dependency(main, flags))
+	    set.addDep(curClass, dep)
 	rc.append(set)
 
     return rc
