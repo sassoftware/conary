@@ -33,7 +33,8 @@ def usage():
     print ""
 
 def verify(troveNameList, db, cfg, all=False):
-    (troveNames, hasVersions) = display.parseTroveStrings(troveNameList)
+    (troveNames, hasVersions, hasFlavors) = \
+                    display.parseTroveStrings(troveNameList, cfg.flavor)
     if not troveNames and not all:
         usage()
         log.error("must specify either a trove or --all")
@@ -42,10 +43,11 @@ def verify(troveNameList, db, cfg, all=False):
 	troveNames = [ (x, None) for x in db.iterAllTroveNames() \
                                           if x.find(':') == -1 ]
 	troveNames.sort()
-    for (troveName, versionStr) in troveNames:
+    for (troveName, versionStr, flavor) in troveNames:
         try:
             for trove in db.findTrove(troveName, versionStr):
-                verifyTrove(trove, db, cfg)
+                if not flavor or trove.getFlavor().satisfies(flavor):
+                    verifyTrove(trove, db, cfg)
         except repository.PackageNotFound:
             if versionStr:
                 log.error("version %s of trove %s is not installed",
