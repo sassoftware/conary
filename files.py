@@ -22,10 +22,8 @@ import stat
 import streams
 import string
 import struct
-import sys
 import tempfile
 import time
-import types
 from lib import util
 
 from deps import filedeps, deps
