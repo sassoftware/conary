@@ -224,9 +224,6 @@ class ConaryClient:
             for (name, changeList) in primaryTroveCs.iterChangedTroves():
                 for (changeType, version, flavor, byDef) in changeList:
                     if changeType == '-': 
-                        # XXX GROUPS we should do something better here (like
-                        # check this against the erase list in the
-                        # changeset)
                         continue
 
                     troveCs = cs.getNewPackageVersion(name, version, flavor)
