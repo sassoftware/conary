@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004 Specifix, Inc.
+# Copyright (c) 2004-2005 Specifix, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -11,6 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+
+SUBDIRS=templates
 
 python_files = apachehooks.py \
 	       server.py      \
