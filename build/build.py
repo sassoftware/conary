@@ -424,7 +424,7 @@ class _FileAction(BuildAction):
 		if mode & 06000:
 		    self.recipe.AddModes(mode, util.literalRegex(path))
 	    if isdir and mode != 0755:
-		self.recipe.ExcludeDirectories(exceptions=util.literalRegex(path))
+		self.recipe.ExcludeDirectories(exceptions=util.literalRegex(path).replace('%', '%%'))
 	    # set explicitly, do not warn
 	    self.recipe.WarnWriteable(exceptions=util.literalRegex(path).replace('%', '%%'))
 
@@ -882,10 +882,9 @@ class MakeDirs(_FileAction):
             for d in dirs:
 		if d[0] != '/':
 		    raise TypeError, 'Inappropriately relative directory %s: directories must start with "/"' %d
-                d = d %macros
                 dest = macros['destdir'] + d
                 log.debug('creating directory %s', d)
-		self.setComponents(d)
+		self.setComponents(d.replace('%', '%%'))
                 util.mkdirChain(dest)
                 self.chmod(macros['destdir'], d)
 
