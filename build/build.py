@@ -148,6 +148,7 @@ class Configure(ShellCommand):
     template = (
 	'cd %%(builddir)s; '
 	'%%(mkObjdir)s '
+	'%%(cdSubDir)s '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 	' %(preConfigure)s %%(configure)s'
 	# XXX host/build/target here
@@ -166,14 +167,16 @@ class Configure(ShellCommand):
 	' --infodir=%%(infodir)s'
 	'  %(args)s')
     keywords = {'preConfigure': '',
-                'objDir': ''}
+                'objDir': '',
+		'subDir': ''}
 
     def __init__(self, *args, **keywords):
         """Create a new Configure instance used to run the autoconf configure
         command with default parameters
-        @keyword mkObjdir: make an object directory before running configure.
+        @keyword objDir: make an object directory before running configure.
         This is useful for applications which do not support running configure
         from the same directory as the sources (srcdir != objdir)
+	@keyword subDir: relative subdirectory in which to run configure
         @keyword preConfigure: Extra shell script which is inserted in front of
         the configure command.
         """
@@ -189,6 +192,8 @@ class Configure(ShellCommand):
 	    macros['configure'] = '../configure'
         else:
             macros['configure'] = './configure'
+	if self.subDir:
+	    macros['cdSubDir'] = 'cd %s;' %self.subDir
         util.execute(self.command %macros)
 
 class ManualConfigure(Configure):
