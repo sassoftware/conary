@@ -114,45 +114,49 @@ class Database(repository.LocalRepository):
     # local changes includes the A->A.local portion of a rollback; if it
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
-    def commitChangeSet(self, cs, localRollback = None):
+    def commitChangeSet(self, cs, isRollback = False, toDatabase = True):
 	assert(not cs.isAbstract())
 
 	for pkg in cs.getNewPackageList():
 	    if pkg.name.endswith(":sources"): raise SourcePackageInstall
 
-	if not localRollback:
-	    # create the change set from A->A.local
-	    for newPkg in cs.getNewPackageList():
-		name = newPkg.getName()
-		old = newPkg.getOldVersion()
-		pkgList = []
-		if self.hasPackage(name) and old:
-		    ver = old.fork(versions.LocalBranch(), sameVerRel = 1)
-		    pkg = self.getPackageVersion(name, old)
-		    assert(pkg)
-		    pkgList.append((pkg, pkg, ver))
-	    result = update.buildLocalChanges(self, pkgList, root = self.root)
-	    if not result: return
+	# create the change set from A->A.local
+	pkgList = []
+	for newPkg in cs.getNewPackageList():
+	    name = newPkg.getName()
+	    old = newPkg.getOldVersion()
+	    if self.hasPackage(name) and old:
+		ver = old.fork(versions.LocalBranch(), sameVerRel = 1)
+		pkg = self.getPackageVersion(name, old)
+		assert(pkg)
+		pkgList.append((pkg, pkg, ver))
 
-	    (localChanges, retList) = result
-	    fsPkgDict = {}
-	    for (changed, fsPkg) in retList:
-		fsPkgDict[fsPkg.getName()] = fsPkg
+	result = update.buildLocalChanges(self, pkgList, root = self.root)
+	if not result: return
 
+	(localChanges, retList) = result
+	fsPkgDict = {}
+	for (changed, fsPkg) in retList:
+	    fsPkgDict[fsPkg.getName()] = fsPkg
+
+	if not isRollback:
 	    inverse = cs.makeRollback(self, configFiles = 1)
-	else:
-	    assert(0)
-	    localChanges = localRollback
 
 	# Build and commit A->B
-	job = DatabaseChangeSetJob(self, cs)
-	undo = repository.ChangeSetUndo(self)
+	if toDatabase:
+	    job = DatabaseChangeSetJob(self, cs)
+	    undo = repository.ChangeSetUndo(self)
 
 	try:
 	    # add new packages
-	    job.commit(undo)
+	    if toDatabase: job.commit(undo)
 	    # build the list of things to commit
-	    fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root)
+	    if isRollback:
+		fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root,
+					     merge = False)
+	    else:
+		fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root,
+					     merge = True)
 	    # remove old packages
 	    errList = fsJob.getErrorList()
 	    if errList:
@@ -161,16 +165,16 @@ class Database(repository.LocalRepository):
 		# FIXME need a --force for this
 		#return
 
-	    job.removals(undo)
+	    if toDatabase: job.removals(undo)
 	except:
 	    # this won't work it things got too far, but it won't hurt
 	    # anything either
-	    undo.undo()
+	    if toDatabase: undo.undo()
 	    raise
 
 	# everything is in the database... save this so we can undo
 	# it later. 
-	if not localRollback:
+	if not isRollback:
 	    self.addRollback(inverse, localChanges)
 
 	fsJob.apply()
@@ -277,8 +281,9 @@ class Database(repository.LocalRepository):
 	    last -= 1
 
 	for name in names:
-	    (repostCs, localCs) = self.getRollback(name)
-	    self.commitChangeSet(repostCs, localRollback = localCs)
+	    (reposCs, localCs) = self.getRollback(name)
+	    self.commitChangeSet(reposCs, isRollback = True)
+	    self.commitChangeSet(localCs, isRollback = True, toDatabase = False)
 	    self.removeRollback(name)
 
     def __init__(self, root, path, mode = "r"):
@@ -299,9 +304,12 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	    self.repos.eraseFileVersion(fileId, fileVersion)
 	    undo.removedFile(fileId, fileVersion, fileObj)
 
-	### FIXME: we don't restore the contents of config files!
+	undo.reset()
+	for (fileId, fileVersion, fileObj) in self.oldFileList():
+	    if fileObj.hasContents and fileObj.isConfig():
+		self.repos.removeFileContents(fileObj.sha1())
 
-    # remove the specified file and it's local branch
+    # remove the specified file 
     def removeFile(self, fileId, version):
 	# we need this object in case of an undo
 	fileObj = self.repos.getFileVersion(fileId, version)
