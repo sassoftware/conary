@@ -172,6 +172,21 @@ class SymbolicLink(File):
 
 	File.__init__(self, path, version, info)
 
+class Directory(File):
+
+    def infoLine(self):
+	return "d %s" % (File.infoLine(self))
+
+    def compare(self, other):
+	return File.compare(self, other)
+
+    def copy(self, source, target):
+	if not os.path.exists(target):
+	    os.mkdir(target)
+
+    def __init__(self, path, version = None, info = None):
+	File.__init__(self, path, version, info)
+
 class RegularFile(File):
 
     def md5(self, md5 = None):
@@ -261,6 +276,9 @@ def FileFromFilesystem(root, path):
 	f = SymbolicLink(path)
 	f.perms(0777)
 	f.linkTarget(os.readlink(root + path))
+    elif (stat.S_ISDIR(perms)):
+	f = Directory(path)
+	f.perms(perms & 07777)
     else:
 	raise TypeError, "unsupported file type for %s" % path
 
@@ -276,5 +294,7 @@ def FileFromInfoLine(path, version, infoLine):
 	return RegularFile(path, version, infoLine)
     elif type == "l":
 	return SymbolicLink(path, version, infoLine)
+    elif type == "d":
+	return Directory(path, version, infoLine)
     else:
 	raise KeyError, "bad infoLine %s" % infoLine
