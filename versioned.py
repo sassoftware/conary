@@ -260,7 +260,7 @@ class VersionedFile:
 	     not self.createBranches and len(self.branchMap.keys()):
 	    # the branch doesn't exist, but other branches do, and
 	    # we're not supposed to create branches automatically
-	    raise VersionedFileMissingBranchError(self.key, version.branch())
+	    raise MissingBranchError(self.key, version.branch())
 	elif not self.branchMap.has_key(branchStr):
 	    # create a new branch
 	    self.createBranch(version.branch())
@@ -340,7 +340,7 @@ class VersionedFile:
 	self._readBranchMap()
 	branchStr = branch.asString()
 	if not self.branchMap.has_key(branchStr):
-	    raise VersionedFileMissingBranchError(self.key, branch)
+	    raise MissingBranchError(self.key, branch)
 
 	del self.branchMap[branchStr]
 	self._writeBranchMap()
@@ -448,7 +448,7 @@ class VersionedFile:
 	try:
 	    curr = self.branchMap[branch.asString()]
 	except KeyError:
-	    raise VersionedFileMissingBranchError(self.key, branch)
+	    raise MissingBranchError(self.key, branch)
 
 	list = []
 	while curr:
@@ -592,7 +592,7 @@ class VersionedFileError(Exception):
 
     pass
 
-class VersionedFileMissingBranchError(VersionedFileError):
+class MissingBranchError(VersionedFileError):
 
     def __str__(self):
 	return "file %s does not contain branch %s" % (self.name, 
