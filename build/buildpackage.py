@@ -86,7 +86,7 @@ class BuildPackage(dict):
 	dict.__init__(self)
 
 class Filter:
-    def __init__(self, name, relist):
+    def __init__(self, name, relist, macros):
 	self.name = name
 	tmplist = []
 	if type(relist) is str:
@@ -99,7 +99,7 @@ class Filter:
 		    subre = subre + '$'
 		tmplist.append('(' + subre + ')')
 	    regexp = string.join(tmplist, '|')
-	self.regexp = re.compile(regexp)
+	self.regexp = re.compile(regexp %macros)
 
     def match(self, string):
 	# search instead of match in order to not automatically
@@ -132,11 +132,12 @@ class AutoBuildPackage:
 	for main in self.mainFilters:
 	    for sub in self.subFilters:
 		name = self._getname(namePrefix, main.name, sub.name)
-                package = BuildPackage(name, version)
-		self.packages[name] = package
-		if not self.packageMap.has_key(main):
+		if name not in self.packages:
+		    package = BuildPackage(name, version)
+		    self.packages[name] = package
+		if main not in self.packageMap:
 		    self.packageMap[main] = {}
-		self.packageMap[main][sub] = package
+		self.packageMap[main][sub] = self.packages[name]
 
     def _getname(self, prefix, pkgname, subname):
         return string.join((prefix, pkgname, subname), ':')

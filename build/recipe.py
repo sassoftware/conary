@@ -447,7 +447,16 @@ class Recipe:
     def packages(self, namePrefix, version, root):
         # by default, everything that hasn't matched a pattern in the
         # main package filter goes in the package named self.name
-        self.mainFilters.append(buildpackage.Filter(self.name, '.*'))
+        self.mainFilters.append(buildpackage.Filter(self.name, '.*',
+						    self.macros))
+	# the extras need to come first in order to override decisions
+	# in the base subfilters
+	for (name, patterns) in self.extraSubFilters:
+	    self.subFilters.append(buildpackage.Filter(name, patterns,
+						       self.macros))
+	for (name, patterns) in baseSubFilters:
+	    self.subFilters.append(buildpackage.Filter(name, patterns,
+						       self.macros))
 	self.autopkg = buildpackage.AutoBuildPackage(namePrefix, version,
                                                      self.mainFilters,
                                                      self.subFilters)
@@ -531,10 +540,10 @@ class Recipe:
 	if extraMacros:
 	    self.addMacros(extraMacros)
             
-	self.subFilters = []
-	for pattern in baseSubFilters:
-	    self.subFilters.append(buildpackage.Filter(*pattern))
+	self.extraSubFilters = []
+
 	self.mainFilters = []
+	self.subFilters = []
 
 class RecipeFileError(Exception):
     def __init__(self, msg):
