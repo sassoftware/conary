@@ -178,12 +178,14 @@ class StringStream(InfoStream):
 class Sha1Stream(StringStream):
 
     def freeze(self):
+	assert(len(self.s) == 40)
 	return struct.pack("!5I", int(self.s[ 0: 8], 16), 
 		int(self.s[ 8:16], 16), int(self.s[16:24], 16), 
 		int(self.s[24:32], 16), int(self.s[32:40], 16))
 
     def thaw(self, data):
 	if data:
+	    assert(len(data) == 20)
 	    self.s = "%08x%08x%08x%08x%08x" % struct.unpack("!5I", data)
 
 class FrozenVersionStream(InfoStream):

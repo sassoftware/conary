@@ -607,42 +607,58 @@ class ReferencedFileList(list, streams.InfoStream):
 
     def freeze(self):
 	l = []
+
+	# XXX this can go away once we track binary fileids
+	sha1 = streams.Sha1Stream()
+
 	for (fileId, path, version) in self:
-	    l.append(fileId)
-	    if path:
-		l.append(path)
-	    else:
-		l.append("")
+	    sha1.set(fileId)
+	    l.append(sha1.freeze())
+	    if not path:
+		path = ""
+
+	    l.append(struct.pack("!H", len(path)))
+	    l.append(path)
 
 	    if version:
-		l.append(version.asString())
+		version = version.asString()
 	    else:
-		l.append("")
+		version = ""
 
-	return "\0".join(l)
+	    l.append(struct.pack("!H", len(version)))
+	    l.append(version)
+
+	return "".join(l)
 
     def thaw(self, data):
 	del self[:]
 	if not data:
 	    return
 
-	l = data.split("\0")
 	i = 0
-	while i < len(l):
-	    fileId = l[i]
-	    if l[i + 1]:
-		path = l[i + 1]
+	while i < len(data):
+	    # XXX this can go away once we track binary fileids
+	    sha1 = streams.Sha1Stream(data[i:i+20])
+	    fileId = sha1.value()
+	    i += 20
+
+	    pathLen = struct.unpack("!H", data[i:i+2])[0]
+	    i += 2
+	    if pathLen:
+		path = data[i:i + pathLen]
+		i += pathLen
 	    else:
 		path = None
 
-	    if l[i + 2]:
-		version = versions.VersionFromString(l[i + 2])
+	    versionLen = struct.unpack("!H", data[i:i+2])[0]
+	    i += 2
+	    if versionLen:
+		version = versions.VersionFromString(data[i:i + versionLen])
+		i += versionLen
 	    else:
 		version = None
 
 	    self.append((fileId, path, version))
-
-	    i += 3
 
     def __init__(self, data = None):
 	list.__init__(self)

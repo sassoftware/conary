@@ -63,9 +63,8 @@ class DeviceStream(streams.TupleStream):
 class RegularFileStream(streams.TupleStream):
 
     __slots__ = []
-
     makeup = (("size", streams.LongLongStream, 8), 
-	      ("sha1", streams.StringStream, 40))
+	      ("sha1", streams.Sha1Stream, 40))
 
     def size(self):
         return self.items[0].value()
@@ -78,6 +77,12 @@ class RegularFileStream(streams.TupleStream):
 
     def setSha1(self, value):
         return self.items[1].set(value)
+
+class OldRegularFileStream(streams.TupleStream):
+
+    __slots__ = []
+    makeup = (("size", streams.LongLongStream, 8), 
+	      ("sha1", streams.StringStream, 40))
     
 class InodeStream(streams.TupleStream):
 
@@ -509,7 +514,9 @@ def FileFromFilesystem(path, fileId, possibleMatch = None, buildDeps = False):
 
     if needsSha1:
 	sha1 = sha1helper.hashFile(path)
-	f.contents = RegularFileStream(s.st_size, sha1)
+	f.contents = RegularFileStream()
+	f.contents.setSize(s.st_size)
+	f.contents.setSha1(sha1)
 
     if buildDeps and f.hasContents and isinstance(f, RegularFile):
 	result = filedeps.findFileDependencies(path)
