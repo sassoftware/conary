@@ -468,6 +468,11 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     flavor = deps.deps.DependencySet()
 
     bldList = recipeObj.getPackages()
+    if not bldList:
+	# no components in packages
+	log.warning('Cowardlily refusing to create empty package %s'
+		    %recipeClass.name)
+	return
 
     for buildPkg in bldList:
 	flavor.union(buildPkg.flavor)

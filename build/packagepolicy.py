@@ -823,9 +823,7 @@ class ExcludeDirectories(policy.Policy):
 	    log.debug('excluding directory %s with mode %o', path, mode&0777)
 	elif not os.listdir(fullpath):
 	    log.debug('excluding empty directory %s', path)
-	del self.recipe.autopkg.pkgMap[path][path]
-	del self.recipe.autopkg.pkgMap[path]
-	del self.recipe.autopkg.pathMap[path]
+	self.recipe.autopkg.delFile(path)
 
 
 class _requirements(policy.Policy):

@@ -178,6 +178,18 @@ class AutoBuildPackage:
 	self.pathMap[path] = pkg.getFile(path)
 	self.pkgMap[path] = pkg
 
+    def delFile(self, path):
+        """
+	Remove a file from the package and from the caches.
+
+        @param path: path to remove from the BuildPackage
+        @type path: str
+        @rtype: None
+        """
+	del self.pkgMap[path][path]
+	del self.pkgMap[path]
+	del self.pathMap[path]
+
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
         """
