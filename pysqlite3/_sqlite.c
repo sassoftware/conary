@@ -473,8 +473,9 @@ aggregate_step(sqlite3_context *context, int argc, sqlite3_value **argv)
 		}
 	}
 
-	if (PyErr_Occurred())
+	if (PyErr_Occurred()) {
 		PRINT_OR_CLEAR_ERROR;
+	}
 
 	function_result = PyObject_CallObject(stepmethod, args);
 	Py_DECREF(args);
