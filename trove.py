@@ -810,7 +810,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	if self.isAbsolute():
 	    f.write("absolute ")
 	elif self.getOldVersion():
-	    f.write("from %s to " % self.getOldVersion.asString())
+	    f.write("from %s to " % self.getOldVersion().asString())
 	else:
 	    f.write("new ")
 
