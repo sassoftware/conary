@@ -1,3 +1,6 @@
+Changes in 0.14.10:
+  * FlavorMap sense wasn't set right for base instruction set
+
 Changes in 0.14.9:
   * Shadow Branch objects didn't return parent branches properly. This
     caused incorrect pathId's to show up on cook on shallow shadows.
