@@ -75,6 +75,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
         return path
 
     def do_GET(self):
+        if self.path.endswith('/'):
+            self.path = self.path[:-1]
         base = os.path.basename(self.path).split('?')[0]
         
         if base != 'changeset':
