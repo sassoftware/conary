@@ -989,11 +989,11 @@ class IgnoredSetuid(policy.Policy):
 
 class _userData(policy.Policy):
     def __init__(self, *args, **keywords):
-	self.namemap = {}
 	policy.Policy.__init__(self, *args, **keywords)
-        self._publish()
+        self._create()
     def test(self):
-        # Ownership does all the work for subclasses of _userData
+        # Ownership, UtilizeUser, and UtilizeGroup do all the per-file
+        # work for subclasses of _userData
         return False
 
 
@@ -1019,10 +1019,10 @@ class User(_userData):
         homedir = keywords.get('homedir', None)
         comment = keywords.get('comment', None)
         shell = keywords.get('shell', '/sbin/nologin')
-        self.namemap[name] = (uid, group, groupid, homedir, comment, shell)
+        self.recipe.usermap[name] = (uid, group, groupid, homedir, comment, shell)
         self.recipe.usergrpmap[group] = name
-    def _publish(self):
-        self.recipe.usermap=self.namemap
+    def _create(self):
+        self.recipe.usermap={}
         self.recipe.usergrpmap={}
 
 
@@ -1036,9 +1036,9 @@ class SupplementalGroup(_userData):
     def updateArgs(self, *args, **keywords):
         assert(len(args) == 3)
         user, group, groupid = args
-        self.namemap[user] = (group, groupid)
-    def _publish(self):
-        self.recipe.suppmap=self.namemap
+        self.recipe.suppmap[user] = (group, groupid)
+    def _create(self):
+        self.recipe.suppmap={}
 
 
 class Group(_userData):
@@ -1053,9 +1053,9 @@ class Group(_userData):
     def updateArgs(self, *args, **keywords):
         assert(len(args) == 2)
         group, groupid = args
-        self.namemap[group] = (groupid,)
-    def _publish(self):
-        self.recipe.grpmap=self.namemap
+        self.recipe.grpmap[group] = groupid
+    def _create(self):
+        self.recipe.grpmap={}
 
 
 class Ownership(policy.Policy):
@@ -1135,6 +1135,71 @@ class Ownership(policy.Policy):
             elif group not in self.systemgroups:
                 log.warning('Group "%s" missing definition for file %s',
                     group, filename)
+
+
+class _Utilize(policy.Policy):
+    """
+    Pure virtual base class for C{UtilizeUser} and C{UtilizeGroup}
+    """
+    def __init__(self, *args, **keywords):
+	self.filespecs = []
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def updateArgs(self, *args, **keywords):
+	"""
+	call as::
+	  UtilizeFoo(item, filespec(s)...)
+	List them in order, most specific first, ending with most
+	general; the filespecs will be matched in the order that
+	you provide them.
+	"""
+	if args:
+	    for filespec in args[1:]:
+		self.filespecs.append((filespec, args[0]))
+	policy.Policy.updateArgs(self, **keywords)
+
+    def doProcess(self, recipe):
+	self.rootdir = self.rootdir % recipe.macros
+	self.fileFilters = []
+	for (filespec, item) in self.filespecs:
+	    self.fileFilters.append(
+		(filter.Filter(filespec, recipe.macros), item))
+	del self.filespecs
+	policy.Policy.doProcess(self, recipe)
+
+    def doFile(self, path):
+	for (f, item) in self.fileFilters:
+	    if f.match(path):
+		self._markItem(path, thing)
+		return
+
+
+class UtilizeUser(_Utilize):
+    """
+    Marks files as requiring a user definition to exist even though
+    the file is not owned by that user:
+    C{r.UtilizeUser(I{username}, I{filterexp}...)}
+    This is particularily useful for daemons that are setuid root
+    but change their user id to a user id with no filesystem permissions
+    after they start.
+    Warning: this is not yet implemented, only stubbed out.
+    """
+    def _markItem(self, path, user):
+        pass
+
+
+class UtilizeGroup(_Utilize):
+    """
+    Marks files as requiring a user definition to exist even though
+    the file is not owned by that user:
+    C{r.UtilizeGroup(I{groupname}, I{filterexp}...)}
+    This is particularily useful for daemons that are setuid root
+    but change their group id to a group id with no filesystem permissions
+    after they start.
+    Warning: this is not yet implemented, only stubbed out.
+    """
+    def _markItem(self, path, group):
+        pass
 
 
 class ExcludeDirectories(policy.Policy):
@@ -1475,6 +1540,8 @@ def DefaultPolicy(recipe):
         SupplementalGroup(recipe),
         Group(recipe),
 	Ownership(recipe),
+        UtilizeUser(recipe),
+        UtilizeGroup(recipe),
 	ExcludeDirectories(recipe),
 	LinkCount(recipe),
 	Requires(recipe),

@@ -152,6 +152,32 @@ class BuildPackage(dict):
         """
 	return self.name
 
+    def getUserMap():
+        """
+        Dict mapping user names to tuples of C{(preferred_uid, groupname,
+        preferred_groupid, homedir, comment, shell)}
+        """
+        return self.recipe.usermap
+
+    def getUserGroupMap():
+        """
+        Reverse map from group name to user name for groups created as part
+        of a user definition.
+        """
+        return self.recipe.usergrpmap
+
+    def getGroupMap():
+        """
+        Dict mapping group names to preferred_groupid
+        """
+        return self.recipe.groupmap
+
+    def getSuppGroupMap():
+        """
+        Dict mapping user names to C{(group, preferred_groupid)} tuples
+        """
+        return self.recipe.suppmap
+
     def __init__(self, name, recipe):
 	self.name = name
         self.requires = deps.DependencySet()
@@ -163,6 +189,7 @@ class BuildPackage(dict):
         self.isnsetMap = {}
         self.hardlinks = []
         self.badhardlinks = []
+        self.recipe = recipe
 	dict.__init__(self)
 
 
