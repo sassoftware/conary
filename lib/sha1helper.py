@@ -12,6 +12,7 @@ def hashFile(path):
     while len(buf):
 	m.update(buf)
 	buf = os.read(fd, 40960)
+    os.close(fd)
 
     return m.hexdigest()
 
