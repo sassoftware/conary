@@ -787,9 +787,13 @@ class ReadOnlyChangeSet(ChangeSet):
         self.files.update(otherCs.files)
         self.primaryTroveList += otherCs.primaryTroveList
         self.newPackages.update(otherCs.newPackages)
-        # keep the old package lists unique on merge
-        self.oldPackages = dict.fromkeys(self.oldPackages + 
-                                         otherCs.oldPackages).keys()
+        # keep the old package lists unique on merge.  we erase all the
+        # entries and extend the existing oldPackages object because it
+        # is a streams.ReferencedTroveList, not a regular list
+        if otherCs.oldPackages:
+            l = dict.fromkeys(self.oldPackages + otherCs.oldPackages).keys()
+            del self.oldPackages[:]
+            self.oldPackages.extend(l)
 
         if isinstance(otherCs, ReadOnlyChangeSet):
             assert(not self.lastCsf)
