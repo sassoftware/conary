@@ -541,6 +541,7 @@ class Trove:
         return self.changeLog
 
     def __init__(self, name, version, flavor, changeLog):
+        assert(flavor is not None)
 	self.idMap = {}
 	self.name = name
 	self.version = version
@@ -591,7 +592,7 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 		flavor = l[i + 2]
 
 		if flavor == "-":
-		    flavor = None
+		    flavor = deps.DependencySet()
 		else:
 		    flavor = deps.ThawDependencySet(flavor)
 
@@ -884,7 +885,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	    f.write("\t\t%s\n" % " ".join(files.fieldsChanged(change)))
 
 	for pathId in self.oldFiles:
-	    pathIdStr = sha1helper.sha1ToString(pathId)
+	    pathIdStr = sha1helper.md5ToString(pathId)
 	    f.write("\tremoved %s(.*)%s\n" % (pathIdStr[:6], pathIdStr[-6:]))
 
 	for name in self.packages.keys():
@@ -921,8 +922,8 @@ class TroveChangeSet(AbstractTroveChangeSet):
 		 oldFlavor, newFlavor, absolute = 0):
 	AbstractTroveChangeSet.__init__(self)
 	assert(isinstance(newVersion, versions.AbstractVersion))
-	assert(not newFlavor or isinstance(newFlavor, deps.DependencySet))
-	assert(not oldFlavor or isinstance(oldFlavor, deps.DependencySet))
+	assert(isinstance(newFlavor, deps.DependencySet))
+	assert(oldFlavor is None or isinstance(oldFlavor, deps.DependencySet))
 	self.name.set(name)
 	self.oldVersion.set(oldVersion)
 	self.newVersion.set(newVersion)
@@ -942,13 +943,12 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
     def __init__(self, buf):
 	AbstractTroveChangeSet.__init__(self, buf)
 
-	# empty flabors should be none, not empty DependencySet Classes
-	if not self.oldFlavor.value().getDepClasses():
+	# we can't represent the different between an empty flavor and
+        # no flavor; the oldFlavor is the only place this matters, and
+        # we can infer the answer from oldVersion
+        if self.oldVersion.value() is None:
 	    self.oldFlavor.set(None)
 	
-	if not self.newFlavor.value().getDepClasses():
-	    self.newFlavor.set(None)
-
 class TroveError(Exception):
 
     """

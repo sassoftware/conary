@@ -138,6 +138,7 @@ class ChangeSet(streams.LargeStreamSet):
 	return self.local
 
     def addPrimaryPackage(self, name, version, flavor):
+        assert(flavor is not None)
 	self.primaryTroveList.append((name, version, flavor))
 
     def getPrimaryPackageList(self):
@@ -669,7 +670,7 @@ class ReadOnlyChangeSet(ChangeSet):
 	    else:
 		old = db.getTrove(troveName, oldVersion, oldFlavor,
 					     pristine = True)
-	    newPkg = trove.Trove(troveName, None, None, None)
+	    newPkg = trove.Trove(troveName, None, deps.DependencySet(), None)
 	    newPkg.applyChangeSet(troveCs)
 
 	    # we ignore pkgsNeeded; it doesn't mean much in this case

@@ -310,9 +310,6 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
         for (version, flavor) in versionFlavorList:
             grpFlavor.union(flavor)
 
-    if not grpFlavor:
-        grpFlavor = None
-
     grp = trove.Trove(fullName, versions.NewVersion(), grpFlavor, None)
 
     for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
@@ -381,11 +378,9 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 	if fileObj.hasContents:
 	    flavor.union(fileObj.flavor.value())
 	changeSet.addFile(None, fileId, fileObj.freeze())
-    if not flavor:
-        flavor = None
 
-	# since the file is already in the repository (we just committed
-	# it there, so it must be there!) leave the contents out. this
+	# since the file is already in the repository (we just got it from
+	# there, so it must be there!) leave the contents out. this
 	# means that the change set we generate can't be used as the 
 	# source of an update, but it saves sending files across the
 	# network for no reason
@@ -408,7 +403,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 
     built = [ (fileset.getName(), fileset.getVersion().asString(), 
                                                 fileset.getFlavor()) ]
-    return (changeSet, built, None)
+    return (changeSet, built, fileset.getFlavor())
 
 def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True, 
 		      macros={}, targetLabel = None, sourceVersion=None,
@@ -513,7 +508,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 		    %recipeClass.name)
 	return
 
-    # Every component has the same flavor, just use the first one
+    # Every component has the same flavor (enforced by policy), just use 
+    # the first one
     flavor = deps.deps.DependencySet()
     flavor.union(bldList[0].flavor)
 
@@ -572,8 +568,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, 
 					targetVersion, ident)
 
-	built.append((compName, p.getVersion().asString(), 
-                                                    p.getFlavor() or None))
+	built.append((compName, p.getVersion().asString(), p.getFlavor()))
 	packageList.append((p, fileMap))
 	
 	# don't install :test component when you are installing

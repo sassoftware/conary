@@ -343,7 +343,7 @@ class DBFlavors(idtable.IdTable):
 	idtable.IdTable.addId(self, flavor.freeze())
 
     def __getitem__(self, flavor):
-        if flavor is None:
+        if not flavor:
             return 0
 	return idtable.IdTable.__getitem__(self, flavor.freeze())
 
@@ -352,12 +352,12 @@ class DBFlavors(idtable.IdTable):
 								 flavorId))
 
     def get(self, flavor, defValue):
-        if flavor is None:
+        if not flavor:
             return 0
 	return idtable.IdTable.get(self, flavor.freeze(), defValue)
 
     def __delitem__(self, flavor):
-        assert(flavor is not None)
+        assert(flavor)
 	idtable.IdTable.__delitem__(self, flavor.freeze())
 
     def getItemDict(self, itemSeq):
@@ -720,9 +720,9 @@ class Database:
 	    else:
 		troveFlavorId = self.flavors[troveFlavor]
 	
-	if troveFlavor == 0:
+	if troveFlavor is 0:
 	    if troveFlavorId == 0:
-		troveFlavor = None
+		troveFlavor = deps.deps.DependencySet()
 	    else:
 		troveFlavor = self.flavors.getId(troveFlavorId)
 
@@ -756,7 +756,7 @@ class Database:
 	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
 	    if not flavorId:
-		flavor = None
+		flavor = deps.deps.DependencySet()
 	    else:
 		flavor = flavorCache.get(flavorId, None)
 		if flavor is None:

@@ -24,6 +24,7 @@ from local import update
 from repository import changeset
 import changelog
 from build import cook
+import deps
 import files
 from lib import log
 from lib import magic
@@ -101,7 +102,8 @@ class SourceState(trove.Trove):
 	return versionStr
 
     def __init__(self, name, version):
-	trove.Trove.__init__(self, name, version, None, None)
+	trove.Trove.__init__(self, name, version, 
+                             deps.deps.DependencySet(), None)
 
 class SourceStateFromFile(SourceState):
 
@@ -217,8 +219,9 @@ def checkout(repos, cfg, workDir, name):
 
     # it's a shame that findTrove already sent us the trove since we're
     # just going to request it again
-    cs = repos.createChangeSet([(trv.getName(), (None, None), 
-						(trv.getVersion(), None),
+    cs = repos.createChangeSet([(trv.getName(), 
+                                (None, None), 
+                                (trv.getVersion(), deps.deps.DependencySet()),
 			        True)])
 
     pkgCs = cs.iterNewPackageList().next()
@@ -270,7 +273,8 @@ def commit(repos, cfg, message):
 	    return
 	srcPkg = None
     else:
-	srcPkg = repos.getTrove(state.getName(), state.getVersion(), None)
+	srcPkg = repos.getTrove(state.getName(), state.getVersion(),
+                                deps.deps.DependencySet())
 
 	if not _verifyAtHead(repos, srcPkg, state):
 	    log.error("contents of working directory are not all "
@@ -301,7 +305,8 @@ def commit(repos, cfg, message):
 	branch = state.getVersion().branch()
 
     newVersion = repos.nextVersion(state.getName(), recipeVersionStr, 
-				   None, branch, binary = False)
+				   deps.deps.DependencySet(), branch, 
+                                   binary = False)
 
     result = update.buildLocalChanges(repos, 
 		    [(state, srcPkg, newVersion, update.IGNOREUGIDS)] )
@@ -376,7 +381,7 @@ def annotate(repos, filename):
 
     while verList:
         oldV = verList.pop()
-        oldTrove = repos.getTrove(troveName, oldV, None)
+        oldTrove = repos.getTrove(troveName, oldV, deps.deps.DependencySet())
 
         try:
             name, oldFileId, oldFileV = oldTrove.getFile(pathId)
@@ -545,7 +550,8 @@ def diff(repos, versionStr = None):
 
 	oldPackage = pkgList[0]
     else:
-	oldPackage = repos.getTrove(state.getName(), state.getVersion(), None)
+	oldPackage = repos.getTrove(state.getName(), state.getVersion(), 
+                                    deps.deps.DependencySet())
 
     result = update.buildLocalChanges(repos, 
 	    [(state, oldPackage, versions.NewVersion(), update.IGNOREUGIDS)])
@@ -629,7 +635,8 @@ def updateSrc(repos, versionStr = None):
     if not versionStr:
 	headVersion = repos.getTroveLatestVersion(pkgName, 
 						  state.getVersion().branch())
-	head = repos.getTrove(pkgName, headVersion, None)
+	head = repos.getTrove(pkgName, headVersion, 
+                              deps.deps.DependencySet())
 	newBranch = None
 	headVersion = head.getVersion()
 	if headVersion == baseVersion:
@@ -654,8 +661,10 @@ def updateSrc(repos, versionStr = None):
 	headVersion = head.getVersion()
 	newBranch = fullLabel(None, headVersion, versionStr)
 
-    changeSet = repos.createChangeSet([(pkgName, (baseVersion, None),
-					(headVersion, None), 0)])
+    changeSet = repos.createChangeSet([(pkgName, 
+                                (baseVersion, deps.deps.DependencySet()), 
+                                (headVersion, deps.deps.DependencySet()), 
+                                0)])
 
     packageChanges = changeSet.iterNewPackageList()
     pkgCs = packageChanges.next()

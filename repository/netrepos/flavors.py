@@ -68,7 +68,7 @@ class Flavors:
 
     def getId(self, flavorId):
 	if flavorId == 0:
-	    return None
+	    return deps.deps.DependencySet()
 
 	cu = self.db.cursor()
 	cu.execute("SELECT flavor FROM Flavors WHERE flavorId = ?", 

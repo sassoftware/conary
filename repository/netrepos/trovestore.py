@@ -637,6 +637,10 @@ class TroveStore:
 	else:
 	    changeLog = None
 
+        if troveFlavor is None:
+            import lib
+            lib.epdb.st()
+
 	trv = trove.Trove(troveName, troveVersion, troveFlavor,
 			      changeLog)
 	for instanceId in self.troveTroves[troveInstanceId]:

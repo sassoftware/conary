@@ -37,6 +37,7 @@ import types
 import use
 from lib import util
 import versions
+from deps import deps
 
 from fnmatch import fnmatchcase
 
@@ -229,7 +230,8 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
                 label = versions.Label(label)
 
     try:
-	pkgs = repos.findTrove(label, component, None, versionStr)
+	pkgs = repos.findTrove(label, component, deps.DependencySet(), 
+                               versionStr)
 	if len(pkgs) > 1:
 	    raise RecipeFileError("source component %s has multiple versions "
 				  "with label %s" %(component,
@@ -497,7 +499,8 @@ class PackageRecipe(Recipe):
                 continue
             srcName = rclass._trove.getName()
             srcVersion = rclass._trove.getVersion()
-            for f in repos.iterFilesInTrove(srcName, srcVersion, None,
+            for f in repos.iterFilesInTrove(srcName, srcVersion, 
+                                            deps.DependencySet(),
                                             withFiles=True):
                 pathId, path, fileId, version, fileObj = f
                 assert(path[0] != "/")

@@ -55,14 +55,14 @@ class NetworkConvertors(object):
 	return versions.VersionFromString(b)
 
     def toFlavor(self, f):
-	if f == 0 or f == "none" or f is None:
-	    return None
+        assert(f is not None)
+	if f == 0 or f == "none":
+	    return deps.deps.DependencySet()
 
 	return deps.deps.ThawDependencySet(f)
 
     def fromFlavor(self, f):
-	if f is None:
-	    return 0
+        assert(f is not None)
 
 	return f.freeze()
 

@@ -39,7 +39,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	if flavor and flavor != "none":
 	    return deps.ThawDependencySet(flavor)
 
-	return None
+	return deps.DependencySet()
 
     def iterAllTroveNames(self):
 	a = self.troveStore.iterTroveNames()

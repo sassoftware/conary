@@ -153,7 +153,10 @@ def parseTroveStrings(troveNameList):
 
 
 def _formatFlavor(flavor):
-    return '\n   ' + '\n   '.join(str(flavor).split('\n'))
+    if flavor:
+        return '\n   ' + '\n   '.join(str(flavor).split('\n'))
+    else:
+        return '\n   None'
 
 
 def _printOneTrove(db, troveName, troveVersions, fullVersions):

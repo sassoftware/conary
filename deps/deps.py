@@ -13,6 +13,7 @@
 #
 
 import copy
+import re
 from lib import util
 
 DEP_CLASS_ABI		= 0
@@ -418,4 +419,48 @@ def ThawDependencySet(frz):
         depSet.addDep(depClass, depClass.thawDependency(frozen))
     return depSet
 
+def parseFlavor(s):
+    # return a DependencySet for the string passed. format is
+    # [arch[(flag,[flag]*)]] [use:flag[,flag]*]
+
+    match = flavorRegexp.match(s)
+    if not match:
+        return None
+
+    groups = match.groups()
+
+    set = DependencySet()
+
+    baseInsSet = groups[0]
+    if baseInsSet:
+        if groups[1]:
+            insSetFlags = groups[1].split(",")
+            for i, flag in enumerate(insSetFlags):
+                insSetFlags[i] = insSetFlags[i].strip()
+        else:
+            insSetFlags = []
+        set.addDep(InstructionSetDependency, Dependency(baseInsSet, 
+                                                        insSetFlags))
+
+    if groups[2]:
+        useFlags = groups[2].split(",")
+        for i, flag in enumerate(useFlags):
+            useFlags[i] = useFlags[i].strip()
+        set.addDep(UseDependency, Dependency("use", useFlags))
+
+    return set
+
 dependencyCache = util.ObjectCache()
+
+ident = '(?:[_A-Za-z][0-9A-Za-z_]*)'
+useFlag = '(?:!|~!)?IDENT(?:\.IDENT)?'
+archClause = '(IDENT)(?:\((IDENT(?:,IDENT)*)\))?(?:$| )'
+useClause = 'use: *(USEFLAG *(?:, *USEFLAG)*) *'
+exp = '^(?:ARCHCLAUSE)? *(?:USECLAUSE)?$'
+
+exp = exp.replace('ARCHCLAUSE', archClause)
+exp = exp.replace('USECLAUSE', useClause)
+exp = exp.replace('USEFLAG', useFlag)
+exp = exp.replace('IDENT', ident)
+
+flavorRegexp = re.compile(exp)

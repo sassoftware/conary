@@ -437,8 +437,11 @@ class DependencyTables:
                             (name STRING, version STRING, flavor STRING)""",
                        start_transaction = False)
             for (name, version, flavor) in oldTroves:
-                if flavor is not None:
+                if flavor:
                     flavor = flavor.freeze()
+                else:
+                    flavor = None
+
                 cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?)",
                            (name, version.asString(), flavor), 
                            start_transaction = False)

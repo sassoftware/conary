@@ -591,10 +591,7 @@ class ReferencedTroveList(list, InfoStream):
 	    version = versions.ThawVersion(l[i + 1])
 	    flavor = l[i + 2]
 
-	    if not flavor:
-		flavor = None
-	    else:
-		flavor = deps.ThawDependencySet(flavor)
+            flavor = deps.ThawDependencySet(flavor)
 
 	    self.append((name, version, flavor))
 	    i += 3

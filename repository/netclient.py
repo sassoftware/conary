@@ -812,9 +812,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         currentVersions = self.getTroveFlavorsLatestVersion(troveName, 
                                                              currentBranch)
 
-        if not troveFlavors:
-            troveFlavors = (None,)
-        elif not isinstance(troveFlavors, (list, tuple)):
+        assert(troveFlavors is not None)
+        if not isinstance(troveFlavors, (list, tuple)):
             troveFlavors = (troveFlavors,)
         # find the latest version of this trove and the latest version of
         # this flavor of this trove

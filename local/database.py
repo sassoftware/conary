@@ -25,6 +25,7 @@ import update
 from lib import util
 import versions
 from build import tags
+from deps import deps
 
 class SqlDbRepository(repository.DataStoreRepository,
 		      repository.AbstractRepository):
@@ -201,13 +202,13 @@ class Database(SqlDbRepository):
         # diff tells us how to match them up. anything which doesn't get
         # a match gets removed. got that? 
         instGroup = trove.Trove("@update", versions.NewVersion(), 
-                                None, None)
+                                deps.DependencySet(), None)
         for instTrove in instList:
             instGroup.addTrove(instTrove.getName(), instTrove.getVersion(),
                                instTrove.getFlavor())
 
         newGroup = trove.Trove("@update", versions.NewVersion(), 
-                                None, None)
+                                deps.DependencySet(), None)
         for (name, version, flavor) in l:
             newGroup.addTrove(name, version, flavor)
 
