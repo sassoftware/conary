@@ -26,14 +26,15 @@ class AbstractTroveDatabase:
 	  1. C{where} specifies a particular version to branch from
 	  2. the branch does not yet exist and C{where} is a label which matches multiple existing branches
 
-	Where specifies the node branches are created from for the
-	trove troveName (or all of the troves if troveName is empty).
-	Any troves or files branched due to inclusion in a branched
-	trove will be branched at the version required by the object
-	including it. If different versions of objects are included
-	from multiple places, bad things will happen (an incomplete
-	branch will be formed). More complicated algorithms for branch
-	will fix this, but it's not clear doing so is necessary.
+	C{where} specifies the node branches are created from for the
+	troves in C{troveList} (or all of the troves if C{troveList}
+	is empty). Any troves or files branched due to inclusion in a
+	branched trove will be branched at the version required by the
+	object including it. If different versions of objects are
+	included from multiple places, bad things will happen (an
+	incomplete branch will be formed). More complicated algorithms
+	for branch will fix this, but it's not clear doing so is
+	necessary.
 
 	@param newBranch: Label of the new branch
 	@type newBranch: versions.BranchName
@@ -41,7 +42,7 @@ class AbstractTroveDatabase:
 	@type where: versions.Version or versions.BranchName
 	@param troveList: Name of the troves to branch; empty list if all
 	troves in the repository should be branched.
-	@type troveName: str
+	@type troveList: list of str
 	"""
 	raise NotImplementedError
 
@@ -188,7 +189,7 @@ class AbstractTroveDatabase:
 	been unlinked, and has no file name in this case).
 
 	@param sha1List: files to retrieve
-	@type param: list
+	@type sha1List: list
 	@rtype: list
 	"""
 
