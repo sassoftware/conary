@@ -15,7 +15,7 @@ import os
 from lib import util
 import pickle
 
-from callback import UpdateCallback
+from callbacks import UpdateCallback
 import conarycfg
 import deps
 import versions

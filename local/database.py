@@ -13,7 +13,7 @@
 #
 
 import datastore
-from callback import UpdateCallback
+from callbacks import UpdateCallback
 from repository import changeset
 import errno
 from repository import filecontents

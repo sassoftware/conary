@@ -24,7 +24,7 @@ the way of a newly created file will be overwritten.  Otherwise an error
 is produced.
 """
 
-from callback import UpdateCallback
+from callbacks import UpdateCallback
 from repository import changeset
 import errno
 from repository import filecontents
