@@ -40,7 +40,7 @@ def displayPkgs(reppath, packageList):
 	    pkgSet = package.PackageSet(reppath, pkgName)
 	    l = pkgSet.versionList()
 	    for version in l:
-		print "/%-24s %s" % (pkgName, version)
+		print "/%-39s %s" % (pkgName, version)
 
 if (len(sys.argv) < 2):
     usage()
