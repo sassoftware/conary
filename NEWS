@@ -5,6 +5,8 @@ Changes in 0.50.2:
     that architecture-sensitive but non-code files in (say) /usr/lib64
     do not show up on 32-bit platforms.
   * Sped up dependency resolution on the client
+  * The reworked getFileContents call now asks for contents from the
+    correct server when contents from more than one server are requested
 
 Changes in 0.50.1:
   * Add support for trove=<troveVersion> in rq, cvc co, and other places that 
