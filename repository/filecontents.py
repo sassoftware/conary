@@ -24,6 +24,12 @@ class FileContents(object):
 
     __slots__ = ()
 
+    def size(self):
+	raise NotImplementedError
+
+    def copy(self):
+        raise NotImplementedError
+
     def getWithSize(self):
 	return (self.get(), self.size())
 
