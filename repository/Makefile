@@ -16,7 +16,6 @@ python_files = __init__.py	\
 		changeset.py	\
 		filecontainer.py\
 		filecontents.py	\
-		fsrepos.py	\
 		netclient.py 	\
 		repository.py	\
 		transport.py	\
