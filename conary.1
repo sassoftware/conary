@@ -35,7 +35,16 @@ matches the \fBinstall-label\fP) and applies the changesets contained in any
 .RS 4
 .TP 4
 .B \-\-keep-existing
-.\" FIXME: add semantics
+When applying a changeset, do not remove any existing versions of
+the troves included in the changeset.
+This will work correctly only if the versions have entirely
+disjoint file sets.
+The \-\-keep-existing option is normally used to add another
+branch with the same trove name to the system; after that,
+each branch can be updated normally.
+If two versions from the same branch are
+installed at the same time, this may confuse future update
+operations.
 .TP
 .B \-\-no-deps
 Skip dependency resolution and errors.
@@ -57,11 +66,12 @@ implies recursion.
 .TP
 .B \-\-replace-files
 When a normal file (not a configuration file or a transient file) has
-changed on the system between updates, conary normally flags this as
-an error.  If you want conary to update anyway, replacing the contents
-of the file with the new version from the repository, you will need
+changed on the system between updates to that file, or if a file
+already exists when conary tries to create it, conary normally
+aborts the operation with an error message.
+If you want conary to update anyway, replacing the contents
+of the file with the new version from the changeset, you will need
 to provide the \-\-replace-files option.
-.\" FIXME: double-check semantics
 .RE
 .TP
 .TP
