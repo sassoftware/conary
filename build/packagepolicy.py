@@ -102,7 +102,12 @@ class CheckSonames(policy.Policy):
     C{r.CheckSonames(exceptions=I{filterexp})} for things like directories
     full of plugins.
     """
-    invariantinclusions = [ (r'..*\.so', None, stat.S_IFDIR), ]
+    invariantsubtrees = destdirpolicy.librarydirs
+    invariantinclusions = [
+	(r'..*\.so', None, stat.S_IFDIR),
+    ]
+    recursive = False
+
     def doFile(self, path):
 	d = self.macros.destdir
 	destlen = len(d)
@@ -380,10 +385,11 @@ class SharedLibrary(policy.Policy):
     ]
     recursive = False
 
-    # needs to share with ExecutableLibraries
+    # needs to share with ExecutableLibraries and CheckSonames
     def updateArgs(self, *args, **keywords):
 	policy.updateArgs(self, *args, **keywords)
 	self.recipe.ExecutableLibraries(*args, **keywords)
+	self.recipe.CheckSonames(*args, **keywords)
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
