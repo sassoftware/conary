@@ -14,7 +14,7 @@ class AbstractVersion:
 
 class BranchVersion(AbstractVersion):
 
-    def compare(self, version):
+    def equal(self, version):
 	if type(self) == type(version) and self.value == version.value:
 	    return 1
 	return 0
@@ -33,7 +33,7 @@ class VersionRelease(AbstractVersion):
     def getVersion(self):
 	return self.version
 
-    def compare(self, version):
+    def equal(self, version):
 	if (type(self) == type(version) and self.version == version.version
 		and self.release == version.release):
 	    return 1
@@ -76,16 +76,16 @@ class Version:
 
 	return self.versions[-1].getVersion()
 
-    def compareList(self, list, other):
+    def listsEqual(self, list, other):
 	if len(other.versions) != len(list): return 0
 
 	for i in range(0, len(list)):
-	    if not list[i].compare(other.versions[i]): return 0
+	    if not list[i].equal(other.versions[i]): return 0
 	
 	return 1
 
-    def compare(self, other):
-	return self.compareList(self.versions, other)
+    def equal(self, other):
+	return self.listsEqual(self.versions, other)
 
     #def __str__(self):
 	#return self.asString()
@@ -114,10 +114,13 @@ class Version:
 	if not self.isBranch() and not self.isVersion():
 	    raise KeyError, "invalid version set %s" % self
 	
-def VersionFromString(str):
+def VersionFromString(str, defaultBranch = None):
+    if str[0] != "/":
+	if not defaultBranch:
+	    raise KeyError, "relative verions given without a default branch"
+	str = defaultBranch.asString() + "/" + str
+
     parts = string.split(str, "/")
-    if parts[0]:
-	raise KeyError, ("relative versions are not yet supported: %s" % str)
     del parts[0]	# absolute versions start with a /
 
     if (len(parts) % 3) == 1:
