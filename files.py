@@ -121,7 +121,7 @@ class FileMode:
 	    else:
 		self.theFlags &= ~(_FILE_FLAG_CONFIG)
 
-	return (self.theFlags and self.theFlags & _FILE_FLAG_)
+	return (self.theFlags and self.theFlags & _FILE_FLAG_CONFIG)
 
     def infoLine(self):
 	return "0%o %s %s %s %s 0x%x" % (self.thePerms, self.theOwner, 
