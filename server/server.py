@@ -107,7 +107,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
             try:
                 httpHandler.handleCmd(self.wfile.write, base, authToken, fields)
             except netserver.InsufficientPermission:
-                self.send_response(403)
+                self.send_error(403)
             except:
                 self.writeTraceback()
         else:
@@ -171,7 +171,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
                                  environ = { 'REQUEST_METHOD' : 'POST' })
             httpHandler.handleCmd(self.wfile.write, cmd, authToken, c)
         except netserver.InsufficientPermission:
-            self.send_response(403)
+            self.send_error(403)
         except:
             self.writeTraceback()
 
@@ -184,11 +184,11 @@ class HttpRequests(SimpleHTTPRequestHandler):
         try:
             authString = base64.decodestring(info[1])
         except:
-            self.send_response(400)
+            self.send_error(400)
             return None
 
         if authString.count(":") != 1:
-            self.send_response(400)
+            self.send_error(400)
             return None
             
         authToken = authString.split(":")
@@ -206,13 +206,13 @@ class HttpRequests(SimpleHTTPRequestHandler):
             
             # verify that the user/password actually exists in the database
             if not netRepos.auth.checkUserPass(authToken):
-                self.send_response(403)
+                self.send_error(403)
                 return None
 
 	return authToken
       
     def requestAuth(self):
-        self.send_response(401)
+        self.send_error(401)
         self.send_header("WWW-Authenticate", 'Basic realm="Conary Repository"')
         self.end_headers()
         return None
@@ -228,7 +228,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	try:
 	    result = netRepos.callWrapper(None, None, method, authToken, params)
 	except netserver.InsufficientPermission:
-	    self.send_response(403)
+	    self.send_error(403)
 	    return
 
 	resp = xmlrpclib.dumps((result,), methodresponse=1)
@@ -251,7 +251,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
 	size = os.stat(path).st_size
 	if size != 0:
-	    self.send_response(410, "Gone")
+	    self.send_error(410, "Gone")
 	    return
 
 	out = open(path, "w")
