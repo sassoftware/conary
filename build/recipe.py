@@ -146,10 +146,11 @@ def _extractSourceFromRPM(rpm, targetfile):
 	               %(filename, os.path.basename(rpm))
 
 def setupRecipeDict(d, filename):
-    exec 'from recipe import PackageRecipe' in d
-    exec 'from recipe import GroupRecipe' in d
-    exec 'from recipe import FilesetRecipe' in d
-    exec 'from recipe import loadRecipe' in d
+    exec 'import build' in d
+    exec 'from build.recipe import PackageRecipe' in d
+    exec 'from build.recipe import GroupRecipe' in d
+    exec 'from build.recipe import FilesetRecipe' in d
+    exec 'from build.recipe import loadRecipe' in d
     exec 'import build, os, package, sys, stat, util' in d
     exec 'from use import Use, Arch' in d
     if sys.excepthook == util.excepthook:
