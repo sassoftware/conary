@@ -153,8 +153,7 @@ def autoVisit(arg, dir, files):
             path = dir + '/' + file
         else:
             path = '/' + file
-	if not os.path.isdir(path):
-	    if path[:15] == "/usr/share/man/":
-		manPkg.addFile(path)
-	    else:
-		buildPkg.addFile(path)
+        if path.startswith('/usr/share/man/')
+            manPkg.addFile(path)
+        else:
+            buildPkg.addFile(path)
