@@ -34,6 +34,7 @@ _STREAM_INODE	    = 7
 _STREAM_FLAGS	    = 8
 _STREAM_MTIME	    = 9
 _STREAM_DEPENDENCIES = 10
+_STREAM_STRINGS     = 11
 
 class InfoStream(object):
 
@@ -243,6 +244,61 @@ class DependenciesStream(InfoStream):
         assert(type(dep) is str)
         self.deps = None
         self.thaw(dep)
+
+class StringsStream(InfoStream):
+    """
+    Stores list of arbitrary strings
+    """
+
+    __slots__ = 'l'
+    streamId = _STREAM_STRINGS
+
+    def value(self):
+	return self.l
+
+    def set(self, val):
+        assert(type(val) is str)
+	if val not in self.l:
+	    self.l.append(val)
+	    self.l.sort()
+    
+    def __contains__(self, val):
+	return val in self.l
+
+    def __delitem__(self, val):
+	if val in self.l:
+	    self.l.remove(val)
+
+    def merge(self, other):
+        self.l = other.l
+
+    def freeze(self):
+        if self.l is None:
+            return ''
+        return '\0'.join(self.l)
+
+    def diff(self, them):
+	if self.l != them.l:
+	    return self.freeze()
+	return ''
+
+    def thaw(self, frz):
+	if len(frz) == 0:
+	    self.l = []
+	else:
+	    self.l = frz.split('\0')
+        
+    def twm(self, diff, base):
+	if not diff:
+	    return False
+        self.thaw(diff)
+        return True
+
+    def __eq__(self, other):
+	return other.__class__ == self.__class__ and self.l == other.l
+
+    def __init__(self, frz = ''):
+	self.thaw(frz)
 
 class TupleStream(InfoStream):
 
@@ -525,8 +581,10 @@ class File(object):
 
     lsTag = None
     hasContents = 0
-    streamList = ( ("inode", InodeStream), ("flags", FlagsStream) )
-    __slots__ = [ "theId", "inode", "flags" ]
+    streamList = ( ("inode", InodeStream),
+                   ("flags", FlagsStream),
+		   ("tags", StringsStream) )
+    __slots__ = [ "theId", "inode", "flags", "tags" ]
 
     def modeString(self):
 	l = self.inode.permsString()

@@ -44,11 +44,12 @@ class FilesystemJob:
     def _restore(self, fileObj, target, msg, contentsOverride = ""):
 	self.restores.append((fileObj.id(), fileObj, target, contentsOverride, 
 			      msg))
-	if fileObj.flags.isShLib() and not os.path.exists(target):
+	# hacks until we have generic tag trigger scripts
+	if 'shlib' in fileObj.tags and not os.path.exists(target):
 	    self.sharedLibraries.append(target)
-	if fileObj.flags.isInitScript() and not os.path.exists(target):
+	if 'initscript' in fileObj.tags and not os.path.exists(target):
 	    self.initScripts.append(target)
-	if fileObj.flags.isGconfSchema() and not os.path.exists(target):
+	if 'gconf2schema' in fileObj.tags and not os.path.exists(target):
 	    self.gconfSchema.append(target)
 
     def _remove(self, fileObj, target, msg):

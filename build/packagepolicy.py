@@ -329,7 +329,7 @@ class InitScript(policy.Policy):
 
     def _markInitScript(self, filename):
 	log.debug('initscript: %s', filename)
-	self.recipe.autopkg.pathMap[filename].flags.isInitScript(True)
+	self.recipe.autopkg.pathMap[filename].tags.set("initscript")
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
@@ -347,7 +347,7 @@ class GconfSchema(policy.Policy):
 
     def _markGconfSchema(self, filename):
 	log.debug('gconf schema: %s', filename)
-	self.recipe.autopkg.pathMap[filename].flags.isGconfSchema(True)
+	self.recipe.autopkg.pathMap[filename].tags.set("gconf2schema")
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
@@ -373,7 +373,7 @@ class SharedLibrary(policy.Policy):
 
     def _markSharedLibrary(self, filename):
 	log.debug('shared library: %s', filename)
-	self.recipe.autopkg.pathMap[filename].flags.isShLib(True)
+	self.recipe.autopkg.pathMap[filename].tags.set("shlib")
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
