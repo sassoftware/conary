@@ -219,7 +219,7 @@ class File(FileMode):
 
 	return self.theId
 
-    def restore(self, target):
+    def restore(self, target, skipContents):
 	self.chmod(target)
 	self.setOwnerGroup(target)
 
@@ -285,7 +285,7 @@ class SymbolicLink(File):
 	# chmod() on a symlink follows the symlink
 	pass
 
-    def restore(self, changeSet, target):
+    def restore(self, changeSet, target, skipContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.symlink(self.theLinkTarget, target)
@@ -311,7 +311,7 @@ class Socket(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, changeSet, target):
+    def restore(self, changeSet, target, skipContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
@@ -329,7 +329,7 @@ class NamedPipe(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, changeSet, target):
+    def restore(self, changeSet, target, skipContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.mkfifo(target)
@@ -345,7 +345,7 @@ class Directory(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, changeSet, target):
+    def restore(self, changeSet, target, skipContents):
 	if not os.path.isdir(target):
 	    util.mkdirChain(target)
 
@@ -370,7 +370,7 @@ class DeviceFile(File):
 	
 	return 0
 
-    def restore(self, changeSet, target):
+    def restore(self, changeSet, target, skipContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 
@@ -452,18 +452,20 @@ class RegularFile(File):
 
 	return 0
 
-    def restore(self, changeSet, target):
-	if os.path.exists(target) or os.path.islink(target):
-	    os.unlink(target)
-	else:
-	    path = os.path.dirname(target)
-	    util.mkdirChain(path)
+    def restore(self, changeSet, target, skipContents):
+	if not skipContents:
+	    if os.path.exists(target) or os.path.islink(target):
+		os.unlink(target)
+	    else:
+		path = os.path.dirname(target)
+		util.mkdirChain(path)
 
-	f = open(target, "w")
-	src = changeSet.getFileContents(self.sha1())
-	f.write(src.read())
-	f.close()
-	src.close()
+	    f = open(target, "w")
+	    src = changeSet.getFileContents(self.sha1())
+	    f.write(src.read())
+	    f.close()
+	    src.close()
+
 	File.restore(self, target)
 
     def archive(self, repos, file):
