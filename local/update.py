@@ -63,10 +63,8 @@ class FilesystemJob:
                               contentsOverride, msg))
 
 	for tag in fileObj.tags:
-	    if self.tagUpdates.has_key(tag):
-		self.tagUpdates[tag].append(target)
-	    else:
-		self.tagUpdates[tag] = [ target ]
+            l = self.tagUpdates.setdefault(tag, [])
+            l.append(target)
 
     def _remove(self, fileObj, target, msg):
 	if isinstance(fileObj, files.Directory):
@@ -74,23 +72,20 @@ class FilesystemJob:
 		self.directorySet[target] = 0
 	else:
 	    self.removes[target] = (fileObj, msg)
+
+            # track removals from each directory
 	    dir = os.path.dirname(target)
-	    if self.directorySet.has_key(dir):
-		self.directorySet[dir] += 1
-	    else:
-		self.directorySet[dir] = 1
+            self.directorySet.setdefault(dir, 0)
+            self.directorySet[dir] += 1
 
 	for tag in fileObj.tags:
-	    if self.tagRemoves.has_key(tag):
-		self.tagRemoves[tag].append(target)
-	    else:
-		self.tagRemoves[tag] = [ target ]
+            l = self.tagRemoves.setdefault(tag, [])
+            l.append(target)
 
     def userRemoval(self, troveName, troveVersion, troveFlavor, pathId):
-	if not self.userRemovals.has_key((troveName, troveVersion, troveFlavor)):
-	    self.userRemovals[(troveName, troveVersion, troveFlavor)] = [ pathId ]
-	else:
-	    self.userRemovals[(troveName, troveVersion, troveFlavor)].append(pathId)
+        l = self.userRemovals.setdefault(
+                    (troveName, troveVersion, troveFlavor), [])
+        l.append(pathId)
 
     def iterUserRemovals(self):
 	for ((troveName, troveVersion, troveFlavor), pathIdList) in \
@@ -105,35 +100,34 @@ class FilesystemJob:
 	rootLen = len(self.root)
 	tagCommands = []
 
-	if self.tagRemoves.has_key('tagdescription'):
-	    for path in self.tagRemoves['tagdescription']:
-		path = path[rootLen:]
-		tagInfo = None	
-		for ti in tagSet.itervalues():
-		    if ti.tagFile[:rootLen] == self.root and \
-		       ti.tagFile[rootLen:] == path: 
-			tagInfo = ti
-			break
+        for path in self.tagRemoves.get('tagdescription', []):
+            path = path[rootLen:]
+            tagInfo = None	
+            for ti in tagSet.itervalues():
+                if ti.tagFile[:rootLen] == self.root and \
+                   ti.tagFile[rootLen:] == path: 
+                    tagInfo = ti
+                    break
 
-		if tagInfo:
-		    # this prevents us from trying to run "files add"
-		    del tagSet[tagInfo.tag]
+            if tagInfo:
+                # this prevents us from trying to run "files add"
+                del tagSet[tagInfo.tag]
 
-		    if self.tagRemoves.has_key(tagInfo.tag):
-			# we're running "description preremove"; we don't need 
-                        # to run "files preremove" as well, and we won't be
-			# able to run "files remove"
-			del self.tagRemoves[tagInfo.tag]
+                if self.tagRemoves.has_key(tagInfo.tag):
+                    # we're running "description preremove"; we don't need 
+                    # to run "files preremove" as well, and we won't be
+                    # able to run "files remove"
+                    del self.tagRemoves[tagInfo.tag]
 
-		    if "description preremove" in tagInfo.implements:
-			tagCommands.append([ tagInfo, ("description", 
-                                                       "preremove"), 
-			   [x for x in 
-				self.repos.iterFilesWithTag(tagInfo.tag) ] ] )
-
-	    del self.tagRemoves['tagdescription']
+                if "description preremove" in tagInfo.implements:
+                    tagCommands.append([ tagInfo, ("description", 
+                                                   "preremove"), 
+                       [x for x in 
+                            self.repos.iterFilesWithTag(tagInfo.tag) ] ] )
 
 	for tag, l in self.tagRemoves.iteritems():
+	    if tag == 'tagdescription':
+                continue
 	    if not tagSet.has_key(tag): continue
 	    tagInfo = tagSet[tag]
 
@@ -333,36 +327,36 @@ class FilesystemJob:
 	    # override to force ldconfig to run on shlib removal
 	    shlibAction(self.root, [])
 
-	if self.tagUpdates.has_key('tagdescription'):
-	    for path in self.tagUpdates['tagdescription']:
-		# these are new tag action files which we need to run for
-		# the first time. we run them against everything in the database
-		# which has this tag, which includes the files we've just
-		# installed
+        for path in self.tagUpdates.get('tagdescription', []):
+            # these are new tag action files which we need to run for
+            # the first time. we run them against everything in the database
+            # which has this tag, which includes the files we've just
+            # installed
 
-		tagInfo = tags.TagFile(path, {})
-		path = path[len(self.root):]
-		
-		# don't run these twice
-		if self.tagUpdates.has_key(tagInfo.tag):
-		    del self.tagUpdates[tagInfo.tag]
+            tagInfo = tags.TagFile(path, {})
+            path = path[len(self.root):]
+            
+            # don't run these twice
+            if self.tagUpdates.has_key(tagInfo.tag):
+                del self.tagUpdates[tagInfo.tag]
 
-		if "description update" in tagInfo.implements:
-		    cmd = [ tagInfo, ("description", "update"),
-			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)] ]
-		    tagCommands.append(cmd)
-		elif "files update" in tagInfo.implements:
-		    fileList = [x for x in 
-				self.repos.iterFilesWithTag(tagInfo.tag) ] 
-		    if fileList:
-			cmd = [ tagInfo, ("files", "update"), fileList ]
-			tagCommands.append(cmd)
+            if "description update" in tagInfo.implements:
+                cmd = [ tagInfo, ("description", "update"),
+                    [x for x in self.repos.iterFilesWithTag(tagInfo.tag)] ]
+                tagCommands.append(cmd)
+            elif "files update" in tagInfo.implements:
+                fileList = [x for x in 
+                            self.repos.iterFilesWithTag(tagInfo.tag) ] 
+                if fileList:
+                    cmd = [ tagInfo, ("files", "update"), fileList ]
+                    tagCommands.append(cmd)
 
-		tagSet[tagInfo.tag] = tagInfo
-
-	    del self.tagUpdates['tagdescription']
+            tagSet[tagInfo.tag] = tagInfo
 
 	for (tag, l) in self.tagUpdates.iteritems():
+            if tag == 'tagdescription':
+                continue
+
 	    tagInfo = tagSet.get(tag, None)
 	    if tagInfo is None: continue
 
@@ -397,7 +391,7 @@ class FilesystemJob:
     def getDirectoryCountSet(self):
 	return self.directorySet
 
-    def _handleRemoves(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
+    def _setupRemoves(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
 		       flags):
         # Remove old files. if the files have already been removed, just
         # mention that fact and continue. Don't erase files which
@@ -859,7 +853,7 @@ class FilesystemJob:
 	    else:
                 basePkg = None
 
-            self._handleRemoves(repos, pkgCs, changeSet, basePkg,
+            self._setupRemoves(repos, pkgCs, changeSet, basePkg,
                                       newFsPkg, root, flags)
 
 	for (pkgCs, newFsPkg) in pkgList:
