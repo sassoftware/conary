@@ -3,6 +3,7 @@ from localrep import fsrepos
 import filecontainer
 import md5
 import os
+import re
 import sqlite
 import tempfile
 import util
@@ -305,10 +306,11 @@ class NetworkAuthorization:
 	    return False
 
 	stmt = """
-	    SELECT count(*) FROM
+	    SELECT troveName FROM
 	       (SELECT userId as uuserId FROM Users WHERE user=%s AND 
 		    password=%s) 
 	    JOIN Permissions ON uuserId=Permissions.userId
+	    LEFT OUTER JOIN TroveNames ON Permissions.troveNameId = TroveNames.troveNameId
 	""" 
 	m = md5.new()
 	m.update(authToken[1])
@@ -320,11 +322,6 @@ class NetworkAuthorization:
 			    "label=%s) OR labelId is Null")
 	    params.append(label.asString())
 
-	if trove:
-	    where.append(" troveNameId=(SELECT troveNameId FROM TroveNames "
-			        "WHERE troveName=%s) OR troveNameId is Null" )
-	    params.append(trove)
-
 	if write:
 	    where.append("write=1")
 
@@ -333,13 +330,25 @@ class NetworkAuthorization:
 
 	cu = self.db.cursor()
 	cu.execute(stmt, params)
-	result = cu.fetchone()[0]
 
-	return result != 0
+	for (troveName, ) in cu:
+	    if not troveName or not trove:
+		return True
+
+	    regExp = self.reCache.get(troveName, None)
+	    if regExp is None:
+		regExp = re.compile(troveName)
+		self.reCache[troveName] = regExp
+
+	    if regExp.match(trove):
+		return True
+
+	return False
 
     def __init__(self, dbpath, anonymousReads = False):
 	self.db = sqlite.connect(dbpath)
 	self.anonReads = anonymousReads
+	self.reCache = {}
 
 class InsufficientPermission(Exception):
 
