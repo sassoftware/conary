@@ -83,7 +83,7 @@ class FileContainer:
 	if len(version) != 4:
 	    raise BadContainer, "invalid container version"
 	version = struct.unpack("!I", version)[0]
-	if version not in READABLE_VERSIONS::
+	if version not in READABLE_VERSIONS:
 	    raise BadContainer, "unsupported file container version %d" % \
 			version
 
