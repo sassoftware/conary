@@ -186,13 +186,14 @@ class RecipeLoader:
         except:
             pass
 
-def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
+def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
+                                    versionStr = None):
     if not component.endswith(':source'):
         component += ":source"
     name = filename[:-len('.recipe')]
 
     try:
-	pkgs = repos.findTrove(cfg.buildLabel, component, None)
+	pkgs = repos.findTrove(cfg.buildLabel, component, None, versionStr)
 	if len(pkgs) > 1:
 	    raise RecipeFileError("source component %s has multiple versions "
 				  "with label %s", component,
@@ -426,8 +427,9 @@ class GroupRecipe(Recipe):
 	except repository.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
 
-	versionList = [ x.getVersion() for x in pkgList ]
-	self.troveVersions[pkgList[0].getName()] = versionList
+        l = self.troveVersions.get(name, [])
+        l.extend([ x.getVersion() for x in pkgList ])
+        self.troveVersions[name] = l
 
     def getTroveList(self):
 	return self.troveVersions
