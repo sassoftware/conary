@@ -2,6 +2,7 @@ Changes in 0.12.4
   * set more arch flags for x86 and x86_64
   * troves can have multiple instruction set flavors now
   * flipped around use: and is: sections of flavor strings
+  * Version and Branch object completely separated
 
 Changes in 0.12.3
   * conary verify updated to new API so that it works again
