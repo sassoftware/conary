@@ -404,7 +404,7 @@ class ChangeSetJob:
 	    # note that the order doesn't matter; we're just copying
 	    # files into the repository
 	    if self.repos.storeFileFromChangeset(self.cs, file, 
-						 newFile.restoreContents):
+						 newFile.restoreContents()):
 		undo.addedFileContents(file.sha1())
 
     def __init__(self, repos, cs):
