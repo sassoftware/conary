@@ -287,18 +287,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise RuntimeError, "client is too old"
         return 0
 
-    def __init__(self, path, tmpPath, urlBase, authDbPath,
+    def __init__(self, path, tmpPath, urlBase, authDbPath, name,
 		 commitAction = None):
-	self.repos = fsrepos.FilesystemRepository(path)
+	self.repos = fsrepos.FilesystemRepository(name, path)
 	self.repPath = path
 	self.tmpPath = tmpPath
 	self.urlBase = urlBase
-	self.auth = NetworkAuthorization(authDbPath, anonymousReads = True)
+	self.name = name
+	self.auth = NetworkAuthorization(authDbPath, name, anonymousReads = True)
 	self.commitAction = commitAction
 
 class NetworkAuthorization:
 
     def check(self, authToken, write = False, label = None, trove = None):
+	if label and label.getHost() != self.name:
+	    return False
+
 	if not write and self.anonReads:
 	    return True
 
@@ -345,7 +349,8 @@ class NetworkAuthorization:
 
 	return False
 
-    def __init__(self, dbpath, anonymousReads = False):
+    def __init__(self, dbpath, name, anonymousReads = False):
+	self.name = name
 	self.db = sqlite.connect(dbpath)
 	self.anonReads = anonymousReads
 	self.reCache = {}

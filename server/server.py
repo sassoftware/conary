@@ -16,8 +16,8 @@ import urllib
 from BaseHTTPServer import HTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
-if len(sys.argv) != 4:
-    print "needs path to conary, the repository, and the authorization database"
+if len(sys.argv) != 5:
+    print "needs path to conary, the repository, and authorization database, and the name of this repository"
     sys.exit(1)
 
 sys.path.append(sys.argv[1])
@@ -141,7 +141,7 @@ if __name__ == '__main__':
         prof.start()
 
     netRepos = NetworkRepositoryServer(sys.argv[2], FILE_PATH, BASE_URL,
-				       sys.argv[3])
+				       sys.argv[3], sys.argv[4])
 
     httpServer = HTTPServer(("", 8000), HttpRequests)
 

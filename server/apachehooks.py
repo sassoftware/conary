@@ -90,6 +90,7 @@ def handler(req):
 	repositories[repName] = netserver.NetworkRepositoryServer(
 				d['reppath'], d['tmppath'], 
 				urlBase, d['authpath'],
+				d['servername'],
 				commitAction = commitAction)
 
     repos = repositories[repName]
