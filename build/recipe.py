@@ -17,10 +17,11 @@ import gzip
 baseMacros = (
     ('prefix'		, '/usr'),
     ('sysconfdir'	, '/etc'),
+    ('lib'              , 'lib'),  # may be overridden with 'lib64'
     ('exec_prefix'	, '%(prefix)s'),
     ('bindir'		, '%(exec_prefix)s/bin'),
     ('sbindir'		, '%(exec_prefix)s/sbin'),
-    ('libdir'		, '%(exec_prefix)s/lib'),
+    ('libdir'		, '%(exec_prefix)s/%(lib)s'),
     ('libexecdir'	, '%(exec_prefix)s/libexec'),
     ('localstatedir'	, '%(prefix)s/var'),
     ('includedir'	, '%(prefix)s/include'),
