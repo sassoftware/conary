@@ -478,8 +478,6 @@ class RegularFile(File):
 		util.mkdirChain(path)
 
 	    tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
-            # don't let anyone else peek at the contents
-            os.chmod(tmpname, 0600)
 	    try:
 		f = os.fdopen(tmpfd, 'w')
 		util.copyfileobj(src, f)
