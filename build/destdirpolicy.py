@@ -680,10 +680,12 @@ class Strip(policy.Policy):
     def postProcess(self):
         if self.debuginfo:
             for file in sorted(self.debugfiles):
-                dir = os.path.dirname(file)
-                util.mkdirChain('%(destdir)s%(debugsrcdir)s/'%self.dm +dir)
-                shutil.copy2('%(topbuilddir)s/'%self.dm +file,
-                             '%(destdir)s%(debugsrcdir)s/'%self.dm +file)
+                builddirpath = '%(topbuilddir)s/' % self.dm +file
+                if os.path.exists(builddirpath):
+                    dir = os.path.dirname(file)
+                    util.mkdirChain('%(destdir)s%(debugsrcdir)s/'%self.dm +dir)
+                    shutil.copy2(builddirpath,
+                                 '%(destdir)s%(debugsrcdir)s/'%self.dm +file)
 
 class NormalizeCompression(policy.Policy):
     """
