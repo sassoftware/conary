@@ -17,7 +17,7 @@ import sqlite3
 class NetworkAuthorization:
     def check(self, authToken, write = False, label = None, trove = None):
         if label and label.getHost() != self.name:
-            return False
+            raise RepositoryMismatch
 
         if not write and self.anonReads:
             return True
@@ -67,7 +67,7 @@ class NetworkAuthorization:
         
     def checkUserPass(self, authToken, label = None):
         if label and label.getHost() != self.name:
-            return False
+            raise RepositoryMismatch
 
         stmt = "SELECT COUNT(userId) FROM Users WHERE user=? AND password=?"
         m = md5.new()
@@ -124,6 +124,9 @@ class NetworkAuthorization:
                                                     write INTEGER)""")
             cu.execute("""CREATE INDEX PermissionsIdx
                           ON Permissions(userId, labelId, troveNameId)""")
+
+class RepositoryMismatch(Exception):
+    pass
 
 class InsufficientPermission(Exception):
     pass
