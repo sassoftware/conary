@@ -37,6 +37,7 @@ def doImport(dbpath, rpmFile):
     md5s = h['filemd5s']
     rdevs = h['filerdevs']
     linktos = h['filelinktos']
+    flags = h['fileflags']
 
     del h
     del ts
@@ -44,7 +45,10 @@ def doImport(dbpath, rpmFile):
     fileList = []
     for i in range(0, len(list)):
 	if (stat.S_ISREG(modes[i])):
-	    f = files.RegularFile(list[i])
+	    if not (flags[i] & rpm.RPMFILE_GHOST):
+		f = files.RegularFile(list[i])
+	    else:
+		continue
 	    f.md5(md5s[i])
 	elif (stat.S_ISLNK(modes[i])):
 	    f = files.SymbolicLink(list[i])
