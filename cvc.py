@@ -14,6 +14,8 @@ argDef['dir'] = 1
 def usage(rc = 1):
     print "usage: srs source checkin <file>"
     print "       srs source checkout [--dir <dir>] <group> <version>"
+    print "       srs source commit"
+    print "       srs source diff"
     sys.exit(rc)
 
 def sourceCommand(cfg, args, argSet):
@@ -37,3 +39,15 @@ def sourceCommand(cfg, args, argSet):
 
 	args = [repos, cfg, dir] + args[1:]
 	checkin.checkout(*args)
+    elif (args[0] == "commit"):
+	repos = repository.LocalRepository(cfg.reppath, "w")
+
+	if argSet or len(args) != 1: usage()
+	checkin.commit(repos, cfg)
+    elif (args[0] == "diff"):
+	repos = repository.LocalRepository(cfg.reppath, "r")
+
+	if argSet or len(args) != 1: usage()
+	checkin.diff(repos, cfg)
+    else:
+	usage()
