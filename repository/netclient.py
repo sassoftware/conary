@@ -933,7 +933,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossRepositories = False, 
                   affinityDatabase = None):
-        from deps.deps import overrideFlavor
         results = {}
         remaining = []
         affinityTroveMap = {}
@@ -1023,7 +1022,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     byBranchMap[name] = tup
                     for dummy, afVersion, afFlavor in affinityTroves:
                         if not flavor:
-                            f = overrideFlavor(defaultFlavor, afFlavor, 
+                            f = deps.overrideFlavor(defaultFlavor, afFlavor, 
                                        mergeType = deps.DEP_MERGE_TYPE_PREFS)
                         branch = afVersion.branch()
                         byBranch[name].setdefault(afVersion.branch(),
@@ -1069,7 +1068,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                             if otherFlavor != f:
                                 f = defaultFlavor
                                 break
-                        f = overrideFlavor(defaultFlavor, f, 
+                        f = deps.overrideFlavor(defaultFlavor, f, 
                                     mergeType = deps.DEP_MERGE_TYPE_PREFS)
                     if f is None:
                         dNoFlavor[name] = { version : [ None ] }
@@ -1154,7 +1153,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                 if otherFlavor != f:
                                     f = defaultFlavor
                                     break
-                            f = overrideFlavor(defaultFlavor, f, 
+                            f = deps.overrideFlavor(defaultFlavor, f, 
                                        mergeType = deps.DEP_MERGE_TYPE_PREFS)
                         if acrossRepositories:
                             # acrossRepositories - 
@@ -1190,7 +1189,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     for dummy, afVersion, afFlavor in affinityTroves:
                         # XXX matches no version given code
                         if not flavor:
-                            f = overrideFlavor(defaultFlavor, afFlavor, 
+                            f = deps.overrideFlavor(defaultFlavor, afFlavor, 
                                        mergeType = deps.DEP_MERGE_TYPE_PREFS)
                         branch = afVersion.branch()
                         verRelBranch[name].setdefault(afVersion.branch(), 
