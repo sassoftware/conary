@@ -8,6 +8,12 @@ Changes in 0.50.5:
     which were already installed on the system
   * r.ComponentSpec('somecomponent', '.*') will no longer override the
     file specifications for packaging :debuginfo and :test components.
+  * loadRecipe now takes a troveSpec as its first parameter, and uses that
+    troveSpec to find the trove on the local system that matches the source
+    component that is being loaded.  loadRecipe also automatically searches 
+    the labels that are parents of the current recipe, so if you shadow a 
+    recipe, any loadRecipe lines contained in that recipe should still do 
+    what you want. 
 
 Changes in 0.50.4:
   * Most rollback information is stored as a reference to a repository

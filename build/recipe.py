@@ -160,7 +160,7 @@ def setupRecipeDict(d, filename):
 
 class RecipeLoader:
     def __init__(self, filename, cfg=None, repos=None, component=None,
-                 label=None):
+                 branch=None):
         self.recipes = {}
         
         if filename[0] != "/":
@@ -184,7 +184,8 @@ class RecipeLoader:
         self.module.__dict__['cfg'] = cfg
         self.module.__dict__['repos'] = repos
         self.module.__dict__['component'] = component
-        self.module.__dict__['label'] = label
+        self.module.__dict__['branch'] = branch
+        self.module.__dict__['name'] = pkgname
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -205,7 +206,8 @@ class RecipeLoader:
         del self.module.__dict__['cfg']
         del self.module.__dict__['repos']
         del self.module.__dict__['component']
-        del self.module.__dict__['label']
+        del self.module.__dict__['branch']
+        del self.module.__dict__['name']
 
         found = False
         for (name, obj) in self.module.__dict__.items():
@@ -291,24 +293,15 @@ class RecipeLoader:
         except:
             pass
 
-def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
-                                    versionStr=None, label=None):
-    if not component.endswith(':source'):
-        component += ":source"
-    name = filename[:-len('.recipe')]
-    if not label:
-	label = cfg.buildLabel
-    else:
-	if type(label) == str:
-            if '@' not in label:
-                # copy namespace and branchname
-                l = cfg.buildLabel
-                label = versions.Label('%s@%s:%s' %(label, l.getNamespace(), l.getLabel()))
-            else:
-                label = versions.Label(label)
-
+def recipeLoaderFromSourceComponent(name, cfg, repos,
+                                    versionStr=None, labelPath=None):
+    name = name.split(':')[0]
+    component = name + ":source"
+    filename = name + '.recipe'
+    if not labelPath:
+	labelPath = cfg.buildLabel
     try:
-	pkgs = repos.findTrove(label, 
+	pkgs = repos.findTrove(labelPath, 
                                (component, versionStr, deps.DependencySet()))
 	if len(pkgs) > 1:
 	    raise RecipeFileError("source component %s has multiple versions "
@@ -339,39 +332,144 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     del outF
 
     try:
-        loader = RecipeLoader(recipeFile, cfg, repos, component, label)
+        loader = RecipeLoader(recipeFile, cfg, repos, component, 
+                              sourceComponent.getVersion().branch())
     finally:
         os.unlink(recipeFile)
     recipe = loader.getRecipe()
     recipe._trove = sourceComponent.copy()
     return (loader, sourceComponent.getVersion())
 
-def loadRecipe(file, sourcecomponent=None, label=None):
-    oldUsed = use.getUsed()
+
+
+
+def loadRecipe(troveSpec, label=None):
+    """Load a recipe so that its class/data can be used in another recipe.
+
+    If a complete version is not specified in the trovespec, the version of 
+    the recipe to load will be based on what is installed on the system.  
+    For example, if loadRecipe('foo') was called, and foo with version
+    /bar.org@bar:devel/4.1-1-1 was installed on the system, foo:source with
+    version /bar.org@bar:devel/4.1-1 will be loaded.  The recipe will also
+    be loaded with the installed package's flavor.
+
+    If the package is not installed anywhere on the system, the labelPath 
+    will be searched without reference to the installed system.  
+
+    @param troveSpec: name[=version][[flavor]] specification of the trove to
+    load.  The flavor given will be used to find the given recipe and also
+    to set the flavor of the loaded recipe.
+    @param label: label string or list of label strings to search for the 
+    given recipe.  
+    Defaults to the labels listed in the version in the 
+    including recipe.  For example, if called from recipe with version
+    /conary.specifix.com@spx:devel//shadow/1.0-1-1, the default labelPath
+    would be [conary.specifix.com@spx:shadow, conary.specifix.com@spx:devel]
+    """
+
+    def _findInstalledVersion(db, labelPath, name, versionStr, flavor):
+        """ Specialized search of the installed system along a labelPath, 
+            defaulting to searching the whole system if the trove is not
+            found along the label path.
+
+            The version and flavor of the first found installed trove is 
+            returned, or none if no trove is found.
+        """
+        # first search on the labelPath.  
+        try:
+            troves = db.findTrove(labelPath, name, flavor, versionStr)
+            if len(troves) > 1:
+                raise RuntimeError, (
+                                'Multiple troves could match loadRecipe' 
+                                ' request %s' % troveSpec)
+            if troves:
+                return troves[0][1].getSourceVersion(), troves[0][2]
+        except repository.TroveNotFound:
+            pass
+        if labelPath is None:
+            return None
+        try:
+            troves = db.findTrove(None, name, flavor, versionStr)
+            if len(troves) > 1:
+                raise RuntimeError, (
+                                'Multiple troves could match loadRecipe' 
+                                ' request for %s' % name)
+            if troves:
+                return troves[0][1].getSourceVersion(), troves[0][2]
+        except repository.TroveNotFound:
+            pass
+        return None
 
     callerGlobals = inspect.stack()[1][0].f_globals
     cfg = callerGlobals['cfg']
     repos = callerGlobals['repos']
-    if label is None:
-        # if a label is not specified, use the label from the last loaded
-        # recipe
-        label = callerGlobals['label']
+    branch = callerGlobals['branch']
+    parentPackageName = callerGlobals['name']
 
-    if sourcecomponent and not sourcecomponent.endswith(':source'):
-	sourcecomponent = sourcecomponent + ':source'
-	# XXX the sourcecomponent argument should go away
-	# and always pull by file name
+    oldUsed = use.getUsed()
+    name, versionStr, flavor = updatecmd.parseTroveSpec(troveSpec, None)
+
+    if name.endswith('.recipe'):
+        file = name
+        name = name[:-len('.recipe')]
     else:
-	sourcecomponent = file.split('.')[0] + ':source'
-    if file[0] != '/':
-        recipepath = os.path.dirname(callerGlobals['filename'])
-        localfile = recipepath + '/' + file
-    try:
-        loader = RecipeLoader(localfile, cfg)
-    except IOError, err:
-        if err.errno == errno.ENOENT:
-            loader = recipeLoaderFromSourceComponent(sourcecomponent, file, 
-						     cfg, repos, label=label)[0]
+        file = name + '.recipe'
+
+
+    #first check to see if a filename was specified, and if that 
+    #recipe actually exists.   
+    loader = None
+    if not (label or versionStr or flavor):
+        if name[0] != '/':
+            recipepath = os.path.dirname(callerGlobals['filename'])
+            localfile = recipepath + '/' + file
+        else:
+            localfile = name + '.recipe'
+
+        if os.path.exists(localfile):
+            if flavor:
+                oldBuildFlavor = cfg.buildFlavor
+                cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
+                use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
+            loader = RecipeLoader(localfile, cfg)
+
+    if not loader:
+        if label:
+            if not isinstance(label, list):
+                labelPath = [versions.Label(label)]
+            else:
+                labelPath = [ versions.Label(x) for x in label ]
+        elif branch:
+            # if no labelPath was specified, search backwards through the 
+            # labels on the current branch.
+            labelPath = [branch.label()]
+            while branch.hasParentBranch():
+                branch = branch.parentBranch()
+                labelPath.append(branch.label())
+        else:
+            labelPath = None
+        db = database.Database(cfg.root, cfg.dbPath)
+        parts = _findInstalledVersion(db, labelPath, name, versionStr, flavor)
+
+        if parts:
+            version, flavor = parts
+            if version.isLocalCook() or version.isEmerge() or version.isLocal():
+                version = version.getSourceVersion().parentVersion()
+            versionStr = version.getSourceVersion().asString()
+        if flavor:
+            # override the current flavor with the flavor found in the 
+            # installed trove (or the troveSpec flavor, if no installed 
+            # trove was found.  
+            oldBuildFlavor = cfg.buildFlavor
+            cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
+            use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
+        loader = recipeLoaderFromSourceComponent(name, cfg, repos, 
+                                                 labelPath=labelPath, 
+                                                 versionStr=versionStr)[0]
+    if flavor:
+        cfg.buildFlavor = oldBuildFlavor
+        use.setBuildFlagsFromFlavor(parentPackageName, cfg.buildFlavor)
+
 
     for name, recipe in loader.allRecipes().items():
         # hide all recipes from RecipeLoader - we don't want to return
