@@ -81,7 +81,8 @@ class taghandlerBuilder:
 
         postScript = None
         if rpmhelper.POSTIN in rpmHeader:
-            if rpmhelper.POSTINPROG in rpmHeader:
+            if rpmhelper.POSTINPROG in rpmHeader and \
+               rpmHeader[rpmhelper.POSTINPROG] != '/bin/sh':
                 postInProg = rpmHeader[rpmhelper.POSTINPROG]
                 if 'ldconfig' in postInProg:
                     # ldconfig happens automatically
@@ -110,7 +111,8 @@ class taghandlerBuilder:
         postUn = None
         if rpmhelper.POSTUN in rpmHeader:
             postUn = self.removeUnConary(rpmHeader[rpmhelper.POSTUN])
-            if rpmhelper.POSTUNPROG in rpmHeader:
+            if rpmhelper.POSTUNPROG in rpmHeader and \
+               rpmHeader[rpmhelper.POSTUNPROG] != '/bin/sh':
                 postInProg = rpmHeader[rpmhelper.POSTUNPROG]
                 if 'ldconfig' in postUnProg:
                     # ldconfig happens automatically
@@ -160,6 +162,7 @@ class taghandlerBuilder:
     def removeUnConary(self, script):
         # make parsing easier by removing \ line continuation
         script = ''.join(script.split('\\\n'))
+        scriptLines = script.split('\n')
         # conary will deal with chkconfig automatically,
         # and we do not want to run it twice
         # adding users and groups should be done through Conary
@@ -172,7 +175,6 @@ class taghandlerBuilder:
            'userdel' in script or \
            'groupadd' in script or \
            'groupdel' in script:
-            scriptLines = script.split('\n')
             lines = []
             for line in scriptLines:
                 if 'chkconfig' in line:
@@ -199,8 +201,8 @@ class taghandlerBuilder:
                     print 'removing groupdel from "%s"' %line
                     line = userRe.sub(r'\1:', line)
                 lines.append(line)
-            script = '\n'.join(lines)
-        return script
+            scriptLines = lines
+        return scriptLines
 
     def warnRelocation(self, name):
         print '%%%s requires relocation.' %name
@@ -302,7 +304,7 @@ class taghandlerBuilder:
         self.preunname = self.packagename+'.rpmpostun'
 
         tagdescription = [
-            'file          %(taghandlerdir)s/'+self.packagename,
+            'file          %(taghandlerdir)s/%(name)s',
             'description   %(name)s RPM script proxy handler',
             'datasource    args',
         ]
@@ -319,6 +321,7 @@ class taghandlerBuilder:
                 '        ;;',
             ])
             tagdescription.append('implements    files update')
+            writeLines(self.postscriptname, self.scripts[POST])
         if PREUN in self.scripts:
             taghandler.extend([
                 '    remove)',
@@ -326,11 +329,14 @@ class taghandlerBuilder:
                 '        ;;',
             ])
             tagdescription.append('implements    files preremove')
+            writeLines(self.preunname, self.scripts[PREUN])
 
         taghandler.extend([
             'esac',
             'exit 0',
         ])
+        writeLines(self.tagdescriptionname, tagdescription)
+        writeLines(self.taghandlername, taghandler)
 
     def sourcefiles(self):
         sourcefiles = [self.taghandlername, self.tagdescriptionname]
@@ -344,6 +350,7 @@ class taghandlerBuilder:
         # note that we cannot do r.TagSpec('%(name)s',... because
         # tag specs cannot have macros embedded in them
         recipelines = [
+            "",
             "        r.addSource('"+self.taghandlername+"', dest='%(taghandlerdir)s%(name)s', macros=True)",
             "        r.addSource('"+self.tagdescriptionname+"', dest='%(tagdescriptiondir)s%(name)s', macros=True)",
             "        # this file needs to have different contents in each build",
@@ -370,25 +377,26 @@ class recipeBuilder:
         self.packagename = 'rpm_'+self.packagebasename
         self.recipename = self.packagename + '.recipe'
         # get information from RPM
-        self.rpmdata = {}
-        self.rpmdata['packagename'] = self.packagename
-        self.rpmdata['version'] = '_'.join((
+        rpmdata = {}
+        rpmdata['packagename'] = self.packagename
+        rpmdata['version'] = '_'.join((
             self.rpmHeader[rpmhelper.VERSION],
             self.rpmHeader[rpmhelper.RELEASE]))
-        self.rpmdata['rpmname'] = os.path.basename(rpmname)
+        rpmdata['rpmname'] = os.path.basename(rpmname)
 
         self.recipe = [
-            "class %(packagename)s(PackageRecipe):",
-            "    name = '%(packagename)s'",
-            "    version = '%(version)s'",
+            "class %(packagename)s(PackageRecipe):" %rpmdata,
+            "    name = '%(packagename)s'" %rpmdata,
+            "    version = '%(version)s'" %rpmdata,
             "    def setup(r):",
-            "        r.addArchive('%(rpmname)s', dir='/')",
+            "        r.addArchive('%(rpmname)s', dir='/')" %rpmdata,
             "        # by default, we do not split RPMs up into components",
             "        r.ComponentSpec('runtime', '.*')",
             "        # RPMs may not follow conary rules for config files for",
             "        # each file in /etc, so we'll stick to only files marked",
             "        # as config files in the RPM proper",
             "        r.EtcConfig(exceptions='.*')",
+            "",
         ]
 
         users = {}
@@ -482,11 +490,14 @@ class recipeBuilder:
             checkin.addFiles(self.tag.sourcefiles(), ignoreExisting=True)
             self.recipe.extend(self.tag.recipelines())
 
-        f = open(self.recipename, 'w')
-        f.write('\n'.join(self.recipe) % self.rpmdata)
-        f.close()
+        writeLines(self.recipename, self.recipe)
 
 
+def writeLines(filename, lines):
+    f = open(filename, 'w')
+    f.write('\n'.join(lines))
+    f.close()
+    
 
 def usage():
     print "\n".join((
