@@ -2,6 +2,7 @@ Changes in 0.11.1:
   * erasing troves enforces dependencies -- this requires a database 
     conversion (run the conary-add-filedeps script which fixed the
     conversion to 0.11.0 after updating conary)
+  * add --add-user to script.py for creating the authdb
 
 Changes in 0.11.0:
   * massive rework of fileId mechanism to allow better flavor support
