@@ -39,8 +39,8 @@ class Database(repository.LocalRepository):
 	    else:
 		old = self.getPackageVersion(pkgName, oldVersion)
 
-	    (pkgChgSet, filesNeeded) = newPkg.diff(old, oldVersion, newVersion)
-	    cs.addPackage(pkgChgSet)
+	    (pkgChgSet, filesNeeded) = newPkg.diff(old)
+	    cs.newPackage(pkgChgSet)
 
 	    for (fileId, oldVersion, newVersion) in filesNeeded:
 		filedb = self._getFileDB(fileId)

@@ -29,7 +29,7 @@ class Repository:
 	oldPackageList = []
 
 	# build todo set
-	for csPkg in cs.getPackageList():
+	for csPkg in cs.getNewPackageList():
 	    newVersion = csPkg.getNewVersion()
 	    old = csPkg.getOldVersion()
 
@@ -182,8 +182,9 @@ class Repository:
 	    else:
 		old = None
 
-	    (pkgChgSet, filesNeeded) = new.diff(old, oldVersion, newVersion)
-	    cs.addPackage(pkgChgSet)
+	    (pkgChgSet, filesNeeded) = new.diff(old, 
+						abstract = (not oldVersion))
+	    cs.newPackage(pkgChgSet)
 
 	    for (fileId, oldVersion, newVersion) in filesNeeded:
 		filedb = self._getFileDB(fileId)
