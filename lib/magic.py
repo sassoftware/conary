@@ -35,7 +35,7 @@ class ar(Magic):
 class gzip(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
-	if _char(buffer[3]) == 0x8:
+	if buffer[3] == '\x08':
 	    self.contents['name'] = _string(buffer[10:])
 	if buffer[8] == 4:
 	    self.contents['compression'] = '9'
@@ -58,19 +58,16 @@ def magic(path, basedir=''):
     f = file(basedir+path)
     b = f.read(4096)
     f.close()
-    if len(b) > 4 and _char(b[0]) == 0x7f and b[1:4] == "ELF":
+    if len(b) > 4 and b[0] == '\x7f' and b[1:4] == "ELF":
 	return ELF(path, basedir, b)
-    elif len(b) > 7 and b[0:6] == "!<arch>":
+    elif len(b) > 7 and b[0:7] == "!<arch>":
 	return ar(path, basedir, b)
-    elif len(b) > 2 and _char(b[0]) == 0x1f and _char(b[1]) == 0x8b:
+    elif len(b) > 2 and b[0] == '\x1f' and b[1] == '\x8b':
 	return gzip(path, basedir, b)
-    elif len(b) > 3 and b[0:2] == "BZh":
+    elif len(b) > 3 and b[0:3] == "BZh":
 	return bzip(path, basedir, b)
 
 # internal helpers
 
 def _string(buffer):
     return buffer[:string.find(buffer, '\0')]
-
-def _char(c):
-    return struct.unpack("B", c)[0]
