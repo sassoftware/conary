@@ -91,10 +91,18 @@ def findPackage(repos, packageNamespace, defaultNick, name,
 
 	pkgList = []
 	for branch in branchList:
-	    pkg = repos.getLatestPackage(name, branch)
-	    pkgVerRel = pkg.getVersion().trailingVersion()
-	    if pkgVerRel.equal(verRel):
+	    version = branch.copy()
+	    version.appendVersionReleaseObject(verRel)
+	    try:
+		pkg = repos.getPackageVersion(name, version)
 		pkgList.append(pkg)
+	    except repository.PackageMissing, e:
+		pass
+
+	if not pkgList:
+	    raise PackageNotFound, \
+		"version %s of %s is not on any branch named %s" % \
+		(versionStr, name, str(defaultNick))
     else:
 	try:
 	    version = versions.VersionFromString(versionStr)
