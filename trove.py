@@ -2,10 +2,15 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+import copy
 import versions
 
 # this is the repository's idea of a package
 class Package:
+
+    def copy(self):
+	return copy.deepcopy(self)
+
     def getName(self):
         return self.name
     
@@ -16,7 +21,6 @@ class Package:
         self.version = version
     
     def addFile(self, fileId, path, version):
-	self.files[path] = (fileId, path, version)
 	self.idMap[fileId] = (path, version)
 
     # fileId is the only thing that must be here; the other fields could
@@ -26,26 +30,29 @@ class Package:
 
 	if not path:
 	    path = origPath
-	else:
-	    del self.files[path]
 
 	if not version:
 	    version = origVersion
 	    
-	self.files[path] = (fileId, path, version)
 	self.idMap[fileId] = (path, version)
 
     def removeFile(self, fileId):   
 	path = self.idMap[fileId][0]
-	del self.files[path]
 	del self.idMap[fileId]
 
     def fileList(self):
 	l = []
-        paths = self.files.keys()
+	mapping = {}
+
+	for (theId, (path, version)) in self.idMap.items():
+	    mapping[path] = theId
+
+        paths = mapping.keys()
         paths.sort()
         for path in paths:
-	    l.append(self.files[path])
+	    fileId = mapping[path]
+	    version = self.idMap[fileId][1]
+	    l.append((fileId, path, version))
 
 	return l
 
@@ -54,7 +61,7 @@ class Package:
 
     def formatString(self):
 	rc = ""
-	for (fileId, path, version) in self.files.values():
+	for (fileId, (path, version)) in self.idMap.items():
 	    rc += ("%s %s %s\n" % (fileId, path, version.freeze()))
 	return rc
 
@@ -134,7 +141,6 @@ class Package:
 	return (chgSet, filesNeeded)
 
     def __init__(self, name, version):
-	self.files = {}
 	self.idMap = {}
 	self.name = name
 	self.version = version
@@ -212,6 +218,29 @@ class PackageChangeSet:
 	for fileId in self.oldFiles:
 	    f.write("\tremoved %s(.*)%s\n" % (fileId[:6], fileId[-6:]))
 
+    def remapSinglePath(self, path, map):
+	# the first item in map remaps source packages, which are present
+	# without a leading /
+	newPath = path
+
+	if path[0] != "/":
+	    shortName = self.name.split(':')[-2]
+	    prefix = map[0][1]% {'pkgname': shortName } 
+	    newPath = prefix + path
+	else:
+	    for (prefix, newPrefix) in map[1:]:
+		if path.startswith(prefix):
+		    newPath = newPrefix + path[strlen(prefix):]
+
+	return newPath
+
+    def remapPaths(self, map):
+	for list in ( self.changedFiles, self.newFiles ):
+	    for i in range(0,len(list)):
+		newPath = self.remapSinglePath(list[i][1], map)
+		if newPath != list[i][1]:
+		    list[i] = (list[i][0], newPath, list[i][2])
+
     def freeze(self):
 	rc = ""
 
@@ -245,7 +274,7 @@ class PackageChangeSet:
 		       self.newVersion.freeze(), rc.count("\n"))
 
 	return hdr + rc	
-    
+
     def __init__(self, name, oldVersion, newVersion, abstract = 0):
 	self.name = name
 	self.oldVersion = oldVersion

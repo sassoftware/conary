@@ -68,6 +68,10 @@ class ChangeSet:
     def getFileList(self):
 	return self.files.items()
 
+    def remapPaths(self, map):
+	for pkgCs in self.newPackages:
+	    pkgCs.remapPaths(map)
+
     def formatToFile(self, cfg, f):
 	for pkg in self.newPackages:
 	    pkg.formatToFile(self, cfg, f)
@@ -76,6 +80,9 @@ class ChangeSet:
 
     def getFileChange(self, fileId):
 	return self.files[fileId][2]
+
+    def getFileOldVersion(self, fileId):
+	return self.files[fileId][0]
 
     def headerAsString(self):
 	rc = ""
@@ -394,7 +401,7 @@ def ChangeSetCommand(repos, cfg, packageName, outFileName, oldVersionStr, \
 
     list = []
     for name in repos.getPackageList(packageName):
-	list.append((name, oldVersion, newVersion))
+	list.append((name, oldVersion, newVersion, (not oldVersion)))
 
     cs = repos.createChangeSet(list)
     cs.writeToFile(outFileName)

@@ -6,6 +6,7 @@
 # implements the SRS system repository
 
 import changeset
+import copy
 import datastore
 import fcntl
 import files
@@ -17,190 +18,142 @@ import bsddb
 
 class Repository:
 
-    # returns 
-    # (pkgList, fileList, fileMap, oldFileList, oldPackageList, erasePkgs) 
-    # tuple, which forms a todo for how to apply the change set; that tuple 
-    # is used to either commit the change set or to reroot the change set 
-    # against another target
-    def _buildChangeSetJob(self, sourcePath, cs):
-	pkgList = []
-	fileMap = {}
-	fileList = []
-	oldFileList = []
-	oldPackageList = []
-
-	# build todo set
-	for csPkg in cs.getNewPackageList():
-	    newVersion = csPkg.getNewVersion()
-	    old = csPkg.getOldVersion()
-
-	    if self.hasPackage(csPkg.getName()):
-		pkgSet = self._getPackageSet(csPkg.getName())
-
-		if pkgSet.hasVersion(newVersion):
-		    raise KeyError, "version %s for %s exists" % \
-			    (newVersion.asString(), csPkg.getName())
-	    else:
-		pkgSet = None
-
-	    if old:
-		oldPackageList.append((csPkg.getName(), old))
-		newPkg = pkgSet.getVersion(old)
-		newPkg.changeVersion(newVersion)
-	    else:
-		newPkg = package.Package(csPkg.name, newVersion)
-
-	    newFileMap = newPkg.applyChangeSet(csPkg)
-	    pkgList.append((csPkg.getName(), newPkg, newVersion))
-	    fileMap.update(newFileMap)
-
-	    if old:
-		oldPackage = self.getPackageVersion(csPkg.getName(), old)
-		for fileId in csPkg.getOldFileList():
-		    version = oldPackage.getFile(fileId)[1]
-		    oldFileList.append((fileId, version))
-
-		for (fileId, path, version) in csPkg.getChangedFileList():
-		    version = oldPackage.getFile(fileId)[1]
-		    oldFileList.append((fileId, version))
-
-	# Create the file objects we'll need for the commit. This handles
-	# files which were added and files which have changed
-	for (fileId, (oldVer, newVer, infoLine)) in cs.getFileList():
-	    skipRestoreContents = 0
-	    if oldVer:
-		fileDB = self._getFileDB(fileId)
-		oldfile = fileDB.getVersion(oldVer)
-
-		file = fileDB.getVersion(oldVer)
-		file.applyChange(infoLine)
-		
-		if isinstance(file, files.RegularFile) and \
-		   isinstance(oldfile, files.RegularFile) and \
-		   file.sha1() == oldfile.sha1():
-		    skipRestoreContents = 1
-	    else:
-		file = files.FileFromInfoLine(infoLine, fileId)
-
-	    assert(newVer.equal(fileMap[fileId][1]))
-	    fileList.append((fileId, newVer, file, skipRestoreContents))
-
-	# make sure the packages which need to be removed are installed
-	erasedPackages = []
-	erasedFiles = []
-	for (pkgName, version) in cs.getOldPackageList():
-	    pkg = self.getPackageVersion(pkgName, version)
-	    erasedPackages.append(pkg)
-
-	    for (fileId, path, version) in pkg.fileList():
-		file = self.getFileVersion(fileId, version)
-		if isinstance(file, files.SourceFile):
-		    basePkgName = pkgName.split(':')[-2]
-		    d = { 'pkgname' : basePkgName }
-		    path = (sourcePath) % d + "/" + path
-		erasedFiles.append((fileId, path, version))
-		    
-
-	return (pkgList, fileList, fileMap, oldFileList, oldPackageList,
-	        erasedPackages, erasedFiles)
-
     def _getPackageSet(self, name):
 	return _PackageSet(self.pkgDB, name)
 
     def _getFileDB(self, fileId):
 	return _FileDB(self.fileDB, fileId)
 
-    def commitChangeSet(self, sourcePathTemplate, cs, eraseOld = 0):
-	(pkgList, fileList, fileMap, oldFileList, oldPackageList, 
-	 eraseList, eraseFiles) = self._buildChangeSetJob(sourcePathTemplate, 
-							  cs)
+    def getPackageList(self, groupName = ""):
+	if self.pkgDB.hasFile(groupName):
+	    return [ groupName ]
 
-	# we can't erase the oldVersion for abstract change sets
-	assert(not(cs.isAbstract() and eraseOld))
+	allPackages = self.pkgDB.fileList()
+	list = []
+	groupName = groupName + ":"
+
+	for pkgName in allPackages:
+	    if pkgName.startswith(groupName):
+		list.append(pkgName)
+
+	list.sort()
+
+	return list
+
+    def hasPackage(self, pkg):
+	return self.pkgDB.hasFile(pkg)
+
+    def hasPackageVersion(self, pkgName, version):
+	return self._getPackageSet(pkgName).hasVersion(version)
+
+    def pkgLatestVersion(self, pkgName, branch):
+	return self._getPackageSet(pkgName).getLatestVersion(branch)
+
+    def getLatestPackage(self, pkgName, branch):
+	return self._getPackageSet(pkgName).getLatestPackage(branch)
+
+    def getPackageVersion(self, pkgName, version):
+	return self._getPackageSet(pkgName).getVersion(version)
+
+    def erasePackageVersion(self, pkgName, version):
+	ps = self._getPackageSet(pkgName)
+	ps.eraseVersion(version)
+
+    def addPackage(self, pkg):
+	ps = self._getPackageSet(pkg.getName())
+	ps.addVersion(pkg.getVersion(), pkg)
+
+    def getPackageVersionList(self, pkgName):
+	return self._getPackageSet(pkgName).fullVersionList()
+
+    def fileLatestVersion(self, fileId, branch):
+	fileDB = self._getFileDB(fileId)
+	return fileDB.getLatestVersion(branch)
 	
-	# commit changes
-	pkgsDone = []
-	filesDone = []
-	filesToArchive = {}
-	try:
-	    for (pkgName, newPkg, newVersion) in pkgList:
-		pkgSet = self._getPackageSet(pkgName)
-		pkgSet.addVersion(newVersion, newPkg)
-		pkgsDone.append((pkgSet, newVersion))
+    def getFileVersion(self, fileId, version):
+	fileDB = self._getFileDB(fileId)
+	return fileDB.getVersion(version)
 
-	    for (fileId, fileVersion, file, skipRestoreContents) in fileList:
-		infoFile = self._getFileDB(fileId)
-		pathInPkg = fileMap[fileId][0]
-		pkgName = fileMap[fileId][2]
+    def addFileVersion(self, fileId, version, file):
+	fileDB = self._getFileDB(fileId)
+	fileDB.addVersion(version, file)
 
-		# this version may already exist, abstract change sets
-		# include redundant files quite often
-		if not infoFile.hasVersion(fileVersion):
-		    infoFile.addVersion(fileVersion, file)
-		    infoFile.close()
-		    filesDone.append(fileId)
-		    filesToArchive[pathInPkg] = \
-			(file, pathInPkg, pkgName, skipRestoreContents)
+    def hasFileVersion(self, fileId, version):
+	fileDB = self._getFileDB(fileId)
+	return fileDB.hasVersion(version)
 
-	    # sort paths and store in order (to make sure that directories
-	    # are stored before the files that reside in them in the case of
-	    # restore to a local file system
-	    pathsToArchive = filesToArchive.keys()
-	    pathsToArchive.sort()
-	    for pathInPkg in pathsToArchive:
-		(file, path, pkgName, skipRestore) = filesToArchive[pathInPkg]
-		if isinstance(file, files.SourceFile):
-		    basePkgName = pkgName.split(':')[-2]
-		    d = { 'pkgname' : basePkgName }
-		    path = (sourcePathTemplate) % d + "/" + path
+    def eraseFileVersion(self, fileId, version):
+	fileDB = self._getFileDB(fileId)
+	fileDB.eraseVersion(version)
 
-		self.storeFileFromChangeset(cs, file, path, skipRestore)
+    def storeFileFromChangeset(self, chgSet, file, restoreContents):
+	raise NotImplemented
 
-	    # remove packages we don't need anymore, including the files
-	    for pkg in eraseList:
-		pkgSet = self._getPackageSet(pkg.getName())
-		pkgSet.eraseVersion(pkg.getVersion())
-		pkgSet.close()
+    def __del__(self):
+	self.close()
 
-	    eraseFiles = [ (x[1], x[0], x[2]) for x in eraseFiles ]
-	    eraseFiles.sort()
-	    eraseFiles.reverse()
+    def __init__(self):
+	pass
 
-	    for (path, fileId, version) in eraseFiles:
-		infoFile = self._getFileDB(fileId)
-		file = infoFile.getVersion(version)
-		self.removeFile(file, path)
-		infoFile.eraseVersion(version)
-		infoFile.close()
+class LocalRepository(Repository):
 
-	except:
-	    # something went wrong; try to unwind our commits
-	    for fileId in filesDone:
-		infoFile = self._getFileDB(fileId)
-		(path, fileVersion) = fileMap[fileId][0:2]
-		infoFile.eraseVersion(fileVersion)
-		infoFile.close()
+    def storeFileFromChangeset(self, chgSet, file, restoreContents):
+	if isinstance(file, files.RegularFile):
+	    if restoreContents:
+		f = chgSet.getFileContents(file.sha1())
+		targetFile = self.contentsStore.newFile(file.sha1())
 
-	    for (pkgSet, newVersion) in pkgsDone:
-		pkgSet.eraseVersion(newVersion)
-		pkgSet.close()
+		# if targetFile is None the file is already in the store
+		if targetFile:
+		    targetFile.write(f.read())
+		    targetFile.close()
 
-	    raise 
+		f.close()
+	    else:
+		# the file doesn't have any contents, so it must exist
+		# in the data store already; we still need to increment
+		# the reference count for it
+		self.contentsStore.addFileReference(file.sha1)
 
-	if eraseOld:
-	    # at this point the new version is in the repository, and we
-	    # can't undo that anymore. if erasing the old version fails, we
-	    # need to just commit the inverse change set; fortunately erasing
-	    # rarely fails
-	    for (fileId, version) in oldFileList:
-		filesDB = self._getFileDB(fileId)
-		filesDB.eraseVersion(version)
-		filesDB.close()
+	    return 1
+	
+	return 0
 
-	    for (pkgName, pkgVersion) in oldPackageList:
-		pkgSet = self._getPackageSet(pkgName)
-		pkgSet.eraseVersion(pkgVersion)
-		pkgSet.close()
+    def removeFileContents(self, sha1):
+	self.contentsStore.removeFile(sha1)
+
+    def pullFileContentsObject(self, fileId):
+	return self.contentsStore.openFile(fileId)
+
+    def hasFileContents(self, fileId):
+	return self.contentsStore.hasFile(fileId)
+
+    def open(self, mode):
+	if self.pkgDB:
+	    self.close()
+
+	self.lockfd = os.open(self.top + "/lock", os.O_CREAT | os.O_RDWR)
+
+	if mode == "r":
+	    fcntl.lockf(self.lockfd, fcntl.LOCK_SH)
+	else:
+	    fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
+
+        try:
+            self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", mode)
+            self.fileDB = versioned.Database(self.top + "/files.db", mode)
+        # XXX this should be translated into a generic versioned.DatabaseError
+        except bsddb.error:
+            # an error occured, close our databases and relinquish the lock
+            if self.pkgDB is not None:
+                self.pkgDB.close()
+                self.pkgDB = None
+	    fcntl.lockf(self.lockfd, fcntl.LOCK_UN)
+            os.close(self.lockfd)
+            self.lockfd = -1
+            raise
+
+	self.mode = mode
 
     # packageList is a list of (pkgName, oldVersion, newVersion, abstract) 
     # tuples
@@ -242,104 +195,15 @@ class Repository:
 
 	return cs
 
-    def pullFileContentsObject(self, fileId):
-	return self.contentsStore.openFile(fileId)
+    def commitChangeSet(self, cs):
+	job = ChangeSetJob(self, cs)
+	undo = ChangeSetUndo(self)
 
-    def newFileContents(self, fileId, srcFile):
-	# if targetFile is None the file is already in the store
-	targetFile = self.contentsStore.newFile(fileId)
-	if targetFile:
-	    targetFile.write(srcFile.read())
-	    targetFile.close()
-
-    def hasFileContents(self, fileId):
-	return self.contentsStore.hasFile(fileId)
-
-    def getPackageList(self, groupName = ""):
-	if self.pkgDB.hasFile(groupName):
-	    return [ groupName ]
-
-	allPackages = self.pkgDB.fileList()
-	list = []
-	groupName = groupName + ":"
-
-	for pkgName in allPackages:
-	    if pkgName.startswith(groupName):
-		list.append(pkgName)
-
-	list.sort()
-
-	return list
-
-    def hasPackage(self, pkg):
-	return self.pkgDB.hasFile(pkg)
-
-    def hasPackageVersion(self, pkgName, version):
-	return self._getPackageSet(pkgName).hasVersion(version)
-
-    def pkgLatestVersion(self, pkgName, branch):
-	return self._getPackageSet(pkgName).getLatestVersion(branch)
-
-    def getLatestPackage(self, pkgName, branch):
-	return self._getPackageSet(pkgName).getLatestPackage(branch)
-
-    def getPackageVersion(self, pkgName, version):
-	return self._getPackageSet(pkgName).getVersion(version)
-
-    def getPackageVersionList(self, pkgName):
-	return self._getPackageSet(pkgName).fullVersionList()
-
-    def fileLatestVersion(self, fileId, branch):
-	fileDB = self._getFileDB(fileId)
-	return fileDB.getLatestVersion(branch)
-	
-    def getFileVersion(self, fileId, version):
-	fileDB = self._getFileDB(fileId)
-	return fileDB.getVersion(version)
-
-    def storeFileFromChangeset(self, chgSet, file, pathToFile, skipContents):
-	raise NotImplemented
-
-    def __del__(self):
-	self.close()
-
-    def __init__(self):
-	pass
-
-class LocalRepository(Repository):
-
-    def storeFileFromChangeset(self, chgSet, file, pathToFile, skipContents):
-	if not skipContents and isinstance(file, files.RegularFile):
-	    f = chgSet.getFileContents(file.sha1())
-	    file.archive(self, f)
-	    f.close()
-
-    def open(self, mode):
-	if self.pkgDB:
-	    self.close()
-
-	self.lockfd = os.open(self.top + "/lock", os.O_CREAT | os.O_RDWR)
-
-	if mode == "r":
-	    fcntl.lockf(self.lockfd, fcntl.LOCK_SH)
-	else:
-	    fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
-
-        try:
-            self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", mode)
-            self.fileDB = versioned.Database(self.top + "/files.db", mode)
-        # XXX this should be translated into a generic versioned.DatabaseError
-        except bsddb.error:
-            # an error occured, close our databases and relinquish the lock
-            if self.pkgDB is not None:
-                self.pkgDB.close()
-                self.pkgDB = None
-	    fcntl.lockf(self.lockfd, fcntl.LOCK_UN)
-            os.close(self.lockfd)
-            self.lockfd = -1
-            raise
-
-	self.mode = mode
+	try:
+	    job.commit(undo)
+	except:
+	    undo.undo()
+	    raise
 
     def close(self):
 	if self.pkgDB is not None:
@@ -363,7 +227,6 @@ class LocalRepository(Repository):
 	self.open(mode)
 
 	Repository.__init__(self)
-
 
 # this is a set of all of the versions of a single packages 
 class _PackageSet:
@@ -445,8 +308,182 @@ class _FileDB:
 	self.f = db.openFile(fileId)
 	self.fileId = fileId
 
+class ChangeSetJobFile:
+
+    def version(self):
+	return self.theVersion
+
+    def changeVersion(self, ver):
+	self.theVersion = ver
+
+    def restoreContents(self):
+	return self.theRestoreContents
+
+    def file(self):
+	return self.theFile
+
+    def path(self):
+	return self.thePath
+
+    def fileId(self):
+	return self.theFileId
+
+    def copy(self):
+	return copy.deepcopy(self)
+
+    def __init__(self, fileId, file, version, path, restoreContents):
+	self.theVersion = version
+	self.theFile = file
+	self.theRestoreContents = restoreContents
+	self.thePath = path
+	self.theFileId = fileId
+
+# ChangeSetJob provides a to-do list for applying a change set; file
+# remappings should have been applied to the change set before it gets
+# this far
+class ChangeSetJob:
+
+    def addPackage(self, pkg):
+	self.packages.append(pkg)
+
+    def newPackageList(self):
+	return self.packages
+
+    def addFile(self, fileObject):
+	self.files.append(fileObject)
+	self.filePaths[fileObject.path] = 1
+
+    def containsFilePath(self, path):
+	return self.filePaths.has_key(path)
+
+    def newFileList(self):
+	return self.files
+
+    # the undo object it kept up-to-date with what needs to be done to undo
+    # the work completed so far; the caller can use a try/except block to
+    # cause an undo to happen if an error occurs the change set is needed to
+    # access the file contents; it's not used for anything else
+    def commit(self, undo):
+	# commit changes
+	filesToArchive = []
+
+	for newPkg in self.newPackageList():
+	    self.repos.addPackage(newPkg)
+	    undo.addedPackage(newPkg)
+
+	for newFile in self.newFileList():
+	    file = newFile.file()
+	    fileId = newFile.fileId()
+
+	    if not self.repos.hasFileVersion(fileId, newFile.version()):
+		self.repos.addFileVersion(fileId, newFile.version(), file)
+		undo.addedFile(newFile)
+
+		path = newFile.path()
+
+	    # note that the order doesn't matter; we're just copying
+	    # files into the repository
+	    if self.repos.storeFileFromChangeset(self.cs, file, 
+						 newFile.restoreContents):
+		undo.addedFileContents(file.sha1())
+
+    def __init__(self, repos, cs):
+	self.repos = repos
+	self.cs = cs
+
+	self.packages = []
+	self.files = []
+	self.filePaths = {}
+
+	fileMap = {}
+
+	# create the package objects which need to be installed; the
+	# file objects which map up with them are created later, but
+	# we do need a map from fileId to the path and version of the
+	# file we need, so build up a dictionary with that information
+	for csPkg in cs.getNewPackageList():
+	    newVersion = csPkg.getNewVersion()
+	    old = csPkg.getOldVersion()
+	    pkgName = csPkg.getName()
+
+	    if repos.hasPackage(pkgName):
+		if repos.hasPackageVersion(pkgName, newVersion):
+		    raise CommitError, "version %s for %s exists" % \
+			    (newVersion.asString(), csPkg.getName())
+
+	    if old:
+		newPkg = repos.getPackageVersion(pkgName, old)
+		newPkg.changeVersion(newVersion)
+	    else:
+		newPkg = package.Package(csPkg.name, newVersion)
+
+	    newFileMap = newPkg.applyChangeSet(csPkg)
+
+	    self.addPackage(newPkg)
+	    fileMap.update(newFileMap)
+
+	# Create the file objects we'll need for the commit. This handles
+	# files which were added and files which have changed
+	for (fileId, (oldVer, newVer, infoLine)) in cs.getFileList():
+	    restoreContents = 1
+	    if oldVer:
+		oldfile = repos.getFileVersion(fileId, oldVer)
+		file = repos.getFileVersion(fileId, oldVer)
+		file.applyChange(infoLine)
+		
+		if isinstance(file, files.RegularFile) and \
+		   isinstance(oldfile, files.RegularFile) and \
+		   file.sha1() == oldfile.sha1():
+		    restoreContents = 0
+	    else:
+		# this is for new files
+		file = files.FileFromInfoLine(infoLine, fileId)
+
+	    # we should have had a package which requires this (new) version
+	    # of the file
+	    assert(newVer.equal(fileMap[fileId][1]))
+	    path = fileMap[fileId][0]
+	    self.addFile(ChangeSetJobFile(fileId, file, newVer, path, 
+					  restoreContents))
+
+class ChangeSetUndo:
+
+    def undo(self):
+	# something went wrong; try to unwind our commits
+	for newFile in self.filesDone:
+	    self.repos.eraseFileVersion(newFile.fileId(), newFile.version())
+
+	for pkg in self.pkgsDone:
+	    self.repos.erasePackageVersion(pkg.getName(), pkg.getVersion())
+
+	for sha1 in self.filesStored:
+	    self.repos.removeFileContents(sha1)
+
+	self.reset()
+
+    def addedPackage(self, pkg):
+	self.pkgsDone.append(pkg)
+
+    def addedFile(self, file):
+	self.filesDone.append(file)
+
+    def addedFileContents(self, sha1):
+	self.filesStored.append(sha1)
+
+    def reset(self):
+	self.filesDone = []
+	self.pkgsDone = []
+	self.filesStored = []
+
+    def __init__(self, repos):
+	self.reset()
+	self.repos = repos
+
 class RepositoryError(Exception):
 
     """Base class for exceptions from the system repository"""
     pass
 
+class CommitError(RepositoryError):
+
+    pass

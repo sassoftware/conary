@@ -99,7 +99,13 @@ class VersionedFile:
 	str = "".join(map(lambda x: "%s %s\n" % 
 					    (x, self.branchMap[x].freeze()), 
 			    self.branchMap.keys()))
-	self.db[_BRANCH_MAP % self.key] = str
+
+	key = _BRANCH_MAP % self.key
+
+	if not str:
+	    if self.db.has_key(key): del self.db[key]
+	else:
+	    self.db[_BRANCH_MAP % self.key] = str
 
     def getVersion(self, version):
 	return FalseFile(self.db[_CONTENTS % (self.key, version.asString())])

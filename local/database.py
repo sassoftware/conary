@@ -8,8 +8,25 @@ import dbhash
 import files
 import os
 import repository
+import versions
+
+# Every item which is inserted into the database really goes in twice;
+# once as is, and then a LocalBranch is immediately created which reflects
+# what's in the file system. The "as is" copy doesn't include data for
+# any file except configuration files (which means while they can be used
+# as the source for a change set, they can't be used as the target)
+#
+# The LocalBranch for each item in the database has normal header information,
+# but the on-disk files are the real source of information on the package,
+# including file types, hashes, etc
 
 class Database(repository.LocalRepository):
+
+    def pullFileContentsObject(self, fileId):
+	raise NotImplemented
+
+    def hasFileContents(self, fileId):
+	raise NotImplemented
 
     # takes an abstract change set and creates a differential change set 
     # against a branch of the repository
@@ -67,49 +84,41 @@ class Database(repository.LocalRepository):
 
 	return cs
 
-    def removeFile(self, file, pathToFile):
-	file.remove(self.root + pathToFile)
-	if isinstance(file, files.RegularFile):
-	    key = file.sha1()
-	    l = self.fileIdMap[key].split("\n")
-	    if len(l) == 1:
-		del self.fileIdMap[key]
-	    else:
-		l.remove(pathToFile)
-		self.fileIdMap[key] = "\n".join(l)
+    def commitChangeSet(self, sourcePath, cs, makeRollback = 1):
+	assert(not cs.isAbstract())
 
-	    if file.isConfig():
-		self.contentsStore.removeFile(file.sha1())
+	map = ( ( None, sourcePath + "/" ), )
+	cs.remapPaths(map)
 
-    def storeFileFromChangeset(self, chgSet, file, pathToFile, skipContents):
-	file.restore(chgSet, self.root + pathToFile, skipContents)
-	if isinstance(file, files.RegularFile):
-	    key = file.sha1()
-	    if self.fileIdMap.has_key(key):
-		self.fileIdMap[key] += "\n" + pathToFile
-	    else:
-		self.fileIdMap[key] = pathToFile
+	job = DatabaseChangeSetJob(self, cs)
 
-	    # archive config files; we might want them later
-	    if file.isConfig():
-		f = chgSet.getFileContents(file.sha1())
-		file.archive(self, f)
-		f.close()
+	undo = DatabaseChangeSetUndo(self)
 
-    def pullFileContentsObject(self, fileId):
-	# just pick the first path; we don't care which one we use
-	path = self.fileIdMap[fileId].split('\n')[0]
-	return open(self.root + self.fileIdMap[fileId], "r")
+	#if makeRollback:
+	#    inverse = cs.invert(self)
+	#    self.addRollback(inverse)
+
+	try:
+	    job.commit(undo, self.root)
+	except:
+	    # this won't work it things got too far, but it won't hurt
+	    # anything either
+	    undo.undo()
+	    raise
+
+    # this is called when a Repository wants to store a file; we never
+    # want to do this; we copy files onto the filesystem after we've
+    # created the LocalBranch
+    def storeFileFromChangeset(self, chgSet, file, restoreContents):
+	if file.isConfig():
+	    return repository.LocalRepository.storeFileFromChangeset(self, 
+				    chgSet, file, restoreContents)
 
     def close(self):
-	if self.fileIdMap is not None:
-            self.fileIdMap.close()
-	    self.fileIdMap = None
 	repository.LocalRepository.close(self)
 
     def open(self, mode):
 	repository.LocalRepository.open(self, mode)
-	self.fileIdMap = dbhash.open(self.top + "/fileid.db", mode)
 	self.rollbackCache = self.top + "/rollbacks"
 	self.rollbackStatus = self.rollbackCache + "/status"
 	if not os.path.exists(self.rollbackCache):
@@ -188,13 +197,195 @@ class Database(repository.LocalRepository):
 
 	for name in names:
 	    cs = self.getRollback(name)
-	    self.commitChangeSet(sourcepath, cs, eraseOld = 1)
+	    self.commitChangeSet(cs, makeRollback = 0)
 	    self.removeRollback(name)
 
     def __init__(self, root, path, mode = "r"):
 	self.root = root
 	fullPath = root + "/" + path
 	repository.LocalRepository.__init__(self, fullPath, mode)
+
+class DatabaseChangeSetJob(repository.ChangeSetJob):
+
+    def oldPackage(self, pkg):
+	self.oldPackages.append(pkg)
+
+    def oldPackageList(self):
+	return self.oldPackages
+
+    def oldFile(self, fileId, fileVersion, fileObj):
+	self.oldFiles.append((fileId, fileVersion, fileObj))
+
+    def oldFileList(self):
+	return self.oldFiles
+
+    def addStaleFile(self, path, fileObj):
+	self.staleFiles.append((path, fileObj))
+
+    def staleFileList(self):
+	self.staleFiles.sort()
+	return self.staleFiles
+
+    def commit(self, undo, root):
+	repository.ChangeSetJob.commit(self, undo)
+
+	for pkg in self.oldPackageList():
+	    self.repos.erasePackageVersion(pkg.getName(), pkg.getVersion())
+	    undo.removedPackage(pkg)
+
+	for (fileId, fileVersion, fileObj) in self.oldFileList():
+	    self.repos.eraseFileVersion(fileId, fileVersion)
+	    undo.removedFile(fileId, fileVersion, fileObj)
+
+	# the undo object won't work after this point, but a rollback
+	# should work fine (even if some extraneous errors get reported)
+	undo.reset()
+
+	# write files to the filesystem, finally
+	for (path, newFile) in self.pathList:
+	    fileObj = newFile.file()
+	    fileObj.restore(self.cs, root + path, newFile.restoreContents())
+
+	# remove paths which are no longer valid
+	for (path, file) in self.staleFileList():
+	    file.remove(root + path)
+
+	# time to remove files from the repository
+	for (fileId, fileVersion, fileObj) in self.oldFileList():
+	    if fileObj.isConfig():
+		self.repos.removeFileContents(fileObj.sha1())
+
+    def __init__(self, repos, cs):
+	repository.ChangeSetJob.__init__(self, repos, cs)
+
+	# list of packages which need to be removed
+	self.oldPackages = []
+	self.oldFiles = []
+	self.staleFiles = []
+
+	# make local branches for each package and let them get committed 
+	# with the rest of this change set
+	#
+	# iterate over a copy of this list as the real list keeps
+	# growing through the loop
+	list = self.newPackageList()[:]
+	for newPkg in list:
+	    branchPkg = newPkg.copy()
+	    ver = branchPkg.getVersion().fork(versions.LocalBranch(), 
+					      sameVerRel = 1)
+	    branchPkg.changeVersion(ver)
+	    self.addPackage(branchPkg)
+
+	# remove old versions of the packages which are being added; make sure
+	# we get both the version being replaced and the local branch for that
+	# version
+	# 
+	# while we're here, package change sets may mark some files as removed;
+	# we need to remember to remove those files and their local branches.
+	# package change sets also know when file paths have changed, and the
+	# old paths are candidates for removal (and should be removed unless
+	# something else in this change set caused those paths to be owned
+	# again)
+
+	for csPkg in cs.getNewPackageList():
+	    name = csPkg.getName()
+	    oldVersion = csPkg.getOldVersion()
+
+	    if not oldVersion:
+		# we know this isn't an abstract change set (since this
+		# class can't handle abstract change sets, and asserts
+		# the away at the top of __init__() ), so this must be
+		# a new package. no need to erase any old stuff then!
+		continue
+
+	    oldBranch = oldVersion.fork(versions.LocalBranch(), sameVerRel = 1)
+
+	    assert(repos.hasPackageVersion(name, oldVersion))
+	    assert(repos.hasPackageVersion(name, oldBranch))
+
+	    self.oldPackage(repos.getPackageVersion(name, oldVersion))
+	    self.oldPackage(repos.getPackageVersion(name, oldBranch))
+
+	    pkg = repos.getPackageVersion(name, oldVersion)
+
+	    for fileId in csPkg.getOldFileList():
+		(oldPath, oldFileVersion) = pkg.getFile(fileId)
+		# we need this object in case of an undo
+		fileObj = repos.getFileVersion(fileId, oldFileVersion)
+
+		oldFileBranch = oldFileVersion.fork(versions.LocalBranch(),
+						    sameVerRel = 1)
+
+		self.oldFile(fileId, oldFileVersion, fileObj)
+		self.oldFile(fileId, oldFileBranch, fileObj)
+
+		self.addStaleFile(oldPath, fileObj)
+
+	    for (fileId, newPath, newVersion) in csPkg.getChangedFileList():
+		if newPath:
+		    # find the old path for this file
+		    (oldPath, oldFileVersion) = pkg.getFile(fileId)
+		    if not self.containsFilePath[oldPath]:
+			# the path has been orphaned
+			fileObj = self.repos.getFileVersion(fileId, 
+							    oldFileVersion)
+			self.addStaleFile(oldPath, fileObj)
+
+	# for each file we are going to create, create the file as
+	# well as the local branch; while we're at it erase the old
+	# version of that file, and the old branch
+	# 
+	# also build up a list of file paths so we can sort it to write
+	# files onto the filesystem in the right order later on
+	l = self.newFileList()[:]
+	self.pathList = []
+	for f in l:
+	    self.pathList.append((f.path(), f))
+
+	    newFile = f.copy()
+	    ver = newFile.version().fork(versions.LocalBranch(), sameVerRel = 1)
+	    newFile.changeVersion(ver)
+	    self.addFile(newFile)
+
+	    oldVersion = cs.getFileOldVersion(f.fileId())
+	    if not oldVersion:
+		# this is a new file; there is no old version to erase
+		continue
+
+	    oldBranch = oldVersion.fork(versions.LocalBranch(), sameVerRel = 1)
+
+	    self.oldFile(f.fileId(), oldVersion, 
+			 repos.getFileVersion(f.fileId(), oldVersion))
+	    self.oldFile(f.fileId(), oldBranch,
+			 repos.getFileVersion(f.fileId(), oldBranch))
+
+	self.pathList.sort()
+
+class DatabaseChangeSetUndo(repository.ChangeSetUndo):
+
+    def undo(self):
+	for pkg in self.removedPackages:
+	    self.repos.addPackage(pkg)
+
+	for (fileId, fileVersion, fileObj) in self.removedFiles:
+	    self.repos.addFileVersion(fileId, fileVersion, fileObj)
+
+	repository.ChangeSetUndo.undo(self)
+
+    def removedPackage(self, pkg):
+	self.removedPackages.append(pkg)
+
+    def removedFile(self, fileId, fileVersion, fileObj):
+	self.removedFiles.append((fileId, fileVersion, fileObj))
+
+    def reset(self):
+	repository.ChangeSetUndo.reset(self)
+	self.removedPackages = []
+	self.removedFiles = []
+
+    def __init__(self, repos):
+	self.repos = repos
+	self.reset()
 
 # Exception classes
 

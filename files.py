@@ -3,6 +3,7 @@
 # All rights reserved
 #
 import string
+import copy
 import os
 import sha1helper
 import stat
@@ -215,6 +216,9 @@ class File(FileMode):
 
 	return self.lsTag + string.join(list, "")
 
+    def copy(self):
+	return copy.deepcopy(self)
+
     def infoLine(self):
 	return self.infoTag + " " + FileMode.infoLine(self)
 
@@ -227,7 +231,7 @@ class File(FileMode):
     def remove(self, target):
 	os.unlink(target)
 
-    def restore(self, target, skipContents, skipMtime = 0):
+    def restore(self, target, restoreContents, skipMtime = 0):
 	self.chmod(target)
 	self.setOwnerGroup(target)
 
@@ -246,11 +250,6 @@ class File(FileMode):
 	# FIXME: this needs to use lchown, which is in 2.3, and
 	# this should happen unconditionally
 	os.chown(target, uid, gid)
-
-    # copies a files contents into the repository, if necessary
-    def archive(self, repos, source):
-	# most file types don't need to do this
-	pass
 
     # public interface to applyChangeLine
     #
@@ -298,11 +297,11 @@ class SymbolicLink(File):
 	# chmod() on a symlink follows the symlink
 	pass
 
-    def restore(self, changeSet, target, skipContents):
+    def restore(self, changeSet, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.symlink(self.theLinkTarget, target)
-	File.restore(self, target, skipContents, skipMtime = 1)
+	File.restore(self, target, restoreContents, skipMtime = 1)
 
     def applyChangeLine(self, line):
 	(target, line) = line.split(None, 1)
@@ -324,13 +323,13 @@ class Socket(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, changeSet, target, skipContents):
+    def restore(self, changeSet, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
         sock.bind(target)
         sock.close()
-	File.restore(self, target, skipContents)
+	File.restore(self, target, restoreContents)
 
     def __init__(self, fileId, info = None):
 	File.__init__(self, fileId, info, infoTag = "s")
@@ -342,11 +341,11 @@ class NamedPipe(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, changeSet, target, skipContents):
+    def restore(self, changeSet, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.mkfifo(target)
-	File.restore(self, target, skipContents)
+	File.restore(self, target, restoreContents)
 
     def __init__(self, fileId, info = None):
 	File.__init__(self, fileId, info, infoTag = "p")
@@ -358,11 +357,11 @@ class Directory(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, changeSet, target, skipContents):
+    def restore(self, changeSet, target, restoreContents):
 	if not os.path.isdir(target):
 	    util.mkdirChain(target)
 
-	File.restore(self, target, skipContents)
+	File.restore(self, target, restoreContents)
 
     def remove(self, target):
 	os.rmdir(target)
@@ -388,7 +387,7 @@ class DeviceFile(File):
 	
 	return 0
 
-    def restore(self, changeSet, target, skipContents):
+    def restore(self, changeSet, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 
@@ -404,7 +403,7 @@ class DeviceFile(File):
             os.system("mknod %s %c %d %d" % (target, self.infoTag, self.major,
                                              self.minor))
             
-	File.restore(self, target, skipContents)
+	File.restore(self, target, restoreContents)
 
     def majorMinor(self, major = None, minor = None):
 	if major is not None:
@@ -474,8 +473,8 @@ class RegularFile(File):
 
 	return 0
 
-    def restore(self, changeSet, target, skipContents):
-	if not skipContents:
+    def restore(self, changeSet, target, restoreContents):
+	if restoreContents:
 	    if os.path.exists(target) or os.path.islink(target):
 		os.unlink(target)
 	    else:
@@ -488,10 +487,7 @@ class RegularFile(File):
 	    f.close()
 	    src.close()
 
-	File.restore(self, target, skipContents)
-
-    def archive(self, repos, file):
-	repos.newFileContents(self.sha1(), file)
+	File.restore(self, target, restoreContents)
 
     def applyChangeLine(self, line):
 	(sha, line) = line.split(None, 1)

@@ -77,8 +77,6 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 
     # create a change set between what is in the database and what is
     # on the disk
-    localChanges = changeset.CreateAgainstLocal(cfg, db, list)
+    #localChanges = changeset.CreateAgainstLocal(cfg, db, list)
 
-    inverse = cs.invert(db)
-    db.addRollback(inverse)
-    db.commitChangeSet(cfg.sourcepath, cs, eraseOld = 1)
+    db.commitChangeSet(cfg.sourcepath, cs)

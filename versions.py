@@ -106,20 +106,31 @@ class Version:
 	return self.listsEqual(self.versions, other)
 
     def asString(self, defaultBranch = None):
-	if defaultBranch and self.onBranch(defaultBranch):
-	    return "%s" % self.versions[-1]
-	else:
-	    s = ""
-	    for version in self.versions:
-		s = s + ("/%s" % version)
+	list = self.versions
+	s = "/"
 
-	return s
+	if defaultBranch and len(defaultBranch.versions) < len(self.versions):
+	    start = Version(self.versions[0:len(defaultBranch.versions)], 0)
+	    if start.equal(defaultBranch):
+		list = self.versions[len(defaultBranch.versions):]
+		s = ""
+
+	for version in list:
+	    s = s + ("%s/" % version)
+
+	return s[:-1]
 
     def freeze(self, defaultBranch = None):
 	return ("%.3f:" % self.timeStamp) + self.asString(defaultBranch)
 
     def isBranch(self):
 	return isinstance(self.versions[-1], BranchName)
+
+    # true as long as we're either on the local branch or part of the
+    # name of the local branch
+    def isLocal(self):
+	return isinstance(self.versions[-1], LocalBranch) or \
+	       isinstance(self.versions[-2], LocalBranch)
 
     def onBranch(self, branch):
 	if self.isBranch(): return 0
