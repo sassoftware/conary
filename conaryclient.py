@@ -129,10 +129,8 @@ class ConaryClient:
                                 choice = scoredList[-1][1]
                                 suggList.append(choice)
 
-                                if suggMap.has_key(troveName):
-                                    suggMap[troveName].append(choice)
-                                else:
-                                    suggMap[troveName] = [ choice ]
+                                l = suggMap.setdefault(troveName, [])
+                                l.append(choice)
 
 			troves.update(dict.fromkeys(suggList))
 
@@ -467,10 +465,8 @@ class ConaryClient:
             # a better repository API
             queryDict = {}
             for (name, version, flavor) in branchedTroves.iterkeys():
-                if queryDict.has_key(name):
-                    queryDict[name].append(version)
-                else:
-                    queryDict[name] = [ version ]
+                l = queryDict.setdefault(name, [])
+                l.append(version)
 
             matches = self.repos.getAllTroveFlavors(queryDict)
 
