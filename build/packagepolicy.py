@@ -140,4 +140,5 @@ def DefaultPolicy():
 	Config(),
 	ParseManifest(),
 	MakeDevices(),
+	AddModes(),
     ]
