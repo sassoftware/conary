@@ -503,7 +503,6 @@ class RegularFile(File):
 	    src = fileContents.get()
 	    f.write(src.read())
 	    f.close()
-	    src.close()
 
 	File.restore(self, target, restoreContents)
 
