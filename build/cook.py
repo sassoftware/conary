@@ -347,10 +347,10 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     grpName = recipeClass.name
 
     # build up the name->fileid mapping so we reuse fileids wherever
-    # possible; we do this by looking in the database for a trove
-    # with the same name as the recipe and recursing through it's
-    # subpackages; this mechanism continues to work as subpackages
-    # come and go.
+    # possible; we do this by looking in the database for the latest
+    # group for each flavor avalable on the branch and recursing
+    # through its subpackages; this mechanism continues to work as
+    # subpackages come and go.
     ident = _IdGen()
     try:
         versionList = repos.getTroveFlavorsLatestVersion(grpName, buildBranch)
