@@ -36,7 +36,8 @@ class ComponentSpec(_filterSpec):
     Determines which component each file is in.
     """
     # XXX TEMPORARY - remove directories such as /usr/include from this
-    # list when filesystem package is in place.
+    # list when filesystem package is in place and we have install
+    # ordering.
     baseFilters = (
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
@@ -67,7 +68,7 @@ class ComponentSpec(_filterSpec):
 	# the extras need to come first in order to override decisions
 	# in the base subfilters
 	for (name, patterns) in self.extraFilters:
-	    compFilters.append(buildpackage.Filter(name, patterns, macros))
+	    compFilters.append(buildpackage.Filter(name %macros, patterns, macros))
 	for (name, patterns) in self.baseFilters:
 	    compFilters.append(buildpackage.Filter(name, patterns, macros))
 
@@ -82,7 +83,7 @@ class PackageSpec(_filterSpec):
 	macros = recipe.macros
 
 	for (name, patterns) in self.extraFilters:
-	    pkgFilters.append(buildpackage.Filter(name, patterns, macros))
+	    pkgFilters.append(buildpackage.Filter(name %macros, patterns, macros))
 	# by default, everything that hasn't matched a pattern in the
 	# main package filter goes in the package named recipe.name
 	pkgFilters.append(buildpackage.Filter(recipe.name, '.*', macros))
