@@ -6,6 +6,7 @@ Changes in 0.14.3:
     location and with the right permissions, and fetches manually-added
     as well as automatically-added sources.
   * In recipes, addSource can now take dest='/path/to/file'
+  * Change %(servicedir)s location from /var to /srv
 
 Changes in 0.14.2:
   * contents are now stored as diffs when either the new file or the
