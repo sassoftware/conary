@@ -68,8 +68,8 @@ class FilesystemRepository(AbstractRepository):
 	ps = self._getPackageSet(pkg.getName())
 	ps.addVersion(pkg.getVersion(), pkg)
 
-    def getPackageLabelBranches(self, pkgName, nick):
-	return self._getPackageSet(pkgName).mapBranchNickname(nick)
+    def getPackageLabelBranches(self, pkgName, label):
+	return self._getPackageSet(pkgName).mapLabel(label)
 
     def getPackageVersionList(self, pkgName):
 	return self._getPackageSet(pkgName).fullVersionList()
@@ -156,8 +156,8 @@ class FilesystemRepository(AbstractRepository):
 	also getting branched. Duplicate branches can be created,
 	but only if one of the following is true:
 	 
-	  1. where specifies a particular version to branch from
-	  2. the branch does not yet exist and where is a branch nickname which matches multiple existing branches
+	  1. C{where} specifies a particular version to branch from
+	  2. the branch does not yet exist and C{where} is a label which matches multiple existing branches
 
 	Where specifies the node branches are created from for the
 	trove troveName (or all of the troves if troveName is empty).
@@ -168,7 +168,7 @@ class FilesystemRepository(AbstractRepository):
 	branch will be formed). More complicated algorithms for branch
 	will fix this, but it's not clear doing so is necessary.
 
-	@param newBranch: Nickname of the new branch
+	@param newBranch: Label of the new branch
 	@type newBranch: versions.BranchName
 	@param where: Where the branch should be created from
 	@type where: versions.Version or versions.BranchName

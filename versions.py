@@ -163,7 +163,7 @@ class VersionRelease(AbstractVersion):
 class BranchName(AbstractBranch):
 
     """
-    Stores a branch name, which is the same as a nickname. Branch names
+    Stores a branch name, which is the same as a label. Branch names
     are of the form hostname@branch.
     """
 
@@ -447,11 +447,10 @@ class Version(object):
 	assert(not self.isBranch())
 	return Version(self.versions[:-1], 0)
 
-    def branchNickname(self):
+    def label(self):
 	"""
 	Returns the BranchName object at the end of a branch. This is
-	known as the branch nick name, as is used in VersionedFiles as
-	an index.
+	known as a label, as is used in VersionedFiles as an index.
 
 	@rtype: BranchName
 	"""

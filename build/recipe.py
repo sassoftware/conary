@@ -677,7 +677,7 @@ class GroupRecipe(Recipe):
 
     def addTrove(self, name, versionStr = None):
 	try:
-	    pkgList = helper.findPackage(self.repos, self.branchNick, name, 
+	    pkgList = helper.findPackage(self.repos, self.label, name, 
 					 versionStr)
 	except helper.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
@@ -692,7 +692,7 @@ class GroupRecipe(Recipe):
 	self.repos = repos
 	self.cfg = cfg
 	self.troveVersions = {}
-	self.branchNick = branch.branchNickname()
+	self.label = branch.label()
 
 class FilesetRecipe(Recipe):
 
@@ -765,7 +765,7 @@ class FilesetRecipe(Recipe):
 	    remap = [ remap ]
 
 	try:
-	    pkgList = helper.findPackage(self.repos, self.branchNick, 
+	    pkgList = helper.findPackage(self.repos, self.label, 
 					 component, versionStr)
 	except helper.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
@@ -794,7 +794,7 @@ class FilesetRecipe(Recipe):
 	self.cfg = cfg
 	self.files = {}
 	self.paths = {}
-	self.branchNick = branch.branchNickname()
+	self.label = branch.label()
 	
 class RecipeFileError(Exception):
     def __init__(self, msg):

@@ -19,8 +19,8 @@ the frozen version of the version uses info is being stored.
 
 The contents of each file are stored as _CONTENTS.
 
-The _BRANCH_NICK stores a mapping from a branch nickname to a list of
-all of the versions to which that branch maps.
+The _LABEL_MAP stores a mapping from a label to a list of all of the
+versions to which it maps.
 
 The _VERSION_INFO builds a linked list of versions for a file.
 
@@ -37,7 +37,7 @@ _FILE_MAP = "FILEMAP"
 _VERSION_INFO = "VINFO-%s-%s"
 _BRANCH_MAP = "BMAP-%s"
 _CONTENTS = "%s %s"
-_BRANCH_NICK = "BNICK-%s-%s"
+_LABEL_MAP = "BNICK-%s-%s"
 
 class FalseFile:
     """
@@ -285,16 +285,16 @@ class VersionedFile:
 
 	#self.db.sync()
 
-    def mapBranchNickname(self, nick):
+    def mapLabel(self, label):
 	"""
-	Returns a list of the branches the given nickname refers to.
+	Returns a list of the branches the given label refers to.
 
-	@param nick: Nickname
-	@type nick: versions.BranchName
+	@param label: Label
+	@type label: versions.BranchName
 	@rtype: list of versions.Version objects, each of which is a branch
 	"""
 
-	key = _BRANCH_NICK % (self.key, str(nick))
+	key = _LABEL_MAP % (self.key, str(label))
 	if self.db.has_key(key):
 	    # cut off the empty item at the end which results from the
 	    # trailing \n
@@ -303,17 +303,17 @@ class VersionedFile:
 
 	return []
 
-    def _writeBranchNicknameList(self, nick, branchList):
+    def _writeLabelList(self, label, branchList):
 	"""
-	Saves the list of branches a nickname refers to.
+	Saves the list of branches a label refers to.
 
-	@param nick: Nickname
-	@type nick: versions.BranchName
-	@param branchList: List of branches nick refers to
+	@param label: Label
+	@type label: versions.BranchName
+	@param branchList: List of branches label refers to
 	@type branchList: list of versions.Version object
 	"""
 
-	key = _BRANCH_NICK % (self.key, str(nick))
+	key = _LABEL_MAP % (self.key, str(label))
 	if not branchList:
 	    if self.db.has_key(key):
 		del self.db[key]
@@ -335,8 +335,8 @@ class VersionedFile:
 	del self.branchMap[branchStr]
 	self._writeBranchMap()
 
-	nick = branch.branchNickname()
-	l = self.mapBranchNickname(nick)
+	label = branch.label()
+	l = self.mapLabel(label)
 	i = 0
 	for (i, b) in enumerate(l):
 	    if b == branch: 
@@ -344,7 +344,7 @@ class VersionedFile:
 		break
 
 	# this does the erase if l is empty
-	self._writeBranchNicknameList(nick, l)
+	self._writeLabelList(label, l)
 
 	assert(i < (len(l) + 1))
 
@@ -359,10 +359,10 @@ class VersionedFile:
 	branchStr = branch.asString()
 	assert(not self.branchMap.has_key(branchStr))
 
-	nick = branch.branchNickname()
-	branches = self.mapBranchNickname(nick)
+	label = branch.label()
+	branches = self.mapLabel(label)
 	branches.append(branch)
-	self._writeBranchNicknameList(nick, branches)
+	self._writeLabelList(label, branches)
 	self.branchMap[branchStr] = ""
 	self._writeBranchMap()
 

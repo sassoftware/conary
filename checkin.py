@@ -49,7 +49,7 @@ class SourceState(package.Package):
     def expandVersionStr(self, versionStr):
 	if versionStr[0] == "@":
 	    # get the name of the repository from the current branch
-	    repName = self.getBranch().branchNickname().getHost()
+	    repName = self.getBranch().label().getHost()
 	    return repName + versionStr
 	elif versionStr[0] != "/" and versionStr.find("@") == -1:
 	    # non fully-qualified version; make it relative to the current
@@ -126,8 +126,8 @@ def _getRecipeLoader(recipeFile):
 
 
 def checkout(repos, cfg, dir, name, versionStr = None):
-    # We have to be careful with branch nicknames.  First, we could get
-    # multiple matches for a single package. Two, when a nickname uniquely
+    # We have to be careful with labels.  First, we could get
+    # multiple matches for a single package. Two, when a label uniquely
     # identifies a package we still need to make sure the state has the name of
     # the actual branch since empty branches yield objects whose versions are
     # on the parent branch.

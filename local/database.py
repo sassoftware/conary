@@ -46,11 +46,11 @@ class AbstractDatabase(repository.AbstractRepository):
     def hasPackage(self, name):
 	return self.troveDb.hasByName(name)
 
-    def getPackageLabelBranches(self, name, nick):
+    def getPackageLabelBranches(self, name, label):
 	rc = []
 	for x in self.troveDb.iterFindByName(name):
 	    b = x.getVersion().branch()
-	    if b.branchNickname() == nick:
+	    if b.label() == label:
 		rc.append(b)
 
 	return rc

@@ -10,20 +10,20 @@ Simple functions used throughout srs.
 from repository import repository
 import versions
 
-def findPackage(repos, defaultNick, name, versionStr = None, forceGroup = 0):
+def findPackage(repos, defaultLabel, name, versionStr = None, forceGroup = 0):
     """
     Looks up a package in the given repository based on the name and
     version provided. If any errors are occured, PackageNotFound is
     raised with an appropriate error message. Multiple matches could
-    be found if versionStr refers to a branch nickname.
+    be found if versionStr refers to a label.
 
     @param repos: Repository to look for the package in
     @type repos: repository.Repository
-    @param defaultNick: Nickname of the branch to use if no branch
+    @param defaultLabel: Label of the branch to use if no branch
     is specified. If only a branch name is given (not a complete label),
-    the repository name from this nick name is used as the repository
+    the repository name from this label is used as the repository
     name for the branch name to form a complete label.
-    @type defaultNick: versions.BranchName
+    @type defaultLabel: versions.BranchName
     @param name: Package name
     @type name: str
     @param versionStr: Package version
@@ -45,47 +45,47 @@ def findPackage(repos, defaultNick, name, versionStr = None, forceGroup = 0):
 	    raise PackageNotFound,  \
 		    "only groups and filesets may be checked out of the repository"
 
-    if not defaultNick:
+    if not defaultLabel:
 	if versionStr[0] != "/" and (versionStr.find("/") != -1 or
 				     versionStr.find("@") == -1):
 	    raise PackageNotFound, \
-		"fully qualified version or branch nickname " + \
+		"fully qualified version or label " + \
 		"expected instead of %s" % versionStr
 
-    # a version is a branch nickname if
+    # a version is a label if
     #   1. it doesn't being with / (it isn't fully qualified)
     #   2. it only has one element (no /)
     #   3. it contains an @ sign
     if not versionStr or (versionStr[0] != "/" and  \
-	# branch nickname was given
+	# label was given
 	    (versionStr.find("/") == -1) and versionStr.count("@")):
 
 	if versionStr:
-	    if versionStr[0] == "@" and defaultNick:
-		versionStr = defaultNick.getHost() + versionStr
+	    if versionStr[0] == "@" and defaultLabel:
+		versionStr = defaultLabel.getHost() + versionStr
 
 	    try:
-		nick = versions.BranchName(versionStr)
+		label = versions.BranchName(versionStr)
 	    except versions.ParseError:
 		raise repository.PackageMissing, "invalid version %s" % versionStr
 	else:
-	    nick = defaultNick
+	    label = defaultLabel
 
-	branchList = repos.getPackageLabelBranches(name, nick)
+	branchList = repos.getPackageLabelBranches(name, label)
 	if not branchList:
 	    raise PackageNotFound, "branch %s does not exist for package %s" \
-			% (str(nick), name)
+			% (str(label), name)
 
 	pkgList = []
 	for branch in branchList:
 	    pkgList.append(repos.getLatestPackage(name, branch))
     elif versionStr[0] != "/" and versionStr.find("/") == -1:
 	# version/release was given
-	branchList = repos.getPackageLabelBranches(name, defaultNick)
+	branchList = repos.getPackageLabelBranches(name, defaultLabel)
 	if not branchList:
 	    raise PackageNotFound, \
 			"branch %s does not exist for package %s" \
-			% (str(defaultNick), name)
+			% (str(defaultLabel), name)
 	
 	try:
 	    verRel = versions.VersionRelease(versionStr)
@@ -105,7 +105,7 @@ def findPackage(repos, defaultNick, name, versionStr = None, forceGroup = 0):
 	if not pkgList:
 	    raise PackageNotFound, \
 		"version %s of %s is not on any branch named %s" % \
-		(versionStr, name, str(defaultNick))
+		(versionStr, name, str(defaultLabel))
     elif versionStr[0] != "/":
 	# partial version string, we don't support this
 	raise PackageNotFound, \
@@ -128,7 +128,7 @@ def findPackage(repos, defaultNick, name, versionStr = None, forceGroup = 0):
 
     return pkgList
 
-def fullBranchName(defaultNick, version, versionStr):
+def fullBranchName(defaultLabel, version, versionStr):
     """
     Converts a version string, and the version the string refers to
     (often returned by findPackage()) into the full branch name the
@@ -137,30 +137,30 @@ def fullBranchName(defaultNick, version, versionStr):
     be the version the branch was forked from rather then a version on
     that branch.
 
-    @param defaultNick: branch nickname we're on if versionStr is None
+    @param defaultLabel: default label we're on if versionStr is None
     (may be none if versionStr is not None)
-    @type defaultNick: versions.BranchName
+    @type defaultLabel: versions.BranchName
     @param version: version of the node versionStr resolved to
     @type version: versions.Version
     @param versionStr: string from the user; likely a very abbreviated version
     @type versionStr: str
     """
     if not versionStr or (versionStr[0] != "/" and  \
-	# branch nickname was given
+	# label was given
 	    (versionStr.find("/") == -1) and versionStr.count("@")):
 	if not versionStr:
-	    nick = defaultNick
+	    label = defaultLabel
 	elif versionStr[0] == "@":
-	    nick = versions.BranchName(defaultNick.getHost() + versionStr)
+            label = versions.BranchName(defaultLabel.getHost() + versionStr)
 	else:
-	    nick = versions.BranchName(versionStr)
+	    label = versions.BranchName(versionStr)
 
-	if version.branch().branchNickname() == nick:
+	if version.branch().label() == label:
 	    return version.branch()
 	else:
 	    # this must be the node the branch was created at, otherwise
 	    # we'd be on it
-	    return version.fork(nick, sameVerRel = 0)
+	    return version.fork(label, sameVerRel = 0)
     elif version.isBranch():
 	return version
     else:

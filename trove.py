@@ -516,12 +516,12 @@ class PackageChangeSet:
 	return newPath
 
     def remapPaths(self, map, dict):
-	for list in ( self.changedFiles, self.newFiles ):
-	    for i in range(0,len(list)):
-		if list[i][1]:
-		    newPath = self.remapSinglePath(list[i][1], map, dict)
-		    if newPath != list[i][1]:
-			list[i] = (list[i][0], newPath, list[i][2])
+	for filelist in (self.changedFiles, self.newFiles):
+            for i, path in enumerate(filelist):
+                if path[1]:
+		    newPath = self.remapSinglePath(path[1], map, dict)
+		    if newPath != path[1]:
+			filelist[i] = (path[0], newPath, path[2])
 
     def freeze(self):
 	"""
