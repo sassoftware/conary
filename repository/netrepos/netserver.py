@@ -23,8 +23,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     # 2. netserver.InsufficientPermission
 
     def callWrapper(self, method, authToken, args):
-	print method, args
-
 	try:
 	    r = self.__class__.__dict__[method](self, authToken, *args)
 	    return (False, r)
