@@ -741,7 +741,7 @@ class Database:
 				 pristine = pristine)
 	    yield trv
     
-    def iterIdByPath(self, path):
+    def iterTroveNameVersionByPath(self, path):
 	for instanceId in self.troveFiles.iterPath(path):
 	    troveId = self.instances.getId(instanceId)
 	    yield troveId

@@ -16,93 +16,116 @@ Provides the output for the "conary query" command
 """
 
 import files
+from lib import log
 
 from lib.sha1helper import sha1ToString
+from repository import repository
 
 _troveFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
-def displayTroves(db, cfg, ls = False, ids = False, sha1s = False,
-                  fullVersions = False, path = None, trove = "", versionStr = None):
+def displayTroves(db, troveNameList = [], pathList = [], ls = False, 
+                  ids = False, sha1s = False, fullVersions = False):
+    troveNames = []
+    hasVersions = False
+    for item in troveNameList:
+        if item.find("=") != -1:
+            l = item.split("=")
+            if len(l) > 2:
+                log.error("versions may not contain =")
+                return
+            troveNames.append(tuple(l))
+            hasVersions = True
+        else:
+            troveNames.append((item, None))
 
-    if path:
-	assert(not trove)
-	troves = db.getTroveIdsFromPath(path)
-	troves = [ troveid[0] for troveid in troves ]
-	if not troves:
-	    return
-    elif trove:
-	troves = [ trove ]
-    else:
-	troves = [ x for x in db.iterAllTroveNames() ]
-	troves.sort()
+    if not troveNames and not pathList:
+	troveNames = [ (x, None) for x in db.iterAllTroveNames() ]
+	troveNames.sort()
 
-    for troveName in troves:
-	if versionStr or ls or ids or sha1s:
-	    _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s,
-			      fullVersions)
-	    continue
-	else:
-	    l = db.getTroveVersionList(troveName)
+    if not hasVersions and not ls and not ids and not sha1s:
+        for path in pathList:
+            for trove in db.iterTrovesByPath(path):
+                troveNames.append((trove.getName(), [ trove.getVersion() ]))
 
-	    for version in l:
-		if fullVersions:
-		    print _troveFormat % (troveName, version.asString())
-		else:
-		    print _troveFormat % (troveName, 
+        for troveName, versionList in troveNames:
+            if not versionList:
+                versionList = db.getTroveVersionList(troveName)
+                if not versionList:
+                    log.error("trove %s is not installed", troveName)
+                    continue
+
+            for version in versionList:
+                if fullVersions:
+                    print _troveFormat % (troveName, version.asString())
+                else:
+                    print _troveFormat % (troveName, 
                                           version.trailingVersion().asString())
+        return
 
-def _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s, 
-		      fullVersions):
-    troveList = db.findTrove(troveName, versionStr)
+    for path in pathList:
+        for trove in db.iterTrovesByPath(path):
+	    _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions)
 
-    for trove in troveList:
-	version = trove.getVersion()
+    for (troveName, versionStr) in troveNames:
+        try:
+            for trove in db.findTrove(troveName, versionStr):
+                _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions)
+        except repository.PackageNotFound:
+            if versionStr:
+                log.error("version %s of trove %s is not installed",
+                          versionStr, troveName)
+            else:
+                log.error("trove %s is not installed", troveName)
+        
+def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions):
 
-	if ls:
-	    outerTrove = trove
-	    for trove in db.walkTroveSet(outerTrove):
-		iter = db.iterFilesInTrove(trove.getName(), trove.getVersion(),
-					   trove.getFlavor(),
-					   sortByPath = True, withFiles = True)
-		for (fileId, path, version, file) in iter:
-		    if isinstance(file, files.SymbolicLink):
-			name = "%s -> %s" %(path, file.target.value())
-		    else:
-			name = path
+    version = trove.getVersion()
 
-		    print "%s    1 %-8s %-8s %s %s %s" % \
-			(file.modeString(), file.inode.owner(), 
-			 file.inode.group(), 
-			 file.sizeString(), file.timeString(), name)
-	elif ids:
-	    for (fileId, path, version) in trove.iterFileList():
-		print "%s %s" % (sha1ToString(fileId), path)
-	elif sha1s:
-	    for (fileId, path, version) in trove.iterFileList():
-		file = db.getFileVersion(fileId, version)
-		if file.hasContents:
-		    print "%s %s" % (sha1ToString(file.contents.sha1()), path)
-	else:
-	    if fullVersions:
-		print _troveFormat % (troveName, version.asString())
-	    else:
-		print _troveFormat % (troveName, 
-				      version.trailingVersion().asString())
+    if ls:
+        outerTrove = trove
+        for trove in db.walkTroveSet(outerTrove):
+            iter = db.iterFilesInTrove(trove.getName(), trove.getVersion(),
+                                       trove.getFlavor(),
+                                       sortByPath = True, withFiles = True)
+            for (fileId, path, version, file) in iter:
+                if isinstance(file, files.SymbolicLink):
+                    name = "%s -> %s" %(path, file.target.value())
+                else:
+                    name = path
 
-	    for (troveName, ver, flavor) in trove.iterTroveList():
-		if fullVersions:
-		    print _grpFormat % (troveName, ver.asString())
-		else:
-		    print _grpFormat % (troveName, 
-					ver.trailingVersion().asString())
+                print "%s    1 %-8s %-8s %s %s %s" % \
+                    (file.modeString(), file.inode.owner(), 
+                     file.inode.group(), 
+                     file.sizeString(), file.timeString(), name)
+    elif ids:
+        for (fileId, path, version) in trove.iterFileList():
+            print "%s %s" % (sha1ToString(fileId), path)
+    elif sha1s:
+        for (fileId, path, version) in trove.iterFileList():
+            file = db.getFileVersion(fileId, version)
+            if file.hasContents:
+                print "%s %s" % (sha1ToString(file.contents.sha1()), path)
+    else:
+        if fullVersions:
+            print _troveFormat % (trove.getName(), version.asString())
+        else:
+            print _troveFormat % (trove.getName(), 
+                                  version.trailingVersion().asString())
 
-	    fileL = [ (x[1], x[0], x[2]) for x in trove.iterFileList() ]
-	    fileL.sort()
-	    for (path, fileId, version) in fileL:
-		if fullVersions:
-		    print _fileFormat % (path, version.asString())
-		else:
-		    print _fileFormat % (path, 
-					 version.trailingVersion().asString())
+        for (troveName, ver, flavor) in trove.iterTroveList():
+            if fullVersions:
+                print _grpFormat % (troveName, ver.asString())
+            else:
+                print _grpFormat % (troveName, 
+                                    ver.trailingVersion().asString())
+
+        fileL = [ (x[1], x[0], x[2]) for x in trove.iterFileList() ]
+        fileL.sort()
+        for (path, fileId, version) in fileL:
+            if fullVersions:
+                print _fileFormat % (path, version.asString())
+            else:
+                print _fileFormat % (path, 
+                                     version.trailingVersion().asString())

@@ -161,8 +161,8 @@ class Database(SqlDbRepository):
 			flavor, sortByPath = sortByPath,
 			withFiles = withFiles, pristine = False)
 
-    def getTroveIdsFromPath(self, path):
-	return [ x for x in self.db.iterIdByPath(path) ]
+    def iterTrovesByPath(self, path):
+	return [ x for x in self.db.iterFindByPath(path) ]
 
     def outdatedTroves(self, l):
         """
