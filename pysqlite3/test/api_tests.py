@@ -550,6 +550,17 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
         self.assertEqual(type(r[0]), bool,
                          "Type is is %s, it should be <bool>."  %type(r[0]))
 
+    def CheckReadonlyDatabase(self):
+        import tempfile, os
+        fd, fn = tempfile.mkstemp()
+        os.close(fd)
+        os.chmod(fn, 0444)
+        cx = sqlite.connect(fn)
+        cu = cx.cursor()
+        try:
+            cu.execute('CREATE TABLE foo (bar)')
+        except sqlite.ProgrammingError, e:
+            assert (str(e) == "attempt to write a readonly database")
 
 def suite():
     dbapi_suite = unittest.makeSuite(DBAPICompliance, "Check")
