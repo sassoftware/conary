@@ -312,7 +312,8 @@ def commit(repos, cfg, message, sourceCheck = False):
                                    binary = False)
 
     result = update.buildLocalChanges(repos, 
-		    [(state, srcPkg, newVersion, update.IGNOREUGIDS)] )
+		    [(state, srcPkg, newVersion, update.IGNOREUGIDS)],
+                    forceSha1=True)
     if not result: return
 
     (changeSet, ((isDifferent, newState),)) = result
@@ -563,7 +564,8 @@ def diff(repos, versionStr = None):
                                     deps.deps.DependencySet())
 
     result = update.buildLocalChanges(repos, 
-	    [(state, oldPackage, versions.NewVersion(), update.IGNOREUGIDS)])
+	    [(state, oldPackage, versions.NewVersion(), update.IGNOREUGIDS)],
+            forceSha1=True)
     if not result: return
 
     (changeSet, ((isDifferent, newState),)) = result
