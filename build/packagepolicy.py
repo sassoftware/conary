@@ -209,7 +209,7 @@ class RequireChkconfig(policy.Policy):
                 break
         if not foundChkconfig:
 	    self.recipe.reportErrors(
-		"initscript %s has no chkconfig setting" %path)
+		"initscript %s must contain chkconfig information before any uncommented lines"  %path)
 
 
 class CheckDestDir(policy.Policy):
