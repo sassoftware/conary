@@ -28,7 +28,7 @@ class Repository:
 	    old = csPkg.getOldVersion()
 	
 	    if self.hasPackage(csPkg.getName()):
-		pkgSet = self.getPackageSet(csPkg.getName(), "r")
+		pkgSet = package.PackageSet(self.pkgDB, csPkg.getName())
 
 		if pkgSet.hasVersion(newVersion):
 		    raise KeyError, "version %s for %s exists" % \
@@ -66,7 +66,7 @@ class Repository:
 	filesToArchive = {}
 	try:
 	    for (pkgName, newPkg, newVersion) in pkgList:
-		pkgSet = self.getPackageSet(pkgName, "w")
+		pkgSet = package.PackageSet(self.pkgDB, pkgName)
 		pkgSet.addVersion(newVersion, newPkg)
 		pkgsDone.append((pkgSet, newVersion))
 
@@ -114,7 +114,7 @@ class Repository:
 	cs = changeset.ChangeSetFromRepository(self)
 
 	for (packageName, oldVersion, newVersion) in packageList:
-	    pkgSet = self.getPackageSet(packageName)
+	    pkgSet = package.PackageSet(self.pkgDB, packageName)
 
 	    new = pkgSet.getVersion(newVersion)
 	 
@@ -141,9 +141,6 @@ class Repository:
 		if hash: cs.addFileContents(hash)
 
 	return cs
-
-    def getPackageSet(self, pkgName, mode = 0):
-	return package.PackageSet(self.pkgDB, pkgName)
 
     def getFileDB(self, fileId):
 	return files.FileDB(self.fileDB, fileId)

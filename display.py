@@ -30,8 +30,6 @@ def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
 		    version.asString(cfg.defaultbranch))
 
 def displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
-    pkgSet = repos.getPackageSet(pkgName)
-
     if versionStr:
 	if versionStr[0] != "/":
 	    versionStr = cfg.defaultbranch.asString() + "/" + versionStr
