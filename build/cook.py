@@ -23,6 +23,7 @@ import time
 import types
 import util
 import log
+import tempfile
 
 # -------------------- private below this line -------------------------
 
