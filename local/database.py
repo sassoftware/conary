@@ -31,63 +31,25 @@ class Database(repository.LocalRepository):
 
     createBranches = 1
 
-    # If the request is for the head element of the local branch, we need
-    # to be a bit careful with the file list. It currently contains the
-    # branched version of each file, but we want to contain the non-branch
-    # version if the branch (that is, the local filesystem) hasn't changed
+    # If the request is on the local branch, pull the package from the
+    # filesystem
     def getPackageVersion(self, name, version):
-	pkg = repository.LocalRepository.getPackageVersion(self, name, version)
-	if not version.isLocal(): return pkg
-
-
-	for (fileId, path, fileVersion) in pkg.fileList():
-	    parentVersion = fileVersion.parent()
-
-	    dbFile = self.getFileVersion(fileId, parentVersion)
-	    localFile = self.getFileVersion(fileId, fileVersion, path = path)
-
-	    if dbFile.same(localFile):
-		pkg.updateFile(fileId, path, fileVersion.parent())
-
-	return pkg
-
-    # like getPackageVersion, we need to look to the filesystem for file
-    # versions which are on the local branch
-    def getFileVersion(self, fileId, version, path = None, withContents = 0):
 	if not version.isLocal():
-	    (file, contents) = repository.LocalRepository.getFileVersion(
-					self, fileId, version, withContents = 1)
+	    return repository.LocalRepository.getPackageVersion(self, name, 
+								version)
+	parent = version.parent()
+	pkg = repository.LocalRepository.getPackageVersion(self, name, parent)
+	pkg.changeVersion(self.pkgGetFullVersion(pkg.getName(), 
+			  pkg.getVersion()))
 
-	    if withContents:
-		return (file, contents)
-	    return file
+	version.timeStamp = 1
+	rc = update.buildLocalChanges(self, [(pkg, pkg, version)])
+	if not rc:
+	    raise DatabaseError, \
+		    "failed to build local package for %s" % pkg.getName()
 
-	assert(path)
-
-	# we can't get the file flags or know if it's a source file by looking
-	# in the filesystem; we don't let the user change those for the local
-	# branch either
-	parentV = version.parent()
-	file = repository.LocalRepository.getFileVersion(self, fileId, parentV)
-	if isinstance(file, files.SourceFile):
-	    localFile = files.FileFromFilesystem(self.root + path, fileId,
-						 type = "src",
-						 possibleMatch = file)
-	else:
-	    localFile = files.FileFromFilesystem(self.root + path, fileId,
-						 possibleMatch = file)
-
-	localFile.flags(file.flags())
-
-	if withContents:
-	    if isinstance(file, files.RegularFile): 
-		cont = filecontents.FromFilesystem(self.root + path)
-	    else:
-		cont = None
-
-	    return (localFile, cont)
-
-	return localFile
+	assert(len(rc[1]) == 1)
+	return rc[1][0][1]
 
     # takes an abstract change set and creates a differential change set 
     # against a branch of the repository
