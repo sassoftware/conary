@@ -1,5 +1,7 @@
 Changes in 0.10.6:
   * Lots of bug fixes for distributed branching
+  * Some code rearrangement
+  * The start of metadata support code is now included
 
 Changes in 0.10.5:
   * The local database is used for fetching file information (but not
