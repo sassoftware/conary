@@ -66,3 +66,11 @@ class Repository:
 	util.mkdirChain(self.pkgDB, self.fileDB, self.contentsDB)
 
 	self.contentsStore = datastore.DataStore(self.contentsDB)
+
+# The database is a magic repository where files in the data store are quite
+# often pointers to the actual file in the file system
+class Database(Repository):
+
+    def __init__(self, root, path):
+	fullPath = root + "/" + path
+	Repository.__init__(self, fullPath)

@@ -163,7 +163,7 @@ elif (otherArgs[1] == "update"):
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	args = [repos, cfg] + otherArgs[2:]
-	apply(update.update, args)
+	apply(update.doUpdate, args)
     else:
 	usage()
 elif (otherArgs[1] == "config"):

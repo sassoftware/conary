@@ -216,7 +216,7 @@ def CreateFromRepository(repos, packageList, outFileName):
 	    cs.addFile(fileId, oldVersion, newVersion, filecs)
 	    if hash: hashList.append(hash)
 
-    cs.writeToFile(hashList, outFileName)
+    return cs
 
 def ChangeSetCommand(repos, cfg, packageName, outFileName, oldVersionStr, \
 	      newVersionStr):
@@ -235,4 +235,5 @@ def ChangeSetCommand(repos, cfg, packageName, outFileName, oldVersionStr, \
     for name in repos.getPackageList(packageName):
 	list.append((name, oldVersion, newVersion))
 
-    CreateFromRepository(repos, list, outFileName)
+    cs = CreateFromRepository(repos, list, outFileName)
+    cs.writeToFile(hashList, outFileName)

@@ -41,6 +41,7 @@ class SrsConfiguration:
 	self.packagenamespace = "/localhost"
 	self.defaultbranch = None
 	self.lookaside = "/var/cache/srs"
+	self.dbpath = "/var/lib/srsdb"
 
 	self.read("/etc/srsrc")
 	self.read(os.environ["HOME"] + "/" + ".srsrc")
