@@ -103,8 +103,9 @@ class Recipe:
             sources.append(tarball)
         for (patch, level, backup) in self.patches:
             sources.append(patch)
-	for (gpg, cached) in self.signatures.values()[0]:
-	    sources.append(gpg)
+	for signaturelist in self.signatures.values():
+            for (gpg, cached) in signaturelist:
+                sources.append(gpg)
 	return sources + self.sources
 
     def mainDir(self, new = None):
