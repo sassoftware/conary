@@ -286,6 +286,7 @@ class Cursor:
             return obj
 
     def execute(self, SQL, *parms):
+        SQL = SQL.strip()
         self._checkNotClosed("execute")
 
         if self.con.autocommit:
