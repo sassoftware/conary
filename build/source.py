@@ -414,7 +414,7 @@ def _extractFilesFromRPM(rpm, targetfile=None, directory=None):
     assert targetfile or directory
     if not directory:
 	directory = os.path.dirname(targetfile)
-    cpioArgs = ['/bin/cpio', 'cpio', '-ium', '--quiet']
+    cpioArgs = ['/bin/cpio', 'cpio', '-iumd', '--quiet']
     if targetfile:
 	filename = os.path.basename(targetfile)
 	cpioArgs.append(filename)
