@@ -344,17 +344,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     finally:
 	os.chdir(cwd)
     
-    packageList = []
-
-    # build the group before the source package is added to the 
-    # packageList; the package's group doesn't include :source
     grpName = recipeClass.name
-
-    requires = deps.deps.DependencySet()
-    provides = deps.deps.DependencySet()
-    flavor = deps.deps.DependencySet()
-
-    pkgList = []
 
     # build up the name->fileid mapping so we reuse fileids wherever
     # possible; we do this by looking in the database for a trove
@@ -367,7 +357,6 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     except repository.PackageNotFound:
         versionList = []
     troveList = [ (grpName, x[0], x[1]) for x in versionList ]
-    #print "got trovelist", troveList
     while troveList:
         troves = repos.getTroves(troveList)
         troveList = []
@@ -375,24 +364,24 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
             ident.populate(repos, trove)
             troveList += [ x for x in trove.iterTroveList() ]
 
+    requires = deps.deps.DependencySet()
+    provides = deps.deps.DependencySet()
+    flavor = deps.deps.DependencySet()
+    grp = package.Package(grpName, newVersion, flavor)
+    grp.setRequires(requires)
+    grp.setProvides(provides)
+
+    packageList = []
     for buildPkg in recipeObj.getPackages(newVersion):
 	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, ident)
-
-	pkgList.append((p, fileMap))
 
 	requires.union(p.getRequires())
 	provides.union(p.getProvides())
 	flavor.union(p.getFlavor())
 
-    grp = package.Package(grpName, newVersion, flavor)
-    grp.setRequires(requires)
-    grp.setProvides(provides)
-
-    for (p, fileMap) in pkgList:
 	built.append((p.getName(), p.getVersion().asString()))
 	packageList.append((p, fileMap))
 	grp.addTrove(p.getName(), p.getVersion(), p.getFlavor())
-
 
     changeSet = changeset.CreateFromFilesystem(packageList)
     changeSet.addPrimaryPackage(grpName, newVersion, None)
