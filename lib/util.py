@@ -12,6 +12,7 @@ import pdb
 import exceptions
 import glob
 import shutil
+import string
 
 def mkdirChain(*paths):
     for path in paths:
@@ -73,26 +74,47 @@ def execute(cmd):
 	raise RuntimeError, info
 
 
+# string extensions
+
+def find(s, subs, start=0):
+    ret = -1
+    found = None
+    for sub in subs:
+	this = string.find(s, sub, start)
+	if this > -1 and ( ret < 0 or this < ret):
+	    ret = this
+	    found = s[this:this+1]
+    return (ret, found)
+
 
 # shutil module extensions, with {}-expansion and globbing
 
-# XXX -- this does not do {{}} nested {}-expansion -- we should
-# just write a C extension that simply exports GLOB_BRACE and
-# use it instead.
 def braceExpand(path):
     obrace = string.find(path, "{")
     if obrace < 0:
 	return [path]
-    start = path[0:obrace]
-    cbrace = string.find(path, "}")
-    if cbrace < 0:
-	raise ValueError, 'path %s has unbalanced {}' %path
-    segments = string.split(path[obrace+1:cbrace], ',')
-    end = path[cbrace+1:]
+
+    level=1
     pathlist = []
-    for segment in segments:
-	pathlist.extend(braceExpand(start+segment+end))
-    return pathlist
+    h = obrace
+    while level:
+	(h, it) = find(path, "{}", h)
+	if h < 0:
+	    raise ValueError, 'path %s has unbalanced {}' %path
+	if it == "{":
+	    level = level + 1
+	    obrace = h
+	else:
+	    segments = string.split(path[obrace+1:h], ',')
+	    start = path[:obrace]
+	    end = path[h+1:]
+	    for segment in segments:
+		newbits = braceExpand(start+segment+end)
+		for bit in newbits:
+		    if not bit in pathlist:
+			pathlist.append(bit)
+	    return pathlist
+	h = h + 1
 
 def braceGlob(paths):
     pathlist = []
