@@ -6,7 +6,6 @@
 #----------------------------------------------------------------------------
 # this is the build system's idea of a package. maybe they'll merge. someday.
 
-import types
 import string
 import re
 import os
@@ -37,7 +36,7 @@ class BuildDeviceFile(files.DeviceFile, BuildFile):
         self.theSize = 0
         self.theMtime = 0
         
-class BuildPackage(types.DictionaryType):
+class BuildPackage(dict):
 
     def addFile(self, path, realPath, type="auto"):
         """
@@ -69,7 +68,7 @@ class BuildPackage(types.DictionaryType):
     def __init__(self, name, version):
 	self.name = name
 	self.version = version
-	types.DictionaryType.__init__(self)
+	dict.__init__(self)
 
 class BuildPackageSet:
 
