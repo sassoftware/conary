@@ -12,7 +12,7 @@
 # full details.
 #
 """
-Provides the output for the "conary showcs" command
+Provides the output for the "conary verify" command
 """
 
 import display
