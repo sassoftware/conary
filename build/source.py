@@ -174,7 +174,7 @@ class Archive(_Source):
 	    destdir = self.builddir
 
 	if f.endswith(".zip"):
-	    util.execute("unzip -q -o -d %s %s", destdir, f)
+	    util.execute("unzip -q -o -d %s %s" % (destdir, f))
 	    return
 
 	if f.endswith(".bz2") or f.endswith(".tbz2"):
