@@ -162,7 +162,9 @@ class FilesystemJob:
 		except:
 		    os.unlink(ldsotmpname)
 		    raise
-	    if os.access(util.joinPaths(self.root, p), os.X_OK) != True:
+	    if os.getuid():
+		log.warning("ldconfig skipped (insufficient permissions)")
+	    elif os.access(util.joinPaths(self.root, p), os.X_OK) != True:
 		log.error("/sbin/ldconfig is not available")
 	    else:
 		log.debug("running ldconfig")
