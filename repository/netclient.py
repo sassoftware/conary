@@ -932,7 +932,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
                   acrossRepositories = False, 
-                  affinityDatabase = None):
+                  affinityDatabase = None, allowMissing=False):
         results = {}
         remaining = []
         affinityTroveMap = {}
@@ -1395,7 +1395,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             del verRelLabel
             del verRelLabelMap
             del query
-        if missing:
+        if missing and not allowMissing:
             import updatecmd
             raise repository.TroveNotFound, 'Troves %s not found' % \
                                    [updatecmd.toTroveSpec(*x) for x in missing]
@@ -1403,7 +1403,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if remaining: 
             findTroveMap = self.findTroves(labelPath, remaining, defaultFlavor, 
                                            acrossRepositories,
-                                           affinityDatabase)
+                                           affinityDatabase, 
+                                           allowMissing)
             finalMap.update(findTroveMap)
         return finalMap
 
