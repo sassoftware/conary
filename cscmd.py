@@ -20,7 +20,7 @@ def ChangeSetCommand(repos, cfg, troveName, outFileName, oldVersionStr, \
     newVersion = pkgList[0].getVersion()
 
     if (oldVersionStr):
-	pkgList = repos.findTrove(cfg.installLabel, troveName, cfg.flavor,
+	pkgList = repos.findTrove(cfg.installLabel, troveName, pkgList[0].getFlavor(),
 				  oldVersionStr)
 	if len(pkgList) > 1:
 	    log.error("trove %s has multiple branches named %s",
@@ -31,7 +31,7 @@ def ChangeSetCommand(repos, cfg, troveName, outFileName, oldVersionStr, \
     else:
 	oldVersion = None
 
-    list = [(troveName, None, oldVersion, newVersion, (not oldVersion))]
+    list = [(troveName, pkgList[0].getFlavor(), oldVersion, newVersion, (not oldVersion))]
 
     cs = repos.createChangeSet(list)
     cs.writeToFile(outFileName)
