@@ -607,16 +607,18 @@ class ChangeSetJob:
 
 	    troveInfo = self.addPackage(newPkg)
 
-	    for (fileId, path, version) in newPkg.iterFileList():
+	    for (fileId, path, newVersion) in newPkg.iterFileList():
 		tuple = newFileMap.get(fileId, None)
 		if tuple is not None:
 		    (oldPath, oldVersion) = tuple[-2:]
+		else:
+		    oldVersion = None
 
-		if tuple is None or oldVersion == version:
+		if tuple is None or oldVersion == newVersion:
 		    # the file didn't change between versions; we can just
 		    # ignore it
 		    fileObj = None
-		elif oldVersion == version:
+		elif oldVersion == newVersion:
 		    fileObj = None
 		else:
 		    diff = cs.getFileChange(fileId)
@@ -635,7 +637,7 @@ class ChangeSetJob:
 			fileObj = files.ThawFile(diff, fileId)
 			oldfile = None
 
-		self.addFile(troveInfo, fileId, fileObj, path, version)
+		self.addFile(troveInfo, fileId, fileObj, path, newVersion)
 
 		# files with contents need to be tracked so we can stick
 		# there contents in the archive "soon"; config files need
@@ -659,17 +661,17 @@ class ChangeSetJob:
 ## 				     fileObj.contents.sha1(), 
 ## 				     fileObj.contents.size())
 ## 		    contType = changeset.ChangedFileTypes.file
-## 		    self.addFileContents(fileObj.contents.sha1(), version, 
+## 		    self.addFileContents(fileObj.contents.sha1(), newVersion, 
 ## 					 fileContents, restoreContents, 
 ## 					 fileObj.flags.isConfig())
 
 		elif fileObj.flags.isConfig():
 		    tup = (fileId, fileObj, oldPath, oldfile, pkgName,
-			   oldTroveVersion, troveFlavor, version, 
-			   restoreContents)
+			   oldTroveVersion, troveFlavor, newVersion, 
+			   oldVersion, restoreContents)
 		    configRestoreList.append(tup)
 		else:
-		    tup = (fileId, fileObj.contents.sha1(), version, 
+		    tup = (fileId, fileObj.contents.sha1(), newVersion, 
 			   restoreContents)
 		    normalRestoreList.append(tup)
 
@@ -680,7 +682,8 @@ class ChangeSetJob:
 	normalRestoreList.sort()
 
 	for (fileId, fileObj, oldPath, oldfile, pkgName, oldTroveVersion,
-	     troveFlavor, version, restoreContents) in configRestoreList:
+	     troveFlavor, newVersion, oldVersion, restoreContents) in \
+							configRestoreList:
 	    (contType, fileContents) = cs.getFileContents(fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
 		assert(fileObj.flags.isConfig())
@@ -706,7 +709,7 @@ class ChangeSetJob:
 		    fileContents = filecontents.WithFailedHunks(
 					fileContents, failedHunks)
 
-	    self.addFileContents(fileObj.contents.sha1(), version, 
+	    self.addFileContents(fileObj.contents.sha1(), newVersion, 
 				 fileContents, restoreContents, 1)
 
 	normalRestoreList.sort()
