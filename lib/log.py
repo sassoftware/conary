@@ -4,7 +4,14 @@
 #
 
 """
-Implements the logging facility for srs
+Implements the logging facility for srs.
+
+Similar to the C printf function, the functions in this module take a
+format string that specifies how the subsequent variables should be
+converted in the log output.
+
+For example::
+   log.error("%s not found", foo)
 """
 
 import logging
