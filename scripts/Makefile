@@ -12,7 +12,7 @@
 # full details.
 #
 
-extra_dist = Makefile rpm2cpio yuck yuck.1
+extra_dist = Makefile rpm2cpio yuck yuck.1 convertcontents
 
 dist_files = $(python_files) $(extra_dist)
 
@@ -21,6 +21,7 @@ all: default-install
 install:
 	install -m 755 rpm2cpio $(DESTDIR)$(conarydir)
 	install -m 755 yuck $(DESTDIR)$(conarydir)
+	install -m 755 convertcontents $(DESTDIR)$(conarydir)
 	install -m 644 yuck.1 $(DESTDIR)$(mandir)/man1
 
 dist: default-dist
