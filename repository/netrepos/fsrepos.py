@@ -449,13 +449,6 @@ class ChangeSetJob:
     def oldFileList(self):
 	return self.oldFiles
 
-    def addStaleFile(self, path, fileObj):
-	self.staleFiles.append((path, fileObj))
-
-    def staleFileList(self):
-	self.staleFiles.sort()
-	return self.staleFiles
-
     def addFile(self, fileObject):
 	self.files[fileObject.fileId()] = fileObject
 	self.filePaths[fileObject.path] = 1
@@ -509,7 +502,6 @@ class ChangeSetJob:
 	self.filePaths = {}
 	self.oldPackages = []
 	self.oldFiles = []
-	self.staleFiles = []
 
 	fileMap = {}
 
@@ -592,6 +584,3 @@ class ChangeSetJob:
 	    for (fileId, path, version) in pkg.iterFileList():
 		file = self.repos.getFileVersion(fileId, version)
 		self.oldFile(fileId, version, file)
-		
-		if not self.containsFilePath(path):
-		    self.addStaleFile(path, file)
