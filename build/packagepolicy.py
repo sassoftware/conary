@@ -611,24 +611,37 @@ class TagSpec(_addInfo):
             tags.set(tag)
 
     def runInfo(self, path):
-	for tag in self.included:
+        for tag in self.included:
 	    for filt in self.included[tag]:
 		if filt.match(path):
-		    self.markTag(tag, tag, path)
+                    isExcluded = False
+                    if tag in self.excluded:
+		        for filt in self.excluded[tag]:
+                            if filt.match(path):
+			        log.debug('ignoring tag match for %s: %s',
+				      tag, path)
+                                isExcluded = True
+                                break
+                    if not isExcluded:
+		        self.markTag(tag, tag, path)
+                
 	for tag in self.tagList:
 	    if tag.match(path):
 		if tag.name:
 		    name = tag.name
 		else:
 		    name = tag.tag
+                isExcluded = False
 		if tag.tag in self.excluded:
 		    for filt in self.excluded[tag.tag]:
 			# exception handling is per-tag, so handled specially
 			if filt.match(path):
 			    log.debug('ignoring tag match for %s: %s',
 				      name, path)
-			    return
-		self.markTag(name, tag.tag, path)
+                            isExcluded = True
+			    break
+                if not isExcluded:
+		    self.markTag(name, tag.tag, path)
 
 
 class ParseManifest(policy.Policy):
