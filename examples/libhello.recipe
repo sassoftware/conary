@@ -1,0 +1,15 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
+class Libhello(PackageRecipe):
+    name = 'libhello'
+    version = '0'
+    
+    def setup(self):
+	self.addSource('libhello.c')
+	self.Run('%(cc)s %(ldflags)s -shared -Wl,-soname,libhello.so.0 -o libhello.so.0.0 libhello.c -lc')
+	self.InstallFiles('libhello.so.0.0', '%(libdir)s/')
+	self.InstallFiles('/sbin/ldconfig', '%(essentialsbindir)s/')
+
