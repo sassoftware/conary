@@ -10,6 +10,7 @@ resulting packages to the repository.
 
 import buildpackage
 import changeset
+import filecontents
 import files
 import helper
 import log
@@ -144,6 +145,9 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     elif issubclass(recipeClass, recipe.GroupRecipe):
 	(cs, built, cleanup) = cookGroupObject(repos, cfg, recipeClass, 
 				    newVersion, buildBranch, macros = macros)
+    elif issubclass(recipeClass, recipe.FilesetRecipe):
+	(cs, built, cleanup) = cookFilesetObject(repos, cfg, recipeClass, 
+				    newVersion, buildBranch, macros = macros)
     else:
 	assert(0)
     
@@ -159,7 +163,6 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 	fn(*args)
 
     return built
-
 
 def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch, 
 		      macros=()):
@@ -197,6 +200,49 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     changeSet.newPackage(grpDiff)
 
     built = [ (grp.getName(), grp.getVersion().asString()) ]
+    return (changeSet, built, None)
+
+def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch, 
+		      macros=()):
+    """
+    Turns a fileset recipe object into a change set. Returns the abstract
+    changeset created, a list of the names of the packages built, and
+    and None (for compatibility with cookPackageObject).
+
+    @param repos: Repository to both look for source files and file id's in.
+    @type repos: repository.Repository
+    @param cfg: srs configuration
+    @type cfg: srscfg.SrsConfiguration
+    @param recipeClass: class which will be instantiated into a recipe
+    @type recipeClass: class descended from recipe.Recipe
+    @param newVersion: version to assign the newly built objects
+    @param buildBranch: the branch the new build will be committed to
+    @type buildBranch: versions.Version
+    @param macros: set of macros for the build
+    @type macros: sequence
+    @rtype: tuple
+    """
+
+    fullName = cfg.packagenamespace + ":" + recipeClass.name
+
+    recipeObj = recipeClass(repos, cfg)
+    recipeObj.setup()
+
+    changeSet = changeset.ChangeSet()
+    fileset = package.Package(fullName, newVersion)
+
+    for (fileId, (path, version)) in recipeObj.iterFileList():
+	fileset.addFile(fileId, path, version)
+	fileObj = repos.getFileVersion(fileId, version)
+	changeSet.addFile(fileId, None, version, fileObj.infoLine())
+	if fileObj.hasContents:
+	    changeSet.addFileContents(fileId, changeset.ChangedFileTypes.file,
+			filecontents.FromRepository(repos, fileObj.sha1()))
+
+    filesetDiff = fileset.diff(None, abstract = 1)[0]
+    changeSet.newPackage(filesetDiff)
+
+    built = [ (fileset.getName(), fileset.getVersion().asString()) ]
     return (changeSet, built, None)
 
 def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch, 

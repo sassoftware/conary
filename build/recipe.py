@@ -145,6 +145,7 @@ def _extractSourceFromRPM(rpm, targetfile):
 def setupRecipeDict(d, filename):
     exec 'from recipe import PackageRecipe' in d
     exec 'from recipe import GroupRecipe' in d
+    exec 'from recipe import FilesetRecipe' in d
     exec 'from recipe import loadRecipe' in d
     exec 'import build, os, package, sys, util' in d
     exec 'from use import Use, Arch' in d
@@ -208,11 +209,20 @@ class RecipeLoader(types.DictionaryType):
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name cannot '
                         'begin with "group-"' %basename)
+                if recipename.startswith('fileset-'):
+                    raise RecipeFileError(
+                        'Error in recipe file "%s": package name cannot '
+                        'begin with "fileset-"' %basename)
 	    elif issubclass(obj, GroupRecipe):
                 if recipename and not recipename.startswith('group-'):
                     raise RecipeFileError(
                         'Error in recipe file "%s": group name must '
                         'begin with "group-"' %basename)
+	    elif issubclass(obj, FilesetRecipe):
+                if recipename and not recipename.startswith('fileset-'):
+                    raise RecipeFileError(
+                        'Error in recipe file "%s": fileset name must '
+                        'begin with "fileset-"' %basename)
             else:
                 continue
             self.recipes[name] = obj
@@ -668,6 +678,49 @@ class GroupRecipe(Recipe):
 	self.repos = repos
 	self.cfg = cfg
 	self.troveVersions = {}
+
+class FilesetRecipe(Recipe):
+
+    def addFile(self, path, component, versionStr):
+	if self.paths.has_key(path):
+	    raise RecipeFileError, "path %s has already been included" % path
+
+	try:
+	    pkgList = helper.findPackage(self.repos, self.cfg.packagenamespace,
+				     None, component, versionStr)
+	except helper.PackageNotFound, e:
+	    raise RecipeFileError, str(e)
+
+	if len(pkgList) == 0:
+	    raise RecipeFileError, "no packages match %s" % component
+	elif len(pkgList) > 1:
+	    raise RecipeFileError, "too many packages match %s" % component
+
+	pkg = pkgList[0]
+	match = None
+	for (fileId, (pkgPath, version)) in pkg.iterFileList():
+	    if pkgPath == path:
+		match = (fileId, version)
+		break
+
+	if not match:
+	    raise RecipeFileError, "%s does not exist in version %s of %s" % \
+		    (pkg.getVersion().asString(), pkg.getName())
+	elif self.files.has_key(match[0]):
+	    raise RecipeFileError, "a version of %s has already been included" % path
+
+	self.files[match[0]] = (path, match[1])
+	self.paths[path] = 1
+
+    def iterFileList(self):
+	return self.files.iteritems()
+	    
+    def __init__(self, repos, cfg):
+	self.repos = repos
+	self.cfg = cfg
+	self.files = {}
+	self.paths = {}
+	
 
 class RecipeFileError(Exception):
     def __init__(self, msg):

@@ -44,12 +44,12 @@ def findPackage(repos, packageNamespace, defaultNick, name,
 
     if forceGroup:
 	if name.count(":") != 2:
-	    raise PackageNotFound, "group names may not include colons"
+	    raise PackageNotFound, "group and fileset names may not include colons"
 
 	last = name.split(":")[-1]
-	if not last.startswith("group-"):
+	if not last.startswith("group-") and not last.startswith("fileset-"):
 	    raise PackageNotFound,  \
-		    "only groups may be checked out of the repository"
+		    "only groups and filesets may be checked out of the repository"
 
     if not defaultNick:
 	if versionStr[0] != "/" and (versionStr.find("/") != -1 or
