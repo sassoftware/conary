@@ -17,11 +17,11 @@ import versions
 from repository.repository import DuplicateBranch
 
 class BranchTable(idtable.IdTable):
-    def addId(self, branch, parentId):
+    def addId(self, branch):
         assert(isinstance(branch, versions.Branch))
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Branches VALUES (NULL, ?, ?)", 
-		   branch.asString(), parentId)
+        cu.execute("INSERT INTO Branches VALUES (NULL, ?)", 
+		   branch.asString())
 	return cu.lastrowid
 
     def getId(self, theId):
@@ -60,8 +60,7 @@ class BranchTable(idtable.IdTable):
         tables = [ x[0] for x in cu ]
         if 'Branches' not in tables:
             cu.execute("CREATE TABLE Branches(branchId integer primary key,"
-					     "branch str unique,"
-					     "parentVersion integer)")
+					     "branch str unique)")
 	    self.initTable()
 
 class LabelTable(idtable.IdTable):
@@ -240,7 +239,7 @@ class SqlVersioning:
 	label = branch.label()
 	branchId = self.branchTable.get(branch, None)
 	if not branchId:
-	    branchId = self.branchTable.addId(branch, 0)
+	    branchId = self.branchTable.addId(branch)
 	    if not self.labels.has_key(label):
 		self.labels.addId(label)
 
