@@ -833,7 +833,7 @@ class FilesForDirectories(policy.Policy):
 	    if os.path.exists(fullpath):
 		if not os.path.isdir(fullpath):
 		    self.recipe.reportErrors(
-			'File %s should be a directory; bad r.Install()?' %file)
+			'File %s should be a directory; bad r.Install()?' %path)
 
 
 class ObsoletePaths(policy.Policy):
