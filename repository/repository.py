@@ -8,6 +8,7 @@
 import changeset
 import copy
 import datastore
+import difflib
 import fcntl
 import files
 import os
@@ -112,7 +113,9 @@ class LocalRepository(Repository):
     def storeFileFromChangeset(self, chgSet, file, restoreContents):
 	if isinstance(file, files.RegularFile):
 	    if restoreContents:
-		f = chgSet.getFileContents(file.sha1())
+		(t, cont) = chgSet.getFileContents(file.sha1())
+		assert(t == changeset.ChangedFileTypes.file)
+		f = cont.get()
 		targetFile = self.contentsStore.newFile(file.sha1())
 
 		# if targetFile is None the file is already in the store
@@ -195,6 +198,8 @@ class LocalRepository(Repository):
 		oldFile = None
 		if oldVersion:
 		    oldFile = self.getFileVersion(fileId, oldVersion)
+		    (oldFile, oldCont) = self.getFileVersion(fileId, 
+				oldVersion, path = newPath, withContents = 1)
 		(newFile, newCont) = self.getFileVersion(fileId, newVersion,
 					    path = newPath, withContents = 1)
 
@@ -202,7 +207,20 @@ class LocalRepository(Repository):
 							 newFile)
 
 		cs.addFile(fileId, oldVersion, newVersion, filecs)
-		if hash: cs.addFileContents(hash, newCont)
+
+		if hash:
+		    #if oldFile and oldFile.isConfig() and newFile.isConfig():
+		#	diff = difflib.unified_diff(oldCont.get().readlines(),
+		#				    newCont.get().readlines(),
+		#				    "old", "new")
+		#	diff.next()
+		#	diff.next()
+		#	cont = FileContentsFromString("".join(diff))
+		#	cs.addFileContents(hash, 
+		#		    changeset.ChangedFileTypes.diff, cont)
+		    #else:
+		    cs.addFileContents(hash, 
+				changeset.ChangedFileTypes.file, newCont)
 
 	return cs
 
@@ -576,11 +594,27 @@ class FileContentsFromFilesystem(FileContents):
 class FileContentsFromChangeSet(FileContents):
 
     def get(self):
-	return self.cs.getFileContents(self.hash)
+	return self.cs.getFileContents(self.hash)[1].get()
 
     def __init__(self, cs, hash):
 	self.cs = cs
 	self.hash = hash
+
+class FileContentsFromString(FileContents):
+
+    def get(self):
+	return versioned.FalseFile(self.str)
+
+    def __init__(self, str):
+	self.str = str
+
+class FileContentsFromFile(FileContents):
+
+    def get(self):
+	return self.f
+
+    def __init__(self, f):
+	self.f = f
 
 class RepositoryError(Exception):
 

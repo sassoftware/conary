@@ -131,7 +131,8 @@ class Database(repository.LocalRepository):
 							 fileObj.file())
 
 		cs.addFile(fileId, oldVersion, newVersion, filecs)
-		if hash: cs.addFileContents(hash)
+		if hash: 
+		    cs.addFileContents(hash)
 
 	return cs
 
@@ -331,9 +332,9 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	paths = self.paths.keys()
 	paths.sort()
 	for path in paths:
-	    (newFile, csWithContents) = self.paths[path]
+	    (newFile, fileCont) = self.paths[path]
 	    fileObj = newFile.file()
-	    fileObj.restore(csWithContents, root + path, 
+	    fileObj.restore(fileCont, root + path, 
 			    newFile.restoreContents())
 
 	# remove paths which are no longer valid
@@ -436,6 +437,16 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	    if not skipPaths.has_key(f.path()):
 		self.paths[f.path()] = (f, origJob.cs)
 
+	# now look through all of the files we're supposed to create and
+	# set the FileContents object with the actual contents of the file
+	for (path, (f, cs)) in self.paths.items():
+	    fileObj = f.file()
+	    if not fileObj.hasContents: continue
+
+	    #(t, cont) = cs.getFileContents(fileObj.sha1())
+	    self.paths[path] = (f, 
+		    repository.FileContentsFromChangeSet(cs, fileObj.sha1()))
+
 	# at this point, self is job which does all of the creation of
 	# new bits. we need self to perform the removal of the old bits
 	# as well
@@ -483,7 +494,6 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 			fileObj = self.repos.getFileVersion(fileId, 
 							    oldFileVersion)
 			self.addStaleFile(oldPath, fileObj)
-			print "s:", oldPath
 
 	# for each file which has changed, erase the old version of that
 	# file from the repository

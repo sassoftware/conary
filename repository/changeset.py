@@ -3,12 +3,15 @@
 # All rights reserved
 #
 
+import enum
 import filecontainer
 import files
 import package
 import versions
 import os
 import repository
+
+ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff")
 
 class ChangeSet:
 
@@ -78,11 +81,13 @@ class ChangeSet:
     def getOldPackageList(self):
 	return self.oldPackages
 
-    def addFileContents(self, hash, contents):
-	self.fileContents[hash] = contents
+    def addFileContents(self, hash, contType, contents):
+	assert(contType == ChangedFileTypes.file)
+
+	self.fileContents[hash] = (contType, contents)
 
     def getFileContents(self, hash):
-	return self.fileContents[hash].get()
+	return self.fileContents[hash]
 
     def hasFileContents(self, hash):
 	return self.fileContents.has_key(hash)
@@ -136,10 +141,8 @@ class ChangeSet:
 
 	    csf.addFile("SRSCHANGESET", self.headerAsString(), "")
 
-	    for hash in self.fileContents.keys():
-		f = self.getFileContents(hash)
-		csf.addFile(hash, f, "")
-		f.close()
+	    for (hash, (contType, f)) in self.fileContents.items():
+		csf.addFile(hash, f.get(), contType[4:])
 
 	    csf.close()
 	except:
@@ -192,7 +195,8 @@ class ChangeSet:
 		if origFile.isConfig():
 		    cont = repository.FileContentsFromRepository(db, 
 						  origFile.sha1())
-		    rollback.addFileContents(origFile.sha1(), cont)
+		    rollback.addFileContents(origFile.sha1(), 
+					     ChangedFileTypes.file, cont)
 		else:
 		    if isinstance(origFile, files.SourceFile):
 			type = "src"
@@ -206,7 +210,8 @@ class ChangeSet:
 
 		    if fsFile.same(origFile):
 			cont = repository.FileContentsFromFilesystem(fullPath)
-			rollback.addFileContents(origFile.sha1(), cont)
+			rollback.addFileContents(origFile.sha1(), 
+						 ChangedFileTypes.file, cont)
 
 	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
 		(curPath, curVersion) = pkg.getFile(fileId)
@@ -237,7 +242,8 @@ class ChangeSet:
 		   (origFile.isConfig() or newFile.isConfig()):
 		    cont = repository.FileContentsFromRepository(db, 
 						  origFile.sha1())
-		    rollback.addFileContents(origFile.sha1(), cont)
+		    rollback.addFileContents(origFile.sha1(), 
+					     ChangedFileTypes.file, cont)
 		elif origFile.sha1() != newFile.sha1():
 		    # if a file which isn't a config file has changed, and
 		    # the right version of the file is available in the
@@ -256,7 +262,8 @@ class ChangeSet:
 
 		    if fsFile.same(origFile):
 			cont = repository.FileContentsFromFilesystem(fullPath)
-			rollback.addFileContents(origFile.sha1(), cont)
+			rollback.addFileContents(origFile.sha1(), 
+						 ChangedFileTypes.file, cont)
 
 	    rollback.newPackage(invertedPkg)
 
@@ -290,7 +297,7 @@ class ChangeSetFromRepository(ChangeSet):
 class ChangeSetFromAbstractChangeSet(ChangeSet):
 
     def addFileContents(self, hash):
-	return ChangeSet.addFileContents(self, hash, 
+	return ChangeSet.addFileContents(self, hash, ChangedFileTypes.file,
 		    repository.FileContentsFromChangeSet(self.absCS, hash))
 
     def __init__(self, absCS):
@@ -300,7 +307,10 @@ class ChangeSetFromAbstractChangeSet(ChangeSet):
 class ChangeSetFromFile(ChangeSet):
 
     def getFileContents(self, hash):
-	return self.csf.getFile(hash)
+	f = self.csf.getFile(hash)
+	tag = "cft-" + self.csf.getTag(hash)
+
+	return (tag, repository.FileContentsFromFile(f))
 
     def hasFileContents(self, hash):
 	return self.csf.hasFile(hash)
@@ -407,7 +417,7 @@ def CreateFromFilesystem(pkgList):
 	    cs.addFile(fileId, oldVersion, newVersion, filecs)
 
 	    if hash:
-		cs.addFileContents(hash, 
+		cs.addFileContents(hash, ChangedFileTypes.file,
 			  repository.FileContentsFromFilesystem(realPath))
 
     return cs

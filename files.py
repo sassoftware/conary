@@ -210,6 +210,10 @@ class FileMode:
 	    self.theFlags = None
 	
 class File(FileMode):
+
+    lsTag = None
+    hasContents = 0
+
     def modeString(self):
 	l = self.triplet(self.thePerms >> 6, self.thePerms & 04000)
 	l = l + self.triplet(self.thePerms >> 3, self.thePerms & 02000)
@@ -310,7 +314,7 @@ class SymbolicLink(File):
 	# chmod() on a symlink follows the symlink
 	pass
 
-    def restore(self, changeSet, target, restoreContents):
+    def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.symlink(self.theLinkTarget, target)
@@ -336,7 +340,7 @@ class Socket(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, changeSet, target, restoreContents):
+    def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
@@ -354,7 +358,7 @@ class NamedPipe(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, changeSet, target, restoreContents):
+    def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.mkfifo(target)
@@ -370,7 +374,7 @@ class Directory(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def restore(self, changeSet, target, restoreContents):
+    def restore(self, fileContents, target, restoreContents):
 	if not os.path.isdir(target):
 	    util.mkdirChain(target)
 
@@ -404,7 +408,7 @@ class DeviceFile(File):
 	
 	return 0
 
-    def restore(self, changeSet, target, restoreContents):
+    def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 
@@ -467,6 +471,7 @@ class CharacterDevice(DeviceFile):
 class RegularFile(File):
 
     lsTag = "-"
+    hasContents = 1
 
     def sha1(self, sha1 = None):
 	if sha1 and sha1 != "-":
@@ -486,7 +491,7 @@ class RegularFile(File):
 
 	return 0
 
-    def restore(self, changeSet, target, restoreContents):
+    def restore(self, fileContents, target, restoreContents):
 	if restoreContents:
 	    if os.path.exists(target) or os.path.islink(target):
 		os.unlink(target)
@@ -495,7 +500,7 @@ class RegularFile(File):
 		util.mkdirChain(path)
 
 	    f = open(target, "w")
-	    src = changeSet.getFileContents(self.sha1())
+	    src = fileContents.get()
 	    f.write(src.read())
 	    f.close()
 	    src.close()
