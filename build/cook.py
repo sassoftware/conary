@@ -647,7 +647,10 @@ def cookCommand(cfg, args, prep, macros, buildBranch = None, emerge = False, res
     repos = NetworkRepositoryClient(cfg.repositoryMap)
 
     # do not cook as root!
-    if not os.getuid:
+    # XXX fix emerge to build as non-root user, either build as current
+    # non-root user and use consolehelper to install the changeset, or
+    # have an "emergeUser" config item and change uid after the fork.
+    if not emerge and not os.getuid:
         raise CookError('Do not cook as root')
 
     for item in args:
