@@ -330,7 +330,8 @@ def rmtree(paths, ignore_errors=False, onerror=None):
     for path in braceGlob(paths):
 	log.debug('deleting [tree] %s', path)
 	# act more like rm -rf -- allow files, too
-	if not os.path.isdir(path):
+	if (os.path.exists(path) or os.path.islink(path)) \
+               and not os.path.isdir(path):
 	    os.remove(path)
 	else:
 	    os.path.walk(path, _permsVisit, None)
