@@ -362,7 +362,7 @@ class PackageRecipe(Recipe):
                            (level, backup, macros, extraArgs))
 
     def addSource(self, filename, keyid=None, extractDir='',
-                  apply=None, use=None, macros=False):
+                  apply='', use=None, macros=False):
 	self._appendSource(filename, keyid, 'source', extractDir, use,
                            (apply %self.macros, macros))
 
