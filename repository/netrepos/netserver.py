@@ -1,4 +1,5 @@
 from repository import changeset
+from repository import repository
 from localrep import fsrepos
 import filecontainer
 import md5
@@ -10,6 +11,26 @@ import util
 import xmlshims
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
+
+    # lets the following exceptions pass:
+    #
+    # 1. Internal server error (unknown exception)
+    # 2. netserver.InsufficientPermission
+
+    def callWrapper(self, method, authToken, args):
+	try:
+	    r = self.__class__.__dict__[method](self, authToken, *args)
+	    return (False, r)
+	except repository.TroveMissing, e:
+	    if not e.troveName:
+		return (True, ("TroveMissing", "", ""))
+	    elif not e.troveVersion:
+		return (True, ("TroveMissing", e.troveName, ""))
+	    else:
+		return (True, ("TroveMissing", e.troveName, 
+			self.fromVersion(e.troveVersion)))
+	except:
+	    raise
 
     def allTroveNames(self, authToken):
 	if not self.auth.check(authToken, write = False):

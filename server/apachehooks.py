@@ -31,7 +31,7 @@ def xmlPost(repos, req):
     (params, method) = xmlrpclib.loads(req.read())
 
     try:
-	result = repos.__class__.__dict__[method](repos, authToken, *params)
+	result = repos.callWrapper(method, authToken, params)
     except netserver.InsufficientPermission:
 	return apache.HTTP_FORBIDDEN
 

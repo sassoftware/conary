@@ -19,6 +19,31 @@ import xmlrpclib
 import xmlshims
 from deps import deps
 
+class _Method(xmlrpclib._Method):
+
+    def __call__(self, *args):
+        isException, result = self.__send(self.__name, args)
+	if not isException:
+	    return result
+
+	exceptionName = args[0]
+	exceptionArgs = args[1:]
+
+	if exceptionName == "TroveMissing":
+	    (name, version) = exceptionArgs
+	    if not name: name = None
+	    if not version:
+		version = None
+	    else:
+		version = self.FromVersion(version)
+
+	raise repository.repository.TroveMissing(name, version)
+
+class ServerProxy(xmlrpclib.ServerProxy):
+
+    def __getattr__(self, name):
+        return _Method(self.__request, name)
+
 class ServerCache:
 
     def __getitem__(self, item):
@@ -40,7 +65,7 @@ class ServerCache:
 
 	    if url is None:
 		url = "http://%s/conary/" % serverName
-	    server = xmlrpclib.Server(url)
+	    server = ServerProxy(url)
 	    self.cache[serverName] = server
 
 	    try:

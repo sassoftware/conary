@@ -97,14 +97,10 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	(params, method) = xmlrpclib.loads(self.rfile.read(contentLength))
 
 	try:
-	    result = netRepos.__class__.__dict__[method](netRepos, authToken,
-							 *params)
+	    result = netRepos.callWrapper(method, authToken, params)
 	except netserver.InsufficientPermission:
 	    self.send_response(403)
 	    return
-	#except:
-	#    self.send_response(500)
-	#    return
 
 	resp = xmlrpclib.dumps((result,), methodresponse=1)
 
