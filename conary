@@ -56,6 +56,8 @@ def usage(rc = 1):
     print ""
     print "pkglist flags: --all"
     print "               --ls"
+    print ""
+    print "update flags: --replacefiles"
     sys.exit(rc)
 
 otherArgs = [ sys.argv[0] ]
@@ -77,6 +79,7 @@ argDef["prep"] = 0
 argDef["macros"] = 1
 argDef["ls"] = 0
 argDef["profile"] = 0
+argDef["replacefiles"] = 0
 
 argDef.update(srcctl.argDef)
 
@@ -231,13 +234,18 @@ elif (otherArgs[1] == "rollback"):
 elif (otherArgs[1] == "source" or otherArgs[1] == "src"):
     srcctl.sourceCommand(cfg, otherArgs[2:], argSet)
 elif (otherArgs[1] == "update"):
+    kwargs = {}
+    replaceFiles = argSet.has_key('replacefiles')
+    if replaceFiles:
+        kwargs['replaceFiles'] = True
+        del argSet['replacefiles']
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	repos = repository.LocalRepository(cfg.reppath, "r")
 	db = database.Database(cfg.root, cfg.dbpath, "c")
 
 	args = [repos, db, cfg] + otherArgs[2:]
-	updatecmd.doUpdate(*args)
+	updatecmd.doUpdate(*args, **kwargs)
     else:
 	usage()
 elif (otherArgs[1] == "usage"):

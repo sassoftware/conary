@@ -114,8 +114,12 @@ class Database(repository.LocalRepository):
     # local changes includes the A->A.local portion of a rollback; if it
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
-    def commitChangeSet(self, cs, isRollback = False, toDatabase = True):
+    def commitChangeSet(self, cs, isRollback = False, toDatabase = True,
+                        replaceFiles = False):
 	assert(not cs.isAbstract())
+        flags = 0
+        if replaceFiles:
+            flags |= update.REPLACEFILES
 
 	for pkg in cs.getNewPackageList():
 	    if pkg.name.endswith(":sources"): raise SourcePackageInstall
@@ -141,6 +145,8 @@ class Database(repository.LocalRepository):
 
 	if not isRollback:
 	    inverse = cs.makeRollback(self, configFiles = 1)
+        else:
+            flags |= update.MERGE
 
 	# Build and commit A->B
 	if toDatabase:
@@ -151,12 +157,8 @@ class Database(repository.LocalRepository):
 	    # add new packages
 	    if toDatabase: job.commit(undo)
 	    # build the list of things to commit
-	    if isRollback:
-		fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root,
-					     merge = False)
-	    else:
-		fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root,
-					     merge = True)
+            fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root,
+                                         flags = flags)
 	    # remove old packages
 	    errList = fsJob.getErrorList()
 	    if errList:

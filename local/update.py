@@ -5,6 +5,13 @@
 """
 Handles all updates to the file system; files should never get changed
 on the filesystem except by this module!
+
+@var MERGE: Flag constant value.  If set, merge is attempted,
+otherwise the changes from the changeset are used (this is for
+rollbacks)
+@var REPLACEFILES: Flag constant value.  If set, a file that is in
+the way of a newly created file will be overwritten.  Otherwise an error
+is produced.
 """
 
 import changeset
@@ -18,6 +25,9 @@ import patch
 import stat
 import versions
 
+MERGE = 1 << 0
+REPLACEFILES = 1 << 1
+        
 class FilesystemJob:
     """
     Represents a set of actions which need to be applied to the filesystem.
@@ -66,7 +76,7 @@ class FilesystemJob:
 	return self.newPackages
 
     def _singlePackage(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
-		       merge):
+		       flags):
 	"""
 	Build up the todo list for applying a single package to the
 	filesystem. Returns a package object which represents what will
@@ -86,9 +96,9 @@ class FilesystemJob:
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
-	@param merge: a merge is attempted if true, otherwise the changes
-	from the changeset are used (this is for rollbacks)
-	@type merge: boolean
+	@param flags: flags which modify update behavior.  See L{update}
+        module variable summary for flags definitions.
+	@type flags: int bitfield
 	@rtype: package.Package
 	"""
 	if basePkg:
@@ -109,20 +119,25 @@ class FilesystemJob:
 
 	    headFile = files.FileFromInfoLine(changeSet.getFileChange(fileId),
 					      fileId)
-	    try:
-		s = os.lstat(headRealPath)
-		if (not isinstance(headFile, files.Directory)
-                    or not stat.S_ISDIR(s.st_mode)):
-		    self.errors.append("%s is in the way of a newly " 
+
+            try:
+                s = os.lstat(headRealPath)
+                # if this file is a directory and the file on the file
+                # system is a directory, we're OK
+                if (isinstance(headFile, files.Directory)
+                    and stat.S_ISDIR(s.st_mode)):
+                    # FIXME: this isn't the right directory handling
+                    # we will want to set ownership/permissions if
+                    # they don't conflict with any already-installed package
+                    continue
+                elif not flags & REPLACEFILES:
+                    self.errors.append("%s is in the way of a newly " 
                                        "created file" % headRealPath)
-		    fullyUpdated = 0
-
-		# FIXME: this isn't the right directory handling
-		    
-		continue
-	    except OSError:
-		pass
-
+                    fullyUpdated = 0
+                    continue
+            except OSError:
+                # the path doesn't exist, carry on with the restore
+                pass
 
 	    if headFile.hasContents:
 		headFileContents = changeSet.getFileContents(fileId)[1]
@@ -143,7 +158,7 @@ class FilesystemJob:
 	    else:
 		realPath = cwd + "/" + path
 
-	    if merge:
+	    if flags & MERGE:
 		try:
 		    # don't remove files if they've been changed locally
 		    localFile = files.FileFromFilesystem(realPath, fileId)
@@ -185,7 +200,7 @@ class FilesystemJob:
 		else:
 		    basePath = None
 
-		if (not merge) or fsPath == basePath :
+		if (not flags & MERGE) or fsPath == basePath :
 		    # the path changed in the repository, propage that change
 		    self._rename(rootFixup + fsPath, rootFixup + headPath,
 		                 "renaming %s to %s" % (fsPath, headPath))
@@ -230,7 +245,7 @@ class FilesystemJob:
 	    if (basePkg and headFileVersion
                 and not fsFile.same(headFile, ignoreOwner = True)):
 		# something has changed for the file
-		if merge:
+		if flags & MERGE:
 		    (conflicts, mergedChanges) = files.mergeChangeLines(
 						    headChanges, fsChanges)
 		    if mergedChanges and (not conflicts or
@@ -266,7 +281,7 @@ class FilesystemJob:
 		else:
 		    headFileContents = None
 
-		if (not merge) or fsFile.same(baseFile, ignoreOwner = True):
+		if (not flags & MERGE) or fsFile.same(baseFile, ignoreOwner = True):
 		    # the contents changed in just the repository, so take
 		    # those changes
 		    if headFileContType == changeset.ChangedFileTypes.diff:
@@ -329,7 +344,7 @@ class FilesystemJob:
 
 	return fsPkg
 
-    def __init__(self, repos, changeSet, fsPkgDict, root, merge = True):
+    def __init__(self, repos, changeSet, fsPkgDict, root, flags = MERGE):
 	"""
 	Constructs the job for applying a change set to the filesystem.
 
@@ -344,9 +359,9 @@ class FilesystemJob:
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
-	@param merge: a merge is attempted if true, otherwise the changes
-	from the changeset are used (this is for rollbacks)
-	@type merge: boolean
+	@param flags: flags which modify update behavior.  See L{update}
+        module variable summary for flags definitions.
+	@type flags: int bitfield
 	"""
 	self.renames = []
 	self.restores = []
@@ -366,10 +381,10 @@ class FilesystemJob:
 	    if old:
 		basePkg = repos.getPackageVersion(name, old)
 		pkg = self._singlePackage(repos, pkgCs, changeSet, basePkg, 
-					  fsPkgDict[name], root, merge)
+					  fsPkgDict[name], root, flags)
 	    else:
 		pkg = self._singlePackage(repos, pkgCs, changeSet, None, 
-					  None, root, merge)
+					  None, root, flags)
 
 	    self.newPackages.append(pkg)
 

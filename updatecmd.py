@@ -11,7 +11,7 @@ import repository
 import sys
 import util
 
-def doUpdate(repos, db, cfg, pkg, versionStr = None):
+def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
     cs = None
     if not os.path.exists(cfg.root):
         util.mkdirChain(cfg.root)
@@ -66,7 +66,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	list = [ x[0] for x in list ]
 
     try:
-	db.commitChangeSet(cs)
+	db.commitChangeSet(cs, replaceFiles=replaceFiles)
     except database.SourcePackageInstall, e:
 	log.error(e)
     except repository.CommitError, e:
