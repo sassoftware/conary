@@ -223,6 +223,28 @@ class _recipeHelper:
     def __call__(self, *args, **keywords):
         self.list.append(self.theclass(*args, **keywords))
 
+class _policyUpdater:
+    def __init__(self, list, index, theobject, theclass):
+        self.list = list
+	self.index = index
+        self.theobject = theobject
+        self.theclass = theclass
+    def __call__(self, *args, **keywords):
+	if not args:
+	    # we can just update the existing object
+	    for key in keywords.keys():
+		if not self.theobject.__dict__.has_key(key):
+		    raise TypeError, (
+			'no such key %s in %s'
+			    %(key, self.theobject.__class__.__name__))
+	    self.theobject.__dict__.update(keywords)
+	else:
+	    # we have to replace the old object with a new one
+	    # we don't yet use args for anything, but if we do
+	    # it will be evaluated at init time and so cannot be
+	    # re-evaluated...
+	    self.list[index] = self.theclass(*args, **keywords)
+
 class Recipe:
     buildRequires = []
     runRequires = []
@@ -447,9 +469,11 @@ class Recipe:
 		return _recipeHelper(self.build, build.__dict__[name])
 	    if policy.__dict__.has_key(name):
 		policyClass = policy.__dict__[name]
-		for policyObj in self.process:
+		for index in range(len(self.process)):
+		    policyObj = self.process[index]
 		    if isinstance(policyObj, policyClass):
-			return policyObj
+			return _policyUpdater(self.process, index,
+			                      policyObj, policyClass)
 		return _recipeHelper(self.policy, policyClass)
         return self.__dict__[name]
     

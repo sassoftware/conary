@@ -8,6 +8,9 @@ import re
 import os
 
 """
+Module used by recipes to modify the state of the installed %(destdir)s
+Classes from this module are not used directly; instead, they are used
+through eponymous interfaces in recipe.
 """
 
 
@@ -76,7 +79,6 @@ class Policy(util.Action):
 def _policyException(policyObj, filespec):
     for re in policyObj.exceptionREs:
 	if re.search(filespec):
-	    print filespec
 	    return True
     return False
     
