@@ -29,6 +29,8 @@ class Macros(dict):
 	    self.__macros = {}
 	    self.update(macros)
 
+    def _get(self, key):
+        return dict.__getitem__(self, key)
             
     def update(self, other):
         for key, item in other.iteritems():
