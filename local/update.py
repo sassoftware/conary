@@ -164,6 +164,16 @@ class FilesystemJob:
 
         return False
 
+    def ptrCmp(a, b):
+        if a[0] == b[0]:
+            return 0
+        elif a[0] < b[0]:
+            return -1
+        else:
+            return 0
+
+    ptrCmp = staticmethod(ptrCmp)
+
     def apply(self, tagSet = {}, tagScript = None):
 	# this is run after the changes are in the database (but before
 	# they are committed
@@ -244,8 +254,9 @@ class FilesystemJob:
                                                 ptrId))
                         if not ptrTargets.has_key(ptrId):
                             ptrTargets[ptrId] = None
-                            util.tupleListBsearchInsert(restores, 0,
-                                (ptrId, None, None, None, None))
+                            util.tupleListBsearchInsert(restores, 
+                                (ptrId, None, None, None, None),
+                                self.ptrCmp)
 
                         continue
 

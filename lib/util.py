@@ -360,7 +360,7 @@ def createLink(src, to):
     os.link(src, tmpname)
     os.rename(tmpname, to)
 
-def tupleListBsearchInsert(haystack, cmpIdx, newItem):
+def tupleListBsearchInsert(haystack, newItem, cmpFn):
     """
     Inserts newItem into haystack, maintaining the sorted order. The
     cmpIdx is the item number in the list of tuples to base comparisons on.
@@ -375,18 +375,22 @@ def tupleListBsearchInsert(haystack, cmpIdx, newItem):
     finish = len(haystack) - 1
     while start < finish:
         i = (start + finish) / 2
-        if haystack[i][cmpIdx] == newItem[cmpIdx]:
+
+        rc = cmpFn(haystack[i], newItem)
+        if rc == 0:
             start = i
             finish = i
             break
-        elif haystack[i][cmpIdx] < newItem[cmpIdx]:
+        elif rc < 0:
             start = i + 1
         else:
             finish = i - 1
 
     if start >= len(haystack):
         haystack.append(newItem)
-    elif haystack[start][cmpIdx] < newItem[cmpIdx]:
-        haystack.insert(start + 1, newItem)
-    elif haystack[start][cmpIdx] > newItem[cmpIdx]:
-        haystack.insert(start, newItem)
+    else:
+        rc = cmpFn(haystack[start], newItem)
+        if rc < 0:
+            haystack.insert(start + 1, newItem)
+        elif rc > 0:
+            haystack.insert(start, newItem)
