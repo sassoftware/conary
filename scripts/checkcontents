@@ -82,6 +82,7 @@ def main(argv):
     neededFiles = []
     # list of needed contents sha1 hashes
     neededSha1s = []
+    sha1Counts = {}
 
     # loop over all the files in the database
     cu = db.db.cursor()
@@ -101,6 +102,31 @@ def main(argv):
                       '(sha1: %s)' %h, 'missing from data store'
                 neededFiles.append((f.fileId(), fileVersion))
                 neededSha1s.append(h)
+            else:
+                # excellent, not missing the contents.  let's count
+                # how many instances we have
+                sha1Counts[h] = sha1Counts.get(h, 0) + 1
+
+    for h, count in sha1Counts.iteritems():
+        path = contentsStore.hashToPath(h)
+        realCount = contentsStore.readCount(path)
+        if realCount != count:
+            print ('count file incorrect for %s. '
+                   'expected %d got %d' %(h, count, realCount))
+            if repair:
+                if count == 0:
+                    # this can't happen
+                    raise AssertionError
+                elif count == 1:
+                    # remove the link incorrect count file
+                    os.unlink(path + '#')
+                else:
+                    # write the correct value to the count file
+                    # NOTE - there's no locking here, we're assuming
+                    # that no one else is using the data store
+                    f = open(path + '#', 'w')
+                    f.write('%d\n' %count)
+                    f.close()
 
     if repair:
         # set up a network client using the repositoryMap - hopefully
