@@ -884,7 +884,8 @@ class FilesystemJob:
 		self._remove(fileObj, root + path, "removing %s")
 
 def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
-                  withFileContents=True, forceSha1=False):
+                  withFileContents=True, forceSha1=False, 
+                  ignoreTransient=False):
     """
     Populates a change set against the files in the filesystem and builds
     a package object which describes the files installed.  The return
@@ -969,6 +970,10 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 
 	srcFile = repos.getFileVersion(pathId, srcFileId, srcFileVersion)
 
+        # transient files never show up in in local changesets...
+        if ignoreTransient and srcFile.flags.isTransient():
+            continue
+
         if forceSha1:
             possibleMatch = None
         else:
@@ -983,7 +988,17 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
         # the link group doesn't change due to local mods
         if srcFile.hasContents and f.hasContents:
             f.linkGroup.set(srcFile.linkGroup.value())
-	
+
+        # these values are not picked up from the local system
+        if hasattr(f, 'requires') and hasattr(srcFile, 'requires'):
+            f.requires.set(srcFile.requires.value())
+        if srcFile.hasContents and f.hasContents:
+            f.provides.set(srcFile.provides.value())
+        f.flags.set(srcFile.flags.value())
+        if srcFile.hasContents and f.hasContents:
+            f.flavor.set(srcFile.flavor.value())
+        f.tags = srcFile.tags.copy()
+
 	extension = path.split(".")[-1]
 	if isSrcPkg and extension not in nonCfgExt:
 	    f.flags.isConfig(set = True)

@@ -62,20 +62,26 @@ def verifyTrove(trove, db, cfg):
         ver = ver.fork(versions.LocalBranch(), sameVerRel = 1)
         list.append((pkg, origPkg, ver, 0))
 	    
-    result = update.buildLocalChanges(db, list, root = cfg.root, 
-                                      withFileContents=False, forceSha1=True)
-    if not result: return
-    cs = result[0]
+    try:
+        result = update.buildLocalChanges(db, list, root = cfg.root, 
+                                      withFileContents=False, forceSha1=True,
+                                      ignoreTransient=True)
+        if not result: return
+        cs = result[0]
 
-    cs.addPrimaryPackage(trove.getName(), 
-            trove.getVersion().fork(
-            versions.LocalBranch(), sameVerRel = 1),
-            trove.getFlavor())
+        cs.addPrimaryPackage(trove.getName(), 
+                trove.getVersion().fork(
+                versions.LocalBranch(), sameVerRel = 1),
+                trove.getFlavor())
 
-    for (changed, fsPkg) in result[1]:
-	if changed:
-	    break
-    if not changed:
-        return
-    showchangeset.displayChangeSet(db, None, cs, [], cfg, ls=True, 
-                                                          showChanges=True)
+        for (changed, fsPkg) in result[1]:
+            if changed:
+                break
+        if not changed:
+            return
+        showchangeset.displayChangeSet(db, None, cs, [], cfg, ls=True, 
+                                                              showChanges=True)
+    except OSError, err:
+        if err.errno == 13:
+            log.warning("Permission denied creating local changeset for"
+                        " %s " % trove.getName())
