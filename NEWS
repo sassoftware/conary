@@ -7,6 +7,9 @@ Changes in 0.50.4:
     version.
   * Added /usr/lib/conary/conarybugz.py to make it easy to automatically
     populate bugzilla databases from repositories.
+  * Sped up Strip, NormalizeInitscriptLocation, NormalizePamConfig,
+    TagDescription, and TagHandler policies by limiting them to
+    only appropriate directories.
 
 Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 
