@@ -111,7 +111,8 @@ class BadInterpreterPaths(policy.Policy):
             interp = m.contents['interpreter']
             if not interp:
                 self.recipe.reportErrors(
-                    "missing interpreter in %s" % path)
+                    'missing interpreter in "%s", missing buildRequires?'
+                    %path)
             elif interp[0] != '/':
                 self.recipe.reportErrors(
                     "illegal relative interpreter path %s in %s (%s)"
@@ -1367,11 +1368,15 @@ class Requires(_addInfo):
             m = self.recipe.magic[path]
             if m and m.name == 'script':
                 interp = m.contents['interpreter']
-                if self._checkInclusion(interp, path):
-                    if not os.path.exists(interp):
-                        # this interpreter not on system, at least warn
-                        log.warning('%s (referenced in %s) missing',
-                                    interp, path)
+                if len(interp.strip()) and self._checkInclusion(interp, path):
+                    # no interpreter string warning is in BadInterpreterPaths
+                    if not (os.path.exists(interp) or
+                            os.path.exists(self.recipe.macros.destdir+interp)):
+                        # this interpreter not on system, warn
+                        # cannot be an error to prevent buildReq loops
+                        log.warning(
+                            'interpreter "%s" (referenced in %s) missing',
+                            interp, path)
                         # N.B. no special handling for /{,usr/}bin/env here;
                         # if there has been an exception to
                         # NormalizeInterpreterPaths, then it is a
