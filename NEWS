@@ -17,6 +17,7 @@ Changes in 0.14.11:
   * TroveNotFound exceptions are handled gracefully in cvc.  'conary cook
     foo' will no longer traceback when foo:souce could not be found in
     the repository.
+  * Local systems store config files in sql tables now
 
 Changes in 0.14.10:
   * FlavorMap sense wasn't set right for base instruction set
