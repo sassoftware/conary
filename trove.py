@@ -157,7 +157,7 @@ class Trove:
 	self.redirect = pkgCS.getIsRedirect()
         if self.redirect:
             # we don't explicitly remove files for redirects
-            self.idMap = None
+            self.idMap = {}
 
 	fileMap = {}
 
