@@ -92,9 +92,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def hasPackage(self, serverName, pkg):
         return self.c[serverName].hasPackage(pkg)
 
-    def hasTrove(self, pkgName, version, flavor):
-	return self.s.hasTrove(pkgName, version, flavor)
-
     def iterAllTroveNames(self, serverName):
 	for name in self.c[serverName].allTroveNames():
 	    yield name
