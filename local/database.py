@@ -106,8 +106,8 @@ class SqlDbRepository(repository.DataStoreRepository,
     def addFileVersion(self, troveId, fileId, fileObj, path, version):
 	self.db.addFile(troveId, fileId, fileObj, path, version)
 
-    def addPackage(self, pkg, oldVersion = None):
-	return self.db.addTrove(pkg, oldVersion = oldVersion)
+    def addPackage(self, pkg):
+	return self.db.addTrove(pkg)
 
     def addPackageDone(self, troveInfo):
 	pass

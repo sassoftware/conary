@@ -462,7 +462,7 @@ class Database:
 
 	return theId
 
-    def addTrove(self, trove, oldVersion = None):
+    def addTrove(self, trove):
 	cu = self.db.cursor()
 
 	troveName = trove.getName()

@@ -27,8 +27,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     def addPackage(self, pkg):
 	pkgCs = self.cs.getNewPackageVersion(pkg.getName(), pkg.getVersion(),
 					     pkg.getFlavor())
-	old = pkgCs.getOldVersion()
-	return self.repos.addPackage(pkg, oldVersion = old)
+	return self.repos.addPackage(pkg)
 
     def addPackageDone(self, troveId):
 	pass
