@@ -35,8 +35,10 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self._message("Resolving dependencies...")
 
     def downloadingChangeSet(self, got, need):
-        self._message("Downloading changeset (%d%% of %dk)..." 
-                    % ((got * 100)/ need , need / 1024))
+        if need != 0:
+            self._message("Downloading changeset (%d%% of %dk)..." 
+                          % ((got * 100) / need , need / 1024))
+            
 
     def requestingChangeSet(self):
         self._message("Requesting changeset...")
@@ -48,14 +50,16 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self._message("Preparing update...")
 
     def restoreFiles(self, size, totalSize):
-        self.restored += size
-        self._message("Writing %dk of %dk (%d%%)..." 
-                    % (self.restored / 1024 , totalSize / 1024,
-                       (self.restored * 100) / totalSize))
+        if totalSize != 0:
+            self.restored += size
+            self._message("Writing %dk of %dk (%d%%)..." 
+                        % (self.restored / 1024 , totalSize / 1024,
+                           (self.restored * 100) / totalSize))
 
     def removeFiles(self, fileNum, total):
-        self._message("Removing %d of %d (%d%%)..."
-                    % (fileNum , total, (fileNum * 100) / total))
+        if total != 0:
+            self._message("Removing %d of %d (%d%%)..."
+                        % (fileNum , total, (fileNum * 100) / total))
 
     def runningPreTagHandlers(self):
         self._message("Running tag pre-scripts...")
