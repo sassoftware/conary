@@ -38,7 +38,7 @@ class ComponentSpec(_filterSpec):
     baseFilters = (
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
-	('python',    ('%(libdir)s/python.*/site-packages/.*')),
+	('python',    ('%(libdir)s/python.*/site-packages/')),
 	('devel',     ('\.a',
 		       '\.so',
 		       '.*/include/.*\.h',
