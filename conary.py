@@ -125,7 +125,7 @@ def openRepository(repMap):
 def openDatabase(root, path):
     return database.Database(root, path)
 
-def realMain():
+def realMain(argv=sys.argv):
     argDef = {}
     cfgMap = {}
 
@@ -166,7 +166,8 @@ def realMain():
     argDef.update(srcctl.argDef)
 
     try:
-        argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
+        argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
+                                                argv=argv)
     except options.OptionError, e:
         sys.exit(e.val)
     except versions.ParseError, e:
@@ -460,9 +461,9 @@ def realMain():
     if log.errorOccurred():
 	sys.exit(1)
 
-def main():
+def main(argv=sys.argv):
     try:
-	realMain()
+	realMain(argv)
     except xmlrpclib.ProtocolError, e:
 	if e.errcode == 403:
 	    print >> sys.stderr, \
