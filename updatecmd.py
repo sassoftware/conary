@@ -63,8 +63,8 @@ def update(repos, cfg, pkg, versionStr = None):
 	#
 	# this means we can parse a simple name of the package
 	# out of the full package identifier
-	if pkgName[-8:] == "/sources":
-	    mainPackageName = pkgName[:-8]
+	if pkgName.endswith('/sources'):
+	    mainPackageName = pkgName.rstrip('/sources')
 
     for pkg in list:
 	doUpdate(repos, cfg, pkg, mainPackageName)
