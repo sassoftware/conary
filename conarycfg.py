@@ -29,15 +29,7 @@ class SrsConfiguration:
 	self.__dict__[key] = val
 
 	try:
-	    if key == "defaultbranch":
-		self.defaultbranch = \
-			versions.VersionFromString(self.defaultbranch)
-
-		if self.defaultbranch.isVersion():
-		    sys.stderr.write("The configured default branch %s " +
-			"specifies version, not a branch.\n" % 
-			   self.defaultbranch.asString())
-	    elif key == "installlabel":
+	    if key == "installlabel":
 		self.installlabel = versions.BranchName(self.installlabel)
 	    elif key == "buildlabel":
 		self.buildlabel = versions.BranchName(self.buildlabel)
@@ -66,7 +58,6 @@ class SrsConfiguration:
 	self.root = "/"
 	self.sourcepath = "/usr/src/srs/sources"
 	self.buildpath = "/usr/src/srs/builds"
-	self.defaultbranch = None
 	self.installlabel = None
 	self.buildlabel = None
 	self.lookaside = "/var/cache/srs"
@@ -77,8 +68,6 @@ class SrsConfiguration:
 	self.flavor = deps.deps.DependencySet()
 	self.flavor.addDep(deps.deps.InstructionSetDependency, 
 			   self.instructionSet)
-
-	self.defaultbranch = versions.VersionFromString("/localhost@local:head")
 
 	self.read("/etc/srsrc")
 	self.read(os.environ["HOME"] + "/" + ".srsrc")
