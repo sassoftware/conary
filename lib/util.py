@@ -200,7 +200,9 @@ def _permsVisit(arg, dirname, names):
 
 def remove(paths):
     for path in braceGlob(paths):
-	if os.path.exists(path) or os.path.islink(path):
+	if os.path.isdir(path):
+	    log.warning('Not removing directory %s', path)
+	elif os.path.exists(path) or os.path.islink(path):
 	    log.debug('deleting [file] %s', path)
 	    os.remove(path)
 	else:
