@@ -873,16 +873,17 @@ class MakeDirs(_FileAction):
 
 class TestSuite(_FileAction):
     """
-    FIXME: needs to be documented!
+    The TestSuite class creates a script to run this package's test suite: 
+    C{TestSuite(I{<dir>}, I{<command>})}.  TestSuite also modifies Makefiles 
+    in order to compile binaries needed for testing at cook time, while 
+    allowing the actual testsuite to run at a later point.  It does this
+    if the command to be run is of the form C{make I{<target>}}, in which
+    case all of the target's dependencies are built, and the makefile is 
+    edited to then remove those dependencies from the target.  Also, if 
+    the command is a make command, the arguments C{-o Makefile -o config.status}
+    are added to help ensure that automake does not try to regenerate
+    the Makefile at test time. 
     """
-
-    idnum = 0
-    keywords = {'ignore'    : [],
-		'recursive' : False,
-		'subdirs'   : [] } 
-
-    command_path = '%(thistestdir)s/conary-test-command' 
-    testsuite_path = '%(thistestdir)s/conary-testsuite-%(identifier)s'
 
     commandScript = '''#!/bin/sh -x
 # run this script to execute the test suite
@@ -908,9 +909,23 @@ popd
 exit $failed
 '''
 
+    idnum = 0
+
+    command_path = '%(thistestdir)s/conary-test-command' 
+    testsuite_path = '%(thistestdir)s/conary-testsuite-%(identifier)s'
+    keywords = {'ignore'    : [],
+		'recursive' : False,
+		'subdirs'   : [] } 
 
 
     def __init__(self, recipe, *args, **keywords):
+        """
+        @keyword ignore: A list of files to tell make not to rebuild.  
+	In addition to this key, make is told to never rebuild Makefile 
+	or config.status.  Default: []
+        @keyword recursive:  If True, modify all the Makefiles below the given directory.  Default: False 
+        @keyword subdirs: Modify the Makefiles in the given subdirs.  Default: []
+        """
         _FileAction.__init__(self, recipe, *args, **keywords)
 	if len(args) > 2:
 	    raise TypeError, ("TestSuite must be passed a dir to run in and"
@@ -925,7 +940,7 @@ exit $failed
 	    self.command = 'make check-TESTS'
 	else:
 	    self.command = args[1]
-	if self.subdirs and not isinstance(self.subdirs, tuple, list):
+	if self.subdirs and not isinstance(self.subdirs, (tuple, list)):
 	    self.subdirs = [self.subdirs]
 	# turn on test component
 	recipe.TestSuiteLinks(build=True)
