@@ -13,6 +13,7 @@
 #
 
 from repository import changeset
+import errno
 from repository import filecontents
 import helper
 import log
@@ -349,7 +350,9 @@ class Database(SqlDbRepository):
 	    del list[0]
             try:
                 entries = len(os.listdir(path))
-            except OSError:
+            except OSError, e:
+                if e.errno != errno.ENOENT:
+                    raise
                 continue
             
 	    entries -= set[path]
