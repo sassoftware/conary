@@ -32,7 +32,7 @@ class HttpHandler(HtmlEngine):
         # "command name": (command handler, page title, requires authentication)
         self.commands = {
                          # metadata commands
-                         "metadata":            (self.metadataCmd, "View Metadata", False),
+                         "metadata":            (self.metadataCmd, "View Metadata", True),
                          "chooseBranch":        (self.chooseBranchCmd, "View Metadata", True),
                          "getMetadata":         (self.getMetadataCmd, "View Metadata", True),
                          "updateMetadata":      (self.updateMetadataCmd, "Metadata Updated", True),
