@@ -71,7 +71,11 @@ class Action:
         d = _AnyDict()
         for arg in args:
             if type(arg) is str and '%' in arg:
-                arg % d
+                try:
+                    arg % d
+                except ValueError, msg:
+                    log.error('invalid macro substitution in "%s", missing "s"?' %arg)
+                    raise
 
     def doAction(self):
 	if self.debug:

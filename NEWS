@@ -9,6 +9,7 @@ Changes in 0.14.12:
     better multilib support.
   * Policy now helps ensure that :python components are either
     architecture-neutral or multilib-friendly.
+  * better error messages for "%(foo)/" (which should be "%(foo)s/")
 
 Changes in 0.14.11:
   * Local systems store config files in sql tables now.  Use

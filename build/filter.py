@@ -18,9 +18,10 @@ mode bit masks (positive and negative) are applied to the mode of the
 file as it appears in the filesystem.
 """
 
-import stat
-import re
+from lib import log
 import os
+import re
+import stat
 
 class Filter:
     """
@@ -71,11 +72,19 @@ class Filter:
 	self.unsetmode = unsetmode
 	tmplist = []
 	if type(regex) is str:
-	    self.regexp = self._anchor(regex %macros)
+            try:
+                self.regexp = self._anchor(regex %macros)
+            except ValueError, msg:
+                log.error('invalid macro substitution in "%s", missing "s"?' %regex)
+                raise
 	    self.re = re.compile(self.regexp)
 	elif type(regex) in (tuple, list):
 	    for subre in regex:
-		subre = self._anchor(subre %macros)
+                try:
+                    subre = self._anchor(subre %macros)
+                except ValueError, msg:
+                    log.error('invalid macro substitution in "%s", missing "s"?' %subre)
+                    raise
 		tmplist.append('(' + subre + ')')
 	    self.regexp = '|'.join(tmplist)
 	    self.re = re.compile(self.regexp)
