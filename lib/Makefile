@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004 Specifix, Inc.
+# Copyright (c) 2004-2005 Specifix, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -11,8 +11,6 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-
-CFLAGS=-Wall -I$(PYINCLUDE) -fPIC
 
 python_files=	    __init__.py		\
 		    enum.py		\
@@ -54,3 +52,5 @@ clean: default-clean
 dist: default-dist
 
 include ../Make.rules
+# needs to come after including Make.rules so that PYINCLUDE is defined
+CFLAGS:=-Wall -I$(PYINCLUDE) -fPIC $(CFLAGS)
