@@ -26,6 +26,7 @@ import gzip
 from lib import log
 import os
 from lib import util
+from lib import sha1helper
 
 class DataStore:
 
