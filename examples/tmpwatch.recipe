@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-class Logrotate(recipe.Recipe):
+class tmpwatch(Recipe):
     description = """Logrotate is a genuinally useful piece of code for
 preventing files from growing ad nauseum"""
 

@@ -14,7 +14,7 @@ class RecipeLoader(types.DictionaryType):
     def __init__(self, file):
         self.module = imp.new_module(file)
         f = open(file)
-        exec 'import recipe' in self.module.__dict__
+        exec 'from recipe import Recipe' in self.module.__dict__
         exec 'import build' in self.module.__dict__
         exec 'import os' in self.module.__dict__
         exec 'import package' in self.module.__dict__
@@ -22,8 +22,10 @@ class RecipeLoader(types.DictionaryType):
         exec code in self.module.__dict__
         for (key, value) in  self.module.__dict__.items():
             if type(value) == types.ClassType:
+                # make sure the class is derived from something
+                # and has a name
                 # XXX better test?
-                if 'nameVer' in dir(value):
+                if len(value.__bases__) > 0 and 'name' in dir(value):
                     self[key] = value
 
 class Recipe:
@@ -53,9 +55,9 @@ class Recipe:
 	util.mkdirChain(builddir)
 	for file in self.tarballs:
             if file.endswith(".bz2"):
-                tarflags = "-jxvf"
+                tarflags = "-jxf"
             elif file.endswith(".gz") or file.endswit(".tgz"):
-                tarflags = "-zxvf"
+                tarflags = "-zxf"
             else:
                 raise RuntimeError, "unknown archive compression"
 	    os.system("tar -C %s %s %s" % (builddir, tarflags,
