@@ -50,9 +50,9 @@ def findFile(file, searchdirs):
     return searchFile(file, searchdirs, error=1)
 
 def excepthook(type, value, tb):
-    if type is exceptions.IOError:
-        sys.stderr.write('%s\n' % value)
-        sys.exit(1)
+    #if type is exceptions.IOError:
+        #sys.stderr.write('%s\n' % value)
+        #sys.exit(1)
     sys.excepthook = sys.__excepthook__
     lines = traceback.format_exception(type, value, tb)
     print string.joinfields(lines, "")
