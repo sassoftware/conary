@@ -11,6 +11,7 @@ export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
 export conarydir = $(prefix)/share/conary
 export bindir = $(prefix)/bin
+export mandir = $(prefix)/share/man
 
 SUBDIRS=build local repository lib pysqlite deps
 
@@ -66,6 +67,7 @@ conary-wrapper: conary-wrapper.in
 
 install-mkdirs:
 	mkdir -p $(DESTDIR)$(bindir)
+	mkdir -p $(DESTDIR)$(mandir)/man1
 
 install: all install-mkdirs install-subdirs pyfiles-install
 	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
@@ -74,6 +76,7 @@ install: all install-mkdirs install-subdirs pyfiles-install
 	for f in $(bin_files); do \
 		ln -sf conary-wrapper $(DESTDIR)$(bindir)/$$f; \
 	done
+	install -m 644 conary.1 $(DESTDIR)$(mandir)/man1
 
 dist: $(dist_files)
 	rm -rf $(DISTDIR)
