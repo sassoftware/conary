@@ -51,7 +51,11 @@ class SrsConfiguration:
 	    elif isinstance(self.__dict__[item], versions.Version):
 		print "%-20s %s" % (item, self.__dict__[item].asString())
 	    elif isinstance(self.__dict__[item], versions.BranchName):
+		print "%-20s %s" % (item, self.__dict__[item].asString())
+	    elif isinstance(self.__dict__[item], deps.deps.Dependency):
 		print "%-20s %s" % (item, self.__dict__[item])
+	    elif item == "flavor":
+		pass
 	    else:
 		print "%-20s (unknown type)" % (item)
 
@@ -70,7 +74,6 @@ class SrsConfiguration:
 	self.flavor = deps.deps.DependencySet()
 	self.flavor.addDep(deps.deps.InstructionSetDependency, 
 			   self.instructionSet)
-
 
 	self.defaultbranch = versions.VersionFromString("/localhost@local:head")
 
