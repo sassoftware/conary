@@ -6,6 +6,7 @@
 import changeset
 import filecontents
 import files
+import log
 import os
 import repository
 import versions
@@ -338,6 +339,8 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	    fileObj.restore(cont, root + path, newFile.restoreContents())
 
 	    if isinstance(cont, filecontents.WithFailedHunks):
+		log.warning("nonmerged changes to %s saved in %s.conflicts",
+			    path, path)
 		f = open(root + path + ".conflicts", "w")
 		f.write("--- current file\n")
 		f.write("+++ missing patches\n")
