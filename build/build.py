@@ -263,14 +263,30 @@ class InstallSymlink:
     def doInstall(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 	util.mkdirChain(os.path.dirname(dest))
-	if os.path.exists(dest) or os.path.islink(dest):
-	    os.remove(dest)
-	os.symlink(self.fromFile %macros, dest)
+	if self.toFile.endswith('/'):
+	    if os.path.exists(dest) or os.path.islink(dest):
+		os.remove(dest)
 
-    def __init__(self, fromFile, toFile):
-	# Note: this class is unusual in this set for not taking a tuple --
-	# but a tuple wouldn't make much sense, either
-	self.fromFile = fromFile
+	if type(self.fromFiles) is str:
+	    if self.toFile.endswith('/'):
+		dest = dest + os.path.basename(self.fromFiles)
+	    print '+ creating symlink from %s to %s' %(dest, self.fromFiles)
+	    os.symlink(self.fromFiles %macros, dest)
+	    return
+
+	for fromFile in self.fromFiles:
+	    # only if toFiles ends in / can fromFile be brace-expanded
+	    sources = braceExpand(fromFile %macros)
+	    for source in sources:
+		print '+ creating symlink from %s to %s' %(dest, source)
+		os.symlink(source, dest+os.path.basename(source))
+
+    def __init__(self, fromFiles, toFile):
+	# raise error early
+	if not type(fromFiles) is str:
+	    if not toFile.endswith('/'):
+		raise TypeError, 'too many targets for non-directory %s' %toFile
+	self.fromFiles = fromFiles
 	self.toFile = toFile
 
 class RemoveFiles:
