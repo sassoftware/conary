@@ -12,8 +12,8 @@ _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
-def displayPkgs(repos, cfg, all = False, ls = False, ids = False, pkg = "", 
-		versionStr = None):
+def displayPkgs(repos, cfg, all = False, ls = False, ids = False, sha1s = False,
+		pkg = "", versionStr = None):
     if pkg:
 	list = [ pkg ]
     else:
@@ -21,8 +21,8 @@ def displayPkgs(repos, cfg, all = False, ls = False, ids = False, pkg = "",
 	list.sort()
 
     for pkgName in list:
-	if versionStr or ls or ids:
-	    _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids)
+	if versionStr or ls or ids or sha1s:
+	    _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids, sha1s)
 	    continue
 	else:
 	    if all:
@@ -60,7 +60,7 @@ def _versionList(repos, pkgName):
 
     return l
 
-def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids):
+def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids, sha1s):
     try:
 	pkgList = helper.findPackage(repos, cfg.installbranch, pkgName, 
 				     versionStr)
@@ -88,6 +88,11 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids):
 	elif ids:
 	    for (fileId, path, version) in pkg.iterFileList():
 		print "%s %s" % (fileId, path)
+	elif sha1s:
+	    for (fileId, path, version) in pkg.iterFileList():
+		file = repos.getFileVersion(fileId, version, path = path)
+		if file.hasContents:
+		    print "%s %s" % (file.contents.sha1(), path)
 	else:
 	    print _pkgFormat % (pkgName, version.asString(cfg.defaultbranch))
 
