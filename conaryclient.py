@@ -283,7 +283,7 @@ class ConaryClient:
                     # check the exclude list
                     skipped = False
                     for reStr, regExp in self.cfg.excludeTroves:
-                        if regExp.match(name):
+                        if regExp.match(item[0]):
                             cs.delNewPackage(*item)
                             skipped = True
                             break
