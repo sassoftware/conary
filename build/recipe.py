@@ -374,7 +374,7 @@ class Recipe:
             pass
         elif type(self.build) is str:
             util.execute(self.build %self.macros)
-        elif type(self.build) is tuple:
+        elif type(self.build) is tuple or type(self.build) is list:
 	    for bld in self.build:
                 if type(bld) is str:
                     util.execute(bld %self.macros)
@@ -391,7 +391,7 @@ class Recipe:
             pass
         elif type(self.install) is str:
             util.execute(self.install %self.macros)
-	elif type(self.install) is tuple:
+        elif type(self.install) is tuple or type(self.install) is list:
 	    for inst in self.install:
                 if type(inst) is str:
                     util.execute(inst %self.macros)
