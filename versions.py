@@ -100,12 +100,21 @@ class VersionRelease(AbstractVersion):
 	Returns a string representation of a version/release pair.
 	"""
 	if versus and self.version == versus.version:
-	    rc = str(self.release)
+	    if versus and self.release == versus.release:
+		if self.buildCount is None:
+		    rc = str(self.release)
+		else:
+		    rc = ""
+	    else:
+		rc = str(self.release)
 	else:
 	    rc = self.version + '-' + str(self.release)
 
 	if self.buildCount != None:
-	    rc += "-%d" % self.buildCount
+	    if rc:
+		rc += "-%d" % self.buildCount
+	    else:
+		rc = str(self.buildCount)
 
 	if frozen:
 	    rc = self.freezeTimestamp() + ":" + rc
@@ -187,8 +196,14 @@ class VersionRelease(AbstractVersion):
 
 	@param value: String representation of a VersionRelease
 	@type value: string
+	@type template: VersionRelease
 	"""
 	self.timeStamp = 0
+	self.buildCount = None
+
+	version = None
+	release = None
+	buildCount = None
 
 	if frozen:
 	    (t, value) = value.split(':', 1)
@@ -199,42 +214,53 @@ class VersionRelease(AbstractVersion):
 
 	if value.find("@") != -1:
 	    raise ParseError, "version/release pairs may not contain @ signs"
-	cut = value.find("-")
-	if cut == -1:
-	    if not template:
-		raise ParseError, ("version/release pair was expected")
 
-	    self.version = template.version
-	    fullRelease = value
+	fields = value.split("-")
+	if len(fields) > 3:
+	    raise ParseError, ("too many fields in version/release set")
+
+	if len(fields) == 1:
+	    if template and template.buildCount is not None:
+		self.version = template.version
+		self.release = template.release
+		buildCount = fields[0]
+	    elif template:
+		self.version = template.version
+		release = fields[0]
+	    else:
+		raise ParseError, "bad version/release set %s" % value
+	elif len(fields) == 2:
+	    if template and template.buildCount is not None:
+		self.version = template.version
+		release = fields[0]
+		buildCount = fields[1]
+	    else:
+		version = fields[0]
+		release = fields[1]
 	else:
-	    self.version = value[:cut]
+	    (version, release, buildCount) = fields
 
+	if version is not None:
 	    try:
-		int(self.version[0])
+		int(version[0])
 	    except:
 		raise ParseError, \
 		    ("version numbers must be begin with a digit: %s" % value)
 
-	    fullRelease = value[cut + 1:]
+	    self.version = version
 
-	cut = fullRelease.find("-") 
-	if cut != -1:
-	    self.release = fullRelease[:cut]
-	    self.buildCount = fullRelease[cut + 1:]
-	else:
-	    self.release = fullRelease
-	    self.buildCount = None
-
-	try:
-	    self.release = int(self.release)
-	except:
-	    raise ParseError, ("release numbers must be all numeric: %s" % value)
-	if self.buildCount:
+	if release is not None:
 	    try:
-		self.buildCount = int(self.buildCount)
+		self.release = int(release)
 	    except:
 		raise ParseError, \
-		    ("build count numbers must be all numeric: %s" % value)
+		    ("release numbers must be all numeric: %s" % release)
+	if buildCount is not None:
+	    try:
+		self.buildCount = int(buildCount)
+	    except:
+		raise ParseError, \
+		    ("build count numbers must be all numeric: %s" % buildCount)
 
 class BranchName(AbstractBranch):
 
