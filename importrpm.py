@@ -7,6 +7,7 @@ import os
 import files
 import commit
 import stat
+import util
 
 def doImport(reppath, rpmFile):
     scratch = reppath + "/scratch"
@@ -84,7 +85,7 @@ def doImport(reppath, rpmFile):
 	f.mtime(mtimes[i])
 	fileList.append(f)
 
-    os.makedirs(scratch)
+    util.mkdirChain(scratch)
 
     if mustExtract:
 	os.system("cd %s; rpm2cpio %s | cpio -iumd --quiet" % 

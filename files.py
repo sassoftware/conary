@@ -12,6 +12,7 @@ import shutil
 import stat
 import pwd
 import grp
+import util
 
 class FileMode:
 
@@ -312,13 +313,13 @@ class RegularFile(File):
 		   self.uniqueName() 
 	target = root + self.path()
 	path = os.path.dirname(target)
-	os.makedirs(path)
+	util.mkdirChain(path)
 	shutil.copyfile(source, target)
 	File.restore(self, reppath, srcpath, root)
 
     def archive(self, reppath, root):
 	dest = reppath + "/files" + self.path() + ".contents"
-	os.makedirs(dest)
+	util.mkdirChain(dest)
 	dest = dest + "/" + self.uniqueName()
 	shutil.copyfile(root + "/" + self.path(), dest)
 
@@ -337,14 +338,14 @@ class SourceFile(RegularFile):
 		+ ".contents/" + self.uniqueName()
 	target = root + srcpath + "/" + os.path.basename(self.path())
 	path = os.path.dirname(target)
-	os.makedirs(path)
+	util.mkdirChain(path)
 	shutil.copyfile(source, target)
 	File.restore(self, reppath, srcpath, root)
 
     def archive(self, reppath, root):
 	dest = reppath + "/sources/" + os.path.basename(self.path()) \
 		+ ".contents"
-	os.makedirs(dest)
+	util.mkdirChain(dest)
 	dest = dest + "/" + self.uniqueName()
 	shutil.copyfile(root + "/" + self.path(), dest)
 
@@ -385,7 +386,7 @@ class FileDB:
 
     def write(self):
 	dir = os.path.split(self.dbfile)[0]
-	os.makedirs(dir)
+	util.mkdirChain(dir)
 
 	f = versioned.open(self.dbfile, "w")
 	for (version, file) in self.versions.items():

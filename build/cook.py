@@ -7,6 +7,7 @@ import time
 import files
 import commit
 import os
+import util
 
 def cook(reppath, srcdir, builddir, recipeFile):
     classList = recipe.RecipeLoader(recipeFile)
@@ -23,7 +24,7 @@ def cook(reppath, srcdir, builddir, recipeFile):
 	recp.doBuild(ourBuildDir)
 
 	rootDir = "/var/tmp/srs/%s-%d" % (recp.name, int(time.time()))
-        os.makedirs(rootDir, 0700)
+        util.mkdirChain(rootDir, 0700)
 	recp.doInstall(ourBuildDir, rootDir)
 
 	pkgSet = recp.packages(rootDir)

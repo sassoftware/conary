@@ -13,13 +13,13 @@ import update
 import commit
 import srscfg
 import cook
+import util
 
 cfg = srscfg.SrsConfiguration()
 
 fileDB = cfg.reppath + "/files"
 pkgDB = cfg.reppath + "/pkgs"
-os.makedirs(fileDB)
-os.makedirs(pkgDB)
+util.mkdirChain(fileDB, pkgDB)
 
 def usage():
     print "usage: srs import <file.rpm>"

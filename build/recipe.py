@@ -4,6 +4,7 @@
 #
 import imp, sys, types
 import os
+import util
 
 class RecipeLoader(types.DictionaryType):
     def __init__(self, file):
@@ -40,7 +41,7 @@ class Recipe:
 	return self.name + "-" + self.version
 
     def unpackSources(self, srcdir, builddir):
-	os.makedirs(builddir)
+	util.mkdirChain(builddir)
 	for file in self.tarballs:
 	    os.system("tar -C %s -xvzf %s" % (builddir, srcdir + "/" + file))
 

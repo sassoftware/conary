@@ -6,6 +6,7 @@ import os
 import versioned
 import string
 import types
+import util
 
 # this is the repositories idea of a package
 class Package:
@@ -59,7 +60,7 @@ class PackageFromFile(Package):
 # this is a set of all of the versions of a single packages 
 class PackageSet:
     def write(self):
-	os.makedirs(os.path.split(self.pkgPath)[0])
+	util.mkdirChain(os.path.split(self.pkgPath)[0])
 	f = versioned.open(self.pkgPath, "w")
 	for (version, package) in self.packages.items():
 	    f.createVersion(version)
