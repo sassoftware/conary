@@ -153,10 +153,10 @@ class DBTroveFiles:
     def iterFilesWithTag(self, tag):
 	cu = self.db.cursor()
 	cu.execute("""
-	    SELECT path FROM 
-		Tags JOIN DBFileTags ON Tags.tagId = DBFileTags.tagId
-		     JOIN DBTroveFiles ON DBFileTags.streamId = 
-						    DBTroveFiles.streamId
+	    SELECT path FROM Tags
+                INNER JOIN DBFileTags ON Tags.tagId = DBFileTags.tagId
+                INNER JOIN DBTroveFiles ON
+                    DBFileTags.streamId = DBTroveFiles.streamId
 		WHERE tag=? ORDER BY DBTroveFiles.path
 	""", tag)
 
@@ -307,7 +307,7 @@ class DBInstanceTable:
     def getVersion(self, instanceId):
         cu = self.db.cursor()
         cu.execute("""SELECT version, timeStamps FROM DBInstances
-		      JOIN Versions ON 
+		      INNER JOIN Versions ON 
 			    DBInstances.versionId = Versions.versionId
 		      WHERE instanceId=?""", instanceId)
 	try:
@@ -441,7 +441,7 @@ class Database:
 
         if withFlavors:
             flavorCol = "flavor"
-            flavorClause = """JOIN DBFlavors ON
+            flavorClause = """INNER JOIN DBFlavors ON
                             DBFlavors.flavorId = DBInstances.flavorId"""
         else:
             flavorCol = "NULL"
@@ -477,11 +477,12 @@ class Database:
             outD[name] = d
             for key in d:
                 d[key] = []
-            cu.execute("""SELECT version, timeStamps, flavor FROM DBInstances
-                              NATURAL JOIN Versions
-                              JOIN DBFlavors
-                                  ON DBInstances.flavorid = DBFlavors.flavorid
-                          WHERE troveName=? AND isPresent=1""", name)
+            cu.execute("""
+                SELECT version, timeStamps, flavor FROM DBInstances
+                    NATURAL JOIN Versions
+                    INNER JOIN DBFlavors
+                        ON DBInstances.flavorid = DBFlavors.flavorid
+                WHERE troveName=? AND isPresent=1""", name)
             for (match, timeStamps, flavor) in cu:
                 ts = [float(x) for x in timeStamps.split(':')]
                 version = versions.VersionFromString(match, timeStamps=ts)
@@ -620,10 +621,10 @@ class Database:
 
     def findFileVersion(self, fileId):
         cu = self.db.cursor()
-        cu.execute("""SELECT stream FROM
-                            DBTroveFiles JOIN Versions ON
-                                DBTroveFiles.versionId == Versions.versionId
-                            WHERE fileId == ?""", fileId)
+        cu.execute("""SELECT stream FROM DBTroveFiles
+                          INNER JOIN Versions ON
+                              DBTroveFiles.versionId == Versions.versionId
+                      WHERE fileId == ?""", fileId)
                             
         for (stream,) in cu:
             return files.ThawFile(stream, None)
@@ -644,7 +645,7 @@ class Database:
 
 	cu.execute("""
 	    SELECT DISTINCT row, stream FROM getFilesTbl 
-                JOIN DBTroveFiles ON
+                INNER JOIN DBTroveFiles ON
 		    getFilesTbl.fileId = DBTroveFiles.fileId
 	""")
 
@@ -688,9 +689,9 @@ class Database:
                        start_transaction = False)
 
         cu.execute("""SELECT idx, DBInstances.instanceId FROM getTrovesTbl 
-                        JOIN Versions ON
+                        INNER JOIN Versions ON
                             Versions.version == getTrovesTbl.troveVersion
-                        JOIN DBInstances ON
+                        INNER JOIN DBInstances ON
                             getTrovesTbl.troveName == DBInstances.troveName AND
                             getTrovesTbl.flavorId == DBInstances.flavorId AND
                             DBInstances.versionId == Versions.versionId
@@ -750,7 +751,7 @@ class Database:
 	cu = self.db.cursor()
 	cu.execute("""
 	    SELECT troveName, versionId, timeStamps, DBFlavors.flavorId, flavor FROM 
-		TroveTroves JOIN DBInstances JOIN DBFlavors ON 
+		TroveTroves INNER JOIN DBInstances INNER JOIN DBFlavors ON 
 		    TroveTroves.includedId = DBInstances.instanceId AND
 		    DBFlavors.flavorId = DBInstances.flavorId 
 		WHERE TroveTroves.instanceId = ?

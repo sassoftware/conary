@@ -335,21 +335,21 @@ class DependencyTables:
                               %(class)s AS class,
                               %(name)s AS name,
                               %(flag)s AS flag
-                         FROM %(requires)s JOIN %(provides)s ON
+                         FROM %(requires)s INNER JOIN %(provides)s ON
                               %(requires)s.depId = %(provides)s.depId
 """ % substTable
 
             if providesLabel:
                 subselect += """\
-                           JOIN Instances ON
+                           INNER JOIN Instances ON
                               %(provides)s.instanceId = Instances.instanceId
-                           JOIN Nodes ON
+                           INNER JOIN Nodes ON
                               Instances.itemId = Nodes.itemId AND
                               Instances.versionId = Nodes.versionId
-                           JOIN LabelMap ON
+                           INNER JOIN LabelMap ON
                               LabelMap.itemId = Nodes.itemId AND
                               LabelMap.branchId = Nodes.branchId
-                           JOIN Labels ON
+                           INNER JOIN Labels ON
                               Labels.labelId = LabelMap.labelId
 """ % substTable
 
@@ -368,7 +368,7 @@ class DependencyTables:
                        Matched.provInstId as provInstanceId
                     FROM (
 %s                       ) AS Matched
-                    JOIN DepCheck ON
+                    INNER JOIN DepCheck ON
                         Matched.reqInstId == DepCheck.troveId AND
                         Matched.class == DepCheck.class AND
                         Matched.name == DepCheck.name AND
@@ -422,11 +422,11 @@ class DependencyTables:
 
             cu.execute("""
                     SELECT DISTINCT troveName, class, name, flag FROM 
-                        BrokenDeps JOIN Requires ON 
+                        BrokenDeps INNER JOIN Requires ON 
                             BrokenDeps.depNum = Requires.DepNum
-                        JOIN Dependencies ON
+                        INNER JOIN Dependencies ON
                             Requires.depId = Dependencies.depId
-                        JOIN DBInstances ON
+                        INNER JOIN DBInstances ON
                             Requires.instanceId = DBInstances.instanceId
                 """, start_transaction = False)
 
@@ -499,13 +499,13 @@ class DependencyTables:
 
             cu.execute("""INSERT INTO RemovedTroveIds 
                             SELECT instanceId FROM
-                                RemovedTroves JOIN Versions ON
+                                RemovedTroves INNER JOIN Versions ON
                                 RemovedTroves.version = Versions.version
-                            JOIN DBFlavors ON
+                            INNER JOIN DBFlavors ON
                                 RemovedTroves.flavor = DBFlavors.flavor OR
                                 (RemovedTroves.flavor is NULL AND
                                  DBFlavors.flavor is NULL)
-                            JOIN DBInstances ON
+                            INNER JOIN DBInstances ON
                                 DBInstances.troveName = RemovedTroves.name AND
                                 DBInstances.versionId = Versions.versionId AND
                                 DBInstances.flavorId  = DBFlavors.flavorId""",
@@ -523,9 +523,9 @@ class DependencyTables:
                 INSERT INTO TmpRequires SELECT 
                     DISTINCT Requires.instanceId, Requires.depId, 
                              Requires.depNum, Requires.depCount
-                FROM RemovedTroveIds JOIN Provides ON
+                FROM RemovedTroveIds INNER JOIN Provides ON
                     RemovedTroveIds.troveId == Provides.instanceId
-                JOIN Requires ON
+                INNER JOIN Requires ON
                     Provides.depId = Requires.depId
         """, start_transaction = False)
 
@@ -534,11 +534,11 @@ class DependencyTables:
                     Requires.instanceId, Requires.depNum,
                     Requires.DepCount, 0, Dependencies.class,
                     Dependencies.name, Dependencies.flag
-                FROM RemovedTroveIds JOIN Provides ON
+                FROM RemovedTroveIds INNER JOIN Provides ON
                     RemovedTroveIds.troveId == Provides.instanceId
-                JOIN Requires ON
+                INNER JOIN Requires ON
                     Provides.depId = Requires.depId
-                JOIN Dependencies ON
+                INNER JOIN Dependencies ON
                     Dependencies.depId == Requires.depId
         """, start_transaction = False)
 
@@ -657,15 +657,15 @@ class DependencyTables:
         full = """SELECT depNum, Items.item, Versions.version, 
                          Nodes.timeStamps, flavor FROM 
                         (%s)
-                      JOIN Instances ON
+                      INNER JOIN Instances ON
                         provInstanceId == Instances.instanceId
-                      JOIN Items ON
+                      INNER JOIN Items ON
                         Instances.itemId == Items.itemId
-                      JOIN Versions ON
+                      INNER JOIN Versions ON
                         Instances.versionId == Versions.versionId
-                      JOIN Flavors ON
+                      INNER JOIN Flavors ON
                         Instances.flavorId == Flavors.flavorId
-                      JOIN Nodes ON
+                      INNER JOIN Nodes ON
                         Instances.itemId == Nodes.itemId AND
                         Instances.versionId == Nodes.versionId
                       ORDER BY

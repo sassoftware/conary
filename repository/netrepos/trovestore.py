@@ -37,7 +37,7 @@ class LocalRepVersionTable(versiontable.VersionTable):
     def getId(self, theId, itemId):
         cu = self.db.cursor()
         cu.execute("""SELECT version, timeStamps FROM Versions
-		      JOIN Nodes ON Versions.versionId = Nodes.versionId
+		      INNER JOIN Nodes ON Versions.versionId = Nodes.versionId
 		      WHERE Versions.versionId=? AND Nodes.itemId=?""", 
 		   theId, itemId)
 	try:
@@ -158,11 +158,11 @@ class TroveStore:
 				WHERE item=?)
 		    AND branchId=(SELECT branchId FROM Branches
 				WHERE branch=?)
-		) JOIN Latest ON 
+		) INNER JOIN Latest ON 
 		    AitemId=Latest.itemId AND AbranchId=Latest.branchId
-		JOIN Nodes ON
+		INNER JOIN Nodes ON
 		    AitemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
-		JOIN Versions ON
+		INNER JOIN Versions ON
 		    Nodes.versionId = versions.versionId
                 ORDER BY
                     Nodes.finalTimeStamp
@@ -203,12 +203,12 @@ class TroveStore:
 			versions.versionId AS aVersionId,
 			Items.item AS aItem,
 			fullVersion FROM
-		    itf JOIN Items ON itf.item = Items.item
-			JOIN versions ON itf.version = versions.version)
-		JOIN instances ON
+		    itf INNER JOIN Items ON itf.item = Items.item
+			INNER JOIN versions ON itf.version = versions.version)
+		INNER JOIN instances ON
 		    aItemId = instances.itemId AND
 		    aVersionId = instances.versionId
-		JOIN flavors ON
+		INNER JOIN flavors ON
 		    instances.flavorId = flavors.flavorId
 		ORDER BY aItem, fullVersion
 	""")
@@ -298,7 +298,7 @@ class TroveStore:
 
 	flavors = {}
 	cu.execute("""SELECT Flavors.flavor, Flavors.flavorId FROM
-			NeededFlavors JOIN Flavors ON
+			NeededFlavors INNER JOIN Flavors ON
 			NeededFlavors.flavor = Flavors.flavor""")
 	for (flavorStr, flavorId) in cu:
 	    flavors[flavorIndex[flavorStr]] = flavorId
@@ -340,7 +340,7 @@ class TroveStore:
                        troveFlavorId)
             cu.execute("""INSERT INTO Latest 
                             SELECT ?, ?, ?, Instances.versionId 
-                                FROM Instances JOIN Nodes ON
+                                FROM Instances INNER JOIN Nodes ON
                                     Instances.itemId = Nodes.itemId AND
                                     Instances.versionId = Nodes.versionId
                                 WHERE 
@@ -371,7 +371,7 @@ class TroveStore:
             INSERT OR REPLACE INTO FileStreams 
                 SELECT FileStreams.streamId, FileStreams.fileId, 
                        NewFiles.stream
-                FROM NewFiles JOIN FileStreams ON
+                FROM NewFiles INNER JOIN FileStreams ON
                     NewFiles.fileId = FileStreams.FileId
                 WHERE
                     FileStreams.stream IS NULL
@@ -383,7 +383,7 @@ class TroveStore:
 					  NewFiles.versionId,
 					  NewFiles.pathId,
 					  NewFiles.path
-		FROM NewFiles JOIN FileStreams ON
+		FROM NewFiles INNER JOIN FileStreams ON
                     NewFiles.fileId == FileStreams.fileId
                     """, troveInstanceId)
         cu.execute("DROP TABLE NewFiles")
@@ -540,7 +540,7 @@ class TroveStore:
                              instances.isRedirect, ChangeLogs.name, 
 			     ChangeLogs.contact,
 			     ChangeLogs.message FROM
-		      Instances JOIN Nodes ON 
+		      Instances INNER JOIN Nodes ON 
 		             Instances.itemId=Nodes.itemId AND
 			     Instances.versionId=Nodes.versionId
 		        LEFT OUTER JOIN ChangeLogs ON
@@ -674,7 +674,7 @@ class TroveStore:
 	    lookup[cu.lastrowid] = (pathId, fileId)
 
 	cu.execute("""
-	    SELECT rowId, stream FROM getFilesTbl JOIN FileStreams ON
+	    SELECT rowId, stream FROM getFilesTbl INNER JOIN FileStreams ON
 		    getFilesTbl.fileId = FileStreams.fileId 
 	""")
 

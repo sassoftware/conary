@@ -48,7 +48,8 @@ def getTroveInfo(db, instanceId):
     "return troveName, version, and flavor for a given db's instanceId"
     cu = db.db.cursor()
     cu.execute('SELECT troveName, flavor FROM DBInstances '
-               '  JOIN DBFlavors on DBInstances.flavorId = DBFlavors.flavorId '
+               '    INNER JOIN DBFlavors '
+               '        ON DBInstances.flavorId = DBFlavors.flavorId '
                'WHERE instanceId=?', (instanceId))
     troveName, frozenFlavor = cu.next()
     flavor = deps.deps.ThawDependencySet(frozenFlavor)

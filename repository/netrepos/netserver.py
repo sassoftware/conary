@@ -283,7 +283,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             cu.execute("CREATE INDEX gtblIdx on gtvlTbl(item)", 
                        start_transaction = False)
             troveNameClause = """gtvlTbl 
-                    JOIN Items ON
+                    INNER JOIN Items ON
                         gtvlTbl.item = Items.item
             """
 
@@ -297,7 +297,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if withVersions:
             getList += [ 'Versions.version', 'timeStamps', 'Nodes.branchId',
                          'finalTimestamp' ]
-            versionClause = """JOIN versions ON
+            versionClause = """INNER JOIN versions ON
                         Nodes.versionId = versions.versionId
             """
         else:
@@ -306,34 +306,34 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         if versionType == self._GTL_VERSION_TYPE_LABEL:
             if singleVersionSpec:
-                labelClause = """JOIN Labels ON
+                labelClause = """INNER JOIN Labels ON
                             Labels.labelId = NodeLabelMap.labelId AND
                             Labels.label = '%s'
                 """ % singleVersionSpec
             else:
-                labelClause = """JOIN Labels ON
+                labelClause = """INNER JOIN Labels ON
                             Labels.labelId = NodeLabelMap.labelId AND
                             Labels.label = gtvlTbl.versionSpec
                 """
         elif versionType == self._GTL_VERSION_TYPE_BRANCH:
             if singleVersionSpec:
-                labelClause = """JOIN Branches ON
+                labelClause = """INNER JOIN Branches ON
                             Branches.branchId = NodeLabelMap.branchId AND
                             Branches.branch = '%s'
                 """ % singleVersionSpec
             else:
-                labelClause = """JOIN Branches ON
+                labelClause = """INNER JOIN Branches ON
                             Branches.branchId = NodeLabelMap.branchId AND
                             Branches.branch = gtvlTbl.versionSpec
                 """
         elif versionType == self._GTL_VERSION_TYPE_VERSION:
             if singleVersionSpec:
-                labelClause = """JOIN Versions AS VrsnFilter ON
+                labelClause = """INNER JOIN Versions AS VrsnFilter ON
                             VrsnFilter.versionId = Instances.versionId AND
                             VrsnFilter.version = '%s'
                 """ % singleVersionSpec
             else:
-                labelClause = """JOIN Versions AS VrsnFilter ON
+                labelClause = """INNER JOIN Versions AS VrsnFilter ON
                             VrsnFilter.versionId = Instances.versionId AND
                             VrsnFilter.version = gtvlTbl.versionSpec
                 """
@@ -346,9 +346,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # that a bit?
         if latestFilter != self._GET_TROVE_ALL_VERSIONS:
             assert(withVersions)
-            instanceClause = """JOIN Latest ON
+            instanceClause = """INNER JOIN Latest ON
                         Latest.itemId = Items.itemId
-                    JOIN Instances ON
+                    INNER JOIN Instances ON
                         Instances.itemId = Items.itemId 
                       AND
                         Instances.versionId = Latest.versionId
@@ -356,14 +356,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         Instances.flavorId = Latest.flavorId
             """
         else:
-            instanceClause = """JOIN Instances ON 
+            instanceClause = """INNER JOIN Instances ON 
                         Instances.itemId = Items.itemId
             """
 
         if withFlavors:
             assert(withVersions)
             getList.append("InstFlavor.flavor")
-            flavorClause = """JOIN Flavors AS InstFlavor ON
+            flavorClause = """INNER JOIN Flavors AS InstFlavor ON
                         InstFlavor.flavorId = Instances.flavorId
             """
         else:
@@ -422,10 +422,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     FROM
                     %s
                     %s
-                    JOIN Nodes ON
+                    INNER JOIN Nodes ON
                         Nodes.itemId = Instances.itemId AND
                         Nodes.versionId = Instances.versionId
-                    JOIN LabelMap AS NodeLabelMap ON
+                    INNER JOIN LabelMap AS NodeLabelMap ON
                         NodeLabelMap.branchId = Nodes.branchId AND
                         NodeLabelMap.itemId = Nodes.itemId
                     LEFT OUTER JOIN UserPermissions ON
@@ -1038,12 +1038,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             SELECT DISTINCT pathId, path FROM
                 TroveInfo JOIN Instances ON
                     TroveInfo.instanceId == Instances.instanceId
-                JOIN Nodes ON
+                INNER JOIN Nodes ON
                     Instances.itemId == Nodes.itemId AND
                     Instances.versionId == Nodes.versionId
-                JOIN Branches ON
+                INNER JOIN Branches ON
                     Nodes.branchId = Branches.branchId
-                JOIN TroveFiles ON
+                INNER JOIN TroveFiles ON
                     Instances.instanceId = TroveFiles.instanceId
                 WHERE
                     TroveInfo.infoType = ? AND

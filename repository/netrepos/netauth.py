@@ -30,9 +30,9 @@ class NetworkAuthorization:
         stmt = """
             SELECT item, salt, password FROM
                (SELECT * FROM Users WHERE user=?) AS Users
-            JOIN UserGroupMembers ON
+            INNER JOIN UserGroupMembers ON
                 UserGroupMembers.userId = Users.userId
-            JOIN Permissions ON 
+            INNER JOIN Permissions ON 
                 UserGroupMembers.userGroupId = Permissions.userGroupId
             LEFT OUTER JOIN Items ON 
                 Permissions.itemId = Items.itemId
@@ -224,7 +224,7 @@ class NetworkAuthorization:
     def iterGroupsByUserId(self, userId):
         cu = self.db.cursor()
         cu.execute("""SELECT UserGroups.userGroupId, UserGroups.userGroup
-                      FROM UserGroups JOIN UserGroupMembers ON
+                      FROM UserGroups INNER JOIN UserGroupMembers ON
                       UserGroups.userGroupId = UserGroupMembers.userGroupId
                       WHERE UserGroupMembers.userId=?""", userId)
 
@@ -344,7 +344,7 @@ class NetworkAuthorization:
                          Permissions._ROWID_ as aclId
                       FROM Users JOIN UserGroupMembers ON
                           Users.userId = UserGroupMembers.userId
-                      JOIN Permissions ON
+                      INNER JOIN Permissions ON
                           UserGroupMembers.userGroupId = Permissions.userGroupId
                       LEFT OUTER JOIN Items AS PerItems ON
                           PerItems.itemId = Permissions.itemId
