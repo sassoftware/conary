@@ -23,6 +23,10 @@ div.formHeader {
     width: 16%;
 }
 
+div.warning {
+    color: red;
+}
+
 h2 {
     font-size: 150%;
     color: white;
@@ -120,6 +124,9 @@ Choose a branch: %s
     def htmlPageTitle(self, title=""):
         self.writeFn("""<h2>%s</h2>""" % title)
 
+    def htmlWarning(self, warning=""):
+        self.writeFn("""<div class="warning">%s</div>""" % warning)
+        
     # XXX this is just a placeholder for a real editor
     def htmlMetadataEditor(self, troveName, branch, metadata):
         branchStr = branch.asString().split("/")[-1]
@@ -137,7 +144,6 @@ Choose a branch: %s
         categories.sort()
 
         self.writeFn("""
-<h2>Metadata for %s</h2>
 <h4>Branch: %s</h4>
 <h4>Metadata revision: %s</h4>
 <form method="post" action="updateMetadata">
@@ -152,19 +158,19 @@ Choose a branch: %s
 <input type="hidden" name="branch" value="%s" />
 <input type="hidden" name="troveName" value="%s" />
 </form>
-
-""" %   (troveName, branchStr, versionStr,
-         metadata[MDClass.SHORT_DESC][0],
-         metadata[MDClass.LONG_DESC][0],
-         self.makeSelect(metadata[MDClass.URL], "urlList", size=4,
-                         expand="53%", multiple=True, onClick="setValue('urlList', 'newUrl')"),
-         self.makeSelectAppender("newUrl", "urlList"),
-         self.makeSelect(metadata[MDClass.LICENSE], "licenseList", size=4, expand="53%", multiple=True),
-         self.makeSelectAppenderList("newLicense", "licenseList", licenses),
-         self.makeSelect(metadata[MDClass.CATEGORY], "categoryList", size=4, expand="53%", multiple=True),
-         self.makeSelectAppenderList("newCategory", "categoryList", categories), 
-         branchFrz, troveName)
-         )
+"""     % (branchStr, versionStr,
+           metadata[MDClass.SHORT_DESC][0],
+           metadata[MDClass.LONG_DESC][0],
+           self.makeSelect(metadata[MDClass.URL], "urlList", size=4,
+                           expand="53%", multiple=True,
+                           onClick="setValue('urlList', 'newUrl')"),
+           self.makeSelectAppender("newUrl", "urlList"),
+           self.makeSelect(metadata[MDClass.LICENSE], "licenseList", size=4, expand="53%", multiple=True),
+           self.makeSelectAppenderList("newLicense", "licenseList", licenses),
+           self.makeSelect(metadata[MDClass.CATEGORY], "categoryList", size=4, expand="53%", multiple=True),
+           self.makeSelectAppenderList("newCategory", "categoryList", categories), 
+           branchFrz, troveName)
+          )
 
         self.writeFn("""
 <form method="post" action="getMetadata">
@@ -186,8 +192,8 @@ Choose a branch: %s
         s = """
 <input style="width: 40%%;" type="text" name="%s" id="%s" />
 <input style="width: 6%%;" type="button" onclick="javascript:append('%s', '%s');" value="Add" />
-<input style="width: 6%%;" type="button" onclick="javascript:removeSelected('%s');" value="Remove" />""" %\
-            (name, name, selectionName, name, selectionName)
+<input style="width: 6%%;" type="button" onclick="javascript:removeSelected('%s');" value="Remove" />
+"""     % (name, name, selectionName, name, selectionName)
         return s
 
     def makeSelectAppenderList(self, name, selectionName, items):
@@ -199,8 +205,7 @@ Choose a branch: %s
         s += """
 <input style="width: 6%%;" type="button" onclick="javascript:append('%s', '%s');" value="Add" />
 <input style="width: 6%%;" type="button" onclick="javascript:removeSelected('%s');" value="Remove" />
-""" %\
-            (selectionName, inputId, selectionName)
+"""     % (selectionName, inputId, selectionName)
         return s
 
     def makeSelect(self, items, name, default=None, size=1, expand=False, multiple=False, onClick=""):

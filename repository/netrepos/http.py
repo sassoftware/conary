@@ -14,6 +14,7 @@
 import urllib
 import urlparse
 import xml.dom.minidom
+import xml.parsers.expat
 from fmtroves import TroveCategories, LicenseCategories
 from htmlengine import HtmlEngine
 from metadata import MDClass
@@ -89,8 +90,13 @@ class HttpHandler(HtmlEngine):
     def _getMetadata(self, troveName, branch, source=None):
         branch = self.repServer.thawVersion(branch)
 
+        self.htmlPageTitle("Metadata for %s" % troveName)
         if source == "freshmeat":
-            metadata = self.fetchFreshmeat(troveName[:-7])
+            try:
+                metadata = self.fetchFreshmeat(troveName[:-7])
+            except xml.parsers.expat.ExpatError:
+                metadata = None
+                self.htmlWarning("No Freshmeat record found.")
         else:
             metadata = self.troveStore.getMetadata(troveName, branch)
 
