@@ -27,8 +27,8 @@ else:
     fullPath = os.getcwd()
 
 sys.path.append(os.path.dirname(fullPath))
-from filecontainer import FileContainer
-import sha1helper
+from repository.filecontainer import FileContainer
+from lib import sha1helper
 
 f = open(sys.argv[1], "r")
 c = FileContainer(f)
