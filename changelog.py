@@ -43,7 +43,7 @@ class AbstractChangeLog(streams.TupleStream):
 	return self.items[2].value()
 
     def setMessage(self, value):
-	assert(value[-1] == '\n')
+	assert(not value or value[-1] == '\n')
 	return self.items[2].set(value)
 
     def freeze(self):
