@@ -13,6 +13,7 @@ import stat
 import string
 import sys
 import traceback
+import weakref
 
 # build.py and policy.py need some common definitions
 
@@ -368,3 +369,11 @@ def assertIteratorAtEnd(iter):
     except StopIteration:
 	return True
 
+class ObjectCache(weakref.WeakKeyDictionary):
+    """
+    Implements a cache of arbitrary (hashable objects) where an object
+    can be looked up and have it's cached value retrieved. This allows
+    a single copy of immutable objects to be kept in memory.
+    """
+    def __setitem__(self, key, value):
+	weakref.WeakKeyDictionary.__setitem__(self, key, weakref.ref(value))
