@@ -108,27 +108,6 @@ class ManualConfigure(Configure):
                 '%%(mkObjdir)s '
 	        '%(preConfigure)s %%(configure)s %(args)s')
 
-class GNUConfigure(Configure):
-    template = (
-	'cd %%(builddir)s; '
-	'%%(mkObjdir)s '
-	'CFLAGS=%%(cflags)s CXXFLAGS=%%(cflags)s'
-	' %(preConfigure)s %%(configure)s'
-	# XXX host/build/target here
-	' --prefix=%%(prefix)s'
-	' --exec-prefix=%%(exec_prefix)s'
-	' --bindir=%%(bindir)s'
-	' --sbindir=%%(sbindir)s'
-	' --sysconfdir=%%(sysconfdir)s'
-	' --datadir=%%(datadir)s'
-	' --includedir=%%(includedir)s'
-	' --libdir=%%(libdir)s'
-	' --libexecdir=%%(libexecdir)s'
-	' --localstatedir=%%(localstatedir)s'
-	' --sharedstatedir=%%(sharedstatedir)s'
-	' --mandir=%%(mandir)s'
-	' --infodir=%%(infodir)s'
-	'  %(args)s')
 
 class Make(ShellCommand):
     template = ('cd %%(builddir)s; '
