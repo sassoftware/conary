@@ -98,14 +98,14 @@ bootstrap:
 		echo "/opt isn't writable, this won't work"; \
 		exit 1; \
 	fi
-	time python2.3 ./srs-bootstrap --bootstrap
+	time python2.3 ./srs-bootstrap --bootstrap group-bootstrap
 
 bootstrap-continue:
 	@if ! [ -d /opt/ -a -w /opt/ ]; then \
 		echo "/opt isn't writable, this won't work"; \
 		exit 1; \
 	fi
-	time python2.3 ./srs-bootstrap --bootstrap --onlyunbuilt
+	time python2.3 ./srs-bootstrap --bootstrap --onlyunbuilt group-bootstrap
 
 
 deps.dot:
