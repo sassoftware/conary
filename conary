@@ -115,7 +115,7 @@ elif (otherArgs[1] == "changeset"):
     changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
 elif (otherArgs[1] == "commit"):
     for changeSet in otherArgs[2:]:
-	commit.commitChangeSet(repos, cfg, changeSet)
+	commit.doCommit(repos, cfg, changeSet)
 elif (otherArgs[1] == "cook"):
     prep = 0
     if argSet.has_key('prep'):
