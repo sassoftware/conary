@@ -4,10 +4,18 @@
 # temporary override
 #repPath=http://conary:conary@lambchop/distro/
 
+if [ $0 = "chanagemail" ]; then
+    CONARY=../conary
+else
+    CONARY=$(echo $0 | sed 's|/[^/]*$||')/../conary
+fi
+
 usage ()
 {
-    (echo "Usage: $0 --reppath <repPath> --trove <trove> --version <version>"
-     echo "       $0 --reppath <repPath> <trove> <version>"
+    (echo "Usage: changemail --reppath <repPath> --trove <trove> --version <version> "
+     echo "                 --email <email>"
+     echo "       changemail --reppath <repPath> <trove> <version> <email>"
+     echo "(using command $CONARY)"
      #echo "default repPath: ${repPath}"
     ) 1>&2
     exit 1
@@ -29,6 +37,11 @@ while [ $# -gt 0 ] ; do
 	    trove=$1
 	    shift
 	    ;;
+	--email)
+	    shift
+	    email=$1
+	    shift
+	    ;;
 	--version)
 	    shift
 	    version=$1
@@ -39,6 +52,8 @@ while [ $# -gt 0 ] ; do
 		trove=$1
 	    elif [ -z "$version" ] ; then
 		version=$1
+	    elif [ -z "$email" ] ; then
+		email=$1
 	    else
 		usage
 	    fi
@@ -52,5 +67,5 @@ if [ -z "$repPath" ]; then
     exit 1
 fi
 
-conary src rdiff --reppath $repPath $trove -1 $version | \
-    mail -s "$trove $version" distro-commits@lambchop.rdu.specifixinc.com
+$CONARY src rdiff --reppath $repPath $trove -1 $version | \
+    mail -s "$trove $version" $email
