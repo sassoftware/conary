@@ -41,14 +41,24 @@ the component that now contains \fI/foo/blah\fP instead of
 \fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
 as a new file.)
 .TP
-.B changeset \fIpkg [oldver] newver outfile\fP
-Creates an absolute changeset for \fIpkg newver\fP, or a relative
-changeset between \fIpkg oldver\fP and \fIpkg newver\fP, and stores
+.B changeset \fIpkgname [oldver] newver outfile\fP
+Creates an absolute changeset for \fIpkgname newver\fP, or a relative
+changeset between \fIpkgname oldver\fP and \fIpkgname newver\fP, and stores
 it in outfile.
 .TP
-.B localcs
+.B localcs \fIpkgname outfile\fP
+Creates a local changeset, which represents the changes made on the
+local system to \fIpkgname\fP, relative to the package as it is
+represented in the repository.
 .TP
 .B localcommit
+Applies a local changeset to the local system.  This is exactly
+equivalent to making every change represented in the changeset
+by hand on the local system, the locally-installed versions still
+reference the repository as their source, future updates will still
+come from the repository, and the changes represented in the local
+changeset will be preserved as if they had been made by hand
+locally.
 .TP
 .B rblist
 Lists available rollbacks.
@@ -59,25 +69,106 @@ of Conary.)
 .TP
 .B replist \fIpkgname [version]\fP
 Lists troves in the repository.
+.\"
+.\"
+.\"
 .SS "Building Components and Packages"
 .TP 4
 .B branch \fInewbranch branchfrom [trove]\fP
+Creates a new branch in the repository, relative to branch
+\fIbranchfrom\fP.  If \fItrove\fP is listed, create the
+branch only for that trove.
 .TP
-.B cook \fI[\fP--prep\fI] [\fP--macros file\fI] file.recipe\fP
+.B cook \fI[\fP--prep\fI] [\fP--macros file\fI] <file>\fP.recipe|\fI<component>...\fP
+Build a package.  If \fB--prep\fP is specified, the souce code is
+unpacked, but is not built. if \fB--macros\fP is specified, it
+names a file containing macro definitions to apply to the recipe
+macro set.  If the thing to be cooked ends in \fB.recipe\fP, then
+it must be a recipe file and the package will be cooked from the
+filesystem.  Otherwise, it must name a repository component and
+the package will be cooked from the repository.
 .TP
 .B commit \fIchangeset\fP
+Commits a changeset to the repository.  This is not a reversible
+operation, so take care.
 .TP
 .B conary source \fIsubcommand\fP
-Actions on source directories, \fIexcept for \fBcook\fR, are
-subcommands on \fBconary source\fP.  (The exception is because
-conary can cook directly from the repository; cooking is not
-done only on a checked-out source directory.)
+Actions on source components, \fIexcept for \fBcook\fR, are
+subcommands on \fBconary source\fP, which can be abbreviated
+as \fBconary src\fP.  (The exception for \fBcook\fP is because
+conary can cook directly from the repository as well as from
+a checked-out source directory.)
+.IP
+A source component is checked out into a \fBsource directory\fP
+with the \fBcheckout\fP subcommand, or a source component and
+source directory are created with the \fBnewpkg\fP subcommand.
+Then the contents of the source directory are modified with other
+subcommands, and the changes to the source component are then
+committed to the repository with the \fBcommit\fP subcommand.
+Only the \fBcommit\fP subcommand modifies the repository; the
+rest of the commands either query the repository for information
+about a source package or schedule a change to be applied to the
+repository by the next \fBcommit\fP subcommand.
+.IP
+The default branch on which each of these commands operates
+is specified by the \fBbuildLabel\fP configuration entry
+(see below).
+.IP
+\fIsubcommands\fP include:
 .RS
 .TP 4
 .B add \fIfile...\fP
+Adds all the files listed on the command line to the source
+component.
 .TP
-checkout ...
+.B checkout [--dir \fI<dir>\fP] \fI<trove>\fP [\fI<version>\fP]
+Check the \fI<trove>\fB:source\fR component out of the repository
+and put it in directory \fI<dir>\fP if specified, and directory
+\fI<trove>\fP otherwise.  Fetches the most recent version
+specified by \fBbuildLabel\fP unless \fI<version>\fP is specified.
+.TP
+.B commit [--message \fI<message>\fP]
+Different from \fBconary commit\fP, \fBconary source commit\fP
+commits all the changes in the source directory to the repository. 
+It will ask for a changelog message unless one is passed on the
+command line with \fB--message\fP.
+.TP
+.B diff
+Show (in a slightly extended unified diff format) the changes that
+have been made in the current source directory since the last
+\fBconary source commit\fP
+(or, if no commit, since the source component was checked out).
+.TP
+.B log [\fI<branch>\fP]
+Prints the log messages for the branch specified by \fBbuildLabel\fP,
+or for \fI<branch>\fP if specified.
+.TP
+.B newpkg \fI<name>\fP
+Creates a new package.  This modifies the repository, and is
+irreversable, so use this command with care.
+.TP
+.B rdiff \fI<name> <oldver> <newver>\fP
+This source command operates only on the repository, not on a
+source directory.  It creates a diff between two versions of
+a source trove from the repository.
+.TP
+.B remove \fI<filename>...\fP
+Unlike \(lq\fBcvs remove\fP\(rq, \fBconary source remove\fP both removes
+the file from the filesystem and marks it to be removed from the next
+version checked into the repository at the next \fBconary source commit\fP.
+.TP
+.B rename \fI<oldname> <newname>\fP
+Renames the file \fI<oldname>\fP to \fI<newname>\fP on the filesystem,
+and marks it to be removed from the repository at the next
+\fBconary source commit\fP.
+.TP
+.B update [\fI<version>\fP]
+Updates the current source directory to the latest version, or to
+\fI<version>\fP if specified.  Merges changes when possible.
 .RE
+.\"
+.\"
+.\"
 .SH JARGON
 Conary introduces new concepts and makes new distinctions.
 .TP 4
@@ -157,6 +248,14 @@ A \fBchangeset\fP is a representation of the changes between two versions
 (an \fBabsolute changeset\fP).  Changesets are used internally as the
 main form of communication between the Conary client and the repository,
 and can also live independently as files.
+.\"
+.\"
+.\"
+.SH EXAMPLES
+Coming soon to a man page near you!
+.\"
+.\"
+.\"
 .SH FILES
 .\" do not put excess space in the file list
 .PD 0
@@ -224,8 +323,14 @@ Original file contents of configuration files Conary tracks.
 .I /var/lib/conarydb/rollbacks
 Changeset files representing rollbacks (listed via \fBconary
 rblist\fP).
+.\"
+.\"
+.\"
 .SH BUGS
 There are no bugs, only undocumented features.
+.\"
+.\"
+.\"
 .SH "SEE ALSO"
 http://www.specifixinc.com/
 .\" need URL to intro paper on web site?
