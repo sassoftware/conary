@@ -276,18 +276,18 @@ class SetModes(_FileAction):
     """
     def __init__(self, path, mode, use=None):
 	self.mode = mode
-	if type(path) is string:
+	if type(path) is str:
 	    path = (path,)
 	self.paths = path
-	self.use = use
+	self.use = util.checkUse(use)
 
     def do(self, macros):
 	files = []
 	for path in self.paths:
 	    files.extend(util.braceExpand(path %macros))
-	for file in files:
-	    print '+ changing mode for %s to %o' %(file, self.mode)
-	    self.chmod(macros['destdir'], file)
+	for f in files:
+	    print '+ changing mode for %s to %o' %(f, self.mode)
+	    self.chmod(macros['destdir'], f)
 
 class _PutFiles(_FileAction):
     def do(self, macros):
