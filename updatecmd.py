@@ -132,8 +132,7 @@ def parseTroveSpec(specStr, defaultFlavor):
     if specStr.find("=") >= 0:
         l = specStr.split("=")
         if len(l) != 2:
-            log.error("too many ='s in %s", pkgStr)
-            return 1
+            raise TroveSpecError, "too many ='s in %s" %specStr
         name, versionSpec = l
     else:
         name = specStr
