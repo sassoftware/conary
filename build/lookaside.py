@@ -67,11 +67,21 @@ def searchAll(cfg, name, location, srcdirs):
     if f: return f
 
     if name.startswith("http://") or name.startswith("ftp://"):
-	try:
-	    url = urllib2.urlopen(name)
-	except urllib2.URLError:
-	    createNegativeCacheEntry(cfg, name[5:], location)
-	    return None
+        retrys = 0
+        url = None
+        while retrys < 5:
+            try:
+                url = urllib2.urlopen(name)
+                break
+            except IOError, msg:
+                print 'Error retreiving', name + '.', msg, ' Retrying in 10 seconds.'
+                time.sleep(10)
+                retrys += 1
+            except urllib2.URLError:
+                createNegativeCacheEntry(cfg, name[5:], location)
+                return None
+        if url is None:
+            return None
 	return createCacheEntry(cfg, name[5:], location, url)
 
     return None
