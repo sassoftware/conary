@@ -3,7 +3,6 @@
 # All rights reserved
 #
 import changeset
-import commit
 import os
 import sys
 import util
@@ -39,7 +38,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 		newVersion = repos.pkgLatestVersion(pkgName, cfg.defaultbranch)
 	    elif not repos.hasPackageVersion(pkgName, newVersion):
 		sys.stderr.write("package %s does not contain version %s\n" %
-				     (pkgName, version.asString()))
+				     (pkgName, newVersion.asString()))
 		bail = 1
 	    else:
 		if db.hasPackage(pkgName):
