@@ -20,7 +20,7 @@ class VersionTable:
         tables = [ x[0] for x in cu ]
         if 'Versions' not in tables:
             cu.execute("CREATE TABLE Versions(versionId INTEGER PRIMARY KEY,"
-		       "version str UNIQUE)")
+		       "version STR UNIQUE)")
 	    cu.execute("INSERT INTO Versions VALUES (%d, NULL)", 
 			self.noVersion)
 
