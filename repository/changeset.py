@@ -11,6 +11,9 @@ import os
 
 class ChangeSet:
 
+    def isAbstract(self):
+	return self.abstract
+
     def validate(self):
 	for pkg in self.getPackageList():
 	    # if this is abstract, we can't have any removed or changed files
@@ -46,6 +49,8 @@ class ChangeSet:
     
     def addPackage(self, pkg):
 	self.packages.append(pkg)
+	if not pkg.getOldVersion():
+	    self.abstract = 1
 
     def getPackageList(self):
 	return self.packages
@@ -102,6 +107,8 @@ class ChangeSet:
 	    raise
 
     def invert(self, repos):
+	assert(not self.abstract)
+
 	inversion = ChangeSetFromRepository(repos)
 
 	for pkgCs in self.getPackageList():
@@ -123,18 +130,18 @@ class ChangeSet:
 		inversion.addFileContents(origFile.sha1())
 
 	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
-		(path, newVersion) = pkg.getFile(fileId)
-		invertedPkg.changedFile(fileId, path, version)
+		(curPath, curVersion) = pkg.getFile(fileId)
+		invertedPkg.changedFile(fileId, curPath, curVersion)
 
-		(oldVersion, ver, csInfo) = pkgCs.getFile(fileId)
-		assert(oldVersion.equal(ver))
+		(oldVersion, newVersion, csInfo) = self.getFile(fileId)
+		assert(curVersion.equal(oldVersion))
 
 		origFile = repos.getFileVersion(fileId, oldVersion)
 		newFile = repos.getFileVersion(fileId, oldVersion)
-		file.setVersion(newVersion)
-		file.applyChange(csInfo)
+		newFile.applyChange(csInfo)
 
-		inversion.addFile(fileId, newVersion, oldVersion, old.diff(new))
+		inversion.addFile(fileId, newVersion, oldVersion, 
+				  origFile.diff(newFile))
 
 		if origFile.sha1() != newFile.sha1():
 		    inversion.addFileContents(origFile.sha1())
@@ -148,6 +155,7 @@ class ChangeSet:
 	self.packages = []
 	self.files = {}
 	self.fileContents = []
+	self.abstract = 0
 
 class ChangeSetFromFilesystem(ChangeSet):
 
