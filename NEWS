@@ -6,6 +6,8 @@ Changes in 0.50.5:
     conary config > <file> will result in a valid configuration file.
   * Updating groups didn't work when the group referenced troves as new
     which were already installed on the system
+  * r.ComponentSpec('somecomponent', '.*') will no longer override the
+    file specifications for packaging :debuginfo and :test components.
 
 Changes in 0.50.4:
   * Most rollback information is stored as a reference to a repository

@@ -352,12 +352,16 @@ class ComponentSpec(_filterSpec):
     is C{runtime} by default but can be changed with the C{catchall=}
     argument.
     """
-    baseFilters = (
-	# automatic subpackage names and sets of regexps that define them
-	# cannot be a dictionary because it is ordered; first match wins
+    invariantFilters = (
+        # These must never be overridden; keeping this separate allows for
+        # r.ComponentSpec('runtime', '.*')
 	('test',      ('%(testdir)s/')),
 	('debuginfo', ('%(debugsrcdir)s/',
 		       '%(debuglibdir)s/')),
+    )
+    baseFilters = (
+	# automatic subpackage names and sets of regexps that define them
+	# cannot be a dictionary because it is ordered; first match wins
 	('runtime',   ('%(datadir)s/gnome/help/.*/C/')), # help menu stuff
         # python is potentially architecture-specific because of %(lib)
 	('python',    ('/usr/(%(lib)s|lib)/python.*/site-packages/')),
@@ -396,9 +400,10 @@ class ComponentSpec(_filterSpec):
 	self.macros = recipe.macros
 	self.rootdir = self.rootdir % recipe.macros
 
-	# the extras need to come first in order to override decisions
-	# in the base subfilters
-	for (filteritem) in self.extraFilters + list(self.baseFilters):
+        # The extras need to come before base in order to override decisions
+        # in the base subfilters; invariants come first for those very few
+        # specs that absolutely should not be overridden in recipes.
+        for filteritem in list(self.invariantFilters) + self.extraFilters + list(self.baseFilters):
             main = ''
 	    name = filteritem[0] % self.macros
             if ':' in name:
