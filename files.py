@@ -31,9 +31,16 @@ import util
 from deps import filedeps, deps
 
 _FILE_FLAG_CONFIG = 1 << 0
+# the following three are a legacy from before tag handlers, kept because they
+# describe entries in the main repository...  If we run out, we can
+# touch up our main repository (the only one that has any references to
+# these flag values) to use the corresponding tags and then reuse these
+# values.
 _FILE_FLAG_INITSCRIPT = 1 << 1
 _FILE_FLAG_SHLIB = 1 << 2
-_FILE_FLAG_GCONFSCHEMA = 1<< 3
+_FILE_FLAG_GCONFSCHEMA = 1 << 3
+# transient contents that may have modified contents overwritten
+_FILE_FLAG_TRANSIENT = 1 << 4
 
 class DeviceStream(streams.TupleStream):
 
@@ -184,13 +191,19 @@ class FlagsStream(streams.IntStream):
     def isConfig(self, set = None):
 	return self._isFlag(_FILE_FLAG_CONFIG, set)
 
+    def isTransient(self, set = None):
+	return self._isFlag(_FILE_FLAG_TRANSIENT, set)
+
     def isInitScript(self, set = None):
+	'legacy, not used for new packages'
 	return self._isFlag(_FILE_FLAG_INITSCRIPT, set)
 
     def isShLib(self, set = None):
+	'legacy, not used for new packages'
 	return self._isFlag(_FILE_FLAG_SHLIB, set)
 
     def isGconfSchema(self, set = None):
+	'legacy, not used for new packages'
 	return self._isFlag(_FILE_FLAG_GCONFSCHEMA, set)
 
     def _isFlag(self, flag, set):

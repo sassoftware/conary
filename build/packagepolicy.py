@@ -317,7 +317,7 @@ class Config(policy.Policy):
         @keyword inclusions: regexp(s) specifying files to be included.
         Do not mention files in /etc, which are already covered by the
         EtcConfig class.
-        @type inclusions: None, regexp string, sequence of regexp strings.
+        @type inclusions: None, filter expression, sequence of filter expressions.
         """
         policy.Policy.__init__(self, *args, **keywords)
         
@@ -350,6 +350,23 @@ class Config(policy.Policy):
 	    for configFilter in self.configFilters:
 		if configFilter.match(file):
 		    _markConfig(self.recipe, file, fullpath)
+
+
+class Transient(policy.Policy):
+    """
+    Mark files that have transient contents as such.  Transient contents
+    are contents that should be overwritten by a new version without
+    question at update time; almost the opposite of configuration files.
+    """
+    invariantinclusions = [
+	r'..*\.py(c|o)$',
+    ]
+
+    def doFile(self, file):
+	fullpath = ('%(destdir)s/'+file) %self.macros
+	if os.path.isfile(fullpath) and util.isregular(fullpath):
+	    log.debug('transient: %s', file)
+	    self.recipe.autopkg.pathMap[file].flags.isConfig(True)
 
 
 class SharedLibrary(policy.Policy):
@@ -827,6 +844,7 @@ def DefaultPolicy():
 	PackageSpec(),
 	EtcConfig(),
 	Config(),
+	Transient(),
 	SharedLibrary(),
 	TagDescription(),
 	TagSpec(),
