@@ -165,7 +165,8 @@ class TroveStore:
 	cu.execute("CREATE TEMPORARY TABLE itlblb(troveName str)", 
 		   start_transaction = False)
 	for name in troveNameList:
-	    cu.execute("INSERT INTO itlblb VALUES (%s)", name)
+	    cu.execute("INSERT INTO itlblb VALUES (%s)", name,
+		       start_transaction = False)
 
 	cu.execute("""
 		SELECT Items.item, Versions.version, Nodes.timeStamps FROM
@@ -195,7 +196,7 @@ class TroveStore:
 	    else:
 		d[troveName] = [ v ]
 
-	cu.execute("DROP TABLE itlblb")
+	cu.execute("DROP TABLE itlblb", start_transaction = False)
 
 	return d
 
