@@ -690,7 +690,7 @@ class ReadOnlyChangeSet(ChangeSet):
 	    assert(not troveCs.getOldVersion())
 
 	    key = (troveName, newVersion, newFlavor)
-	    if not troveMap.has_key(key):
+	    if troveMap is not None and not troveMap.has_key(key):
 		log.warning("package %s %s is already installed -- skipping",
 			    troveName, newVersion.asString())
 		continue
