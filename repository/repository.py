@@ -239,7 +239,12 @@ class LocalRepository(Repository):
         flags = os.O_RDONLY
         if mode != 'r':
             flags |= os.O_CREAT | os.O_RDWR
-	self.lockfd = os.open(self.top + '/lock', flags)
+        try:
+            self.lockfd = os.open(self.top + '/lock', flags)
+        except OSError, e:
+            raise RepositoryError('Unable to open lock file %s for %s: %s' % (
+                self.top + '/lock', mode == 'r' and 'read' or 'read/write',
+                e.strerror))
 
         try:
             if mode == 'r':
