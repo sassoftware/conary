@@ -49,7 +49,7 @@ class SrsConfiguration:
 	if self.defaultbranch:
 	    self.defaultbranch = versions.VersionFromString(self.defaultbranch)
 	else:
-	    self.defaultbranch = versions.VersionFromString("/localhost/local")
+	    self.defaultbranch = versions.VersionFromString("/localhost@local")
 
 	if self.defaultbranch.isVersion():
 	    sys.stderr.write("The configured default branch %s specifies " +
