@@ -54,7 +54,8 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
     try:
         (cs, depFailures, suggMap) = \
             client.updateChangeSet(applyList, recurse = recurse,
-                                   resolveDeps = depCheck)
+                                   resolveDeps = depCheck,
+                                   keepExisting = keepExisting)
 
         if depFailures:
             print "The following dependencies could not be resolved:"

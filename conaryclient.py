@@ -212,7 +212,7 @@ class ConaryClient:
 
         return finalCs
 
-    def updateChangeSet(self, itemList, keepExisting = None, 
+    def updateChangeSet(self, itemList, keepExisting = False,
                         recurse = True, resolveDeps = True):
         finalCs = self._updateChangeSet(itemList, keepExisting = keepExisting)
 
