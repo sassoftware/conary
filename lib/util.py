@@ -61,9 +61,12 @@ def excepthook(type, value, tb):
     print string.joinfields(lines, "")
     pdb.post_mortem(tb)
 
-def execute(cmd):
+def execute(cmd, destDir=None):
     print '+', cmd
-    rc = os.system(cmd)
+    if destDir:
+	rc = os.system('cd %s; %s' %(destDir, cmd))
+    else:
+	rc = os.system(cmd)
     if rc:
 	if not os.WIFEXITED(rc):
 	    info = 'Shell command "%s" killed with signal %d' \
