@@ -185,39 +185,39 @@ class TroveStore:
 	    CREATE TEMPORARY TABLE itf(item STRING, version STRING,
 				      fullVersion STRING)
 	""", start_transaction = False)
+        try:
+            for troveName in troveDict.keys():
+                outD[troveName] = {}
+                for version in troveDict[troveName]:
+                    outD[troveName][version] = []
+                    versionStr = version.asString()
+                    vMap[versionStr] = version
+                    cu.execute("""
+                        INSERT INTO itf VALUES (?, ?, ?)
+                    """, 
+                    (troveName, versionStr, versionStr), start_transaction = False)
 
-	for troveName in troveDict.keys():
-            outD[troveName] = {}
-	    for version in troveDict[troveName]:
-                outD[troveName][version] = []
-		versionStr = version.asString()
-		vMap[versionStr] = version
-		cu.execute("""
-		    INSERT INTO itf VALUES (?, ?, ?)
-		""", 
-		(troveName, versionStr, versionStr), start_transaction = False)
+            cu.execute("""
+                SELECT aItem, fullVersion, Flavors.flavor FROM
+                    (SELECT Items.itemId AS aItemId, 
+                            versions.versionId AS aVersionId,
+                            Items.item AS aItem,
+                            fullVersion FROM
+                        itf INNER JOIN Items ON itf.item = Items.item
+                            INNER JOIN versions ON itf.version = versions.version)
+                    INNER JOIN instances ON
+                        aItemId = instances.itemId AND
+                        aVersionId = instances.versionId
+                    INNER JOIN flavors ON
+                        instances.flavorId = flavors.flavorId
+                    ORDER BY aItem, fullVersion
+            """)
 
-	cu.execute("""
-	    SELECT aItem, fullVersion, Flavors.flavor FROM
-		(SELECT Items.itemId AS aItemId, 
-			versions.versionId AS aVersionId,
-			Items.item AS aItem,
-			fullVersion FROM
-		    itf INNER JOIN Items ON itf.item = Items.item
-			INNER JOIN versions ON itf.version = versions.version)
-		INNER JOIN instances ON
-		    aItemId = instances.itemId AND
-		    aVersionId = instances.versionId
-		INNER JOIN flavors ON
-		    instances.flavorId = flavors.flavorId
-		ORDER BY aItem, fullVersion
-	""")
-
-	for (item, verString, flavor) in cu:
-	    ver = vMap[verString]
-	    outD[item][ver].append(flavor)
-
-	cu.execute("DROP TABLE itf", start_transaction = False)
+            for (item, verString, flavor) in cu:
+                ver = vMap[verString]
+                outD[item][ver].append(flavor)
+        finally:
+            cu.execute("DROP TABLE itf", start_transaction = False)
 
 	return outD
 
