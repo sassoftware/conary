@@ -191,7 +191,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
     nextVersion = helper.nextVersion(repos, fullName, recipeClass.version, 
 				     None, buildBranch, binary = True)
 
-    grp = package.Package(fullName, newVersion, None)
+    grp = package.Package(fullName, nextVersion, None)
 
     d = {}
     for (name, versionList) in recipeObj.getTroveList().iteritems():
