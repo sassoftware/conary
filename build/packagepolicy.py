@@ -113,10 +113,16 @@ class ComponentSpec(_filterSpec):
 class PackageSpec(_filterSpec):
     """
     FIXME
-    @keyword compFilters: reserved for C{ComponentSpec} to pass information
-    needed by C{PackageSpec}.
     """
     keywords = { 'compFilters': None }
+
+    def __init__(self, *args, **keywords):
+        """
+        @keyword compFilters: reserved for C{ComponentSpec} to pass information
+        needed by C{PackageSpec}.
+        """
+        _filterSpec.__init__(self, *args, **keywords)
+        
 
     def doProcess(self, recipe):
 	pkgFilters = []
