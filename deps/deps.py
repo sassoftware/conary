@@ -135,17 +135,6 @@ class Dependency(BaseDependency):
 	    for flags in flags:
 		self.flags[flags] = True
 
-def ThawDependency(frozen):
-    l = frozen.split(":")
-    flags = []
-    if len(l) > 1:
-        flags = l[1].split(',')
-    d = Dependency(l[0], flags)
-    if not dependencyCache.has_key(d):
-	dependencyCache[d] = d
-
-    return dependencyCache[d]
-
 class DependencyClass:
 
     def addDep(self, dep):
@@ -190,6 +179,18 @@ class DependencyClass:
     def getDeps(self):
         for name, dep in self.members.iteritems():
             yield dep
+
+    def thawDependency(frozen):
+        l = frozen.split(":")
+        flags = []
+        if len(l) > 1:
+            flags = l[1].split(',')
+        d = Dependency(l[0], flags)
+        if not dependencyCache.has_key(d):
+            dependencyCache[d] = d
+
+        return dependencyCache[d]
+    thawDependency = staticmethod(thawDependency)
 
     def __hash__(self):
 	val = self.tag
@@ -268,6 +269,15 @@ class TroveDependencies(DependencyClass):
     exactMatch = True
     justOne = False
     depClass = Dependency
+
+    def thawDependency(frozen):
+        d = Dependency(frozen, [])
+        if not dependencyCache.has_key(d):
+            dependencyCache[d] = d
+
+        return dependencyCache[d]
+    thawDependency = staticmethod(thawDependency)
+
 _registerDepClass(TroveDependencies)
 
 class UseDependency(DependencyClass):
@@ -365,7 +375,8 @@ def ThawDependencySet(frz):
             continue
         tag, frozen = line.split('#', 1)
         tag = int(tag)
-        depSet.addDep(dependencyClasses[tag], ThawDependency(frozen))
+        depClass = dependencyClasses[tag]
+        depSet.addDep(depClass, depClass.thawDependency(frozen))
     return depSet
 
 dependencyCache = util.ObjectCache()
