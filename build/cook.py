@@ -178,7 +178,7 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch, 
 		      macros=()):
     """
-    Turns a group recipe object into a change set. Returns the abstract
+    Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
     and None (for compatibility with cookPackageObject).
 
@@ -206,7 +206,7 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     for (name, versionList) in includedSet.iteritems():
 	grp.addPackage(name, versionList)
 
-    grpDiff = grp.diff(None, abstract = 1)[0]
+    grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet = changeset.ChangeSet()
     changeSet.newPackage(grpDiff)
 
@@ -216,7 +216,7 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
 def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch, 
 		      macros=()):
     """
-    Turns a fileset recipe object into a change set. Returns the abstract
+    Turns a fileset recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
     and None (for compatibility with cookPackageObject).
 
@@ -253,7 +253,7 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
 				    fileObj.contents.size()),
 			fileObj.flags.isConfig())
 
-    filesetDiff = fileset.diff(None, abstract = 1)[0]
+    filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newPackage(filesetDiff)
 
     built = [ (fileset.getName(), fileset.getVersion().asString()) ]
@@ -262,7 +262,7 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
 def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch, 
 		      prep=True, macros=()):
     """
-    Turns a package recipe object into a change set. Returns the abstract
+    Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
     and a tuple with a function to call and its arguments, which should
     be called when the build root for the package can be safely removed
@@ -362,7 +362,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     changeSet = changeset.CreateFromFilesystem(packageList)
     changeSet.addPrimaryPackage(grpName, newVersion)
 
-    grpDiff = grp.diff(None, abstract = 1)[0]
+    grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet.newPackage(grpDiff)
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))

@@ -31,15 +31,15 @@ class FileInfo(files.TupleStream):
 
 class ChangeSet:
 
-    def isAbstract(self):
-	return self.abstract
+    def isAbsolute(self):
+	return self.absolute
 
     def isLocal(self):
 	return self.local
 
     def validate(self, justContentsForConfig = 0):
 	for pkg in self.iterNewPackageList():
-	    # if this is abstract, we can't have any removed or changed files
+	    # if this is absolute, we can't have any removed or changed files
 	    if not pkg.getOldVersion():
 		assert(not pkg.getChangedFileList())
 		assert(not pkg.getOldFileList())
@@ -84,8 +84,8 @@ class ChangeSet:
 
 	self.newPackages[(csPkg.getName(), csPkg.getNewVersion())] = csPkg
 
-	if csPkg.isAbstract():
-	    self.abstract = 1
+	if csPkg.isAbsolute():
+	    self.absolute = 1
 	if (old and old.isLocal()) or new.isLocal():
 	    self.local = 1
 
@@ -247,7 +247,7 @@ class ChangeSet:
     # if availableFiles is set, this includes the contents that it can
     # find, but doesn't worry about files which it can't find
     def makeRollback(self, db, configFiles = 0):
-	assert(not self.abstract)
+	assert(not self.absolute)
 
 	rollback = ChangeSetFromRepository(db)
 
@@ -480,7 +480,7 @@ class ChangeSet:
 	self.earlyFileContents = {}
 	self.lateFileContents = {}
 	self.primaryPackageList = []
-	self.abstract = 0
+	self.absolute = 0
 	self.local = 0
 
 class ChangeSetFromRepository(ChangeSet):
@@ -496,7 +496,7 @@ class ChangeSetFromRepository(ChangeSet):
 	self.repos = repos
 	ChangeSet.__init__(self)
 
-class ChangeSetFromAbstractChangeSet(ChangeSet):
+class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 
     def __init__(self, absCS):
 	self.absCS = absCS
@@ -620,7 +620,7 @@ def fileChangeSet(fileId, old, new):
 		  and new.contents.sha1() != old.contents.sha1():
 	    hash = new.contents.sha1()
     else:
-	# different classes; these are always written as abstract changes
+	# different classes; these are always written as absolute changes
 	old = None
 	diff = new.freeze()
 	if isinstance(new, files.RegularFile):
@@ -643,7 +643,7 @@ def fileContentsDiff(oldFile, oldCont, newFile, newCont):
 
     return (contType, cont)
 
-# this creates an abstract changeset
+# this creates an absolute changeset
 #
 # expects a list of (pkg, fileMap) tuples
 #
@@ -652,7 +652,7 @@ def CreateFromFilesystem(pkgList):
 
     for (pkg, fileMap) in pkgList:
         version = pkg.getVersion()
-	(pkgChgSet, filesNeeded, pkgsNeeded) = pkg.diff(None, abstract = 1)
+	(pkgChgSet, filesNeeded, pkgsNeeded) = pkg.diff(None, absolute = 1)
 	cs.newPackage(pkgChgSet)
 
 	for (fileId, oldVersion, newVersion, path) in filesNeeded:

@@ -29,7 +29,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
         else:
 	    cs.remapPaths(map)
 
-            if cs.isAbstract():
+            if cs.isAbsolute():
                 cs = db.rootChangeSet(cs, cfg.defaultbranch)
 
 	    list = [ x.getName() for x  in cs.iterNewPackageList() ]

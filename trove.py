@@ -216,24 +216,24 @@ class Package:
 		    self.delPackageVersion(name, version, 
 					   missingOkay = redundantOkay)
 
-    def diff(self, them, abstract = 0):
+    def diff(self, them, absolute = 0):
 	"""
 	Generates a change set between them (considered the old version) and
 	this instance. We return the change set, a list of other package diffs
 	which should be included for this change set to be complete, and a list
 	of file change sets which need to be included.  The list of package
-	changes is of the form (pkgName, oldVersion, newVersion).  If abstract
-	is True, oldVersion is always None and abstract diffs can be used.
-	Otherwise, abstract versions are not necessary, and oldVersion of None
+	changes is of the form (pkgName, oldVersion, newVersion).  If absolute
+	is True, oldVersion is always None and absolute diffs can be used.
+	Otherwise, absolute versions are not necessary, and oldVersion of None
 	means the package is new. The list of file changes is a list of
 	(fileId, oldVersion, newVersion, newPath) tuples, where newPath is the
 	path to the file in this package.
 
 	@param them: object to generate a change set from (may be None)
 	@type them: Group
-	@param abstract: tells if this is a new group or an abstract change
+	@param absolute: tells if this is a new group or an absolute change
 	when them is None
-	@type abstract: boolean
+	@type absolute: boolean
 	@rtype: (ChangeSetGroup, packageChangeList, fileChangeList)
 	"""
 
@@ -246,7 +246,7 @@ class Package:
 	else:
 	    themMap = {}
 	    chgSet = PackageChangeSet(self.name, None, self.getVersion(),
-				      abstract = abstract)
+				      absolute = absolute)
 
 	removedIds = []
 	addedIds = []
@@ -316,7 +316,7 @@ class Package:
 
 	pkgList = []
 
-	if abstract:
+	if absolute:
 	    for name in added.keys():
 		for version in added[name]:
 		    pkgList.append((name, None, version))
@@ -386,8 +386,8 @@ class PackageChangeSet:
     ChangeSet. 
     """
 
-    def isAbstract(self):
-	return self.abstract
+    def isAbsolute(self):
+	return self.absolute
 
     def newFile(self, fileId, path, version):
 	self.newFiles.append((fileId, path, version))
@@ -476,8 +476,8 @@ class PackageChangeSet:
     def formatToFile(self, changeSet, cfg, f):
 	f.write("%s " % self.name)
 
-	if self.isAbstract():
-	    f.write("abstract ")
+	if self.isAbsolute():
+	    f.write("absolute ")
 	elif self.oldVersion:
 	    f.write("from %s to " % self.oldVersion.asString(cfg.defaultbranch))
 	else:
@@ -577,7 +577,7 @@ class PackageChangeSet:
         rc = "".join(rc)
 	mainLineCount = rc.count("\n")
 
-	if self.abstract:
+	if self.absolute:
 	    hdr = "ABS %s %s\n" % \
 		      (self.name, self.newVersion.freeze())
 	elif not self.oldVersion:
@@ -590,14 +590,14 @@ class PackageChangeSet:
 
 	return hdr + rc
 
-    def __init__(self, name, oldVersion, newVersion, abstract = 0):
+    def __init__(self, name, oldVersion, newVersion, absolute = 0):
 	self.name = name
 	self.oldVersion = oldVersion
 	self.newVersion = newVersion
 	self.newFiles = []
 	self.oldFiles = []
 	self.changedFiles = []
-	self.abstract = abstract
+	self.absolute = absolute
 	self.packages = {}
 
 class ThawPackageChangeSet(PackageChangeSet):
@@ -659,7 +659,7 @@ class ThawPackageChangeSet(PackageChangeSet):
 	newVersion = versions.ThawVersion(l[rest])
 
 	PackageChangeSet.__init__(self, pkgName, oldVersion, newVersion,
-			          abstract = (pkgType == "ABS"))
+			          absolute = (pkgType == "ABS"))
 
 	for line in lines:
 	    self.parse(line)

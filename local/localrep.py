@@ -59,7 +59,7 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
     def __init__(self, repos, cs):
-	assert(not cs.isAbstract())
+	assert(not cs.isAbsolute())
 	fsrepos.ChangeSetJob.__init__(self, repos, cs)
 
 	# remove old versions of the packages which are being added
@@ -74,8 +74,8 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 	    oldVersion = csPkg.getOldVersion()
 
 	    if not oldVersion:
-		# we know this isn't an abstract change set (since this
-		# class can't handle abstract change sets, and asserts
+		# we know this isn't an absolute change set (since this
+		# class can't handle absolute change sets, and asserts
 		# the away at the top of __init__() ), so this must be
 		# a new package. no need to erase any old stuff then!
 		continue

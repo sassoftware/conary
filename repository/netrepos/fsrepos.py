@@ -134,7 +134,7 @@ class FilesystemRepository(AbstractRepository):
 		# the file doesn't have any contents, so it must exist
 		# in the data store already; we still need to increment
 		# the reference count for it
-		self.contentsStore.addFileReference(file.sha1())
+		self.contentsStore.addFileReference(file.contents.sha1())
 
 	    return 1
 	
@@ -268,16 +268,16 @@ class FilesystemRepository(AbstractRepository):
 
     def createChangeSet(self, packageList):
 	"""
-	packageList is a list of (pkgName, oldVersion, newVersion, abstract) 
+	packageList is a list of (pkgName, oldVersion, newVersion, absolute) 
 	tuples. 
 
-	if oldVersion == None and abstract == 0, then the package is assumed
+	if oldVersion == None and absolute == 0, then the package is assumed
 	to be new for the purposes of the change set
 
 	if newVersion == None then the package is being removed
 	"""
 	cs = changeset.ChangeSetFromRepository(self)
-	for (name, v1, v2, abstract) in packageList:
+	for (name, v1, v2, absolute) in packageList:
 	    cs.addPrimaryPackage(name, v2)
 
 	dupFilter = {}
@@ -286,7 +286,7 @@ class FilesystemRepository(AbstractRepository):
 	# this loop
 	packageCounter = 0
 	while packageCounter < len(packageList):
-	    (packageName, oldVersion, newVersion, abstract) = \
+	    (packageName, oldVersion, newVersion, absolute) = \
 		packageList[packageCounter]
 	    packageCounter += 1
 
@@ -320,7 +320,7 @@ class FilesystemRepository(AbstractRepository):
 		old = self.getPackageVersion(packageName, oldVersion)
 		cs.oldPackage(packageName, oldVersion)
 		for (name, version) in old.iterPackageList():
-		    packageList.append((name, version, None, abstract))
+		    packageList.append((name, version, None, absolute))
 		    
 		continue
 		    
@@ -332,10 +332,10 @@ class FilesystemRepository(AbstractRepository):
 		old = None
 
 	    (pkgChgSet, filesNeeded, pkgsNeeded) = \
-				new.diff(old, abstract = abstract)
+				new.diff(old, absolute = absolute)
 
 	    for (pkgName, old, new) in pkgsNeeded:
-		packageList.append((pkgName, old, new, abstract))
+		packageList.append((pkgName, old, new, absolute))
 
 	    cs.newPackage(pkgChgSet)
 

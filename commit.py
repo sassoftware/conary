@@ -10,9 +10,9 @@ import versions
 def doCommit(repos, changeSetFile, targetBranch):
     cs = changeset.ChangeSetFromFile(changeSetFile)
     if targetBranch:
-	if cs.isAbstract():
+	if cs.isAbsolute():
 	    # we can't do this -- where would we branch from?
-	    log.error("abstract change sets cannot be retargeted")
+	    log.error("absolute change sets cannot be retargeted")
 	    return
 	label = versions.BranchName(targetBranch)
 	cs.setTargetBranch(repos, label)

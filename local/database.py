@@ -67,23 +67,23 @@ class AbstractDatabase(repository.AbstractRepository):
 	return self.stash.getFileVersion(fileId, version, 
 					 withContents = withContents)
 
-    # takes an abstract change set and creates a differential change set 
+    # takes an absolute change set and creates a differential change set 
     # against a branch of the repository
     def rootChangeSet(self, absSet, branch):
-	assert(absSet.isAbstract())
+	assert(absSet.isAbsolute())
 
 	# this has an empty source path template, which is only used to
 	# construct the eraseFiles list anyway
 	
 	# we don't use stash.buildJob here as it can't deal with
-	# abstract change sets
+	# absolute change sets
 	job = fsrepos.ChangeSetJob(self.stash, absSet)
 
-	# abstract change sets cannot have eraseLists
+	# absolute change sets cannot have eraseLists
 	#assert(not eraseList)
 	#assert(not eraseFiles)
 
-	cs = changeset.ChangeSetFromAbstractChangeSet(absSet)
+	cs = changeset.ChangeSetFromAbsoluteChangeSet(absSet)
 
 	for (name, version) in absSet.getPrimaryPackageList():
 	    cs.addPrimaryPackage(name, version)
@@ -98,14 +98,14 @@ class AbstractDatabase(repository.AbstractRepository):
 	    oldVersion = self.stash.pkgLatestVersion(pkgName, branch)
 	    if not oldVersion:
 		# new package; the Package.diff() right after this never
-		# sets the abstract flag, so the right thing happens
+		# sets the absolute flag, so the right thing happens
 		old = None
 	    else:
 		old = self.stash.getPackageVersion(pkgName, oldVersion)
 
 	    # we ignore pkgsNeeded; it doesn't mean much in this case
 	    (pkgChgSet, filesNeeded, pkgsNeeded) =	    \
-		    newPkg.diff(old, abstract = 0)
+		    newPkg.diff(old, absolute = 0)
 	    cs.newPackage(pkgChgSet)
 
 	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
@@ -140,7 +140,7 @@ class AbstractDatabase(repository.AbstractRepository):
     # transaction
     def commitChangeSet(self, cs, isRollback = False, toStash = True,
                         replaceFiles = False):
-	assert(not cs.isAbstract())
+	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
             flags |= update.REPLACEFILES
