@@ -6,7 +6,6 @@
 # implements the SRS system repository
 
 import changeset
-import copy
 import datastore
 import fcntl
 import files
@@ -37,7 +36,7 @@ class Repository:
 		pkgSet = None
 
 	    if old:
-		newPkg = copy.deepcopy(pkgSet.getVersion(old))
+		newPkg = pkgSet.getVersion(old)
 		newPkg.changeVersion(newVersion)
 	    else:
 		newPkg = package.Package(csPkg.name, newVersion)
@@ -51,7 +50,7 @@ class Repository:
 	for (fileId, (oldVer, newVer, infoLine)) in cs.getFileList():
 	    if oldVer:
 		fileDB = self._getFileDB(fileId)
-		file = copy.deepcopy(fileDB.getVersion(oldVer))
+		file = fileDB.getVersion(oldVer)
 		file.applyChange(infoLine)
 		del fileDB
 	    else:
