@@ -5,17 +5,17 @@
 
 python_files = __init__.py	\
 	build.py		\
+	buildpackage.py		\
 	destdirpolicy.py	\
 	filter.py 		\
 	fixedglob.py		\
-	buildpackage.py		\
 	lookaside.py		\
+	macros.py		\
 	packagepolicy.py	\
 	policy.py		\
 	recipe.py		\
-	use.py			\
-	macros.py		\
-	sourcepy		\
+	source.py		\
+	use.py
 
 extra_dist = Makefile
 

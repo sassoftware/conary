@@ -6,9 +6,10 @@
 SUBDIRS=localrep
 
 python_files = __init__.py	\
+		changeset.py	\
 		filecontents.py	\
 		fsrepos.py	\
-		changeset.py	\
+		netclient.py 	\
 		repository.py	\
 
 extra_dist = Makefile
