@@ -36,15 +36,15 @@ class Flavors:
 
     def createFlavor(self, flavor):
 	cu = self.db.cursor()
-	cu.execute("INSERT INTO Flavors VALUES (NULL, %s)", flavor.freeze())
+	cu.execute("INSERT INTO Flavors VALUES (NULL, ?)", flavor.freeze())
 	flavorId = cu.lastrowid
 
 	for depClass in flavor.getDepClasses().itervalues():
 	    for dep in depClass.getDeps():
-		cu.execute("INSERT INTO FlavorMap VALUES (%d, %s, NULL)",
+		cu.execute("INSERT INTO FlavorMap VALUES (?, ?, NULL)",
 			   flavorId, dep.name)
 		for flag in dep.flags.iterkeys():
-		    cu.execute("INSERT INTO FlavorMap VALUES (%d, %s, %s)",
+		    cu.execute("INSERT INTO FlavorMap VALUES (?, ?, ?)",
 			       flavorId, dep.name, flag)
 
     def __getitem__(self, flavor):
@@ -60,7 +60,7 @@ class Flavors:
 	    return 0
 
 	cu = self.db.cursor()
-	cu.execute("SELECT flavorId FROM Flavors WHERE flavor = %s", 
+	cu.execute("SELECT flavorId FROM Flavors WHERE flavor = ?", 
 		   flavor.freeze())
 	item = cu.fetchone()
 	if item is None:
@@ -72,7 +72,7 @@ class Flavors:
 	    return None
 
 	cu = self.db.cursor()
-	cu.execute("SELECT flavor FROM Flavors WHERE flavorId = %d", 
+	cu.execute("SELECT flavor FROM Flavors WHERE flavorId = ?", 
 		   flavorId)
 	try:
 	    return deps.deps.ThawDependencySet(cu.next()[0])

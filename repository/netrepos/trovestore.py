@@ -36,7 +36,7 @@ class LocalRepVersionTable(versiontable.VersionTable):
         cu = self.db.cursor()
         cu.execute("""SELECT version, timeStamps FROM Versions
 		      JOIN Nodes ON Versions.versionId = Nodes.versionId
-		      WHERE Versions.versionId=%d AND Nodes.itemId=%s""", 
+		      WHERE Versions.versionId=? AND Nodes.itemId=?""", 
 		   theId, itemId)
 	try:
 	    (s, t) = cu.next()
@@ -49,9 +49,9 @@ class LocalRepVersionTable(versiontable.VersionTable):
         cu = self.db.cursor()
         cu.execute("""SELECT timeStamps FROM Nodes
 		      WHERE versionId=(
-			SELECT versionId from Versions WHERE version=%s
+			SELECT versionId from Versions WHERE version=?
 		      )
-		      AND itemId=%s""", version.asString(), itemId)
+		      AND itemId=?""", version.asString(), itemId)
 	try:
 	    (t,) = cu.next()
 	    return [ float(x) for x in t.split(":") ]
@@ -128,8 +128,8 @@ class TroveStore:
 	cu = self.db.cursor()
 	cu.execute("""
 	    SELECT timeStamps FROM Nodes WHERE
-		itemId=(SELECT itemId FROM Items WHERE item=%s) AND
-		versionId=(SELECT versionId FROM Versions WHERE version=%s)
+		itemId=(SELECT itemId FROM Items WHERE item=?) AND
+		versionId=(SELECT versionId FROM Versions WHERE version=?)
 	""", item, version.asString())
 
 	timeStamps = cu.fetchone()[0]
@@ -144,7 +144,7 @@ class TroveStore:
 	cu.execute("""
 	    SELECT version, Nodes.timeStamps FROM Items JOIN Nodes 
 		    ON Items.itemId = Nodes.itemId NATURAL
-		JOIN Versions WHERE item=%s""", troveName)
+		JOIN Versions WHERE item=?""", troveName)
 	for (versionStr, timeStamps) in cu:
 	    version = versions.VersionFromString(versionStr)
 	    version.setTimeStamps([float(x) for x in timeStamps.split(":")])
@@ -159,9 +159,9 @@ class TroveStore:
 	    SELECT version, timeStamps FROM 
 		(SELECT itemId AS AitemId, branchId as AbranchId FROM labelMap
 		    WHERE itemId=(SELECT itemId from Items 
-				WHERE item=%s)
+				WHERE item=?)
 		    AND branchId=(SELECT branchId FROM Branches
-				WHERE branch=%s)
+				WHERE branch=?)
 		) JOIN Latest ON 
 		    AitemId=Latest.itemId AND AbranchId=Latest.branchId
 		JOIN Nodes ON
@@ -181,7 +181,7 @@ class TroveStore:
 	cu.execute("CREATE TEMPORARY TABLE itlblb(troveName str)", 
 		   start_transaction = False)
 	for name in troveNameList:
-	    cu.execute("INSERT INTO itlblb VALUES (%s)", name,
+	    cu.execute("INSERT INTO itlblb VALUES (?)", name,
 		       start_transaction = False)
 
 	cu.execute("""
@@ -191,7 +191,7 @@ class TroveStore:
 		JOIN LabelMap
 		    ON Items.itemId = LabelMap.itemId
 		JOIN (SELECT labelId as aLabelId FROM Labels 
-				WHERE Labels.label=%s)
+				WHERE Labels.label=?)
 		    ON LabelMap.labelId = aLabelId
 		JOIN Latest ON 
 		    Items.itemId=Latest.itemId AND LabelMap.branchId=Latest.branchId
@@ -225,9 +225,9 @@ class TroveStore:
 	    SELECT Versions.version, Nodes.timeStamps FROM 
 		(SELECT itemId AS AitemId, branchId as AbranchId FROM labelMap
 		    WHERE itemId=(SELECT itemId from Items 
-				WHERE item=%s)
+				WHERE item=?)
 		    AND labelId=(SELECT labelId FROM Labels 
-				WHERE label=%s)
+				WHERE label=?)
 		) 
 		JOIN Latest ON 
 		    AitemId=Latest.itemId AND AbranchId=Latest.branchId
@@ -251,9 +251,9 @@ class TroveStore:
 	    SELECT Versions.version, Nodes.timeStamps FROM 
 		(SELECT itemId AS AitemId, branchId as AbranchId FROM labelMap
 		    WHERE itemId=(SELECT itemId from Items 
-				WHERE item=%s)
+				WHERE item=?)
 		    AND labelId=(SELECT labelId FROM Labels 
-				WHERE label=%s)
+				WHERE label=?)
 		) JOIN Nodes ON
 		    AitemId=Nodes.itemId AND Nodes.branchId=AbranchId 
 		JOIN Versions ON
@@ -284,7 +284,7 @@ class TroveStore:
 		versionStr = version.asString()
 		vMap[versionStr] = version
 		cu.execute("""
-		    INSERT INTO itf VALUES (%s, %s, %s)
+		    INSERT INTO itf VALUES (?, ?, ?)
 		""", 
 		(troveName, versionStr, versionStr), start_transaction = False)
 
@@ -368,7 +368,7 @@ class TroveStore:
 	cu.execute("CREATE TEMPORARY TABLE NeededFlavors(flavor STR)")
 	for flavor in flavorsNeeded.iterkeys():
 	    flavorIndex[flavor.freeze()] = flavor
-	    cu.execute("INSERT INTO NeededFlavors VALUES(%s)", 
+	    cu.execute("INSERT INTO NeededFlavors VALUES(?)", 
 		       flavor.freeze())
 	    
 	del flavorsNeeded
@@ -416,7 +416,7 @@ class TroveStore:
 		WHERE FileStreams.streamId is NULL
                 """)
         cu.execute("""
-	    INSERT INTO TroveFiles SELECT %d,
+	    INSERT INTO TroveFiles SELECT ?,
 					  FileStreams.streamId,
 					  NewFiles.path
 		FROM NewFiles JOIN FileStreams ON
@@ -468,8 +468,8 @@ class TroveStore:
 	cu.execute("""
 	    SELECT item, version FROM Items NATURAL JOIN Latest 
 				      NATURAL JOIN Versions
-		WHERE item in (%s)""" % 
-	    ",".join(["'%s'" % x for x in troveNameList]))
+		WHERE item in (?)""" % 
+	    ",".join(["'?'" % x for x in troveNameList]))
 
 	lastName = None
 	leafList = []
@@ -526,9 +526,9 @@ class TroveStore:
 			     Instances.versionId=Nodes.versionId
 		        LEFT OUTER JOIN ChangeLogs ON
 			     Nodes.nodeId = ChangeLogs.NodeId
-		      WHERE  Instances.itemId=%d AND
-			     Instances.versionId=%d AND
-			     Instances.flavorId=%d""",
+		      WHERE  Instances.itemId=? AND
+			     Instances.versionId=? AND
+			     Instances.flavorId=?""",
 		      troveNameId, troveVersionId, troveFlavorId)
 
 	result = cu.fetchone()
@@ -551,7 +551,7 @@ class TroveStore:
 
 	versionCache = {}
 	cu.execute("SELECT fileId, path, versionId FROM "
-		   "TroveFiles NATURAL JOIN FileStreams WHERE instanceId = %d", 
+		   "TroveFiles NATURAL JOIN FileStreams WHERE instanceId = ?", 
 		   troveInstanceId)
 	for (fileId, path, versionId) in cu:
 	    version = versionCache.get(versionId, None)
@@ -580,7 +580,7 @@ class TroveStore:
 
 	cu.execute("SELECT fileId, path, versionId, stream FROM "
 		   "TroveFiles NATURAL JOIN FileStreams "
-		   "WHERE instanceId = %%d %s" % sort, 
+		   "WHERE instanceId = ? ?" % sort, 
 		   troveInstanceId)
 
 	versionCache = {}
@@ -624,7 +624,7 @@ class TroveStore:
 		JOIN Nodes ON
 		    Nodes.itemId = instances.itemId AND
 		    Nodes.versionId = instances.versionId
-		WHERE item=%s AND version=%s""", troveName, parent.asString())
+		WHERE item=? AND version=?""", troveName, parent.asString())
 
 	    l = [ (brVersion.asString(), x[0], x[1]) for x in cu ]
 
@@ -637,8 +637,8 @@ class TroveStore:
 				        Nodes.versionId=Instances.versionId 
 		      JOIN Versions ON Instances.versionId=Versions.versionId
 		      JOIN Flavors ON Instances.flavorId = Flavors.flavorId
-	   WHERE Nodes.itemId=(SELECT itemId FROM Items WHERE item=%s)
-	     AND branchId=(SELECT branchId FROM Branches WHERE branch=%s)
+	   WHERE Nodes.itemId=(SELECT itemId FROM Items WHERE item=?)
+	     AND branchId=(SELECT branchId FROM Branches WHERE branch=?)
 	   ORDER BY finalTimeStamp
 	""", troveName, branch)
 
@@ -666,10 +666,10 @@ class TroveStore:
 
 	if fileObj:
 	    stream = sqlite3.encode(fileObj.freeze())
-	    cu.execute("INSERT INTO NewFiles VALUES(%s, %d, %s, %s)", 
+	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, ?, ?)", 
 		       (encodeFileId(fileId), versionId, stream, path))
 	else:
-	    cu.execute("INSERT INTO NewFiles VALUES(%s, %d, NULL, %s)", 
+	    cu.execute("INSERT INTO NewFiles VALUES(?, ?, NULL, ?)", 
 		       (encodeFileId(fileId), versionId, path))
 
     def getFile(self, fileId, fileVersion):
@@ -694,7 +694,7 @@ class TroveStore:
 		versionId = self.versionTable[fileVersion]
 		verCache[fileVersion] = versionId
 
-	    cu.execute("INSERT INTO getFilesTbl VALUES(NULL, %s, %d)",
+	    cu.execute("INSERT INTO getFilesTbl VALUES(NULL, ?, ?)",
 		       (encodeFileId(fileId), versionId), 
 		       start_transaction = False)
 	    lookup[cu.lastrowid] = (fileId, fileVersion)

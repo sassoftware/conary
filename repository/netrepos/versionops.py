@@ -19,7 +19,7 @@ class BranchTable(idtable.IdTable):
     def addId(self, branch, parentId):
         assert(branch.isBranch())
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Branches VALUES (NULL, %s, %d)", 
+        cu.execute("INSERT INTO Branches VALUES (NULL, ?, ?)", 
 		   branch.asString(), parentId)
 	return cu.lastrowid
 
@@ -165,7 +165,7 @@ class Nodes:
 
     def addRow(self, itemId, branchId, versionId, timeStamps):
         cu = self.db.cursor()
-	cu.execute("INSERT INTO Nodes VALUES (NULL, %d, %d, %d, %s, %.3f)",
+	cu.execute("INSERT INTO Nodes VALUES (NULL, ?, ?, ?, ?, %.3f)",
 		   itemId, branchId, versionId, 
 		   ":".join(["%.3f" % x for x in timeStamps]),
 		   timeStamps[-1],)
@@ -173,20 +173,20 @@ class Nodes:
 		    
     def hasItemId(self, itemId):
         cu = self.db.cursor()
-        cu.execute("SELECT itemId FROM Nodes WHERE itemId=%d",
+        cu.execute("SELECT itemId FROM Nodes WHERE itemId=?",
 		   itemId)
 	return not(cu.fetchone() == None)
 
     def hasRow(self, itemId, versionId):
         cu = self.db.cursor()
         cu.execute("SELECT itemId FROM Nodes "
-			"WHERE itemId=%d AND versionId=%d", itemId, versionId)
+			"WHERE itemId=? AND versionId=?", itemId, versionId)
 	return not(cu.fetchone() == None)
 
     def getRow(self, itemId, versionId, default):
         cu = self.db.cursor()
         cu.execute("SELECT itemId FROM Nodes "
-			"WHERE itemId=%d AND versionId=%d", itemId, versionId)
+			"WHERE itemId=? AND versionId=?", itemId, versionId)
 	nodeId = cu.fetchone()
 	if nodeId is None:
 	    return default
@@ -199,7 +199,7 @@ class SqlVersioning:
 	cu = self.db.cursor()
 	cu.execute("""
 	    SELECT versionId FROM Nodes WHERE
-		itemId=%d AND branchId=%d ORDER BY finalTimeStamp DESC
+		itemId=? AND branchId=? ORDER BY finalTimeStamp DESC
 	""", itemId, branchId)
 	
 	for (versionId,) in cu:

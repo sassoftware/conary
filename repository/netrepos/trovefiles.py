@@ -35,7 +35,7 @@ class TroveFiles:
         cu = self.db.cursor()
 	
         cu.execute("SELECT instanceId FROM TroveFiles "
-			    "WHERE instanceId=%d", (key,))
+			    "WHERE instanceId=?", (key,))
 		   
 	item = cu.fetchone()	
 	return item != None
@@ -43,17 +43,17 @@ class TroveFiles:
     def __getitem__(self, key):
 	cu = self.db.cursor()
 	cu.execute("SELECT streamId, path FROM TroveFiles "
-		   "WHERE instanceId=%s", (key,))
+		   "WHERE instanceId=?", (key,))
 	for match in cu:
 	    yield match
 
     def __delitem__(self, key):
         cu = self.db.cursor()
 	
-        cu.execute("DELETE from TroveFiles WHERE instanceId=%s", key)
+        cu.execute("DELETE from TroveFiles WHERE instanceId=?", key)
 
     def addItem(self, instanceId, streamId, path):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO TroveFiles VALUES (%d, %d, %s)",
+        cu.execute("INSERT INTO TroveFiles VALUES (?, ?, ?)",
                    (instanceId, streamId, path ))
 

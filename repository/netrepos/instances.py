@@ -44,19 +44,19 @@ class InstanceTable:
 	    isPresent = 0
 
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Instances VALUES (NULL, %d, %d, %d, %s)",
+        cu.execute("INSERT INTO Instances VALUES (NULL, ?, ?, ?, ?)",
                    (itemId, versionId, flavorId, isPresent))
 	return cu.lastrowid
 
     def delId(self, theId):
         assert(type(theId) is int)
         cu = self.db.cursor()
-        cu.execute("DELETE FROM Instances WHERE instanceId=%d", theId)
+        cu.execute("DELETE FROM Instances WHERE instanceId=?", theId)
 
     def getId(self, theId):
         cu = self.db.cursor()
         cu.execute("SELECT itemId, versionId, flavorId, isPresent "
-		   "FROM Instances WHERE instanceId=%d", theId)
+		   "FROM Instances WHERE instanceId=?", theId)
 	try:
 	    return cu.next()
 	except StopIteration:
@@ -65,7 +65,7 @@ class InstanceTable:
     def isPresent(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT isPresent FROM Instances WHERE "
-			"itemId=%d AND versionId=%d AND flavorId=%d", item)
+			"itemId=? AND versionId=? AND flavorId=?", item)
 
 	val = cu.fetchone()
 	if not val:
@@ -75,24 +75,24 @@ class InstanceTable:
 
     def setPresent(self, theId, val):
         cu = self.db.cursor()
-	cu.execute("UPDATE Instances SET isPresent=%d WHERE instanceId=%d",
+	cu.execute("UPDATE Instances SET isPresent=? WHERE instanceId=?",
                    (val, theId))
 
     def has_key(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM Instances WHERE "
-			"itemId=%d AND versionId=%d AND flavorId=%d", item)
+			"itemId=? AND versionId=? AND flavorId=?", item)
 	return not(cu.fetchone() == None)
 
     def __delitem__(self, item):
         cu = self.db.cursor()
         cu.execute("DELETE FROM Instances WHERE "
-			"itemId=%d AND versionId=%d AND flavorId=%d", item)
+			"itemId=? AND versionId=? AND flavorId=?", item)
 
     def __getitem__(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM Instances WHERE "
-			"itemId=%d AND versionId=%d AND flavorId=%d", item)
+			"itemId=? AND versionId=? AND flavorId=?", item)
 	try:
 	    return cu.next()[0]
 	except StopIteration:
@@ -101,7 +101,7 @@ class InstanceTable:
     def get(self, item, defValue):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM Instances WHERE "
-			"itemId=%d AND versionId=%d AND flavorId=%d", item)
+			"itemId=? AND versionId=? AND flavorId=?", item)
 	item = cu.fetchone()
 	if not item:
 	    return defValue
@@ -152,7 +152,7 @@ class FileStreams:
 	(fileId, versionId) = key
 	fileId = encodeFileId(fileId)
         cu = self.db.cursor()
-        cu.execute("INSERT INTO FileStreams VALUES (NULL, %s, %d, %d, %s)",
+        cu.execute("INSERT INTO FileStreams VALUES (NULL, ?, ?, ?, ?)",
                    (fileId, versionId, sqlite3.encode(stream)))
 	return cu.lastrowid
         
@@ -160,14 +160,14 @@ class FileStreams:
 	(fileId, versionId) = key
         cu = self.db.cursor()
         cu.execute("DELETE FROM FileStreams WHERE "
-			"fileId=%s and versionId=%d",
+			"fileId=? and versionId=?",
                    (encodeFileId(fileId), versionId))
 
     def has_key(self, key):
 	(fileId, versionId) = key
         cu = self.db.cursor()
         cu.execute("SELECT stream from FileStreams WHERE "
-		    "fileId=%s and versionId=%d",
+		    "fileId=? and versionId=?",
                    (encodeFileId(fileId), versionId))
         row = cu.fetchone()
 	return row is not None
@@ -176,7 +176,7 @@ class FileStreams:
 	(fileId, versionId) = key
         cu = self.db.cursor()
         cu.execute("SELECT stream from FileStreams WHERE "
-		    "fileId=%s and versionId=%d",
+		    "fileId=? and versionId=?",
                    (encodeFileId(fileId), versionId))
         row = cu.fetchone()
         if row is None:
@@ -187,7 +187,7 @@ class FileStreams:
 	(fileId, versionId) = key
         cu = self.db.cursor()
         cu.execute("SELECT streamId from FileStreams WHERE "
-		    "fileId=%s and versionId=%d",
+		    "fileId=? and versionId=?",
                    (encodeFileId(fileId), versionId))
         row = cu.fetchone()
         if row is None:

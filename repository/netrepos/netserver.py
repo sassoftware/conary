@@ -380,8 +380,8 @@ class NetworkAuthorization:
 
 	stmt = """
 	    SELECT troveName FROM
-	       (SELECT userId as uuserId FROM Users WHERE user=%s AND 
-		    password=%s) 
+	       (SELECT userId as uuserId FROM Users WHERE user=? AND 
+		    password=?) 
 	    JOIN Permissions ON uuserId=Permissions.userId
 	    LEFT OUTER JOIN TroveNames ON Permissions.troveNameId = TroveNames.troveNameId
 	""" 
@@ -392,7 +392,7 @@ class NetworkAuthorization:
 	where = []
 	if label:
 	    where.append(" labelId=(SELECT labelId FROM Labels WHERE " \
-			    "label=%s) OR labelId is Null")
+			    "label=?) OR labelId is Null")
 	    params.append(label.asString())
 
 	if write:
@@ -416,7 +416,7 @@ class NetworkAuthorization:
 	    if regExp.match(trove):
 		return True
 
-	log.error("no permissions match for (%s, %s)" % authToken)
+	log.error("no permissions match for (?, ?)" % authToken)
 
 	return False
 

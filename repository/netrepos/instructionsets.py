@@ -49,36 +49,36 @@ class InstructionSets:
         cu = self.db.cursor()
         assert(isinstance(isd, deps.deps.Dependency))
         base, flags = self._freezeIsd(isd)
-        cu.execute("INSERT INTO InstructionSets VALUES (NULL, %s, %s)",
+        cu.execute("INSERT INTO InstructionSets VALUES (NULL, ?, ?)",
                    (base, flags))
 
     def delId(self, theId):
         assert(type(theId) is int)
         cu = self.db.cursor()
-        cu.execute("DELETE FROM InstructionSets WHERE isnSetId=%d", (theId,))
+        cu.execute("DELETE FROM InstructionSets WHERE isnSetId=?", (theId,))
 
     def __delitem__(self, isd):
         assert(isinstance(isd, deps.deps.Dependency))
         base, flags = self._freezeIsd(isd)
         cu = self.db.cursor()
-        query = "DELETE FROM InstructionSets WHERE base=%s "
+        query = "DELETE FROM InstructionSets WHERE base=? "
         if flags is None:
             query += "AND flags is NULL"
             cu.execute(query, (base))
         else:
-            query += "AND flags=%s"
+            query += "AND flags=?"
             cu.execute(query, (base, flags))
 
     def __getitem__(self, isd):
         assert(isinstance(isd, deps.deps.Dependency))
         base, flags = self._freezeIsd(isd)
         cu = self.db.cursor()
-        query = "SELECT isnSetId from InstructionSets WHERE base=%s AND "
+        query = "SELECT isnSetId from InstructionSets WHERE base=? AND "
         if flags is None:
             query += "flags IS NULL"
             cu.execute(query, (base,))
         else:
-            query += "flags=%s"
+            query += "flags=?"
             cu.execute(query, (base, flags))            
         row = cu.fetchone()
         if row is None:

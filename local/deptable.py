@@ -34,28 +34,28 @@ class DepTable:
         cu = self.db.cursor()
         cu.execute("""INSERT INTO Dependencies(depId, class, name, flags,
                                                verConstraint)
-                      VALUES (NULL, %s, %s, %s, %s)""",
+                      VALUES (NULL, ?, ?, ?, ?)""",
                    (depClass.tag, dep.name, " ".join(dep.flags.iterkeys()), ""))
 
     def delId(self, theId):
         assert(type(theId) is int)
         cu = self.db.cursor()
-        cu.execute("DELETE FROM Dependencies WHERE depId=%d", theId)
+        cu.execute("DELETE FROM Dependencies WHERE depId=?, theId)
 
     def delDep(self, depClass, dep):
         cu = self.db.cursor()
         cu.execute("""DELETE FROM Dependencies WHERE
-		      class = %s AND
-                      name = %s AND
-                      flags = %s""",
+		      class = ? AND
+                      name = ? AND
+                      flags = ?""",
                    (depClass.tag, dep.name, " ".join(dep.flags.iterkeys())))
 
     def get(self, depClass, dep):
         cu = self.db.cursor()
         cu.execute("""SELECT depId from Dependencies WHERE
-                      class = %s AND
-                      name = %s AND 
-                      flags = %s""",
+                      class = ? AND
+                      name = ? AND 
+                      flags = ?""",
                    (depClass.tag, dep.name, " ".join(dep.flags.iterkeys())))
         row = cu.fetchone()
         if row is None:

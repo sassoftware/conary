@@ -35,6 +35,6 @@ class ChangeLogTable:
 
     def add(self, nodeId, cl):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO ChangeLogs VALUES (%d, %s, %s, %s)",
+        cu.execute("INSERT INTO ChangeLogs VALUES (?, ?, ?, ?)",
                    (nodeId, cl.getName(), cl.getContact(), cl.getMessage()))
 	return cu.lastrowid
