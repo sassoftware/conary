@@ -46,7 +46,7 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 	self.undoObj.reset()
 	for (fileId, fileVersion, fileObj) in self.oldFileList():
 	    if fileObj.hasContents and fileObj.flags.isConfig():
-		self.repos.removeFileContents(fileObj.sha1())
+		self.repos.removeFileContents(fileObj.contents.sha1())
 
     # remove the specified file 
     def removeFile(self, fileId, version):

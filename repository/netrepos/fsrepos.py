@@ -662,7 +662,7 @@ class ChangeSetJob:
 		    # the content for this file is in the form of a diff,
 		    # which we need to apply against the file in the repository
 		    assert(oldVer)
-		    f = repos.pullFileContentsObject(oldfile.sha1())
+		    f = repos.pullFileContentsObject(oldfile.contents.sha1())
 		    oldLines = f.readlines()
 		    diff = fileContents.get().readlines()
 		    (newLines, failedHunks) = patch.patch(oldLines, diff)

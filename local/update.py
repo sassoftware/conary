@@ -368,7 +368,7 @@ class FilesystemJob:
 		    # those changes
 		    if headFileContType == changeset.ChangedFileTypes.diff:
 			baseLines = repos.pullFileContentsObject(
-						baseFile.sha1()).readlines()
+					baseFile.contents.sha1()).readlines()
 			headFileContents = changeSet.getFileContents(fileId)[1]
 			diff = headFileContents.get().readlines()
 			(newLines, failedHunks) = patch.patch(baseLines, diff)

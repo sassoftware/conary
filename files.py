@@ -369,39 +369,29 @@ class InodeStream(TupleStream):
 	       self.owner() == other.owner() and \
 	       self.group() == other.group()
 
-class FlagsStream:
+class FlagsStream(IntStream):
 
     streamId = _STREAM_FLAGS
 
     def isConfig(self, set = None):
-	return False
 	return self._isFlag(_FILE_FLAG_CONFIG, set)
 
     def isInitScript(self, set = None):
-	return False
 	return self._isFlag(_FILE_FLAG_INITSCRIPT, set)
 
     def isShLib(self, set = None):
-	return False
 	return self._isFlag(_FILE_FLAG_SHLIB, set)
 
-    def freeze(self):
-	return struct.pack("!I", 0)
+    def _isFlag(self, flag, set):
+	if set != None:
+            if self.val is None:
+                self.val = 0x0
+	    if set:
+		self.val |= flag
+	    else:
+		self.val &= ~(flag)
 
-    def diff(self, them):
-	return ""
-
-    def twm(self, diff, base):
-	pass
-
-    def merge(self, other):
-	pass
-
-    def __init__(self, *args):
-	pass
-
-    def __eq__(self, other):
-	return self.__class__ == other.__class__
+	return (self.val and self.val & flag)
 
 class File:
 
@@ -759,20 +749,17 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
         raise FilesError("unsupported file type for %s" % path)
 
     f.inode = inode
-
-    #f.perms(s.st_mode & 07777)
-
-    #f.flags(0)
+    f.flags = FlagsStream(0)
     
     # assume we have a match if the FileMode and object type match
-    if possibleMatch and (possibleMatch.__class__ == f.__class__) and \
-       f.inode == possibleMatch.inode:
+    if possibleMatch and (possibleMatch.__class__ == f.__class__) \
+		     and f.inode == possibleMatch.inode:
+	    f.flags.set(possibleMatch.flags.value())
 	    return possibleMatch
 
     if needsSha1:
 	sha1 = sha1helper.hashFile(path)
 	f.contents = RegularFileStream(s.st_size, sha1)
-	f.flags = FlagsStream(f.flags)
 
     return f
 
