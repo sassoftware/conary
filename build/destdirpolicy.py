@@ -225,6 +225,7 @@ class NormalizeManPages(policy.Policy):
 	    util.execute("sed -i 's,/*%s,,g' %s" %(self.destdir, path))
 
     def _sosymlink(self, dirname, names):
+	section = os.path.basename(dirname)
 	for name in names:
 	    path = dirname + os.sep + name
 	    if util.isregular(path):
@@ -242,33 +243,40 @@ class NormalizeManPages(policy.Policy):
 		lines = newlines
 
 		# now see if we have only a .so line to replace
+		# only replace .so with symlink if the file exists
+		# in order to deal with searchpaths
 		if len(lines) == 1:
 		    line = lines[0]
 		    # remove newline and other trailing whitespace if it exists
 		    line = line.rstrip() # chop-chop
 		    match = self.soexp.search(line)
 		    if match:
-			section = os.path.basename(os.path.dirname(path))
 			matchlist = match.group(1).split('/')
 			l = len(matchlist)
 			if l == 1 or matchlist[l-2] == section:
 			    # no directory specified, or in the same
 			    # directory:
-			    log.debug('replacing %s (%s) with symlink %s',
-				      name, match.group(0),
-				      os.path.basename(match.group(1)))
-			    os.remove(path)
-			    os.symlink(os.path.basename(match.group(1)), path)
+			    targetpath = os.sep.join((dirname, matchlist[l-1]))
+			    if os.path.exists(targetpath):
+				log.debug('replacing %s (%s) with symlink %s',
+					  name, match.group(0),
+					  os.path.basename(match.group(1)))
+				os.remove(path)
+				os.symlink(os.path.basename(match.group(1)),
+					   path)
 			else:
 			    # either the canonical .so manN/foo.N or an
 			    # absolute path /usr/share/man/manN/foo.N
 			    # .so is relative to %(mandir)s and the other
 			    # man page is in a different dir, so add ../
-			    target = "../%s/%s" %(matchlist[l-2], matchlist[l-1])
-			    log.debug('replacing %s (%s) with symlink %s',
-				      name, match.group(0), target)
-			    os.remove(path)
-			    os.symlink(target, path)
+			    target = "../%s/%s" %(matchlist[l-2],
+						  matchlist[l-1])
+			    targetpath = os.sep.join((dirname, target))
+			    if os.path.exists(targetpath):
+				log.debug('replacing %s (%s) with symlink %s',
+					  name, match.group(0), target)
+				os.remove(path)
+				os.symlink(target, path)
 
     def _compress(self, dirname, names):
 	for name in names:
@@ -295,18 +303,23 @@ class NormalizeManPages(policy.Policy):
 	self.commentexp = re.compile(r'^\.\\"')
 
     def do(self):
-	manpath = self.macros['destdir'] + self.macros['mandir']
-	self.destdir = self.macros['destdir'][1:] # we need without leading /
-	# uncompress all man pages
-	os.path.walk(manpath, NormalizeManPages._uncompress, self)
-	# remove '/?%(destdir)s' and fix modes
-	os.path.walk(manpath, NormalizeManPages._dedestdir, self)
-	# .so foo.n becomes a symlink to foo.n
-	os.path.walk(manpath, NormalizeManPages._sosymlink, self)
-	# recompress all man pages
-	os.path.walk(manpath, NormalizeManPages._compress, self)
-	# change all symlinks to point to .gz (if they don't already)
-	os.path.walk(manpath, NormalizeManPages._gzsymlink, self)
+	for manpath in (
+	    self.macros.mandir,
+	    os.sep.join((self.macros.x11prefix, 'man')),
+	    os.sep.join((self.macros.krbprefix, 'man')),
+	    ):
+	    manpath = self.macros.destdir + manpath
+	    self.destdir = self.macros['destdir'][1:] # without leading /
+	    # uncompress all man pages
+	    os.path.walk(manpath, NormalizeManPages._uncompress, self)
+	    # remove '/?%(destdir)s' and fix modes
+	    os.path.walk(manpath, NormalizeManPages._dedestdir, self)
+	    # .so foo.n becomes a symlink to foo.n
+	    os.path.walk(manpath, NormalizeManPages._sosymlink, self)
+	    # recompress all man pages
+	    os.path.walk(manpath, NormalizeManPages._compress, self)
+	    # change all symlinks to point to .gz (if they don't already)
+	    os.path.walk(manpath, NormalizeManPages._gzsymlink, self)
 
 class NormalizeInfoPages(policy.Policy):
     """
