@@ -166,7 +166,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	packageList.append((pkgname + "/sources", p, fileMap))
 
 	changeSet = changeset.CreateFromFilesystem(packageList, version)
-	commit.commitChangeSet(repos, cfg, changeSet)
+	repos.commitChangeSet(cfg.sourcepath, changeSet)
 
 	repos.open("r")
 

@@ -58,4 +58,4 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 
 	cs = changeset.CreateFromRepository(repos, list)
 
-    commit.commitChangeSet(db, cfg, cs)
+    db.commitChangeSet(cfg.sourcepath, cs)
