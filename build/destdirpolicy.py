@@ -116,7 +116,7 @@ class NormalizeManPages(policy.Policy):
 	    if not os.path.isdir(path) and not os.path.islink(path) \
 	       and not name.endswith('.gz'):
 		util.execute("sed -i 's,/?%s,,g' %s"
-			     %(self.macros['destdir'], path))
+			     %(self.macros['destdir'][1:], path))
 
     def _sosymlink(self, dirname, names):
 	for name in names:
