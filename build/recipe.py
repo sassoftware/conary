@@ -386,11 +386,34 @@ class PackageRecipe(Recipe):
 	else:
 	    util.rmtree(builddir)
 
+    def sourceMap(self, path):
+        basepath = os.path.basename(path)
+        if basepath == path:
+            # we only care about truly different source locations with the
+            # same basename
+            return
+        if basepath in self.sourcePathMap:
+            if basepath in self.pathConflicts:
+                self.pathConflicts[basepath].append(path)
+            else:
+                self.pathConflicts[basepath] = [
+                    # previous (first) instance
+                    self.sourcePathMap[basepath],
+                    # this instance
+                    path
+                ]
+
     def fetchAllSources(self):
 	"""
 	returns a list of file locations for all the sources in
 	the package recipe
 	"""
+        # first make sure we had no path conflicts:
+        if self.pathConflicts:
+            errlist = []
+            for basepath in self.pathConflicts.keys():
+                errlist.extend([x for x in self.pathConflicts[basepath]])
+            raise RecipeFileError, '\n'.join(errlist)
 	self.prepSources()
 	files = []
 	for src in self._sources:
@@ -631,6 +654,8 @@ class PackageRecipe(Recipe):
 	if extraMacros:
 	    self.macros.update(extraMacros)
 	self.mainDir(self.nameVer())
+        self.sourcePathMap = {}
+        self.pathConflicts = {}
 
 class _GroupOrRedirectRecipe(Recipe):
     Flags = use.LocalFlags

@@ -36,6 +36,7 @@ class _Source(action.RecipeAction):
 	sourcename = args[0]
 	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.sourcename = sourcename % recipe.macros
+        recipe.sourcemap(self.sourcename)
 	self.rpm = self.rpm % recipe.macros
 	    
     def doPrep(self):
