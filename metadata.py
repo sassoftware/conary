@@ -309,7 +309,7 @@ def showDetails(repos, cfg, db, troveName, branchStr=None):
         log.error("trove not found for branch %s: %s", branchStr, troveName)
         return 0
 
-    log.info("retrieving package details for %s on %s", troveName, branch.asString())
+    log.info("retrieving package details for %s on %s", troveName, branchStr)
     md = repos.getMetadata([sourceName, branch], branch.label())
 
     if sourceName in md:
