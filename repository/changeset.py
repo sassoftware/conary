@@ -665,7 +665,6 @@ class ChangeSetFromFile(ChangeSet):
 
 	idList.sort()
 
-	count = 0
 	for fileId in idList:
 	    tags = self.csf.getTag(fileId)
 	    if early:
