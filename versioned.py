@@ -377,16 +377,19 @@ class VersionedFile:
 
     def eraseVersion(self, version):
 	"""
-        Removes a version of the file.
+        Removes a version of the file. Returns True if this was the
+	last version of the file erased, false otherwise.
 
         @param version: The version of the file to remove
         @type version: versions.Version
+	@rtype: boolean
 	"""
 	self._readBranchMap()
 
 	versionStr = version.asString()
 	branch = version.branch()
 	branchStr = branch.asString()
+	retValue = False
 
 	(node, prev, next) = self._getVersionInfo(version)
 
@@ -395,6 +398,12 @@ class VersionedFile:
 	    # we were the only item, so the branch needs to be emptied
 	    if not prev:
 		self.branchMap[branchStr] = None
+		# this might have been the last version left -- check
+		retValue = True
+		for br in self.branchMap.keys():
+		    if self.branchMap[br]: 
+			retValue = False
+			break
 	    else:
 		self.branchMap[branchStr] = prev
 
@@ -411,7 +420,12 @@ class VersionedFile:
 	del self.db[_CONTENTS % (self.key, versionStr)]
 	del self.db[_VERSION_INFO % (self.key, versionStr)]
 
+	if (self.key[0] == ":"):
+	    print "%s" % (_VERSION_INFO % (self.key, versionStr))
+
 	#self.db.sync()
+
+	return retValue
 
     def hasVersion(self, version):
 	"""
@@ -497,12 +511,27 @@ class Database:
 	self.db = dbhash.open(path, mode)
 	self.createBranches = createBranches
 
+class IndexedVersionedFile(VersionedFile):
+    """
+    Provides a VersionedIndexedFile which removes itself from a 
+    FileIndexedDatabase when the last version of the file has been
+    removed.
+    """
+    def eraseVersion(self, version):
+	if VersionedFile.eraseVersion(self, version):
+	    print "HERE"
+	    db.eraseFile(self.key)
+
+    def __init__(self, db, filename, createBranches, database):
+	self.db = database
+	VersionedFile.__init__(self, db, filename, createBranches)
+
 class FileIndexedDatabase(Database):
     """
     Provides a set of VersionedFile objects on a single dbhash file
     and maintains a list of all of the files present in the database.
     """
-    def openFile(self, file, fileClass = VersionedFile):
+    def openFile(self, file, fileClass = IndexedVersionedFile):
 	"""
         Returns a particular VersionedFile object.
 
@@ -510,11 +539,23 @@ class FileIndexedDatabase(Database):
         @type file: str
         @rtype: VersionedFile
 	"""
+	assert(issubclass(fileClass, IndexedVersionedFile))
+
 	if not self.files.has_key(file):
 	    self.files[file] = 1
 	    self._writeMap()
+	
+	return fileClass(self.db, file, self.createBranches, self)
 
-	return Database.openFile(self, file, fileClass = fileClass)
+    def eraseFile(self, file):
+	"""
+	Removes a file from the database.
+
+	@param file: filename to remove
+	@type file: str
+	"""
+	del self.files[file]
+	self._writeMap()
 
     def hasFile(self, file):
 	"""

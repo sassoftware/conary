@@ -20,6 +20,7 @@ import versioned
 import bsddb
 
 from versioned import VersionedFile
+from versioned import IndexedVersionedFile
 
 class Repository:
 
@@ -304,15 +305,15 @@ class LocalRepository(Repository):
 	Repository.__init__(self)
 
 # this is a set of all of the versions of a single packages 
-class _PackageSetClass(VersionedFile):
+class _PackageSetClass(IndexedVersionedFile):
     def getVersion(self, version):
-	f1 = VersionedFile.getVersion(self, version)
+	f1 = IndexedVersionedFile.getVersion(self, version)
 	p = package.PackageFromFile(self.name, f1, version)
 	f1.close()
 	return p
 
     def addVersion(self, version, package):
-	VersionedFile.addVersion(self, version, package.formatString())
+	IndexedVersionedFile.addVersion(self, version, package.formatString())
 
     def fullVersionList(self):
 	branches = self.branchList()
@@ -329,8 +330,8 @@ class _PackageSetClass(VersionedFile):
 
 	return self.getVersion(ver)
 
-    def __init__(self, db, name, createBranches):
-	VersionedFile.__init__(self, db, name, createBranches)
+    def __init__(self, db, name, createBranches, dbFile):
+	IndexedVersionedFile.__init__(self, db, name, createBranches, dbFile)
 	self.name = name
 
 def _PackageSet(db, name):
