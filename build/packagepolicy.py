@@ -127,6 +127,24 @@ class CheckSonames(policy.Policy):
 			    " use Ldconfig('%s')?", path, s,
 			    os.path.dirname(path))
 
+class CheckDestDir(policy.Policy):
+    """
+    Look for the destdir path in files and symlink contents; it should
+    not be there.
+    """
+    def doFile(self, file):
+	d = self.macros.destdir
+	if file.find(d) != -1:
+	    self.recipe.reportErrors('Path %s contains destdir %s' %(file, d))
+	fullpath = d+file
+	if os.path.islink(fullpath):
+	    contents = os.readlink(fullpath)
+	    if contents.find(d) != -1:
+		self.recipe.reportErrors(
+		    'Symlink %s contains destdir %s in contents %s'
+		    %(file, d, contents))
+
+
 # now the packaging classes
 
 class _filterSpec(policy.Policy):
@@ -675,6 +693,7 @@ def DefaultPolicy():
 	FilesInMandir(),
 	ImproperlyShared(),
 	CheckSonames(),
+	CheckDestDir(),
 	ComponentSpec(),
 	PackageSpec(),
 	EtcConfig(),
