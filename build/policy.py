@@ -48,7 +48,7 @@ class Policy(util.Action):
 
     keywords = {
         'use': None,
-        'exceptions': None
+        'exceptions': None,
 	'subtrees': None
     }
 
