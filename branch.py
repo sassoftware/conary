@@ -10,7 +10,10 @@ Implements branch command line functionality.
 import versions
 import log
 
-def branch(repos, branchName, branchFrom, troveName = None):
+def branch(repos, packageNamespace, branchName, branchFrom, troveName = None):
+    if troveName and troveName[0] != ":":
+	 troveName = packageNamespace + ":" + troveName
+
     try:
 	newBranch = versions.BranchName(branchName)
 
