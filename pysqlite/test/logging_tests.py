@@ -50,10 +50,10 @@ class CommandLoggingTests(unittest.TestCase, testsupport.TestSupport):
     def CheckLoggingWorks(self):
         logger = StringIO.StringIO()
 
-        expected_output = "\n".join([
+        expected_output = ";\n".join([
             "BEGIN", "CREATE TABLE TEST(FOO INTEGER)",
             "INSERT INTO TEST(FOO) VALUES (5)",
-            "ROLLBACK"]) + "\n"
+            "ROLLBACK"]) + ";\n"
 
         self.cnx = sqlite.connect(self.getfilename(),
             command_logfile=logger)
