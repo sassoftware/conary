@@ -79,4 +79,4 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
     # on the disk
     #localChanges = changeset.CreateAgainstLocal(cfg, db, list)
 
-    db.commitChangeSet(cfg.sourcepath, cs)
+    db.commitChangeSet(cs, sourcePath = cfg.sourcepath)
