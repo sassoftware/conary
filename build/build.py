@@ -997,9 +997,6 @@ exit $failed
 	# special processing on automake test suites
 	makefile = dir + '/Makefile'
         makeTarget = self.makeTarget
-
-	#cmd = r"grep ^%s: %s | sed -e 's/^%s://' " % (makeTarget, makefile, makeTarget)
-	#dependencies = util.popen(cmd).read()
 	if self.recursive:
 	    files = os.listdir(dir)
 	    base = util.normpath(self.macros.builddir + os.sep + self.dir)
@@ -1010,7 +1007,7 @@ exit $failed
 		    self.subdirs.append(fullpath[baselen:])
 		    self.mungeMakefiles(fullpath, command)
 	util.execute(r"sed -i -e 's/^%s\s*:\s*\(.*\)/conary-pre-%s: \1\n\n%s:/'  %s" % (makeTarget, makeTarget, makeTarget, makefile))
-	util.execute('cd %s; make conary-pre-%s' % (dir, makeTarget))
+	util.execute('cd %s; make %s conary-pre-%s' % (dir, ' '.join(self.makeArgs), makeTarget))
 
     def do(self, macros):
 	self.macros = macros.copy()
@@ -1020,11 +1017,14 @@ exit $failed
 	command = self.command % macros
 	if command[:4] == 'make':
 	    self.mungeMakeCommand()
+            self.makeArgs = []
             potentialTargets  = command[5:].split()
             targets = []
             for t in potentialTargets:
                 if t.find('=') == -1:
                     targets.append(t)
+                else:
+                    self.makeArgs.append(t)
             for t in targets:
                 self.makeTarget = t
 	        self.mungeMakefiles(util.normpath(self.macros.builddir + os.sep + self.dir), self.command)
