@@ -34,7 +34,8 @@ class Flag(dict):
     Magic is used to make the initialization of the object easy.
     """
     def __init__(self, value=None, name=None, showdefaults=True, parent=None, 
-                 createOnAccess=False, required=True, track=False):
+                 createOnAccess=False, required=True, track=False, 
+                 inFlavor=True, flavorName=None, subsumes = None):
 	self._showdefaults = showdefaults
         assert(isinstance(value, bool) or value is None)
         self._value = value
@@ -42,6 +43,10 @@ class Flag(dict):
         self._long = ""
         self._parent = parent
         self._name = name
+        if flavorName != None:
+            self._flavorName = flavorName
+        else:
+            self._flavorName = name
 	self._frozen = False
         self._track = track
         self._used = False
@@ -49,8 +54,14 @@ class Flag(dict):
 	self._deprecated = {}
         self._createOnAccess = createOnAccess
         self._required = required
+        if not subsumes:
+            self._subsumes = []
+        else:
+            self._subsumes = subsumes
+        self._inFlavor = inFlavor
         # this must be set last
         self._initialized = True
+
 
     def setShortDoc(self, doc):
         self._short = doc
@@ -60,6 +71,27 @@ class Flag(dict):
 
     def setRequired(self, required):
         self._required = required
+
+    def setFlavorName(self, flavorName):
+        """ Set the name of this flag in a trove's flavor.  
+            Flag names must be valid python identifier, while trove flavor
+            indicators do not have the same restriction.
+        """
+        self._flavorName = flavorName
+
+    def setNoFlavor(self):
+        """ Do not include this flag when converting to a flavor """
+        self._inFlavor = False
+
+    def inFlavor(self):
+        """ Returns true if this flag should be part of a trove's flavor """
+        return self._inFlavor
+
+    def setSubsumes(self, *subsumedFlags):
+        """ Indicate that this flag, when true, implies the truth of the 
+            flags passed.  Only affects the creation of trove flavors
+        """
+        self._subsumes.extend(subsumedFlags)
 
     def getRequired(self):
         return self._required
@@ -148,7 +180,9 @@ class Flag(dict):
         value = other._value
         if value is None:
             value = self._value
-        new = Flag(value=value, name=other._name, parent=parent)
+        new = Flag(value=value, name=other._name, parent=parent, 
+                    flavorName=self._flavorName, subsumes=self._subsumes,
+                    inFlavor=self._inFlavor)
         # overrides and usedFlags are combined
         # from both
         new._overrides = self._overrides.copy()
@@ -265,7 +299,9 @@ class Flag(dict):
         new = Flag(value=self._value, name=self._name,
                    showdefaults=self._showdefaults, parent=parent,
                    createOnAccess=self._createOnAccess,
-                   required=self._required, track=self._track)
+                   required=self._required, track=self._track, 
+                   subsumes=self._subsumes, flavorName=self._flavorName,
+                   inFlavor=self._inFlavor)
         new._overrides = self._overrides.copy()
         new._used = self._used
         new._track = self._track
@@ -324,7 +360,9 @@ class Flag(dict):
         if self._name == '__GLOBAL__':
             return self
         top = parent = Flag(value=None, name=self._name, 
-                                        required=self._required)
+                            required=self._required, inFlavor=self._inFlavor,
+                            flavorName=self._flavorName, 
+                            subsumes=self._subsumes)
         cursor = self._parent
         while cursor is not None:
             child = parent
@@ -346,7 +384,10 @@ class Flag(dict):
         if flags:
             for flag in flags:
                 top[flag] = Flag(value=True, name=flag, parent=top,
-                                 required=self[flag]._required)
+                                 required=self[flag]._required, 
+                                 inFlavor=self[flag]._inFlavor,
+                                 flavorName=self[flag]._flavorName,
+                                 subsumes=self[flag]._subsumes)
         else:
             top._value = True
         return parent
@@ -359,6 +400,17 @@ class Flag(dict):
         set = deps.DependencySet()
         if self._name != '__GLOBAL__':
             self = self.asSet()
+
+        # go through and set to true all child flags that are subsumed 
+        # by flags set in this group.
+        flagsToCheck = self.values()
+        while flagsToCheck:
+            flag = flagsToCheck.pop()
+            if flag._get() is True:
+                # add 
+                for subflag in flag._subsumes:
+                    self = self + subflag
+            flagsToCheck.extend(flag.values())
         if 'Use' in self or 'Flags' in self:
             depFlags = []
             if 'Use' in self and self.Use.keys():
@@ -373,7 +425,6 @@ class Flag(dict):
                 dep = deps.Dependency('use', depFlags)
                 set.addDep(deps.UseDependency, dep)
         if 'Arch' in self:
-            excludeFlags = ['bits64', 'bits32', 'BE', 'LE' ] 
             for arch, topflag in self['Arch'].iteritems():
                 if topflag._value is None:
                     # if we didn't check the top level arch, 
@@ -384,10 +435,12 @@ class Flag(dict):
                     # if we checked the arch and it is not our arch
                     # don't add a dependency
                     continue
-                if arch in excludeFlags:
+                if not topflag.inFlavor():
                     continue
                 depFlags = []
                 for subarch, flag in topflag.iteritems():
+                    if not flag.inFlavor():
+                        continue
                     depFlags.extend(flag.toDepFlags(topflag=topflag))
                 dep = deps.Dependency(arch, depFlags)
                 set.addDep(deps.InstructionSetDependency, dep)
@@ -400,7 +453,7 @@ class Flag(dict):
             topflag = self
         cur = self
         while cur._name != topflag._name:
-            namelist.insert(0, cur._name)
+            namelist.insert(0, cur._flavorName)
             cur = cur._parent
         name = ".".join(namelist)
         if prefix:
@@ -414,6 +467,8 @@ class Flag(dict):
             else:
                 flags.append((name, deps.FLAG_SENSE_PREFERNOT))
         for subflag in self.iterkeys():
+            if not self[subflag].inFlavor():
+                continue
             flags.extend(self[subflag].toDepFlags(prefix=prefix,
                                                       topflag=topflag))
         return flags
@@ -693,23 +748,32 @@ Arch = Flag(showdefaults=False, name='Arch')
 # Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686
 Arch.x86 = True
 Arch.x86.setShortDoc('True if any IA32-compatible architecture is set')
-Arch.x86.i386 = False
 Arch.x86.i486 = False
 Arch.x86.i586 = False
+Arch.x86.i586.setSubsumes(Arch.x86.i486)
 Arch.x86.i686 = True
+Arch.x86.i686.setSubsumes(Arch.x86.i586, Arch.x86.i486)
 Arch.x86.cmov = True
 Arch.x86.sse = False
 Arch.x86.sse2 = False
+Arch.x86.sse2.setSubsumes(Arch.x86.sse)
 Arch.x86.mmx = False
+Arch.x86.mmxext = False
 Arch.x86.threednow = False # '3dnow' is an illegal identifier name
+Arch.x86.threednow.setFlavorName('3dnow')
+Arch.x86.threednowext = False
+Arch.x86.threednowext.setFlavorName('3dnowext')
+Arch.x86.threednowext.setSubsumes(Arch.x86.threednow)
 
 Arch.x86_64 = False
 Arch.x86_64.setShortDoc('x86_64 base 64-bit extensions')
-Arch.x86_64.amd64 = False
-Arch.x86_64.amd64.setShortDoc('x86_64 with base AMD64 extensions')
-Arch.x86_64.em64t = False
-Arch.x86_64.em64t.setShortDoc('x86_64 with base EM64T extensions')
+Arch.x86_64.nx = False
 Arch.x86_64.sse3 = False
+Arch.x86_64.threednow = False # '3dnow' is an illegal identifier name
+Arch.x86_64.threednow.setFlavorName('3dnow')
+Arch.x86_64.threednowext = False
+Arch.x86_64.threednowext.setFlavorName('3dnowext')
+Arch.x86_64.threednowext.setSubsumes(Arch.x86_64.threednow)
 
 # we used to support Arch.x86.x86_64, has been changed to Arch.x86_64
 Arch.x86.addDeprecated('x86_64', Arch.x86_64)
@@ -727,13 +791,17 @@ Arch.alpha = False
 # Arch.LE = Arch.x86 | Arch.ia64
 Arch.LE = True
 Arch.LE.setShortDoc('True if current architecture is little-endian')
+Arch.LE.setNoFlavor() # do not affect flavor
 # Arch.BE = Arch.sparc | Arch.ppc | Arch.s390
 Arch.BE = False
 Arch.BE.setShortDoc('True if current architecture is big-endian')
+Arch.BE.setNoFlavor() 
 Arch.bits32= True
 Arch.bits32.setShortDoc('True if the current architecture is 32-bit')
+Arch.bits32.setNoFlavor() 
 Arch.bits64 = False
 Arch.bits64.setShortDoc('True if the current architecture is 64-bit')
+Arch.bits64.setNoFlavor() 
 Arch._freeze()
 _addDocs(Arch)
 
