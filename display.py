@@ -55,7 +55,7 @@ def displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
 	    print _fileFormat % (path, version.asString(cfg.defaultbranch))
     else:
 	for (fileId, path, version) in pkg.fileList():
-	    file = repos.getFileVersion(fileId, version)
+	    file = repos.getFileVersion(fileId, version, path = path)
 
 	    if isinstance(file, files.SymbolicLink):
 		name = "%s -> %s" %(path, file.linkTarget())
