@@ -24,10 +24,11 @@ def cook(reppath, srcdir, builddir, recipeFile):
 	recp.doBuild(ourBuildDir)
 
 	rootDir = "/var/tmp/srs/%s-%d" % (recp.name, int(time.time()))
-        util.mkdirChain(rootDir, 0700)
+        util.mkdirChain(rootDir)
 	recp.doInstall(ourBuildDir, rootDir)
 
-	pkgSet = recp.packages(rootDir)
+        recp.packages(rootDir)
+        pkgSet = recp.getPackageSet()
 
 	for (name, buildPkg) in pkgSet.packageSet():
 	    fileList = []

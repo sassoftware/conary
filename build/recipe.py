@@ -5,6 +5,8 @@
 import imp, sys, types
 import os
 import util
+import build
+import package
 
 class RecipeLoader(types.DictionaryType):
     def __init__(self, file):
@@ -51,7 +53,14 @@ class Recipe:
     def doInstall(self, builddir, root):
 	self.install.doInstall(builddir + "/" + self.mainDir(), root)
 
+    def packages(self, root):
+        self.packageSet = package.Auto(self.name, root)
+
+    def getPackageSet(self):
+        return self.packageSet
+
     def __init__(self):
 	self.tarballs = []
 	self.patches = []
 	self.theMainDir = self.name + "-" + self.version
+	self.build = build.Make()

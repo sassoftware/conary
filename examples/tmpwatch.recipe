@@ -14,9 +14,5 @@ preventing files from growing ad nauseum"""
     version = "2.9.0"
 
     def setup(self):
-	self.addTarball("tmpwatch-%s.tar.gz" % self.version)
-	self.build = build.Make()
+	self.addTarball("%s-%s.tar.gz" % (self.name, self.version))
 	self.install = build.MakeInstall(rootVar = "ROOT")
-
-    def packages(self, root):
-	return package.Auto("tmpwatch", root)
