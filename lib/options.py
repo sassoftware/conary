@@ -10,6 +10,10 @@ import sys
 # 1 - arg may occur once, w/ parameter
 # 2 - arg may occur N times, w/ parameter
 
+class OptionError(Exception):
+    def __init__(self, val):
+        self.val = val
+
 def processArgs(argDef, cfgMap, cfg, usage):
     otherArgs = [ sys.argv[0] ]
     argSet = {}
@@ -23,18 +27,18 @@ def processArgs(argDef, cfgMap, cfg, usage):
 	    otherArgs.append(sys.argv[i])
 	else:
 	    arg = sys.argv[i][2:]
-	    if not argDef.has_key(arg): return usage()
+	    if not argDef.has_key(arg): raise OptionError(usage())
 
 	    if not argDef[arg]:
 		argSet[arg] = 1
 	    else:
 		# the argument takes a parameter
 		i = i + 1
-		if i >= len(sys.argv): return usage()
+		if i >= len(sys.argv): raise OptionError(usage())
 
 		if argDef[arg] == 1:
 		    # exactly one parameter is allowd
-		    if argSet.has_key(arg): return usage()
+		    if argSet.has_key(arg): raise OptionError(usage())
 		    argSet[arg] = sys.argv[i]
 		else:
 		    # multiple parameters may occur
