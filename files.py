@@ -4,6 +4,8 @@ import versioned
 import md5sum
 import pwd
 import grp
+import shutil
+import util
 
 class FileMode:
 
@@ -118,8 +120,14 @@ class File(FileMode):
 
 	return self.theVersion
 
+    def uniqueName(self):
+	return md5sum.md5str(self.theVersion)
+
     def infoLine(self):
 	return FileMode.infoLine(self)
+
+    def copy(self):
+	raise "method should be provided by derivative classes"
 
     def __init__(self, path, newVersion = None, info = None):
 	self.path(path)
@@ -143,6 +151,9 @@ class RegularFile(File):
 
 	return 0
 
+    def copy(self, source, target):
+	shutil.copyfile(source, target)
+
     def __init__(self, path, version = None, info = None):
 	if (info):
 	    (type, self.themd5, info) = string.split(info, None, 2)
@@ -154,13 +165,14 @@ class RegularFile(File):
 class FileDB:
 
     def read(self):
-	f = versioned.open(self.dbfile, "r+")
+	f = versioned.open(self.dbfile, "r")
 	self.versions = {}
 
 	for version in f.versionList():
 	    f.setVersion(version)
 	    line = f.read()
 	    self.versions[version] = RegularFile(self.path, version, line)
+
 	f.close()
 
     def findVersion(self, file):
@@ -183,6 +195,9 @@ class FileDB:
 	return self.versions[version]
 
     def write(self):
+	dir = os.path.split(self.dbfile)[0]
+	util.mkdirChain(dir)
+
 	f = versioned.open(self.dbfile, "w")
 	for (version, file) in self.versions.items():
 	    f.createVersion(version)

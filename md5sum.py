@@ -10,3 +10,8 @@ def md5sum(path):
 	buf = os.read(fd, 40960)
 
     return m.hexdigest()
+
+def md5str(str):
+    m = md5.new()
+    m.update(str)
+    return m.hexdigest()

@@ -20,7 +20,7 @@ def doUpdate(DBPATH, root, pkgName):
 	dir = os.path.split(target)[0]
 	util.mkdirChain(dir)
 
-	source = "%s/files/%s.contents/%s" % (DBPATH, fileName, f.md5())
+	source = "%s/files/%s.contents/%s" % (DBPATH, fileName, f.uniqueName())
 
-	shutil.copyfile(source, target)
+	f.copy(source, target)
 	os.chmod(target, f.perms())
