@@ -81,6 +81,30 @@ class ImproperlyShared(policy.Policy):
 		"Architecture-specific file %s in shared data directory" %file)
 
 
+class DanglingSymlinks(policy.Policy):
+    """
+    Disallow dangling symbolic links (symbolic links which point to
+    files which do not exist).  If you know that a dangling symbolic
+    link created by your package is fulfilled by another package on
+    which your package depends, you may set up an exception for that
+    file for the C{DanglingSymlinks} policy.
+    """
+    def doFile(self, file):
+	d = self.macros.destdir
+	f = util.joinPaths(d, file)
+	if stat.S_ISLNK(os.lstat(f).st_mode):
+	    contents = os.readlink(f)
+	    if contents[0] == '/':
+		log.warning('Absolute symlink %s points to %s, should probably be relative', file, contents)
+		return
+	    try:
+		os.stat(f)
+	    except OSError:
+		raise PackagePolicyError(
+		    "Dangling symlink: %s points to non-existant %s"
+		    %(file, contents))
+
+
 # now the packaging classes
 
 class _filterSpec(policy.Policy):
@@ -536,6 +560,7 @@ def DefaultPolicy():
 	NonBinariesInBindirs(),
 	FilesInMandir(),
 	ImproperlyShared(),
+	DanglingSymlinks(),
 	ComponentSpec(),
 	PackageSpec(),
 	EtcConfig(),
