@@ -70,7 +70,9 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
         elif (not cfg.autoResolve or brokenByErase) and suggMap:
             print "Additional troves are needed:"
             for (req, suggList) in suggMap.iteritems():
-                print "    %s -> %s" % (req, " ".join([x[0] for x in suggList]))
+                print "    %s -> %s" % \
+                  (req, " ".join(["%s(%s)" % 
+                  (x[0], x[1].trailingVersion().asString()) for x in suggList]))
             return
         elif suggMap:
             print "Including extra troves to resolve dependencies:"
