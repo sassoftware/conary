@@ -818,7 +818,8 @@ def updateSrc(repos, versionStr = None):
     changeSet = repos.createChangeSet([(pkgName, 
                                 (baseVersion, deps.deps.DependencySet()), 
                                 (headVersion, deps.deps.DependencySet()), 
-                                0)])
+                                0)],
+                                      excludeAutoSource = True)
 
     packageChanges = changeSet.iterNewPackageList()
     pkgCs = packageChanges.next()
