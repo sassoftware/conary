@@ -27,6 +27,7 @@ import os
 import policy
 from lib import log
 from deps import deps
+import re
 import stat
 import tags
 import buildpackage
@@ -117,18 +118,21 @@ class BadInterpreterPaths(policy.Policy):
                     %(interp, path, m.contents['line']))
 
 
-class NonMultilibPython(policy.Policy):
+class NonMultilibComponent(policy.Policy):
     invariantsubtrees = [
         '%(libdir)s/',
         '%(prefix)s/lib/',
     ]
     invariantinclusions = [
-        ',*/python.*/site-packages/.*',
+        '.*/python[^/]*/site-packages/.*',
+        '.*/perl[^/]*/vendor-perl/.*',
     ]
     def __init__(self, *args, **keywords):
-        self.foundlib = False
-        self.foundlib64 = False
-        self.reported = False
+        self.foundlib = {'python': False, 'perl': False}
+        self.foundlib64 = {'python': False, 'perl': False}
+        self.reported = {'python': False, 'perl': False}
+        self.productMapRe = re.compile(
+            '.*/(python|perl)[^/]*/(site-packages|vendor-perl)/.*')
 	policy.Policy.__init__(self, *args, **keywords)
 
     def test(self):
@@ -138,18 +142,22 @@ class NonMultilibPython(policy.Policy):
         return True
 
     def doFile(self, path):
-        if self.reported:
+        if not False in self.reported.values():
+            return
+        # we've already matched effectively the same regex, so should match...
+        p = self.productMapRe.match(path).group(1)
+        if self.reported[p]:
             return
         if self.currentsubtree == '%(libdir)s/':
-            self.foundlib64 = path
+            self.foundlib64[p] = path
         else:
-            self.foundlib = path
-        if self.foundlib64 and self.foundlib and not self.reported:
+            self.foundlib[p] = path
+        if self.foundlib64[p] and self.foundlib[p] and not self.reported[p]:
             self.recipe.reportErrors(
-                'python packages may install in /usr/lib or /usr/lib64,'
+                '%s packages may install in /usr/lib or /usr/lib64,'
                 ' but not both: at least %s and %s both exist' %(
-                self.foundlib, self.foundlib64))
-            self.reported = True
+                p, self.foundlib[p], self.foundlib64[p]))
+            self.reported[p] = True
 
 
 class ImproperlyShared(policy.Policy):
@@ -325,6 +333,8 @@ class ComponentSpec(_filterSpec):
 	('runtime',   ('%(datadir)s/gnome/help/.*/C/')), # help menu stuff
         # python is potentially architecture-specific because of %(lib)
 	('python',    ('/usr/(%(lib)s|lib)/python.*/site-packages/')),
+        # perl is potentially architecture-specific because of %(lib)
+	('perl',      ('/usr/(%(lib)s|lib)/perl.*/vendor_perl/')),
         # devellib is architecture-specific
         ('devellib',  (r'\.so',), stat.S_IFLNK),
 	('devellib',  (r'\.a',
@@ -1543,7 +1553,7 @@ def DefaultPolicy(recipe):
 	NonBinariesInBindirs(recipe),
 	FilesInMandir(recipe),
         BadInterpreterPaths(recipe),
-        NonMultilibPython(recipe),
+        NonMultilibComponent(recipe),
 	ImproperlyShared(recipe),
 	CheckSonames(recipe),
         RequireChkconfig(recipe),

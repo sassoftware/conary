@@ -6,6 +6,9 @@ Changes in 0.50.1:
     troves which are not included in packages and groups by default,
     takes a --no-recurse option, and filters based on the excludeTroves
     configuration setting
+  * Added automatic :perl component that works like the :python component,
+    and extended the multilib-friendly-or-architecture-neutral policy to
+    work with perl as well as python.
 
 Changes in 0.50.0:
   * Redirections work
