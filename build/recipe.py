@@ -104,18 +104,52 @@ crossMacros = {
     'headerpath'	: '%(sysroot)s/usr/include',
 }
 
+def localImport(d, package, modules=()):
+    """
+    import a package into a non-global context.
+
+    @param d: the context to import the module
+    @type d: dict
+    @param package: the name of the module to import
+    @type package: str
+    @param modules: a sequence of modules to import from the package.
+    If a 2-tuple is in the sequence, rename the imported module to
+    the second value in the tuple.
+    @type modules: sequence of strings or tuples, or empty tuple
+
+    Examples of translated import statements::
+      from foo import bar as baz:
+          localImport(d, "foo", (("bar", "baz"))
+      from bar import fred, george:
+          localImport(d, "bar", ("fred", "george"))
+      import os
+          localImport(d, "os")
+    """
+    m = __import__(package, d, {}, modules)
+    if modules:
+        for name in modules:
+            if type(name) is tuple:
+                mod = name[0]
+                name = name[1]
+            else:
+                mod = name
+            d[name] = getattr(m, mod)
+    else:
+        d[package] = m
+    # save a reference to the module inside this context, so it won't
+    # be garbage collected until the context is deleted.
+    l = d.setdefault('__localImportModules', [])
+    l.append(m)
+
 def setupRecipeDict(d, filename):
-    exec 'from build import build' in d
-    exec 'from build import action' in d
-    exec 'from build.recipe import PackageRecipe' in d
-    exec 'from build.recipe import GroupRecipe' in d
-    exec 'from build.recipe import RedirectRecipe' in d
-    exec 'from build.recipe import FilesetRecipe' in d
-    exec 'from build.recipe import loadRecipe' in d
-    exec 'from lib import util' in d
-    exec 'import os, re, sys, stat' in d
-    exec 'from build.use import Use, Arch' in d
-    exec 'from build.use import LocalFlags as Flags' in d
+    localImport(d, 'build', ('build', 'action'))
+    localImport(d, 'build.recipe', ('PackageRecipe', 'GroupRecipe',
+                                    'RedirectRecipe', 'FilesetRecipe',
+                                    'loadRecipe'))
+    localImport(d, 'lib', ('util',))
+    for x in ('os', 're', 'sys', 'stat'):
+        localImport(d, x)
+    localImport(d, 'build.use', ('Arch', 'Use', ('LocalFlags', 'Flags')))
     d['filename'] = filename
 
 class RecipeLoader:
