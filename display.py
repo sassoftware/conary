@@ -26,7 +26,8 @@ _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
 def displayTroves(db, troveNameList = [], pathList = [], ls = False, 
-                  ids = False, sha1s = False, fullVersions = False):
+                  ids = False, sha1s = False, fullVersions = False, 
+                  tags = False):
     troveNames = []
     hasVersions = False
     for item in troveNameList:
@@ -44,7 +45,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
 	troveNames = [ (x, None) for x in db.iterAllTroveNames() ]
 	troveNames.sort()
 
-    if not hasVersions and not ls and not ids and not sha1s:
+    if not hasVersions and not ls and not ids and not sha1s and not tags:
         for path in pathList:
             for trove in db.iterTrovesByPath(path):
                 troveNames.append((trove.getName(), [ trove.getVersion() ]))
@@ -71,7 +72,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
     for (troveName, versionStr) in troveNames:
         try:
             for trove in db.findTrove(troveName, versionStr):
-                _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions)
+                _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags)
         except repository.PackageNotFound:
             if versionStr:
                 log.error("version %s of trove %s is not installed",
@@ -79,17 +80,23 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
             else:
                 log.error("trove %s is not installed", troveName)
         
-def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions):
+def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags):
 
     version = trove.getVersion()
 
-    if ls:
+    if ls or tags:
         outerTrove = trove
         for trove in db.walkTroveSet(outerTrove):
             iter = db.iterFilesInTrove(trove.getName(), trove.getVersion(),
                                        trove.getFlavor(),
                                        sortByPath = True, withFiles = True)
             for (fileId, path, version, file) in iter:
+                if tags: 
+                    if not file.tags:
+                        continue
+                    taglist = '[' + ' '.join(file.tags) + ']'
+                    print "%-40s   %s" % (path, taglist)
+                    continue
                 if isinstance(file, files.SymbolicLink):
                     name = "%s -> %s" %(path, file.target.value())
                 else:

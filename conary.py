@@ -76,6 +76,7 @@ def usage(rc = 1):
     print "               --path <file>"
     print "               --ls"
     print "               --sha1s"
+    print "               --tags"
     print ""
     print "repquery flags: --all"
     print "                --deps"    
@@ -246,6 +247,9 @@ def realMain(cfg, argv=sys.argv):
 	    del argSet['path']
 	else:
 	    paths = []
+
+	tags = argSet.has_key('tags')
+	if tags: del argSet['tags']
 	
 	ls = argSet.has_key('ls')
 	if ls: del argSet['ls']
@@ -266,7 +270,7 @@ def realMain(cfg, argv=sys.argv):
 	if len(otherArgs) >= 2:
 	    try:
                 display.displayTroves(db, otherArgs[2:], paths, ls, ids, sha1s,
-                                      fullVersions)
+                                      fullVersions, tags)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
 		return 1
