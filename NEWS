@@ -1,5 +1,10 @@
 Changes in 0.12.6
   * removed importrpm.py
+  * diffs between a file object that has a non-empty provides or requires
+    to a file object that has an empty provides or requires are now properly
+    generated and applied.
+  * added checks to validate merged file objects against the fileIds
+    in the changeset
 
 Changes in 0.12.5
   * reworked dependency resolution a bit for a big speedup in the server
