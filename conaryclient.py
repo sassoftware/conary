@@ -32,7 +32,7 @@ class VersionSuppliedError(UpdateError):
 
 class NoNewTrovesError(UpdateError):
     def __str__(self):
-        return "no new troves found"
+        return "no new troves were found"
 
 class ConaryClient:
     def __init__(self, repos = None, cfg = None):
@@ -113,7 +113,16 @@ class ConaryClient:
 
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, keepExisting = keepExisting)
- 
+
+    def eraseTrove(pkg, versionStr = None, tagScript = None):
+        pkgList = self.db.findTrove(pkg, versionStr)
+
+        list = []
+        for p in pkgList:
+            list.append((p.getName(), p.getVersion(), p.getFlavor()))
+
+        self.db.eraseTroves(list, tagScript = tagScript)
+
     def _prepareRoot(self):
         """Prepares the installation root for trove updates and change set applications."""
         if not os.path.exists(self.cfg.root):
