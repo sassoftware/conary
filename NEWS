@@ -1,3 +1,6 @@
+Changes in 0.12.6
+  * removed importrpm.py
+
 Changes in 0.12.5
   * reworked dependency resolution a bit for a big speedup in the server
   * moved destdir to %(builddir)s/_ROOT_

@@ -35,7 +35,6 @@ import constants
 import cscmd
 import deps
 import display
-import importrpm
 from lib import log
 from lib import options
 from lib import util
