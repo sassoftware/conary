@@ -535,7 +535,7 @@ def usage():
         '           --update cooks and updates a changeset on the local system',
         '         --ignore-scripts ignores RPM scripts, relying instead on',
         "           Conary's automated policy for all actions",
-        '         --noclean keeps conary from cleaning up after the build',
+        '         --no-clean keeps conary from cleaning up after the build',
         '         --commit tells conary to commit changes to the repository',
         '',
         ))
@@ -572,7 +572,7 @@ def main(argv):
         packageScripts = False
 
     cfg.noClean = False
-    if '--noclean' in argv:
+    if '--no-clean' in argv:
         cfg.noClean = True
 
     commitWork=False
