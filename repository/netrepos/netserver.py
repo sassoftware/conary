@@ -158,6 +158,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getFilesInTrove(self, authToken, clientVersion, troveName, versionStr, 
                         flavor, sortByPath = False, withFiles = False):
+        # XXX this method is deprecated
         version = self.toVersion(versionStr)
 	if not self.repos.auth.check(authToken, write = False, 
                                      trove = troveName,
