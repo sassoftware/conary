@@ -686,7 +686,7 @@ class Version(AbstractVersion):
 	    self.versions[count].timeStamp = stamp
 	    count += 2
 
-    def getSourceBranch(version):
+    def getSourceBranch(self):
         """ Takes a binary branch and returns its associated source branch.
             (any trailing version info is left untouched).
             If source is branched off of <repo1>-2 into <repo2>, its new
@@ -696,7 +696,7 @@ class Version(AbstractVersion):
             Always returns a copy of the branch, even when the two are
             equal.
         """
-        v = version.copy()
+        v = self.copy()
         if v.isVersion():
             p = v.branch()
         else:
@@ -711,7 +711,7 @@ class Version(AbstractVersion):
                 p.trailingVersion().buildCount = None
         return v
 
-    def getBinaryBranch(version):
+    def getBinaryBranch(self):
         """ Takes a source branch and returns its associated binary branch.
             (any trailing version info is left untouched).
             If source is branched off of <repo1>-2 into <repo2>, its new
@@ -721,7 +721,7 @@ class Version(AbstractVersion):
             Always returns a copy of the branch, even when the two are
             equal.
         """
-        v = version.copy()
+        v = self.copy()
         if v.isVersion():
             p = v.branch()
         else:
