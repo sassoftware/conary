@@ -8,7 +8,10 @@ import helper
 import log
 import os
 import package
+import repository
 import util
+import versioned
+import versions
 
 def checkin(repos, cfg, file):
     f = open(file, "r")
@@ -35,27 +38,41 @@ def checkin(repos, cfg, file):
     repos.commitChangeSet(changeSet)
 
 def checkout(repos, cfg, name, versionStr = None):
+    # This doesn't use helper.findPackage as it doesn't want to allow
+    # branches nicknames. Doing so would cause two problems. First, we could
+    # get multiple matches for a single pacakge. Two, even if we got
+    # a single match we wouldn't know where to check in changes. A nickname
+    # branch doesn't work for checkins as it could refer to multiple
+    # branches, even if it doesn't right now.
+    if name[0] != ":":
+	name = cfg.packagenamespace + ":" + name
+    name = name + ":sources"
+
+    if not versionStr:
+	version = cfg.defaultbranch
+    else:
+	if versionStr != "/":
+	    versionStr = cfg.defaultbranch.asString() + "/" + versionStr
+
+	try:
+	    version = versions.VersionFromString(versionStr)
+	except versions.ParseError, e:
+	    log.error(str(e))
+	    return
+
     try:
-	pkgList = helper.findPackage(repos, cfg.packagenamespace, 
-				     cfg.installbranch, name, versionStr)
-    except helper.PackageNotFound, e:
+	if version.isBranch():
+	    trv = repos.getLatestPackage(name, version)
+	else:
+	    trv = repos.getPackageVersion(name, version)
+    except versioned.MissingBranchError, e:
 	log.error(str(e))
 	return
-
-    if len(pkgList) > 1:
-	log.error("%s %s specified multiple packages" % (name, versionStr))
-	return
-
-    mainTrove = pkgList[0]
-    sourceTroveName = mainTrove.getName() + ":sources"
-    try:
-	trv = repos.getPackageVersion(sourceTroveName, mainTrove.getVersion())
     except repository.PackageMissing, e:
-	log.error("version %s of package %s does not have a source package",
-		  mainPkg.getVersion().asString(), mainTrove.getName())
+	log.error(str(e))
 	return
-
-    dir = mainTrove.getName().split(":")[-1]
+	
+    dir = trv.getName().split(":")[-2]
 
     if not os.path.isdir(dir):
 	try:
@@ -70,3 +87,7 @@ def checkout(repos, cfg, name, versionStr = None):
 	src = repos.pullFileContentsObject(fileObj.sha1())
 	dest = open(fullPath, "w")
 	util.copyfileobj(src, dest)
+
+    f = open(dir + "/" + "SRS", "w")
+    f.write("name %s\n" % ":".join(trv.getName().split(":")[:-1]))
+    f.write("version %s\n" % version.asString())
