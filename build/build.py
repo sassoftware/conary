@@ -433,11 +433,13 @@ class SetModes(_FileAction):
 
     def do(self, macros):
 	files = []
+	dest = macros['destdir']
 	for path in self.paths:
-	    files.extend(util.braceGlob(path %macros))
+	    files.extend(util.braceGlob(dest+os.sep+path %macros))
 	for f in files:
+	    f = util.normpath(f[len(dest):])
 	    log.debug('changing mode for %s to %o' %(f, self.mode))
-	    self.chmod(macros['destdir'], f)
+	    self.chmod(dest, f)
 	    self.setComponents(f)
 
 class _PutFiles(_FileAction):
