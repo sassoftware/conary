@@ -206,8 +206,62 @@ class NetworkAuthorization:
 
     def iterUsers(self):
         cu = self.db.cursor()
-        cu.execute("""SELECT Users.user, Users.userId, Permissions.write, Permissions.admin FROM Users
-                      LEFT JOIN Permissions ON Users.userId=Permissions.userGroupId""")
+        cu.execute("SELECT userId, user FROM Users")
+        
+        for row in cu:
+            yield row
+
+    def iterGroups(self):
+        cu = self.db.cursor()
+        cu.execute("SELECT userGroupId, userGroup FROM UserGroups")
+        
+        for row in cu:
+            yield row
+
+    def iterGroupsByUserId(self, userId):
+        cu = self.db.cursor()
+        cu.execute("""SELECT UserGroups.userGroupId, UserGroups.userGroup
+                      FROM UserGroups JOIN UserGroupMembers ON
+                      UserGroups.userGroupId = UserGroupMembers.userGroupId
+                      WHERE UserGroupMembers.userId=?""", userId)
+
+        for row in cu:
+            yield row
+
+    def iterPermsByGroupId(self, userGroupId):
+        cu = self.db.cursor()
+        cu.execute("""SELECT Labels.label, PerItems.item, write, capped, admin
+                      FROM Permissions
+                      LEFT OUTER JOIN Items AS PerItems ON
+                          PerItems.itemId = Permissions.itemId
+                      LEFT OUTER JOIN Labels ON
+                          Permissions.labelId = Labels.labelId
+                      WHERE userGroupId=?""", userGroupId)
+
+        for row in cu:
+            yield row
+
+    def addPermission(self, userGroupId,
+                      labelId = None, itemId = None,
+                      write = False, capped = False, admin = False):
+
+        cu = self.db.cursor()
+        cu.execute("INSERT INTO Permissions VALUES(?, ?, ?, ?, ?, ?)",
+                   userGroupId, labelId, itemId, write, capped, admin)
+        self.db.commit()
+
+    # XXX this is probably the wrong place for these functions...
+    def iterItems(self):
+        cu = self.db.cursor()
+
+        cu.execute("SELECT itemId, item FROM Items")
+        for row in cu:
+            yield row
+
+    def iterLabels(self):
+        cu = self.db.cursor()
+       
+        cu.execute("SELECT labelId, label FROM Labels")
         for row in cu:
             yield row
 
