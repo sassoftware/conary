@@ -1060,7 +1060,8 @@ exit $failed
 
 class ConsoleHelper(BuildAction):
     """
-    Set up consolehelper symlinks and control files for an application:
+    Set up consolehelper symlinks, control files, and dependency for an
+    application:
     C{r.ConsoleHelper(I{linkname}, I{realprogram}, [pamfile=I{path},]
     [user=I{user(root)},] [session=I{bool},] [fallback=I{bool},]
     [noxoption=I{optstring},] [otherlines=I{linelist}])}
