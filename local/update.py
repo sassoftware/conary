@@ -728,8 +728,8 @@ class FilesystemJob:
 		    log.debug("preserving new contents of %s" % finalPath)
 		elif headFile.flags.isConfig() and \
 					    not baseFile.flags.isConfig():
-		    # it changed in the filesystem and the repository, and
-		    # but it wasn't always a config files. this means we
+		    # it changed in the filesystem and the repository,
+		    # but it wasn't always a config file. this means we
 		    # don't have a patch available for it, and we just leave
 		    # the old contents in place
 		    if headFile.contents.sha1() != baseFile.contents.sha1():
