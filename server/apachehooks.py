@@ -192,8 +192,9 @@ def get(isSecure, repos, httpHandler, req):
     for (path, size) in items:
         req.sendfile(path)
 
-        if path.startswith(repos.tmpPath) and (req.args[0:6] != "cache-"
-               or not repos.cacheChangeSets()):
+        if path.startswith(repos.tmpPath) and \
+		not(os.path.basename(path)[0:6].startswith('cache-')):
+	    print "removing", path
             os.unlink(path)
 
     return apache.OK
