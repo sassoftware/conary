@@ -73,7 +73,7 @@ conary-wrapper: conary-wrapper.in
 	sed s,@conarydir@,$(conarydir),g $< > $@
 	chmod 755 $@
 
-constants.py: constants.py.in
+constants.py: constants.py.in Makefile
 	sed s,@version@,$(VERSION),g $< > $@
 
 install-mkdirs:
