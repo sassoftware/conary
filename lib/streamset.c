@@ -147,23 +147,23 @@ static PyObject * StreamSet_concatStrings(StreamSetDefObject * ssd,
 					  PyObject ** vals, int len,
 					  int includeEmpty) {
     char * final, * chptr;
-    int i, vallen;
+    int i, valLen;
 
     final = alloca(len);
     chptr = final;
     for (i = 0; i < ssd->tagCount; i++) {
 	if (vals[i] != Py_None)  {
-	    vallen = PyString_GET_SIZE(vals[i]);
+	    valLen = PyString_GET_SIZE(vals[i]);
 	    /* do not include zero length frozen data if requested */
-	    if (vallen > 0 || includeEmpty) {
+	    if (valLen > 0 || includeEmpty) {
 		/* either we have data or including empty data was
 		   requested */
 		*chptr++ = ssd->tags[i].tag;
-		*((short *) chptr) = htons(vallen);
+		*((short *) chptr) = htons(valLen);
 		chptr += 2;
 		
-		memcpy(chptr, PyString_AS_STRING(vals[i]), vallen);
-		chptr += vallen;
+		memcpy(chptr, PyString_AS_STRING(vals[i]), valLen);
+		chptr += valLen;
 	    } else {
 		/* otherwise we need to reduce the total size because
 		   we are excluding tags */
@@ -197,7 +197,7 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args) {
     int i, len;
     PyObject * attr, * otherAttr;
     StreamSetObject * other;
-    
+
     if (!PyArg_ParseTuple(args, "O!", self->ob_type, &other))
         return NULL;
 
@@ -283,7 +283,8 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
 	Py_DECREF(attr);
 	if (!vals[i])
 	    return NULL;
-	len += PyString_GET_SIZE(vals[i]) + 3;
+        if (vals[i] != Py_None)
+            len += PyString_GET_SIZE(vals[i]) + 3;
     }
     /* do not include zero length frozen data */
     return StreamSet_concatStrings(ssd, vals, len, EXCLUDE_EMPTY);
@@ -302,7 +303,7 @@ static int StreamSet_Init(PyObject * self, PyObject * args,
     PyObject * attr;
     int offset = 0;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|s#i", kwlist, &data, 
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|z#i", kwlist, &data, 
 				     &dataLen, &offset)) {
         return -1;
     }
@@ -386,7 +387,7 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
     int streamId;
     PyObject * attr, * baseAttr;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#O!|O", kwlist, 
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "z#O!|O", kwlist, 
 				     &diff, &diffLen, self->ob_type,
 				     &base, &skipSet))
         return NULL;
@@ -394,6 +395,11 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
     if (skipSet != Py_None && skipSet->ob_type != &PyDict_Type) {
         PyErr_SetString(PyExc_TypeError, "skipSet must be None or a dict");
 	return NULL;
+    }
+
+    if (!diff) {
+        Py_INCREF(Py_False);
+        return Py_False;
     }
 
     ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
@@ -410,7 +416,7 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
 	for (i = 0; i < ssd->tagCount; i++)
 	    if (ssd->tags[i].tag == streamId) break;
 	if (i == ssd->tagCount) {
-	    PyErr_SetString(PyExc_ValueError, "Unknown tag for merge");
+	    PyErr_SetString(PyExc_ValueError, "unknown tag for merge");
 	    return NULL;
 	}
 
