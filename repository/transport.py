@@ -75,11 +75,11 @@ class XMLOpener(urllib.FancyURLopener):
         if data is not None:
             h.send(data)
         errcode, errmsg, headers = h.getreply()
-        fp = h.getfile()
-        encoding = headers.get('Content-encoding', None)
-        if encoding == 'zlib':
-            fp = StringIO(zlib.decompress(fp.read()))
         if errcode == 200:
+            fp = h.getfile()
+            encoding = headers.get('Content-encoding', None)
+            if encoding == 'zlib':
+                fp = StringIO(zlib.decompress(fp.read()))
             return urllib.addinfourl(fp, headers, "http:" + url)
         else:
 	    raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
