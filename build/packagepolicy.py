@@ -35,9 +35,6 @@ class ComponentSpec(_filterSpec):
     """
     Determines which component each file is in.
     """
-    # XXX TEMPORARY - remove directories such as /usr/include from this
-    # list when filesystem package is in place and we have install
-    # ordering.
     baseFilters = (
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
@@ -46,19 +43,13 @@ class ComponentSpec(_filterSpec):
 		       '\.so',
 		       '.*/include/.*\.h',
 		       '%(includedir)s/',
-		       '%(includedir)s',
 		       '%(mandir)s/man(2|3)/',
-		       '%(mandir)s/man(2|3)',
-		       '%(datadir)s/aclocal/',
-		       '%(datadir)s/aclocal')),
-	('lib',       ('.*/lib/.*\.so\..*',
-                       '.*/lib')),
+		       '%(datadir)s/aclocal/')),
+	('lib',       ('.*/lib/.*\.so\..*')),
 	# note that gtk-doc is not well-named; it is a shared system, like info,
 	# and is used by unassociated tools (devhelp)
-	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info)/',
-		       '%(datadir)s/(gtk-doc|doc|man|info)')),
-	('locale',    ('%(datadir)s/locale/',
-		       '%(datadir)s/locale')),
+	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info)/')),
+	('locale',    ('%(datadir)s/locale/')),
 	('emacs',     ('%(datadir)s/emacs/site-lisp/.*',)),
 	('runtime',   ('.*',)),
     )
