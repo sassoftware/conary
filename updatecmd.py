@@ -36,7 +36,11 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False,
             pass
         else:
             if cs.isAbsolute():
-                cs = db.rootChangeSet(cs)
+                try:
+                    cs = db.rootChangeSet(cs)
+                except repository.CommitError, e:
+                    sys.stderr.write("%s\n" %str(e))
+                    return 1
 
 	    list = [ x.getName() for x  in cs.iterNewPackageList() ]
 	    if versionStr:
