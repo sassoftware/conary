@@ -58,7 +58,7 @@ class FileMode:
 		else:
 		    rc = rc + " " + selfLine[i]
 
-	    return rc + "\n"
+	    return rc
 	else:
 	    return self.infoLine()
 
