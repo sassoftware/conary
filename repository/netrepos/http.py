@@ -14,7 +14,7 @@
 import urllib
 import urlparse
 import xml.dom.minidom
-from fmtroves import TroveCategories
+from fmtroves import TroveCategories, LicenseCategories
 from htmlengine import HtmlEngine
 from metadata import MDClass
 from urllib2 import urlopen
@@ -67,10 +67,10 @@ class HttpHandler(HtmlEngine):
             branch = version.branch().freeze()
 
             branchName = branch.split("@")[-1]
-            branches[branchName] = branch
+            branches[branch] = branchName
 
         if len(branches) == 1:
-            self._getMetadata(troveName, branches.values()[0])
+            self._getMetadata(troveName, branches.keys()[0])
             return
 
         self.htmlPageTitle("Please choose a branch:")
@@ -119,12 +119,14 @@ class HttpHandler(HtmlEngine):
         metadata[4] = []
         for node in doc.getElementsByTagName("trove_id"):
             id = node.childNodes[0].data
-            name = TroveCategories[id]
             
-            if name.startswith("License"):
+            if id in LicenseCategories:
+                name = LicenseCategories[id]
                 metadata[3].append(name)
             else:
-                metadata[4].append(name)
+                name = TroveCategories[id]
+                if name.startswith('Topic ::'):
+                    metadata[4].append(name)
 
         return metadata
 

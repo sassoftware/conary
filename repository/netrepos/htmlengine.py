@@ -12,6 +12,7 @@
 # full details.
 #
 from metadata import MDClass
+from fmtroves import TroveCategories, LicenseCategories
 
 class HtmlEngine:
 
@@ -124,6 +125,11 @@ Choose a branch: %s
         else:
             versionStr = "Initial Version"
 
+        licenses = [x for x in LicenseCategories.values() if "::" in x]
+        licenses.sort()
+        categories = [x for x in TroveCategories.values() if x.startswith('Topic') and '::' in x]
+        categories.sort()
+
         self.writeFn("""
 <h2>Metadata for %s</h2>
 <h4>Branch: %s</h4>
@@ -147,9 +153,9 @@ Choose a branch: %s
          self._genSelect(metadata[MDClass.URL], "urlList", size=4, expand=True, multiple=True),
          self._genSelectAppender("newUrl", "urlList"),
          self._genSelect(metadata[MDClass.LICENSE], "licenseList", size=4, expand=True, multiple=True),
-         self._genSelectAppender("newLicense", "licenseList"),
+         self._genSelectAppenderList("newLicense", "licenseList", licenses),
          self._genSelect(metadata[MDClass.CATEGORY], "categoryList", size=4, expand=True, multiple=True),
-         self._genSelectAppender("newCategory", "categoryList"),
+         self._genSelectAppenderList("newCategory", "categoryList", categories), 
          branchFrz, troveName)
          )
 
@@ -167,7 +173,6 @@ Choose a branch: %s
         self.writeFn("""Successfully updated %s's metadata on branch %s.""" 
             % (troveName, branchStr))
 
-
     def _genSelectAppender(self, name, selectionName):
         """Generates an input box and add/remove button pair to manage a list of arbitrary
            items in a selection."""
@@ -177,6 +182,19 @@ Choose a branch: %s
 <input type="button" onClick="javascript:append('%s', '%s');" value="Add" />
 <input type="button" onClick="javascript:removeSelected('%s');" value="Remove" />""" %\
             (name, inputId, selectionName, inputId, selectionName)
+        return s
+
+    def _genSelectAppenderList(self, name, selectionName, items):
+        """Generates an selection and add/remove button pair to manage a list of arbitrary
+           items in a selection."""
+        inputId = name + "Select"
+
+        s = self._genSelect(items, inputId, expand=True)
+        s += """
+<input type="button" onClick="javascript:append('%s', '%s');" value="Add" />
+<input type="button" onClick="javascript:removeSelected('%s');" value="Remove" />
+""" %\
+            (selectionName, inputId, selectionName)
         return s
 
     def _genSelect(self, items, name, default=None, size=1, expand=False, multiple=False):
@@ -202,7 +220,7 @@ Choose a branch: %s
             items = items.items()
 
         for key, item in items:
-            s += """<option value="%s">%s</option>\n""" % (item, key)
+            s += """<option value="%s">%s</option>\n""" % (key, item)
         s += """</select>"""
 
         return s
