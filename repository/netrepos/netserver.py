@@ -192,21 +192,26 @@ class NetworkAuthorization:
 	""" 
 	m = md5.new()
 	m.update(authToken[1])
-	params = (authToken[0], m.hexdigest())
+	params = [authToken[0], m.hexdigest()]
 
-	if label or trove:
-	    stmt += " WHERE "
-
+	where = []
 	if label:
-	    stmt += " labelId=(SELECT labelId FROM Labels WHERE " \
-			    "label=%s) OR labelId is Null" 
-	    params += (label.asString(),)
+	    where.append(" labelId=(SELECT labelId FROM Labels WHERE " \
+			    "label=%s) OR labelId is Null")
+	    params.append(label.asString())
+
 	if trove:
-	    if label:
-		stmt += " AND "
-	    stmt += " troveNameId=(SELECT troveNameId FROM TroveNames WHERE " \
-			    "troveName=%s) OR troveNameId is Null" 
-	    params += (trove,)
+	    where.append(" troveNameId=(SELECT troveNameId FROM TroveNames "
+			        "WHERE troveName=%s) OR troveNameId is Null" )
+	    params.append(trove)
+
+	if write:
+	    where.append("write=1")
+
+	if where:
+	    stmt += "WHERE " + " AND ".join(where)
+
+	print stmt
 
 	cu = self.db.cursor()
 	cu.execute(stmt, params)

@@ -9,7 +9,8 @@ CREATE TABLE TroveNames (troveNameId INTEGER PRIMARY KEY,
 		         troveName STRING UNIQUE);
 CREATE TABLE Permissions (userId INTEGER,
 		          labelId INTEGER,
-		          troveNameId INTEGER);
+		          troveNameId INTEGER,
+			  write INTEGER);
 CREATE INDEX PermissionsIdx ON Permissions(userId, labelId, troveNameId);
 
 COMMIT;
