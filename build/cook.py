@@ -226,7 +226,8 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
 	    grp.addPackage(pkg.getName(), [ pkg.getVersion() ])
 
 	changeSet = changeset.CreateFromFilesystem(packageList)
-	changeSet.newGroup(grp.diff(None, abstract = 1))
+	(grpDiff, grpList) = grp.diff(None, abstract = 1)
+	changeSet.newGroup(grpDiff)
 
 	repos.commitChangeSet(changeSet)
 
