@@ -145,6 +145,8 @@ class Configure(ShellCommand):
     default paths as defined by the macro set passed into it when doBuild
     is invoked.
     """
+    # note that template is NOT a tuple, () is used merely to group strings
+    # to avoid trailing \ characters on every line
     template = (
 	'cd %%(builddir)s; '
 	'%%(mkObjdir)s '
@@ -203,12 +205,14 @@ class ManualConfigure(Configure):
 
 class Make(ShellCommand):
     template = ('cd %%(builddir)s; '
-                '%(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s')
+	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+                ' %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': ''}
 
 class MakeInstall(ShellCommand):
     template = ('cd %%(builddir)s; '
-                '%(preMake)s make %%(mflags)s %%(rootVarArgs)s'
+	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+                ' %(preMake)s make %%(mflags)s %%(rootVarArgs)s'
 		' %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
                 'preMake': '',
@@ -227,7 +231,8 @@ class GNUMakeInstall(ShellCommand):
     """For use at least when there is no single functional DESTDIR or similar"""
     template = (
 	'cd %%(builddir)s; '
-	'%(preMake)s make %%(mflags)s'
+	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	' %(preMake)s make %%(mflags)s'
 	' prefix=%%(destdir)s/%%(prefix)s'
 	' exec-prefix=%%(destdir)s/%%(exec_prefix)s'
 	' bindir=%%(destdir)s/%%(bindir)s'
@@ -244,6 +249,22 @@ class GNUMakeInstall(ShellCommand):
 	' %(installtarget)s %(args)s')
     keywords = {'preMake': '',
 		'installtarget': 'install'}
+
+
+
+class InstallDesktopfile(ShellCommand):
+    template = ('desktop-file-install --vendor %(vendor)s'
+		' --dir %%(destdir)s/%%(datadir)s/applications'
+		' %%(category)s'
+		' %(args)s')
+    keywords = {'vendor': 'net',
+		'categories': None}
+
+    def doBuild(self, macros):
+	macros = macros.copy()
+        if self.categories:
+	    macros['category'] = '--add-category %s' %self.categories
+	ShellCommand.doBuild(self, macros)
 
 
 class _PutFiles:
@@ -312,20 +333,22 @@ class InstallSymlinks:
 	    sources = []
 	    for fromFile in self.fromFiles:
 		sources.extend(util.braceExpand(fromFile %macros))
-	else:
-	    if os.path.exists(dest) or os.path.islink(dest):
-		os.remove(dest)
 
 	if type(self.fromFiles) is str:
 	    if self.toFile.endswith('/'):
 		dest = dest + os.path.basename(self.fromFiles)
 	    print '+ creating symlink from %s to %s' %(dest, self.fromFiles)
+	    if os.path.exists(dest) or os.path.islink(dest):
+		os.remove(dest)
 	    os.symlink(self.fromFiles %macros, dest)
 	    return
 
 	for source in sources:
 	    print '+ creating symlink from %s to %s' %(dest, source)
-	    os.symlink(source, dest+os.path.basename(source))
+	    dest = dest+os.path.basename(source)
+	    if os.path.exists(dest) or os.path.islink(dest):
+		os.remove(dest)
+	    os.symlink(source, dest)
 
     def __init__(self, fromFiles, toFile, use=None):
 	# raise error early
