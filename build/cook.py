@@ -24,7 +24,7 @@ from repository import repository
 from repository.netclient import NetworkRepositoryClient
 import files
 from lib import log
-import buildinfo, lookaside, use, recipe
+import buildinfo, buildpackage, lookaside, use, recipe
 import os
 import resource
 from lib import sha1helper
@@ -295,20 +295,29 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     recipeObj = recipeClass(repos, cfg, buildBranch, cfg.flavor)
 
     try:
+        use.track(True)
+        recipeObj.Flags._freeze()
 	recipeObj.setup()
         recipeObj.findTroves()
+	use.track(False)
     except recipe.RecipeFileError, msg:
 	raise CookError(str(msg))
 
     grpFlavor = deps.deps.DependencySet()
+    grpFlavor.union(buildpackage._getUseDependencySet(recipeObj))
+
+    for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
+        for (version, flavor) in versionFlavorList:
+            grpFlavor.union(flavor)
+
+    if not grpFlavor:
+        grpFlavor = None
+
     grp = trove.Trove(fullName, versions.NewVersion(), grpFlavor, None)
 
-    d = {}
     for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
         for (version, flavor) in versionFlavorList:
             grp.addTrove(name, version, flavor)
-            if flavor:
-                grpFlavor.union(flavor)
 
     targetVersion = repos.nextVersion(fullName, recipeClass.version, grpFlavor, 
 				      buildBranch, binary = True, 
@@ -325,7 +334,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     changeSet = changeset.ChangeSet()
     changeSet.newPackage(grpDiff)
 
-    built = [ (grp.getName(), grp.getVersion().asString()) ]
+    built = [ (grp.getName(), grp.getVersion().asString(), grp.getFlavor()) ]
     return (changeSet, built, None)
 
 def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
@@ -372,7 +381,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 	if fileObj.hasContents:
 	    flavor.union(fileObj.flavor.value())
 	changeSet.addFile(None, fileId, fileObj.freeze())
-	
+    if not flavor:
+        flavor = None
 
 	# since the file is already in the repository (we just committed
 	# it there, so it must be there!) leave the contents out. this
@@ -396,7 +406,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
     filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newPackage(filesetDiff)
 
-    built = [ (fileset.getName(), fileset.getVersion().asString()) ]
+    built = [ (fileset.getName(), fileset.getVersion().asString(), 
+                                                fileset.getFlavor()) ]
     return (changeSet, built, None)
 
 def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True, 
@@ -569,13 +580,14 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, 
 					targetVersion, ident)
 
-	built.append((compName, p.getVersion().asString()))
+	built.append((compName, p.getVersion().asString(), 
+                                                    p.getFlavor() or None))
 	packageList.append((p, fileMap))
 	
 	# don't install :test component when you are installing
 	# the package
 	if not comp in recipeObj.getUnpackagedComponentNames():
-	    grp.addTrove(compName, p.getVersion(), p.getFlavor())
+	    grp.addTrove(compName, p.getVersion(), p.getFlavor() or None)
 
     changeSet = changeset.CreateFromFilesystem(packageList)
     for packageName in grpMap:

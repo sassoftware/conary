@@ -117,11 +117,41 @@ class Dependency(BaseDependency):
 	Returns a new Dependency which merges the flags from the two
 	existing dependencies. We don't want to merge in place as this
 	Dependency could be shared between many objects (via a 
-	DependencyGroup)
+	DependencyGroup).  Always pick an absolute flavor over a preference:
+        e.g. when merging a set of flags with a ~foo and !foo, 
+        make the merged flavor !foo.  
 	"""
 	allFlags = self.flags.copy()
-	allFlags.update(other.flags)
+        for flag in other.flags:
+            if flag[0] == '~':
+                baseFlag = flag[1:]
+            else:
+                baseFlag = flag
+            if baseFlag[0] == '!':
+                opposite = baseFlag[1:]
+            else:
+                opposite = '!' + baseFlag
 
+            if flag[0] == '~':
+                # don't allow ~foo and ~!foo, ignore this flag if a stronger
+                # flag (with no ~) exists
+                if '~' + opposite  in allFlags:
+                    raise RuntimeError, ("Invalid flag combination in merge:"
+                                         " %s and ~%s"  % (flag, opposite))
+                if opposite in allFlags or baseFlag in allFlags:
+                    continue
+                allFlags[flag] = True
+            else:
+                # don't allow foo and !foo, delete any weaker flags -- 
+                # (with ~)
+                if opposite in allFlags:
+                    raise RuntimeError, ("Invalid flag combination in merge:"
+                                         " %s and %s"  % (flag, opposite))
+                if ('~' + baseFlag) in allFlags:
+                    del allFlags['~' + baseFlag]
+                elif ('~' + opposite) in allFlags:
+                    del allFlags['~' + opposite]
+                allFlags[flag] = True
 	return Dependency(self.name, allFlags)
 
     def getName(self):

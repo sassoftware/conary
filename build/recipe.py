@@ -588,6 +588,7 @@ class PackageRecipe(Recipe):
 	self.mainDir(self.nameVer())
 
 class GroupRecipe(Recipe):
+    Flags = use.LocalFlags
 
     def addTrove(self, name, versionStr = None, flavor = None):
         if flavor is not None:
