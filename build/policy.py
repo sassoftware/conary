@@ -26,14 +26,16 @@ class Policy(util.Action):
     well, but should use the same rules if they do use them.  All of
     them have C{self.macros} applied before use.
 
-    @cvar invariantsubtrees: if invariantsubtrees is not empty,
+    @cvar invariantsubtrees: if C{invariantsubtrees} is not empty,
     then it is a list of subtrees (relative to C{%(destdir)s}) to
-    walk INSTEAD of walking the entire C{%(destdir)s} tree.
+    walk INSTEAD of walking the entire C{%(destdir)s} tree.  Any
+    C{subtrees} are appended to C{invariantsubtrees}.
 
-    @cvar invariantinclusions: if invariantinclusions is not empty,
+    @cvar invariantinclusions: if C{invariantinclusions} is not empty,
     then only files matching a filter in it are considered to be passed
     to to the C{doFile} method.  Any exceptions, including invariants,
-    are applied after invariantinclusions are applied.
+    are applied after C{invariantinclusions} are applied; this means
+    that all exceptions OVERRULE every type of inclusion.
 
     @cvar invariantexceptions: subclasses may set to a list of
     exception filters that are always applied regardless of what other
@@ -47,6 +49,7 @@ class Policy(util.Action):
     keywords = {
         'use': None,
         'exceptions': None
+	'subtrees': None
     }
 
     def __init__(self, *args, **keywords):
@@ -73,14 +76,19 @@ class Policy(util.Action):
 	a policy object.  It acts rather like __init__ except that it
 	can meaningfully be called more than once for an object.
 
-	Some keyword arguments (at least C{exceptions}) should be
-	appended rather than replaced.
+	Some keyword arguments (at least C{exceptions} and C{subtrees})
+	should be appended rather than replaced.
 	"""
 	exceptions = keywords.pop('exceptions', None)
 	if exceptions:
 	    if not self.exceptions:
 		self.exceptions = []
 	    self.exceptions.append(exceptions)
+	subtrees = keywords.pop('subtrees', None)
+	if subtrees:
+	    if not self.subtrees:
+		self.subtrees = []
+	    self.subtrees.append(subtrees)
 	self.addArgs(*args, **keywords)
 
     def filterExpression(self, expression, name=None):
