@@ -47,8 +47,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    else:
 		return (True, ("TroveMissing", e.troveName, 
 			self.fromVersion(e.version)))
-	#except repository.CommitError, e:
-	#    return (True, ("CommitError", str(e)))
+	except repository.CommitError, e:
+	    return (True, ("CommitError", str(e)))
 	except ClientTooOld, e:
 	    return (True, ("ClientTooOld", str(e)))
 	except Exception:
