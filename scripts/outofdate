@@ -82,7 +82,9 @@ def getOutOfDate(pkgs, sources, versions):
                 
 def getMissing(sources, versions):
     abstract = [ 'cpanpackage', 'gnomepackage' ]
-    dead = [ 'srs', 'srs-python', 'viewcvs', 'gnome-vfs-extras', 'bootstrap-srs', 'bootstrap-srs-python', 'gqview', 'imlib' ] 
+    dead = [ 'srs', 'srs-python', 'viewcvs', 'gnome-vfs-extras',
+        'group-cyrus-sasl', 'bootstrap-srs', 'bootstrap-srs-python',
+        'gqview', 'imlib', 'tora' ] 
     missing = []
     missinggroups = []
     missingbootstraps = []
