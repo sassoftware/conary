@@ -78,6 +78,10 @@ class Epdb(pdb.Pdb):
 
     def do_list(self, arg):
         rel = re.compile(r'^[-+] *[0-9]* *$')
+        if arg and arg == '.':
+            self.lineno = None
+            pdb.Pdb.do_list(self, '')
+            return
         if rel.match(arg):
             if arg == '-':
                 reldist = -7
