@@ -316,6 +316,7 @@ class SymbolicLink(File):
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
+        util.mkdirChain(os.path.dirname(target))
 	os.symlink(self.theLinkTarget, target)
 	File.restore(self, target, restoreContents, skipMtime = 1)
 
@@ -342,6 +343,7 @@ class Socket(File):
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
+        util.mkdirChain(os.path.dirname(target))
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
         sock.bind(target)
         sock.close()
@@ -360,6 +362,7 @@ class NamedPipe(File):
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
+        util.mkdirChain(os.path.dirname(target))
 	os.mkfifo(target)
 	File.restore(self, target, restoreContents)
 
@@ -417,6 +420,7 @@ class DeviceFile(File):
 	    flags = stat.S_IFCHR
 	else:
 	    flags = stat.S_IFBLK
+        util.mkdirChain(os.path.dirname(target))
 	os.mknod(target, flags, os.makedev(self.major, self.minor))
             
 	File.restore(self, target, restoreContents)
