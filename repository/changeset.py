@@ -588,10 +588,11 @@ class ChangeSetFromFile(ChangeSet):
 	else:
             self.filesRead = True
 
-            if not self.fileQueue:
+            if self.lastCsf:
                 next = self.csf.getNextFile()
                 if next:
                     self.fileQueue.append(next + (self.csf,))
+                self.lastCsf = None
 
             while self.fileQueue:
                 rc = self.fileQueue[0]
@@ -608,6 +609,7 @@ class ChangeSetFromFile(ChangeSet):
 
                     # we found the one we're looking for, break out
                     if name == fileId:
+                        self.lastCsf = csf
                         break
 
                 next = csf.getNextFile()
@@ -758,6 +760,9 @@ class ChangeSetFromFile(ChangeSet):
 	self.configCache = {}
         self.filesRead = False
 
+        self.lastCsf = None
+        self.fileQueue = []
+
         # load the diff cache
         nextFile = self.csf.getNextFile()
         while nextFile:
@@ -778,7 +783,7 @@ class ChangeSetFromFile(ChangeSet):
             nextFile = self.csf.getNextFile()
 
         if nextFile:
-            self.fileQueue = [ nextFile + (self.csf,) ]
+            self.fileQueue.append(nextFile + (self.csf,))
 
 # old may be None
 def fileChangeSet(fileId, old, new):
