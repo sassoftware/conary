@@ -14,7 +14,6 @@ import deps.deps
 from repository import changeset
 from repository import filecontents
 import files
-from repository import fsrepos
 import helper
 import log
 from build import lookaside, use
@@ -454,7 +453,7 @@ class CookError(Exception):
 
 def cookCommand(cfg, args, prep, macros):
     # this ensures the repository exists
-    repos = fsrepos.FilesystemRepository(cfg.reppath, "c")
+    repos = helper.openRepository(cfg.reppath, "c")
     repos.close()
 
     for item in args:
@@ -470,7 +469,7 @@ def cookCommand(cfg, args, prep, macros):
 	    os.umask(0022)
 	    # and if we do not create core files we will not package them
 	    resource.setrlimit(resource.RLIMIT_CORE, (0,0))
-	    repos = fsrepos.FilesystemRepository(cfg.reppath, "r")
+	    repos = helper.openRepository(cfg.reppath, "r")
             try:
                 built = cookItem(repos, cfg, item, prep=prep, macros=macros)
             except CookError, msg:
