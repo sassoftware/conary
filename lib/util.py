@@ -8,6 +8,7 @@ import string
 import errno
 import sys
 import traceback
+import pdb
 
 def mkdirChain(*paths):
     for path in paths:
@@ -36,5 +37,4 @@ def excepthook(type, value, tb):
     sys.excepthook = sys.__excepthook__
     lines = traceback.format_exception(type, value, tb)
     print string.joinfields(lines, "")
-    import pdb
     pdb.post_mortem(tb)
