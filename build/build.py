@@ -182,12 +182,23 @@ class Make(BuildCommand):
     make by using self.disableParallelMake() in your recipe.  If your
     package can do parallel builds but needs some other mechanism,
     then you can modify parallelmflags as necessary in your recipe.
+
+    @keyword preMake: string to be inserted before the "make" command.
+      Use preMake if you need to set an environment variable.  The
+      preMake keyword cannot contain a ;
+    @keyword subDir: the sub directory to enter before running "make"
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
                 ' %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
                 'subDir': ''}
+
+    def __init__(self, *args, **keywords):
+        if 'preMake' in keywords:
+            if ';' in keywords['preMake']:
+                raise TypeError, 'preMake argument cannot contain ;'
+        BuildCommand.__init__(self, *args, **keywords)
 
 class MakeParallelSubdir(Make):
     """
