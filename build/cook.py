@@ -128,6 +128,23 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     
     assert(0)
 
+def cookGroupObject(repos, cfg, recipeClass, buildBranch, 
+		      changeSetFile = None, prep=True, macros=()):
+    """
+    Just like cookObject(), but only works for objects descended
+    from recipe.GroupRecipe.
+
+    The parameters and return type are identical to those for
+    cookObject()
+    """
+
+    built = []
+    log.info("Building %s", recipeClass.name)
+
+    fullName = cfg.packagenamespace + ":" + recipeClass.name
+
+    recipeObj = recipeClass(repos, cfg)
+
 def cookPackageObject(repos, cfg, recipeClass, buildBranch, 
 		      changeSetFile = None, prep=True, macros=()):
     """
@@ -187,7 +204,6 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
 		pkg = repos.getPackageVersion(name, version)
 		pkgList += pkg.getPackageList()
 
-    srcName = fullName + ":sources"
     if repos.hasPackage(srcName):
 	pkg = repos.getLatestPackage(srcName, buildBranch)
 	ident.populate(repos, lcache, pkg)

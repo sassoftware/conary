@@ -171,9 +171,6 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     for (fileId, path, version) in trv.fileList():
 	fullPath = dir + "/" + path
 	fileObj = repos.getFileVersion(fileId, version)
-        # XXX src and dest are not used
-	src = repos.pullFileContentsObject(fileObj.sha1())
-	dest = open(fullPath, "w")
 	contents = filecontents.FromRepository(repos, fileObj.sha1())
 	fileObj.restore(contents, fullPath, 1)
 

@@ -575,6 +575,16 @@ class PackageRecipe(Recipe):
 	if extraMacros:
 	    self.addMacros(extraMacros)
 
+class GroupRecipe():
+
+    def addTrove(self, name, version):
+	self.troveVersions[name] = version
+
+    def __init__(self, repos, cfg):
+	self.repos = repos
+	self.cfg = cfg
+	self.troveVersions = []
+
 class RecipeFileError(Exception):
     def __init__(self, msg):
         self.msg = msg
