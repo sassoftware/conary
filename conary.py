@@ -349,6 +349,9 @@ def realMain(cfg, argv=sys.argv):
         ls = argSet.has_key('ls')
 	if ls: del argSet['ls']
 
+        all = argSet.has_key('all')
+	if all: del argSet['all']
+
         tags = argSet.has_key('tags')
 	if tags: del argSet['tags']
 
@@ -367,7 +370,7 @@ def realMain(cfg, argv=sys.argv):
         fullVersions = argSet.has_key('full-versions')
 	if fullVersions: del argSet['full-versions']
 
-        if argSet: return usage()
+        if argSet: return showchangeset.usage()
 
         if len(otherArgs) < 3:
             showchangeset.usage()
@@ -381,7 +384,7 @@ def realMain(cfg, argv=sys.argv):
 	repos = openRepository(cfg.repositoryMap)
         showchangeset.displayChangeSet(db, repos, cs, component, cfg, ls, 
                                         tags, info, fullVersions, showChanges, 
-                                        ids=ids, sha1s=sha1s)
+                                        ids=ids, sha1s=sha1s, all=all)
     elif (otherArgs[1] == "update"):
 	kwargs = {}
 

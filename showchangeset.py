@@ -33,6 +33,8 @@ def usage():
     print "                --ls              (Recursive) list file contents"
     print "                --show-changes    For modifications, show the old file version next to new one"
     print "                --tags            Show tagged files (use with ls to show tagged and untagged)"
+    print "                --sha1s           Show sha1s for files"
+    print "                --ids             Show fileids"
     print "                --all             Combine above tags"
     print ""
 
@@ -42,6 +44,8 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                      info=False, fullVersions=False, showChanges=False,
                     all=False, deps=False, sha1s=False, ids=False):
     (troves, hasVersions) = getTroves(cs, troveList) 
+    if all:
+        ls = tags = fullVersions = info = deps = True
     
     if not (ls or tags or sha1s or ids):
         if hasVersions:
