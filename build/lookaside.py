@@ -21,7 +21,7 @@ import log
 # location is normally the package name
 
 def createCacheName(cfg, name, location, negative=''):
-    cachedname = '%s/%s%s/%s' %(cfg.lookaside, negative, location, name)
+    cachedname = os.sep.join((cfg.lookaside, negative + location, name))
     util.mkdirChain(os.path.dirname(cachedname))
     return cachedname
 
@@ -50,7 +50,7 @@ def createCacheEntry(cfg, name, location, infile):
     return cachedname
 
 def createNegativeCacheEntry(cfg, name, location):
-    negativeEntry = createCacheName(cfg, name, location, 'NEGATIVE/')
+    negativeEntry = createCacheName(cfg, name, location, 'NEGATIVE' + os.sep)
     open(negativeEntry, "w+").close()
 
 def searchCache(cfg, name, location):
@@ -59,7 +59,8 @@ def searchCache(cfg, name, location):
     if name.startswith("http://") or name.startswith("ftp://"):
 
 	# check for negative cache entries to avoid spamming servers
-	negativeName = '%s/NEGATIVE/%s/%s' %(cfg.lookaside, location, name[5:])
+	negativeName = os.sep.join((cfg.lookaside, 'NEGATIVE',
+                                    location, name[5:]))
 	if os.path.exists(negativeName):
 	    if time.time() > 60*60*24*7 + os.path.getmtime(negativeName):
 		os.remove(negativeName)
@@ -67,13 +68,14 @@ def searchCache(cfg, name, location):
 	    return -1
 
 	# exact match first, then look for cached responses from other servers
-	positiveName = '%s/%s/%s' %(cfg.lookaside, location, name[5:])
+	positiveName = os.sep.join((cfg.lookaside, location, name[5:]))
 	if os.path.exists(positiveName):
 	    return positiveName
-	return util.searchPath(basename, '%s/%s/%s' %(cfg.lookaside, location,
-	                                              basename))
+	return util.searchPath(basename, os.sep.join((cfg.lookaside,
+                                                      location, basename)))
     else:
-	return util.searchFile(basename, ['%s/%s' %(cfg.lookaside, location)])
+	return util.searchFile(basename,
+                               [os.sep.join((cfg.lookaside, location))])
 
 
 def searchRepository(cfg, repCache, name, location):
