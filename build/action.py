@@ -120,16 +120,23 @@ def excepthook(type, exc_msg, tb):
 	    exc_message = "%s:%s: %s: %s" % (self.file, self.linenum, 
 					  type.__name__, exc_msg)
 	print exc_message
-    buildinfo = self.recipe.buildinfo
-    buildinfo.error = exc_message
-    buildinfo.file = self.file
-    buildinfo.lastline = self.linenum
-    buildinfo.stop()
 
-    (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
-    output = os.fdopen(tbfd, 'w')
-    stackutil.printTraceBack(tb, output)
-    log.info("** NOTE ** Extended traceback written to %s\n" % path)
+    try:
+        buildinfo = self.recipe.buildinfo
+        buildinfo.error = exc_message
+        buildinfo.file = self.file
+        buildinfo.lastline = self.linenum
+        buildinfo.stop()
+    except:
+        log.warning("could not write out to buildinfo")
+
+    try:
+        (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
+        output = os.fdopen(tbfd, 'w')
+        stackutil.printTraceBack(tb, output)
+        log.info("** NOTE ** Extended traceback written to %s\n" % path)
+    except:
+        log.warning("Could not write extended traceback")
     if actionobject.recipe.cfg.debugRecipeExceptions and sys.stdout.isatty() \
 					         and sys.stdin.isatty():
         epdb.post_mortem(tb)
