@@ -147,6 +147,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def hasPackage(self, serverName, pkg):
         return self.c[serverName].hasPackage(pkg)
 
+    def updateMetadata(self, troveName, branch, shortDesc = None, longDesc = None,
+                       urls = [], licenses=[], categories = [], language = "C"):
+ 
+        self.c[branch].updateMetadata(troveName, branch.freeze(), shortDesc, longDesc,
+                                      urls, licenses, categories, language)
+
+    def getMetadata(self, troveName, branch, language="C", version=""):
+        if version:
+            version = version.freeze()
+            
+        return self.c[branch].getMetadata(troveName, branch.freeze(), language, version)
+
     def iterAllTroveNames(self, serverName):
 	for name in self.c[serverName].allTroveNames():
 	    yield name
