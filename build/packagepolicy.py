@@ -612,12 +612,22 @@ class ExcludeDirectories(policy.Policy):
     """
     In SRS, there are only two reasons to package a directory: the
     directory needs permissions other than 0755, or it must exist
-    even if it is empty.
+    even if it is empty.  Packages do not need to explicitly include
+    a directory just to ensure that there is a place to put a file;
+    SRS will appropriately create the directory, and delete it later
+    if the directory becomes empty.
 
-    In order to include a directory in a package, call
-    C{self.SetMode(path, mode)} where C{mode} is not C{0755},
-    or call C{ExcludeDirectories(exceptions=path)} if the
-    directory mode is C{0755}
+    The ExcludeDirectories policy causes directories to be excluded
+    from the package.  You can set exceptions to this policy with
+    C{ExcludeDirectories(exceptions=I{regexp})} and the directories
+    matching the regular expression will be included in the package.
+
+    However, it should generally not be necessary to invoke this
+    policy directly, because the most common reason to include a
+    directory in a package is that it needs permissions other than
+    0755, so simply call C{SetMode(I{path(s)}, I{mode})} where
+    C{I{mode}} is not C{0755}, and the directory will automatically
+    included.
     """
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
 
