@@ -412,15 +412,26 @@ class InstallDocs(BuildAction):
 	self.use = util.checkUse(use)
 
 class MakeDirs(BuildAction):
+    keywords = { 'mode': 0755 }
+
+    # probably should make this common code - use putFiles
+    def _sugidMode(self, path):
+	specialbits = self.mode & 06000
+	if specialbits:
+	    self.recipe.fixmodes[path] = specialbits
 
     def do(self, macros):
         for path in self.paths:
             path = path %macros
             dirs = util.braceExpand(path)
             for d in dirs:
-                dest = macros['destdir'] + d %macros
+                d = d %macros
+                dest = macros['destdir'] + d
                 print '+ creating directory', dest
                 util.mkdirChain(dest)
+                if self.mode >= 0:
+                    os.chmod(dest, self.mode)
+                    self._sugidMode(d)
 
     def __init__(self, paths, **keywords):
         BuildAction.__init__(self, paths, **keywords)
@@ -428,3 +439,8 @@ class MakeDirs(BuildAction):
 	    self.paths = (paths,)
 	else:
 	    self.paths = paths
+	if self.mode >= 0:
+	    if _permmap.has_key(self.mode):
+		print 'odd permission %o, correcting to %o: add initial "0"?' \
+		      %(mode, _permmap[self.mode])
+		mode = _permmap[self.mode]
