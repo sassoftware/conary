@@ -460,7 +460,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None):
 
     buildList = []
     changeSetFile = None
-    if os.path.isfile(item):
+    if item.endswith('.recipe') and os.path.isfile(item):
 	recipeFile = item
 
 	if recipeFile[0] != '/':
