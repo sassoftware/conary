@@ -268,6 +268,7 @@ Use.kde = False
 Use.xfce = False
 Use.gd = False
 Use.ldap = True
+Use.sasl = False
 Use.pie = False
 
 Use.desktop = Use.gnome | Use.kde | Use.xfce
