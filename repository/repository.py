@@ -36,9 +36,12 @@ class Repository:
 	return self.contentsStore.hasFile(fileId)
 
     def getPackageList(self, groupName = ""):
-	if os.path.isfile(self.pkgDB + groupName):
+	if not os.path.exists(self.pkgDB + groupName):
+	    return []
+	elif os.path.isfile(self.pkgDB + groupName):
 	    return [ groupName ]
-	return self.recurPackageList(self.pkgDB, groupName)
+	else:
+	    return self.recurPackageList(self.pkgDB, groupName)
 
     def hasPackage(self, pkg):
 	return os.path.exists(self.pkgDB + pkg)
