@@ -749,10 +749,10 @@ class TroveMissing(RepositoryError):
     troveType = "trove"
     def __str__(self):
         if type(self.version) == list:
-            return '%s %s does not exist for any of ' \
-                   'the following labels:\n    %s' %  \
-                        (self.troveType, self.troveName,
-                         "    %s\n".join([x.asString() for x in self.version]))
+            return ('%s %s does not exist for any of '
+                    'the following labels:\n    %s' %
+                    (self.troveType, self.troveName,
+                     "\n    ".join([x.asString() for x in self.version])))
         elif self.version:
             if self.version.isBranch():
                 return ("%s %s does not exist on branch %s" % \
