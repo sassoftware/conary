@@ -608,23 +608,40 @@ class ChangeSetFromFile(ChangeSet):
 	return self.csf.getSize(fileId)
 
     def getFileContents(self, fileId, withSize = False):
-	if self.configCache.has_key(fileId):
-	    (tag, str) = self.configCache[fileId]
+        # XXX this can go away once we track fileids as binary
+        import sha1helper
+        binFileId = sha1helper.sha1FromString(fileId)
+	if self.configCache.has_key(binFileId):
+	    (tag, str) = self.configCache[binFileId]
 	    cont = filecontents.FromString(str)
 	    size = len(str)
 	else:
-	    # XXX this can go away once we track fileids as binary
-	    import sha1helper
-	    hash = sha1helper.sha1FromString(fileId)
-	    (tagInfo, f, size) = self.csf.getFile(hash)
-	    tag = "cft-" + tagInfo.split()[1]
-	    cont = filecontents.FromFile(f)
+            while True:
+                rc = self.csf.getNextFile()
 
-	    if tagInfo[0] == "1":
-		str = cont.get().read()
-		self.configCache[fileId] = (tag, str)
-		cont = filecontents.FromString(str)
-		size = len(str)
+                # we have reached the end, without finding our fileId
+                if rc is None:
+                    raise KeyError, 'fileId %s is not in the changeset' %fileId
+
+                name, tagInfo, f, size = rc
+                
+                # if we found the fileId we're looking for, or the fileId
+                # we got is a config file, cache or break out of the loop
+                # accordingly
+                if name == binFileId or tagInfo[0] == '1':
+                    tag = 'cft-' + tagInfo.split()[1]
+                    cont = filecontents.FromFile(f)
+
+                    # cache all config file contents
+                    if tagInfo[0] == '1':
+                        str = cont.get().read()
+                        size = len(str)
+                        self.configCache[name] = (tag, str)
+                        cont = filecontents.FromString(str)
+                    
+                    # we found the one we're looking for, break out
+                    if name == binFileId:
+                        break
 
 	if withSize:
 	    return (tag, cont, size)
