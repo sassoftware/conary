@@ -41,6 +41,9 @@ class Flag:
             other = other.value
         return (self.value, other)
 
+    def __nonzero__(self):
+        return self.value
+
 class UseClass:
     """
     Implements a simple object that contains boolean flags objects.
