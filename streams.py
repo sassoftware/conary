@@ -70,10 +70,6 @@ class NumericStream(InfoStream):
     def set(self, val):
 	self.val = val
 
-    def merge(self, other):
-	if other.val != None:
-	    self.val = other.val
-
     def freeze(self):
 	return struct.pack(self.format, self.val)
 
@@ -149,10 +145,6 @@ class StringStream(InfoStream):
         assert(type(val) is str)
 	self.s = val
 
-    def merge(self, other):
-	if other.s != None:
-	    self.s = other.s
-
     def freeze(self):
 	return self.s
 
@@ -200,10 +192,6 @@ class FrozenVersionStream(InfoStream):
     def set(self, val):
 	assert(not val or min(val.timeStamps()) > 0)
 	self.v = val
-
-    def merge(self, other):
-	if other.v != None:
-	    self.v = other.v
 
     def freeze(self):
 	if self.v:
@@ -253,9 +241,6 @@ class DependenciesStream(InfoStream):
 
     def set(self, val):
 	self.deps = val
-
-    def merge(self, other):
-        self.deps = other.deps
 
     def freeze(self):
         if self.deps is None:
@@ -308,9 +293,6 @@ class StringsStream(InfoStream):
 	if val in self.l:
 	    self.l.remove(val)
 
-    def merge(self, other):
-        self.l = other.l
-
     def __iter__(self):
 	return self.l.__iter__()
 
@@ -361,10 +343,6 @@ class TupleStream(InfoStream):
 		rc.append(struct.pack(size, len(s)) + s)
 
 	return "".join(rc)
-
-    def merge(self, other):
-	for i in xrange(len(self.makeup)):
-	    self.items[i].merge(other.items[i])
 
     def diff(self, them):
 	code = 0
