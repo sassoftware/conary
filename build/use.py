@@ -21,6 +21,7 @@ relative to the build being done.  For now, we'll intialize a static
 configuration sufficient to build.
 
 """
+from deps import deps
 
 class Flag(dict):
     """
@@ -211,6 +212,9 @@ class Flag(dict):
             containing this flag and the child flags """
         # a) create a Flag with knowledge about this flag and its
         # parents (parents all set to none)
+
+        if self._name == '__GLOBAL__':
+            return self
         top = parent = Flag(None, self._name)
         cursor = self._ref
         while cursor is not None:
@@ -236,6 +240,48 @@ class Flag(dict):
         else:
             top._value = True
         return parent
+
+    def toDependency(self):
+        """ Convert this flag set to a list of dependencies """
+        # XXX this code should probably disappear with the reworking of 
+        # flavors and their relationship with deps, but for now, 
+        # it is very handy
+        set = deps.DependencySet()
+        useflagsets = []
+        if self._name != '__GLOBAL__':
+            self = self.asSet()
+        if 'Use' in self:
+            useflagsets.append(self['Use'])
+        if 'Flags' in self:
+            useflagsets.append(self['Flags'])
+        stringDeps = []
+        for flagset in useflagsets:
+            for flag in flagset.iterkeys():
+                stringDeps.extend(flagset[flag].toDepStrings())
+        dep = deps.Dependency('use', stringDeps)
+        set.addDep(deps.UseDependency, dep)
+        stringDeps = []
+        if 'Arch' in self:
+            for flag in self['Arch'].iterkeys():
+                stringDeps.extend(self['Arch'][flag].toDepStrings())
+            dep = deps.Dependency('is', stringDeps)
+            set.addDep(deps.InstructionSetDependency, dep)
+        return set
+
+    def toDepStrings(self, prefix=None):
+        strings = []
+        if prefix:
+            prefix = '.'.join([prefix, self._name])
+        else:
+            prefix = self._name
+        if self._value is not None:
+            if self._value:
+                strings.append(prefix)
+            else:
+                strings.append('!' + prefix)
+        for subflag in self.iterkeys():
+            strings.extend(self[subflag].toDepStrings(prefix=prefix))
+        return strings
 
     def __setitem__(self, key, value):
 	if self._frozen:
