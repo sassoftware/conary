@@ -377,3 +377,6 @@ class ObjectCache(weakref.WeakKeyDictionary):
     """
     def __setitem__(self, key, value):
 	weakref.WeakKeyDictionary.__setitem__(self, key, weakref.ref(value))
+
+    def __getitem__(self, key):
+	return weakref.WeakKeyDictionary.__getitem__(self, key)()
