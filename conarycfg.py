@@ -14,10 +14,18 @@ class SrsConfiguration:
 		self.__dict__[key] = val
 	    f.close()
 
+    def display(self):
+	keys = self.__dict__.keys()
+	keys.sort()
+	for item in keys:
+	    if type(self.__dict__[item]) == type ("a"):
+		print "%-15s %s" % (item, self.__dict__[item])
+
     def __init__(self):
 	self.reppath = "/var/lib/srsrep"
 	self.root = "/"
-	self.sourcepath = "/usr/src/srs"
+	self.sourcepath = "/usr/src/srs/sources"
+	self.buildpath = "/usr/src/srs/builds"
 
 	self.read("/etc/srsrc")
 	self.read(os.environ["HOME"] + "/" + ".srsrc")
