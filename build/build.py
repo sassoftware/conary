@@ -247,6 +247,7 @@ class Make(BuildCommand):
     def do(self, macros):
 	macros = macros.copy()
 	if self.forceFlags:
+	    # XXX should this be just '-e'?
 	    macros['overrides'] = ('CFLAGS="%(cflags)s" CXXFLAGS="%(cflags)s"'
 			           ' CPPFLAGS="%(cppflags)s"'
 	                           ' LDFLAGS="%(ldflags)s"')
