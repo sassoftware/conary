@@ -764,7 +764,8 @@ class NormalizeInterpreterPaths(policy.Policy):
                 wordlist.pop(0) # get rid of env
                 fullintpath = util.checkPath(wordlist[0])
                 if fullintpath == None:
-		    raise DestdirPolicyError("Interpreter %s for file %s not found, could not convert from /usr/bin/env syntax " % (wordlist[0], path))
+		    self.recipe.reportErrors("Interpreter %s for file %s not found, could not convert from /usr/bin/env syntax " % (wordlist[0], path))
+                    return
                 
                 wordlist[0] = fullintpath
                 l.insert(0, '#!'+" ".join(wordlist)+'\n')
