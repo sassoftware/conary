@@ -997,7 +997,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	for pkgCs in cs.iterNewPackageList():
 	    d = { 'reppath' : self.urlBase(),
 	    	  'trove' : pkgCs.getName(),
-                  'flavor' : deps.formatFlavor(pkgCs.getFlavor()),
+                  'flavor' : deps.formatFlavor(pkgCs.getNewFlavor()),
 		  'version' : pkgCs.getNewVersion().asString() }
 	    cmd = self.commitAction % d
 	    os.system(cmd)
