@@ -14,7 +14,7 @@ class SrsConfiguration:
 	    for line in f.readlines():
 		(key, val) = string.split(line)
 		if not self.__dict__.has_key(key):
-		    raise KeyError, "configuration value %s unknown" % key
+		    raise KeyError, ("configuration value %s unknown" % key)
 
 		self.__dict__[key] = val
 	    f.close()
@@ -31,6 +31,8 @@ class SrsConfiguration:
 	self.root = "/"
 	self.sourcepath = "/usr/src/srs/sources"
 	self.buildpath = "/usr/src/srs/builds"
+	self.packagenamespace = "/localhost"
+	self.defaultbranch = "local"
 
 	self.read("/etc/srsrc")
 	self.read(os.environ["HOME"] + "/" + ".srsrc")
