@@ -60,7 +60,8 @@ class VersionRelease(AbstractVersion):
 	@rtype: boolean
 	"""
 	if (type(self) == type(version) and self.version == version.version
-		and self.release == version.release):
+		and self.release == version.release
+		and self.buildCount == version.buildCount):
 	    return 1
 	return 0
 
