@@ -30,6 +30,7 @@ import srcctl
 import updatecmd
 import util
 import xmlrpclib
+from repository import netclient
 
 sys.excepthook = util.excepthook
 
@@ -381,6 +382,10 @@ def main():
 		"remote server denied permission for the requested operation"
 	else:
 	    raise
-
+    except netclient.UnknownException, e:
+	print >> sys.stderr, \
+	    "An unknown exception occured on the repository server:"
+	print >> sys.stderr, "\t%s" % str(e)
+	    
 if __name__ == "__main__":
     sys.exit(main())

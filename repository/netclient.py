@@ -26,8 +26,8 @@ class _Method(xmlrpclib._Method):
 	if not isException:
 	    return result
 
-	exceptionName = args[0]
-	exceptionArgs = args[1:]
+	exceptionName = result[0]
+	exceptionArgs = result[1:]
 
 	if exceptionName == "TroveMissing":
 	    (name, version) = exceptionArgs
@@ -36,8 +36,11 @@ class _Method(xmlrpclib._Method):
 		version = None
 	    else:
 		version = self.FromVersion(version)
-
-	raise repository.repository.TroveMissing(name, version)
+	    raise repository.TroveMissing(name, version)
+	elif exceptionName == "CommitError":
+	    raise repository.CommitError(exceptionArgs[0])
+	else:
+	    raise UnknownException(exceptionName, exceptionArgs)
 
 class ServerProxy(xmlrpclib.ServerProxy):
 
@@ -347,3 +350,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def __init__(self, repMap):
 	self.c = ServerCache(repMap)
+
+class UnknownException(repository.RepositoryError):
+
+    def __str__(self):
+	return "UnknownException: %s %s" % (self.eName, self.eArgs)
+
+    def __init__(self, eName, eArgs):
+	self.eName = eName
+	self.eArgs = eArgs
