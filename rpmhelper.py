@@ -22,7 +22,7 @@ def seekToData(f):
     leadMagic = struct.unpack("!i", lead[0:4])[0]
 
     if (leadMagic & 0xffffffffl) != 0xedabeedbl: 
-	print "0x%x" % leadMagic
+	print hex(leadMagic)
 	raise IOError, "file is not an RPM"
 
     # signature block
