@@ -95,13 +95,36 @@ class _IdGen:
 		f = repos.getFileVersion(fileId, version)
 		lcache.addFileHash(path, f.sha1())
 
-def cookObject(repos, cfg, className, recipeClass, prep=0, macros=()):
+def cookObject(repos, cfg, recipeClass, changeSetFile = None, prep=True, 
+	       macros=()):
+    """
+    Turns a recipe object into a change set, and sometimes commits the
+    result.
+
+    @param repos: Repository to both look for source files and file id's in.
+    @type repos: repository.Repository
+    @param cfg: srs configuration
+    @type cfg: srscfg.SrsConfiguration
+    @param recipeClass: class which will be instantiated into a recipe
+    @type recipeClass: class
+    @param changeSetFile: if set, the changeset is stored in this file
+    instead of committed to a repository
+    @type changeSetFile: str
+    @param prep: If true, the build stops after the package is unpacked
+    and None is returned instead of a changeset.
+    @type prep: boolean
+    @param macros: set of macros for the build
+    @type marcros: sequence
+    @rtype: changeset.ChangeSet
+
+    """
+
     repos.open("r")
 
     buildBranch = cfg.defaultbranch
     built = []
 
-    log.info("Building %s", className)
+    log.info("Building %s", recipeClass.name)
     fullName = cfg.packagenamespace + ":" + recipeClass.name
     srcName = fullName + ":sources"
 
@@ -169,7 +192,7 @@ def cookObject(repos, cfg, className, recipeClass, prep=0, macros=()):
     util.mkdirChain(cfg.tmpdir)
     destdir = tempfile.mkdtemp("", "srs-%s-" % recipeObj.name, cfg.tmpdir)
     recipeObj.doBuild(builddir, destdir)
-    log.info('Processing %s', className)
+    log.info('Processing %s', recipeClass.name)
     recipeObj.doDestdirProcess() # includes policy
 
     repos.open("w")
@@ -262,7 +285,10 @@ def cookObject(repos, cfg, className, recipeClass, prep=0, macros=()):
 
     changeSet.newPackage(grpDiff)
 
-    repos.commitChangeSet(changeSet)
+    if changeSetFile:
+	changeSet.writeToFile(changeSetFile)
+    else:
+	repos.commitChangeSet(changeSet)
 
     repos.open("r")
 
@@ -273,6 +299,9 @@ def cookObject(repos, cfg, className, recipeClass, prep=0, macros=()):
 # -------------------- public below this line -------------------------
 
 def cookFile(repos, cfg, recipeFile, prep=0, macros=()):
+    if recipeFile[0] != '/':
+	recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
+
     try:
 	classList = recipe.RecipeLoader(recipeFile)
     except recipe.RecipeFileError, msg:
@@ -281,7 +310,7 @@ def cookFile(repos, cfg, recipeFile, prep=0, macros=()):
     built = []
     for (className, classObject) in classList.iteritems():
 	try:
-	    built += cookObject(repos, cfg, className, classObject, 
+	    built += cookObject(repos, cfg, classObject, 
 				prep = prep, macros = macros)
 	except repository.RepositoryError, e:
 	    raise CookError(str(e))
@@ -304,8 +333,6 @@ def cookCommand(cfg, args, prep, macros):
     repos.close()
 
     for file in args:
-        if file[0] != '/':
-            file = "%s/%s" % (os.getcwd(), file)
         # we want to fork here to isolate changes the recipe might make
         # in the environment (such as environment variables)
         signal.signal(signal.SIGTTOU, signal.SIG_IGN)
