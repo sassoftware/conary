@@ -10,4 +10,7 @@ all:
 install:
 	$(PYTHON) setup.py install --root=$(DESTDIR)
 
+clean:
+	$(PYTHON) setup.py clean
+
 include ../Make.rules
