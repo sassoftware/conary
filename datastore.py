@@ -15,6 +15,7 @@ import errno
 import fcntl
 import gzip
 import os
+import struct
 import util
 
 class DataStore:
@@ -124,7 +125,19 @@ class DataStore:
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):
 	path = self.hashToPath(hash)[1]
-	return gzip.GzipFile(path, mode)
+	f = open(path, "r")
+
+	# read in the size of the file
+	f.seek(-4, 2)
+	size = f.read(4)
+	f.seek(0)
+
+	# we need the size to create a file container to pass over
+	# the wire for getFileContents()
+	size = struct.unpack("<i", size)[0]
+	gzfile = gzip.GzipFile(path, mode)
+	gzfile.fullSize = size
+	return gzfile
 
     def removeFile(self, hash):
 	(dir, path) = self.hashToPath(hash)
