@@ -37,10 +37,13 @@ class Hunk:
 	return conflicts
 
     def write(self, f):
-	f.write("@@ -%d,%s +%d,%d @@\n" % (self.fromStart, self.fromLen, 
-		self.toStart, self.toLen))
-	for line in self.lines:
-	    f.write(line)
+	f.write(self.asString())
+
+    def asString(self):
+	str = "@@ -%d,%s +%d,%d @@\n" % (self.fromStart, self.fromLen, 
+		self.toStart, self.toLen)
+	str += "".join(self.lines)
+	return str
 
     def __init__(self, fromStart, fromLen, toStart, toLen, lines, contextCount):
 	self.fromStart = fromStart
