@@ -7,6 +7,8 @@
 Module implementing the "macro" dictionary class
 """
 
+import log
+
 class Macros(dict):
     def __setitem__(self, name, value):
         # only expand references to ourself
