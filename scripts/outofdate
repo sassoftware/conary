@@ -47,7 +47,7 @@ def main(argv):
 
     cfg = conarycfg.ConaryConfiguration()
     repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
-    troves = [ x for x in repos.iterAllTroveNames(cfg.installLabelPath[0].getHost()) ]
+    troves = [ x for x in repos.troveNames(cfg.installLabelPath[0]) ]
     pkgs = [ p for p in troves if p.find(':') == -1 ]
     sources = [ p for p in troves if p.endswith(':source') ]
     versions = repos.getTroveLeavesByLabel(pkgs + sources, cfg.installLabelPath[0])
