@@ -12,6 +12,7 @@
 # full details.
 #
 import urllib
+from fmtroves import TroveCategories
 from htmlengine import HtmlEngine
 from metadata import MDClass
 
@@ -111,11 +112,18 @@ class HttpHandler(HtmlEngine):
         metadata[0] = [doc.getElementsByTagName("desc_short")[0].childNodes[0].data]
         metadata[1] = [doc.getElementsByTagName("desc_full")[0].childNodes[0].data]
         metadata[2] = [doc.getElementsByTagName("url_homepage")[0].childNodes[0].data]
-        metadata[3] = [doc.getElementsByTagName("license")[0].childNodes[0].data]
 
+        metadata[3] = []
         metadata[4] = []
         for node in doc.getElementsByTagName("trove_id"):
-            metadata[4].append(node.childNodes[0].data)
+            id = node.childNodes[0].data
+            name = TroveCategories[id]
+            
+            if name.startswith("License"):
+                metadata[3].append(name)
+            else:
+                metadata[4].append(name)
+            
 
         return metadata
 
