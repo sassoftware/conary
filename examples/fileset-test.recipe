@@ -2,7 +2,6 @@ class filesetTest(FilesetRecipe):
     name = "fileset-test"
     version = "1.0"
 
-    def setup(self):
-	self.addFile("/usr/sbin/tmpwatch", "tmpwatch:runtime", "@linux")
-	self.addFile("/usr/share/man/man8/tmpwatch.8.gz", "tmpwatch:doc", 
-		      "@linux")
+    def setup(r):
+	r.addFile("/usr/sbin/tmpwatch", "tmpwatch:runtime", "@linux")
+	r.addFile("/usr/share/man/man8/tmpwatch.8.gz", "tmpwatch:doc", "@linux")
