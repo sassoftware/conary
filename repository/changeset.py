@@ -8,9 +8,14 @@ import filecontainer
 import filecontents
 import files
 import group
+import os
 import package
 import patch
+import packagename
+import repository
 import versions
+
+from packagename import PackageName
 import os
 
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff")
@@ -332,13 +337,25 @@ class ChangeSetFromRepository(ChangeSet):
 	# add the time stamps to the package version numbers
 	if pkg.getOldVersion():
 	    if not pkg.getOldVersion().timeStamp:
-		pkg.changeOldVersion(self.repos.getFullVersion(pkg.getName(),
+		pkg.changeOldVersion(self.repos.pkgGetFullVersion(pkg.getName(),
 							       pkg.getOldVersion()))
 
 	if not pkg.getNewVersion().timeStamp:
-	    pkg.changeNewVersion(self.repos.getFullVersion(pkg.getName(),
+	    pkg.changeNewVersion(self.repos.pkgGetFullVersion(pkg.getName(),
 							   pkg.getNewVersion()))
 	ChangeSet.newPackage(self, pkg)
+
+    def newGroup(self, grp):
+	# add the time stamps to the package version numbers
+	if grp.getOldVersion():
+	    if not grp.getOldVersion().timeStamp:
+		grp.changeOldVersion(self.repos.grpGetFullVersion(grp.getName(),
+							       grp.getOldVersion()))
+
+	if not grp.getNewVersion().timeStamp:
+	    grp.changeNewVersion(self.repos.grpGetFullVersion(grp.getName(),
+							   grp.getNewVersion()))
+	ChangeSet.newGroup(self, grp)
 
     def __init__(self, repos):
 	self.repos = repos
@@ -499,10 +516,11 @@ def CreateFromFilesystem(pkgList):
 
     return cs
 
-def ChangeSetCommand(repos, cfg, packageName, outFileName, oldVersionStr, \
+def ChangeSetCommand(repos, cfg, itemName, outFileName, oldVersionStr, \
 	      newVersionStr):
-    if packageName[0] != ":":
-	packageName = cfg.packagenamespace + ":" + packageName
+    if itemName[0] != ":":
+	itemName = cfg.packagenamespace + ":" + itemName
+    itemName = PackageName(itemName)
 
     newVersion = versions.VersionFromString(newVersionStr, cfg.defaultbranch)
 
@@ -512,9 +530,7 @@ def ChangeSetCommand(repos, cfg, packageName, outFileName, oldVersionStr, \
     else:
 	oldVersion = None
 
-    list = []
-    for name in repos.getPackageList(packageName):
-	list.append((name, oldVersion, newVersion, (not oldVersion)))
+    list = [(itemName, oldVersion, newVersion, (not oldVersion))]
 
     cs = repos.createChangeSet(list)
     cs.writeToFile(outFileName)
