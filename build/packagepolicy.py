@@ -154,6 +154,35 @@ class CheckSonames(policy.Policy):
 			    " use r.Ldconfig('%s')?", path, s,
 			    os.path.dirname(path))
 
+
+class RequireChkconfig(policy.Policy):
+    """
+    Require that all initscripts provide chkconfig information; the only
+    exceptions should be core initscripts like reboot:
+    C{r.RequireChkconfig(exceptions=I{filterexp})}
+    """
+    invariantsubtrees = [ '%(initdir)s' ]
+    def doFile(self, path):
+	d = self.macros.destdir
+        fullpath = util.joinPaths(d, path)
+	if not (os.path.isfile(fullpath) and util.isregular(fullpath)):
+            return
+        f = file(fullpath)
+        lines = f.readlines()
+        f.close()
+        foundChkconfig = False
+        for line in lines:
+            if not line.startswith('#'):
+                # chkconfig tag must come before any uncommented lines
+                break
+            if line.find('chkconfig:') != -1:
+                foundChkconfig = True
+                break
+        if not foundChkconfig:
+	    self.recipe.reportErrors(
+		"initscript %s has no chkconfig setting" %path)
+
+
 class CheckDestDir(policy.Policy):
     """
     Look for the C{%(destdir)s} path in file paths and symlink contents;
@@ -310,6 +339,7 @@ def _markConfig(recipe, filename, fullpath):
 	f.close()
 	if lastchar != '\n':
 	    recipe.reportErrors("config file %s missing trailing newline" %filename)
+    f.close()
     recipe.autopkg.pathMap[filename].flags.isConfig(True)
 
 class EtcConfig(policy.Policy):
@@ -1014,6 +1044,7 @@ def DefaultPolicy(recipe):
 	FilesInMandir(recipe),
 	ImproperlyShared(recipe),
 	CheckSonames(recipe),
+        RequireChkconfig(recipe),
 	CheckDestDir(recipe),
 	ComponentSpec(recipe),
 	PackageSpec(recipe),
