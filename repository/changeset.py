@@ -15,6 +15,7 @@
 from deps import deps
 import difflib
 import enum
+import errno
 import filecontainer
 import filecontents
 import files
@@ -380,10 +381,15 @@ class ChangeSet(streams.LargeStreamSet):
 		else:
 		    fullPath = db.root + path
 
-		    fsFile = files.FileFromFilesystem(fullPath, fileId,
-				possibleMatch = origFile)
+                    try:
+                        fsFile = files.FileFromFilesystem(fullPath, fileId,
+                                    possibleMatch = origFile)
+                    except OSError, e:
+                        if e.errno != errno.ENOENT:
+                            raise
+                        fsFile = None
 
-		    if fsFile == origFile:
+		    if fsFile and fsFile == origFile:
 			cont = filecontents.FromFilesystem(fullPath)
 		    else:
 			# a file which was removed in this changeset is
