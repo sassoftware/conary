@@ -431,7 +431,7 @@ class Database(Repository):
 	last = self.lastRollback
 	for name in names:
 	    if not self.hasRollback(name):
-		return KeyError, name
+		raise KeyError(name)
 
 	    num = int(name[2:])
 	    if num != last:

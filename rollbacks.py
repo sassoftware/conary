@@ -4,6 +4,8 @@
 #
 
 import package
+import repository
+import sys
 
 def listRollbacks(db, cfg):
     for rollbackName in db.getRollbackList():
@@ -20,10 +22,10 @@ def listRollbacks(db, cfg):
 	print
 
 def apply(db, cfg, *names):
-    list = []
-    for name in names:
-	list.append((db.getRollback(name), name))
-
-    for (rb, name) in list:
-	db.commitChangeSet(cfg.sourcepath, rb, eraseOld = 1)
-	db.removeRollback(name)
+    try:
+	db.applyRollbackList(cfg.sourcepath, names)
+    except repository.RollbackOrderError, e:
+	sys.stderr.write("%s\n" % repr(e))	
+    except KeyError, e:
+	sys.stderr.write("rollback %s does not exist in the database\n" %
+			 str(e))
