@@ -220,8 +220,11 @@ def rmtree(paths, ignore_errors=False, onerror=None):
 
 def remove(paths):
     for path in braceGlob(paths):
-	print '+ deleting [file] %s' %path
-	os.remove(path)
+	if os.path.exists(path) or os.path.islink(path):
+	    print '+ deleting [file] %s' %path
+	    os.remove(path)
+	else:
+	    print 'WARNING: file %s does not exist when attempting to delete [file]' %path
 
 def copyfile(sources, dest):
     for source in braceGlob(sources):
