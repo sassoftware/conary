@@ -3,6 +3,7 @@ Changes in 0.10.10:
     of separate files
   * fix several bugs in the freshmeat record parsing
   * add a freshmeat project page URL to the metadata by default
+  * add a "source" item to metadata
   * the server implementation of troveNames() was horrible
 
 Changes in 0.10.9:
