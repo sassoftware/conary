@@ -76,19 +76,21 @@ class Flag(dict):
 	    return repr(self._value)
 
     def __eq__(self, other):
-        return bool(self) == bool(other)
+        if isinstance(other, Flag):
+            other = bool(other)
+        return bool(self) == other
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def __ror__(self, other):
-        return bool(self) | bool(other)
+        return bool(self) | other
 
     def __or__(self, other):
 	return self.__ror__(other)
 
     def __rand__(self, other):
-        return bool(self) & bool(other)
+        return bool(self) & other
 
     def __and__(self, other):
 	return self.__rand__(other)
@@ -99,7 +101,7 @@ class Flag(dict):
                                  ' which is not bool' % self._name)
         if self._track and self._value is not None:
             self._used = True
-        return bool(self._value)
+        return self._value
 
     def _freeze(self):
 	self._frozen = True
@@ -303,7 +305,6 @@ class Flag(dict):
                 for flag in self.Use.iterkeys():
                     stringDeps.extend(self.Use[flag].toDepStrings(topflag=self.Use))
             if 'Flags' in self and self.Flags.keys():
-                assert(recipename)
                 for flag in self.Flags.iterkeys():
                     stringDeps.extend(
                         self.Flags[flag].toDepStrings(prefix=recipename,
