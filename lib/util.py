@@ -39,7 +39,7 @@ class Action:
     instantiated with data, and later asked to take an action based
     on that data.
 
-    @cvar keywords: The keywords and default values accepted by the class at
+    @cvar keywords: The keywords and default values accepted by the class
     """
     def __init__(self, *args, **keywords):
         assert(self.__class__ is not Action)
