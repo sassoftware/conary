@@ -53,7 +53,7 @@ def _createPackage(repos, cfg, bldPkg, ident):
             f = files.FileFromFilesystem(realPath, ident(path), 
                                          type = buildFile.getType())
         else:
-            raise RuntimeError, "unable to create file object for package"
+            raise CookError("unable to create file object for package")
 
         # set ownership, flags, etc
         f.merge(buildFile)
