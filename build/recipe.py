@@ -272,17 +272,15 @@ class Recipe:
 	# do not search unless a gpg keyid is specified
 	if not keyid or not filename:
 	    return
-	gpg = '%s.sig' %(filename)
-	c = lookaside.searchAll(self.cfg, self.laReposCache, gpg, 
-				self.name, self.srcdirs)
-	if not c:
-	    gpg = '%s.sign' %(filename)
-	    c = lookaside.searchAll(self.cfg, self.laReposCache,
-				    gpg, self.name, self.srcdirs)
-	if c:
-	    if not self.signatures.has_key(filename):
-		self.signatures[filename] = []
-	    self.signatures[filename].append((gpg, c, keyid))
+        for suffix in ('sig', 'sign', 'asc'):
+            gpg = '%s.%s' %(filename, suffix)
+            c = lookaside.searchAll(self.cfg, self.laReposCache, gpg, 
+                                    self.name, self.srcdirs)
+            if c:
+                if not self.signatures.has_key(filename):
+                    self.signatures[filename] = []
+                self.signatures[filename].append((gpg, c, keyid))
+                break
 
     def _appendSource(self, filename, keyid, type, extractDir, use, args):
 	filename = filename % self.macros
