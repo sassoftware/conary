@@ -157,7 +157,10 @@ class RecipeLoader(types.DictionaryType):
         except SyntaxError, err:
             msg = ('Error in recipe file "%s": '
                    '%s\n' %(os.path.basename(filename), err))
-            msg += '%s%s^\n' %(err.text, ' ' * (err.offset-1))
+            if err.offset is not None:
+                msg += '%s%s^\n' %(err.text, ' ' * (err.offset-1))
+            else:
+                msg += err.text
             raise RecipeFileError(msg)
         exec code in self.module.__dict__
         for (name, obj) in  self.module.__dict__.items():
