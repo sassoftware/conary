@@ -85,7 +85,7 @@ def sort_t_time_per_call(model, iter1, iter2):
         t1 = info1.tt/info1.nc
     t2 = 0
     if info2.nc != 0:
-        t1 = info2.tt/info2.nc
+        t2 = info2.tt/info2.nc
     return compare(t1, t2)
 
 def set_c_time(tree, cell, model, iter):
@@ -112,7 +112,7 @@ def sort_c_time_per_call(model, iter1, iter2):
         t1 = info1.ct/info1.cc
     t2 = 0
     if info2.cc != 0:
-        t1 = info2.ct/info2.cc
+        t2 = info2.ct/info2.cc
     return compare(t1, t2)
 
 def setup_tree_view(treeview, model, cols):
