@@ -66,11 +66,28 @@ class SqlDbRepository(datastore.DataStoreRepository,
 	return self.db.hasByName(name)
 
     def hasTrove(self, pkgName, version, flavor):
-	for x in self.db.iterFindByName(pkgName):
-	     if version == x.getVersion() and flavor == x.getFlavor():
-		return True
+        cu = self.db.db.cursor()
 
-	return False
+        if flavor:
+            flavorTest = "== '%s'" % flavor.freeze()
+        else:
+            flavorTest = "is NULL";
+
+        cu.execute("""SELECT count(*) FROM DBInstances
+                        JOIN Versions ON
+                            DBInstances.versionId == Versions.versionId
+                        JOIN DBFlavors ON
+                            DBInstances.flavorId == DBFlavors.flavorId
+                        WHERE
+                            DBInstances.troveName == ? AND
+                            DBInstances.isPresent != 0 AND
+                            Versions.version == ? AND
+                            DBFlavors.flavor %s
+                   """ % flavorTest, pkgName, version.asString())
+
+        result = cu.next()[0] != 0
+
+        return result
 
     def getTroveVersionList(self, name, withFlavors = False):
 	"""

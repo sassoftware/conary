@@ -3,6 +3,7 @@ Changes in 0.50.3:
     repository findTrove function -- this enables conary q to work like 
     conary rq
   * Group handling didn't work for multiple levels of group inclusion
+  * Database.hasTrove() no longer needs to instantiate troves
 
 Changes in 0.50.2:
   * Any %(lib)s-derived path (/%(lib)s, %(libdir)s, %(krbprefix)s/%(lib)s,
