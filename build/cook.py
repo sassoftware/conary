@@ -15,7 +15,7 @@ import types
 
 def cook(repos, cfg, recipeFile):
     if type(recipeFile) is types.ClassType:
-        classList = [(recipeFile.__name__, recipeFile)]
+        classList = {recipeFile.__name__: recipeFile}
     else:
         classList = recipe.RecipeLoader(recipeFile)
     built = []
