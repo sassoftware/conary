@@ -136,10 +136,19 @@ class NormalizeManPages(policy.Policy):
 	    if os.path.exists and not os.path.isdir(path) \
 	       and not os.path.islink(path) \
 	       and not name.endswith('.gz'):
-		# find .so and change to symlink
+		# if only .so, change to symlink
 		f = file(path)
 		lines = f.readlines(512) # we really don't need the whole file
 		f.close()
+
+		# delete comment lines first
+		newlines = []
+		for line in lines:
+		    if not self.commentexp.search(line[:-1]):
+			newlines.append(line)
+		lines = newlines
+
+		# now see if we have only a .so line to replace
 		if len(lines) == 1:
 		    match = self.soexp.search(lines[0][:-1]) # chop-chop
 		    if match:
@@ -165,6 +174,7 @@ class NormalizeManPages(policy.Policy):
     def __init__(self, *args, **keywords):
 	policy.Policy.__init__(self, *args, **keywords)
 	self.soexp = re.compile('^\.so (.*\...*)$')
+	self.commentexp = re.compile('^\.\\\\"')
 
     def do(self):
 	manpath = self.macros['destdir'] + self.macros['mandir']
