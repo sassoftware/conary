@@ -63,7 +63,6 @@ class MetadataTable:
                 cu.execute("""
                     INSERT INTO MetadataItems (metadataId, class, data, language)
                     VALUES(?, ?, ?, ?)""", mdId, mdClass, d, language)
-            print "inserting"
         return mdId
 
     def get(self, itemId, versionId, branchId, language):
@@ -72,15 +71,23 @@ class MetadataTable:
         cu.execute("SELECT metadataId FROM Metadata WHERE itemId=? AND versionId=? AND branchId=?",
                    itemId, versionId, branchId)
         metadataId = cu.fetchone()
-
+        if metadataId:
+            metadataId = metadataId[0]
+        else:
+            return None
+            
         cu.execute("SELECT class, data FROM MetadataItems WHERE metadataId=? and language=?",
                    metadataId, language)
 
         # create a dictionary of metadata classes
         # each key points to a list of metadata items
-        classes, mdData = [x[0], x[1] for x in cu]
+        classes = []
+        mdData = []
+        for mdClass, data in cu:
+            classes.append(str(mdClass))
+            mdData.append(data)
         items = dict(zip(classes, mdData))
-
+        
         return items
 
     def getLatestVersion(self, itemId, branchId):
@@ -92,4 +99,7 @@ class MetadataTable:
                       ORDER BY Metadata.timeStamp DESC LIMIT 1""", itemId, branchId)
 
         item = cu.fetchone()
-        return item
+        if item:
+            return item[0]
+        else:
+            return None
