@@ -46,7 +46,8 @@ class Automake(ShellCommand):
 
 class Configure(ShellCommand):
     template = ('cd %%s; %%s %(preConfigure)s %%s --prefix=/usr '
-                '--sysconfdir=/etc %(args)s')
+                '--sysconfdir=/etc --mandir=/usr/share/man '
+                '--infodir=/usr/share/info %(args)s')
     keywords = {'preConfigure': '',
                 'objDir': ''}
     
