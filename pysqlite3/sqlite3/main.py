@@ -4,8 +4,7 @@ import _sqlite3 as _sqlite
 import copy, new, sys, weakref
 from types import *
 
-ver = _sqlite.sqlite_version().split('.')
-if ver >= (3,0,8):
+if _sqlite.sqlite_version_info() >= (3,0,8):
     _BEGIN = "BEGIN IMMEDIATE"
 else:
     _BEGIN = "BEGIN"

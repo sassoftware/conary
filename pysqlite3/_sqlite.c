@@ -885,7 +885,7 @@ _con_sqlite_changes(pysqlc *self)
 static PyObject*
 sqlite_library_version(PyObject *self)
 {
-	return Py_BuildValue("s", SQLITE_VERSION);
+	return Py_BuildValue("s", sqlite3_libversion());
 }
 
 static PyObject*
@@ -1074,7 +1074,7 @@ sqlite_version_info(PyObject* self)
 	char* iterator;
 	char* token;
 
-	buf = strdup(SQLITE_VERSION);
+	buf = strdup(sqlite3_libversion());
 	iterator = buf;
 
 	vi_list = PyList_New(0);
