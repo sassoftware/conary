@@ -416,7 +416,7 @@ class NetworkAuthorization:
 	    if regExp.match(trove):
 		return True
 
-	log.error("no permissions match for (?, ?)" % authToken)
+	log.error("no permissions match for (%s, %s)" % authToken)
 
 	return False
 
