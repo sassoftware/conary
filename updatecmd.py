@@ -4,11 +4,10 @@
 #
 import changeset
 import commit
-import files
-import sys
-import versions
 import os
+import sys
 import util
+import versions
 
 def doUpdate(repos, db, cfg, pkg, versionStr = None):
     if not os.path.exists(cfg.root):
@@ -40,16 +39,6 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	    bail = 1
 	else:
 	    list.append((pkgName, None, newVersion))
-
-	# sources are only in source packages, which are always
-	# named <pkgname>/<source>
-	#
-	# this means we can parse a simple name of the package
-	# out of the full package identifier (we need this for
-	# installing source packages, whose path can depend on the
-	# name of the package being installed)
-	if pkgName.endswith('/sources'):
-	    mainPackageName = pkgName.rstrip('/sources')
 
     if bail:
 	return
