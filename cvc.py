@@ -150,6 +150,8 @@ def sourceCommand(cfg, args, argSet):
         args = [cfg, ] + args[1:]
         branch.branch(*args, **extraArgs)
     elif (args[0] == "commit"):
+        level = log.getVerbosity()
+        log.setVerbosity(log.INFO)
 	message = argSet.get("message", None)
         sourceCheck = True
         if argSet.has_key("no-source-check"):
@@ -163,6 +165,7 @@ def sourceCommand(cfg, args, argSet):
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	checkin.commit(repos, cfg, message, sourceCheck = sourceCheck)
+        log.setVerbosity(level)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
@@ -215,8 +218,8 @@ def sourceCommand(cfg, args, argSet):
 	args[0] = repos
 	checkin.updateSrc(*args)
     elif (args[0] == "cook"):
-
-        log.setVerbosity(1)
+        level = log.getVerbosity()
+        log.setVerbosity(log.DEBUG)
         macros = {}
         prep = 0
         resume = None
@@ -262,8 +265,10 @@ def sourceCommand(cfg, args, argSet):
         if argSet: return usage()
         
         cook.cookCommand(cfg, args[1:], prep, macros, resume=resume)
+        log.setVerbosity(level)
     elif (args[0] == "describe"):
-        log.setVerbosity(1)
+        level = log.getVerbosity()
+        log.setVerbosity(log.INFO)
         
         xmlSource = args[1]
         state = checkin.SourceStateFromFile("CONARY")
@@ -276,6 +281,7 @@ def sourceCommand(cfg, args, argSet):
 
         repos = NetworkRepositoryClient(cfg.repositoryMap)
         repos.updateMetadataFromXML(troveName, troveBranch, xml)
+        log.setVerbosity(level)
     elif (args[0] == "usage"):	
         return usage(rc = 0)
     else:

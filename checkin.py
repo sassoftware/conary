@@ -302,10 +302,11 @@ def commit(repos, cfg, message, sourceCheck = False):
                         cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
             recipeObj = recipeClass(cfg, lcache, srcdirs)
             recipeObj.populateLcache()
-            log.setVerbosity(1)
+            level = log.getVerbosity()
+            log.setVerbosity(log.INFO)
             recipeObj.setup()
             recipeObj.fetchAllSources()
-            log.setVerbosity(0)
+            log.setVerbosity(level)
         
     recipeVersionStr = recipeClass.version
 
@@ -348,6 +349,9 @@ def commit(repos, cfg, message, sourceCheck = False):
     result = update.buildLocalChanges(repos, 
 		    [(state, srcPkg, newVersion, update.IGNOREUGIDS)],
                     forceSha1=True)
+
+    # an error occurred.  buildLocalChanges() should have a useful
+    # message, so we just return
     if not result: return
 
     (changeSet, ((isDifferent, newState),)) = result

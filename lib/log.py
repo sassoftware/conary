@@ -26,6 +26,8 @@ For example::
 import logging
 import sys
 
+from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
+
 def error(*args):
     "Log an error"
     logger.error(*args)
@@ -50,10 +52,10 @@ def resetErrorOccured():
     hdlr.error = False
 
 def setVerbosity(val):
-    if val < 1:
-        logger.setLevel(logging.WARNING)
-    else:
-        logger.setLevel(logging.DEBUG)
+    return logger.setLevel(val)
+
+def getVerbosity():
+    return logger.getEffectiveLevel()
 
 class ErrorCheckingHandler(logging.StreamHandler):
     def __init__(self, *args, **keywords):

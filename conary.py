@@ -246,7 +246,7 @@ def realMain(cfg, argv=sys.argv):
 	else:
 	    cfg.display()
     elif (otherArgs[1] == "emerge"):
-	log.setVerbosity(1)
+	log.setVerbosity(log.DEBUG)
 
 	if argSet: return usage()
 

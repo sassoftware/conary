@@ -128,8 +128,8 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 
     if '-v' in otherArgs:
 	otherArgs.remove('-v')
-	log.setVerbosity(1)
+	log.setVerbosity(log.DEBUG)
     else:
-	log.setVerbosity(0)
+	log.setVerbosity(log.WARNING)
 
     return argSet, otherArgs
