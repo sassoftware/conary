@@ -48,7 +48,6 @@ class ConcurrencyTests(unittest.TestCase):
         fd, dbfile = tempfile.mkstemp()
         os.close(fd)
 
-        # 2 second timeout
         db1 = sqlite.connect(dbfile)
         waiter = Waiter()
         db1.db.sqlite_busy_handler(waiter.wait)
