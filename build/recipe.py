@@ -271,7 +271,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
         raise RecipeFileError, '%s does not contain %s' % (component, filename)
 
     fileObj = repos.getFileVersion(fileId, version)
-    theFile = repos.pullFileContentsObject(fileObj.sha1())
+    theFile = repos.pullFileContentsObject(fileObj.contents.sha1())
     (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name)
 
     os.write(fd, theFile.read())
