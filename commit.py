@@ -5,7 +5,7 @@
 import changeset
 import repository
 
-def doCommit(repos, cfg, changeSetFile):
+def doCommit(repos, changeSetFile):
     cs = changeset.ChangeSetFromFile(changeSetFile)
 
     try:
@@ -13,3 +13,8 @@ def doCommit(repos, cfg, changeSetFile):
     except repository.CommitError, e:
 	print e
 	
+def doLocalCommit(db, changeSetFile):
+    cs = changeset.ChangeSetFromFile(changeSetFile)
+    db.commitChangeSet(cs, isRollback = True, toDatabase = False)
+    
+
