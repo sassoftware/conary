@@ -40,6 +40,7 @@ python_files = __init__.py	\
 	datastore.py		\
 	display.py		\
 	enum.py			\
+	epdb.py			\
 	filecontainer.py	\
 	files.py		\
 	helper.py		\
@@ -53,6 +54,7 @@ python_files = __init__.py	\
 	rpmhelper.py		\
 	sha1helper.py		\
 	srcctl.py		\
+	stackutil.py		\
 	streams.py		\
 	trove.py		\
 	updatecmd.py		\
@@ -67,7 +69,7 @@ dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
 generated_files = conary-wrapper *.pyo *.pyc 
 
-.PHONY: clean bootstrap deps.dot pychecker dist install subdirs
+.PHONY: clean dist install subdirs
 
 
 subdirs:
