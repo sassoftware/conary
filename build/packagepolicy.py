@@ -1187,15 +1187,10 @@ class Provides(policy.Policy):
             # need to create a few more DependencySets.
             pkg.providesMap[path] = deps.DependencySet()
 
-        if provision.startswith("soname:"):
-            if m.name != 'ELF':
-                # Only ELF files can provide sonames.
-                # This is for libraries that don't really include a soname,
-                # but programs linked against them require a soname
-                main = provision[7:].strip()
-                abi = m.contents['abi']
-                pkg.providesMap[path].addDep(deps.SonameDependencies,
-                    deps.Dependency('/'.join((abi[0], main)), abi[1]))
+        if provision.startswith("file"):
+            # can't actually specify what to provide, just that it provides...
+            f.flags.isPathDependencyTarget(True)
+            return
 
         if provision.startswith("abi:"):
             abistring = provision[4:].strip()
@@ -1204,10 +1199,18 @@ class Provides(policy.Policy):
             flags = abistring[op+1:-1].split()
             pkg.providesMap[path].addDep(deps.AbiDependency,
                 deps.Dependency(abi, flags))
+            return
 
-        if provision.startswith("file"):
-            # can't actually specify what to provide, just that it provides...
-            f.flags.isPathDependencyTarget(True)
+        if provision.startswith("soname:"):
+            if m and m.name == 'ELF':
+                # Only ELF files can provide sonames.
+                # This is for libraries that don't really include a soname,
+                # but programs linked against them require a soname
+                main = provision[7:].strip()
+                abi = m.contents['abi']
+                pkg.providesMap[path].addDep(deps.SonameDependencies,
+                    deps.Dependency('/'.join((abi[0], main)), abi[1]))
+            return
 
 
 class Flavor(policy.Policy):
