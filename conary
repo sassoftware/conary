@@ -105,10 +105,11 @@ elif (otherArgs[1] == "cook"):
         if not pid:
             cook.cook(repos, cfg, file)
         else:
+            os.setpgid(pid, pid)
             try:
                 (id, status) = os.waitpid(pid, 0);
             except KeyboardInterrupt:
-                os.kill(pid, signal.SIGINT)
+                os.kill(-pid, signal.SIGINT)
                 
 elif (otherArgs[1] == "pkglist"):
     all = argSet.has_key('all')
