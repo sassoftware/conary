@@ -12,7 +12,10 @@ def flags_i686():
 		   "sse"    : True,
 		   "sse2"   : True,
 		   "3dnow"  : True }
-    lines = open("/proc/cpuinfo").read().split("\n")
+    try:
+        lines = open("/proc/cpuinfo").read().split("\n")
+    except IOError:
+        lines=[]
     rc = [ 'i686' ]
     for line in lines:
 	if not line.startswith("flags"): continue
