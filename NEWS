@@ -1,13 +1,13 @@
 Changes in 0.14.9:
-  * Shadow branches didn't return parent branches properly. This caused
-    incorrect pathId's to show up on cook on shallow shadows.
+  * Shadow Branch objects didn't return parent branches properly. This
+    caused incorrect pathId's to show up on cook on shallow shadows.
   * Reworked the code which looks up pathIds to take advantage of a new
-    server call (getPackageBranchPathIds) so it's faster and looks on
-    both the full branch, and full parent branches
-  * apache repository server allows mixed ssl and normal requests
-  * Added forceSSL to apache repository server configuration
-  * The network client code now supports accessing servers over https
-  * Use proper salt for user passwords
+    server call (getPackageBranchPathIds) which is faster and looks on
+    both the full branch and full parent branches.
+  * The Apache repository server now allows mixed ssl and normal requests.
+  * Added forceSSL option to apache repository server configuration.
+  * The network client code now supports accessing servers over https.
+  * Proper salts are used for user passwords.
 
 Changes in 0.14.8:
   * Fixed bug where streams for commits on distributed branches didn't always
