@@ -242,26 +242,35 @@ class NormalizeManPages(policy.Policy):
 
 		# now see if we have only a .so line to replace
 		if len(lines) == 1:
-		    match = self.soexp.search(lines[0][:-1]) # chop-chop
+		    line = lines[0]
+		    # remove newline if it exists
+		    if line[-1] == '\n':
+			line = line[:-1] # chop-chop
+		    match = self.soexp.search(line)
 		    if match:
 			section = os.path.basename(os.path.dirname(path))
 			matchlist = match.group(1).split('/')
-			if len(matchlist) == 1 or matchlist[0] == section:
-			    # no directory specified
+			l = len(matchlist)
+			if l == 1 or matchlist[l-2] == section:
+			    print 'foo', name
+			    # no directory specified, or in the same
+			    # directory:
 			    log.debug('replacing %s (%s) with symlink %s',
 				      name, match.group(0),
 				      os.path.basename(match.group(1)))
 			    os.remove(path)
-			    os.symlink(util.normpath(
-				os.path.basename(match.group(1))), path)
+			    os.symlink(os.path.basename(match.group(1)), path)
 			else:
+			    print name
+			    # either the canonical .so manN/foo.N or an
+			    # absolute path /usr/share/man/manN/foo.N
 			    # .so is relative to %(mandir)s and the other
 			    # man page is in a different dir, so add ../
-			    log.debug('replacing %s (%s) with symlink ../%s',
-				      name, match.group(0), match.group(1))
+			    target = "../%s/%s" %(matchlist[l-2], matchlist[l-1])
+			    log.debug('replacing %s (%s) with symlink %s',
+				      name, match.group(0), target)
 			    os.remove(path)
-			    os.symlink(util.normpath('../'+match.group(1)),
-				       path)
+			    os.symlink(target, path)
 
     def _compress(self, dirname, names):
 	for name in names:
