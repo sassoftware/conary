@@ -264,6 +264,10 @@ Arch.s390 = False
 Arch.s390x = False
 Arch.s390_all = Arch.s390 | Arch.s390x
 Arch.s390_all.setShortDoc('True if s390 or s390x is set')
+Arch.LE = Arch.x86 | Arch.x86_64 | Arch.ia64
+Arch.LE.setShortDoc('True if current architecture is little-endian')
+Arch.BE = Arch.sparc | Arch.sparc64 | Arch.ppc | Arch.ppc64 | Arch.s390_all
+Arch.BE.setShortDoc('True if current architecture is big-endian')
 Arch._freeze()
 _addDocs(Arch)
 
