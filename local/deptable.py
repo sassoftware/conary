@@ -162,12 +162,15 @@ class DependencyTables:
             cu.execute("UPDATE %s SET depId=depId * %d"  
                            % (depTable, multiplier), start_transaction = False)
 
-        cu.execute("SELECT COUNT(*) FROM %(reqTable)s" % substDict)
-        substDict['reqLen'] = cu.next()[0]
+        cu.execute("SELECT MAX(depNum) FROM %(reqTable)s" % substDict)
+        base = cu.next()[0]
+        if base is None:
+            base = 0
+        substDict['baseReqNum'] = base + 1
 
         cu.execute("""INSERT INTO %(reqTable)s 
                     SELECT %(tmpName)s.troveId, depId, 
-                           %(reqLen)d + depNum , flagCount FROM
+                           %(baseReqNum)d + depNum , flagCount FROM
                         %(tmpName)s JOIN %(allDeps)s ON
                             %(tmpName)s.class == %(allDeps)s.class AND
                             %(tmpName)s.name == %(allDeps)s.name AND
@@ -395,6 +398,9 @@ class DependencyTables:
 
         # this works against a database, not a repository
         cu = self.db.cursor()
+
+        import lib
+        lib.epdb.st()
 
         self._createTmpTable(cu, "DepCheck")
         createDepTable(cu, 'TmpDependencies', isTemp = True)
