@@ -9,6 +9,7 @@ import commit
 import os
 import util
 import sha1helper
+import shutil
 
 def cook(repos, cfg, recipeFile):
     classList = recipe.RecipeLoader(recipeFile)
@@ -62,12 +63,13 @@ def cook(repos, cfg, recipeFile):
 		f = files.FileFromFilesystem(realPath, ident(filePath))
 		fileList.append((f, realPath, filePath))
 
-	    commit.finalCommit(repos, cfg, pkgname + "/" + name, recipeObj.version,
-			       fileList)
+	    commit.finalCommit(repos, cfg, pkgname + "/" + name,
+                               recipeObj.version, fileList)
 
         # XXX include recipe files loaded by a recipe to derive
 	recipeName = os.path.basename(recipeFile)
-	f = files.FileFromFilesystem(recipeFile, ident(recipeName), type = "src")
+	f = files.FileFromFilesystem(recipeFile, ident(recipeName),
+                                     type = "src")
 	fileList = [ (f, recipeFile, recipeName) ]
 
 	for file in recipeObj.allSources():
