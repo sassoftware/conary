@@ -47,7 +47,7 @@ class NetworkAuthorization:
             where.append("write=1")
 
         if superUser:
-            where.append("superUser=1")
+            where.append("admin=1")
 
         if where:
             stmt += "WHERE " + " AND ".join(where)
@@ -96,7 +96,7 @@ class NetworkAuthorization:
 
     def iterUsers(self):
         cu = self.db.cursor()
-        cu.execute("""SELECT Users.user, Users.userId, Permissions.write, Permissions.superUser FROM Users
+        cu.execute("""SELECT Users.user, Users.userId, Permissions.write, Permissions.admin FROM Users
                       LEFT JOIN Permissions ON Users.userId=Permissions.userId""")
         for row in cu:
             yield row
@@ -126,7 +126,7 @@ class NetworkAuthorization:
                                                     labelId INTEGER,
                                                     troveNameId INTEGER,
                                                     write INTEGER,
-                                                    superUser INTEGER)""")
+                                                    admin INTEGER)""")
             cu.execute("""CREATE INDEX PermissionsIdx
                           ON Permissions(userId, labelId, troveNameId)""")
 
