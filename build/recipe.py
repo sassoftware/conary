@@ -15,6 +15,10 @@ import rpmhelper
 import gzip
 
 baseMacros = (
+    # Note that these macros cannot be represented as a dictionary,
+    # because the items need to be added in order so that they will
+    # be properly interpolated.
+    #
     # paths
     ('prefix'		, '/usr'),
     ('sysconfdir'	, '/etc'),
@@ -32,7 +36,7 @@ baseMacros = (
     ('infodir'		, '%(datadir)s/info'),
     ('docdir'		, '%(datadir)s/doc'),
     ('develdocdir'	, '%(datadir)s/develdoc'),
-    # arguments/flags
+    # arguments/flags (empty ones are for documentation; non-existant = empty)
     ('cflags'           , '-O2'),
     ('mflags'		, ''),
     ('parallelmflags'   , ''),
@@ -45,6 +49,22 @@ crossMacros = (
     ('prefix'		, '/opt/%(crossdir)s'),
     ('sysroot'		, '%(prefix)s/sys-root'),
     ('headerpath'	, '%(sysroot)s/usr/include')
+)
+
+baseAutoSpec = (
+    # automatic subpackage names and sets of regexps that define them
+    # cannot be a dictionary because it is ordered; first match wins
+    ('devel',
+	('.*\.a$',
+	 '.*\.so$',
+	 '.*/include/.*\.h$',
+	 '^/usr/include/.*',
+	 '^/usr/share/man/man(2|3)',
+	 '^/usr/share/develdoc/')),
+    ('lib', ('.*/lib/.*\.so\.')),
+    ('doc', ('^/usr/share/(doc|man|info)/')),
+    ('locale', ('^/usr/share/locale/',)),
+    ('runtime', ('.*',)),
 )
 
 class Macros(dict):
@@ -328,7 +348,11 @@ class Recipe:
 	    self.install.doInstall(self.macros)
 
     def packages(self, root):
-        self.packageSet = package.Auto(self.name, root)
+	self.autoSpecList = []
+	for spec in baseAutoSpec:
+	    self.autoSpecList.append(package.PackageSpec(spec[0], spec[1]))
+	self.packageSpecSet = package.PackageSpecSet(self.autoSpecList, None)
+        self.packageSet = package.Auto(self.name, root, self.packageSpecSet)
 
     def getPackageSet(self):
         return self.packageSet

@@ -336,75 +336,83 @@ class BuildPackageSet:
 	self.name = name
 	self.pkgs = {}
 
-develRE = None
-libRE = None
-docRE = None
-localeRE = None
+class PackageSpec:
+    
+    def __init__(self, name, relist):
+	self.name = name
+	tmplist = []
+	if type(relist) is str:
+	    regexp = relist
+	else:
+	    for subre in relist:
+		tmplist.append('(' + subre + ')')
+	    regexp = string.join(tmplist, '|')
+	self.regexp = re.compile(regexp)
 
-def Auto(name, root):
-    runtime = BuildPackage("runtime")
-    devel = BuildPackage("devel")
-    lib = BuildPackage("lib")
-    doc = BuildPackage("doc")
-    locale = BuildPackage("locale")
+    def match(self, string):
+	return self.regexp.match(string)
 
-    global develRE
-    global libRE
-    global docRE
-    global localeRE
+class PackageSpecInstance:
+    """An instance of a spec formed by the conjugation of a subspec and
+    an autospec"""
+    def __init__(self, instance, subspec, autospec):
+	self.instance = instance
+	self.subspec  = subspec
+	self.autospec = autospec
 
-    if not develRE:
-	develRE=re.compile(
-	    '(.*\.a$)|'
-	    '(.*\.so$)|'
-	    '(.*/include/.*\.h$)|'
-	    '(/usr/include/.*)|'
-	    '(^/usr/share/man/man(2|3))|'
-	    '(^/usr/share/develdoc/)'
-	)
-    if not libRE:
-	libRE=re.compile('.*/lib/.*\.so\.')
-    if not docRE:
-	docRE=re.compile('(^/usr/share/doc/)|'
-	                  '(^/usr/share/man/)|'
-	                  '(^/usr/share/info/)|')
-    if not localeRE:
-	localeRE=re.compile('^/usr/share/locale/')
+class PackageSpecSet(dict):
+    """An "ordered dictionary" containing PackageSpecs"""
+    def __init__(self, auto, subs):
+	self.auto = auto
+	if subs:
+	    self.subs = subs
+	else:
+	    self.subs = (PackageSpec('', '.*'), )
+	self.packageList = []
+	self.packageMap = {}
+	for subspec in self.subs:
+	    for autospec in self.auto:
+		name = self._getname(subspec.name, autospec.name)
+		self[name] = PackageSpecInstance(BuildPackage(name), subspec, autospec)
+		self.packageList.append(name)
+		if not self.packageMap.has_key(subspec.name):
+		    self.packageMap[subspec.name] = {}
+		self.packageMap[subspec.name][autospec.name] = self[name]
+
+    def _getname(self, subname, autoname):
+	"""Cheap way of saying "if subname, then subname/autoname,
+	otherwise just autoname"""
+	return string.lstrip(string.join((subname, autoname), '/'), '/')
+    
+    def add(self, path, subspec, autospec):
+	self.packageMap[subspec.name][autospec.name].instance.addFile(path)
+
+
+def Auto(name, root, specSet):
 
     os.path.walk(root, autoVisit,
-                 (root, runtime, devel, lib, doc, locale))
+                 (root, specSet))
 
     set = BuildPackageSet(name)
-    set.addPackage(runtime)
-    if devel.keys():
-	set.addPackage(devel)
-    if lib.keys():
-	set.addPackage(lib)
-    if doc.keys():
-	set.addPackage(doc)
-    
+    for name in specSet.packageList:
+	if specSet[name].instance.keys():
+	    set.addPackage(specSet[name].instance)
     return set
 
 def autoVisit(arg, dir, files):
-    (root, runtimePkg, develPkg, libPkg, docPkg, localePkg) = arg
+    (root, specSet) = arg
     dir = dir[len(root):]
-    global develRE
-    global libRE
-    global docRE
-    global localeRE
 
     for file in files:
         if dir:
             path = dir + '/' + file
         else:
             path = '/' + file
-        if develRE.match(path):
-            develPkg.addFile(path)
-        elif libRE.match(path):
-            libPkg.addFile(path)
-        elif docRE.match(path):
-            docPkg.addFile(path)
-        elif localeRE.match(path):
-            localePkg.addFile(path)
-        else:
-            runtimePkg.addFile(path)
+	
+	for subspec in specSet.subs:
+	    if subspec.match(path):
+		for autospec in specSet.auto:
+		    if autospec.match(path):
+			specSet.add(path, subspec, autospec)
+			break
+		break
