@@ -15,7 +15,7 @@
 Command-line option handling
 """
 
-from lib import log
+from lib import log, util
 import sys
 
 
@@ -119,6 +119,9 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 	del argSet['debug']
 	from lib import epdb
 	epdb.set_trace()
+        sys.excepthook = util.genExcepthook(cfg.dumpStackOnError, 
+                                            debugCtrlC=True)
+
 
     if '-v' in otherArgs:
 	otherArgs.remove('-v')

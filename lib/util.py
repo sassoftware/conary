@@ -88,9 +88,11 @@ def searchFile(file, searchdirs, error=None):
 def findFile(file, searchdirs):
     return searchFile(file, searchdirs, error=1)
 
-def genExcepthook(dumpStack=True):
+def genExcepthook(dumpStack=True, debugCtrlC=False):
     def excepthook(type, value, tb):
         sys.excepthook = sys.__excepthook__
+        if type == KeyboardInterrupt and not debugCtrlC:
+            sys.exit(1)
         lines = traceback.format_exception(type, value, tb)
         if dumpStack:
             try:

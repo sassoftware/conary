@@ -468,8 +468,6 @@ def main(argv=sys.argv):
 	print >> sys.stderr, str(e)
     except repository.repository.PackageNotFound, e:
 	print >> sys.stderr, str(e)
-    except KeyboardInterrupt:
-	pass
 	    
 if __name__ == "__main__":
     sys.exit(main())
