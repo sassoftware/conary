@@ -20,6 +20,10 @@ f.close()
 if len(sys.argv) == 2:
     for n in c.fileList():
 	print "%s (%s)" % (n, c.getTag(n))
+elif len(sys.argv) == 3:
+    f = c.getFile(sys.argv[2])
+    sys.stdout.write(f.read())
+    f.close
 else:
     for file in sys.argv[2:]:
 	print "--", file
