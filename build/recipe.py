@@ -561,12 +561,7 @@ class PackageRecipe(Recipe):
 	else:
 	    self._build.doBuild(self)
 
-    def addProcess(self, post):
-	self.process[:0] = [post] # prepend so that policy is done last
-
     def doDestdirProcess(self):
-        for post in self.process:
-            post.doProcess(self)
 	for post in self.destdirPolicy:
             post.doProcess(self)
 
@@ -665,8 +660,6 @@ class PackageRecipe(Recipe):
 	self.srcdirs = srcdirs
 	self.theMainDir = self.name + "-" + self.version
 	self._build = []
-	# what needs to be done to massage the installed tree
-        self.process = []
         self.destdirPolicy = destdirpolicy.DefaultPolicy()
         self.packagePolicy = packagepolicy.DefaultPolicy()
 	self.macros = Macros()
