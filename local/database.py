@@ -155,9 +155,7 @@ class Database(repository.LocalRepository):
 	    # build the list of things to commit
 	    fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root)
 	    # remove old packages
-            # XXX FilesystemJob has no getErrorList
-	    # errList = fsJob.getErrorList()
-            errList = None
+	    errList = fsJob.getErrorList()
 	    if errList:
 		for err in errList: log.error(err)
 		undo.undo()
