@@ -82,7 +82,7 @@ def doErase(cfg, itemList, tagScript = None):
         elif len(l) == 2:
             troveList.append((l[0], l[1]))
         else:
-            log.error("too many ='s in %s", pkgStr)
+            log.error("too many ='s in %s", item)
             return 1
 
     client = conaryclient.ConaryClient(cfg=cfg)
