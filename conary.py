@@ -83,6 +83,7 @@ def usage(rc = 1):
     print ""
     print "query flags:    --full-versions"
     print "                --ids"
+    print "                --info"
     print "                --path <file>"
     print "                --ls"
     print "                --sha1s"
@@ -292,6 +293,9 @@ def realMain(cfg, argv=sys.argv):
 
 	tags = argSet.has_key('tags')
 	if tags: del argSet['tags']
+
+	info = argSet.has_key('info')
+	if info: del argSet['info']
 	
 	ls = argSet.has_key('ls')
 	if ls: del argSet['ls']
@@ -313,7 +317,7 @@ def realMain(cfg, argv=sys.argv):
 	    try:
                 display.displayTroves(db, otherArgs[2:], paths, ls, ids, sha1s,
                                       fullVersions, tags, 
-                                      defaultFlavor = cfg.flavor)
+                                      defaultFlavor = cfg.flavor, info=info)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
 		return 1

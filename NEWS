@@ -1,6 +1,7 @@
 Changes in 0.50.1:
   * Add support for trove=<troveVersion> in rq, cvc co, and other places that 
     use findTrove
+  * Add conary q --info option to display flavors
 
 Changes in 0.50.0:
   * Redirections work
