@@ -71,6 +71,8 @@ class ChangeSet:
     def formatToFile(self, cfg, f):
 	for pkg in self.newPackages:
 	    pkg.formatToFile(self, cfg, f)
+	for (pkgName, version) in self.oldPackages:
+	    print pkgName, "removed", version.asString(cfg.defaultbranch)
 
     def getFileChange(self, fileId):
 	return self.files[fileId][2]
@@ -81,7 +83,7 @@ class ChangeSet:
             rc += pkg.freeze()
 
 	for (pkgName, version) in self.getOldPackageList():
-	    rc += "SRS PKG REMOVED %s %s" % (pkgName, version.freeze())
+	    rc += "SRS PKG REMOVED %s %s\n" % (pkgName, version.freeze())
 	
 	for (fileId, (oldVersion, newVersion, csInfo)) in self.getFileList():
 	    if oldVersion:
@@ -114,12 +116,22 @@ class ChangeSet:
 
     def invert(self, repos):
 	assert(not self.abstract)
+	# this is easy to fix if it turns out to be necessary
+	assert(not self.oldPackages)
 
 	inversion = ChangeSetFromRepository(repos)
 
 	for pkgCs in self.getNewPackageList():
+	    if not pkgCs.getOldVersion():
+		# this was a new package, and the inverse of a new
+		# package is an old package
+		inversion.oldPackage(pkgCs.getName(), pkgCs.getNewVersion())
+		continue
+
 	    pkg = repos.getPackageVersion(pkgCs.getName(), 
 					  pkgCs.getOldVersion())
+
+	    # this is a modified package and needs to be inverted
 
 	    invertedPkg = package.PackageChangeSet(pkgCs.getName(), 
 			       pkgCs.getNewVersion(), pkgCs.getOldVersion())
@@ -227,7 +239,7 @@ class ChangeSetFromFile(ChangeSet):
 	    if header.startswith("SRS PKG REMOVED "):
 		(pkgName, verStr) = header.split()[3:6]
 		version = versions.ThawVersion(verStr)
-		self.oldPackage(pkgName, verStr)
+		self.oldPackage(pkgName, version)
 	    elif header.startswith("SRS PKG "):
 		l = header.split()
 
