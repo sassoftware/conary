@@ -156,7 +156,7 @@ class Epdb(pdb.Pdb):
     def do_trace_cond(self, args):
         args = args.split(' ', 1)
         if len(args) not in (1, 2):
-            print "trace_cond <cond> [marker]"
+            print "trace_cond [marker] <cond>"
         if len(args) == 1:
             cond = args[0]
             marker = 'default'
@@ -164,11 +164,11 @@ class Epdb(pdb.Pdb):
             marker, cond = args
         if cond == 'None': 
             cond = None
-            set_trace_cond(cond, marker)
+            self.set_trace_cond(marker, cond)
             return
         try:
             cond = int(cond)
-            set_trace_cond(cond, marker)
+            self.set_trace_cond(marker, cond)
             return
         except ValueError:
             locals = self.curframe.f_locals
@@ -178,13 +178,14 @@ class Epdb(pdb.Pdb):
                 # test to be sure that what we code is a 
                 # function that can take one arg and return a bool
                 rv = (type(cond) == bool) or bool(cond(1))
-                set_trace_cond(cond, marker)
+                self.set_trace_cond(marker, cond)
             except:
                 t, v = sys.exc_info()[:2]
                 if type(t) == type(''):
                     exc_type_name = t
                 else: exc_type_name = t.__name__
                 print '***', exc_type_name + ':', v
+    do_tc = do_trace_cond
 
     def _set_path(self, paths):
         paths = paths.split(' ')
@@ -343,7 +344,7 @@ class Epdb(pdb.Pdb):
             pass
     reset_trace_count = classmethod(reset_trace_count)
 
-    def set_trace_cond(klass, cond=None, marker='default'):
+    def set_trace_cond(klass, marker='default', cond=None):
         """ Sets a condition for set_trace statements that have the 
             specified marker.  A condition can either callable, in
             which case it should take one argument, which is the 
@@ -460,7 +461,7 @@ def beingTraced():
         frame = frame.f_back
     return False
 
-def set_trace_cond(cond=None, marker='default'):
+def set_trace_cond(cond=None, **kw):
     """ Sets a condition for set_trace statements that have the 
         specified marker.  A condition can either callable, in
         which case it should take one argument, which is the 
@@ -468,7 +469,10 @@ def set_trace_cond(cond=None, marker='default'):
         or it can be a number, in which case the break will
         only be called.
     """
-    Epdb.set_trace_cond(cond, marker)
+    for key, val in kw.iteritems():
+        Epdb.set_trace_cond(key, val)
+    if not kw or cond is not None:
+        Epdb.set_trace_cond('default', cond)
 
 def reset_trace_count(marker='default'):
     """ Resets the number a set_trace for a marker has been 
