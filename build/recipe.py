@@ -58,6 +58,9 @@ baseMacros = (
     ('infodir'		, '%(datadir)s/info'),
     ('docdir'		, '%(datadir)s/doc'),
     ('thisdocdir'       , '%(docdir)s/%(name)s-%(version)s'),
+    # special component prefixes that the whole system needs to share
+    ('krbprefix'	, '%(exec_prefix)s/kerberos'),
+    ('x11prefix'	, '%(exec_prefix)s/X11R6'),
     # arguments/flags (empty ones are for documentation; non-existant = empty)
     ('cc'		, 'gcc'),
     ('cflags'           , '-O2'), # -g when we have debuginfo
