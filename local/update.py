@@ -401,6 +401,8 @@ class FilesystemJob:
         # Remove old files. if the files have already been removed, just
         # mention that fact and continue. Don't erase files which
         # have changed contents.
+	cwd = os.getcwd()
+
 	for fileId in pkgCs.getOldFileList():
 	    (path, version) = basePkg.getFile(fileId)
 
