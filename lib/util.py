@@ -10,6 +10,8 @@ import sys
 import traceback
 import pdb
 import exceptions
+import glob
+import shutil
 
 def mkdirChain(*paths):
     for path in paths:
@@ -69,3 +71,49 @@ def execute(cmd):
 	    info = 'Shell command "%s" exited with exit code %d' \
 		    %(cmd, os.WEXITSTATUS(rc))
 	raise RuntimeError, info
+
+
+
+# shutil module extensions, with {}-expansion and globbing
+
+# XXX -- this does not do {{}} nested {}-expansion -- we should
+# just write a C extension that simply exports GLOB_BRACE and
+# use it instead.
+def braceExpand(path):
+    obrace = string.find(path, "{")
+    if obrace < 0:
+	return [path]
+    start = path[0:obrace]
+    cbrace = string.find(path, "}")
+    if cbrace < 0:
+	raise ValueError, 'path %s has unbalanced {}' %path
+    segments = string.split(path[obrace+1:cbrace], ',')
+    end = path[cbrace+1:]
+    pathlist = []
+    for segment in segments:
+	pathlist.extend(braceExpand(start+segment+end))
+    return pathlist
+
+def braceGlob(paths):
+    pathlist = []
+    for path in braceExpand(paths):
+	pathlist.extend(glob.glob(path))
+    return pathlist
+
+def rmtree(paths, ignore_errors=False, onerror=None):
+    for path in braceGlob(paths):
+	print '+ deleting [tree] %s' %path
+	shutil.rmtree(path, ignore_errors, onerror)
+
+def remove(paths):
+    for path in braceGlob(paths):
+	print '+ deleting [file] %s' %path
+	os.remove(path)
+
+def copyfile(source, dest):
+    print '+ copying %s to %s' %(source, dest)
+    shutil.copyfile(source, dest)
+
+def rename(source, dest):
+    print '+ renaming %s to %s' %(source, dest)
+    os.rename(source, dest)

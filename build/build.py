@@ -6,7 +6,6 @@ import os
 import shutil
 import util
 import string
-import glob
 
 # Note: when creating templates, be aware that they are evaulated
 # twice, in the context of two different dictionaries.
@@ -99,6 +98,7 @@ class ManualConfigure(Configure):
 	        '%(preConfigure)s %%(configure)s %(args)s')
 
 class GNUConfigure(Configure):
+    """For use at least when there is no single functional DESTDIR or similar"""
     template = (
 	'cd %%(builddir)s; '
 	'CFLAGS=%%(cflags)s CXXFLAGS=%%(cflags)s'
@@ -123,12 +123,14 @@ class GNUConfigure(Configure):
                 'objDir': ''}
 
 class Make(ShellCommand):
-    template = 'cd %%(builddir)s; %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s'
+    template = ('cd %%(builddir)s; '
+                '%(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': ''}
 
 class MakeInstall(ShellCommand):
     template = ('cd %%(builddir)s; '
-                '%(preMake)s make %%(mflags)s %%(rootVarArgs)s %(installtarget)s %(args)s')
+                '%(preMake)s make %%(mflags)s %%(rootVarArgs)s'
+		' %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
                 'preMake': '',
 		'installtarget': 'install'}
@@ -168,15 +170,17 @@ class _PutFile:
 
 	for fromFile in self.fromFiles:
 	    sources = (self.source + fromFile) %macros
-	    # XXX add {} expansion -- util.braceglob?
-	    sourcelist = glob.glob(sources)
+	    sourcelist = util.braceGlob(sources)
 	    if dest[-1:] != '/' and len(sourcelist) > 1:
 		raise TypeError, 'singleton destination %s requires singleton source'
 	    for source in sourcelist:
 		thisdest = dest
 		if dest[-1:] == '/':
 		    thisdest = dest + os.path.basename(source)
-		shutil.copyfile(source, thisdest)
+		if self.move:
+		    util.rename(source, thisdest)
+		else:
+		    util.copyfile(source, thisdest)
 		if self.mode >= 0:
 		    os.chmod(thisdest, self.mode)
 
@@ -199,11 +203,13 @@ class InstallFile(_PutFile):
     def __init__(self, fromFiles, toFile, perms = 0644):
 	_PutFile.__init__(self, fromFiles, toFile, perms)
 	self.source = ''
+	self.move = 0
 
 class MoveFile(_PutFile):
     def __init__(self, fromFiles, toFile, perms = -1):
 	_PutFile.__init__(self, fromFiles, toFile, perms)
 	self.source = '%(destdir)s'
+	self.move = 1
 
 class InstallSymlink:
 
@@ -222,9 +228,9 @@ class RemoveFiles:
 
     def doInstall(self, macros):
 	if self.recursive:
-	    util.execute("rm -rf %s/%s" %(macros['destdir'], self.filespec %macros))
+	    util.rmtree("%s/%s" %(macros['destdir'], self.filespec %macros))
 	else:
-	    util.execute("rm -f %s/%s" %(macros['destdir'], self.filespec %macros))
+	    util.remove("%s/%s" %(macros['destdir'], self.filespec %macros))
 
     def __init__(self, filespec, recursive=0):
 	self.filespec = filespec
