@@ -70,7 +70,7 @@ def usage(rc = 1):
 def openRepository(path, mode):
     try:
         repos = fsrepos.FilesystemRepository(path, mode)
-    except repository.OpenError, e:
+    except repository.repository.OpenError, e:
         log.error('Unable to open repository %s: %s', path, str(e))
         sys.exit(1)
     return repos
@@ -78,7 +78,7 @@ def openRepository(path, mode):
 def openDatabase(root, path, mode):
     try:
         db = database.Database(root, path, mode)
-    except repository.OpenError, e:
+    except repository.repository.OpenError, e:
         log.error('Unable to open database %s%s%s: %s', root, os.sep, path, str(e))
         sys.exit(1)
     return db
