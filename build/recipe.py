@@ -384,7 +384,7 @@ class Recipe:
 	               ('destdir', root))
         if self.build is None:
             pass
-        elif isistance(self.build, str):
+        elif isinstance(self.build, str):
             util.execute(self.build %self.macros)
         elif isinstance(self.build, tuple) or isinstance(self.build, list):
 	    for bld in self.build:
