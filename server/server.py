@@ -105,6 +105,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 
 	return d
 
+    def getFilesInTrove(self, troveName, version, flavor,
+                        sortByPath = False, withFiles = False):
+        gen = self.troveStore.iterFilesInTrove(troveName,
+                                               self.toVersion(version),
+                                               self.toFlavor(flavor),
+                                               sortByPath, 
+                                               withFiles) 
+        if withFiles:
+            return [ (x[0], x[1], self.fromVersion(x[2]), self.fromFile(x[3]))
+                     for x in gen ]
+        else:
+            return [ (x[0], x[1], self.toVersion(x[2])) for x in gen ]
+
     def getAllTroveLeafs(self, troveNames):
 	d = {}
 	for troveName in troveNames:
@@ -177,6 +190,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 	fsrepos.FilesystemRepository.commitChangeSet(self, cs)
 
 	return True
+
+    def getFileVersion(self, fileId, version, withContents = 0):
+        # this is a sub-optimal test, we need to see if we've been
+        # called from xmlrpc or if we're being called internally
+        # to access data in the fsrepos
+        if type(version) is str:
+            # xml request
+            f = self.troveStore.getFile(fileId, self.toVersion(version))
+            return self.fromFile(f)
+        # internal fsrepos request
+        return fsrepos.FilesystemRepository.getFileVersion(self, fileId, version, withContents = withContents)
 
     def checkVersion(self, clientVersion):
         if clientVersion < 0:
