@@ -566,7 +566,7 @@ class LocalFlagCollection(Collection):
 
     def _override(self, key, value):
         if key not in self:
-            dict.__setitem__(self, self._getNonExistantKey(key))
+            self._addFlag(key)
         self[key]._set(value, override=True)
 
     def _getNonExistantKey(self, key):
