@@ -1,11 +1,10 @@
 
 class Hunk:
 
-    # src is assumed to be positioned at the right place to start
-    # applying the patch, and the new lines are returned
-    def apply(self, src):
+    # the new lines which result from this hunk are returned
+    def apply(self, src, srcLine):
 	result = []
-	fromLine = 0
+	fromLine = srcLine
 	for line in self.lines:
 	    if line[0] == " ":
 		if src[fromLine] != line[1:]:
@@ -15,12 +14,25 @@ class Hunk:
 	    elif line[0] == "+":
 		result.append(line[1:])
 	    elif line[0] == "-":
+		if src[fromLine] != line[1:]:
+		    raise Conflict()
+
 		fromLine = fromLine + 1
 
-	assert(fromLine == self.fromLen)
+	assert(fromLine == self.fromLen + srcLine)
 	assert(len(result) == self.toLen)
 
 	return result
+
+    def countConflicts(self, src, srcLine):
+	conflicts = 0
+	for line in self.lines:
+	    if line[0] == " " or line[0] == "-":
+		if src[srcLine] != line[1:]: 
+		    conflicts += 1
+		srcLine += 1
+
+	return conflicts
 
     def __init__(self, fromStart, fromLen, toStart, toLen, lines):
 	self.fromStart = fromStart
@@ -81,15 +93,37 @@ def patch(oldLines, unifiedDiff):
     result = []
 
     fromLine = 0
+    offset = 0
 
     for hunk in hunks:
-	while (fromLine < hunk.fromStart):
+	start = hunk.fromStart + offset
+	conflicts = hunk.countConflicts(oldLines, start)
+
+	i = 0
+	before = 1000
+	after = 1000
+	while conflicts:
+	    i = i + 1
+	    if (start - abs(i) >= 0):
+		before = hunk.countConflicts(oldLines, start - abs(i))
+	    if (start + abs(i) < (len(oldLines) - hunk.fromLen)):
+		after = hunk.countConflicts(oldLines, start + abs(i))
+
+	    if before < after:
+		conflicts = before
+		i = -(abs(i))
+	    else:
+		conflicts = after
+		i = abs(i)
+
+	offset = i
+	start += i
+
+	while (fromLine < start):
 	    result.append(oldLines[fromLine])
 	    fromLine = fromLine + 1
 
-	assert(hunk.toStart == len(result))
-
-	result += hunk.apply(oldLines[fromLine:])
+	result += hunk.apply(oldLines, start)
 	fromLine += hunk.fromLen
 
     while (fromLine < len(oldLines)):
