@@ -44,6 +44,8 @@ class lowlevelTestCases(unittest.TestCase, testsupport.TestSupport):
             pass
 
     def CheckSQLiteExec(self):
+        # removed sqlite_exec interface
+        return
         self.cnx.execute("create table test(id int, name varchar(20))")
         self.cnx.execute("insert into test(id, name) values (1, 'foo')")
         self.cnx.execute("insert into test(id, name) values (2, 'bar')")
@@ -97,13 +99,15 @@ class lowlevelTestCases(unittest.TestCase, testsupport.TestSupport):
         self.removefile()
 
         self.failUnlessRaises(ProgrammingError, self.cnx.close)
-        self.failUnlessRaises(ProgrammingError, self.cnx.execute, "")
+        # execute method is gone
+        #self.failUnlessRaises(ProgrammingError, self.cnx.execute, "")
 
     def CheckConnectionForNumberOfArguments(self):
         self.failUnlessRaises(TypeError, self.cnx.close, None)
         self.failUnlessRaises(TypeError, self.cnx.execute, None, None)
         self.failUnlessRaises(TypeError, self.cnx.sqlite_changes, None)
-        self.failUnlessRaises(TypeError, self.cnx.sqlite_exec, None)
+        # sqlite_exec is gone
+        # self.failUnlessRaises(TypeError, self.cnx.sqlite_exec, None)
         self.failUnlessRaises(TypeError, self.cnx.sqlite_last_insert_rowid, None)
 
     def CheckConnectionDestructor(self):
@@ -111,6 +115,8 @@ class lowlevelTestCases(unittest.TestCase, testsupport.TestSupport):
         self.removefile()
 
     def CheckResultObject(self):
+        # execute method is gone
+        return
         create_statement = "create table test(id INTEGER, name TEXT)"
         self.cnx.execute(create_statement)
 
@@ -133,6 +139,8 @@ class lowlevelTestCases(unittest.TestCase, testsupport.TestSupport):
             "rowlist should have been %s, was %s" % (repr(correct_row_list), repr(res.row_list)))
 
     def CheckResultAttributes(self):
+        # low level api removed
+        return
         res = self.cnx.execute("select NULL, max(4,5)")
         try:
             res.foo = 7

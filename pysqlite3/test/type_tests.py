@@ -59,7 +59,7 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
     def CheckExpectedTypesStandardTypes(self):
         self.cur.execute("create table test (a, b, c)")
         self.cur.execute("insert into test(a, b, c) values (5, 6.3, 'hello')")
-        self.cur.execute("-- types int, float, str")
+        #self.cur.execute("-- types int, float, str")
         self.cur.execute("select * from test")
         res = self.cur.fetchone()
         self.failUnless(isinstance(res.a, types.IntType),
@@ -72,7 +72,7 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
     def CheckExpectedTypesStandardTypesNull(self):
         self.cur.execute("create table test (a, b, c)")
         self.cur.execute("insert into test(a, b, c) values (NULL, NULL, NULL)")
-        self.cur.execute("-- types int, float, str")
+        #self.cur.execute("-- types int, float, str")
         self.cur.execute("select * from test")
         res = self.cur.fetchone()
         self.failUnless(res.a == None,
@@ -83,6 +83,8 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
                         "The built-in string converter should have returned None.")
 
     def CheckExpectedTypesCustomTypes(self):
+        # no longer supported
+        return
         value = MyType(10)
         self.cur.execute("create table test (a)")
         self.cur.execute("insert into test(a) values (?)", value)
@@ -99,6 +101,7 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
         value = MyTypeNew(10)
         self.cur.execute("create table test (a integer)")
         self.cur.execute("insert into test(a) values (?)", value)
+        #self.cur.execute("-- types mytype")
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
 
@@ -109,7 +112,6 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
         value = None
         self.cur.execute("create table test (a)")
         self.cur.execute("insert into test(a) values (?)", value)
-        self.cur.execute("-- types mytype")
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
 
@@ -117,9 +119,11 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
                         "The converter should have returned None.")
 
     def CheckResetExpectedTypes(self):
+        # no longer supported
+        return
         self.cur.execute("create table test (a str)")
         self.cur.execute("insert into test(a) values (5)")
-        self.cur.execute("-- types int")
+        #self.cur.execute("-- types int")
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
         self.assert_(isinstance(res.a, types.IntType),
@@ -284,7 +288,7 @@ class SQLiteBuiltinTypeSupport(unittest.TestCase, testsupport.TestSupport):
     def CheckBinary(self):
         bindata = "".join([chr(x) for x in range(256)])
         self.cur.execute("create table test(b BINARY)")
-        self.cur.execute("insert into test(b) values(?)", sqlite.Binary(bindata))
+        self.cur.execute("insert into test(b) values(?)", bindata)
         self.cur.execute("select b from test")
         res = self.cur.fetchone()
         self.failUnlessEqual(bindata, res.b, "Binary roundtrip didn't produce original string")

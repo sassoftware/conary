@@ -21,7 +21,6 @@ class TransactionTests(unittest.TestCase, testsupport.TestSupport):
     def CheckValueInTransaction(self):
         self.cur.execute("create table test (a)")
         self.cur.execute("insert into test (a) values (?)", "foo")
-        self.cur.execute("-- types int")
         self.cur.execute("select count(a) as count from test")
         res = self.cur.fetchone()
         self.failUnlessEqual(res.count, 1,
@@ -30,9 +29,8 @@ class TransactionTests(unittest.TestCase, testsupport.TestSupport):
     def CheckValueAfterCommit(self):
         self.cur.execute("create table test (a)")
         self.cur.execute("insert into test (a) values (?)", "foo")
-        self.cur.execute("-- types int")
-        self.cur.execute("select count(a) as count from test")
         self.cnx.commit()
+        self.cur.execute("select count(a) as count from test")
         res = self.cur.fetchone()
         self.failUnlessEqual(res.count, 1,
                              "Wrong number of rows during transaction.")
@@ -42,7 +40,6 @@ class TransactionTests(unittest.TestCase, testsupport.TestSupport):
         self.cnx.commit()
         self.cur.execute("insert into test (a) values (?)", "foo")
         self.cnx.rollback()
-        self.cur.execute("-- types int")
         self.cur.execute("select count(a) as count from test")
         res = self.cur.fetchone()
         self.failUnlessEqual(res.count, 0,

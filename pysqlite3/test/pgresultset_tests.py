@@ -27,7 +27,6 @@ class PgResultSetTests(unittest.TestCase, testsupport.TestSupport):
         self.cur.execute("CREATE TABLE TEST (id, name, age)")
         self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
                             (5, 'Alice', 29))
-        self.cur.execute("-- types int, str, int")
         self.cur.execute("SELECT id, name, age FROM TEST")
         return self.cur.fetchone()
 
@@ -112,86 +111,9 @@ class PgResultSetTests(unittest.TestCase, testsupport.TestSupport):
         if v != 6:
             self.fail("Wrong result for get [4]")
 
-class TupleResultTests(unittest.TestCase, testsupport.TestSupport):
-    def setUp(self):
-        self.filename = self.getfilename()
-        self.cnx = sqlite.connect(self.filename)
-        self.cnx.rowclass = tuple
-        self.cur = self.cnx.cursor()
-
-    def tearDown(self):
-        try:
-            self.cnx.close()
-            self.removefile()
-        except AttributeError:
-            pass
-        except sqlite.ProgrammingError:
-            pass
-
-    def getOneResult(self):
-        try:
-            self.cur.execute("DROP TABLE TEST")
-        except sqlite.DatabaseError, reason:
-            pass
-
-        self.cur.execute("CREATE TABLE TEST (id, name, age)")
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
-                            (5, 'Alice', 29))
-        self.cur.execute("-- types int, str, int")
-        self.cur.execute("SELECT id, name, age FROM TEST")
-        return self.cur.fetchone()
-
-    def getManyResults(self):
-        try:
-            self.cur.execute("DROP TABLE TEST")
-        except sqlite.DatabaseError, reason:
-            pass
-
-        self.cur.execute("CREATE TABLE TEST (id, name, age)")
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
-                            (5, 'Alice', 29))
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
-                            (5, 'Alice', 29))
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
-                            (5, 'Alice', 29))
-        self.cur.execute("-- types int, str, int")
-        self.cur.execute("SELECT id, name, age FROM TEST")
-        return self.cur.fetchmany(2)
-
-    def getAllResults(self):
-        try:
-            self.cur.execute("DROP TABLE TEST")
-        except sqlite.DatabaseError, reason:
-            pass
-
-        self.cur.execute("CREATE TABLE TEST (id, name, age)")
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
-                            (5, 'Alice', 29))
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
-                            (5, 'Alice', 29))
-        self.cur.execute("INSERT INTO TEST (id, name, age) VALUES (?, ?, ?)",
-                            (5, 'Alice', 29))
-        self.cur.execute("-- types int, str, int")
-        self.cur.execute("SELECT id, name, age FROM TEST")
-        return self.cur.fetchall()
-
-    def CheckRowTypeIsTupleFetchone(self):
-        res = self.getOneResult()
-        self.failUnless(type(res) is tuple, "Result type of row isn't a tuple")
-
-    def CheckRowTypeIsTupleFetchmany(self):
-        res = self.getManyResults()
-        self.failUnless(type(res[1]) is tuple, "Result type of row isn't a tuple")
-
-    def CheckRowTypeIsTupleFetchall(self):
-        res = self.getAllResults()
-        self.failUnless(type(res[2]) is tuple, "Result type of row isn't a tuple")
-
 def suite():
     tests = [unittest.makeSuite(PgResultSetTests, "Check"),
                                 unittest.makeSuite(PgResultSetTests, "Check")]
-    if sys.version_info >= (2,2):
-        tests.append(unittest.makeSuite(TupleResultTests, "Check"))
     return unittest.TestSuite(tests)
 
 def main():
