@@ -1045,16 +1045,17 @@ class Requires(_addInfo):
                     self.addRequirement(path, info, pkg, depClass)
 
         # now check for automatic dependencies besides ELF
-	m = self.recipe.magic[path]
-	if m and m.name == 'script':
-            interp = m.contents['interpreter']
-            if not os.path.exists(interp):
-                # I do not see this interpreter on the system, at least warn
-		log.warning('%s (referenced in %s) missing', interp, path)
-                # N.B. no special handling for env here; if there has been
-                # an exception to NormalizeInterpreterPaths then it is a
-                # real dependency on env
-            self.addRequirement(path, interp, pkg, deps.FileDependencies)
+        if f.inode.perms() & 0111:
+            m = self.recipe.magic[path]
+            if m and m.name == 'script':
+                interp = m.contents['interpreter']
+                if not os.path.exists(interp):
+                    # I do not see this interpreter on the system, at least warn
+                    log.warning('%s (referenced in %s) missing', interp, path)
+                    # N.B. no special handling for env here; if there has been
+                    # an exception to NormalizeInterpreterPaths then it is a
+                    # real dependency on env
+                self.addRequirement(path, interp, pkg, deps.FileDependencies)
 
         # finally, package the dependencies up
         if path not in pkg.requiresMap:
