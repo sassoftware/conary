@@ -429,8 +429,9 @@ class Database:
 
     def iterVersionByName(self, name):
 	cu = self.db.cursor()
-	cu.execute("SELECT version, timeStamps FROM DBInstances NATURAL JOIN Versions "
-		   "WHERE troveName=? AND isPresent=1", name)
+	cu.execute("""SELECT DISTINCT version, timeStamps FROM DBInstances
+                          NATURAL JOIN Versions 
+		      WHERE troveName=? AND isPresent=1""", name)
  	for (match, timeStamps) in cu:
             ts = [float(x) for x in timeStamps.split(':')]
 	    yield versions.VersionFromString(match, timeStamps=ts)
