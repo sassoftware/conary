@@ -23,6 +23,7 @@ import srcctl
 import sys
 import updatecmd
 import util
+import xmlrpclib
 
 if sys.version_info < (2, 3):
     print "error: python 2.3 or greater is requried"
@@ -88,7 +89,7 @@ def openDatabase(root, path):
         sys.exit(1)
     return db
 
-def main():
+def realMain():
     otherArgs = [ sys.argv[0] ]
     argSet = {}
     argDef = {}
@@ -358,6 +359,16 @@ def main():
 
     if log.errorOccurred():
 	sys.exit(1)
+
+def main():
+    try:
+	realMain()
+    except xmlrpclib.ProtocolError, e:
+	if e.errcode == 403:
+	    print >> sys.stderr, \
+		"remote server denied permission for the requested operation"
+	else:
+	    raise
 
 if __name__ == "__main__":
     sys.exit(main())
