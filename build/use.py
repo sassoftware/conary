@@ -301,11 +301,10 @@ class NoSuchUseFlagError(AttributeError):
     def __str__(self):
         return """
 
-
-An unknown use flag, Use.%s  was accessed.  The default behavior 
+An unknown use flag, Use.%s, was accessed.  The default behavior 
 of conary is to complain about the missing flag, since it may be 
 a typo.  You can add the flag /etc/conary/use/%s, or 
-$(HOME)/.conary/use/%s, or use the --unknown-flags option on
+${HOME}/.conary/use/%s, or use the --unknown-flags option on
 the command line to make conary assume that all unknown flags are
 not relevant to your system.  
 
@@ -320,10 +319,10 @@ class NoSuchArchFlagError(AttributeError):
         return """
 
 
-An unknown architecture, Arch.%s was accessed.  The default 
+An unknown architecture, Arch.%s, was accessed.  The default 
 behavior of conary is to complain about the missing flag, 
 since it may be a typo.  You can add the architecture 
-/etc/conary/arch/%s or $(HOME)/.conary/arch/%s, or 
+/etc/conary/arch/%s or ${HOME}/.conary/arch/%s, or 
 use the --unknown-flags option on the command line to make 
 conary assume that all unknown flags are not relevant to 
 your system.
