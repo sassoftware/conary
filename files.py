@@ -205,6 +205,11 @@ class TupleStream(InfoStream):
     def __eq__(self, other):
 	return other.__class__ == self.__class__ and other.items == self.items
 
+    def __deepcopy__(self, memo):
+        # trying to copy the lambda this uses causes problems; this
+        # avoids them
+        return self.__class__(self.freeze())
+
     def freeze(self):
 	rc = []
 	for (i, (name, itemType, size)) in enumerate(self.makeup):
