@@ -26,6 +26,22 @@ _permmap = {
     640: 0640,
 }
 
+def _checkuse(use):
+    """
+    Determines whether to take an action, based on system configuration
+    @param use: Flags telling whether to take action
+    @type use: None, boolean, or tuple of booleans
+    """
+    if use == None:
+	return True
+    if not type(use) is tuple:
+	use = (use,)
+    for usevar in use:
+	if not usevar:
+	    return False
+    return True
+	
+
 class ShellCommand:
     """Base class for shell-based commands. ShellCommand is an abstract class
     and can not be made into a working instance. Only derived classes which
@@ -57,12 +73,19 @@ class ShellCommand:
         accepted by the class.
         @rtype: ShellCommand
         """
+	# enforce pure virtual status
         assert(self.__class__ is not ShellCommand)
+	# dictionary of common keywords
+	self.commonkeywords = {
+	    'use': 'None'
+	}
         # initialize initialize our keywords to the defaults
+	self.__dict__.update(self.commonkeywords)
         self.__dict__.update(self.keywords)
         # check to make sure that we don't get a keyword we don't expect
         for key in keywords.keys():
-            if key not in self.keywords.keys():
+            if key not in self.keywords.keys() and \
+	       key not in self.commonkeywords.keys():
                 raise TypeError, ("%s.__init__() got an unexpected keyword argument "
                                   "'%s'" % (self.__class__.__name__, key))
         # copy the keywords into our dict, overwriting the defaults
@@ -70,6 +93,8 @@ class ShellCommand:
         self.args = string.join(args)
         # pre-fill in the preMake and arguments
         self.command = self.template % self.__dict__
+	# change self.use to be a simple flag
+	self.use = _checkuse(self.use)
 
     def doInstall(self, macros):
         """Method which is used if the ShellCommand instance is invoked 
@@ -79,7 +104,7 @@ class ShellCommand:
         @type macros: recipe.Macros
         @return: None
         @rtype: None"""
-        util.execute(self.command %macros)
+        if self.use: util.execute(self.command %macros)
 
     def doBuild(self, macros):
         """Method which is used if the ShellCommand instance is invoked 
@@ -89,7 +114,7 @@ class ShellCommand:
         @type macros: recipe.Macros
         @return: None
         @rtype: None"""
-        util.execute(self.command %macros)
+        if self.use: util.execute(self.command %macros)
 
 
 
@@ -107,6 +132,8 @@ class Automake(ShellCommand):
 		'automakeVer': ''}
     
     def doBuild(self, macros):
+	if not self.use:
+	    return
 	macros = macros.copy()
         if self.m4Dir:
 	    macros.update({'m4DirArgs': '-I %s' %(self.m4Dir)})
@@ -153,6 +180,8 @@ class Configure(ShellCommand):
         ShellCommand.__init__(self, *args, **keywords)
          
     def doBuild(self, macros):
+	if not self.use:
+	    return
 	macros = macros.copy()
         if self.objDir:
             macros['mkObjdir'] = 'mkdir -p %s; cd %s;' \
@@ -181,6 +210,8 @@ class MakeInstall(ShellCommand):
 		'installtarget': 'install'}
 
     def doInstall(self, macros):
+	if not self.use:
+	    return
 	macros = macros.copy()
         if self.rootVar:
 	    macros.update({'rootVarArgs': '%s=%s'
@@ -212,6 +243,8 @@ class GNUMakeInstall(ShellCommand):
 
 class _PutFiles:
     def doInstall(self, macros):
+	if not self.use:
+	    return
 	dest = macros['destdir'] + self.toFile %macros
 	util.mkdirChain(os.path.dirname(dest))
 
@@ -231,7 +264,7 @@ class _PutFiles:
 		if self.mode >= 0:
 		    os.chmod(thisdest, self.mode)
 
-    def __init__(self, fromFiles, toFile, mode):
+    def __init__(self, fromFiles, toFile, mode, use):
 	self.toFile = toFile
 	if type(fromFiles) is str:
 	    self.fromFiles = (fromFiles,)
@@ -244,23 +277,26 @@ class _PutFiles:
 		      %(mode, _permmap[mode])
 		mode = _permmap[mode]
 	self.mode = mode
+	self.use = _checkuse(use)
     
 
 class InstallFiles(_PutFiles):
-    def __init__(self, fromFiles, toFile, mode = 0644):
-	_PutFiles.__init__(self, fromFiles, toFile, mode)
+    def __init__(self, fromFiles, toFile, mode = 0644, use=None):
+	_PutFiles.__init__(self, fromFiles, toFile, mode, use)
 	self.source = ''
 	self.move = 0
 
 class MoveFiles(_PutFiles):
-    def __init__(self, fromFiles, toFile, mode = -1):
-	_PutFiles.__init__(self, fromFiles, toFile, mode)
+    def __init__(self, fromFiles, toFile, mode = -1, use=None):
+	_PutFiles.__init__(self, fromFiles, toFile, mode, use)
 	self.source = '%(destdir)s'
 	self.move = 1
 
 class InstallSymlinks:
 
     def doInstall(self, macros):
+	if not self.use:
+	    return
 	dest = macros['destdir'] + self.toFile %macros
 	util.mkdirChain(os.path.dirname(dest))
 
@@ -286,33 +322,39 @@ class InstallSymlinks:
 	    print '+ creating symlink from %s to %s' %(dest, source)
 	    os.symlink(source, dest+os.path.basename(source))
 
-    def __init__(self, fromFiles, toFile):
+    def __init__(self, fromFiles, toFile, use=None):
 	# raise error early
 	if not type(fromFiles) is str:
 	    if not toFile.endswith('/'):
 		raise TypeError, 'too many targets for non-directory %s' %toFile
 	self.fromFiles = fromFiles
 	self.toFile = toFile
+	self.use = _checkuse(use)
 
 class RemoveFiles:
 
     def doInstall(self, macros):
+	if not self.use:
+	    return
 	for filespec in self.filespecs:
 	    if self.recursive:
 		util.rmtree("%s/%s" %(macros['destdir'], filespec %macros))
 	    else:
 		util.remove("%s/%s" %(macros['destdir'], filespec %macros))
 
-    def __init__(self, filespecs, recursive=0):
+    def __init__(self, filespecs, recursive=0, use=None):
 	if type(filespecs) is str:
 	    self.filespecs = (filespecs,)
 	else:
 	    self.filespecs = filespecs
 	self.recursive = recursive
+	self.use = _checkuse(use)
 
 class InstallDocs:
 
     def doInstall(self, macros):
+	if not self.use:
+	    return
 	macros = macros.copy()
 	if self.subdir:
 	    macros['subdir'] = '/%s' % self.subdir
@@ -324,10 +366,11 @@ class InstallDocs:
 	for path in self.paths:
 	    util.copytree(path, dest, True)
 
-    def __init__(self, paths, devel=False, subdir=''):
+    def __init__(self, paths, devel=False, subdir='', use=None):
 	if type(paths) is str:
 	    self.paths = (paths,)
 	else:
 	    self.paths = paths
 	self.devel = devel
 	self.subdir = subdir
+	self.use = _checkuse(use)

@@ -156,6 +156,7 @@ class RecipeLoader(types.DictionaryType):
         exec 'from recipe import Recipe' in self.module.__dict__
         exec 'from recipe import loadRecipe' in self.module.__dict__
         exec 'import build, os, package, sys, util' in self.module.__dict__
+        exec 'from use import Use, Arch' in self.module.__dict__
         if sys.excepthook == util.excepthook:
             exec 'sys.excepthook = util.excepthook' in self.module.__dict__
         exec 'filename = "%s"' %(file) in self.module.__dict__
@@ -230,11 +231,11 @@ class Recipe:
 		self.signatures[file] = []
 	    self.signatures[file].append((gpg, c, keyid))
 
-    def addArchive(self, file, extractDir='', keyid=None):
-	self.sources.append((file, 'tarball', extractDir, ()))
+    def addArchive(self, file, extractDir='', keyid=None, use=None):
+	self.sources.append((file, 'tarball', extractDir, use, ()))
 	self.addSignature(file, keyid)
 
-    def addArchiveFromRPM(self, rpm, file, extractDir='', keyid=None):
+    def addArchiveFromRPM(self, rpm, file, extractDir='', keyid=None, use=None):
 	f = lookaside.searchAll(self.cfg, self.laReposCache, 
 			     os.path.basename(file), self.name, self.srcdirs)
 	if not f:
@@ -244,20 +245,20 @@ class Recipe:
 	    extractSourceFromRPM(r, c)
 	    f = lookaside.findAll(self.cfg, self.laReposCache, file, 
 				  self.name, self.srcdirs)
-	self.sources.append((file, 'tarball', extractDir, ()))
+	self.sources.append((file, 'tarball', extractDir, use, ()))
 	self.addSignature(f, keyid)
 
-    def addPatch(self, file, level='1', backup='', keyid=None):
-	self.sources.append((file, 'patch', '', (level, backup)))
+    def addPatch(self, file, level='1', backup='', keyid=None, use=None):
+	self.sources.append((file, 'patch', '', use, (level, backup)))
 	self.addSignature(file, keyid)
 
-    def addSource(self, file, keyid=None, extractDir='', apply=None):
-	self.sources.append((file, 'source', extractDir, (apply)))
+    def addSource(self, file, keyid=None, extractDir='', apply=None, use=None):
+	self.sources.append((file, 'source', extractDir, use, (apply)))
 	self.addSignature(file, keyid)
 
     def allSources(self):
         sources = []
-        for (file, filetype, extractDir, args) in self.sources:
+        for (file, filetype, extractDir, use, args) in self.sources:
             sources.append(file)
 	for signaturelist in self.signatures.values():
             for (gpg, cached, keyid) in signaturelist:
@@ -296,7 +297,19 @@ class Recipe:
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
 
-	for (file, filetype, targetdir, args) in self.sources:
+	for (file, filetype, targetdir, use, args) in self.sources:
+
+	    if use != None:
+		if not type(use) is tuple:
+		    use=(use,)
+		for usevar in use:
+		    if not usevar:
+			# put this in the repository, but do not apply it
+			filetype = None
+			continue
+		if filetype == None:
+		    continue
+
 	    if filetype == 'tarball':
 		f = lookaside.findAll(self.cfg, self.laReposCache, file, 
 			      self.name, self.srcdirs)
@@ -336,7 +349,7 @@ class Recipe:
 		(apply) = args
 		f = lookaside.findAll(self.cfg, self.laReposCache, file, 
 				      self.name, self.srcdirs)
-		shutil.copyfile(f, destDir + "/" + os.path.basename(file))
+		util.copyfile(f, destDir + "/" + os.path.basename(file))
 		if apply:
 		    util.execute(apply, destDir)
 		continue
@@ -391,10 +404,13 @@ class Recipe:
         assert(self.__class__ is not Recipe)
 	self.sources = []
 	# XXX fixme: convert to proper documentation string
-	# sources is list of (file, filetype, targetdir, (args)) tuples, where
+	# sources is list of (file, filetype, targetdir, use, (args)) tuples,
+	# where:
 	# - file is the name of the file
 	# - filetype is 'tarball', 'patch', 'source'
 	# - targetdir is subdirectory to work in
+	# - use is a use flag or tuple of use flags; if it is a tuple,
+	#   they all have to be True in order to apply it
 	# - args is filetype-specific:
 	#   patch: (level, backup)
 	#     - level is -p<level>

@@ -4,32 +4,55 @@
 #
 
 """
-Provides the build configuration as a special dictionary that directly
-exports its namespace.
+Provides the build configuration as special dictionaries that directly
+export their namespaces.
+
+Should read, or be provided, some sort of configuration information
+relative to the build being done.  For now, we'll intialize a static
+configuration sufficient to build.
+
+@var Use: Set of flags defined for this build, with their boolean status
+@type Use: UseClass
+@var Arch: Set of architectures defined for this build, with their boolean status
+@type Arch: UseClass
 """
 
 class UseClass(dict):
+    """
+    Immutable dictionary
+    """
     def __init__(self, d):
-	"""
-	Should read, or be provided, some sort of configuration information
-	relative to the build being done.  For now, we'll intialize a static
-	configuration.
-	"""
+	self.freeze = 0
 	self.update(d)
+	self.freeze = 1
+
+    def __setitem__(self, key, value):
+	if freeze:
+	    raise TypeError, 'cannot modify immutable dictionary FIXME reference'
+	dict.__setitem__(self, key, value)
 
     def __getattr__(self, attr):
         return self[attr]
 
 Use = UseClass({
-    'foo': True,
-    'bar': False,
+    'gcj':		True,
+    'gnat':		False,
+    'selinux':		False,
+    'pam':		True,
+    'dietlibc':		False,
+    'bootstrap':	False,
 })
 
 Arch = UseClass({
-    'i386': True,
-    'i486': True,
-    'i586': True,
-    'i686': True,
-    'sparc': False,
-    'ppc': False,
+    'i386':		True,
+    'i486':		True,
+    'i586':		True,
+    'i686':		True,
+    'x86_64':		False,
+    'sparc':		False,
+    'sparc64':		False,
+    'ppc64':		False,
+    'ia64':		False,
+    's390':		False,
+    's390x':		False,
 })
