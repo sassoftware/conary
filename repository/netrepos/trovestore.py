@@ -370,11 +370,11 @@ class TroveStore:
         cu.execute("""
             INSERT OR REPLACE INTO FileStreams 
                 SELECT FileStreams.streamId, FileStreams.fileId, 
-                       NewFiles.fileId
+                       NewFiles.stream
                 FROM NewFiles JOIN FileStreams ON
                     NewFiles.fileId = FileStreams.FileId
                 WHERE
-                    FileStreams.streamId IS NULL
+                    FileStreams.stream IS NULL
         """)
 
         cu.execute("""
