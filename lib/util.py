@@ -13,7 +13,7 @@ import exceptions
 import fixedglob
 import shutil
 import string
-
+import log
 
 # build.py and policy.py need some common definitions
 
@@ -167,7 +167,7 @@ def excepthook(type, value, tb):
         sys.exit(1)
 
 def execute(cmd, destDir=None):
-    print '+', cmd
+    log.debug(cmd)
     if destDir:
 	rc = os.system('cd %s; %s' %(destDir, cmd))
     else:
@@ -179,6 +179,7 @@ def execute(cmd, destDir=None):
 	if os.WEXITSTATUS(rc):
 	    info = 'Shell command "%s" exited with exit code %d' \
 		    %(cmd, os.WEXITSTATUS(rc))
+        log.error(info)
 	raise RuntimeError, info
 
 
@@ -232,20 +233,20 @@ def braceGlob(paths):
 
 def rmtree(paths, ignore_errors=False, onerror=None):
     for path in braceGlob(paths):
-	print '+ deleting [tree] %s' %path
+	log.debug('deleting [tree] %s', path)
 	shutil.rmtree(path, ignore_errors, onerror)
 
 def remove(paths):
     for path in braceGlob(paths):
 	if os.path.exists(path) or os.path.islink(path):
-	    print '+ deleting [file] %s' %path
+	    log.debug('deleting [file] %s', path)
 	    os.remove(path)
 	else:
-	    print 'WARNING: file %s does not exist when attempting to delete [file]' %path
+	    log.warning('file %s does not exist when attempting to delete [file]', path)
 
 def copyfile(sources, dest):
     for source in braceGlob(sources):
-	print '+ copying %s to %s' %(source, dest)
+	log.debug('copying %s to %s', source, dest)
 	shutil.copy2(source, dest)
 
 def copyfileobj(source, dest):
@@ -253,17 +254,17 @@ def copyfileobj(source, dest):
 
 def rename(sources, dest):
     for source in braceGlob(sources):
-	print '+ renaming %s to %s' %(source, dest)
+	log.debug('renaming %s to %s', source, dest)
 	os.rename(source, dest)
 
 def copytree(sources, dest, symlinks=False):
     for source in braceGlob(sources):
 	if os.path.isdir(source):
 	    dest = '%s/%s' %(dest, os.path.basename(source))
-	    print '+ copying [tree] %s to %s' %(source, dest)
+	    log.debug('copying [tree] %s to %s', source, dest)
 	    shutil.copytree(source, dest, symlinks)
 	else:
-	    print '+ copying [file] %s to %s' %(source, dest)
+	    log.debug('copying [file] %s to %s', source, dest)
 	    shutil.copy2(source, dest)
 
 def checkPath(binary):

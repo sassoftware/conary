@@ -7,6 +7,7 @@ import util
 import re
 import os
 import policy
+import log
 
 """
 Module used by recipes to effect packaging policy; things like setting
@@ -19,7 +20,7 @@ def _markConfig(recipe, filename):
     packages = recipe.autopkg.packages
     for package in packages.keys():
 	if packages[package].has_key(filename):
-	    print 'config:', filename
+            log.debug('config: %s', filename)
 	    packages[package][filename].isConfig(True)
 
 
@@ -126,7 +127,7 @@ class AddModes(policy.Policy):
 	    packages = self.recipe.autopkg.packages
 	    for package in packages.keys():
 		if packages[package].has_key(path):
-		    print 'suid/sgid:', path
+		    log.debug('suid/sgid: %s', path)
 		    packages[package][path].perms(mode)
 
 

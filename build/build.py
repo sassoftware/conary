@@ -16,6 +16,7 @@ import os
 import util
 import string
 import fixedglob
+import log
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
@@ -286,7 +287,7 @@ class SetModes(_FileAction):
 	for path in self.paths:
 	    files.extend(util.braceExpand(path %macros))
 	for f in files:
-	    print '+ changing mode for %s to %o' %(f, self.mode)
+	    log.debug('changing mode for %s to %o' %(f, self.mode))
 	    self.chmod(macros['destdir'], f)
 
 class _PutFiles(_FileAction):
@@ -322,8 +323,8 @@ class _PutFiles(_FileAction):
 	# notice obviously broken permissions
 	if mode >= 0:
 	    if _permmap.has_key(mode):
-		print 'odd permission %o, correcting to %o: add initial "0"?' \
-		      %(mode, _permmap[mode])
+                log.warning('odd permission %o, correcting to %o: add initial "0"?' \
+                            %(mode, _permmap[mode]))
 		mode = _permmap[mode]
 	self.mode = mode
 	self.use = util.checkUse(use)
@@ -405,7 +406,7 @@ class InstallSymlinks(BuildAction):
                 to = dest
 	    if os.path.exists(to) or os.path.islink(to):
 		os.remove(to)
-            print '+ creating symlink %s -> %s' %(to, source)
+            log.debug('creating symlink %s -> %s' %(to, source))
 	    os.symlink(os.path.normpath(source), to)
 
     def __init__(self, fromFiles, toFile, use=None, allowDangling=False):
@@ -491,7 +492,7 @@ class MakeDirs(_FileAction):
             for d in dirs:
                 d = d %macros
                 dest = macros['destdir'] + d
-                print '+ creating directory', dest
+                log.debug('creating directory', dest)
                 util.mkdirChain(dest)
                 if self.mode >= 0:
                     self.chmod(macros['destdir'], d)
@@ -504,6 +505,6 @@ class MakeDirs(_FileAction):
 	    self.paths = paths
 	if self.mode >= 0:
 	    if _permmap.has_key(self.mode):
-		print 'odd permission %o, correcting to %o: add initial "0"?' \
-		      %(mode, _permmap[self.mode])
+		log.warning('odd permission %o, correcting to %o: add initial "0"?' \
+                            %(mode, _permmap[self.mode]))
 		mode = _permmap[self.mode]

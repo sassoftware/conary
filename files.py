@@ -14,6 +14,7 @@ import types
 import time
 import lookaside
 import socket
+import log
 
 _FILE_FLAG_CONFIG = 1 << 0
 
@@ -258,12 +259,12 @@ class File(FileMode):
         try:
             uid = pwd.getpwnam(self.owner())[2]
         except KeyError:
-            print "warning: user %s does not exist - using root" %self.owner()
+            log.warn('user %s does not exist - using root', self.owner())
             uid = 0
         try:
             gid = grp.getgrnam(self.group())[2]
         except KeyError:
-            print "warning: group %s does not exist - using root" %self.group()
+            log.warn('group %s does not exist - using root', self.group())
             gid = 0
 
 	os.lchown(target, uid, gid)
@@ -385,7 +386,7 @@ class Directory(File):
             os.rmdir(target)
         except OSError, err:
             # XXX
-            print "WARNING: rmdir %s failed" %target, err
+            log.warning('rmdir %s failed: %s', target, str(err))
 
     def __init__(self, fileId, info = None):
 	File.__init__(self, fileId, info, infoTag = "d")

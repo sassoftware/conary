@@ -21,6 +21,7 @@ import lookaside
 import rpmhelper
 import gzip
 import buildpackage
+import log
 
 baseMacros = (
     # Note that these macros cannot be represented as a dictionary,
@@ -411,9 +412,9 @@ class Recipe:
 		if targetdir:
 		    destDir = "/".join((destDir, targetdir))
 		if macros:
-		    print '+ applying macros to %s' %f
+		    log.debug('applying macros to %s' %f)
 		    pin = os.popen("%s '%s'" %(provides, f))
-		    print '+ patch -d %s -p%s %s %s' %(destDir, level, backup, extraArgs)
+		    log.debug('patch -d %s -p%s %s %s' %(destDir, level, backup, extraArgs))
 		    pout = os.popen('patch -d %s -p%s %s %s'
 		                    %(destDir, level, backup, extraArgs), 'w')
 		    pout.write(pin.read()%self.macros)

@@ -20,6 +20,7 @@ import shutil
 import time
 import types
 import util
+import log
 
 # -------------------- private below this line -------------------------
 
@@ -129,7 +130,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
     built = []
 
     for (className, recipeClass) in classList.items():
-	print "Building", className
+	log.info("Building %s", className)
 	fullName = cfg.packagenamespace + ":" + recipeClass.name
 
 	lcache = lookaside.RepositoryCache(repos)
@@ -177,7 +178,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
             shutil.rmtree(destdir)
         util.mkdirChain(destdir)
 	recipeObj.doBuild(builddir, destdir)
-	print 'Processing', className
+	log.info('Processing %s', className)
         recipeObj.doDestdirProcess() # includes policy
 
 	repos.open("w")

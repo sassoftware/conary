@@ -8,6 +8,7 @@ import os
 import util
 import urllib2
 import time
+import log
 
 # location is normally the package name
 
@@ -63,7 +64,7 @@ def searchRepository(cfg, repCache, name, location):
     basename = os.path.basename(name)
 
     if repCache.hasFile(basename):
-	print '+ found %s in repository' %name
+	log.debug('found %s in repository', name)
 	return repCache.moveFileToCache(cfg, basename, location)
 
     return None
@@ -84,8 +85,7 @@ def searchAll(cfg, repCache, name, location, srcdirs):
     if f: return f
 
     if name.startswith("http://") or name.startswith("ftp://"):
-	sys.stdout.write("Downloading %s..." % name)
-	sys.stdout.flush()
+        log.info('Downloading %s...', name)
         retries = 0
         url = None
         while retries < 5:
@@ -97,7 +97,7 @@ def searchAll(cfg, repCache, name, location, srcdirs):
                     createNegativeCacheEntry(cfg, name[5:], location)
                     return None
             except IOError, msg:
-                print 'Error retreiving', name + '.', msg, ' Retrying in 10 seconds.'
+                log.info('Error retreiving %s. %s Retrying in 10 seconds.', name, msg)
                 time.sleep(10)
                 retries += 1
             except urllib2.URLError:
@@ -107,7 +107,6 @@ def searchAll(cfg, repCache, name, location, srcdirs):
             return None
 
 	rc = createCacheEntry(cfg, name[5:], location, url)
-	print
 	return rc
 
     return None
