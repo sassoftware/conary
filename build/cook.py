@@ -93,26 +93,20 @@ class _IdGen:
         else:
             self.map = map
 
-    def populate(self, branch, repos, lcache, fullName):
+    def populate(self, repos, lcache, pkg):
 	# Find the files and ids which were owned by the last version of
 	# this package on the branch. We also construct an object which
 	# lets us look for source files this build needs inside of the
 	# repository
-	fileIdMap = {}
-	pkg = None
-	for pkgName in repos.getPackageList(fullName):
-	    pkg = repos.getLatestPackage(pkgName, branch)
-	    for (fileId, path, version) in pkg.fileList():
-		fileIdMap[path] = fileId
-		if path[0] != "/":
-		    # we might need to retrieve this source file
-		    # to enable a build, so we need to find the
-		    # sha1 hash of it since that's how it's indexed
-		    # in the file store
-		    f = repos.getFileVersion(fileId, version)
-		    lcache.addFileHash(path, f.sha1())
-
-        self.map.update(fileIdMap)
+	for (fileId, path, version) in pkg.fileList():
+	    self.map[path] = fileId
+	    if path[0] != "/":
+		# we might need to retrieve this source file
+		# to enable a build, so we need to find the
+		# sha1 hash of it since that's how it's indexed
+		# in the file store
+		f = repos.getFileVersion(fileId, version)
+		lcache.addFileHash(path, f.sha1())
 
 def _cook(repos, cfg, recipeFile, prep=0, macros=()):
     repos.open("r")
@@ -131,12 +125,9 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
     for (className, recipeClass) in classList.items():
 	log.info("Building %s", className)
 	fullName = cfg.packagenamespace + ":" + recipeClass.name
+	srcName = fullName + ":sources"
 
 	lcache = lookaside.RepositoryCache(repos)
-
-	ident = _IdGen()
-        ident.populate(buildBranch, repos, lcache, 
-		       cfg.packagenamespace + ":" + recipeClass.name)
 
         srcdirs = [ os.path.dirname(recipeClass.filename),
                     cfg.sourcepath % {'pkgname': recipeClass.name} ]
@@ -147,21 +138,21 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
 			    'with "group-"')
 
 	nameList = repos.getPackageList(fullName)
-	version = None
-	if nameList:
+	newVersion = None
+	if repos.hasPackage(fullName):
 	    # if this package/version exists already, increment the
 	    # existing revision
-	    version = repos.pkgLatestVersion(nameList[0], buildBranch)
-	    if version and recipeObj.version == version.trailingVersion():
-		version = version.copy()
-		version.incrementVersionRelease()
+	    newVersion = repos.pkgLatestVersion(fullName, buildBranch)
+	    if newVersion and recipeObj.version == newVersion.trailingVersion():
+		newVersion = newVersion.copy()
+		newVersion.incrementVersionRelease()
 	    else:
-		version = None
+		newVersion = None
 
 	# this package/version doesn't exist yet
-	if not version:
-	    version = buildBranch.copy()
-	    version.appendVersionRelease(recipeObj.version, 1)
+	if not newVersion:
+	    newVersion = buildBranch.copy()
+	    newVersion.appendVersionRelease(recipeObj.version, 1)
 
 	builddir = cfg.buildpath + "/" + recipeObj.name
 
@@ -188,7 +179,25 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
         os.chdir(cwd)
         
 	packageList = []
-        recipeObj.packages(cfg.packagenamespace, version, destdir)
+        recipeObj.packages(cfg.packagenamespace, newVersion, destdir)
+
+	# build up the name->fileid mapping so we reuse fileids wherever
+	# possible; we do this by looking in the database for a pacakge
+	# with the same name as the recipe and recursing through it's
+	# subpackages; this mechanism continues to work as subpackages
+	# come and go
+
+	ident = _IdGen()
+	if repos.hasPackage(fullName):
+	    pkgList = [ (fullName, 
+			[repos.pkgLatestVersion(fullName, buildBranch)]) ]
+	    while pkgList:
+		(name, versionList) = pkgList[0]
+		del pkgList[0]
+		for version in versionList:
+		    pkg = repos.getPackageVersion(name, version)
+		    pkgList += pkg.getPackageList()
+		    ident.populate(repos, lcache, pkg)
 
 	for buildPkg in recipeObj.getPackages():
 	    (p, fileMap) = _createPackage(repos, buildBranch, buildPkg, ident)
@@ -206,8 +215,7 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
             if not parent.filename in recipes:
                 recipes.append(parent.filename)
 
-	srcName = cfg.packagenamespace + ":" + recipeObj.name + ":sources"
-	srcBldPkg = buildpackage.BuildPackage(srcName, version)
+	srcBldPkg = buildpackage.BuildPackage(srcName, newVersion)
 	for file in recipeObj.allSources() + recipes:
             src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
 	    srcBldPkg.addFile(os.path.basename(src), src, type="src")
@@ -219,7 +227,7 @@ def _cook(repos, cfg, recipeFile, prep=0, macros=()):
 	packageList.append((p, fileMap))
 
 	grpName = cfg.packagenamespace + ":" + recipeClass.name
-	grp = package.Package(grpName, version)
+	grp = package.Package(grpName, newVersion)
 	for (pkg, map) in packageList:
 	    grp.addPackage(pkg.getName(), [ pkg.getVersion() ])
 
