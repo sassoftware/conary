@@ -6,7 +6,9 @@
 import changeset
 import helper
 import log
+import os
 import package
+import util
 
 def checkin(repos, cfg, file):
     f = open(file, "r")
@@ -32,11 +34,10 @@ def checkin(repos, cfg, file):
     changeSet = changeset.CreateFromFilesystem( [ (grp, {}) ] )
     repos.commitChangeSet(changeSet)
 
-def checkout(repos, cfg, name, file, versionStr = None):
+def checkout(repos, cfg, name, versionStr = None):
     try:
 	pkgList = helper.findPackage(repos, cfg.packagenamespace, 
-				     cfg.installbranch, name, versionStr, 
-				     forceGroup = 1)
+				     cfg.installbranch, name, versionStr)
     except helper.PackageNotFound, e:
 	log.error(str(e))
 	return
@@ -45,8 +46,27 @@ def checkout(repos, cfg, name, file, versionStr = None):
 	log.error("%s %s specified multiple packages" % (name, versionStr))
 	return
 
-    pkg = pkgList[0]
+    mainTrove = pkgList[0]
+    sourceTroveName = mainTrove.getName() + ":sources"
+    try:
+	trv = repos.getPackageVersion(sourceTroveName, mainTrove.getVersion())
+    except repository.PackageMissing, e:
+	log.error("version %s of package %s does not have a source package",
+		  mainPkg.getVersion().asString(), mainTrove.getName())
+	return
 
-    f = open(file, "w")
-    f.write("\n".join(pkg.getGroupFile()))
-    f.write("\n")
+    dir = mainTrove.getName().split(":")[-1]
+
+    if not os.path.isdir(dir):
+	try:
+	    os.mkdir(dir)
+	except:
+	    log.error("cannot create directory %s/%s", os.getcwd(), dir)
+	    return
+
+    for (fileId, path, version) in trv.fileList():
+	fullPath = dir + "/" + path
+	fileObj = repos.getFileVersion(fileId, version)
+	src = repos.pullFileContentsObject(fileObj.sha1())
+	dest = open(fullPath, "w")
+	util.copyfileobj(src, dest)
