@@ -24,7 +24,7 @@ from repository import changeset
 import changelog
 from build import cook
 import files
-import log
+from lib import log
 import magic
 import os
 import repository

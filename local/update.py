@@ -28,7 +28,7 @@ from repository import changeset
 import errno
 from repository import filecontents
 import files
-import log
+from lib import log
 import os
 import patch
 import stat

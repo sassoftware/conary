@@ -13,7 +13,7 @@
 #
 
 from local import database
-import log
+from lib import log
 
 def listRollbacks(db, cfg):
     def verStr(cfg, version):

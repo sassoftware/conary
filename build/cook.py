@@ -23,7 +23,7 @@ from repository import filecontents
 from repository import repository
 from repository.netclient import NetworkRepositoryClient
 import files
-import log
+from lib import log
 import buildinfo, lookaside, use, recipe
 import os
 import resource

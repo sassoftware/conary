@@ -15,7 +15,7 @@
 from repository import changeset
 import errno
 from repository import filecontents
-import log
+from lib import log
 import localrep
 import os
 from repository import repository

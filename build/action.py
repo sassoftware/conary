@@ -13,7 +13,7 @@
 #
 
 from lib import epdb
-import log
+from lib import log
 import os
 import util
 import sys

@@ -34,7 +34,7 @@ import re
 import os
 import stat
 import policy
-import log
+from lib import log
 import magic
 
 # used in multiple places, should be maintained in one place

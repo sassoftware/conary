@@ -32,7 +32,7 @@ import cscmd
 from local import database
 import display
 import importrpm
-import log
+from lib import log
 import os
 import queryrep
 import repository

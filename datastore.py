@@ -23,7 +23,7 @@ keys are assumed to be unique.
 import errno
 import fcntl
 import gzip
-import log
+from lib import log
 import os
 import struct
 import util

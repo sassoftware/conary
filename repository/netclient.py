@@ -16,7 +16,7 @@ import exceptions
 import filecontents
 import gzip
 import httplib
-import log
+from lib import log
 import os
 import repository
 import socket

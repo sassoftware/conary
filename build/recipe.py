@@ -24,7 +24,7 @@ import errno
 import files
 import imp
 import inspect
-import log
+from lib import log
 import macros
 import magic
 import os

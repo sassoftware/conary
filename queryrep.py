@@ -17,7 +17,7 @@ Provides the output for the "conary repquery" command
 
 from repository import repository
 import files
-import log
+from lib import log
 import time
 
 from sha1helper import sha1ToString

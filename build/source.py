@@ -19,7 +19,7 @@ public classes in this module is accessed from a recipe as addI{Name}.
 """
 
 import gzip
-import log
+from lib import log
 import lookaside
 import os
 import rpmhelper

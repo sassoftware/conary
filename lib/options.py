@@ -15,7 +15,7 @@
 Command-line option handling
 """
 
-import log
+from lib import log
 import sys
 
 

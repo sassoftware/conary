@@ -18,7 +18,7 @@ Module implementing tag file handling
 
 import conarycfg
 import filter
-import log
+from lib import log
 import os
 
 EXCLUDE, INCLUDE = range(2)

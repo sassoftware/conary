@@ -14,7 +14,7 @@
 from repository import changeset
 from repository import repository
 from repository import filecontainer
-import log
+from lib import log
 import os
 import tempfile
 import versions

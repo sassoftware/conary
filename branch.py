@@ -17,7 +17,7 @@ Implements branch command line functionality.
 """
 
 import versions
-import log
+from lib import log
 
 def branch(repos, branchName, branchFrom, troveName = None):
     try:

@@ -13,7 +13,7 @@
 #
 import copy
 import grp
-import log
+from lib import log
 import os
 import pwd
 import sha1helper

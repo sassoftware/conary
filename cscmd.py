@@ -14,7 +14,7 @@
 
 from local import update
 from repository import repository
-import log
+from lib import log
 import versions
 
 def ChangeSetCommand(repos, cfg, troveName, outFileName, oldVersionStr, \

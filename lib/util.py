@@ -15,7 +15,7 @@
 from build import fixedglob
 from lib import epdb
 import errno
-import log
+from lib import log
 import os
 import shutil
 from lib import stackutil

@@ -25,7 +25,7 @@ expected to be invoked in some recipes.
 import util
 import os
 import policy
-import log
+from lib import log
 import stat
 import tags
 import buildpackage

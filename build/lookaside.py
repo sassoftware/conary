@@ -16,7 +16,7 @@ import os
 import util
 import urllib2
 import time
-import log
+from lib import log
 
 # location is normally the package name
 
