@@ -478,6 +478,7 @@ class Strip(policy.Policy):
 	if (m.name == "ELF" and m.contents['hasDebug']) or \
 	   (m.name == "ar"):
 	    util.execute('%(strip)s -g ' %self.macros +self.macros.destdir+path)
+            del self.recipe.magic[path]
 
 
 class NormalizeCompression(policy.Policy):
@@ -508,8 +509,10 @@ class NormalizeCompression(policy.Policy):
 	if m.name == 'gzip' and \
 	   (m.contents['compression'] != '9' or 'name' in m.contents):
 	    util.execute('gunzip %s; gzip -n -9 %s' %(p, p[:-3]))
+            del self.recipe.magic[path]
 	if m.name == 'bzip' and m.contents['compression'] != '9':
 	    util.execute('bunzip2 %s; bzip2 -9 %s' %(p, p[:-4]))
+            del self.recipe.magic[path]
 
 class NormalizeManPages(policy.Policy):
     """
@@ -668,15 +671,18 @@ class NormalizeInfoPages(policy.Policy):
 		    if not m:
 			# not compressed
 			util.execute('gzip -n -9 %s' %syspath)
+                        del self.recipe.magic[path]
 		    elif m.name == 'gzip' and \
 		       (m.contents['compression'] != '9' or \
 		        'name' in m.contents):
 			util.execute('gunzip %s; gzip -n -9 %s'
                                      %(syspath, syspath[:-3]))
+                        del self.recipe.magic[path]
 		    elif m.name == 'bzip':
 			# should use gzip instead
 			util.execute('bunzip2 %s; gzip -n -9 %s'
                                      %(syspath, syspath[:-4]))
+                        del self.recipe.magic[path]
 
 
 class NormalizeInitscriptLocation(policy.Policy):
@@ -759,6 +765,7 @@ class NormalizeInterpreterPaths(policy.Policy):
                 f.close()
                 log.warning('changing %s to %s in %s'
                             %(line, " ".join(wordlist), path))
+                del self.recipe.magic[path]
 
 
 class RelativeSymlinks(policy.Policy):
