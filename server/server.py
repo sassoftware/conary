@@ -39,7 +39,6 @@ sys.path.append(mainPath)
 
 from repository.netrepos import netserver
 from repository.netrepos.netserver import NetworkRepositoryServer
-from repository.netrepos.netauth import NoPermission
 from conarycfg import ConfigFile
 from conarycfg import STRINGDICT
 from lib import options
