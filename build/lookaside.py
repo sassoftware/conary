@@ -201,10 +201,11 @@ class RepositoryCache:
 	if os.path.exists(cachedname):
             sha1Cached = sha1helper.sha1FileBin(cachedname)
         if sha1Cached != sha1:
+            f = self.repos.getFileContents(
+                [ (fileId, troveFileVersion) ])[0].get()
+            util.copyfileobj(f, open(cachedname, "w"))
             fileObj = self.repos.getFileVersion(
                 pathId, fileId, troveFileVersion)
-            f = fileObj.get()
-            util.copyfileobj(f, open(cachedname, "w"))
             fileObj.chmod(cachedname)
         self.cacheMap[fileName] = cachedname
 	return cachedname
