@@ -84,7 +84,7 @@ class Database(repository.LocalRepository):
 
 	return cs
 
-    def commitChangeSet(self, sourcePath, cs, makeRollback = 1):
+    def commitChangeSet(self, cs, makeRollback = 1, sourcePath = "/"):
 	assert(not cs.isAbstract())
 
 	map = ( ( None, sourcePath + "/" ), )
@@ -184,7 +184,7 @@ class Database(repository.LocalRepository):
 
 	return changeset.ChangeSetFromFile(self.rollbackCache + "/" + name)
 
-    def applyRollbackList(self, sourcepath, names):
+    def applyRollbackList(self, names):
 	last = self.lastRollback
 	for name in names:
 	    if not self.hasRollback(name):
@@ -206,6 +206,9 @@ class Database(repository.LocalRepository):
 	repository.LocalRepository.__init__(self, fullPath, mode)
 
 class DatabaseChangeSetJob(repository.ChangeSetJob):
+
+    def createChangeSet(self, packageList):
+	raise NotImplemented
 
     def oldPackage(self, pkg):
 	self.oldPackages.append(pkg)
@@ -254,6 +257,19 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	for (fileId, fileVersion, fileObj) in self.oldFileList():
 	    if fileObj.isConfig():
 		self.repos.removeFileContents(fileObj.sha1())
+
+    # remove the specified file and it's local branch
+    def removeFile(self, fileId, version, path):
+	# we need this object in case of an undo
+	fileObj = self.repos.getFileVersion(fileId, version)
+
+	branch = version.fork(versions.LocalBranch(), sameVerRel = 1)
+
+	self.oldFile(fileId, version, fileObj)
+	self.oldFile(fileId, branch, fileObj)
+
+	if not self.containsFilePath(path):
+	    self.addStaleFile(path, fileObj)
 
     def __init__(self, repos, cs):
 	repository.ChangeSetJob.__init__(self, repos, cs)
@@ -310,22 +326,13 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 
 	    for fileId in csPkg.getOldFileList():
 		(oldPath, oldFileVersion) = pkg.getFile(fileId)
-		# we need this object in case of an undo
-		fileObj = repos.getFileVersion(fileId, oldFileVersion)
-
-		oldFileBranch = oldFileVersion.fork(versions.LocalBranch(),
-						    sameVerRel = 1)
-
-		self.oldFile(fileId, oldFileVersion, fileObj)
-		self.oldFile(fileId, oldFileBranch, fileObj)
-
-		self.addStaleFile(oldPath, fileObj)
+		self.removeFile(fileId, oldFileVersion, oldPath)
 
 	    for (fileId, newPath, newVersion) in csPkg.getChangedFileList():
 		if newPath:
 		    # find the old path for this file
 		    (oldPath, oldFileVersion) = pkg.getFile(fileId)
-		    if not self.containsFilePath[oldPath]:
+		    if not self.containsFilePath(oldPath):
 			# the path has been orphaned
 			fileObj = self.repos.getFileVersion(fileId, 
 							    oldFileVersion)
