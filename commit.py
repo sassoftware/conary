@@ -55,6 +55,7 @@ def commitChangeSet(repos, cfg, changeSetFile):
     # commit changes
     pkgsDone = []
     filesDone = []
+    filesToArchive = []
     try:
 	for (pkgName, newPkg, newVersion) in pkgList:
 	    pkgSet = repos.getPackageSet(pkgName, "w")
@@ -63,12 +64,17 @@ def commitChangeSet(repos, cfg, changeSetFile):
 
 	for (fileId, fileVersion, file) in fileList:
 	    infoFile = repos.getFileDB(fileId)
-	    infoFile.addVersion(fileVersion, file)
-	    infoFile.close()
-	    filesDone.append(fileId)
 
-	for (fileId, fileVersion, file) in fileList:
-	    if isinstance(file, files.RegularFile):
+	    # this version may already exist, abstract change sets
+	    # include redundant files quite often
+	    if not infoFile.hasVersion(fileVersion):
+		infoFile.addVersion(fileVersion, file)
+		infoFile.close()
+		filesDone.append(fileId)
+		if isinstance(file, files.RegularFile):
+		    filesToArchive.append(file)
+
+	for file in filesToArchive:
 		f = cs.getFileContents(file.sha1())
 		file.archive(repos, f)
 		f.close()
