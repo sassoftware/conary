@@ -42,6 +42,7 @@ from repository.netrepos.netserver import NetworkRepositoryServer
 from conarycfg import ConfigFile
 from conarycfg import STRINGDICT
 from lib import options
+from lib import util
 
 FILE_PATH="/tmp/conary-server"
 
@@ -80,15 +81,46 @@ class HttpRequests(SimpleHTTPRequestHandler):
         base = os.path.basename(self.path).split('?')[0]
         
         if base != 'changeset':
-            self.wfile.write("HTTP/1.0 200 OK\n")
-            self.wfile.write("Content-Type: text/html\n")
-            self.wfile.write("\n")
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.end_headers()
             netRepos.handleGet(self.wfile.write, base)
         else:
-            self.cleanup = None
-            SimpleHTTPRequestHandler.do_GET(self)
-            if self.cleanup:
-                os.unlink(self.cleanup)
+            urlPath = posixpath.normpath(urllib.unquote(self.path))
+            localName = FILE_PATH + "/" + urlPath.split('?', 1)[1] + "-out"
+
+            if localName.endswith(".cf-out"):
+                try:
+                    f = open(localName, "r")
+                except IOError:
+                    self.send_error(404, "File not found")
+                    return None
+
+                os.unlink(localName)
+
+                items = []
+                totalSize = 0
+                for l in f.readlines():
+                    (path, size) = l.split()
+                    size = int(size)
+                    totalSize += size
+                    items.append((path, size))
+                del f
+            else:
+                size = os.stat(localName).st_size;
+                items = [ (localName, size) ]
+                totalSize = size
+    
+            self.send_response(200)
+            self.send_header("Content-type", "application/octet-stream")
+            self.send_header("Content-Length", str(totalSize))
+            self.end_headers()
+
+            f = open(items[0][0], "r")
+            util.copyfileobj(f, self.wfile)
+
+            if not localName.endswith(".cf-out"):
+                os.unlink(items[0][0])
 
     def do_POST(self):
 	if not self.headers.has_key('Authorization'):

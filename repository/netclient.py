@@ -642,13 +642,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	inF = urllib.urlopen(url)
 
-        if not tmpFile:
+        if tmpFile:
+            start = tmpFile.tell()
+            outF = tmpFile
+        else:
             (fd, path) = tempfile.mkstemp()
             os.unlink(path)
             outF = os.fdopen(fd, "r+")
-        else:
-            start = tmpFile.tell()
-            outF = tmpFile
 
 	size = util.copyfileobj(inF, outF)
 	del inF

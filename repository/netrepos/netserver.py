@@ -243,13 +243,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         fileObj = self.repos.findFileVersion(troveName, troveVersion,
                                              fileId, fileVersion)
 
-        inF = self.repos.contentsStore.openRawFile(
+        filePath = self.repos.contentsStore.hashToPath(
                         sha1helper.sha1ToString(fileObj.contents.sha1()))
+        size = os.stat(filePath).st_size
 
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
                                       suffix = '.cf-out')
-        outF = os.fdopen(fd, "w")
-        util.copyfileobj(inF, outF)
+        os.write(fd, "%s %d\n" % (filePath, size))
+        os.close(fd)
 
         url = os.path.join(self.urlBase, 
                            "changeset?%s" % os.path.basename(path)[:-4])

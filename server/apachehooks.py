@@ -85,12 +85,38 @@ def getFile(repos, req):
         repos.handleGet(req.write, os.path.basename(req.uri))
         return apache.OK
 
-    path = repos.tmpPath + "/" + req.args + "-out"
-    size = os.stat(path).st_size
+    localName = repos.tmpPath + "/" + req.args + "-out"
+    size = os.stat(localName).st_size
+
+    if localName.endswith(".cf-out"):
+        try:
+            f = open(localName, "r")
+        except IOError:
+            self.send_error(404, "File not found")
+            return None
+
+        if req.args[0:6] != "cache-" or not repos.cacheChangeSets():
+            os.unlink(localName)
+
+        items = []
+        totalSize = 0
+        for l in f.readlines():
+            (path, size) = l.split()
+            size = int(size)
+            totalSize += size
+            items.append((path, size))
+        del f
+    else:
+        size = os.stat(localName).st_size;
+        items = [ (localName, size) ]
+        totalSize = size
+
     req.content_type = "application/x-conary-change-set"
-    req.sendfile(path)
-    if req.args[0:6] != "cache-" or not repos.cacheChangeSets():
-        os.unlink(path)
+    req.sendfile(items[0][0])
+
+    if not localName.endswith(".cf-out"):
+        os.unlink(items[0][0])
+
     return apache.OK
 
 def putFile(repos, req):
