@@ -80,11 +80,23 @@ class FileMode:
 	else:
 	    return time.strftime("%b %e  %Y", timeSet)
 
-    def perms(self, new = None):
+    def perms(self, new = None, addbits = None):
 	if (new != None and new != "-"):
 	    self.thePerms = new
+	
+	if addbits:
+	    # primarily useful for adding setuid/setgid bits
+	    self.thePerms &= addbits
 
 	return self.thePerms
+
+    def acls(self, new = None):
+	# we need to implement storing ACLs
+	pass
+
+    def eas(self, new = None):
+	# we need to implement storing EAs
+	pass
 
     def owner(self, new = None):
 	if (new != None and new != "-"):

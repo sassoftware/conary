@@ -64,6 +64,66 @@ class Config(policy.Policy):
 		    _markConfig(self.recipe, file)
 
 
+class ParseManifest(policy.Policy):
+    """
+    """
+    keywords = {
+	'path': None
+    }
+
+    def do(self):
+	if not self.path:
+	    return
+	if not self.path.startswith('/'):
+	    self.path = self.macros['builddir'] + os.sep + self.path
+        f = open(self.path)
+        for line in f:
+            line = line.strip()
+            fields = line.split(')')
+
+            attr = fields[0].lstrip('%attr(').split(',')
+            perms = attr[0].strip()
+            owner = attr[1].strip()
+            group = attr[2].strip()
+
+            fields[1] = fields[1].strip()
+            if fields[1].startswith('%dev('):
+                dev = fields[1][5:].split(',')
+                devtype = dev[0]
+                major = dev[1]
+                minor = dev[2]
+                target = fields[2].strip()
+                self.recipe.addDevice(target, devtype, int(major), int(minor),
+                                      owner, group, int(perms, 0))
+            elif fields[1].startswith('%dir '):
+                target = fields[1][5:]
+		# XXX not sure what we should do here...
+                dironly = 1
+            else:
+                target = fields[1].strip()
+
+class MakeDevices(policy.Policy):
+    """
+    Make device nodes
+    """
+    def do(self):
+        for device in self.recipe.devices:
+            self.recipe.autopkg.addDevice(*device)
+
+class AddModes(policy.Policy):
+    """
+    Apply suid/sgid modes
+    """
+    def doFile(self, path):
+	if path in self.recipe.fixmodes:
+	    mode = self.recipe.fixmodes[path]
+	    packages = self.recipe.autopkg.packages
+	    for package in packages.keys():
+		if packages[package].has_key(path):
+		    print 'suid/sgid:', path
+		    packages[package][filename].perms(addbits=mode)
+
+
 def DefaultPolicy():
     """
     Return a list of actions that expresses the default policy.
@@ -72,4 +132,6 @@ def DefaultPolicy():
     return [
 	EtcConfig(),
 	Config(),
+	ParseManifest(),
+	MakeDevices(),
     ]

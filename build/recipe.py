@@ -433,8 +433,20 @@ class Recipe:
 	for post in self.destdirPolicy:
             post.doProcess(self)
 
-    def addDevice(self, target, devtype, major, minor, owner, group, perms):
-        self._devices.append((target, devtype, major, minor, owner, group, perms))
+    def addDevice(self, target, devtype, major, minor, owner, group, perms=0400):
+        self.devices.append((target, devtype, major, minor, owner, group, perms))
+
+    def setUid(self, path):
+	if path in self.fixmodes:
+	    self.fixmodes[path] &= 04000
+	else:
+	    self.fixmodes[path] = 04000
+
+    def setGid(self, path):
+	if path in self.fixmodes:
+	    self.fixmodes[path] &= 02000
+	else:
+	    self.fixmodes[path] = 02000
 
     def packages(self, namePrefix, version, root):
         # by default, everything that hasn't matched a pattern in the
@@ -446,13 +458,7 @@ class Recipe:
         self.autopkg.walk(root)
 	for policy in self.packagePolicy:
 	    policy.doProcess(self)
-	# XXX next two should get wrapped up in policy, I think
-        for device in self._devices:
-            self.autopkg.addDevice(*device)
         self.packages = self.autopkg.getPackages()
-
-    def package(self):
-        pass
 
     def getPackages(self):
         return self.packages
@@ -508,7 +514,8 @@ class Recipe:
 	#   source: (apply)
 	#     - apply is None or command to util.execute(apply)
 	self.signatures = {}
-        self._devices = []
+        self.devices = []
+        self.fixmodes = {}
         self.cfg = cfg
 	self.laReposCache = laReposCache
 	self.srcdirs = srcdirs

@@ -183,7 +183,6 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         
 	packageList = []
         recipeObj.packages(cfg.packagenamespace, version, destdir)
-        recipeObj.package() # XXX what is this supposed to do?
 
 	for buildPkg in recipeObj.getPackages():
 	    (p, fileMap) = _createPackage(repos, cfg, buildPkg, ident)
