@@ -502,7 +502,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         def _cvtTroveList(l):
             new = []
-            for (name, (oldV, oldF), (newV, newF)) in l:
+            for (name, (oldV, oldF), (newV, newF), absolute) in l:
                 if oldV == 0:
                     oldV = None
                     oldF = None
@@ -511,9 +511,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     oldF = self.toFlavor(oldF)
 
                 newV = self.toVersion(newV)
-                newF = self.toFlavor(newV)
+                newF = self.toFlavor(newF)
 
-                new.append((name, (oldV, oldF), (newV, newF)))
+                new.append((name, (oldV, oldF), (newV, newF), absolute))
 
             return new
 
@@ -584,7 +584,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     self.c[serverName].getChangeSet(job, recurse, 
                                                 withFiles, withFileContents)
 
-                extraTroveList = _cvtTroveList(extraTroveList)
+                chgSetList += _cvtTroveList(extraTroveList)
                 filesNeeded += _cvtFileList(extraFileList)
 
                 for url in urlList:

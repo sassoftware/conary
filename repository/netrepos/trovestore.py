@@ -370,12 +370,30 @@ class TroveStore:
         cu.execute("DROP TABLE NewFiles")
 
 	for (name, version, flavor) in trove.iterTroveList():
-	    versionId = self.getVersionId(version, versionCache)
 	    itemId = self.getItemId(name)
+
 	    if flavor:
 		flavorId = flavors[flavor]
 	    else:
 		flavorId = 0
+
+	    # make sure the versionId and nodeId exists for this (we need
+	    # a nodeId, or the version doesn't get timestamps)
+	    versionId = self.versionTable.get(version, None)
+	    if versionId is not None:
+		nodeId = self.versionOps.nodes.getRow(itemId, 
+						      versionId, None)
+		if nodeId is None:
+		    (nodeId, versionId) = self.versionOps.createVersion(
+						    itemId, version,
+						    flavorId, 
+						    updateLatest = False)
+		del nodeId
+            else:
+                (nodeId, versionId) = self.versionOps.createVersion(
+                                                itemId, version,
+                                                flavorId, 
+                                                updateLatest = False)
 
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
 					    isPresent = False)

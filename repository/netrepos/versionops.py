@@ -192,7 +192,7 @@ class SqlVersioning:
     def hasVersion(self, itemId, versionId):
 	return self.nodes.hasItemId(itemId)
 
-    def createVersion(self, itemId, version, flavorId):
+    def createVersion(self, itemId, version, flavorId, updateLatest = True):
 	"""
 	Creates a new versionId for itemId. The branch must already exist
 	for the given itemId.
@@ -224,15 +224,16 @@ class SqlVersioning:
 	if self.nodes.hasRow(itemId, versionId):
 	    raise DuplicateVersionError(itemId, version)
 
-	latestId = self.latest.get((itemId, branchId, flavorId), None)
-	if latestId == None:
-	    # this must be the first thing on the branch
-	    self.latest[(itemId, branchId, flavorId)] = versionId
-	else:
-	    currVer = self.versionTable.getId(latestId, itemId)
-	    if not currVer.isAfter(version):
-		del self.latest[(itemId, branchId, flavorId)]
+	if updateLatest:
+	    latestId = self.latest.get((itemId, branchId, flavorId), None)
+	    if latestId == None:
+		# this must be the first thing on the branch
 		self.latest[(itemId, branchId, flavorId)] = versionId
+	    else:
+		currVer = self.versionTable.getId(latestId, itemId)
+		if not currVer.isAfter(version):
+		    del self.latest[(itemId, branchId, flavorId)]
+		    self.latest[(itemId, branchId, flavorId)] = versionId
 
 	nodeId = self.nodes.addRow(itemId, branchId, versionId, 
 				   version.timeStamps())

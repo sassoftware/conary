@@ -850,8 +850,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     oldV = self.fromVersion(oldV)
                     oldF = self.fromFlavor(oldF)
                 else:
-                    oldV = '0'
-                    oldF = '0'
+                    oldV = 0
+                    oldF = 0
 
                 newV = self.fromVersion(newV)
                 newF = self.fromFlavor(newF)
