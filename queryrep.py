@@ -33,15 +33,22 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 	else:
             versions = repos.getAllTroveLeafs(troves)
 
-	for troveName in troves:
-            versionList = versions[troveName]
-            if not versionList:
+	flavors = repos.getTroveVersionFlavors(versions)
+
+	for troveName in flavors.iterkeys():
+            if not flavors[troveName]:
                 log.error('No versions for "%s" were found in the repository',
                           troveName)
                 continue
-	    for version in versionList:
-		print _troveFormat % (troveName, 
-				    version.asString(cfg.defaultbranch))
+
+	    for version in flavors[troveName]:
+		for flavor in flavors[troveName][version]:
+		    if all:
+			print "%-30s %-15s %s" % (troveName, flavor,
+					    version.asString(cfg.defaultbranch))
+		    elif not all and (flavor is None or cfg.flavor.satisfies(flavor)):
+			print _troveFormat % (troveName, 
+					    version.asString(cfg.defaultbranch))
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s):
     try:
