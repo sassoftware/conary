@@ -266,6 +266,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	if self.sqlDeviceInode != sqlDeviceInode:
 	    del self.troveStore
 	    self.troveStore = trovestore.TroveStore(self.sqlDB)
+	    sb = os.stat(self.sqlDB)
+	    self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
 
     def commitChangeSet(self, cs):
         self.troveStore.begin()
