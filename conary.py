@@ -155,15 +155,11 @@ def realMain(argv=sys.argv):
         print constants.version
         sys.exit(0)
 
-    if cfg.installLabel is None:
-        print >> sys.stderr, "installLabel is not set"
+    if not cfg.installLabelPath:
+        print >> sys.stderr, "installLabelPath is not set"
         sys.exit(1)
-    if cfg.repositoryPath is None:
-        print >> sys.stderr, "repositoryPath is not set"
-        sys.exit(1)
-    if cfg.installBranch is None:
-        print >> sys.stderr, "installBranch is not set"
-        sys.exit(1)
+
+    cfg.installLabel = cfg.installLabelPath[0]
 
     profile = False
     if argSet.has_key('profile'):

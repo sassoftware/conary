@@ -28,12 +28,13 @@ import versions
 (STRING, 
     BOOL, 
     LABEL, 
+    LABELLIST,
     STRINGDICT, 
     STRINGLIST, 
     CALLBACK, 
     EXEC, 
     BRANCHNAME,
-    STRINGPATH) = range(9)
+    STRINGPATH) = range(10)
 
 class ConfigFile:
 
@@ -105,6 +106,13 @@ class ConfigFile:
 		self.__dict__[key] = versions.Label(val)
 	    except versions.ParseError, e:
 		raise versions.ParseError, str(e)
+	elif type == LABELLIST:
+            self.__dict__[key] = []
+            for labelStr in val.split():
+                try:
+                    self.__dict__[key].append(versions.Label(labelStr))
+                except versions.ParseError, e:
+                    raise versions.ParseError, str(e)
 	elif type == BOOL:
 	    if isinstance(val, bool):
 		self.__dict__[key] = val
@@ -128,6 +136,8 @@ class ConfigFile:
 		print "%-25s %s" % (item, self.__dict__[item])
 	    elif t == LABEL:
 		print "%-25s %s" % (item, self.__dict__[item].asString())
+	    elif t == LABELLIST:
+		print "%-25s %s" % (item, " ".join([x.asString() for x in self.__dict__[item]]))
 	    elif t == BRANCHNAME:
 		print "%-25s %s" % (item, self.__dict__[item].asString())
 	    elif t == STRINGPATH:
@@ -168,13 +178,11 @@ class ConaryConfiguration(ConfigFile):
 	'dbPath'		: '/var/lib/conarydb',
 	'debugRecipeExceptions' : [ BOOL, False ], 
 	'dumpStackOnError'      : [ BOOL, True ], 
-	'installLabel'		: [ LABEL, None ],
-        'installBranch'         : [ BRANCHNAME, None ],
+	'installLabelPath'	: [ LABELLIST, [] ],
 	'instructionSet'	: deps.arch.current(),
 	'lookaside'		: '/var/cache/conary',
 	'name'			: None,
 	'repositoryMap'	        : [ STRINGDICT, {} ],
-	'repositoryPath'	: [ STRINGPATH, [] ],
 	'root'			: '/',
 	'sourceSearchDir'	: '.',
 	'tmpDir'		: '/var/tmp/',
