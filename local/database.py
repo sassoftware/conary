@@ -69,9 +69,11 @@ class Database(repository.LocalRepository):
 	file = repository.LocalRepository.getFileVersion(self, fileId, parentV)
 	if isinstance(file, files.SourceFile):
 	    localFile = files.FileFromFilesystem(self.root + path, fileId,
-						 type = "src")
+						 type = "src",
+						 possibleMatch = file)
 	else:
-	    localFile = files.FileFromFilesystem(self.root + path, fileId)
+	    localFile = files.FileFromFilesystem(self.root + path, fileId,
+						 possibleMatch = file)
 
 	localFile.flags(file.flags())
 
