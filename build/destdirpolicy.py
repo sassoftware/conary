@@ -63,6 +63,14 @@ class TestSuiteLinks(policy.Policy):
     buildTestSuite = None
 
     def updateArgs(self, *args, **keywords):
+	"""
+	call as C{TestSuiteLinks(<inclusions>, fileMap=<map>, ...)}.
+	@keyword fileMap: each key is a path to a builddir file, each value is
+	path to a destdir file that is equivalent to the builddir file.  Default: {}
+	@type fileMap: Hash builddir path -> destdir path
+	@keyword build: If set to true, will create TestSuiteLinks even if a TestSuite command is not given.  If set to false, will not create TestSuiteLinks even if a TestSuite command is given.  Also turns on/off TestSuiteFiles
+
+	"""
 	# XXX add fileMap param, to map from builddir -> destdir files
 	# could update automatically when we install a file?
 	# but then we remove/move a file after installing,
@@ -131,12 +139,6 @@ class TestSuiteLinks(policy.Policy):
 
 
     def doFile(self, path):
-	"""
-	Create a directory structure in testdir that mirrors 
-	builddir, except that where ever there is a file in 
-	builddir that was installed to destdir, create a link
-	to that installed file instead of copying it
-	"""
 	fullpath = self.macros.destdir + path
 
 	fileName = os.path.basename(path)
@@ -180,9 +182,10 @@ class TestSuiteLinks(policy.Policy):
 
     def betterLink(self, newpath, testpath, buildpath):
 	""" 
-	determines whether destdir file pointed to by newpath
-	is a better match with the buildpath  file in question
-	than the current file at testpath
+	betterLink determines whether the destdir file 
+	I{newpath} is a better match than the destdir file pointed
+	to by the current symlink at I{testpath} for the builddir
+	file I{buildpath}.
 	"""
 	# sample test: duplicates behavior in findRightfile
 	#newsize = os.stat(newpath)[stat.ST_SIZE]
@@ -195,9 +198,9 @@ class TestSuiteLinks(policy.Policy):
 
     def findRightFile(self, fullpath, fileName, dirList):
 	"""
-	Search for the best match for the the current file.
-	Match fullpath against %(builddir)/dir/fileName for each dir 
-	in dirList
+	Search for the best match in buildir for the the destdirfile
+	fullPath.  Match I{fullpath} against %(builddir)/dir/fileName for each 
+	directory in I{dirList}
 	"""
 	
 	# XXX need to cache size/diff info
@@ -239,7 +242,13 @@ class TestSuiteLinks(policy.Policy):
 #XXX this is a builddir policy
 class TestSuiteFiles(policy.Policy):
     """
-    XXX This still needs to be documented.
+    TestSuiteFiles marks those files which are not installed on 
+    the user's system, but are needed for running the testsuite
+    included with the package.  TestSuiteFiles are installed 
+    in the I{:test} component, in a special I{testdir}. 
+    The TestSuiteFiles policy is only activated if a TestSuite
+    build command has been given, or it is explictly activated using 
+    the keyword I{build}.
     """
 
     rootdir = '%(builddir)s'
@@ -265,6 +274,10 @@ class TestSuiteFiles(policy.Policy):
 	policy.Policy.do(self)
 
     def updateArgs(self, *args, **keywords):
+	"""
+	call as C{TestSuiteFiles(<inclusions>)}.
+	@keyword build: If set to true, will create TestSuiteFiles even if a TestSuite command is not given.  If set to false, will not create TestSuiteFiles even if a TestSuite command is given.  Also turns on/off TestSuiteLinkx
+	"""
 	build = keywords.pop('build', None)
 	builddirlinks = keywords.pop('builddirlinks', None)
 	if build is not None:
