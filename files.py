@@ -306,13 +306,11 @@ class RegularFile(File):
 	f.close()
 	File.restore(self, target)
 
-    def archive(self, repos, source):
+    def archive(self, repos, file):
 	if repos.hasFileContents(self.sha1()):
 	    return
 
-	file = open(source, "r")
 	repos.newFileContents(self.sha1(), file)
-	file.close()
 
     def __init__(self, fileId, info = None, infoTag = "f"):
 	if (info):
@@ -362,6 +360,12 @@ class FileDB:
 	file = FileFromInfoLine(f1.read(), self.fileId)
 	f1.close()
 	return file
+
+    def hasVersion(self, version):
+	return self.f.hasVersion(version)
+
+    def eraseVersion(self, version):
+	self.f.eraseVersion(version)
 
     def close(self):
 	if self.f:
