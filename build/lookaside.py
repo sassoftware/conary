@@ -20,6 +20,7 @@ downloads and unpacking layers of files.
 import errno
 import os
 from lib import util
+import socket
 import urllib2
 import time
 from lib import log
