@@ -1,7 +1,11 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 import util
 import sys
 import string
-
 
 # build.py and policy.py need some common definitions
 
