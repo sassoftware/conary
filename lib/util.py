@@ -338,3 +338,9 @@ def checkPath(binary):
         if os.access(os.path.join(path, binary), os.X_OK):
             return True
     return False
+
+def joinPaths(one, two):
+    if two[0] == "/":
+	return one + two
+    return one + "/" + two
+
