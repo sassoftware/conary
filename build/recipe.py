@@ -9,6 +9,7 @@ import build
 import package
 import shutil
 import types
+import inspect
 
 class RecipeLoader(types.DictionaryType):
     def __init__(self, file):
@@ -16,6 +17,7 @@ class RecipeLoader(types.DictionaryType):
         f = open(file)
         
         exec 'from recipe import Recipe' in self.module.__dict__
+        exec 'from recipe import loadRecipe' in self.module.__dict__
         exec 'import build, os, package, sys, util' in self.module.__dict__
         exec 'sys.excepthook = util.excepthook' in self.module.__dict__ 
         code = compile(f.read(), file, 'exec')
@@ -25,9 +27,21 @@ class RecipeLoader(types.DictionaryType):
                 # make sure the class is derived from something
                 # and has a name
                 # XXX better test?
+                if value.__dict__.has_key('ignore'):
+                    continue
                 if len(value.__bases__) > 0 and 'name' in dir(value):
                     self[key] = value
 
+def loadRecipe(file):
+    recipes = RecipeLoader(file)
+    for name, recipe in recipes.items():
+        # XXX hack to hide parent recipies
+        recipe.ignore = 1
+        inspect.stack()[1][0].f_globals[name] = recipe
+        # stash a reference to the module in the namespace
+        # of the recipe that loaded it, or else it will be destroyed
+        inspect.stack()[1][0].f_globals[file] = recipes
+        
 class Recipe:
 
     def addTarball(self, file):
