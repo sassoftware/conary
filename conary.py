@@ -280,7 +280,7 @@ def main():
 	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
 	    args = [db, cfg, ls, ids, sha1s] + otherArgs[2:]
 	    try:
-		display.displayPkgs(*args)
+		display.displayTroves(*args)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
 		sys.exit(1)
@@ -306,7 +306,7 @@ def main():
 	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
 	    args = [repos, cfg, all, ls, ids, sha1s] + otherArgs[2:]
 	    try:
-		queryrep.displayPkgs(*args)
+		queryrep.displayTroves(*args)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
 		sys.exit(1)

@@ -6,30 +6,30 @@
 import files
 import versions
 
-_pkgFormat  = "%-39s %s"
+_troveFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
-def displayPkgs(db, cfg, ls = False, ids = False, sha1s = False,
-		pkg = "", versionStr = None):
-    if pkg:
-	list = [ pkg ]
+def displayTroves(db, cfg, ls = False, ids = False, sha1s = False,
+                  trove = "", versionStr = None):
+    if trove:
+	troves = [ trove ]
     else:
-	list = [ x for x in db.iterAllTroveNames() ]
-	list.sort()
+	troves = [ x for x in db.iterAllTroveNames() ]
+	troves.sort()
 
-    for pkgName in list:
+    for troveName in troves:
 	if versionStr or ls or ids or sha1s:
-	    _displayPkgInfo(db, cfg, pkgName, versionStr, ls, ids, sha1s)
+	    _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s)
 	    continue
 	else:
-	    l = db.getPackageVersionList(pkgName)
+	    l = db.getPackageVersionList(troveName)
 
 	    for version in l:
-		print _pkgFormat % (pkgName, 
+		print _troveFormat % (troveName, 
 				    version.asString(cfg.defaultbranch))
 
-def _displayPkgInfo(db, cfg, troveName, versionStr, ls, ids, sha1s):
+def _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s):
     troveList = db.findTrove(troveName, versionStr)
 
     for trove in troveList:
@@ -57,7 +57,7 @@ def _displayPkgInfo(db, cfg, troveName, versionStr, ls, ids, sha1s):
 		if file.hasContents:
 		    print "%s %s" % (file.contents.sha1(), path)
 	else:
-	    print _pkgFormat % (troveName, version.asString(cfg.defaultbranch))
+	    print _troveFormat % (troveName, version.asString(cfg.defaultbranch))
 
 	    for (troveName, ver, flavor) in trove.iterTroveList():
 		print _grpFormat % (troveName, ver.asString(cfg.defaultbranch))

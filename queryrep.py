@@ -7,57 +7,57 @@ from repository import repository
 import files
 import log
 
-_pkgFormat  = "%-39s %s"
+_troveFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
-def displayPkgs(repos, cfg, all = False, ls = False, ids = False, sha1s = False,
-		pkg = "", versionStr = None):
-    if pkg:
-	list = [ pkg ]
+def displayTroves(repos, cfg, all = False, ls = False, ids = False,
+                  sha1s = False, trove = "", versionStr = None):
+    if trove:
+	troves = [ trove ]
     else:
-	list = [ x for x in repos.iterAllTroveNames() ]
-	list.sort()
+	troves = [ x for x in repos.iterAllTroveNames() ]
+	troves.sort()
 
     if versionStr or ls or ids or sha1s:
 	if all:
 	    log.error("--all cannot be used with queries which display file "
 		      "lists")
 	    return
-	for pkgName in list:
-	    _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids, sha1s)
+	for troveName in troves:
+	    _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s)
 	    continue
     else:
 	if all:
-	    versions = repos.getTroveVersionList(list)
+	    versions = repos.getTroveVersionList(troves)
 	else:
-            versions = repos.getAllTroveLeafs(list)
+            versions = repos.getAllTroveLeafs(troves)
 
-	for pkgName in list:
-            versionList = versions[pkgName]
+	for troveName in troves:
+            versionList = versions[troveName]
             if not versionList:
                 log.error('No versions for "%s" were found in the repository',
-                          pkgName)
+                          troveName)
                 continue
 	    for version in versionList:
-		print _pkgFormat % (pkgName, 
+		print _troveFormat % (troveName, 
 				    version.asString(cfg.defaultbranch))
 
-def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids, sha1s):
+def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s):
     try:
-	pkgList = repos.findTrove(cfg.installbranch, pkgName, versionStr)
+	troveList = repos.findTrove(cfg.installbranch, troveName, versionStr)
     except repository.PackageNotFound, e:
 	log.error(str(e))
 	return
 
-    for pkg in pkgList:
-	version = pkg.getVersion()
+    for trove in troveList:
+	version = trove.getVersion()
 
 	if ls:
-	    fileL = [ (x[1], x[0], x[2]) for x in pkg.iterFileList() ]
+	    fileL = [ (x[1], x[0], x[2]) for x in trove.iterFileList() ]
 	    fileL.sort()
-	    iter = repos.iterFilesInTrove(pkg.getName(), pkg.getVersion(),
-                                          pkg.getFlavor(), sortByPath = True, 
+	    iter = repos.iterFilesInTrove(trove.getName(), trove.getVersion(),
+                                          trove.getFlavor(), sortByPath = True, 
 					  withFiles = True)
 	    for (fileId, path, version, file) in iter:
 		if isinstance(file, files.SymbolicLink):
@@ -69,20 +69,20 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids, sha1s):
 		    (file.modeString(), file.inode.owner(), file.inode.group(), 
 		     file.sizeString(), file.timeString(), name)
 	elif ids:
-	    for (fileId, path, version) in pkg.iterFileList():
+	    for (fileId, path, version) in trove.iterFileList():
 		print "%s %s" % (fileId, path)
 	elif sha1s:
-	    for (fileId, path, version) in pkg.iterFileList():
+	    for (fileId, path, version) in trove.iterFileList():
 		file = repos.getFileVersion(fileId, version)
 		if file.hasContents:
 		    print "%s %s" % (file.contents.sha1(), path)
 	else:
-	    print _pkgFormat % (pkgName, version.asString(cfg.defaultbranch))
+	    print _troveFormat % (troveName, version.asString(cfg.defaultbranch))
 
-	    for (pkgName, ver, flavor) in pkg.iterTroveList():
-		print _grpFormat % (pkgName, ver.asString(cfg.defaultbranch))
+	    for (troveName, ver, flavor) in trove.iterTroveList():
+		print _grpFormat % (troveName, ver.asString(cfg.defaultbranch))
 
-	    fileL = [ (x[1], x[0], x[2]) for x in pkg.iterFileList() ]
+	    fileL = [ (x[1], x[0], x[2]) for x in trove.iterFileList() ]
 	    fileL.sort()
 	    for (path, fileId, version) in fileL:
 		print _fileFormat % (path, version.asString(cfg.defaultbranch))
