@@ -26,10 +26,10 @@ class Repository:
     createBranches = 0
 
     def _getPackageSet(self, name):
-	return _PackageSet(self.pkgDB, name)
+	return _PackageSet(self.pkgDB, name, self.createBranches)
 
     def _getFileDB(self, fileId):
-	return _FileDB(self.fileDB, fileId)
+	return _FileDB(self.fileDB, fileId, self.createBranches)
 
     def getPackageList(self, groupName = ""):
 	if self.pkgDB.hasFile(groupName):
@@ -269,8 +269,7 @@ class _PackageSetClass(VersionedFile):
 	return p
 
     def addVersion(self, version, package):
-	VersionedFile.addVersion(self, version, package.formatString(),
-				 createBranch = 1)
+	VersionedFile.addVersion(self, version, package.formatString())
 
     def fullVersionList(self):
 	branches = self.f.branchList()
@@ -287,7 +286,7 @@ class _PackageSetClass(VersionedFile):
 	VersionedFile.__init__(self, db, name)
 	self.name = name
 
-def _PackageSet(db, name):
+def _PackageSet(db, name, createBranches):
     return db.openFile(name, fileClass = _PackageSetClass)
 
 class _FileDBClass(VersionedFile):
@@ -299,8 +298,7 @@ class _FileDBClass(VersionedFile):
 	    if file.id() != self.fileId:
 		raise KeyError, "file id mismatch for file database"
 	
-	VersionedFile.addVersion(self, version, "%s\n" % file.infoLine(),
-				 createBranch = 1)
+	VersionedFile.addVersion(self, version, "%s\n" % file.infoLine())
 
     def getVersion(self, version):
 	f1 = VersionedFile.getVersion(self, version)
@@ -312,7 +310,7 @@ class _FileDBClass(VersionedFile):
 	VersionedFile.__init__(self, db, fileId)
 	self.fileId = fileId
 
-def _FileDB(db, fileId):
+def _FileDB(db, fileId, createBranches):
     return db.openFile(fileId, fileClass = _FileDBClass)
 
 class ChangeSetJobFile:
