@@ -236,7 +236,7 @@ class PackageChangeSet:
 	else:
 	    for (prefix, newPrefix) in map[1:]:
 		if path.startswith(prefix):
-		    newPath = newPrefix + path[strlen(prefix):]
+		    newPath = newPrefix + path[len(prefix):]
 
 	return newPath
 
