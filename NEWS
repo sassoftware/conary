@@ -3,12 +3,12 @@ Changes in 0.11.0:
   * added columns to dependency tables to allow erase dependency checks
     (which are not yet implemented)
   * enabled trove requirements
-
-Changes in 0.10.12:
-  * changed getFileContents() to not need trove name or trove version
   * added cvcdesc and the 'describe' command to cvc to generate
     and use metadata XML files.
-  
+  * getMetadata follows the branch structure up until it finds metadata
+    for the trove.
+  * changed getFileContents() to not need trove name or trove version
+ 
 Changes in 0.10.11:
   * reworked how absolute change sets get converted to relative change
     sets for better efficiency
