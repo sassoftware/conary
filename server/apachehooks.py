@@ -137,6 +137,10 @@ def get(repos, httpHandler, req):
         uri = uri[:-1]
     cmd = os.path.basename(uri)
     fields = util.FieldStorage(req)
+
+    authToken = getAuth(req, repos)
+    if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
+        return apache.HTTP_FORBIDDEN
    
     if cmd != "changeset":
 	# we need to redo this with a trailing / for the root menu to work
