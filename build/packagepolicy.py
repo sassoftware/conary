@@ -4,7 +4,6 @@
 #
 
 import util
-import re
 import os
 import policy
 import log
@@ -155,19 +154,20 @@ class Config(policy.Policy):
 	policy.Policy.updateArgs(self, [], **keywords)
 
     def doProcess(self, recipe):
-	self.configREs = []
+	self.configFilters = []
 	if self.inclusions:
 	    if not isinstance(self.inclusions, (tuple, list)):
 		self.inclusions = (self.inclusions,)
 	    for inclusion in self.inclusions:
-		self.configREs.append(re.compile(inclusion %recipe.macros))
+		self.configFilters.append(
+		    filter.Filter(inclusion, recipe.macros))
 	policy.Policy.doProcess(self, recipe)
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and not os.path.islink(fullpath):
-	    for configRE in self.configREs:
-		if configRE.search(file):
+	    for configFilter in self.configFilters:
+		if configFilter.match(file):
 		    _markConfig(self.recipe, file)
 
 
@@ -355,16 +355,16 @@ class Ownership(policy.Policy):
     def doProcess(self, recipe):
 	# we must NEVER take ownership from the filesystem
 	assert(not self.exceptions)
-	self.fileREs = []
+	self.fileFilters = []
 	for (filespec, user, group) in self.filespecs:
-	    self.fileREs.append((re.compile(filespec %recipe.macros),
-	                        user, group))
+	    self.fileFilters.append(
+		(filter.Filter(filespec, recipe.macros), user, group))
 	del self.filespecs
 	policy.Policy.doProcess(self, recipe)
 
     def doFile(self, path):
-	for (regex, owner, group) in self.fileREs:
-	    if regex.search(path):
+	for (f, owner, group) in self.fileFilters:
+	    if f.match(path):
 		self._markOwnership(path, owner, group)
 		return
 	self._markOwnership(path, 'root', 'root')

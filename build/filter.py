@@ -17,7 +17,8 @@ class Filter:
 	"""
 	Provide information to match against.
 	@param regex: regular expression(s) to match against pathnames
-	@type regex: string, list of strings, or compiled regular expression
+	@type regex: string, list of strings, or compiled regular expression;
+	strings or lists of strings will have macros interpolated.
 	@param macros: current recipe macros
 	@param name: name of package or component
 	@param setmode: bitmask containing bits that must be set

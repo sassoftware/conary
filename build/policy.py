@@ -4,7 +4,7 @@
 #
 
 import util
-import re
+import filter
 import os
 
 """
@@ -15,7 +15,7 @@ Base class used for destdirpolicy and packagepolicy
 class Policy(util.Action):
     """
     Pure virtual superclass for all policy actions.  Policy actions
-    that operate on the entire %(destdir)s implement the C{do} method;
+    that operate on the entire C{%(destdir)s} implement the C{do} method;
     Policy actions that operate on a per-file basis implement the
     C{doFile} method.  The C{doFile} function is never called for files
     that match an exception regexp; C{do} functions must implement
@@ -27,8 +27,8 @@ class Policy(util.Action):
     them have C{self.macros} applied before use.
 
     @cvar invariantsubtree: if invariantsubtree is not empty,
-    then it is a list of subtrees (relative to %(destdir)s) to
-    walk INSTEAD of walking the entire %(destdir)s tree.
+    then it is a list of subtrees (relative to C{%(destdir)s}) to
+    walk INSTEAD of walking the entire C{%(destdir)s} tree.
 
     @cvar invariantinclusions: if invariantinclusions is not empty,
     then only files matching a regular expression in it are
@@ -93,19 +93,22 @@ class Policy(util.Action):
 	self.use = util.checkUse(self.use)
 
 	# compile the inclusions
-	self.inclusionREs = []
+	self.inclusionFilters = []
 	for inclusion in self.invariantinclusions:
-	    self.inclusionREs.append(re.compile(inclusion %self.macros))
+	    self.inclusionFilters.append(
+		filter.Filter(inclusion, self.macros))
 
 	# compile the exceptions
-	self.exceptionREs = []
+	self.exceptionFilters = []
 	for exception in self.invariantexceptions:
-	    self.exceptionREs.append(re.compile(exception %self.macros))
+	    self.exceptionFilters.append(
+		filter.Filter(exception, self.macros))
 	if self.exceptions:
 	    if not isinstance(self.exceptions, (tuple, list)):
 		self.exceptions = (self.exceptions,)
 	    for exception in self.exceptions:
-		self.exceptionREs.append(re.compile(exception %self.macros))
+		self.exceptionFilters.append(
+		    filter.Filter(exception, self.macros))
 
 	# dispatch if/as appropriate
 	if self.use:
@@ -134,16 +137,16 @@ def _walkFile(policyObj, dirname, names):
 # external helpers
 
 def policyException(policyObj, filespec):
-    for re in policyObj.exceptionREs:
-	if re.search(filespec):
+    for f in policyObj.exceptionFilters:
+	if f.match(filespec):
 	    return True
     return False
 
 def policyInclusion(policyObj, filespec):
-    if not policyObj.inclusionREs:
+    if not policyObj.inclusionFilters:
 	# empty list is '.*'
 	return True
-    for re in policyObj.inclusionREs:
-	if re.search(filespec):
+    for f in policyObj.inclusionFilters:
+	if f.match(filespec):
 	    return True
     return False
