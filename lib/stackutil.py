@@ -15,7 +15,6 @@
 """ Tools for printing out extended information about frame variables """
 
 import inspect
-import os
 import smtplib
 import sys
 import string
