@@ -330,6 +330,7 @@ class PackageRecipe(Recipe):
 	returns a list of file locations for all the sources in
 	the package recipe
 	"""
+	self.prepSources()
 	files = []
 	for src in self._sources:
 	    f = src.fetch()
@@ -352,10 +353,13 @@ class PackageRecipe(Recipe):
         self._sources.append(action)
 
 
-    def unpackSources(self, builddir):
-	self.macros.builddir = builddir
+    def prepSources(self):
 	for source in self._sources:
 	    source.doPrep()
+    
+    def unpackSources(self, builddir):
+	self.prepSources()
+	self.macros.builddir = builddir
 	for source in self._sources:
 	    source.doAction()
 
@@ -509,6 +513,8 @@ class PackageRecipe(Recipe):
 	self.srcdirs = srcdirs
 	self.macros = macros.Macros()
 	self.macros.update(baseMacros)
+	for key in cfg.macroKeys():
+	    self.macros._override(key, cfg['macros.' + key])
 	self.macros.name = self.name
 	self.macros.version = self.version
 	if extraMacros:
