@@ -589,7 +589,6 @@ class ChangeSetJob:
 	# file objects which map up with them are created later, but
 	# we do need a map from fileId to the path and version of the
 	# file we need, so build up a dictionary with that information
-	print "\t\ta"
 	for csPkg in cs.iterNewPackageList():
 	    newVersion = csPkg.getNewVersion()
 	    old = csPkg.getOldVersion()
@@ -614,8 +613,6 @@ class ChangeSetJob:
 
 	    self.packagesToCommit.append(newPkg)
 	    fileMap.update(newFileMap)
-
-	print "\t\tb"
 
 	# Create the file objects we'll need for the commit. This handles
 	# files which were added and files which have changed
@@ -685,8 +682,6 @@ class ChangeSetJob:
 	    path = fileMap[fileId][0]
 	    self.addFile(cs, file, newVer, path, fileContents, restoreContents)
 
-	print "\t\tc"
-
 	for (pkgName, version, flavor) in cs.getOldPackageList():
 	    pkg = self.repos.getTrove(pkgName, version, flavor)
 	    self.oldPackage(pkg)
@@ -695,9 +690,5 @@ class ChangeSetJob:
 		file = self.repos.getFileVersion(fileId, version)
 		self.oldFile(fileId, version, file)
 
-	print "\t\td"
-
 	for newPkg in self.packagesToCommit:
 	    self.addPackage(newPkg)
-
-	print "\t\te"
