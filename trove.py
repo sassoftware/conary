@@ -746,6 +746,8 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         _STREAM_TCS_IS_REDIRECT : (streams.ByteStream,         "isRedirect"  ),
      }
 
+     ignoreUnknown = True
+
     """
     Represents the changes between two packages and forms part of a
     ChangeSet. 
