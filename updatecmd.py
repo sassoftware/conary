@@ -27,12 +27,9 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
             pass
         else:
             if cs.isAbstract():
-                newcs = db.rootChangeSet(cs, cfg.defaultbranch)
-                if newcs:
-                    cs = newcs
+                cs = db.rootChangeSet(cs, cfg.defaultbranch)
 
-	    list = []
-	    list = map(lambda x: list.append(x.getName()), cs.getPackageList())
+	    list = [ x.getName() for x  in cs.getNewPackageList() ]
 
     if not cs:
         # so far no changeset (either the path didn't exist or we could not
@@ -65,7 +62,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 		else:
 		    currentVersion = None
 
-		list.append((pkgName, currentVersion, newVersion))
+		list.append((pkgName, currentVersion, newVersion, 0))
 	if bail:
 	    return
 
@@ -82,9 +79,6 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
     # on the disk
     localChanges = changeset.CreateAgainstLocal(cfg, db, list)
 
-    if cs.isAbstract():
-	db.commitChangeSet(cfg.sourcepath, cs, eraseOld = 0)
-    else:
-	inverse = cs.invert(db)
-	db.addRollback(inverse)
-	db.commitChangeSet(cfg.sourcepath, cs, eraseOld = 1)
+    inverse = cs.invert(db)
+    db.addRollback(inverse)
+    db.commitChangeSet(cfg.sourcepath, cs, eraseOld = 1)
