@@ -25,7 +25,8 @@ import conaryclient
 # conary client
 
 def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None, 
-                                  keepExisting = False, depCheck = True):
+                                  keepExisting = False, depCheck = True,
+                                  recurse = True):
     client = conaryclient.ConaryClient(repos, cfg)
 
     applyList = []
@@ -51,20 +52,28 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
             applyList.append(pkgStr)
             
     try:
-        cs = client.updateTroveCreateChangeSet(applyList, replaceFiles, 
-                            tagScript, keepExisting, depCheck)
-        #depFailures = client.checkDependencies(cs)
-        #missingDeps = [ x[1] for x in depFailures ]
-        #res = client.resolveDependencies(missingDeps)
-        #for dep in missingDeps:
-        #    if res.has_key(dep):
-        #        print dep, res[dep]
-        #    else:
-        #        print dep, "NONE"
+        (cs, depFailures, suggMap) = \
+            client.updateChangeSet(applyList, replaceFiles, recurse = recurse,
+                                   resolveDeps = depCheck)
 
-        #return
+        if depFailures:
+            print "The following dependencies could not be resolved:"
+            for (troveName, depSet) in depFailures:
+                print "    %s:\n\t%s" %  \
+                        (troveName, "\n\t".join(str(depSet).split("\n")))
+            return
+        elif not cfg.autoResolve and suggMap:
+            print "Extra packages are needed for the install"
+            for (req, suggList) in suggMap.iteritems():
+                print "    %s -> %s" % (req, " ".join([x[0] for x in suggList]))
+            return
+        elif suggMap:
+            print "Installing extra packages for dependency resolution"
+            print "    %s" % " ".join(suggMap.iterkeys())
 
-        client.updateTrove(cs, replaceFiles, tagScript, keepExisting,
+        return
+
+        client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,
                            depCheck)
     except conaryclient.UpdateError, e:
         log.error(e)

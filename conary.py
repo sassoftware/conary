@@ -89,7 +89,10 @@ def usage(rc = 1):
     print ""
     print "update flags: --keep-existing"
     print "              --no-deps"
+    print "              --no-deps-recurse"
+    print "              --no-resolve"
     print "              --replace-files"
+    print "              --resolve"
     return rc
 
 def openRepository(repMap):
@@ -123,6 +126,9 @@ def realMain(cfg, argv=sys.argv):
     argDef["install-label"] = MULT_PARAM
     argDef["keep-existing"] = NO_PARAM
     argDef["no-deps"] = NO_PARAM
+    argDef["no-deps-recurse"] = NO_PARAM
+    argDef["resolve"] = NO_PARAM
+    argDef["no-resolve"] = NO_PARAM
     argDef["leaves"] = NO_PARAM
     argDef["path"] = MULT_PARAM
     argDef["ls"] = NO_PARAM
@@ -335,15 +341,25 @@ def realMain(cfg, argv=sys.argv):
     elif (otherArgs[1] == "update"):
 	kwargs = {}
 
-	replaceFiles = argSet.has_key('replace-files')
-	if replaceFiles:
+	if argSet.has_key('replace-files'):
 	    kwargs['replaceFiles'] = True
 	    del argSet['replace-files']
 
-	noDeps = argSet.has_key('no-deps')
-	if noDeps:
+	if argSet.has_key('no-deps'):
 	    kwargs['depCheck'] = False
 	    del argSet['no-deps']
+
+	if argSet.has_key('resolve'):
+            cfg.autoResolve = True
+	    del argSet['resolve']
+
+	if argSet.has_key('no-resolve'):
+            cfg.autoResolve = False
+	    del argSet['no-resolve']
+
+	if argSet.has_key('no-deps-recurse'):
+	    kwargs['recurse'] = False
+	    del argSet['no-deps-recurse']
 
 	keepExisting = argSet.has_key('keep-existing')
 	if keepExisting:

@@ -67,15 +67,52 @@ class ConaryClient:
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
 
-    def checkDependencies(self, changeSet):
-        return self.db.depCheck(changeSet)[1]
+    def _resolveDependencies(self, cs, keepExisting = None, recurse = True):
+        pathIdx = 0
+        foundSuggestions = False
+        depList = self.db.depCheck(cs)[1]
+        suggMap = {}
 
-    def resolveDependencies(self, depList):
-        return self.repos.resolveDependencies(self.cfg.installLabelPath[0],
-                                              depList)
+        while depList and True:
+            sugg = self.repos.resolveDependencies(
+                            self.cfg.installLabelPath[pathIdx], 
+                            [ x[1] for x in depList ])
 
-    def updateTroveCreateChangeSet(self, itemList, replaceFiles = False,
-                    tagScript = None, keepExisting = None, depCheck = True):
+            if sugg:
+                for (troveName, depSet) in depList:
+                    if sugg.has_key(depSet):
+                        if suggMap.has_key(troveName):
+                            suggMap[troveName] += sugg[depSet]
+                        else:
+                            suggMap[troveName] = sugg[depSet]
+
+                troves = {}
+                for suggList in suggMap.itervalues():
+                    suggList = [ (x[0], x[1]) for x in suggList ]
+                    troves.update(dict.fromkeys(suggList))
+                
+                troves = troves.keys()
+                newCs = self._updateChangeSet(troves, 
+                                              keepExisting = keepExisting)
+                cs.merge(newCs, (self.repos.createChangeSet, troves))
+
+                depList = self.db.depCheck(cs)[1]
+
+            if sugg and recurse:
+                pathIdx = 0
+                foundSuggestions = False
+            else:
+                pathIdx += 1
+                foundSuggestions = True
+                if pathIdx == len(self.cfg.installLabelPath):
+                    if not foundSuggestions or not recurse:
+                        return (cs, depList, suggMap)
+                    pathIdx = 0
+                    foundSuggestions = False
+
+        return (cs, depList, suggMap)
+
+    def _updateChangeSet(self, itemList, keepExisting = None):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -175,7 +212,17 @@ class ConaryClient:
 
         return finalCs
 
-    def updateTrove(self, theCs, replaceFiles = False,
+    def updateChangeSet(self, itemList, keepExisting = None, 
+                        recurse = True, resolveDeps = True):
+        finalCs = self._updateChangeSet(itemList, keepExisting = keepExisting)
+
+        if not resolveDeps:
+            return (finalCs, [], {})
+
+        return self._resolveDependencies(finalCs, keepExisting = keepExisting, 
+                                         recurse = recurse)
+
+    def applyUpdate(self, theCs, replaceFiles = False,
                     tagScript = None, keepExisting = None, depCheck = True):
         cs = changeset.MergeableChangeSet()
         for (how, what) in theCs.contents:

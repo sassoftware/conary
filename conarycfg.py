@@ -181,6 +181,7 @@ class ConfigFile:
 class ConaryConfiguration(ConfigFile):
 
     defaults = {
+	'autoResolve'	        : [ BOOL, False ],
 	'buildLabel'	        : [ LABEL, versions.Label('localhost@local:trunk') ],
 	'buildPath'		: '/usr/src/conary/builds',
 	'contact'		: None,
