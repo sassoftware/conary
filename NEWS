@@ -2,6 +2,9 @@ Changes in 0.14.7:
   * ELF libraries with sonames that have paths in them are now handled
     sanely, by removing the path (and complaining...)
   * split march into targetArch and unameArch -- requires a new distro-release
+  * rework command line arguments to shadow and branch to match how versions
+    are normally specified, and allow a flavor specificatoin
+  * added --sources to branch and shadow commands
 
 Changes in 0.14.6:
   * fix for generating changesets between repositories

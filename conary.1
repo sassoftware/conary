@@ -323,10 +323,11 @@ component.
 Show the version, date, and author of each of the lines in \fI<file>.
 \fI<file> must be a file in a conary source dir.
 .TP
-.B branch \fInewbranch branchfrom [trove]\fP
+.B branch \fInewbranch [\fItrovename\fP[=\fIversion\fP][[flavor]]]*
 Creates a new branch in the repository, relative to branch
-\fIbranchfrom\fP.  If \fItrove\fP is listed, create the
-branch only for that trove.
+\fIbranchfrom\fP. The \fBtrovename\fR, and any troves it references 
+are recursively branched. If \fB-\-sources\fR is specified, the source
+troves for each binary trove is branched instead of the binary trove.
 .TP
 .B checkout [\-\-dir \fI<dir>\fP] \fI<trove\fP[=\fIversion\fP]>\fP
 Check the \fI<trove>\fB:source\fR component out of the repository

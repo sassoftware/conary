@@ -19,25 +19,28 @@ Implements branch and shadow command line functionality.
 import conaryclient
 import versions
 from lib import log
+import updatecmd
 
-def branch(cfg, branchName, branchFrom, troveName = None, makeShadow = False):
-    try:
-	newBranch = versions.Label(branchName)
-
-	if branchFrom[0] == "/":
-	    branchSource = versions.VersionFromString(branchFrom)
-	else:
-	    branchSource = versions.Label(branchFrom)
-    except versions.ParseError, e:
-	log.error(str(e))
-	return
-
+def branch(repos, cfg, newLabel, troveSpec, makeShadow = False,
+           sourceTroves = False):
     client = conaryclient.ConaryClient(cfg)
 
+    (troveName, versionSpec, flavor) = updatecmd.parseTroveSpec(troveSpec,
+                                                                cfg.flavor)
+    if not flavor:
+        flavor = cfg.flavor
+
+    troveList = repos.findTrove(cfg.installLabelPath, troveName, flavor,
+                                versionSpec)
+    troveList = [ ( x.getName(), x.getVersion(), x.getFlavor()) 
+                        for x in troveList ]
+
     if makeShadow:
-        dups = client.createShadow(newBranch, branchSource, [troveName])
+        dups = client.createShadow(newLabel, troveList,
+                                   sourceTroves = sourceTroves)
     else:
-        dups = client.createBranch(newBranch, branchSource, [troveName])
+        dups = client.createBranch(newLabel, troveList,
+                                   sourceTroves = sourceTroves)
 
     for (name, branch) in dups:
         log.warning("%s already has branch %s", name, branch.asString())

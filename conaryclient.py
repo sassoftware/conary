@@ -16,6 +16,7 @@ from lib import util
 import pickle
 
 import conarycfg
+import deps
 import versions
 import metadata
 from deps import deps
@@ -371,94 +372,75 @@ class ConaryClient:
 
         return md
 
-    def createBranch(self, newBranch, where, troveList = []):
-        return self._createBranchOrShadow(newBranch, where, troveList, 
-                                     shadow = False)
+    def createBranch(self, newLabel, troveList = [], sourceTroves = True):
+        return self._createBranchOrShadow(newLabel, troveList, shadow = False, 
+                                     sourceTroves = sourceTroves)
 
-    def createShadow(self, newBranch, where, troveList = []):
-        return self._createBranchOrShadow(newBranch, where, troveList, 
-                                     shadow = True)
+    def createShadow(self, newLabel, troveList = [], sourceTroves = True):
+        return self._createBranchOrShadow(newLabel, troveList, shadow = True, 
+                                     sourceTroves = sourceTroves)
 
-    def _createBranchOrShadow(self, newBranch, where, troveList, shadow):
+    def _createBranchOrShadow(self, newLabel, troveList, shadow,
+                              sourceTroves):
         cs = changeset.ChangeSet()
 
-	troveList = [ (x, where) for x in troveList ]
-
-	branchedTroves = {}
-	branchedFiles = {}
+        seen = {}
         dupList = []
         needsCommit = False
+
+        newLabel = versions.Label(newLabel)
 
 	while troveList:
             leavesByLabelOps = {}
 
-            for (troveName, location) in troveList:
-                if branchedTroves.has_key(troveName): continue
-                branchedTroves[troveName] = 1
-
-                l = leavesByLabelOps.get(location, None)
-                if l is None:
-                    l = []
-                    leavesByLabelOps[location] = l
-                l.append(troveName)
-
-            # reset for the next pass
+            troves = self.repos.getTroves(troveList)
             troveList = []
-
-            verDict = {}
-            for (location, l) in leavesByLabelOps.iteritems():
-                if isinstance(location, versions.Version):
-                    for name in l:
-                        l = verDict.get(name, None)
-                        if l is None:
-                            l = [ location ]
-                            verDict[name] = l
-                        else:
-                            verDict[name].append(location)
-                else:
-                    verDict.update(
-                            self.repos.getTroveLeavesByLabel(l, location))
-
-            del leavesByLabelOps
-
-            flavors = self.repos.getAllTroveFlavors(verDict)
-            del verDict
-
-            fullList = []
-            for troveName in flavors.iterkeys():
-                for (version, theFlavors) in flavors[troveName].iteritems():
-                    fullList += [ (troveName, version, x) for x in theFlavors ]
-            del flavors
-        
-            troves = self.repos.getTroves(fullList)
             branchedTroves = {}
 
 	    for trove in troves:
-                troveName = trove.getName()
+                key = (trove.getName(), trove.getVersion(), trove.getFlavor())
+                if seen.has_key(key):
+                    continue
+                seen[key] = True
+                print key[0]
+
+                # add contained troves to the todo-list
+                troveList += [ x for x in trove.iterTroveList() ]
+
+                if sourceTroves and not trove.getName().endswith(':source'):
+                    # XXX this can go away once we don't care about
+                    # pre-troveInfo troves
+                    if not trove.getSourceName():
+                        log.warning('%s has no source information' % 
+                                    trove.getName())
+
+                    troveList.append((trove.getSourceName(),
+                                      trove.getVersion().getSourceVersion(),
+                                      deps.DependencySet()))
+                    continue
+                    
                 if shadow:
                     branchedVersion = \
-                        trove.getVersion().createShadow(newBranch)
+                        trove.getVersion().createShadow(newLabel)
                 else:
                     branchedVersion = \
-                        trove.getVersion().createBranch(newBranch, 
+                        trove.getVersion().createBranch(newLabel, 
                                                         withVerRel = 1)
 
                 branchedTrove = trove.copy()
 		branchedTrove.changeVersion(branchedVersion)
 
 		for (name, version, flavor) in trove.iterTroveList():
-		    troveList.append((name, version))
-
                     if shadow:
-                        branchedVersion = version.createShadow(newBranch)
+                        branchedVersion = version.createShadow(newLabel)
                     else:
-                        branchedVersion = version.createBranch(newBranch, 
+                        branchedVersion = version.createBranch(newLabel, 
                                                                withVerRel = 1)
 		    branchedTrove.delTrove(name, version, flavor,
                                            missingOkay = False)
 		    branchedTrove.addTrove(name, branchedVersion, flavor)
 
-                key = (troveName, branchedVersion, trove.getFlavor())
+                key = (trove.getName(), branchedVersion, trove.getFlavor())
                 branchedTroves[key] = branchedTrove.diff(None)[0]
 
             # check for duplicates - XXX this could be more efficient with

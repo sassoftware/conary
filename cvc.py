@@ -42,7 +42,7 @@ sys.excepthook = util.genExcepthook()
 def usage(rc = 1):
     print "usage: cvc add <file> [<file2> <file3> ...]"
     print "       cvc annotate <file>"
-    print "       cvc branch <newbranch> <branchfrom> [<trove>]"
+    print "       cvc branch <newshadow> <trove>[=<version>][[flavor]]"
     print "       cvc checkout [--dir <dir>] <trove>[=<version>]"
     print "       cvc commit [--message <message>]"
     print '       cvc cook [--prep] [--debug-exceptions] [--macros file] '
@@ -56,9 +56,11 @@ def usage(rc = 1):
     print "       cvc rdiff <name> <oldver> <newver>"
     print "       cvc remove <file> [<file2> <file3> ...]"
     print "       cvc rename <oldfile> <newfile>"
-    print "       cvc shadow <newshadow> <shadowfrom> [<trove>]"
+    print "       cvc shadow <newshadow> <trove>[=<version>][[flavor]]"
     print "       cvc update <version>"
     print 
+    print "branch flags:  --sources"
+    print
     print 'common flags:  --build-label <label>'
     print '               --config-file <path>'
     print '               --config "<item> <value>"'
@@ -76,6 +78,8 @@ def usage(rc = 1):
     print "               --target-branch <branch>"
     print ""
     print "commit flags:  --message <msg>"
+    print ""
+    print "shadow flags:  --sources"
     return rc
 
 def realMain(cfg, argv=sys.argv):
@@ -100,6 +104,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["replace-files"] = NO_PARAM
     argDef["resume"] = OPT_PARAM
     argDef["sha1s"] = NO_PARAM
+    argDef["sources"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
     argDef["target-branch"] = ONE_PARAM
@@ -147,12 +152,18 @@ def sourceCommand(cfg, args, argSet):
 	args = [repos, cfg, dir] + args[1:]
 	checkin.checkout(*args)
     elif (args[0] == "branch" or args[0] == "shadow"):
-        if argSet: return usage()
-        if len(args) != 4: return usage()
-
         extraArgs = { 'makeShadow' : (args[0] == "shadow") }
 
-        args = [cfg, ] + args[1:]
+        extraArgs['sourceTroves'] = argSet.has_key('sources')
+        if extraArgs['sourceTroves']:
+            del argSet['sources']
+            
+        if argSet: return usage()
+        if len(args) != 3: return usage()
+
+	repos = NetworkRepositoryClient(cfg.repositoryMap)
+
+        args = [repos, cfg, ] + args[1:]
         branch.branch(*args, **extraArgs)
     elif (args[0] == "commit"):
         level = log.getVerbosity()
@@ -168,6 +179,12 @@ def sourceCommand(cfg, args, argSet):
 
 	checkin.commit(repos, cfg, message)
         log.setVerbosity(level)
+    elif (args[0] == "config"):
+	if argSet: return usage()
+	if (len(args) > 2):
+	    return usage()
+	else:
+	    cfg.display()
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
