@@ -71,9 +71,14 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
         elif suggMap:
             print "Including extra troves to resolve dependencies:"
             print "   ",
+            items = {}
             for suggList in suggMap.itervalues():
-                print "%s" % (" ".join([x[0] for x in suggList])),
-            print
+                # remove duplicates
+                items.update(dict.fromkeys([x[0] for x in suggList]))
+
+            items = items.keys()
+            items.sort()
+            print "%s" % (" ".join(items))
 
         client.applyUpdate(cs, replaceFiles, tagScript, keepExisting)
     except conaryclient.UpdateError, e:
