@@ -126,7 +126,7 @@ class _Source(action.RecipeAction):
 
 class Archive(_Source):
     """
-    Called as r.addArchive from a recipe, this class adds an archive
+    Called as C{r.addArchive()} from a recipe, this class adds an archive
     such as an optionally compressed tarball or zip file, unpacking it
     into the appropriate directory.
     
@@ -135,7 +135,12 @@ class Archive(_Source):
     signed with the appropriate GPG key.  A missing signature is a
     warning; a failed signature check is fatal.
 
-    FIXME: must fix the rules for directories, then explain here.
+    By default, C{addArchive} assumes that the archive contains the 
+    first directory level in which all the build commands will run,
+    called C{%(maindir)s}.  If an archive needs to be unpacked within
+    this directory, pass in C{dir=r.macros.maindir} or for a
+    subdirectory of maindir, pass in
+    C{dir=r.macros.maindir + '/subdir'}
     """
 
     def __init__(self, recipe, *args, **keywords):
@@ -146,8 +151,9 @@ class Archive(_Source):
 	@keyword sourcename: The name of the archive
 	@keyword rpm: If specified, causes Archive to look in the URL or
 	    file specified by C{rpm} for an RPM containing C{sourcename}
-	@keyword dir: FIXME: need to make directory handling more sensible,
-	    then describe it
+	@keyword dir: If specified, the subdirectory in which to unpack
+	    the sources, relative to C{%(builddir)s}; defaults to
+	    C{%(maindir)s}
 	@keyword keyid: The 8-digit GPG key ID (no leading C{0x}) for the
 	    signature.  Indicates that a signature should be sought and
 	    checked.
@@ -186,7 +192,7 @@ class Archive(_Source):
 
 class Patch(_Source):
     """
-    Called as r.addPatch from a recipe, this class applies a
+    Called as C{r.addPatch()} from a recipe, this class applies a
     patch.
     
     If you provide the C{keyid} argument, it will search for a file
@@ -267,7 +273,7 @@ class Patch(_Source):
 
 class Source(_Source):
     """
-    Called as r.addSource from a recipe, this class copies a file
+    Called as C{r.addSource()} from a recipe, this class copies a file
     into the build directory %(builddir)s.
     
     If you provide the C{keyid} argument, it will search for a file
@@ -363,8 +369,8 @@ class Source(_Source):
 
 class Action(action.RecipeAction):
     """
-    Called as r.addAction from a recipe, this class copies a file
-    into the build directory %(builddir)s.
+    Called as C{r.addAction()} from a recipe, this class copies a file
+    into the build directory C{%(builddir)s}.
     """
 
     keywords = {'dir': '' }
