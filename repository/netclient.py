@@ -37,7 +37,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=21
+CLIENT_VERSION=22
 
 class _Method(xmlrpclib._Method):
 
@@ -343,7 +343,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return self.getTroveVersionFlavors(d)
 
-    def getTroveLeavesByBranch(self, troveSpecs, bestFlavor = False):
+    def _getTroveInfoByBranch(self, troveSpecs, bestFlavor, method):
         d = {}
         for name, branches in troveSpecs.iteritems():
             for branch, flavors in branches.iteritems():
@@ -365,10 +365,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         result = {}
 
         for host, requestD in d.iteritems():
-            respD = self.c[host].getTroveLeavesByBranch(requestD, bestFlavor)
+            respD = self.c[host].__getattr__(method)(requestD, bestFlavor)
             self._mergeTroveQuery(result, respD)
 
         return result
+
+    def getTroveLeavesByBranch(self, troveSpecs, bestFlavor = False):
+        return self._getTroveInfoByBranch(troveSpecs, bestFlavor, 
+                                          'getTroveLeavesByBranch')
+
+    def getTroveVersionsByBranch(self, troveSpecs, bestFlavor = False):
+        return self._getTroveInfoByBranch(troveSpecs, bestFlavor, 
+                                          'getTroveVersionsByBranch')
 
     def getTroveLatestVersion(self, troveName, branch):
 	b = self.fromBranch(branch)
@@ -952,12 +960,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def findTrove(self, labelPath, name, defaultFlavor, versionStr = None,
                   acrossRepositories = False, withFiles = True,
-                  affintyDatabase = None):
+                  affinityDatabase = None):
 	assert(not defaultFlavor or 
 	       isinstance(defaultFlavor, deps.DependencySet))
-
-        import lib
-        lib.epdb.st('f')
 
         if not type(labelPath) == list:
             labelPath = [ labelPath ]
@@ -971,21 +976,51 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 		    "fully qualified version or label " + \
 		    "expected instead of %s" % versionStr
 
-	# a version is a label if
-	#   1. it doesn't being with / (it isn't fully qualified)
-	#   2. it only has one element (no /)
-	#   3. it contains an @ sign
-	if not versionStr or (versionStr[0] != "/" and  \
-		(versionStr.find("/") == -1) and versionStr.count("@")):
-	    # either the supplied version is a label or we're going to use
-	    # the default
-            if versionStr and versionStr[0] != "@":
+        if not versionStr:
+            query = {}
+            if affinityDatabase and affinityDatabase.hasPackage(name):
+                troves = affinityDatabase.findTrove(name)
+                if troves:
+                    query[name] = {}
+                    for trove in troves:
+                        # XXX what if multiple troves are on this branch,
+                        # but with different flavors?
+
+                        query[name][trove.getVersion().branch()] = \
+                            [ defaultFlavor ]
+
+            if query:
+                flavorDict = self.getTroveLeavesByBranch(query, 
+                                                         bestFlavor = True)
+            else:
+                flavorDict = { name : {} }
+                for label in labelPath:
+                    d = self.getTroveLeavesByLabel([name], label, 
+                                             flavorFilter = defaultFlavor)
+
+                    if not d.has_key(name):
+                        continue
+                    elif not acrossRepositories:
+                        flavorDict = d
+                        break
+                    else:
+                        self.queryMerge(flavorDict, d)
+        elif (versionStr[0] != "/" and (versionStr.find("/") == -1)  \
+             and versionStr.count("@")):
+            # a version is a label if
+            #   1. it doesn't being with / (it isn't fully qualified)
+            #   2. it only has one element (no /)
+            #   3. it contains an @ sign
+	    # either the supplied version is a label, or we need to get the
+            # branch from the affinity db, or or we're going to use
+	    # the default labelPath
+            if versionStr[0] != "@":
 		try:
 		    label = versions.Label(versionStr)
                     labelPath = [ label ]
 		except versions.ParseError:
 		    raise TroveMissing, "invalid version %s" % versionStr
-            elif versionStr:
+            else:
                 # just a branch name was specified
                 repositories = [ x.getHost() for x in labelPath ]
                 labelPath = []
@@ -1004,11 +1039,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     break
                 else:
                     self.queryMerge(flavorDict, d)
-
-	    if not flavorDict[name]:
-		raise repository.TroveNotFound, \
-                      ('"%s" was not found in the search path (%s)'
-                       %(name, " ".join([ x.asString() for x in labelPath ])))
 	elif versionStr[0] != "/" and versionStr.find("/") == -1:
 	    # version/release was given. look in the affinityDatabase
             # for the branches to look on
@@ -1017,34 +1047,41 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	    except versions.ParseError, e:
 		raise repository.TroveNotFound, str(e)
 
-            #if affinityDatabase and affinityDatabase.hasTrove(name):
-            #    for trove in self.db.findTrove(troveName):
-            #        
-            #    labels = [ x.getVersion().branch().label()
-            #               for x in self.db.findTrove(troveName) ]
-            #else:
-                
+            query = {}
+            if affinityDatabase and affinityDatabase.hasPackage(name):
+                troves = affinityDatabase.findTrove(name)
+                if troves:
+                    query[name] = {}
+                    for trove in troves:
+                        # XXX what if multiple troves are on this branch,
+                        # but with different flavors?
 
-            flavorDict = { name : {} }
-            for label in labelPath:
-                d = self.getTroveVersionsByLabel([name], label, 
-                                                 flavorFilter = defaultFlavor)
-                for version in d[name].keys():
+                        query[name][trove.getVersion().branch()] = \
+                            [ defaultFlavor ]
+
+            if query:
+                flavorDict = self.getTroveVersionsByBranch(query, 
+                                                           bestFlavor = True)
+
+                for version in flavorDict[name].keys():
                     if version.trailingVersion() != verRel:
-                        del d[name][version]
+                        del flavorDict[name][version]
+            else:
+                flavorDict = { name : {} }
+                for label in labelPath:
+                    d = self.getTroveVersionsByLabel([name], label, 
+                                             flavorFilter = defaultFlavor)
+                    for version in d[name].keys():
+                        if version.trailingVersion() != verRel:
+                            del d[name][version]
 
-                if not d[name]:
-                    continue
-                elif not acrossRepositories:
-                    flavorDict = d
-                    break
-                else:
-                    self.queryMerge(flavorDict, d)
-
-	    if not flavorDict[name]:
-		raise repository.TroveNotFound, \
-		    "version %s of %s is not on found on path %s" % \
-		    (versionStr, name, " ".join([x.asString() for x in labelPath]))
+                    if not d[name]:
+                        continue
+                    elif not acrossRepositories:
+                        flavorDict = d
+                        break
+                    else:
+                        self.queryMerge(flavorDict, d)
 	elif versionStr[0] != "/":
 	    # partial version string, we don't support this
 	    raise repository.TroveNotFound, \
@@ -1068,6 +1105,19 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             if not flavorDict.has_key(name):
                 flavorDict[name] = {}
+
+        if not flavorDict.has_key(name) or not flavorDict[name]:
+            if not labelPath or not labelPath[0]:
+                raise repository.TroveNotFound, "trove %s not found" % name
+            elif versionStr:
+                raise repository.TroveNotFound, \
+                    "version %s of %s was not on found on path %s" % \
+                    (versionStr, name, " ".join([x.asString() for x in 
+                        labelPath]))
+            else:
+                raise repository.TroveNotFound, \
+                    "%s was not on found on path %s" % \
+                    (name, " ".join([x.asString() for x in labelPath]))
 
 	pkgList = []
 	for version, flavorList in flavorDict[name].iteritems():

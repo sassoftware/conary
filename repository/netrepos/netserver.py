@@ -33,7 +33,7 @@ from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExi
 import trovestore
 import versions
 
-SERVER_VERSIONS = [ 21 ]
+SERVER_VERSIONS = [ 21, 22 ]
 CACHE_SCHEMA_VERSION = 11
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -487,12 +487,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         d = {}
                         troveVersions[troveName] = d
 
-                    lastTimestamp, lastFlavorScore = d.get(branchId, 
+                    lastTimestamp, lastFlavorScore = d.get(versionStr, 
                                                            (0, -500000))[0:2]
 
                     if (flavorScore > lastFlavorScore):
-                        d[branchId] = (finalTimestamp, flavorScore, versionStr, 
-                                        timeStamps, flavor)
+                        d[versionStr] = (finalTimestamp, flavorScore, 
+                                         versionStr, timeStamps, flavor)
                 else:
                     # if _GET_TROVE_ALL_VERSIONS is used, withFlavors must
                     # be specified (or the various latest versions can't
@@ -591,6 +591,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return self._getTroveList(authToken, clientVersion, troveFilter,
                                   withVersions = True, 
                                   versionType = self._GTL_VERSION_TYPE_LABEL,
+                                  withFlavors = True)
+
+    def getTroveVersionsByBranch(self, authToken, clientVersion, troveSpecs,
+                                 bestFlavor):
+        d = {}
+        for (name, branches) in troveSpecs.iteritems():
+            d[name] = {}
+            for branch, flavors in branches.iteritems():
+                if type(flavors) == list:
+                    d[name][branch] = flavors
+                else:
+                    d[name][branch] = None
+
+        if bestFlavor:
+            flavorFilter = self._GET_TROVE_BEST_FLAVOR
+        else:
+            flavorFilter = self._GET_TROVE_ALL_FLAVORS
+
+        return self._getTroveList(authToken, clientVersion, d, 
+                                  withVersions = True, 
+                                  flavorFilter = flavorFilter,
+                                  versionType = self._GTL_VERSION_TYPE_BRANCH,
+                                  latestFilter = self._GET_TROVE_ALL_VERSIONS,
                                   withFlavors = True)
 
     def getTroveLeavesByBranch(self, authToken, clientVersion, troveSpecs,

@@ -38,7 +38,8 @@ class AbstractTroveDatabase:
 	Looks up a trove in the repository based on the name and
 	version provided. If any errors occur, TroveNotFound is
 	raised with an appropriate error message. Multiple matches
-	could be found if versionStr refers to a label.
+	could be found if versionStr refers to a label, or if 
+        affinityDatabase is used and there are multiple matches.
 
 	@param labelPath: Path of labels to look on if no branch
 	is specified. If only a branch name is given (not a complete label),

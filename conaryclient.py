@@ -173,43 +173,23 @@ class ConaryClient:
                     # we give an error for this later on
                     newList = []
             else:
-                if self.db.hasPackage(troveName):
-                    justFirst = False
-
-                    labels = [ x.getVersion().branch().label()
-                               for x in self.db.findTrove(troveName) ]
-
-                    # this removes duplicates
-                    labels = {}.fromkeys(labels).keys()
-                    
+                newList = self.repos.findTrove(self.cfg.installLabelPath, troveName, 
+                                               self.cfg.flavor, versionStr,
+                                               withFiles = False,
+                                               affinityDatabase = self.db)
+                    # XXX where does this go now?                    
                     # updating locally cooked troves needs a label override
-                    if True in [isinstance(x, versions.CookBranch) or
-                                isinstance(x, versions.EmergeBranch)
-                                for x in labels]:
-                        if not versionStr:
-                            raise UpdateError, \
-                             "Package %s cooked locally; version, branch, or " \
-                             "label must be specified for update" % troveName
-                        else:
-                            labels = [ None ]
-                        
-                else:
-                    justFirst = True
-                    labels = self.cfg.installLabelPath
-
-                newList = []
-                for label in labels:
-                    try:
-                        newList += self.repos.findTrove(label, troveName, 
-                                                        self.cfg.flavor, 
-                                                        versionStr,
-                                                        withFiles = False)
-                        if justFirst and newList: break
-                    except repository.TroveNotFound, e:
-                        pass
-
-                if not newList:
-                    raise repository.TroveMissing(troveName, labels)
+                    #if True in [isinstance(x, versions.CookBranch) or
+                    #            isinstance(x, versions.EmergeBranch)
+                    #            for x in labels]:
+                    #    if not versionStr:
+                    #        raise UpdateError, \
+                    #         "Package %s cooked locally; version, branch, or " \
+                    #         "label must be specified for update" % troveName
+                    #    else:
+                    #        labels = [ None ]
+                    #    
+                    #    pass
 
             if keepExisting:
                 for newTrove in newList:
@@ -264,8 +244,7 @@ class ConaryClient:
                                 keepExisting = keepExisting)
 
     def applyUpdate(self, theCs, replaceFiles = False, tagScript = None, 
-                    keepExisting = None, test = False, justDatabase = False,
-                    journal = None):
+                    keepExisting = None, test = False, justDatabase = False):
         assert(isinstance(theCs, changeset.ReadOnlyChangeSet))
         cs = changeset.ReadOnlyChangeSet()
         for (how, what) in theCs.contents:
@@ -279,8 +258,7 @@ class ConaryClient:
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
                                 keepExisting = keepExisting,
-                                test = test, justDatabase = justDatabase,
-                                journal = journal)
+                                test = test, justDatabase = justDatabase)
 
     def eraseTrove(self, troveList, depCheck = True, tagScript = None,
                    test = False, justDatabase = False):

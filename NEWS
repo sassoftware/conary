@@ -1,3 +1,10 @@
+Changes in 0.12.2
+  * added getTroveVersionsByBranch
+  * make better use of _mergeQueryResults
+  * moved version affinity into findTrove from ConaryClient
+  * fixed branch affinity so that it's actually branch affinity instead of
+    label affinity
+
 Changes in 0.12.1
   * repquery and query always showed dependency information
   * getTroveLeavesByBranch did extra demarshalling of the flavor
