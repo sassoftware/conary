@@ -7,7 +7,6 @@
 
 import branch
 import changeset
-import checkin
 import commit
 import cook
 import database
@@ -18,6 +17,7 @@ import repository
 import rollbacks
 import signal
 import srscfg
+import srcctl
 import sys
 import update
 import util
@@ -34,19 +34,19 @@ except srscfg.ParseError, e:
     log.error(str(e))
     sys.exit(1)
 
-def usage():
+def usage(rc = 1):
     print "usage: srs branch <newbranch> <branchfrom> [<trove>]"
     print "       srs changeset <pkg> [<oldver>] <newver> <outfile>"
     print "       srs cook    [--prep] [--macros file] <first.recipe> <second.recipe> ..."
-    print "       srs checkin <file>"
-    print "       srs checkout <group> <version>"
-    print "       srs commit  <file>"
+    print "       srs commit  <changeset>"
     print "       srs pkglist <pkgname> <version>"
     print "       srs replist <pkgname> <version>"
     print "       srs rblist"
     print "       srs rollback"
+    print "       srs source [usage]"
     print "       srs update  <pkgname> <version>"
-    print "                   <pkgfile>"
+    print "           update  <changeset>"
+    print "       srs usage"
     print ""
     print "changeset flags: --fromdb"
     print ""
@@ -57,7 +57,7 @@ def usage():
     print ""
     print "pkglist flags: --all"
     print "               --ls"
-    sys.exit(0)
+    return rc
 
 otherArgs = [ sys.argv[0] ]
 argSet = {}
@@ -122,8 +122,13 @@ for (arg, name) in cfgMap.items():
 
 if (len(otherArgs) < 2):
     usage()
-elif (otherArgs[1] == "import"):
-    print "this is broken"
+elif (otherArgs[1] == "branch"):
+    if argSet: usage
+    if len(otherArgs) < 4 or len(otherArgs) > 5: usage()
+    repos = repository.LocalRepository(cfg.reppath, "c")
+
+    args = [repos ] + otherArgs[2:]
+    branch.branch(*args)
 elif (otherArgs[1] == "changeset"):
     # current usage is "package file oldversion newversion"
     if len(otherArgs) != 5 and len(otherArgs) != 6:
@@ -148,6 +153,12 @@ elif (otherArgs[1] == "commit"):
     repos = repository.LocalRepository(cfg.reppath, "c")
     for changeSet in otherArgs[2:]:
 	commit.doCommit(repos, cfg, changeSet)
+elif (otherArgs[1] == "config"):
+    if argSet: usage
+    if (len(otherArgs) > 2):
+	usage()
+    else:
+	cfg.display()
 elif (otherArgs[1] == "cook"):
     # this ensures the repository exists
     repos = repository.LocalRepository(cfg.reppath, "c")
@@ -212,6 +223,8 @@ elif (otherArgs[1] == "cook"):
         # make sure that we are the foreground process again
         os.tcsetpgrp(0, os.getpgrp())
                 
+elif (otherArgs[1] == "import"):
+    print "this is broken"
 elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
     all = argSet.has_key('all')
     if all: del argSet['all']
@@ -235,6 +248,17 @@ elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
             sys.exit(1)
     else:
 	usage()
+elif (otherArgs[1] == "rblist"):
+    if argSet: usage
+    db = database.Database(cfg.root, cfg.dbpath, "r")
+    rollbacks.listRollbacks(db, cfg)
+elif (otherArgs[1] == "rollback"):
+    if argSet: usage
+    db = database.Database(cfg.root, cfg.dbpath, "c")
+    args = [db, cfg] + otherArgs[2:]
+    rollbacks.apply(*args)
+elif (otherArgs[1] == "source" or otherArgs[1] == "src"):
+    srcctl.sourceCommand(cfg, otherArgs[2:], argSet)
 elif (otherArgs[1] == "update"):
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
@@ -245,34 +269,7 @@ elif (otherArgs[1] == "update"):
 	update.doUpdate(*args)
     else:
 	usage()
-elif (otherArgs[1] == "config"):
-    if argSet: usage
-    if (len(otherArgs) > 2):
-	usage()
-    else:
-	cfg.display()
-elif (otherArgs[1] == "rblist"):
-    db = database.Database(cfg.root, cfg.dbpath, "r")
-    rollbacks.listRollbacks(db, cfg)
-elif (otherArgs[1] == "rollback"):
-    db = database.Database(cfg.root, cfg.dbpath, "c")
-    args = [db, cfg] + otherArgs[2:]
-    rollbacks.apply(*args)
-elif (otherArgs[1] == "branch"):
-    if len(otherArgs) < 4 or len(otherArgs) > 5: usage()
-    repos = repository.LocalRepository(cfg.reppath, "c")
-
-    args = [repos ] + otherArgs[2:]
-    branch.branch(*args)
-elif (otherArgs[1] == "checkin"):
-    if len(otherArgs) != 3: usage()
-    repos = repository.LocalRepository(cfg.reppath, "c")
-    checkin.checkin(repos, cfg, otherArgs[2])
-elif (otherArgs[1] == "checkout"):
-    if len(otherArgs) < 3 or len(otherArgs) > 4: usage()
-    repos = repository.LocalRepository(cfg.reppath, "r")
-
-    args = [repos, cfg] + otherArgs[2:]
-    checkin.checkout(*args)
+elif (otherArgs[1] == "usage"):
+    usage(rc = 0)
 else:
     usage()
