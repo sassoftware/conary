@@ -143,11 +143,12 @@ class HttpHandler:
         versions = self.repServer.getTroveVersionList(authToken,
             netserver.SERVER_VERSIONS[-1], { troveName : None }, "")
         
-        branches = []
+        branches = {}
         for version in versions[troveName]:
             version = self.repServer.thawVersion(version)
-            branches.append(version.branch())
+            branches[version.branch()] = True
 
+        branches = branches.keys()
         if len(branches) == 1:
             self._getMetadata(fields, troveName, branches[0].freeze())
         else:
