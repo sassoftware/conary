@@ -63,4 +63,4 @@ def execute(cmd):
     rc = os.system(cmd)
     if rc:
 	raise RuntimeError, ('Shell command "%s" returned '
-	                     'non-zero status %d' % (command, rc))
+	                     'non-zero status %d' % (cmd, rc))
