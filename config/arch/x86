@@ -1,0 +1,49 @@
+Name x86
+archProp LE True
+archProp BE False
+archProp bits32 True
+archProp bits64 False
+targetArch i386
+unameArch i386
+optflags -O2 -march=i386 -mcpu=i686
+
+[i486]
+targetArch i386
+unameArch i386
+optflags -O2 -march=i486
+
+[i586]
+targetArch i586
+unameArch i586
+subsumes i486
+optflags -O2 -march=i586
+
+[i686]
+targetArch i686
+unameArch i686
+subsumes i586, i486
+optflags -O2 -march=i686
+
+[cmov]
+
+[sse]
+
+[sse2]
+subsumes sse
+
+[sse3]
+subsumes sse2,sse
+
+[mmx]
+
+[mmxext]
+subsumes mmx
+
+[3dnow]
+buildName threednow
+
+[3dnowext]
+buildName threednowext
+subsumes 3dnow
+
+[nx]

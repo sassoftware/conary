@@ -1,0 +1,6 @@
+archProp LE False
+archProp BE True
+archProp bits32 True
+archProp bits64 False
+unameArch ppc
+targetArch powerpc

@@ -1,0 +1,17 @@
+archProp LE True
+archProp BE False
+archProp bits32 False
+archProp bits64 True
+macro lib lib64
+
+[nx]
+
+[sse3]
+
+[3dnow]
+buildName threednow
+
+[3dnowext]
+buildName threednowext
+subsumes 3dnow
+
