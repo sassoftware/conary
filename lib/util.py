@@ -41,21 +41,38 @@ class Action:
 
     @cvar keywords: The keywords and default values accepted by the class
     """
+
+    def _applyDefaults(self):
+        """
+        Traverse the class hierarchy, picking up default keywords.  We
+        ascend to the topmost class and pick up the keywords as we work
+        back to our class, to allow proper overriding.
+        """
+        baselist = []
+        bases = list(self.__class__.__bases__)
+        while bases:
+	    parent = bases.pop()
+	    bases.extend(list(parent.__bases__))
+            baselist.append(parent)
+        baselist.reverse()
+        for base in baselist:
+            if base.__dict__.has_key('keywords'):
+                self.__dict__.update(base.__dict__['keywords'])
+        if self.__class__.__dict__.has_key('keywords'):
+            self.__dict__.update(self.__class__.keywords)
+        
     def __init__(self, *args, **keywords):
         assert(self.__class__ is not Action)
-        # initialize initialize our keywords to the defaults
-	# keywords will be set in subclass init before calling down
-	if not self.__dict__.has_key('commonkeywords'):
-	    self.commonkeywords = {}
-	self.__dict__.update(self.commonkeywords)
 	# keywords will be in the class object, not the instance
 	if not hasattr(self.__class__, 'keywords'):
 	    self.keywords = {}
-	self.__dict__.update(self.keywords)
+        self._applyDefaults()
         # check to make sure that we don't get a keyword we don't expect
         for key in keywords.keys():
-            if key not in self.keywords.keys() and \
-	       key not in self.commonkeywords.keys():
+            # XXX this is not the best test, but otherwise we have to
+            # keep a dictionary of all of the keywords (including the parent
+            # keywords)
+            if key not in self.__dict__.keys():
                 raise TypeError, ("%s.__init__() got an unexpected keyword argument "
                                   "'%s'" % (self.__class__.__name__, key))
         # copy the keywords into our dict, overwriting the defaults

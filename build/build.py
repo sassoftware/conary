@@ -30,6 +30,9 @@ _permmap = {
 }
 
 class BuildAction(util.Action):
+    keywords = {
+        'use': None
+    }
     def __init__(self, *args, **keywords):
 	"""
 	@keyword use: Optional argument; Use flag(s) telling whether
@@ -38,10 +41,6 @@ class BuildAction(util.Action):
 	"""
 	# enforce pure virtual status
         assert(self.__class__ is not BuildCommand)
-	# dictionary of common keywords
-	self.commonkeywords = {
-	    'use': None
-	}
 	util.Action.__init__(self, *args, **keywords)
 	# change self.use to be a simple flag
 	self.use = util.checkUse(self.use)
@@ -165,7 +164,6 @@ class ManualConfigure(Configure):
     template = ('cd %%(builddir)s/%(subDir)s; '
                 '%%(mkObjdir)s '
 	        '%(preConfigure)s %%(configure)s %(args)s')
-    keywords = {'subDir': ''}
 
 class Make(BuildCommand):
     template = ('cd %%(builddir)s/%(subDir)s; '
@@ -173,7 +171,7 @@ class Make(BuildCommand):
                 ' %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
                 'subDir': ''}
-
+    
 class MakeInstall(BuildCommand):
     template = ('cd %%(builddir)s/%(subDir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'

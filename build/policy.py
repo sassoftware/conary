@@ -46,6 +46,11 @@ class Policy(util.Action):
     invariantexceptions = []
     invariantinclusions = []
 
+    keywords = {
+        'use': None,
+        'exceptions': None
+    }
+
     def __init__(self, *args, **keywords):
 	"""
 	@keyword exceptions: Optional argument; regexp(s) specifying
@@ -59,11 +64,6 @@ class Policy(util.Action):
 	"""
 	# enforce pure virtual status
 	assert(self.__class__ is not Policy)
-	# dictionary of common keywords
-	self.commonkeywords = {
-	    'use': None,
-	    'exceptions': None
-	}
 	util.Action.__init__(self, *args, **keywords)
 
     def doProcess(self, recipe):
