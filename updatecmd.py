@@ -45,7 +45,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                 sys.exit(1)
             applyList.append(cs)
         else:
-            applyList.append(parseTroveSpec(pkgStr))
+            applyList.append(parseTroveSpec(pkgStr, cfg.flavor))
 
     try:
         (cs, depFailures, suggMap, brokenByErase) = \
@@ -95,7 +95,7 @@ def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False,
             justDatabase = False):
     client = conaryclient.ConaryClient(cfg=cfg)
 
-    troveList = [ parseTroveSpec(item) for item in itemList ]
+    troveList = [ parseTroveSpec(item, cfg.flavor) for item in itemList ]
 
     brokenByErase = []
     try:
@@ -112,14 +112,14 @@ def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False,
                     (troveName, "\n\t".join(str(depSet).split("\n")))
         return 1
 
-def parseTroveSpec(specStr):
+def parseTroveSpec(specStr, defaultFlavor):
     if specStr.find('[') > 0 and specStr[-1] == ']':
         specStr = specStr[:-1]
         l = specStr.split('[')
         if len(l) != 2:
             raise TroveSpecError, "bad trove spec %s]" % specStr
         specStr, flavorSpec = l
-        flavor = deps.parseFlavor(flavorSpec)
+        flavor = deps.parseFlavor(flavorSpec, mergeBase = defaultFlavor)
         if flavor is None:
             raise TroveSpecError, "bad flavor [%s]" % flavorSpec
     else:
