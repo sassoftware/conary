@@ -106,8 +106,9 @@ def _handle_rc(rc, cmd):
         log.error(info)
 	raise RuntimeError, info
 
-def execute(cmd, destDir=None):
-    log.debug(cmd)
+def execute(cmd, destDir=None, verbose=True):
+    if verbose:
+	log.debug(cmd)
     if destDir:
 	rc = os.system('cd %s; %s' %(destDir, cmd))
     else:
@@ -208,9 +209,10 @@ def remove(paths):
 	else:
 	    log.warning('file %s does not exist when attempting to delete [file]', path)
 
-def copyfile(sources, dest):
+def copyfile(sources, dest, verbose=True):
     for source in braceGlob(sources):
-	log.debug('copying %s to %s', source, dest)
+	if verbose:
+	    log.debug('copying %s to %s', source, dest)
 	shutil.copy2(source, dest)
 
 def copyfileobj(source, dest):

@@ -307,7 +307,7 @@ class TestSuiteFiles(policy.Policy):
 		    os.symlink(contents, testpath)
 	    elif os.path.isfile(fullpath):
 		util.mkdirChain(os.path.dirname(testpath))
-		util.copyfile(fullpath, testpath)
+		util.copyfile(fullpath, testpath, verbose=False)
 		self.replaceBuildPath(testpath)
 		# finally, include any symlinks that point
 		# to the file we just copied
@@ -328,7 +328,7 @@ class TestSuiteFiles(policy.Policy):
 	    return
 	if extension in ('pyo', 'pyc'): # add as needed
 	    return
-	util.execute(("sed -i -e 's|%%(builddir)s|%%(testdir)s/%%(name)s-%%(version)s|g' '%s'" % path) % self.macros)
+	util.execute(("sed -i -e 's|%%(builddir)s|%%(testdir)s/%%(name)s-%%(version)s|g' '%s'" % path) % self.macros, verbose=False)
 
 	
 class FixDirModes(policy.Policy):
