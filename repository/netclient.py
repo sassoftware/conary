@@ -37,7 +37,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=24
+CLIENT_VERSION=25
 
 class _Method(xmlrpclib._Method):
 
@@ -759,7 +759,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         d = self.c[label].getDepSuggestions(self.fromLabel(label), l)
         r = {}
         for (key, val) in d.iteritems():
-            r[self.toDepSet(key)] = val
+            l = []
+            for items in val:
+                l.append([ (x[0], self.thawVersion(x[1]), self.toFlavor(x[2]))
+                                    for x in items ])
+
+            r[self.toDepSet(key)] = l
 
         return r
 

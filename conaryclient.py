@@ -18,6 +18,7 @@ import pickle
 import conarycfg
 import versions
 import metadata
+from deps import deps
 from local import database
 from repository import repository
 from repository import changeset
@@ -104,17 +105,17 @@ class ConaryClient:
 
                 for (troveName, depSet) in depList:
                     if sugg.has_key(depSet):
-                        if suggMap.has_key(troveName):
-                            suggMap[troveName] += sugg[depSet]
-                        else:
-                            suggMap[troveName] = sugg[depSet]
+                        suggList = []
+                        for choiceList in sugg[depSet]:
+                            # pick one from each choiceList
+                            choice = choiceList[0]
+                            suggList.append(choice)
 
-                        #for choiceList in sugg[depSet]:
-                        #    # pick one from each choiceList
-                        #    choice = choiceList[0]
+                            if suggMap.has_key(troveName):
+                                suggMap[troveName].append(choice)
+                            else:
+                                suggMap[troveName] = [ choice ]
 
-
-			suggList = [ (x[0], x[1], None) for x in sugg[depSet] ]
 			troves.update(dict.fromkeys(suggList))
 
                 troves = troves.keys()
@@ -175,7 +176,7 @@ class ConaryClient:
             if isinstance(versionStr, versions.Version):
                 assert(isinstance(flavor, deps.DependencySet))
                 newItems.append((troveName, versionStr, flavor))
-            if versionStr and versionStr[0] == '/':
+            elif versionStr and versionStr[0] == '/':
                 # fully qualified versions don't need repository affinity
                 # or the label search path
                 try:
