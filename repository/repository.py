@@ -7,7 +7,6 @@
 
 import changeset
 import datastore
-import dbhash
 import fcntl
 import files
 import os
