@@ -527,7 +527,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	    grp.addTrove(compName, p.getVersion(), p.getFlavor())
 
     changeSet = changeset.CreateFromFilesystem(packageList)
-    changeSet.addPrimaryPackage(grpName, targetVersion, grp.getFlavor())
+    for packageName in grpMap:
+        changeSet.addPrimaryPackage(packageName, targetVersion, grp.getFlavor())
 
     for grp in grpMap.values():
         grpDiff = grp.diff(None, absolute = 1)[0]
