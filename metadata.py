@@ -155,9 +155,21 @@ def fetchFreshmeat(troveName):
 
     doc = xml.dom.minidom.parse(url)
     metadata = {}
-    metadata["shortDesc"] = [doc.getElementsByTagName("desc_short")[0].childNodes[0].data]
-    metadata["longDesc"] = [doc.getElementsByTagName("desc_full")[0].childNodes[0].data]
-    metadata["url"] = [resolveUrl(doc.getElementsByTagName("url_homepage")[0].childNodes[0].data)]
+    
+    shortDesc = doc.getElementsByTagName("desc_short")[0]
+    if shortDesc.childNodes:
+        metadata["shortDesc"] = [shortDesc.childNodes[0].data]
+
+    longDesc = doc.getElementsByTagName("desc_full")[0]
+    if longDesc.childNodes:
+        metadata["longDesc"] = [longDesc.childNodes[0].data]
+    
+    metadata["url"] = []
+    urlHomepage = doc.getElementsByTagName("url_homepage")[0]
+    if urlHomepage.childNodes:
+        metadata["url"].append(resolveUrl(urlHomepage.childNodes[0].data))
+    metadata["url"].append("http://freshmeat.net/projects/%s/" % troveName)
+    
     metadata["license"] = []
     metadata["category"] = []
 
@@ -172,5 +184,3 @@ def fetchFreshmeat(troveName):
                 metadata["category"].append(name)
 
     return metadata
-
-
