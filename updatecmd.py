@@ -37,7 +37,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	mainPackageName = None
 	for pkgName in repos.getPackageList(pkg):
 	    if not newVersion:
-		newVersion = repos.pkgLatestVersion(cfg.defaultbranch)
+		newVersion = repos.pkgLatestVersion(pkgName, cfg.defaultbranch)
 	    elif not repos.hasPackageVersion(pkgName, newVersion):
 		sys.stderr.write("package %s does not contain version %s\n" %
 				     (pkgName, version.asString()))
