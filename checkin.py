@@ -25,7 +25,7 @@ import changelog
 from build import cook
 import files
 from lib import log
-import magic
+from lib import magic
 import os
 import repository
 import sha1helper

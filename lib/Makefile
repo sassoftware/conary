@@ -18,6 +18,7 @@ python_files=	    __init__.py		\
 		    enum.py		\
 		    epdb.py		\
 		    log.py		\
+		    magic.py		\
 		    options.py		\
 		    patch.py		\
 		    stackutil.py	\

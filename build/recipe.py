@@ -26,7 +26,7 @@ import imp
 import inspect
 from lib import log
 import macros
-import magic
+from lib import magic
 import os
 import packagepolicy
 from repository import repository

@@ -35,7 +35,7 @@ import os
 import stat
 import policy
 from lib import log
-import magic
+from lib import magic
 
 # used in multiple places, should be maintained in one place
 # probably needs to migrate to some form of configuration
