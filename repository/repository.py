@@ -650,17 +650,18 @@ class ChangeSetJob:
 
 		# we already have the contents of this file... we can go
 		# ahead and restore it reusing those contents
-		if repos._hasFileContents(fileObj.contents.sha1()):
+                # XXX this breaks filecontainer test
+#		if repos._hasFileContents(fileObj.contents.sha1()):
 		    # if we already have the file in the data store we can
 		    # get the contents from there
-		    fileContents = filecontents.FromDataStore(
-				     repos.contentsStore, 
-				     fileObj.contents.sha1(), 
-				     fileObj.contents.size())
-		    contType = changeset.ChangedFileTypes.file
-		    self.addFileContents(fileObj.contents.sha1(), version, 
-					 fileContents, restoreContents, 
-					 fileObj.flags.isConfig())
+## 		    fileContents = filecontents.FromDataStore(
+## 				     repos.contentsStore, 
+## 				     fileObj.contents.sha1(), 
+## 				     fileObj.contents.size())
+## 		    contType = changeset.ChangedFileTypes.file
+## 		    self.addFileContents(fileObj.contents.sha1(), version, 
+## 					 fileContents, restoreContents, 
+## 					 fileObj.flags.isConfig())
 
 		elif fileObj.flags.isConfig():
 		    tup = (fileId, fileObj, oldPath, oldfile, pkgName,
