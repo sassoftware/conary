@@ -85,7 +85,8 @@ class DBTroveFiles:
 
     def delInstance(self, instanceId):
         cu = self.db.cursor()
-	
+ 	cu.execute("""DELETE FROM DBFileTags WHERE streamId IN
+        (SELECT streamId from DBTroveFiles WHERE instanceId=?)""", instanceId)
         cu.execute("DELETE from DBTroveFiles WHERE instanceId=?", instanceId)
 
     def hasFileId(self, fileId, versionId, pristine):
