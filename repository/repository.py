@@ -336,6 +336,9 @@ class ChangeSetJobFile:
     def file(self):
 	return self.theFile
 
+    def changeFile(self, fileObj):
+	self.theFile = fileObj
+
     def path(self):
 	return self.thePath
 
@@ -364,14 +367,14 @@ class ChangeSetJob:
 	return self.packages
 
     def addFile(self, fileObject):
-	self.files.append(fileObject)
+	self.files[fileObject.fileId()] = fileObject
 	self.filePaths[fileObject.path] = 1
 
     def containsFilePath(self, path):
 	return self.filePaths.has_key(path)
 
     def newFileList(self):
-	return self.files
+	return self.files.values()
 
     # the undo object it kept up-to-date with what needs to be done to undo
     # the work completed so far; the caller can use a try/except block to
@@ -406,7 +409,7 @@ class ChangeSetJob:
 	self.cs = cs
 
 	self.packages = []
-	self.files = []
+	self.files = {}
 	self.filePaths = {}
 
 	fileMap = {}
