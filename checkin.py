@@ -176,7 +176,7 @@ def checkout(repos, cfg, dir, name, versionStr = None):
 
     state.write(dir + "/SRS")
 
-def _buildChangeSet(repos, state, srcVersion = None, needsHead = False):
+def _buildChangeSet(repos, state, srcPkg):
     """
     Builds a change set against the sources in the current directory and
     builds an in-core state object as if these changes were committed. If
@@ -189,50 +189,22 @@ def _buildChangeSet(repos, state, srcVersion = None, needsHead = False):
     @type repos: repository.Repository
     @param state: Current state object
     @type state: SourceState
-    @param srcVersion: Version in the repository to generate the change ste
-    against
-    @type srcVersion: versions.Version
-    @param needsHead: If true, this operation fails if it's done against
-    something other then head
-    @type needsHead: Boolean
-    @rtype: (boolean, SourceState, changeset.ChangeSet, package.Package)
-    """
-
-    if isinstance(state.getVersion(), versions.NewVersion):
-	# new package, so it shouldn't exist yet
-	if needsHead:
-	    if repos.hasPackage(state.getName()):
-		log.error("%s is marked as a new package but it " 
-			  "already exists" % state.getName())
-		return
-	srcVersion = None
-	srcPkg = None
-    else:
-	if not srcVersion:
-	    srcVersion = state.getVersion()
-
-	srcPkg = repos.getPackageVersion(state.getName(), srcVersion)
-	srcPkg.changeVersion(repos.pkgGetFullVersion(state.getName(), 
-			     srcVersion))
-
-	if needsHead:
-	    # existing package
-	    if not _verifyAtHead(repos, srcPkg, state):
-		log.error("contents of working directory are not all "
-			  "from the head of the branch; use update")
-		return
+    @param srcPkg: Package to generate the change set against
+    @type srcPkg: package.Package
 
     recipeVersionStr = _getRecipeVersion(state.getRecipeFileName())
     if not recipeVersionStr: return
 
-    newVersion = helper.nextVersion(recipeVersionStr, srcVersion, 
-				    state.getBranch(), binary = False)
+    if srcPkg:
+	newVersion = helper.nextVersion(recipeVersionStr, srcPkg.getVersion(),
+					state.getBranch(), binary = False)
+    else:
+	newVersion = helper.nextVersion(recipeVersionStr, None,
+					state.getBranch(), binary = False)
     newState = state.copy()
     newState.changeVersion(newVersion)
     changeSet = changeset.ChangeSet()
 
-    # this lets us avoid changing the size of the dict we're iterating
-    # through
     for (fileId, (path, version)) in newState.iterFileList():
 	realPath = os.getcwd() + "/" + path
 
@@ -243,7 +215,13 @@ def _buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 		% path)
 	    return
 
-	f = files.FileFromFilesystem(realPath, fileId)
+	if srcPkg and srcPkg.hasFile(fileId):
+	    srcFileVersion = srcPkg.getFile(fileId)[1]
+	    srcFile = repos.getFileVersion(fileId, srcFileVersion)
+	    f = files.FileFromFilesystem(realPath, fileId,
+					 possibleMatch = fileId)
+	else:
+	    f = files.FileFromFilesystem(realPath, fileId)
 
 	if path.endswith(".recipe"):
 	    f.isConfig(set = True)
@@ -252,7 +230,7 @@ def _buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 	    # if we're committing against head, this better be a new file.
 	    # if we're generating a diff against someplace else, it might not 
 	    # be.
-	    assert(needsHead and isinstance(version, versions.NewVersion))
+	    assert(srcPkg or isinstance(version, versions.NewVersion))
 	    # new file, so this is easy
 	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
 	    newState.addFile(fileId, path, newVersion)
@@ -294,8 +272,26 @@ def _buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 def commit(repos):
     state = SourceStateFromFile("SRS")
 
+    if isinstance(state.getVersion(), versions.NewVersion):
+	# new package, so it shouldn't exist yet
+	if repos.hasPackage(state.getName()):
+	    log.error("%s is marked as a new package but it " 
+		      "already exists" % state.getName())
+	    return
+	srcPkg = None
+    else:
+	srcPkg = repos.getPackageVersion(state.getName(), state.getVersion())
+	# update the version to one w/ a timestamp
+	srcPkg.changeVersion(repos.pkgGetFullVersion(state.getName(), 
+			     srcPkg.getVersion()))
+
+	if not _verifyAtHead(repos, srcPkg, state):
+	    log.error("contents of working directory are not all "
+		      "from the head of the branch; use update")
+	    return
+
     # we need to commit based on changes to the head of a branch
-    result = _buildChangeSet(repos, state, needsHead = True)
+    result = _buildChangeSet(repos, state, srcPkg)
     if not result: return
 
     (isDifferent, newState, changeSet, oldPackage) = result
@@ -318,11 +314,11 @@ def diff(repos, versionStr = None):
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return
 
-	srcVersion = pkgList[0].getVersion()
+	srcPkg = pkgList[0]
     else:
-	srcVersion = None
+	srcPkg = repos.getLatestPackage(state.getName())
 
-    result = _buildChangeSet(repos, state, srcVersion = srcVersion)
+    result = _buildChangeSet(repos, state, srcPkg)
     if not result: return
 
     (changed, newState, changeSet, oldPackage) = result
