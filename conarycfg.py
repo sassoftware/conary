@@ -168,9 +168,9 @@ class ConfigFile:
 	    elif t == CALLBACK:
 		self.__dict__[item]('display')
 	    elif t == BOOL:
-		out.write("%-25s %s" % (item, bool(self.__dict__[item])))
+		out.write("%-25s %s\n" % (item, bool(self.__dict__[item])))
 	    else:
-		out.write("%-25s (unknown type)" % (item))
+		out.write("%-25s (unknown type)\n" % (item))
 
 
     def __init__(self):
