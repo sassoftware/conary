@@ -25,11 +25,15 @@ import urllib
 from BaseHTTPServer import HTTPServer
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 
-if not os.environ.has_key('CONARY_PATH'):
-    print "CONARY_PATH needs to be set"
-    sys.exit(1)
+thisFile = sys.modules[__name__].__file__
+thisPath = os.path.dirname(thisFile)
+if thisPath:
+    mainPath = thisPath + "/.."
+else:
+    mainPath = ".."
+mainPath = os.path.realpath(mainPath)
 
-sys.path.append(os.environ['CONARY_PATH'])
+sys.path.append(mainPath)
 
 import netserver
 from netserver import NetworkRepositoryServer
@@ -38,10 +42,6 @@ from conarycfg import STRINGDICT
 from lib import options
 
 FILE_PATH="/tmp/conary-server"
-
-#class SRSServer(SimpleXMLRPCServer):
-
-    #allow_reuse_address = 1
 
 class HttpRequests(SimpleHTTPRequestHandler):
     
