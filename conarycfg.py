@@ -11,7 +11,7 @@ class SrsConfiguration:
     def read(self, file):
 	if os.path.exists(file):
 	    f = open(file, "r")
-	    for line in f.readlines():
+	    for line in f:
 		self.configLine(line)
 	    f.close()
 
