@@ -740,6 +740,8 @@ class RelativeSymlinks(policy.Policy):
 	    if contents.startswith('/'):
 		pathlist = util.normpath(path).split('/')
 		contentslist = util.normpath(contents).split('/')
+		if pathlist == contentslist:
+		    raise DestdirPolicyError("Symlink points to itself: %s -> %s" % (path, contents))
 		while pathlist[0] == contentslist[0]:
 		    pathlist = pathlist[1:]
 		    contentslist = contentslist[1:]
