@@ -38,7 +38,7 @@ bin_files = srs srs-bootstrap
 extra_files = srs.recipe.in srs.recipe srs-wrapper.in Makefile
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
-generated_files = srs-bootstrap srs.recipe *.pyo *.pyc 
+generated_files = srs-wrapper srs.recipe *.pyo *.pyc 
 
 .PHONY: clean bootstrap deps.dot pychecker dist install
 
