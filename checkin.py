@@ -130,7 +130,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
     # We have to be careful with labels
     name += ":source"
     try:
-        trvList = repos.findTrove(cfg.installbranch, name, 
+        trvList = repos.findTrove(cfg.installbranch, name, None,
 				  versionStr = versionStr)
     except repository.repository.PackageNotFound, e:
         log.error(str(e))
@@ -248,7 +248,8 @@ def diff(repos, versionStr = None):
     if versionStr:
 	versionStr = state.expandVersionStr(versionStr)
 
-	pkgList = repos.findTrove(None, state.getName(), versionStr)
+	pkgList = repos.findTrove(None, state.getName(), None, None, 
+				  versionStr = versionStr)
 	if len(pkgList) > 1:
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return
@@ -322,7 +323,8 @@ def updateSrc(repos, versionStr = None):
     else:
 	versionStr = state.expandVersionStr(versionStr)
 
-	pkgList = repos.findTrove(None, pkgName, versionStr)
+	pkgList = repos.findTrove(None, pkgName, None, None, 
+				  versionStr = versionStr)
 	if len(pkgList) > 1:
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return

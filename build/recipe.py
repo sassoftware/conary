@@ -408,7 +408,8 @@ class GroupRecipe(Recipe):
 
     def addTrove(self, name, versionStr = None):
 	try:
-	    pkgList = self.repos.findTrove(self.label, name, versionStr)
+	    pkgList = self.repos.findTrove(self.label, name, self.flavor, 
+					   versionStr = versionStr)
 	except repository.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
 
@@ -418,11 +419,12 @@ class GroupRecipe(Recipe):
     def getTroveList(self):
 	return self.troveVersions
 
-    def __init__(self, repos, cfg, branch):
+    def __init__(self, repos, cfg, branch, flavor):
 	self.repos = repos
 	self.cfg = cfg
 	self.troveVersions = {}
 	self.label = branch.label()
+	self.flavor = flavor
 
 class FilesetRecipe(Recipe):
 
@@ -495,7 +497,8 @@ class FilesetRecipe(Recipe):
 	    remap = [ remap ]
 
 	try:
-	    pkgList = self.repos.findTrove(self.label, component, versionStr)
+	    pkgList = self.repos.findTrove(self.label, component, self.flavor,
+					   versionStr = versionStr)
 	except repository.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
 
@@ -518,12 +521,13 @@ class FilesetRecipe(Recipe):
 	for (fileId, (path, version)) in self.files.iteritems():
 	    yield (fileId, path, version)
 	    
-    def __init__(self, repos, cfg, branch):
+    def __init__(self, repos, cfg, branch, flavor):
 	self.repos = repos
 	self.cfg = cfg
 	self.files = {}
 	self.paths = {}
 	self.label = branch.label()
+	self.flavor = flavor
 	
 class RecipeFileError(Exception):
     def __init__(self, msg):

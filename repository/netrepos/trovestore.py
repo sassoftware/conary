@@ -77,10 +77,10 @@ class TroveStore:
 
 	return theId
 
-    def getInstanceId(self, itemId, versionId, archId):
-	theId = self.instances.get((itemId, versionId, archId), None)
+    def getInstanceId(self, itemId, versionId, flavorId):
+	theId = self.instances.get((itemId, versionId, flavorId), None)
 	if theId == None:
-	    theId = self.instances.addId(itemId, versionId, archId)
+	    theId = self.instances.addId(itemId, versionId, flavorId)
 
 	return theId
 

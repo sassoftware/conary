@@ -52,7 +52,8 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s):
     try:
-	troveList = repos.findTrove(cfg.installbranch, troveName, versionStr)
+	troveList = repos.findTrove(cfg.installbranch, troveName, 
+				    cfg.flavor, versionStr)
     except repository.PackageNotFound, e:
 	log.error(str(e))
 	return

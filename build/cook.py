@@ -185,7 +185,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
 
     fullName = recipeClass.name
 
-    recipeObj = recipeClass(repos, cfg, buildBranch)
+    recipeObj = recipeClass(repos, cfg, buildBranch, cfg.flavor)
     recipeObj.setup()
 
     nextVersion = helper.nextVersion(repos, fullName, recipeClass.version, 
@@ -232,7 +232,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={}):
 
     fullName = recipeClass.name
 
-    recipeObj = recipeClass(repos, cfg, buildBranch)
+    recipeObj = recipeClass(repos, cfg, buildBranch, cfg.flavor)
     recipeObj.setup()
 
     changeSet = changeset.ChangeSet()

@@ -39,7 +39,8 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
         # so far no changeset (either the path didn't exist or we could not
         # read it
 	try:
-	    pkgList = repos.findTrove(cfg.installbranch, pkg, versionStr)
+	    pkgList = repos.findTrove(cfg.installbranch, pkg, cfg.flavor,
+				      versionStr)
 	except repository.PackageNotFound, e:
 	    log.error(str(e))
 	    return

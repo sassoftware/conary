@@ -7,6 +7,7 @@
 
 import changeset
 import datastore
+import deps.deps
 import tempfile
 import util
 import versions
@@ -148,7 +149,7 @@ class AbstractTroveDatabase:
 
 	return cs
 
-    def findTrove(repos, defaultLabel, name, versionStr = None):
+    def findTrove(repos, defaultLabel, name, flavor, versionStr = None):
 	"""
 	Looks up a package in the given repository based on the name and
 	version provided. If any errors are occured, PackageNotFound is
@@ -162,6 +163,8 @@ class AbstractTroveDatabase:
 	@type defaultLabel: versions.BranchName
 	@param name: Package name
 	@type name: str
+	@param flavor: only troves compatible with this flavor will be returned
+	@type flavor: deps.DependencySet
 	@param versionStr: Package version
 	@type versionStr: str
 	@rtype: list of package.Package
@@ -330,7 +333,10 @@ class IdealRepository(AbstractTroveDatabase):
 	"""
 	raise NotImplementedError
 
-    def findTrove(self, defaultLabel, name, versionStr = None):
+    def findTrove(self, defaultLabel, name, targetFlavor, versionStr = None):
+	assert(not targetFlavor or 
+	       isinstance(targetFlavor, deps.deps.DependencySet))
+
 	if not defaultLabel:
 	    # if we don't have a default label, we need a fully qualified
 	    # version string; make sure have it
@@ -404,7 +410,9 @@ class IdealRepository(AbstractTroveDatabase):
 	pkgList = []
 	for version in flavorDict[name].iterkeys():
 	    for flavor in flavorDict[name][version]:
-		pkgList.append((name, version, flavor))
+		if not flavor or (targetFlavor and 
+				  targetFlavor.satisfies(flavor)):
+		    pkgList.append((name, version, flavor))
 
 	if not pkgList:
 	    raise PackageNotFound, "package %s does not exist" % name
