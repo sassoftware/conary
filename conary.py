@@ -242,7 +242,7 @@ def realMain():
 
 	if argSet.has_key('use-macro'):
 	    for macro in argSet['use-macro']:
-		cfg.configLine('macros'.macro)
+		cfg.configLine('macros.' + macro)
 	    del argSet['use-macro']
 
 	if argSet.has_key('prep'):
