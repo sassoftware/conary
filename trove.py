@@ -549,14 +549,67 @@ class Trove:
         self.requires = None
 	self.changeLog = changeLog
 
-_STREAM_TCS_NAME        = streams._STREAM_TROVE_CHANGE_SET + 0
-_STREAM_TCS_OLD_VERSION = streams._STREAM_TROVE_CHANGE_SET + 1
-_STREAM_TCS_NEW_VERSION = streams._STREAM_TROVE_CHANGE_SET + 2
-_STREAM_TCS_REQUIRES    = streams._STREAM_TROVE_CHANGE_SET + 3
-_STREAM_TCS_PROVIDES    = streams._STREAM_TROVE_CHANGE_SET + 4
-_STREAM_TCS_CHANGE_LOG  = streams._STREAM_TROVE_CHANGE_SET + 5
-_STREAM_TCS_OLD_FILES   = streams._STREAM_TROVE_CHANGE_SET + 6
-_STREAM_TCS_TYPE        = streams._STREAM_TROVE_CHANGE_SET + 7
+class ReferencedTroveSet(streams.InfoStream, dict):
+
+    def freeze(self):
+	l = []
+	for name, troveList in self.iteritems():
+	    subL = []
+	    for (change, version, flavor) in troveList:
+		version = version.freeze()
+		if flavor:
+		    flavor = flavor.freeze()
+		else:
+		    flavor = "-"
+
+		subL.append(change)
+		subL.append(version)
+		subL.append(flavor)
+
+	    l.append(name)
+	    l += subL
+	    l.append("")
+
+	return "\0".join(l)
+
+    def thaw(self, data):
+	l = data.split("\0")
+	i = 0
+
+	while i < len(l):
+	    name = l[i]
+	    self[name] = []
+
+	    i += 1
+	    while l[i]:
+		change = l[i]
+		version = versions.ThawVersion(l[i + 1])
+		flavor = l[i + 2]
+
+		if flavor == "-":
+		    flavor = None
+		else:
+		    flavor = deps.ThawDependencySet(flavor)
+
+		self[name].append((change, version, flavor))
+		i += 3
+
+	    i += 1
+
+    def __init__(self, data = None):
+	dict.__init__(self)
+	if data is not None:
+	    self.thaw(data)
+
+_STREAM_TCS_NAME	    = streams._STREAM_TROVE_CHANGE_SET + 0
+_STREAM_TCS_OLD_VERSION	    = streams._STREAM_TROVE_CHANGE_SET + 1
+_STREAM_TCS_NEW_VERSION	    = streams._STREAM_TROVE_CHANGE_SET + 2
+_STREAM_TCS_REQUIRES	    = streams._STREAM_TROVE_CHANGE_SET + 3
+_STREAM_TCS_PROVIDES	    = streams._STREAM_TROVE_CHANGE_SET + 4
+_STREAM_TCS_CHANGE_LOG	    = streams._STREAM_TROVE_CHANGE_SET + 5
+_STREAM_TCS_OLD_FILES	    = streams._STREAM_TROVE_CHANGE_SET + 6
+_STREAM_TCS_TYPE	    = streams._STREAM_TROVE_CHANGE_SET + 7
+_STREAM_TCS_TROVE_CHANGES   = streams._STREAM_TROVE_CHANGE_SET + 8
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
@@ -572,6 +625,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         _STREAM_TCS_CHANGE_LOG  : (changelog.AbstractChangeLog, "changeLog" ),
         _STREAM_TCS_OLD_FILES   : (streams.StringsStream,       "oldFiles" ),
         _STREAM_TCS_TYPE        : (streams.IntStream,           "tcsType" ),
+        _STREAM_TCS_TROVE_CHANGES : (ReferencedTroveSet,        "packages" ),
      }
 
     """
@@ -740,7 +794,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	later be parsed by parse(). The representation begins with a
 	header::
 
-         ABS <name> <newversion> ||
+         AwBS <name> <newversion> ||
            CS <name> <oldversion> <newversion> ||
            NEW <name> <newversion>
          [REQUIRES <dep set>]
@@ -782,26 +836,10 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	    else:
 		rc.append(" -\n")
 
-	lines = []
-	for name in self.packages.keys():
-	    list = []
-	    for (kind, version, flavor) in self.packages[name]:
-		if flavor:
-		    list.append(kind + version.freeze() + 
-				    "|" + flavor.freeze())
-		else:
-		    list.append(kind + version.freeze() + 
-				    "|")
-
-	    lines.append("p " + name + " " + " ".join(list))
-
-	if lines:
-	    rc.append("\n".join(lines) + "\n")
-
 	newStyle = ""
 	rc = "".join(rc)
 
-	final = struct.pack("!H", len(rc)) + rc + \
+	final = struct.pack("!I", len(rc)) + rc + \
 		    streams.StreamSet.freeze(self)
 
 	return final
@@ -846,7 +884,7 @@ class TroveChangeSet(AbstractTroveChangeSet):
 	    self.tcsType.set(_TCS_TYPE_ABSOLUTE)
 	else:
 	    self.tcsType.set(_TCS_TYPE_RELATIVE)
-	self.packages = {}
+	self.packages = ReferencedTroveSet()
         self.provides.set(None)
         self.requires.set(None)
 	self.oldFlavor = oldFlavor
@@ -877,32 +915,14 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
 		self.changedFile(fileId, path, version)
 	elif action == "-":
 	    self.oldFile(line[1:])
-	elif action == "p":
-	    fields = line[2:].split()
-	    name = fields[0]
-	    for item in fields[1:]:
-		op = item[0]
-		v,f = item[1:].split("|", 1)
-		v = versions.ThawVersion(v)
-		if f:
-		    f = deps.ThawDependencySet(f)
-		else:
-		    f = None
-
-		assert(op == "+" or op == "-")
-
-		if op == "+":
-		    self.newTroveVersion(name, v, f)
-		else: # op == "-"
-		    self.oldTroveVersion(name, v, f)
 	
 	# this makes our order match the order in the changeset
 	self.changedFiles.sort()
 
     def __init__(self, buf):
-	oldSize = struct.unpack("!H", buf[0:2])[0]
-	newStyle = buf[oldSize + 2:]
-	buf = buf[2:oldSize + 2]
+	oldSize = struct.unpack("!I", buf[0:4])[0]
+	newStyle = buf[oldSize + 4:]
+	buf = buf[4:oldSize + 4]
 
 	AbstractTroveChangeSet.__init__(self, newStyle)
 
@@ -929,7 +949,6 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
 
 	self.newFiles = []
 	self.changedFiles = []
-	self.packages = {}
 	self.oldFlavor = oldFlavor
 	self.newFlavor = newFlavor
         
