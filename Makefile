@@ -41,7 +41,7 @@ python_files = __init__.py	\
 	sha1helper.py		\
 	srcctl.py		\
 	srscfg.py		\
-	update.py		\
+	updatecmd.py		\
 	util.py			\
 	versioned.py		\
 	versions.py		\
