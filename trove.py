@@ -307,45 +307,41 @@ class BuildPackageSet:
 
 develRE = None
 libRE = None
-manRE = None
-infoRE = None
 docRE = None
-develdocRE = None
+localeRE = None
 
 def Auto(name, root):
     runtime = BuildPackage("runtime")
     devel = BuildPackage("devel")
     lib = BuildPackage("lib")
-    man = BuildPackage("man")
-    info = BuildPackage("info")
     doc = BuildPackage("doc")
-    develdoc = BuildPackage("develdoc")
+    locale = BuildPackage("locale")
+
     global develRE
     global libRE
-    global manRE
-    global infoRE
     global docRE
-    global develdocRE
+    global localeRE
+
     if not develRE:
 	develRE=re.compile(
 	    '(.*\.a$)|'
 	    '(.*\.so$)|'
 	    '(.*/include/.*\.h$)|'
 	    '(/usr/include/.*)|'
-	    '(^/usr/share/man/man(2|3))'
+	    '(^/usr/share/man/man(2|3))|'
+	    '(^/usr/share/develdoc/)'
 	)
     if not libRE:
-	libRE= re.compile('.*/lib/.*\.so\.')
-    if not manRE:
-	manRE= re.compile('^/usr/share/man/')
-    if not infoRE:
-	infoRE= re.compile('^/usr/share/info/')
+	libRE=re.compile('.*/lib/.*\.so\.')
     if not docRE:
-	docRE= re.compile('^/usr/share/doc/')
-    if not develdocRE:
-	develdocRE= re.compile('^/usr/share/develdoc/')
+	docRE=re.compile('(^/usr/share/doc/)|'
+	                  '(^/usr/share/man/)|'
+	                  '(^/usr/share/info/)|')
+    if not localeRE:
+	localeRE=re.compile('^/usr/share/locale/')
+
     os.path.walk(root, autoVisit,
-                 (root, runtime, devel, lib, man, info, doc, develdoc))
+                 (root, runtime, devel, lib, doc, locale))
 
     set = BuildPackageSet(name)
     set.addPackage(runtime)
@@ -353,26 +349,18 @@ def Auto(name, root):
 	set.addPackage(devel)
     if lib.keys():
 	set.addPackage(lib)
-    if man.keys():
-	set.addPackage(man)
-    if info.keys():
-	set.addPackage(info)
     if doc.keys():
 	set.addPackage(doc)
-    if develdoc.keys():
-	set.addPackage(develdoc)
     
     return set
 
 def autoVisit(arg, dir, files):
-    (root, runtimePkg, develPkg, libPkg, manPkg, infoPkg, docPkg, develdocPkg) = arg
+    (root, runtimePkg, develPkg, libPkg, docPkg, localePkg) = arg
     dir = dir[len(root):]
     global develRE
     global libRE
-    global manRE
-    global infoRE
     global docRE
-    global develdocRE
+    global localeRE
 
     for file in files:
         if dir:
@@ -381,15 +369,11 @@ def autoVisit(arg, dir, files):
             path = '/' + file
         if develRE.match(path):
             develPkg.addFile(path)
-        elif libRE.match(path):    # XXX controversial?
+        elif libRE.match(path):
             libPkg.addFile(path)
-        elif manRE.match(path):
-            manPkg.addFile(path)
-        elif infoRE.match(path):
-            infoPkg.addFile(path)
         elif docRE.match(path):
             docPkg.addFile(path)
-        elif develdocRE.match(path):
-            develdocPkg.addFile(path)
+        elif localeRE.match(path):
+            localePkg.addFile(path)
         else:
             runtimePkg.addFile(path)
