@@ -28,6 +28,9 @@ Changes in 0.50.4:
   * Arch files can now contain arbitrary macro definitions, and in the future
     will contain values for macros like %(lib)s, which is lib64 
     on some platforms.
+  * when using --keep-existing, the install label path and install flavor
+    are used to determine which version to install instead of using affinity 
+    to install something close to what you already have.   
 
 Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 

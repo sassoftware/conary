@@ -322,22 +322,30 @@ class ConaryClient:
             if isinstance(versionStr, versions.Version):
                 assert(isinstance(flavor, deps.DependencySet))
                 newItems.append((troveName, versionStr, flavor))
-            elif versionStr and versionStr[0] == '/':
-                # fully qualified versions don't need repository affinity
-                # or the label search path
+            elif (versionStr and versionStr[0] == '/'):
+                # fully qualified versions don't need branch affinity
+                # but they do use flavor affinity
                 try:
                     l = self.repos.findTrove(None, 
                                               (troveName, versionStr, flavor), 
                                               self.cfg.flavor, 
-                                              affinityDatabase = self.db)
+                                              affinityDatabase=self.db)
                 except repository.TroveNotFound, e:
                     raise NoNewTrovesError
                 newItems += l
             else:
+                if keepExisting:
+                    # when using keepExisting, branch affinity doesn't make 
+                    # sense - we are installing a new, generally unrelated 
+                    # version of this trove
+                    affinityDb = None
+                else:
+                    affinityDb = self.db
+
                 l = self.repos.findTrove(self.cfg.installLabelPath, 
                                           (troveName, versionStr, flavor),
                                           self.cfg.flavor, 
-                                          affinityDatabase = self.db)
+                                          affinityDatabase = affinityDb)
                 newItems += l
                 # XXX where does this go now?                    
                 # updating locally cooked troves needs a label override
