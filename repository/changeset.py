@@ -375,7 +375,6 @@ class ChangeSetFromFile(ChangeSet):
 
 		newVersion = versions.ThawVersion(l[rest])
 		lineCount = int(l[rest + 1])
-		groupLineCount = int(l[rest + 2])
 
 		pkg = package.PackageChangeSet(pkgName, oldVersion, newVersion,
 				       abstract = (pkgType == "ABSTRACT"))
@@ -384,11 +383,6 @@ class ChangeSetFromFile(ChangeSet):
 		while i < end:
 		    pkg.parse(lines[i][:-1])
 		    i = i + 1
-
-		# cut off trailing newlines
-		groupLines = [ x[:-1] for x in lines[end:end + groupLineCount] ]
-		pkg.setGroupFileDiff(groupLines)
-		i = end + groupLineCount
 
 		self.newPackage(pkg)
 	    elif header.startswith("SRS FILE CHANGESET "):

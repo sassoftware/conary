@@ -15,30 +15,6 @@ reference. By convention, "package" often refers to a package with
 files but no other packages, while a "group" means a package with other
 packages but no files. While this object allows any mix of file and
 package inclusion, in practice srs doesn't allow it.
-
-Groups are most often created automatically as part of cook to group
-the packages from a recipe together. Groups can also be specified by
-a file which contains package names, white space, and a version. If
-the package name isn't fully qualified, it's assumed to be part of the
-same repository the group file is from. The version can be either fully
-qualified or a branch nickname, in which case if refers to the head of
-the branch at the time the group file is added to a repository.
-
-Group files are parsed into group objects, which resolve the package and
-name as specified above; the original group file is preserved for future
-modification. This also allows a group file to be checked out and back
-in again, and have it updated with new head versions of it's components.
-Some groups (notably ones derived from recipes) exist only in their
-parsed forms; these groups cannot be checked in or out.
-
-Group files can contain comment lines (which begin with #), and the first
-two lines should read::
-
-    name NAME
-    version VERSION
-
-Where the name is a simple package name (not fully qualified) and the
-version is just a version.
 """
 
 # this is the repository's idea of a package
@@ -56,12 +32,6 @@ class Package:
     def changeVersion(self, version):
         self.version = version
 
-    def getGroupFile(self):
-	return self.groupFile
-    
-    def setGroupFile(self, contents):
-	self.groupFile = contents
-    
     def addFile(self, fileId, path, version):
 	self.idMap[fileId] = (path, version)
 
@@ -171,9 +141,6 @@ class Package:
 		   " ".join([v.asString() for v in self.packages[pkg]]) + \
 		   "\n"
 
-	if self.groupFile:
-	    rc += "\n".join(self.groupFile) + "\n"
-
 	return rc
 
     # returns a dictionary mapping a fileId to a (path, version, pkgName) tuple
@@ -189,21 +156,6 @@ class Package:
 	"""
 
 	fileMap = {}
-
-	diff = pkgCS.getGroupFileDiff()
-	if diff:
-	    if not self.groupFile:
-		oldLines = ""
-	    else:
-		oldLines = self.groupFile
-
-	    (newLines, failedHunks) = patch.patch(oldLines, diff)
-
-	    if failedHunks:
-		# this really should never happen.
-		raise PatchError
-
-	    self.setGroupFile(newLines)
 
 	for (fileId, path, fileVersion) in pkgCS.getNewFileList():
 	    self.addFile(fileId, path, fileVersion)
@@ -256,10 +208,6 @@ class Package:
 	@type abstract: boolean
 	@rtype: (ChangeSetGroup, packageChangeList, fileChangeList)
 	"""
-
-	# logical xor would be nice here, but it's not part of python :-(
-	assert(not them or (not self.groupFile and not them.groupFile) or
-	       (self.groupFile and them.groupFile))
 
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
@@ -361,27 +309,6 @@ class Package:
 		else:
 		    removed[name] = [ version ]
 
-	# create the diff of the groupFile if both versions have them. note
-	# the assert above makes this test correct
-	if self.groupFile:
-	    if them:
-		oldLines = them.groupFile
-	    else:
-		oldLines = ""
-	    newLines = self.groupFile
-	    diff = difflib.unified_diff(oldLines, newLines, "old", "new",
-					lineterm = "")
-
-	    # using try/except seems dumb, but I don't know any other
-	    # way
-	    try:
-		diff.next()
-		diff.next()
-	    except StopIteration:
-		pass
-
-	    chgSet.setGroupFileDiff(diff)
-
 	pkgList = []
 
 	if abstract:
@@ -442,7 +369,6 @@ class Package:
 	self.name = name
 	self.version = version
 	self.packages = {}
-	self.groupFile = None
 
 class PackageChangeSet:
 
@@ -517,12 +443,6 @@ class PackageChangeSet:
 	if not self.packages.has_key(name):
 	    self.packages[name] = []
 	self.packages[name].append(('-', version))
-
-    def setGroupFileDiff(self, diff):
-	self.groupFileDiff = diff
-
-    def getGroupFileDiff(self):
-	return self.groupFileDiff
 
     def parse(self, line):
 	action = line[0]
@@ -663,26 +583,16 @@ class PackageChangeSet:
 
 	mainLineCount = rc.count("\n")
 
-	if self.groupFileDiff:
-	    groupLineCount = 0
-	    for diff in self.groupFileDiff:
-		groupLineCount += 1
-		rc += diff + "\n"
-	else:
-	    groupLineCount = 0
-
 	if self.abstract:
-	    hdr = "SRS PKG ABSTRACT %s %s %d %d\n" % \
-		      (self.name, self.newVersion.freeze(), mainLineCount,
-		       groupLineCount)
+	    hdr = "SRS PKG ABSTRACT %s %s %d\n" % \
+		      (self.name, self.newVersion.freeze(), mainLineCount)
 	elif not self.oldVersion:
-	    hdr = "SRS PKG NEW %s %s %d %d\n" % \
-		      (self.name, self.newVersion.freeze(), mainLineCount,
-		       groupLineCount)
+	    hdr = "SRS PKG NEW %s %s %d\n" % \
+		      (self.name, self.newVersion.freeze(), mainLineCount)
 	else:
-	    hdr = "SRS PKG CHANGESET %s %s %s %d %d\n" % \
+	    hdr = "SRS PKG CHANGESET %s %s %s %d\n" % \
 		      (self.name, self.oldVersion.freeze(), 
-		       self.newVersion.freeze(), mainLineCount, groupLineCount)
+		       self.newVersion.freeze(), mainLineCount)
 
 	return hdr + rc
 
@@ -695,7 +605,6 @@ class PackageChangeSet:
 	self.changedFiles = []
 	self.abstract = abstract
 	self.packages = {}
-	self.groupFileDiff = None
 
 class PackageFromFile(Package):
 
@@ -722,10 +631,6 @@ class PackageFromFile(Package):
 	    for versionStr in items[1:]:
 		version = versions.VersionFromString(versionStr)
 		self.addPackageVersion(name, version)
-
-	# this strips the newlines off the end
-	groupFileList = [ x[:-1] for x in lines[pkgEnd:] ]
-	self.setGroupFile(groupFileList)
 
     def __init__(self, name, dataFile, version):
 	"""
