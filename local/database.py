@@ -160,11 +160,11 @@ class Database(repository.LocalRepository):
 
 	localChanges = self.createChangeSet(list)
 
-	if makeRollback:
-	    # rollbacks have two pieces, B->A and A->A.local; applying
-	    # both of them gets us back where we started
-	    inverse = cs.invert(self, availableFiles = 1)
-	    self.addRollback(inverse, localChanges)
+	#if makeRollback:
+	#    # rollbacks have two pieces, B->A and A->A.local; applying
+	#    # both of them gets us back where we started
+	#    inverse = cs.invert(self, availableFiles = 1)
+	#    self.addRollback(inverse, localChanges)
 
 	# Build and commit A->B
 	job = repository.ChangeSetJob(self, cs)
