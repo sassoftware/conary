@@ -21,7 +21,7 @@ class Package:
     def getVersion(self):
         return self.version
     
-    def setVersion(self, version):
+    def changeVersion(self, version):
         self.version = version
     
     def getFileMap(self):
@@ -143,10 +143,11 @@ class Package:
 
 	return (chgSet, filesNeeded)
 
-    def __init__(self, name):
+    def __init__(self, name, version):
 	self.files = {}
 	self.idMap = {}
 	self.name = name
+	self.version = version
 
 class PackageChangeSet:
 
@@ -263,8 +264,8 @@ class PackageFromFile(Package):
 	    version = versions.VersionFromString(version)
 	    self.addFile(fileId, path, version)
 
-    def __init__(self, name, dataFile):
-	Package.__init__(self, name)
+    def __init__(self, name, dataFile, version):
+	Package.__init__(self, name, version)
 	self.read(dataFile)
 
 def stripNamespace(namespace, pkgName):
@@ -276,7 +277,7 @@ def stripNamespace(namespace, pkgName):
 class PackageSet:
     def getVersion(self, version):
 	f1 = self.f.getVersion(version)
-	p = PackageFromFile(self.name, f1)
+	p = PackageFromFile(self.name, f1, version)
 	f1.close()
 	return p
 

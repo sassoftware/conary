@@ -22,7 +22,7 @@ import buildpackage
 def createPackage(repos, cfg, destdir, fileList, name, version, ident, 
 		  pkgtype = "auto"):
     fileMap = {}
-    p = package.Package(name)
+    p = package.Package(name, version)
 
     for filePath in fileList:
 	if pkgtype == "auto":
@@ -47,7 +47,6 @@ def createPackage(repos, cfg, destdir, fileList, name, version, ident,
         fileMap[file.id()] = (file, realPath, targetPath)
 
     p.setFileMap(fileMap)
-    p.setVersion(version)
     return p
 
 def cook(repos, cfg, recipeFile, prep=0, macros=()):

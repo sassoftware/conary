@@ -21,26 +21,27 @@ class Repository:
 	fileMap = {}
 
 	# build todo set
-	for pkg in cs.getPackageList():
-	    newVersion = pkg.getNewVersion()
-	    old = pkg.getOldVersion()
+	for csPkg in cs.getPackageList():
+	    newVersion = csPkg.getNewVersion()
+	    old = csPkg.getOldVersion()
 	
-	    if self.hasPackage(pkg.getName()):
-		pkgSet = self.getPackageSet(pkg.getName(), "r")
+	    if self.hasPackage(csPkg.getName()):
+		pkgSet = self.getPackageSet(csPkg.getName(), "r")
 
 		if pkgSet.hasVersion(newVersion):
 		    raise KeyError, "version %s for %s exists" % \
-			    (newVersion.asString(), pkg.getName())
+			    (newVersion.asString(), csPkg.getName())
 	    else:
 		pkgSet = None
 
 	    if old:
 		newPkg = copy.deepcopy(pkgSet.getVersion(old))
+		newPkg.changeVersion(newVersion)
 	    else:
-		newPkg = package.Package(pkg.name)
+		newPkg = package.Package(csPkg.name, newVersion)
 
-	    newFileMap = newPkg.applyChangeSet(self, pkg)
-	    pkgList.append((pkg.getName(), newPkg, newVersion))
+	    newFileMap = newPkg.applyChangeSet(self, csPkg)
+	    pkgList.append((csPkg.getName(), newPkg, newVersion))
 	    fileMap.update(newFileMap)
 
 	# create the file objects we'll need for the commit
