@@ -568,10 +568,16 @@ class TroveChangeSet:
 	    #f.write("\tadded (%s(.*)%s)\n" % (fileId[:6], fileId[-6:]))
             change = changeSet.getFileChange(fileId)
             fileobj = files.ThawFile(change, fileId)
-            print "\t%s    1 %-8s %-8s %s %s %s" % \
+            
+	    if isinstance(fileobj, files.SymbolicLink):
+		name = "%s -> %s" % (path, fileobj.target.value())
+	    else:
+		name = path
+	    
+	    print "\t%s    1 %-8s %-8s %s %s %s" % \
                   (fileobj.modeString(), fileobj.inode.owner(),
                    fileobj.inode.group(), fileobj.sizeString(),
-                   fileobj.timeString(), path)
+                   fileobj.timeString(), name)
 
 	for (fileId, path, version) in self.changedFiles:
 	    if path:
