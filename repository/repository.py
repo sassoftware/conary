@@ -90,9 +90,6 @@ class Repository:
 	(pkgList, fileList, fileMap, oldFileList, oldPackageList) = \
 	    self._buildChangeSetJob(cs)
 
-	print len(fileList)
-	print fileList
-
 	# we can't erase the oldVersion for abstract change sets
 	assert(not(cs.isAbstract() and eraseOld))
 	
