@@ -21,6 +21,7 @@ import posixpath
 import select
 import sys
 import tempfile
+import traceback
 import xmlrpclib
 import urllib
 import zlib
@@ -45,7 +46,10 @@ from conarycfg import STRINGDICT
 from lib import options
 from lib import util
 from http import HttpHandler
-from htmlengine import HtmlEngine
+
+import kid
+kid.enable_import()
+from templates import error as kid_error
 
 DEFAULT_FILE_PATH="/tmp/conary-server"
 
@@ -214,9 +218,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
         return None
       
     def traceback(self):
-        htmlengine = HtmlEngine()
-        htmlengine.setWriter(self.wfile)
-        htmlengine.stackTrace(self.wfile)
+        kid_error.write(self.wfile, pageTitle = "Error",
+                        error = traceback.format_exc())
         
     def handleXml(self, authToken):
 	contentLength = int(self.headers['Content-Length'])

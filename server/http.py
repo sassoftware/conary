@@ -51,6 +51,7 @@ class HttpHandler:
                                (True, True, False)),
              "updateMetadata": (self.updateMetadataCmd, "Metadata Updated", 
                                (True, True, False)),
+             
              # user administration commands
              "userlist":       (self.userlistCmd, "User Administration",    
                                (True, True, True)),
@@ -62,6 +63,7 @@ class HttpHandler:
                                (True, True, True)),
              "addUser":        (self.addUserCmd, "Add User",                
                                (True, True, True)),
+             
              # change password commands
              "chPassForm":     (self.chPassFormCmd, "Change Password",
                                (True, False, False)),

@@ -77,7 +77,10 @@ from templates import library
                 </tr>
             </tbody>
         </table>
-        <p><a href="addPermForm">Add Permission</a></p>
+        <p>
+            <a href="addPermForm">Add Permission</a><br />
+            <a href="addGroupForm">Add Group</a>
+        </p>
 
         {library.html_footer()}
     </body>

@@ -9,7 +9,7 @@ from templates import library
     <body>
         <h2>{pageTitle}</h2>
         
-        <p class="warning">{error}</p>
+        <pre class="error">{error}</pre>
         <p>Please go back and try again.</p>
 
         {library.html_footer()}

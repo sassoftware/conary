@@ -16,13 +16,17 @@ from mod_python import apache
 from mod_python import util
 import base64
 import os
+import traceback
 import xmlrpclib
 import zlib
 
 from repository.netrepos import netserver
 from http import HttpHandler
-from htmlengine import HtmlEngine
 import conarycfg
+
+import kid
+kid.enable_import()
+from templates import error as kid_error
 
 BUFFER=1024 * 256
 
@@ -194,9 +198,8 @@ def putFile(repos, req):
     return apache.OK
 
 def traceback(wfile):
-    htmlengine = HtmlEngine()
-    htmlengine.setWriter(wfile.write)
-    htmlengine.stackTrace(wfile)
+    kid_error.write(wfile, pageTitle = "Error",
+                           error = traceback.format_exc())
 
 def handler(req):
     repName = req.filename

@@ -4,10 +4,6 @@ div.formHeader {
     width: 16%;
 }
 
-div.warning {
-    color: red;
-}
-
 div.tbHeader {
     font-size: 150%;
     color: white;
@@ -94,5 +90,9 @@ table.add-perm td#header {
 
 .even {
     background: #eeeeee;
+}
+
+pre.error {
+    color: red;
 }
 
