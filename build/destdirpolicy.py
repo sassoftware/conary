@@ -1033,8 +1033,12 @@ class RelativeSymlinks(policy.Policy):
 		dots = "../"
 		dots *= len(pathlist) - 1
 		normpath = util.normpath(dots + '/'.join(contentslist))
-		log.debug('Changing absolute symlink %s -> %s to relative symlink -> %s',
-                          path, contents, normpath)
+                # we do not want to give people the idea that they should
+                # prefer writing relative symlinks, since we want them to
+                # create absolute symlinks and let us make minimal relative
+                # symlink from them, so let's not make noise about this.
+                #log.debug('Changing absolute symlink %s -> %s to relative symlink -> %s',
+                #          path, contents, normpath)
 		os.symlink(normpath, fullpath)
 
 
