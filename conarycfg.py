@@ -45,7 +45,7 @@ class ConaryConfiguration:
 	(key, val) = line.split(None, 1)
         key = key.lower()
 	if not self.lowerCaseMap.has_key(key):
-	    raise ParseError, ("%s:%s: configuration value '%s' unknown" % (self.file, self.lineno, key))
+	    raise ParseError, ("%s:%s: configuration value '%s' unknown" % (file, self.lineno, key))
 	else:
 	    key = self.lowerCaseMap[key]
 	
