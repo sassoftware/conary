@@ -34,7 +34,6 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 
 	list = []
 	bail = 0
-	mainPackageName = None
 	for pkgName in repos.getPackageList(pkg):
 	    if not newVersion:
 		newVersion = repos.pkgLatestVersion(pkgName, cfg.defaultbranch)
