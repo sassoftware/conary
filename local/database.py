@@ -563,6 +563,7 @@ class Database(SqlDbRepository):
 
                 repositories = [(x.getHost(), x.getNamespace()) \
                                                         for x in labelPath ]
+                labelPath = []
                 for serverName, namespace in repositories:
                     labelPath.append(
                         versions.Label("%s@%s%s" % (serverName, namespace, 
