@@ -441,6 +441,7 @@ class Desktopfile(BuildCommand, _FileAction):
 	    macros['category'] = '--add-category "%s"' %self.category
         else:
             macros['category'] = ''
+	self.do(macros)
 	for file in self.arglist:
 	    self.setComponents('%(datadir)s/applications'+file)
 
