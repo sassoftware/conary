@@ -174,8 +174,6 @@ class Flag(dict):
         """ -Flag -- negates all flags in a flag set.  Converts to a
             flag set if necessary """
         if self._name != '__GLOBAL__':
-            #import lib
-            #lib.epdb.st()
             new = self.asSet()
         else:
             new = self.deepCopy()
@@ -301,7 +299,13 @@ class Flag(dict):
             dep = deps.Dependency('use', stringDeps)
             set.addDep(deps.UseDependency, dep)
         if 'Arch' in self:
+            excludeFlags = ['bits64', 'bits32', 'BE', 'LE' ] 
             for arch, topflag in self['Arch'].iteritems():
+                # don't include Arch values we don't want
+                if not topflag:
+                    continue
+                if arch in excludeFlags:
+                    continue
                 stringDeps = []
                 for subarch, flag in topflag.iteritems():
                     stringDeps.extend(flag.toDepStrings(topflag=topflag))
