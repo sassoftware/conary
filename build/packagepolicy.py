@@ -367,8 +367,8 @@ class Transient(policy.Policy):
 class SharedLibrary(policy.Policy):
     """
     Mark system shared libaries as such so that ldconfig will be run:
-    C{r.SharedLibrary(subtree=I{path})} to mark a path;
-    C{r.SharedLibrary(I{filterexp})} to mark a file.
+    C{r.SharedLibrary(subtrees=I{path})} to mark a path as containing
+    shared libraries; C{r.SharedLibrary(I{filterexp})} to mark a file.
 
     C{r.SharedLibrary} does B{not} walk entire directory trees.  Every
     directory that you want to add must be passed in using the
@@ -380,11 +380,16 @@ class SharedLibrary(policy.Policy):
     ]
     recursive = False
 
+    # needs to share with ExecutableLibraries
+    def updateArgs(self, *args, **keywords):
+	policy.updateArgs(self, *args, **keywords)
+	self.recipe.ExecutableLibraries(*args, **keywords)
+
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    m = self.recipe.magic[file]
-	    if m.name == 'ELF' and 'soname' in m.contents:
+	    if m and m.name == 'ELF' and 'soname' in m.contents:
 		log.debug('shared library: %s', file)
 		self.recipe.autopkg.pathMap[file].tags.set("shlib")
 

@@ -422,12 +422,21 @@ class ExecutableLibraries(policy.Policy):
     The C{ldconfig} program will complain if libraries do not have have
     executable bits set; this policy changes the mode and warns that
     it has done so.
+
+    Do not invoke C{r.ExecutableLibraries()} from recipes; invoke
+    C{r.SharedLibrary(subtrees='/path/to/libraries/')} instead.
     """
     invariantsubtrees = librarydirs
     invariantinclusions = [
 	(r'..*\.so\..*', None, stat.S_IFDIR),
     ]
     recursive = False
+
+    # packagepolicy.SharedLibrary will pass in all its arguments,
+    # which apply equally to both policies.  They would be one
+    # policy if we didn't require this to be in destdirpolicy
+    # to touch up permissions, and SharedLibrary to be in
+    # packagepolicy to add the "shlib" tag.
 
     def doFile(self, path):
 	fullpath = util.joinPaths(self.macros['destdir'], path)
