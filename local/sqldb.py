@@ -401,7 +401,7 @@ class Database:
             raise OldDatabaseSchema, \
                     "The Conary database on this system "           \
                     "is too old. For information on how to\n"       \
-                    "conver this database, please visit "           \
+                    "convert this database, please visit "           \
                     "http://wiki.specifix.com/ConaryConversion."
 
 	self.troveTroves = trovetroves.TroveTroves(self.db)
