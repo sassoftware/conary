@@ -237,13 +237,8 @@ class popen:
     # unfortunately, can't derive from os.popen.  Add methods as necessary.
     def __init__(self, *args):
 	self.p = os.popen(*args)
-	self.name = self.p.name
-        
-    def write(self, *args):
-	return self.p.write(*args)
-
-    def read(self, *args):
-	return self.p.read(*args)
+        self.write = self.p.write
+        self.read = self.p.read
 
     def close(self, *args):
 	rc = self.p.close(*args)
