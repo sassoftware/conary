@@ -203,6 +203,9 @@ class NormalizeManPages(policy.Policy):
 	for name in names:
 	    path = dirname + os.sep + name
 	    mode = os.lstat(path)[stat.ST_MODE]
+            # avoid things like symlinks
+            if not stat.S_ISREG(mode):
+                continue
 	    if mode & 0777 != 0644:
 		os.chmod(path, 0644)
 	    if not os.path.isdir(path) and not os.path.islink(path):
