@@ -22,7 +22,7 @@ import repository
 import repository.netclient
 from repository.repository import AbstractRepository
 from repository.repository import ChangeSetJob
-from repository.repository import DataStoreRepository
+from datastore import DataStoreRepository
 from repository.repository import DuplicateBranch
 from repository.repository import RepositoryError
 from repository.repository import TroveMissing

@@ -12,7 +12,10 @@
 # full details.
 #
 
+import database
 from repository import repository
+from StringIO import StringIO
+import zlib
 
 class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
@@ -125,3 +128,79 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	for (pathId, fileVersion, fileObj) in self.oldFileList():
 	    if fileObj.hasContents and fileObj.flags.isConfig():
 		self.repos._removeFileContents(fileObj.contents.sha1())
+
+class SqlDataStore:
+
+    """
+    Implements a DataStore interface on a sql database. File contents are
+    stored directly in the sql database.
+    """
+
+    def hasFile(self, hash):
+        cu = self.db.cursor()
+        cu.execute("SELECT COUNT(*) FROM DataStore WHERE hash=?", hash)
+        return (cu.next()[0] != 0)
+
+    def decrementCount(self, hash):
+	"""
+	Decrements the count by one; it it becomes 1, the count file
+	is removed. If it becomes zero, the contents are removed.
+	"""
+        cu = self.db.cursor()
+        cu.execute("SELECT count FROM DataStore WHERE hash=?", hash)
+        count = cu.next()[0]
+        if count == 1:
+            cu.execute("DELETE FROM DataStore WHERE hash=?", hash)
+        else:
+            count -= 1
+            cu.execute("UPDATE DataStore SET count=? WHERE hash=?", 
+                       count, hash)
+
+    def incrementCount(self, hash, fileObj = None):
+	"""
+	Increments the count by one.  If it becomes one (the file is
+        new), the contents of fileObj are stored into that path.
+	"""
+        cu = self.db.cursor()
+        cu.execute("SELECT COUNT(*) FROM DataStore WHERE hash=?", hash)
+        exists = cu.next()[0]
+
+        if exists:
+            cu.execute("UPDATE DataStore SET count=count+1 WHERE hash=?",
+                       hash)
+        else:
+            data = zlib.compress(fileObj.read())
+            cu.execute("INSERT INTO DataStore VALUES(?, 1, ?)",
+                       hash, data)
+
+    # add one to the reference count for a file which already exists
+    # in the archive
+    def addFileReference(self, hash):
+	self.incrementCount(hash)
+
+    # file should be a python file object seek'd to the beginning
+    # this messes up the file pointer
+    def addFile(self, f, hash):
+	self.incrementCount(hash, fileObj = f)
+
+    # returns a python file object for the file requested
+    def openFile(self, hash, mode = "r"):
+        cu = self.db.cursor()
+        cu.execute("SELECT data FROM DataStore WHERE hash=?", hash)
+        data = cu.next()[0]
+        data = zlib.decompress(data)
+        return StringIO(data)
+
+    def removeFile(self, hash):
+	self.decrementCount(hash)
+
+    def __init__(self, db):
+        cu = db.cursor()
+        self.db = db
+        cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
+                   "name = 'DataStore'")
+        if cu.next()[0] == 0:
+            cu.execute("""CREATE TABLE DataStore(hash BIN,
+                                                 count INT,
+                                                 data BIN)""")
+            cu.execute("CREATE INDEX DataStoreIdx ON DataStore(data)")

@@ -335,61 +335,6 @@ class AbstractRepository(IdealRepository):
     def __init__(self):
 	assert(self.__class__ != AbstractRepository)
 
-class DataStoreRepository:
-
-    """
-    Mix-in class which lets a TroveDatabase use a Datastore object for
-    storing and retrieving files. These functions aren't provided by
-    network repositories.
-    """
-
-    def _storeFileFromContents(self, contents, sha1, restoreContents):
-	if restoreContents:
-	    self.contentsStore.addFile(contents.get(), 
-				       sha1helper.sha1ToString(sha1))
-	else:
-	    # the file doesn't have any contents, so it must exist
-	    # in the data store already; we still need to increment
-	    # the reference count for it
-	    self.contentsStore.addFileReference(sha1helper.sha1ToString(sha1))
-
-	return 1
-
-    def _removeFileContents(self, sha1):
-	self.contentsStore.removeFile(sha1helper.sha1ToString(sha1))
-
-    def _getFileObject(self, sha1):
-	return self.contentsStore.openFile(sha1helper.sha1ToString(sha1))
-
-    def _hasFileContents(self, sha1):
-	return self.contentsStore.hasFile(sha1helper.sha1ToString(sha1))
-
-    def getFileContents(self, fileList):
-        contentList = []
-
-        for item in fileList:
-            (fileId, fileVersion) = item[0:2]
-            if len(item) == 3:
-                fileObj = item[2]
-            else:
-                fileObj = self.findFileVersion(fileId)
-            
-            if fileObj:
-                cont = filecontents.FromDataStore(self.contentsStore,
-                                                  fileObj.contents.sha1(),
-                                                  fileObj.contents.size())
-            else:
-                cont = ""
-
-            contentList.append(cont)
-
-        return contentList
-
-    def __init__(self, path, logFile = None):
-	fullPath = path + "/contents"
-	util.mkdirChain(fullPath)
-	self.contentsStore = datastore.DataStore(fullPath, logFile = logFile)
-
 class ChangeSetJob:
     """
     ChangeSetJob provides a to-do list for applying a change set; file

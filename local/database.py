@@ -12,6 +12,7 @@
 # full details.
 #
 
+import datastore
 from repository import changeset
 import errno
 from repository import filecontents
@@ -27,7 +28,7 @@ import versions
 from build import tags
 from deps import deps
 
-class SqlDbRepository(repository.DataStoreRepository,
+class SqlDbRepository(datastore.DataStoreRepository,
 		      repository.AbstractRepository):
 
     def iterAllTroveNames(self):
@@ -160,7 +161,7 @@ class SqlDbRepository(repository.DataStoreRepository,
             self.dbpath = path
         else:
             self.dbpath = path + "/conarydb"
-            repository.DataStoreRepository.__init__(self, path)
+            datastore.DataStoreRepository.__init__(self, path)
             repository.AbstractRepository.__init__(self)
 	self.db = sqldb.Database(self.dbpath)
 
