@@ -23,6 +23,7 @@ class Macros(dict):
 	self.__tracked = {}
 	self.__track = False
 	self.__overrides = {}
+        self.__callbacks = {}
 	if shadow:
 	    self.__macros = macros
 	else:
@@ -35,6 +36,13 @@ class Macros(dict):
     def update(self, other):
         for key, item in other.iteritems():
             self[key] = item
+
+    def setCallback(self, name, callback):
+        """ Add a callback to a particular macros.  When that macro is 
+            accessed, the callback function will be called with that macro's
+            name as an argument 
+        """
+        self.__callbacks[name] = callback
     
     def __setitem__(self, name, value):
 	if name.startswith('_Macros'):
@@ -72,6 +80,8 @@ class Macros(dict):
         if len(parts) > 1:
             repmethod = parts[1]
             name = parts[0]
+        if name in self.__callbacks:
+            self.__callbacks[name](name)
 	if name in self.__overrides:
 	    return self.__repmethod(self.__overrides[name], repmethod)
 	if not name in self:
