@@ -58,7 +58,7 @@ def usage(rc = 1):
     print "commit flags:  --target-branch <branch>"
     print ""
     print 'common flags:  --config "<item> <value>"'
-    print "               --repPath <repository-path>"
+    print "               --reppath <repository-path>"
     print "               --root <root>"
     print ""
     print "pkglist flags: --sha1s"
@@ -98,7 +98,7 @@ def realMain():
     # 1 - arg may occur once, w/ parameter
     # 2 - arg may occur N times, w/ parameter
 
-    cfgMap["repPath"] = "repPath"
+    cfgMap["reppath"] = "repPath"
     cfgMap["root"] = "root"
 
     argDef["all"] = 0
