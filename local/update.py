@@ -29,6 +29,7 @@ import versions
 
 MERGE = 1 << 0
 REPLACEFILES = 1 << 1
+IGNOREUGIDS = 1 << 2
         
 class FilesystemJob:
     """
@@ -171,6 +172,8 @@ class FilesystemJob:
 	fullyUpdated = 1
 	cwd = os.getcwd()
 
+	noIds = ((flags & IGNOREUGIDS) != 0)
+
 	if fsPkg:
 	    fsPkg = fsPkg.copy()
 	else:
@@ -235,9 +238,7 @@ class FilesystemJob:
 
 	    oldFile = repos.getFileVersion(fileId, version)
 
-	    # XXX X this needs to ignore the owner for source packages, but
-	    # not for binary packages!
-	    if oldFile == localFile:
+	    if oldFile.parialEquality(localFile, ignoreOwnerGroup = noIds):
 		self.errors.append("%s has changed but has been removed "
 				   "on head" % path)
 		continue
@@ -313,9 +314,8 @@ class FilesystemJob:
 
 	    attributesChanged = False
 
-	    # XXX X this needs to ignore the owner for source packages, but
-	    # not for binary packages!
-	    if basePkg and headFileVersion and not fsFile == headFile:
+	    if basePkg and headFileVersion and \
+	         not fsFile.partialEquality(headFile, ignoreOwnerGroup = noIds):
 		# something has changed for the file
 		if flags & MERGE:
 		    # XXX X for all we know, headChanges is empty!
@@ -360,8 +360,6 @@ class FilesystemJob:
 		else:
 		    headFileContType = None
 
-		# XXX X this needs to ignore the owner for source packages, but
-		# not for binary packages!
 		if (flags & REPLACEFILES) or (not flags & MERGE) or \
 				fsFile.contents == baseFile.contents:
 		    # the contents changed in just the repository, so take
@@ -386,9 +384,7 @@ class FilesystemJob:
 				      "from repository" % realPath)
 
 		    beenRestored = True
-		# XXX X this needs to ignore the owner for source packages, but
-		# not for binary packages!
-		elif headFile == baseFile:
+		elif headFile.contents == baseFile.contents:
 		    # it changed in just the filesystem, so leave that change
 		    log.debug("preserving new contents of %s" % realPath)
 		elif fsFile.flags.isConfig() or headFile.flags.isConfig():
@@ -499,7 +495,7 @@ class FilesystemJob:
 		self._remove(fileObj, root + path,
 			     "removing %s" % root + path)
 
-def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
+def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     """
     Populates a change set against the files in the filesystem and builds
     a package object which describes the files installed.  The return
@@ -520,7 +516,11 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
     @param root: root directory the files are in (ignored for sources, which
     are assumed to be in the current directory)
     @type root: str
+    @param flags: IGNOREUGIDS or zero
+    @type param: int
     """
+
+    noIds = ((flags & IGNOREUGIDS) != 0)
 
     newPkg = curPkg.copy()
     newPkg.changeVersion(newVersion)
@@ -569,9 +569,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
 	oldVersion = srcPkg.getFile(fileId)[1]	
 	(oldFile, oldCont) = repos.getFileVersion(fileId, oldVersion,
 						  withContents = 1)
-	# XXX X this needs to ignore the owner for source packages, but
-	# not for binary packages!
-	if not f == oldFile:
+
+	if not f.partialEquality(oldFile, ignoreOwnerGroup = noIds):
 	    newPkg.addFile(fileId, path, newVersion)
 
 	    (filecs, hash) = changeset.fileChangeSet(fileId, oldFile, f)
@@ -596,7 +595,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
 
     return (foundDifference, newPkg)
 
-def buildLocalChanges(repos, pkgList, root = ""):
+def buildLocalChanges(repos, pkgList, root = "", flags = 0):
     """
     Builds a change set against a set of files currently installed
     and builds a package objects which describes the files installed.
@@ -612,13 +611,15 @@ def buildLocalChanges(repos, pkgList, root = ""):
     @param root: root directory the files are in (ignored for sources, which
     are assumed to be in the current directory)
     @type root: str
+    @param flags: IGNOREUGIDS or zero
+    @type param: int
     """
 
     changeSet = changeset.ChangeSet()
     returnList = []
     for (curPkg, srcPkg, newVersion) in pkgList:
 	result = _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, 
-			       root)
+			       root, flags)
         if result is None:
             # an error occurred
             return None

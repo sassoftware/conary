@@ -199,7 +199,8 @@ def commit(repos):
 	newVersion = helper.nextVersion(recipeVersionStr, None,
 					state.getBranch(), binary = False)
 
-    result = update.buildLocalChanges(repos, [(state, srcPkg, newVersion)])
+    result = update.buildLocalChanges(repos, [(state, srcPkg, newVersion)],
+				      flags = update.IGNOREUGIDS)
     if not result: return
 
     (changeSet, ((isDifferent, newState),)) = result
@@ -235,7 +236,8 @@ def diff(repos, versionStr = None):
 					     state.getVersion())
 
     result = update.buildLocalChanges(repos, [(state, oldPackage, 
-					       versions.NewVersion())])
+					       versions.NewVersion())],
+				      flags = update.IGNOREUGIDS)
     if not result: return
 
     (changeSet, ((isDifferent, newState),)) = result
@@ -314,7 +316,8 @@ def updateSrc(repos, versionStr = None):
     assert(util.assertIteratorAtEnd(packageChanges))
 
     fsJob = update.FilesystemJob(repos, changeSet, 
-				 { state.getName() : state }, "" )
+				 { state.getName() : state }, "",
+				 flags = update.IGNOREUGIDS | update.MERGE)
     errList = fsJob.getErrorList()
     if errList:
 	for err in errList: log.error(err)

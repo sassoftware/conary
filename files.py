@@ -363,6 +363,10 @@ class InodeStream(TupleStream):
 	else:
 	    return time.strftime("%b %e  %Y", timeSet)
 
+    def partialEquality(self, other):
+	return self.__class__ == other.__class__ and \
+	       self.perms() == other.perms() 
+
     def __eq__(self, other):
 	return self.__class__ == other.__class__ and \
 	       self.perms() == other.perms() and\
@@ -506,6 +510,18 @@ class File:
 		return False
 
 	return True
+
+    def partialEquality(self, other, ignoreOwnerGroup):
+	if not ignoreOwnerGroup:
+	    return self == other
+
+	for (name, streamType) in self.streamList:
+	    if name == 'inode':
+		if not self.__dict__[name].partialEquality(
+		       other.__dict__[name]):
+		    return False
+	    elif not self.__dict__[name] == other.__dict__[name]:
+		return False
 
     def freeze(self):
 	rc = [ self.lsTag ]
