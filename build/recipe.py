@@ -360,8 +360,10 @@ def loadRecipe(troveSpec, label=None):
     @param troveSpec: C{name}I{[}C{=I{version}}I{][}C{[I{flavor}]}I{]}
     specification of the trove to load.  The flavor given will be used
     to find the given recipe and also to set the flavor of the loaded recipe.
-    @param label: label string to search for the given recipe.  
-    Defaults to the labels listed in the version in the including recipe.
+    @param label: label string to search for the given recipe in place of 
+    using the default C{labelPath}.  
+    If not specified, the labels listed in the version in the including 
+    recipe will be used as the c{labelPath} to search.
     For example, if called from recipe with version
     C{/conary.specifix.com@spx:devel//shadow/1.0-1-1},
     the default C{labelPath} that would be constructed would be:
@@ -436,10 +438,7 @@ def loadRecipe(troveSpec, label=None):
 
     if not loader:
         if label:
-            if not isinstance(label, list):
-                labelPath = [versions.Label(label)]
-            else:
-                labelPath = [ versions.Label(x) for x in label ]
+            labelPath = [versions.Label(label)]
         elif branch:
             # if no labelPath was specified, search backwards through the 
             # labels on the current branch.
