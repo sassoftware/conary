@@ -236,7 +236,8 @@ class NormalizeManPages(policy.Policy):
 		# delete comment lines first
 		newlines = []
 		for line in lines:
-		    if not self.commentexp.search(line[:-1]):
+		    # newline means len(line) will be at least 1
+		    if len(line) > 1 and not self.commentexp.search(line[:-1]):
 			newlines.append(line)
 		lines = newlines
 
@@ -291,8 +292,8 @@ class NormalizeManPages(policy.Policy):
 
     def __init__(self, *args, **keywords):
 	policy.Policy.__init__(self, *args, **keywords)
-	self.soexp = re.compile('^\.so (.*\...*)$')
-	self.commentexp = re.compile('^\.\\\\"')
+	self.soexp = re.compile(r'^\.so (.*\...*)$')
+	self.commentexp = re.compile(r'^\.\\"')
 
     def do(self):
 	manpath = self.macros['destdir'] + self.macros['mandir']
