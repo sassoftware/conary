@@ -142,6 +142,10 @@ class Version:
 	assert(not self.isBranch())
 	return Version(self.versions[:-1], 0)
 
+    def branchNickname(self):
+	assert(self.isBranch())
+	return self.versions[-1]
+
     def parent(self):
 	assert(self.isVersion())
 	assert(len(self.versions) > 3)

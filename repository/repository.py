@@ -19,7 +19,11 @@ import util
 import versioned
 import bsddb
 
+from versioned import VersionedFile
+
 class Repository:
+
+    createBranches = 0
 
     def _getPackageSet(self, name):
 	return _PackageSet(self.pkgDB, name)
@@ -53,7 +57,7 @@ class Repository:
 	return self._getPackageSet(pkgName).hasVersion(version)
 
     def pkgLatestVersion(self, pkgName, branch):
-	return self._getPackageSet(pkgName).getLatestVersion(branch)
+	return self._getPackageSet(pkgName).findLatestVersion(branch)
 
     def getLatestPackage(self, pkgName, branch):
 	return self._getPackageSet(pkgName).getLatestPackage(branch)
@@ -74,7 +78,7 @@ class Repository:
 
     def fileLatestVersion(self, fileId, branch):
 	fileDB = self._getFileDB(fileId)
-	return fileDB.getLatestVersion(branch)
+	return fileDB.findLatestVersion(branch)
 	
     def getFileVersion(self, fileId, version, path = None, withContents = 0):
 	fileDB = self._getFileDB(fileId)
@@ -257,24 +261,16 @@ class LocalRepository(Repository):
 	Repository.__init__(self)
 
 # this is a set of all of the versions of a single packages 
-class _PackageSet:
+class _PackageSetClass(VersionedFile):
     def getVersion(self, version):
-	f1 = self.f.getVersion(version)
+	f1 = VersionedFile.getVersion(self, version)
 	p = package.PackageFromFile(self.name, f1, version)
 	f1.close()
 	return p
 
-    def getFullVersion(self, version):
-	return self.f.getFullVersion(version)
-
-    def hasVersion(self, version):
-	return self.f.hasVersion(version)
-
-    def eraseVersion(self, version):
-	self.f.eraseVersion(version)
-
     def addVersion(self, version, package):
-	self.f.addVersion(version, package.formatString())
+	VersionedFile.addVersion(self, version, package.formatString(),
+				 createBranch = 1)
 
     def fullVersionList(self):
 	branches = self.f.branchList()
@@ -285,59 +281,39 @@ class _PackageSet:
 	return rc
 
     def getLatestPackage(self, branch):
-	return self.getVersion(self.f.findLatestVersion(branch))
-
-    def findLatestVersion(self, branch):
-	return self.f.findLatestVersion(branch)
-
-    def getLatestVersion(self, branch):
-	return self.f.findLatestVersion(branch)
-
-    def close(self):
-	self.f = None
-
-    def __del__(self):
-	self.f = None
+	return self.getVersion(self.findLatestVersion(branch))
 
     def __init__(self, db, name):
+	VersionedFile.__init__(self, db, name)
 	self.name = name
-	self.f = db.openFile(name)
 
-class _FileDB:
+def _PackageSet(db, name):
+    return db.openFile(name, fileClass = _PackageSetClass)
 
-    def getLatestVersion(self, branch):
-	return self.f.findLatestVersion(branch)
+class _FileDBClass(VersionedFile):
 
     def addVersion(self, version, file):
-	if self.f.hasVersion(version):
+	if self.hasVersion(version):
 	    raise KeyError, "duplicate version for database"
 	else:
 	    if file.id() != self.fileId:
 		raise KeyError, "file id mismatch for file database"
 	
-	self.f.addVersion(version, "%s\n" % file.infoLine())
+	VersionedFile.addVersion(self, version, "%s\n" % file.infoLine(),
+				 createBranch = 1)
 
     def getVersion(self, version):
-	f1 = self.f.getVersion(version)
+	f1 = VersionedFile.getVersion(self, version)
 	file = files.FileFromInfoLine(f1.read(), self.fileId)
 	f1.close()
 	return file
 
-    def hasVersion(self, version):
-	return self.f.hasVersion(version)
-
-    def eraseVersion(self, version):
-	self.f.eraseVersion(version)
-
-    def close(self):
-	self.f = None
-
-    def __del__(self):
-	self.close()
-
     def __init__(self, db, fileId):
-	self.f = db.openFile(fileId)
+	VersionedFile.__init__(self, db, fileId)
 	self.fileId = fileId
+
+def _FileDB(db, fileId):
+    return db.openFile(fileId, fileClass = _FileDBClass)
 
 class ChangeSetJobFile:
 

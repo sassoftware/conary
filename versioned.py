@@ -202,7 +202,7 @@ class VersionedFile:
 	self.db[_VERSION_INFO % (self.key, node.asString())] = \
 	    "%s %s %s" % (vStr, pStr, cStr)
 
-    def addVersion(self, version, data):
+    def addVersion(self, version, data, createBranch = 0):
 	"""
         Adds a new version of the file. The new addition gets placed 
         on the proper branch in the position determined by the version's 
@@ -231,6 +231,8 @@ class VersionedFile:
 	    while curr and curr.isAfter(version):
 		next = curr
 		curr = self._getVersionInfo(curr)[1]
+	elif not createBranch:
+	    raise VersionedFileMissingBranchError, version.branch()
 	else:
 	    curr = None
 	    next = None
@@ -345,15 +347,19 @@ class Database:
     dbhash file.
     """
 
-    def openFile(self, file):
+    def openFile(self, file, fileClass = VersionedFile):
 	"""
         Returns a particular VersionedFile object.
 
         @param file: File name
         @type file: str
+	@param fileClass: Descendent of VersionedFile object which
+	will be used as the return value
+	@type fileClass: class descended from VersionedFile
         @rtype: VersionedFile
 	"""
-	return VersionedFile(self.db, file)
+	assert(issubclass(fileClass, VersionedFile))
+	return fileClass(self.db, file)
 
     def __del__(self):
         self.close()
@@ -364,6 +370,8 @@ class Database:
             self.db = None
 
     def __init__(self, path, mode = "r"):
+	# this lets __del__ work right if dbhash.open throws an exception
+	self.db = None
 	self.db = dbhash.open(path, mode)
 
 class FileIndexedDatabase(Database):
@@ -371,7 +379,7 @@ class FileIndexedDatabase(Database):
     Provides a set of VersionedFile objects on a single dbhash file
     and maintains a list of all of the files present in the database.
     """
-    def openFile(self, file):
+    def openFile(self, file, fileClass = VersionedFile):
 	"""
         Returns a particular VersionedFile object.
 
@@ -383,7 +391,7 @@ class FileIndexedDatabase(Database):
 	    self.files[file] = 1
 	    self._writeMap()
 
-	return Database.openFile(self, file)
+	return Database.openFile(self, file, fileClass = fileClass)
 
     def hasFile(self, file):
 	"""
@@ -419,4 +427,20 @@ class FileIndexedDatabase(Database):
     def __init__(self, path, mode = "r"):
 	Database.__init__(self, path, mode)
 	self._readMap()
+
+class VersionedFileError(Exception):
+
+    pass
+
+class VersionedFileMissingBranchError(VersionedFileError):
+
+    def __repr(self):
+	return str(self)
+
+    def __str__(self):
+	return self.branch.asString()
+
+    def __init__(self, branch):
+	VersionedFileError.__init__(self)
+	self.branch = branch
 
