@@ -292,7 +292,7 @@ class CollectionWithFlag(Flag, Collection):
         return "%s: %s {%s}" % (self._name, self._value, 
                                 ', '.join((repr(x) for x in self.values())))
 
-class NoSuchUseFlagError(Exception):
+class NoSuchUseFlagError(AttributeError):
 
     def __init__(self, key):
         self.key = key
@@ -310,7 +310,7 @@ not relevant to your system.
 
 """ % (self.key, self.key, self.key)
              
-class NoSuchArchFlagError(Exception):
+class NoSuchArchFlagError(AttributeError):
 
     def __init__(self, key):
         self.key = key
@@ -329,7 +329,7 @@ your system.
 
 """ % (self.key, self.key, self.key)
  
-class NoSuchSubArchFlagError(Exception):
+class NoSuchSubArchFlagError(AttributeError):
 
     def __init__(self, majArch, key):
         self.majArch = majArch
@@ -444,7 +444,7 @@ class MajorArch(CollectionWithFlag):
 
     def _getNonExistantKey(self, key):
         if self._strictMode:
-            raise NoSuchSubArchFlagError(self._parent._name, key)
+            raise NoSuchSubArchFlagError(self._name, key)
         else:
             self._addFlag(key)
             return self[key]
