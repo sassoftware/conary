@@ -680,11 +680,11 @@ def setBuildFlagsFromFlavor(recipeName, flavor):
                     else:
                         assert(recipeName)
                         packageName, flag = parts
-                        if package == recipeName:
+                        if packageName == recipeName:
                             # local flag values set from a build flavor
                             # are overrides -- the recipe should not 
                             # change these values
-                            Flags._override(flag, value)
+                            LocalFlags._override(flag, value)
         elif isinstance(depGroup, deps.InstructionSetDependency):
             # ensure that there is only on major architecture listed
             # XXX this could be user error -- handle gracefully
