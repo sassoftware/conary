@@ -130,6 +130,11 @@ class Epdb(pdb.Pdb):
         print "%s:%s" % (filename, lineno) 
     do_f = do_file
 
+    def do_until(self, arg):
+        self.do_tbreak(arg)
+        self.set_continue()
+        return 1
+
     def do_set(self, arg):
         if not arg:
             keys = self._config.keys()
