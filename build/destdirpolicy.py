@@ -297,8 +297,8 @@ class TestSuiteFiles(policy.Policy):
 	policy.Policy.updateArgs(self, *args, **keywords)
 
     def doFile(self, path):
-	fullpath = ('%(builddir)s'+path) %self.macros
-	testpath = ('%(destdir)s%(thistestdir)s'+path) % self.macros
+	fullpath = self.macros.builddir + path 
+	testpath = self.macros.destdir + self.macros.thistestdir + path 
 	if not (os.path.islink(testpath) or os.path.exists(testpath)):
 	    if os.path.islink(fullpath):
 		contents = os.readlink(fullpath)
@@ -351,7 +351,7 @@ class FixDirModes(policy.Policy):
     invariantexceptions = [ ('.*', 0700) ]
 
     def doFile(self, path):
-	fullpath = util.normpath(self.macros['destdir']+os.sep+path)
+        fullpath = self.macros.destdir + path
 	mode = os.lstat(fullpath)[stat.ST_MODE]
 	self.recipe.AddModes(mode, path)
 	os.chmod(fullpath, mode | 0700)

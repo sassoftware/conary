@@ -425,7 +425,7 @@ class Config(policy.Policy):
     keywords['inclusions'] = []
 
     def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
+	fullpath = self.macros.destdir + file
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    _markConfig(self.recipe, file, fullpath)
 
@@ -444,7 +444,7 @@ class Transient(policy.Policy):
     ]
 
     def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
+	fullpath = self.macros.destdir + file
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    log.debug('transient: %s', file)
 	    self.recipe.autopkg.pathMap[file].flags.isTransient(True)
@@ -473,7 +473,7 @@ class SharedLibrary(policy.Policy):
 	self.recipe.CheckSonames(*args, **keywords)
 
     def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
+	fullpath = self.macros.destdir + file
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    m = self.recipe.magic[file]
 	    if m and m.name == 'ELF' and 'soname' in m.contents:
@@ -490,7 +490,7 @@ class TagDescription(policy.Policy):
     invariantinclusions = [ '%(tagdescriptiondir)s/' ]
 
     def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
+	fullpath = self.macros.destdir + file
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    log.debug('conary tag file: %s', file)
 	    self.recipe.autopkg.pathMap[file].tags.set("tagdescription")
@@ -505,7 +505,7 @@ class TagHandler(policy.Policy):
     invariantinclusions = [ '%(taghandlerdir)s/' ]
 
     def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
+	fullpath = self.macros.destdir + file
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    log.debug('conary tag handler: %s', file)
 	    self.recipe.autopkg.pathMap[file].tags.set("taghandler")
@@ -843,7 +843,7 @@ class WarnWriteable(policy.Policy):
     """
     # Needs to run after AddModes because AddModes sets exceptions
     def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
+	fullpath = self.macros.destdir + file
 	if os.path.islink(fullpath):
 	    return
 	if file not in self.recipe.autopkg.pathMap:
@@ -958,7 +958,7 @@ class IgnoredSetuid(policy.Policy):
     a bug, so flag it with a warning.
     """
     def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
+	fullpath = self.macros.destdir + file
 	mode = os.lstat(fullpath)[stat.ST_MODE]
 	if mode & 06000 and \
 	   not self.recipe.autopkg.pathMap[file].inode.perms() & 06000:
