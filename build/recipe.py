@@ -30,11 +30,9 @@ from lib import magic
 import os
 import packagepolicy
 from repository import repository
-import shutil
 import source
 import sys
 import tempfile
-import trove
 import types
 import use
 from lib import util

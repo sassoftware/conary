@@ -25,7 +25,6 @@ import os
 import rpmhelper
 from lib import util
 import action
-import string
 
 class _Source(action.RecipeAction):
     keywords = {'rpm': '',
