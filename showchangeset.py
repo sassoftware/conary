@@ -221,12 +221,28 @@ def includeChildTroves(cs, troves):
 
 def getTroves(cs, troveList):
     if not troveList:
+        # create a list of all troves in this changeset, but only 
+        # display those that are either primary packages, or are not
+        # contained by any primary packages 
+        # (other packages will be picked up if we are asked to recurse)
+        allTroves = {}
+        for trove in cs.iterNewPackageList():
+            allTroves[trove.getName(), trove.getNewVersion(), \
+                                                trove.getNewFlavor()] = True
         ppl =  cs.getPrimaryPackageList()
         if ppl:
-            troveList = [ x for x in ppl]
+            troveList = []
+            for (name, version, flavor) in ppl:
+                del allTroves[name, version, flavor]
+                troveList.append((name, version, flavor))
+                trove = cs.getNewPackageVersion(name, version, flavor)
+                for subTroveName, changes in  trove.iterChangedTroves():
+                    (type, version, flavor) = changes[0]
+                    del allTroves[subTroveName, version, flavor]
+            troveList.extend(allTroves.keys())
         else:
             print "Note: changeset has no primary troves, showing all troves"
-            troveList = [ x for x in cs.newPackages ]
+            troveList = allTroves.keys()
         troveList.sort(lambda a, b: cmp(a[0], b[0]))
         return ([ (x, '') for x in troveList], False)
     hasVersions = False
