@@ -256,16 +256,14 @@ def sourceCommand(cfg, args, argSet):
         xmlSource = args[1]
         state = checkin.SourceStateFromFile("CONARY")
         troveName = state.getName()
-        branch = state.getVersion().branch()
-        print branch.asString()
+        troveBranch = state.getVersion().branch()
        
         log.info("describing trove %s with %s", troveName, xmlSource)
         xmlFile = open(xmlSource)
         xml = xmlFile.read()
 
         repos = NetworkRepositoryClient(cfg.repositoryMap)
-        print cfg.installLabelPath[0]
-        repos.updateMetadataFromXML(troveName, branch, xml)
+        repos.updateMetadataFromXML(troveName, troveBranch, xml)
     elif (args[0] == "usage"):	
         return usage(rc = 0)
     else:
