@@ -12,8 +12,10 @@
 # full details.
 #
 
+import base64
 import exceptions
 import filecontents
+import files
 import gzip
 import httplib
 from lib import log
@@ -32,7 +34,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=7
+CLIENT_VERSION=8
 
 class _Method(xmlrpclib._Method):
 
@@ -151,18 +153,24 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
-        gen = self.c[version].getFilesInTrove(troveName,
-                                     self.fromVersion(version),
-                                     self.fromFlavor(flavor),
-                                     sortByPath,
-                                     withFiles)
-        if withFiles:
-            for (fileId, path, version, f) in gen:
-                yield (self.toFileId(fileId), path, self.toVersion(version), 
-		       self.toFile(f))
-        else:
-            for (fileId, path, version) in gen:
-                yield (self.toFileId(fileId), path, self.toVersion(version))
+        (gen, verList, dirList) = self.c[version].getFilesInTrove(troveName,
+                                             self.fromVersion(version),
+                                             self.fromFlavor(flavor),
+                                             sortByPath,
+                                             withFiles)
+        verList = [ self.toVersion(x) for x in verList ]
+
+        for tup in gen:
+            (fileId, dirNum, fileName, verNum) = tup[0:4]
+            path = os.path.join(dirList[dirNum], fileName)
+
+            fileId = base64.decodestring(fileId)
+
+            if withFiles:
+                yield (fileId, path, verList[verNum],
+                       files.ThawFile(base64.decodestring(tup[4]), fileId))
+            else:
+                yield (fileId, path, verList[verNum])
 
     def getAllTroveLeafs(self, serverName, troveNames):
 	d = self.c[serverName].getAllTroveLeafs(troveNames)
