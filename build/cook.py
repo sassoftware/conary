@@ -415,6 +415,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
 
     grp = trove.Trove(fullName, versions.NewVersion(), grpFlavor, None,
                       isRedirect = False)
+    grp.setRequires(recipeObj.getRequires())
 
     for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
         for (version, flavor, byDefault) in versionFlavorList:

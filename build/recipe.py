@@ -799,6 +799,16 @@ class GroupRecipe(Recipe):
             raise ValueError, 'invalid flavor'
         self.addTroveList.append((name, versionStr, flavor, source, byDefault))
 
+    def Requires(self, requirement):
+        if requirement[0] == '/':
+            raise RecipeFileError, 'file requirements not allowed in groups'
+
+        self.requires.addDep(deps.TroveDependencies, 
+                             deps.Dependency(requirement))
+
+    def getRequires(self):
+        return self.requires
+
     def findTroves(self):
         self.size = 0
 
@@ -849,6 +859,7 @@ class GroupRecipe(Recipe):
 	self.label = label
 	self.flavor = flavor
         self.addTroveList = []
+        self.requires = deps.DependencySet()
 
 class RedirectRecipe(Recipe):
     Flags = use.LocalFlags

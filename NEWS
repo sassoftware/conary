@@ -7,6 +7,7 @@ Changes in 0.14.13:
   * Added optional 'recurse' parameter to netclient.createChangeSetFile
   * The first argument to the Requires and TagSpec commands can now have
     macros interpolated, as in r.Requires('%(bindir)s/foo', ...)
+  * Groups can have requirements now
 
 Changes in 0.14.12:
   * The shadow command looks at buildLabel instead of following
