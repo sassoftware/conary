@@ -24,14 +24,14 @@ def displayTroves(db, cfg, ls = False, ids = False, sha1s = False,
 			      fullVersions)
 	    continue
 	else:
-	    l = db.getPackageVersionList(troveName)
+	    l = db.getTroveVersionList(troveName)
 
 	    for version in l:
 		if fullVersions:
 		    print _troveFormat % (troveName, version.asString())
 		else:
 		    print _troveFormat % (troveName, 
-					version.trailingVersion().asString())
+                                          version.trailingVersion().asString())
 
 def _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s, 
 		      fullVersions):

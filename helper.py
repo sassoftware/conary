@@ -133,7 +133,7 @@ def previousVersion(repos, troveName, troveVersion, troveFlavor):
     """
 
     oldVersion = None
-    oldVersions = repos.getPackageVersionList(troveName)
+    oldVersions = repos.getTroveVersionList(troveName)
     if len(oldVersions) > 1:
 	# try and pick the one which looks like a good match
 	# for the new version

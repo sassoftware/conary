@@ -90,7 +90,7 @@ class SqlDbRepository(repository.DataStoreRepository,
 
 	return False
 
-    def getPackageVersionList(self, name):
+    def getTroveVersionList(self, name):
 	"""
 	Returns a list of all of the versions of a trove available
 	in the repository.
@@ -485,7 +485,7 @@ class Database(SqlDbRepository):
 	    self.removeRollback(name)
     
     def findTrove(self, troveName, versionStr = None):
-	versionList = self.getPackageVersionList(troveName)
+	versionList = self.getTroveVersionList(troveName)
 
 	if versionStr:
 	    # filter the list of versions based on versionStr
