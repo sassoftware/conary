@@ -52,38 +52,38 @@ class AbstractTroveDatabase:
 	"""
 	raise NotImplementedError
 
-    def createChangeSet(self, packageList, recurse = True, withFiles = True):
+    def createChangeSet(self, troveList, recurse = True, withFiles = True):
 	"""
-	packageList is a list of (pkgName, flavor, oldVersion, newVersion, 
+	troveList is a list of (troveName, flavor, oldVersion, newVersion, 
         absolute) tuples. 
 
-	if oldVersion == None and absolute == 0, then the package is assumed
+	if oldVersion == None and absolute == 0, then the trove is assumed
 	to be new for the purposes of the change set
 
-	if newVersion == None then the package is being removed
+	if newVersion == None then the trove is being removed
 	"""
 	cs = changeset.ChangeSetFromRepository(self)
-	for (name, flavor, v1, v2, absolute) in packageList:
+	for (name, flavor, v1, v2, absolute) in troveList:
 	    cs.addPrimaryPackage(name, v2, flavor)
 
 	dupFilter = {}
 
 	# make a copy to remove things from
-	packageList = packageList[:]
+	troveList = troveList[:]
 
-	# don't use a for in here since we grow packageList inside of
+	# don't use a for in here since we grow troveList inside of
 	# this loop
-	while packageList:
-	    (packageName, flavor, oldVersion, newVersion, absolute) = \
-		packageList[0]
-	    del packageList[0]
+	while troveList:
+	    (troveName, flavor, oldVersion, newVersion, absolute) = \
+		troveList[0]
+	    del troveList[0]
 
 	    # make sure we haven't already generated this changeset; since
-	    # packages can be included from other packages we could try
+	    # troves can be included from other troves we could try
 	    # to generate quite a few duplicates
-	    if dupFilter.has_key((packageName, flavor)):
+	    if dupFilter.has_key((troveName, flavor)):
 		match = False
-		for (otherOld, otherNew) in dupFilter[(packageName, flavor)]:
+		for (otherOld, otherNew) in dupFilter[(troveName, flavor)]:
 		    if not otherOld and not oldVersion:
 			same = True
 		    elif not otherOld and oldVersion:
@@ -99,28 +99,27 @@ class AbstractTroveDatabase:
 		
 		if match: continue
 
-		dupFilter[(packageName, flavor)].append(
-					    (oldVersion, newVersion))
+		dupFilter[(troveName, flavor)].append((oldVersion, newVersion))
 	    else:
-		dupFilter[(packageName, flavor)] = [ (oldVersion, newVersion) ]
+		dupFilter[(troveName, flavor)] = [(oldVersion, newVersion)]
 
 	    if not newVersion:
-		# remove this package and any subpackages
-		old = self.getTrove(packageName, oldVersion, flavor)
-		cs.oldPackage(packageName, oldVersion, flavor)
+		# remove this trove and any trove contained in it
+		old = self.getTrove(troveName, oldVersion, flavor)
+		cs.oldPackage(troveName, oldVersion, flavor)
 		for (name, version, flavor) in old.iterTroveList():
-                    # it's possible that a component of a package
+                    # it's possible that a component of a trove
                     # was erased, make sure that it is installed
                     if self.hasTrove(name, version, flavor):
-                        packageList.append((name, flavor, version, None, 
+                        troveList.append((name, flavor, version, None, 
 					    absolute))
 		    
 		continue
 		    
-	    new = self.getTrove(packageName, newVersion, flavor)
+	    new = self.getTrove(troveName, newVersion, flavor)
 	 
 	    if oldVersion:
-		old = self.getTrove(packageName, oldVersion, flavor)
+		old = self.getTrove(troveName, oldVersion, flavor)
 	    else:
 		old = None
 
@@ -129,7 +128,7 @@ class AbstractTroveDatabase:
 
 	    if recurse:
 		for (pkgName, old, new, flavor) in pkgsNeeded:
-		    packageList.append((pkgName, flavor, old, new, absolute))
+		    troveList.append((pkgName, flavor, old, new, absolute))
 
 	    cs.newPackage(pkgChgSet)
 
@@ -234,15 +233,17 @@ class AbstractTroveDatabase:
 	for item in troveList:
 	    try:
 		rc.append(self.getTrove(*item))
-	    except PackageMissing:
+	    except TroveMissing:
 		rc.append(None)
 
 	return rc
 
-    def iterAllTroveNames(self):
+    def iterAllTroveNames(self, serverName):
 	"""
-	Returns a list of all of the troves contained in the repository.
+	Returns a list of all of the troves contained in a repository.
 
+        @param serverName: name of the server containing troves
+        @type serverName: str
 	@rtype: list of str
 	"""
 	raise NotImplementedError
@@ -324,7 +325,7 @@ class IdealRepository(AbstractTroveDatabase):
 	branch. If that branch doesn't exist for the trove, PackageMissing
 	is raised. The version returned includes timestamps.
 
-	@param troveName: package name
+	@param troveName: trove name
 	@type troveName: str
 	@param branch: branch
 	@type branch: versions.Version
@@ -340,7 +341,7 @@ class IdealRepository(AbstractTroveDatabase):
 	by version, with earlier versions first. The versions returned
 	by this function include time stamps.
 
-	@param troveName: package name
+	@param troveName: trove name
 	@type troveName: str
 	@param branch: branch
 	@type branch: versions.Version
@@ -440,7 +441,7 @@ class IdealRepository(AbstractTroveDatabase):
 		    pkgList.append((name, version, flavor))
 
 	if not pkgList:
-	    raise PackageNotFound, "package %s does not exist" % name
+	    raise PackageNotFound, "trove %s does not exist" % name
 
 	pkgList = self.getTroves(pkgList)
 
@@ -464,7 +465,7 @@ class AbstractRepository(IdealRepository):
 	"""
 	Tests if the repository contains a particular version of a trove.
 
-	@param troveName: package name
+	@param troveName: trove name
 	@type troveName: str
 	@rtype: boolean
 	"""
@@ -526,40 +527,52 @@ class DataStoreRepository:
 class RepositoryError(Exception):
     """Base class for exceptions from the system repository"""
 
-class PackageNotFound(Exception):
+class TroveNotFound(Exception):
     """Raised when findTrove failes"""
+
+class PackageNotFound(TroveNotFound): pass
 
 class OpenError(RepositoryError):
     """Error occured opening the repository"""
 
 class CommitError(RepositoryError):
-    """Error occured commiting a package"""
+    """Error occured commiting a trove"""
 
-class PackageMissing(RepositoryError):
-
+class TroveMissing(RepositoryError):
+    troveType = "trove"
     def __str__(self):
 	if self.version:
 	    if self.version.isBranch():
 		return ("%s %s does not exist on branch %s" % \
-		    (self.type, self.packageName, self.version.asString()))
+		    (self.troveType, self.troveName, self.version.asString()))
 
 	    return "version %s of %s %s does not exist" % \
-		(self.version.asString(), self.type, self.packageName)
+		(self.version.asString(), self.troveType, self.troveName)
 	else:
-	    return "%s %s does not exist" % (self.type, self.packageName)
+	    return "%s %s does not exist" % (self.troveType, self.troveName)
 
-    def __init__(self, packageName, version = None):
+    def __init__(self, troveName, version = None):
 	"""
-	Initializes a PackageMissing exception.
+	Initializes a TroveMissing exception.
 
-	@param packageName: package which could not be found
-	@type packageName: str
-	@param version: version of the package which does not exist
+	@param troveName: trove which could not be found
+	@type troveName: str
+	@param version: version of the trove which does not exist
 	@type version: versions.Version
 	"""
-	self.packageName = packageName
+	self.troveName = troveName
 	self.version = version
-	self.type = "package"
+        if troveName.startswith('group-'):
+            self.type = 'group'
+        elif troveName.startswith('fileset-'):
+            self.type = 'fileset'
+        elif troveName.find(':') != -1:
+            self.type = 'component'
+        else:
+            self.type = 'package'
+
+class PackageMissing(TroveMissing):
+    troveType = "package"
 
 class ChangeSetJobFile(object):
 
