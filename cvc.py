@@ -197,7 +197,7 @@ def sourceCommand(cfg, args, argSet):
 	
 	try:
 	    repos = NetworkRepositoryClient(cfg.repositoryMap)
-	except repository.OpenError:
+	except repository.repository.OpenError:
 	    repos = None
 
 	checkin.newPackage(repos, cfg, args[1])
