@@ -388,11 +388,11 @@ class PackageRecipe(Recipe):
 
     def sourceMap(self, path):
         basepath = os.path.basename(path)
-        if basepath == path:
-            # we only care about truly different source locations with the
-            # same basename
-            return
         if basepath in self.sourcePathMap:
+            if basepath == path:
+                # we only care about truly different source locations with the
+                # same basename
+                return
             if basepath in self.pathConflicts:
                 self.pathConflicts[basepath].append(path)
             else:
@@ -402,6 +402,8 @@ class PackageRecipe(Recipe):
                     # this instance
                     path
                 ]
+        else:
+            self.sourcePathMap[basepath] = path
 
     def fetchAllSources(self):
 	"""
