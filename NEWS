@@ -1,5 +1,5 @@
 Changes in 0.14.4:
-  * fixed several bugs in the 'cvc update' code paths
+  * several bugs in the 'cvc update' code paths have been fixed
     - it no longer retrieves autosource sources
     - the CONARY file now gets populated entries for autosource files
     - the fileids in CONARY files are now correct after an update
