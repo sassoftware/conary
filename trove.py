@@ -2,39 +2,62 @@ import os.path
 import versioned
 import string
 
+# this is a single version of a single package
 class Package:
-    
+
     def addFile(self, path, version):
 	self.files[path] = version
 
-    def write(self):
-	f = versioned.open(self.pkgPath, "r+")
-	if f.hasVersion(self.version):
-	    f.setVersion(self.version)
-	else:
-	    f.createVersion(self.version)
-
+    def write(self, dataFile):
 	for (file, version) in self.files.items():
-	    f.write("%s %s\n" % (file, version))
+	    dataFile.write("%s %s\n" % (file, version))
 
-	f.close()
-
-    def read(self):
-	if os.path.exists(self.pkgPath):
-	    # this creates the file if it doesn't exist so write()
-	    # knows it does exist
-	    f = versioned.open(self.pkgPath, "r+")
-	    if f.hasVersion(self.version):
-		for line in f.readLines():
-		    (path, version) = string.split(line)
-		    self.addFile(path, version)
-
-	    f.close()
-
-    def __init__(self, dbpath, name, version):
+    def __init__(self, name):
 	self.files = {}
 	self.name = name
-	self.version = version
-	self.dbpath = dbpath
-	self.pkgPath = self.dbpath + "/pkgs/" + self.name
-	self.read()
+
+class PackageFromFile(Package):
+
+    def read(self, dataFile):
+	for line in dataFile.readLines():
+	    (path, version) = string.split(line)
+	    self.addFile(path, version)
+
+    def __init__(self, name, dataFile):
+	Package.__init__(self, name)
+	self.read(dataFile)
+
+# this is a set of all of the versions of a single packages 
+class PackageSet:
+    def write(self):
+	f = versioned.open(self.pkgPath, "w")
+	for (version, package) in self.packages.items():
+	    f.createVersion(version)
+	    package.write(f)
+	f.close()
+
+    def getVersion(self, version):
+	return self.packages[version]
+
+    def hasVersion(self, version):
+	return self.packages.has_key(version)
+
+    def createVersion(self, version):
+	self.packages[version] = Package(version)
+	return self.packages[version]
+
+    def versionList(self):
+	return self.packages.keys()
+	
+    def __init__(self, dbpath, name):
+	self.name = name
+	self.pkgPath = dbpath + "/pkgs/" + self.name
+
+	f = versioned.open(self.pkgPath, "r+")
+	versions = f.versionList()
+	self.packages = {}
+	for version in versions:
+	    f.setVersion(version)
+	    self.packages[version] = PackageFromFile(name, f)
+
+	f.close()

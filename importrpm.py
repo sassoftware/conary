@@ -23,9 +23,10 @@ def doImport(DBPATH, rpmFile):
     pkgVersion = h['version']
     pkgRelease = h['release']
 
+    version = "/specifix.com/" + pkgVersion + "-" + pkgRelease
+
     if (not pkgRelease):
 	print pkgFile + " does not appear to be a valid RPM"
-
 
     list = h['filenames']
     modes = h['filemodes']
@@ -47,11 +48,13 @@ def doImport(DBPATH, rpmFile):
 	f.md5(md5s[i])
 	fileList.append(f)
 
+    pkgSet = package.PackageSet(DBPATH, pkgName)
+    if pkgSet.hasVersion(version):
+	raise KeyError, ("package %s version %s is already installed" %
+		    (pkgName, version))
+    p = pkgSet.createVersion(version)
+
     os.system("cd %s; rpm2cpio %s | cpio -iumd --quiet" % (scratch, pkgFile))
-
-    version = "/specifix.com/" + pkgVersion + "-" + pkgRelease
-
-    p = package.Package(DBPATH, pkgName, version)
 
     for file in fileList:
 	dest = fileDB + "/" + file.dir() + "/" + file.name() + ".contents" 
@@ -71,4 +74,4 @@ def doImport(DBPATH, rpmFile):
 	else:
 	    p.addFile(file.path(), file.version())
 
-    p.write()
+    pkgSet.write()

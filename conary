@@ -5,7 +5,7 @@ import sys
 import util
 import importrpm
 import string
-import versioned
+import package
 
 DBPATH=os.getcwd() + "/srsdb"
 
@@ -21,12 +21,10 @@ def usage():
 
 def displayPkgs(DBPATH, packageList):
     for pkgName in packageList:
-	f = versioned.open(DBPATH + "/pkgs/" + pkgName, "r")
-	l = f.versionList()
-	l.sort()
+	pkgSet = package.PackageSet(DBPATH, pkgName)
+	l = pkgSet.versionList()
 	for version in l:
 	    print "%-24s %s" % (pkgName, version)
-	f.close()
 
 if (len(sys.argv) < 2):
     usage()
