@@ -74,7 +74,7 @@ class Package:
 	    filesNeeded.append((id, None, selfVersion))
 
 	for id in sameIds.keys():
-	    
+
 	    (selfPath, selfVersion) = selfMap[id]
 	    (themPath, themVersion) = themMap[id]
 
@@ -86,6 +86,7 @@ class Package:
 
 	    if not selfVersion.equal(themVersion):
 		newVersion = selfVersion.asString()
+		filesNeeded.append((id, themVersion, selfVersion))
 
 	    if newPath != "-" or newVersion != "-":
 		rc = rc + "~%s %s %s\n" % (id, newPath, newVersion)
@@ -105,7 +106,7 @@ class PackageChangeSet:
 	return self.newFiles
 
     def oldFile(self, fileId):
-	self.newFiles.append(fileId)
+	self.oldFiles.append(fileId)
 
     def getName(self):
 	return self.name
@@ -139,7 +140,8 @@ class PackageChangeSet:
 	    else:
 		self.changedFile(fileId, path, version)
 	elif action == "-":
-	    self.oldfile(line[1:])
+	    # -1 chops off the \n
+	    self.oldFile(line[1:-1])
 
     def formatToFile(self, f):
 	f.write("changeset for %s " % self.name)
