@@ -175,7 +175,7 @@ def checkout(repos, cfg, dir, name, versionStr = None):
 
     state.write(dir + "/SRS")
 
-def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
+def _buildChangeSet(repos, state, srcVersion = None, needsHead = False):
     """
     Builds a change set against the sources in the current directory and
     builds an in-core state object as if these changes were committed. If
@@ -226,12 +226,9 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 
     newVersion = helper.nextVersion(recipeVersionStr, srcVersion, 
 				    state.getBranch(), binary = False)
-
     state.changeVersion(newVersion)
 
-    pkg = package.Package(state.getName(), newVersion)
     changeSet = changeset.ChangeSet()
-
     foundDifference = 0
 
     for (fileId, (path, version)) in state.iterFileList():
@@ -257,7 +254,6 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 					  changeset.ChangedFileTypes.file,
 					  newCont)
 
-	    pkg.addFile(fileId, path, newVersion)
 	    foundDifference = 1
 	    continue
 
@@ -266,7 +262,6 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 						  withContents = 1)
         if not f.same(oldFile, ignoreOwner = True):
 	    foundDifference = 1
-	    pkg.addFile(fileId, path, newVersion)
 	    state.addFile(fileId, path, newVersion)
 
 	    (filecs, hash) = changeset.fileChangeSet(fileId, oldFile, f)
@@ -277,11 +272,8 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 					f, newCont)
 						
 		changeSet.addFileContents(fileId, contType, cont)
-				   
-	else:
-	    pkg.addFile(f.id(), path, oldVersion)
 
-    (csPkg, filesNeeded, pkgsNeeded) = pkg.diff(srcPkg)
+    (csPkg, filesNeeded, pkgsNeeded) = state.diff(srcPkg)
     assert(not pkgsNeeded)
     changeSet.newPackage(csPkg)
 
@@ -294,7 +286,7 @@ def commit(repos):
     state = SourceStateFromFile("SRS")
 
     # we need to commit based on changes to the head of a branch
-    result = buildChangeSet(repos, state, needsHead = True)
+    result = _buildChangeSet(repos, state, needsHead = True)
     if not result: return
 
     (isDifferent, state, changeSet, oldPackage) = result
@@ -321,7 +313,7 @@ def diff(repos, versionStr = None):
     else:
 	srcVersion = None
 
-    result = buildChangeSet(repos, state, srcVersion = srcVersion)
+    result = _buildChangeSet(repos, state, srcVersion = srcVersion)
     if not result: return
 
     (changed, state, changeSet, oldPackage) = result
