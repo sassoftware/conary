@@ -62,6 +62,7 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
         #    else:
         #        print dep, "NONE"
 
+        #return
 
         client.updateTrove(cs, replaceFiles, tagScript, keepExisting,
                            depCheck)

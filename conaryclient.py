@@ -43,6 +43,18 @@ class NoNewTrovesError(UpdateError):
     def __str__(self):
         return "no new troves were found"
 
+class UpdateChangeSet(changeset.MergeableChangeSet):
+
+    def merge(self, cs, src):
+        changeset.MergeableChangeSet.merge(self, cs)
+        self.contents.append(src)
+        self.empty = False
+
+    def __init__(self, *args):
+        changeset.MergeableChangeSet.__init__(self, *args)
+        self.contents = []
+        self.empty = True
+
 class ConaryClient:
     def __init__(self, repos = None, cfg = None):
         if cfg == None:
@@ -76,16 +88,13 @@ class ConaryClient:
         self._prepareRoot()
 
         changeSetList = []
-        finalCs = None
+        finalCs = UpdateChangeSet()
         for item in itemList:
             if isinstance(item, changeset.ChangeSetFromFile):
                 if item.isAbsolute():
                     item.rootChangeSet(self.db, keepExisting)
 
-                if finalCs is not None:
-                    finalCs.merge(item)
-                else:
-                    finalCs = item
+                finalCs.merge(item, (changeset.ChangeSetFromFile, item))
 
                 continue
 
@@ -101,7 +110,8 @@ class ConaryClient:
                 # or the label search path
                 try:
                     newList = self.repos.findTrove(None, troveName, 
-                                                   self.cfg.flavor, versionStr)
+                                                   self.cfg.flavor, versionStr,
+                                                   withFiles = False)
                 except repository.PackageNotFound, e:
                     # we give an error for this later on
                     pass
@@ -128,7 +138,8 @@ class ConaryClient:
                     try:
                         newList += self.repos.findTrove(label, troveName, 
                                                         self.cfg.flavor, 
-                                                        versionStr)
+                                                        versionStr,
+                                                        withFiles = False)
                     except repository.PackageNotFound, e:
                         pass
 
@@ -155,21 +166,27 @@ class ConaryClient:
                     changeSetList.append((name, (oldVersion, oldFlavor),
                                                 (newVersion, newFlavor), 0))
 
-        if not finalCs and not changeSetList:
+        if finalCs.empty  and not changeSetList:
             raise NoNewTrovesError
 
         if changeSetList:
-            cs = self.repos.createChangeSet(changeSetList)
-            if finalCs:
-                finalCs.merge(cs)
-            else:
-                finalCs = cs
+            cs = self.repos.createChangeSet(changeSetList, withFiles = False)
+            finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
 
         return finalCs
 
     def updateTrove(self, theCs, replaceFiles = False,
                     tagScript = None, keepExisting = None, depCheck = True):
-        self.db.commitChangeSet(theCs, replaceFiles = replaceFiles,
+        cs = changeset.MergeableChangeSet()
+        for (how, what) in theCs.contents:
+            if how == self.repos.createChangeSet:
+                newCs = self.repos.createChangeSet(what)
+                cs.merge(newCs)
+            else:
+                assert(how == changeset.ChangeSetFromFile)
+                cs.merge(how)
+
+        self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
                                 keepExisting = keepExisting,
                                 depCheck = depCheck)

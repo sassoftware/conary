@@ -575,7 +575,7 @@ class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 	self.absCS = absCS
 	ChangeSet.__init__(self)
 
-class ChangeSetFromFile(ChangeSet):
+class MergeableChangeSet(ChangeSet):
 
     def fileQueueCmp(a, b):
         if a[1][0] == "1" and b[1][0] == "0":
@@ -752,7 +752,7 @@ class ChangeSetFromFile(ChangeSet):
             next = self._nextFile()
 
     def merge(self, otherCs):
-        assert(self.__class__ == otherCs.__class__)
+        assert(isinstance(otherCs, MergeableChangeSet))
         assert(not self.lastCsf)
         assert(not otherCs.lastCsf)
 
@@ -766,8 +766,18 @@ class ChangeSetFromFile(ChangeSet):
             util.tupleListBsearchInsert(self.fileQueue, entry, 
                                         self.fileQueueCmp)
 
-    def __init__(self, file, skipValidate = 1):
-	f = open(file, "r")
+    def __init__(self, data = None):
+	ChangeSet.__init__(self, data = data)
+	self.configCache = {}
+        self.filesRead = False
+
+        self.lastCsf = None
+        self.fileQueue = []
+
+class ChangeSetFromFile(MergeableChangeSet):
+
+    def __init__(self, fileName, skipValidate = 1):
+	f = open(fileName, "r")
 	csf = filecontainer.FileContainer(f)
 	f.close()
 
@@ -775,7 +785,7 @@ class ChangeSetFromFile(ChangeSet):
         assert(name == "CONARYCHANGESET")
 
 	start = control.read()
-	ChangeSet.__init__(self, data = start)
+	MergeableChangeSet.__init__(self, data = start)
 
 	for trvCs in self.newPackages.itervalues():
 	    if trvCs.isAbsolute():
@@ -786,12 +796,6 @@ class ChangeSetFromFile(ChangeSet):
 
 	    if (old and old.isLocal()) or new.isLocal():
 		self.local = 1
-
-	self.configCache = {}
-        self.filesRead = False
-
-        self.lastCsf = None
-        self.fileQueue = []
 
         # load the diff cache
         nextFile = csf.getNextFile()

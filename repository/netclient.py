@@ -279,8 +279,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return l
 
-    def createChangeSet(self, list):
-	return self._getChangeSet(list)
+    def createChangeSet(self, list, withFiles = True, withFileContents = True):
+	return self._getChangeSet(list, withFiles = withFiles, 
+                                  withFileContents = withFileContents)
 
     def createChangeSetFile(self, list, fName):
 	self._getChangeSet(list, target = fName)
