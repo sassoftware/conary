@@ -1074,7 +1074,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 		    label = versions.Label(versionStr)
                     labelPath = [ label ]
 		except versions.ParseError:
-		    raise TroveMissing, "invalid version %s" % versionStr
+		    raise repository.TroveNotFound, "invalid version %s" % versionStr
             else:
                 # just a branch name was specified
                 repositories = [ x.getHost() for x in labelPath ]
