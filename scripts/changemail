@@ -72,5 +72,10 @@ while [ $# -gt 0 ] ; do
     esac
 done
 
-$CONARY src rdiff $repMapArg "$repMap" $trove -1 $version | \
-	mail -s "$trove $version" $email
+if [ $(echo -n $trove | tail -c7) == ":source" ]; then
+    $CONARY src rdiff $repMapArg "$repMap" $trove -1 $version | \
+	    mail -s "$trove $version" $email
+elif ! echo $trove | grep -s : > /dev/null; then
+    echo "${trove} ($version) has been built into the repository" | \
+	    mail -s "$trove $version" $email
+fi
