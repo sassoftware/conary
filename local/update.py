@@ -741,7 +741,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 	    (filecs, hash) = changeset.fileChangeSet(fileId, srcFile, f)
 	    changeSet.addFile(fileId, srcFileVersion, newVersion, filecs)
-	    if hash and srcFile.flags.isConfig():
+	    if hash and (srcFile.flags.isConfig() or isSrcPkg):
 		newCont = filecontents.FromFilesystem(realPath)
 
 		if srcFile.hasContents:
@@ -751,9 +751,10 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 		(contType, cont) = changeset.fileContentsDiff(srcFile, srcCont,
                                                               f, newCont)
-						
+
 		changeSet.addFileContents(fileId, contType, cont, 
 					  f.flags.isConfig())
+            
 
     for fileId in fileIds.iterkeys():
 	(path, version) = newPkg.getFile(fileId)
