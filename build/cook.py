@@ -556,7 +556,8 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     recipeObj.checkBuildRequirements(cfg, sourceVersion, ignoreDeps=ignoreDeps)
     bldInfo = buildinfo.BuildInfo(builddir)
     recipeObj.buildinfo = bldInfo
-
+    from lib import logger
+    #logger.startLog(recipeClass.filename + '.log')
 
     if not resume:
         destdir = ''

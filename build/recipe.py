@@ -160,7 +160,7 @@ def setupRecipeDict(d, filename):
 
 class RecipeLoader:
     def __init__(self, filename, cfg=None, repos=None, component=None,
-                 branch=None):
+                 branch=None, ignoreInstalled=False):
         self.recipes = {}
         
         if filename[0] != "/":
@@ -186,6 +186,7 @@ class RecipeLoader:
         self.module.__dict__['component'] = component
         self.module.__dict__['branch'] = branch
         self.module.__dict__['name'] = pkgname
+        self.module.__dict__['ignoreInstalled'] = ignoreInstalled
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -208,6 +209,7 @@ class RecipeLoader:
         del self.module.__dict__['component']
         del self.module.__dict__['branch']
         del self.module.__dict__['name']
+        del self.module.__dict__['ignoreInstalled']
 
         found = False
         for (name, obj) in self.module.__dict__.items():
@@ -407,6 +409,7 @@ def loadRecipe(troveSpec, label=None):
     cfg = callerGlobals['cfg']
     repos = callerGlobals['repos']
     branch = callerGlobals['branch']
+    ignoreInstalled = callerGlobals['ignoreInstalled']
     parentPackageName = callerGlobals['name']
 
     oldUsed = use.getUsed()
@@ -448,14 +451,19 @@ def loadRecipe(troveSpec, label=None):
                 labelPath.append(branch.label())
         else:
             labelPath = None
-        db = database.Database(cfg.root, cfg.dbPath)
-        parts = _findInstalledVersion(db, labelPath, name, versionStr, flavor)
-
-        if parts:
-            version, flavor = parts
-            if version.isLocalCook() or version.isEmerge() or version.isLocal():
-                version = version.getSourceVersion().parentVersion()
-            versionStr = version.getSourceVersion().asString()
+        if not ignoreInstalled:
+            # look on the local system to find a trove that is installed that
+            # matches this loadrecipe request.  Use that trove's version
+            # and flavor information to grab the source out of the repository
+            db = database.Database(cfg.root, cfg.dbPath)
+            parts = _findInstalledVersion(db, labelPath, name, 
+                                          versionStr, flavor)
+            if parts:
+                version, flavor = parts
+                if (version.isLocalCook() or version.isEmerge() 
+                    or version.isLocal()):
+                    version = version.getSourceVersion().parentVersion()
+                versionStr = version.getSourceVersion().asString()
         if flavor:
             # override the current flavor with the flavor found in the 
             # installed trove (or the troveSpec flavor, if no installed 
