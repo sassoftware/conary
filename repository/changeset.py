@@ -280,7 +280,7 @@ class ChangeSet:
 		invertedPkg.newFile(fileId, path, version)
 
 		origFile = db.getFileVersion(fileId, version)
-		rollback.addFile(fileId, None, version, origFile.diff(None))
+		rollback.addFile(fileId, None, version, origFile.freeze())
 
 		if not origFile.hasContents:
 		    continue

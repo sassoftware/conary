@@ -172,7 +172,10 @@ class FilesystemJob:
 	fullyUpdated = 1
 	cwd = os.getcwd()
 
-	noIds = ((flags & IGNOREUGIDS) != 0)
+	if (flags & IGNOREUGIDS) or os.getuid():
+	    noIds = True
+	else:
+	    noIds = False
 
 	if fsPkg:
 	    fsPkg = fsPkg.copy()

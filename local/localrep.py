@@ -82,10 +82,11 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 
 	    assert(repos.hasPackageVersion(name, oldVersion))
 
-	    self.oldPackage(repos.getPackageVersion(name, oldVersion))
+	    oldPkg = repos.getPackageVersion(name, oldVersion)
+	    self.oldPackage(oldPkg)
 
 	    for fileId in csPkg.getOldFileList():
-		(oldPath, oldFileVersion) = csPkg.getFile(fileId)
+		(oldPath, oldFileVersion) = oldPkg.getFile(fileId)
 		self.removeFile(fileId, oldFileVersion)
 
 	# for each file which has changed, erase the old version of that
