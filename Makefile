@@ -59,6 +59,7 @@ extra_files = \
 	NEWS			\
 	conary-wrapper.in	\
 	conary.1		\
+        cvcdesc.1               \
 	constants.py.in
 
 dist_files = $(python_files) $(bin_files) $(extra_files)
