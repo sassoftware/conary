@@ -1274,7 +1274,7 @@ static PyObject* _con_prepare(pysqlc* self, PyObject *args)
     {
         return NULL;
     }
-
+    
     if(self->p_db == 0)
     {
         /* There is no open database. */
@@ -1795,6 +1795,12 @@ static PyObject* _precomp_step(pysqlprecomp *self, PyObject *args)
     const char **p_fields=NULL;
     const char **p_col_names=NULL;    
 
+    if(self->p_vm == NULL)
+    {
+        PyErr_SetString(_sqlite_ProgrammingError, "Virtual machine has already been finalized.");
+        return NULL;
+    }
+    
     result=sqlite_step(self->p_vm, &num_fields, &p_fields, &p_col_names);
 
     if (result == SQLITE_ROW) {
@@ -1830,11 +1836,50 @@ static PyObject* _precomp_reset(pysqlprecomp *self, PyObject *args)
     {
         return NULL;
     }
+
+    if(self->p_vm == NULL)
+    {
+        PyErr_SetString(_sqlite_ProgrammingError, "Virtual machine has already been finalized.");
+        return NULL;
+    }
     
     result = sqlite_reset(self->p_vm, &errmsg);
     if (result != SQLITE_OK) {
 	_seterror(result, errmsg);
 	return NULL;
+    }
+    
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static char _precomp_finalize_doc [] =
+"step()\n\
+Frees the virtual machine associated with a precompiled SQL statement.";
+
+static PyObject* _precomp_finalize(pysqlprecomp *self, PyObject *args)
+{
+    char *errmsg;
+    int result;
+
+    if (!PyArg_ParseTuple(args,""))
+    {
+        return NULL;
+    }
+
+    if(self->p_vm == NULL)
+    {
+        PyErr_SetString(_sqlite_ProgrammingError, "Virtual machine has already been finalized.");
+        return NULL;
+    }
+
+    if (self->p_vm != NULL) {
+	result = sqlite_finalize(self->p_vm, &errmsg);
+	if (result != SQLITE_OK) {
+	    _seterror(result, errmsg);
+	    return NULL;
+	}
+	self->p_vm = NULL;
     }
     
     Py_INCREF(Py_None);
@@ -1852,6 +1897,12 @@ static PyObject* _precomp_bind(pysqlprecomp *self, PyObject *args)
     
     if (!PyArg_ParseTuple(args, "is#", &idx, &buf, &len))
     {
+        return NULL;
+    }
+
+    if(self->p_vm == NULL)
+    {
+        PyErr_SetString(_sqlite_ProgrammingError, "Virtual machine has already been finalized.");
         return NULL;
     }
 
@@ -1875,6 +1926,7 @@ static PyMethodDef _precomp_methods[] =
 {
     {"step", (PyCFunction) _precomp_step, METH_VARARGS, _precomp_step_doc},
     {"reset", (PyCFunction) _precomp_reset, METH_VARARGS, _precomp_reset_doc},
+    {"finalize", (PyCFunction) _precomp_finalize, METH_VARARGS, _precomp_finalize_doc},
     {"bind", (PyCFunction) _precomp_bind, METH_VARARGS, _precomp_bind_doc},
     { NULL, NULL}
 };
@@ -1883,18 +1935,30 @@ static PyMethodDef _precomp_methods[] =
 static void
 _precomp_dealloc(pysqlprecomp* self)
 {
-    if(self)
-    {
-	char *errmsg = NULL;
-	int result;
-	if (self->p_vm != NULL) {
-	    result = sqlite_finalize(self->p_vm, &errmsg);
-	    if (result != SQLITE_OK)
-		_seterror(result, errmsg);
-	}
-        Py_DECREF(self->con);
-        PyObject_Del(self);
+    char *errmsg = NULL;
+    int result, have_error;
+    PyObject *err_type, *err_value, *err_traceback;
+    
+    have_error = PyErr_Occurred() ? 1 : 0;
+    if (have_error)
+	PyErr_Fetch(&err_type, &err_value, &err_traceback);    
+    
+    if(self->p_col_def_list != 0) {
+	Py_DECREF(self->p_col_def_list);
+	self->p_col_def_list = 0;
     }
+    
+    if (self->p_vm != NULL) {
+	result = sqlite_finalize(self->p_vm, &errmsg);
+	if (result != SQLITE_OK) {
+	    _seterror(result, errmsg);
+	    PyErr_WriteUnraisable(PyString_FromString("_sqlite.Precompiled.__del__"));
+	    if (have_error)
+		PyErr_Restore(err_type, err_value, err_traceback);
+	}
+    }
+    Py_DECREF(self->con);
+    PyObject_Del(self);
 }
 
 static PyObject* _precomp_get_attr(pysqlprecomp *self, char *attr)

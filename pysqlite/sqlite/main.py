@@ -195,19 +195,28 @@ class PrecompiledCursor:
     def reset(self):
         self.precomp.reset()
 
-    def execute(self, parms=None):
-        if parms:
-            if len(parms) == 1 and \
-               (type(parms[0]) in (DictType, ListType, TupleType) or \
-                        isinstance(parms[0], PgResultSet)):
-                #parms = (self._unicodeConvert(parms[0]),)
-                parms = _quoteall(parms[0])
-            else:
-                #parms = self._unicodeConvert(parms)
-                parms = tuple(map(_quote, parms))
-        
-            for num, parm in enumerate(parms):
+    def bind(self, *args):
+        self.precomp.reset()
+        if args:
+            for num, parm in enumerate(args):
                 self.precomp.bind(num + 1, str(parm))
+
+    def close(self):
+        self.precomp.finalize()
+        try:
+            cursors = self.con.cursors
+            del cursors.data[id(self)]
+        except:
+            pass
+        
+    def execute(self, *args):
+        """
+        bind parameters (if given) to the stored sql query, execute the
+        stored query, and reset the vm.
+        """
+        self.bind(args)
+        self.precomp.step()
+        self.precomp.reset()
 
 class Cursor:
     """Abstract cursor class implementing what all cursor classes have in
