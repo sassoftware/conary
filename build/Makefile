@@ -16,6 +16,7 @@ python_files = __init__.py	\
 	policy.py		\
 	recipe.py		\
 	source.py		\
+	tags.py			\
 	use.py
 
 extra_dist = Makefile
