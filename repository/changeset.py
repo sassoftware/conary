@@ -3,6 +3,7 @@ import files
 import package
 import string
 import versions
+import os
 
 class ChangeSet:
 
@@ -19,7 +20,7 @@ class ChangeSet:
 	lines = control.readLines()
 	i = 0
 	while i < len(lines):
-	    header = lines[i]
+	    header = lines[i][:-1]
 	    i = i + 1
 
 	    if header[0:18] == "SRS PKG CHANGESET ":
@@ -39,13 +40,18 @@ class ChangeSet:
 
 		end = i + lineCount
 		while i < end:
-		    pkg.parse(lines[i])
+		    pkg.parse(lines[i][:-1])
 		    i = i + 1
 
 		self.packages.append(pkg)
 	    elif header[0:19] == "SRS FILE CHANGESET ":
-		fileId = string.split(header)[3]
-		self.files[fileId] = lines[i]
+		(fileId, oldVerStr, newVerStr) = string.split(header)[3:6]
+		if oldVerStr == "(none)":
+		    oldVersion = None
+		else:
+		    oldVersion = versions.VersionFromString(oldVerStr)
+		newVersion = versions.VersionFromString(newVerStr)
+		self.files[fileId] = (oldVersion, newVersion, lines[i][:-1])
 		i = i + 1
 	    else:
 		raise IOError, "invalid line in change set %s" % file
@@ -55,12 +61,16 @@ class ChangeSet:
     def getPackageList(self):
 	return self.packages
 
-    def formatToFile(self, f):
+    def getFileList(self):
+	return self.files.items()
+
+    def formatToFile(self, cfg, f):
 	for pkg in self.packages:
-	    pkg.formatToFile(f)
+	    pkg.formatToFile(self, cfg, f)
+	    print
 
     def getFileChange(self, fileId):
-	return self.files[fileId]
+	return self.files[fileId][2]
 
     def __init__(self):
 	self.packages = []
@@ -80,7 +90,7 @@ def packageChangeSet(packageName, old, oldStr, new, newStr):
     return (rc, filesNeeded)
 	
 # old may be None
-def fileChangeSet(fileId, old, new):
+def fileChangeSet(fileId, old, oldVersion, new, newVersion):
     hash = None
 
     if old and old.__class__ == new.__class__:
@@ -90,12 +100,19 @@ def fileChangeSet(fileId, old, new):
 		  and new.sha1() != old.sha1():
 	    hash = new.sha1()
     else:
-	# different classes
+	# different classes; these are always written as abstract changes
+	old = None
 	diff = new.infoLine() + "\n"
 	if isinstance(new, files.RegularFile):
 	    hash = new.sha1()
 
-    rc = "SRS FILE CHANGESET %s\n" % (fileId) + diff
+    if old:
+	oldStr = oldVersion.asString()
+    else:
+	oldStr = "(none)"
+
+    rc = "SRS FILE CHANGESET %s %s %s\n" % \
+	    (fileId, oldStr, newVersion.asString()) + diff
 
     return (rc, hash)
 
@@ -114,7 +131,8 @@ def CreateFromFilesystem(pkgList, version, outFileName):
 
 	for (fileId, oldVersion, newVersion) in filesNeeded:
 	    (file, realPath, filePath) = fileMap[fileId]
-	    (filecs, hash) = fileChangeSet(fileId, None, file)
+	    (filecs, hash) = fileChangeSet(fileId, None, None, file, 
+					   newVersion)
 
 	    if hash:
 		hashMap[hash] = realPath
@@ -165,7 +183,8 @@ def CreateFromRepository(repos, packageList, outFileName):
 		oldFile = filedb.getVersion(oldVersion)
 	    newFile = filedb.getVersion(newVersion)
 
-	    (filecs, hash) = fileChangeSet(fileId, oldFile, newFile)
+	    (filecs, hash) = fileChangeSet(fileId, oldFile, oldVersion,
+					   newFile, newVersion)
 	    cs = cs + filecs
 	    if hash: hashList.append(hash)
 
