@@ -59,7 +59,7 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
 	    origPkg = db.getTrove(pkg.getName(), ver, pkg.getFlavor(), 
 				  pristine = True)
 	    ver = ver.fork(versions.LocalBranch(), sameVerRel = 1)
-	    list.append((pkg, origPkg, ver))
+	    list.append((pkg, origPkg, ver, 0))
 	    
     result = update.buildLocalChanges(db, list, root = cfg.root)
     if not result: return

@@ -234,8 +234,8 @@ def commit(repos, cfg, message):
     newVersion = helper.nextVersion(repos, state.getName(), recipeVersionStr, 
 				    None, branch, binary = False)
 
-    result = update.buildLocalChanges(repos, [(state, srcPkg, newVersion)],
-				      flags = update.IGNOREUGIDS)
+    result = update.buildLocalChanges(repos, 
+		    [(state, srcPkg, newVersion, update.IGNOREUGIDS)] )
     if not result: return
 
     (changeSet, ((isDifferent, newState),)) = result
@@ -325,9 +325,8 @@ def diff(repos, versionStr = None):
     else:
 	oldPackage = repos.getTrove(state.getName(), state.getVersion(), None)
 
-    result = update.buildLocalChanges(repos, [(state, oldPackage, 
-					       versions.NewVersion())],
-				      flags = update.IGNOREUGIDS)
+    result = update.buildLocalChanges(repos, 
+	    [(state, oldPackage, versions.NewVersion(), update.IGNOREUGIDS)])
     if not result: return
 
     (changeSet, ((isDifferent, newState),)) = result

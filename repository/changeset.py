@@ -188,8 +188,8 @@ class ChangeSet:
 
 	for pkg in self.newPackages.itervalues():
 	    pkg.formatToFile(self, f)
-	for (pkgName, version) in self.oldPackages:
-	    f.write("removed %s %s\n" %
+	for (pkgName, version, flavor) in self.oldPackages:
+	    f.write("remove %s %s\n" %
 		    (pkgName, version.asString()))
 
     def getFileChange(self, fileId):
@@ -424,10 +424,15 @@ class ChangeSet:
 		rollback.addFile(fileId, None, fileVersion, fileObj.freeze())
 		if fileObj.hasContents:
 		    fullPath = db.root + path
-		    fsFile = files.FileFromFilesystem(fullPath, fileId,
-				possibleMatch = fileObj)
 
-		    if fsFile.contents.sha1() == fileObj.contents.sha1():
+		    if os.path.exists(fullPath):
+			fsFile = files.FileFromFilesystem(fullPath, fileId,
+				    possibleMatch = fileObj)
+		    else:
+			fsFile = None
+
+		    if fsFile and \
+			    fsFile.contents.sha1() == fileObj.contents.sha1():
 			# the contents in the file system are right
 			cont = filecontents.FromFilesystem(fullPath)
 		    else:
@@ -438,7 +443,7 @@ class ChangeSet:
 
 		    rollback.addFileContents(fileId,
 					     ChangedFileTypes.file, cont,
-					     fsFile.flags.isConfig())
+					     fileObj.flags.isConfig())
 
 	return rollback
 

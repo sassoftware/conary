@@ -43,6 +43,7 @@ from build import tags
 MERGE = 1 << 0
 REPLACEFILES = 1 << 1
 IGNOREUGIDS = 1 << 2
+MISSINGFILESOKAY = 1 << 3
         
 class FilesystemJob:
     """
@@ -173,8 +174,14 @@ class FilesystemJob:
 	    # don't worry about files which don't exist
 	    try:
 		os.lstat(target)
-	    except OSError:
-		pass	
+	    except OSError, e:
+		if e.errno == errno.ENOENT:
+		    log.warning("%s has already been removed" % 
+				    target[len(self.root):])
+		else:
+		    log.error("%s could not be removed: %s" % 
+				    (target, e.strerror))
+		    raise
 	    else:
 		fileObj.remove(target)
 
@@ -363,6 +370,8 @@ class FilesystemJob:
 			continue
 		    else:
 			raise
+	    else:
+		localFile = None
 
 	    oldFile = repos.getFileVersion(fileId, version)
             # XXX mask out any flag that isn't the config flag.
@@ -371,7 +380,7 @@ class FilesystemJob:
             oldFile.flags.set(oldFile.flags.value() & files._FILE_FLAG_CONFIG)
             
 	    # don't worry about metadata changes, just content changes
-	    if oldFile.hasContents and localFile.hasContents and \
+	    if oldFile.hasContents and localFile and localFile.hasContents and \
 			oldFile.contents != localFile.contents:
 		self.errors.append("%s has changed but has been removed "
 				   "on head" % path)
@@ -667,7 +676,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     @param root: root directory the files are in (ignored for sources, which
     are assumed to be in the current directory)
     @type root: str
-    @param flags: IGNOREUGIDS or zero
+    @param flags: (IGNOREUGIDS|MISSINGFILESOKAY) or zero
     @type flags: int
     """
 
@@ -714,9 +723,13 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	try:
 	    os.lstat(realPath)
 	except OSError:
-	    log.error("%s is missing (use remove if this is intentional)" 
-		% path)
-	    return None
+	    if flags & MISSINGFILESOKAY:
+		newPkg.removeFile(fileId)
+		continue
+	    else:
+		log.error("%s is missing (use remove if this is intentional)" 
+		    % path)
+		return None
 
 	srcFile = repos.getFileVersion(fileId, srcFileVersion)
 
@@ -798,7 +811,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
     return (foundDifference, newPkg)
 
-def buildLocalChanges(repos, pkgList, root = "", flags = 0):
+def buildLocalChanges(repos, pkgList, root = ""):
     """
     Builds a change set against a set of files currently installed and
     builds a package object which describes the files installed.  The
@@ -809,18 +822,16 @@ def buildLocalChanges(repos, pkgList, root = "", flags = 0):
     @param repos: Repository this directory is against.
     @type repos: repository.Repository
     @param pkgList: Specifies which pacakage to work on, and is a list
-    of (curPkg, srcPkg, newVersion) tuples as defined in the parameter
+    of (curPkg, srcPkg, newVersion, flags) tuples as defined in the parameter
     list for _localChanges()
     @param root: root directory the files are in (ignored for sources, which
     are assumed to be in the current directory)
     @type root: str
-    @param flags: IGNOREUGIDS or zero
-    @type flags: int
     """
 
     changeSet = changeset.ChangeSet()
     returnList = []
-    for (curPkg, srcPkg, newVersion) in pkgList:
+    for (curPkg, srcPkg, newVersion, flags) in pkgList:
 	result = _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, 
 			       root, flags)
         if result is None:

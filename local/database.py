@@ -313,7 +313,15 @@ class Database(SqlDbRepository):
 		pkg = self.getTrove(name, old, flavor)
 		origPkg = self.getTrove(name, old, flavor, pristine = 1)
 		assert(pkg)
-		pkgList.append((pkg, origPkg, ver))
+		pkgList.append((pkg, origPkg, ver, 0))
+
+	for (name, version, flavor) in cs.getOldPackageList():
+	    localVersion = version.fork(versions.LocalBranch(), sameVerRel = 1)
+	    pkg = self.getTrove(name, version, flavor)
+	    origPkg = self.getTrove(name, version, flavor, pristine = 1)
+	    assert(pkg)
+	    pkgList.append((pkg, origPkg, localVersion, 
+			    update.MISSINGFILESOKAY))
 
 	result = update.buildLocalChanges(self, pkgList, root = self.root)
 	if not result: return
