@@ -403,6 +403,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             return new
 
+        def _getLocalTroves(troveList):
+            return ([], troveList)
+            
+
         if not chgSetList:
             # no need to work hard to find this out
             return repository.changeset.ReadOnlyChangeSet()
@@ -477,7 +481,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 trovesNeeded.append((troveName, oldVersion, oldFlavor))
                 trovesNeeded.append((troveName, newVersion, newFlavor))
 
-            troves = self.getTroves(trovesNeeded)
+            (troves, trovesNeeded) = _getLocalTroves(trovesNeeded)
+            troves += self.getTroves(trovesNeeded)
+
             i = 0
             for (troveName, (oldVersion, oldFlavor),
                             (newVersion, newFlavor), absolute) in ourJobList:
@@ -788,8 +794,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	r = c.getresponse()
 	assert(r.status == 200)
 
-    def __init__(self, repMap):
+    def __init__(self, repMap, localRepository = None):
+        # the local repository is used as a quick place to check for
+        # troves _getChangeSet needs when it's building changesets which
+        # span repositories. it has no effect on any other operation.
 	self.c = ServerCache(repMap)
+        self.localRep = localRepository
 
 class UnknownException(repository.RepositoryError):
 

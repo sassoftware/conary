@@ -40,6 +40,9 @@ class SqlDbRepository(repository.DataStoreRepository,
 	assert(len(l) == 1)
 	return l[0]
 
+    def getTroves(self, troveList, pristine = False):
+        return self.db.getTroves(troveList, pristine, missingOkay)
+
     def getTroveLatestVersion(self, name, branch):
 	l = [ x.getVersion() for x in self.db.iterFindByName(name)
 		     if branch == x.getVersion().branch() ]

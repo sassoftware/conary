@@ -627,6 +627,38 @@ class Database:
 	for (fileId, stream) in cu:
 	    yield files.ThawFile(stream, fileId)
 
+    def getTroves(self, troveList, pristine):
+        # returns a list parallel to troveList, with nonexistant troves
+        # filled in w/ None
+        cu = self.db.cursor()
+
+        cu.execute("""CREATE TABLE getTrovesTbl(
+                                idx INTEGER PRIMARY KEY,
+                                troveName STRING,
+                                troveVersion STRING,
+                                flavorId INT)
+                   """, start_transaction = False)
+
+        for i, (name, version, flavor) in enumerate(troveList):
+            cu.execute("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",
+                       i, name, version.asString(), self.flavors[flavor],
+                       start_transaction = False)
+
+        cu.execute("""SELECT idx, DBInstances.instanceId FROM getTrovesTbl 
+                        JOIN Versions ON
+                            Versions.version == getTrovesTbl.troveVersion
+                        JOIN DBInstances ON
+                            getTrovesTbl.troveName == DBInstances.troveName AND
+                            getTrovesTbl.flavorId == DBInstances.flavorId AND
+                            DBInstances.versionId == Versions.versionId
+                    """)
+
+        r = [ None ] * len(troveList)
+        for (idx, instanceId) in cu:
+            r[idx] = self._getTrove(pristine, troveInstanceId = instanceId)
+
+        return r
+
     def getTrove(self, troveName, troveVersion, troveFlavor, pristine = False):
 	return self._getTrove(troveName = troveName, 
 			      troveVersion = troveVersion, 
