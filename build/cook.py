@@ -13,7 +13,7 @@ import lookaside
 import shutil
 import types
 
-def cook(repos, cfg, recipeFile, prep=0):
+def cook(repos, cfg, recipeFile, prep=0, macros=()):
     if type(recipeFile) is types.ClassType:
         classList = {recipeFile.__name__: recipeFile}
     else:
@@ -48,7 +48,7 @@ def cook(repos, cfg, recipeFile, prep=0):
 	ident = IdGen(fileIdMap)
 
         srcdirs = [ os.path.dirname(recipeClass.filename), cfg.sourcepath % {'pkgname': recipeClass.name} ]
-	recipeObj = recipeClass(cfg, lcache, srcdirs)
+	recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
 
 	builddir = cfg.buildpath + "/" + recipeObj.name
 
