@@ -28,7 +28,8 @@ _grpFormat  = "  %-37s %s"
 
 def displayTroves(repos, cfg, troveList = [], all = False, ls = False, 
                   ids = False, sha1s = False, leaves = False, 
-                  fullVersions = False, info = False, tags = False):
+                  fullVersions = False, info = False, tags = False,
+                  deps = False):
     hasVersions = False
 
     if troveList:
@@ -57,14 +58,14 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 
             troves += [ (x, None) for x in repos.iterAllTroveNames(host) ]
 
-    if hasVersions or ls or ids or sha1s or info or tags:
+    if hasVersions or ls or ids or sha1s or info or tags or deps:
 	if all:
 	    log.error("--all cannot be used with queries which display file "
 		      "lists")
 	    return
 	for troveName, versionStr in troves:
 	    _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-			      info, tags, fullVersions)
+			      info, tags, deps, fullVersions)
 	    continue
     else:
 	if all or leaves:
@@ -164,7 +165,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 					      versionStrs[version])
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-		      info, tags, fullVersions):
+		      info, tags, deps, fullVersions):
     try:
 	troveList = repos.findTrove(cfg.installLabelPath, troveName, 
 				    cfg.flavor, versionStr,
@@ -228,7 +229,17 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		print "Change log: %s (%s)" % (cl.getName(), cl.getContact())
 		lines = cl.getMessage().split("\n")[:-1]
 		for l in lines:
-		    print "    %s" % l
+		    print "    ", l
+        elif deps:
+            for name, dep in (('Provides', trove.provides),
+                              ('Requires', trove.requires)):
+                print '%s:' %name
+                if not dep:
+                    print '     None'
+                else:
+                    lines = str(dep).split('\n')
+                    for l in lines:
+                        print '    ', l
 	else:
 	    if fullVersions or len(troveList) > 1:
 		print _troveFormat % (trove.getName(), version.asString())

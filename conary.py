@@ -115,6 +115,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
     argDef["debug"] = NO_PARAM
+    argDef["deps"] = NO_PARAM
     argDef["full-versions"] = NO_PARAM
     argDef["ids"] = NO_PARAM
     argDef["info"] = NO_PARAM
@@ -289,13 +290,16 @@ def realMain(cfg, argv=sys.argv):
 	leaves = argSet.has_key('leaves')
 	if leaves: del argSet['leaves']
 
+	deps = argSet.has_key('deps')
+	if deps: del argSet['deps']
+
 	repos = openRepository(cfg.repositoryMap)
 
 	if argSet: return usage()
 
 	if len(otherArgs) >= 2:
 	    args = [repos, cfg, otherArgs[2:], all, ls, ids, sha1s, leaves, 
-                    fullVersions, info, tags] 
+                    fullVersions, info, tags, deps] 
 	    try:
 		queryrep.displayTroves(*args)
 	    except IOError, msg:
