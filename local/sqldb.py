@@ -654,8 +654,12 @@ class Database:
                    """, start_transaction = False)
 
         for i, (name, version, flavor) in enumerate(troveList):
+            flavorId = self.flavors.get(flavor, "")
+            if flavorId == "":
+                continue
+
             cu.execute("INSERT INTO getTrovesTbl VALUES(?, ?, ?, ?)",
-                       i, name, version.asString(), self.flavors[flavor],
+                       i, name, version.asString(), flavorId,
                        start_transaction = False)
 
         cu.execute("""SELECT idx, DBInstances.instanceId FROM getTrovesTbl 
