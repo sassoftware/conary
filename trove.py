@@ -6,12 +6,13 @@ import string
 class Package:
 
     def addFile(self, path, version):
-	self.files[path] = version
+	self.files["/files" + path] = version
 
     def fileList(self):
 	l = []
-	for item in self.files.items():
-	    l.append(item)
+	# rip off the /files prefix
+	for (path, file) in self.files.items():
+	    l.append((path[6:], file))
 
 	return l
 
@@ -28,7 +29,8 @@ class PackageFromFile(Package):
     def read(self, dataFile):
 	for line in dataFile.readLines():
 	    (path, version) = string.split(line)
-	    self.addFile(path, version)
+	    # remove the "files/" bit
+	    self.addFile(path[6:], version)
 
     def __init__(self, name, dataFile):
 	Package.__init__(self, name)
