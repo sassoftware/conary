@@ -55,7 +55,12 @@ def magic(path, basedir=''):
     """
     if basedir and not basedir.endswith('/'):
 	basedir += '/'
-    f = file(basedir+path)
+
+    n = basedir+path
+    if os.path.isdir(n):
+	return None
+
+    f = file(n)
     b = f.read(4096)
     f.close()
     if len(b) > 4 and b[0] == '\x7f' and b[1:4] == "ELF":
@@ -66,6 +71,8 @@ def magic(path, basedir=''):
 	return gzip(path, basedir, b)
     elif len(b) > 3 and b[0:3] == "BZh":
 	return bzip(path, basedir, b)
+
+    return None
 
 # internal helpers
 
