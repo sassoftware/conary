@@ -51,35 +51,29 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	else:
 	    newVersion = None
 
-	list = []
 	bail = 0
-	for pkgName in repos.getPackageList(pkg):
-	    if not newVersion:
-		newVersion = repos.pkgLatestVersion(pkgName, cfg.defaultbranch)
 
-	    if not repos.hasPackageVersion(pkgName, newVersion):
-		sys.stderr.write("package %s does not contain version %s\n" %
-				     (pkgName, newVersion.asString()))
-		bail = 1
+	if not newVersion:
+	    newVersion = repos.pkgLatestVersion(pkg, cfg.defaultbranch)
+
+	if not repos.hasPackage(pkg):
+            log.error("repository does not contain a package called %s\n" % pkg)
+	    bail = 1
+	elif not repos.hasPackageVersion(pkg, newVersion):
+	    log.error("package %s does not contain version %s\n" %
+				 (pkg, newVersion.asString()))
+	    bail = 1
+	else:
+	    if db.hasPackage(pkg):
+		currentVersion = db.pkgLatestVersion(pkg, 
+						     newVersion.branch())
 	    else:
-		if db.hasPackage(pkgName):
-		    currentVersion = db.pkgLatestVersion(pkgName, 
-							 newVersion.branch())
-		else:
-		    currentVersion = None
+		currentVersion = None
 
-		list.append((pkgName, currentVersion, newVersion, 0))
-
-	if not list:
-	    log.error("package %s was not found", pkg)
-	    return
+	    list = [(pkg, currentVersion, newVersion, 0)]
 
 	if bail:
 	    return
-
-        if not list:
-            sys.stderr.write("repository does not contain a package called %s\n" % pkg)
-            return
 
 	cs = repos.createChangeSet(list)
 	cs.remapPaths(map)
