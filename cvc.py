@@ -22,8 +22,8 @@ argDef['dir'] = 1
 
 def usage(rc = 1):
     print "usage: conary source add <file> [<file2> <file3> ...]"
-    print "       conary source checkout [--dir <dir>] <group> <version>"
-    print "       conary source commit"
+    print "       conary source checkout [--dir <dir>] <trove> <version>"
+    print "       conary source commit [--message <message>]"
     print "       conary source diff"
     print "       conary source log [<branch>]"
     print "       conary source newpkg <name>"
