@@ -1462,7 +1462,7 @@ static PyObject *build_row(pysqlc* p_con, int num_fields, char** p_fields,
     PyObject* type_code;
     PyObject* converters;
     PyObject* converted;
-    PyObject* expected_type_name;
+    PyObject* expected_type_name = NULL;
     PyObject* callable;
     PyObject* callable_args;
     int i;
