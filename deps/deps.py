@@ -326,7 +326,6 @@ class AbiDependency(DependencyClass):
 
     tag = DEP_CLASS_ABI
     tagName = "abi"
-    exactMatch = True
     justOne = False
     depClass = Dependency
 _registerDepClass(AbiDependency)
@@ -335,7 +334,6 @@ class InstructionSetDependency(DependencyClass):
 
     tag = DEP_CLASS_IS
     tagName = "is"
-    exactMatch = True
     justOne = True
     depClass = Dependency
 _registerDepClass(InstructionSetDependency)
@@ -344,7 +342,6 @@ class OldSonameDependencies(DependencyClass):
 
     tag = DEP_CLASS_OLD_SONAME
     tagName = "oldsoname"
-    exactMatch = True
     justOne = False
     depClass = Dependency
 _registerDepClass(OldSonameDependencies)
@@ -353,7 +350,6 @@ class SonameDependencies(DependencyClass):
 
     tag = DEP_CLASS_SONAME
     tagName = "soname"
-    exactMatch = True
     justOne = False
     depClass = Dependency
 _registerDepClass(SonameDependencies)
@@ -362,7 +358,6 @@ class FileDependencies(DependencyClass):
 
     tag = DEP_CLASS_FILES
     tagName = "file"
-    exactMatch = True
     justOne = False
     depClass = Dependency
 _registerDepClass(FileDependencies)
@@ -371,7 +366,6 @@ class TroveDependencies(DependencyClass):
 
     tag = DEP_CLASS_TROVES
     tagName = "trove"
-    exactMatch = True
     justOne = False
     depClass = Dependency
 
@@ -389,9 +383,6 @@ class UseDependency(DependencyClass):
 
     tag = DEP_CLASS_USE
     tagName = "use"
-    # XXX this is a hack to avoid throwing out troves in the repos that
-    # have a Use flag flavor.
-    exactMatch = False
     justOne = True
     depClass = Dependency
 _registerDepClass(UseDependency)
@@ -413,9 +404,6 @@ class DependencySet:
     def score(self,other):
         score = 0
 	for tag in other.members:
-            # XXX might not be the right semantic for exactMatch
-            if not other.members[tag].exactMatch:
-                continue
 	    if not self.members.has_key(tag): 
 		return False
 
@@ -630,22 +618,27 @@ del ident, flag, useFlag, archClause, useClause, exp
 # None means disallowed match
 flavorScores = {
       (FLAG_SENSE_UNSPECIFIED, FLAG_SENSE_REQUIRED ) : None,
+      (FLAG_SENSE_UNSPECIFIED, FLAG_SENSE_DISALLOWED):    0,
       (FLAG_SENSE_UNSPECIFIED, FLAG_SENSE_PREFERRED) :   -1,
       (FLAG_SENSE_UNSPECIFIED, FLAG_SENSE_PREFERNOT) :    1,
 
       (FLAG_SENSE_REQUIRED,    FLAG_SENSE_REQUIRED ) :    2,
+      (FLAG_SENSE_REQUIRED,    FLAG_SENSE_DISALLOWED): None,
       (FLAG_SENSE_REQUIRED,    FLAG_SENSE_PREFERRED) :    1,
       (FLAG_SENSE_REQUIRED,    FLAG_SENSE_PREFERNOT) : None,
 
       (FLAG_SENSE_DISALLOWED,  FLAG_SENSE_REQUIRED ) : None,
+      (FLAG_SENSE_DISALLOWED,  FLAG_SENSE_DISALLOWED):    2,
       (FLAG_SENSE_DISALLOWED,  FLAG_SENSE_PREFERRED) : None,
       (FLAG_SENSE_DISALLOWED,  FLAG_SENSE_PREFERNOT) :    1,
 
       (FLAG_SENSE_PREFERRED,   FLAG_SENSE_REQUIRED ) :    1,
+      (FLAG_SENSE_PREFERRED,   FLAG_SENSE_DISALLOWED): None,
       (FLAG_SENSE_PREFERRED,   FLAG_SENSE_PREFERRED) :    2,
       (FLAG_SENSE_PREFERRED,   FLAG_SENSE_PREFERNOT) :   -1,
 
       (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_REQUIRED ) :   -2,
+      (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_DISALLOWED):    1,
       (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_PREFERRED) :   -1,
       (FLAG_SENSE_PREFERNOT,   FLAG_SENSE_PREFERNOT) :    1 
 }
