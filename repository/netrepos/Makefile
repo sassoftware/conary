@@ -3,11 +3,15 @@
 # All rights reserved
 #
 
-python_files =  __init__.py	\
-		filecontents.py	\
-		fsrepos.py	\
-		changeset.py	\
-		repository.py	\
+python_files =  __init__.py		\
+		deptable.py		\
+		idtable.py		\
+		instances.py		\
+		instructionsets.py	\
+		items.py		\
+		trovecontents.py	\
+		trovestore.py		\
+		versionops.py
 
 extra_dist = Makefile
 dist_files = $(python_files) $(extra_dist)
