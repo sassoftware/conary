@@ -5,6 +5,8 @@
 import files
 import sys
 import versions
+import os
+import util
 
 def doUpdate(repos, cfg, pkg, mainPackageName):
     if cfg.root == "/":
@@ -24,6 +26,9 @@ def doUpdate(repos, cfg, pkg, mainPackageName):
 	f.restore(repos, cfg.root + path)
 
 def update(repos, cfg, pkg, versionStr = None):
+    if not os.path.exists(cfg.root):
+        util.mkdirChain(cfg.root)
+    
     if pkg and pkg[0] != "/":
 	pkg = cfg.packagenamespace + "/" + pkg
 
