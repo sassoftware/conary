@@ -65,7 +65,7 @@ def main(argv):
         if arg == '--except':
             arg = args[0]
             args = args[1:]
-            updateExceptions = arg.split(',')
+            updateExceptions.extend(arg.split(','))
             lastArg = ''
             continue
         elif arg == '--missing':
@@ -147,7 +147,7 @@ def main(argv):
                 else:
                     repoVersions.sort()
                     v = repoVersions[-1]
-                    if v.isAfter(lv):
+                    if v.isAfter(lv) and v not in dbVersions:
                         updates.append((branch, pkg, lv, v))
 
     maxL = 0
