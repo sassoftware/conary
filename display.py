@@ -27,7 +27,12 @@ def displayPkgInfo(repos, cfg, pkgName, versionStr):
     version = versions.VersionFromString(versionStr)
 
     pkgSet = repos.getPackageSet(pkgName)
-    pkg = pkgSet.getVersion(version)
+
+    if version.isBranch():
+	pkg = pkgSet.getLatestPackage(version)
+    else:
+	pkg = pkgSet.getVersion(version)
+
     print "%-39s %s" % (
 	    package.stripNamespace(cfg.packagenamespace, pkgName),
 	    version.asString(cfg.defaultbranch)
