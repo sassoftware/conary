@@ -7,6 +7,7 @@
 import changeset
 import commit
 import cook
+import database
 import display
 import os
 import repository
@@ -194,7 +195,7 @@ elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
     if otherArgs[1] == "replist":
 	queryRepos = repository.Repository(cfg.reppath, "r")
     else:
-	queryRepos = repository.Database(cfg.root, cfg.dbpath, "r")
+	queryRepos = database.Database(cfg.root, cfg.dbpath, "r")
 
     if argSet: usage
 
@@ -211,7 +212,7 @@ elif (otherArgs[1] == "update"):
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	repos = repository.Repository(cfg.reppath, "r")
-	db = repository.Database(cfg.root, cfg.dbpath, "c")
+	db = database.Database(cfg.root, cfg.dbpath, "c")
 
 	args = [repos, db, cfg] + otherArgs[2:]
 	update.doUpdate(*args)
@@ -224,10 +225,10 @@ elif (otherArgs[1] == "config"):
     else:
 	cfg.display()
 elif (otherArgs[1] == "rblist"):
-    db = repository.Database(cfg.root, cfg.dbpath, "r")
+    db = database.Database(cfg.root, cfg.dbpath, "r")
     rollbacks.listRollbacks(db, cfg)
 elif (otherArgs[1] == "rollback"):
-    db = repository.Database(cfg.root, cfg.dbpath, "c")
+    db = database.Database(cfg.root, cfg.dbpath, "c")
     args = [db, cfg] + otherArgs[2:]
     rollbacks.apply(*args)
 else:
