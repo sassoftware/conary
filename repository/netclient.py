@@ -34,7 +34,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=9
+CLIENT_VERSION=10
 
 class _Method(xmlrpclib._Method):
 
@@ -454,11 +454,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             firstPass = False
 
-        if withFiles:
+        if withFiles and filesNeeded:
             need = []
             for (troveName, troveVersion, troveFlavor, 
                     (fileId, oldFileVersion, newFileVersion, 
                      oldPath, newPath)) in filesNeeded:
+                if oldFileVersion:
+                    need.append((fileId, oldFileVersion))
                 need.append((fileId, newFileVersion))
 
             fileObjs = self.getFileVersions(need)
@@ -469,12 +471,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             for (troveName, troveVersion, troveFlavor, 
                     (fileId, oldFileVersion, newFileVersion, 
                      oldPath, newPath)) in filesNeeded:
-                fileObj = fileDict[(fileId, newFileVersion)]
+                if oldFileVersion:
+                    oldFileObj = fileDict[(fileId, oldFileVersion)]
+                else:
+                    oldFileObj = None
+
+                newFileObj = fileDict[(fileId, newFileVersion)]
 
 		(filecs, hash) = repository.changeset.fileChangeSet(fileId, 
-                                                None, fileObj)
+                                                oldFileObj, newFileObj)
 
-		internalCs.addFile(fileId, None, newFileVersion, filecs)
+		internalCs.addFile(fileId, oldFileVersion, newFileVersion, 
+                                   filecs)
 
                 if withFileContents and hash:
                     cont = self.getFileContents(troveName, troveVersion, 
@@ -511,12 +519,25 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return r
 
-    def getFileVersions(self, l):
-        r = []
-        for (fileId, version) in l:
-            r.append(self.getFileVersion(fileId, version))
+    def getFileVersions(self, fullList):
+        byServer = {}
+        for i, (fileId, version) in enumerate(fullList):
+            server = version.branch().label().getHost()
+            if not byServer.has_key(server):
+                byServer[server] = []
+            byServer[server].append((i, (self.fromFileId(fileId), 
+                                     self.fromVersion(version))))
+        
+        result = [ None ] * len(fullList)
 
-        return r
+        for (server, l) in byServer.iteritems():
+            sendL = [ x[1] for x in l ]
+            idxL = [ x[0] for x in l ]
+            fileStreams = self.c[server].getFileVersions(sendL)
+            for (fileStream, idx) in zip(fileStreams, idxL):
+                result[idx] = self.toFile(fileStream)
+
+        return result
 
     def getFileVersion(self, fileId, version):
         return self.toFile(self.c[version].getFileVersion(
