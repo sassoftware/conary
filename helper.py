@@ -63,6 +63,7 @@ def findPackage(repos, packageNamespace, defaultNick, name,
     #   2. it only has one element (no /)
     #   3. it contains an @ sign
     if not versionStr or (versionStr[0] != "/" and  \
+	# branch nickname was given
 	    (versionStr.find("/") == -1) and versionStr.count("@")):
 	if versionStr:
 	    try:
@@ -80,7 +81,8 @@ def findPackage(repos, packageNamespace, defaultNick, name,
 	pkgList = []
 	for branch in branchList:
 	    pkgList.append(repos.getLatestPackage(name, branch))
-    elif versionStr[0] != "/":
+    elif versionStr[0] != "/" and versionStr.find("/") == -1:
+	# version/release was given
 	branchList = repos.getPackageNickList(name, defaultNick)
 	if not branchList:
 	    raise PackageNotFound, \
@@ -106,6 +108,10 @@ def findPackage(repos, packageNamespace, defaultNick, name,
 	    raise PackageNotFound, \
 		"version %s of %s is not on any branch named %s" % \
 		(versionStr, name, str(defaultNick))
+    elif versionStr[0] != "/":
+	# partial version string, we don't support this
+	raise PackageNotFound, \
+	    "incomplete version string %s not allowed" % versionStr
     else:
 	try:
 	    version = versions.VersionFromString(versionStr)
