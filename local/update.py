@@ -148,11 +148,15 @@ class FilesystemJob:
 			  " ".join(newlines))
 		ldsofd, ldsotmpname = tempfile.mkstemp(
 		    'ld.so.conf', '.ct', sysetc)
-		ldso = os.fdopen(ldsofd, 'w')
-		os.chmod(ldsotmpname, 0644)
-		ldso.writelines(ldsolines)
-		ldso.close()
-		os.rename(ldsotmpname, ldsopath)
+		try:
+		    ldso = os.fdopen(ldsofd, 'w')
+		    os.chmod(ldsotmpname, 0644)
+		    ldso.writelines(ldsolines)
+		    ldso.close()
+		    os.rename(ldsotmpname, ldsopath)
+		except:
+		    os.unlink(ldsotmpname)
+		    raise
 	    if os.access(util.joinPaths(self.root, p), os.X_OK) != True:
 		log.error("/sbin/ldconfig is not available")
 	    else:

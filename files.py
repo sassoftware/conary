@@ -801,12 +801,16 @@ class RegularFile(File):
 		util.mkdirChain(path)
 
 	    tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
-	    File.restore(self, tmpname, restoreContents)
-	    f = os.fdopen(tmpfd, 'w')
-            util.copyfileobj(src, f)
-	    f.close()
-	    os.rename(tmpname, target)
-	    self.setMtime(target)
+	    try:
+		File.restore(self, tmpname, restoreContents)
+		f = os.fdopen(tmpfd, 'w')
+		util.copyfileobj(src, f)
+		f.close()
+		os.rename(tmpname, target)
+		self.setMtime(target)
+	    except:
+		os.unlink(tmpname)
+		raise
 
 	else:
 	    File.restore(self, target, restoreContents)
