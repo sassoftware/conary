@@ -8,9 +8,12 @@ import enum
 import filecontainer
 import filecontents
 import files
+import helper
+import log
 import os
 import package
 import patch
+import update
 import versions
 
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff")
@@ -502,3 +505,31 @@ def ChangeSetCommand(repos, cfg, pkgName, outFileName, oldVersionStr, \
 
     cs = repos.createChangeSet(list)
     cs.writeToFile(outFileName)
+
+def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
+    if pkgName[0] != ":":
+	pkgName = cfg.packagenamespace + ":" + pkgName
+
+    try:
+	pkgList = helper.findPackage(db, cfg.packagenamespace, 
+				     cfg.installbranch, pkgName, None)
+    except helper.PackageNotFound, e:
+	log.error(e)
+	return
+
+    list = [ (x, x, x.getVersion().fork(versions.LocalBranch(), sameVerRel = 1))
+		for x in pkgList ]
+
+    result = update.buildLocalChanges(db, list, root = cfg.root)
+    if not result: return
+    cs = result[0]
+    hasChanges = False
+    for (changed, fsPkg) in result[1]:
+	if changed:
+	    hasChanges = True
+	    break
+
+    if not changed:
+	log.error("there have been no local changes")
+    else:
+	cs.writeToFile(outFileName)
