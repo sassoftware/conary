@@ -35,6 +35,7 @@ class Flag(dict):
     def __init__(self, value=None, name=None, showdefaults=True, parent=None, 
                  createOnAccess=False, required=True, track=False):
 	self._showdefaults = showdefaults
+        assert(isinstance(value, bool) or value is None)
         self._value = value
         self._short = ""
         self._long = ""
@@ -62,6 +63,7 @@ class Flag(dict):
         return self._required
 
     def _set(self, value):
+        assert(isinstance(value, bool) or value is None)
         self._value = value
 
     def __repr__(self):
@@ -98,9 +100,12 @@ class Flag(dict):
 	return self.__rand__(other)
 
     def __nonzero__(self):
+        if not isinstance(self._value, bool):
+            raise RuntimeError, ('checking nonzero of %s,'
+                                 ' which is not bool' % self._name)
         if self._track and self._value is not None:
             self._used = True
-        return self._value
+        return bool(self._value)
 
     def _freeze(self):
 	self._frozen = True
@@ -113,10 +118,10 @@ class Flag(dict):
             self[key]._set(bool(value))
         else:
             # override flag values that haven't been entered yet
-            self[key] = Flag(value=value, name=key, parent=self,
+            self[key] = Flag(value=bool(value), name=key, parent=self,
                 createOnAccess=self._createOnAccess, required=self._required,
                 track=self._track)
-	self._overrides[key] = value
+	self._overrides[key] = bool(value)
 
     def __delattr__(self, key):
         """ Remove a flag from this flag set """
@@ -300,17 +305,18 @@ class Flag(dict):
             self = self.asSet()
         if 'Use' in self or 'Flags' in self:
             stringDeps = []
-            if 'Use' in self:
+            if 'Use' in self and self.Use.keys():
                 for flag in self.Use.iterkeys():
                     stringDeps.extend(self.Use[flag].toDepStrings(topflag=self.Use))
-            if 'Flags' in self:
+            if 'Flags' in self and self.Flags.keys():
                 assert(recipename)
                 for flag in self.Flags.iterkeys():
                     stringDeps.extend(
                         self.Flags[flag].toDepStrings(prefix=recipename,
                                                    topflag=self.Flags))
-            dep = deps.Dependency('use', stringDeps)
-            set.addDep(deps.UseDependency, dep)
+            if stringDeps:
+                dep = deps.Dependency('use', stringDeps)
+                set.addDep(deps.UseDependency, dep)
         if 'Arch' in self:
             excludeFlags = ['bits64', 'bits32', 'BE', 'LE' ] 
             for arch, topflag in self['Arch'].iteritems():
