@@ -370,6 +370,9 @@ class ChangeSetJob:
 	self.files[fileObject.fileId()] = fileObject
 	self.filePaths[fileObject.path] = 1
 
+    def getFile(self, fileId):
+	return self.files[fileId]
+
     def containsFilePath(self, path):
 	return self.filePaths.has_key(path)
 
@@ -522,7 +525,7 @@ class FileContentsFromFilesystem(FileContents):
 class FileContentsFromChangeSet(FileContents):
 
     def get(self):
-	return self.absCS.getFileContents(self.hash)
+	return self.cs.getFileContents(self.hash)
 
     def __init__(self, cs, hash):
 	self.cs = cs
