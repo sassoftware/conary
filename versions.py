@@ -405,16 +405,6 @@ class Version:
 	"""
 	return(len(self.versions) >= 3)
 
-    def isBefore(self, other):
-	"""
-	Tests whether the parameter is a version earlier then this object.
-
-	@param other: Object to test against
-	@type other: Version
-	@rtype: boolean
-	"""
-	return self.timeStamp < other.timeStamp
-
     def isAfter(self, other):
 	"""
 	Tests whether the parameter is a version later then this object.
@@ -455,25 +445,14 @@ class Version:
 
 	return Version(self.versions + newlist, time.time())
 
-    def parseVersionString(self, ver, defaultBranch = None):
+    def parseVersionString(self, ver):
 	"""
 	Converts a string representation of a version into a VersionRelease
 	object.
 
 	@param ver: version string
 	@type ver: str
-	@param defaultBranch: if provided and the ver parameter is not
-	fully-qualified (it doesn't begin with a /), ver is taken to
-	be relative to this branch.
-	@type defaultBranch: Version
 	"""
-	if ver[0] != "/":
-            # XXX broken code, no defaultBranch in this scope
-	    if not defaultBranch:
-		raise KeyError, "relative version given without a default " \
-			        "branch"
-	    ver = defaultBranch.asString() + "/" + ver
-
 	parts = ver.split("/")
 	del parts[0]	# absolute versions start with a /
 
@@ -549,13 +528,10 @@ class _VersionFromString(Version):
 	be relative to this branch.
 	@type defaultBranch: Version
 	"""
-	if ver[0] == "@NEW@":
-	    return NewVersion()
-
 	if ver[0] != "/":
 	    ver = defaultBranch.asString() + "/" + ver
 
-	v = self.parseVersionString(ver, defaultBranch)
+	v = self.parseVersionString(ver)
 
 	Version.__init__(self, v, 0)
 
@@ -573,9 +549,6 @@ class ParseError(VersionsError):
     Indicates that an error occured turning a string into an object
     in the versions module.
     """
-
-    def __repr__(self):
-	return self.str
 
     def __str__(self):
 	return self.str
