@@ -165,9 +165,9 @@ class FilesystemJob:
 
 	for (fileId, fileObj, target, override, msg) in self.restores:
 	    # None means "don't restore contents"; "" means "take the
-	    # contents from the change set". If we take the file contents
-            # from the change set, we look for the opportunity to make
-            # a hard link instead of actually restoring it.
+	    # contents from the change set or from the database". If we 
+            # take the file contents from the change set, we look for the
+            # opportunity to make a hard link instead of actually restoring it.
 	    fileObj = files.ThawFile(fileObj, fileId)
 
             if override == "" and fileObj.hasContents and fileObj.linkGroup.value():
@@ -186,11 +186,16 @@ class FilesystemJob:
 	    if override != "":
 		contents = override
 	    elif fileObj.hasContents:
-		contType, contents = self.changeSet.getFileContents(fileId)
-		assert(contType != changeset.ChangedFileTypes.diff)
-                if contType == changeset.ChangedFileTypes.ptr:
-                    ptrId = contents.get().read()
-                    contents = filecontents.FromFilesystem(restored[ptrId])
+                if fileObj.flags.isConfig() and not fileObj.flags.isSource():
+                    # take the config file from the local database
+                    contents = self.repos.getFileContents(
+                                    None, None, None, None, None, fileObj)
+                else:
+                    contType, contents = self.changeSet.getFileContents(fileId)
+                    assert(contType != changeset.ChangedFileTypes.diff)
+                    if contType == changeset.ChangedFileTypes.ptr:
+                        ptrId = contents.get().read()
+                        contents = filecontents.FromFilesystem(restored[ptrId])
 
             restored[fileId] = target
 	    fileObj.restore(contents, self.root, target, contents != None)
@@ -302,7 +307,7 @@ class FilesystemJob:
     def getDirectoryCountSet(self):
 	return self.directorySet
 
-    def _singlePackage(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
+    def _singleTrove(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
 		       flags):
 	"""
 	Build up the todo list for applying a single package to the
@@ -734,13 +739,13 @@ class FilesystemJob:
 	    if old:
 		localVer = old.fork(versions.LocalBranch(), sameVerRel = 1)
 		basePkg = repos.getTrove(name, old, pkgCs.getOldFlavor())
-		pkg = self._singlePackage(repos, pkgCs, changeSet, basePkg, 
+		pkg = self._singleTrove(repos, pkgCs, changeSet, basePkg, 
 				      fsPkgDict[(name, localVer)], root, flags)
 		self.oldPackages.append((basePkg.getName(), 
 					 basePkg.getVersion(),
 					 basePkg.getFlavor()))
 	    else:
-		pkg = self._singlePackage(repos, pkgCs, changeSet, None, 
+		pkg = self._singleTrove(repos, pkgCs, changeSet, None, 
 					  None, root, flags)
 
 	    self.newPackages.append(pkg)
