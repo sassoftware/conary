@@ -2,7 +2,7 @@ import rpm
 import os
 import files
 import util
-import package
+import commit
 
 def doImport(DBPATH, rpmFile):
     scratch = DBPATH + "/scratch"
@@ -48,30 +48,9 @@ def doImport(DBPATH, rpmFile):
 	f.md5(md5s[i])
 	fileList.append(f)
 
-    pkgSet = package.PackageSet(DBPATH, pkgName)
-    if pkgSet.hasVersion(version):
-	raise KeyError, ("package %s version %s is already installed" %
-		    (pkgName, version))
-    p = pkgSet.createVersion(version)
+    util.mkdirChain(scratch)
 
     os.system("cd %s; rpm2cpio %s | cpio -iumd --quiet" % (scratch, pkgFile))
+    commit.finalCommit(DBPATH, pkgName, version, scratch, fileList)
+    os.system("rm -rf %s" % scratch)
 
-    for file in fileList:
-	dest = fileDB + "/" + file.dir() + "/" + file.name() + ".contents" 
-
-	util.mkdirChain(dest)
-	dest = dest + "/" + file.md5()
-	os.rename(scratch + "/" + file.path(), dest)
-
-	infoFile = files.FileDB(DBPATH, file.path())
-
-	existing = infoFile.findVersion(file)
-	if not existing:
-	    file.version(version)
-	    infoFile.addVersion(version, file)
-	    p.addFile(file.path(), file.version())
-	    infoFile.write()
-	else:
-	    p.addFile(file.path(), existing[0])
-
-    pkgSet.write()

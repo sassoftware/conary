@@ -1,6 +1,9 @@
 import string
 import os
 import versioned
+import md5sum
+import pwd
+import grp
 
 class FileMode:
 
@@ -192,3 +195,16 @@ class FileDB:
 	self.path = path
 	self.dbfile = dbpath + '/files' + path + '.info'
 	self.read()
+
+def FileFromFilesystem(path):
+    f = RegularFile(path)
+    (perms, inode, dev, links, uid, gid, size, atime, mtime, ctime) = \
+	os.stat(path)
+    f.perms(perms)
+    f.owner(pwd.getpwuid(uid)[0])
+    f.group(grp.getgrgid(gid)[0])
+    f.mtime(mtime)
+    f.md5(md5sum.md5sum(path))
+
+    return f
+

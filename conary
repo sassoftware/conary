@@ -7,18 +7,20 @@ import importrpm
 import string
 import package
 import update
+import commit
 
 DBPATH=os.getcwd() + "/srsdb"
 ROOT=os.getcwd() + "/root"
 
-scratch = DBPATH + "/scratch"
 fileDB = DBPATH + "/files"
 pkgDB = DBPATH + "/pkgs"
-util.mkdirChain(scratch, fileDB, pkgDB)
+util.mkdirChain(fileDB, pkgDB)
 
 def usage():
     print "usage: srs import <file.rpm>"
-    print "           pkglist <pkg>"
+    print "       srs pkglist <pkg>"
+    print "       srs update  <pkg>"
+    print "       srs commit  <pkg> <version> <root> <filelist>"
     sys.exit(0)
 
 def displayPkgs(DBPATH, packageList):
@@ -41,5 +43,11 @@ elif (sys.argv[1] == "pkglist"):
 elif (sys.argv[1] == "update"):
     for pkg in sys.argv[2:]:
 	update.doUpdate(DBPATH, ROOT, pkg)
+elif (sys.argv[1] == "commit"):
+    if (len(sys.argv) != 6 or sys.argv[3][0] != "/"):
+	print "usage: srs commit <pkg> <version> <root> <filelist>"
+	sys.exit(1)
+
+    commit.doCommit(DBPATH, sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
 else:
     usage()
