@@ -10,6 +10,7 @@ import copy
 import datastore
 import difflib
 import fcntl
+import filecontents
 import files
 import os
 import package
@@ -80,7 +81,7 @@ class Repository:
 	file = fileDB.getVersion(version)
 	if withContents:
 	    if isinstance(file, files.RegularFile): 
-		cont = FileContentsFromRepository(self, file.sha1())
+		cont = filecontents.FromRepository(self, file.sha1())
 	    else:
 		cont = None
 
@@ -213,7 +214,7 @@ class LocalRepository(Repository):
 						    "old", "new")
 			diff.next()
 			diff.next()
-			cont = FileContentsFromString("".join(diff))
+			cont = filecontents.FromString("".join(diff))
 			cs.addFileContents(hash, 
 				    changeset.ChangedFileTypes.diff, cont)
 		    else:
@@ -521,8 +522,8 @@ class ChangeSetJob:
 		    f = repos.pullFileContentsObject(oldfile.sha1())
 		    oldLines = f.readlines()
 		    diff = fileContents.get().readlines()
-		    newLines = patch.patch(oldLines, diff)
-		    fileContents = FileContentsFromString("".join(newLines))
+		    (newLines, failedHunks) = patch.patch(oldLines, diff)
+		    fileContents = filecontents.FromString("".join(newLines))
 	    else:
 		fileContents = None
 
@@ -589,54 +590,6 @@ class ChangeSetUndo:
     def __init__(self, repos):
 	self.reset()
 	self.repos = repos
-
-class FileContents:
-
-    def __init__(self):
-	if self.__class__ == FileContents:
-	    raise NotImplemented
-
-class FileContentsFromRepository(FileContents):
-
-    def get(self):
-	return self.repos.pullFileContentsObject(self.fileId)
-
-    def __init__(self, repos, fileId):
-	self.repos = repos
-	self.fileId = fileId
-
-class FileContentsFromFilesystem(FileContents):
-
-    def get(self):
-	return open(self.path, "r")
-
-    def __init__(self, path):
-	self.path = path
-
-class FileContentsFromChangeSet(FileContents):
-
-    def get(self):
-	return self.cs.getFileContents(self.hash)[1].get()
-
-    def __init__(self, cs, hash):
-	self.cs = cs
-	self.hash = hash
-
-class FileContentsFromString(FileContents):
-
-    def get(self):
-	return versioned.FalseFile(self.str)
-
-    def __init__(self, str):
-	self.str = str
-
-class FileContentsFromFile(FileContents):
-
-    def get(self):
-	return self.f
-
-    def __init__(self, f):
-	self.f = f
 
 class RepositoryError(Exception):
     """Base class for exceptions from the system repository"""

@@ -5,6 +5,7 @@
 
 import enum
 import filecontainer
+import filecontents
 import files
 import package
 import patch
@@ -195,8 +196,7 @@ class ChangeSet:
 		# members of the local branch, and their contents will be
 		# saved as part of that change set.
 		if origFile.isConfig():
-		    cont = repository.FileContentsFromRepository(db, 
-						  origFile.sha1())
+		    cont = filecontents.FromRepository(db, origFile.sha1())
 		    rollback.addFileContents(origFile.sha1(), 
 					     ChangedFileTypes.file, cont)
 		else:
@@ -211,7 +211,7 @@ class ChangeSet:
 				type = type, possibleMatch = origFile)
 
 		    if fsFile.same(origFile):
-			cont = repository.FileContentsFromFilesystem(fullPath)
+			cont = filecontents.FromFilesystem(fullPath)
 			rollback.addFileContents(origFile.sha1(), 
 						 ChangedFileTypes.file, cont)
 
@@ -248,12 +248,11 @@ class ChangeSet:
 			f = cont.get()
 			diff = "".join(patch.reverse(f.readlines()))
 			f.seek(0)
-			cont = repository.FileContentsFromString(diff)
+			cont = filecontents.FromString(diff)
 			rollback.addFileContents(origFile.sha1(), 
 						 ChangedFileTypes.diff, cont)
 		    else:
-			cont = repository.FileContentsFromRepository(db, 
-						      origFile.sha1())
+			cont = filecontents.FromRepository(db, origFile.sha1())
 			rollback.addFileContents(origFile.sha1(), 
 						 ChangedFileTypes.file, cont)
 		elif origFile.sha1() != newFile.sha1():
@@ -273,7 +272,7 @@ class ChangeSet:
 				type = type, possibleMatch = origFile)
 
 		    if fsFile.same(origFile):
-			cont = repository.FileContentsFromFilesystem(fullPath)
+			cont = filecontents.FromFilesystem(fullPath)
 			rollback.addFileContents(origFile.sha1(), 
 						 ChangedFileTypes.file, cont)
 
@@ -310,7 +309,7 @@ class ChangeSetFromAbstractChangeSet(ChangeSet):
 
     def addFileContents(self, hash):
 	return ChangeSet.addFileContents(self, hash, ChangedFileTypes.file,
-		    repository.FileContentsFromChangeSet(self.absCS, hash))
+		    filecontents.FromChangeSet(self.absCS, hash))
 
     def __init__(self, absCS):
 	self.absCS = absCS
@@ -322,7 +321,7 @@ class ChangeSetFromFile(ChangeSet):
 	f = self.csf.getFile(hash)
 	tag = "cft-" + self.csf.getTag(hash)
 
-	return (tag, repository.FileContentsFromFile(f))
+	return (tag, filecontents.FromFile(f))
 
     def hasFileContents(self, hash):
 	return self.csf.hasFile(hash)
@@ -430,7 +429,7 @@ def CreateFromFilesystem(pkgList):
 
 	    if hash:
 		cs.addFileContents(hash, ChangedFileTypes.file,
-			  repository.FileContentsFromFilesystem(realPath))
+			  filecontents.FromFilesystem(realPath))
 
     return cs
 

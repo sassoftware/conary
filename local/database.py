@@ -4,6 +4,7 @@
 #
 
 import changeset
+import filecontents
 import files
 import os
 import repository
@@ -77,7 +78,7 @@ class Database(repository.LocalRepository):
 
 	if withContents:
 	    if isinstance(file, files.RegularFile): 
-		cont = repository.FileContentsFromFilesystem(self.root + path)
+		cont = filecontents.FromFilesystem(self.root + path)
 	    else:
 		cont = None
 
