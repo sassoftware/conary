@@ -220,8 +220,6 @@ class FileContainer:
     # if it's not a string, it should be a file and the entire
     # contents of that file are copied into the container 
     def addFile(self, fileName, data, tableData):
-        # XXX ewt: failed does nothing
-	failed = 1
 	try:
 	    self.file.seek(self.tableOffset)
 	    size = 0
