@@ -436,9 +436,9 @@ class _FileAction(BuildAction):
 
 class Desktopfile(BuildCommand, _FileAction):
     """
-    Used to provide category (and vendor, if necessary) for files in
-    C{/usr/share/applications/}, if the target has enabled building
-    desktop files: C{r.Desktopfile(I{filename})}
+    Properly installs desktop files in C{/usr/share/applications/},
+    including setting category (and vendor, if necessary), if the
+    target has enabled building desktop files: C{r.Desktopfile(I{filename})}
 
     It also enforces proper build requirements for desktop files.
     """
