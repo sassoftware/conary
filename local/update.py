@@ -302,8 +302,12 @@ class FilesystemJob:
 	"""
 	if basePkg:
 	    assert(pkgCs.getOldVersion() == basePkg.getVersion())
-	fullyUpdated = True
 	cwd = os.getcwd()
+
+        # fully updated tracks whether any errors have occured; if no
+        # errors occur, fsPkg gets updated to the new version of the trove
+        # this doesn't matter for binary stuff, just source management
+	fullyUpdated = True
 
 	if (flags & IGNOREUGIDS) or os.getuid():
 	    noIds = True
@@ -319,6 +323,8 @@ class FilesystemJob:
 	fsPkg.mergeTroveListChanges(pkgCs.iterChangedTroves(),
 				    redundantOkay = True)
 
+        # Create new files. If the files we are about to create already
+        # exist, it's an error.
 	for (fileId, headPath, headFileVersion) in pkgCs.getNewFileList():
 	    if headPath[0] == '/':
 		headRealPath = root + headPath
@@ -351,6 +357,9 @@ class FilesystemJob:
 	    self._restore(headFile, headRealPath, "creating %s")
 	    fsPkg.addFile(fileId, headPath, headFileVersion)
 
+        # Remove old files. if the files have already been removed, just
+        # mention that fact and continue. Don't erase files which
+        # have changed contents.
 	for fileId in pkgCs.getOldFileList():
 	    (path, version) = basePkg.getFile(fileId)
 
@@ -392,6 +401,8 @@ class FilesystemJob:
 	    self._remove(oldFile, realPath, "removing %s")
 	    fsPkg.removeFile(fileId)
 
+        # Handle files which have changed betweeen versions. This is by
+        # far the most complicated case.
 	for (fileId, headPath, headFileVersion) in pkgCs.getChangedFileList():
 	    if not fsPkg.hasFile(fileId):
 		# the file was removed from the local system; this change
@@ -406,8 +417,9 @@ class FilesystemJob:
 	    else:
 		rootFixup = cwd + "/"
 
-	    pathOkay = True
-	    contentsOkay = True
+	    pathOkay = True             # do we have a valid, merged path?
+	    contentsOkay = True         # do we have valid contents
+
 	    finalPath = fsPath
 	    # if headPath is none, the name hasn't changed in the repository
 	    if headPath and headPath != fsPath:
@@ -432,36 +444,41 @@ class FilesystemJob:
 		    self.errors.append("path conflict for %s (%s on head)" % 
                                        (fsPath, headPath))
 
+            # final path is the path to use w/o the root
+            # real path is the path to use w/ the root
 	    realPath = rootFixup + finalPath
 
-	    # headFileVersion is None for renames
-	    if headFileVersion:
-		# FIXME we should be able to inspect headChanges directly
-		# to see if we need to go into the if statement which follows
-		# this rather then having to look up the file from the old
-		# package for every file which has changed
-		fsFile = files.FileFromFilesystem(realPath, fileId)
-		
-		if not basePkg.hasFile(fileId):
-		    # a file which was not in the base package was created
-		    # on both the head of the branch and in the filesystem;
-		    # this can happen during source management
-		    self.errors.append("new file %s conflicts with file on "
-                                       "head of branch" % realPath)
-		    contentsOkay = False
-		else:
-		    (baseFilePath, baseFileVersion) = basePkg.getFile(fileId)
-		    baseFile = repos.getFileVersion(fileId, baseFileVersion)
-		
-		headChanges = changeSet.getFileChange(fileId)
-		headFile = baseFile.copy()
-		headFile.twm(headChanges, headFile)
-		fsFile.flags.isConfig(headFile.flags.isConfig())
-		fsChanges = fsFile.diff(baseFile)
+	    # headFileVersion is None for renames, but in that case there
+            # is nothing left to do for this file
+            if not headFileVersion:
+                continue
+
+            # FIXME we should be able to inspect headChanges directly
+            # to see if we need to go into the if statement which follows
+            # this rather then having to look up the file from the old
+            # package for every file which has changed
+            fsFile = files.FileFromFilesystem(realPath, fileId)
+            
+            if not basePkg.hasFile(fileId):
+                # a file which was not in the base package was created
+                # on both the head of the branch and in the filesystem;
+                # this can happen during source management
+                self.errors.append("new file %s conflicts with file on "
+                                   "head of branch" % realPath)
+                contentsOkay = False
+            else:
+                (baseFilePath, baseFileVersion) = basePkg.getFile(fileId)
+                baseFile = repos.getFileVersion(fileId, baseFileVersion)
+            
+            headChanges = changeSet.getFileChange(fileId)
+            headFile = baseFile.copy()
+            headFile.twm(headChanges, headFile)
+            fsFile.flags.isConfig(headFile.flags.isConfig())
+            fsChanges = fsFile.diff(baseFile)
 
 	    attributesChanged = False
 
-	    if basePkg and headFileVersion and \
+	    if basePkg and \
 	         not fsFile.metadataEqual(headFile, ignoreOwnerGroup = noIds):
 		# some of the attributes have changed for this file; try
                 # and merge
@@ -489,7 +506,7 @@ class FilesystemJob:
 
 	    beenRestored = False
 
-	    if headFileVersion and headFile.hasContents and \
+	    if headFile.hasContents and \
 	       fsFile.hasContents and \
 	       fsFile.contents.sha1() != headFile.contents.sha1() and \
 	       headFile.contents.sha1() != baseFile.contents.sha1():
@@ -588,8 +605,6 @@ class FilesystemJob:
 		# XXX this doesn't even attempt to merge file permissions
 		# and such; the good part of that is differing owners don't
 		# break things
-		if not headFileVersion:
-		    headFileVersion = fsPkg.getFile(fileId)[1]
 		fsPkg.addFile(fileId, finalPath, headFileVersion)
 	    else:
 		fullyUpdated = False
