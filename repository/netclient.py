@@ -405,20 +405,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         def _getLocalTroves(troveList):
             if not self.localRep or not troveList:
-                return ([], troveList)
+                return troveList
 
-            matches = self.localRep.getTroves(troveList)
-
-            got = []
-            need = []
-
-            for trove, req in zip(matches, troveList):
-                if trove:
-                    got.append(trove)
-                else:
-                    need.append(req)
-
-            return (got, need)
+            return self.localRep.getTroves(troveList)
 
         if not chgSetList:
             # no need to work hard to find this out
@@ -486,16 +475,27 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             # generate this change set, and put any recursive generation
             # which is needed onto the chgSetList for the next pass
-            trovesNeeded = []
+            allTrovesNeeded = []
             for (troveName, (oldVersion, oldFlavor),
                             (newVersion, newFlavor), absolute) in ourJobList:
                 # old version and new version are both set, otherwise
                 # we wouldn't need to generate the change set ourself
-                trovesNeeded.append((troveName, oldVersion, oldFlavor))
-                trovesNeeded.append((troveName, newVersion, newFlavor))
+                allTrovesNeeded.append((troveName, oldVersion, oldFlavor))
+                allTrovesNeeded.append((troveName, newVersion, newFlavor))
 
-            (troves, trovesNeeded) = _getLocalTroves(trovesNeeded)
-            troves += self.getTroves(trovesNeeded)
+            troves = _getLocalTroves(allTrovesNeeded)
+            remoteTrovesNeeded = []
+            indices = []
+            for i, (trove, req) in enumerate(zip(troves, allTrovesNeeded)):
+                if trove is None:
+                    remoteTrovesNeeded.append(req)
+                    indices.append(i)
+
+            remoteTroves = self.getTroves(remoteTrovesNeeded)
+            for i, trove in zip(indices, remoteTroves):
+                troves[i] = trove
+
+            del allTrovesNeeded, remoteTrovesNeeded, indices, remoteTroves
 
             i = 0
             for (troveName, (oldVersion, oldFlavor),
