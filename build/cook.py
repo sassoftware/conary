@@ -37,7 +37,7 @@ def createPackage(repos, cfg, destdir, bldPkg, ident, pkgtype = "auto"):
     fileMap = {}
     p = package.Package(bldPkg.getName(), bldPkg.getVersion())
 
-    for filePath in bldPkg.items():
+    for filePath in bldPkg.keys():
 	if pkgtype == "auto":
 	    realPath = destdir + filePath
 	    targetPath = filePath
