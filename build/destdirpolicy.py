@@ -613,16 +613,11 @@ class Strip(policy.Policy):
         self.dm.update(self.macros)
         # we need to start searching from just below the build directory
         topbuilddir = '/'.join(self.macros.builddir.split('/')[:-1])
-        builddirlen = len(topbuilddir)
-        if self.macros.lib == 'lib':
-            # we don't want debug info on one arch and not another, so
-            # make sure there is always enough room
-            builddirlen += 2
         if self.tryDebuginfo and\
            'eu-strip' in self.macros.strip and \
            'debugedit' in self.macros and \
            util.checkPath(self.macros.debugedit) and \
-           len(self.macros.debugsrcdir) <= builddirlen:
+           len(self.macros.debugsrcdir) <= len(topbuilddir):
             self.debuginfo = True
             self.debugfiles = set()
             self.dm.topbuilddir = topbuilddir
