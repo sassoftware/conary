@@ -48,8 +48,9 @@ class RootChangeSetJob(repository.ChangeSetJob):
     def oldFileList(self):
 	return self.oldFiles
 
-    def addFile(self, fileObj, newVer):
-	self.files[fileObj.id()] = (fileObj, newVer)
+    def addFile(self, troveID, fileId, fileObj, path, version):
+	if fileObj:
+	    self.files[fileId] = (fileObj, version)
 
     def addFileContents(self, fileObj, newVer, fileContents, restoreContents,
 			isConfig):
@@ -145,11 +146,14 @@ class SqlDbRepository(repository.DataStoreRepository,
     def iterFilesWithTag(self, tag):
 	return self.db.iterFilesWithTag(tag)
 
-    def addFileVersion(self, fileId, version, file):
-	self.db.addFile(file, version)
+    def addFileVersion(self, troveId, fileId, fileObj, path, version):
+	self.db.addFile(troveId, fileId, fileObj, path, version)
 
     def addPackage(self, pkg, oldVersion = None):
-	self.db.addTrove(pkg, oldVersion = oldVersion)
+	return self.db.addTrove(pkg, oldVersion = oldVersion)
+
+    def addPackageDone(self, troveInfo):
+	pass
 
     def commit(self):
 	self.db.commit()

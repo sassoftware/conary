@@ -550,7 +550,10 @@ class ChangeSetJob:
     storeOnlyConfigFiles = False
 
     def addPackage(self, pkg):
-	self.repos.addPackage(pkg)
+	return self.repos.addPackage(pkg)
+
+    def addPackageDone(self, pkgId):
+	self.repos.addPackageDone(pkgId)
 
     def oldPackage(self, pkg):
 	pass
@@ -558,8 +561,8 @@ class ChangeSetJob:
     def oldFile(self, fileId, fileVersion, fileObj):
 	pass
 
-    def addFile(self, fileObj, fileVersion):
-	self.repos.addFileVersion(fileObj.id(), fileVersion, fileObj)
+    def addFile(self, troveId, fileId, fileObj, path, version):
+	self.repos.addFileVersion(troveId, fileId, fileObj, path, version)
 
     def addFileContents(self, sha1, fileVersion, fileContents, 
 		restoreContents, isConfig):
@@ -572,8 +575,6 @@ class ChangeSetJob:
     def __init__(self, repos, cs):
 	self.repos = repos
 	self.cs = cs
-
-	self.packagesToCommit = []
 
 	restoreList = []
 
@@ -603,42 +604,42 @@ class ChangeSetJob:
 
 	    newFileMap = newPkg.applyChangeSet(csPkg)
 
-	    self.packagesToCommit.append(newPkg)
+	    troveInfo = self.addPackage(newPkg)
 
 	    for (fileId, path, version) in newPkg.iterFileList():
-		if not newFileMap.has_key(fileId):
+		tuple = newFileMap.get(fileId, None)
+		if tuple is not None:
+		    (oldPath, oldVersion) = tuple[-2:]
+
+		if tuple is None or oldVersion == version:
 		    # the file didn't change between versions; we can just
 		    # ignore it
-		    continue
-
-		oldPath, oldVersion = newFileMap[fileId][-2:]
-
-		if oldVersion == version:
-		    # just the path changed. we don't need to bother.
-		    continue
-
-		diff = cs.getFileChange(fileId)
-		restoreContents = 1
-		if oldVersion:
-		    oldfile = repos.getFileVersion(fileId, oldVersion)
-		    fileObj = oldfile.copy()
-		    fileObj.twm(diff, oldfile)
-
-		    if fileObj.hasContents and oldfile.hasContents and	    \
-		       fileObj.contents.sha1() == oldfile.contents.sha1() and \
-		       not (fileObj.flags.isConfig() and not 
-						oldfile.flags.isConfig()):
-			restoreContents = 0
+		    fileObj = None
+		elif oldVersion == version:
+		    fileObj = None
 		else:
-		    fileObj = files.ThawFile(diff, fileId)
+		    diff = cs.getFileChange(fileId)
+		    restoreContents = 1
+		    if oldVersion:
+			oldfile = repos.getFileVersion(fileId, oldVersion)
+			fileObj = oldfile.copy()
+			fileObj.twm(diff, oldfile)
 
-		self.addFile(fileObj, version)
+			if fileObj.hasContents and oldfile.hasContents and	    \
+			   fileObj.contents.sha1() == oldfile.contents.sha1() and \
+			   not (fileObj.flags.isConfig() and not 
+						    oldfile.flags.isConfig()):
+			    restoreContents = 0
+		    else:
+			fileObj = files.ThawFile(diff, fileId)
+
+		self.addFile(troveInfo, fileId, fileObj, path, version)
 
 		# we can restore config files and files with no contents
 		# here; other files need to wait so we can do them in the
 		# right order based on the sha1 since they may be getting
 		# read from a gzip'd arghice
-		if not fileObj.hasContents or not restoreContents:
+		if not fileObj or not fileObj.hasContents or not restoreContents:
 		    # this means there are no contents to restore (None
 		    # means get the contents from the change set)
 		    continue
@@ -693,8 +694,7 @@ class ChangeSetJob:
 		    restoreList.append((fileId, tup))
 
 	    del newFileMap
-
-	    self.addPackage(newPkg)
+	    self.addPackageDone(troveInfo)
 
 	restoreList.sort()
 	for fileId, (sha1, version, restoreContents, isConfig) in restoreList:

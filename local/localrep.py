@@ -28,7 +28,10 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	pkgCs = self.cs.getNewPackageVersion(pkg.getName(), pkg.getVersion(),
 					     pkg.getFlavor())
 	old = pkgCs.getOldVersion()
-	self.repos.addPackage(pkg, oldVersion = old)
+	return self.repos.addPackage(pkg, oldVersion = old)
+
+    def addPackageDone(self, troveId):
+	pass
 
     def oldPackage(self, pkg):
 	self.oldPackages.append(pkg)
@@ -42,12 +45,14 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     def oldFileList(self):
 	return self.oldFiles
 
-    def addFile(self, fileObj, newVer):
-	repository.ChangeSetJob.addFile(self, fileObj, newVer)
+    def addFile(self, troveId, fileId, fileObj, path, version):
+	repository.ChangeSetJob.addFile(self, troveId, fileId, fileObj, path, 
+					version)
 
-	oldVersion = self.cs.getFileOldVersion(fileObj.id())
-	if oldVersion:
-	    self.removeFile(fileObj.id(), oldVersion)
+	if fileObj:
+	    oldVersion = self.cs.getFileOldVersion(fileId)
+	    if oldVersion:
+		self.removeFile(fileId, oldVersion)
 
     def addFileContents(self, sha1, newVer, fileContents, restoreContents,
 			isConfig):

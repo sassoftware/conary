@@ -463,6 +463,8 @@ class Database:
 	return theId
 
     def addTrove(self, trove, oldVersion = None):
+	cu = self.db.cursor()
+
 	troveName = trove.getName()
 	troveVersion = trove.getVersion()
 	troveVersionId = self.getVersionId(troveVersion, {})
@@ -478,7 +480,6 @@ class Database:
 
 	if self.flavorsNeeded:
 	    # create all of the flavor id's we'll need
-	    cu = self.db.cursor()
 	    cu.execute("CREATE TEMPORARY TABLE flavorsNeeded(empty INTEGER, "
 							    "flavor STRING)")
 	    for flavor in self.flavorsNeeded.keys():
@@ -535,64 +536,6 @@ class Database:
 	
 	assert(not self.troveTroves.has_key(troveInstanceId))
 
-	# we're updating from a previous version of the trove, which will
-	# later be erased. it'll be a lot faster to reuse streams from that
-	# trove (as long as the file versions haven't changed) then create new
-	# ones. just move all of them to the new trove's instanceid and
-	# clean it up a later (existingFiles will tell us how)
-	existingFiles = {}
-	if oldVersion:
-	    cu = self.db.cursor()
-	    oldVersionId = self.getVersionId(oldVersion, self.addVersionCache)
-	    oldInstanceId = self.instances[(troveName, oldVersionId, 
-					    troveFlavorId)]
-	    cu.execute("SELECT fileId, versionId FROM DBTroveFiles "
-		       "WHERE instanceId=%d", oldInstanceId)
-	    for (fileId, versionId) in cu:
-		existingFiles[fileId] = versionId
-
-	    cu.execute("UPDATE DBTroveFiles SET instanceId=%d WHERE "
-		       "instanceId=%d", troveInstanceId, oldInstanceId)
-
-	for (fileId, path, version) in trove.iterFileList():
-	    # we know this is in the cache from above where we looked up
-	    # all of the flavorId's we need for this add
-	    versionId = self.addVersionCache[version]
-
-	    existingId = existingFiles.get(fileId, None)
-	    if existingId == versionId:
-		# the file is in the table from a previous version, and
-		# hasn't changed. nothing to do here.
-		del existingFiles[fileId]
-		continue
-
-	    result = self.streamCache.get((fileId, versionId), None)
-	    if result is None:
-		(stream, flavor, tags) = self.troveFiles.getFileByFileId(
-						fileId, versionId)[1:3]
-	    else:
-		(stream, flavor, tags) = result
-		del self.streamCache[(fileId, versionId)]
-
-	    if existingId:
-		# existing file, new troveInstanceId
-		del existingFiles[fileId]
-		self.troveFiles.updateItem(troveInstanceId, fileId, existingId,
-					   versionId, stream, tags)
-	    else:
-		if flavor is None:
-		    flavorId = 0
-		else:
-		    flavorId = flavorMap[flavor.freeze()]
-
-		self.troveFiles.addItem(fileId, versionId, path, 
-				        troveInstanceId, stream, tags)
-
-	if existingFiles:
-	    self.troveFiles.removeFileIds(troveInstanceId,
-					  existingFiles.iterkeys(),
-					  forReal = True)
-
 	for (name, version, flavor) in trove.iterTroveList():
 	    versionId = self.getVersionId(version, self.addVersionCache)
 	    if flavor:
@@ -604,19 +547,22 @@ class Database:
 					    isPresent = False)
 	    self.troveTroves.addItem(troveInstanceId, instanceId)
 
-    def addFile(self, fileObj, fileVersion):
-	versionId = self.getVersionId(fileVersion, self.addVersionCache)
-	if fileObj.hasContents:
-	    flavor = fileObj.flavor.deps
-	    if flavor:
-		self.flavorsNeeded[flavor] = True
-	    else:
-		flavor = None
-	else:
-	    flavor = None
+	return (cu, troveInstanceId)
 
-	self.streamCache[(fileObj.id(), versionId)] = \
-		(fileObj.freeze(), flavor, fileObj.tags)
+    def addFile(self, troveInfo, fileId, fileObj, path, fileVersion):
+	(cu, troveInstanceId) = troveInfo
+	versionId = self.getVersionId(fileVersion, self.addVersionCache)
+
+	if fileObj:
+	    self.troveFiles.addItem(fileObj.id(), versionId, path, 
+				    troveInstanceId, fileObj.freeze(), 
+				    fileObj.tags)
+	else:
+	    pass
+	    cu.execute("""
+		UPDATE DBTroveFiles SET instanceId=%s WHERE
+		    fileId=%s and versionId=%d""", troveInstanceId,
+		fileId, versionId)
 
     def getFile(self, fileId, fileVersion, pristine = False):
 	versionId = self.versionTable[fileVersion]
