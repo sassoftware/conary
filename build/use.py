@@ -39,6 +39,7 @@ class Flag(dict):
 	self._frozen = False
         self._track = False
         self._usedFlags = {}
+	self._overrides = {}
         # this must be set last
         self._initialized = True
 
@@ -85,6 +86,9 @@ class Flag(dict):
     def _thaw(self):
 	self._frozen = False
 
+    def _override(self, key, value):
+	self._overrides[key] = value
+
     def getUsed(self):
         return self._usedFlags
 
@@ -102,8 +106,11 @@ class Flag(dict):
     def __getattr__(self, name):
         if name in self.__dict__:
             return self.__dict__[name]
-        if name in self:
-            flag = self[name]
+        if name in self or name in self._overrides:
+	    if name in self._overrides:
+		flag = self._overrides[name]
+	    else:
+		flag = self[name]
             if self._track:
                 self._usedFlags[name] = flag
             return flag
@@ -354,32 +361,7 @@ Arch.bits64.setShortDoc('True if the current architecture is 64-bit')
 Arch._freeze()
 _addDocs(Arch)
 
-class LocalFlag(Flag):
-
-    _overrides = {}
-
-    def __init__(self):
-	Flag.__init__(self, showdefaults=False)
-	self._cfg = None
-	self._name = None
-
-    def _override(self, key, value):
-	self._overrides[key] = value
-
-    def __getattr__(self, name):
-        if name in self.__dict__:
-            return self.__dict__[name]
-        if name in self or name in self._overrides:
-	    if name in self._overrides:
-		flag = self._overrides[name]
-	    else:
-		flag = self[name]
-            if self._track:
-                self._usedFlags[name] = flag
-            return flag
-        raise AttributeError, "class %s has no attribute '%s'" % (self.__class__.__name__, name)
-
-LocalFlags = LocalFlag()
+LocalFlags = Flag(showdefaults=False)
 
 def track(arg):
     """
@@ -392,7 +374,7 @@ def track(arg):
 def overrideFlags(config, pkgname):
     Use._thaw()
     for key in config.useKeys():
-	Use[key] = config['Use.' + key]
+	Use._override(key, config['Use.' + key])
 
     prefix = 'Flags.%s.' % pkgname
     for key in config.pkgKeys(pkgname):
