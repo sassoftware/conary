@@ -102,7 +102,7 @@ class Database(Repository):
     def storeFileFromChangeset(self, chgSet, file, pathToFile):
 	file.restore(chgSet, self.root + pathToFile)
 
-    def __init__(self, root, path):
+    def __init__(self, root, path, mode = "c"):
 	self.root = root
 	fullPath = root + "/" + path
-	Repository.__init__(self, fullPath)
+	Repository.__init__(self, fullPath, mode)

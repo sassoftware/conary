@@ -161,7 +161,7 @@ elif (otherArgs[1] == "pkglist"):
 	queryRepos = repository.Repository(cfg.reppath, "r")
 	del argSet['repos']
     else:
-	queryRepos = repository.Database(cfg.root, cfg.dbpath)
+	queryRepos = repository.Database(cfg.root, cfg.dbpath, "r")
 
     if argSet: usage
 
@@ -174,7 +174,7 @@ elif (otherArgs[1] == "update"):
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	repos = repository.Repository(cfg.reppath, "r")
-	db = repository.Database(cfg.root, cfg.dbpath)
+	db = repository.Database(cfg.root, cfg.dbpath, "c")
 
 	args = [repos, db, cfg] + otherArgs[2:]
 	update.doUpdate(*args)
