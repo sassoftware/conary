@@ -441,6 +441,7 @@ def annotate(repos, filename):
     verList = [ v for v in branchVerList[branch] if not v.isAfter(curVersion) ]
 
     while verList:
+        # iterate backwards from newest to oldest through verList
         oldV = verList.pop()
         oldTrove = repos.getTrove(troveName, oldV, deps.deps.DependencySet())
 
@@ -451,6 +452,8 @@ def annotate(repos, filename):
             break
 
         if oldFileV != newFileV:
+            # this file is distinct for this version of the trove,
+            # perform diffs
             oldFile = repos.getFileContents([ (oldFileId, oldFileV) ])[0]
             oldLines = oldFile.get().readlines()
             oldContact = oldTrove.changeLog.getName()
@@ -459,41 +462,73 @@ def annotate(repos, filename):
                 # and lineMap
                 index = 0
                 for line in oldLines:
+                    # mark all lines as having come from this version
                     finalLines.append([line, None])
                     lineMap[index] = index 
                     index = index + 1
                 unmatchedLines = index
             else:
+                for i in xrange(0, len(newLines)):
+                    if lineMap.get(i, None) is not None:
+                        assert(newLines[i] == finalLines[lineMap[i]][0])
+                # use difflib SequenceMatcher to 
+                # find lines that are shared between old and new files
                 s.set_seqs(oldLines, newLines)
                 blocks = s.get_matching_blocks()
                 laststartnew = 0
                 laststartold = 0
                 for (startold, startnew, lines) in blocks:
+                    # range (laststartnew, startnew) is the list of all 
+                    # lines in the newer of the two files being diffed
+                    # that don't exist in the older of the two files
+                    # being diffed.  Associate those lines with the
+                    # the newer file.
                     for i in range(laststartnew, startnew):
-                        # for each line where the two versions of the
+                        # i is a line in newFile here the two versions of the
                         # file do not match, if that line maps back to
                         # a line in finalLines, mark is as changed here
                         if lineMap.get(i,None) is not None:
+                            # if this entry does not exist in lineMap,
+                            # then line i in this file does not match
+                            # to any line in the final file 
+                            assert(newLines[i] == finalLines[lineMap[i]][0])
+                            assert(finalLines[lineMap[i]][1] is None)
                             finalLines[lineMap[i]][1] = (newV, newContact)
                             lineMap[i] = None
                             unmatchedLines = unmatchedLines - 1
+                            assert(unmatchedLines >= 0)
                     laststartnew = startnew + lines
 
                 if unmatchedLines == 0:
                     break
 
-                # update the linemap for places where the files are
-                # the same.
+                # future diffs 
                 changes = {}
                 for (startold, startnew, lines) in blocks:
                     if startold == startnew:
                         continue
+                    # the range(startnew, startnew + lines) are the lines
+                    # that are the same between newfile and oldfile.  Since
+                    # all future diffs will be against oldfile, we want to 
+                    # ensure that the lineMap points from the line numbers
+                    # in the old file to the line numbers in the final file
+                    
                     for i in range(0, lines):
                         if lineMap.get(startnew + i, None) is not None:
                             changes[startold + i] = lineMap[startnew + i]
+                            # the pointer at lineMap[startnew + i]
+                            # is now invalid; the correct pointer is 
+                            # now at lineMap[startold + i]
+                            if startnew + i not in changes:
+                                changes[startnew + i] = None
                 lineMap.update(changes)
         (newV, newTrove, newContact) = (oldV, oldTrove, oldContact)
         (newFileV, newLines) = (oldFileV, oldLines)
+
+        # assert that the lineMap is still correct -- 
+        for i in xrange(0, len(newLines)):
+            if lineMap.get(i, None) is not None:
+                assert(newLines[i] == finalLines[lineMap[i]][0])
             
         # there are still unmatched lines, and there is a parent branch,  
         # so search the parent branch for matches
@@ -512,7 +547,8 @@ def annotate(repos, filename):
                     if b not in branchVerList:
                         branchVerList[b] = []
                     branchVerList[b].append(ver)
-            verList = [ v for v in  branchVerList[branch] if not v.isAfter(curVersion)]
+            verList = [ v for v in  branchVerList[branch] \
+                                            if not v.isAfter(curVersion)]
 
     if unmatchedLines > 0:
         # these lines are in the original version of the file
