@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python
 # -*- mode: python -*-
 #
 # Copyright (c) 2004 Specifix, Inc.
