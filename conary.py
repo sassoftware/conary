@@ -18,7 +18,7 @@ import os
 import queryrep
 import repository
 import rollbacks
-import srscfg
+import conarycfg
 import srcctl
 import sys
 import updatecmd
@@ -32,8 +32,8 @@ if sys.version_info < (2, 3):
 sys.excepthook = util.excepthook
 
 try:
-    cfg = srscfg.SrsConfiguration()
-except srscfg.ParseError, e:
+    cfg = conarycfg.ConaryConfiguration()
+except conarycfg.ParseError, e:
     log.error(str(e))
     sys.exit(1)
 

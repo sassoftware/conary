@@ -110,7 +110,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     @param repos: Repository to both look for source files and file id's in.
     @type repos: repository.Repository
     @param cfg: srs configuration
-    @type cfg: srscfg.SrsConfiguration
+    @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
     @param buildLabel: label to use to to find the branch to build on
@@ -203,7 +203,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
     @param repos: Repository to both look for source files and file id's in.
     @type repos: repository.Repository
     @param cfg: srs configuration
-    @type cfg: srscfg.SrsConfiguration
+    @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
     @param newVersion: version to assign the newly built objects
@@ -255,7 +255,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={}):
     @param repos: Repository to both look for source files and file id's in.
     @type repos: repository.Repository
     @param cfg: srs configuration
-    @type cfg: srscfg.SrsConfiguration
+    @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
     @param buildBranch: the branch the new build will be committed to
@@ -313,7 +313,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
     @param repos: Repository to both look for source files and file id's in.
     @type repos: repository.Repository
     @param cfg: srs configuration
-    @type cfg: srscfg.SrsConfiguration
+    @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
     @param buildBranch: the branch the new build will be committed to
@@ -448,7 +448,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None):
     @param repos: Repository to use for building
     @type repos: repository.Repository
     @param cfg: srs configuration
-    @type cfg: srscfg.SrsConfiguration
+    @type cfg: conarycfg.ConaryConfiguration
     @param item: the item to cook
     @type item: str
     @param prep: If true, the build stops after the package is unpacked

@@ -144,7 +144,7 @@ class SqlDbRepository(repository.DataStoreRepository,
     def __init__(self, path):
 	repository.DataStoreRepository.__init__(self, path)
 	repository.AbstractRepository.__init__(self)
-	self.db = sqldb.Database(path + "/srsdb")
+	self.db = sqldb.Database(path + "/conarydb")
 
 class Database(SqlDbRepository):
 

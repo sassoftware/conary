@@ -183,11 +183,6 @@ class ChangeSet:
 	    f.write("removed %s %s\n" %
 		    (pkgName, version.asString()))
 
-    def dump(self):
-	import srscfg, sys
-	cfg = srscfg.SrsConfiguration()
-	self.formatToFile(cfg, sys.stdout)
-
     def getFileChange(self, fileId):
 	return self.files[fileId][2]
 

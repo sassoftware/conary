@@ -9,7 +9,7 @@ import deps.deps
 import os
 import versions
 
-class SrsConfiguration:
+class ConaryConfiguration:
 
     def read(self, file):
 	if os.path.exists(file):
@@ -55,14 +55,14 @@ class SrsConfiguration:
 		print "%-20s (unknown type)" % (item)
 
     def __init__(self):
-	self.repPath = "/var/lib/srsrep"
+	self.repPath = "/var/lib/conary-rep"
 	self.root = "/"
-	self.sourcePath = "/usr/src/srs/sources"
-	self.buildPath = "/usr/src/srs/builds"
+	self.sourcePath = "/usr/src/conary/sources"
+	self.buildPath = "/usr/src/conary/builds"
 	self.installLabel = None
 	self.buildLabel = None
-	self.lookaside = "/var/cache/srs"
-	self.dbPath = "/var/lib/srsdb"
+	self.lookaside = "/var/cache/conary"
+	self.dbPath = "/var/lib/conarydb"
         self.tmpDir = "/var/tmp/"
 	self.name = None
 	self.contact = None
@@ -76,18 +76,18 @@ class SrsConfiguration:
 	self.flavor.addDep(deps.deps.InstructionSetDependency, 
 			   self.instructionSet)
 
-	self.read("/etc/srsrc")
-	self.read(os.environ["HOME"] + "/" + ".srsrc")
+	self.read("/etc/conaryrc")
+	self.read(os.environ["HOME"] + "/" + ".conaryrc")
 
-class SrsCfgError(Exception):
+class ConaryCfgError(Exception):
 
     """
-    Ancestor for all exceptions raised by the srscfg module.
+    Ancestor for all exceptions raised by the conarycfg module.
     """
 
     pass
 
-class ParseError(SrsCfgError):
+class ParseError(ConaryCfgError):
 
     """
     Indicates that an error occured parsing the config file.
