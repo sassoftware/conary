@@ -13,13 +13,13 @@ class Filter:
     acts like a regular expression, except that besides matching
     the name, it can also test against file metadata.
     """
-    def __init__(self, name, regex, macros, setmode=None, unsetmode=None):
+    def __init__(self, regex, macros, name=None, setmode=None, unsetmode=None):
 	"""
 	Provide information to match against.
-	@param name: name of component
 	@param regex: regular expression(s) to match against pathnames
 	@type regex: string, list of strings, or compiled regular expression
 	@param macros: current recipe macros
+	@param name: name of package or component
 	@param setmode: bitmask containing bits that must be set
 	for a match
 	@type setmode: integer
@@ -44,7 +44,8 @@ class Filter:
 	    S_IFLNK  = 1010000000000000
 	    S_IFSOCK = 1100000000000000
 	"""
-	self.name = name
+	if name:
+	    self.name = name
 	self.destdir = macros['destdir']
 	self.setmode = setmode
 	self.unsetmode = unsetmode

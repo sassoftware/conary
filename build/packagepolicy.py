@@ -73,7 +73,7 @@ class ComponentSpec(_filterSpec):
 	    name = name %macros
 	    assert(name != 'sources')
 	    compFilters.append(
-		filter.Filter(name, patterns, macros,
+		filter.Filter(patterns, macros, name,
 			      setmode=setmode, unsetmode=unsetmode))
 
 	# pass these down to PackageSpec for building the package
@@ -92,11 +92,11 @@ class PackageSpec(_filterSpec):
 		filteritem.append(None)
 	    name, patterns, setmode, unsetmode = filteritem
 	    pkgFilters.append(
-		filter.Filter(name %macros, patterns, macros,
+		filter.Filter(patterns, macros, name %macros,
 			      setmode=setmode, unsetmode=unsetmode))
 	# by default, everything that hasn't matched a pattern in the
 	# main package filter goes in the package named recipe.name
-	pkgFilters.append(filter.Filter(recipe.name, '.*', macros))
+	pkgFilters.append(filter.Filter('.*', macros, recipe.name))
 
 	# OK, all the filters exist, build an autopackage object that
 	# knows about them
