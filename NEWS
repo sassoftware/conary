@@ -1,3 +1,6 @@
+Changes in 0.11.3:
+  * optimized a sqlite update statement to use indexed columns
+
 Changes in 0.11.2:
   * standalone server was broken by --add-user changes in 0.11.1
   * dependency check no longer allows packages being removed to cause
