@@ -63,16 +63,16 @@ class VersionRelease(AbstractVersion):
 class Version:
 
     def appendVersionRelease(self, version, release):
-	assert(self.isBranch)
+	assert(self.isBranch())
 	self.versions.append(VersionRelease("%s-%d" % (version, release)))
 
     def incrementVersionRelease(self):
-	assert(self.isVersion)
+	assert(self.isVersion())
 	
 	self.versions[-1].incrementRelease()
 
     def trailingVersion(self):
-	assert(self.isVersion)
+	assert(self.isVersion())
 
 	return self.versions[-1].getVersion()
 
