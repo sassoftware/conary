@@ -26,7 +26,9 @@ baseMacros = (
     ('includedir'	, '%(prefix)s/include'),
     ('datadir'		, '/usr/share'),
     ('mandir'		, '%(datadir)s/man'),
-    ('infodir'		, '%(datadir)s/info')
+    ('infodir'		, '%(datadir)s/info'),
+    ('mflags'		, ''),
+    ('parallelmflags'   , ''),
 )
 
 crossMacros = (
@@ -36,12 +38,6 @@ crossMacros = (
     ('sysroot'		, '%(prefix)s/sys-root'),
     ('headerpath'	, '%(sysroot)s/usr/include')
 )
-
-def system(cmd):
-    print '+', cmd
-    rc = os.system(cmd)
-    if rc != 0:
-        raise RuntimeError, 'Shell command "' + cmd + '" returned non-zero status'
 
 class Macros(dict):
     def __setitem__(self, name, value):
@@ -267,10 +263,10 @@ class Recipe:
                 raise RuntimeError, "unknown archive compression"
             if extractdir:
                 destdir = '%s/%s' % (builddir, extractdir)
-                system("mkdir -p %s" % destdir)
+                util.execute("mkdir -p %s" % destdir)
             else:
                 destdir = builddir
-	    system("tar -C %s %s %s" % (destdir, tarflags, f))
+            util.execute("tar -C %s %s %s" % (destdir, tarflags, f))
 	
 	for file in self.sources:
             f = lookaside.findAll(self.cfg, self.laReposCache, file, 
@@ -285,7 +281,7 @@ class Recipe:
 	    destDir = builddir + "/" + self.theMainDir
             if backup:
                 backup = '-b -z %s' % backup
-            system('patch -d %s -p%s %s < %s' %(destDir, level, backup, f))
+            util.execute('patch -d %s -p%s %s < %s' %(destDir, level, backup, f))
 
     def doBuild(self, buildpath):
         builddir = buildpath + "/" + self.mainDir()
@@ -293,11 +289,11 @@ class Recipe:
         if self.build is None:
             pass
         elif type(self.build) is str:
-            system(self.build %self.macros)
+            util.execute(self.build %self.macros)
         elif type(self.build) is tuple:
 	    for bld in self.build:
                 if type(bld) is str:
-                    system(bld %self.macros)
+                    util.execute(bld %self.macros)
                 else:
                     bld.doBuild(self.macros)
 	else:
@@ -310,11 +306,11 @@ class Recipe:
         if self.install is None:
             pass
         elif type(self.install) is str:
-            system(self.install %self.macros)
+            util.execute(self.install %self.macros)
 	elif type(self.install) is tuple:
 	    for inst in self.install:
                 if type(inst) is str:
-                    system(inst %self.macros)
+                    util.execute(inst %self.macros)
                 else:
                     inst.doInstall(self.macros)
 	else:

@@ -15,13 +15,6 @@ import string
 #     least %%(builddir)s for all, and doInstall will also get
 #     %%(destdir)s
 
-def execute(command):
-    print '+', command
-    rc = os.system(command)
-    if rc:
-	raise RuntimeError, ('Shell command "%s" returned '
-	                     'non-zero status %d' % (command, rc))
-
 class ShellCommand:
     def __init__(self, *args, **keywords):
         # initialize initialize our keywords to the defaults
@@ -55,7 +48,7 @@ class Automake(ShellCommand):
 	macros = macros.copy()
         if self.m4Dir:
 	    macros.update({'m4DirArgs': '-I %s' %(self.m4Dir)})
-        execute(self.command %macros)
+        util.execute(self.command %macros)
 
 
 class Configure(ShellCommand):
@@ -79,7 +72,7 @@ class Configure(ShellCommand):
 	    macros['configure'] = '../configure'
         else:
             macros['configure'] = './configure'
-        execute(self.command %macros)
+        util.execute(self.command %macros)
 
 class ManualConfigure(Configure):
     template = ('cd %%(builddir)s; '
@@ -87,22 +80,22 @@ class ManualConfigure(Configure):
 	        '%(preConfigure)s %%(configure)s %(args)s')
 
 class Make(ShellCommand):
-    template = 'cd %%(builddir)s; %(preMake)s make %(args)s'
+    template = 'cd %%(builddir)s; %(preMake)s make %%(mflags) %%(parallelmflags) %(args)s'
     keywords = {'preMake': ''}
     
     def doBuild(self, macros):
 	macros = macros.copy()
-        execute(self.command %macros)
+        util.execute(self.command %macros)
 
 class MakeInstall(ShellCommand):
     template = ('cd %%(builddir)s; '
-                '%(preMake)s make %(rootVar)s=%%(destdir)s %(installtarget)s %(args)s')
+                '%(preMake)s make %%(mflags) %(rootVar)s=%%(destdir)s %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
                 'preMake': '',
 		'installtarget': 'install'}
 
     def doInstall(self, macros):
-	execute(self.command %macros)
+	util.execute(self.command %macros)
 
 class InstallFile:
 
@@ -156,9 +149,9 @@ class RemoveFiles:
 
     def doInstall(self, macros):
 	if self.recursive:
-	    execute("rm -rf %s/%s" %(macros['destdir'], self.filespec %macros))
+	    util.execute("rm -rf %s/%s" %(macros['destdir'], self.filespec %macros))
 	else:
-	    execute("rm -f %s/%s" %(macros['destdir'], self.filespec %macros))
+	    util.execute("rm -f %s/%s" %(macros['destdir'], self.filespec %macros))
 
     def __init__(self, filespec, recursive=0):
 	self.filespec = filespec

@@ -57,3 +57,10 @@ def excepthook(type, value, tb):
     lines = traceback.format_exception(type, value, tb)
     print string.joinfields(lines, "")
     pdb.post_mortem(tb)
+
+def execute(cmd):
+    print '+', cmd
+    rc = os.system(cmd)
+    if rc:
+	raise RuntimeError, ('Shell command "%s" returned '
+	                     'non-zero status %d' % (command, rc))
