@@ -523,6 +523,8 @@ class File:
 	    elif not self.__dict__[name] == other.__dict__[name]:
 		return False
 
+	return True
+
     def freeze(self):
 	rc = [ self.lsTag ]
 	for (name, streamType) in self.streamList:
@@ -710,7 +712,12 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
     
     # assume we have a match if the FileMode and object type match
     if possibleMatch and (possibleMatch.__class__ == f.__class__) \
-		     and f.inode == possibleMatch.inode:
+		     and f.inode == possibleMatch.inode \
+		     and f.inode.mtime() == possibleMatch.inode.mtime() \
+		     and (not s.st_size or
+			  (possibleMatch.hasContents and
+			   s.st_size == possibleMatch.contents.size())
+			 ):
 	    f.flags.set(possibleMatch.flags.value())
 	    return possibleMatch
 
@@ -751,6 +758,25 @@ class FilesError(Exception):
     def __str__(self):
 	return repr(self)
 
+def contentsChanged(diff):
+    if diff[0] == 0:
+	return False
+
+    type = diff[1]
+    if type != "-": return False
+    i = 2
+
+    for (name, streamType) in RegularFile.streamList:
+	size = struct.unpack("!H", diff[i:i+2])[0]
+	i += 2
+	
+	if name == "contents":
+	    return size != 0
+
+	i += size
+
+    return False
+
 def fieldsChanged(diff):
     sameType = struct.unpack("B", diff[0])
     if not sameType:
@@ -762,6 +788,16 @@ def fieldsChanged(diff):
 	cl = RegularFile
     elif type == "d":
 	cl = Directory
+    elif type == "b":
+	cl = BlockDevice
+    elif type == "c":
+	cl = CharacterDevice
+    elif type == "s":
+	cl = SocketDevice
+    elif type == "l":
+	cl = SymbolicLink
+    elif type == "p":
+	cl = NamedPipe
     else:
 	assert(0)
 
@@ -774,17 +810,18 @@ def fieldsChanged(diff):
 	
 	if name == "inode":
 	    l = tupleChanged(InodeStream, diff[i:i+size])
-	    s = " ".join(l)
-	    rc.append("inode(%s)" % s)
+	    if l:
+		s = " ".join(l)
+		rc.append("inode(%s)" % s)
 	elif name == "contents":
 	    l = tupleChanged(RegularFileStream, diff[i:i+size])
-	    s = " ".join(l)
-	    rc.append("contents(%s)" % s)
+	    if l:
+		s = " ".join(l)
+		rc.append("contents(%s)" % s)
 	else:
 	    rc.append(name)
 
 	i += size
-
 
     return rc
 
