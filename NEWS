@@ -12,8 +12,8 @@ Changes in 0.10.5:
   * Conary can handle filenames with '%' in them
   * The showcs command has been significantly updated, and the updates
     are documented in the conary.1 manpage
-  * New syntax for flags distinguishes requirements from "optimized for"
-    using the "~" character
+  * New syntax for flags distinguishes requirements from "optimized for";
+    see http://wiki.specifix.com/FlavorRankSpec
   * Arch flags now show up in package flavors
 
 Changes in 0.10.4:
