@@ -9,7 +9,7 @@ import types
 import util
 import versions
 
-# this is the repositories idea of a package
+# this is the repository's idea of a package
 class Package:
 
     def addFile(self, path, version):
