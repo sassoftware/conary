@@ -161,7 +161,7 @@ class StatWindow(gtk.Window):
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw.set_size_request(150, 150)
         sw.add(self.funcview)
-        pane.pack1(sw, gtk.TRUE, gtk.FALSE)
+        pane.pack1(sw, True, False)
 
         self.callerstore = gtk.ListStore(Caller)
         callerview = gtk.TreeView(self.callerstore)
@@ -179,7 +179,7 @@ class StatWindow(gtk.Window):
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw.set_size_request(-1, 150)
         sw.add(callerview)
-        pane.pack2(sw, gtk.FALSE, gtk.TRUE)
+        pane.pack2(sw, False, True)
         
         self.add(pane)
 
@@ -209,8 +209,8 @@ class StatWindow(gtk.Window):
                 self.funcselection.select_iter(iter)
                 path = self.funcstore.get_path(iter)
                 col = self.funcview.get_column(0)
-                self.funcview.scroll_to_cell(path, col, gtk.TRUE, 0.5, 0.5)
-                self.funcview.set_cursor(path, col, gtk.FALSE)
+                self.funcview.scroll_to_cell(path, col, True, 0.5, 0.5)
+                self.funcview.set_cursor(path, col, False)
                 break
             iter = self.funcstore.iter_next(iter)
         
