@@ -7,6 +7,7 @@
 
 import changeset
 import datastore
+import dbhash
 import fcntl
 import files
 import os
@@ -16,14 +17,19 @@ import versioned
 
 class Repository:
 
-    def commitChangeSet(self, sourcePathTemplate, cs):
+    def commitChangeSet(self, sourcePathTemplate, cs, eraseOld = 0):
 	pkgList = []
+	oldFileList = []
+	oldPackageList = []
 	fileMap = {}
 
 	# build todo set
 	for csPkg in cs.getPackageList():
 	    newVersion = csPkg.getNewVersion()
 	    old = csPkg.getOldVersion()
+
+	    # we can't erase the oldVersion for abstract change sets
+	    assert(old or not eraseOld)
 	
 	    if self.hasPackage(csPkg.getName()):
 		pkgSet = self._getPackageSet(csPkg.getName())
@@ -35,6 +41,7 @@ class Repository:
 		pkgSet = None
 
 	    if old:
+		oldPackageList.append((csPkg.getName(), old))
 		newPkg = pkgSet.getVersion(old)
 		newPkg.changeVersion(newVersion)
 	    else:
@@ -44,7 +51,14 @@ class Repository:
 	    pkgList.append((csPkg.getName(), newPkg, newVersion))
 	    fileMap.update(newFileMap)
 
-	# create the file objects we'll need for the commit
+	    if old:
+		oldPackage = self.getPackageVersion(csPkg.getName(), old)
+		for fileId in csPkg.getOldFileList():
+		    version = oldPackage.getFile(fileId)[1]
+		    oldFileList.append((fileId, version))
+
+	# Create the file objects we'll need for the commit. This handles
+	# files which were added and files which have changed
 	fileList = []
 	for (fileId, (oldVer, newVer, infoLine)) in cs.getFileList():
 	    if oldVer:
@@ -105,6 +119,18 @@ class Repository:
 		pkgSet.eraseVersion(newVersion)
 
 	    raise 
+
+	# at this point the new version is in the repository, and we
+	# can't undo that anymore. if erasing the old version fails, we
+	# need to just commit the inverse change set; fortunately erasing
+	# rarely fails
+	for (fileId, version) in oldFileList:
+	    filesDB = self._getFileDB(fileId)
+	    filesDB.eraseVersion(version)
+
+	for (pkgName, pkgVersion) in oldPackageList:
+	    pkgSet = self._getPackageSet(pkgName)
+	    pkgSet.eraseVersion(pkgVersion)
 
     # packageList is a list of (pkgName, oldVersion, newVersion) tuples
     def createChangeSet(self, packageList):
@@ -211,7 +237,8 @@ class Repository:
 	    f.close()
 
     def open(self, mode):
-	self.close()
+	if self.pkgDB:
+	    self.close()
 
 	self.lockfd = os.open(self.top + "/lock", os.O_CREAT | os.O_RDWR)
 
@@ -222,6 +249,8 @@ class Repository:
 
 	self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db")
 	self.fileDB = versioned.Database(self.top + "/files.db")
+
+	self.mode = mode
 
     def close(self):
 	if self.pkgDB:
@@ -243,12 +272,58 @@ class Repository:
 
 	self.open(mode)
 
-# The database is a magic repository where files in the data store are quite
-# often pointers to the actual file in the file system
+# This is a repository which includes a mapping from a sha1 to a path
 class Database(Repository):
 
     def storeFileFromChangeset(self, chgSet, file, pathToFile):
 	file.restore(chgSet, self.root + pathToFile)
+	if isinstance(file, files.RegularFile):
+	    self.fileIdMap[file.sha1()] = pathToFile
+
+    def pullFileContents(self, fileId, targetFile):
+	srcFile = open(self.root + self.fileIdMap[fileId], "r")
+	targetFile.write(srcFile.read())
+	srcFile.close()
+
+    def pullFileContentsObject(self, fileId):
+	return open(self.root + self.fileIdMap[fileId], "r")
+
+    def close(self):
+	if self.fileIdMap:
+	    self.fileIdMap = None
+	Repository.close(self)
+
+    def open(self, mode):
+	Repository.open(self, mode)
+	self.fileIdMap = dbhash.open(self.top + "/fileid.db", mode)
+	self.rollbackCache = self.top + "/rollbacks"
+	self.rollbackStatus = self.rollbackCache + "/status"
+	if not os.path.exists(self.rollbackCache):
+	    os.mkdir(self.rollbackCache)
+	if not os.path.exists(self.rollbackStatus):
+	    f = open(self.rollbackStatus, "w")
+	    f.write("0 -1\n")
+	    f.close()
+
+    def addRollback(self, changeset):
+	if self.mode == "r":
+	    raise IOError, "database is read only"
+
+	f = open(self.rollbackStatus)
+	(first, last) = f.read()[:-1].split()
+	last = int(last)
+
+	fn = self.rollbackCache + ("/r.%d" % (last + 1))
+	changeset.writeToFile(fn)
+	f.close()
+
+	newStatus = self.rollbackCache + ".new"
+
+	f = open(newStatus, "w")
+	f.write("%s %d\n" % (first, last + 1))
+	f.close()
+
+	os.rename(newStatus, self.rollbackStatus)
 
     def __init__(self, root, path, mode = "c"):
 	self.root = root
