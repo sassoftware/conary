@@ -600,7 +600,8 @@ class Database:
 	cu = self.db.cursor()
 
 	cu.execute("""
-	    CREATE TEMPORARY TABLE getFilesTbl(fileId BINARY, version STR)
+	    CREATE TEMPORARY TABLE getFilesTbl(row INTEGER PRIMARY KEY,
+                                               fileId BINARY, version STR)
 	""", start_transaction = False)
 
 	versionStrs = {}
@@ -611,21 +612,34 @@ class Database:
 		vs = version.asString()
 		versionStrs[version] = vs
 
-	    cu.execute("INSERT INTO getFilesTbl VALUES (?, ?)", 
+	    cu.execute("INSERT INTO getFilesTbl VALUES (NULL, ?, ?)", 
 		       fileId, vs,
 		       start_transaction = False)
 	del versionStrs
 
 	cu.execute("""
-	    SELECT getFilesTbl.fileId, stream FROM getFilesTbl JOIN Versions ON
+	    SELECT row, getFilesTbl.fileId, stream FROM getFilesTbl 
+                JOIN Versions ON
 		    getFilesTbl.version = Versions.version
 		JOIN DBTroveFiles ON
 		    getFilesTbl.fileId = DBTroveFiles.fileId AND
 		    Versions.versionId == DBTroveFiles.versionId
 	""")
 
-	for (fileId, stream) in cu:
+        nextRow = 0
+	for (row, fileId, stream) in cu:
+            while nextRow < row:
+                yield None
+                nextRow += 1
+
+            nextRow += 1
 	    yield files.ThawFile(stream, fileId)
+
+        cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
+
+        while nextRow < len(l):
+            yield None
+            nextRow += 1
 
     def getTroves(self, troveList, pristine):
         # returns a list parallel to troveList, with nonexistant troves
