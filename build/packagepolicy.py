@@ -471,13 +471,10 @@ class TagHandler(policy.Policy):
 	    self.recipe.autopkg.pathMap[file].tags.set("taghandler")
 
 
-class TagSpec(policy.Policy):
+class _addInfo(policy.Policy):
     """
-    Apply tags defined by tag descriptions in both the current system
-    and C{%(destdir)s} to all the files in C{%(destdir)s}; can also
-    be told to apply tags manually:
-    C{r.TagSpec(I{tagname}, I{filterexp})} to add manually, or
-    C{r.TagSpec(I{tagname}, exceptions=I{filterexp})} to set an exception
+    Pure virtual class for policies that add information such as tags,
+    requirements, and provision, to files.
     """
     keywords = {
 	'included': {},
@@ -487,28 +484,69 @@ class TagSpec(policy.Policy):
     def updateArgs(self, *args, **keywords):
 	"""
 	Call as::
-	    C{TagSpec(I{tagname}, I{filterexp})}
+	    C{I{ClassName}(I{info}, I{filterexp})}
 	or::
-	    C{TagSpec(I{tagname}, exceptions=I{filterexp})}
+	    C{I{ClassName}(I{info}, exceptions=I{filterexp})}
 	where C{I{filterexp}} is either a regular expression or a
 	tuple of C{(regexp[, setmodes[, unsetmodes]])}
 	"""
 	if args:
 	    args = list(args)
-	    tagname = args.pop(0)
+	    info = args.pop(0)
 	    if args:
-		if tagname not in self.included:
-		    self.included[tagname] = []
-		self.included[tagname].extend(args)
+		if info not in self.included:
+		    self.included[info] = []
+		self.included[info].extend(args)
 	    if 'exceptions' in keywords:
-		# not the usual exception handling
-		if tagname not in self.excluded:
-		    self.excluded[tagname] = []
-		self.excluded[tagname].append(keywords.pop('exceptions'))
+		# not the usual exception handling, this is an exception
+		if info not in self.excluded:
+		    self.excluded[info] = []
+		self.excluded[info].append(keywords.pop('exceptions'))
 	policy.Policy.updateArgs(self, **keywords)
 
     def doProcess(self, recipe):
+        # for filters
 	self.rootdir = self.rootdir % recipe.macros
+
+	# instantiate filters
+	d = {}
+	for info in self.included:
+	    l = []
+	    for item in self.included[info]:
+		l.append(filter.Filter(item, recipe.macros))
+	    d[info] = l
+	self.included = d
+
+	d = {}
+	for info in self.excluded:
+	    l = []
+	    for item in self.excluded[info]:
+		l.append(filter.Filter(item, recipe.macros))
+	    d[info] = l
+	self.excluded = d
+
+	policy.Policy.doProcess(self, recipe)
+
+    def doFile(self, path):
+	fullpath = self.recipe.macros.destdir+path
+	if not util.isregular(fullpath) and not os.path.islink(fullpath):
+	    return
+        self.runInfo(path)
+
+    def runInfo(self, path):
+        'pure virtual'
+        pass
+
+
+class TagSpec(_addInfo):
+    """
+    Apply tags defined by tag descriptions in both the current system
+    and C{%(destdir)s} to all the files in C{%(destdir)s}; can also
+    be told to apply tags manually:
+    C{r.TagSpec(I{tagname}, I{filterexp})} to add manually, or
+    C{r.TagSpec(I{tagname}, exceptions=I{filterexp})} to set an exception
+    """
+    def doProcess(self, recipe):
 	self.tagList = []
 	# read the system and %(destdir)s tag databases
 	for directory in (recipe.macros.destdir+'/etc/conary/tags/',
@@ -517,46 +555,24 @@ class TagSpec(policy.Policy):
 		for filename in os.listdir(directory):
 		    path = util.joinPaths(directory, filename)
 		    self.tagList.append(tags.TagFile(path, recipe.macros, True))
+        _addInfo.doProcess(self, recipe)
 
-	# instantiate filters
-	d = {}
-	for tagname in self.included:
-	    l = []
-	    for item in self.included[tagname]:
-		l.append(filter.Filter(item, recipe.macros))
-	    d[tagname] = l
-	self.included = d
-
-	d = {}
-	for tagname in self.excluded:
-	    l = []
-	    for item in self.excluded[tagname]:
-		l.append(filter.Filter(item, recipe.macros))
-	    d[tagname] = l
-	self.excluded = d
-
-	policy.Policy.doProcess(self, recipe)
-
-
-    def markTag(self, name, tag, file):
+    def markTag(self, name, tag, path):
         # commonly, a tagdescription will nominate a file to be
         # tagged, but it will also be set explicitly in the recipe,
         # and therefore markTag will be called twice.
-        tags = self.recipe.autopkg.pathMap[file].tags
+        tags = self.recipe.autopkg.pathMap[path].tags
         if tag not in tags:
-            log.debug('%s: %s', name, file)
+            log.debug('%s: %s', name, path)
             tags.set(tag)
 
-    def doFile(self, file):
-	fullpath = self.recipe.macros.destdir+file
-	if not util.isregular(fullpath) and not os.path.islink(fullpath):
-	    return
+    def runInfo(self, path):
 	for tag in self.included:
 	    for filt in self.included[tag]:
-		if filt.match(file):
-		    self.markTag(tag, tag, file)
+		if filt.match(path):
+		    self.markTag(tag, tag, path)
 	for tag in self.tagList:
-	    if tag.match(file):
+	    if tag.match(path):
 		if tag.name:
 		    name = tag.name
 		else:
@@ -564,11 +580,11 @@ class TagSpec(policy.Policy):
 		if tag.tag in self.excluded:
 		    for filt in self.excluded[tag.tag]:
 			# exception handling is per-tag, so handled specially
-			if filt.match(file):
+			if filt.match(path):
 			    log.debug('ignoring tag match for %s: %s',
-				      name, file)
+				      name, path)
 			    return
-		self.markTag(name, tag.tag, file)
+		self.markTag(name, tag.tag, path)
 
 
 class ParseManifest(policy.Policy):
@@ -974,55 +990,84 @@ class LinkCount(policy.Policy):
                     "Special file %s has illegal hard links" %path)
 
 
-class _requirements(policy.Policy):
+class _requirements(_addInfo):
     """
-    Pure virtual base class for Requires/Provides/Flavor
+    Pure virtual base class for Requires/Provides
     """
-    def doFile(self, path):
+
+    def runInfo(self, path):
+	for info in self.included:
+	    for filt in self.included[info]:
+		if filt.match(path):
+                    # XXX mark a virtual Depends/Requires
+                    pass
 	pkgMap = self.recipe.autopkg.pkgMap
 	if path not in pkgMap:
 	    return
 	pkg = pkgMap[path]
 	f = pkg.getFile(path)
-	if f.hasContents:
-	    self.addOne(path, pkg, f)
-    def addOne(self, path, pkg, f):
+        self.autoAddOne(path, pkg, f)
+    def autoAddOne(self, path, pkg, f):
 	'pure virtual'
 	pass
 
 class Requires(_requirements):
     """
-    Drives requirement mechanism: to avoid adding requirements for a file:
+    Drives requirement mechanism: to avoid adding requirements for a file,
+    such as example shell scripts outside C{%(docdir)s},
     C{r.Requires(exceptions=I{filterexp})}
+    and to add a requirement manually,
+    C{r.Requires('foo', I{filterexp})}
     """
-    def addOne(self, path, pkg, f):
-	pkg.requires.union(f.requires.value())
+    def autoAddOne(self, path, pkg, f):
+        # Only regular files with contents will be in requiresMap
+        if path not in pkg.requiresMap:
+            return
+        f.requires.set(pkg.requiresMap[path])
+        pkg.requires.union(f.requires.value())
 
 class Provides(_requirements):
     """
     Drives provides mechanism: to avoid marking a file as providing things,
     such as for package-private plugin modules installed in system library
-    directories (unfortunately happens) or example shell scripts outside
-    C{%(docdir)s}: C{r.Provides(exceptions=I{filterexp})}
+    directories,
+    C{r.Provides(exceptions=I{filterexp})}
+    and to add a provision manually,
+    C{r.Provides('foo', I{filterexp})}
     """
     invariantexceptions = (
 	'%(docdir)s/',
     )
-    def addOne(self, path, pkg, f):
+    def autoAddOne(self, path, pkg, f):
+        # Only regular files with contents will be in providesMap
+        if path not in pkg.providesMap:
+            return
 	m = self.recipe.magic[path]
 	if m and m.name == 'ELF' and 'soname' not in m.contents:
 	    return
 	fullpath = self.recipe.macros.destdir + path
 	mode = os.lstat(fullpath)[stat.ST_MODE]
 	if mode & 0111:
+            f.provides.set(pkg.providesMap[path])
 	    pkg.provides.union(f.provides.value())
 
-class Flavor(_requirements):
+
+# There is no manual tagging of flavors, so Flavor does not inherit
+# from _addInfo or _requirements.
+class Flavor(policy.Policy):
     """
     Drives flavor mechanism: to avoid marking a file's flavor:
     C{r.Flavor(exceptions=I{filterexp})}
     """
-    def addOne(self, path, pkg, f):
+    def doFile(self, path):
+	pkgMap = self.recipe.autopkg.pkgMap
+	if path not in pkgMap:
+	    return
+	pkg = pkgMap[path]
+        if path not in pkg.flavorMap:
+            return
+	f = pkg.getFile(path)
+        f.flavor.set(pkg.flavorMap[path])
 	pkg.flavor.union(f.flavor.value())
 
 

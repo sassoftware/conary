@@ -24,7 +24,7 @@ import files
 import time
 import use
 
-from deps import deps
+from deps import deps, filedeps
 
 def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     if devtype == "b":
@@ -80,9 +80,17 @@ class BuildPackage(dict):
         to commit to the repository
         """
 	(f, linkCount, inode) = files.FileFromFilesystem(realPath, None, 
-                                        buildDeps = True, inodeInfo = True)
+                                        inodeInfo = True)
 	f.inode.setPerms(f.inode.perms() & 01777)
 	self[path] = (realPath, f)
+
+        if f.hasContents and isinstance(f, files.RegularFile):
+            result = filedeps.findFileDependencies(realPath)
+            if result != None:
+                self.requiresMap[path] = result[0]
+                self.providesMap[path] = result[1]
+
+            self.flavorMap[path] = filedeps.findFileFlavor(realPath)
 
         if linkCount > 1:
             if f.hasContents:
@@ -127,6 +135,9 @@ class BuildPackage(dict):
         self.provides = deps.DependencySet()
         self.flavor = _getUseDependencySet(recipe)
         self.linkGroups = {}
+        self.requiresMap = {}
+        self.providesMap = {}
+        self.flavorMap = {}
         self.hardlinks = []
         self.badhardlinks = []
 	dict.__init__(self)

@@ -495,8 +495,7 @@ class RegularFile(File):
     def __init__(self, *args, **kargs):
 	File.__init__(self, *args, **kargs)
 
-def FileFromFilesystem(path, fileId, possibleMatch = None, buildDeps = False,
-                       inodeInfo = False):
+def FileFromFilesystem(path, fileId, possibleMatch = None, inodeInfo = False):
     s = os.lstat(path)
 
     try:
@@ -555,14 +554,6 @@ def FileFromFilesystem(path, fileId, possibleMatch = None, buildDeps = False,
 	f.contents = RegularFileStream()
 	f.contents.setSize(s.st_size)
 	f.contents.setSha1(sha1)
-
-    if buildDeps and f.hasContents and isinstance(f, RegularFile):
-	result = filedeps.findFileDependencies(path)
-	if result != None:
-	    f.requires.set(result[0])
-	    f.provides.set(result[1])
-
-        f.flavor.set(filedeps.findFileFlavor(path))
 
     if inodeInfo:
         return (f, s.st_nlink, (s.st_rdev, s.st_ino))
