@@ -126,7 +126,7 @@ class _Source(action.RecipeAction):
 
 class Archive(_Source):
     """
-    Called as self.addArchive from a recipe, this class adds an archive
+    Called as r.addArchive from a recipe, this class adds an archive
     such as an optionally compressed tarball or zip file, unpacking it
     into the appropriate directory.
     
@@ -141,15 +141,17 @@ class Archive(_Source):
     def __init__(self, recipe, *args, **keywords):
 	"""
 	@param recipe: The recipe object currently being built.
-	@param sourcename: The name of the archive
-	@param rpm: If specified, causes Archive to look in the URL or
+	    Provided automatically by the PackageRecipe object;
+	    do not pass in C{r} from within a recipe.
+	@keyword sourcename: The name of the archive
+	@keyword rpm: If specified, causes Archive to look in the URL or
 	    file specified by C{rpm} for an RPM containing C{sourcename}
-	@param dir: FIXME: need to make directory handling more sensible,
+	@keyword dir: FIXME: need to make directory handling more sensible,
 	    then describe it
-	@param keyid: The 8-digit GPG key ID (no leading C{0x}) for the
+	@keyword keyid: The 8-digit GPG key ID (no leading C{0x}) for the
 	    signature.  Indicates that a signature should be sought and
 	    checked.
-	@param use: A Use flag or boolean, or a tuple of Use flags and/or
+	@keyword use: A Use flag or boolean, or a tuple of Use flags and/or
 	    booleans, that determine whether the archive is actually
 	    unpacked or merely stored in the archive.
 	"""
@@ -184,7 +186,7 @@ class Archive(_Source):
 
 class Patch(_Source):
     """
-    Called as self.addPatch from a recipe, this class applies a
+    Called as r.addPatch from a recipe, this class applies a
     patch.
     
     If you provide the C{keyid} argument, it will search for a file
@@ -201,28 +203,30 @@ class Patch(_Source):
     def __init__(self, recipe, *args, **keywords):
 	"""
 	@param recipe: The recipe object currently being built.
-	@param sourcename: The name of the patch file
-	@param rpm: If specified, causes Archive to look in the URL or
+	    Provided automatically by the PackageRecipe object;
+	    do not pass in C{r} from within a recipe.
+	@keyword sourcename: The name of the patch file
+	@keyword rpm: If specified, causes Archive to look in the URL or
 	    file specified by C{rpm} for an RPM containing C{sourcename}
-	@param dir: The directory relative to C{%(builddir)s} to which
+	@keyword dir: The directory relative to C{%(builddir)s} to which
 	    to change before applying the patch.
-	@param keyid: The 8-digit GPG key ID (no leading C{0x}) for the
+	@keyword keyid: The 8-digit GPG key ID (no leading C{0x}) for the
 	    signature.  Indicates that a signature should be sought and
 	    checked.
-	@param use: A Use flag or boolean, or a tuple of Use flags and/or
+	@keyword use: A Use flag or boolean, or a tuple of Use flags and/or
 	    booleans, that determine whether the archive is actually
 	    unpacked or merely stored in the archive.
-	@param level: The number of initial subdirectory names to strip
+	@keyword level: The number of initial subdirectory names to strip
 	    out when applying the patch; the default is 1.
-	@param backup: A backup suffix to use for storing the versions
+	@keyword backup: A backup suffix to use for storing the versions
 	    of files before the patch is applied.
-	@param macros: If true, interpolate recipe macros in the body
+	@keyword macros: If true, interpolate recipe macros in the body
 	    of the patch before applying it.  For example, you might
 	    have a patch that changes C{CFLAGS = -O2} to
 	    C{CFLAGS = %(cflags)s}, which will cause C{%(cflags)s} to
 	    be replaced with the current setting of C{recipe.macros.cflags}.
 	    Defaults to False.
-	@param extraArgs: Arbitrary arguments to pass to the patch program.
+	@keyword extraArgs: Arbitrary arguments to pass to the patch program.
 	    Use only as a last resort -- and probably also file a bug
 	    report suggesting the possibility of direct support.
 	"""
@@ -263,7 +267,7 @@ class Patch(_Source):
 
 class Source(_Source):
     """
-    Called as self.addSource from a recipe, this class copies a file
+    Called as r.addSource from a recipe, this class copies a file
     into the build directory %(builddir)s.
     
     If you provide the C{keyid} argument, it will search for a file
@@ -283,29 +287,31 @@ class Source(_Source):
 
 	"""
 	@param recipe: The recipe object currently being built.
-	@param sourcename: The name of the archive
-	@param rpm: If specified, causes Archive to look in the URL or
+	    Provided automatically by the PackageRecipe object;
+	    do not pass in C{r} from within a recipe.
+	@keyword sourcename: The name of the archive
+	@keyword rpm: If specified, causes Archive to look in the URL or
 	    file specified by C{rpm} for an RPM containing C{sourcename}
-	@param dir: The directory in which to store the file, relative
+	@keyword dir: The directory in which to store the file, relative
 	    to C{%(builddir)s}.  Defaults to storing directly in the
 	    C{%(builddir)s}.
-	@param keyid: The 8-digit GPG key ID (no leading C{0x}) for the
+	@keyword keyid: The 8-digit GPG key ID (no leading C{0x}) for the
 	    signature.  Indicates that a signature should be sought and
 	    checked.
-	@param use: A Use flag or boolean, or a tuple of Use flags and/or
+	@keyword use: A Use flag or boolean, or a tuple of Use flags and/or
 	    booleans, that determine whether the archive is actually
 	    unpacked or merely stored in the archive.
-	@param apply: A command line to run after storing the file.
+	@keyword apply: A command line to run after storing the file.
 	    Macros will be interpolated into this command.
-	@param contents: If specified, provides the contents of the
+	@keyword contents: If specified, provides the contents of the
 	    file.  The provided contents will be placed in C{sourcename}.
-	@param macros: If true, interpolate recipe macros in the body
+	@keyword macros: If true, interpolate recipe macros in the body
 	    of the patch before applying it.  For example, you might
 	    have a patch that changes C{CFLAGS = -O2} to
 	    C{CFLAGS = %(cflags)s}, which will cause C{%(cflags)s} to
 	    be replaced with the current setting of C{recipe.macros.cflags}.
 	    Defaults to False.
-	@param dest: If set, provides the name of the file in the build
+	@keyword dest: If set, provides the name of the file in the build
 	    directory.  Do not include any subdirectories; use C{dir}
 	    instead for subdirectories.  Useful mainly when fetching
 	    the file from an source outside your direct control, such as
@@ -357,7 +363,7 @@ class Source(_Source):
 
 class Action(action.RecipeAction):
     """
-    Called as self.addAction from a recipe, this class copies a file
+    Called as r.addAction from a recipe, this class copies a file
     into the build directory %(builddir)s.
     """
 
@@ -366,12 +372,14 @@ class Action(action.RecipeAction):
     def __init__(self, recipe, *args, **keywords):
 	"""
 	@param recipe: The recipe object currently being built.
-	@param action: A command line to run.
+	    Provided automatically by the PackageRecipe object;
+	    do not pass in C{r} from within a recipe.
+	@keyword action: A command line to run.
 	    Macros will be interpolated into this command.
-	@param dir: The directory in which to store the file, relative
+	@keyword dir: The directory in which to store the file, relative
 	    to C{%(builddir)s}.  Defaults to storing directly in the
 	    C{%(builddir)s}.
-	@param use: A Use flag or boolean, or a tuple of Use flags and/or
+	@keyword use: A Use flag or boolean, or a tuple of Use flags and/or
 	    booleans, that determine whether the archive is actually
 	    unpacked or merely stored in the archive.
 	"""
