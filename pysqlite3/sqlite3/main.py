@@ -108,7 +108,7 @@ class Cursor:
         self.description = None
         self.current_row = None
         if self.stmt is not None:
-            self.stmt.reset()
+            self.stmt.finalize()
             self.stmt = None
         
     def _checkNotClosed(self, methodname=None):
