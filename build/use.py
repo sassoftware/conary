@@ -312,7 +312,7 @@ class Flag(dict):
         if topflag is None:
             topflag = self
         cur = self
-        while cur != topflag:
+        while cur._name != topflag._name:
             namelist.insert(0, cur._name)
             cur = cur._parent
         name = ".".join(namelist)
