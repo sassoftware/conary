@@ -12,7 +12,7 @@ export prefix = /usr
 export conarydir = $(prefix)/share/conary
 export bindir = $(prefix)/bin
 
-SUBDIRS=build local repository test lib pysqlite deps
+SUBDIRS=build local repository lib pysqlite deps
 
 subdirs_rule=
 
@@ -54,7 +54,7 @@ dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
 generated_files = conary-wrapper *.pyo *.pyc 
 
-.PHONY: clean bootstrap deps.dot pychecker dist install test debug-test subdirs
+.PHONY: clean bootstrap deps.dot pychecker dist install subdirs
 
 
 subdirs:
@@ -86,15 +86,6 @@ dist: $(dist_files)
 	tar cjf $(DISTDIR).tar.bz2 conary-$(VERSION)
 	rm -rf $(DISTDIR)
 
-distcheck: dist
-	d=`mktemp -d`; \
-	cd $$d; \
-	tar jxvf $(DISTDIR).tar.bz2; \
-	cd conary-$(VERSION); \
-	make; make test; \
-	cd -; \
-	rm -rf $$d
-
 clean: clean-subdirs default-clean
 	rm -f _sqlite.so
 	rm -rf sqlite
@@ -119,11 +110,5 @@ deps.dot:
 
 pychecker:
 	$(PYTHON) /usr/lib/python2.2/site-packages/pychecker/checker.py *.py
-
-test:
-	make -C test $@
-
-debug-test:
-	make -C test $@
 
 include Make.rules
