@@ -230,8 +230,17 @@ def _buildChangeSet(repos, state, srcVersion = None, needsHead = False):
     newState.changeVersion(newVersion)
     changeSet = changeset.ChangeSet()
 
+    # this lets us avoid changing the size of the dict we're iterating
+    # through
     for (fileId, (path, version)) in newState.iterFileList():
 	realPath = os.getcwd() + "/" + path
+
+	try:
+	    os.lstat(realPath)
+	except OSError:
+	    log.error("%s is missing (use remove if this is intentional)" 
+		% path)
+	    return
 
 	f = files.FileFromFilesystem(realPath, fileId)
 
