@@ -337,8 +337,10 @@ def getOldTrove(trove, db, repos):
     oldTrove = None
     if db is not None:
         try:
+            # get the pristine version from the database, since that's
+            # what the changeset was created against
             oldTrove = db.getTrove(trove.getName(), trove.getOldVersion(), 
-                                    trove.getOldFlavor())
+                                    trove.getOldFlavor(), pristine=True)
         except repository.TroveMissing:
             pass
     if oldTrove is None:
