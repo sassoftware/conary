@@ -6,6 +6,7 @@ import pwd
 import grp
 import shutil
 import util
+import stat
 
 class FileMode:
 
@@ -129,10 +130,47 @@ class File(FileMode):
     def copy(self):
 	raise "method should be provided by derivative classes"
 
+    def chmod(self, path):
+	os.chmod(path, self.thePerms)
+
     def __init__(self, path, newVersion = None, info = None):
 	self.path(path)
 	self.theVersion = newVersion
 	FileMode.__init__(self, info)
+
+class SymbolicLink(File):
+
+    def linkTarget(self, newLinkTarget = None):
+	if (newLinkTarget):
+	    self.theLinkTarget = newLinkTarget
+
+	return self.theLinkTarget
+
+    def infoLine(self):
+	return "l %s %s" % (self.theLinkTarget, File.infoLine(self))
+
+    def compare(self, other):
+	if self.theLinkTarget == other.theLinkTarget:
+	    # recursing does a permission check, which doens't apply 
+	    # to symlinks under Linux
+	    return 1
+
+	return 0
+
+    def chmod(self, path):
+	# chmod() on a symlink follows the symlink
+	pass
+
+    def copy(self, source, target):
+	os.symlink(self.theLinkTarget, target)
+
+    def __init__(self, path, version = None, info = None):
+	if (info):
+	    (self.theLinkTarget, info) = string.split(info, None, 1)
+	else:
+	    self.theLinkTarget = None
+
+	File.__init__(self, path, version, info)
 
 class RegularFile(File):
 
@@ -156,7 +194,7 @@ class RegularFile(File):
 
     def __init__(self, path, version = None, info = None):
 	if (info):
-	    (type, self.themd5, info) = string.split(info, None, 2)
+	    (self.themd5, info) = string.split(info, None, 1)
 	else:
 	    self.themd5 = None
 
@@ -171,7 +209,7 @@ class FileDB:
 	for version in f.versionList():
 	    f.setVersion(version)
 	    line = f.read()
-	    self.versions[version] = RegularFile(self.path, version, line)
+	    self.versions[version] = FileFromInfoLine(self.path, version, line)
 
 	f.close()
 
@@ -211,15 +249,32 @@ class FileDB:
 	self.dbfile = dbpath + '/files' + path + '.info'
 	self.read()
 
-def FileFromFilesystem(path):
-    f = RegularFile(path)
+def FileFromFilesystem(root, path):
     (perms, inode, dev, links, uid, gid, size, atime, mtime, ctime) = \
-	os.stat(path)
-    f.perms(perms)
+	os.lstat(root + path)
+
+    if (stat.S_ISREG(perms)):
+	f = RegularFile(path)
+	f.perms(perms)
+	f.md5(md5sum.md5sum(root + path))
+    elif (stat.S_ISLNK(perms)):
+	f = SymbolicLink(path)
+	f.perms(0777)
+	f.linkTarget(os.readlink(root + path))
+    else:
+	raise TypeError, "unsupported file type for %s" % path
+
     f.owner(pwd.getpwuid(uid)[0])
     f.group(grp.getgrgid(gid)[0])
     f.mtime(mtime)
-    f.md5(md5sum.md5sum(path))
 
     return f
 
+def FileFromInfoLine(path, version, infoLine):
+    (type, infoLine) = string.split(infoLine, None, 1)
+    if type == "f":
+	return RegularFile(path, version, infoLine)
+    elif type == "l":
+	return SymbolicLink(path, version, infoLine)
+    else:
+	raise KeyError, "bad infoLine %s" % infoLine
