@@ -132,7 +132,7 @@ def mkdirChain(*paths):
                 try:
                     os.mkdir(p)
                 except OSError, exc:
-                    if exc.errno == errno.EEXISTS:
+                    if exc.errno == errno.EEXIST:
                         pass
 
 def _searchVisit(arg, dirname, names):
