@@ -2,6 +2,7 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+import changelog
 import copy
 import files
 import versions
@@ -583,11 +584,11 @@ class TroveChangeSet:
          ABS <name> <newversion> ||
            CS <name> <oldversion> <newversion> ||
            NEW <name> <newversion>
-	 [CL <name> <email> <linecount>
-	   <line count lines of change log>]
          [REQUIRES <dep set>]
          [PROVIDES <dep set>]
          [FLAVOR <dep set>]
+	 [CL <name> <email> <linecount>
+	   <line count lines of change log>]
          
 	The remainder of the lines, each specifies a new file, old file,
 	removed file, or a change to the set of included packages. Each of
@@ -606,16 +607,16 @@ class TroveChangeSet:
 	else:
 	    rc.append("CS %s %s %s\n" % (self.name, self.oldVersion.freeze(),
                                          self.newVersion.freeze()))
-	if self.changeLog:
-	    frz = self.changeLog.freeze()
-	    rc.append("CL %d\n", frz.count("\n"))
-	    rc.append(frz)
         if self.requires:
             rc.append("REQUIRES %s\n" % (self.requires.freeze()))
         if self.provides:
             rc.append("PROVIDES %s\n" % (self.provides.freeze()))
         if self.flavor:
             rc.append("FLAVOR %s\n" % (self.flavor.freeze()))
+	if self.changeLog:
+	    frz = self.changeLog.freeze()
+	    rc.append("CL %d\n" % frz.count("\n"))
+	    rc.append(frz)
 
 	for id in self.getOldFileList():
 	    rc.append("-%s\n" % id)
@@ -694,9 +695,6 @@ class ThawTroveChangeSet(TroveChangeSet):
             dep = line.split(' ', 1)[1]
             self.setProvides(deps.ThawDependencySet(dep))
             return
-        if line.startswith('FLAVOR '):
-	    # this was handled in __init__
-	    return
         
 	action = line[0]
 
@@ -763,18 +761,21 @@ class ThawTroveChangeSet(TroveChangeSet):
 
 	# find the flavor
 	flavor = None
-	for l in lines[1:4]:
+	for i, l in enumerate(lines[1:4]):
 	    if l.startswith("FLAVOR "):
 		dep = l.split(' ', 1)[1]
 		flavor = deps.ThawDependencySet(dep)
+		del lines[i + 1]
 		break
 
 	# find the change log
 	changeLog = None
-	for l in lines[1:5]:
+	for i, l in enumerate(lines[1:5]):
 	    if l.startswith("CL "):
-		lines = int(l.split(' ', 1)[1])
-		changeLog = changelog.ThawChangeLog(lines)
+		cnt = int(l.split(' ', 1)[1])
+		first = i + 2
+		changeLog = changelog.ThawChangeLog(lines[first:first + cnt])
+		del lines[i: first + cnt]
 
 	TroveChangeSet.__init__(self, pkgName, flavor, changeLog, oldVersion, 
 				  newVersion, absolute = (pkgType == "ABS"))
