@@ -537,7 +537,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     need.append((fileId, oldFileVersion))
                 need.append((fileId, newFileVersion))
 
-            fileObjs = self.getFileVersions(need)
+            fileObjs = self.getFileVersions(need, lookInLocal = True)
             fileDict = {}
             for (key, fileObj) in zip(need, fileObjs):
                 fileDict[key] = fileObj
@@ -573,9 +573,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     contentsNeeded.append( (troveName, newFileVersion, 
                                       fileId, newFileVersion, newFileObj) )
 
-            contentList = self.getFileContents(contentsNeeded, 
-                                               tmpFile = tmpF,
-                                               lookInLocal = True)
+            contentList = self.getFileContents(contentsNeeded, tmpFile = tmpF)
             for (item, contents) in zip(contentsNeeded, contentList):
                 fileId = item[2]
                 newFileObj = item[4]
@@ -615,17 +613,23 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         return r
 
-    def getFileVersions(self, fullList):
+    def getFileVersions(self, fullList, lookInLocal = False):
+        if self.localRep and lookInLocal:
+            result = [ x for x in self.localRep.getFileVersions(fullList) ]
+        else:
+            result = [ None ] * len(fullList)
+
         byServer = {}
         for i, (fileId, version) in enumerate(fullList):
+            if result[i] is not None:
+                continue
+
             server = version.branch().label().getHost()
             if not byServer.has_key(server):
                 byServer[server] = []
             byServer[server].append((i, (self.fromFileId(fileId), 
                                      self.fromVersion(version))))
         
-        result = [ None ] * len(fullList)
-
         for (server, l) in byServer.iteritems():
             sendL = [ x[1] for x in l ]
             idxL = [ x[0] for x in l ]
