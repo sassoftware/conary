@@ -398,8 +398,14 @@ def updateSrc(repos, versionStr = None):
     else:
 	versionStr = state.expandVersionStr(versionStr)
 
-	pkgList = repos.findTrove(None, pkgName, None, None, 
-				  versionStr = versionStr)
+        try:
+            pkgList = repos.findTrove(None, pkgName, None,
+                                      versionStr = versionStr)
+        except repository.repository.PackageNotFound:
+	    log.error("Unable to find source component %s with version %s"
+                      % (pkgName, versionStr))
+	    return
+            
 	if len(pkgList) > 1:
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return
