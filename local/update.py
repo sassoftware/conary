@@ -42,7 +42,8 @@ class FilesystemJob:
     def _restore(self, fileObj, target, msg, contentsOverride = ""):
 	self.restores.append((fileObj.id(), fileObj, target, contentsOverride, 
 			      msg))
-	self.runLdconfig = self.runLdconfig | fileObj.flags.isShLib()
+	if fileObj.flags.isShLib() and not os.path.exists(target):
+	    self.sharedLibraries.append(target)
 	if fileObj.flags.isInitScript() and not os.path.exists(target):
 	    self.initScripts.append(target)
 	if fileObj.flags.isGconfSchema() and not os.path.exists(target):
@@ -115,13 +116,30 @@ class FilesystemJob:
 	    f.close()
 	    log.debug(msg)
 
-	if self.runLdconfig:
+	if self.sharedLibraries:
 	    p = "/sbin/ldconfig"
 	    if os.getuid():
 		log.warning("ldconfig skipped (insufficient permissions)")
 	    elif os.access(util.joinPaths(self.root, p), os.X_OK) != True:
 		log.error("/sbin/ldconfig is not available")
 	    else:
+		# write any needed entries in ld.so.conf, then run ldconfig
+		ldso = file(util.joinPaths(self.root, '/etc/ld.so.conf'), 'w+')
+		ldsolines = ldso.readlines()
+		newlines = []
+		rootlen = len(self.root)
+		for path in self.sharedLibraries:
+		    dirname = os.path.dirname(path)[rootlen:]
+		    dirline = dirname+'\n'
+		    if dirline not in ldsolines:
+			ldsolines.append(dirline)
+			newlines.append(dirname)
+		if newlines:
+		    log.debug("adding ld.so.conf entries: %s",
+			      " ".join(newlines))
+		    ldso.seek(0)
+		    ldso.writelines(ldsolines)
+		ldso.close()
 		log.debug("running ldconfig")
 		pid = os.fork()
 		if not pid:
@@ -543,7 +561,7 @@ class FilesystemJob:
 	self.oldPackages = []
 	self.errors = []
 	self.newFiles = []
-	self.runLdconfig = False
+	self.sharedLibraries = []
 	self.root = root
 	self.initScripts = []
 	self.gconfSchema = []
