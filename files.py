@@ -256,8 +256,16 @@ class File(FileMode):
     def setOwnerGroup(self, target):
 	if os.getuid(): return
 
-	uid = pwd.getpwnam(self.owner())[2]
-	gid = grp.getgrnam(self.group())[2]
+        try:
+            uid = pwd.getpwnam(self.owner())[2]
+        except KeyError:
+            print "warning: user %s does not exist - using root" %self.owner()
+            uid = 0
+        try:
+            gid = grp.getgrnam(self.group())[2]
+        except KeyError:
+            print "warning: group %s does not exist - using root" %self.group()
+            gid = 0
 
 	# FIXME: this needs to use lchown, which is in 2.3, and
 	# this should happen unconditionally
