@@ -380,6 +380,8 @@ class DeviceFile(File):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 
+	if os.getuid(): return
+
 	if sys.hexversion >= 0x20300f0:
             if self.infoTag == 'c':
                 flags = stat.S_IFCHR
