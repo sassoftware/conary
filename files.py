@@ -369,10 +369,6 @@ class SymbolicLink(File):
 	# chmod() on a symlink follows the symlink
 	pass
 
-    def setOwnerGroup(self, root, target):
-	# chmod() on a symlink follows the symlink
-	pass
-
     def restore(self, fileContents, root, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
