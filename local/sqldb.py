@@ -580,8 +580,8 @@ class Database:
 	    else:
 		troveFlavorId = self.flavors[troveFlavor]
 	
-	if troveFlavor is 0:
-	    if troveFlavorId is 0:
+	if troveFlavor == 0:
+	    if troveFlavorId == 0:
 		troveFlavor = None
 	    else:
 		troveFlavor = self.flavors.getId(troveFlavorId)
