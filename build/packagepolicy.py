@@ -1228,6 +1228,10 @@ class Requires(_addInfo):
                     self.recipe.reportErrors(
                         'group dependency %s no allowed' %info)
                     return
+                if info.startswith('fileset-'):
+                    self.recipe.reportErrors(
+                        'fileset dependency %s no allowed' %info)
+                    return
                 if ':' not in info:
                     self.recipe.reportErrors(
                         'package dependency %s no allowed' %info)
