@@ -24,7 +24,7 @@ sys.path.append(sys.argv[1])
 from netserver import NetworkRepositoryServer
 
 FILE_PATH="/tmp/conary-server"
-BASE_URL="http://porkloin:8001/"
+BASE_URL="http://localhost:8001/"
 
 class SRSServer(SimpleXMLRPCServer):
 
@@ -94,11 +94,11 @@ def handler(req):
 
 if __name__ == '__main__':
     netRepos = NetworkRepositoryServer(sys.argv[2], FILE_PATH, BASE_URL)
-    xmlServer = SRSServer(("", 8000))
+    xmlServer = SRSServer(("localhost", 8000))
     xmlServer.register_instance(netRepos)
     xmlServer.register_introspection_functions()
 
-    httpServer = HTTPServer(("", 8001), HttpRequests)
+    httpServer = HTTPServer(("localhost", 8001), HttpRequests)
 
     fds = {}
     fds[xmlServer.fileno()] = xmlServer
