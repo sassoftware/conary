@@ -77,7 +77,7 @@ class Recipe:
 	self.tarballs.append((file, extractDir))
 	self.addSignature(file, keyid)
 
-    def addSourceFromRPM(self, rpm, file, extractDir='', keyid=None):
+    def addTarballFromRPM(self, rpm, file, extractDir='', keyid=None):
 	f = lookaside.searchAll(self.cfg, os.path.basename(file), self.name, self.srcdirs)
 	if not f:
 	    r = lookaside.findAll(self.cfg, rpm, self.name, self.srcdirs)

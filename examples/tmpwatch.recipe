@@ -20,7 +20,7 @@ only removes empty directories and regular files."""
 
     def setup(self):
 	#self.addTarball("%s-%s.tar.gz" % (self.name, self.version))
-	self.addSourceFromRPM("ftp://ftp.redhat.com/pub/fedora/linux/core/development/SRPMS/%s-%s-%s.src.rpm" %(self.name, self.version, self.rpmrevision), 
+	self.addTarballFromRPM("ftp://ftp.redhat.com/pub/fedora/linux/core/development/SRPMS/%s-%s-%s.src.rpm" %(self.name, self.version, self.rpmrevision), 
 	                      "%s-%s.tar.gz" %(self.name, self.version))
 	self.addSource("crond-tmpwatch")
 	self.install = (build.MakeInstall(rootVar = "ROOT"),
