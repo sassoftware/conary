@@ -61,7 +61,7 @@ def _createComponent(repos, bldPkg, newVersion, ident):
             flavor = f.flavor.deps
         else:
             flavor = None
-        (pathId, fileVersion, oldFile) = ident(path, flavor)
+        (pathId, fileVersion, oldFile) = ident(path, newVersion, flavor)
 	f.pathId(pathId)
         
         linkGroupId = linkGroups.get(path, None)
@@ -91,20 +91,15 @@ def _createComponent(repos, bldPkg, newVersion, ident):
     return (p, fileMap)
 
 class _IdGen:
-    def __call__(self, path, flavor):
+    def __call__(self, path, version, flavor):
 	if self.map.has_key(path):
 	    return self.map[path]
 
-	fileid = sha1helper.md5String("%s %f %s" % (path, time.time(), 
-                                                     self.noise))
+	fileid = sha1helper.md5String("%s %s" % (path, version.asString()))
 	self.map[(path, flavor)] = (fileid, None, None)
 	return (fileid, None, None)
 
     def __init__(self, map=None):
-	# path ids need to be unique. we include the time and path when
-	# we generate them; any data put here is also used
-	uname = os.uname()
-	self.noise = "%s %s" % (uname[1], uname[2])
         if map is None:
             self.map = {}
         else:
@@ -1054,8 +1049,3 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                     os.kill(-pid, signal.SIGINT)
         # make sure that we are the foreground process again
         os.tcsetpgrp(0, os.getpgrp())
-
-def makeFileId(*args):
-    assert(args)
-    str = "".join(args)
-    return _IdGen()(str, None)[0]

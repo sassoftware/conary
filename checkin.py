@@ -37,6 +37,9 @@ import trove
 from lib import util
 import versions
 
+# makeFileId() returns 16 random bytes, for use as a fileId
+makeFileId = lambda: os.urandom(16)
+
 class SourceState(trove.Trove):
 
     def setPathMap(self, map):
@@ -340,7 +343,7 @@ def commit(repos, cfg, message):
                               'cvc add' % base)
                     return
 
-                pathId = cook.makeFileId(os.getcwd(), base)
+                pathId = makeFileId()
                 state.addFile(pathId, base, versions.NewVersion(), "0" * 20)
 
             if os.path.dirname(fullPath) != cwd:
@@ -929,7 +932,7 @@ def addFiles(fileList, ignoreExisting=False):
 	    log.error("refusing to add CONARY to the list of managed sources")
 	    continue
 
-	pathId = cook.makeFileId(os.getcwd(), file)
+	pathId = makeFileId()
 
 	state.addFile(pathId, file, versions.NewVersion(), "0" * 20)
 
