@@ -50,7 +50,7 @@ dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
 generated_files = srs-wrapper srs.recipe *.pyo *.pyc 
 
-.PHONY: clean bootstrap deps.dot pychecker dist install test
+.PHONY: clean bootstrap deps.dot pychecker dist install test debug-test
 
 all: srs-wrapper srs.recipe
 
@@ -110,4 +110,5 @@ pychecker:
 	python2.3 /usr/lib/python2.2/site-packages/pychecker/checker.py *.py
 
 test:
-	python2.3 test/testsuite.py
+debug-test:
+	make -C test $@
