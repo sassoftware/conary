@@ -432,8 +432,6 @@ class Database:
             # then the database version is old
             count = cu.execute("SELECT count(*) FROM sqlite_master").next()[0]
             if count:
-                import lib
-                lib.epdb.st()
                 return False
 
             cu.execute("CREATE TABLE DatabaseVersion (version INTEGER)")
