@@ -212,7 +212,7 @@ class HttpHandler(HtmlEngine):
             admin = True
         else:
             admin = False
-        self.repServer.auth.add(user, password, write=write, admin=admin)
+        self.repServer.auth.addUser(user, password, write=write, admin=admin)
         self.writeFn("""User added successfully. <a href="userlist">Return</a>""")
         
     def chPassFormCmd(self, authToken, fields):
