@@ -709,7 +709,7 @@ def setBuildFlagsFromFlavor(recipeName, flavor, error=True):
                     elif error:
                         raise RuntimeError, ('Trying to set a flavor with '
                                              'localflag %s when no trove '
-                                             ' name was given')
+                                             ' name was given' % flag)
         elif isinstance(depGroup, deps.InstructionSetDependency):
             # ensure that there is only on major architecture listed
             # XXX this could be user error -- handle gracefully
