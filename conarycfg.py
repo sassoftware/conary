@@ -43,10 +43,10 @@ class ConfigFile:
     def read(self, file, exception=False):
 	if os.path.exists(file):
 	    f = open(file, "r")
-	    self.lineno = 1
+	    lineno = 1
 	    for line in f:
-		self.configLine(line, file)
-		self.lineno = self.lineno + 1
+		self.configLine(line, file, lineno)
+		lineno = lineno + 1
 	    f.close()
 	elif exception:
 	    raise IOError, file
@@ -54,7 +54,8 @@ class ConfigFile:
     def __getitem__(self, name):
 	return self.__dict__[name]
 
-    def configLine(self, line, file = "override"):
+    def configLine(self, line, file = "override", lineno = '<No line>'):
+        self.lineno = lineno
 	line = line.strip()
 	if not line or line[0] == '#':
 	    return
