@@ -383,7 +383,8 @@ class RemoveNonPackageFiles(policy.Policy):
     """
     invariantinclusions = [
 	r'\.la$',
-	r'%(libdir)s/python.*/site-packages/.*\.a$',
+        # python .a's might have been installed in the wrong place on multilib
+	r'%(prefix)s/(lib|%(lib)s)/python.*/site-packages/.*\.a$',
 	r'perllocal\.pod$',
 	r'\.packlist$',
 	r'\.cvsignore$',
