@@ -238,7 +238,8 @@ class FilesystemJob:
 
 	    oldFile = repos.getFileVersion(fileId, version)
 
-	    if not oldFile.partialEquality(localFile, ignoreOwnerGroup = noIds):
+	    if not oldFile.metadataEqual(localFile, 
+					    ignoreOwnerGroup = noIds):
 		self.errors.append("%s has changed but has been removed "
 				   "on head" % path)
 		continue
@@ -315,7 +316,7 @@ class FilesystemJob:
 	    attributesChanged = False
 
 	    if basePkg and headFileVersion and \
-	         not fsFile.partialEquality(headFile, ignoreOwnerGroup = noIds):
+	         not fsFile.metadataEqual(headFile, ignoreOwnerGroup = noIds):
 		# something has changed for the file
 		if flags & MERGE:
 		    conflicts = fsFile.twm(headChanges, baseFile, 
@@ -566,7 +567,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	oldVersion = srcPkg.getFile(fileId)[1]	
 	(oldFile, oldCont) = repos.getFileVersion(fileId, oldVersion,
 						  withContents = 1)
-	if not f.partialEquality(oldFile, ignoreOwnerGroup = noIds):
+	if not f.metadataEqual(oldFile, ignoreOwnerGroup = noIds):
 	    newPkg.addFile(fileId, path, newVersion)
 
 	    (filecs, hash) = changeset.fileChangeSet(fileId, oldFile, f)

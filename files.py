@@ -363,7 +363,7 @@ class InodeStream(TupleStream):
 	else:
 	    return time.strftime("%b %e  %Y", timeSet)
 
-    def partialEquality(self, other):
+    def metadataEqual(self, other):
 	return self.__class__ == other.__class__ and \
 	       self.perms() == other.perms() 
 
@@ -511,15 +511,21 @@ class File:
 
 	return True
 
-    def partialEquality(self, other, ignoreOwnerGroup):
+    def metadataEqual(self, other, ignoreOwnerGroup):
+	"""
+	Never compares contents, might not compare owner/group
+	"""
+
 	if not ignoreOwnerGroup:
 	    return self == other
 
 	for (name, streamType) in self.streamList:
 	    if name == 'inode':
-		if not self.__dict__[name].partialEquality(
+		if not self.__dict__[name].metadataEqual(
 		       other.__dict__[name]):
 		    return False
+	    elif name == 'contents':
+		pass
 	    elif not self.__dict__[name] == other.__dict__[name]:
 		return False
 
