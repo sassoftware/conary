@@ -158,10 +158,10 @@ class FilesystemJob:
 	    log.debug(msg)
 
 	contents = None
-        restored = {}           # keep track of what was restored; we may need these
-                                # contents for files with duplicate contents
 	# restore in the same order files appear in the change set
 	self.restores.sort()
+        delayedRestores = []
+        ptrTargets = {}
 
 	for (fileId, fileObj, target, override, msg) in self.restores:
 	    # None means "don't restore contents"; "" means "take the
@@ -169,33 +169,6 @@ class FilesystemJob:
             # take the file contents from the change set, we look for the
             # opportunity to make a hard link instead of actually restoring it.
 	    fileObj = files.ThawFile(fileObj, fileId)
-
-            # this is part of a hard link group, attempt making a
-            # hardlink.
-            if override == "" and fileObj.hasContents and fileObj.linkGroup.value():
-                linkGroup = fileObj.linkGroup.value()
-                linkPath = self.linkGroups.get(linkGroup, None)
-                if linkPath is None:
-                    self.linkGroups[linkGroup] = target
-                else:
-                    try:
-                        name = os.path.basename(target)
-                        path = os.path.dirname(target)
-                        util.mkdirChain(path)
-                        tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
-                        os.close(tmpfd)
-                        os.remove(tmpname)
-                        os.link(linkPath, tmpname)
-                        os.rename(tmpname, target)
-                        # hard link created, all that's needed, continue
-                        # with the next file to restore
-                        continue
-                    except OSError, e:
-                        # ignore failure to create a cross-device symlink.
-                        # restore the file as if it's not a hard link
-                        # below
-                        if e.errno != errno.EXDEV:
-                            raise
 
 	    if override != "":
 		contents = override
@@ -207,15 +180,73 @@ class FilesystemJob:
                 else:
                     contType, contents = self.changeSet.getFileContents(fileId)
                     assert(contType != changeset.ChangedFileTypes.diff)
+                    # PTR types are restored later
                     if contType == changeset.ChangedFileTypes.ptr:
                         ptrId = contents.get().read()
-                        contents = filecontents.FromFilesystem(restored[ptrId])
+                        delayedRestores.append((fileId, fileObj, target, msg, 
+                                                ptrId))
+                        ptrTargets[ptrId] = None
+                        continue
 
-            restored[fileId] = target
+            # we may want to make a symlink here... imagine a change set
+            # that contains the contents for one member of a link group
+            # (the contents other members of the link group not having 
+            # changed). that member isn't on the delayedRestore list
+            # (since it's the only file in the changeset with contents
+            # it can't be a PTR), but it still needs to be created as
+            # a link
+            if fileObj.hasContents and fileObj.linkGroup.value() and \
+                    self.linkGroups.has_key(fileObj.linkGroup.value()):
+                # this is part of a hard link group, attempt making a
+                # hardlink.
+                linkGroup = fileObj.linkGroup.value()
+                linkPath = self.linkGroups[linkGroup]
+
+                try:
+                    util.createLink(linkPath, target)
+                    # continue with the next file to restore
+                    continue
+                except OSError, e:
+                    # ignore failure to create a cross-device symlink.
+                    # we'll restore the file as if it's not a hard link
+                    # below
+                    if e.errno != errno.EXDEV:
+                        raise
+
 	    fileObj.restore(contents, self.root, target, contents != None)
+            if ptrTargets.has_key(fileId):
+                ptrTargets[fileId] = target
 	    log.debug(msg, target)
 
-        del restored
+            if fileObj.hasContents and fileObj.linkGroup.value():
+                linkGroup = fileObj.linkGroup.value()
+                self.linkGroups[linkGroup] = target
+
+	for (fileId, fileObj, target, msg, ptrId) in delayedRestores:
+            # we wouldn't be here if the fileObj didn't have contents and
+            # no override
+            if fileObj.linkGroup.value():
+                # this is part of a hard link group, attempt making a
+                # hardlink.
+                linkGroup = fileObj.linkGroup.value()
+                linkPath = self.linkGroups[linkGroup]
+
+                try:
+                    util.createLink(linkPath, target)
+                    # continue with the next file to restore
+                    continue
+                except OSError, e:
+                    # ignore failure to create a cross-device symlink.
+                    # we'll restore the file as if it's not a hard link
+                    # below
+                    if e.errno != errno.EXDEV:
+                        raise
+
+            fileObj.restore(filecontents.FromFilesystem(ptrTargets[ptrId]),
+                            self.root, target, True)
+            log.debug(msg, target)
+
+        del delayedRestores
 
 	paths = self.removes.keys()
 	paths.sort()

@@ -665,23 +665,19 @@ class ReferencedFileList(list, streams.InfoStream):
 	if data is not None:
 	    self.thaw(data)
 
-# the 100 here is a silly relic; it should go away the next time we need to
-# break the format
-_STREAM_TCS_NAME	    = 100 +  0
-_STREAM_TCS_OLD_VERSION	    = 100 +  1
-_STREAM_TCS_NEW_VERSION	    = 100 +  2
-_STREAM_TCS_REQUIRES	    = 100 +  3
-_STREAM_TCS_PROVIDES	    = 100 +  4
-_STREAM_TCS_CHANGE_LOG	    = 100 +  5
-# + 6 was used for a broken OLD_FILES tag; we should put this back next
-# time we break the change set format
-_STREAM_TCS_OLD_FILES	    = 100 + 13
-_STREAM_TCS_TYPE	    = 100 +  7
-_STREAM_TCS_TROVE_CHANGES   = 100 +  8
-_STREAM_TCS_NEW_FILES       = 100 +  9
-_STREAM_TCS_CHG_FILES       = 100 + 10
-_STREAM_TCS_OLD_FLAVOR      = 100 + 11
-_STREAM_TCS_NEW_FLAVOR      = 100 + 12
+_STREAM_TCS_NAME	    =  0
+_STREAM_TCS_OLD_VERSION	    =  1
+_STREAM_TCS_NEW_VERSION	    =  2
+_STREAM_TCS_REQUIRES	    =  3
+_STREAM_TCS_PROVIDES	    =  4
+_STREAM_TCS_CHANGE_LOG	    =  5
+_STREAM_TCS_OLD_FILES	    =  6
+_STREAM_TCS_TYPE	    =  7
+_STREAM_TCS_TROVE_CHANGES   =  8
+_STREAM_TCS_NEW_FILES       =  9
+_STREAM_TCS_CHG_FILES       = 10
+_STREAM_TCS_OLD_FLAVOR      = 11
+_STREAM_TCS_NEW_FLAVOR      = 12
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2

@@ -340,3 +340,13 @@ def memsize():
     lines = open(pfn).readlines()
     f = lines[10].split()
     return int(f[1])
+
+def createLink(src, to):
+    name = os.path.basename(to)
+    path = os.path.dirname(to)
+    mkdirChain(path)
+    tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
+    os.close(tmpfd)
+    os.remove(tmpname)
+    os.link(src, tmpname)
+    os.rename(tmpname, to)

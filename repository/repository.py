@@ -670,12 +670,21 @@ class ChangeSetJob:
 	    self.addFileContents(fileObj.contents.sha1(), newVersion, 
 				 fileContents, restoreContents, 1)
 
+        # normalRestoreList is empty if storeOnlyConfigFiles
 	normalRestoreList.sort()
+        ptrRestores = []
 	for (fileId, sha1, version, restoreContents) in normalRestoreList:
 	    (contType, fileContents) = cs.getFileContents(fileId)
+            if contType == changeset.ChangedFileTypes.ptr:
+                ptrRestores.append(sha1)
+                continue
+
 	    assert(contType == changeset.ChangedFileTypes.file)
 	    self.addFileContents(sha1, version, fileContents, restoreContents,
 				 0)
+
+        for sha1 in ptrRestores:
+	    self.addFileContents(sha1, None, None, False, 0)
 
 	del configRestoreList
 	del normalRestoreList

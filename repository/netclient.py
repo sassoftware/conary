@@ -88,7 +88,7 @@ class ServerCache:
 	    self.cache[serverName] = server
 
 	    try:
-		if server.checkVersion(3) != 3:
+		if server.checkVersion(4) != 4:
 		    raise repository.OpenError('Server version too old')
 	    except Exception, e:
                 if isinstance(e, socket.error):
