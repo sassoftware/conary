@@ -33,6 +33,7 @@ import conarycfg
 from local import database
 from lib import util
 from repository import netclient
+import updatecmd
 
 def usage():
     print "Usage: localoutofdate [--missing]"
@@ -43,10 +44,14 @@ sys.excepthook = util.genExcepthook()
 
 def main(argv):
     listMissing = False
+    doUpdate = False
     args = argv[1:]
     for arg in args:
         if arg == '--missing':
             listMissing = True
+        elif arg == '--update':
+            
+            doUpdate = True
         else:
             return usage()
         args.remove(arg)
@@ -67,6 +72,9 @@ def main(argv):
         lvt = lv.trailingVersion()
         if (v.branch(),vt.getVersion(),vt.getRelease(),vt.buildCount) != (lv.branch(),lvt.getVersion(),lvt.getRelease(),lvt.buildCount):
             print "%-35s%-25s%-20s" % (pkg, lvt.asString(), vt.asString())
+
+            if doUpdate:
+                updatecmd.doUpdate(repos, cfg, [ "%s=%s" %(pkg, v.asString()) ])
 
     if listMissing:
         
