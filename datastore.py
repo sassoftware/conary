@@ -245,8 +245,6 @@ class DataStoreRepository:
 
         return contentList
 
-    def __init__(self, path, logFile = None):
-	fullPath = path + "/contents"
-	util.mkdirChain(fullPath)
-	self.contentsStore = DataStore(fullPath, logFile = logFile)
+    def __init__(self, path, logFile = None, dataStore = None):
+	self.contentsStore = dataStore
 

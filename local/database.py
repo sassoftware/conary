@@ -161,9 +161,12 @@ class SqlDbRepository(datastore.DataStoreRepository,
             self.dbpath = path
         else:
             self.dbpath = path + "/conarydb"
-            datastore.DataStoreRepository.__init__(self, path)
-            repository.AbstractRepository.__init__(self)
+
 	self.db = sqldb.Database(self.dbpath)
+
+        datastore.DataStoreRepository.__init__(self, path,
+                           dataStore = localrep.SqlDataStore(self.db.db))
+        repository.AbstractRepository.__init__(self)
 
 class Database(SqlDbRepository):
 

@@ -22,7 +22,7 @@ import repository
 import repository.netclient
 from repository.repository import AbstractRepository
 from repository.repository import ChangeSetJob
-from datastore import DataStoreRepository
+from datastore import DataStoreRepository, DataStore
 from repository.repository import DuplicateBranch
 from repository.repository import RepositoryError
 from repository.repository import TroveMissing
@@ -355,5 +355,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	self.sqlDbPath = self.top + "/sqldb"
 
-	DataStoreRepository.__init__(self, path, logFile = logFile)
+	fullPath = path + "/contents"
+	util.mkdirChain(fullPath)
+        store = DataStore(fullPath, logFile = logFile)
+
+	DataStoreRepository.__init__(self, path, logFile = logFile,
+                                     dataStore = store)
 	AbstractRepository.__init__(self)

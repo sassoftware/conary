@@ -204,3 +204,4 @@ class SqlDataStore:
                                                  count INT,
                                                  data BIN)""")
             cu.execute("CREATE INDEX DataStoreIdx ON DataStore(data)")
+            self.db.commit()
