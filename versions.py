@@ -943,7 +943,7 @@ class Branch(VersionSequence):
 	return Branch(items)
 
     def hasParentBranch(self):
-        return len(self.versions) > 2
+        return len(self.versions) >= 2
 
     def createVersion(self, verRel):
 	"""
