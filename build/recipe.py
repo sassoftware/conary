@@ -19,7 +19,8 @@ class RecipeLoader(types.DictionaryType):
         exec 'from recipe import Recipe' in self.module.__dict__
         exec 'from recipe import loadRecipe' in self.module.__dict__
         exec 'import build, os, package, sys, util' in self.module.__dict__
-        exec 'sys.excepthook = util.excepthook' in self.module.__dict__ 
+        exec 'sys.excepthook = util.excepthook' in self.module.__dict__
+        exec 'filename = "%s"' %(file) in self.module.__dict__
         code = compile(f.read(), file, 'exec')
         exec code in self.module.__dict__
         for (key, value) in  self.module.__dict__.items():
@@ -32,15 +33,20 @@ class RecipeLoader(types.DictionaryType):
                 if len(value.__bases__) > 0 and 'name' in dir(value):
                     self[key] = value
 
+# XXX this should be extended to load a recipe from srs
 def loadRecipe(file):
+    callerGlobals = inspect.stack()[1][0].f_globals
+    if file[0] != '/':
+        recipepath = os.path.dirname(callerGlobals['filename'])
+        file = recipepath + '/' + file
     recipes = RecipeLoader(file)
     for name, recipe in recipes.items():
         # XXX hack to hide parent recipies
         recipe.ignore = 1
-        inspect.stack()[1][0].f_globals[name] = recipe
+        callerGlobals[name] = recipe
         # stash a reference to the module in the namespace
         # of the recipe that loaded it, or else it will be destroyed
-        inspect.stack()[1][0].f_globals[file] = recipes
+        callerGlobals[file] = recipes
         
 class Recipe:
 
@@ -99,7 +105,9 @@ class Recipe:
 	    self.build.doBuild(builddir + "/" + self.mainDir())
 
     def doInstall(self, builddir, root):
-	if type(self.install) == types.TupleType:
+        if self.install is None:
+            pass
+	elif type(self.install) == types.TupleType:
 	    for inst in self.install:
 		inst.doInstall(builddir + "/" + self.mainDir(), root)
 	else:
