@@ -94,6 +94,9 @@ class VersionedFile:
 
     def findLatestVersion(self, branch):
 	matchesByTime = {}
+	if not self.versionMap:
+	    self.read()
+
 	for (verString, (version, time)) in self.versionMap.items():
 	    if version.onBranch(branch):
 		matchesByTime[time] = version
@@ -107,6 +110,9 @@ class VersionedFile:
     # data can be a string, which is written into the new version, or
     # a file-type object, whose contents are copied into the new version
     def addVersion(self, version, data):
+	if not self.versionMap:
+	    self.read()
+
 	versionStr = version.asString()
 
 	if type(data) != types.StringType:
@@ -114,9 +120,13 @@ class VersionedFile:
 	self.db[_CONTENTS % (self.key, versionStr)] = data
 	self.versionMap[versionStr] = (version, time.time())
 	self.writeMap()
+
 	self.db.sync()
 
     def eraseVersion(self, version):
+	if not self.versionMap:
+	    self.read()
+	    
 	versionStr = version.asString()
 	del self.db[_CONTENTS % (self.key, versionStr)]
 	del self.versionMap[versionStr]
@@ -124,10 +134,16 @@ class VersionedFile:
 	self.db.sync()
 
     def hasVersion(self, version):
+	if not self.versionMap:
+	    self.read()
+	    
 	return self.versionMap.has_key(version.asString())
 
+    # returns a list of version objects
     def versionList(self):
-	# returns a list of version objects
+	if not self.versionMap:
+	    self.read()
+	    
 	list = []
 	for (version, time) in self.versionMap.values():
 	    list.append(version)
