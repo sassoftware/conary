@@ -46,7 +46,7 @@ class TroveStore:
 
     def __init__(self, path):
 	import sys
-	self.db = sqlite.connect(path, timeout = 30000, command_logfile = sys.stderr)
+	self.db = sqlite.connect(path, timeout = 30000)
 	self.troveTroves = trovecontents.TroveTroves(self.db)
 	self.troveFiles = trovecontents.TroveFiles(self.db)
 	self.fileStreams = instances.FileStreams(self.db)
@@ -171,10 +171,10 @@ class TroveStore:
 		    AitemId=Latest.itemId AND AbranchId=Latest.branchId
 		NATURAL JOIN Versions
 	""", troveName, branch.asString())
-	
-	latest = cu.fetchone()[0]
-
-	return versions.VersionFromString(latest)
+        try:
+            return versions.VersionFromString(cu.next()[0])
+        except StopIteration:
+            raise KeyError, troveName, branch
 
     def iterTroveLeafsByLabel(self, troveName, labelStr):
 	cu = self.db.cursor()

@@ -313,7 +313,7 @@ class IdealRepository(AbstractTroveDatabase):
 	@type troveName: str
 	@param branch: branch
 	@type branch: versions.Version
-	@rtype: list of (versions.Version, flavor) tuples
+	@rtype: list of (flavor, versions.Version) tuples
 	"""
 	raise NotImplementedError
 
