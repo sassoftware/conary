@@ -1062,28 +1062,42 @@ class ConsoleHelper(BuildAction):
     """
     Set up consolehelper symlinks, control files, and dependency for an
     application:
-    C{r.ConsoleHelper(I{linkname}, I{realprogram}, [pamfile=I{path},]
-    [user=I{user(root)},] [session=I{bool},] [fallback=I{bool},]
+    C{r.ConsoleHelper(I{linkname}, I{realprogram},
+    [consoleuser=I{bool(False)},] [timestamp=I{bool(False)},]
+    [pamfile=I{path},]
+    [targetuser=I{user(root)},] [session=I{bool},] [fallback=I{bool},]
     [noxoption=I{optstring},] [otherlines=I{linelist}])}
 
     The C{I{linkname}} and C{I{realprogram}} paths are relative to
     the destdir.
 
+    Setting C{consoleuser} to C{True} allows the console user to access
+    the service without providing a password; for best security, it
+    defaults to false.
+
+    Setting C{timestamp} to C{True} allows recently-authenticated users
+    to access the service without providing a password; for best security,
+    it defaults to false.
+
     The default C{pamfile} contains auth via C{pam_rootok}, then
     C{pam_stack service=system-auth} and everything else as
     C{pam_permit}.  Otherwise, just provide the name of a file,
-    relative to the builddir, to use.
+    relative to the builddir, to use.  If C{pamfile} is set, then
+    C{consoleuser} is ignored.
 
     The C{session}, C{fallback}, and C{noxoption} default to None,
     which means that no line is generated in the C{console.apps}
     file.  The C{otherlines} option is the catchall for options
     otherwise unhandled by C{ConsoleHelper}, and is simply a list
     of lines of text (no newline characters) to put in the
-    C{console.apps} file.
+    C{console.apps} file.  We assume that C{session=True} implies
+    that the application uses X.
     """
     keywords = {
+        'consoleuser': False,
+        'timestamp': False,
         'pamfile': None,
-        'user': 'root',
+        'targetuser': 'root',
         'session': None,
         'fallback': None,
         'noxoption': None,
@@ -1111,11 +1125,22 @@ class ConsoleHelper(BuildAction):
         else:
             contents = [
                 '#%PAM-1.0',
-                'auth       sufficient   /lib/security/$ISA/pam_rootok.so',
-                'auth       required     /lib/security/$ISA/pam_stack.so service=system-auth',
-                'account    required     /lib/security/$ISA/pam_permit.so',
-                'session    required     /lib/security/$ISA/pam_permit.so',
+                'auth       sufficient   pam_rootok.so',
             ]
+            if self.consoleuser is True:
+                contents.append('auth       sufficient   pam_console.so')
+            if self.timestamp is True:
+                contents.append('auth       sufficient   pam_timestamp.so')
+            contents.extend([
+                'auth       required     pam_stack.so service=system-auth',
+                'account    required     pam_permit.so'
+            ])
+            if self.session is True or self.timestamp is True:
+                contents.append('session    required     pam_permit.so')
+                if self.session is True:
+                    contents.append('session    optional     pam_xauth.so')
+                if self.timestamp is True:
+                    contents.append('session    optional     pam_timestamp.so')
             f = file(destpath, 'w')
             f.writelines([ x+'\n' for x in contents])
             f.close()
@@ -1127,7 +1152,7 @@ class ConsoleHelper(BuildAction):
         destpath += programname
         contents = [
             'PROGRAM='+self.realprogram,
-            'USER='+self.user,
+            'USER='+self.targetuser,
         ]
         boolMap = {True: 'true', False: 'false'}
         if self.session is not None:
