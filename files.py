@@ -794,7 +794,7 @@ def fieldsChanged(diff):
     elif type == "c":
 	cl = CharacterDevice
     elif type == "s":
-	cl = SocketDevice
+	cl = Socket
     elif type == "l":
 	cl = SymbolicLink
     elif type == "p":
