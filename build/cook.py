@@ -523,7 +523,7 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
 
     built = [ (fileset.getName(), fileset.getVersion().asString(), 
                                                 fileset.getFlavor()) ]
-    return (changeSet, built, fileset.getFlavor())
+    return (changeSet, built, None)
 
 def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True, 
 		      macros={}, targetLabel = None, 
