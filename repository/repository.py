@@ -220,7 +220,7 @@ class AbstractTroveDatabase:
 	is a list of (troveName, version, flavor) tuples. Version can
 	a version or a branch; if it's a branch the latest version of the
 	trove on that branch is returned. If there is no match for a
-	particular tuple, None is placed in the retur nlist for that tuple.
+	particular tuple, None is placed in the return list for that tuple.
 	"""
 	rc = []
 	for item in troveList:
