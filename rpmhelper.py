@@ -26,6 +26,7 @@ PREIN           = 1023
 POSTIN          = 1024
 PREUN           = 1025
 POSTUN          = 1026
+OLDFILENAMES    = 1027
 FILEMODES       = 1030
 FILERDEVS       = 1033
 FILEFLAGS       = 1037 # bitmask; (1<<0 => config)
@@ -87,6 +88,10 @@ class RpmHeader:
     __contains__ = has_key
 
     def paths(self):
+        if OLDFILENAMES in self:
+            for path in self[OLDFILENAMES]
+                yield path
+
         paths = self[DIRNAMES]
         indexes = self[DIRINDEXES]
 
