@@ -3,6 +3,7 @@
 # All rights reserved
 #
 
+import difflib
 import enum
 import filecontainer
 import filecontents
@@ -429,6 +430,21 @@ def fileChangeSet(fileId, old, new):
 	    hash = new.sha1()
 
     return (diff, hash)
+
+def fileContentsDiff(oldFile, oldCont, newFile, newCont):
+    if oldFile and oldFile.isConfig() and newFile.isConfig():
+	diff = difflib.unified_diff(oldCont.get().readlines(),
+				    newCont.get().readlines(),
+				    "old", "new")
+	diff.next()
+	diff.next()
+	cont = filecontents.FromString("".join(diff))
+	contType = ChangedFileTypes.diff
+    else:
+	cont = newCont
+	contType = ChangedFileTypes.file
+
+    return (contType, cont)
 
 # this creates an abstract changeset
 #
