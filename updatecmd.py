@@ -16,10 +16,7 @@ from local import database
 from lib import log
 import os
 from repository import repository
-import sys
-import trove
 from lib import util
-import versions
 import conaryclient
 
 # FIXME client should instantiated once per execution of the command line 
