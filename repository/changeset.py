@@ -179,12 +179,16 @@ class ChangeSet:
     def headerAsString(self):
 	rc = []
 
-	rc.append("PRIMARIES %d\n" % len(self.primaryPackageList))
+	primaries = [ ]
 	for (name, version) in self.primaryPackageList:
-	    rc.append("%s %s\n" % (name, version.asString()))
-
+	    primaries.append(name)
+	    primaries.append(version.asString())
+	primaries = "\0".join(primaries)
+	
 	for pkg in self.iterNewPackageList():
-            rc.append(pkg.freeze())
+	    s = pkg.freeze()
+	    rc.append("PKG %d\n" % len(s))
+            rc.append(s)
 
 	for (pkgName, version) in self.getOldPackageList():
 	    rc.append("PKG RMVD %s %s\n" % (pkgName, version.freeze()))
@@ -203,7 +207,10 @@ class ChangeSet:
 
 	fileList[0] = "FILES %d\n" % totalLen
 	
-	return "".join(rc + fileList)
+	return "PRIMARIES %d\n%s%s%s" % \
+		    (len(primaries), primaries,
+		     "".join(rc),
+		     "".join(fileList))
 
     def writeContents(self, csf, contents, early):
 	# these are kept sorted so we know which one comes next
@@ -530,44 +537,27 @@ class ChangeSetFromFile(ChangeSet):
 	    header = line[:-1]
 
 	    if header.startswith("PRIMARIES "):
-		lineCount = int(header.split()[1])
-		while lineCount:
-		    line = control.readline()
-		    (name, version) = line.split()
+		size = int(header.split()[1])
+		buf = control.read(size)
+		items = buf.split("\0")
+
+		assert(len(items) % 2 == 0)
+		i = 0
+		while i < len(items):
+		    name = items[i]
+		    version = items[i + 1]
+		    i += 2
 		    version = versions.VersionFromString(version)
 		    self.primaryPackageList.append((name, version))
-		    lineCount -= 1
-
 	    elif header.startswith("PKG RMVD "):
 		(pkgName, verStr) = header.split()[2:5]
 		version = versions.ThawVersion(verStr)
 		self.oldPackage(pkgName, version)
 	    elif header.startswith("PKG "):
-		l = header.split()
-
-		pkgType = l[1]
-		pkgName = l[2]
-
-		if pkgType == "CS":
-		    oldVersion = versions.ThawVersion(l[3])
-		    rest = 4
-		elif pkgType == "NEW" or pkgType == "ABS":
-		    oldVersion = None
-		    rest = 3
-		else:
-		    raise IOError, "invalid line in change set %s" % file
-
-		newVersion = versions.ThawVersion(l[rest])
-		lineCount = int(l[rest + 1])
-
-		pkg = package.PackageChangeSet(pkgName, oldVersion, newVersion,
-				       abstract = (pkgType == "ABS"))
-
-		while lineCount:
-		    line = control.readline()
-		    pkg.parse(line[:-1])
-		    lineCount -= 1
-
+		size = int(header.split()[1])
+		buf = control.read(size)
+		lines = buf.split("\n")[:-1]
+		pkg = package.ThawPackageChangeSet(lines)
 		self.newPackage(pkg)
 	    elif header.startswith("FILES "):
 		size = int(header.split()[1])

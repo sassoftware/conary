@@ -472,43 +472,6 @@ class PackageChangeSet:
 	    self.packages[name] = []
 	self.packages[name].append(('-', version))
 
-    def parse(self, line):
-	action = line[0]
-
-	if action == "+" or action == "~":
-	    (fileId, path, version) = line[1:].split()
-
-	    if version == "-":
-		version = None
-	    else:
-		version = versions.ThawVersion(version)
-
-	    if path == "-":
-		path = None
-
-	    if action == "+":
-		self.newFile(fileId, path, version)
-	    else:
-		self.changedFile(fileId, path, version)
-	elif action == "-":
-	    self.oldFile(line[1:])
-	elif action == "p":
-	    fields = line[2:].split()
-	    name = fields[0]
-	    for item in fields[1:]:
-		op = item[0]
-		v = versions.ThawVersion(item[1:])
-
-		assert(op == "+" or op == "-")
-
-		if op == "+":
-		    self.newPackageVersion(name, v)
-		else: # op == "-"
-		    self.oldPackageVersion(name, v)
-	
-	# this makes our order match the order in the changeset
-	self.changedFiles.sort()
-
     def formatToFile(self, changeSet, cfg, f):
 	f.write("%s " % self.name)
 
@@ -569,9 +532,9 @@ class PackageChangeSet:
 	later be parsed by parse(). The representation begins with a
 	header::
 
-         PKG ABS <name> <newversion> <linecount> <diffcount>
-         PKG CS <name> <oldversion> <newversion> <linecount> <diffcount>
-         PKG NEW <name> <newversion> <linecount> <diffcount>
+         ABS <name> <newversion>
+         CS <name> <oldversion> <newversion>
+         NEW <name> <newversion>
 
 	It is followed by <linecount> lines, each of which specifies a
 	new file, old file, removed file, or a change to the set of
@@ -614,15 +577,15 @@ class PackageChangeSet:
 	mainLineCount = rc.count("\n")
 
 	if self.abstract:
-	    hdr = "PKG ABS %s %s %d\n" % \
-		      (self.name, self.newVersion.freeze(), mainLineCount)
+	    hdr = "ABS %s %s\n" % \
+		      (self.name, self.newVersion.freeze())
 	elif not self.oldVersion:
-	    hdr = "PKG NEW %s %s %d\n" % \
-		      (self.name, self.newVersion.freeze(), mainLineCount)
+	    hdr = "NEW %s %s\n" % \
+		      (self.name, self.newVersion.freeze())
 	else:
-	    hdr = "PKG CS %s %s %s %d\n" % \
+	    hdr = "CS %s %s %s\n" % \
 		      (self.name, self.oldVersion.freeze(), 
-		       self.newVersion.freeze(), mainLineCount)
+		       self.newVersion.freeze())
 
 	return hdr + rc
 
@@ -635,6 +598,70 @@ class PackageChangeSet:
 	self.changedFiles = []
 	self.abstract = abstract
 	self.packages = {}
+
+class ThawPackageChangeSet(PackageChangeSet):
+
+    def parse(self, line):
+	action = line[0]
+
+	if action == "+" or action == "~":
+	    (fileId, path, version) = line[1:].split()
+
+	    if version == "-":
+		version = None
+	    else:
+		version = versions.ThawVersion(version)
+
+	    if path == "-":
+		path = None
+
+	    if action == "+":
+		self.newFile(fileId, path, version)
+	    else:
+		self.changedFile(fileId, path, version)
+	elif action == "-":
+	    self.oldFile(line[1:])
+	elif action == "p":
+	    fields = line[2:].split()
+	    name = fields[0]
+	    for item in fields[1:]:
+		op = item[0]
+		v = versions.ThawVersion(item[1:])
+
+		assert(op == "+" or op == "-")
+
+		if op == "+":
+		    self.newPackageVersion(name, v)
+		else: # op == "-"
+		    self.oldPackageVersion(name, v)
+	
+	# this makes our order match the order in the changeset
+	self.changedFiles.sort()
+
+    def __init__(self, lines):
+	header = lines[0]
+
+	l = header.split()
+
+	pkgType = l[0]
+	pkgName = l[1]
+
+	if pkgType == "CS":
+	    oldVersion = versions.ThawVersion(l[3])
+	    rest = 3
+	elif pkgType == "NEW" or pkgType == "ABS":
+	    oldVersion = None
+	    rest = 2
+	else:
+	    raise IOError, "invalid line in change set %s" % file
+
+	newVersion = versions.ThawVersion(l[rest])
+
+	PackageChangeSet.__init__(self, pkgName, oldVersion, newVersion,
+			          abstract = (pkgType == "ABS"))
+
+	for line in lines:
+	    self.parse(line)
 
 class PackageFromFile(Package):
 
