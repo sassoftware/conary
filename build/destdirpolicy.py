@@ -234,7 +234,7 @@ class TestSuiteFiles(policy.Policy):
 
     invariantexceptions = [ ( '.*', stat.S_IFDIR ), ]
     
-    invariantinclusions = [ '.*[tT][eE][sS][tT].*/*',
+    invariantinclusions = [ '.*[tT][eE][sS][tT].*/.*',
 			    'Makefile.*',
 			    '.*/config.*',
 			    '.*/shconfig',
