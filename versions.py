@@ -885,6 +885,21 @@ class Version(VersionSequence):
         newList = self.versions[:-1] + [ label ] + [ newRelease ]
         return Version(copy.deepcopy(newList))
 
+    def isBranchedBinary(self):
+        """
+	Returns true if this version is a binary version that was branched/
+        shadowed directly, instead of branching/shadowing a source and then
+        cooking it
+
+	@rtype: bool 
+	"""
+        # ensure this version is branched and is actually a binary
+        if not (self.hasParentVersion() and self.trailingRevision().buildCount):
+            return False
+        # check that its parent version is also a binary
+        buildCount = self.parentVersion().trailingRevision().buildCount
+        return buildCount is None or str(buildCount) != '0'
+
     def getSourceVersion(self):
         """ 
         Takes a binary version and returns its associated source version (any
@@ -895,11 +910,13 @@ class Version(VersionSequence):
         a copy of the version, even when the two are equal.
         """
         v = self.copy()
-
+        # if a binary was branched/shadowed onto this label
+        while v.isBranchedBinary():
+            v = v.parentVersion()
+        v = v.canonicalVersion()
         for item in v.versions:
             if isinstance(item, Revision):
                 item.buildCount = None
-
         return v
 
     def getBinaryVersion(self):

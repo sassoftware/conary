@@ -829,7 +829,8 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
     for troveName in troveNames:
         if troveName in d:
             for version in d[troveName]:
-                if version.getSourceVersion() == sourceVersion:
+                if (not version.isBranchedBinary()
+                    and version.getSourceVersion() == sourceVersion):
                     relVersions.append((version, d[troveName][version]))
     if relVersions:
         # all these versions only differ by build count.

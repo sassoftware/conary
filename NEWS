@@ -1,5 +1,8 @@
 Changes in 0.50.9:
   * reimplemented StreamSet in C
+  * moved findTroves out to findtrove.py, reworked it to be more modular
+  * getSourceVersion now correctly handles branched binaries by looking
+    up the branch to find the source component.
 
 Changes in 0.50.8:
   * sort update --info alphabetically, display old versions, and display

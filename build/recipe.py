@@ -469,9 +469,6 @@ def loadRecipe(troveSpec, label=None):
                                           versionStr, flavor)
             if parts:
                 version, flavor = parts
-                if (version.isLocalCook() or version.isEmerge() 
-                    or version.isLocal()):
-                    version = version.getSourceVersion().parentVersion()
                 versionStr = version.getSourceVersion().asString()
         if flavor:
             # override the current flavor with the flavor found in the 
