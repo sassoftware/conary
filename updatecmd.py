@@ -44,7 +44,8 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 		bail = 1
 	    else:
 		if db.hasPackage(pkgName):
-		    currentVersion = db.pkgLatestVersion(newVersion.branch)
+		    currentVersion = db.pkgLatestVersion(pkgName, 
+							 newVersion.branch())
 		else:
 		    currentVersion = None
 
