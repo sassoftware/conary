@@ -388,6 +388,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     """
 
     fullName = recipeClass.name
+    changeSet = changeset.ChangeSet()
 
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
                             cfg.flavor, macros)
@@ -395,7 +396,6 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     try:
         use.track(True)
 	recipeObj.setup()
-        recipeObj.findTroves()
 	use.track(False)
     except recipe.RecipeFileError, msg:
 	raise CookError(str(msg))
@@ -403,33 +403,44 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     grpFlavor = deps.deps.DependencySet()
     grpFlavor.union(buildpackage._getUseDependencySet(recipeObj)) 
 
-    for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
-        for (version, flavor, byDefault) in versionFlavorList:
-            grpFlavor.union(flavor,
+    for groupName in recipeObj.getGroupNames():
+        try:
+            recipeObj.findTroves(groupName = groupName)
+        except recipe.RecipeFileError, msg:
+            raise CookError(str(msg))
+
+        for (name, versionFlavorList) in recipeObj.getTroveList(
+                                            groupName = groupName).iteritems():
+            for (version, flavor, byDefault) in versionFlavorList:
+                grpFlavor.union(flavor,
                             mergeType=deps.deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
-
-    grp = trove.Trove(fullName, versions.NewVersion(), grpFlavor, None,
-                      isRedirect = False)
-    grp.setRequires(recipeObj.getRequires())
-
-    for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
-        for (version, flavor, byDefault) in versionFlavorList:
-            grp.addTrove(name, version, flavor, byDefault = byDefault)
 
     targetVersion = nextVersion(repos, fullName, sourceVersion, grpFlavor,
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
+    buildTime = time.time()
 
-    grp.changeVersion(targetVersion)
-    grp.setBuildTime(time.time())
-    grp.setSourceName(fullName + ':source')
-    grp.setSize(recipeObj.size)
-    grp.setConaryVersion(constants.version)
+    groups = {}
+    for groupName in recipeObj.getGroupNames():
+        grp = trove.Trove(groupName, targetVersion, grpFlavor, None,
+                          isRedirect = False)
+        grp.setRequires(recipeObj.getRequires(groupName = groupName))
+        groups[groupName] = grp
 
-    grpDiff = grp.diff(None, absolute = 1)[0]
-    changeSet = changeset.ChangeSet()
-    changeSet.newPackage(grpDiff)
+        for (name, versionFlavorList) in recipeObj.getTroveList(groupName = groupName).iteritems():
+            for (version, flavor, byDefault) in versionFlavorList:
+                grp.addTrove(name, version, flavor, byDefault = byDefault)
 
-    built = [ (grp.getName(), grp.getVersion().asString(), grp.getFlavor()) ]
+        grp.setBuildTime(buildTime)
+        grp.setSourceName(fullName + ':source')
+        grp.setSize(recipeObj.getSize(groupName = groupName))
+        grp.setConaryVersion(constants.version)
+
+        grpDiff = grp.diff(None, absolute = 1)[0]
+        changeSet.newPackage(grpDiff)
+
+    built = [ (grp.getName(), grp.getVersion().asString(), grp.getFlavor()) 
+              for grp in groups.itervalues()]
+
     return (changeSet, built, None)
 
 def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},

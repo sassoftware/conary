@@ -881,36 +881,20 @@ class PackageRecipe(Recipe):
         self.sourcePathMap = {}
         self.pathConflicts = {}
 
-class GroupRecipe(Recipe):
-    Flags = use.LocalFlags
+class SingleGroup:
 
     def addTrove(self, name, versionStr = None, flavor = None, source = None,
                  byDefault = True):
-        # XXX we likely should not accept multiple types
-        # of flavors, it's not a good API
-        if isinstance(flavor, deps.DependencySet) or flavor is None:
-            # nothing needs to be done
-            pass
-        elif isinstance(flavor, str):
-            flavorStr = flavor
-            flavor = deps.parseFlavor(flavorStr)
+        assert(flavor is None or isinstance(flavor, str))
+
+        if flavor is not None:
+            flavor = deps.parseFlavor(flavor)
             if flavor is None:
                 raise ValueError, 'invalid flavor %s' % flavorStr
-        else:
-            raise ValueError, 'invalid flavor'
+
         self.addTroveList.append((name, versionStr, flavor, source, byDefault))
 
-    def Requires(self, requirement):
-        if requirement[0] == '/':
-            raise RecipeFileError, 'file requirements not allowed in groups'
-
-        self.requires.addDep(deps.TroveDependencies, 
-                             deps.Dependency(requirement))
-
-    def getRequires(self):
-        return self.requires
-
-    def findTroves(self):
+    def findTroves(self, cfg, repos, label):
         self.size = 0
 
         validSize = True
@@ -918,13 +902,13 @@ class GroupRecipe(Recipe):
         flavorMap = {}
         findTroveList = []
         for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
-            desFlavor = self.cfg.buildFlavor.copy()
+            desFlavor = cfg.buildFlavor.copy()
             if flavor is not None:
                 desFlavor = deps.overrideFlavor(desFlavor, flavor)
             findTroveList.append((name, versionStr, desFlavor))
             flavorMap[flavor] = desFlavor
         try:
-            results = self.repos.findTroves(self.label, findTroveList)
+            results = repos.findTroves(label, findTroveList)
         except repository.TroveNotFound, e:
             raise RecipeFileError, str(e)
         for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
@@ -934,7 +918,7 @@ class GroupRecipe(Recipe):
             troveList.append((pkgList[0], byDefault))
             assert(desFlavor.score(pkgList[0][2]) is not False)
 
-        troves = self.repos.getTroves([ x[0] for x in troveList ], 
+        troves = repos.getTroves([ x[0] for x in troveList ], 
                                       withFiles = False)
         for (((name, v, f), byDefault), trove) in izip(troveList, troves):
             l = self.troveVersionFlavors.get(name, [])
@@ -955,19 +939,72 @@ class GroupRecipe(Recipe):
         if not validSize:
             self.size = None
 
+    def getRequires(self):
+        return self.requires
+
     def getTroveList(self):
 	return self.troveVersionFlavors
+
+    def __init__(self):
+        self.addTroveList = []
+        self.requires = deps.DependencySet()
+	self.troveVersionFlavors = {}
+
+    def Requires(self, requirement):
+        self.requires.addDep(deps.TroveDependencies, 
+                             deps.Dependency(requirement))
+
+class GroupRecipe(Recipe):
+    Flags = use.LocalFlags
+
+    def Requires(self, requirement):
+        if requirement[0] == '/':
+            raise RecipeFileError, 'file requirements not allowed in groups'
+
+        self.groupObj.Requires(requirement)
+
+    def addTrove(self, name, versionStr = None, flavor = None, source = None,
+                 byDefault = True, groupName = None):
+        if groupName is None: groupName = self.name
+        self.groups[groupName].addTrove(name, versionStr = versionStr,
+                                        flavor = flavor, source = source,
+                                        byDefault = byDefault)
+
+    def findTroves(self, groupName = None):
+        if groupName is None: groupName = self.name
+        self.groups[groupName].findTroves(self.cfg, self.repos, self.label)
+
+    def getRequires(self, groupName = None):
+        if groupName is None: groupName = self.name
+        return self.groups[groupName].getRequires()
+
+    def getTroveList(self, groupName = None):
+        if groupName is None: groupName = self.name
+	return self.groups[groupName].getTroveList()
+
+    def getSize(self, groupName = None):
+        if groupName is None: groupName = self.name
+        return self.groups[groupName].size
+
+    def createGroup(self, groupName):
+        if self.groups.has_key(groupName):
+            raise RecipeFileError, 'group %s was already created' % groupName
+        if not groupName.startswith('group-'):
+            raise RecipeFileError, 'group names must start with "group-"'
+        self.groups[groupName] = SingleGroup()
+
+    def getGroupNames(self):
+        return self.groups.keys()
 
     def __init__(self, repos, cfg, label, flavor, extraMacros={}):
 	self.repos = repos
 	self.cfg = cfg
-	self.troveVersionFlavors = {}
 	self.label = label
 	self.flavor = flavor
-        self.addTroveList = []
-        self.requires = deps.DependencySet()
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
+        self.groups = {}
+        self.groups[self.name] = SingleGroup()
 
 class RedirectRecipe(Recipe):
     Flags = use.LocalFlags
