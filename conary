@@ -6,6 +6,7 @@
 #
 
 import changeset
+import checkin
 import commit
 import cook
 import database
@@ -31,6 +32,7 @@ cfg = srscfg.SrsConfiguration()
 def usage():
     print "usage: srs changeset <pkg> [<oldver>] <newver> <outfile>"
     print "       srs cook    [--prep] [--macros file] <first.recipe> <second.recipe> ..."
+    print "       srs checkin <file>"
     print "       srs commit  <file>"
     print "       srs pkglist <pkgname> <version>"
     print "       srs replist <pkgname> <version>"
@@ -249,5 +251,9 @@ elif (otherArgs[1] == "rollback"):
     db = database.Database(cfg.root, cfg.dbpath, "c")
     args = [db, cfg] + otherArgs[2:]
     rollbacks.apply(*args)
+elif (otherArgs[1] == "checkin"):
+    if len(otherArgs) != 3: usage()
+    repos = repository.LocalRepository(cfg.reppath, "c")
+    checkin.checkin(repos, cfg, otherArgs[2])
 else:
     usage()
