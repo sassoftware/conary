@@ -259,6 +259,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 	    for version in versionList:
 		pkg = repos.getPackageVersion(name, version)
 		pkgList += pkg.getPackageList()
+		ident.populate(repos, lcache, pkg)
 
     if repos.hasPackage(srcName):
 	pkg = repos.getLatestPackage(srcName, buildBranch)
@@ -288,50 +289,6 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 
     os.chdir(cwd)
     
-    # build up the name->fileid mapping so we reuse fileids wherever
-    # build up the name->fileid mapping so we reuse fileids wherever
-    # possible; we do this by looking in the database for a pacakge
-    # with the same name as the recipe and recursing through it's
-    # subpackages; this mechanism continues to work as subpackages
-    # come and go
-
-    ident = _IdGen()
-    if repos.hasPackage(fullName):
-	pkgList = [ (fullName, 
-		    [repos.pkgLatestVersion(fullName, buildBranch)]) ]
-	while pkgList:
-	    (name, versionList) = pkgList[0]
-	    del pkgList[0]
-	    for version in versionList:
-		pkg = repos.getPackageVersion(name, version)
-		pkgList += pkg.getPackageList()
-
-    srcName = fullName + ":sources"
-    if repos.hasPackage(srcName):
-	pkg = repos.getLatestPackage(srcName, buildBranch)
-	ident.populate(repos, lcache, pkg)
-
-    # possible; we do this by looking in the database for a pacakge
-    # with the same name as the recipe and recursing through it's
-    # subpackages; this mechanism continues to work as subpackages
-    # come and go
-
-    ident = _IdGen()
-    if repos.hasPackage(fullName):
-	pkgList = [ (fullName, 
-		    [repos.pkgLatestVersion(fullName, buildBranch)]) ]
-	while pkgList:
-	    (name, versionList) = pkgList[0]
-	    del pkgList[0]
-	    for version in versionList:
-		pkg = repos.getPackageVersion(name, version)
-		pkgList += pkg.getPackageList()
-
-    srcName = fullName + ":sources"
-    if repos.hasPackage(srcName):
-	pkg = repos.getLatestPackage(srcName, buildBranch)
-	ident.populate(repos, lcache, pkg)
-
     packageList = []
 
     for buildPkg in recipeObj.getPackages(cfg.packagenamespace, newVersion):
