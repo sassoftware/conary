@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-# classes for version structures and strings
+"""Classes for version structures and strings"""
 
 import copy
 import time
