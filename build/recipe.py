@@ -582,7 +582,9 @@ class GroupRecipe(Recipe):
             except repository.PackageNotFound, e:
                 raise RecipeFileError, str(e)
             l = self.troveVersions.get(name, [])
-            l.extend([ x.getVersion() for x in pkgList ])
+            for version in [ x.getVersion() for x in pkgList ]:
+                if version not in l:
+                    l.append(version)
             self.troveVersions[name] = l
 
     def getTroveList(self):
