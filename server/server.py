@@ -148,8 +148,10 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 	del self.repos
 	shutil.rmtree(self.repPath + '/contents')
         os.unlink(self.repPath + '/sqldb')
+        os.unlink(self.repPath + '/cache.sql')
 	self.repos = fsrepos.FilesystemRepository(self.name, self.repPath,
 						  self.map)
+        self.cache = netserver.CacheSet(self.repPath + "/cache.sql", self.tmpPath, netserver.SERVER_VERSION)
         return 0
 
 class ServerConfig(ConfigFile):

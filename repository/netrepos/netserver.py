@@ -25,6 +25,7 @@ import tempfile
 from lib import util
 from repository import xmlshims
 from repository import repository
+from local import idtable
 
 SERVER_VERSION=5
 
@@ -266,7 +267,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse, 
                      withFiles):
-	l = []
+        urlList = []
+
+        # XXX all of these lookups should be a single operation through a 
+        # temporary table
 	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
 	    newVer = self.toVersion(new)
 
@@ -275,23 +279,27 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 		raise InsufficientPermission
 
 	    if old == 0:
-		l.append((name, 
+		l = [ ((name, 
 			 (None, None),
 			 (self.toVersion(new), self.toFlavor(newFlavor)),
-			 absolute))
+			 absolute)) ]
 	    else:
-		l.append((name, 
+		l = [ ((name, 
 			 (self.toVersion(old), self.toFlavor(oldFlavor)),
 			 (self.toVersion(new), self.toFlavor(newFlavor)),
-			 absolute))
+			 absolute)) ]
 
-	cs = self.repos.createChangeSet(l, recurse = recurse, 
-					withFiles = withFiles)
-	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-out')
-	os.close(fd)
-	cs.writeToFile(path)
-	fileName = os.path.basename(path)
-	return "%s?%s" % (self.urlBase, fileName[:-4])
+            cs = self.repos.createChangeSet(l, recurse = recurse, 
+                                            withFiles = withFiles)
+            (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
+                                          suffix = '.ccs-out')
+            os.close(fd)
+            cs.writeToFile(path)
+            fileName = os.path.basename(path)
+
+            urlList.append("%s?%s" % (self.urlBase, fileName[:-4]))
+
+        return urlList
 
     def iterAllTroveNames(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
@@ -371,8 +379,62 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	self.tmpPath = tmpPath
 	self.urlBase = urlBase
 	self.name = name
-	self.auth = NetworkAuthorization(authDbPath, name, anonymousReads = True)
+	self.auth = NetworkAuthorization(authDbPath, name, 
+                                         anonymousReads = True)
+        self.cache = CacheSet(path + "/cache.sql", tmpPath, SERVER_VERSION)
 	self.commitAction = commitAction
+
+class CacheSet:
+
+    def createSchema(self, dbpath, protocolVersion):
+	self.db = sqlite3.connect(dbpath)
+        cu = self.db.cursor()
+        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+        tables = [ x[0] for x in cu ]
+        if "CacheContents" in tables:
+            cu.execute("SELECT version FROM CacheVersion")
+            version = cu.next()[0]
+            if version != protocolVersion:
+                cu.execute("SELECT row from CacheContents")
+                for (row,) in cu:
+                    fn = self.tmpDir + "/cache-%s.ccs-out"
+                    if os.path.exists(fn):
+                        os.unlink(fn)
+
+                self.db.close()
+                os.unlink(dbpath)
+                self.db = sqlite3.connect(dbpath)
+                tables = []
+
+        if "CacheContents" not in tables:
+            cu.execute("""
+                CREATE TABLE CacheContents(
+                    row INTEGER PRIMARY KEY,
+                    troveName STRING,
+                    oldFlavorId INTEGER,
+                    oldVersionId INTEGER,
+                    newFlavorId INTEGER,
+                    newVersionId INTEGER,
+                    absolute INTEGER)
+            """)
+            cu.execute("""
+                CREATE INDEX CacheContentsIdx ON 
+                        CacheContents(troveName, oldFlavorId, oldVersionId, 
+                                      newFlavorId, newVersionId)
+            """)
+
+            cu.execute("CREATE TABLE CacheVersion(version INTEGER)")
+            cu.execute("INSERT INTO CacheVersion VALUES(?)", protocolVersion)
+            self.db.commit()
+
+    def __init__(self, dbpath, tmpDir, protocolVersion):
+	self.tmpDir = tmpDir
+        self.createSchema(dbpath, protocolVersion)
+        self.db._begin()
+        self.flavors = idtable.IdTable(self.db, "Flavors", "flavorId", "flavor")
+        self.versions = idtable.IdTable(self.db, "Versions", "versionId", 
+                                        "version")
+        self.db.commit()
 
 class NetworkAuthorization:
 
