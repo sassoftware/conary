@@ -330,6 +330,8 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
     pkgCs = packageChanges.next()
     assert(util.assertIteratorAtEnd(packageChanges))
 
+    showOneLog(pkgCs.getNewVersion(), pkgCs.getChangeLog())
+
     for (fileId, path, newVersion) in pkgCs.getNewFileList():
 	print "%s: new" % path
 	chg = changeSet.getFileChange(fileId)
@@ -550,14 +552,23 @@ def showLog(repos, branch = None):
     for trove in troves:
 	v = trove.getVersion()
 	cl = trove.getChangeLog()
-	when = time.strftime("%c", time.localtime(v.timeStamps()[-1]))
-	if cl:
-	    print "%s %s (%s) %s" % \
-		(trove.getVersion().trailingVersion().asString(),
-		 cl.name, cl.contact, when)
-	    lines = cl.message.split("\n")
-	    for l in lines:
-		print "    %s" % l
-	else:
-	    print "%s %s (no log message)" \
-                  %(trove.getVersion().trailingVersion().asString(), when)
+	showOneLog(v, cl)
+
+def showOneLog(version, changeLog=''):
+    when = time.strftime("%c", time.localtime(version.timeStamps()[-1]))
+
+    if version == versions.NewVersion():
+	versionStr = "(working version)"
+    else:
+	versionStr = version.trailingVersion().asString()
+
+    if changeLog:
+	print "%s %s (%s) %s" % \
+	    (versionStr, changeLog.name, changeLog.contact, when)
+	lines = changeLog.message.split("\n")
+	for l in lines:
+	    print "    %s" % l
+    else:
+	print "%s %s (no log message)" \
+	      %(versionStr, when)
+    print
