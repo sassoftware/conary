@@ -133,7 +133,7 @@ class Database(repository.LocalRepository):
 		if hash: 
 		    cs.addFileContents(hash)
 
-	assert(cs.validate())
+	assert(not cs.validate())
 
 	return cs
 
