@@ -408,6 +408,10 @@ Can be overridden by the \fB--use-flag \fI"<flag> <bool>"\fR command-line option
 .B Macros.<macro>
 Assigns the given string to <macro>, for use in cooking.  Useful especially for setting march, os, target, and parallelmflags.
 Can be overridden by the \fB--use-macro \fI"<macro> <value>"\fR command-line option.  Note that all values are assumed to be strings -- no quotes are necessary around <value> on the command line or in the config file.
+.TP
+.B includeConfigFile
+Immediately reads the listed configuration file.  The file name may include
+shell globs, in which case all files matching the glob will be read in.
 .RE
 .TP 4
 .I /etc/conary

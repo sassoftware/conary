@@ -21,9 +21,11 @@ import deps.arch
 import deps.deps
 import os
 from build import use
+import util
 import versions
 
-STRING, BOOL, LABEL, STRINGDICT, STRINGLIST, CALLBACK = range(6)
+
+STRING, BOOL, LABEL, STRINGDICT, STRINGLIST, CALLBACK, EXEC = range(7)
 
 class ConfigFile:
 
@@ -49,10 +51,22 @@ class ConfigFile:
 	    return
 	(key, val) = line.split(None, 1)
 	(key, type) = self.checkKey(key)
-	self.setValue(key, val, type, file)
+	if key:
+	    if type == EXEC:
+		self.execCmd(key, val, file)
+	    else:
+		self.setValue(key, val, type, file)
 	
+    def execCmd(self, key, val, file):
+	if key == 'includeConfigFile':
+	    for cfgfile in util.braceGlob(val):
+		self.read(cfgfile)
+
     def checkKey(self, key):
 	lckey = key.lower()
+	# XXX may have to generalize this some day
+	if lckey == 'includeconfigfile':
+	    return ('includeConfigFile', EXEC)
 	if not self.lowerCaseMap.has_key(lckey):
 	   raise ParseError, ("%s:%s: configuration value '%s' unknown" % (file, self.lineno, key))
 	else:
@@ -140,6 +154,7 @@ class ConaryConfiguration(ConfigFile):
 	'name'			: None,
 	'repositoryMap'	        : [ STRINGDICT, {} ],
 	'root'			: '/',
+	'sourceSearchDir'	: '.',
 	'sourceSearchDir'	: '.',
 	'tmpDir'		: '/var/tmp/',
     }
