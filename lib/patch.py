@@ -52,7 +52,7 @@ class Hunk:
 
 class FailedHunkList(list):
 
-    def write(filename, oldName, newName):
+    def write(self, filename, oldName, newName):
 	f = open(filename, "w")
 	f.write("--- %s\n" % oldName)
 	f.write("+++ %s\n" % newName)
