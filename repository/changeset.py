@@ -215,8 +215,9 @@ class ChangeSetFromRepository(ChangeSet):
 
     def newPackage(self, pkg):
 	# add the time stamps to the package version numbers
-	pkg.changeOldVersion(self.repos.getFullVersion(pkg.getName(),
-						       pkg.getOldVersion()))
+	if pkg.getOldVersion():
+	    pkg.changeOldVersion(self.repos.getFullVersion(pkg.getName(),
+							   pkg.getOldVersion()))
 	pkg.changeNewVersion(self.repos.getFullVersion(pkg.getName(),
 						       pkg.getNewVersion()))
 	ChangeSet.newPackage(self, pkg)
