@@ -12,10 +12,10 @@
 # full details.
 #
 
-import lib.elf
+import elf
 import os
 import string
-from lib import util
+import util
 
 class Magic:
     def __init__(self, path, basedir):
@@ -28,9 +28,9 @@ class Magic:
 class ELF(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
-	self.contents['stripped'] = lib.elf.stripped(basedir+path)
-	self.contents['hasDebug'] = lib.elf.hasDebug(basedir+path)
-	provides = lib.elf.inspect(basedir+path)[1]
+	self.contents['stripped'] = elf.stripped(basedir+path)
+	self.contents['hasDebug'] = elf.hasDebug(basedir+path)
+	provides = elf.inspect(basedir+path)[1]
 	if provides:
 	    self.contents['soname'] = provides[0][1]
 
