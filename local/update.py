@@ -989,7 +989,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
     # Used in the loops to determine whether to mark files as config
     # would be nice to have a better list...
     nonCfgExt = ('ps', 'eps', 'gif', 'png', 'tiff', 'jpeg', 'jpg',
-	'ico', 'rpm', 'ccs', 'gz', 'bz2', 'tgz', 'tbz', 'tbz2')
+	'ico', 'rpm', 'ccs', 'gz', 'bz2', 'tgz', 'tbz', 'tbz2', 'zip')
     isSrcPkg = curPkg.getName().endswith(':source')
 
     for (pathId, srcPath, srcFileId, srcFileVersion) in fileList:
