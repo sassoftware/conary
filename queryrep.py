@@ -34,19 +34,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
     hasVersions = False
 
     if troveList:
-        troves = []
-        for item in troveList:
-            i = item.find("=") 
-            if i == -1:
-                troves.append((item, None))
-            else:
-                hasVersions = True
-                l = item.split("=")
-                if len(l) > 2:
-                    log.error("bad version string: %s", "=".join(l[1:]))
-                    return
-                    
-                troves.append(tuple(l))
+        (troves, hasVersions) = display.parseTroveStrings(troveList)
     else:
 	# this returns a sorted list
         troves = []
@@ -152,33 +140,15 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 
     for trove in troveList:
 	version = trove.getVersion()
-
-	if ls:
-	    outerTrove = trove
-	    for trove in repos.walkTroveSet(outerTrove):
-		iter = repos.iterFilesInTrove(trove.getName(), 
-				trove.getVersion(), trove.getFlavor(), 
-				sortByPath = True, withFiles = True)
-		for (fileId, path, version, file) in iter:
-                    display.printFile(file, path)
-	elif ids:
-	    for (fileId, path, version) in trove.iterFileList():
-		print "%s %s" % (sha1ToString(fileId), path)
-	elif tags:
-	    iter = repos.iterFilesInTrove(trove.getName(), trove.getVersion(),
-                                          trove.getFlavor(), sortByPath = True, 
-					  withFiles = True)
-
-	    for (fileId, path, version, fObj) in iter:
-		print "%-59s %s" % (path, " ".join(fObj.tags))
-	elif sha1s:
-            iter = repos.iterFilesInTrove(trove.getName(), 
+        if ls or tags or sha1s or ids:
+            outerTrove = trove
+            for trove in repos.walkTroveSet(outerTrove):
+                iter = repos.iterFilesInTrove(trove.getName(), 
                             trove.getVersion(), trove.getFlavor(), 
                             sortByPath = True, withFiles = True)
-            for (fileId, path, version, fileObj) in iter:
-		if fileObj.hasContents:
-		    print "%s %s" % (sha1ToString(fileObj.contents.sha1()), 
-                                     path)
+                for (fileId, path, version, fObj) in iter:
+                    display.printFile(fObj, path, verbose=ls, tags=tags, 
+                                    sha1s=sha1s, fileId=fileId, fileIds=ids)
 	elif info:
 	    buildTime = time.strftime("%c",
 				time.localtime(version.timeStamps()[-1]))

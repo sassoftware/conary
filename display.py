@@ -103,24 +103,30 @@ class DisplayCache:
     def __call__(self, troveName, version):
         return self._cache[troveName][version]
 
-def printFile(fileObj, path, prefix=''):
-    if isinstance(fileObj, files.SymbolicLink):
+def printFile(fileObj, path, prefix='', verbose=True, tags=False, sha1s=False,
+              fileId=None, fileIds=False):
+    taglist = ''
+    sha1 = ''
+    id = ''
+
+    if verbose and isinstance(fileObj, files.SymbolicLink):
         name = "%s -> %s" % (path, fileObj.target.value())
     else:
         name = path
+    if tags and fileObj.tags:
+        taglist = ' [' + ' '.join(fileObj.tags) + ']' 
+    if sha1s and fileObj.contents:
+        sha1 = sha1ToString(fileObj.contents.sha1()) + ' '
+    if fileIds and fileId:
+        id = sha1ToString(fileId) + ' '
+    if verbose: 
+        print "%s%s%s%s    1 %-8s %-8s %s %s %s%s" % \
+          (prefix, id, sha1, fileObj.modeString(), fileObj.inode.owner(), fileObj.inode.group(), 
+            fileObj.sizeString(), fileObj.timeString(), name, taglist)
+    else:
+        print "%s%s%s%s" % (id, sha1,path, taglist)
 
-    print "%s%s    1 %-8s %-8s %s %s %s" % \
-      (prefix, fileObj.modeString(), fileObj.inode.owner(), fileObj.inode.group(), 
-        fileObj.sizeString(), fileObj.timeString(), name)
-
-
-
-def displayTroves(db, troveNameList = [], pathList = [], ls = False, 
-                  ids = False, sha1s = False, fullVersions = False, 
-                  tags = False):
-
-    pathList = [os.path.abspath(util.normpath(x)) for x in pathList]
-
+def parseTroveStrings(troveNameList):
     troveNames = []
     hasVersions = False
     for item in troveNameList:
@@ -133,7 +139,16 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
             hasVersions = True
         else:
             troveNames.append((item, None))
+    return troveNames, hasVersions
 
+
+def displayTroves(db, troveNameList = [], pathList = [], ls = False, 
+                  ids = False, sha1s = False, fullVersions = False, 
+                  tags = False):
+   
+    (troveNames, hasVersions) = parseTroveStrings(troveNameList)
+    pathList = [os.path.abspath(util.normpath(x)) for x in pathList]
+    
     if not troveNames and not pathList:
 	troveNames = [ (x, None) for x in db.iterAllTroveNames() ]
 	troveNames.sort()
