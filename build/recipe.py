@@ -319,22 +319,24 @@ class Recipe:
 
 	    if filetype == 'patch':
 		(level, backup) = args
-		# XXX handle .gz/.bz2 patch files
 		f = util.findFile(file, self.srcdirs)
+		provides = "cat"
+		if file.endswith(".gz"):
+		    provides = "zcat"
+		elif file.endswith(".bz2"):
+		    provides = "bzcat"
 		if backup:
 		    backup = '-b -z %s' % backup
-		util.execute('patch -d %s -p%s %s < %s' %(destDir, level, backup, f))
+		util.execute('%s %s | patch -d %s -p%s %s' %(provides, f, destDir, level, backup))
 		continue
 
 	    if filetype == 'source':
 		(apply) = args
-		print 'FOUND: src ', file, apply
 		f = lookaside.findAll(self.cfg, self.laReposCache, file, 
 				      self.name, self.srcdirs)
+		shutil.copyfile(f, destDir + "/" + os.path.basename(file))
 		if apply:
-		    util.execute(apply)
-		else:
-		    shutil.copyfile(f, destDir + "/" + os.path.basename(file))
+		    util.execute(apply, destDir)
 		continue
 
     def doBuild(self, buildpath, root):
