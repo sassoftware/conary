@@ -129,9 +129,9 @@ def _policyInclusion(policyObj, filespec):
 
 def _walkFile(policyObj, dirname, names):
     # chop off bit not useful for comparison
-    path=dirname[len(policyObj.macros['destdir']):]
+    path=dirname[len(policyObj.macros['destdir'])-1:]
     for name in names:
-	thispath = path + os.sep + name
+	thispath = path + name
 	if _policyInclusion (policyObj, thispath) and \
 	   not _policyException(policyObj, thispath):
 	    policyObj.doFile(thispath)
@@ -171,9 +171,10 @@ class StripToDebug(Policy):
 
 class NormalizeGzip(Policy):
     """
-    re-gzip .gz files with -9 -n
+    re-gzip .gz files with -9 -n to get maximum compression and
+    avoid meaningless changes overpopulating the database.
     Ignore man/info pages, we'll get them separately while fixing
-    other things
+    up other things
     """
     invariantexceptions = [
 	'%(mandir)s/man.*/.*',
@@ -187,8 +188,87 @@ class NormalizeGzip(Policy):
 	util.execute('gzip -n -9 %s' %path[:-3])
 
 class NormalizeManPages(Policy):
+    """
+    Make all man pages follow sane system policy
+     - Fix all man pages' contents:
+       - remove '/?%(destdir)s' from all man pages
+       - '.so foo.n' becomes a symlink to foo.n
+     - (re)compress all man pages with gzip -n -9
+     - change all symlinks to point to .gz (if they don't already)
+    Exceptions to this policy are ill-defined and thus are not
+    currently honored.  Any suggestion that this policy should
+    honor inclusion/exception need to include statements of
+    precise semantics in that case...
+    """
+    def _uncompress(self, dirname, names):
+	for name in names:
+	    path = dirname + os.sep + name
+	    if name.endswith('.gz') and not os.path.islink(path):
+		util.execute('gunzip ' + dirname + os.sep + name)
+
+    def _compress(self, dirname, names):
+	for name in names:
+	    path = dirname + os.sep + name
+	    if not os.path.isdir(path) and not os.path.islink(path) \
+	       and not name.endswith('.gz'):
+		util.execute('gzip -n -9 ' + dirname + os.sep + name)
+
+    def _dedestdir(self, dirname, names):
+	for name in names:
+	    path = dirname + os.sep + name
+	    if not os.path.isdir(path) and not os.path.islink(path) \
+	       and not name.endswith('.gz'):
+		util.execute("sed -i 's,/?%s,,g' %s"
+			     %(self.macros['destdir'], path))
+
+    def _sosymlink(self, dirname, names):
+	for name in names:
+	    path = dirname + os.sep + name
+	    if os.path.exists and not os.path.isdir(path) \
+	       and not os.path.islink(path) \
+	       and not name.endswith('.gz'):
+		# find .so and change to symlink
+		f = file(path)
+		lines = f.readlines(512) # we really don't need the whole file
+		f.close()
+		if len(lines) == 1:
+		    match = self.soexp.search(lines[0][:-1]) # chop-chop
+		    if match:
+			# .so is relative to %(mandir)s, so add ../
+			print '+ replacing %s (%s) with symlink ../%s' \
+			      %(name, match.group(0), match.group(1))
+			os.remove(path)
+			os.symlink('../'+match.group(1), path)
+
+    def _gzsymlink(self, dirname, names):
+	for name in names:
+	    path = dirname + os.sep + name
+	    if os.path.islink(path):
+		# change symlinks to .gz -> .gz
+		contents = os.readlink(path)
+		os.remove(path)
+		if not contents.endswith('.gz'):
+		    contents = contents + '.gz'
+		if not path.endswith('.gz'):
+		    path = path + '.gz'
+		os.symlink(contents, path)
+
+    def __init__(self, *args, **keywords):
+	Policy.__init__(self, *args, **keywords)
+	self.soexp = re.compile('^\.so (.*\...*)$')
+
     def do(self):
-	pass
+	manpath = self.macros['destdir'] + self.macros['mandir']
+	# uncompress all man pages
+	os.path.walk(manpath, NormalizeManPages._uncompress, self)
+	# remove '/?%(destdir)s'
+	os.path.walk(manpath, NormalizeManPages._dedestdir, self)
+	# .so foo.n becomes a symlink to foo.n
+	os.path.walk(manpath, NormalizeManPages._sosymlink, self)
+	# recompress all man pages
+	os.path.walk(manpath, NormalizeManPages._compress, self)
+	# change all symlinks to point to .gz (if they don't already)
+	os.path.walk(manpath, NormalizeManPages._gzsymlink, self)
 
 class NormalizeInfoPages(Policy):
     """
