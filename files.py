@@ -164,7 +164,7 @@ class SymbolicLink(File):
 	pass
 
     def restore(self, repos, target):
-	if os.path.islink(target):
+	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.symlink(self.theLinkTarget, target)
 	File.restore(self, target)
@@ -200,7 +200,7 @@ class NamedPipe(File):
 	return File.same(self, other)
 
     def restore(self, repos, target):
-	if os.path.exists(target):
+	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.mkfifo(target)
 	File.restore(self, target)
@@ -239,7 +239,7 @@ class DeviceFile(File):
 	return 0
 
     def restore(self, repos, target):
-	if os.path.exists(target):
+	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 
 	# FIXME os.mknod is in 2.3
@@ -283,7 +283,7 @@ class RegularFile(File):
 	return 0
 
     def restore(self, repos, target):
-	if os.path.exists(target):
+	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	else:
 	    path = os.path.dirname(target)
