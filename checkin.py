@@ -559,4 +559,5 @@ def showLog(repos, branch = None):
 	    for l in lines:
 		print "    %s" % l
 	else:
-	    print "%s %s (no log message)" % when
+	    print "%s %s (no log message)" \
+                  %(trove.getVersion().trailingVersion().asString(), when)
