@@ -2,6 +2,7 @@ Changes in 0.13.2
   * dependencies resolution is flavor sensitive now (and uses flavor
     affinity)
   * added trove version/release number to dependency messages
+  * renamed classes and methods in versions.py to match current terminology
 
 Changes in 0.13.1
   * repquery wasn't filtering by flavor properly (exposed by a bug fix 
