@@ -76,6 +76,9 @@ class Repository:
     def getPackageVersionList(self, pkgName):
 	return self._getPackageSet(pkgName).fullVersionList()
 
+    def getPackageBranchList(self, pkgName):
+	return self._getPackageSet(pkgName).branchList()
+
     def fileLatestVersion(self, fileId, branch):
 	fileDB = self._getFileDB(fileId)
 	return fileDB.findLatestVersion(branch)
