@@ -283,7 +283,8 @@ class Source(_Source):
     keywords = {'apply': '',
 		'contents': None,
 		'macros': False,
-		'dest': None}
+		'dest': None,
+                'mode': None}
 
 
     def __init__(self, recipe, *args, **keywords):
@@ -315,6 +316,7 @@ class Source(_Source):
 	    C{CFLAGS = %(cflags)s}, which will cause C{%(cflags)s} to
 	    be replaced with the current setting of C{recipe.macros.cflags}.
 	    Defaults to False.
+        @keyword mode: If set, provides the mode to set on the file.
 	@keyword dest: If set, provides the name of the file in the build
 	    directory.  Do not include any subdirectories; use C{dir}
 	    instead for subdirectories.  Useful mainly when fetching
@@ -344,8 +346,9 @@ class Source(_Source):
 	if self.dir:
 	    destDir = os.sep.join((destDir, self.dir))
 	    util.mkdirChain(destDir)
+        destFile = os.sep.join((destDir, self.dest))
 	if self.contents is not None:
-	    pout = file(os.sep.join((destDir, self.dest)), "w")
+	    pout = file(destFile, "w")
 	    if self.applymacros:
 		pout.write(self.contents %self.recipe.macros)
 	    else:
@@ -355,12 +358,14 @@ class Source(_Source):
 	    if self.applymacros:
 		log.debug('applying macros to source %s' %f)
 		pin = file(f)
-		pout = file(os.sep.join((destDir, self.dest)), "w")
+		pout = file(destFile, "w")
 		pout.write(pin.read()%self.recipe.macros)
 		pin.close()
 		pout.close()
 	    else:
-		util.copyfile(f, os.sep.join((destDir, self.dest)))
+		util.copyfile(f, destFile)
+        if self.mode:
+            os.chmod(destFile, self.mode)
 	if self.apply:
 	    util.execute(self.apply %self.recipe.macros, destDir)
 
