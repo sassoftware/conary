@@ -203,15 +203,23 @@ def _applyPackageChangeSet(repos, pkgCs, changeSet, basePkg, fsPkg, root):
 	    headFile = baseFile.copy()
 	    headFile.applyChange(fileChanges)
 
-	    if headFile.hasContents:
+	if basePkg and headFileVersion and not \
+		    fsFile.same(headFile, ignoreOwner = True):
+	    # the contents have changed... let's see what to do
+
+	    # get the contents if the version on head has contents, and
+	    # either
+	    #	1. the version from the base package doesn't have contents, or
+	    #	2. the file changed between head and base
+	    # (if both are false, no contents would have been saved for
+	    # this file)
+	    if headFile.hasContents and  \
+	          (not baseFile.hasContents or 
+		   headFile.sha1() != baseFile.sha1()):
 		(headFileContType, headFileContents) = \
 			changeSet.getFileContents(fileId)
 	    else:
 		headFileContents = None
-
-	if basePkg and headFileVersion and not \
-		    fsFile.same(headFile, ignoreOwner = True):
-	    # the contents have changed... let's see what to do
 
 	    if headFile.same(baseFile, ignoreOwner = True):
 		# it changed in just the filesystem, so leave that change
