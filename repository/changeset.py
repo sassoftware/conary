@@ -3,6 +3,7 @@
 # All rights reserved
 #
 
+from deps import deps
 import difflib
 import enum
 import filecontainer
@@ -94,8 +95,8 @@ class ChangeSet:
 	    for fileId in pkg.getOldFileList():
 		assert(not self.files.has_key(fileId))
 
-    def addPrimaryPackage(self, name, version):
-	self.primaryPackageList.append((name, version))
+    def addPrimaryPackage(self, name, version, flavor):
+	self.primaryPackageList.append((name, version, flavor))
 
     def getPrimaryPackageList(self):
 	return self.primaryPackageList
@@ -106,25 +107,26 @@ class ChangeSet:
 	assert(not old or old.timeStamp)
 	assert(new.timeStamp)
 
-	self.newPackages[(csPkg.getName(), csPkg.getNewVersion())] = csPkg
+	self.newPackages[(csPkg.getName(), csPkg.getNewVersion(),
+		          csPkg.getFlavor())] = csPkg
 
 	if csPkg.isAbsolute():
 	    self.absolute = 1
 	if (old and old.isLocal()) or new.isLocal():
 	    self.local = 1
 
-    def delNewPackage(self, name, version):
-	del self.newPackages[(name, version)]
+    def delNewPackage(self, name, version, flavor):
+	del self.newPackages[(name, version, flavor)]
 
-    def oldPackage(self, name, version):
+    def oldPackage(self, name, version, flavor):
 	assert(version.timeStamp)
-	self.oldPackages.append((name, version))
+	self.oldPackages.append((name, version, flavor))
 
     def iterNewPackageList(self):
 	return self.newPackages.itervalues()
 
-    def getNewPackageVersion(self, name, version):
-	return self.newPackages[(name, version)]
+    def getNewPackageVersion(self, name, version, flavor):
+	return self.newPackages[(name, version, flavor)]
 
     def getOldPackageList(self):
 	return self.oldPackages
@@ -169,8 +171,12 @@ class ChangeSet:
 
     def formatToFile(self, cfg, f):
 	f.write("primary packages:\n")
-	for (pkgName, version) in self.primaryPackageList:
-	    f.write("\t%s %s\n" % (pkgName, version.asString()))
+	for (pkgName, version, flavor) in self.primaryPackageList:
+	    if flavor:
+		f.write("\t%s %s %s\n" % (pkgName, version.asString(), 
+					  flavor.freeze()))
+	    else:
+		f.write("\t%s %s\n" % (pkgName, version.asString()))
 	f.write("\n")
 
 	for pkg in self.newPackages.itervalues():
@@ -197,9 +203,13 @@ class ChangeSet:
 	rc = []
 
 	primaries = [ ]
-	for (name, version) in self.primaryPackageList:
+	for (name, version, flavor) in self.primaryPackageList:
 	    primaries.append(name)
 	    primaries.append(version.asString())
+	    if flavor:
+		primaries.append(flavor.freeze())
+	    else:
+		primaries.append("")
 	primaries = "\0".join(primaries)
 	
 	for pkg in self.iterNewPackageList():
@@ -207,8 +217,13 @@ class ChangeSet:
 	    rc.append("PKG %d\n" % len(s))
             rc.append(s)
 
-	for (pkgName, version) in self.getOldPackageList():
-	    rc.append("PKG RMVD %s %s\n" % (pkgName, version.freeze()))
+	for (pkgName, version, flavor) in self.getOldPackageList():
+	    if flavor:
+		rc.append("PKG RMVD %s %s %s\n" % 
+			  (pkgName, version.freeze(), flavor.freeze()))
+	    else:
+		rc.append("PKG RMVD %s %s\n" % 
+			  (pkgName, version.freeze()))
 	
 	fileList = [ None,]
 	totalLen = 0
@@ -272,23 +287,25 @@ class ChangeSet:
 	    if not pkgCs.getOldVersion():
 		# this was a new package, and the inverse of a new
 		# package is an old package
-		rollback.oldPackage(pkgCs.getName(), pkgCs.getNewVersion())
+		rollback.oldPackage(pkgCs.getName(), pkgCs.getNewVersion(), 
+				    pkgCs.getFlavor())
 		continue
 
-	    pkg = db.getPackageVersion(pkgCs.getName(), 
-					  pkgCs.getOldVersion())
+	    pkg = db.getTrove(pkgCs.getName(), pkgCs.getOldVersion(),
+			      pkgCs.getFlavor())
 
 	    # this is a modified package and needs to be inverted
 
-	    invertedPkg = package.PackageChangeSet(pkgCs.getName(), 
+	    invertedPkg = package.TroveChangeSet(pkgCs.getName(), 
+			       pkgCs.getFlavor(),
 			       pkgCs.getNewVersion(), pkgCs.getOldVersion())
 
-	    for (name, list) in pkgCs.iterChangedPackages():
-		for (oper, version) in list:
+	    for (name, list) in pkgCs.iterChangedTroves():
+		for (oper, version, flavor) in list:
 		    if oper == '+':
-			invertedPkg.oldPackageVersion(name, version)
+			invertedPkg.oldTroveVersion(name, version, flavor)
 		    elif oper == "-":
-			invertedPkg.newPackageVersion(name, version)
+			invertedPkg.newTroveVersion(name, version, flavor)
 
 	    for (fileId, path, version) in pkgCs.getNewFileList():
 		invertedPkg.oldFile(fileId)
@@ -395,8 +412,8 @@ class ChangeSet:
 
 	    rollback.newPackage(invertedPkg)
 
-	for (name, version) in self.getOldPackageList():
-	    pkg = db.getPackageVersion(name, version)
+	for (name, version, flavor) in self.getOldPackageList():
+	    pkg = db.getTrove(name, version, flavor)
 	    pkgDiff = pkg.diff(None)[0]
 	    rollback.newPackage(pkgDiff)
 	    for (fileId, path, fileVersion) in pkg.iterFileList():
@@ -449,12 +466,12 @@ class ChangeSet:
 	    # try and reuse the version number we created; if
 	    # it's already in use we won't be able to though
 	    try:
-		repos.getPackageVersion(name, newVer)
+		repos.getTrove(name, newVer, pkgCs.getFlavor())
 	    except repository.PackageMissing: 
 		pass
 	    else:
 		branch = oldVer.fork(targetBranchLabel, sameVerRel = 0)
-		newVer = repos.pkgLatestVersion(name, branch)
+		newVer = repos.getTroveLatestVersion(name, branch)
 
 	    pkgCs.changeNewVersion(newVer)
 	    if not packageVersions.has_key(name):
@@ -561,23 +578,33 @@ class ChangeSetFromFile(ChangeSet):
 		    buf = control.read(size)
 		    items = buf.split("\0")
 
-		    assert(len(items) % 2 == 0)
+		    assert(len(items) % 3 == 0)
 		    i = 0
 		    while i < len(items):
 			name = items[i]
 			version = items[i + 1]
-			i += 2
+			flavor = items[i + 2]
+			i += 3
 			version = versions.VersionFromString(version)
-			self.primaryPackageList.append((name, version))
+			if flavor:
+			    flavor = deps.ThawDependencySet(flavor)
+			else:
+			    flavor = None
+			self.primaryPackageList.append((name, version, flavor))
 	    elif header.startswith("PKG RMVD "):
-		(pkgName, verStr) = header.split()[2:5]
+		fields = header.split()
+		(pkgName, verStr) = fields[2:4]
 		version = versions.ThawVersion(verStr)
-		self.oldPackage(pkgName, version)
+		if len(fields) == 5:
+		    flavor = deps.ThawDependencySet(fields[4])
+		else:
+		    flavor = None
+		self.oldPackage(pkgName, version, flavor)
 	    elif header.startswith("PKG "):
 		size = int(header.split()[1])
 		buf = control.read(size)
 		lines = buf.split("\n")[:-1]
-		pkg = package.ThawPackageChangeSet(lines)
+		pkg = package.ThawTroveChangeSet(lines)
 		self.newPackage(pkg)
 	    elif header.startswith("FILES "):
 		size = int(header.split()[1])
@@ -620,9 +647,44 @@ class ChangeSetFromFile(ChangeSet):
 	    tag = "cft-" + tags.split()[1]
 	    self.configCache[fileId] = (tag, self.csf.getFile(fileId).read())
 
+    def writeContents(self, csf, contents, early):
+	# these are kept sorted so we know which one comes next
+	if early:
+	    tag = "1 "
+	else:
+	    tag = "0 "
+
+	idList = []
+	for fileId in self.csf.iterFileList():
+	    if fileId == "SRSCHANGESET": continue
+	    tags = self.csf.getTag(fileId)
+	    if early and tags.startswith("0 "): 
+		continue
+	    elif not early and tags.startswith("1 "): 
+		continue
+
+	    idList.append(fileId)
+
+	idList.sort()
+
+	count = 0
+	for fileId in idList:
+	    tags = self.csf.getTag(fileId)
+	    if early:
+		csf.addFile(fileId, StringIO(self.configCache[fileId][1]), 
+			    tags, len(self.configCache[fileId][1]))
+	    else:
+		import util, sys
+		sys.excepthook = util.excepthook
+
+		cont = filecontents.FromChangeSet(self, fileId)
+		csf.addFile(fileId, cont, tags, self.csf.getSize(fileId))
+
     def __init__(self, file, justContentsForConfig = 0, skipValidate = 1):
 	ChangeSet.__init__(self)
 	self.configCache = {}
+	self.earlyFileContents = None
+	self.lateFileContents = None
 	self.read(file)
 	if not skipValidate:
 	    self.validate(justContentsForConfig)

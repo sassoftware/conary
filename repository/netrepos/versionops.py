@@ -102,9 +102,12 @@ class VersionTable:
 	    """)
 
 class BranchTable(idtable.IdTable):
-    def addId(self, branch):
+    def addId(self, branch, parentId):
         assert(branch.isBranch())
-	return idtable.IdTable.addId(self, branch.asString())
+        cu = self.db.cursor()
+        cu.execute("INSERT INTO Branches VALUES (NULL, %s, %d)", 
+		   branch.asString(), parentId)
+	return cu.lastrowid
 
     def getId(self, theId):
 	return versions.VersionFromString(idtable.IdTable.getId(self, theId))
@@ -147,7 +150,19 @@ class BranchTable(idtable.IdTable):
 	    """)
 
     def __init__(self, db):
-        idtable.IdTable.__init__(self, db, 'branches', 'branchId', 'branch')
+        self.db = db
+	self.tableName = 'branches';
+	self.keyName = 'branchId'
+	self.strName = 'branch';
+        
+        cu = self.db.cursor()
+        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+        tables = [ x[0] for x in cu ]
+        if 'Branches' not in tables:
+            cu.execute("CREATE TABLE Branches(branchId integer primary key,"
+					     "branch str unique,"
+					     "parentNode integer)")
+	    self.initTable()
 
 class LabelTable(idtable.IdTable):
 
@@ -213,16 +228,53 @@ class ParentTable(idtable.IdPairMapping):
 	    cu.execute("CREATE INDEX ParentVersionIdx on Parent(versionId)")
 	    cu.execute("INSERT INTO Parent VALUES (0,0,0)")
 
+class BranchContents:
+
+    def __init__(self, db):
+	self.db = db
+        cu = self.db.cursor()
+        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+        tables = [ x[0] for x in cu ]
+        if 'BranchContents' not in tables:
+	    cu.execute("""
+		CREATE TABLE BranchContents(itemId INT,
+					    branchId INT,
+					    versionId INT,
+					    timeStamp INT);
+		CREATE INDEX BranchContentsIdx ON 
+			BranchContents(itemId, branchId);
+		CREATE INDEX BranchContentsIdx2 ON 
+			BranchContents(itemId, versionId);
+	    """)
+
+    def addRow(self, itemId, branchId, versionId, timeStamp):
+        cu = self.db.cursor()
+	cu.execute("INSERT INTO BranchContents VALUES (%d, %d, %d, %d)",
+		   itemId, branchId, versionId, timeStamp)
+
+    def hasItemId(self, itemId):
+        cu = self.db.cursor()
+        cu.execute("SELECT itemId FROM BranchContents WHERE itemId=%d",
+		   itemId)
+	return not(cu.fetchone() == None)
+
+    def hasRow(self, itemId, versionId):
+        cu = self.db.cursor()
+        cu.execute("SELECT itemId FROM BranchContents "
+			"WHERE itemId=%d AND versionId=%d", itemId, versionId)
+	return not(cu.fetchone() == None)
+
 class SqlVersioning:
 
     def versionsOnBranch(self, itemId, branchId):
-	currId = self.latest.get((itemId, branchId), None)
-	if not currId:
-	    return
-
-	while currId != self.versionTable.noVersion:
-	    yield currId
-	    currId = self.parents.get((itemId, currId), None)
+	cu = self.db.cursor()
+	cu.execute("""
+	    SELECT versionId FROM BranchContents WHERE
+		itemId=%d AND branchId=%d ORDER BY timeStamp DESC
+	""", itemId, branchId)
+	
+	for (versionId,) in cu:
+	    yield versionId
 
     def branchesOfLabel(self, itemId, label):
 	labelId = self.labels[label]
@@ -244,7 +296,7 @@ class SqlVersioning:
         return versionId
 
     def hasVersion(self, itemId, versionId):
-	return self.parents.has_key((itemId, versionId))
+	return self.branchContents.hasItemId(itemId)
 
     def createVersion(self, itemId, version):
 	"""
@@ -270,41 +322,28 @@ class SqlVersioning:
 	    self.versionTable.addId(version)
 	    versionId = self.versionTable.get(version, None)
 
-	if self.parents.has_key((itemId, versionId)):
+	if self.branchContents.hasRow(itemId, versionId):
 	    raise DuplicateVersionError(itemId, version)
 
 	latestId = self.latest.get((itemId, branchId), None)
 	if latestId == None:
 	    # this must be the first thing on the branch
 	    self.latest[(itemId, branchId)] = versionId
-	    self.parents[(itemId, versionId)] = self.versionTable.noVersion
 	else:
 	    currVer = self.versionTable.getId(latestId)
 	    if not currVer.isAfter(version):
 		del self.latest[(itemId, branchId)]
 		self.latest[(itemId, branchId)] = versionId
-		self.parents[(itemId, versionId)] = latestId
-	    else:
-		currId = latestId
-		while currId != self.versionTable.noVersion \
-		      and currVer.isAfter(version):
-		    lastId = currId
-		    currId = self.parents.get((itemId, currId), None)
-		    if currId != self.versionTable.noVersion:
-			currVer = self.versionTable.getId(currId)
 
-		# insert just before lastId; currId is the parent of the
-		# new node we're adding; if it's noVersion we're at the top
-		self.parents[(itemId, versionId)] = currId
-
-		del self.parents[(itemId, lastId)]
-		self.parents[(itemId, lastId)] = versionId
+	self.branchContents.addRow(itemId, branchId, versionId,
+				   version.timeStamp)
 
 	return versionId
 
     def eraseVersion(self, itemId, versionId):
 	# should we make them pass in the version as well to save the
 	# lookup?
+	assert(0)
 	version = self.versionTable.getId(versionId)
 	branch = version.branch()
 	branchId = self.branchTable[branch]
@@ -330,14 +369,24 @@ class SqlVersioning:
 
 	self.needsCleanup = True
 	
-    def createBranch(self, itemId, branch):
+    def createBranch(self, itemId, branch, topVersionId = None,
+		     topVersionTimestamp = None):
 	"""
-	Creates a new branch for the given node. 
+	Creates a new branch for the given node. If topVersionId is
+	not None, that node is considered the only node on the branch.
 	"""
 	label = branch.label()
 	branchId = self.branchTable.get(branch, None)
 	if not branchId:
-	    branchId = self.branchTable.addId(branch)
+	    if branch.hasParent():
+		parent = branch.parentNode()
+		parentId = self.versionTable.get(parent, None)
+		if parentId is None:
+		    parentId = self.versionTable.addId(parent)
+	    else:
+		parentId = 0
+
+	    branchId = self.branchTable.addId(branch, parentId)
 	    if not self.labels.has_key(label):
 		self.labels.addId(label)
 
@@ -347,16 +396,22 @@ class SqlVersioning:
 	       branchId not in self.labelMap[(itemId, labelId)])
 	self.labelMap.addItem((itemId, labelId), branchId)
 
+	if topVersionId is not None:
+	    self.latest[(itemId, branchId)] = topVersionId
+	    self.branchContents.addRow(itemId, branchId, topVersionId,
+				       topVersionTimestamp)
+
 	return branchId
 
     def __init__(self, db, versionTable, branchTable):
 	self.labels = LabelTable(db)
 	self.latest = LatestTable(db)
 	self.labelMap = LabelMap(db)
-	self.parents = ParentTable(db)
 	self.versionTable = versionTable
         self.branchTable = branchTable
 	self.needsCleanup = False
+	self.branchContents = BranchContents(db)
+	self.db = db
 
 class SqlVersionsError(Exception):
 

@@ -7,126 +7,20 @@
 Simple functions used throughout srs.
 """
 
-from repository import repository
+import log
+import repository
+import repository.fsrepos
+import repository.netclient
 import versions
+import sys
 
-def findPackage(repos, defaultLabel, name, versionStr = None, forceGroup = 0):
-    """
-    Looks up a package in the given repository based on the name and
-    version provided. If any errors are occured, PackageNotFound is
-    raised with an appropriate error message. Multiple matches could
-    be found if versionStr refers to a label.
-
-    @param repos: Repository to look for the package in
-    @type repos: repository.Repository
-    @param defaultLabel: Label of the branch to use if no branch
-    is specified. If only a branch name is given (not a complete label),
-    the repository name from this label is used as the repository
-    name for the branch name to form a complete label.
-    @type defaultLabel: versions.BranchName
-    @param name: Package name
-    @type name: str
-    @param versionStr: Package version
-    @type versionStr: str
-    @param forceGroup: If true the name should specify a group
-    @type forceGroup: boolean
-    @rtype: list of package.Package
-    """
-
-    if not repos.hasPackage(name):
-	raise PackageNotFound, "package %s does not exist" % name
-
-    if forceGroup:
-	if name.count(":") != 2:
-	    raise PackageNotFound, "group and fileset names may not include colons"
-
-	last = name.split(":")[-1]
-	if not last.startswith("group-") and not last.startswith("fileset-"):
-	    raise PackageNotFound,  \
-		    "only groups and filesets may be checked out of the repository"
-
-    if not defaultLabel:
-	if versionStr[0] != "/" and (versionStr.find("/") != -1 or
-				     versionStr.find("@") == -1):
-	    raise PackageNotFound, \
-		"fully qualified version or label " + \
-		"expected instead of %s" % versionStr
-
-    # a version is a label if
-    #   1. it doesn't being with / (it isn't fully qualified)
-    #   2. it only has one element (no /)
-    #   3. it contains an @ sign
-    if not versionStr or (versionStr[0] != "/" and  \
-	# label was given
-	    (versionStr.find("/") == -1) and versionStr.count("@")):
-
-	if versionStr:
-	    if versionStr[0] == "@" and defaultLabel:
-		versionStr = defaultLabel.getHost() + versionStr
-
-	    try:
-		label = versions.BranchName(versionStr)
-	    except versions.ParseError:
-		raise repository.PackageMissing, "invalid version %s" % versionStr
-	else:
-	    label = defaultLabel
-
-	branchList = repos.branchesOfTroveLabel(name, label)
-	if not branchList:
-	    raise PackageNotFound, "branch %s does not exist for package %s" \
-			% (str(label), name)
-
-	pkgList = []
-	for branch in branchList:
-	    pkgList.append(repos.getLatestPackage(name, branch))
-    elif versionStr[0] != "/" and versionStr.find("/") == -1:
-	# version/release was given
-	branchList = repos.branchesOfTroveLabel(name, defaultLabel)
-	if not branchList:
-	    raise PackageNotFound, \
-			"branch %s does not exist for package %s" \
-			% (str(defaultLabel), name)
-	
-	try:
-	    verRel = versions.VersionRelease(versionStr)
-	except versions.ParseError, e:
-	    raise PackageNotFound, str(e)
-
-	pkgList = []
-	for branch in branchList:
-	    version = branch.copy()
-	    version.appendVersionReleaseObject(verRel)
-	    try:
-		pkg = repos.getPackageVersion(name, version)
-		pkgList.append(pkg)
-	    except repository.PackageMissing, e:
-		pass
-
-	if not pkgList:
-	    raise PackageNotFound, \
-		"version %s of %s is not on any branch named %s" % \
-		(versionStr, name, str(defaultLabel))
-    elif versionStr[0] != "/":
-	# partial version string, we don't support this
-	raise PackageNotFound, \
-	    "incomplete version string %s not allowed" % versionStr
+def openRepository(path, mode):
+    if path.startswith("http://"):
+        repos = repository.netclient.NetworkRepositoryClient(path)
     else:
-	try:
-	    version = versions.VersionFromString(versionStr)
-	except versions.ParseError:
-	    raise PackageNotFound, str(e)
+        repos = repository.fsrepos.FilesystemRepository(path, mode)
 
-	try:
-	    if version.isBranch():
-		pkg = repos.getLatestPackage(name, version)
-	    else:
-		pkg = repos.getPackageVersion(name, version)
-	except repository.PackageMissing, e:  
-	    raise PackageNotFound, str(e)
-
-	pkgList = [ pkg ]
-
-    return pkgList
+    return repos
 
 def fullBranchName(defaultLabel, version, versionStr):
     """

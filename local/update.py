@@ -202,10 +202,11 @@ class FilesystemJob:
 	if fsPkg:
 	    fsPkg = fsPkg.copy()
 	else:
-	    fsPkg = package.Package(pkgCs.getName(), versions.NewVersion())
+	    fsPkg = package.Package(pkgCs.getName(), versions.NewVersion(),
+				    pkgCs.getFlavor())
 
-	fsPkg.mergePackageListChanges(pkgCs.iterChangedPackages(),
-				      redundantOkay = True)
+	fsPkg.mergeTroveListChanges(pkgCs.iterChangedTroves(),
+				    redundantOkay = True)
 
 	for (fileId, headPath, headFileVersion) in pkgCs.getNewFileList():
 	    if headPath[0] == '/':
@@ -331,8 +332,7 @@ class FilesystemJob:
 		    contentsOkay = 0
 		else:
 		    baseFileVersion = basePkg.getFile(fileId)[1]
-		    (baseFile, baseFileContents) = repos.getFileVersion(fileId, 
-					baseFileVersion, withContents = 1)
+		    baseFile = repos.getFileVersion(fileId, baseFileVersion)
 		
 		headChanges = changeSet.getFileChange(fileId)
 		headFile = baseFile.copy()
@@ -503,20 +503,21 @@ class FilesystemJob:
 	    name = pkgCs.getName()
 	    old = pkgCs.getOldVersion()
 	    if old:
-		basePkg = repos.getPackageVersion(name, old)
+		basePkg = repos.getTrove(name, old, pkgCs.getFlavor())
 		pkg = self._singlePackage(repos, pkgCs, changeSet, basePkg, 
 					  fsPkgDict[name], root, flags)
 		self.oldPackages.append((basePkg.getName(), 
-					 basePkg.getVersion()))
+					 basePkg.getVersion(),
+					 basePkg.getFlavor()))
 	    else:
 		pkg = self._singlePackage(repos, pkgCs, changeSet, None, 
 					  None, root, flags)
 
 	    self.newPackages.append(pkg)
 
-	for (name, oldVersion) in changeSet.getOldPackageList():
-	    self.oldPackages.append((name, oldVersion))
-	    oldPkg = repos.getPackageVersion(name, oldVersion)
+	for (name, oldVersion, oldFlavor) in changeSet.getOldPackageList():
+	    self.oldPackages.append((name, oldVersion, oldFlavor))
+	    oldPkg = repos.getTrove(name, oldVersion, oldFlavor)
 	    for (fileId, path, version) in oldPkg.iterFileList():
 		fileObj = repos.getFileVersion(fileId, version)
 		self._remove(fileObj, root + path,
@@ -560,13 +561,20 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     Iterating over the files in newPkg would be much more natural then
     iterating over the ones in the old package, and then going through
     newPkg to find what we missed. However, doing it the hard way lets
-    us use iterTroveFiles(), which is much faster.
+    us iterate right over the changeset we get from the repository.
     """
     if srcPkg:
-	iter = repos.iterFilesInTrove(srcPkg, withFiles = True)
+	cs = repos.createChangeSet([(srcPkg.getName(), None, None,
+				     srcPkg.getVersion(), True)])
+	pkgCs = cs.iterNewPackageList().next()
+	fileList = pkgCs.getNewFileList()
     else:
-	iter = []
-    for (fileId, srcPath, srcFileVersion, srcFile) in iter:
+	fileList = []
+
+    # need to walk changesets in order of fileid
+    fileList.sort()
+
+    for (fileId, srcPath, srcFileVersion) in fileList:
 	# file disappeared
 	if not fileIds.has_key(fileId): continue
 
@@ -585,8 +593,10 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 		% path)
 	    return None
 
+	srcFile = files.ThawFile(cs.getFileChange(fileId), fileId)
+
 	if srcFile.hasContents:
-	    srcCont = repos.getFileContents(srcFile)
+	    srcCont = cs.getFileContents(fileId)[1]
 
 	f = files.FileFromFilesystem(realPath, fileId,
 				     possibleMatch = srcFile)

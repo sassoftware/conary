@@ -220,12 +220,15 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
     name = filename[:-len('.recipe')]
 
     try:
-        sourceComponent = repos.getLatestPackage(component, cfg.defaultbranch)
+	version = repos.getTroveLatestVersion(component, cfg.defaultbranch)
+        sourceComponent = repos.getTrove(component, cfg.defaultbranch, None)
     except repository.PackageMissing:
         raise RecipeFileError, 'cannot find source component %s' % component
 
     srcFileInfo = None
-    for (fileId, path, version) in repos.iterFilesInTrove(sourceComponent):
+    for (fileId, path, version) in repos.iterFilesInTrove(sourceComponent.getName(),
+                                                          sourceComponent.getVersion(),
+                                                          sourceComponent.getFlavor()):
         if path == filename:
             srcFileInfo = (fileId, version)
             break
@@ -642,9 +645,8 @@ class GroupRecipe(Recipe):
 
     def addTrove(self, name, versionStr = None):
 	try:
-	    pkgList = helper.findPackage(self.repos, self.label, name, 
-					 versionStr)
-	except helper.PackageNotFound, e:
+	    pkgList = self.repos.findTrove(self.label, name, versionStr)
+	except repository.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
 
 	versionList = [ x.getVersion() for x in pkgList ]
@@ -730,9 +732,8 @@ class FilesetRecipe(Recipe):
 	    remap = [ remap ]
 
 	try:
-	    pkgList = helper.findPackage(self.repos, self.label, 
-					 component, versionStr)
-	except helper.PackageNotFound, e:
+	    pkgList = self.repos.findTrove(self.label, component, versionStr)
+	except repository.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
 
 	if len(pkgList) == 0:

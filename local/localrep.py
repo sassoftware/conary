@@ -17,7 +17,8 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
     """
 
     def addPackage(self, pkg):
-	pkgCs = self.cs.getNewPackageVersion(pkg.getName(), pkg.getVersion())
+	pkgCs = self.cs.getNewPackageVersion(pkg.getName(), pkg.getVersion(),
+					     pkg.getFlavor())
 	old = pkgCs.getOldVersion()
 	self.repos.addPackage(pkg, oldVersion = old)
 
@@ -34,7 +35,8 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 	return self.oldFiles
 
     def addFile(self, fileObject):
-	fsrepos.ChangeSetJob.addFile(self, fileObject)
+	fsrepos.ChangeSetJob.addFile(self, fileObject, 
+			 storeContents = fileObject.file().flags.isConfig())
 
 	fileId = fileObject.fileId()
 	oldVersion = self.cs.getFileOldVersion(fileId)
@@ -78,9 +80,9 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 		# a new package. no need to erase any old stuff then!
 		continue
 
-	    assert(repos.hasPackageVersion(name, oldVersion))
+	    assert(repos.hasTrove(name, oldVersion, csPkg.getFlavor()))
 
-	    oldPkg = repos.getPackageVersion(name, oldVersion)
+	    oldPkg = repos.getTrove(name, oldVersion, csPkg.getFlavor())
 	    self.oldPackage(oldPkg)
 
 	    for fileId in csPkg.getOldFileList():
@@ -90,7 +92,8 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 	fsrepos.ChangeSetJob.__init__(self, repos, cs)
 
 	for pkg in self.oldPackageList():
-	    self.repos.erasePackageVersion(pkg.getName(), pkg.getVersion())
+	    self.repos.eraseTrove(pkg.getName(), pkg.getVersion(),
+				  pkg.getFlavor())
 
 	for (fileId, fileVersion, fileObj) in self.oldFileList():
 	    self.repos.eraseFileVersion(fileId, fileVersion)

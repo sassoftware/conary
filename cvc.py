@@ -4,8 +4,8 @@
 # All rights reserved
 #
 
-from repository import fsrepos
 from repository import repository
+from helper import openRepository
 import checkin
 
 argDef = {}
@@ -37,18 +37,18 @@ def sourceCommand(cfg, args, argSet):
 	    dir = None
 
 	if argSet or (len(args) < 2 or len(args) > 3): return usage()
-	repos = fsrepos.FilesystemRepository(cfg.reppath, "r")
+	repos = openRepository(cfg.reppath, "r")
 
 	args = [repos, cfg, dir] + args[1:]
 	checkin.checkout(*args)
     elif (args[0] == "commit"):
 	if argSet or len(args) != 1: return usage()
-	repos = fsrepos.FilesystemRepository(cfg.reppath, "c")
+	repos = openRepository(cfg.reppath, "c")
 
 	checkin.commit(repos, cfg)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
-	repos = fsrepos.FilesystemRepository(cfg.reppath, "r")
+	repos = openRepository(cfg.reppath, "r")
 
 	args[0] = repos
 	checkin.diff(*args)
@@ -63,14 +63,14 @@ def sourceCommand(cfg, args, argSet):
 	if len(args) != 2: return usage()
 	
 	try:
-	    repos = fsrepos.FilesystemRepository(cfg.reppath, "r")
+	    repos = openRepository(cfg.reppath, "r")
 	except repository.OpenError:
 	    repos = None
 
 	checkin.newPackage(repos, cfg, args[1])
     elif (args[0] == "update"):
 	if argSet or not args or len(args) > 2: return usage()
-	repos = fsrepos.FilesystemRepository(cfg.reppath, "r")
+	repos = openRepository(cfg.reppath, "r")
 
 	args[0] = repos
 	checkin.updateSrc(*args)

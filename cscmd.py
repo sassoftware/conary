@@ -19,15 +19,15 @@ def ChangeSetCommand(repos, cfg, pkgName, outFileName, oldVersionStr, \
     else:
 	oldVersion = None
 
-    list = [(pkgName, oldVersion, newVersion, (not oldVersion))]
+    list = [(pkgName, None, oldVersion, newVersion, (not oldVersion))]
 
     cs = repos.createChangeSet(list)
     cs.writeToFile(outFileName)
 
 def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     try:
-	pkgList = helper.findPackage(db, cfg.installbranch, pkgName, None)
-    except helper.PackageNotFound, e:
+	pkgList = db.findTrove(pkgName, None)
+    except repository.repository.PackageNotFound, e:
 	log.error(e)
 	return
 
@@ -35,7 +35,8 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     for outerPackage in pkgList:
 	for pkg in package.walkPackageSet(db, outerPackage):
 	    ver = pkg.getVersion()
-	    origPkg = db.getPackageVersion(pkg.getName(), ver, pristine = True)
+	    origPkg = db.getTrove(pkg.getName(), ver, pkg.getFlavor(), 
+				  pristine = True)
 	    ver = ver.fork(versions.LocalBranch(), sameVerRel = 1)
 	    list.append((pkg, origPkg, ver))
 	    
@@ -45,8 +46,9 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
 
     for outerPackage in pkgList:
 	cs.addPrimaryPackage(outerPackage.getName(), 
-	  outerPackage.getVersion().fork(
-		versions.LocalBranch(), sameVerRel = 1))
+	    outerPackage.getVersion().fork(
+		versions.LocalBranch(), sameVerRel = 1),
+	   outerPackage.getFlavor())
 
     for (changed, fsPkg) in result[1]:
 	if changed:

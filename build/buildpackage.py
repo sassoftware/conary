@@ -13,6 +13,7 @@ import string
 import os
 import files
 import time
+import use
 
 from deps import deps
 
@@ -34,6 +35,27 @@ def BuildDeviceFile(devtype, major, minor, owner, group, perms):
 
     return f
 
+def _getUseDependencySet():
+    """
+    Returns a deps.DependencySet instance that represents the Use flags
+    that have been used.
+    """
+    set = deps.DependencySet()
+    flags = use.Use.getUsed()
+    depFlags = []
+    names = flags.keys()
+    if names:
+        names.sort()
+        for name in names:
+            val = flags[name]
+            if val:
+                depFlags.append(name)
+            else:
+                depFlags.append('!' + name)
+        dep = deps.Dependency('use', depFlags)
+        set.addDep(deps.UseDependency, dep)
+    return set
+    
 class BuildPackage(dict):
 
     def addFile(self, path, realPath):
@@ -46,6 +68,11 @@ class BuildPackage(dict):
         to commit to the repository
         """
 	f = files.FileFromFilesystem(realPath, None, buildDeps = True)
+        if f.hasContents:
+            self.requires.union(f.requires.value())
+            self.provides.union(f.provides.value())
+            self.flavor.union(f.flavor.value())
+        
 	f.inode.setPerms(f.inode.perms() & 01777)
 	self[path] = (realPath, f)
 
@@ -86,6 +113,9 @@ class BuildPackage(dict):
     def __init__(self, name, version):
 	self.name = name
 	self.version = version
+        self.requires = deps.DependencySet()
+        self.provides = deps.DependencySet()
+        self.flavor = _getUseDependencySet()
 	dict.__init__(self)
 
 

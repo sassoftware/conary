@@ -54,6 +54,9 @@ class UseClass(dict):
 	self.showdefaults = showdefaults
         self.initialized = False
 	self.frozen = False
+        self.track = False
+        self.usedFlags = {}
+        # this must be set last
         self.initialized = True
 
     def _freeze(self):
@@ -61,6 +64,12 @@ class UseClass(dict):
 
     def _thaw(self):
 	self.frozen = False
+
+    def getUsed(self):
+        return self.usedFlags
+
+    def trackUsed(self, val):
+        self.track = val
 
     def __setitem__(self, key, value):
 	if self.frozen:
@@ -70,26 +79,28 @@ class UseClass(dict):
         else:
             dict.__setitem__(self, key, value)
             
-    def __repr__(self):
-        return dict.__repr__(self)
-
     def __getattr__(self, name):
-        if name in self.__dict__:
+        if self.__dict__.has_key(name):
             return self.__dict__[name]
-        if dict.has_key(self, name):
-            return self[name]
+        if self.has_key(name):
+            flag = self[name]
+            if self.track:
+                self.usedFlags[name] = flag
+            return flag
         raise AttributeError, "class %s has no attribute '%s'" % (self.__class__.__name__, name)
 
     def __setattr__(self, name, value):
         initialized = self.__dict__.get('initialized', False)
+        # this allows us to add instance variables during __init__
         if not initialized:
             self.__dict__[name] = value
             return
+        # after init, only set instance variables that already exist
         if self.__dict__.has_key(name):
             self.__dict__[name] = value
             return
-        frozen = self.__dict__.get('frozen', False)
-        if frozen:
+        # everything else should be handled as a Use flag
+        if self.frozen:
             raise TypeError, 'flags are frozen'
         if self.has_key(name):
             self[name].set(value)
@@ -273,3 +284,9 @@ Arch.BE.setShortDoc('True if current architecture is big-endian')
 Arch._freeze()
 _addDocs(Arch)
 
+def track(arg):
+    """
+    Turns Use flag tracking on or off.
+    """
+    Arch.trackUsed(arg)
+    Use.trackUsed(arg)

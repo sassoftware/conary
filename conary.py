@@ -11,10 +11,11 @@ import cook
 import cscmd
 from local import database
 import display
-from repository import fsrepos
+import helper
 import importrpm
 import log
 import os
+import queryrep
 import repository
 import rollbacks
 import srscfg
@@ -60,7 +61,11 @@ def usage(rc = 1):
     print "               --reppath <repository-path>"
     print "               --root <root>"
     print ""
-    print "pkglist flags: --all"
+    print "pkglist flags: --sha1s"
+    print "               --ids"
+    print "               --ls"
+    print ""
+    print "replist flags: --all"
     print "               --sha1s"
     print "               --ids"
     print "               --ls"
@@ -70,15 +75,14 @@ def usage(rc = 1):
 
 def openRepository(path, mode):
     try:
-        repos = fsrepos.FilesystemRepository(path, mode)
+        return helper.openRepository(path, mode)
     except repository.repository.OpenError, e:
-        log.error('Unable to open repository %s: %s', path, str(e))
-        sys.exit(1)
-    return repos
+	log.error('Unable to open repository %s: %s', path, str(e))
+	sys.exit(1)
 
-def openDatabase(root, path, mode):
+def openDatabase(root, path):
     try:
-        db = database.Database(root, path, mode)
+        db = database.Database(root, path)
     except repository.repository.OpenError, e:
         log.error('Unable to open database %s%s%s: %s', root, os.sep, path, str(e))
         sys.exit(1)
@@ -233,7 +237,7 @@ def main():
     elif (otherArgs[1] == "erase"):
 	if argSet: return usage
 	if len(otherArgs) >= 3 and len(otherArgs) <=4:
-	    db = openDatabase(cfg.root, cfg.dbpath, "c")
+	    db = openDatabase(cfg.root, cfg.dbpath)
 
 	    args = [db, cfg] + otherArgs[2:]
 	    updatecmd.doErase(*args)
@@ -259,7 +263,30 @@ def main():
 	db = database.Database(cfg.root, cfg.dbpath, "c")
 	for changeSet in otherArgs[2:]:
 	    commit.doLocalCommit(db, changeSet)
-    elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
+    elif (otherArgs[1] == "pkglist"):
+	ls = argSet.has_key('ls')
+	if ls: del argSet['ls']
+
+	ids = argSet.has_key('ids')
+	if ids: del argSet['ids']
+
+	sha1s = argSet.has_key('sha1s')
+	if sha1s: del argSet['sha1s']
+
+	db = openDatabase(cfg.root, cfg.dbpath)
+
+	if argSet: return usage()
+
+	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
+	    args = [db, cfg, ls, ids, sha1s] + otherArgs[2:]
+	    try:
+		display.displayPkgs(*args)
+	    except IOError, msg:
+		sys.stderr.write(msg.strerror + '\n')
+		sys.exit(1)
+	else:
+	    return usage()
+    elif (otherArgs[1] == "replist"):
 	all = argSet.has_key('all')
 	if all: del argSet['all']
 
@@ -272,17 +299,14 @@ def main():
 	sha1s = argSet.has_key('sha1s')
 	if sha1s: del argSet['sha1s']
 
-	if otherArgs[1] == "replist":
-	    queryRepos = openRepository(cfg.reppath, "r")
-	else:
-	    queryRepos = openDatabase(cfg.root, cfg.dbpath, "r")
+	repos = openRepository(cfg.reppath, "r")
 
 	if argSet: return usage()
 
 	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	    args = [queryRepos, cfg, all, ls, ids, sha1s] + otherArgs[2:]
+	    args = [repos, cfg, all, ls, ids, sha1s] + otherArgs[2:]
 	    try:
-		display.displayPkgs(*args)
+		queryrep.displayPkgs(*args)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
 		sys.exit(1)
@@ -290,12 +314,12 @@ def main():
 	    return usage()
     elif (otherArgs[1] == "rblist"):
 	if argSet: return usage
-	db = openDatabase(cfg.root, cfg.dbpath, "r")
+	db = openDatabase(cfg.root, cfg.dbpath)
 	rollbacks.listRollbacks(db, cfg)
     elif (otherArgs[1] == "remove"):
 	if len(otherArgs) != 3: return usage()
 	if argSet: return usage
-	db = openDatabase(cfg.root, cfg.dbpath, "c")
+	db = openDatabase(cfg.root, cfg.dbpath)
 	fullPath = util.joinPaths(cfg.root, otherArgs[2])
 	if os.path.exists(fullPath):
 	    os.unlink(fullPath)
@@ -304,7 +328,7 @@ def main():
 	db.removeFile(otherArgs[2])
     elif (otherArgs[1] == "rollback"):
 	if argSet: return usage
-	db = openDatabase(cfg.root, cfg.dbpath, "c")
+	db = openDatabase(cfg.root, cfg.dbpath)
 	args = [db, cfg] + otherArgs[2:]
 	rollbacks.apply(*args)
     elif (otherArgs[1] == "source" or otherArgs[1] == "src"):
@@ -318,7 +342,7 @@ def main():
 	if argSet: return usage
 	if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	    repos = openRepository(cfg.reppath, "r")
-	    db = openDatabase(cfg.root, cfg.dbpath, "c")
+	    db = openDatabase(cfg.root, cfg.dbpath)
 
 	    args = [repos, db, cfg] + otherArgs[2:]
 	    updatecmd.doUpdate(*args, **kwargs)

@@ -10,6 +10,7 @@ DEP_CLASS_IS		= 1
 DEP_CLASS_SONAME	= 2
 DEP_CLASS_FILES		= 3
 DEP_CLASS_TROVES	= 4
+DEP_CLASS_USE		= 5
 
 dependencyClasses = {}
 
@@ -39,13 +40,17 @@ class Dependency:
 
     def __str__(self):
 	if self.flags:
-	    return "%s(%s)" % (self.name, " ".join(self.flags.iterkeys()))
+	    flags = self.flags.keys()
+	    flags.sort()
+	    return "%s(%s)" % (self.name, " ".join(flags))
 	else:
 	    return self.name
 
     def freeze(self):
 	if self.flags:
-	    return "%s %s" % (self.name, " ".join(self.flags.iterkeys()))
+	    flags = self.flags.keys()
+	    flags.sort()
+	    return "%s:%s" % (self.name, ",".join(flags))
 	else:
 	    return self.name
 
@@ -86,8 +91,11 @@ class Dependency:
 		self.flags[flags] = True
 
 def ThawDependency(frozen):
-    l = frozen.split(" ")
-    d = Dependency(l[0], l[1:])
+    l = frozen.split(":")
+    flags = []
+    if len(l) > 1:
+        flags = l[1].split(',')
+    d = Dependency(l[0], flags)
     if not dependencyCache.has_key(d):
 	dependencyCache[d] = d
 
@@ -127,6 +135,7 @@ class DependencyClass:
 	return True
 
     def union(self, other):
+	if other is None: return
 	for otherdep in other.members.itervalues():
 	    # calling this for duplicates is a noop
 	    self.addDep(otherdep)
@@ -150,8 +159,10 @@ class DependencyClass:
         return not self == other
 
     def __str__(self):
-	return "\n".join([ "%s: %s" % (self.tagName, dep) 
-		    for dep in self.members.itervalues() ])
+	memberList = self.members.items()
+	memberList.sort()
+	return "\n".join([ "%s: %s" % (self.tagName, dep[1]) 
+		    for dep in memberList ])
 
     def __init__(self):
 	self.members = {}
@@ -196,6 +207,14 @@ class TroveDependencies(DependencyClass):
     justOne = False
 _registerDepClass(TroveDependencies)
 
+class UseDependency(DependencyClass):
+
+    tag = DEP_CLASS_USE
+    tagName = "use"
+    exactMatch = True
+    justOne = True
+_registerDepClass(UseDependency)
+
 class DependencySet:
 
     def addDep(self, depClass, dep):
@@ -238,10 +257,39 @@ class DependencySet:
     def __ne__(self, other):
         return not self == other
 
+    def __hash__(self):
+	h = 0
+	for member in self.members.itervalues():
+	    h ^= hash(member)
+	return h
+
+    def __nonzero__(self):
+	return not(not(self.members))
+
     def __str__(self):
-	return "\n".join([ str(x) for x in self.members.itervalues()])
+	memberList = self.members.items()
+	memberList.sort()
+	return "\n".join([ str(x[1]) for x in memberList])
+
+    def freeze(self):
+        rc = []
+        for tag, depclass in self.getDepClasses().items():
+            for dep in depclass.getDeps():
+                rc.append('%d#%s' %(tag, dep.freeze()))
+        return '|'.join(rc)
 
     def __init__(self):
 	self.members = {}
+
+def ThawDependencySet(frz):
+    l = frz.split('|')
+    depSet = DependencySet()
+    for line in l:
+        if not line:
+            continue
+        tag, frozen = line.split('#', 1)
+        tag = int(tag)
+        depSet.addDep(dependencyClasses[tag], ThawDependency(frozen))
+    return depSet
 
 dependencyCache = util.ObjectCache()

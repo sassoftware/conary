@@ -75,6 +75,13 @@ class IdTable:
 	    return defValue
 	return item[0]
 
+    def getItemDict(self, itemSeq):
+	cu = self.db.cursor()
+        cu.execute("SELECT %s, %s FROM %s WHERE %s in (%s)"
+                   % (self.strName, self.keyName, self.tableName, self.strName,
+		      ",".join(["'%s'" % x for x in itemSeq])))
+	return dict(cu)
+
     def iterkeys(self):
         cu = self.db.cursor()
         cu.execute("SELECT %s FROM %s" %(self.strName, self.tableName))

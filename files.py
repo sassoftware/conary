@@ -217,11 +217,7 @@ class DependenciesStream(InfoStream):
     def freeze(self):
         if self.deps is None:
             return ''
-        rc = []
-        for tag, depclass in self.deps.getDepClasses().items():
-            for dep in depclass.getDeps():
-                rc.append('%d %s' %(tag, dep.freeze()))
-        return '\n'.join(rc)
+        return self.deps.freeze()
 
     def diff(self, them):
 	if self.deps != them.deps:
@@ -230,16 +226,7 @@ class DependenciesStream(InfoStream):
 	return ''
 
     def thaw(self, frz):
-        l = frz.split('\n')
-        depSet = deps.DependencySet()
-        for line in l:
-            if not line:
-                continue
-            tag, frozen = line.split(' ', 1)
-            tag = int(tag)
-            depSet.addDep(deps.dependencyClasses[tag],
-                          deps.ThawDependency(frozen))
-	self.deps = depSet
+        self.deps = deps.ThawDependencySet(frz)
         
     def twm(self, diff, base):
 	if not diff: return False
@@ -785,8 +772,8 @@ class RegularFile(File):
     streamList = File.streamList + (('contents', RegularFileStream),
                                     ('provides', DependenciesStream),
                                     ('requires', DependenciesStream),
-                                    ('isnSet', StringStream))
-    __slots__ = ('contents', 'provides', 'requires', 'isnSet')
+                                    ('flavor', DependenciesStream))
+    __slots__ = ('contents', 'provides', 'requires', 'flavor')
 
     lsTag = "-"
     hasContents = 1
@@ -879,7 +866,7 @@ def FileFromFilesystem(path, fileId, possibleMatch = None, buildDeps = False):
 	    f.requires.set(result[0])
 	    f.provides.set(result[1])
 
-        f.isnSet.set(filedeps.findFileInstructionSet(path))
+        f.flavor.set(filedeps.findFileFlavor(path))
 
     return f
 

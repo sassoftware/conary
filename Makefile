@@ -32,6 +32,7 @@ python_files = __init__.py	\
 	log.py			\
 	package.py		\
 	patch.py		\
+	queryrep.py		\
 	rollbacks.py		\
 	rpmhelper.py		\
 	sha1helper.py		\
@@ -41,7 +42,8 @@ python_files = __init__.py	\
 	updatecmd.py		\
 	util.py			\
 	magic.py		\
-	versions.py
+	versions.py		\
+	xmlshims.py
 
 example_files = examples/tmpwatch.recipe
 bin_files = srs srs-bootstrap
@@ -85,9 +87,14 @@ dist: $(dist_files)
 	tar cjf $(DISTDIR).tar.bz2 srs-$(VERSION)
 	rm -rf $(DISTDIR)
 
-distcheck:
-	@echo Possible missing files:
-	@(ls *py; for f in $(python_files); do echo $$f; done) | sort | uniq -u
+distcheck: dist
+	d=`mktemp -d`; \
+	cd $$d; \
+	tar jxvf $(DISTDIR).tar.bz2; \
+	cd srs-$(VERSION); \
+	make; make test; \
+	cd -; \
+	rm -rf $$d
 
 clean: clean-subdirs default-clean
 

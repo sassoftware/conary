@@ -8,147 +8,45 @@
 import changeset
 import datastore
 import util
+import versions
 
-class AbstractRepository:
-    #
-    ### Package access functions
+class AbstractTroveDatabase:
 
-    def iterAllTroveNames(self):
-	"""
-	Returns a list of all of the troves contained in the repository.
-
-	@rtype: list of str
-	"""
-
+    def commitChangeSet(self, cs):
 	raise NotImplementedError
 
-    def hasPackage(self, troveName):
+    def createBranch(self, newBranch, where, troveName = None):
 	"""
-	Tests to see if the repository contains any version of the named
-	trove.
+	Creates a branch for the troves in the repository. This
+	operations is recursive, with any required troves and files
+	also getting branched. Duplicate branches can be created,
+	but only if one of the following is true:
+	 
+	  1. C{where} specifies a particular version to branch from
+	  2. the branch does not yet exist and C{where} is a label which matches multiple existing branches
 
-	@param troveName: trove name
+	Where specifies the node branches are created from for the
+	trove troveName (or all of the troves if troveName is empty).
+	Any troves or files branched due to inclusion in a branched
+	trove will be branched at the version required by the object
+	including it. If different versions of objects are included
+	from multiple places, bad things will happen (an incomplete
+	branch will be formed). More complicated algorithms for branch
+	will fix this, but it's not clear doing so is necessary.
+
+	@param newBranch: Label of the new branch
+	@type newBranch: versions.BranchName
+	@param where: Where the branch should be created from
+	@type where: versions.Version or versions.BranchName
+	@param troveList: Name of the troves to branch; empty list if all
+	troves in the repository should be branched.
 	@type troveName: str
-	@rtype: boolean
-	"""
-	raise NotImplementedError
-
-    def hasPackageVersion(self, troveName, version):
-	"""
-	Tests if the repository contains a particular version of a trove.
-
-	@param troveName: package name
-	@type troveName: str
-	@rtype: boolean
-	"""
-	raise NotImplementedError
-
-    def pkgLatestVersion(self, troveName, branch):
-	"""
-	Returns the version of the latest version of a trove on a particular
-	branch.
-
-	@param troveName: package name
-	@type troveName: str
-	@param branch: branch
-	@type branch: versions.Version
-	@rtype: versions.Version
 	"""
 
-	raise NotImplementedError
-
-    def getLatestPackage(self, troveName, branch):
+    def createChangeSet(self, packageList, recurse = True, withFiles = True):
 	"""
-	Returns the latest trove from a given branch.
-
-	@param troveName: package name
-	@type troveName: str
-	@param branch: branch
-	@type branch: versions.Version
-	@rtype: package.Package
-	"""
-	raise NotImplementedError
-
-    def getPackageVersion(self, troveName, version):
-	"""
-	Returns a particular version of a trove.
-
-	@param troveName: package name
-	@type troveName: str
-	@param version: version
-	@type version: versions.Version
-	@rtype: package.Package
-	"""
-	raise NotImplementedError
-
-    def branchesOfTroveLabel(self, troveName, label):
-	"""
-	Returns the full branch names which matcha  given label name
-	for a trove.
-
-	@param troveName: package name
-	@type troveName: str
-	@param label: label
-	@type label: versions.BranchName
-	@rtype: package.Package
-	"""
-	raise NotImplementedError
-
-    def getPackageVersionList(self, troveName):
-	"""
-	Returns a list of all of the versions of a trove available
-	in the repository.
-
-	@param troveName: trove
-	@type troveName: str
-	@rtype: list of versions.Version
-	"""
-
-	raise NotImplementedError
-
-    def getPackageBranchList(self, troveName):
-	"""
-	Returns a list of all of the branches for a particular trove.
-
-	@param troveName: trove
-	@type troveName: str
-	@rtype: list of versions.Version
-	"""
-	raise NotImplementedError
-
-    ### File functions
-
-    def getFileVersion(self, fileId, version, path = None, withContents = 0):
-	raise NotImplementedError
-
-    def iterFilesInTrove(self, trove, sortByPath = False, withFiles = False):
-	raise NotImplementedError
-
-    def buildJob(self, changeSet):
-	raise NotImplementedError
-
-    def storeFileFromContents(self, contents, file, restoreContents):
-	raise NotImplementedError
-
-    def addFileVersion(self, fileId, version, file):
-	raise NotImplementedError
-
-    def addPackage(self, pkg):
-	raise NotImplementedError
-
-    def commit(self):
-	raise NotImplementedError
-
-    def eraseFileVersion(self, fileId, version):
-	raise NotImplementedError
-
-    def erasePackageVersion(self, pkgName, version):
-	raise NotImplementedError
-
-    def createChangeSet(self, packageList):
-	"""
-	packageList is a list of (pkgName, oldVersion, newVersion, absolute) 
-	tuples. 
+	packageList is a list of (pkgName, flavor, oldVersion, newVersion, 
+        absolute) tuples. 
 
 	if oldVersion == None and absolute == 0, then the package is assumed
 	to be new for the purposes of the change set
@@ -156,25 +54,24 @@ class AbstractRepository:
 	if newVersion == None then the package is being removed
 	"""
 	cs = changeset.ChangeSetFromRepository(self)
-	for (name, v1, v2, absolute) in packageList:
-	    cs.addPrimaryPackage(name, v2)
+	for (name, flavor, v1, v2, absolute) in packageList:
+	    cs.addPrimaryPackage(name, v2, flavor)
 
 	dupFilter = {}
 
 	# don't use a for in here since we grow packageList inside of
 	# this loop
-	packageCounter = 0
-	while packageCounter < len(packageList):
-	    (packageName, oldVersion, newVersion, absolute) = \
-		packageList[packageCounter]
-	    packageCounter += 1
+	while packageList:
+	    (packageName, flavor, oldVersion, newVersion, absolute) = \
+		packageList[0]
+	    del packageList[0]
 
 	    # make sure we haven't already generated this changeset; since
 	    # packages can be included from other packages we could try
 	    # to generate quite a few duplicates
-	    if dupFilter.has_key(packageName):
+	    if dupFilter.has_key((packageName, flavor)):
 		match = False
-		for (otherOld, otherNew) in dupFilter[packageName]:
+		for (otherOld, otherNew) in dupFilter[(packageName, flavor)]:
 		    if not otherOld and not oldVersion:
 			same = True
 		    elif not otherOld and oldVersion:
@@ -190,54 +87,57 @@ class AbstractRepository:
 		
 		if match: continue
 
-		dupFilter[packageName].append((oldVersion, newVersion))
+		dupFilter[(packageName, flavor)].append(
+					    (oldVersion, newVersion))
 	    else:
-		dupFilter[packageName] = [ (oldVersion, newVersion) ]
+		dupFilter[(packageName, flavor)] = [ (oldVersion, newVersion) ]
 
 	    if not newVersion:
 		# remove this package and any subpackages
-		old = self.getPackageVersion(packageName, oldVersion)
-		cs.oldPackage(packageName, oldVersion)
-		for (name, version) in old.iterPackageList():
+		old = self.getTrove(packageName, oldVersion, flavor)
+		cs.oldPackage(packageName, oldVersion, flavor)
+		for (name, version, flavor) in old.iterTroveList():
                     # it's possible that a component of a package
                     # was erased, make sure that it is installed
-                    if self.hasPackageVersion(name, version):
-                        packageList.append((name, version, None, absolute))
+                    if self.hasTrove(name, version, flavor):
+                        packageList.append((name, flavor, version, None, 
+					    absolute))
 		    
 		continue
 		    
-	    new = self.getPackageVersion(packageName, newVersion)
+	    new = self.getTrove(packageName, newVersion, flavor)
 	 
 	    if oldVersion:
-		old = self.getPackageVersion(packageName, oldVersion)
+		old = self.getTrove(packageName, oldVersion, flavor)
 	    else:
 		old = None
 
 	    (pkgChgSet, filesNeeded, pkgsNeeded) = \
 				new.diff(old, absolute = absolute)
 
-	    for (pkgName, old, new) in pkgsNeeded:
-		packageList.append((pkgName, old, new, absolute))
+	    if recurse:
+		for (pkgName, old, new, flavor) in pkgsNeeded:
+		    packageList.append((pkgName, flavor, old, new, absolute))
 
 	    cs.newPackage(pkgChgSet)
 
 	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
 		if oldVersion:
 		    (oldFile, oldCont) = self.getFileVersion(fileId, 
-				oldVersion, path = newPath, withContents = 1)
+				oldVersion, withContents = 1)
 		else:
 		    oldFile = None
 		    oldCont = None
 
 		(newFile, newCont) = self.getFileVersion(fileId, newVersion,
-					    path = newPath, withContents = 1)
+					    withContents = 1)
 
 		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
 							 newFile)
 
 		cs.addFile(fileId, oldVersion, newVersion, filecs)
 
-		if hash:
+		if hash and withFiles:
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
 		    cs.addFileContents(fileId, contType, cont, 
@@ -245,10 +145,271 @@ class AbstractRepository:
 
 	return cs
 
+    def findTrove(repos, defaultLabel, name, versionStr = None):
+	"""
+	Looks up a package in the given repository based on the name and
+	version provided. If any errors are occured, PackageNotFound is
+	raised with an appropriate error message. Multiple matches could
+	be found if versionStr refers to a label.
+
+	@param defaultLabel: Label of the branch to use if no branch
+	is specified. If only a branch name is given (not a complete label),
+	the repository name from this label is used as the repository
+	name for the branch name to form a complete label.
+	@type defaultLabel: versions.BranchName
+	@param name: Package name
+	@type name: str
+	@param versionStr: Package version
+	@type versionStr: str
+	@rtype: list of package.Package
+	"""
+	raise NotImplementedError
+
+    def getFileVersion(self, fileId, version, withContents = 0):
+	"""
+	Returns the file object for the given (fileId, version).
+	"""
+	raise NotImplementedError
+
+    def getTrove(self, troveName, version, flavor):
+	"""
+	Returns the trove which matches (troveName, version, flavor). If
+	the trove does not exist, PackageMissing is raised.
+
+	@param troveName: package name
+	@type troveName: str
+	@param version: version
+	@type version: versions.Version
+	@param flavor: flavor
+	@type flavor: deps.deps.DependencySet
+	@rtype: package.Package
+	"""
+	raise NotImplementedError
+
+    def getTroves(self, troveList):
+	"""
+	Returns a list of trove objects which parallels troveList. troveList 
+	is a list of (troveName, version, flavor) tuples. Version can
+	a version or a branch; if it's a branch the latest version of the
+	trove on that branch is returned. If there is no match for a
+	particular tuple, None is placed in the retur nlist for that tuple.
+	"""
+	rc = []
+	for item in troveList:
+	    try:
+		rc.append(self.getTrove(*item))
+	    except repository.PackageMissing:
+		rc.append(None)
+
+	return rc
+
+    def iterAllTroveNames(self):
+	"""
+	Returns a list of all of the troves contained in the repository.
+
+	@rtype: list of str
+	"""
+	raise NotImplementedError
+
+    def iterFilesInTrove(self, troveName, version, flavor,
+                         sortByPath = False, withFiles = False):
+	"""
+	Returns a generator for (fileId, path, version) tuples for all
+	of the files in the trove. This is equivlent to trove.iterFileList(),
+	but if withFiles is set this is *much* more efficient.
+
+	@param withFiles: if set, the file object for the file is 
+	created and returned as the fourth element in the tuple.
+	"""
+	raise NotImplementedError
+
+class IdealRepository(AbstractTroveDatabase):
+
+    def getTroveVersionList(self, troveNameList):
+	"""
+	Returns a dictionary indexed by the items in troveNameList. Each
+	item in the dictionary is a list of all of the versions for that 
+	trove. If no versions are available for a particular trove,
+	the dictionary entry for that trove's name is left empty.
+
+	@param troveNameList: list trove names
+	@type troveNameList: list of str
+	@rtype: dict of lists
+	"""
+	raise NotImplementedError
+
+    def getAllTroveLeafs(self, troveNameList):
+	"""
+	Returns a dictionary indexed by the items in troveNameList. Each
+	item in the dictionary is a list of all of the leaf versions for
+	that trove. If no branches are available for a particular trove,
+	the dictionary entry for that trove's name is left empty.
+
+	@param troveNameList: trove names
+	@type troveNameList: list of str
+	@rtype: dict of lists
+	"""
+	raise NotImplementedError
+
+    def getTroveLeavesByLabel(self, troveNameList, label):
+	"""
+	Returns a dictionary indexed by the items in troveNameList. Each
+	item in the dictionary is a list of all of the leaf versions for
+	that trove which are on a branch w/ the given label. If a trove
+	does not have any branches for the given label, the version list
+	for that trove name will be empty.
+
+	@param troveNameList: trove names
+	@type troveNameList: list of str
+	@param label: label
+	@type label: versions.BranchName
+	@rtype: dict of lists
+	"""
+	raise NotImplementedError
+
+    def getTroveLatestVersion(self, troveName, branch):
+	"""
+	Returns the version of the latest version of a trove on a particular
+	branch. If that branch doesn't exist for the trove, PackageMissing
+	is raised.
+
+	@param troveName: package name
+	@type troveName: str
+	@param branch: branch
+	@type branch: versions.Version
+	@rtype: versions.Version
+	"""
+	raise NotImplementedError
+
+    def getTroveVersionFlavors(self, troveDict):
+	"""
+	Converts a dictionary of the format retured by getAllTroveLeafs()
+	to contains dicts of { version : flavorList } sets instead of 
+	containing lists of versions.
+
+	@type troveDict: dict
+	@rtype: dict
+	"""
+	raise NotImplementedError
+
+    def findTrove(self, defaultLabel, name, versionStr = None):
+	if not defaultLabel:
+	    # if we don't have a default label, we need a fully qualified
+	    # version string; make sure have it
+	    if versionStr[0] != "/" and (versionStr.find("/") != -1 or
+					 versionStr.find("@") == -1):
+		raise PackageNotFound, \
+		    "fully qualified version or label " + \
+		    "expected instead of %s" % versionStr
+
+	# a version is a label if
+	#   1. it doesn't being with / (it isn't fully qualified)
+	#   2. it only has one element (no /)
+	#   3. it contains an @ sign
+	if not versionStr or (versionStr[0] != "/" and  \
+		(versionStr.find("/") == -1) and versionStr.count("@")):
+	    # either the supplied version is a label or we're going to use
+	    # the default
+
+	    if versionStr:
+		if versionStr[0] == "@" and defaultLabel:
+		    versionStr = defaultLabel.getHost() + versionStr
+
+		try:
+		    label = versions.BranchName(versionStr)
+		except versions.ParseError:
+		    raise self.PackageMissing, "invalid version %s" % versionStr
+	    else:
+		label = defaultLabel
+
+	    versionDict = self.getTroveLeavesByLabel([name], label)
+	    if not versionDict:
+		raise PackageNotFound, "branch %s does not exist for package %s" \
+			    % (str(label), name)
+	elif versionStr[0] != "/" and versionStr.find("/") == -1:
+	    # version/release was given
+	    try:
+		verRel = versions.VersionRelease(versionStr)
+	    except versions.ParseError, e:
+		raise PackageNotFound, str(e)
+
+	    # XXX this should restrict to the current label...
+	    versionDict = self.getTroveVersionList([name])
+	    for version in versionDict[name][:]:
+		if version.trailingVersion() != verRel:
+		    versionDict[name].remove(version)
+
+	    if not versionDict:
+		raise PackageNotFound, \
+		    "version %s of %s is not on any branch named %s" % \
+		    (versionStr, name, str(defaultLabel))
+	elif versionStr[0] != "/":
+	    # partial version string, we don't support this
+	    raise PackageNotFound, \
+		"incomplete version string %s not allowed" % versionStr
+	else:
+	    try:
+		version = versions.VersionFromString(versionStr)
+	    except versions.ParseError:
+		raise PackageNotFound, str(e)
+
+	    try:
+		# XXX
+		if version.isBranch():
+		    version = self.getTroveLatestVersion(name, version)
+
+		versionDict = { name : [ version] }
+	    except self.PackageMissing, e:  
+		raise PackageNotFound, str(e)
+
+	flavorDict = self.getTroveVersionFlavors(versionDict)
+	pkgList = []
+	for version in flavorDict[name].iterkeys():
+	    for flavor in flavorDict[name][version]:
+		pkgList.append((name, version, flavor))
+
+	if not pkgList:
+	    raise PackageNotFound, "package %s does not exist" % name
+
+	pkgList = self.getTroves(pkgList)
+
+	return pkgList
+
+class AbstractRepository(IdealRepository):
+    ### Package access functions
+
+    def hasPackage(self, troveName):
+	"""
+	Tests to see if the repository contains any version of the named
+	trove.
+
+	@param troveName: trove name
+	@type troveName: str
+	@rtype: boolean
+	"""
+	raise NotImplementedError
+
+    def hasTrove(self, troveName, version, flavor):
+	"""
+	Tests if the repository contains a particular version of a trove.
+
+	@param troveName: package name
+	@type troveName: str
+	@rtype: boolean
+	"""
+	raise NotImplementedError
+
+    ### File functions
+
     def __init__(self):
 	assert(self.__class__ != AbstractRepository)
 
-class DataStoreRepository(AbstractRepository):
+class DataStoreRepository:
+
+    """
+    Mix-in class which lets a TroveDatabase use a Datastore object for
+    storing and retrieving files.
+    """
 
     def storeFileFromContents(self, contents, file, restoreContents):
 	if file.hasContents:
@@ -279,9 +440,6 @@ class DataStoreRepository(AbstractRepository):
     def hasFileContents(self, fileId):
 	return self.contentsStore.hasFile(fileId)
 
-    def hasPackageVersion(self, pkgName, version):
-	return self.contentsStore.hasFile(fileId)
-
     def __init__(self, path):
 	fullPath = path + "/contents"
 	util.mkdirChain(fullPath)
@@ -289,6 +447,9 @@ class DataStoreRepository(AbstractRepository):
 
 class RepositoryError(Exception):
     """Base class for exceptions from the system repository"""
+
+class PackageNotFound(Exception):
+    """Raised when findTrove failes"""
 
 class OpenError(RepositoryError):
     """Error occured opening the repository"""

@@ -18,16 +18,27 @@ class InstanceTable:
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if "Instances" not in tables:
-            cu.execute("""CREATE TABLE Instances(instanceId integer primary 
-				key, itemId int, versionId int, insSetId int,
-				isPresent int)""")
-	    cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
-		       "Instances(itemId, versionId, insSetId)")
+            cu.execute("""CREATE TABLE Instances(
+				instanceId INTEGER PRIMARY KEY, 
+				itemId INT, 
+				versionId INT, 
+				flavorId INT,
+				silentRedirect INT,
+				isPresent INT);
+			  CREATE UNIQUE INDEX InstancesIdx ON 
+		               Instances(itemId, versionId, flavorId);
+			""")
 
-    def addId(self, itemId, versionId, insSetId):
+    def addId(self, itemId, versionId, flavorId):
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Instances VALUES (NULL, %s, %s, %s, %d)",
-                   (itemId, versionId, insSetId, 1))
+        cu.execute("INSERT INTO Instances VALUES (NULL, %d, %d, %d, 0, 1)",
+                   (itemId, versionId, flavorId))
+	return cu.lastrowid
+
+    def addRedirect(self, itemId, versionId, redirectId):
+        cu = self.db.cursor()
+        cu.execute("INSERT INTO Instances VALUES (NULL, %d, %d, -1, %d, 1)",
+                   (itemId, versionId, redirectId))
 	return cu.lastrowid
 
     def delId(self, theId):
@@ -37,7 +48,7 @@ class InstanceTable:
 
     def getId(self, theId):
         cu = self.db.cursor()
-        cu.execute("SELECT itemId, versionId, insSetId, isPresent "
+        cu.execute("SELECT itemId, versionId, flavorId, isPresent "
 		   "FROM Instances WHERE instanceId=%d", theId)
 	try:
 	    return cu.next()
@@ -47,7 +58,7 @@ class InstanceTable:
     def isPresent(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT isPresent FROM Instances WHERE "
-			"itemId=%d AND versionId=%d AND insSetId=%d", item)
+			"itemId=%d AND versionId=%d AND flavorId=%d", item)
 
 	val = cu.fetchone()
 	if not val:
@@ -63,18 +74,18 @@ class InstanceTable:
     def has_key(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM Instances WHERE "
-			"itemId=%d AND versionId=%d AND insSetId=%d", item)
+			"itemId=%d AND versionId=%d AND flavorId=%d", item)
 	return not(cu.fetchone() == None)
 
     def __delitem__(self, item):
         cu = self.db.cursor()
         cu.execute("DELETE FROM Instances WHERE "
-			"itemId=%d AND versionId=%d AND insSetId=%d", item)
+			"itemId=%d AND versionId=%d AND flavorId=%d", item)
 
     def __getitem__(self, item):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM Instances WHERE "
-			"itemId=%d AND versionId=%d AND insSetId=%d", item)
+			"itemId=%d AND versionId=%d AND flavorId=%d", item)
 	try:
 	    return cu.next()[0]
 	except StopIteration:
@@ -83,7 +94,7 @@ class InstanceTable:
     def get(self, item, defValue):
         cu = self.db.cursor()
         cu.execute("SELECT instanceId FROM Instances WHERE "
-			"itemId=%d AND versionId=%d AND insSetId=%d", item)
+			"itemId=%d AND versionId=%d AND flavorId=%d", item)
 	item = cu.fetchone()
 	if not item:
 	    return defValue
@@ -110,8 +121,9 @@ class FileStreams:
             cu.execute("""CREATE TABLE FileStreams(streamId INTEGER PRIMARY KEY,
 						   fileId STR,
 						   versionId INT,
+						   flavorId INT,
                                                    stream BINARY);""")
-	    cu.execute("""CREATE INDEX FileStreamsIdx ON
+	    cu.execute("""CREATE UNIQUE INDEX FileStreamsIdx ON
 			  FileStreams(fileId, versionId)""")
 	    cu.execute("""CREATE INDEX FileStreamsVersionIdx ON
 			  FileStreams(versionId)""")
@@ -128,23 +140,11 @@ class FileStreams:
         for row in cu:
             yield row[0]
         
-    #def getStreams(self, ids):
-        #cu = self.db.cursor()
-        #cmd = ["SELECT stream FROM FileStreams WHERE"]
-        #for i in ids:
-            #cmd.append("(instanceId=%d) OR" %i)
-        #cmd[-1] = cmd[-1][:-3]
-        #cmd = " ".join(cmd)
-        #cu.execute(cmd)
-        #if cu.rowcount != len(ids):
-            #raise RuntimeError, 'did not get the expect number of streams'
-        #return self._rowGenerator(cu)
-    
     def addStream(self, key, stream):
-	(fileId, versionId) = key
+	(fileId, versionId, flavorId) = key
         cu = self.db.cursor()
-        cu.execute("INSERT INTO FileStreams VALUES (NULL, %s, %d, %s)",
-                   (fileId, versionId, sqlite.encode(stream)))
+        cu.execute("INSERT INTO FileStreams VALUES (NULL, %s, %d, %d, %s)",
+                   (fileId, versionId, flavorId, sqlite.encode(stream)))
 	return cu.lastrowid
         
     def __delitem__(self, key):

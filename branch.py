@@ -22,6 +22,6 @@ def branch(repos, branchName, branchFrom, troveName = None):
 	log.error(str(e))
 	return
 
-    repos.createBranch(newBranch, branchSource, troveName)
+    repos.createBranch(newBranch, branchSource, [troveName])
 	    
 

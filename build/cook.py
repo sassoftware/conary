@@ -10,13 +10,14 @@ resulting packages to the repository.
 
 from build import *
 
+import deps.deps
 from repository import changeset
 from repository import filecontents
 import files
 from repository import fsrepos
 import helper
 import log
-from build import lookaside
+from build import lookaside, use
 import os
 import package
 import repository
@@ -34,9 +35,11 @@ import util
 # type could be "src"
 #
 # returns a (pkg, fileMap) tuple
-def _createPackage(repos, branch, bldPkg, ident):
+def _createComponent(repos, branch, bldPkg, ident):
     fileMap = {}
-    p = package.Package(bldPkg.getName(), bldPkg.getVersion())
+    p = package.Trove(bldPkg.getName(), bldPkg.getVersion(), bldPkg.flavor)
+    p.setRequires(bldPkg.requires)
+    p.setProvides(bldPkg.provides)
 
     for (path, (realPath, f)) in bldPkg.iteritems():
 	(fileId, fileVersion) = ident(path)
@@ -135,7 +138,7 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 
     currentVersion = None
     if repos.hasPackage(fullName):
-	currentVersion = repos.pkgLatestVersion(fullName, buildBranch)
+	currentVersion = repos.getTroveLatestVersion(fullName, buildBranch)
 
     newVersion = helper.nextVersion(recipeClass.version, currentVersion, 
 				    buildBranch, binary = True)
@@ -197,11 +200,18 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     recipeObj = recipeClass(repos, cfg, buildBranch)
     recipeObj.setup()
 
-    includedSet = recipeObj.getTroveList()
-    grp = package.Package(fullName, newVersion)
-    for (name, versionList) in includedSet.iteritems():
-        for v in versionList:
-            grp.addPackageVersion(name, v)
+    grp = package.Package(fullName, newVersion, None)
+
+    d = {}
+    for (name, versionList) in recipeObj.getTroveList().iteritems():
+	d[name] = versionList
+
+    d = repos.getTroveVersionFlavors(d)
+
+    for (name, subd) in d.iteritems():
+	for (v, flavorList) in subd.iteritems():
+	    # XXX
+	    grp.addTrove(name, v, flavors[0])
 
     grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet = changeset.ChangeSet()
@@ -237,18 +247,25 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
     recipeObj.setup()
 
     changeSet = changeset.ChangeSet()
-    fileset = package.Package(fullName, newVersion)
 
+    l = []
+    flavor = deps.deps.DependencySet()
     for (fileId, path, version) in recipeObj.iterFileList():
-	fileset.addFile(fileId, path, version)
 	fileObj = repos.getFileVersion(fileId, version)
-	changeSet.addFile(fileId, None, version, fileObj.freeze())
+	l.append((fileId, path, version))
 	if fileObj.hasContents:
-	    changeSet.addFileContents(fileId, changeset.ChangedFileTypes.file,
-			filecontents.FromRepository(repos, 
-				    fileObj.contents.sha1(), 
-				    fileObj.contents.size()),
-			fileObj.flags.isConfig())
+	    flavor.union(fileObj.flavor.value())
+	changeSet.addFile(fileId, None, version, fileObj.freeze())
+	
+	# since the file is already in the repository (we just committed
+	# it there, so it must be there!) leave the contents out. this
+	# means that the change set we generate can't be used as the 
+	# source of an update, but it saves sending files across the
+	# network for no reason
+
+    fileset = package.Package(fullName, newVersion, flavor)
+    for (fileId, path, version) in l:
+	fileset.addFile(fileId, path, version)
 
     filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newPackage(filesetDiff)
@@ -305,18 +322,20 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     for pkgName in (fullName, fullName + ':source'):
         if repos.hasPackage(pkgName):
             pkgList = [ (pkgName, 
-                        repos.pkgLatestVersion(pkgName, buildBranch)) ]
+                        repos.getTroveLatestVersion(pkgName, buildBranch),
+			None) ]
             while pkgList:
-                (name, version) = pkgList[0]
+                (name, version, flavor) = pkgList[0]
                 del pkgList[0]
                 if not version: continue
 
-                pkg = repos.getPackageVersion(name, version)
-                pkgList += [ x for x in pkg.iterPackageList() ]
+                pkg = repos.getTrove(name, version, flavor)
+                pkgList += [ x for x in pkg.iterTroveList() ]
                 ident.populate(repos, lcache, pkg)
 
     builddir = cfg.buildpath + "/" + recipeObj.name
 
+    use.track(True)
     recipeObj.setup()
     recipeObj.unpackSources(builddir)
 
@@ -335,7 +354,8 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
 	recipeObj.doBuild(builddir, destdir)
 	log.info('Processing %s', recipeClass.name)
 	recipeObj.doDestdirProcess() # includes policy
-
+	use.track(False)
+	
 	repos.open("c")
 
     finally:
@@ -343,20 +363,19 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     
     packageList = []
 
-    for buildPkg in recipeObj.getPackages(newVersion):
-	(p, fileMap) = _createPackage(repos, buildBranch, buildPkg, ident)
-	built.append((p.getName(), p.getVersion().asString()))
-	packageList.append((p, fileMap))
-
     # build the group before the source package is added to the 
     # packageList; the package's group doesn't include :source
     grpName = recipeClass.name
-    grp = package.Package(grpName, newVersion)
-    for (pkg, map) in packageList:
-	grp.addPackageVersion(pkg.getName(), pkg.getVersion())
+    grp = package.Package(grpName, newVersion, None)
+
+    for buildPkg in recipeObj.getPackages(newVersion):
+	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, ident)
+	built.append((p.getName(), p.getVersion().asString()))
+	packageList.append((p, fileMap))
+	grp.addTrove(p.getName(), p.getVersion(), p.getFlavor())
 
     changeSet = changeset.CreateFromFilesystem(packageList)
-    changeSet.addPrimaryPackage(grpName, newVersion)
+    changeSet.addPrimaryPackage(grpName, newVersion, None)
 
     grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet.newPackage(grpDiff)

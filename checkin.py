@@ -12,6 +12,7 @@ import helper
 import log
 import os
 import package
+import repository
 import sys
 import util
 import versions
@@ -32,7 +33,7 @@ class SourceState(package.Package):
 	if self.version:
 	    f.write("version %s\n" % self.version.asString())
 	f.write("branch %s\n" % self.branch.asString())
-	f.write(self.freeze())
+	f.write(self.freezeFileList())
 
     def getBranch(self):
 	return self.branch
@@ -59,7 +60,7 @@ class SourceState(package.Package):
 	return versionStr
 
     def __init__(self, name, version, branch):
-	package.Package.__init__(self, name, version)
+	package.Package.__init__(self, name, version, None)
 	self.branch = branch
 
 class SourceStateFromFile(SourceState):
@@ -79,7 +80,7 @@ class SourceStateFromFile(SourceState):
 
 	SourceState.__init__(*rc)
 
-	self.read(f)
+	self.readFileList(f)
 
     def __init__(self, file):
 	if not os.path.isfile(file):
@@ -89,7 +90,7 @@ class SourceStateFromFile(SourceState):
 	self.parseFile(file)
 
 def _verifyAtHead(repos, headPkg, state):
-    headVersion = repos.pkgLatestVersion(state.getName(), 
+    headVersion = repos.getTroveLatestVersion(state.getName(), 
 					 state.getBranch())
     if not headVersion == state.getVersion():
 	return False
@@ -125,17 +126,13 @@ def _getRecipeLoader(recipeFile):
     return loader
 
 
-def checkout(repos, cfg, dir, name, versionStr = None):
-    # We have to be careful with labels.  First, we could get
-    # multiple matches for a single package. Two, when a label uniquely
-    # identifies a package we still need to make sure the state has the name of
-    # the actual branch since empty branches yield objects whose versions are
-    # on the parent branch.
+def checkout(repos, cfg, workDir, name, versionStr = None):
+    # We have to be careful with labels
     name += ":source"
     try:
-        trvList = helper.findPackage(repos, cfg.installbranch, name, 
-                                     versionStr = versionStr)
-    except helper.PackageNotFound, e:
+        trvList = repos.findTrove(cfg.installbranch, name, 
+				  versionStr = versionStr)
+    except repository.repository.PackageNotFound, e:
         log.error(str(e))
         return
     if len(trvList) > 1:
@@ -143,31 +140,44 @@ def checkout(repos, cfg, dir, name, versionStr = None):
 	return
     trv = trvList[0]
 	
-    if not dir:
-	dir = trv.getName().split(":")[0]
+    if not workDir:
+	workDir = trv.getName().split(":")[0]
 
-    if not os.path.isdir(dir):
+    if not os.path.isdir(workDir):
 	try:
-	    os.mkdir(dir)
+	    os.mkdir(workDir)
 	except OSError, err:
-	    log.error("cannot create directory %s/%s: %s", os.getcwd(), dir,
-                      str(err))
+	    log.error("cannot create directory %s/%s: %s", os.getcwd(),
+                      workDir, str(err))
 	    return
 
     branch = helper.fullBranchName(cfg.installbranch, trv.getVersion(), 
 				   versionStr)
     state = SourceState(trv.getName(), trv.getVersion(), branch)
 
-    for (fileId, path, version) in trv.iterFileList():
-	fullPath = dir + "/" + path
-	(fileObj, contents) = repos.getFileVersion(fileId, version,
-						   withContents = True)
+    # it's a shame that findTrove already sent us the trove since we're
+    # just going to request it again
+    cs = repos.createChangeSet([(trv.getName(), None, None, trv.getVersion(),
+			        True)])
+
+    pkgCs = cs.iterNewPackageList().next()
+
+    fileList = pkgCs.getNewFileList()
+    fileList.sort()
+
+    for (fileId, path, version) in fileList:
+	fullPath = workDir + "/" + path
+	fileObj = files.ThawFile(cs.getFileChange(fileId), fileId)
+	if fileObj.hasContents:
+	    contents = cs.getFileContents(fileId)[1]
+	else:
+	    contents = None
 
 	fileObj.restore(contents, fullPath, 1)
 
 	state.addFile(fileId, path, version)
 
-    state.write(dir + "/SRS")
+    state.write(workDir + "/SRS")
 
 def commit(repos, cfg):
     try:
@@ -183,7 +193,7 @@ def commit(repos, cfg):
 	    return
 	srcPkg = None
     else:
-	srcPkg = repos.getPackageVersion(state.getName(), state.getVersion())
+	srcPkg = repos.getTrove(state.getName(), state.getVersion(), None)
 
 	if not _verifyAtHead(repos, srcPkg, state):
 	    log.error("contents of working directory are not all "
@@ -237,16 +247,14 @@ def diff(repos, versionStr = None):
     if versionStr:
 	versionStr = state.expandVersionStr(versionStr)
 
-	pkgList = helper.findPackage(repos, None, None, state.getName(), 
-				     versionStr)
+	pkgList = repos.findTrove(None, state.getName(), versionStr)
 	if len(pkgList) > 1:
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return
 
 	oldPackage = pkgList[0]
     else:
-	oldPackage = repos.getPackageVersion(state.getName(), 
-					     state.getVersion())
+	oldPackage = repos.getTrove(state.getName(), state.getVersion(), None)
 
     result = update.buildLocalChanges(repos, [(state, oldPackage, 
 					       versions.NewVersion())],
@@ -303,7 +311,8 @@ def updateSrc(repos, versionStr = None):
     baseVersion = state.getVersion()
     
     if not versionStr:
-	head = repos.getLatestPackage(pkgName, state.getBranch())
+	headVersion = repos.getTroveLatestVersion(pkgName, state.getBranch())
+	head = repos.getTrove(pkgName, headVersion, None)
 	newBranch = None
 	headVersion = head.getVersion()
 	if headVersion == baseVersion:
@@ -312,7 +321,7 @@ def updateSrc(repos, versionStr = None):
     else:
 	versionStr = state.expandVersionStr(versionStr)
 
-	pkgList = helper.findPackage(repos, None, pkgName, versionStr)
+	pkgList = repos.findTrove(None, pkgName, versionStr)
 	if len(pkgList) > 1:
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return
@@ -321,7 +330,8 @@ def updateSrc(repos, versionStr = None):
 	headVersion = head.getVersion()
 	newBranch = helper.fullBranchName(None, headVersion, versionStr)
 
-    changeSet = repos.createChangeSet([(pkgName, baseVersion, headVersion, 0)])
+    changeSet = repos.createChangeSet([(pkgName, None, baseVersion, 
+					headVersion, 0)])
 
     packageChanges = changeSet.iterNewPackageList()
     pkgCs = packageChanges.next()

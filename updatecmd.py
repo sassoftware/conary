@@ -39,9 +39,8 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
         # so far no changeset (either the path didn't exist or we could not
         # read it
 	try:
-	    pkgList = helper.findPackage(repos, cfg.installbranch, pkg, 
-					 versionStr)
-	except helper.PackageNotFound, e:
+	    pkgList = repos.findTrove(cfg.installbranch, pkg, versionStr)
+	except repository.PackageNotFound, e:
 	    log.error(str(e))
 	    return
 
@@ -59,7 +58,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 		    # upgrade all of them look for one on the same branch
 		    # as the one we're installing. if there's a match, great;
 		    # if not, bail
-		    currentVersion = db.pkgLatestVersion(pkg.getName(), 
+		    currentVersion = db.getTroveLatestVersion(pkg.getName(), 
 						     pkg.getVersion().branch())
 		    if not currentVersion:
 			log.error("multiple versions of %s are installed and "
@@ -68,7 +67,8 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 	    else:
 		currentVersion = None
 
-	    list.append((pkg.getName(), currentVersion, pkg.getVersion(), 0))
+	    list.append((pkg.getName(), pkg.getFlavor(), currentVersion, 
+			 pkg.getVersion(), 0))
 
 	cs = repos.createChangeSet(list)
 	list = [ x[0] for x in list ]
@@ -82,15 +82,15 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 
 def doErase(db, cfg, pkg, versionStr = None):
     try:
-	pkgList = helper.findPackage(db, cfg.installbranch, pkg, 
-				     versionStr)
+	pkgList = db.findTrove(pkg, versionStr)
     except helper.PackageNotFound, e:
 	log.error(str(e))
 	return
 
     list = []
     for pkg in pkgList:
-	list.append((pkg.getName(), pkg.getVersion(), None, False))
+	list.append((pkg.getName(), pkg.getFlavor(), pkg.getVersion(), None, 
+		     False))
 
     cs = db.createChangeSet(list)
     db.commitChangeSet(cs)

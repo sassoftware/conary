@@ -20,9 +20,10 @@ import versions
 import bsddb
 
 from repository import DataStoreRepository
+from repository import AbstractRepository
 from localrep import trovestore
 
-class FilesystemRepository(DataStoreRepository):
+class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     createBranches = 1
 
@@ -31,26 +32,60 @@ class FilesystemRepository(DataStoreRepository):
     def iterAllTroveNames(self):
 	return self.troveStore.iterTroveNames()
 
+    def getAllTroveLeafs(self, troveNameList):
+	d = {}
+	for troveName in troveNameList:
+	    d[troveName] = [ versions.VersionFromString(x) for x in
+				self.troveStore.iterAllTroveLeafs(troveName) ]
+	return d
+
+    def getTroveVersionList(self, troveNameList):
+	d = {}
+	for troveName in troveNameList:
+	    d[troveName] = [ versions.VersionFromString(x) for x in
+				self.troveStore.iterTroveVersions(troveName) ]
+
+	return d
+
+    def getTroveLeavesByLabel(self, troveNameList, label):
+	d = {}
+	labelStr = str(label)
+	for troveName in troveNameList:
+	    d[troveName] = [ versions.VersionFromString(x) for x in
+			     self.troveStore.iterTroveLeafsByLabel(troveName,
+								   labelStr) ]
+
+	return d
+	
+    def getTroveVersionFlavors(self, troveDict):
+	newD = {}
+	for (troveName, versionList) in troveDict.iteritems():
+	    innerD = {}
+	    for version in versionList:
+		innerD[version] = [ x for x in 
+		    self.troveStore.iterTroveFlavors(troveName, version) ]
+	    newD[troveName] = innerD
+
+	return newD
+
     def hasPackage(self, pkgName):
 	return self.troveStore.hasTrove(pkgName)
 
-    def hasPackageVersion(self, pkgName, version):
-	return self.troveStore.hasTrove(pkgName, troveVersion = version)
+    def hasTrove(self, pkgName, version, flavor):
+	return self.troveStore.hasTrove(pkgName, troveVersion = version,
+					troveFlavor = flavor)
 
-    def pkgLatestVersion(self, pkgName, branch):
+    def getTroveLatestVersion(self, pkgName, branch):
 	return self.troveStore.troveLatestVersion(pkgName, branch)
 
-    def getLatestPackage(self, pkgName, branch):
-	return self.troveStore.getLatestTrove(pkgName, branch)
-
-    def getPackageVersion(self, pkgName, version, pristine = True):
+    def getTrove(self, pkgName, version, flavor, pristine = True):
 	try:
-	    return self.troveStore.getTrove(pkgName, version)
+	    return self.troveStore.getTrove(pkgName, version, flavor)
 	except KeyError:
 	    raise repository.PackageMissing(pkgName, version)
 
-    def erasePackageVersion(self, pkgName, version):
-	self.troveStore.eraseTrove(pkgName, version)
+    def eraseTrove(self, pkgName, version, flavor):
+	self.troveStore.eraseTrove(pkgName, version, flavor)
 
     def addPackage(self, pkg):
 	self.troveStore.addTrove(pkg)
@@ -61,24 +96,20 @@ class FilesystemRepository(DataStoreRepository):
     def branchesOfTroveLabel(self, troveName, label):
 	return self.troveStore.branchesOfTroveLabel(troveName, label)
 
-    def getPackageVersionList(self, troveName):
-	return self.troveStore.iterTroveVersions(troveName)
-
-    def getPackageBranchList(self, pkgName):
-	return self.troveStore.iterTroveBranches(pkgName)
-
     def createTroveBranch(self, pkgName, branch):
 	log.debug("creating branch %s for %s", branch.asString(), pkgName)
 	if not self.hasPackage(pkgName):
 	    raise repository.PackageMissing, pkgName
         return self.troveStore.createTroveBranch(pkgName, branch)
 
-    def iterFilesInTrove(self, trove, sortByPath = False, withFiles = False):
-	return self.troveStore.iterFilesInTrove(trove, sortByPath, withFiles)
+    def iterFilesInTrove(self, troveName, version, flavor,
+                         sortByPath = False, withFiles = False):
+	return self.troveStore.iterFilesInTrove(troveName, version, flavor,
+                                                sortByPath, withFiles)
 
     ### File functions
 
-    def getFileVersion(self, fileId, version, path = None, withContents = 0):
+    def getFileVersion(self, fileId, version, withContents = 0):
 	file = self.troveStore.getFile(fileId, version)
 	if withContents:
 	    if file.hasContents:
@@ -108,37 +139,9 @@ class FilesystemRepository(DataStoreRepository):
     def __del__(self):
 	self.close()
 
-    def createBranch(self, newBranch, where, troveName = None):
-	"""
-	Creates a branch for the troves in the repository. This
-	operations is recursive, with any required troves and files
-	also getting branched. Duplicate branches can be created,
-	but only if one of the following is true:
-	 
-	  1. C{where} specifies a particular version to branch from
-	  2. the branch does not yet exist and C{where} is a label which matches multiple existing branches
-
-	Where specifies the node branches are created from for the
-	trove troveName (or all of the troves if troveName is empty).
-	Any troves or files branched due to inclusion in a branched
-	trove will be branched at the version required by the object
-	including it. If different versions of objects are included
-	from multiple places, bad things will happen (an incomplete
-	branch will be formed). More complicated algorithms for branch
-	will fix this, but it's not clear doing so is necessary.
-
-	@param newBranch: Label of the new branch
-	@type newBranch: versions.BranchName
-	@param where: Where the branch should be created from
-	@type where: versions.Version or versions.BranchName
-	@param troveName: Name of the trove to branch; none if all
-	troves in the repository should be branched.
-	@type troveName: str
-	"""
-	if not troveName:
+    def createBranch(self, newBranch, where, troveList = []):
+	if not troveList:
 	    troveList = self.iterAllTroveNames()
-	else:
-	    troveList = [ troveName ]
 
 	troveList = [ (x, where) for x in troveList ]
 
@@ -164,16 +167,20 @@ class FilesystemRepository(DataStoreRepository):
 		if not branchList:
 		    log.error("%s does not have branch %s", troveName, location)
 		for branch in branchList:
-		    v = self.pkgLatestVersion(troveName, branch)
+		    v = self.getTroveLatestVersion(troveName, branch)
 		    list.append(v)
 
-	    for version in list:
-		pkg = self.getPackageVersion(troveName, version)
-		branchedVersion = version.fork(newBranch, sameVerRel = 0)
-		self.createTroveBranch(troveName, branchedVersion)
+	    # XXX this probably doesn't get flavors right
 
-		for (name, version) in pkg.iterPackageList():
-		    troveList.append((name, version))
+	    d = self.getTroveVersionFlavors({troveName: list})
+	    for (version, flavors) in d[troveName].iteritems():
+		for flavor in flavors:
+		    pkg = self.getTrove(troveName, version, flavor)
+		    branchedVersion = version.fork(newBranch, sameVerRel = 0)
+		    self.createTroveBranch(troveName, branchedVersion)
+
+		    for (name, version, flavor) in pkg.iterTroveList():
+			troveList.append((name, version))
 
         # commit branch to the repository
         self.commit()
@@ -212,15 +219,8 @@ class FilesystemRepository(DataStoreRepository):
 
 	self.mode = mode
 
-    def buildJob(self, changeSet):
-	"""
-	Returns a ChangeSetJob object representing what needs to be done
-	to apply the changeset to this repository.
-	"""
-	return ChangeSetJob(self, changeSet)
-
     def commitChangeSet(self, cs):
-	job = self.buildJob(cs)
+	job = ChangeSetJob(self, cs)
 	self.commit()
 
     def close(self):
@@ -245,6 +245,7 @@ class FilesystemRepository(DataStoreRepository):
         self.open(mode)
 
 	DataStoreRepository.__init__(self, path)
+	AbstractRepository.__init__(self)
 
 class ChangeSetJobFile(object):
 
@@ -313,10 +314,9 @@ class ChangeSetJob:
     def oldFile(self, fileId, fileVersion, fileObj):
 	pass
 
-    def addFile(self, fileObject):
-	newFile = fileObject
+    def addFile(self, newFile, storeContents = True):
 	file = newFile.file()
-	fileId = fileObject.fileId()
+	fileId = newFile.fileId()
 
 	# duplicates are filtered out (as necessary) by addFileVersion
 	self.repos.addFileVersion(fileId, newFile.version(), file)
@@ -325,8 +325,9 @@ class ChangeSetJob:
 	# files into the repository. Restore the file pointer to
 	# the beginning of the file as we may want to commit this
 	# file to multiple locations.
-	self.repos.storeFileFromContents(newFile.getContents(), file, 
-					 newFile.restoreContents())
+	if storeContents:
+	    self.repos.storeFileFromContents(newFile.getContents(), file, 
+					     newFile.restoreContents())
 
     def __init__(self, repos, cs):
 	self.repos = repos
@@ -345,17 +346,18 @@ class ChangeSetJob:
 	    old = csPkg.getOldVersion()
 	    pkgName = csPkg.getName()
 
-	    if repos.hasPackage(pkgName):
-		if repos.hasPackageVersion(pkgName, newVersion):
-		    raise repository.CommitError, \
-			   "version %s for %s is already installed" % \
-			    (newVersion.asString(), csPkg.getName())
+	    if repos.hasTrove(pkgName, newVersion, csPkg.getFlavor()):
+		raise repository.CommitError, \
+		       "version %s for %s is already installed" % \
+			(newVersion.asString(), csPkg.getName())
 
 	    if old:
-		newPkg = repos.getPackageVersion(pkgName, old, pristine = True)
+		newPkg = repos.getTrove(pkgName, old, csPkg.getFlavor(),
+					pristine = True)
 		newPkg.changeVersion(newVersion)
 	    else:
-		newPkg = package.Package(csPkg.name, newVersion)
+		newPkg = package.Trove(csPkg.getName(), newVersion,
+					 csPkg.getFlavor())
 
 	    newFileMap = newPkg.applyChangeSet(csPkg)
 
@@ -372,7 +374,7 @@ class ChangeSetJob:
 	    restoreContents = 1
 	    if oldVer:
 		oldfile = repos.getFileVersion(fileId, oldVer)
-		file = repos.getFileVersion(fileId, oldVer)
+		file = oldfile.copy()
 		file.twm(diff, oldfile)
 		
 		if file.hasContents and oldfile.hasContents and	    \
@@ -388,21 +390,31 @@ class ChangeSetJob:
 
 	    if file.hasContents and restoreContents:
 		fileContents = None
-		contType = cs.getFileContentsType(fileId)
-		if contType == changeset.ChangedFileTypes.diff:
-		    (contType, fileContents) = cs.getFileContents(fileId)
-		    # the content for this file is in the form of a diff,
-		    # which we need to apply against the file in the repository
-		    assert(oldVer)
-		    f = repos.pullFileContentsObject(oldfile.contents.sha1())
-		    oldLines = f.readlines()
-		    diff = fileContents.get().readlines()
-		    (newLines, failedHunks) = patch.patch(oldLines, diff)
-		    fileContents = filecontents.FromString("".join(newLines))
 
-		    if failedHunks:
-			fileContents = filecontents.WithFailedHunks(
-					    fileContents, failedHunks)
+		if repos.hasFileContents(file.contents.sha1()):
+		    # if we already have the file in the data store we can
+		    # get the contents from there
+		    fileContents = filecontents.FromRepository(repos,
+				    file.contents.sha1(), file.contents.size())
+		    contType = changeset.ChangedFileTypes.file
+		else:
+		    contType = cs.getFileContentsType(fileId)
+		    if contType == changeset.ChangedFileTypes.diff:
+			# the content for this file is in the form of a diff,
+			# which we need to apply against the file in the
+			# repository
+			assert(oldVer)
+			(contType, fileContents) = cs.getFileContents(fileId)
+			f = repos.pullFileContentsObject(
+						oldfile.contents.sha1())
+			oldLines = f.readlines()
+			diff = fileContents.get().readlines()
+			(newLines, failedHunks) = patch.patch(oldLines, diff)
+			fileContents = filecontents.FromString("".join(newLines))
+
+			if failedHunks:
+			    fileContents = filecontents.WithFailedHunks(
+						fileContents, failedHunks)
 	    else:
 		# this means there are no contents to restore (None
 		# means get the contents from the change set)
@@ -412,8 +424,8 @@ class ChangeSetJob:
 	    self.addFile(ChangeSetJobFile(cs, fileId, file, newVer, path, 
 					  fileContents, restoreContents))
 
-	for (pkgName, version) in cs.getOldPackageList():
-	    pkg = self.repos.getPackageVersion(pkgName, version)
+	for (pkgName, version, flavor) in cs.getOldPackageList():
+	    pkg = self.repos.getTrove(pkgName, version, flavor)
 	    self.oldPackage(pkg)
 
 	    for (fileId, path, version) in pkg.iterFileList():

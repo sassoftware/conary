@@ -5,6 +5,7 @@
 
 python_files =  __init__.py		\
 		deptable.py		\
+		flavors.py		\
 		idtable.py		\
 		instances.py		\
 		instructionsets.py	\

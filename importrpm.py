@@ -18,6 +18,9 @@ def doImport(repos, cfg, rpmFile):
     # old rpm module is being used
     import rpm
 
+    print "I can't handle flavors"
+    assert(0)
+
     ts = rpm.TransactionSet()
     ts.setVSFlags(~(rpm._RPMVSF_NOSIGNATURES))
 
@@ -53,7 +56,7 @@ def doImport(repos, cfg, rpmFile):
     ident = cook._IdGen()
     currentVersion = None
     if repos.hasPackage(pkgName):
-	currentVersion = repos.pkgLatestVersion(pkgName, buildBranch)
+	currentVersion = repos.getTroveLatestVersion(pkgName, buildBranch)
 	pkg = repos.getPackageVersion(pkgName, currentVersion)
 	ident.populate(repos, lcache, pkg)
 

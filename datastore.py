@@ -11,7 +11,8 @@ The hash can be any arbitrary string of at least 5 bytes in length;
 keys are assumed to be unique.
 """
 
-
+import errno
+import fcntl
 import gzip
 import os
 import util
@@ -22,32 +23,63 @@ class DataStore:
 	if (len(hash) < 5):
 	    raise KeyError, ("invalid hash %s" % hash)
 
-	dir = self.top + "/" + hash[0:2] + "/" + hash[2:4] 
-	name = dir + "/" + hash[4:]
+	dir = os.sep.join((self.top, hash[0:2], hash[2:4]))
+	name = os.sep.join((dir, hash[4:]))
 	return (dir, name)
 
     def hasFile(self, hash):
 	path = self.hashToPath(hash)[1]
 	return os.path.exists(path)
 
-    def writeCount(self, path, newCount):
-	path = path + "#"
+    def modifyCount(self, path, amount):
+        countPath = path + "#"
+        oldFd = -1
+        # get the current count
+	if os.path.exists(countPath):
+	    oldFd = os.open(countPath, os.O_RDWR)
+            # exclusive lock the existing file so that we are the
+            # only process that reads the current state.
+            fcntl.lockf(oldFd, fcntl.LOCK_EX)
+            oldF = os.fdopen(oldFd)
+	    # cut off the trailing \n
+	    count = int(oldF.read()[:-1])
+	elif os.path.exists(path):
+	    count = 1
+	else:
+	    count = 0
 
-	if newCount <= 1:
-	    os.unlink(path)
-	    return
-	    
-	f = open(path + ".new", "w")
-	f.write("%d\n" % newCount)
-	f.close()
-	os.rename(path + ".new", path)
+        # modify the count
+        count += amount
+
+        # write out the new count
+        if count <= 1:
+            # the count file exists and needs to be removed
+            if oldFd != -1:
+                os.unlink(countPath)
+                os.close(oldFd)
+	    return count
+
+        fd = os.open(countPath + '.new', os.O_CREAT | os.O_WRONLY)
+        fcntl.lockf(fd, fcntl.LOCK_EX)
+        os.ftruncate(fd, 0)
+	os.write(fd, "%d\n" % count)
+	os.close(fd)
+	os.rename(countPath + ".new", countPath)
+
+        # close the fd on the existing file
+        if oldFd != -1:
+            os.close(oldFd)
+        return count
 
     def readCount(self, path):
+        # XXX this code is not used anymore
 	if os.path.exists(path + "#"):
-	    f = open(path + "#")
+	    fd = os.open(path + "#", os.O_RDONLY)
+            fcntl.lockf(fd, fcntl.LOCK_SH)
+            f = os.fdopen(fd)
 	    # cut off the trailing \n
 	    count = int(f.read()[:-1])
-	    f.close()
+            os.close(fd)
 	elif os.path.exists(path):
 	    count = 1
 	else:
@@ -59,8 +91,7 @@ class DataStore:
     # in the archive
     def addFileReference(self, hash):
 	(dir, path) = self.hashToPath(hash)
-	count = self.readCount(path)
-	self.writeCount(path, count + 1)
+	self.modifyCount(path, 1)
 	return
 
     # list addFile, but this returns a file pointer which can be used
@@ -69,9 +100,9 @@ class DataStore:
     def newFile(self, hash):
 	(dir, path) = self.hashToPath(hash)
 
-	count = self.readCount(path)
-	if count:
-	    self.writeCount(path, count + 1)
+	count = self.modifyCount(path, 1)
+	if count > 1:
+            # the file already exists, nothing to do here.
 	    return
 
 	shortPath = dir[:-3]
@@ -98,9 +129,7 @@ class DataStore:
     def removeFile(self, hash):
 	(dir, path) = self.hashToPath(hash)
 
-	count = self.readCount(path)
-	if count > 1:
-	    self.writeCount(path, count - 1)
+        if self.modifyCount(path, -1) > 0:
 	    return
 
 	os.unlink(path)

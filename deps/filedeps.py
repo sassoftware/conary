@@ -32,14 +32,21 @@ def findFileDependencies(path):
 
     return rc
 
-def findFileInstructionSet(path):
+def findFileFlavor(path):
+    # XXX get Use flags in here
+    set = deps.DependencySet()
     results = lib.elf.inspect(path)
     if results is None:
-        return ''
+        return set
     for depClass, main, flags in results[0]:
         if depClass == 'abi':
-            if main == 'x86':
-                return deps.Dependency('i386', []).freeze()
-            return deps.Dependency(main, []).freeze()
+            abi, isnset = flags
+            if isnset == 'x86':
+                set.addDep(deps.InstructionSetDependency,
+                           deps.Dependency('i386', []))
+            else:
+                set.addDep(deps.InstructionSetDependency,
+                           deps.Dependency(isnset, []))
+            return set
 
     raise AssertionError

@@ -28,7 +28,7 @@ def listRollbacks(db, cfg):
 			 pkg.getNewVersion().asString(cfg.defaultbranch))
 
 	    list = []
-	    for (pkg, version) in cs.getOldPackageList():
+	    for (pkg, version, flavor) in cs.getOldPackageList():
 		list.append((pkg, version))
 
 	    list.sort()

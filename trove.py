@@ -5,18 +5,17 @@
 import copy
 import files
 import versions
-
-"""
-Packages are groups of files and other packages, which are included by
-reference. By convention, "package" often refers to a package with
-files but no other packages, while a "group" means a package with other
-packages but no files. While this object allows any mix of file and
-package inclusion, in practice srs doesn't allow it.
-"""
+from deps import deps
 
 # this is the repository's idea of a package
 class Package:
-
+    """
+    Packages are groups of files and other packages, which are included by
+    reference. By convention, "package" often refers to a package with
+    files but no other packages, while a "group" means a package with other
+    packages but no files. While this object allows any mix of file and
+    package inclusion, in practice srs doesn't allow it.
+    """
     def copy(self):
 	return copy.deepcopy(self)
 
@@ -33,7 +32,7 @@ class Package:
 	self.idMap[fileId] = (path, version)
 
     # fileId is the only thing that must be here; the other fields could
-    # be "-"
+    # be None
     def updateFile(self, fileId, path, version):
 	(origPath, origVersion) = self.idMap[fileId]
 
@@ -62,7 +61,7 @@ class Package:
     def hasFile(self, fileId):
 	return self.idMap.has_key(fileId)
 
-    def addPackageVersion(self, name, version, presentOkay = False):
+    def addTrove(self, name, version, flavor, presentOkay = False):
 	"""
 	Adds a single version of a package.
 
@@ -70,10 +69,16 @@ class Package:
 	@type name: str
 	@param version: version of the package
 	@type version: versions.Version
+	@param flavor: flavor of the package to include
+	@type flavor: deps.deps.DependencySet
+	@param presentOkay: replace if this is a duplicate, don't complain
+	@type presentOkay: boolean
 	"""
-	self.packages[(name, version)] = True
+	if not presentOkay and self.packages.has_key((name, version, flavor)):
+	    raise TroveError, "duplicate trove included in %s" % self.name
+	self.packages[(name, version, flavor)] = True
 
-    def delPackageVersion(self, name, version, missingOkay):
+    def delTrove(self, name, version, flavor, missingOkay):
 	"""
 	Removes a single version of a package.
 
@@ -81,42 +86,37 @@ class Package:
 	@type name: str
 	@param version: version of the package
 	@type version: versions.Version
+	@param flavor: flavor of the package to include
+	@type flavor: deps.deps.DependencySet
 	@param missingOkay: should we raise an error if the version isn't
 	part of this trove?
 	@type missingOkay: boolean
 	"""
-	if self.packages.has_key((name, version)):
-	    del self.packages[(name, version)]
+	if self.packages.has_key((name, version, flavor)):
+	    del self.packages[(name, version, flavor)]
 	elif missingOkay:
 	    pass
 	else:
-	    # FIXME, this isn't the right thing to do
-	    raise KeyError
+	    # FIXME, we should have better text here
+	    raise TroveError
 
-    def iterPackageList(self):
+    def iterTroveList(self):
 	"""
-	Returns a generator for (packageName, version) ordered pairs, listing
-	all of the package in the group, along with their versions. 
+	Returns a generator for (packageName, version, flavor) ordered pairs, 
+	listing all of the package in the group, along with their versions. 
 
 	@rtype: list
 	"""
 	return self.packages.iterkeys()
 
-    def hasPackageVersion(self, name, version):
-	return self.packages.has_key((name, version))
+    def hasTrove(self, name, version, flavor):
+	return self.packages.has_key((name, version, flavor))
 
-    def read(self, dataFile):
-	lines = dataFile.readlines()
+    def readFileList(self, dataFile):
+        line = dataFile.next()
+	fileCount = int(line)
 
-	fields = lines[0].split()
-	fileCount = int(fields[0])
-	pkgCount = int(fields[1])
-
-	start = 1
-	fileEnd = start + fileCount
-	pkgEnd = fileEnd + pkgCount
-
-	for line in lines[start:fileEnd]:
+        for line in dataFile:
 	    fields = line.split()
 	    fileId = fields.pop(0)
 	    version = fields.pop(-1)
@@ -125,41 +125,27 @@ class Package:
 	    version = versions.ThawVersion(version)
 	    self.addFile(fileId, path, version)
 
-	for line in lines[fileEnd:pkgEnd]:
-	    (name, version) = line.split()
-	    self.addPackageVersion(name, versions.VersionFromString(version))
-
-    def freeze(self):
+    def freezeFileList(self):
 	"""
-	Returns a string representing everything about this package, which can
-	later be read by the read() method. The format of the string is:
+	Returns a string representing file information for this trove
+	trove, which can later be read by the read() method. This is
+	only used to create the SRS control file when dealing with
+	:source component checkins, so things like trove dependency
+	information is not needed.  The format of the string is:
 
-	<file count> <group count>
+	<file count>
 	FILEID1 PATH1 VERSION1
 	FILEID2 PATH2 VERSION2
 	.
 	.
 	.
 	FILEIDn PATHn VERSIONn
-	PACKAGE1 VERSION1
-	PACKAGE2 VERSION2
-	.
-	.
-	.
-	PACKAGEn VERSIONn
-	GROUP FILE
-
-	Group file may be empty, in which case nothing follows the newline
-	for the final file package entry.
-
 	"""
+        assert(len(self.packages) == 0)
         rc = []
-	rc.append("%d %d\n" % (len(self.idMap), len(self.packages)))
+	rc.append("%d\n" % (len(self.idMap)))
         rc += [ "%s %s %s\n" % (x[0], x[1][0], x[1][1].freeze())
                 for x in self.idMap.iteritems() ]
-
-	rc += [ "%s %s\n" % (x[0], x[1].asString()) for x in 
-				    self.packages.iterkeys() ]
 	return "".join(rc)
 
     # returns a dictionary mapping a fileId to a (path, version, pkgName) tuple
@@ -170,7 +156,7 @@ class Package:
 	(path, version, packageName) for that file.
 
 	@param pkgCS: change set
-	@type pkgCS: PackageChangeSet
+	@type pkgCS: TroveChangeSet
 	@rtype: dict
 	"""
 
@@ -189,31 +175,35 @@ class Package:
 	for fileId in pkgCS.getOldFileList():
 	    self.removeFile(fileId)
 
-	self.mergePackageListChanges(pkgCS.iterChangedPackages())
+	self.mergeTroveListChanges(pkgCS.iterChangedTroves())
+	self.flavor = pkgCS.getFlavor()
+	self.setProvides(pkgCS.getProvides())
+	self.setRequires(pkgCS.getRequires())
+	self.changeVersion(pkgCS.getNewVersion())
 
 	return fileMap
 
-    def mergePackageListChanges(self, changeList, redundantOkay = False):
+    def mergeTroveListChanges(self, changeList, redundantOkay = False):
 	"""
 	Merges a set of changes to the included package list into this
 	package.
 
 	@param changeList: A list or generator specifying a set of
 	package changes; this is the same as returned by
-	PackageChangeSet.iterChangedPackages()
+	TroveChangeSet.iterChangedTroves()
 	@type changeList: (name, list) tuple
 	@param redundantOkay: Redundant changes are normally considered errors
 	@type redundantOkay: boolean
 	"""
 
 	for (name, list) in changeList:
-	    for (oper, version) in list:
+	    for (oper, version, flavor) in list:
 		if oper == '+':
-		    self.addPackageVersion(name, version, 
+		    self.addTrove(name, version, flavor,
 					   presentOkay = redundantOkay)
 
 		elif oper == "-":
-		    self.delPackageVersion(name, version, 
+		    self.delTrove(name, version, flavor,
 					   missingOkay = redundantOkay)
     
     def __eq__(self, them):
@@ -222,9 +212,13 @@ class Package:
 	and shouldn't really be done. It's handy for testing the database
 	though.
 	"""
+        if them is None:
+            return False
 	if self.getName() != them.getName():
 	    return False
 	if self.getVersion() != them.getVersion():
+	    return False
+	if self.getFlavor() != them.getFlavor():
 	    return False
 
 	(csg, pcl, fcl) = self.diff(them)
@@ -251,19 +245,32 @@ class Package:
 	@param absolute: tells if this is a new group or an absolute change
 	when them is None
 	@type absolute: boolean
-	@rtype: (ChangeSetGroup, packageChangeList, fileChangeList)
+	@rtype: (TroveChangeSet, fileChangeList, troveChangeList)
 	"""
+
+	assert(not them or self.name == them.name)
+	assert(not them or self.flavor == them.flavor)
 
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
 	if them:
 	    themMap = them.idMap
-	    chgSet = PackageChangeSet(self.name, them.getVersion(),	
-				      self.getVersion())
+	    chgSet = TroveChangeSet(self.name, self.flavor, 
+				      them.getVersion(),	
+				      self.getVersion(),
+				      absolute = False)
 	else:
 	    themMap = {}
-	    chgSet = PackageChangeSet(self.name, None, self.getVersion(),
+	    chgSet = TroveChangeSet(self.name, self.flavor, 
+				      None, 
+				      self.getVersion(),
 				      absolute = absolute)
+
+	# dependency and flavor information is always included in total;
+	# this lets us do dependency checking w/o having to load packages
+	# on the clien
+	chgSet.setRequires(self.requires)
+	chgSet.setProvides(self.provides)
 
 	removedIds = []
 	addedIds = []
@@ -313,38 +320,38 @@ class Package:
 	for key in self.packages.iterkeys():
 	    if them and them.packages.has_key(key): continue
 
-	    (name, version) = key
-	    chgSet.newPackageVersion(name, version)
-	    if added.has_key(name):
-		added[name].append(version)
+	    (name, version, flavor) = key
+	    chgSet.newTroveVersion(name, version, flavor)
+	    if added.has_key((name, flavor)):
+		added[(name, flavor)].append(version)
 	    else:
-		added[name] = [ version ]
+		added[(name, flavor)] = [ version ]
 
 	if them:
 	    for key in them.packages.iterkeys():
 		if self.packages.has_key(key): continue
 
-		(name, version) = key
-		chgSet.oldPackageVersion(name, version)
-		if removed.has_key(name):
-		    removed[name].append(version)
+		(name, version, flavor) = key
+		chgSet.oldTroveVersion(name, version, flavor)
+		if removed.has_key((name, flavor)):
+		    removed[(name, flavor)].append(version)
 		else:
-		    removed[name] = [ version ]
+		    removed[(name, flavor)] = [ version ]
 
 	pkgList = []
 
 	if absolute:
-	    for name in added.keys():
-		for version in added[name]:
-		    pkgList.append((name, None, version))
+	    for name, flavor in added.keys():
+		for version in added[(name, flavor)]:
+		    pkgList.append((name, None, version, flavor))
 	    return (chgSet, filesNeeded, pkgList)
 
 	# use added and removed to assemble a list of package diffs which need
 	# to go along with this change set
-	for name in added.keys():
-	    if not removed.has_key(name):
-		for version in added[name]:
-		    pkgList.append((name, None, version))
+	for name, flavor in added.keys():
+	    if not removed.has_key((name, flavor)):
+		for version in added[(name, flavor)]:
+		    pkgList.append((name, None, version, flavor))
 		continue
 
 	    # name was changed between this version. for each new version
@@ -356,29 +363,30 @@ class Package:
 	    # being obsoleted, use that for the diff. if we can't do that
 	    # either, throw up our hands in a fit of pique
 	    
-	    for version in added[name]:
+	    for version in added[(name, flavor)]:
 		branch = version.branch()
 		if version.hasParent():
 		    parent = version.parent()
 		else:
 		    parent = None
 
-		if len(removed[name]) == 1:
-		    pkgList.append((name, removed[name][0], version))
+		if len(removed[(name, flavor)]) == 1:
+		    pkgList.append((name, removed[(name, flavor)][0], version, 
+				   flavor))
 		else:
 		    sameBranch = None
 		    parentNode = None
 
-		    for other in removed[name]:
+		    for other in removed[(name, flavor)]:
 			if other.branch() == branch:
 			    sameBranch = other
 			if parent and other == parent:
 			    parentNode = other
 
 		    if sameBranch:
-			pkgList.append((name, sameBranch, version))
+			pkgList.append((name, sameBranch, version, flavor))
 		    elif parentNode:
-			pkgList.append((name, parentNode, version))
+			pkgList.append((name, parentNode, version, flavor))
 		    else:
 			# Here's the fit of pique. This shouldn't happen
 			# except for the most ill-formed of groups.
@@ -386,17 +394,35 @@ class Package:
 
 	return (chgSet, filesNeeded, pkgList)
 
-    def __init__(self, name, version):
+    def setProvides(self, provides):
+        self.provides = provides
+
+    def setRequires(self, requires):
+        self.requires = requires
+
+    def getProvides(self):
+        return self.provides
+
+    def getRequires(self):
+        return self.requires
+
+    def getFlavor(self):
+        return self.flavor
+
+    def __init__(self, name, version, flavor):
 	self.idMap = {}
 	self.name = name
 	self.version = version
+	self.flavor = flavor
 	self.packages = {}
+        self.provides = None
+        self.requires = None
 
 class Trove(Package):
 
     pass
 
-class PackageChangeSet:
+class TroveChangeSet:
 
     """
     Represents the changes between two packages and forms part of a
@@ -440,10 +466,10 @@ class PackageChangeSet:
     def getChangedFileList(self):
 	return self.changedFiles
 
-    def iterChangedPackages(self):
+    def iterChangedTroves(self):
 	return self.packages.iteritems()
 
-    def newPackageVersion(self, name, version):
+    def newTroveVersion(self, name, version, flavor):
 	"""
 	Adds a version of a package which appeared in newVersion.
 
@@ -451,20 +477,24 @@ class PackageChangeSet:
 	@type name: str
 	@param version: new version
 	@type version: versions.Version
+	@param flavor: new flavor
+	@type flavor: deps.deps.DependencySet
 	"""
 
 	if not self.packages.has_key(name):
 	    self.packages[name] = []
-	self.packages[name].append(('+', version))
+	self.packages[name].append(('+', version, flavor))
 
-    def updateChangedPackage(self, name, old, new):
+    def updateChangedPackage(self, name, flavor, old, new):
 	"""
-	Removes package name, version old from the changed list and
-	adds package name, version new to the list (with the same 
+	Removes package (name, flavor, old version) from the changed list and
+	adds package (name, flavor, version) new to the list (with the same 
 	change type).
 
 	@param name: name of the package
 	@type name: str
+	@param flavor: flavor of the package
+	@type flavor: deps.deps.DependencySet
 	@param old: version to remove from the changed list
 	@type old: versions.VersionString
 	@param new: version to add to the changed list
@@ -477,7 +507,7 @@ class PackageChangeSet:
 		    list[i] = (change, new)
 		    return
 
-    def oldPackageVersion(self, name, version):
+    def oldTroveVersion(self, name, version, flavor):
 	"""
 	Adds a version of a package which appeared in oldVersion.
 
@@ -485,10 +515,12 @@ class PackageChangeSet:
 	@type name: str
 	@param version: old version
 	@type version: versions.Version
+	@param flavor: old flavor
+	@type flavor: deps.deps.DependencySet
 	"""
 	if not self.packages.has_key(name):
 	    self.packages[name] = []
-	self.packages[name].append(('-', version))
+	self.packages[name].append(('-', version, flavor))
 
     def formatToFile(self, changeSet, cfg, f):
 	f.write("%s " % self.name)
@@ -501,6 +533,17 @@ class PackageChangeSet:
 	    f.write("new ")
 
 	f.write("%s\n" % self.newVersion.asString(cfg.defaultbranch))
+
+        def depformat(name, dep, f):
+            f.write('\t%s: %s\n' %(name,
+                                   str(dep).replace('\n', '\n\t%s'
+                                                    %(' '* (len(name)+2)))))
+        if self.requires:
+            depformat('Requires', self.requires, f)
+        if self.provides:
+            depformat('Provides', self.provides, f)
+        if self.flavor:
+            depformat('Flavor', self.flavor, f)
 
 	for (fileId, path, version) in self.newFiles:
 	    #f.write("\tadded (%s(.*)%s)\n" % (fileId[:6], fileId[-6:]))
@@ -536,18 +579,33 @@ class PackageChangeSet:
          ABS <name> <newversion>
          CS <name> <oldversion> <newversion>
          NEW <name> <newversion>
-
-	It is followed by <linecount> lines, each of which specifies a
-	new file, old file, removed file, or a change to the set of
-	included packages. Each of these lines begins with a "+", "-",
-	"~", or "p" respectively. Following that are <diffcount> (possibly
-	0) lines which make up the diff for the group file.
+         [REQUIRES <dep set>]
+         [PROVIDES <dep set>]
+         [FLAVOR <dep set>]
+         
+	The remainder of the lines, each specifies a new file, old file,
+	removed file, or a change to the set of included packages. Each of
+	these lines begins with a "+", "-", "~", or "p" respectively. 
 
 	@rtype: string
 	"""
 
 	rc = []
 	lines = 0
+
+	if self.absolute:
+            rc.append("ABS %s %s\n" % (self.name, self.newVersion.freeze()))
+	elif not self.oldVersion:
+	    rc.append("NEW %s %s\n" % (self.name, self.newVersion.freeze()))
+	else:
+	    rc.append("CS %s %s %s\n" % (self.name, self.oldVersion.freeze(),
+                                         self.newVersion.freeze()))
+        if self.requires:
+            rc.append("REQUIRES %s\n" % (self.requires.freeze()))
+        if self.provides:
+            rc.append("PROVIDES %s\n" % (self.provides.freeze()))
+        if self.flavor:
+            rc.append("FLAVOR %s\n" % (self.flavor.freeze()))
 
 	for id in self.getOldFileList():
 	    rc.append("-%s\n" % id)
@@ -569,27 +627,38 @@ class PackageChangeSet:
 
 	lines = []
 	for name in self.packages.keys():
-	    list = [ x[0] + x[1].freeze() for x in self.packages[name] ]
+	    list = []
+	    for (kind, version, flavor) in self.packages[name]:
+		if flavor:
+		    list.append(kind + version.freeze() + 
+				    "|" + flavor.freeze())
+		else:
+		    list.append(kind + version.freeze() + 
+				    "|")
+
 	    lines.append("p " + name + " " + " ".join(list))
 
 	if lines:
 	    rc.append("\n".join(lines) + "\n")
-        rc = "".join(rc)
 
-	if self.absolute:
-	    hdr = "ABS %s %s\n" % \
-		      (self.name, self.newVersion.freeze())
-	elif not self.oldVersion:
-	    hdr = "NEW %s %s\n" % \
-		      (self.name, self.newVersion.freeze())
-	else:
-	    hdr = "CS %s %s %s\n" % \
-		      (self.name, self.oldVersion.freeze(), 
-		       self.newVersion.freeze())
+	return "".join(rc)
 
-	return hdr + rc
+    def setProvides(self, provides):
+        self.provides = provides
 
-    def __init__(self, name, oldVersion, newVersion, absolute = 0):
+    def getProvides(self):
+        return self.provides
+
+    def setRequires(self, requires):
+        self.requires = requires
+
+    def getRequires(self):
+        return self.requires
+
+    def getFlavor(self):
+        return self.flavor
+
+    def __init__(self, name, flavor, oldVersion, newVersion, absolute = 0):
 	self.name = name
 	self.oldVersion = oldVersion
 	self.newVersion = newVersion
@@ -598,10 +667,25 @@ class PackageChangeSet:
 	self.changedFiles = []
 	self.absolute = absolute
 	self.packages = {}
+        self.provides = None
+        self.requires = None
+        self.flavor = flavor
 
-class ThawPackageChangeSet(PackageChangeSet):
+class ThawTroveChangeSet(TroveChangeSet):
 
     def parse(self, line):
+        if line.startswith('REQUIRES '):
+            dep = line.split(' ', 1)[1]
+            self.setRequires(deps.ThawDependencySet(dep))
+            return
+        if line.startswith('PROVIDES '):
+            dep = line.split(' ', 1)[1]
+            self.setProvides(deps.ThawDependencySet(dep))
+            return
+        if line.startswith('FLAVOR '):
+	    # this was handled in __init__
+	    return
+        
 	action = line[0]
 
 	if action == "+" or action == "~":
@@ -629,14 +713,19 @@ class ThawPackageChangeSet(PackageChangeSet):
 	    name = fields[0]
 	    for item in fields[1:]:
 		op = item[0]
-		v = versions.ThawVersion(item[1:])
+		v,f = item[1:].split("|", 1)
+		v = versions.ThawVersion(v)
+		if f:
+		    f = deps.ThawDependencySet(f)
+		else:
+		    f = None
 
 		assert(op == "+" or op == "-")
 
 		if op == "+":
-		    self.newPackageVersion(name, v)
+		    self.newTroveVersion(name, v, f)
 		else: # op == "-"
-		    self.oldPackageVersion(name, v)
+		    self.oldTroveVersion(name, v, f)
 	
 	# this makes our order match the order in the changeset
 	self.changedFiles.sort()
@@ -660,9 +749,17 @@ class ThawPackageChangeSet(PackageChangeSet):
 
 	newVersion = versions.ThawVersion(l[rest])
 
-	PackageChangeSet.__init__(self, pkgName, oldVersion, newVersion,
-			          absolute = (pkgType == "ABS"))
+	# find the flavor
+	flavor = None
+	for l in lines[1:4]:
+	    if l.startswith("FLAVOR "):
+		dep = l.split(' ', 1)[1]
+		flavor = deps.ThawDependencySet(dep)
+		break
 
+	TroveChangeSet.__init__(self, pkgName, flavor, oldVersion, 
+				  newVersion, absolute = (pkgType == "ABS"))
+        
 	for line in lines:
 	    self.parse(line)
 
@@ -687,42 +784,41 @@ class TroveFromFile(PackageFromFile):
 
     pass
 
-def walkPackageSet(repos, pkg):
+def walkPackageSet(repos, trove):
     """
     Generator returns all of the packages included by pkg, including
     pkg itself.
     """
-    yield pkg
-    seen = { pkg.getName() : [ pkg.getVersion().asString() ] }
+    yield trove
+    seen = { trove.getName() : [ (trove.getVersion(),
+				  trove.getFlavor()) ] }
 
-    list = []
-    for (name, version) in pkg.iterPackageList():
-	list.append((name, version))
+    troveList = [x for x in trove.iterTroveList()]
 
-    while list:
-	(name, version) = list[0]
-	del list[0]
+    while troveList:
+	(name, version, flavor) = troveList[0]
+	del troveList[0]
 
 	if seen.has_key(name):
 	    match = False
-	    for ver in seen[name]:
-		if version == ver:
+	    for (ver, fla) in seen[name]:
+		if version == ver and fla == flavor:
 		    match = True
 		    break
 	    if match: continue
 
-	    seen[name].append(version)
+	    seen[name].append((version, flavor))
 	else:
-	    seen[name] = [ version ]
+	    seen[name] = [ (version, flavor) ]
 
-	pkg = repos.getPackageVersion(name, version)
+	trove = repos.getTrove(name, version, flavor)
 
-	yield pkg
+	yield trove
 
-	for (pkg, version) in pkg.iterPackageList():
-	    list.append((pkg, version))
+	for (trove, version, flavor) in trove.iterTroveList():
+	    troveList += [ x for x in trove.iterTroveList() ]
 
-class PackageError(Exception):
+class TroveError(Exception):
 
     """
     Ancestor for all exceptions raised by the package module.
@@ -730,7 +826,7 @@ class PackageError(Exception):
 
     pass
 
-class ParseError(PackageError):
+class ParseError(TroveError):
 
     """
     Indicates that an error occured parsing a group file.
@@ -738,7 +834,7 @@ class ParseError(PackageError):
 
     pass
 
-class PatchError(PackageError):
+class PatchError(TroveError):
 
     """
     Indicates that an error occured parsing a group file.
