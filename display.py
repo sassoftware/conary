@@ -29,8 +29,8 @@ def displayPkgs(db, cfg, ls = False, ids = False, sha1s = False,
 		print _pkgFormat % (pkgName, 
 				    version.asString(cfg.defaultbranch))
 
-def _displayPkgInfo(db, cfg, pkgName, versionStr, ls, ids, sha1s):
-    troveList = db.findTrove(pkgName, versionStr)
+def _displayPkgInfo(db, cfg, troveName, versionStr, ls, ids, sha1s):
+    troveList = db.findTrove(troveName, versionStr)
 
     for trove in troveList:
 	version = trove.getVersion()
