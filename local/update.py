@@ -453,33 +453,32 @@ class FilesystemJob:
             if not headFileVersion:
                 continue
 
+            # we know we are switching from one version of the file to
+            # (we just checked headFileVersion, and if there isn't an
+            # old version then this file would be new, not changed
+
             # FIXME we should be able to inspect headChanges directly
             # to see if we need to go into the if statement which follows
             # this rather then having to look up the file from the old
             # package for every file which has changed
             fsFile = files.FileFromFilesystem(realPath, fileId)
             
-            if not basePkg.hasFile(fileId):
-                # a file which was not in the base package was created
-                # on both the head of the branch and in the filesystem;
-                # this can happen during source management
-                self.errors.append("new file %s conflicts with file on "
-                                   "head of branch" % realPath)
-                contentsOkay = False
-            else:
-                (baseFilePath, baseFileVersion) = basePkg.getFile(fileId)
-                baseFile = repos.getFileVersion(fileId, baseFileVersion)
+            # get the baseFile which was originally installed
+            (baseFilePath, baseFileVersion) = basePkg.getFile(fileId)
+            baseFile = repos.getFileVersion(fileId, baseFileVersion)
             
+            # now assemble what the file is supposed to look like on head
             headChanges = changeSet.getFileChange(fileId)
             headFile = baseFile.copy()
             headFile.twm(headChanges, headFile)
             fsFile.flags.isConfig(headFile.flags.isConfig())
             fsChanges = fsFile.diff(baseFile)
 
+            # this is changed to true when the file attributes have changed;
+            # this helps us know if we need a restore event
 	    attributesChanged = False
 
-	    if basePkg and \
-	         not fsFile.metadataEqual(headFile, ignoreOwnerGroup = noIds):
+	    if not fsFile.metadataEqual(headFile, ignoreOwnerGroup = noIds):
 		# some of the attributes have changed for this file; try
                 # and merge
 		if flags & MERGE:
