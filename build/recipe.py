@@ -270,7 +270,6 @@ class Recipe:
 
 class PackageRecipe(Recipe):
     buildRequires = []
-    runRequires = []
 
     def mainDir(self, new = None):
 	if new:
