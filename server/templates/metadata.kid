@@ -1,9 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <?python # template imports
-import kid; kid.enable_import()
 from templates import library
 from fmtroves import TroveCategories, LicenseCategories
-
 ?>
 
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:py="http://naeblis.cx/ns/kid#">

@@ -1,9 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<?python #
-import kid; kid.enable_import()
+<?python # import library
 from templates import library
 ?>
-
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:py="http://naeblis.cx/ns/kid#">
     {library.html_header(pageTitle)}
     <body>
