@@ -11,12 +11,10 @@ The hash can be any arbitrary string of at least 5 bytes in length;
 keys are assumed to be unique.
 """
 
-import errno
 import fcntl
 import gzip
 import os
 import struct
-import time
 import util
 
 class DataStore:
