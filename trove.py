@@ -15,6 +15,28 @@ class Package:
 
     def addFile(self, fileId, path, version):
 	self.files[path] = (fileId, path, version)
+	self.idMap[fileId] = (path, version)
+
+    # fileId is the only thing that must be here; the other fields could
+    # be "-"
+    def updateFile(self, fileId, path, version):
+	(origPath, origVersion) = self.idMap[fileId]
+
+	if not path:
+	    path = origPath
+	else:
+	    del self.files[path]
+
+	if not version:
+	    version = origVersion
+	    
+	self.files[path] = (fileId, path, version)
+	self.idMap[fileId] = (path, version)
+
+    def removeFile(self, fileId):   
+	path = self.idMap[fileId][0]
+	del self.files[path]
+	del self.idMap[fileId]
 
     def fileList(self):
 	l = []
@@ -31,20 +53,28 @@ class Package:
 	    str = str + ("%s %s %s\n" % (fileId, path, version.asString()))
 	return str
 
-    def idmap(self):
-	map = {}
-	for (fileId, path, version) in self.files.values():
-	    map[fileId] = (path, version)
+    # returns a dictionary mapping a fileId to a (path, version) pair
+    def applyChangeSet(self, repos, pkgCS):
+	fileMap = {}
 
-	return map
+	for (fileId, path, fileVersion) in pkgCS.getNewFileList():
+	    self.addFile(fileId, path, fileVersion)
+	    fileMap[fileId] = (path, fileVersion)
+
+	for (fileId, path, fileVersion) in pkgCS.getChangedFileList():
+	    self.updateFile(fileId, path, fileVersion)
+	    fileMap[fileId] = (path, fileVersion)
+
+	for fileId in pkgCS.getOldFileList():
+	    self.removeFile(fileId)
+
+	return fileMap
 
     def diff(self, them):
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
-	selfMap = self.idmap()
-
 	if them:
-	    themMap = them.idmap()
+	    themMap = them.idMap
 	else:
 	    themMap = {}
 
@@ -55,9 +85,9 @@ class Package:
 	sameIds = {}
 	filesNeeded = []
 
-	allIds = selfMap.keys() + themMap.keys()
+	allIds = self.idMap.keys() + themMap.keys()
 	for id in allIds:
-	    inSelf = selfMap.has_key(id)
+	    inSelf = self.idMap.has_key(id)
 	    inThem = themMap.has_key(id)
 	    if inSelf and inThem:
 		sameIds[id] = None
@@ -70,13 +100,12 @@ class Package:
 	    rc = rc + "-%s\n" % id
 
 	for id in addedIds:
-	    (selfPath, selfVersion) = selfMap[id]
+	    (selfPath, selfVersion) = self.idMap[id]
 	    rc = rc + "+%s %s %s\n" % (id, selfPath, selfVersion.asString())
 	    filesNeeded.append((id, None, selfVersion))
 
 	for id in sameIds.keys():
-
-	    (selfPath, selfVersion) = selfMap[id]
+	    (selfPath, selfVersion) = self.idMap[id]
 	    (themPath, themVersion) = themMap[id]
 
 	    newPath = "-"
@@ -96,6 +125,7 @@ class Package:
 
     def __init__(self, name):
 	self.files = {}
+	self.idMap = {}
 	self.name = name
 
 class PackageChangeSet:
@@ -109,6 +139,9 @@ class PackageChangeSet:
     def oldFile(self, fileId):
 	self.oldFiles.append(fileId)
 
+    def getOldFileList(self):
+	return self.oldFiles
+
     def getName(self):
 	return self.name
 
@@ -121,6 +154,9 @@ class PackageChangeSet:
     # path and/or version can be None
     def changedFile(self, fileId, path, version):
 	self.changedFiles.append((fileId, path, version))
+
+    def getChangedFileList(self):
+	return self.changedFiles
 
     def parse(self, line):
 	action = line[0]
@@ -141,24 +177,24 @@ class PackageChangeSet:
 	    else:
 		self.changedFile(fileId, path, version)
 	elif action == "-":
-	    # -1 chops off the \n
-	    self.oldFile(line[1:-1])
+	    self.oldFile(line[1:])
 
-    def formatToFile(self, f):
-	f.write("changeset for %s " % self.name)
-	#if self.oldVersion:
-	    #f.write("from %s to " % self.oldVersion.asString())
-	#else:
-	    #f.write("to ")
-	#f.write("%s\n" % self.newVersion.asString())
-	f.write("\n")
+    def formatToFile(self, changeSet, cfg, f):
+	f.write("%s " % self.name)
+	if self.oldVersion:
+	    f.write("from %s to " % self.oldVersion.asString(cfg.defaultbranch))
+	else:
+	    f.write("abstract ")
+	f.write("%s\n" % self.newVersion.asString(cfg.defaultbranch))
 
 	for (fileId, path, version) in self.newFiles:
 	    f.write("\tadded %s\n" % path)
 	for (fileId, path, version) in self.changedFiles:
 	    f.write("\tchanged %s\n" % path)
+	    change = changeSet.getFileChange(fileId)
+	    print "\t\t%s" % change
 	for path in self.oldFiles:
-	    f.write("\tremoved %s\n" % path)
+	    f.write("\tremoved %s(.*)%s\n" % (path[:8], path[-8:]))
     
     def __init__(self, name, oldVersion, newVersion):
 	self.name = name
