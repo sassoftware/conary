@@ -523,6 +523,15 @@ class InstallFiles(_PutFiles):
 	self.source = ''
 	self.move = 0
 
+class CopyFiles(_PutFiles):
+    """
+    This class copies files within the destdir.
+    """
+    def __init__(self, *args, **keywords):
+	_PutFiles.__init__(self, *args, **keywords)
+	self.source = '%(destdir)s'
+	self.move = 0
+
 class MoveFiles(_PutFiles):
     """
     This class moves files within the destdir.
