@@ -79,8 +79,10 @@ elif ! echo $trove | grep -s : > /dev/null; then
     echo "${trove} ($version) has been built into the repository" > $TMP
 fi
 
-for address in $email; do
-    mail -s "$trove $version" $address < $TMP
-done
+if [ -s $TMP ] ; then
+    for address in $email; do
+        mail -s "$trove $version" $address < $TMP
+    done
+fi
 
 rm -f $TMP
