@@ -56,7 +56,12 @@ of the trove.  Meaningless with \-\-resolve because dependency resolution
 implies recursion.
 .TP
 .B \-\-replace-files
-.\" FIXME: add semantics
+When a normal file (not a configuration file or a transient file) has
+changed on the system between updates, conary normally flags this as
+an error.  If you want conary to update anyway, replacing the contents
+of the file with the new version from the repository, you will need
+to provide the \-\-replace-files option.
+.\" FIXME: double-check semantics
 .RE
 .TP
 .TP
@@ -526,12 +531,12 @@ There are no bugs, only undocumented features.
 .\"
 .\"
 .SH "SEE ALSO"
-http://www.specifixinc.com/
+http://www.specifix.com/
 .br
-http://wiki.specifixinc.com/
+http://wiki.specifix.com/
 .br
-http://www.specifixinc.com/technology/conary.pdf
+http://www.specifix.com/technology/conary.pdf
 .I An Introduction to the Conary Software Provisioning System
 .br
-http://www.specifixinc.com/technology/Reprint-Wilson-OLS2004.pdf
+http://www.specifix.com/technology/Reprint-Wilson-OLS2004.pdf
 .I Repository-based System Management Using Conary
