@@ -184,8 +184,6 @@ class GroupFromTextFile(Group):
 			versionList.append(ver)
 
 		    self.packages[name] = versionList
-
-		print "a:", [ x.asString() for x in versionList ]
 	    else:
 		try:
 		    version = versions.VersionFromString(versionStr)
