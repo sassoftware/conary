@@ -376,9 +376,9 @@ class DeviceFile(File):
 	File.restore(self, target)
 
     def majorMinor(self, major = None, minor = None):
-	if major:
+	if major is not None:
 	    self.major = major
-	if minor:
+	if minor is not None:
 	    self.minor = minor
 	
 	return (self.infoTag, self.major, self.minor)
