@@ -396,6 +396,29 @@ class AddModes(policy.Policy):
 	    self.recipe.autopkg.pathMap[path].inode.setPerms(mode)
 
 
+class WarnWriteable(policy.Policy):
+    """
+    Unless a mode has been set explicitly (i.e. with SetModes), warn
+    about group- or other-writeable files.
+    """
+    # Needs to run after AddModes in order to access the pathMap
+    def doFile(self, file):
+	fullpath = ('%(destdir)s/'+file) %self.macros
+	if os.path.islink(fullpath):
+	    return
+	if file not in self.recipe.autopkg.pathMap:
+	    # directory has been deleted
+	    return
+	mode = os.lstat(fullpath)[stat.ST_MODE]
+	if mode & 022:
+	    if stat.S_ISDIR(mode):
+		type = "directory"
+	    else:
+		type = "file"
+	    log.warning('Possibly inappropriately writeable permission'
+			' 0%o for %s %s', mode & 0777, type, file)
+
+
 class Ownership(policy.Policy):
     """
     Set user and group ownership of files.  The default is
@@ -457,29 +480,6 @@ class ExcludeDirectories(policy.Policy):
 	del self.recipe.autopkg.pkgMap[path][path]
 	del self.recipe.autopkg.pkgMap[path]
 	del self.recipe.autopkg.pathMap[path]
-
-
-class WarnWriteable(policy.Policy):
-    """
-    Unless a mode has been set explicitly (i.e. with SetModes), warn
-    about group- or other-writeable files.
-    """
-    # Needs to run after AddModes in order to access the pathMap
-    def doFile(self, file):
-	fullpath = ('%(destdir)s/'+file) %self.macros
-	if os.path.islink(fullpath):
-	    return
-	if file not in self.recipe.autopkg.pathMap:
-	    # directory has been deleted
-	    return
-	mode = os.lstat(fullpath)[stat.ST_MODE]
-	if mode & 022:
-	    if stat.S_ISDIR(mode):
-		type = "directory"
-	    else:
-		type = "file"
-	    log.warning('Possibly inappropriately writeable permission'
-			' 0%o for %s %s', mode & 0777, type, file)
 
 
 def DefaultPolicy():
