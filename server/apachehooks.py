@@ -206,9 +206,6 @@ def handler(req):
 	else:
 	    port = 80
 
-	import lib
-	lib.epdb.st()
-
 	if os.path.basename(req.uri) == "changeset":
 	   rest = os.path.dirname(req.uri) + "/"
 	else:
