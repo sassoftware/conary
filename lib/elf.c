@@ -119,7 +119,7 @@ static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
       case EM_S390:	    insSet = "s390";	    break;
       case EM_ARM:	    insSet = "arm";	    break;
       case EM_IA_64:	    insSet = "ia64";	    break;
-      case EM_X86_64:	    insSet = "x86-64";	    break;
+      case EM_X86_64:	    insSet = "x86_64";	    break;
       case EM_ALPHA:	    insSet = "alpha";	    break;
       default:
 	/* we'll live */

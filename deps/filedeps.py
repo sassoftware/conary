@@ -53,6 +53,9 @@ def findFileFlavor(path):
             if isnset == 'x86':
                 set.addDep(deps.InstructionSetDependency,
                            deps.Dependency('x86', []))
+            elif isnset == 'x86_64':
+                set.addDep(deps.InstructionSetDependency,
+                           deps.Dependency('x86', ['x86_64']))
             else:
                 set.addDep(deps.InstructionSetDependency,
                            deps.Dependency(isnset, []))
