@@ -12,29 +12,37 @@
 # full details.
 #
 
-extra_inst =	add_user.kid 		\
+kid_files =	add_group.kid		\
+		add_user.kid 		\
 		change_password.kid	\
 		choose_branch.kid	\
 		error.kid		\
-		library.js		\
 		library.kid		\
 		main_page.kid		\
 		metadata.kid		\
 		notice.kid		\
 		permission.kid		\
 		pick_trove.kid		\
-		style.css		\
 		user_admin.kid
+
+extra_inst = library.js \
+             style.css
 
 extra_dist = Makefile
 
 python_files = __init__.py
 
-dist_files = $(python_files) $(extra_inst) $(extra_dist)
+dist_files = $(python_files) $(extra_inst) $(extra_dist) $(kid_files)
 
 all: default-all
 
-install: install-subdirs pyfiles-install
+install: pyfiles-install kidfiles-install
+
+kidfiles-install:
+	for f in $(kid_files); do \
+                cp -a $$f $(DESTDIR)/$(conarydir)/$(DIR)/$$f; \
+		kidc $(DESTDIR)/$(conarydir)/$(DIR)/$$f; \
+        done
 
 dist: default-dist
 
