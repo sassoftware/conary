@@ -375,8 +375,9 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
                            path, newVersion.asString()))
         
 	if files.contentsChanged(csInfo):
-	    (contType, contents) = changeSet.getFileContents(fileId)
+	    contType = changeSet.getFileContentsType(fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
+	        contents = changeSet.getFileContents(fileId)[1]
 		lines = contents.get().readlines()
 		str = "".join(lines)
 		print str
