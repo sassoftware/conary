@@ -268,7 +268,7 @@ class _FileAction(BuildAction):
             # fixup obviously broken permissions
 	    if _permmap.has_key(self.mode):
                 log.warning('odd permission %o, correcting to %o: add initial "0"?' \
-                            %(mode, _permmap[self.mode]))
+                            %(self.mode, _permmap[self.mode]))
 		self.mode = _permmap[self.mode]
 	    os.chmod(destdir+os.sep+path, self.mode & 01777)
 	    if self.mode & 06000:
