@@ -290,8 +290,12 @@ class ServerConfig(ConfigFile):
 	self.read(path)
 
 def usage():
-    print "usage: %s repospath reposname [config file]" %sys.argv[0]
+    print "usage: %s repospath reposname" %sys.argv[0]
     print "       %s --add-user <username> repospath" %sys.argv[0]
+    print ""
+    print "server flags: --config-file <path>"
+    print '              --map "<from> <to>"'
+    print "              --tmp-file-path <path>"
     sys.exit(1)
 
 def addUser(userName, otherArgs):
@@ -328,10 +332,17 @@ if __name__ == '__main__':
     cfg = ServerConfig()
 
     argDef["config"] = options.MULT_PARAM
+    # magically handled by processArgs
+    argDef["config-file"] = options.ONE_PARAM
     argDef['add-user'] = options.ONE_PARAM
     argDef['help'] = options.ONE_PARAM
 
-    argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
+    try:
+        argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
+    except options.OptionError, msg:
+        print >> sys.stderr, msg
+        sys.exit(1)
+        
 
     FILE_PATH = cfg.tmpFilePath
 
@@ -347,9 +358,6 @@ if __name__ == '__main__':
     if not os.access(FILE_PATH, os.R_OK | os.W_OK | os.X_OK):
         print FILE_PATH + " needs to allow full read/write access"
         sys.exit(1)
-
-    if len(otherArgs) == 4:
-        cfg.read(otherArgs.pop(), exception = True)
 
     if len(otherArgs) != 3 or argSet:
 	usage()
