@@ -294,6 +294,8 @@ if __name__ == '__main__':
 
     cfg = ServerConfig()
 
+    argDef["config"] = options.MULT_PARAM
+
     argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
 
     FILE_PATH = cfg.tmpFilePath
