@@ -369,6 +369,8 @@ def set_trace(marker='default'):
 
     Epdb().set_trace(marker=marker, skip=1)
 
+st = set_trace
+
 def post_mortem(t, exc_type=None, exc_msg=None):
     p = Epdb()
     p._exc_type = exc_type
