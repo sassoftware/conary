@@ -37,7 +37,6 @@ class Package:
 	self.idMap[fileId] = (path, version)
 
     def removeFile(self, fileId):   
-	path = self.idMap[fileId][0]
 	del self.idMap[fileId]
 
     def fileList(self):
