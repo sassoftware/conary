@@ -44,7 +44,7 @@ class Flag:
     def __nonzero__(self):
         return self.value
 
-class UseClass:
+class UseClass(dict):
     """
     Implements a simple object that contains boolean flags objects.
     Magic is used to make the initialization of the object easy.
@@ -54,7 +54,6 @@ class UseClass:
 	self.showdefaults = showdefaults
         self.initialized = False
 	self.frozen = False
-        self.flags = {}
         self.initialized = True
 
     def _freeze(self):
@@ -66,24 +65,25 @@ class UseClass:
     def __setitem__(self, key, value):
 	if self.frozen:
 	    raise TypeError, 'flags are frozen'
-        if self.flags.has_key(key):
-            self.flags[key].set(bool(value))
-
+        if self.has_key(key):
+            self[key].set(bool(value))
+        else:
+            dict.__setitem__(self, key, value)
+            
     def __repr__(self):
-        return repr(self.flags)
+        return dict.__repr__(self)
 
     def __getattr__(self, name):
         if name in self.__dict__:
             return self.__dict__[name]
-        flags = self.__dict__.get('flags', {})
-        if flags.has_key(name):
-            return flags[name]
+        if dict.has_key(self, name):
+            return self[name]
         raise AttributeError, "class %s has no attribute '%s'" % (self.__class__.__name__, name)
 
     def addFlag(self, name, value):
         if self.frozen:
             raise TypeError, 'flags are frozen'
-        self.flags[name] = Flag(value)
+        self[name] = Flag(value)
 
     def __setattr__(self, name, value):
         initialized = self.__dict__.get('initialized', False)
@@ -96,17 +96,17 @@ class UseClass:
         frozen = self.__dict__.get('frozen', False)
         if frozen:
             raise TypeError, 'flags are frozen'
-        if self.flags.has_key(name):
-            self.flags[name].set(value)
+        if self.has_key(name):
+            self[name].set(value)
         else:
-            self.flags[name] = Flag(value)
+            self[name] = Flag(value)
 
 def _addDocs(obj):
     global __doc__
-    keys = obj.flags.keys()
+    keys = obj.keys()
     keys.sort()
     for key in keys:
-        flag = obj.flags[key]
+        flag = obj[key]
 	dflt = ''
 	if obj.showdefaults:
 	    dflt = 'Default=C{%s}; ' %str(flag.value)
@@ -116,7 +116,7 @@ def _addDocs(obj):
         __doc__ += '  - B{C{%s}}: %s%s.\n'% (key, dflt, desc)
     __doc__ += '\n\nMore details:\n\n'
     for key in keys:
-        flag = obj.flags[key]
+        flag = obj[key]
         if flag.long:
             __doc__ += 'B{C{'+key+'}}: ' + flag.long + '\n\n'
 
