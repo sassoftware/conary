@@ -9,6 +9,7 @@ import commit
 import os
 import util
 import sha1helper
+import lookaside
 import shutil
 
 def cook(repos, cfg, recipeFile):
@@ -73,7 +74,7 @@ def cook(repos, cfg, recipeFile):
 	fileList = [ (f, recipeFile, recipeName) ]
 
 	for file in recipeObj.allSources():
-            src = util.findFile(file, srcdirs)
+            src = lookaside.findAll(file, recipeObj.name, srcdirs)
 	    srcName = os.path.basename(src)
 	    f = files.FileFromFilesystem(src, ident(srcName), type = "src")
 	    fileList.append((f, src, srcName))

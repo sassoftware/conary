@@ -8,7 +8,9 @@ import types
 import versions
 import sys
 
-class SrsConfiguration:
+_cfg = None
+
+class _SrsConfiguration:
 
     def read(self, file):
 	if os.path.exists(file):
@@ -37,6 +39,7 @@ class SrsConfiguration:
 	self.buildpath = "/usr/src/srs/builds"
 	self.packagenamespace = "/localhost"
 	self.defaultbranch = None
+	self.lookaside = "/var/cache/srs"
 
 	self.read("/etc/srsrc")
 	self.read(os.environ["HOME"] + "/" + ".srsrc")
@@ -49,3 +52,9 @@ class SrsConfiguration:
 	if self.defaultbranch.isVersion():
 	    sys.stderr.write("The configured default branch %s specifies " +
 		 "version, not a branch.\n" % self.defaultbranch.asString())
+
+def SrsConfiguration():
+    global _cfg
+    if _cfg is None:
+	_cfg = _SrsConfiguration()
+    return _cfg

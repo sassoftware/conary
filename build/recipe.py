@@ -2,7 +2,7 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-import imp, sys, types
+import imp, sys
 import os
 import util
 import build
@@ -10,6 +10,7 @@ import package
 import shutil
 import types
 import inspect
+import lookaside
 
 def flatten(list):
     if type(list) != types.ListType: return [list]
@@ -60,32 +61,39 @@ def loadRecipe(file):
         
 class Recipe:
 
-    def addSignature(self, file):
-	md5 = util.searchFile('%s.md5sum' %(file), self.srcdirs)
-	if md5:
-	    if not self.signatures.has_key(file):
-		self.signatures[file] = []
-	    self.signatures[file].append(md5)
-
-	gpg = util.searchFile('%s.sign' %(file), self.srcdirs)
+    def addSignature(self, file, fingerprint):
+	# do not search unless a gpg fingerprint is specified
+	if not fingerprint:
+	    return
+	gpg = lookaside.searchAll('%s.sign' %(file), self,name, self.srcdirs)
 	if not gpg:
-	    gpg = util.searchFile('%s.sig' %(file), self.srcdirs)
+	    gpg = lookaside.searchAll('%s.sig' %(file), self,name, self.srcdirs)
 	if gpg:
 	    if not self.signatures.has_key(file):
 		self.signatures[file] = []
 	    self.signatures[file].append(gpg)
 
-    def addTarball(self, file, extractDir=''):
+    def addTarball(self, file, extractDir='', fingerprint=None):
 	self.tarballs.append((file, extractDir))
-	self.addSignature(file)
+	self.addSignature(file, fingerprint)
 
-    def addPatch(self, file, level='0', backup=''):
+    def addSourceFromRPM(self, rpm, file, extractDir='', fingerprint=None):
+	f = lookaside.searchAll(os.path.basename(file), self.name, self.srcdirs)
+	if not f:
+	    r = lookaside.findAll(rpm, self.name, self.srcdirs)
+	    c = lookaside.createCacheName(file, self.name)
+	    os.system("cd %s; rpm2cpio %s | cpio -ium %s" %(os.path.dirname(c), rpm, file))
+	    f = lookaside.findAll(file, self.name, self.srcdirs)
+	self.tarballs.append((file, extractDir))
+	self.addSignature(f, fingerprint)
+
+    def addPatch(self, file, level='0', backup='', fingerprint=None):
 	self.patches.append((file, level, backup))
-	self.addSignature(file)
+	self.addSignature(file, fingerprint)
 
-    def addSource(self, file):
+    def addSource(self, file, fingerprint=None):
 	self.sources.append(file)
-	self.addSignature(file)
+	self.addSignature(file, fingerprint)
 
     def allSources(self):
         sources = []
@@ -112,21 +120,17 @@ class Recipe:
         if not self.signatures.has_key(file):
             return
 	for signature in self.signatures[file]:
-	    if signature.endswith(".md5sum"):
-		if os.system("cat %s | md5sum --check %s"
-			      %(signature, filepath)):
-		    raise RuntimeError, "md5 signature %s failed" %(signature)
-	    elif signature.endswith(".sign") or signature.endswith(".sig"):
-		if os.system("gpg --no-secmem-warning --verify %s %s"
-			      %(signature, filepath)):
-		    raise RuntimeError, "GPG signature %s failed" %(signature)
+	    # FIXME: try to fetch key by fingerprint if necessary
+	    if os.system("gpg --no-secmem-warning --verify %s %s"
+			  %(signature, filepath)):
+		raise RuntimeError, "GPG signature %s failed" %(signature)
 
     def unpackSources(self, builddir):
 	if os.path.exists(builddir):
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
 	for (file, extractdir) in self.tarballs:
-            f = util.findFile(file, self.srcdirs)
+            f = lookaside.findAll(file, self.name, self.srcdirs)
 	    self.checkSignatures(f, file)
             if f.endswith(".bz2"):
                 tarflags = "-jxf"
@@ -142,7 +146,7 @@ class Recipe:
 	    os.system("tar -C %s %s %s" % (destdir, tarflags, f))
 	
 	for file in self.sources:
-            f = util.findFile(file, self.srcdirs)
+            f = lookaside.findAll(file, self.name, self.srcdirs)
 	    destDir = builddir + "/" + self.theMainDir
 	    util.mkdirChain(destDir)
 	    shutil.copyfile(f, destDir + "/" + file)
