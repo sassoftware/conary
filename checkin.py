@@ -112,6 +112,9 @@ def _getRecipeVersion(recipeFile):
     except recipe.RecipeFileError, e:
 	log.error("unable to load recipe file %s: %s", recipeFile, str(e))
         return None
+    except IOError, e:
+	log.error("unable to load recipe file %s: %s", recipeFile, e.strerror)
+        return None
     
     if not loader:
 	log.error("unable to load a valid recipe class from %s", recipeFile)
