@@ -80,7 +80,7 @@ class ManualConfigure(Configure):
 	        '%(preConfigure)s %%(configure)s %(args)s')
 
 class Make(ShellCommand):
-    template = 'cd %%(builddir)s; %(preMake)s make %%(mflags) %%(parallelmflags) %(args)s'
+    template = 'cd %%(builddir)s; %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s'
     keywords = {'preMake': ''}
     
     def doBuild(self, macros):
