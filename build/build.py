@@ -127,8 +127,7 @@ class Configure(BuildCommand):
     # note that template is NOT a tuple, () is used merely to group strings
     # to avoid trailing \ characters on every line
     template = (
-	'cd %%(builddir)s; '
-	'%%(cdSubDir)s '
+	'cd %%(builddir)s/%%(subDir)s; '
 	'%%(mkObjdir)s '
 	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 	' CPPFLAGS="%%(cppflags)s"'
@@ -150,6 +149,7 @@ class Configure(BuildCommand):
 	' --infodir=%%(infodir)s'
 	'  %(args)s')
     keywords = {'preConfigure': '',
+		'configureName': 'configure',
                 'objDir': '',
 		'subDir': ''}
 
@@ -165,6 +165,8 @@ class Configure(BuildCommand):
 	@keyword subDir: relative subdirectory in which to run configure
         @keyword preConfigure: Extra shell script which is inserted in front of
         the configure command.
+	@keyword configureName: the name of the configure command; normally
+	C{configure} but occasionally C{Configure} or something else.
         """
         BuildCommand.__init__(self, *args, **keywords)
          
@@ -173,11 +175,11 @@ class Configure(BuildCommand):
         if self.objDir:
 	    objDir = self.objDir %macros
             macros['mkObjdir'] = 'mkdir -p %s; cd %s;' %(objDir, objDir)
-	    macros['configure'] = '../configure'
+	    macros['configure'] = '../%s' % self.configureName
         else:
-            macros['configure'] = './configure'
+            macros['configure'] = './%s' % self.configureName
 	if self.subDir:
-	    macros['cdSubDir'] = 'cd %s;' %self.subDir
+	    macros['subDir'] = self.subDir
         util.execute(self.command %macros)
 
 class ManualConfigure(Configure):
@@ -186,7 +188,7 @@ class ManualConfigure(Configure):
     except that all the arguments to the configure script have to be
     provided explicitly.
     """
-    template = ('cd %%(builddir)s/%(subDir)s; '
+    template = ('cd %%(builddir)s/%%(subDir)s; '
                 '%%(mkObjdir)s '
 	        '%(preConfigure)s %%(configure)s %(args)s')
 
