@@ -28,6 +28,8 @@ import tempfile
 import types
 import util
 
+from fnmatch import fnmatchcase
+
 baseMacros = (
     # Note that these macros cannot be represented as a dictionary,
     # because the items need to be added in order so that they will
@@ -684,9 +686,13 @@ class GroupRecipe(Recipe):
 
 class FilesetRecipe(Recipe):
 
-    def addFile(self, path, component, versionStr):
-	if self.paths.has_key(path):
-	    raise RecipeFileError, "path %s has already been included" % path
+    def addFile(self, pattern, component, versionStr, recurse = True):
+	"""
+	Adds files which match pattern from version versionStr of component.
+	Pattern is glob-style, with brace expansion. If recurse is set,
+	anything below a directory which matches pattern is also included,
+	and the directory itself does not have to be part of the package.
+	"""
 
 	try:
 	    pkgList = helper.findPackage(self.repos, self.cfg.packagenamespace,
@@ -700,20 +706,41 @@ class FilesetRecipe(Recipe):
 	    raise RecipeFileError, "too many packages match %s" % component
 
 	pkg = pkgList[0]
-	match = None
+	pathMap = {}
 	for (fileId, (pkgPath, version)) in pkg.iterFileList():
-	    if pkgPath == path:
-		match = (fileId, version)
-		break
+	    pathMap[pkgPath] = (fileId, version)
 
-	if not match:
+	patternList = util.braceExpand(pattern)
+	matches = {}
+	for pattern in patternList:
+	    if not recurse:
+		matchList = [ n for n in pathMap.keys() if 
+				    fnmatchcase(n, pattern)]
+	    else:
+		matchList = []	
+		dirCount = pattern.count("/")
+		for n in pathMap.iterkeys():
+		    i = n.count("/")
+		    if i > dirCount:
+			dirName = "/".join(n.split("/")[:dirCount + 1])
+			match = fnmatchcase(pattern, dirName)
+		    elif i == dirCount:
+			match = fnmatchcase(pattern, n)
+		    else:
+			match = False
+
+		    if match: matchList.append(n)
+			
+	    for path in matchList:
+		matches[path] = pathMap[path]
+
+	if not matches:
 	    raise RecipeFileError, "%s does not exist in version %s of %s" % \
-		    (pkg.getVersion().asString(), pkg.getName())
-	elif self.files.has_key(match[0]):
-	    raise RecipeFileError, "a version of %s has already been included" % path
+		(pattern, pkg.getVersion().asString(), pkg.getName())
 
-	self.files[match[0]] = (path, match[1])
-	self.paths[path] = 1
+	for path in matches.keys():
+	    (fileId, version) = matches[path]
+	    self.files[fileId] = (path, version)
 
     def iterFileList(self):
 	return self.files.iteritems()
