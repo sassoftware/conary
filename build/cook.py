@@ -102,7 +102,7 @@ class _IdGen:
 # -------------------- public below this line -------------------------
 
 def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None, 
-	       prep=True, macros={}):
+	       prep=True, macros={}, buildBranch = None):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -113,8 +113,8 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     @type cfg: srscfg.SrsConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
-    @param buildBranch: the branch the new build will be committed to
-    @type buildBranch: versions.Version
+    @param buildLabel: label to use to to find the branch to build on
+    @type buildBranch: versions.BranchName
     @param changeSetFile: if set, the changeset is stored in this file
     instead of committed to a repository
     @type changeSetFile: str
@@ -123,6 +123,11 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     @type prep: boolean
     @param macros: set of macros for the build
     @type macros: dict
+    @param buildBranch: branch to build on; if present buildLabel is ignored.
+    this branch does not need to contain timestamps; they'll be looked up if
+    they are missing.
+    
+    @type buildBranch: versions.Version
     @rtype: list of strings
     """
 
@@ -132,21 +137,34 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     log.info("Building %s", recipeClass.name)
     fullName = recipeClass.name
 
-    currentVersion = None
-    if repos.hasPackage(fullName):
-	vers = repos.getTroveLeavesByLabel([fullName], buildLabel)[fullName]
-	if not len(vers):
-	    raise CookError('No branches labeled %s exist for trove %s'
-			    % (fullName, buildLabel.asString))
-	elif len(vers) > 1:
-	    raise CookError('Multiple branches labeled %s exist for trove %s'
-			    % (fullName, buildLabel.asString))
-	    
-	buildBranch = vers[0].branch()
-    else:
-	# for the first build, we're willing to create the branch for
-	# them (though it has to be a trunk!)
-	buildBranch = versions.Version([buildLabel])
+    if not buildBranch:
+	if repos.hasPackage(fullName):
+	    vers = repos.getTroveLeavesByLabel([fullName], buildLabel)[fullName]
+	    if not len(vers):
+		raise CookError('No branches labeled %s exist for trove %s'
+				% (buildLabel.asString(), fullName))
+	    elif len(vers) > 1:
+		raise CookError('Multiple branches labeled %s exist for '
+				'trove %s' % (fullName, buildLabel.asString))
+		
+	    buildBranch = vers[0].branch()
+	else:
+	    # for the first build, we're willing to create the branch for
+	    # them (though it has to be a trunk!)
+	    buildBranch = versions.Version([buildLabel])
+    elif not buildBranch.timeStamps():
+	# trunk branch, go ahead and create if
+	pass
+    elif max(buildBranch.timeStamps()) == 0:
+	# need to get the timestamps (and the branch has to exist)
+	try:
+	    ver = repos.getTroveLatestVersion(fullName, buildBranch)
+	except repository.PackageMissing:
+	    raise CookError('Branch %s does not exist for trove %s'
+			    % (buildBranch.asString(), fullName))
+
+	buildBranch = ver.branch()
+	del ver
 
     if issubclass(recipeClass, recipe.PackageRecipe):
 	ret = cookPackageObject(repos, cfg, recipeClass, buildBranch,
@@ -419,7 +437,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch,
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
-def cookItem(repos, cfg, item, prep=0, macros={}):
+def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -469,7 +487,8 @@ def cookItem(repos, cfg, item, prep=0, macros={}):
     try:
         troves = cookObject(repos, cfg, recipeClass, cfg.buildLabel,
                             changeSetFile = changeSetFile,
-                            prep = prep, macros = macros)
+                            prep = prep, macros = macros,
+			    buildBranch = buildBranch)
         if troves:
             built = (tuple(troves), changeSetFile)
     except repository.RepositoryError, e:
@@ -487,7 +506,7 @@ class CookError(Exception):
     def __str__(self):
 	return repr(self)
 
-def cookCommand(cfg, args, prep, macros):
+def cookCommand(cfg, args, prep, macros, buildBranch = None):
     # this ensures the repository exists
     repos = helper.openRepository(cfg.repPath)
 
