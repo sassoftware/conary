@@ -110,9 +110,9 @@ class PackageSpecSet(dict):
 		self.packageMap[explicitspec.name][autospec.name] = self[name]
 
     def _getname(self, subname, autoname):
-	"""Cheap way of saying "if subname, then subname/autoname,
+        """Cheap way of saying "if subname, then subname:autoname,
 	otherwise just autoname"."""
-	return string.lstrip(string.join((subname, autoname), '/'), '/')
+	return string.lstrip(string.join((subname, autoname), ':'), ':')
     
     def add(self, path, autospec, explicitspec):
 	self.packageMap[explicitspec.name][autospec.name].instance.addFile(path)
