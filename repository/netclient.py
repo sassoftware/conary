@@ -308,65 +308,107 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
 		      withFileContents = True, target = None):
-        jobList = {}
-	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
-            serverName = new.branch().label().getHost()
-            if not jobList.has_key(serverName):
-                jobList[serverName] = []
-
-	    if old:
-		jobList[serverName].append((name, 
-			  (self.fromVersion(old), self.fromFlavor(oldFlavor)), 
-			  (self.fromVersion(new), self.fromFlavor(newFlavor)),
-			  absolute))
-	    else:
-		jobList[serverName].append((name, 
-			  (0, 0),
-			  (self.fromVersion(new), self.fromFlavor(newFlavor)),
-			  absolute))
+        # This is a bit complicated do to servers not wanting to talk
+        # to other servers. To make this work, we do this:
+        #
+        #   1. Split the list of change set requests into ones for
+        #   remote servers (by server) and ones we need to generate
+        #   locally
+        #
+        #   2. Get the changesets from the remote servers. This also
+        #   gives us lists of other changesets we need (which need
+        #   to be locally generated, or the repository server would
+        #   have created them for us). 
+        #
+        #   3. Create the local changesets. Doing this could well
+        #   result in our needing changesets which we're better off
+        #   generating on a server.
+        #
+        #   4. If more changesets are needed (from step 3) go to
+        #   step 2.
+        #
+        #   5. Download any extra files (and create any extra diffs)
+        #   which step 2 couldn't do for us.
 
         cs = None
         mergedChangeSets = False
-        if len(jobList) > 1:
-            origTarget = target
-            mergedChangeSets = True
-            target = None
+        firstPath = target
 
-        for serverName, job in jobList.iteritems():
-            urlList = self.c[serverName].getChangeSet(job, recurse, withFiles,
-                                                      withFileContents)
+        while chgSetList:
+            # split the chgSetList into jobs for each server and one
+            # for this client
+            serverJobs = {}
+            ourJobList = []
+            for (troveName, (old, oldFlavor), (new, newFlavor), absolute) in \
+                    chgSetList:
+                serverName = new.branch().label().getHost()
+                if not serverJobs.has_key(serverName):
+                    serverJobs[serverName] = []
 
-            if len(urlList) > 1 and target:
-                origTarget = target
-                target = None
-                mergedChangeSets = True
-
-            for url in urlList:
-                inF = urllib.urlopen(url)
-                if not target:
-                    (outFd, name) = tempfile.mkstemp()
-                    outF = os.fdopen(outFd, "w")
-                else:
-                    outF = open(target, "w")
-
-                try:
-                    util.copyfileobj(inF, outF)
-                    outF.close()
-                    if not target:
-                        newCs = repository.changeset.ChangeSetFromFile(name)
-                        if not cs:
-                            cs = newCs
-                        else:
-                            cs.merge(newCs)
+                if old:
+                    if old.branch().label().getHost() == serverName:
+                        serverJobs[serverName].append((troveName, 
+                                  (self.fromVersion(old), 
+                                   self.fromFlavor(oldFlavor)), 
+                                  (self.fromVersion(new), 
+                                   self.fromFlavor(newFlavor)),
+                                  absolute))
                     else:
-                        cs = None
-                finally:
-                    inF.close()
-                    if not target:
-                        os.unlink(name)
+                        ourJobList.append((troveName, (old, oldFlavor),
+                                           (new, newFlavor), absolute))
+                else:
+                    serverJobs[serverName].append((troveName, 
+                              (0, 0),
+                              (self.fromVersion(new), 
+                               self.fromFlavor(newFlavor)),
+                              absolute))
 
-        if mergedChangeSets and origTarget is not None:
-            cs.writeToFile(origTarget)
+            chgSetList = []
+
+            for serverName, job in serverJobs.iteritems():
+                urlList = self.c[serverName].getChangeSet(job, recurse, 
+                                                withFiles, withFileContents)
+
+                if len(urlList) > 1 and target:
+                    origTarget = target
+                    target = None
+
+                for url in urlList:
+                    inF = urllib.urlopen(url)
+
+                    if firstPath:
+                        tmpName = firstPath
+                        outF = open(firstPath, "w")
+                        firstPath = None
+                        doUnlink = False
+                    else:
+                        (outFd, tmpName) = tempfile.mkstemp()
+                        outF = os.fdopen(outFd, "w")
+                        doUnlink = True
+
+                    try:
+                        util.copyfileobj(inF, outF)
+                        outF.close()
+                        if not target:
+                            newCs = repository.changeset.ChangeSetFromFile(
+                                            tmpName)
+                            if not cs:
+                                cs = newCs
+                            else:
+                                cs.merge(newCs)
+                                mergedChangeSets = True
+                        else:
+                            cs = None
+                    finally:
+                        inF.close()
+                        if doUnlink:
+                            os.unlink(tmpName)
+
+            serverJob = {}
+
+        if target and mergedChangeSets:
+            os.unlink(target)
+            cs.writeToFile(target)
             cs = None
 
 	return cs
