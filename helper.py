@@ -65,6 +65,9 @@ def findPackage(repos, packageNamespace, defaultNick, name,
     if not versionStr or (versionStr[0] != "/" and  \
 	# branch nickname was given
 	    (versionStr.find("/") == -1) and versionStr.count("@")):
+	if versionStr[0] == "@":
+	    versionStr = packageNamespace[1:] + versionStr
+
 	if versionStr:
 	    try:
 		nick = versions.BranchName(versionStr)
