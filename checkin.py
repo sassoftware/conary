@@ -24,7 +24,6 @@ from repository import changeset
 import changelog
 import cook
 import files
-import helper
 import log
 import magic
 import os
@@ -203,7 +202,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
                       workDir, str(err))
 	    return
 
-    branch = helper.fullBranchName(cfg.buildLabel, trv.getVersion(), 
+    branch = fullBranchName(cfg.buildLabel, trv.getVersion(), 
 				   versionStr)
     state = SourceState(trv.getName(), trv.getVersion())
 
@@ -496,7 +495,7 @@ def updateSrc(repos, versionStr = None):
 
 	head = pkgList[0]
 	headVersion = head.getVersion()
-	newBranch = helper.fullBranchName(None, headVersion, versionStr)
+	newBranch = fullBranchName(None, headVersion, versionStr)
 
     changeSet = repos.createChangeSet([(pkgName, (baseVersion, None),
 					(headVersion, None), 0)])
@@ -670,3 +669,42 @@ def showOneLog(version, changeLog=''):
     else:
 	print "%s %s (no log message)\n" \
 	      %(versionStr, when)
+
+def fullBranchName(defaultLabel, version, versionStr):
+    """
+    Converts a version string, and the version the string refers to
+    (often returned by findPackage()) into the full branch name the
+    node is on. This is different from version.branch() when versionStr
+    refers to the head of an empty branch, in which case version() will
+    be the version the branch was forked from rather then a version on
+    that branch.
+
+    @param defaultLabel: default label we're on if versionStr is None
+    (may be none if versionStr is not None)
+    @type defaultLabel: versions.BranchName
+    @param version: version of the node versionStr resolved to
+    @type version: versions.Version
+    @param versionStr: string from the user; likely a very abbreviated version
+    @type versionStr: str
+    """
+    if not versionStr or (versionStr[0] != "/" and  \
+	# label was given
+	    (versionStr.find("/") == -1) and versionStr.count("@")):
+	if not versionStr:
+	    label = defaultLabel
+	elif versionStr[0] == "@":
+            label = versions.BranchName(defaultLabel.getHost() + versionStr)
+	else:
+	    label = versions.BranchName(versionStr)
+
+	if version.branch().label() == label:
+	    return version.branch()
+	else:
+	    # this must be the node the branch was created at, otherwise
+	    # we'd be on it
+	    return version.fork(label, sameVerRel = 0)
+    elif version.isBranch():
+	return version
+    else:
+	return version.branch()
+

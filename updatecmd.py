@@ -13,7 +13,6 @@
 #
 from repository import changeset
 from local import database
-import helper
 import log
 import os
 from repository import repository

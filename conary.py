@@ -31,7 +31,6 @@ import cook
 import cscmd
 from local import database
 import display
-import helper
 import importrpm
 import log
 import os
@@ -120,7 +119,7 @@ def usage(rc = 1):
 
 def openRepository(repMap):
     try:
-        return helper.openRepository(repMap)
+        return repository.netclient.NetworkRepositoryClient(repMap)
     except repository.repository.OpenError, e:
 	log.error('Unable to open repository %s: %s', path, str(e))
 	sys.exit(1)

@@ -17,7 +17,7 @@ Provides the output for the "conary source" subcommands
 """
 
 from repository import repository
-from helper import openRepository
+from repository.netclient import NetworkRepositoryClient
 import checkin
 
 argDef = {}
@@ -52,7 +52,7 @@ def sourceCommand(cfg, args, argSet):
 	    dir = None
 
 	if argSet or (len(args) < 2 or len(args) > 3): return usage()
-	repos = openRepository(cfg.repositoryMap)
+	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	args = [repos, cfg, dir] + args[1:]
 	checkin.checkout(*args)
@@ -62,24 +62,24 @@ def sourceCommand(cfg, args, argSet):
 	    del argSet['message']
 
 	if argSet or len(args) != 1: return usage()
-	repos = openRepository(cfg.repositoryMap)
+	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	checkin.commit(repos, cfg, message)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
-	repos = openRepository(cfg.repositoryMap)
+	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	args[0] = repos
 	checkin.diff(*args)
     elif (args[0] == "log"):
 	if argSet or len(args) > 2: return usage()
 
-	repos = openRepository(cfg.repositoryMap)
+	repos = NetworkRepositoryClient(cfg.repositoryMap)
 	args[0] = repos
 	checkin.showLog(*args)
     elif (args[0] == "rdiff"):
 	if argSet or len(args) != 4: return usage()
-	repos = openRepository(cfg.repositoryMap)
+	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	args[0] = repos
 	checkin.rdiff(repos, cfg.buildLabel,  *args[1:])
@@ -94,14 +94,14 @@ def sourceCommand(cfg, args, argSet):
 	if len(args) != 2: return usage()
 	
 	try:
-	    repos = openRepository(cfg.repositoryMap)
+	    repos = NetworkRepositoryClient(cfg.repositoryMap)
 	except repository.OpenError:
 	    repos = None
 
 	checkin.newPackage(repos, cfg, args[1])
     elif (args[0] == "update"):
 	if argSet or not args or len(args) > 2: return usage()
-	repos = openRepository(cfg.repositoryMap)
+	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	args[0] = repos
 	checkin.updateSrc(*args)

@@ -16,7 +16,6 @@ Currently-disabled module for importing RPMs
 """
 import commit
 import cook
-import helper
 import os
 import stat
 import util

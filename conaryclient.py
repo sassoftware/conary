@@ -14,11 +14,11 @@
 import os
 import util
 
-import helper
 import conarycfg
 from local import database
 from repository import repository
 from repository import changeset
+from repository.netclient import NetworkRepositoryClient
 
 class ClientError(Exception):
     """Base class for client errors"""
@@ -46,7 +46,7 @@ class ConaryClient:
         if cfg == None:
             cfg = conarycfg.ConaryConfiguration()
         if repos == None:
-            repos = helper.openRepository(cfg.repositoryMap)
+            repos = NetworkRepositoryClient(cfg.repositoryMap)
         
         self.repos = repos
         self.cfg = cfg

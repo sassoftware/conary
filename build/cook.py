@@ -23,8 +23,8 @@ import deps.deps
 from repository import changeset
 from repository import filecontents
 from repository import repository
+from repository.netclient import NetworkRepositoryClient
 import files
-import helper
 import log
 from build import buildinfo, lookaside, use
 import os
@@ -630,7 +630,7 @@ class CookError(Exception):
 
 def cookCommand(cfg, args, prep, macros, buildBranch = None, emerge = False, resume = None):
     # this ensures the repository exists
-    repos = helper.openRepository(cfg.repositoryMap)
+    repos = NetworkRepositoryClient(cfg.repositoryMap)
 
     for item in args:
         # we want to fork here to isolate changes the recipe might make

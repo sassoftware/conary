@@ -22,7 +22,6 @@ import buildpackage
 import destdirpolicy
 import errno
 import files
-import helper
 import imp
 import inspect
 import log
