@@ -51,9 +51,9 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 
 	list = []
 	for pkg in pkgList:
-	    if db.stash.hasPackage(pkg.getName()):
+	    if db.hasPackage(pkg.getName()):
 		# currentVersion could be None
-		currentVersionList = db.stash.getPackageVersionList(pkg.getName())
+		currentVersionList = db.getPackageVersionList(pkg.getName())
 		if len(currentVersionList) == 1:
 		    currentVersion = currentVersionList[0]
 		elif len(currentVersionList) == 0:
@@ -63,7 +63,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 		    # upgrade all of them look for one on the same branch
 		    # as the one we're installing. if there's a match, great;
 		    # if not, bail
-		    currentVersion = db.stash.pkgLatestVersion(pkg.getName(), 
+		    currentVersion = db.pkgLatestVersion(pkg.getName(), 
 						     pkg.getVersion().branch())
 		    if not currentVersion:
 			log.error("multiple versions of %s are installed and "
@@ -88,7 +88,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 
 def doErase(db, cfg, pkg, versionStr = None):
     try:
-	pkgList = helper.findPackage(db.stash, cfg.installbranch, pkg, 
+	pkgList = helper.findPackage(db, cfg.installbranch, pkg, 
 				     versionStr)
     except helper.PackageNotFound, e:
 	log.error(str(e))
