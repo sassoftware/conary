@@ -19,7 +19,7 @@ python_modules=elfmodule.so miscmodule.so
 elfmodule_objs=elf.o
 miscmodule_objs=misc.o
 generated_files=$(elfmodule_objs) $(python_modules)
-dist_files = $(python_files) elf.c Makefile
+dist_files = $(python_files) elf.c misc.c Makefile
 
 
 all: $(python_modules)
