@@ -107,7 +107,7 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     @param cfg: srs configuration
     @type cfg: srscfg.SrsConfiguration
     @param recipeClass: class which will be instantiated into a recipe
-    @type recipeClass: class
+    @type recipeClass: class descended from recipe.Recipe
     @param buildBranch: the branch the new build will be committed to
     @type buildBranch: versions.Version
     @param changeSetFile: if set, the changeset is stored in this file
@@ -119,7 +119,23 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     @param macros: set of macros for the build
     @type macros: sequence
     @rtype: list of strings
+    """
 
+    if issubclass(recipeClass, recipe.PackageRecipe):
+	return cookPackageObject(repos, cfg, recipeClass, buildBranch,
+				 changeSetFile = changeSetFile,
+				 prep = prep, macros = macros)
+    
+    assert(0)
+
+def cookPackageObject(repos, cfg, recipeClass, buildBranch, 
+		      changeSetFile = None, prep=True, macros=()):
+    """
+    Just like cookObject(), but only works for objects descended
+    from recipe.PackageRecipe.
+
+    The parameters and return type are identical to those for
+    cookObject()
     """
 
     repos.open("r")
