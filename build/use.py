@@ -244,7 +244,8 @@ class Flag(dict):
         while cursor is not None:
             namelist.append(cursor._name)
             cursor = cursor._parent
-        return '.'.join(reversed(namelist))
+        namelist.reverse()
+        return '.'.join(namelist)
 
     def trackUsed(self, val):
         self._track = val
