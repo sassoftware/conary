@@ -113,8 +113,8 @@ def main(argv):
         dbVersions = db.getTroveVersionList(pkg)
         for v in dbVersions:
             branch = v.branch()
-            if isinstance(branch.label(), versions.CookBranch) or\
-               isinstance(branch.label(), versions.EmergeBranch):
+            if isinstance(branch.label(), versions.CookLabel) or\
+               isinstance(branch.label(), versions.EmergeLabel):
                 continue
             if branch not in branchPkgs:
                 branchPkgs[branch] = {}
@@ -142,7 +142,7 @@ def main(argv):
             for lv in dbVersions:
                 if not repoVersions:
                     
-                    lvt = lv.trailingVersion()
+                    lvt = lv.trailingRevision()
                     notavail.append((branch, pkg, lv, None))
                 else:
                     repoVersions.sort()
@@ -162,9 +162,9 @@ def main(argv):
     for (label, pkg, lv, v) in updates + notavail:
         maxL = max(maxL, len(label.asString()))
         maxP = max(maxP, len(pkg))
-        maxLV = max(maxLV, len(lv.trailingVersion().asString()))
+        maxLV = max(maxLV, len(lv.trailingRevision().asString()))
         if v:
-            maxV = max(maxV, len(v.trailingVersion().asString()))
+            maxV = max(maxV, len(v.trailingRevision().asString()))
 
     displayVars = {}
     displayVars['repo'] = ("%-*s" , [maxL])
@@ -180,9 +180,9 @@ def main(argv):
     
 
     for (label, pkg, lv, v) in updates + notavail:
-        lvt = lv.trailingVersion()
+        lvt = lv.trailingRevision()
         if v:
-            vt = v.trailingVersion()
+            vt = v.trailingRevision()
             if lvt.getVersion() != vt.getVersion():
                 change = 'V'
             elif lvt.getRelease() != vt.getRelease():

@@ -76,7 +76,7 @@ def printVersionsAndLeaves(trove, label, level):
    
     for version in flavors[trove]:
 	for flavor in flavors[trove][version]:
-	    print '"%s" [label="%s"];' % (version.asString(), version.trailingVersion().asString())
+	    print '"%s" [label="%s"];' % (version.asString(), version.trailingRevision().asString())
 	    print '"%s" -> "%s"' % (label.asString(), version.asString())
 
 # go
