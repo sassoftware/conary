@@ -181,7 +181,7 @@ class Database(repository.LocalRepository):
 	# and is filled out by ensuring that every package has a branch
 	# in the local tree
 	try:
-	    dbUndo = DatabaseChangeSetUndo(self)
+	    dbUndo = repository.ChangeSetUndo(self)
 	    if localRollback:
 		dbJob = DatabaseChangeSetJob(self, localChanges, job,
 					     retargetLocal = 0)
@@ -519,32 +519,6 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 
 	    self.oldFile(f.fileId(), oldVersion, 
 			 repos.getFileVersion(f.fileId(), oldVersion))
-
-class DatabaseChangeSetUndo(repository.ChangeSetUndo):
-
-    def undo(self):
-	for pkg in self.removedPackages:
-	    self.repos.addPackage(pkg)
-
-	for (fileId, fileVersion, fileObj) in self.removedFiles:
-	    self.repos.addFileVersion(fileId, fileVersion, fileObj)
-
-	repository.ChangeSetUndo.undo(self)
-
-    def removedPackage(self, pkg):
-	self.removedPackages.append(pkg)
-
-    def removedFile(self, fileId, fileVersion, fileObj):
-	self.removedFiles.append((fileId, fileVersion, fileObj))
-
-    def reset(self):
-	repository.ChangeSetUndo.reset(self)
-	self.removedPackages = []
-	self.removedFiles = []
-
-    def __init__(self, repos):
-	self.repos = repos
-	self.reset()
 
 # Exception classes
 

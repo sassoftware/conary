@@ -470,6 +470,12 @@ class ChangeSetUndo:
 
     def undo(self):
 	# something went wrong; try to unwind our commits
+	for pkg in self.removedPackages:
+	    self.repos.addPackage(pkg)
+
+	for (fileId, fileVersion, fileObj) in self.removedFiles:
+	    self.repos.addFileVersion(fileId, fileVersion, fileObj)
+
 	for newFile in self.filesDone:
 	    self.repos.eraseFileVersion(newFile.fileId(), newFile.version())
 
@@ -490,10 +496,18 @@ class ChangeSetUndo:
     def addedFileContents(self, sha1):
 	self.filesStored.append(sha1)
 
+    def removedPackage(self, pkg):
+	self.removedPackages.append(pkg)
+
+    def removedFile(self, fileId, fileVersion, fileObj):
+	self.removedFiles.append((fileId, fileVersion, fileObj))
+
     def reset(self):
 	self.filesDone = []
 	self.pkgsDone = []
 	self.filesStored = []
+	self.removedPackages = []
+	self.removedFiles = []
 
     def __init__(self, repos):
 	self.reset()
