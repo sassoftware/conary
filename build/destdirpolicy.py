@@ -42,7 +42,7 @@ class RemoveExtraLibs(policy.Policy):
     """
     invariantinclusions = [
 	'\.la$',
-	'%(libdir)s/python.*/site-packages/.*.a$'
+	r'%(libdir)s/python.*/site-packages/.*\.a$'
     ]
 
     def doFile(self, path):
