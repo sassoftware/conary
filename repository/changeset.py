@@ -8,6 +8,11 @@ import os
 class ChangeSet:
 
     def getFileContents(self, hash):
+	loc = self.csf.getTag(hash)
+	if loc == "seefile":
+	    fn = self.csf.getFile(hash).read()
+	    return open(fn, "r")
+
 	return self.csf.getFile(hash)
 
     def useFile(self, file):
@@ -145,10 +150,10 @@ def CreateFromFilesystem(pkgList, version, outFileName):
 
     csf.addFile("SRSCHANGESET", cs, "")
 
+    # this changeset points at the local filesystem for the contents
+    # of a file
     for hash in hashMap.keys():
-	f = open(hashMap[hash], "r")
-	csf.addFile(hash, f, "")
-	f.close()
+	csf.addFile(hash, hashMap[hash], "seefile")
 
     csf.close()
 
