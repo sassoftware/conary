@@ -130,7 +130,7 @@ class Trove:
 	"""
 	Returns a string representing file information for this trove
 	trove, which can later be read by the read() method. This is
-	only used to create the SRS control file when dealing with
+	only used to create the Conary control file when dealing with
 	:source component checkins, so things like trove dependency
 	information is not needed.  The format of the string is:
 

@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-# defines the SRS system repository
+# defines the Conary repository
 
 import changeset
 import datastore

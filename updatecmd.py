@@ -31,7 +31,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 	    list = [ x.getName() for x  in cs.iterNewPackageList() ]
 	    if versionStr:
 		sys.stderr.write("Verison should not be specified when a "
-				 "SRS change set is being installed.\n")
+				 "Conary change set is being installed.\n")
 		return 1
 
     if not cs:

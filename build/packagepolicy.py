@@ -388,7 +388,7 @@ class ParseManifest(policy.Policy):
     information that can't be represented by pure filesystem status
     with a non-root built: device files (%dev), directory responsibility
     (%dir), and ownership (%attr).  It translates these into the
-    related SRS construct for each.  There is no equivalent to
+    related Conary construct for each.  There is no equivalent to
     %defattr -- our default ownership is root:root, and permissions
     (except for setuid and setgid files) are collected from the filesystem.
 
@@ -647,11 +647,11 @@ class Ownership(policy.Policy):
 
 class ExcludeDirectories(policy.Policy):
     """
-    In SRS, there are only two reasons to package a directory: the
+    In Conary, there are only two reasons to package a directory: the
     directory needs permissions other than 0755, or it must exist
     even if it is empty.  Packages do not need to explicitly include
     a directory just to ensure that there is a place to put a file;
-    SRS will appropriately create the directory, and delete it later
+    Conary will appropriately create the directory, and delete it later
     if the directory becomes empty.
 
     The ExcludeDirectories policy causes directories to be excluded
