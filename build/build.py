@@ -32,7 +32,7 @@ _permmap = {
 class BuildAction(util.Action):
     def __init__(self, *args, **keywords):
 	"""
-	@param use: Optional argument; Use flag(s) telling whether
+	@keyword use: Optional argument; Use flag(s) telling whether
 	to actually perform the action.
 	@type use: None, Use flag, or sequence of Use flags
 	"""

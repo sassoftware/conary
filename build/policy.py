@@ -26,17 +26,17 @@ class Policy(util.Action):
     but should use the same rules if they do use them.  All of them
     have self.macros applied before use.
 
-    @var invariantsubtrees: if invariantsubtrees is not empty,
+    @cvar invariantsubtrees: if invariantsubtrees is not empty,
     then it is a list of subtrees (relative to %(destdir)s) to
     walk INSTEAD of walking the entire %(destdir)s tree.
 
-    @var invariantinclusions: if invariantinclusions is not empty,
+    @cvar invariantinclusions: if invariantinclusions is not empty,
     then only files matching a regular expression in it are
     considered to be passed to to the doFile member.  Any exclusions
     including invariants, are applied after invariantinclusions
     are applied.
 
-    @var invariantexceptions: subclasses may set to a list of
+    @cvar invariantexceptions: subclasses may set to a list of
     exception regular expressions that are always applied regardless
     of what other exceptions may be provided by the recipe; these
     exceptions being applied is an invariant condition of the doFile
@@ -48,12 +48,12 @@ class Policy(util.Action):
 
     def __init__(self, *args, **keywords):
 	"""
-	@param exceptions: Optional argument; regexp(s) specifying
+	@keyword exceptions: Optional argument; regexp(s) specifying
 	files to ignore while taking the policy action.  It will be
 	interpolated against recipe macros before being used.
 	@type exceptions: None, regular expression string, or
 	tuple/list of regular expressions
-	@param use: Optional argument; Use flag(s) telling whether
+	@keyword use: Optional argument; Use flag(s) telling whether
 	to actually perform the action.
 	@type use: None, Use flag, or tuple/list of Use flags
 	"""
@@ -69,7 +69,7 @@ class Policy(util.Action):
     def doProcess(self, recipe):
 	"""
 	Invocation instance
-        @param macros: macros which will be expanded through dictionary
+        @keyword macros: macros which will be expanded through dictionary
         substitution in self.command
         @type macros: recipe.Macros
         @return: None

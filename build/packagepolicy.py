@@ -45,7 +45,7 @@ class Config(policy.Policy):
 
     def __init__(self, *args, **keywords):
         """
-        @param inclusions: regexp(s) specifying files to be included.
+        @keyword inclusions: regexp(s) specifying files to be included.
         Do not mention files in /etc, which are already covered by the
         EtcConfig class.
         @type inclusions: None, regexp string, sequence of regexp strings.
