@@ -28,6 +28,8 @@ class NewVersion(AbstractVersion):
     Class used as a marker for new (as yet undefined) versions.
     """
 
+    __slots__ = ( "timeStamp" )
+
     def asString(self):
 	return "@NEW@"
 
@@ -51,6 +53,8 @@ class AbstractBranch(object):
     """
     Ancestor class for all branches (as opposed to versions)
     """
+
+    __slots__ = ()
 
     def __init__(self):
 	pass
@@ -573,7 +577,7 @@ def ThawVersion(ver):
 
 class _ThawVersion(Version):
 
-    __slots__ = ( "versions", "timeStamp" )
+    __slots__ = ()
 
     """
     Provides a version object from a frozen version string.
@@ -606,7 +610,7 @@ class _VersionFromString(Version):
     with respect to other versions.
     """
 
-    __slots__ = ( "versions", "timeStamp" )
+    __slots__ = ()
 
     def __init__(self, ver, defaultBranch = None):
 	"""
