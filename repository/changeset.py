@@ -65,10 +65,10 @@ class ChangeSet:
 	    raise
 
     def __init__(self):
+	assert(self.__class__ != ChangeSet)
 	self.packages = []
 	self.files = {}
 	self.fileContents = []
-	pass
 
 class ChangeSetFromFilesystem(ChangeSet):
 
