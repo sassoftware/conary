@@ -509,7 +509,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 	    old = None
 	else:
 	    oldV = branchList[-count]
-	    old = repos.getTrove(troveName, oldV, None)
+	    old = repos.getTrove(troveName, oldV, deps.deps.DependencySet())
     except ValueError:
 	old = repos.findTrove(buildLabel, troveName, None, 
 			      versionStr = oldVersion)
@@ -519,8 +519,9 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 	old = old[0]
 	oldV = old.getVersion()
 
-    cs = repos.createChangeSet([(troveName, (oldV, None),
-					    (newV, None), False)])
+    cs = repos.createChangeSet([(troveName, (oldV, deps.deps.DependencySet()),
+					    (newV, deps.deps.DependencySet()), 
+                                 False)])
 
     _showChangeSet(repos, cs, old, new)
 
