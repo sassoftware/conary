@@ -181,6 +181,9 @@ class Flag(dict):
     def getUsed(self):
         return self._usedFlags
 
+    def setUsed(self, usedDict):
+        self._usedFlags.update(usedDict)
+
     def trackUsed(self, val):
         self._track = val
 
@@ -514,6 +517,29 @@ def resetUsed():
     Use.resetUsed()
     Arch.resetUsed()
     LocalFlags.resetUsed()
+
+def getUsed():
+    """
+    A method for retreive the flags used by a recipe in dict form, separated
+    by Flag set.  Can be used to store and restore a set of used flags 
+    to allow for the separation of loading and setting up of a recipe and 
+    cooking that recipe.
+    """
+    used = {}
+    used['Arch'] = Arch.getUsed()
+    used['Use'] = Use.getUsed()
+    used['Flags'] = LocalFlags.getUsed()
+
+def setUsed(usedDict):
+    """
+    A method for updating the used flags to include the flags passed in.
+    Can be used to store and restore a set of used flags to allow for the 
+    separation of loading and setting up of a recipe and cooking that recipe.
+    """
+    used = {}
+    Arch.setUsed(usedDict['Arch'])
+    Use.setUsed(usedDict['Use'])
+    LocalFlags.setUsed(usedDict['Flags'])
     
 def track(arg):
     """
