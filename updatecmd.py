@@ -21,107 +21,21 @@ import sys
 import trove
 import util
 import versions
+import conaryclient
 
 def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
-	     tagScript = None, keepExisting = False):
-    db = database.Database(cfg.root, cfg.dbPath)
-
-    cs = None
-    if not os.path.exists(cfg.root):
-        util.mkdirChain(cfg.root)
-
-    import time
-    start = time.time()
-
-    if os.path.exists(pkg) and os.path.isfile(pkg):
-	# there is a file, try to read it as a changeset file
-
-        try:
-            cs = changeset.ChangeSetFromFile(pkg)
-        except KeyError:
-            # invalid changeset file
-            pass
-        else:
-            if cs.isAbsolute():
-                try:
-                    cs = db.rootChangeSet(cs)
-                except repository.CommitError, e:
-                    sys.stderr.write("%s\n" %str(e))
-                    return 1
-
-	    list = [ x.getName() for x  in cs.iterNewPackageList() ]
-	    if versionStr:
-		sys.stderr.write("Verison should not be specified when a "
-				 "Conary change set is being installed.\n")
-		return 1
-
-	    eraseList = []
-
-    if not cs:
-        # so far no changeset (either the path didn't exist or we could not
-        # read it
-
-        # if we have this installed already, look at the same repository
-        # for a new version
-
-        if db.hasPackage(pkg):
-            labels = [ x.getVersion().branch().label()
-                                            for x in db.findTrove(pkg) ]
-            # this removes duplicates
-            labels = {}.fromkeys(labels).keys()
-        else:
-            labels = [ cfg.installLabel ]
-
-        newList = []
-        for label in labels:
-            try:
-                newList += repos.findTrove(label, pkg, cfg.flavor, versionStr)
-            except repository.PackageNotFound, e:
-                pass
-
-        if not newList:
-            raise repository.TroveMissing(pkg, labels)
-
-	list = []
-	if keepExisting:
-	    for newTrove in newList:
-		list.append((newTrove.getName(), (None, None),
-			   (newTrove.getVersion(), newTrove.getFlavor()), 0))
-	    eraseList = []
-	else:
-	    newItems = []
-	    for newTrove in newList:
-		newItems.append((newTrove.getName(), newTrove.getVersion(),
-				 newTrove.getFlavor()))
-
-	    # everything which needs to be installed is in this list; if it's
-	    # not here, it's a duplicate
-	    outdated, eraseList = helper.outdatedTroves(db, newItems)
-	    for (name, newVersion, newFlavor), \
-		    (oldName, oldVersion, oldFlavor) in outdated.iteritems():
-		list.append((name, (oldVersion, oldFlavor),
-				   (newVersion, newFlavor), 0))
-
-        if not list:
-            log.warning("no new troves were found")
-            return
-
-	cs = repos.createChangeSet(list)
-	list = [ x[0] for x in list ]
-
-    if not list:
-	log.warning("no new troves were found")
-	return
-
+                              tagScript = None, keepExisting = False):
+    client = conaryclient.ConaryClient(repos, cfg)
+    
     try:
-	db.commitChangeSet(cs, replaceFiles = replaceFiles, 
-			   tagScript = tagScript, keepExisting = keepExisting)
-    except database.SourcePackageInstall, e:
-	log.error(e)
+        if os.path.exists(pkg) and os.path.isfile(pkg):
+            client.applyChangeSet(pkg, replaceFiles, tagScript, keepExisting) 
+        else:
+            client.updateTrove(pkg, versionStr, replaceFiles, tagScript, keepExisting)
+    except conaryclient.UpdateError, e:
+        log.error(e)
     except repository.CommitError, e:
-	log.error(e)
-
-    # this doesn't do anything with eraselist; leave other branches alone
+        log.error(e)
 
 def doErase(db, cfg, pkg, versionStr = None, tagScript = None):
     try:

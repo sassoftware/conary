@@ -33,6 +33,7 @@ python_files = __init__.py	\
 	commit.py		\
 	conary.py		\
 	conarycfg.py		\
+	conaryclient.py		\
 	constants.py		\
 	cook.py			\
 	cscmd.py		\
