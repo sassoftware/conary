@@ -53,7 +53,7 @@ def commitChangeSet(repos, cfg, cs):
     # commit changes
     pkgsDone = []
     filesDone = []
-    filesToArchive = []
+    filesToArchive = {}
     try:
 	for (pkgName, newPkg, newVersion) in pkgList:
 	    pkgSet = repos.getPackageSet(pkgName, "w")
@@ -71,9 +71,15 @@ def commitChangeSet(repos, cfg, cs):
 		infoFile.addVersion(fileVersion, file)
 		infoFile.close()
 		filesDone.append(fileId)
-		filesToArchive.append((file, pathInPkg, pkgName))
+		filesToArchive[pathInPkg] = ((file, pathInPkg, pkgName))
 
-	for (file, path, pkgName) in filesToArchive:
+        # sort paths and store in order (to make sure that directories
+        # are stored before the files that reside in them in the case of
+        # restore to a local file system
+        pathsToArchive = filesToArchive.keys()
+        pathsToArchive.sort()
+	for pathInPkg in pathsToArchive:
+            (file, path, pkgName) = filesToArchive[pathInPkg]
 	    if isinstance(file, files.SourceFile):
 		basePkgName = string.split(pkgName, '/')[-2]
 		d = { 'pkgname' : basePkgName }
