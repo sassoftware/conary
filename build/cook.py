@@ -138,7 +138,11 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     fullName = recipeClass.name
 
     if not buildBranch:
-	if repos.hasPackage(buildLabel.getHost(), fullName):
+	if cfg.cookNewBranches or not repos.hasPackage(buildLabel.getHost(), fullName):
+	    # for the first build, we're willing to create the branch for
+	    # them 
+	    buildBranch = versions.Version([buildLabel])
+	else:
 	    vers = repos.getTroveLeavesByLabel([fullName], buildLabel)[fullName]
 	    if not len(vers):
 		raise CookError('No branches labeled %s exist for trove %s'
@@ -148,10 +152,6 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 				'trove %s' % (fullName, buildLabel.asString))
 		
 	    buildBranch = vers[0].branch()
-	else:
-	    # for the first build, we're willing to create the branch for
-	    # them (though it has to be a trunk!)
-	    buildBranch = versions.Version([buildLabel])
     elif not buildBranch.timeStamps():
 	# trunk branch, go ahead and create if
 	pass

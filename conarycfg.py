@@ -16,6 +16,7 @@ class ConaryConfiguration:
     defaults = {
 	'buildLabel'	        : [ LABEL,	 None ],
 	'buildPath'		: '/usr/src/conary/builds',
+	'cookNewBranches'	: [ BOOL, False ], 
 	'contact'		: None,
 	'dbPath'		: '/var/lib/conarydb',
 	'debugRecipeExceptions' : [ BOOL, False ], 
