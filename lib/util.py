@@ -126,6 +126,12 @@ class ShellCommand(Action):
 
 # Simple ease-of-use extensions to python libraries
 
+def normpath(path):
+    s = os.path.normpath(path)
+    if s.startswith('//'):
+	return s[1:]
+    return s
+
 def mkdirChain(*paths):
     for path in paths:
         if path[0] != "/":
