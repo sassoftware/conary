@@ -35,7 +35,7 @@ IGNOREUGIDS = 1 << 2
 class FilesystemJob:
     """
     Represents a set of actions which need to be applied to the filesystem.
-    This is kept very simple to mimize the chance of mistakes or errors.
+    This is kept very simple to minimize the chance of mistakes or errors.
     """
 
     def _rename(self, oldPath, newPath, msg):
