@@ -217,8 +217,8 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
 	pkgs = repos.findTrove(label, component, None, versionStr)
 	if len(pkgs) > 1:
 	    raise RecipeFileError("source component %s has multiple versions "
-				  "with label %s", component,
-				  cfg.buildLabel.asString())
+				  "with label %s" %(component,
+                                                    cfg.buildLabel.asString()))
 	sourceComponent = pkgs[0]
     except repository.TroveMissing:
         raise RecipeFileError, 'cannot find source component %s' % component
@@ -518,7 +518,7 @@ class PackageRecipe(Recipe):
 		    for policyObj in list:
 			if isinstance(policyObj, policyClass):
 			    return _policyUpdater(policyObj)
-		    return _recipeHelper(list, policyClass)
+		    return _recipeHelper(list, self, policyClass)
         return self.__dict__[name]
 
     def __delattr__(self, name):
