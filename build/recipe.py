@@ -347,6 +347,9 @@ class PackageRecipe(Recipe):
 	self._appendSource(filename, keyid, 'source', extractDir, use,
                            (apply, macros))
 
+    def addAction(self, action, targetdir='', use=None):
+	self._appendSource('', '', 'action', targetdir, use, (action))
+
     def _extractFromRPM(self, rpm, filename):
         """
         Extracts filename from rpm file and creates an entry in the
@@ -377,9 +380,6 @@ class PackageRecipe(Recipe):
     def addSourceFromRPM(self, rpm, filename, **keywords):
         self._extractFromRPM(rpm, filename)
         self.addSource(filename, **keywords)
-
-    def addAction(self, action, targetdir='', use=None):
-	self._appendSource('', '', 'action', targetdir, use, (action))
 
     def allSources(self):
         sources = []
