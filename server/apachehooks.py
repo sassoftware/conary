@@ -252,6 +252,6 @@ def handler(req):
     elif method == "PUT":
 	return putFile(repos, req)
     else:
-	return apache.METHOD_NOT_ALLOWED
+	return apache.HTTP_METHOD_NOT_ALLOWED
 
 repositories = {}
