@@ -37,8 +37,8 @@ mainPath = os.path.realpath(mainPath)
 
 sys.path.append(mainPath)
 
-import netserver
-from netserver import NetworkRepositoryServer
+from repository.netrepos import netserver
+from repository.netrepos.netserver import NetworkRepositoryServer
 from conarycfg import ConfigFile
 from conarycfg import STRINGDICT
 from lib import options
@@ -173,7 +173,7 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 
     def reset(self, authToken, clientVersion):
         import shutil
-        from localrep import fsrepos
+        from repository.netrepos import fsrepos
 	del self.repos
 	shutil.rmtree(self.repPath + '/contents')
         os.unlink(self.repPath + '/sqldb')

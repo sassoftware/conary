@@ -19,7 +19,7 @@ import os
 import xmlrpclib
 import zlib
 
-import netserver
+from repository.netrepos import netserver
 import conarycfg
 
 BUFFER=1024 * 256
