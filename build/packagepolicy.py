@@ -100,7 +100,7 @@ class PackageSpec(_filterSpec):
 	# OK, all the filters exist, build an autopackage object that
 	# knows about them
 	recipe.autopkg = buildpackage.AutoBuildPackage(
-	    recipe.namePrefix, recipe.fullVersion,
+	    recipe.fullVersion,
 	    pkgFilters, self.compFilters)
 
 	# now walk the tree -- all policy classes after this require

@@ -187,7 +187,11 @@ class BranchName(AbstractBranch):
 	    raise ParseError, "/ should not appear in a branch name"
 
 	(self.host, self.branch) = value.split("@", 1)
-	if self.branch.find("@") != -1:
+	if not self.host:
+	    raise ParseError, ("repository names may not be empty: %s" % value)
+	elif not self.branch:
+	    raise ParseError, ("branch names may not be empty: %s" % value)
+	elif self.branch.find("@") != -1:
 	    raise ParseError, ("branch names may not have @ signs: %s" % value)
 
 class LocalBranch(BranchName):

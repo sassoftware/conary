@@ -57,7 +57,6 @@ class SrsConfiguration:
 	self.root = "/"
 	self.sourcepath = "/usr/src/srs/sources"
 	self.buildpath = "/usr/src/srs/builds"
-	self.packagenamespace = ":localhost"
 	self.defaultbranch = None
 	self.installbranch = None
 	self.lookaside = "/var/cache/srs"

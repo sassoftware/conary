@@ -564,7 +564,7 @@ class PackageChangeSet:
 
 	for name in self.packages.keys():
 	    list = [ x[0] + x[1].asString(cfg.defaultbranch) for x in self.packages[name] ]
-	    f.write("\t" + stripNamespace(cfg.packagenamespace, name) + " " + " ".join(list) + "\n")
+	    f.write("\t" + name + " " + " ".join(list) + "\n")
 
     def remapSinglePath(self, path, map, dict):
 	# the first item in map remaps source packages, which are present
@@ -678,11 +678,6 @@ class PackageFromFile(Package):
 
 	Package.__init__(self, name, version)
 	self.read(dataFile)
-
-def stripNamespace(namespace, pkgName):
-    if pkgName.startswith(namespace + ":"):
-	return pkgName[len(namespace) + 1:]
-    return pkgName
 
 def walkPackageSet(repos, pkg):
     """

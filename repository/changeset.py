@@ -130,7 +130,7 @@ class ChangeSet:
 
     def remapPaths(self, map):
 	for pkgCs in self.newPackages.values():
-	    dict = { 'pkgname' : pkgCs.getName().split(":")[2],
+	    dict = { 'pkgname' : pkgCs.getName().split(":")[0],
 		     'branchnick' : 
 			str(pkgCs.getNewVersion().branch().branchNickname()) }
 	    pkgCs.remapPaths(map, dict)
@@ -633,9 +633,6 @@ def CreateFromFilesystem(pkgList):
 
 def ChangeSetCommand(repos, cfg, pkgName, outFileName, oldVersionStr, \
 	      newVersionStr):
-    if pkgName[0] != ":":
-	pkgName = cfg.packagenamespace + ":" + pkgName
-
     newVersion = versions.VersionFromString(newVersionStr, cfg.defaultbranch)
 
     if (oldVersionStr):
@@ -650,12 +647,8 @@ def ChangeSetCommand(repos, cfg, pkgName, outFileName, oldVersionStr, \
     cs.writeToFile(outFileName)
 
 def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
-    if pkgName[0] != ":":
-	pkgName = cfg.packagenamespace + ":" + pkgName
-
     try:
-	pkgList = helper.findPackage(db, cfg.packagenamespace, 
-				     cfg.installbranch, pkgName, None)
+	pkgList = helper.findPackage(db, cfg.installbranch, pkgName, None)
     except helper.PackageNotFound, e:
 	log.error(e)
 	return

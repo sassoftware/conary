@@ -16,9 +16,7 @@ def listRollbacks(db, cfg):
 	for cs in rb:
 	    list = []
 	    for pkg in cs.getNewPackageList():
-		name = package.stripNamespace(cfg.packagenamespace, 
-					    pkg.getName())
-		list.append((name, pkg))
+		list.append((pkg.getName(), pkg))
 
 	    list.sort()
 	    for (name, pkg) in list:
@@ -33,15 +31,12 @@ def listRollbacks(db, cfg):
 
 	    list = []
 	    for (pkg, version) in cs.getOldPackageList():
-		name = package.stripNamespace(cfg.packagenamespace, pkg)
-		list.append((name, version))
+		list.append((pkg, version))
 
 	    list.sort()
 	    for (pkg, version) in list:
 		print "\t%s %s added" %  \
-				(package.stripNamespace(cfg.packagenamespace, 
-							pkg), 
-				 version.asString(cfg.defaultbranch))
+				(pkg, version.asString(cfg.defaultbranch))
 
 	print
 

@@ -172,9 +172,8 @@ class AutoBuildPackage:
     provides facilities for automatically populating them with files
     according to Filters.
     """
-    def __init__(self, namePrefix, version, pkgFilters, compFilters):
+    def __init__(self, version, pkgFilters, compFilters):
         """
-	@param namePrefix: the package prefix, such as ":srs.specifixinc.com"
 	@param version: the version of each package
         @type version: versions.Version instance
 	@param pkgFilters: Filters used to add files to main packages
@@ -191,7 +190,7 @@ class AutoBuildPackage:
 	self.packageMap = {}
 	for main in self.pkgFilters:
 	    for comp in self.compFilters:
-		name = self._getname(namePrefix, main.name, comp.name)
+		name = self._getname(main.name, comp.name)
 		if name not in self.packages:
 		    package = BuildPackage(name, version)
 		    self.packages[name] = package
@@ -199,8 +198,8 @@ class AutoBuildPackage:
 		    self.packageMap[main] = {}
 		self.packageMap[main][comp] = self.packages[name]
 
-    def _getname(self, prefix, pkgname, compname):
-        return string.join((prefix, pkgname, compname), ':')
+    def _getname(self, pkgname, compname):
+        return string.join((pkgname, compname), ':')
 
     def findPackage(self, path):
         """Return the BuildPackage that matches the path"""

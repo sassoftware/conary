@@ -134,7 +134,7 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
         raise CookError('recipe class must have name and version defined')
 
     log.info("Building %s", recipeClass.name)
-    fullName = cfg.packagenamespace + ":" + recipeClass.name
+    fullName = recipeClass.name
 
     currentVersion = None
     if repos.hasPackage(fullName):
@@ -195,7 +195,7 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     @rtype: tuple
     """
 
-    fullName = cfg.packagenamespace + ":" + recipeClass.name
+    fullName = recipeClass.name
 
     recipeObj = recipeClass(repos, cfg, buildBranch)
     recipeObj.setup()
@@ -233,7 +233,7 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
     @rtype: tuple
     """
 
-    fullName = cfg.packagenamespace + ":" + recipeClass.name
+    fullName = recipeClass.name
 
     recipeObj = recipeClass(repos, cfg, buildBranch)
     recipeObj.setup()
@@ -287,7 +287,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     repos.open("r")
 
     built = []
-    fullName = cfg.packagenamespace + ":" + recipeClass.name
+    fullName = recipeClass.name
     srcName = fullName + ":sources"
 
     lcache = lookaside.RepositoryCache(repos)
@@ -345,14 +345,14 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
     
     packageList = []
 
-    for buildPkg in recipeObj.getPackages(cfg.packagenamespace, newVersion):
+    for buildPkg in recipeObj.getPackages(newVersion):
 	(p, fileMap) = _createPackage(repos, buildBranch, buildPkg, ident)
 	built.append((p.getName(), p.getVersion().asString()))
 	packageList.append((p, fileMap))
 
     # build the group before the source package is added to the 
     # packageList; the package's group doesn't include sources
-    grpName = cfg.packagenamespace + ":" + recipeClass.name
+    grpName = recipeClass.name
     grp = package.Package(grpName, newVersion)
     for (pkg, map) in packageList:
 	grp.addPackage(pkg.getName(), [ pkg.getVersion() ])

@@ -14,9 +14,6 @@ _grpFormat  = "  %-37s %s"
 
 def displayPkgs(repos, cfg, all = False, ls = False, ids = False, pkg = "", 
 		versionStr = None):
-    if pkg and pkg[0] != ":":
-	pkg = cfg.packagenamespace + ":" + pkg
-
     if pkg:
 	list = [ pkg ]
     else:
@@ -38,9 +35,8 @@ def displayPkgs(repos, cfg, all = False, ls = False, ids = False, pkg = "",
                     return
 
 	    for version in l:
-		print _pkgFormat % (
-		    package.stripNamespace(cfg.packagenamespace, pkgName),
-		    version.asString(cfg.defaultbranch))
+		print _pkgFormat % (pkgName, 
+				    version.asString(cfg.defaultbranch))
 
 def _versionList(repos, pkgName):
     """
@@ -66,8 +62,8 @@ def _versionList(repos, pkgName):
 
 def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids):
     try:
-	pkgList = helper.findPackage(repos, cfg.packagenamespace, 
-				     cfg.installbranch, pkgName, versionStr)
+	pkgList = helper.findPackage(repos, cfg.installbranch, pkgName, 
+				     versionStr)
     except helper.PackageNotFound, e:
 	log.error(str(e))
 	return
@@ -91,16 +87,11 @@ def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls, ids):
 	    for (fileId, path, version) in pkg.fileList():
 		print "%s %s" % (fileId, path)
 	else:
-	    print _pkgFormat % (
-		package.stripNamespace(cfg.packagenamespace, pkgName),
-		version.asString(cfg.defaultbranch))
+	    print _pkgFormat % (pkgName, version.asString(cfg.defaultbranch))
 
 	    for (pkgName, verList) in pkg.getPackageList():
 		for ver in verList:
-		    print _grpFormat % (
-			    package.stripNamespace(cfg.packagenamespace, 
-						   pkgName),
-			    ver.asString(cfg.defaultbranch))
+		    print _grpFormat % (pkgName, ver.asString(cfg.defaultbranch))
 
 	    for (fileId, path, version) in pkg.fileList():
 		print _fileFormat % (path, version.asString(cfg.defaultbranch))

@@ -42,8 +42,7 @@ class SourceState(package.Package):
     def getRecipeFileName(self):
         # XXX this is not the correct way to solve this problem
         # assumes a fully qualified trove name
-        fields = self.getName().split(':')
-        name = fields[-2]
+        name = self.getName().split(':')[0]
         return os.path.join(os.getcwd(), name + '.recipe')
 
     def expandVersionStr(self, versionStr):
@@ -132,8 +131,7 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     # on the parent branch.
     name += ":sources"
     try:
-        trvList = helper.findPackage(repos, cfg.packagenamespace, 
-                                     cfg.installbranch, name, 
+        trvList = helper.findPackage(repos, cfg.installbranch, name, 
                                      versionStr = versionStr)
     except helper.PackageNotFound, e:
         log.error(str(e))
@@ -144,7 +142,7 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     trv = trvList[0]
 	
     if not dir:
-	dir = trv.getName().split(":")[-2]
+	dir = trv.getName().split(":")[0]
 
     if not os.path.isdir(dir):
 	try:
@@ -154,8 +152,8 @@ def checkout(repos, cfg, dir, name, versionStr = None):
                       str(err))
 	    return
 
-    branch = helper.fullBranchName(cfg.packagenamespace[1:], cfg.installbranch,
-				   trv.getVersion(), versionStr)
+    branch = helper.fullBranchName(cfg.installbranch, trv.getVersion(), 
+				   versionStr)
     state = SourceState(trv.getName(), trv.getVersion(), branch)
 
     for (fileId, (path, version)) in trv.iterFileList():
@@ -350,8 +348,6 @@ def removeFile(file):
     state.write("SRS")
 
 def newPackage(repos, cfg, name):
-    if name[0] != ":":
-	name = cfg.packagenamespace + ":" + name
     name += ":sources"
 
     state = SourceState(name, versions.NewVersion(), cfg.defaultbranch)
@@ -360,7 +356,7 @@ def newPackage(repos, cfg, name):
 	log.error("package %s already exists" % name)
 	return
 
-    dir = name.split(":")[-2]
+    dir = name.split(":")[0]
     if not os.path.isdir(dir):
 	try:
 	    os.mkdir(dir)

@@ -43,8 +43,8 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
         # so far no changeset (either the path didn't exist or we could not
         # read it
 	try:
-	    pkgList = helper.findPackage(repos, cfg.packagenamespace, 
-				     cfg.installbranch, pkg, versionStr)
+	    pkgList = helper.findPackage(repos, cfg.installbranch, pkg, 
+					 versionStr)
 	except helper.PackageNotFound, e:
 	    log.error(str(e))
 	    return
@@ -88,8 +88,8 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 
 def doErase(db, cfg, pkg, versionStr = None):
     try:
-	pkgList = helper.findPackage(db.repcache, cfg.packagenamespace, 
-				 cfg.installbranch, pkg, versionStr)
+	pkgList = helper.findPackage(db.repcache, cfg.installbranch, pkg, 
+				     versionStr)
     except helper.PackageNotFound, e:
 	log.error(str(e))
 	return

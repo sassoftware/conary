@@ -251,8 +251,6 @@ class RecipeLoader:
             pass
 
 def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
-    if component[0] != ":":
-        component = cfg.packagenamespace + ":" + component
     if not component.endswith(':sources'):
         component += ":sources"
     name = filename[:-len('.recipe')]
@@ -557,9 +555,8 @@ class PackageRecipe(Recipe):
 	for post in self.destdirPolicy:
             post.doProcess(self)
 
-    def getPackages(self, namePrefix, fullVersion):
+    def getPackages(self, fullVersion):
 	# policies look at the recipe instance for all information
-	self.namePrefix = namePrefix
 	self.fullVersion = fullVersion
 	for policy in self.packagePolicy:
 	    policy.doProcess(self)
@@ -669,8 +666,8 @@ class GroupRecipe(Recipe):
 
     def addTrove(self, name, versionStr = None):
 	try:
-	    pkgList = helper.findPackage(self.repos, self.cfg.packagenamespace,
-				     self.branchNick, name, versionStr)
+	    pkgList = helper.findPackage(self.repos, self.branchNick, name, 
+					 versionStr)
 	except helper.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
 
@@ -757,8 +754,8 @@ class FilesetRecipe(Recipe):
 	    remap = [ remap ]
 
 	try:
-	    pkgList = helper.findPackage(self.repos, self.cfg.packagenamespace,
-				     self.branchNick, component, versionStr)
+	    pkgList = helper.findPackage(self.repos, self.branchNick, 
+					 component, versionStr)
 	except helper.PackageNotFound, e:
 	    raise RecipeFileError, str(e)
 

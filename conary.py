@@ -169,7 +169,7 @@ def main():
 	if len(otherArgs) < 4 or len(otherArgs) > 5: return usage()
 	repos = openRepository(cfg.reppath, "c")
 
-	args = [repos, cfg.packagenamespace ] + otherArgs[2:]
+	args = [repos, ] + otherArgs[2:]
 	branch.branch(*args)
     elif (otherArgs[1] == "changeset"):
 	# current usage is "package file oldversion newversion"
