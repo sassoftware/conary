@@ -87,6 +87,11 @@ class Flag(dict):
 	self._frozen = False
 
     def _override(self, key, value):
+        if key in self:
+            self[key]._set(bool(value))
+        else:
+            # override flag values that haven't been entered yet
+            self[key] = Flag(value)
 	self._overrides[key] = value
 
     def getUsed(self):
@@ -99,18 +104,16 @@ class Flag(dict):
 	if self._frozen:
 	    raise TypeError, 'flags are frozen'
         if key in self:
-            self[key]._set(bool(value))
+            if key not in self._overrides:
+                self[key]._set(bool(value))
         else:
             dict.__setitem__(self, key, value)
 
     def __getattr__(self, name):
         if name in self.__dict__:
             return self.__dict__[name]
-        if name in self or name in self._overrides:
-	    if name in self._overrides:
-		flag = self._overrides[name]
-	    else:
-		flag = self[name]
+        if name in self:
+            flag = self[name]
             if self._track:
                 self._usedFlags[name] = flag
             return flag
