@@ -378,33 +378,69 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 		name = Bpkg.getName()
 		Bver = Bpkg.getVersion()
 		Bloc = Bver.fork(versions.LocalBranch(), sameVerRel = 1)
-		if not localCs.hasNewPackage(name):
-		    BlocPkg = Bpkg.copy()
-		    BlocPkg.changeVersion(Bloc)
-		    BlocCs = BlocPkg.diff(Bpkg)[0]
-		else:
-		    BlocCs = localCs.getNewPackage(name)
-		    BlocCs.changeOldVersion(Bver)
-		    BlocCs.changeNewVersion(Bloc)
+
+		#if localCs.hasNewPackage(name):
+		#    BlocCs = localCs.getNewPackage(name)
+		#    BlocCs.changeOldVersion(Bver)
+		#    BlocCs.changeNewVersion(Bloc)
+		#else:
+		BlocPkg = Bpkg.copy()
+		BlocPkg.changeVersion(Bloc)
+
+		# look through the files in BlocPkg and point them at
+		# the correct branch if the localCs creates a new version
+		# of that file
+		for (fileId, path, BfileVer) in BlocPkg.fileList():
+		    if localCs.hasFile(fileId):
+			BfileLoc = BfileVer.fork(versions.LocalBranch(),
+						 sameVerRel = 1)
+			BlocPkg.addFile(fileId, path, BfileLoc)
+
+		BlocCs = BlocPkg.diff(Bpkg)[0]
+
 		# this overwrites the package if it already exists in the
 		# change set
 		localCs.newPackage(BlocCs)
 
-	    # look through each of the file changes specified by A->A.local
-	    # and map those onto B->B.local.
+	    # look at each file which as changed from A->A.local; we need
+	    # to get a list of changes from B->B.local (all of which are
+	    # changes represented in the filesystem! they aren't represented
+	    # anyplace in the database as the local branch of a file
+	    # corresponds exactly to that file's instantiation in the
+	    # filesystem)
 	    for (fileId, (Aver, Aloc, csInfo)) in localCs.getFileList():
-		# this file could have disappeared between A and B, which
-		# means we don't need to map A->A.local onto it
-		if not origJob.files.has_key(fileId): continue
+		if not origJob.files.has_key(fileId): 
+		    # this file has disappeared between A and B or didn't
+		    # change in A->B. that means we should leave it alone
+		    # (and possible remove it, but that's handled later)
+		    continue
 
 		Bfile = origJob.files[fileId].file()
 		Bver = origJob.files[fileId].version()
 
-		# XXX this could have "conflict" written all over it! we're
-		# just blindly using our local changes
-		BlocFile = Bfile.copy()
-		BlocFile.applyChange(csInfo)
-		origJob.files[fileId].changeFile(BlocFile)
+		if Aver.equal(Bver):
+		    # the file hasn't changed between A and B, but is has
+		    # changed between Aloc and Bloc; this means that Aloc is
+		    # the right version of the file is use for Bloc as well
+		    #
+		    # A->B shouldn't have a change entry for this file
+		    assert(not origJob.files.has_key(fileId))
+		else:
+		    # the file has changed between A and B, as well as
+		    # between Aloc and Bloc. this situation requires
+		    # taking the changes from A->Aloc, and applying them to
+		    # version B of the file. package B will reference the
+		    # right version of the file, since it references Bver
+		    # (so package Bloc will reference file version BverLoc)
+
+		    # XXX this could have "conflict" written all over it! we're
+		    # just blindly using our local changes
+
+		    Bloc = Bver.fork(versions.LocalBranch(), sameVerRel = 1)
+
+		    BlocFile = Bfile.copy()
+		    BlocFile.applyChange(csInfo)
+		    localCs.addFile(fileId, Bver, Bloc, csInfo)
 
 	repository.ChangeSetJob.__init__(self, repos, localCs)
 
