@@ -12,6 +12,7 @@ import util
 import types
 import time
 import lookaside
+import socket
 
 _FILE_FLAG_CONFIG = 1 << 0
 
@@ -304,6 +305,14 @@ class Socket(File):
 
     def copy(self, source, target):
 	pass
+
+    def restore(self, changeSet, target):
+	if os.path.exists(target) or os.path.islink(target):
+	    os.unlink(target)
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
+        sock.bind(target)
+        sock.close()
+	File.restore(self, target)
 
     def __init__(self, fileId, info = None):
 	File.__init__(self, fileId, info, infoTag = "s")
