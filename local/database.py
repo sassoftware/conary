@@ -46,12 +46,25 @@ class SqlDbRepository(datastore.DataStoreRepository,
         return self.db.getTroves(troveList, pristine)
 
     def getTroveLatestVersion(self, name, branch):
-	l = [ x.getVersion() for x in self.db.iterFindByName(name)
-		     if branch == x.getVersion().branch() ]
-	if not l:
-	    return None
+        cu = self.db.db.cursor()
+	cu.execute("""SELECT version, timeStamps FROM DBInstances 
+			JOIN Versions ON
+			    DBInstances.versionId == Versions.versionId
+			WHERE DBInstances.troveName == ? AND
+			      isPresent == 1
+		   """, name)
 
-	return l[0]
+	last = None
+	for versionStr, timeStamps in cu:
+	    version = versions.VersionFromString(versionStr)
+	    if version.branch() != branch:
+		continue
+
+	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
+	    if not last or version.isAfter(last):
+		last = version
+
+	return last
 
     def getAllTroveFlavors(self, troveDict):
         return self.db.getAllTroveFlavors(troveDict)
@@ -87,7 +100,7 @@ class SqlDbRepository(datastore.DataStoreRepository,
 
         result = cu.next()[0] != 0
 
-        return result
+	return result;
 
     def getTroveVersionList(self, name, withFlavors = False):
 	"""

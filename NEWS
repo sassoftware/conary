@@ -11,6 +11,7 @@ Changes in 0.50.3:
   * the NormalizeInterpreterPath policy can now handle unwriteable files
   * fixed the network client code to return file contents properly when
     multiple file contents are requested from the server (bz#50)
+  * rewrote Database.getTroveLatestVersion()
 
 Changes in 0.50.2:
   * Any %(lib)s-derived path (/%(lib)s, %(libdir)s, %(krbprefix)s/%(lib)s,
