@@ -11,7 +11,10 @@ Changes in 0.50.4:
     TagDescription, and TagHandler policies by limiting them to
     only appropriate directories.
   * Fixed :debuginfo to work with binaries built from more than one
-    source file.
+    source file, and made it less aggressive by only stripping debug
+    information out to the :debuginfo files, which both makes stack
+    traces better without :debuginfo installed and makes libraries
+    stripped for :debuginfo more likely to work.
 
 Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 

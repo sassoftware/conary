@@ -662,7 +662,7 @@ class Strip(policy.Policy):
                     ' -l /dev/stdout '%self.dm
                     +fullpath).read().split('\x00')[:-1])
                 util.mkdirChain(debuglibdir)
-                util.execute('%s -f %s %s' %(
+                util.execute('%s -g -f %s %s' %(
                     self.dm.strip, debuglibpath, fullpath))
 
             else:
