@@ -185,8 +185,11 @@ static PyObject * StreamSet_DeepCopy(PyObject * self, PyObject * args) {
     if (!frz)
         return NULL;
 
-    if (!(obj = PyObject_CallFunction((PyObject *) self->ob_type, "O", frz)))
+    if (!(obj = PyObject_CallFunction((PyObject *) self->ob_type, "O", frz))) {
+	Py_DECREF(frz);
         return NULL;
+    }
+
     Py_DECREF(frz);
 
     return obj;
@@ -213,12 +216,18 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args) {
 						ssd->tags[i].name);
 
 	vals[i] = PyObject_CallMethod(attr, "diff", "O", otherAttr);
+
+	Py_DECREF(attr);
+	Py_DECREF(otherAttr);
+
 	if (!vals[i]) {
+	    int j;
+	    for (j = 0; j < i; j++)
+		Py_DECREF(vals[j]);
+
 	    return NULL;
 	} else if (vals[i] != Py_None)
 	    len += PyString_GET_SIZE(vals[i]) + 3;
-
-	Py_DECREF(attr);
     }
 
     /* note that, unlike freeze(), diff() includes diffs that
@@ -282,8 +291,16 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
 					  ssd->tags[i].name);
 	vals[i] = PyObject_CallMethod(attr, "freeze", "O", skipSet);
 	Py_DECREF(attr);
-	if (!vals[i])
+
+	if (!vals[i]) {
+	    int j;
+
+	    for (j = 0; j < i; j++) 
+		Py_DECREF(vals[j]);
+
 	    return NULL;
+	}
+
         if (vals[i] != Py_None)
             len += PyString_GET_SIZE(vals[i]) + 3;
     }
@@ -301,7 +318,7 @@ static int StreamSet_Init(PyObject * self, PyObject * args,
     char * end, * chptr, * streamData;
     int streamId, size;
     int ignoreUnknown = -1;
-    PyObject * attr;
+    PyObject * attr, * ro;
     int offset = 0;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|z#i", kwlist, &data, 
@@ -329,6 +346,8 @@ static int StreamSet_Init(PyObject * self, PyObject * args,
 	if (self->ob_type->tp_setattro(self, ssd->tags[i].name, 
 				       obj))
 	    return -1;
+	/* we keep our reference in our dict */
+	Py_DECREF(obj);
     }
 
     if (!data)
@@ -354,8 +373,10 @@ static int StreamSet_Init(PyObject * self, PyObject * args,
 	    if (ignoreUnknown == -1) {
 		obj = PyDict_GetItemString(self->ob_type->tp_dict, 
 					   "ignoreUnknown");
-		if (obj)
+		if (obj) {
 		    ignoreUnknown = PyInt_AsLong(obj);
+		    Py_DECREF(obj);
+		}
 
 		if (ignoreUnknown == 1)
 		    continue;
@@ -366,8 +387,12 @@ static int StreamSet_Init(PyObject * self, PyObject * args,
 	}
 
 	attr = self->ob_type->tp_getattro(self, ssd->tags[i].name);
-	if (!PyObject_CallMethod(attr, "thaw", "s#", streamData, size))
+	ro = PyObject_CallMethod(attr, "thaw", "s#", streamData, size);
+	Py_DECREF(attr);
+	if (!ro) {
 	    return -1;
+	}
+	Py_DECREF(ro);
     }
 
     assert(chptr == end);
@@ -386,7 +411,7 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
     int i;
     int size; 
     int streamId;
-    PyObject * attr, * baseAttr;
+    PyObject * attr, * baseAttr, * ro;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "z#O!|O", kwlist, 
 				     &diff, &diffLen, self->ob_type,
@@ -429,9 +454,16 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
 	baseAttr = base->ob_type->tp_getattro((PyObject *) base, 
 					       ssd->tags[i].name);
 
-	if (!PyObject_CallMethod(attr, "twm", "s#O", 
-				 streamData, size, baseAttr))
+	ro = PyObject_CallMethod(attr, "twm", "s#O", streamData, size, 
+				 baseAttr);
+	Py_DECREF(attr);
+	Py_DECREF(baseAttr);
+
+	if (!ro)
 	    return NULL;
+	
+	Py_DECREF(ro);
+
     }
 
     Py_INCREF(Py_None);

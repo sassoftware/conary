@@ -80,6 +80,11 @@ static int StringStream_Cmp(PyObject * self, PyObject * other) {
     return 1;
 }
 
+static void StringStream_Dealloc(PyObject * self) {
+    Py_DECREF(((StringStreamObject *) self)->s);
+    self->ob_type->tp_free(self);;
+}
+
 static PyObject * StringStream_Diff(StringStreamObject * self, 
 				    PyObject * args) {
     StringStreamObject * them;
@@ -164,11 +169,10 @@ static int StringStream_Init(PyObject * self, PyObject * args,
 	}
 	    
 	o->s = initObj;
+	Py_INCREF(o->s);
     } else {
 	o->s = PyString_FromString("");
     }
-
-    Py_INCREF(o->s);
 
     return 0;
 }
@@ -263,7 +267,7 @@ PyTypeObject StringStreamType = {
     "cstreams.StringStream",        /*tp_name*/
     sizeof(StringStreamObject),     /*tp_basicsize*/
     0,                              /*tp_itemsize*/
-    0,                              /*tp_dealloc*/
+    StringStream_Dealloc,           /*tp_dealloc*/
     0,                              /*tp_print*/
     0,                              /*tp_getattr*/
     0,                              /*tp_setattr*/
