@@ -70,3 +70,9 @@ class NetworkConvertors(object):
 
     def toLabel(self, l):
 	return versions.Label(l)
+
+    def fromDepSet(self, ds):
+        return ds.freeze()
+
+    def toDepSet(self, ds):
+        return deps.deps.ThawDependencySet(ds)
