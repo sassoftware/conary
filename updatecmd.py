@@ -16,9 +16,6 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
     if not os.path.exists(cfg.root):
         util.mkdirChain(cfg.root)
 
-    import pdb
-    pdb.set_trace()
-
     if os.path.exists(pkg) and os.path.isfile(pkg):
 	# there is a file, try to read it as a changeset file
 
