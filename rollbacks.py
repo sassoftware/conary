@@ -22,10 +22,14 @@ def listRollbacks(db, cfg):
 
 	    list.sort()
 	    for (name, pkg) in list:
-		print "\t%s %s -> %s" % \
-		    (name,
-		     pkg.getOldVersion().asString(cfg.defaultbranch), 
-		     pkg.getNewVersion().asString(cfg.defaultbranch))
+		if not pkg.getOldVersion():
+		    print "\t%s %s removed" % (name,
+			 pkg.getNewVersion().asString(cfg.defaultbranch))
+		else:
+		    print "\t%s %s -> %s" % \
+			(name,
+			 pkg.getOldVersion().asString(cfg.defaultbranch), 
+			 pkg.getNewVersion().asString(cfg.defaultbranch))
 
 	    list = []
 	    for (pkg, version) in cs.getOldPackageList():

@@ -71,3 +71,18 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
 	log.error(e)
     except repository.CommitError, e:
 	log.error(e)
+
+def doErase(db, cfg, pkg, versionStr = None):
+    try:
+	pkgList = helper.findPackage(db, cfg.packagenamespace, 
+				 cfg.installbranch, pkg, versionStr)
+    except helper.PackageNotFound, e:
+	log.error(str(e))
+	return
+
+    list = []
+    cs = changeset.ChangeSet()
+    for pkg in pkgList:
+	cs.oldPackage(pkg.getName(), pkg.getVersion())
+	
+    db.commitChangeSet(cs)

@@ -166,8 +166,6 @@ class ChangeSet:
     # find, but doesn't worry about files which it can't find
     def makeRollback(self, db, configFiles = 0):
 	assert(not self.abstract)
-	# this is easy to fix if it turns out to be necessary
-	assert(not self.oldPackages)
 
 	rollback = ChangeSetFromRepository(db)
 
@@ -280,7 +278,6 @@ class ChangeSet:
 			type = None
 
 		    fullPath = db.root + curPath
-
 		    fsFile = files.FileFromFilesystem(fullPath, fileId,
 				type = type, possibleMatch = origFile)
 
@@ -297,6 +294,30 @@ class ChangeSet:
 					     ChangedFileTypes.file, cont)
 
 	    rollback.newPackage(invertedPkg)
+
+	for (name, version) in self.getOldPackageList():
+	    pkg = db.getPackageVersion(name, version)
+	    pkgDiff = pkg.diff(None)[0]
+	    rollback.newPackage(pkgDiff)
+	    for (fileId, (path, fileVersion)) in pkg.iterFileList():
+		fileObj = db.getFileVersion(fileId, fileVersion)
+		rollback.addFile(fileId, None, fileVersion, fileObj.infoLine())
+		if fileObj.hasContents:
+		    fullPath = db.root + path
+		    fsFile = files.FileFromFilesystem(fullPath, fileId,
+				possibleMatch = fileObj)
+
+		    if fsFile.sha1() == fileObj.sha1():
+			# the contents in the file system are right
+			cont = filecontents.FromFilesystem(fullPath)
+		    else:
+			# the contents in the file system are wrong; insert
+			# a placeholder and let the local change set worry
+			# about getting this right
+			cont = filecontents.FromString("")
+
+		    rollback.addFileContents(fileId,
+					     ChangedFileTypes.file, cont)
 
 	return rollback
 

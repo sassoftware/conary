@@ -38,8 +38,9 @@ def usage(rc = 1):
     print "       srs changeset <pkg> [<oldver>] <newver> <outfile>"
     print "       srs cook    [--prep] [--macros file] <first.recipe> <second.recipe> ..."
     print "       srs commit  <changeset>"
-    print "       srs pkglist <pkgname> <version>"
-    print "       srs replist <pkgname> <version>"
+    print "       srs erase   <pkgname> [<version>]"
+    print "       srs pkglist <pkgname> [<version>]"
+    print "       srs replist <pkgname> [<version>]"
     print "       srs rblist"
     print "       srs rollback"
     print "       srs source [usage]"
@@ -197,6 +198,15 @@ elif (otherArgs[1] == "cook"):
     if argSet: usage()
 
     cook.cookCommand(cfg, otherArgs[2:], prep, macros)                
+elif (otherArgs[1] == "erase"):
+    if argSet: usage
+    if len(otherArgs) >= 3 and len(otherArgs) <=4:
+	db = database.Database(cfg.root, cfg.dbpath, "c")
+
+	args = [db, cfg] + otherArgs[2:]
+	updatecmd.doErase(*args)
+    else:
+	usage()
 elif (otherArgs[1] == "import"):
     print "this is broken"
 elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
