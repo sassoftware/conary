@@ -170,10 +170,10 @@ class FileContainer:
 	if len(magic) != 4 or magic != FILE_CONTAINER_MAGIC:
 	    raise BadContainer, "bad magic"
 
-	version = self.file.read(2)
-	if len(version) != 2:
+	version = self.file.read(4)
+	if len(version) != 4:
 	    raise BadContainer, "invalid container version"
-	version = struct.unpack("!H", version)[0]
+	version = struct.unpack("!I", version)[0]
 	if version != FILE_CONTAINER_VERSION:
 	    raise BadContainer, "unsupported file container version %d" % \
 			version
@@ -314,7 +314,7 @@ class FileContainer:
 	    self.file.seek(SEEK_SET, 0)
 	    self.file.truncate()
 	    self.file.write(FILE_CONTAINER_MAGIC)
-	    self.file.write(struct.pack("!H", FILE_CONTAINER_VERSION))
+	    self.file.write(struct.pack("!I", FILE_CONTAINER_VERSION))
 
 	    self.mutable = True
 	    self.rest = gzip.GzipFile(None, "wb", 9, self.file)
