@@ -4,6 +4,7 @@
 #
 
 import util
+import magic
 import os
 import policy
 import log
@@ -21,7 +22,7 @@ through eponymous interfaces in recipe.
 # bail out as soon as possible if there's an unrecoverable error
 # so put error classes first
 
-class BinariesInBindirs(policy.Policy):
+class NonBinariesInBindirs(policy.Policy):
     """
     Directories that are specifically for binaries should have only
     files that have some executable bit set.
@@ -55,6 +56,22 @@ class FilesInMandir(policy.Policy):
 
     def doFile(self, file):
 	raise PackagePolicyError("%s is non-directory file in mandir" %file)
+
+
+class ImproperlyShared(policy.Policy):
+    """
+    The %(datadir)s directory (normally /usr/share) is intended for
+    data that can be shared between architectures; therefore, no
+    ELF files should be there.
+    """
+    invariantsubtrees = [ '/usr/share/' ]
+
+    def doFile(self, file):
+	destdir = self.macros['destdir']
+        m = magic.magic(file, destdir)
+	if m and m.name == "ELF":
+	    raise PackagePolicyError(
+		"Architecture-specific file %s in shared data directory" %file)
 
 
 # now the packaging classes
@@ -443,8 +460,9 @@ def DefaultPolicy():
     A recipe can then modify this list if necessary.
     """
     return [
-	BinariesInBindirs(),
+	NonBinariesInBindirs(),
 	FilesInMandir(),
+	ImproperlyShared(),
 	ComponentSpec(),
 	PackageSpec(),
 	EtcConfig(),
