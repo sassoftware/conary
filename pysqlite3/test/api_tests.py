@@ -502,7 +502,6 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
             self.cur.execute("insert into test(a) values (?)", a)
             self.cur.execute('select * from test')
             r = self.cur.fetchone()
-            print r
             self.assertEqual(len(r[0]), len(a),
                              "Length of result is %d, it should be %d."  %
                              (len(r[0]), len(a)))
@@ -510,6 +509,7 @@ class moduleTestCases(unittest.TestCase, testsupport.TestSupport):
                              "Result is '%s', it should be '%s'" % (r.a, a))
         except StandardError, msg:
             self.fail(msg)
+
 
 def suite():
     dbapi_suite = unittest.makeSuite(DBAPICompliance, "Check")
