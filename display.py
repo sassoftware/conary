@@ -4,6 +4,7 @@
 #
 import package
 import versions
+import files
 
 _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
@@ -59,6 +60,12 @@ def displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
 	for (fileId, path, version) in pkg.fileList():
 	    filesDB = repos.getFileDB(fileId)
 	    file = filesDB.getVersion(version)
+
+	    if isinstance(file, files.SymbolicLink):
+		name = "%s -> %s" (path, files.linkTarget())
+	    else:
+		name = path
+
 	    print "%s    1 %-8s %-8s %s %s %s" % \
 		(file.modeString(), file.owner(), file.group(), 
 		 file.sizeString(), file.timeString(), path)
