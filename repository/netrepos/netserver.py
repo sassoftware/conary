@@ -18,7 +18,6 @@ from repository import repository
 import fsrepos
 from lib import log
 import files
-import md5
 import os
 import re
 from lib import sha1helper
@@ -30,6 +29,8 @@ from repository import repository
 from local import idtable
 from local import sqldb
 from local import versiontable
+from netauth import NetworkAuthorization
+from netauth import InsufficientPermission
 
 SERVER_VERSIONS=[6,7,8,9,10]
 
@@ -552,34 +553,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def cacheChangeSets(self):
         return isinstance(self.cache, CacheSet)
 
-    def handleGet(self, writeFn, path):
-        writeFn("""
-<html>
-<head>
-       <title>Form Example (for '%s')</title>
-</head>
-<body>
-<FORM action="action" method=POST>
-Type a string: <input type="text" name="myString">
-</body>
-</html>
-""" % path)
-
-    def handlePost(self, writeFn, authToken, path, fields):
-        writeFn("""
-<html>
-<head>
-       <title>Response Example</title>
-</head>
-<body>
-<p>
-You typed: '%s'.
-<p>
-Form url is: '%s'.
-</body>
-</html>
-""" % (fields['myString'].value, path))
-
     def __init__(self, path, tmpPath, urlBase, authDbPath, name,
 		 repositoryMap, commitAction = None, cacheChangeSets = False):
 	self.repos = fsrepos.FilesystemRepository(name, path, repositoryMap)
@@ -753,72 +726,6 @@ class CacheSet:
         self.flavors = sqldb.DBFlavors(self.db)
         self.versions = versiontable.VersionTable(self.db)
         self.db.commit()
-
-class NetworkAuthorization:
-
-    def check(self, authToken, write = False, label = None, trove = None):
-	if label and label.getHost() != self.name:
-	    log.error("repository name mismatch")
-	    return False
-
-	if not write and self.anonReads:
-	    return True
-
-	if not authToken[0]:
-	    log.error("no authtoken received")
-	    return False
-
-	stmt = """
-	    SELECT troveName FROM
-	       (SELECT userId as uuserId FROM Users WHERE user=? AND 
-		    password=?) 
-	    JOIN Permissions ON uuserId=Permissions.userId
-	    LEFT OUTER JOIN TroveNames ON Permissions.troveNameId = TroveNames.troveNameId
-	""" 
-	m = md5.new()
-	m.update(authToken[1])
-	params = [authToken[0], m.hexdigest()]
-
-	where = []
-	if label:
-	    where.append(" labelId=(SELECT labelId FROM Labels WHERE " \
-			    "label=?) OR labelId is Null")
-	    params.append(label.asString())
-
-	if write:
-	    where.append("write=1")
-
-	if where:
-	    stmt += "WHERE " + " AND ".join(where)
-
-	cu = self.db.cursor()
-	cu.execute(stmt, params)
-
-	for (troveName, ) in cu:
-	    if not troveName or not trove:
-		return True
-
-	    regExp = self.reCache.get(troveName, None)
-	    if regExp is None:
-		regExp = re.compile(troveName)
-		self.reCache[troveName] = regExp
-
-	    if regExp.match(trove):
-		return True
-
-	log.error("no permissions match for (%s, %s)" % authToken)
-
-	return False
-
-    def __init__(self, dbpath, name, anonymousReads = False):
-	self.name = name
-	self.db = sqlite3.connect(dbpath)
-	self.anonReads = anonymousReads
-	self.reCache = {}
-
-class InsufficientPermission(Exception):
-
-    pass
 
 class ClientTooOld(Exception):
 
