@@ -646,6 +646,10 @@ def cookCommand(cfg, args, prep, macros, buildBranch = None, emerge = False, res
     # this ensures the repository exists
     repos = NetworkRepositoryClient(cfg.repositoryMap)
 
+    # do not cook as root!
+    if not os.getuid:
+        raise CookError('Do not cook as root')
+
     for item in args:
         # we want to fork here to isolate changes the recipe might make
         # in the environment (such as environment variables)
