@@ -63,6 +63,7 @@ def searchRepository(cfg, repCache, name, location):
     basename = os.path.basename(name)
 
     if repCache.hasFile(basename):
+	print '+ found %s in repository' %name
 	return repCache.moveFileToCache(cfg, basename, location)
 
     return None
