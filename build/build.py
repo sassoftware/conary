@@ -431,7 +431,7 @@ class _PutFiles(_FileAction):
 		self._do_one(source, dest, destlen, macros)
 
     def _do_one(self, source, dest, destlen, macros):
-	if os.path.isdir(source):
+	if os.path.isdir(source) and not self.move:
 	    srcbase = os.path.basename(source)
 	    dest = dest+os.sep+srcbase
 	    destlen += len(os.sep) + len(srcbase)
