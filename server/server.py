@@ -1,6 +1,10 @@
 #!/usr/bin/python2.3
 
+import os
+import posixpath
 import sys
+import tempfile
+import urllib
 
 if len(sys.argv) != 3:
     print "needs path to srs and to the repository"
@@ -18,6 +22,42 @@ import select
 class SRSServer(SimpleXMLRPCServer):
 
     allow_reuse_address = 1
+
+class HttpRequests(SimpleHTTPRequestHandler):
+    
+    files = {}
+
+    def translate_path(self, path):
+        """Translate a /-separated PATH to the local filename syntax.
+
+        Components that mean special things to the local file system
+        (e.g. drive or directory names) are ignored.  (XXX They should
+        probably be diagnosed.)
+
+        """
+        path = posixpath.normpath(urllib.unquote(path))
+        words = path.split('/')
+        words = filter(None, words)
+        path = '/tmp'
+        for word in words:
+            drive, word = os.path.splitdrive(word)
+            head, word = os.path.split(word)
+            if word in (os.curdir, os.pardir): continue
+            path = os.path.join(path, word)
+
+	if not self.files.has_key(path):
+	    # XXX we need to do something smarter here
+	    return "/tmp/ "
+
+	del self.files[path]
+	self.cleanup = path
+        return path
+
+    def do_GET(self):
+	self.cleanup = None
+	SimpleHTTPRequestHandler.do_GET(self)
+	if self.cleanup:
+	    os.unlink(self.cleanup)
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 			      fsrepos.FilesystemRepository):
@@ -76,8 +116,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 			 self.toVersion(new), absolute))
 
 	cs = self.createChangeSet(l, recurse = recurse, withFiles = withFiles)
-	cs.writeToFile("FOO")
-	return "http://localhost:8001/FOO"
+	(fd, path) = tempfile.mkstemp()
+	os.close(fd)
+	cs.writeToFile(path)
+	fileName = os.path.basename(path)
+	HttpRequests.files[path] = True
+	return "http://localhost:8001/%s" % fileName
 
 netRepos = NetworkRepositoryServer(sys.argv[2], "r")
 
@@ -85,7 +129,7 @@ xmlServer = SRSServer(("localhost", 8000))
 xmlServer.register_instance(netRepos)
 xmlServer.register_introspection_functions()
 
-httpServer = HTTPServer(("localhost", 8001), SimpleHTTPRequestHandler)
+httpServer = HTTPServer(("localhost", 8001), HttpRequests)
 
 fds = {}
 fds[xmlServer.fileno()] = xmlServer
