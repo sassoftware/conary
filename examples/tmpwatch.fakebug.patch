@@ -1,0 +1,10 @@
+--- tmpwatch-2.9.0/tmpwatch.c.orig	2004-03-15 09:30:47.000000000 -0500
++++ tmpwatch-2.9.0/tmpwatch.c	2004-03-15 09:34:57.000000000 -0500
+@@ -419,6 +419,7 @@
+ 
+ 
+ void usage(void) {
++    fprintf(stderr, "this is an ersatz bug for testing, id = @BUGID@\n");
+     printCopyright();
+     fprintf(stderr, "\n");
+ #ifdef _HAVE_GETOPT_LONG
