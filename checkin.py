@@ -146,31 +146,9 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     version = trv.getVersion()
     state.setTroveVersion(version)
 
-    # if a branch nickname was specified, we need to look up the full branch
-    # name that we're on; the version from the package doesn't tell us this
-    # as it could be the node where the branch was created
-    if not versionStr or (versionStr[0] != "/" and  \
-	# branch nickname was given
-	    (versionStr.find("/") == -1) and versionStr.count("@")):
-	if not versionStr:
-	    nick = cfg.installbranch
-	elif versionStr[0] == "@":
-	    nick = versions.BranchName(cfg.packagenamespace[1:] + 
-						versionStr)
-	else:
-	    nick = versions.BranchName(versionStr)
-
-	if version.branch().branchNickname().equal(nick):
-	    state.setTroveBranch(version.branch())
-	else:
-	    # this must be the node the branch was created at, otherwise
-	    # we'd be on it
-	    v = version.fork(nick, sameVerRel = 0)
-	    state.setTroveBranch(v)
-    elif version.isBranch():
-	state.setTroveBranch(version)
-    else:
-	state.setTroveBranch(version.branch())
+    branch = helper.fullBranchName(cfg.packagenamespace[1:], cfg.installbranch,
+				   version, versionStr)
+    state.setTroveBranch(branch)
 
     for (fileId, path, version) in trv.fileList():
 	fullPath = dir + "/" + path
@@ -402,7 +380,7 @@ def diff(repos):
 	path = oldPackage.getFile(fileId)[0]
 	print "%s: removed" % path
 	
-def update(repos):
+def update(repos, versionStr = None):
     if not os.path.isfile("SRS"):
 	log.error("SRS file must exist in the current directory for source commands")
 	return
@@ -411,11 +389,31 @@ def update(repos):
     pkgName = state.getTroveName()
     baseVersion = state.getTroveVersion()
     
-    head = repos.getLatestPackage(pkgName, state.getTroveBranch())
-    headVersion = head.getVersion()
-    if headVersion.equal(baseVersion):
-	log.info("working directory is already based on head of branch")
-	return
+    if not versionStr:
+	head = repos.getLatestPackage(pkgName, state.getTroveBranch())
+	newBranch = None
+	headVersion = head.getVersion()
+	if headVersion.equal(baseVersion):
+	    log.info("working directory is already based on head of branch")
+	    return
+    else:
+	if versionStr[0] == "@":
+	    # get the name of the repository from the current branch
+	    repName = state.getTroveBranch().branchNick().getHost()
+	    versionStr = repName + versionStr
+	elif versionStr[0] != "/" and versionStr.find("@") == -1:
+	    # non fully-qualified version; make it relative to the current
+	    # branch
+	    versionStr = state.getTroveBranch().asString() + "/" + versionStr
+
+	pkgList = helper.findPackage(repos, None, None, pkgName, versionStr)
+	if len(pkgList) > 1:
+	    log.error("%s specifies multiple versions" % versionStr)
+	    return
+
+	head = pkgList[0]
+	headVersion = head.getVersion()
+	newBranch = helper.fullBranchName(None, None, headVersion, versionStr)
 
     changeSet = repos.createChangeSet([(pkgName, baseVersion, headVersion, 0)])
 
@@ -578,6 +576,7 @@ def update(repos):
 
     if fullyUpdated:
 	state.setTroveVersion(headVersion)
+	if newBranch: state.setTroveBranch(newBranch)
 
     state.write("SRS")
 
