@@ -223,7 +223,7 @@ class ChangeSet:
 
 	for hash in idList:
 	    (contType, f) = contents[hash]
-	    csf.addFile(hash, f, tag + contType[4:], f.size())
+	    csf.addFile(hash, f, tag + contType[4:], f.contents.size())
 
     def writeToFile(self, outFileName):
 	try:
@@ -294,7 +294,7 @@ class ChangeSet:
 		if origFile.flags.isConfig():
 		    cont = filecontents.FromRepository(db, 
 						       origFile.contents.sha1(),
-						       origFile.size())
+						       origFile.contents.size())
 		    rollback.addFileContents(fileId,
 					     ChangedFileTypes.file, cont, 1)
 		else:
@@ -350,7 +350,8 @@ class ChangeSet:
 						 ChangedFileTypes.diff, cont, 1)
 		    else:
 			cont = filecontents.FromRepository(db, 
-				    origFile.contents.sha1(), origFile.size())
+				    origFile.contents.sha1(),
+                                    origFile.contents.size())
 			rollback.addFileContents(fileId,
 						 ChangedFileTypes.file, cont,
 						 newFile.flags.isConfig())
