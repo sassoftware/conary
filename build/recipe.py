@@ -23,6 +23,7 @@ import imp
 import inspect
 from itertools import izip
 import os
+import string
 import sys
 import tempfile
 import types
@@ -228,6 +229,10 @@ class RecipeLoader:
                         and obj is not PackageRecipe) or \
                (issubclass(obj, RedirectRecipe) 
                         and obj is not RedirectRecipe):
+                if recipename[0] not in string.ascii_letters:
+                    raise RecipeFileError(
+                        'Error in recipe file "%s": package name must start '
+                        'with an ascii letter.' %basename)
                 if recipename.startswith('group-'):
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name cannot '
