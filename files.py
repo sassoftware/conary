@@ -263,7 +263,8 @@ class FlagsStream(streams.IntStream):
 class File(streams.StreamSet):
 
     lsTag = None
-    hasContents = 0
+    hasContents = False
+    skipChmod = False
     streamDict = { FILE_STREAM_INODE : (InodeStream, "inode"),
                    FILE_STREAM_FLAGS : (FlagsStream, "flags"),
 		   FILE_STREAM_TAGS :  (streams.StringsStream, "tags") }
@@ -291,8 +292,8 @@ class File(streams.StreamSet):
     def remove(self, target):
 	os.unlink(target)
 
-    def restore(self, root, target, skipMtime = 0):
-	self.setPermissions(root, target)
+    def restore(self, root, target, skipMtime=False, journal=None):
+	self.setPermissions(root, target, journal=journal)
 
 	if not skipMtime:
 	    self.setMtime(target)
@@ -301,19 +302,22 @@ class File(streams.StreamSet):
 	os.utime(target, (self.inode.mtime(), self.inode.mtime()))
 
     def chmod(self, target):
-	os.chmod(target, self.inode.perms())
+        if not self.skipChmod:
+            os.chmod(target, self.inode.perms())
 
-    def setPermissions(self, root, target):
-	if os.getuid() == 0:
-            global userCache, groupCache
-
-            uid = userCache.lookup(root, self.inode.owner())
-            gid = groupCache.lookup(root, self.inode.group())
-
-            os.lchown(target, uid, gid)
-        # do the chmod after the chown because some versions of Linux
-        # remove setuid/gid flags when changing ownership to root 
-	self.chmod(target)
+    def setPermissions(self, root, target, journal=None):
+        if journal:
+            journal.lchown(root, target, self.inode.owner(),
+                           self.inode.group())
+        else:
+            if os.getuid() == 0:
+                global userCache, groupCache
+                uid = userCache.lookup(root, self.inode.owner())
+                gid = groupCache.lookup(root, self.inode.group())
+                os.lchown(target, uid, gid)
+            # do the chmod after the chown because some versions of Linux
+            # remove setuid/gid flags when changing ownership to root 
+            self.chmod(target)
 
     def twm(self, diff, base, skip = []):
 	sameType = struct.unpack("B", diff[0])
@@ -357,58 +361,58 @@ class SymbolicLink(File):
         FILE_STREAM_REQUIRES : (streams.DependenciesStream, 'requires'  ),
     }
     streamDict.update(File.streamDict)
+    # chmod() on a symlink follows the symlink
+    skipChmod = True
     __slots__ = [ "target", "requires" ]
 
     def sizeString(self):
 	return "%8d" % len(self.target.value())
 
-    def chmod(self, target):
-	# chmod() on a symlink follows the symlink
-	pass
-
-    def restore(self, fileContents, root, target):
+    def restore(self, fileContents, root, target, journal=None):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         util.mkdirChain(os.path.dirname(target))
 	os.symlink(self.target.value(), target)
-	File.restore(self, root, target, skipMtime = 1)
+        # utime() follows symlinks and Linux currently does not implement
+        # lutimes()
+	File.restore(self, root, target, skipMtime=True, journal=journal)
 
 class Socket(File):
 
     lsTag = "s"
     __slots__ = []
 
-    def restore(self, fileContents, root, target):
+    def restore(self, fileContents, root, target, journal=None):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         util.mkdirChain(os.path.dirname(target))
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
         sock.bind(target)
         sock.close()
-	File.restore(self, root, target)
+	File.restore(self, root, target, journal=journal)
 
 class NamedPipe(File):
 
     lsTag = "p"
     __slots__ = []
 
-    def restore(self, fileContents, root, target):
+    def restore(self, fileContents, root, target, journal=None):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         util.mkdirChain(os.path.dirname(target))
 	os.mkfifo(target)
-	File.restore(self, root, target)
+	File.restore(self, root, target, journal=journal)
 
 class Directory(File):
 
     lsTag = "d"
     __slots__ = []
 
-    def restore(self, fileContents, root, target):
+    def restore(self, fileContents, root, target, journal=None):
 	if not os.path.isdir(target):
 	    util.mkdirChain(target)
 
-	File.restore(self, root, target)
+	File.restore(self, root, target, journal=journal)
 
     def remove(self, target):
 	raise NotImplementedError
@@ -422,21 +426,32 @@ class DeviceFile(File):
     def sizeString(self):
 	return "%3d, %3d" % (self.devt.major(), self.devt.minor())
 
-    def restore(self, fileContents, root, target):
+    def restore(self, fileContents, root, target, journal=None):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 
-	if os.getuid(): return
+        if not journal and os.getuid(): return
 
-	if self.lsTag == 'c':
-	    flags = stat.S_IFCHR
-	else:
-	    flags = stat.S_IFBLK
         util.mkdirChain(os.path.dirname(target))
-	os.mknod(target, flags, os.makedev(self.devt.major(), 
-		 self.devt.minor()))
+
+        if journal:
+            global userCache, groupCache
+
+            uid = userCache.lookup(root, self.inode.owner())
+            gid = groupCache.lookup(root, self.inode.group())
+
+            journal.mknod(root, target, self.lsTag, self.devt.major(),
+                          self.devt.minor(), self.inode.perms(),
+                          uid, gid)
+        else:
+            if self.lsTag == 'c':
+                flags = stat.S_IFCHR
+            else:
+                flags = stat.S_IFBLK
+            os.mknod(target, flags, os.makedev(self.devt.major(), 
+                                               self.devt.minor()))
             
-	File.restore(self, root, target)
+            File.restore(self, root, target, journal=journal)
 
 class BlockDevice(DeviceFile):
 
@@ -462,12 +477,12 @@ class RegularFile(File):
     __slots__ = ('contents', 'provides', 'requires', 'flavor')
 
     lsTag = "-"
-    hasContents = 1
+    hasContents = True
 
     def sizeString(self):
 	return "%8d" % self.contents.size()
 
-    def restore(self, fileContents, root, target):
+    def restore(self, fileContents, root, target, journal=None):
 	if fileContents != None:
 	    # this is first to let us copy the contents of a file
 	    # onto itself; the unlink helps that to work
@@ -484,21 +499,16 @@ class RegularFile(File):
 		util.copyfileobj(src, f)
 		f.close()
 
-                # fdopen()/write() turns off setuid bits!!! placing this
-                # restore after the file contents are created avoid that
-                # bug
-		File.restore(self, root, tmpname)
-
                 if os.path.isdir(target):
                     os.rmdir(target)
 		os.rename(tmpname, target)
-		self.setMtime(target)
+		File.restore(self, root, target, journal=journal)
 	    except:
 		os.unlink(tmpname)
 		raise
 
 	else:
-	    File.restore(self, root, target)
+	    File.restore(self, root, target, journal=journal)
 
     def __init__(self, *args, **kargs):
 	File.__init__(self, *args, **kargs)
