@@ -786,7 +786,7 @@ def cookCommand(cfg, args, prep, macros, buildBranch = None, emerge = False, res
                     if os.WIFSTOPPED(status):
                         # if our child has been stopped (Ctrl+Z or similar)
                         # stop ourself
-                        os.kill(os.getpid(), os.WSTOPSIG(status))
+                        os.killpg(os.getpgrp(), os.WSTOPSIG(status))
                         # when we continue, place our child back
                         # in the foreground process group
                         os.tcsetpgrp(0, pid)
