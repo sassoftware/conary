@@ -131,7 +131,7 @@ def post(port, isSecure, repos, httpHandler, req):
 
     return apache.OK
 
-def get(repos, httpHandler, req):
+def get(isSecure, repos, httpHandler, req):
     uri = req.uri
     if uri.endswith('/'):
         uri = uri[:-1]
@@ -262,17 +262,12 @@ def handler(req):
                                 logFile = cfg.logFile)
 
 	repositories[repName].forceSecure = cfg.forceSSL
-    
-    if req.parsed_uri[apache.URI_PORT]:
-        port = req.parsed_uri[apache.URI_PORT]
-        secure = False
-    elif req.parsed_uri[apache.URI_SCHEME] == "https":
-        port = 443
-        secure = True
-    else:
-        port = 80
-        secure = False
 
+    port = req.server.port
+    if not port:
+	port = 80
+    secure = (port == 443)
+    
     repos = repositories[repName]
     httpHandler = HttpHandler(repos)
     
@@ -281,7 +276,7 @@ def handler(req):
     if method == "POST":
 	return post(port, secure, repos, httpHandler, req)
     elif method == "GET":
-	return get(repos, httpHandler, req)
+	return get(secure, repos, httpHandler, req)
     elif method == "PUT":
 	return putFile(port, secure, repos, req)
     else:
