@@ -138,6 +138,8 @@ class RecipeLoader:
         self.module.__dict__['repos'] = repos
         self.module.__dict__['component'] = component
 
+        
+
         # create the recipe class by executing the code in the recipe
         try:
             code = compile(f.read(), filename, 'exec')
@@ -152,12 +154,13 @@ class RecipeLoader:
         # outside of the setup() function.  
         if cfg is not None:
             use.overrideFlags(cfg, pkgname)
-        use.resetUsed()
+
+        # LocalFlags must be thawed when loading a recipe -- the recipe
+        # may try to set the value
         use.LocalFlags._thaw()
-        use.track(True)
+
+        use.resetUsed()
         exec code in self.module.__dict__
-        use.track(False)
-        use.LocalFlags._freeze()
         if cfg is not None:
             use.clearOverrides(cfg, pkgname)
 
@@ -218,6 +221,15 @@ class RecipeLoader:
                         "file/component name '%s'"
                         % (obj.name, pkgname))
                 found = True
+        # inherit any tracked flags that we found while loading parent
+        # classes
+        if self.recipe._trackedFlags is not None:
+            use.setUsed(self.recipe._trackedFlags)
+        
+        # add in the tracked flags that we found while loading this
+        # class
+        self.recipe._trackedFlags = use.getUsed()
+
 
     def allRecipes(self):
         return self.recipes
@@ -286,9 +298,12 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     return (loader, sourceComponent.getVersion())
 
 def loadRecipe(file, sourcecomponent=None, label=None):
+    oldUsed = use.getUsed()
+
     callerGlobals = inspect.stack()[1][0].f_globals
     cfg = callerGlobals['cfg']
     repos = callerGlobals['repos']
+
     if sourcecomponent and not sourcecomponent.endswith(':source'):
 	sourcecomponent = sourcecomponent + ':source'
 	# XXX the sourcecomponent argument should go away
@@ -314,6 +329,11 @@ def loadRecipe(file, sourcecomponent=None, label=None):
     # of the recipe that loaded it, or else it will be destroyed
     callerGlobals[os.path.basename(file).replace('.', '-')] = loader
 
+    # return the tracked flags to their state before loading this recipe
+    use.resetUsed()
+    use.setUsed(oldUsed)
+
+
 class _sourceHelper:
     def __init__(self, theclass, recipe):
         self.theclass = theclass
@@ -338,6 +358,7 @@ class _policyUpdater:
 class Recipe:
     """Virtual base class for all Recipes"""
     _trove = None
+    _trackedFlags = None
 
     def __init__(self):
         assert(self.__class__ is not Recipe)

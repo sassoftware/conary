@@ -475,6 +475,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     builddir = cfg.buildPath + "/" + recipeObj.name
     use.track(True)
     recipeObj.Flags._freeze()
+    if recipeObj._trackedFlags is not None:
+        use.setUsed(recipeObj._trackedFlags)
 
     recipeObj.setup()
     bldInfo = buildinfo.BuildInfo(builddir)
@@ -630,6 +632,8 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
     buildList = []
     changeSetFile = None
     targetLabel = None
+
+    use.track(True)
 
     if item.endswith('.recipe') and os.path.isfile(item):
 	if emerge:
