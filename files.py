@@ -270,11 +270,19 @@ class File(FileMode):
 
 	os.lchown(target, uid, gid)
 
-    # public interface to _applyChangeLine
-    #
-    # returns 1 if the change worked, 0 if the file changed too much for
-    # the change to apply (which means this is a different file type)
-    def applyChange(self, line):
+    def applyChange(self, line, ignoreContents = 0):
+	"""
+	public interface to _applyChangeLine
+	
+	returns 1 if the change worked, 0 if the file changed too much for
+	the change to apply (which means this is a different file type).
+
+	@param line: change line
+	@type line: str
+	@param ignoreContents: don't merge the sha1's (ignored for most file 
+        types)
+	@type ignoreContents: boolean
+	"""
 	(tag, line) = line.split(None, 1)
 	assert(tag == self.infoTag)
 	self._applyChangeLine(line)
@@ -482,6 +490,15 @@ class RegularFile(File):
 
 	return self.thesha1
 
+    def applyChange(self, line, ignoreContents = 0):
+	if ignoreContents:
+	    l = line.split()
+	    l[1] = "-"			# sha1
+	    l[5] = "-"			# size
+	    line = " ".join(l)
+	
+	File.applyChange(self, line)
+
     def infoLine(self):
 	return "%s %s %s" % (self.infoTag, self.thesha1, 
 			     FileMode.infoLine(self))
@@ -626,3 +643,68 @@ class FilesError(Exception):
 
     def __str__(self):
 	return repr(self)
+
+def mergeChangeLines(lineOne, lineTwo):
+    """
+    Merge two change lines into a new change line. Returns a tuple with
+    a boolean which is true there were conflicts and the new change
+    line (with ! for fields which conflict). If the file types differ
+    between the change lines (True, None) is returned.
+
+    @param lineOne: first change line
+    @type lineOne: str
+    @param lineTwo: first change line
+    @type lineTwo: str
+    @rtype: (boolean, str)
+    """
+
+    ourChanges = lineOne.split()
+    theirChanges = lineTwo.split()
+    resultChanges = []
+    conflicts = False
+
+    if ourChanges[0] != theirChanges[0]:
+	return (True, None)
+
+    # merge fields one by one, skipping over the mtime
+    fieldCount = len(ourChanges)
+    for i in range(0, fieldCount):
+	if i == (fieldCount - 2): 
+	    # mtime
+	    resultChanges.append("%d" % int(time.time()))
+	    continue
+
+	if ourChanges[i] == "-" and theirChanges[i] == "-":
+	    resultChanges.append("-")
+	elif ourChanges[i] == "-": # and theirChanges[i] != "-":
+	    resultChanges.append(theirChanges[i])
+	elif theirChanges[i] == "-": # and ourChanges[i] != "-":
+	    resultChanges.append(ourChanges[i])
+	elif ourChanges[i] == theirChanges[i]:
+	    resultChanges.append(ourChanges[i])
+	else:
+	    resultChanges.append("!")
+	    conflicts = True
+
+    return (conflicts, " ".join(resultChanges))
+
+def contentConflict(changeLine):
+    """
+    Tests a change line to see if only the file's contents conflict. It
+    assumes mtime conflicts have already been filtered. Size and sha1
+    mismatches are considered content conflicts.
+
+    @param changeLine: changeLine to check
+    @type changeLine: str
+    @rtype: boolean
+    """
+    conflictCount = changeLine.find(" ! ")
+    fields = changeLine.split()
+    if fields[0] != "f": return False
+
+    if conflictCount == 1:
+	return fields[1] == "!"
+    elif conflictCount == 2:
+	return fields[1] == "!" and fields[5] == "!"
+
+    return False
