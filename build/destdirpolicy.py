@@ -505,6 +505,17 @@ class ExecutableLibraries(policy.Policy):
 	log.warning('non-executable library %s, changing to mode 0755' %path)
 	os.chmod(fullpath, 0755)
 
+class UTF8Filenames(policy.Policy):
+    """
+    Filenames should be UTF-8 encoded.
+    C{r.UTF8Filenames(exceptions=I{filterexp})}
+    """
+    def doFile(self, path):
+        try:
+            path.decode('utf-8')
+        except UnicodeDecodeError:
+            log.warning('path "%s" is not valid UTF-8' %path)
+
 class ReadableDocs(policy.Policy):
     """
     Documentation should always be world readable
@@ -526,7 +537,6 @@ class ReadableDocs(policy.Policy):
             log.warning('non group and world documentation file %s, changing'
                         ' to mode 0%o' %(path, mode & 07777))
             os.chmod(fullpath, mode)
-
 
 class Strip(policy.Policy):
     """
@@ -929,6 +939,7 @@ def DefaultPolicy(recipe):
 	FixupMultilibPaths(recipe),
 	ExecutableLibraries(recipe),
 	ReadableDocs(recipe),
+	UTF8Filenames(recipe),
 	Strip(recipe),
 	NormalizeCompression(recipe),
 	NormalizeManPages(recipe),
