@@ -14,7 +14,7 @@
 
 # implements a db-based repository
 
-import log
+from lib import log
 import os
 import repository
 import repository.netclient

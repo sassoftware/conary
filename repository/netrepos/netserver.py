@@ -15,7 +15,7 @@
 from repository import changeset
 from repository import repository
 from localrep import fsrepos
-import log
+from lib import log
 import md5
 import os
 import re

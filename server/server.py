@@ -35,7 +35,7 @@ import netserver
 from netserver import NetworkRepositoryServer
 from conarycfg import ConfigFile
 from conarycfg import STRINGDICT
-import options
+from lib import options
 
 FILE_PATH="/tmp/conary-server"
 
