@@ -7,6 +7,12 @@ import os
 
 class ChangeSet:
 
+    def addFile(self, fileId, oldVersion, newVersion, csInfo):
+	self.files[fileId] = (oldVersion, newVersion, csInfo)
+    
+    def addPackage(self, pkg):
+	self.packages.append(pkg)
+
     def getPackageList(self):
 	return self.packages
 
@@ -21,19 +27,69 @@ class ChangeSet:
     def getFileChange(self, fileId):
 	return self.files[fileId][2]
 
+    def headerAsString(self):
+	str = ""
+	for pkg in self.getPackageList():
+	    str = str + pkg.asString()
+	
+	for (fileId, (oldVersion, newVersion, csInfo)) in self.getFileList():
+	    if oldVersion:
+		oldStr = oldVersion.asString()
+	    else:
+		oldStr = "(none)"
+
+	    str = str + "SRS FILE CHANGESET %s %s %s\n%s\n" % \
+			    (fileId, oldStr, newVersion.asString(), csInfo)
+	
+	return str
+
+    def writeToFile(self, fileList, outFileName):
+	try:
+	    outFile = open(outFileName, "w+")
+	    csf = filecontainer.FileContainer(outFile)
+	    outFile.close()
+
+	    csf.addFile("SRSCHANGESET", self.headerAsString(), "")
+
+	    for hash in fileList:
+		f = self.getFileContents(hash)
+		csf.addFile(hash, f, "")
+		f.close()
+
+	    csf.close()
+	except:
+	    os.unlink(outFileName)
+	    raise
+
     def __init__(self):
 	self.packages = []
 	self.files = {}
 	pass
 
+class ChangeSetFromFilesystem(ChangeSet):
+
+    def getFileContents(self, fileId):
+	return open(self.fileMap[fileId])
+
+    def addFilePointer(self, fileId, path):
+	self.fileMap[fileId] = path
+
+    def __init__(self):
+	self.fileMap = {}
+	ChangeSet.__init__(self)
+
+class ChangeSetFromRepository(ChangeSet):
+
+    def getFileContents(self, fileId):
+	return self.repos.pullFileContentsObject(fileId)
+
+    def __init__(self, repos):
+	self.repos = repos
+	ChangeSet.__init__(self)
+
 class ChangeSetFromFile(ChangeSet):
 
     def getFileContents(self, hash):
-	loc = self.csf.getTag(hash)
-	if loc == "seefile":
-	    fn = self.csf.getFile(hash).read()
-	    return open(fn, "r")
-
 	return self.csf.getFile(hash)
 
     def read(self, file):
@@ -69,7 +125,7 @@ class ChangeSetFromFile(ChangeSet):
 		    pkg.parse(lines[i][:-1])
 		    i = i + 1
 
-		self.packages.append(pkg)
+		self.addPackage(pkg)
 	    elif header[0:19] == "SRS FILE CHANGESET ":
 		(fileId, oldVerStr, newVerStr) = string.split(header)[3:6]
 		if oldVerStr == "(none)":
@@ -77,7 +133,7 @@ class ChangeSetFromFile(ChangeSet):
 		else:
 		    oldVersion = versions.VersionFromString(oldVerStr)
 		newVersion = versions.VersionFromString(newVerStr)
-		self.files[fileId] = (oldVersion, newVersion, lines[i][:-1])
+		self.addFile(fileId, oldVersion, newVersion, lines[i][:-1])
 		i = i + 1
 	    else:
 		raise IOError, "invalid line in change set %s" % file
@@ -89,7 +145,7 @@ class ChangeSetFromFile(ChangeSet):
 	self.read(file)
 
 # old may be None
-def fileChangeSet(fileId, old, oldVersion, new, newVersion):
+def fileChangeSet(fileId, old, new):
     hash = None
 
     if old and old.__class__ == new.__class__:
@@ -101,59 +157,37 @@ def fileChangeSet(fileId, old, oldVersion, new, newVersion):
     else:
 	# different classes; these are always written as abstract changes
 	old = None
-	diff = new.infoLine() + "\n"
+	diff = new.infoLine()
 	if isinstance(new, files.RegularFile):
 	    hash = new.sha1()
 
-    if old:
-	oldStr = oldVersion.asString()
-    else:
-	oldStr = "(none)"
-
-    rc = "SRS FILE CHANGESET %s %s %s\n" % \
-	    (fileId, oldStr, newVersion.asString()) + diff
-
-    return (rc, hash)
+    return (diff, hash)
 
 # this creates the changeset against None
 #
-# expects a list of (packageName, pkg, fileMap) tuples, where fileHash
+# expects a list of (packageName, pkg, fileMap) tuples, where fileMap
 # maps each fileid to a (file, realPath, filePath) tuple
-def CreateFromFilesystem(pkgList, version, outFileName):
-    cs = ""
-    hashMap = {}
+def CreateFromFilesystem(pkgList, version):
+    cs = ChangeSetFromFilesystem()
 
     for (packageName, pkg, fileMap) in pkgList:
-	(chgSet, filesNeeded) = pkg.diff(None, None, version)
-	cs = cs + chgSet.asString()
+	(pkgChgSet, filesNeeded) = pkg.diff(None, None, version)
+	cs.addPackage(pkgChgSet)
 
 	for (fileId, oldVersion, newVersion) in filesNeeded:
 	    (file, realPath, filePath) = fileMap[fileId]
-	    (filecs, hash) = fileChangeSet(fileId, None, None, file, 
-					   newVersion)
+	    (filecs, hash) = fileChangeSet(fileId, None, file)
+	    cs.addFile(fileId, oldVersion, newVersion, filecs)
 
 	    if hash:
-		hashMap[hash] = realPath
+		cs.addFilePointer(hash, realPath)
 
-	    cs = cs + filecs
-
-    outFile = open(outFileName, "w+")
-    csf = filecontainer.FileContainer(outFile)
-    outFile.close()
-
-    csf.addFile("SRSCHANGESET", cs, "")
-
-    # this changeset points at the local filesystem for the contents
-    # of a file
-    for hash in hashMap.keys():
-	csf.addFile(hash, hashMap[hash], "seefile")
-
-    csf.close()
+    return cs
 
 # packageList is a list of (pkgName, oldVersion, newVersion) tuples
 def CreateFromRepository(repos, packageList, outFileName):
 
-    cs = ""
+    cs = ChangeSetFromRepository(repos)
     hashList = []
 
     for (packageName, oldVersion, newVersion) in packageList:
@@ -166,8 +200,8 @@ def CreateFromRepository(repos, packageList, outFileName):
 	else:
 	    old = None
 
-	(chgSet, filesNeeded) = new.diff(old, oldVersion, newVersion)
-	cs = cs + chgSet.asString()
+	(pkgChgSet, filesNeeded) = new.diff(old, oldVersion, newVersion)
+	cs.addPackage(pkgChgSet)
 
 	for (fileId, oldVersion, newVersion) in filesNeeded:
 	    filedb = repos.getFileDB(fileId)
@@ -177,27 +211,12 @@ def CreateFromRepository(repos, packageList, outFileName):
 		oldFile = filedb.getVersion(oldVersion)
 	    newFile = filedb.getVersion(newVersion)
 
-	    (filecs, hash) = fileChangeSet(fileId, oldFile, oldVersion,
-					   newFile, newVersion)
-	    cs = cs + filecs
+	    (filecs, hash) = fileChangeSet(fileId, oldFile, newFile)
+
+	    cs.addFile(fileId, oldVersion, newVersion, filecs)
 	    if hash: hashList.append(hash)
 
-    try:
-	outFile = open(outFileName, "w+")
-	csf = filecontainer.FileContainer(outFile)
-	outFile.close()
-
-	csf.addFile("SRSCHANGESET", cs, "")
-
-	for hash in hashList:
-	    f = repos.pullFileContentsObject(hash)
-	    csf.addFile(hash, f, "")
-	    f.close()
-
-	csf.close()
-    except:
-	os.unlink(outFileName)
-	raise
+    cs.writeToFile(hashList, outFileName)
 
 def ChangeSetCommand(repos, cfg, packageName, outFileName, oldVersionStr, \
 	      newVersionStr):
