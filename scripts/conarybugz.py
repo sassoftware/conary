@@ -32,7 +32,7 @@ def getPerson(name, labelText):
     return None
 
 personRe = (
-    ('<email>', re.compile(r'<contact info>')),
+    ('<email-bugzilla-id>', re.compile(r'<contact-info-regular-expression>')),
     ...
 )
 
