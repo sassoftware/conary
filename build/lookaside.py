@@ -133,11 +133,8 @@ class RepositoryCache:
 
     def moveFileToCache(self, cfg, name, location):
 	cachedname = createCacheName(cfg, name, location)
-	dest = open(cachedname, "w+")
-	src = self.repos.pullFileContentsObject(self.map[name])
-        util.copyfileobj(src, dest)
-	src.close()
-	dest.close()
+	self.repos.getFileContents([(self.map[name], cachedname)])
+
 	return cachedname
 
     def __init__(self, repos):

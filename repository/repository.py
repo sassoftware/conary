@@ -7,6 +7,7 @@
 
 import changeset
 import datastore
+import tempfile
 import util
 import versions
 
@@ -170,6 +171,25 @@ class AbstractTroveDatabase:
 	Returns the file object for the given (fileId, version).
 	"""
 	raise NotImplementedError
+
+    def getFileContents(self, sha1List):
+	"""
+	Retrieves the files w/ the sha1s in the parameter list. If
+	an item in the list is a tuple, the first item in the tuple
+	should be the sha1 and the second the path the file should
+	be written to. If item in the tuple is a string, it should be
+	just a sha1 to retrieve.
+
+	A dict indexed by sha1's is returned. For sha1s which were given 
+	file names, the dict contains the file name the file was stored
+	in. For sha1s without file names, the dict contains an open file
+	object for the contents of the file (the file will have already
+	been unlinked, and has no file name in this case).
+
+	@param sha1List: files to retrieve
+	@type: list
+	@rtype: list
+	"""
 
     def getTrove(self, troveName, version, flavor):
 	"""
@@ -434,8 +454,19 @@ class DataStoreRepository:
     def removeFileContents(self, sha1):
 	self.contentsStore.removeFile(sha1)
 
-    def pullFileContentsObject(self, fileId):
-	return self.contentsStore.openFile(fileId)
+    def getFileContents(self, sha1List):
+	d = {}
+	for item in sha1List:
+	    if type(item) == str:
+		d[item] = self.contentsStore.openFile(item)
+	    else:
+		(sha1, path) = item
+		outF = open(path, "w+")
+		inF = self.contentsStore.openFile(item)
+		util.copyfileobj(inF, outF)
+		d[item] = path
+
+	return d
 
     def hasFileContents(self, fileId):
 	return self.contentsStore.hasFile(fileId)

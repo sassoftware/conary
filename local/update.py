@@ -390,8 +390,10 @@ class FilesystemJob:
 		    # the contents changed in just the repository, so take
 		    # those changes
 		    if headFileContType == changeset.ChangedFileTypes.diff:
-			baseLines = repos.pullFileContentsObject(
-					baseFile.contents.sha1()).readlines()
+			sha1 = baseFile.contents.sha1()
+			baseLineF = repos.getFileContents((sha1,))[sha1]
+			baseLines = baseLineF.readlines()
+			del baseLineF
 			headFileContents = changeSet.getFileContents(fileId)[1]
 			diff = headFileContents.get().readlines()
 			(newLines, failedHunks) = patch.patch(baseLines, diff)

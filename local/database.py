@@ -113,10 +113,6 @@ class SqlDbRepository(repository.DataStoreRepository,
 
 	return file
 
-    def getFileContents(self, file):
-	return filecontents.FromRepository(self, file.contents.sha1(), 
-					   file.contents.size())
-
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False,
 			 pristine = False):

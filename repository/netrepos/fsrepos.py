@@ -122,10 +122,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	return file
 
-    def getFileContents(self, file):
-	return filecontents.FromRepository(self, file.contents.sha1(), 
-					   file.contents.size())
-	
     def addFileVersion(self, fileId, version, file):
 	# don't add duplicated to this repository
 	if not self.troveStore.hasFile(fileId, version):
@@ -405,9 +401,10 @@ class ChangeSetJob:
 			# repository
 			assert(oldVer)
 			(contType, fileContents) = cs.getFileContents(fileId)
-			f = repos.pullFileContentsObject(
-						oldfile.contents.sha1())
+			sha1 = oldfile.contents.sha1()
+			f = repos.getFileContents((sha1,))[sha1]
 			oldLines = f.readlines()
+			del f
 			diff = fileContents.get().readlines()
 			(newLines, failedHunks) = patch.patch(oldLines, diff)
 			fileContents = filecontents.FromString("".join(newLines))

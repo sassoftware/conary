@@ -20,17 +20,17 @@ class FileContents(object):
 
 class FromRepository(FileContents):
 
-    __slots__ = ( "repos", "theSize", "fileId" )
+    __slots__ = ( "repos", "theSize", "sha1" )
 
     def get(self):
-	return self.repos.pullFileContentsObject(self.fileId)
+	return self.repos.getFileContents((self.sha1,))[self.sha1]
 
     def size(self):
 	return self.theSize
 
-    def __init__(self, repos, fileId, size):
+    def __init__(self, repos, sha1, size):
 	self.repos = repos
-	self.fileId = fileId
+	self.sha1 = sha1
 	self.theSize = size
 
 class FromFilesystem(FileContents):
