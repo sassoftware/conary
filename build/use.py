@@ -76,25 +76,19 @@ class Flag(dict):
 	    return repr(self._value)
 
     def __eq__(self, other):
-        if type(other) is Flag:
-            return self._value == other._value
-        return self._value == other
+        return bool(self) == bool(other)
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def __ror__(self, other):
-        if type(other) is Flag:
-            other = other._value
-        return self._value | other
+        return bool(self) | bool(other)
 
     def __or__(self, other):
 	return self.__ror__(other)
 
     def __rand__(self, other):
-        if type(other) is Flag:
-            other = other._value
-        return self._value & other
+        return bool(self) & bool(other)
 
     def __and__(self, other):
 	return self.__rand__(other)
