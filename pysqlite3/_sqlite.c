@@ -1948,7 +1948,7 @@ static PyObject* _stmt_step(pysqlstmt *self, PyObject *args)
 }
 
 static char _stmt_reset_doc [] =
-"step()\n\
+"reset()\n\
 Reset the virtual machine associated with a stmtiled SQL statement.";
 
 static PyObject* _stmt_reset(pysqlstmt *self, PyObject *args)
@@ -1978,7 +1978,7 @@ static PyObject* _stmt_reset(pysqlstmt *self, PyObject *args)
 }
 
 static char _stmt_finalize_doc [] =
-"step()\n\
+"finalize()\n\
 Frees the virtual machine associated with a stmtiled SQL statement.";
 
 static PyObject* _stmt_finalize(pysqlstmt *self, PyObject *args)
@@ -2011,7 +2011,7 @@ static PyObject* _stmt_finalize(pysqlstmt *self, PyObject *args)
 }
 
 static char _stmt_bind_doc [] =
-"step()\n\
+"bind()\n\
 Bind arguments to a SQL statement.";
 
 static PyObject* _stmt_bind(pysqlstmt *self, PyObject *args)
