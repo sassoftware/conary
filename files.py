@@ -259,12 +259,12 @@ class File(FileMode):
         try:
             uid = pwd.getpwnam(self.owner())[2]
         except KeyError:
-            log.warn('user %s does not exist - using root', self.owner())
+            log.warning('user %s does not exist - using root', self.owner())
             uid = 0
         try:
             gid = grp.getgrnam(self.group())[2]
         except KeyError:
-            log.warn('group %s does not exist - using root', self.group())
+            log.warning('group %s does not exist - using root', self.group())
             gid = 0
 
 	os.lchown(target, uid, gid)
