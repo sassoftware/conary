@@ -5,7 +5,8 @@
 
 class tmpwatch(Recipe):
     description = """Logrotate is a genuinally useful piece of code for
-preventing files from growing ad nauseum"""
+preventing files from growing ad nauseum
+OK, but what is tmpwatch?  :-)"""
 
     buildRequires = [ "glibc" ]
     runRequires = [ "cron" ]
