@@ -28,6 +28,7 @@ import tempfile
 import time
 import types
 import util
+import versions
 
 # -------------------- private below this line -------------------------
 
@@ -100,7 +101,7 @@ class _IdGen:
             self.map[(path, flavor)] = (fileId, version)
 # -------------------- public below this line -------------------------
 
-def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None, 
+def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None, 
 	       prep=True, macros={}):
     """
     Turns a recipe object into a change set, and sometimes commits the
@@ -133,7 +134,19 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 
     currentVersion = None
     if repos.hasPackage(fullName):
-	currentVersion = repos.getTroveLatestVersion(fullName, buildBranch)
+	vers = repos.getTroveLeavesByLabel([fullName], buildLabel)[fullName]
+	if not len(vers):
+	    raise CookError('No branches labeled %s exist for trove %s'
+			    % (fullName, buildLabel.asString))
+	elif len(vers) > 1:
+	    raise CookError('Multiple branches labeled %s exist for trove %s'
+			    % (fullName, buildLabel.asString))
+	    
+	buildBranch = vers[0].branch()
+    else:
+	# for the first build, we're willing to create the branch for
+	# them (though it has to be a trunk!)
+	buildBranch = versions.Version([buildLabel])
 
     if issubclass(recipeClass, recipe.PackageRecipe):
 	ret = cookPackageObject(repos, cfg, recipeClass, buildBranch,
@@ -454,7 +467,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}):
 
     built = None
     try:
-        troves = cookObject(repos, cfg, recipeClass, cfg.defaultbranch,
+        troves = cookObject(repos, cfg, recipeClass, cfg.buildlabel,
                             changeSetFile = changeSetFile,
                             prep = prep, macros = macros)
         if troves:
