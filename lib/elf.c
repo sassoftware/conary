@@ -47,13 +47,13 @@ static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
     char * class;
 
     if (elf_kind(elf) != ELF_K_ELF) {
-	PyErr_SetString(ElfError, "not a plain elf file\n");
+	PyErr_SetString(ElfError, "not a plain elf file");
 	return 1;
     }
 
     ident = elf_getident(elf, &identSize);
     if (identSize < EI_OSABI) {
-        PyErr_SetString(ElfError, "missing ELF abi\n");
+        PyErr_SetString(ElfError, "missing ELF abi");
 	return 1;
     }
 
