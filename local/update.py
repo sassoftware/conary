@@ -681,7 +681,6 @@ class FilesystemJob:
 			(headFileContType,
 			 headFileContents) = changeSet.getFileContents(fileId)
 
-			sha1 = baseFile.contents.sha1()
 			baseLineF = repos.getFileContents(pkgCs.getName(),
 					pkgCs.getOldVersion(), 
 					pkgCs.getOldFlavor(),
