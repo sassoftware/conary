@@ -368,7 +368,6 @@ def annotate(repos, filename):
 
     while verList:
         oldV = verList.pop()
-        print "Version = %s" % oldV.asString() 
         oldTrove = repos.getTrove(troveName, oldV, None)
 
         try:
@@ -427,7 +426,6 @@ def annotate(repos, filename):
             switchedBranches = True
             curVersion = branch.parentNode()
             branch = curVersion.branch()
-            print "Switching to branch %s" % branch.asString()
             label = branch.label()
             if branch not in branchVerList:
                 labelVerList = repos.getTroveVersionsByLabel([troveName], label)[troveName]
