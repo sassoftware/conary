@@ -248,11 +248,12 @@ class Trove:
 	this instance. We return the change set, a list of other package diffs
 	which should be included for this change set to be complete, and a list
 	of file change sets which need to be included.  The list of package
-	changes is of the form (pkgName, oldVersion, newVersion).  If absolute
-	is True, oldVersion is always None and absolute diffs can be used.
-	Otherwise, absolute versions are not necessary, and oldVersion of None
-	means the package is new. The list of file changes is a list of
-	(fileId, oldVersion, newVersion, oldPath, newPath) tuples, where newPath is 
+	changes is of the form (pkgName, oldVersion, newVersion, oldFlavor,
+	newFlavor).  If absolute is True, oldVersion is always None and
+	absolute diffs can be used.  Otherwise, absolute versions are not
+	necessary, and oldVersion of None means the package is new. The list of
+	file changes is a list of (fileId, oldVersion, newVersion, oldPath,
+	newPath) tuples, where newPath is 
 	the path to the file in this package.
 
 	@param them: object to generate a change set from (may be None)
@@ -270,15 +271,16 @@ class Trove:
 	# stayed the same
 	if them:
 	    themMap = them.idMap
-	    chgSet = TroveChangeSet(self.name, self.flavor, self.changeLog,
+	    chgSet = TroveChangeSet(self.name, self.changeLog,
 				      them.getVersion(),	
 				      self.getVersion(),
+				      them.getFlavor(), self.getFlavor(),
 				      absolute = False)
 	else:
 	    themMap = {}
-	    chgSet = TroveChangeSet(self.name, self.flavor, self.changeLog,
-				      None, 
-				      self.getVersion(),
+	    chgSet = TroveChangeSet(self.name, self.changeLog,
+				      None, self.getVersion(),
+				      None, self.getFlavor(),
 				      absolute = absolute)
 
 	# dependency and flavor information is always included in total;
@@ -338,10 +340,14 @@ class Trove:
 
 	    (name, version, flavor) = key
 	    chgSet.newTroveVersion(name, version, flavor)
-	    if added.has_key((name, flavor)):
-		added[(name, flavor)].append(version)
+
+	    if not added.has_key(name):
+		added[name] = {}
+
+	    if added[name].has_key(flavor):
+		added[name][flavor].append(version)
 	    else:
-		added[(name, flavor)] = [ version ]
+		added[name][flavor] = [ version ]
 
 	if them:
 	    for key in them.packages.iterkeys():
@@ -349,60 +355,160 @@ class Trove:
 
 		(name, version, flavor) = key
 		chgSet.oldTroveVersion(name, version, flavor)
-		if removed.has_key((name, flavor)):
-		    removed[(name, flavor)].append(version)
+		if not removed.has_key(name):
+		    removed[name] = {}
+
+		if removed[name].has_key(flavor):
+		    removed[name][flavor].append(version)
 		else:
-		    removed[(name, flavor)] = [ version ]
+		    removed[name][flavor] = [ version ]
 
 	pkgList = []
 
 	if absolute:
-	    for name, flavor in added.keys():
-		for version in added[(name, flavor)]:
-		    pkgList.append((name, None, version, flavor))
+	    for name in added.keys():
+		for flavor in added[name]:
+		    for version in added[name][flavor]:
+			pkgList.append((name, None, version, None, flavor))
 	    return (chgSet, filesNeeded, pkgList)
 
 	# use added and removed to assemble a list of package diffs which need
 	# to go along with this change set
-	for name, flavor in added.keys():
-	    if not removed.has_key((name, flavor)):
-		for version in added[(name, flavor)]:
-		    pkgList.append((name, None, version, flavor))
+
+	for name in added.keys(): 
+	    if not removed.has_key(name):
+		# there isn't anything which disappeared that has the same
+		# name; this must be a new addition
+		for newFlavor in added[name]:
+		    for version in added[name][newFlavor]:
+			pkgList.append((name, None, version, None, newFlavor))
+
+		del added[name]
+
+	changePair = []
+	# we know everything added now has a matching name in removed; let's
+	# try and match up the flavors. first of all we'll look for exact
+	# matches
+	for name in added.keys():
+	    for newFlavor in added[name].keys():
+		if removed[name].has_key(newFlavor):
+		    # we have a name/flavor match
+		    changePair.append((name, added[name][newFlavor], newFlavor,
+				       removed[name][newFlavor], newFlavor))
+		    del added[name][newFlavor]
+		    del removed[name][newFlavor]
+
+	    if not added[name]:
+		del added[name]
+	    if not removed[name]:
+		del removed[name]
+
+	# for things that are left, see if we can match flavors based on
+	# the architecture
+	for name in added.keys():
+	    for newFlavor in added[name].keys():
+		if not newFlavor:
+		    # this isn't going to match anything well
+		    continue
+
+		match = None
+
+		# first check for matches which are a superset of the old
+		# flavor, then for ones which are a subset of the old flavor
+		for oldFlavor in removed[name].keys():
+		    if not oldFlavor:
+			continue
+
+		    if newFlavor.satisfies(oldFlavor):
+			match = removed[name][oldFlavor]
+			del removed[name][oldFlavor]
+			break
+
+		if match:
+		    changePair.append((name, added[name][newFlavor], newFlavor, 
+				       removed[name][oldFlavor], oldFlavor))
+		    del added[name][newFlavor]
+		    continue
+
+		for oldFlavor in removed[name].keys():
+		    if not oldFlavor:
+			continue
+
+		    if oldFlavor.satisfies(newFlavor):
+			match = removed[name][oldFlavor]
+			del removed[name][oldFlavor]
+			break
+
+		if match:
+		    changePair.append((name, added[name][newFlavor], newFlavor, 
+				       removed[name][oldFlavor], oldFlavor))
+		    del added[name][newFlavor]
+
+	    if not added[name]:
+		del added[name]
+	    if not removed[name]:
+		del removed[name]
+	    
+	for name in added.keys():
+	    if len(added[name]) == 1 and len(removed[name]) == 1:
+		# one of each? they *must* be a good match...
+		newFlavor = added[name].keys()[0]
+		oldFlavor = removed[name].keys()[0]
+		changePair.append((name, added[name][newFlavor], newFlavor, 
+				   removed[name][oldFlavor], oldFlavor))
+		del added[name]
+		del removed[name]
 		continue
 
-	    # name was changed between this version. for each new version
-	    # of a package, try and generate the diff between that package
-	    # and the version of the package which was removed which was
-	    # on the same branch. if that's not possible, see if the parent
-	    # of the package was removed, and use that as the diff. if
-	    # we can't do that and only one version of this package is
-	    # being obsoleted, use that for the diff. if we can't do that
-	    # either, throw up our hands in a fit of pique
+	for name in added.keys():
+	    for newFlavor in added[name].keys():
+		# no good match. that's too bad
+		changePair.append((name, added[name][newFlavor], newFlavor, 
+				   None, None))
+
+	for (name, newVersionList, newFlavor, oldVersionList, oldFlavor) \
+		    in changePair:
+	    assert(newVersionList)
+
+	    if not oldVersionList:
+		for newVersion in newVersionList:
+		    pkgList.append((name, None, newVersion, 
+					  None, newFlavor))
+
+	    # for each new version of a package, try and generate the diff
+	    # between that package and the version of the package which was
+	    # removed which was on the same branch. if that's not possible,
+	    # see if the parent of the package was removed, and use that as
+	    # the diff. if we can't do that and only one version of this
+	    # package is being obsoleted, use that for the diff. if we
+	    # can't do that either, throw up our hands in a fit of pique
 	    
-	    for version in added[(name, flavor)]:
+	    for version in newVersionList:
 		branch = version.branch()
 		if version.hasParent():
 		    parent = version.parent()
 		else:
 		    parent = None
 
-		if len(removed[(name, flavor)]) == 1:
-		    pkgList.append((name, removed[(name, flavor)][0], version, 
-				   flavor))
+		if len(oldVersionList) == 1:
+		    pkgList.append((name, oldVersionList[0], version, 
+				    oldFlavor, newFlavor))
 		else:
 		    sameBranch = None
 		    parentNode = None
 
-		    for other in removed[(name, flavor)]:
+		    for other in oldVersionList:
 			if other.branch() == branch:
 			    sameBranch = other
 			if parent and other == parent:
 			    parentNode = other
 
 		    if sameBranch:
-			pkgList.append((name, sameBranch, version, flavor))
+			pkgList.append((name, sameBranch, version, 
+					oldFlavor, newFlavor))
 		    elif parentNode:
-			pkgList.append((name, parentNode, version, flavor))
+			pkgList.append((name, parentNode, version, 
+					oldFlavor, newFlavor))
 		    else:
 			# Here's the fit of pique. This shouldn't happen
 			# except for the most ill-formed of groups.
@@ -564,8 +670,10 @@ class TroveChangeSet:
             depformat('Requires', self.requires, f)
         if self.provides:
             depformat('Provides', self.provides, f)
-        if self.flavor:
-            depformat('Flavor', self.flavor, f)
+        if self.oldFlavor:
+            depformat('Old Flavor', self.flavor, f)
+        if self.newFlavor:
+            depformat('New Flavor', self.flavor, f)
 
 	for (fileId, path, version) in self.newFiles:
 	    #f.write("\tadded (%s(.*)%s)\n" % (fileId[:6], fileId[-6:]))
@@ -634,8 +742,15 @@ class TroveChangeSet:
             rc.append("REQUIRES %s\n" % (self.requires.freeze()))
         if self.provides:
             rc.append("PROVIDES %s\n" % (self.provides.freeze()))
-        if self.flavor:
-            rc.append("FLAVOR %s\n" % (self.flavor.freeze()))
+
+        if self.oldFlavor and self.newFlavor:
+            rc.append("FLAVOR %s %s\n" % (self.oldFlavor.freeze(),
+					  self.newFlavor.freeze()))
+	elif self.oldFlavor and not self.newFlavor:
+            rc.append("FLAVOR %s -\n" % (self.oldFlavor.freeze()))
+	elif not self.oldFlavor and self.newFlavor:
+            rc.append("FLAVOR - %s\n" % (self.newFlavor.freeze()))
+
 	if self.changeLog:
 	    frz = self.changeLog.freeze()
 	    rc.append("CL %d\n" % frz.count("\n"))
@@ -689,11 +804,20 @@ class TroveChangeSet:
     def getRequires(self):
         return self.requires
 
-    def getFlavor(self):
-        return self.flavor
+    def getOldFlavor(self):
+        return self.newFlavor
 
-    def __init__(self, name, flavor, changeLog, oldVersion, newVersion, 
-		 absolute = 0):
+    def getNewFlavor(self):
+        return self.newFlavor
+
+    def getFlavor(self):
+        return self.newFlavor
+
+    def __init__(self, name, changeLog, oldVersion, newVersion, 
+		 oldFlavor, newFlavor, absolute = 0):
+	assert(isinstance(newVersion, versions.AbstractVersion))
+	assert(not newFlavor or isinstance(newFlavor, deps.DependencySet))
+	assert(not oldFlavor or isinstance(oldFlavor, deps.DependencySet))
 	self.name = name
 	self.oldVersion = oldVersion
 	self.newVersion = newVersion
@@ -705,7 +829,8 @@ class TroveChangeSet:
 	self.packages = {}
         self.provides = None
         self.requires = None
-        self.flavor = flavor
+	self.oldFlavor = oldFlavor
+	self.newFlavor = newFlavor
 
 class ThawTroveChangeSet(TroveChangeSet):
 
@@ -783,11 +908,18 @@ class ThawTroveChangeSet(TroveChangeSet):
 	newVersion = versions.ThawVersion(l[rest])
 
 	# find the flavor
-	flavor = None
+	oldFlavor = None
+	newFlavor = None
 	for i, l in enumerate(lines[1:4]):
 	    if l.startswith("FLAVOR "):
-		dep = l.split(' ', 1)[1]
-		flavor = deps.ThawDependencySet(dep)
+		oldFlavorStr, newFlavorStr = l.split(' ', 2)[1:3]
+
+		if oldFlavorStr != "-":
+		    oldFlavor = deps.ThawDependencySet(oldFlavorStr)
+
+		if newFlavorStr != "-":
+		    newFlavor = deps.ThawDependencySet(newFlavorStr)
+
 		del lines[i + 1]
 		break
 
@@ -801,8 +933,9 @@ class ThawTroveChangeSet(TroveChangeSet):
 		del lines[i: first + cnt]
                 break
 
-	TroveChangeSet.__init__(self, pkgName, flavor, changeLog, oldVersion, 
-				  newVersion, absolute = (pkgType == "ABS"))
+	TroveChangeSet.__init__(self, pkgName, changeLog, oldVersion, 
+				newVersion, oldFlavor, newFlavor, 
+				absolute = (pkgType == "ABS"))
         
 	for line in lines:
 	    self.parse(line)

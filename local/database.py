@@ -224,19 +224,32 @@ class Database(SqlDbRepository):
 	for (name, version, flavor) in absSet.getPrimaryPackageList():
 	    cs.addPrimaryPackage(name, version, flavor)
 
+	items = []
+	for newPkg in job.newPackageList():
+	    items.append((newPkg.getName(), newPkg.getVersion(), 
+			  newPkg.getFlavor()))
+
+	outdated = helper.outdatedTroves(self, items)
+
 	for newPkg in job.newPackageList():
 	    pkgName = newPkg.getName()
+	    newVersion = newPkg.getVersion()
+	    newFlavor = newPkg.getFlavor()
 
-	    oldVersion = helper.previousVersion(self, pkgName, 
-						newPkg.getVersion(),
-						newPkg.getFlavor())
+	    key = (pkgName, newVersion, newFlavor)
+	    if not outdated.has_key(key):
+		log.warning("package %s %s is already installed -- skipping",
+			    pkgName, newVersion.asString())
+		continue
+
+	    (oldVersion, oldFlavor) = outdated[key][1:3]
 
 	    if not oldVersion:
 		# new package; the Package.diff() right after this never
 		# sets the absolute flag, so the right thing happens
 		old = None
 	    else:
-		old = self.getTrove(pkgName, oldVersion, newPkg.getFlavor(),
+		old = self.getTrove(pkgName, oldVersion, oldFlavor,
 					     pristine = True)
 
 	    # we ignore pkgsNeeded; it doesn't mean much in this case

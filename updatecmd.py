@@ -18,7 +18,9 @@ import log
 import os
 from repository import repository
 import sys
+import trove
 import util
+import versions
 
 def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
 	     tagScript = None, keepExisting = False):
@@ -57,24 +59,27 @@ def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
         # so far no changeset (either the path didn't exist or we could not
         # read it
 	try:
-	    pkgList = repos.findTrove(cfg.installLabel, pkg, cfg.flavor,
+	    newList = repos.findTrove(cfg.installLabel, pkg, cfg.flavor,
 				      versionStr)
 	except repository.PackageNotFound, e:
 	    log.error(str(e))
 	    return
 
+	newItems = []
+	for newTrove in newList:
+	    newItems.append((newTrove.getName(), newTrove.getVersion(),
+			     newTrove.getFlavor()))
+
+	# everything which needs to be installed is in this list; if it's
+	# not here, it's a duplicate
+	outdated = helper.outdatedTroves(db, newItems)
 	list = []
-	for pkg in pkgList:
-	    if db.hasTrove(pkg.getName(), pkg.getVersion(), pkg.getFlavor()):
-		continue
-
-	    currentVersion = helper.previousVersion(db, pkg.getName(),
-						    pkg.getVersion(),
-						    pkg.getFlavor())
-
-	    list.append((pkg.getName(), pkg.getFlavor(), currentVersion, 
-			 pkg.getVersion(), 0))
-
+	for newItem in newItems:
+	    (name, newVersion, newFlavor) = newItem
+	    if outdated.has_key(newItem):
+		(oldVersion, oldFlavor) = outdated[newItem][1:3]
+		list.append((name, (oldVersion, oldFlavor),
+				   (newVersion, newFlavor), 0))
 
         if not list:
             log.warning("no new troves were found")

@@ -170,7 +170,8 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
 
     # it's a shame that findTrove already sent us the trove since we're
     # just going to request it again
-    cs = repos.createChangeSet([(trv.getName(), None, None, trv.getVersion(),
+    cs = repos.createChangeSet([(trv.getName(), (None, None), 
+						(trv.getVersion(), None),
 			        True)])
 
     pkgCs = cs.iterNewPackageList().next()
@@ -319,7 +320,8 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 	old = old[0]
 	oldV = old.getVersion()
 
-    cs = repos.createChangeSet([(troveName, None, oldV, newV, False)])
+    cs = repos.createChangeSet([(troveName, (oldV, None),
+					    (newV, None), False)])
 
     _showChangeSet(repos, cs, old, new)
 
@@ -443,8 +445,8 @@ def updateSrc(repos, versionStr = None):
 	headVersion = head.getVersion()
 	newBranch = helper.fullBranchName(None, headVersion, versionStr)
 
-    changeSet = repos.createChangeSet([(pkgName, None, baseVersion, 
-					headVersion, 0)])
+    changeSet = repos.createChangeSet([(pkgName, (baseVersion, None),
+					(headVersion, None), 0)])
 
     packageChanges = changeSet.iterNewPackageList()
     pkgCs = packageChanges.next()

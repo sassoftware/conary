@@ -18,6 +18,7 @@ Simple functions used throughout conary.
 
 import repository
 import repository.netclient
+import trove
 import versions
 
 def openRepository(repMap):
@@ -178,43 +179,53 @@ def nextVersion(repos, troveName, versionStr, troveFlavor, currentBranch,
         
     return newVersion
 
-def previousVersion(repos, troveName, troveVersion, troveFlavor):
+def outdatedTroves(db, l):
     """
-    Returns the trove version which will be outdated by installing
-    the specified trove. If none will be outdated, None is returned.
-    If we can't tell which version will be outdated, AmbiguousOperation
-    is raised.
-
-    @type repos: repository.Repository
-    @type troveName: str
-    @type troveVersion: versions.Version
-    @type troveFlavor: deps.deps.DependencySet
-    @rtype: versions.Version or None
+    For a (troveName, troveVersion, troveFlavor) list return a dict indexed by
+    elements in that list. Each item in the dict is the (troveName,
+    troveVersion, troveFlavor) item for an already installed trove if
+    installing that item doesn't cause a removal, otherwise it is which needs
+    to be removed as part of the update. a (None, None) tuple means the
+    item is new and nothing should be removed while no entry means that the
+    item is already installed.
     """
 
-    oldVersion = None
-    oldVersions = repos.getTroveVersionList(troveName)
-    if len(oldVersions) > 1:
-	# try and pick the one which looks like a good match
-	# for the new version
-	newBranch = troveVersion.branch()
-	for ver in oldVersions:
-	    if ver.branch() == newBranch:
-		# make sure it's the right flavor
-		flavors = repos.pkgVersionFlavors(troveName, ver)
-		if troveFlavor in flavors:
-		    oldVersion = ver
-		    break
+    names = {}
+    for (name, version, flavor) in l:
+	names[name] = True
 
-	if not oldVersion:
-	    raise AmbiguousOperation
-    elif oldVersions:
-	# make sure it's the right flavor
-	flavors = repos.pkgVersionFlavors(troveName, oldVersions[0])
-	if troveFlavor in flavors:
-	    oldVersion = oldVersions[0]
+    instList = []
+    for name in names.iterkeys():
+	# get the current troves installed
+	try:
+	    instList += db.findTrove(name)
+	except repository.repository.PackageNotFound, e:
+	    pass
 
-    return oldVersion
+    # now we need to figure out how to match up the version and flavors
+    # pair. a shortcut is to stick the old troves in one group and
+    # the new troves in another group; when we diff those groups
+    # diff tells us how to match them up. anything which doesn't get
+    # a match gets removed. got that? 
+    instGroup = trove.Trove("@update", versions.NewVersion(), 
+			    None, None)
+    for instTrove in instList:
+	instGroup.addTrove(instTrove.getName(), instTrove.getVersion(),
+			   instTrove.getFlavor())
+
+    newGroup = trove.Trove("@update", versions.NewVersion(), 
+			    None, None)
+    for (name, version, flavor) in l:
+	newGroup.addTrove(name, version, flavor)
+
+    trvChgs = newGroup.diff(instGroup)[2]
+
+    resultDict = {}
+    for (name, oldVersion, newVersion, oldFlavor, newFlavor) in trvChgs:
+	resultDict[(name, newVersion, newFlavor)] = (name, oldVersion, 
+						     oldFlavor)
+
+    return resultDict
 
 class PackageNotFound(Exception):
 

@@ -85,8 +85,7 @@ class ServerCache:
 	    self.cache[serverName] = server
 
 	    try:
-		# we can talk to version 1 and version 2 repositories
-		if server.checkVersion(2) < 1:
+		if server.checkVersion(3) != 3:
 		    raise repository.OpenError('Server version too old')
 	    except OSError, e:
 		raise repository.OpenError('Error occured opening repository '
@@ -243,7 +242,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def getTroves(self, troves):
 	chgSetList = []
 	for (name, version, flavor) in troves:
-	    chgSetList.append((name, flavor, None, version, True))
+	    chgSetList.append((name, (None, None), (version, flavor), True))
 	
 	cs = self._getChangeSet(chgSetList, recurse = False, withFiles = False)
 
@@ -269,17 +268,19 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True):
 	l = []
 	serverName = None
-	for (name, flavor, old, new, absolute) in chgSetList:
+	for (name, (old, oldFlavor), (new, newFlavor), absolute) in chgSetList:
 	    if old:
-		l.append((name, self.fromFlavor(flavor),
-			  self.fromVersion(old), self.fromVersion(new), 
+		l.append((name, 
+			  (self.fromVersion(old), self.fromFlavor(oldFlavor)), 
+			  (self.fromVersion(new), self.fromFlavor(newFlavor)),
 			  absolute))
 		if serverName is None:
 		    serverName = old.branch().label().getHost()
 		assert(serverName == old.branch().label().getHost())
 	    else:
-		l.append((name, self.fromFlavor(flavor),
-			  0, self.fromVersion(new),
+		l.append((name, 
+			  (0, 0),
+			  (self.fromVersion(new), self.fromFlavor(newFlavor)),
 			  absolute))
 
 	    if serverName is None:

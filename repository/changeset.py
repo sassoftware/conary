@@ -302,8 +302,9 @@ class ChangeSet:
 	    # this is a modified package and needs to be inverted
 
 	    invertedPkg = trove.TroveChangeSet(pkgCs.getName(), 
-			       pkgCs.getFlavor(), pkg.getChangeLog(),
-			       pkgCs.getNewVersion(), pkgCs.getOldVersion())
+			       pkg.getChangeLog(),
+			       pkgCs.getNewVersion(), pkgCs.getOldVersion(),
+			       pkgCs.getNewFlavor(), pkgCs.getOldFlavor())
 
 	    for (name, list) in pkgCs.iterChangedTroves():
 		for (oper, version, flavor) in list:
