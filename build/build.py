@@ -835,8 +835,9 @@ class MakeDirs(_FileAction):
 class TestSuite(_FileAction):
 
     idnum = 0
-    keywords = {'subDirs' : [], 
-		'ignore'  : []}
+    keywords = {'ignore'    : [],
+		'recursive' : False,
+		'subdirs'   : [] } 
 
     command_path = '%(thistestdir)s/conary-test-command' 
     testsuite_path = '%(thistestdir)s/conary-testsuite-%(identifier)s'
@@ -853,13 +854,19 @@ exit $failed
     testSuiteScript = '''#!/bin/sh -x
 # testsuite 
 pushd ./%(dir)s
-# BEGIN Recipe supplied code 
-%(command)s
-# END Recipe supplied code
-exitstatus=$?
+    failed=0
+    subdirs="%(subdirs)s"
+    for subdir in $subdirs; do
+	pushd $subdir;
+	    %(command)s || failed=$?
+	popd;
+    done
+    %(command)s || failed=$?
 popd
-exit $exitstatus
+exit $failed
 '''
+
+
 
     def __init__(self, recipe, *args, **keywords):
         _FileAction.__init__(self, recipe, *args, **keywords)
@@ -876,6 +883,8 @@ exit $exitstatus
 	    self.command = 'make check-TESTS'
 	else:
 	    self.command = args[1]
+	if self.subdirs and not isinstance(self.subdirs, tuple, list):
+	    self.subdirs = [self.subdirs]
 	# turn on test component
 	recipe.TestSuiteLinks(build=True)
 
@@ -890,39 +899,44 @@ exit $exitstatus
 	    self.setComponents(path)
 
     def writeTestSuiteScript(self):
-	#id = self.dir
-	#id = id.replace('.', '')
-	#id = id.replace('*', 'star')
-	#id = id.replace('/', '-')
 	idnum = TestSuite.idnum 
 	TestSuite.idnum = idnum + 1
-	#id += str(idnum)
 	self.macros.identifier = str(idnum)
 	path = self.testsuite_path % self.macros
 	fullpath = self.macros.destdir + path
+	self.macros.subdirs = ' '.join(self.subdirs)
 	if not os.path.exists(fullpath):
 	    f = open(fullpath, 'w')
 	    f.write(self.testSuiteScript % self.macros)
 	    self.chmod(self.macros.destdir, path)
     
     def mungeMakeCommand(self):
-	ignoreFiles = [ 'Makefile', 'config.status' ]
-	ignoreFiles.extend(self.ignore)
-	ignoreOpts = ' -o ' + ' -o '.join(ignoreFiles)
-	makeCmd = 'export MAKE="make' + ignoreOpts + '"\n'
-	self.command = makeCmd + '$MAKE' + self.command[:4]
+	if self.ignore is not None:
+	    ignoreFiles = [ 'Makefile', 'config.status' ]
+	    ignoreFiles.extend(self.ignore)
+	    ignoreOpts = ' -o ' + ' -o '.join(ignoreFiles)
+	    makeCmd = 'export MAKE="make' + ignoreOpts + '"\n'
+	    self.command = makeCmd + '$MAKE' + self.command[4:]
+	    self.macros.command = self.command
 
-    def mungeMakefiles(self):
+    def mungeMakefiles(self, dir, command):
 	# special processing on automake test suites
-	filelist = [ '%(builddir)s%(dir)s/Makefile' % self.macros ]
-	for subdir in self.subDirs:
-	    self.macros.subdir = subdir
-	    filelist.append('%(builddir)s%(dir)s%(subdir)s/Makefile' % self.macros)
-	files = ' '.join(filelist)
-	util.execute(r"sed -i -e 's/check-TESTS:.*/\nconary-testprogs: $(TESTS)\n\ncheck-TESTS:\n/' " + files)
-	util.execute('cd ./%s; make conary-testprogs' % self.dir)
-	for subdir in self.subDirs:
-	    util.execute('cd ./%s%s; make conary-testprogs' % (self.dir, subdir))
+	makefile = dir + '/Makefile'
+	makeTarget = self.makeTarget
+
+	#cmd = r"grep ^%s: %s | sed -e 's/^%s://' " % (makeTarget, makefile, makeTarget)
+	#dependencies = util.popen(cmd).read()
+	if self.recursive:
+	    files = os.listdir(dir)
+	    base = util.normpath(self.macros.builddir + os.sep + self.dir)
+	    baselen = len(base) + 1 # for appended /
+	    for file in files:
+		fullpath = '/'.join([dir,file])
+		if os.path.isdir(fullpath) and os.path.exists(fullpath + '/Makefile'):
+		    self.subdirs.append(fullpath[baselen:])
+		    self.mungeMakefiles(fullpath, command)
+	util.execute(r"sed -i -e 's/^%s\s*:\s*\(.*\)/conary-pre-%s: \1\n\n%s:/'  %s" % (makeTarget, makeTarget, makeTarget, makefile))
+	util.execute('cd %s; make conary-pre-%s' % (dir, makeTarget))
 
     def do(self, macros):
 	self.macros = macros.copy()
@@ -931,8 +945,7 @@ exit $exitstatus
 	self.writeCommandScript()
 	command = self.command
 	if command[:4] == 'make':
+	    self.makeTarget = command[5:]
 	    self.mungeMakeCommand()
-	    if command == 'make check' or command == 'make check-TESTS':
-		#automake check scripts, we know how to fix these
-		self.mungeMakefiles()
+	    self.mungeMakefiles(util.normpath(self.macros.builddir + os.sep + self.dir), self.command)
 	self.writeTestSuiteScript()
