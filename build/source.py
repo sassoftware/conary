@@ -178,7 +178,7 @@ class Archive(_Source):
 	    return
 
 	if f.endswith(".rpm"):
-	    _extractFilesFromRPM(r, directory=destdir)
+	    _extractFilesFromRPM(f, directory=destdir)
 	    return
 
 	if f.endswith(".bz2") or f.endswith(".tbz2"):
