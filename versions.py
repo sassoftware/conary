@@ -151,6 +151,14 @@ class Version:
 	assert(len(self.versions) > 3)
 	return Version(self.versions[:-2], 0)
 
+    def parentNode(self):
+	assert(self.isBranch())
+	assert(len(self.versions) >= 3)
+	return Version(self.versions[:-1], 0)
+
+    def hasParent(self):
+	return(len(self.versions) >= 3)
+
     def isBefore(self, other):
 	return self.timeStamp < other.timeStamp
 
