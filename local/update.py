@@ -412,8 +412,6 @@ class FilesystemJob:
 		continue
 
 	    oldFile = repos.getFileVersion(pathId, fileId, version)
-            # XXX mask out any flag that isn't the config flag.
-            oldFile.flags.set(oldFile.flags.value() & files._FILE_FLAG_CONFIG)
             
 	    if path[0] == '/':
 		realPath = root + path
