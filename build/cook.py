@@ -220,7 +220,6 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 
     srcName = fullName + ":sources"
     if repos.hasPackage(srcName):
-	print "HERE"
 	pkg = repos.getLatestPackage(srcName, buildBranch)
 	ident.populate(repos, lcache, pkg)
 
@@ -252,34 +251,12 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 	built.append((p.getName(), p.getVersion().asString()))
 	packageList.append((p, fileMap))
 
-    recipes = [ recipeClass.filename ]
-    # add any recipe that this recipeClass decends from to the sources
-    baseRecipeClasses = list(recipeClass.__bases__)
-    while baseRecipeClasses:
-	parent = baseRecipeClasses.pop()
-	baseRecipeClasses.extend(list(parent.__bases__))
-	if not parent.__dict__.has_key('filename'):
-	    continue
-	if not parent.filename in recipes:
-	    recipes.append(parent.filename)
-
-    srcBldPkg = buildpackage.BuildPackage(srcName, newVersion)
-    for file in recipeObj.allSources() + recipes:
-	src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
-	srcBldPkg.addFile(os.path.basename(src), src, type="src")
-
-    for recipeFile in recipes:
-	srcBldPkg[os.path.basename(recipeFile)].isConfig(True)
-
     # build the group before the source package is added to the 
     # packageList; the package's group doesn't include sources
     grpName = cfg.packagenamespace + ":" + recipeClass.name
     grp = package.Package(grpName, newVersion)
     for (pkg, map) in packageList:
 	grp.addPackage(pkg.getName(), [ pkg.getVersion() ])
-
-    (p, fileMap) = _createPackage(repos, buildBranch, srcBldPkg, ident)
-    #packageList.append((p, fileMap))
 
     changeSet = changeset.CreateFromFilesystem(packageList)
     grpDiff = grp.diff(None, abstract = 1)[0]
