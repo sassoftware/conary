@@ -10,6 +10,7 @@ import cook
 import display
 import os
 import repository
+import rollbacks
 import signal
 import srscfg
 import sys
@@ -26,6 +27,7 @@ def usage():
     print "       srs commit  <file>"
     print "       srs pkglist <pkgname> <version>"
     print "       srs replist <pkgname> <version>"
+    print "       srs rollbacks"
     print "       srs update  <pkgname> <version>"
     print "                   <pkgfile>"
     print ""
@@ -203,5 +205,8 @@ elif (otherArgs[1] == "config"):
 	usage()
     else:
 	cfg.display()
+elif (otherArgs[1] == "rollbacks"):
+    db = repository.Database(cfg.root, cfg.dbpath, "c")
+    rollbacks.listRollbacks(db, cfg)
 else:
     usage()
