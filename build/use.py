@@ -316,7 +316,9 @@ class Flag(dict):
         if self._name == '__GLOBAL__':
             return self
         top = parent = Flag(value=None, name=self._name, 
-                                        required=self._required)
+                            required=self._required, 
+                            flavorName=self._flavorName, 
+                            )
         cursor = self._parent
         while cursor is not None:
             child = parent
@@ -343,7 +345,10 @@ class Flag(dict):
             parent[flagname] = Flag(value=current[flagname]._get(), 
                              name=flagname,
                              parent=parent,
-                             required=current[flagname]._required)
+                             required=current[flagname]._required,
+                             flavorName=current[flagname]._flavorName, 
+                             subsumes=current[flagname]._subsumes, 
+                             inFlavor=current[flagname]._inFlavor)
             for childflag in current[flagname].keys():
                 childflags.append((childflag, parent[flagname], 
                                               current[flagname]))
