@@ -468,8 +468,8 @@ class TroveStore:
 	cu.execute("""
 	    SELECT item, version FROM Items NATURAL JOIN Latest 
 				      NATURAL JOIN Versions
-		WHERE item in (?)""" % 
-	    ",".join(["'?'" % x for x in troveNameList]))
+		WHERE item in (%s)""" % 
+	    ",".join(["'%s'" % x for x in troveNameList]))
 
 	lastName = None
 	leafList = []
