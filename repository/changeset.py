@@ -11,9 +11,14 @@ def ChangeSet(repos, cfg, packageName, f, oldVersionStr, newVersionStr):
     if (oldVersionStr):
 	oldVersion = versions.VersionFromString(oldVersionStr, 
 					        cfg.defaultbranch)
-	cs = pkgSet.changeSet(oldVersion, newVersion)
+	(cs, filesNeeded) = pkgSet.changeSet(oldVersion, newVersion)
     else:
-	cs = pkgSet.changeSet(None, newVersion)
+	(cs, filesNeeded) = pkgSet.changeSet(None, newVersion)
 
-    print cs
+    for (id, oldVersion, newVersion) in filesNeeded:
+	filedb = repos.getFileDB(id)
+	cs = cs + filedb.changeSet(oldVersion, newVersion)
+
+    import sys
+    sys.stdout.write(cs)
 	

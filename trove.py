@@ -150,7 +150,8 @@ class PackageSet:
 
 	rc = "SRS PKG CHANGESET %s %s %s %d\n" % (self.name, oldStr, newStr, 
 						  rc.count("\n")) + rc
-	return rc
+	
+	return (rc, filesNeeded)
 	
     def close(self):
 	self.f.close()
