@@ -185,6 +185,10 @@ class LocalRepository(Repository):
 		old = None
 
 	    (pkgChgSet, filesNeeded) = new.diff(old, abstract = abstract)
+
+	    # there were no changes
+	    if not filesNeeded: continue
+
 	    cs.newPackage(pkgChgSet)
 
 	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
