@@ -222,8 +222,20 @@ class ConaryClient:
         return self._resolveDependencies(finalCs, keepExisting = keepExisting, 
                                          recurse = recurse)
 
-    def applyUpdate(self, theCs, replaceFiles = False,
+    def applyChangeSet(self, cs, replaceFiles = False,
                     tagScript = None, keepExisting = None, depCheck = True):
+        assert(isinstance(cs, changeset.ChangeSet))
+
+        if cs.isAbsolute():
+            cs.rootChangeSet(self.db, keepExisting)
+
+        self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
+                                tagScript = tagScript, 
+                                keepExisting = keepExisting)
+
+    def applyUpdate(self, theCs, replaceFiles = False, tagScript = None, 
+                    keepExisting = None):
+        assert(isinstance(theCs, changeset.MergeableChangeSet))
         cs = changeset.MergeableChangeSet()
         for (how, what) in theCs.contents:
             if how == self.repos.createChangeSet:
@@ -235,8 +247,7 @@ class ConaryClient:
 
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
-                                keepExisting = keepExisting,
-                                depCheck = depCheck)
+                                keepExisting = keepExisting)
 
     def eraseTrove(self, troveList, tagScript = None):
         list = []

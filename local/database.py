@@ -224,7 +224,7 @@ class Database(SqlDbRepository):
     # transaction
     def commitChangeSet(self, cs, isRollback = False, toStash = True,
                         replaceFiles = False, tagScript = None,
-			keepExisting = False, depCheck = True):
+			keepExisting = False):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -234,11 +234,6 @@ class Database(SqlDbRepository):
 
 	for pkg in cs.iterNewPackageList():
 	    if pkg.getName().endswith(":source"): raise SourcePackageInstall
-
-        if depCheck:
-            (missingDeps, failedList) = self.db.depCheck(cs)
-            if missingDeps:
-                raise MissingDependencies(failedList)
 
 	tagSet = tags.loadTagDict(self.root + "/etc/conary/tags")
 
