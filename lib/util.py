@@ -59,7 +59,10 @@ def excepthook(type, value, tb):
     sys.excepthook = sys.__excepthook__
     lines = traceback.format_exception(type, value, tb)
     print string.joinfields(lines, "")
-    pdb.post_mortem(tb)
+    if sys.stdout.isatty() and sys.stdin.isatty():
+        pdb.post_mortem(tb)
+    else:
+        sys.exit(1)
 
 def execute(cmd, destDir=None):
     print '+', cmd
