@@ -237,9 +237,10 @@ class PackageChangeSet:
     def remapPaths(self, map):
 	for list in ( self.changedFiles, self.newFiles ):
 	    for i in range(0,len(list)):
-		newPath = self.remapSinglePath(list[i][1], map)
-		if newPath != list[i][1]:
-		    list[i] = (list[i][0], newPath, list[i][2])
+		if list[i][1]:
+		    newPath = self.remapSinglePath(list[i][1], map)
+		    if newPath != list[i][1]:
+			list[i] = (list[i][0], newPath, list[i][2])
 
     def freeze(self):
 	rc = ""
