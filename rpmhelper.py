@@ -89,7 +89,7 @@ class RpmHeader:
 
     def paths(self):
         if OLDFILENAMES in self:
-            for path in self[OLDFILENAMES]
+            for path in self[OLDFILENAMES]:
                 yield path
 
         paths = self[DIRNAMES]
