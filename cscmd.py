@@ -26,6 +26,7 @@ def ChangeSetCommand(repos, cfg, troveName, outFileName, oldVersionStr, \
 		  troveName, newVersionStr)
 
     newVersion = pkgList[0].getVersion()
+    newFlavor = pkgList[0].getFlavor()
 
     if (oldVersionStr):
 	pkgList = repos.findTrove(cfg.installLabel, troveName, pkgList[0].getFlavor(),
@@ -35,11 +36,13 @@ def ChangeSetCommand(repos, cfg, troveName, outFileName, oldVersionStr, \
 		      troveName, oldVersionStr)
 
 	oldVersion = pkgList[0].getVersion()
-
+	oldFlavor = pkgList[0].getFlavor()
     else:
 	oldVersion = None
+	oldFlavor = None
 
-    list = [(troveName, pkgList[0].getFlavor(), oldVersion, newVersion, (not oldVersion))]
+    list = [(troveName, (oldVersion, oldFlavor), (newVersion, newFlavor),
+	     not oldVersion)]
 
     cs = repos.createChangeSet(list)
     cs.writeToFile(outFileName)
