@@ -499,7 +499,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 
     util.mkdirChain(builddir + '/' + recipeObj.mainDir())
     if not destdir:
-        destdir = builddir + '/root'
+        destdir = builddir + '/_ROOT_'
     util.mkdirChain(destdir)
 
     bldInfo.begin()
