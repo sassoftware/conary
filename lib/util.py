@@ -248,6 +248,8 @@ def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
     sourcelist = []
     for source in braceGlob(sources):
 	if os.path.isdir(source):
+	    if source[-1] == '/':
+		source = source[:-1]
 	    thisdest = '%s%s%s' %(dest, os.sep, os.path.basename(source))
 	    log.debug('copying [tree] %s to %s', source, thisdest)
 	    shutil.copytree(source, thisdest, symlinks)
