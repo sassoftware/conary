@@ -591,6 +591,9 @@ class Trove:
     def setBuildTime(self, nm):
         return self.troveInfo.buildTime.set(nm)
 
+    def getConaryVersion(self):
+        return self.troveInfo.conaryVersion.value()
+
     def setConaryVersion(self, ver):
         return self.troveInfo.conaryVersion.set(ver)
 

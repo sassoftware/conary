@@ -427,7 +427,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 continue
             
             t = trove.Trove(pkgCs.getName(), pkgCs.getOldVersion(),
-                              pkgCs.getNewFlavor(), pkgCs.getChangeLog())
+                            pkgCs.getNewFlavor(), pkgCs.getChangeLog())
             t.applyChangeSet(pkgCs)
             l.append(t)
 

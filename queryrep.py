@@ -136,18 +136,13 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 	log.error(str(e))
 	return
 
-    # FIXME use TroveInfo here
-    if ':' in troveName:
-        package = troveName[:troveName.find(':')]
-    else:
-        package = troveName
-    sourceName = package + ":source"
-    try:
+    sourceName = troveList[0].getSourceName()
+    if sourceName:
         sourceTrove = repos.findTrove(cfg.installLabelPath, sourceName,
                                       cfg.flavor, versionStr,
                                       acrossRepositories = True,
                                       withFiles = False)[0]
-    except repository.TroveNotFound, e:
+    else:
         sourceTrove = None
 
     for trove in troveList:
