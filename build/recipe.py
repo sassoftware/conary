@@ -191,16 +191,18 @@ class RecipeLoader(types.DictionaryType):
                 continue
             # if a recipe has been marked to be ignored (for example, if
             # it was loaded from another recipe by loadRecipe()
+            # (don't use hasattr here, we want to check only the recipe
+            # class itself, not any parent class
             if obj.__dict__.has_key('ignore'):
                 continue
             # make sure the class is derived from Recipe
             # and has a name
-            if issubclass(obj, Recipe) and obj.__dict__.has_key('name'):
+            if issubclass(obj, Recipe) and hasattr(obj, 'name'):
                 if obj.name.startswith('group-'):
                     raise RecipeFileError(
                         'Error in recipe file "%s": name cannot '
                         'begin with "group-"' %os.path.basename(filename))
-                obj.__dict__['filename'] = filename
+                obj.filename = filename
                 self[name] = obj
 
     def __del__(self):
