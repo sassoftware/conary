@@ -243,7 +243,7 @@ class ConaryClient:
                 cs.merge(newCs)
             else:
                 assert(how == changeset.ChangeSetFromFile)
-                cs.merge(how)
+                cs.merge(what)
 
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
