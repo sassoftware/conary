@@ -596,11 +596,7 @@ class Directory(File):
 	File.restore(self, target, restoreContents)
 
     def remove(self, target):
-        try:
-            os.rmdir(target)
-        except OSError, err:
-            # XXX
-            log.warning('rmdir %s failed: %s', target, str(err))
+	raise NotImplementedError
 
 class DeviceFile(File):
 
