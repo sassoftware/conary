@@ -341,7 +341,8 @@ def cookItem(repos, cfg, item, prep=0, macros=()):
 
 	for (className, classObject) in classList.items():
 	    buildList.append((classObject, cfg.defaultbranch,
-			      classObject.name + ".srs"))
+			      "%s-%s.srs" % (classObject.name, 
+					     classObject.version)))
     else:
         try:
             classList = \
