@@ -30,7 +30,7 @@ extra_dist = Makefile
 
 python_files = __init__.py
 
-dist_files = $(python_files) $(extra_inst)
+dist_files = $(python_files) $(extra_inst) $(extra_dist)
 
 all: default-all
 
