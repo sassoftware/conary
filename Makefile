@@ -106,6 +106,6 @@ tag:
 	cvs tag conary-`echo $(VERSION) | sed 's/\./_/g'`
 
 force-tag:
-	cvs tag -f conary-`echo $(VERSION) | sed 's/\./_/g'`
+	cvs tag -F conary-`echo $(VERSION) | sed 's/\./_/g'`
 
 include Make.rules
