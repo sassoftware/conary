@@ -65,7 +65,7 @@ def findPackage(repos, packageNamespace, defaultNick, name,
 	    try:
 		nick = versions.BranchName(versionStr)
 	    except versions.ParseError:
-		raise PackageMissing, "invalid version %s" % versionStr
+		raise repository.PackageMissing, "invalid version %s" % versionStr
 	else:
 	    nick = defaultNick
 
