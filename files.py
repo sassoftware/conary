@@ -198,7 +198,7 @@ class FlagsStream(streams.IntStream):
 	return self._isFlag(_FILE_FLAG_CONFIG, set)
 
     def isSource(self, set = None):
-	return self._isFlag(_FILE_FLAG_CONFIG, set)
+	return self._isFlag(_FILE_FLAG_SOURCEFILE, set)
 
     def isTransient(self, set = None):
 	return self._isFlag(_FILE_FLAG_TRANSIENT, set)

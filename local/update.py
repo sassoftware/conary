@@ -798,6 +798,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	extension = path.split(".")[-1]
 	if isSrcPkg and extension not in nonCfgExt:
 	    f.flags.isConfig(set = True)
+	    f.flags.isSource(set = True)
 
 	# new file, so this part is easy
 	changeSet.addFile(fileId, None, newVersion, f.freeze())
