@@ -686,7 +686,6 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	'ico', 'rpm', 'ccs', 'gz', 'bz2', 'tgz', 'tbz', 'tbz2')
     isSrcPkg = curPkg.getName().endswith(':source')
 
-
     for (fileId, srcPath, srcFileVersion) in fileList:
 	# file disappeared
 	if not fileIds.has_key(fileId): continue
@@ -717,6 +716,16 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 	extension = path.split(".")[-1]
 	if isSrcPkg and extension not in nonCfgExt:
 	    f.flags.isConfig(set = True)
+	    sb = os.stat(realPath)
+	    if sb.st_size > 0 and stat.S_ISREG(sb.st_mode):
+		fd = os.open(realPath, os.O_RDONLY)
+		os.lseek(fd, -1, 2)
+		term = os.read(fd, 1)
+		if term != '\n':
+		    log.warning("%s does not end with a trailing new line", 
+			        srcPath)
+
+		os.close(fd)
 
 	if not f.metadataEqual(srcFile, ignoreOwnerGroup = noIds):
 	    newPkg.addFile(fileId, path, newVersion)
