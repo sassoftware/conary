@@ -59,8 +59,29 @@ class NormalizeGzip(policy.Policy):
 	'.*\.gz'
     ]
     def doFile(self, path):
+	# XXX read in header and check whether needed
+	# if (byte[3] & 0xC) == 0x8 or byte[8] != 2: recompress
 	util.execute('gunzip %s/%s' %(self.macros['destdir'], path));
 	util.execute('gzip -n -9 %s/%s' %(self.macros['destdir'], path[:-3]))
+
+class NormalizeBzip(policy.Policy):
+    """
+    re-bzip .bz2 files with -9  to get maximum compression.
+    Ignore man/info pages, we'll get them separately while fixing
+    up other things
+    """
+    invariantexceptions = [
+	'%(mandir)s/man.*/.*',
+	'%(infodir)s/.*',
+    ]
+    invariantinclusions = [
+	'.*\.bz2'
+    ]
+    def doFile(self, path):
+	# XXX read in header and check whether needed
+	# if byte[3] != 9: recompress
+	util.execute('bunzip2 %s/%s' %(self.macros['destdir'], path));
+	util.execute('bzip2 -9 %s/%s' %(self.macros['destdir'], path[:-3]))
 
 class NormalizeManPages(policy.Policy):
     """
@@ -177,6 +198,7 @@ def DefaultPolicy():
 	RemoveExtraLibs(),
 	StripToDebug(),
 	NormalizeGzip(),
+	NormalizeBzip(),
 	NormalizeManPages(),
 	NormalizeInfoPages(),
     ]
