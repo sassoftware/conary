@@ -92,7 +92,7 @@ class FixupMultilibPaths(policy.Policy):
 		"Conflicting library files %s and %s installed" %(
 		    path, target))
 	log.warning('Multilib error: file %s found in wrong directory,'
-		    'attempting to fix...' %path)
+		    ' attempting to fix...' %path)
 	util.mkdirChain(destdir + targetdir)
 	util.rename(destdir + path, destdir + target)
 
