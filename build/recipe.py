@@ -216,6 +216,13 @@ def loadRecipe(file):
 ##                       'extraConfig'  : extraConfig,
 ##                       'setup'        : setup})
 
+class PrependList(list):
+    def __init__(self, *args):
+        list.__init__(self, args)
+
+    def prepend(self, item):
+        self.insert(0, item)
+
 class Recipe:
     buildRequires = []
     runRequires = []
@@ -377,9 +384,9 @@ class Recipe:
 	               ('destdir', root))
         if self.build is None:
             pass
-        elif type(self.build) is str:
+        elif isistance(self.build, str):
             util.execute(self.build %self.macros)
-        elif type(self.build) is tuple or type(self.build) is list:
+        elif isinstance(self.build, tuple) or isinstance(self.build, list):
 	    for bld in self.build:
                 if type(bld) is str:
                     util.execute(bld %self.macros)
@@ -445,7 +452,7 @@ class Recipe:
 	self.srcdirs = srcdirs
 	self.theMainDir = self.name + "-" + self.version
 	# what needs to be done to get from sources to an installed tree
-	self.build = [build.Make(), build.MakeInstall()]
+	self.build = PrependList(build.Make(), build.MakeInstall())
 	# what needs to be done to massage the installed tree
         self.process = policy.DefaultPolicy()
 	self.macros = Macros()
