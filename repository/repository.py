@@ -12,7 +12,6 @@ import difflib
 import fcntl
 import filecontents
 import files
-import group
 import os
 import package
 import patch
@@ -31,9 +30,6 @@ class Repository:
 
     def _getPackageSet(self, name):
 	return _PackageSet(self.pkgDB, str(name))
-
-    def _getGroupSet(self, name):
-	return _GroupSet(self.groupDB, str(name))
 
     def _getFileDB(self, fileId):
 	return _FileDB(self.fileDB, fileId)
@@ -126,38 +122,6 @@ class Repository:
     def storeFileFromContents(self, chgSet, file, restoreContents):
 	raise NotImplemented
 
-    ### Group functions
-
-    def hasGroup(self, grp):
-	# XXX this str() is to allow a migration to PackageName
-	return self.groupDB.hasFile(str(grp))
-
-    def grpGetFullVersion(self, grpName, version):
-	return self._getGroupSet(grpName).getFullVersion(version)
-
-    def hasGroupVersion(self, grpName, version):
-	return self._getGroupSet(grpName).hasVersion(version)
-
-    def grpLatestVersion(self, grpName, branch):
-	return self._getGroupSet(grpName).findLatestVersion(branch)
-
-    def getLatestGroup(self, grpName, branch):
-	return self._getGroupSet(grpName).getLatestGroup(branch)
-
-    def getGroupVersion(self, grpName, version):
-	return self._getGroupSet(grpName).getVersion(version)
-
-    def eraseGroupVersion(self, grpName, version):
-	gs = self._getGroupSet(grpName)
-	gs.eraseVersion(version)
-
-    def addGroup(self, grp):
-	gs = self._getGroupSet(grp.getName())
-	gs.addVersion(grp.getVersion(), grp)
-
-    def getGroupNickList(self, grpName, nick):
-	return self._getGroupSet(grpName).mapBranchNickname(nick)
-
     ###
 
     def __del__(self):
@@ -217,8 +181,6 @@ class LocalRepository(Repository):
         try:
             self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", 
 						   self.createBranches, mode)
-            self.groupDB = versioned.FileIndexedDatabase(
-			    self.top + "/groups.db", self.createBranches, mode)
             self.fileDB = versioned.Database(self.top + "/files.db", 
 					     self.createBranches, mode)
         # XXX this should be translated into a generic versioned.DatabaseError
@@ -227,10 +189,6 @@ class LocalRepository(Repository):
             if self.pkgDB is not None:
                 self.pkgDB.close()
                 self.pkgDB = None
-
-            if self.groupDB is not None:
-                self.groupDB.close()
-                self.groupDB = None
 
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_UN)
             os.close(self.lockfd)
@@ -357,10 +315,8 @@ class LocalRepository(Repository):
 	if self.pkgDB is not None:
             self.pkgDB.close()
             self.fileDB.close()
-	    self.groupDB.close()
 	    self.pkgDB = None
 	    self.fileDB = None
-	    self.groupDB = None
 	    os.close(self.lockfd)
             self.lockfd = -1
 
@@ -605,31 +561,6 @@ class ChangeSetJob:
 	self.oldGroups = []
 
 	fileMap = {}
-
-	# create the group objects which need installing. at some point
-	# we should make sure these package versions all exist FIXME
-	for csGrp in cs.getNewGroupList():
-	    newVersion = csGrp.getNewVersion()
-	    old = csGrp.getOldVersion()
-	    grpName = csGrp.getName()
-
-	    if repos.hasGroup(grpName):
-		if repos.hasGroupVersion(grpName, newVersion):
-		    raise CommitError, "version %s for %s is already installed" % \
-			    (newVersion.asString(), csGrp.getName())
-
-	    if old:
-		newGrp = repos.getGroupVersion(grpName, old)
-		newGrp.setVersion(newVersion)
-	    else:
-		newGrp = group.Group()
-		newGrp.setName(csGrp.name)
-		newGrp.setVersion(newVersion)
-
-	    # FIXME for above, this should return a list of the new
-	    # package versions which are needed
-	    newGrp.applyChangeSet(csGrp)
-	    self.addGroup(newGrp)
 
 	# create the package objects which need to be installed; the
 	# file objects which map up with them are created later, but

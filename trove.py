@@ -58,14 +58,87 @@ class Package:
     def getFile(self, fileId):
 	return self.idMap[fileId]
 
+    def addPackageVersion(self, name, version):
+	"""
+	Adds a single version of a package.
+
+	@param name: name of the package
+	@type name: str
+	@param version: version of the package
+	@type version: versions.Version
+	"""
+	if self.packages.has_key(name):
+	    self.packages[name].append(version)
+	else:
+	    self.packages[name] = [ version ]
+
+    def addPackage(self, name, versionList):
+	"""
+	Adds a set of versions for a package.
+
+	@param name: name of the package
+	@type name: str
+	@param versionList: list of versions to add
+	@type versionList: list of versions.Version
+	"""
+	self.packages[name] = versionList
+
+    def getPackageList(self):
+	"""
+	Returns a list of (packageName, versionList) ordered pairs, listing
+	all of the package in the group, along with their versions. 
+
+	@rtype: list
+	"""
+	return self.packages.items()
+
     def formatString(self):
-	rc = ""
+	"""
+	Returns a string representing everything about this package, which
+	can later be read by the PackageFromFile object. The format of
+	the string is:
+
+	<file count> <group count>
+	FILEID1 PATH1 VERSION1
+	FILEID2 PATH2 VERSION2
+	.
+	.
+	.
+	FILEIDN PATHN VERSIONN
+	PACKAGE1 VERSION1
+	PACKAGE2 VERSION2
+	.
+	.
+	.
+	PACKAGEN VERSIONN
+
+	Group file may be empty, in which case nothing follows the newline
+	for the final file package entry.
+
+	"""
+	rc = "%d %d\n" % (len(self.idMap), len(self.packages))
 	for (fileId, (path, version)) in self.idMap.items():
 	    rc += ("%s %s %s\n" % (fileId, path, version.freeze()))
+
+	for pkg in self.packages.keys():
+	    rc += pkg + " " +  \
+		   " ".join([v.asString() for v in self.packages[pkg]]) + \
+		   "\n"
+
 	return rc
 
     # returns a dictionary mapping a fileId to a (path, version, pkgName) tuple
     def applyChangeSet(self, pkgCS):
+	"""
+	Updates the package from the changes specified in a change set.
+	Returns a dictionary, indexed by fileId, which gives the
+	(path, version, packageName) for that file.
+
+	@param pkgCS: change set
+	@type pkgCS: PackageChangeSet
+	@rtype: dict
+	"""
+
 	fileMap = {}
 
 	for (fileId, path, fileVersion) in pkgCS.getNewFileList():
@@ -81,10 +154,41 @@ class Package:
 	for fileId in pkgCS.getOldFileList():
 	    self.removeFile(fileId)
 
+	# merge the included packages
+	for (name, list) in pkgCS.packages.items():
+	    for (oper, version) in list:
+		if oper == '+':
+		    self.addPackageVersion(name, version)
+		elif oper == "-":
+		    for i, ver in enumerate(self.packages[name]):
+			if ver.equal(version): break
+		    if i == len(self.packages[name]):
+			# FIXME, this isn't the right thing to do
+			raise IOError
+		    del(self.packages[i])
+
 	return fileMap
 
-    # (them == None, abstract == 0) means the package is new
     def diff(self, them, abstract = 0):
+	"""
+	Generates a change set between them (considered the old version) and
+	this instance. We return the change set, a list of other package diffs
+	which should be included for this change set to be complete, and a list
+	of file change sets which need to be included.  The list of package
+	changes is of the form (pkgName, oldVersion, newVersion).  If abstract
+	is True, oldVersion is always None and abstract diffs can be used.
+	Otherwise, abstract versions are not necessary, and oldVersion of None
+	means the package is new. The list of file changes is a list of
+	(fileId, oldVersion, newVersion, newPath) tuples, where newPath is the
+	path to the file in this package.
+
+	@param them: object to generate a change set from (may be None)
+	@type them: Group
+	@param abstract: tells if this is a new group or an abstract change
+	when them is None
+	@type abstract: boolean
+	@rtype: (ChangeSetGroup, packageChangeList, fileChangeList)
+	"""
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
 	if them:
@@ -137,15 +241,123 @@ class Package:
 	    if newPath or newVersion:
 		chgSet.changedFile(id, newPath, newVersion)
 
-	return (chgSet, filesNeeded)
+	# now handle the packages we include
+	names = {}
+	list = self.packages.keys()
+	if them:
+	    list += them.packages.keys()
+
+	for name in list:
+	    names[name] = 1
+
+	added = {}
+	removed = {}
+
+	for name in names.keys():
+	    if self.packages.has_key(name):
+		ourVersions = self.packages[name]
+	    else:
+		ourVersions = None
+
+	    if them and them.packages.has_key(name):
+		theirVersions = them.packages[name]
+	    else:
+		theirVersions = []
+
+	    for (i, version) in enumerate(ourVersions):
+		match = 0 
+		for (j, v) in enumerate(theirVersions):
+		    if v.equal(version):
+			match = 1
+			break
+
+		if match:
+		    # same version exists in both groups
+		    del theirVersions[j]
+		else:
+		    # this is a new package
+		    chgSet.newPackageVersion(name, version)
+		    if (added.has_key(name)):
+			added[name].append(version)
+		    else:
+			added[name] = [ version ]
+
+	    for version in theirVersions:
+		chgSet.oldPackageVersion(name, version)
+		if (removed.has_key(name)):
+		    removed[name].append(version)
+		else:
+		    removed[name] = [ version ]
+
+	pkgList = []
+
+	if abstract:
+	    print "HERE", added.keys()
+	    for name in added.keys():
+		for version in added[name]:
+		    pkgList.append((name, None, version))
+	    return (chgSet, filesNeeded, pkgList)
+
+	# use added and removed to assemble a list of diffs which need to
+	# go along with this change set
+	for name in added.keys():
+	    if not removed.has_key(name):
+		for version in added[name]:
+		    pkgList.append((name, None, version))
+		continue
+
+	    # name was changed between this version. for each new version
+	    # of a package, try and generate the diff between that package
+	    # and the version of the package which was removed which was
+	    # on the same branch. if that's not possible, see if the parent
+	    # of the package was removed, and use that as the diff. if
+	    # we can't do that and only one version of this package is
+	    # being obsoleted, use that for the diff. if we can't do that
+	    # either, throw up our hands in a fit of pique
+	    
+	    for version in added[name]:
+		branch = version.branch()
+		if version.hasParent():
+		    parent = version.parent()
+		else:
+		    parent = None
+		found = 0
+
+		if len(removed[name]) == 1:
+		    pkgList.append((name, removed[name][0], version))
+		else:
+		    sameBranch = None
+		    parentNode = None
+
+		    for other in removed[name]:
+			if other.branch().equal(branch):
+			    sameBranch = other
+			if parent and other.equal(parent):
+			    parentNode = other
+
+		    if sameBranch:
+			pkgList.append((name, sameBranch, version))
+		    elif parentNode:
+			pkgList.append((name, parentNode, version))
+		    else:
+			# Here's the fit of pique. This shouldn't happen
+			# except for the most ill-formed of groups.
+			raise IOError, "ick. yuck. blech. ptooey."
+
+	return (chgSet, filesNeeded, pkgList)
 
     def __init__(self, name, version):
 	self.idMap = {}
 	self.name = name
-	assert(name.count(":") > 2)
 	self.version = version
+	self.packages = {}
 
 class PackageChangeSet:
+
+    """
+    Represents the changes between two packages and forms part of a
+    ChangeSet. 
+    """
 
     def isAbstract(self):
 	return self.abstract
@@ -184,6 +396,33 @@ class PackageChangeSet:
     def getChangedFileList(self):
 	return self.changedFiles
 
+    def newPackageVersion(self, name, version):
+	"""
+	Adds a version of a package which appeared in newVersion.
+
+	@param name: name of the package
+	@type name: str
+	@param version: new version
+	@type version: versions.Version
+	"""
+
+	if not self.packages.has_key(name):
+	    self.packages[name] = []
+	self.packages[name].append(('+', version))
+
+    def oldPackageVersion(self, name, version):
+	"""
+	Adds a version of a package which appeared in oldVersion.
+
+	@param name: name of the package
+	@type name: str
+	@param version: old version
+	@type version: versions.Version
+	"""
+	if not self.packages.has_key(name):
+	    self.packages[name] = []
+	self.packages[name].append(('-', version))
+
     def parse(self, line):
 	action = line[0]
 
@@ -204,6 +443,16 @@ class PackageChangeSet:
 		self.changedFile(fileId, path, version)
 	elif action == "-":
 	    self.oldFile(line[1:])
+	elif action == "p":
+	    fields = line[2:].split()
+	    name = fields[0]
+	    verList = []
+	    for item in fields[1:]:
+		op = item[0]
+		v = versions.ThawVersion(item[1:])
+		verList.append((op, v))
+
+	    self.addPackage(name, verList)
 
     def formatToFile(self, changeSet, cfg, f):
 	f.write("%s " % self.name)
@@ -253,6 +502,23 @@ class PackageChangeSet:
 			list[i] = (list[i][0], newPath, list[i][2])
 
     def freeze(self):
+	"""
+	Returns a string representation of this change set which can
+	later be parsed by parse(). The representation begins with a
+	header:
+
+         SRS PKG ABSTRACT <name> <newversion> <linecount>
+         SRS PKG CHANGESET <name> <oldversion> <newversion> <linecount>
+         SRS PKG NEW <name> <newversion> <linecount>
+
+	It is followed by <linecount> lines, each of which specifies a
+	new file, old file, removed file, or a change to the set of
+	included packages. Each of these lines begins with a "+", "-",
+	"~", or "p" respectively.
+
+	@rtype: string
+	"""
+
 	rc = ""
 
 	for id in self.getOldFileList():
@@ -273,6 +539,13 @@ class PackageChangeSet:
 	    else:
 		rc += " -\n"
 
+	lines = []
+	for name in self.packages.keys():
+	    list = [ "p " + x[0] + x[1].freeze() for x in self.packages[name] ]
+	    lines.append(name + " " + " ".join(list))
+
+	rc += "\n".join(lines) + "\n"
+    
 	if self.abstract:
 	    hdr = "SRS PKG ABSTRACT %s %s %d\n" % \
 		      (self.name, self.newVersion.freeze(), rc.count("\n"))
@@ -284,7 +557,7 @@ class PackageChangeSet:
 		      (self.name, self.oldVersion.freeze(), 
 		       self.newVersion.freeze(), rc.count("\n"))
 
-	return hdr + rc	
+	return hdr + rc
 
     def __init__(self, name, oldVersion, newVersion, abstract = 0):
 	self.name = name
@@ -294,16 +567,42 @@ class PackageChangeSet:
 	self.oldFiles = []
 	self.changedFiles = []
 	self.abstract = abstract
+	self.packages = {}
 
 class PackageFromFile(Package):
 
     def read(self, dataFile):
-	for line in dataFile.readlines():
+	lines = dataFile.readlines()
+
+	fields = lines[0].split()
+	fileCount = int(fields[0])
+	pkgCount = int(fields[1])
+
+	for line in lines[1:1 + fileCount]:
 	    (fileId, path, version) = line.split()
 	    version = versions.ThawVersion(version)
 	    self.addFile(fileId, path, version)
 
+	for line in lines[1 + fileCount:]:
+	    items = line.split()
+	    name = items[0]
+	    self.packages[name] = []
+	    for versionStr in items[1:]:
+		version = versions.VersionFromString(versionStr)
+		self.addPackageVersion(name, version)
+
     def __init__(self, name, dataFile, version):
+	"""
+	Initializes a PackageFromFile() object.
+
+	@param name: Fully qualified name of the package 
+	@type name: str
+	@param dataFile: File representation of a package
+	@type dataFile: file-type object
+	@param version: Fully qualified version of the package
+	@type version: versions.Version()
+	"""
+
 	Package.__init__(self, name, version)
 	self.read(dataFile)
 
