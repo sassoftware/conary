@@ -51,6 +51,8 @@ class ConaryConfiguration:
 		print "%-20s %s" % (item, self.__dict__[item])
 	    elif item == "flavor":
 		pass
+            elif item == "lowerCaseMap":
+                pass
 	    else:
 		print "%-20s (unknown type)" % (item)
 
