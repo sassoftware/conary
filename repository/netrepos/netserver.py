@@ -350,12 +350,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
-	# we need clientVersion of at least 2 for our changesets to be
+	# we need clientVersion of at least 4 for our changesets to be
 	# understood
-        if clientVersion < 3:
+        if clientVersion < 4:
             raise ClientTooOld
 
-        return 3
+        return 4
 
     def __init__(self, path, tmpPath, urlBase, authDbPath, name,
 		 repositoryMap, commitAction = None):

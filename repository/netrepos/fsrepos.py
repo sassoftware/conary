@@ -457,10 +457,14 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		allFiles = self._getLocalOrRemoteFileVersions(l)
 		idIdx.update(allFiles)
 
-            # put files into the change set in the right order; this makes sure
-            # we we create ptr entries they come after the file which has the
-            # contents
+            # Walk this in reverse order. This may seem odd, but the
+            # order in the final changeset is set by sorting that happens
+            # in the change set object itself. The only reason we sort
+            # here at all is to make sure PTR file types come before the
+            # file they refer to. Reverse shorting makes this a bit easier.
             filesNeeded.sort()
+            filesNeeded.reverse()
+
             ptrTable = {}
 	    for (fileId, oldFileVersion, newFileVersion, oldPath, newPath) in \
 								filesNeeded:
@@ -496,16 +500,20 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
 
-                    if contType == changeset.ChangedFileTypes.file:
+                    # we don't let config files be ptr types; if they were
+                    # they could be ptrs to things which aren't config files,
+                    # which would completely hose the sort order we use. this
+                    # could be relaxed someday to let them be ptr's to other
+                    # config files
+                    if not newFile.flags.isConfig() and \
+                                contType == changeset.ChangedFileTypes.file:
                         hash = newFile.contents.sha1()
                         ptr = ptrTable.get(hash, None)
                         if ptr is not None:
                             contType = changeset.ChangedFileTypes.ptr
                             cont = filecontents.FromString(ptr)
                         else:
-                            pass
-                            # uncomment this to enable ptr record types
-                            #ptrTable[hash] = fileId
+                            ptrTable[hash] = fileId
 
 		    cs.addFileContents(fileId, contType, cont, 
 				       newFile.flags.isConfig())
