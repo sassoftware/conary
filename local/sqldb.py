@@ -415,7 +415,8 @@ class Database:
 	self.flavorsNeeded = {}
 
     def __del__(self):
-	self.db.close()
+        if not self.db.closed:
+            self.db.close()
         del self.db
 
     def iterAllTroveNames(self):
@@ -806,5 +807,4 @@ class Database:
 	return self.troveFiles.iterFilesWithTag(tag)
 
     def close(self):
-	return
 	self.db.close()
