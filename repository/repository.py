@@ -18,7 +18,7 @@ import changeset
 import datastore
 import deps.deps
 import files
-import patch
+from lib import patch
 import sha1helper
 import tempfile
 import trove

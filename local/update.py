@@ -30,7 +30,7 @@ from repository import filecontents
 import files
 from lib import log
 import os
-import patch
+from lib import patch
 import stat
 import sys
 import tempfile

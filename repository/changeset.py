@@ -20,7 +20,7 @@ import filecontainer
 import filecontents
 import files
 import os
-import patch
+from lib import patch
 import repository
 import sha1helper
 import streams

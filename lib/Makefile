@@ -14,7 +14,14 @@
 
 CFLAGS=-Wall -I$(PYINCLUDE) -fPIC
 
-python_files=__init__.py epdb.py stackutil.py enum.py options.py log.py
+python_files=	    __init__.py		\
+		    enum.py		\
+		    epdb.py		\
+		    log.py		\
+		    options.py		\
+		    patch.py		\
+		    stackutil.py
+
 python_modules=elfmodule.so miscmodule.so
 elfmodule_objs=elf.o
 miscmodule_objs=misc.o
