@@ -85,7 +85,8 @@ class ServerCache:
 	    self.cache[serverName] = server
 
 	    try:
-		if server.checkVersion(1) < 1:
+		# we can talk to version 1 and version 2 repositories
+		if server.checkVersion(2) < 1:
 		    raise repository.OpenError('Server version too old')
 	    except OSError, e:
 		raise repository.OpenError('Error occured opening repository '
