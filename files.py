@@ -13,6 +13,7 @@ import util
 import time
 import socket
 import struct
+import tempfile
 import log
 
 from deps import filedeps, deps
@@ -558,7 +559,10 @@ class File(object):
 	self.chmod(target)
 
 	if not skipMtime:
-	    os.utime(target, (self.inode.mtime(), self.inode.mtime()))
+	    self.setMtime(target)
+
+    def setMtime(self, target):
+	os.utime(target, (self.inode.mtime(), self.inode.mtime()))
 
     def chmod(self, target):
 	os.chmod(target, self.inode.perms())
@@ -791,17 +795,21 @@ class RegularFile(File):
 	    # onto itself; the unlink helps that to work
 	    src = fileContents.get()
 
-	    if os.path.exists(target) or os.path.islink(target):
-		os.unlink(target)
-	    else:
-		path = os.path.dirname(target)
+	    path = os.path.dirname(target)
+	    name = os.path.basename(target)
+	    if not os.path.isdir(path):
 		util.mkdirChain(path)
 
-	    f = open(target, "w")
+	    tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
+	    File.restore(self, tmpname, restoreContents)
+	    f = os.fdopen(tmpfd, 'w')
             util.copyfileobj(src, f)
 	    f.close()
+	    os.rename(tmpname, target)
+	    self.setMtime(target)
 
-	File.restore(self, target, restoreContents)
+	else:
+	    File.restore(self, target, restoreContents)
 
     def __init__(self, *args, **kargs):
 	File.__init__(self, *args, **kargs)
