@@ -301,7 +301,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             # a little odd that creating a class instance has the side
             # effect of modifying the repository...
             ChangeSetJob(self, cs)
-        except e, value:
+        except:
             print >> sys.stderr, "exception occurred while committing change set"
             stackutil.printTraceBack()
             print >> sys.stderr, "attempting rollback"
