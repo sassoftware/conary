@@ -1,3 +1,8 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 # provides data storage mechanism for files which are indexed by a hash
 # index. the hash can be any arbitrary string of at least 5 bytes in length;
 # it is assumed the keys are unique

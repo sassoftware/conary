@@ -1,3 +1,8 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 # provides a file which can store multiple files inside of it
 # a table of contents is utilized, and the caller can attach arbitrary
 # data to an entry in the table. no compression is used, but that could
