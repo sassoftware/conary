@@ -537,7 +537,7 @@ class PackageRecipe(Recipe):
 
     def populateLcache(self):
         """
-        Populate a repositoy lookaside cache
+        Populate a repository lookaside cache
         """
         recipeClass = self.__class__ 
         repos = self.laReposCache.repos
@@ -575,9 +575,8 @@ class PackageRecipe(Recipe):
                 if isinstance(fileObj, files.RegularFile):
                     # it only makes sense to fetch regular files, skip
                     # anything that isn't
-                    self.laReposCache.addFileHash(srcName, srcVersion,
-                                                  None, pathId, path, 
-                                                  fileId, version)
+                    self.laReposCache.addFileHash(srcName, srcVersion, pathId,
+                        path, fileId, version, fileObj.contents.sha1())
 
     def __getattr__(self, name):
 	"""

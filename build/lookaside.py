@@ -13,17 +13,18 @@
 #
 
 """
-Provides a lookaside cache for storing files locally, including
+Provides a cache for storing files locally, including
 downloads and unpacking layers of files.
 """
 
 import errno
-import os
-from lib import util
-import socket
-import urllib2
-import time
 from lib import log
+from lib import sha1helper
+from lib import util
+import os
+import socket
+import time
+import urllib2
 
 # location is normally the package name
 
@@ -32,7 +33,7 @@ def createCacheName(cfg, name, location, negative=''):
     util.mkdirChain(os.path.dirname(cachedname))
     return cachedname
 
-def createCacheEntry(cfg, name, location, infile):
+def _createCacheEntry(cfg, name, location, infile):
     # cache needs to be hierarchical to avoid collisions, thus we
     # use location so that files with the same name and different
     # contents in different packages do not collide
@@ -51,16 +52,16 @@ def createCacheEntry(cfg, name, location, infile):
     if name.startswith("ftp://"):
 	if os.stat(cachedname).st_size == 0:
 	    os.unlink(cachedname)
-	    createNegativeCacheEntry(cfg, name[5:], location)
+	    _createNegativeCacheEntry(cfg, name[5:], location)
 	    return None
 
     return cachedname
 
-def createNegativeCacheEntry(cfg, name, location):
+def _createNegativeCacheEntry(cfg, name, location):
     negativeEntry = createCacheName(cfg, name, location, 'NEGATIVE' + os.sep)
     open(negativeEntry, "w+").close()
 
-def searchCache(cfg, name, location):
+def _searchCache(cfg, name, location):
     basename = os.path.basename(name)
 
     if name.startswith("http://") or name.startswith("ftp://"):
@@ -77,7 +78,7 @@ def searchCache(cfg, name, location):
                 return -1
 
 	# exact match first, then look for cached responses from other servers
-	positiveName = os.sep.join((cfg.lookaside, location, name[5:]))
+	positiveName = createCacheName(cfg, name[5:], location)
 	if os.path.exists(positiveName):
 	    return positiveName
 	return util.searchPath(basename, os.sep.join((cfg.lookaside,
@@ -87,75 +88,90 @@ def searchCache(cfg, name, location):
                                [os.sep.join((cfg.lookaside, location))])
 
 
-def searchRepository(cfg, repCache, name, location):
+def _searchRepository(cfg, repCache, name, location):
     """searches repository, and retrieves to cache"""
     basename = os.path.basename(name)
 
-    if repCache.hasFile(basename):
+    if repCache.hasFileName(basename):
 	log.debug('found %s in repository', name)
-	return repCache.moveFileToCache(cfg, basename, location)
+	return repCache.cacheFile(cfg, basename, location)
 
     return None
 
 
-def searchAll(cfg, repCache, name, location, srcdirs):
-    """searches all locations, including populating the cache if the
-    file can't be found in srcdirs, and returns the name of the file"""
-    f = util.searchFile(os.path.basename(name), srcdirs)
-    if f: return f
+def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False):
+    """
+    searches all locations, including populating the cache if the
+    file can't be found in srcdirs, and returns the name of the file.
+    autoSource should be True when the file has been pulled from an RPM,
+    and so has no path associated but is still auto-added
+    """
+    if '/' in name or autoSource:
+        # this needs to come absolutely first to preserve reproducability
+        f = _searchRepository(cfg, repCache, name, location)
+        if f: return f
 
-    # this needs to come before searching the cache, with the expense
-    # of repopulating the cache "unnecessarily", to preserve reproducability
-    f = searchRepository(cfg, repCache, name, location)
-    if f: return f
+        # OK, now look in the lookaside cache
+        # this is for sources that will later be auto-added
+        # one way or another
+        f = _searchCache(cfg, name, location)
+        if f and f != -1: return f
 
-    f = searchCache(cfg, name, location)
-    if f and f != -1: return f
-
-    if (name.startswith("http://") or name.startswith("ftp://")) and f != -1:
-        log.info('Downloading %s...', name)
-        retries = 0
-        url = None
-        while retries < 5:
-            try:
-                url = urllib2.urlopen(name)
-                break
-            except urllib2.HTTPError, msg:
-                if msg.code == 404:
-                    createNegativeCacheEntry(cfg, name[5:], location)
+        # Need to fetch a file that will be auto-added to the repository
+        # on commit
+        if (name.startswith("http://") or name.startswith("ftp://")) and f != -1:
+            log.info('Downloading %s...', name)
+            retries = 0
+            url = None
+            while retries < 5:
+                try:
+                    url = urllib2.urlopen(name)
+                    break
+                except urllib2.HTTPError, msg:
+                    if msg.code == 404:
+                        _createNegativeCacheEntry(cfg, name[5:], location)
+                        return None
+                except urllib2.URLError:
+                    _createNegativeCacheEntry(cfg, name[5:], location)
                     return None
-            except urllib2.URLError:
-                createNegativeCacheEntry(cfg, name[5:], location)
+                except socket.error, err:
+                    num, msg = err
+                    if num == errno.ECONNRESET:
+                        log.info('Connection Reset by FTP server'
+                                 'while retrieving %s.'
+                                 '  Retrying in 10 seconds.', name, msg)
+                        time.sleep(10)
+                        retries += 1
+                    else:
+                        _createNegativeCacheEntry(cfg, name[5:], location)
+                        return None
+                except IOError, msg:
+                    # only retry for server busy.
+                    if 'ftp error] 421' in msg:
+                        log.info('FTP server busy when retrieving %s.'
+                                 '  Retrying in 10 seconds.', name, msg)
+                        time.sleep(10)
+                        retries += 1
+                    else:
+                        _createNegativeCacheEntry(cfg, name[5:], location)
+                        return None
+            if url is None:
                 return None
-            except socket.error, err:
-                num, msg = err
-                if num == errno.ECONNRESET:
-                    log.info('Connection Reset by FTP server while retrieving %s.  Retrying in 10 seconds.', name, msg)
-                    time.sleep(10)
-                    retries += 1
-                else:
-                    createNegativeCacheEntry(cfg, name[5:], location)
-                    return None
-            except IOError, msg:
-                # only retry for server busy.
-                if 'ftp error] 421' in msg:
-                    log.info('FTP server busy when retrieving %s.  Retrying in 10 seconds.', name, msg)
-                    time.sleep(10)
-                    retries += 1
-                else:
-                    createNegativeCacheEntry(cfg, name[5:], location)
-                    return None
-        if url is None:
-            return None
 
-	rc = createCacheEntry(cfg, name, location, url)
-	return rc
+            rc = _createCacheEntry(cfg, name, location, url)
+            return rc
+
+    else:
+        # these are files that do not have / in the name and are not
+        # indirectly fetched via RPMs, so we look in the local directory
+        f = util.searchFile(name, srcdirs)
+        if f: return f
 
     return None
 
 
-def findAll(cfg, repcache, name, location, srcdirs):
-    f = searchAll(cfg, repcache, name, location, srcdirs)
+def findAll(cfg, repcache, name, location, srcdirs, autoSource=False):
+    f = searchAll(cfg, repcache, name, location, srcdirs, autoSource)
     if not f:
 	raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT), name)
     return f
@@ -163,23 +179,32 @@ def findAll(cfg, repcache, name, location, srcdirs):
 
 class RepositoryCache:
 
-    def addFileHash(self, troveName, troveVersion, troveFlavor, pathId, path, 
-		    fileId, fileVersion):
-	self.map[path] = (troveName, troveVersion, troveFlavor, pathId, path,
-			      fileId, fileVersion)
+    def addFileHash(self, troveName, troveVersion, pathId, path, fileId,
+                    fileVersion, sha1):
+	self.nameMap[path] = (troveName, troveVersion, pathId, path, fileId,
+                              fileVersion, sha1)
 
-    def hasFile(self, fileName):
-	return self.map.has_key(fileName)
+    def hasFileName(self, fileName):
+	return fileName in self.nameMap
 
-    def moveFileToCache(self, cfg, fileName, location):
+    def cacheFile(self, cfg, fileName, location):
 	cachedname = createCacheName(cfg, fileName, location)
-	(troveName, troveVersion, troveFlavor, pathId, troveFile, fileId,
-                    troveFileVersion) = self.map[fileName]
-	f = self.repos.getFileContents([ (fileId, troveFileVersion) ])[0].get()
-	util.copyfileobj(f, open(cachedname, "w"))
-
+        if filename in self.cacheMap:
+            # don't check sha1 twice
+            return self.cacheMap[fileName]
+	(troveName, troveVersion, pathId, troveFile, fileId,
+                    troveFileVersion, sha1) = self.nameMap[fileName]
+        sha1Cached = None
+	if os.path.exists(cachedname):
+            sha1Cached = sha1helper.sha1FileBin(cachedname)
+        if sha1Cached != sha1:
+            f = self.repos.getFileContents(
+                [ (fileId, troveFileVersion) ])[0].get()
+            util.copyfileobj(f, open(cachedname, "w"))
+        self.cacheMap[fileName] = cachedname
 	return cachedname
 
     def __init__(self, repos):
 	self.repos = repos
-	self.map = {}
+	self.nameMap = {}
+        self.cacheMap = {}

@@ -89,23 +89,30 @@ class _Source(action.RecipeAction):
         Extracts filename from rpm file and creates an entry in the
         source lookaside cache for the extracted file
         """
-	# XXX check signature in RPM package?
+	f = lookaside.searchAll(self.recipe.cfg, self.recipe.laReposCache,
+	    self.sourcename, self.recipe.name, self.recipe.srcdirs,
+            autoSource=True)
+        if f:
+            return
+
+        # need to pull from RPM
 	r = lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
 			      self.rpm, self.recipe.name,
 			      self.recipe.srcdirs)
+	# XXX check signature in RPM package?
 	c = lookaside.createCacheName(self.recipe.cfg, self.sourcename,
 				      self.recipe.name)
 	_extractFilesFromRPM(r, targetfile=c)
 
 
     def _findSource(self):
-	if self.rpm:
-	    # the file was already unpacked from the RPM, and so it
-	    # must be in the lookaside cache.
-	    return lookaside.searchCache(self.recipe.cfg,self.sourcename,
-				         self.recipe.name)
-	# otherwise, we use a standard search that looks in the repository
-	# first
+        if self.rpm:
+            # the file was pulled at some point from the RPM, and if it
+            # has been committed it is in the repository
+            return lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
+                self.sourcename, self.recipe.name, self.recipe.srcdirs,
+                autoSource=True)
+
 	return lookaside.findAll(self.recipe.cfg, self.recipe.laReposCache,
 	    self.sourcename, self.recipe.name, self.recipe.srcdirs)
 

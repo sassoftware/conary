@@ -17,17 +17,6 @@ import md5
 import os
 import struct
 
-def sha1File(path):
-    fd = os.open(path, os.O_RDONLY)
-    m = sha.new()
-    buf = os.read(fd, 40960)
-    while len(buf):
-	m.update(buf)
-	buf = os.read(fd, 40960)
-    os.close(fd)
-
-    return m.hexdigest()
-
 def sha1FileBin(path):
     fd = os.open(path, os.O_RDONLY)
     m = sha.new()
