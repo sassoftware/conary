@@ -20,110 +20,76 @@ import util
 import versioned
 import versions
 
-class SourceState:
-    """
-    Representation of the SRS file used to keep track of files in source
-    directories.
-    """
-
-    def expandVersionStr(self, versionStr):
-	if versionStr[0] == "@":
-	    # get the name of the repository from the current branch
-	    repName = self.getTroveBranch().branchNickname().getHost()
-	    return repName + versionStr
-	elif versionStr[0] != "/" and versionStr.find("@") == -1:
-	    # non fully-qualified version; make it relative to the current
-	    # branch
-	    return self.getTroveBranch().asString() + "/" + versionStr
-
-    def addFile(self, fileId, path, version):
-	self.files[fileId] = (path, version)
-
-    def removeFile(self, fileId):
-	del self.files[fileId]
+class SourceState(package.Package):
 
     def removeFilePath(self, file):
-	for (fileId, (path, version)) in self.getFileList():
+	for (fileId, (path, version)) in self.iterFileList():
 	    if path == file: 
-		del self.files[fileId]
+		self.removeFile(fileId)
 		return True
 
 	return False
 
-    def setTroveName(self, name):
-	self.troveName = name
+    def write(self, filename):
+	f = open(filename, "w")
+	f.write("name %s\n" % self.name)
+	if self.version:
+	    f.write("version %s\n" % self.version.asString())
+	f.write("branch %s\n" % self.branch.asString())
+	f.write(self.formatString())
 
-    def setTroveVersion(self, version):
-	self.troveVersion = version
+    def getBranch(self):
+	return self.branch
 
-    def setTroveBranch(self, branch):
-	self.troveBranch = branch
-
-    def getTroveName(self):
-	return self.troveName
-
-    def getTroveVersion(self):
-	return self.troveVersion
-
-    def getTroveBranch(self):
-	return self.troveBranch
-
-    def getFileList(self):
-	return self.files.iteritems()
-
-    def getFile(self, fileId):
-	return self.files[fileId]
-
-    def hasFile(self, fileId):
-	return self.files.has_key(fileId)
+    def changeBranch(self, branch):
+	self.branch = branch
 
     def getRecipeFileNames(self):
 	list = []
-	for (fileId, (path, version)) in self.files.iteritems():
+	for (fileId, (path, version)) in self.iterFileList():
 	    if path.endswith(".recipe"): list.append(os.getcwd() + '/' + path)
 
 	return list
-	
+
+    def expandVersionStr(self, versionStr):
+	if versionStr[0] == "@":
+	    # get the name of the repository from the current branch
+	    repName = self.getBranch().branchNickname().getHost()
+	    return repName + versionStr
+	elif versionStr[0] != "/" and versionStr.find("@") == -1:
+	    # non fully-qualified version; make it relative to the current
+	    # branch
+	    return self.getBranch().asString() + "/" + versionStr
+
+    def __init__(self, name, version, branch):
+	package.Package.__init__(self, name, version)
+	self.branch = branch
+
+class SourceStateFromFile(SourceState):
+
     def parseFile(self, filename):
 	f = open(filename)
-	for line in f.readlines():
+	rc = [self]
+	for (what, isBranch) in [ ('name', 0), ('version', 1), ('branch', 1) ]:
+	    line = f.readline()
 	    fields = line.split()
-	    if fields[0] == "name":
-		self.setTroveName(fields[1])
-	    elif fields[0] == "version":
-		if fields[1] != "@NEW@":
-		    self.setTroveVersion(versions.VersionFromString(fields[1]))
-	    elif fields[0] == "branch":
-		self.setTroveBranch(versions.VersionFromString(fields[1]))
-	    elif fields[0] == "file":
-		if fields[3] == "@NEW@":
-		    version = None
-		else:
-		    version = versions.VersionFromString(fields[3])
-
-		self.addFile(fields[1], fields[2], version)
-
-    def write(self, filename):
-	f = open(filename, "w")
-	f.write("name %s\n" % self.troveName)
-
-	if self.troveVersion:
-	    f.write("version %s\n" % self.troveVersion.asString())
-	else:
-	    f.write("version %s\n" % "@NEW@")
-
-	f.write("branch %s\n" % self.troveBranch.asString())
-
-	for (fileId, (path, version)) in self.files.iteritems():
-	    if version:
-		f.write("file %s %s %s\n" % (fileId, path, version.asString()))
+	    assert(len(fields) == 2)
+	    assert(fields[0] == what)
+	    if isBranch:
+		rc.append(versions.VersionFromString(fields[1]))
 	    else:
-		f.write("file %s %s %s\n" % (fileId, path, "@NEW@"))
+		rc.append(fields[1])
 
-    def __init__(self, filename = None):
-	self.files = {}
-	self.troveVersion = None
-	if filename: self.parseFile(filename)
+	SourceState.__init__(*rc)
+
+	self.read(f)
+
+    def __init__(self, file):
+	if not os.path.isfile(file):
+	    log.error("SRS file must exist in the current directory for source commands")
+	    raise OSError  # XXX
+
+	self.parseFile(file)
 
 def checkout(repos, cfg, dir, name, versionStr = None):
     # We have to be careful with branch nicknames.  First, we could get
@@ -151,16 +117,11 @@ def checkout(repos, cfg, dir, name, versionStr = None):
                       str(err))
 	    return
 
-    state = SourceState()
-    state.setTroveName(trv.getName())
-    version = trv.getVersion()
-    state.setTroveVersion(version)
-
     branch = helper.fullBranchName(cfg.packagenamespace[1:], cfg.installbranch,
-				   version, versionStr)
-    state.setTroveBranch(branch)
+				   trv.getVersion(), versionStr)
+    state = SourceState(trv.getName(), trv.getVersion(), branch)
 
-    for (fileId, path, version) in trv.fileList():
+    for (fileId, (path, version)) in trv.iterFileList():
 	fullPath = dir + "/" + path
 	fileObj = repos.getFileVersion(fileId, version)
 	contents = filecontents.FromRepository(repos, fileObj.sha1())
@@ -192,39 +153,39 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
     @rtype: (boolean, SourceState, changeset.ChangeSet, package.Package)
     """
 
-    if not state.getTroveVersion():
+    if isinstance(state.getVersion(), versions.NewVersion):
 	# new package, so it shouldn't exist yet
 	if needsHead:
-	    if repos.hasPackage(state.getTroveName()):
+	    if repos.hasPackage(state.getName()):
 		log.error("%s is marked as a new package but it " 
-			  "already exists" % state.getTroveName())
+			  "already exists" % state.getName())
 		return
 	srcVersion = None
 	srcPkg = None
     else:
 	if not srcVersion:
-	    srcVersion = state.getTroveVersion()
+	    srcVersion = state.getVersion()
 
-	srcPkg = repos.getPackageVersion(state.getTroveName(), srcVersion)
-	srcPkg.changeVersion(repos.pkgGetFullVersion(state.getTroveName(), 
+	srcPkg = repos.getPackageVersion(state.getName(), srcVersion)
+	srcPkg.changeVersion(repos.pkgGetFullVersion(state.getName(), 
 			     srcVersion))
 
 	if needsHead:
 	    # existing package
-	    headVersion = repos.pkgLatestVersion(state.getTroveName(), 
-						 state.getTroveBranch())
-	    if not headVersion.equal(state.getTroveVersion()):
+	    headVersion = repos.pkgLatestVersion(state.getName(), 
+						 state.getBranch())
+	    if not headVersion.equal(state.getVersion()):
 		log.error("working version (%s) is different from the head " +
 			  "of the branch (%s); use update", 
-			  state.getTroveVersion().asString(), 
+			  state.getVersion().asString(), 
 			  srcVersion.asString())
 		return
 
 	    # make sure the files in this directory are based on the same
 	    # versions as those in the package at head
 	    bail = 0
-	    for (fileId, (path, version)) in state.getFileList():
-		if not version:
+	    for (fileId, (path, version)) in state.iterFileList():
+		if isinstance(version, versions.NewVersion):
 		    assert(not srcPkg.hasFile(fileId))
 		    # new file, it shouldn't be in the old package at all
 		else:
@@ -257,7 +218,7 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 	    log.error("all recipes must have the same version")
 	    return
 
-    troveBranch = state.getTroveBranch()
+    troveBranch = state.getBranch()
 
     if not srcVersion:
 	# new package
@@ -271,14 +232,14 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 	newVersion = troveBranch.copy()
 	newVersion.appendVersionRelease(recipeVersionStr, 1)
 
-    state.setTroveVersion(newVersion)
+    state.changeVersion(newVersion)
 
-    pkg = package.Package(state.getTroveName(), newVersion)
+    pkg = package.Package(state.getName(), newVersion)
     changeSet = changeset.ChangeSet()
 
     foundDifference = 0
 
-    for (fileId, (path, version)) in state.getFileList():
+    for (fileId, (path, version)) in state.iterFileList():
 	realPath = os.getcwd() + "/" + path
 
 	f = files.FileFromFilesystem(realPath, fileId, type = "src")
@@ -290,7 +251,7 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 	    # if we're committing against head, this better be a new file.
 	    # if we're generating a diff against someplace else, it might not 
 	    # be.
-	    assert(needsHead and not version)
+	    assert(needsHead and isinstance(version, versions.NewVersion))
 	    # new file, so this is easy
 	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
 	    state.addFile(fileId, path, newVersion)
@@ -332,11 +293,7 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
     return (foundDifference, state, changeSet, srcPkg)
 
 def commit(repos):
-    if not os.path.isfile("SRS"):
-	log.error("SRS file must exist in the current directory for source commands")
-	return
-
-    state = SourceState("SRS")
+    state = SourceStateFromFile("SRS")
 
     # we need to commit based on changes to the head of a branch
     result = buildChangeSet(repos, state, needsHead = True)
@@ -351,16 +308,12 @@ def commit(repos):
 	state.write("SRS")
 
 def diff(repos, versionStr = None):
-    if not os.path.isfile("SRS"):
-	log.error("SRS file must exist in the current directory for source commands")
-	return
-
-    state = SourceState("SRS")
+    state = SourceStateFromFile("SRS")
 
     if versionStr:
 	versionStr = state.expandVersionStr(versionStr)
 
-	pkgList = helper.findPackage(repos, None, None, state.getTroveName(), 
+	pkgList = helper.findPackage(repos, None, None, state.getName(), 
 				     versionStr)
 	if len(pkgList) > 1:
 	    log.error("%s specifies multiple versions" % versionStr)
@@ -415,16 +368,12 @@ def diff(repos, versionStr = None):
 	print "%s: removed" % path
 	
 def update(repos, versionStr = None):
-    if not os.path.isfile("SRS"):
-	log.error("SRS file must exist in the current directory for source commands")
-	return
-
-    state = SourceState("SRS")
-    pkgName = state.getTroveName()
-    baseVersion = state.getTroveVersion()
+    state = SourceStateFromFile("SRS")
+    pkgName = state.getName()
+    baseVersion = state.getVersion()
     
     if not versionStr:
-	head = repos.getLatestPackage(pkgName, state.getTroveBranch())
+	head = repos.getLatestPackage(pkgName, state.getBranch())
 	newBranch = None
 	headVersion = head.getVersion()
 	if headVersion.equal(baseVersion):
@@ -447,8 +396,8 @@ def update(repos, versionStr = None):
     packageChanges = changeSet.getNewPackageList()
     assert(len(packageChanges) == 1)
     pkgCs = packageChanges[0]
-    basePkg = repos.getPackageVersion(state.getTroveName(), 
-				      state.getTroveVersion())
+    basePkg = repos.getPackageVersion(state.getName(), 
+				      state.getVersion())
 
     fullyUpdated = 1
 
@@ -554,7 +503,7 @@ def update(repos, versionStr = None):
 	    elif fsFile.sha1() == baseFile.sha1():
 		# the contents changed in just the repository, so take
 		# those changes
-		log.info("replacing %s with contents from head" % realPath)
+		log.info("replacing %s with contents from repository" % realPath)
 		src = repos.pullFileContentsObject(headFile.sha1())
 		dest = open(realPath, "w")
 		util.copyfileobj(src, dest)
@@ -571,7 +520,7 @@ def update(repos, versionStr = None):
 		    log.error("contents conflict for %s" % realPath)
 		    contentsOkay = 0
 		else:
-		    log.info("merging changes from head into %s" % realPath)
+		    log.info("merging changes from repository into %s" % realPath)
 		    diff = cont.get().readlines()
 		    cur = open(realPath, "r").readlines()
 		    (newLines, failedHunks) = patch.patch(cur, diff)
@@ -602,17 +551,13 @@ def update(repos, versionStr = None):
 	    fullyUpdated = 0
 
     if fullyUpdated:
-	state.setTroveVersion(headVersion)
-	if newBranch: state.setTroveBranch(newBranch)
+	state.changeVersion(headVersion)
+	if newBranch: state.changeBranch(newBranch)
 
     state.write("SRS")
 
 def addFile(file):
-    if not os.path.isfile("SRS"):
-	log.error("SRS file must exist in the current directory for source commands")
-	return
-
-    state = SourceState("SRS")
+    state = SourceStateFromFile("SRS")
 
     if not os.path.exists(file):
 	log.error("files must be created before they can be added")
@@ -620,44 +565,37 @@ def addFile(file):
     elif not os.path.isfile(file):
 	log.error("only normal files can be part of source packages")
 
-    for (fileId, (path, version)) in state.getFileList():
+    for (fileId, (path, version)) in state.iterFileList():
 	if path == file:
 	    log.error("file %s is already part of this source package" % path)
 	    return
 
     fileId = cook.makeFileId(os.getcwd(), file)
 
-    state.addFile(fileId, file, None)
+    state.addFile(fileId, file, versions.NewVersion())
     state.write("SRS")
 
 def removeFile(file):
-    if not os.path.isfile("SRS"):
-	log.error("SRS file must exist in the current directory for source commands")
-	return
-
-    state = SourceState("SRS")
-
-    if os.path.exists(file):
-	log.error("files must be removed from the filesystem first")
-	return
+    state = SourceStateFromFile("SRS")
 
     if not state.removeFilePath(file):
 	log.error("file %s is not under management" % file)
 
+    if os.path.exists(file):
+	os.unlink(file)
+
     state.write("SRS")
 
 def newPackage(repos, cfg, name):
-    state = SourceState()
     if name[0] != ":":
 	name = cfg.packagenamespace + ":" + name
     name += ":sources"
 
+    state = SourceState(name, versions.NewVersion(), cfg.defaultbranch)
+
     if repos and repos.hasPackage(name):
 	log.error("package %s already exists" % name)
 	return
-
-    state.setTroveName(name)
-    state.setTroveBranch(cfg.defaultbranch)
 
     dir = name.split(":")[-2]
     if not os.path.isdir(dir):
@@ -670,11 +608,7 @@ def newPackage(repos, cfg, name):
     state.write(dir + "/" + "SRS")
 
 def renameFile(oldName, newName):
-    if not os.path.isfile("SRS"):
-	log.error("SRS file must exist in the current directory for source commands")
-	return
-
-    state = SourceState("SRS")
+    state = SourceStateFromFile("SRS")
 
     if not os.path.isfile(oldName):
 	log.error("%s does not exist or is not a regular file" % oldName)
@@ -688,7 +622,7 @@ def renameFile(oldName, newName):
 	log.error("%s already exists" % newName)
 	return
 
-    for (fileId, (path, version)) in state.getFileList():
+    for (fileId, (path, version)) in state.iterFileList():
 	if path == oldName:
 	    log.info("renaming %s to %s", oldName, newName)
 	    os.rename(oldName, newName)
