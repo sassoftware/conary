@@ -657,7 +657,7 @@ def createFlavor(recipeName, *flagIterables):
             set.union(flag._toDependency(recipeName))
     return set
 
-def setBuildFlagsFromFlavor(recipeName, flavor):
+def setBuildFlagsFromFlavor(recipeName, flavor, error=True):
     """ Sets the truth of the build Flags based on the build flavor.
         All the set build flags must already exist.  Flags not mentioned
         in this flavor will be untouched.
@@ -679,14 +679,17 @@ def setBuildFlagsFromFlavor(recipeName, flavor):
                     parts = flag.split('.',1)
                     if len(parts) == 1:
                         Use[flag]._set(value)
-                    else:
-                        assert(recipeName)
+                    elif recipeName:
                         packageName, flag = parts
                         if packageName == recipeName:
                             # local flag values set from a build flavor
                             # are overrides -- the recipe should not 
                             # change these values
                             LocalFlags._override(flag, value)
+                    elif error:
+                        raise RuntimeError, ('Trying to set a flavor with '
+                                             'localflag %s when no trove '
+                                             ' name was given')
         elif isinstance(depGroup, deps.InstructionSetDependency):
             # ensure that there is only on major architecture listed
             # XXX this could be user error -- handle gracefully

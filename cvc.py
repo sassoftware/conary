@@ -22,7 +22,7 @@ from lib import options
 from lib import util
 from lib import log
 from local import database
-from build import cook
+from build import cook,use
 import deps
 from repository import netclient
 from repository.netclient import NetworkRepositoryClient
@@ -147,6 +147,12 @@ def realMain(cfg, argv=sys.argv):
                       mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
     cfg.buildFlavor = buildFlavor
     flavorConfig.populateBuildFlags()
+    # set flags from the build flavor to get the correct architecture.
+    # flags and use flags which are needed for loading recipes.
+    # however, we don't know the recipe yet and so can't determine 
+    # what local flags to set -- we'll have to reset the flavor later
+    # for commands that are dependant on allowing overrides.
+    use.setBuildFlagsFromFlavor(None, cfg.buildFlavor, error=False)
     sourceCommand(cfg, otherArgs[1:], argSet)
 
 def sourceCommand(cfg, args, argSet):
