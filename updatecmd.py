@@ -19,6 +19,11 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	    return 1
 
 	cs = changeset.ChangeSetFromFile(pkg)
+
+	if cs.isAbstract():
+	    newcs = db.rootChangeSet(cs, cfg.defaultbranch)
+	    if newcs:
+		cs = newcs
     else:
 	if pkg and pkg[0] != ":":
 	    pkg = cfg.packagenamespace + ":" + pkg
