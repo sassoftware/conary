@@ -229,8 +229,10 @@ class HttpHandler(HtmlEngine):
         
     def chPassCmd(self, authToken, fields):
         username = fields["username"].value
+        admin = self.repServer.repos.auth.check(authToken, admin=True)
+        
         if username != authToken[0]:
-            if not self.repServer.repos.auth.check(authToken, admin=True):
+            if not admin:
                 raise InsufficientPermission
         
         if fields.has_key("oldPassword"):
@@ -241,7 +243,7 @@ class HttpHandler(HtmlEngine):
         p2 = fields["password2"].value
 
         self.htmlPageTitle("Change Password")
-        if authToken[1] != oldPassword and authToken[0] == username:
+        if authToken[1] != oldPassword and authToken[0] == username and not admin:
             self.writeFn("""<div class="warning">Error: old password is incorrect</div>""")
         elif p1 != p2:
             self.writeFn("""<div class="warning">Error: passwords do not match</div>""")
