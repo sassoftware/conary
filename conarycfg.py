@@ -1,0 +1,23 @@
+import os
+import string
+
+class SrsConfiguration:
+
+    def read(self, file):
+	if os.path.exists(file):
+	    f = open(file, "r")
+	    for line in f.readlines():
+		(key, val) = string.split(line)
+		if not self.__dict__.has_key(key):
+		    raise KeyError, "configuration value %s unknown" % key
+
+		self.__dict__[key] = val
+	    f.close()
+
+    def __init__(self):
+	self.dbpath = "/var/lib/srs"
+	self.root = "/"
+
+	self.read(os.environ["HOME"] + "/" + ".srsrc")
+	self.read("/etc/srsrc")
+	
