@@ -128,7 +128,6 @@ class FileStreams:
             cu.execute("""CREATE TABLE FileStreams(streamId INTEGER PRIMARY KEY,
 						   fileId BINARY,
 						   versionId INT,
-						   flavorId INT,
                                                    stream BINARY);""")
 	    # in sqlite 2.8.15, a unique here seems to cause problems
 	    # (as the versionId isn't unique, apparently)
@@ -150,11 +149,11 @@ class FileStreams:
             yield row[0]
 
     def addStream(self, key, stream):
-	(fileId, versionId, flavorId) = key
+	(fileId, versionId) = key
 	fileId = encodeFileId(fileId)
         cu = self.db.cursor()
         cu.execute("INSERT INTO FileStreams VALUES (NULL, %s, %d, %d, %s)",
-                   (fileId, versionId, flavorId, sqlite.encode(stream)))
+                   (fileId, versionId, sqlite.encode(stream)))
 	return cu.lastrowid
         
     def __delitem__(self, key):

@@ -409,7 +409,6 @@ class TroveStore:
 	    INSERT INTO FileStreams SELECT NULL,
 					   NewFiles.fileId,
 					   NewFiles.versionId,
-					   0,
 					   NewFiles.stream
 		FROM NewFiles LEFT OUTER JOIN FileStreams ON
 		    NewFiles.fileId = FileStreams.fileId AND
