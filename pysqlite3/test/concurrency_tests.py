@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+#
+# Copyright (c) 2004 Specifix, Inc.
+#
+
 import testsupport
 import os, sys, tempfile, time, unittest
 import sqlite3 as sqlite
