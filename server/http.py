@@ -147,7 +147,7 @@ class HttpHandler:
         source = str(fields.getfirst('source', '')).lower()
         
         versions = self.repServer.getTroveVersionList(authToken,
-            netserver.SERVER_VERSIONS[-1], { troveName : None }, "")
+            netserver.SERVER_VERSIONS[-1], { troveName : None })
         
         branches = {}
         for version in versions[troveName]:
