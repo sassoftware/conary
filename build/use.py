@@ -521,10 +521,6 @@ class SubArch(Flag):
             value of this subarch is true
             (better comment about why we do that here) 
         """
-        if self._name == '3dnow':
-            from lib import epdb
-            epdb.set_trace('foo')
-            
         set = deps.DependencySet() 
         sense = self._getDepSense()
         depFlags = [ (self._name, sense) ]
