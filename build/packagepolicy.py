@@ -101,6 +101,8 @@ class ComponentSpec(_filterSpec):
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
 	('python',    ('%(libdir)s/python.*/site-packages/')),
+	('runtime',   ('%(essentiallibdir)s/security/',
+		       '/lib/security/')),
 	('devel',     ('\.so',), stat.S_IFLNK),
 	('devel',     ('\.a',
 		       '.*/include/.*\.h',
