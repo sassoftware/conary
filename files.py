@@ -49,19 +49,6 @@ class FileMode:
 	    
 	return list
 
-    def modeString(self):
-	list = self.triplet(self.thePerms >> 6, self.thePerms & 04000)
-	list = list + self.triplet(self.thePerms >> 3, self.thePerms & 02000)
-	list = list + self.triplet(self.thePerms >> 0)
-	
-	if self.thePerms & 01000:
-	    if list[8] == "x":
-		list[8] = "t"
-	    else:
-		list[8] = "T"
-
-	return self.lsTag + string.join(list, "")
-
     def sizeString(self):
 	return "%8d" % self.theSize
 
@@ -178,6 +165,18 @@ class FileMode:
 	    self.theSize = None
 	
 class File(FileMode):
+    def modeString(self):
+	list = self.triplet(self.thePerms >> 6, self.thePerms & 04000)
+	list = list + self.triplet(self.thePerms >> 3, self.thePerms & 02000)
+	list = list + self.triplet(self.thePerms >> 0)
+	
+	if self.thePerms & 01000:
+	    if list[8] == "x":
+		list[8] = "t"
+	    else:
+		list[8] = "T"
+
+	return self.lsTag + string.join(list, "")
 
     def infoLine(self):
 	return self.infoTag + " " + FileMode.infoLine(self)
@@ -220,6 +219,7 @@ class File(FileMode):
 	self.applyChangeLine(line)
 
     def __init__(self, fileId, info = None, infoTag = None):
+        assert(self.__class__ is not File)
 	self.theId = fileId
 	self.infoTag = infoTag
 	FileMode.__init__(self, info)
