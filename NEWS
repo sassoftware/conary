@@ -1,3 +1,7 @@
+Changes in 0.14.11:
+  * Filenames are now required to be UTF-8, instead of just printing a
+    warning when they are not UTF-8.
+
 Changes in 0.14.10:
   * FlavorMap sense wasn't set right for base instruction set
   * Actually check build requirements before building, use --no-deps to 
