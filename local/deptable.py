@@ -31,33 +31,36 @@ def createDepTable(cu, name, isTemp):
     cu.execute("CREATE INDEX %sIdx ON %s(class, name, flag)" % 
                (name, name), start_transaction = (not tmp))
 
+def createDepUserTable(cu, name, isTemp):
+    if isTemp:
+        tmp = "TEMPORARY"
+    else:
+        tmp = ""
+
+    cu.execute("""CREATE %s TABLE %s(instanceId integer,
+                                  depId integer
+                                 )""" % (tmp, name),
+               start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
+               start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name),
+               start_transaction = (not isTemp))
+
 class DepTable:
-    def __init__(self, db, name, isTemp = False):
+    def __init__(self, db, name):
         cu = db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if 'Dependencies' not in tables:
-            createDepTable(cu, name, isTemp)
+            createDepTable(cu, name, False)
 
 class DepUser:
-    def __init__(self, db, name, isTemp = False):
-        if isTemp:
-            tmp = "TEMPORARY"
-        else:
-            tmp = ""
-
+    def __init__(self, db, name):
         cu = db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if name not in tables:
-            cu.execute("""CREATE %s TABLE %s(instanceId integer,
-                                          depId integer
-                                         )""" % (tmp, name),
-                       start_transaction = (not isTemp))
-            cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
-                       start_transaction = (not isTemp))
-            cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name),
-                       start_transaction = (not isTemp))
+            createDepUserTable(cu, name, False)
 
 class DependencyTables:
 
@@ -99,7 +102,7 @@ class DependencyTables:
                                        (troveNum, len(depList), 1, 
                                         isProvides, classId, 
                                         depName, NO_FLAG_MAGIC),
-                                       startTransaction = False)
+                                       start_transaction = False)
 
                 if not isProvides:
                     depList.append((troveNum, classId, dep))
@@ -111,8 +114,6 @@ class DependencyTables:
                       'reqTable'  : reqTable,
                       'provTable' : provTable,
                       'allDeps'   : allDeps   }
-
-        cu = self.db.cursor()
 
         cu.execute("""INSERT INTO %(depTable)s 
                         SELECT DISTINCT
@@ -126,7 +127,7 @@ class DependencyTables:
                             %(tmpName)s.flag == Dependencies.flag
                         WHERE
                             Dependencies.depId is NULL
-                    """ % substDict, startTransaction = False)
+                    """ % substDict, start_transaction = False)
 
         cu.execute("""INSERT INTO %(reqTable)s 
                     SELECT %(tmpName)s.troveId, depId FROM
@@ -137,6 +138,9 @@ class DependencyTables:
                         WHERE
                             %(tmpName)s.isProvides == 0""" % substDict,
                    start_transaction = False)
+
+        if provTable is None:   
+            return
 
         cu.execute("""INSERT INTO %(provTable)s SELECT 
                             %(tmpName)s.troveId, depId FROM
@@ -177,8 +181,7 @@ class DependencyTables:
                 setFn(depSet)
 
     def add(self, cu, trove, troveId):
-        # XXX this should assert() that we're in a transaction, but I
-        # need msw to tell me how to check that
+        assert(cu.con.inTransaction)
         self._createTmpTable(cu, "NeededDeps")
         self._populateTmpTable(cu, "NeededDeps", [], troveId, 
                                trove.getRequires(), trove.getProvides())
@@ -212,24 +215,26 @@ class DependencyTables:
         cu.execute("DROP TABLE suspectDeps")
 
     def _resolveStmt(self, providesTable = "Provides", 
-                     depTable = "Dependencies"):
+                     depTable = "Dependencies",
+                     requiresTable = "Requires"):
         substTable = { 'provides' : providesTable,
+                       'requires' : requiresTable,
                        'deptable' : depTable }
 
         return """
                 SELECT depCheck.depNum as depNum,
                         %(provides)s.instanceId as rsvInstanceId
-                    FROM Requires LEFT OUTER JOIN %(provides)s ON
-                        Requires.depId == %(provides)s.depId
+                    FROM %(requires)s LEFT OUTER JOIN %(provides)s ON
+                        %(requires)s.depId == %(provides)s.depId
                     JOIN %(deptable)s ON
-                        Requires.depId == %(deptable)s.depId
+                        %(requires)s.depId == %(deptable)s.depId
                     JOIN DepCheck ON
-                        Requires.instanceId == DepCheck.troveId AND
+                        %(requires)s.instanceId == DepCheck.troveId AND
                         %(deptable)s.class == DepCheck.class AND
                         %(deptable)s.name == DepCheck.name AND
                         %(deptable)s.flag == DepCheck.flag
                     WHERE
-                        Requires.instanceId < 0 
+                        %(requires)s.instanceId < 0 
                         AND %(provides)s.depId is not NULL
                         AND NOT DepCheck.isProvides
                     GROUP BY
@@ -240,14 +245,19 @@ class DependencyTables:
                 """ % substTable
 
     def check(self, changeSet):
-        # XXX
-        # this ignores file dependencies for now
-
-        self.db._begin()
         cu = self.db.cursor()
 
         self._createTmpTable(cu, "DepCheck")
         createDepTable(cu, 'TmpDependencies', isTemp = True)
+        cu.execute("CREATE TEMPORARY VIEW AllDeps AS SELECT * FROM "
+                   "Dependencies UNION SELECT * FROM TmpDependencies",
+                   start_transaction = False)
+        createDepUserTable(cu, 'TmpProvides', isTemp = True)
+        createDepUserTable(cu, 'TmpRequires', isTemp = True)
+        cu.execute("""CREATE TEMPORARY VIEW AllProvides AS
+                        SELECT * FROM Provides UNION
+                        SELECT * FROM TmpProvides""",
+                   start_transaction = False)
 
         depList = []
         failedSets = []
@@ -266,12 +276,11 @@ class DependencyTables:
             self.db.rollback()
             return (False, [])
 
-        cu.execute("CREATE TEMPORARY VIEW AllDeps AS SELECT * FROM "
-                   "Dependencies UNION SELECT * FROM TmpDependencies")
-
-        self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "Requires",
-                            "Provides", "AllDeps")
-        cu.execute(self._resolveStmt(depTable = "AllDeps"), 
+        self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
+                            "TmpProvides", "AllDeps")
+        cu.execute(self._resolveStmt(depTable = "AllDeps",
+                                     requiresTable = "TmpRequires",
+                                     providesTable = "AllProvides"), 
                    start_transaction = False)
 
         for (depNum, instanceId) in cu:
@@ -302,14 +311,26 @@ class DependencyTables:
 
         # no need to drop the DepCheck table since we're rolling this whole
         # transaction back anyway
-        cu.execute("DROP TABLE DepCheck")
-        cu.execute("DROP TABLE TmpDependencies")
-        self.db.rollback()
+        cu.execute("DROP VIEW AllDeps", start_transaction = False)
+        cu.execute("DROP TABLE TmpDependencies", start_transaction= False)
+        cu.execute("DROP TABLE TmpRequires", start_transaction= False)
+        cu.execute("DROP TABLE TmpProvides", start_transaction= False)
+        cu.execute("DROP VIEW AllProvides", start_transaction= False)
+        cu.execute("DROP TABLE DepCheck", start_transaction = False)
+
+        assert(not self.db.inTransaction)
 
         return (missingDeps, failedList)
 
     def resolve(self, label, depSetList):
         cu = self.db.cursor()
+
+        self._createTmpTable(cu, "DepCheck")
+        createDepTable(cu, 'TmpDependencies', isTemp = True)
+        cu.execute("CREATE TEMPORARY VIEW AllDeps AS SELECT * FROM "
+                   "Dependencies UNION SELECT * FROM TmpDependencies",
+                   start_transaction = False)
+        createDepUserTable(cu, 'TmpRequires', isTemp = True)
 
         cu.execute("""
                 CREATE VIEW providesBranch AS 
@@ -326,21 +347,16 @@ class DependencyTables:
                     WHERE
                         LabelMap.labelId == 
                             (SELECT labelId FROM Labels WHERE Label='%s')
-        """ % label.asString())
-
-        self._createTmpTable(cu, "DepCheck")
-        createDepTable(cu, 'TmpDependencies', isTemp = True)
+        """ % label.asString(), start_transaction = False)
 
         depList = []
         for i, depSet in enumerate(depSetList):
             self._populateTmpTable(cu, "DepCheck", depList, -i - 1, 
                                    depSet, None)
 
-        cu.execute("CREATE TEMPORARY VIEW AllDeps AS SELECT * FROM "
-                   "Dependencies UNION SELECT * FROM TmpDependencies")
 
-        self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "Requires",
-                            "Provides", "AllDeps")
+        self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
+                            None, "AllDeps")
 
         cu.execute("""SELECT depNum, Items.item, Versions.version FROM 
                         (%s)
@@ -356,7 +372,9 @@ class DependencyTables:
                       ORDER BY
                         Nodes.finalTimestamp DESC
                     """ % self._resolveStmt(providesTable = "providesBranch",
-                                            depTable = "AllDeps"))
+                                            requiresTable = "TmpRequires",
+                                            depTable = "AllDeps"),
+                    start_transaction = False)
         result = {}
         handled = {}
         for (depId, troveName, versionStr) in cu:
@@ -373,10 +391,13 @@ class DependencyTables:
             elif (troveName, versionStr) not in l:
                 l.append((troveName, versionStr))
 
-        cu.execute("DROP TABLE DepCheck")
-        cu.execute("DROP TABLE TmpDependencies")
-        cu.execute("DROP VIEW AllDeps")
-        self.db.rollback()
+        cu.execute("DROP VIEW AllDeps", start_transaction = False)
+        cu.execute("DROP TABLE TmpDependencies", start_transaction= False)
+        cu.execute("DROP TABLE TmpRequires", start_transaction= False)
+        cu.execute("DROP TABLE DepCheck", start_transaction = False)
+        cu.execute("DROP VIEW providesBranch", start_transaction = False)
+
+        assert(not self.db.inTransaction)
 
         return result
 
