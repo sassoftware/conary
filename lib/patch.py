@@ -152,10 +152,6 @@ class BadHunk(Exception):
 
     pass
 
-class Conflict(Exception):
-
-    pass
-
 def reverse(lines):
     result = []
     for line in lines:
