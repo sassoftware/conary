@@ -301,6 +301,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	try:
 	    cs = changeset.ChangeSetFromFile(path)
 	finally:
+	    #print path
 	    os.unlink(path)
 
 	# walk through all of the branches this change set commits to
@@ -339,7 +340,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
-        if clientVersion < 1:
+	# we need clientVersion of at least 2 for our changesets to be
+	# understood
+        if clientVersion < 2:
             raise ClientTooOld
         return 1
 
