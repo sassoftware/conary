@@ -472,7 +472,23 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	    self.paths[f.path()] = f
 
 	for f in self.newFileList():
-	    self.paths[f.path()] = f
+	    # even if the B->B.local changeset doesn't have any contents
+	    # to restore (meaning that A->A.local didn't change contents),
+	    # A->B may have specified changes in contents. metadata gets
+	    # handled properly from fixups before popularing self, but
+	    # contents aren't metadata and can't be handled before calling
+	    # our parent __init__
+	    path = f.path()
+	    if self.paths.has_key(path) and not f.restoreContents():
+		AtoB = self.paths[path]
+		if AtoB.restoreContents():
+		    newf = repository.ChangeSetJobFile(f.fileId(), f.file(),
+				f.version(), path, AtoB.getContents(), 1)
+		    self.paths[path] = newf
+		else:
+		    self.paths[path] = f
+	    else:
+		self.paths[path] = f
 
 	# at this point, self is job which does all of the creation of
 	# new bits. we need self to perform the removal of the old bits
