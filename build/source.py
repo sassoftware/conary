@@ -69,13 +69,13 @@ class _Source(action.RecipeAction):
 	# FIXME: our own keyring
 	if not self._checkKeyID(filepath, self.keyid):
 	    # FIXME: only do this if key missing, this is cheap for now
-	    os.system("gpg --no-secmem-warning --keyserver pgp.mit.edu --recv-keys 0x%s")
+	    os.system("gpg --no-options --no-secmem-warning --keyserver pgp.mit.edu --recv-keys 0x%s")
 	    if not self._checkKeyID(filepath, self.keyid):
 		log.error(self.failedtest)
 		raise SourceError, "GPG signature %s failed" %(self.localgpgfile)
 
     def _checkKeyID(self, filepath, keyid):
-	p = util.popen("gpg --logger-fd 1 --no-secmem-warning --verify %s %s"
+	p = util.popen("gpg --no-options --logger-fd 1 --no-secmem-warning --verify %s %s"
 		      %(self.localgpgfile, filepath))
 	result = p.read()
 	found = result.find("key ID %s" % keyid)
