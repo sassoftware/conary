@@ -519,10 +519,11 @@ class PackageRecipe(Recipe):
 		    util.mkdirChain(destDir)
 		if macros:
 		    log.debug('applying macros to patch %s' %f)
-		    pin = os.popen("%s '%s'" %(provides, f))
-		    log.debug('patch -d %s -p%s %s %s' %(destDir, level, backup, extraArgs))
-		    pout = os.popen('patch -d %s -p%s %s %s'
-		                    %(destDir, level, backup, extraArgs), 'w')
+		    pin = util.popen("%s '%s'" %(provides, f))
+		    log.debug('patch -d %s -p%s %s %s'
+		              %(destDir, level, backup, extraArgs))
+		    pout = util.popen('patch -d %s -p%s %s %s'
+		                      %(destDir, level, backup, extraArgs), 'w')
 		    pout.write(pin.read()%self.macros)
 		    pin.close()
 		    pout.close()

@@ -211,12 +211,7 @@ def excepthook(type, value, tb):
     else:
         sys.exit(1)
 
-def execute(cmd, destDir=None):
-    log.debug(cmd)
-    if destDir:
-	rc = os.system('cd %s; %s' %(destDir, cmd))
-    else:
-	rc = os.system(cmd)
+def _handle_rc(rc, cmd):
     if rc:
 	if not os.WIFEXITED(rc):
 	    info = 'Shell command "%s" killed with signal %d' \
@@ -226,6 +221,30 @@ def execute(cmd, destDir=None):
 		    %(cmd, os.WEXITSTATUS(rc))
         log.error(info)
 	raise RuntimeError, info
+
+def execute(cmd, destDir=None):
+    log.debug(cmd)
+    if destDir:
+	rc = os.system('cd %s; %s' %(destDir, cmd))
+    else:
+	rc = os.system(cmd)
+    _handle_rc(rc, cmd)
+
+class popen:
+    """
+    Version of popen() that throws errors on close(), unlike os.popen()
+    """
+    # unfortunately, can't derive from os.popen.  Add methods as necessary.
+    def __init__(self, *args):
+	self.p = os.popen(*args)
+	self.name = self.p.name
+    def write(self, *args):
+	self.p.write(*args)
+    def read(self, *args):
+	self.p.read(*args)
+    def close(self, *args):
+	rc = self.p.close(*args)
+	_handle_rc(rc, self.p.name)
 
 
 # string extensions
