@@ -240,7 +240,7 @@ def realMain(cfg, argv=sys.argv):
 
 	if argSet.has_key('no-deps'):
 	    kwargs['depCheck'] = False
-	    del argSet['depCheck']
+	    del argSet['no-deps']
 
 	if argSet: return usage()
 
