@@ -84,8 +84,8 @@ class Recipe:
 	self.addSignature(file)
 
     def allSources(self):
-	return self.sources + self.tarballs + self.patches +
-	       flatten(self.signatures)
+	return self.sources + self.tarballs + self.patches + \
+               flatten(self.signatures)
 
     def mainDir(self, new = None):
 	if new:
