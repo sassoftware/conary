@@ -3,4 +3,4 @@
 # All rights reserved
 #
 
-__all__ = [ "buildpackage", "recipe" ]
+__all__ = [ "buildpackage", "recipe", "source", "macros" ]

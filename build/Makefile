@@ -14,6 +14,8 @@ python_files = __init__.py	\
 	policy.py		\
 	recipe.py		\
 	use.py			\
+	macros.py		\
+	sourcepy		\
 
 extra_dist = Makefile
 
