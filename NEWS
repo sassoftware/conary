@@ -1,5 +1,9 @@
 Changes in 0.14.12:
-  * shadow command looks at buildLabel instead of following installLabelPath
+  * shadow command looks at buildLabel instead of following
+    installLabelPath
+  * In some cases, troves with an incompatible flavor were chosen when
+    --resolve was used. The proper flavor is now used, or the
+    dependency is reported as unsatisfiable.
 
 Changes in 0.14.11:
   * Local systems store config files in sql tables now.  Use

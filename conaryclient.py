@@ -62,6 +62,19 @@ class UpdateChangeSet(changeset.ReadOnlyChangeSet):
         self.contents = []
         self.empty = True
 
+
+# use a special sort because:
+# l = [ False, -1, 1 ]
+# l.sort()
+# l == [ -1, False, 1 ]
+# note that also False == 0 sometimes
+def _scoreSort(x, y):
+    if x[0] is False:
+        return -1
+    if y[0] is False:
+        return 1
+    return cmp(x[0], y[0])
+
 class ConaryClient:
     def __init__(self, cfg = None):
         if cfg == None:
@@ -96,14 +109,13 @@ class ConaryClient:
         (depList, cannotResolve) = self.db.depCheck(cs)
         suggMap = {}
 
-        while depList and True:
+        while depList:
             sugg = self.repos.resolveDependencies(
                             self.cfg.installLabelPath[pathIdx], 
                             [ x[1] for x in depList ])
 
+            troves = {}
             if sugg:
-                troves = {}
-
                 for (troveName, depSet) in depList:
                     if sugg.has_key(depSet):
                         suggList = []
@@ -124,9 +136,9 @@ class ConaryClient:
                                     f.union(affinityTroves[0].getFlavor(), 
                                         mergeType = deps.DEP_MERGE_TYPE_PREFS)
                                 scoredList.append((f.score(choice[2]), choice))
-
-                            scoredList.sort()
-                            if scoredList[-1][0] is not  None:
+                                
+                            scoredList.sort(_scoreSort)
+                            if scoredList[-1][0] is not False:
                                 choice = scoredList[-1][1]
                                 suggList.append(choice)
 
@@ -136,18 +148,20 @@ class ConaryClient:
 			troves.update(dict.fromkeys(suggList))
 
                 troves = troves.keys()
-                newCs = self._updateChangeSet(troves, 
-                                              keepExisting = keepExisting)
-                cs.merge(newCs)
+                # if we've found good suggestions, merge in those troves
+                if troves:
+                    newCs = self._updateChangeSet(troves, 
+                                                  keepExisting = keepExisting)
+                    cs.merge(newCs)
 
-                (depList, cannotResolve) = self.db.depCheck(cs)
+                    (depList, cannotResolve) = self.db.depCheck(cs)
 
-            if sugg and recurse:
+            if troves and recurse:
                 pathIdx = 0
                 foundSuggestions = False
             else:
                 pathIdx += 1
-                if sugg:
+                if troves:
                     foundSuggestions = True
                 if pathIdx == len(self.cfg.installLabelPath):
                     if not foundSuggestions or not recurse:
@@ -390,7 +404,7 @@ class ConaryClient:
 
         # if the cache missed any, grab from the repos
         if not cacheOnly and troveList:
-            md .update(self.repos.getMetadata(troveList, label))
+            md.update(self.repos.getMetadata(troveList, label))
             if md and cacheFile:
                 try:
                     cacheFp = open(cacheFile, "rw")
