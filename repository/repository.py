@@ -43,7 +43,7 @@ class AbstractTroveDatabase:
 	is specified. If only a branch name is given (not a complete label),
 	the repository name from this label is used as the repository
 	name for the branch name to form a complete label.
-	@type defaultLabel: versions.BranchName
+	@type defaultLabel: versions.Label
 	@param name: Trove name
 	@type name: str
 	@param flavor: only troves compatible with this flavor will be returned
@@ -218,9 +218,9 @@ class IdealRepository(AbstractTroveDatabase):
 	necessary.
 
 	@param newBranch: Label of the new branch
-	@type newBranch: versions.BranchName
+	@type newBranch: versions.Label
 	@param where: Where the branch should be created from
-	@type where: versions.Version or versions.BranchName
+	@type where: versions.Version or versions.Label
 	@param troveList: Name of the troves to branch; empty list if all
 	troves in the repository should be branched.
 	@type troveList: list of str
@@ -265,7 +265,7 @@ class IdealRepository(AbstractTroveDatabase):
 	@param troveNameList: trove names
 	@type troveNameList: list of str
 	@param label: label
-	@type label: versions.BranchName
+	@type label: versions.Label
 	@rtype: dict of lists
 	"""
 	raise NotImplementedError
@@ -279,7 +279,7 @@ class IdealRepository(AbstractTroveDatabase):
 	@param troveNameList: trove names
 	@type troveNameList: list of str
 	@param label: label
-	@type label: versions.BranchName
+	@type label: versions.Label
 	@rtype: dict of lists
 	"""
 	raise NotImplementedError
@@ -352,7 +352,7 @@ class IdealRepository(AbstractTroveDatabase):
 		    versionStr = defaultLabel.getHost() + versionStr
 
 		try:
-		    label = versions.BranchName(versionStr)
+		    label = versions.Label(versionStr)
 		except versions.ParseError:
 		    raise TroveMissing, "invalid version %s" % versionStr
 	    else:
@@ -360,8 +360,8 @@ class IdealRepository(AbstractTroveDatabase):
 
 	    versionDict = self.getTroveLeavesByLabel([name], label)
 	    if not versionDict[name]:
-		raise PackageNotFound, "branch %s does not exist for package %s" \
-			    % (label.asString(), name)
+		raise PackageNotFound, "branch %s does not exist for " \
+                            "package %s" % (label.asString(), name)
 	elif versionStr[0] != "/" and versionStr.find("/") == -1:
 	    # version/release was given
 	    try:

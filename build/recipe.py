@@ -212,7 +212,7 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
 	if '@' not in label:
 	    # copy namespace and branchname
 	    l = cfg.buildLabel
-	    label = versions.BranchName('%s@%s:%s' %(label, l.getNamespace(), l.getBranchName()))
+	    label = versions.Label('%s@%s:%s' %(label, l.getNamespace(), l.getLabel()))
 
     try:
 	pkgs = repos.findTrove(label, component, None, versionStr)

@@ -96,7 +96,7 @@ class ConfigFile:
 	    self.__dict__[key]('set', key, val)
 	elif type == LABEL:
 	    try:
-		self.__dict__[key] = versions.BranchName(val)
+		self.__dict__[key] = versions.Label(val)
 	    except versions.ParseError, e:
 		raise versions.ParseError, str(e)
 	elif type == BOOL:
@@ -154,7 +154,7 @@ class ConfigFile:
 class ConaryConfiguration(ConfigFile):
 
     defaults = {
-	'buildLabel'	        : [ LABEL, versions.BranchName('localhost@local:trunk') ],
+	'buildLabel'	        : [ LABEL, versions.Label('localhost@local:trunk') ],
 	'buildPath'		: '/usr/src/conary/builds',
 	'contact'		: None,
 	'dbPath'		: '/var/lib/conarydb',

@@ -265,7 +265,7 @@ class VersionRelease(AbstractVersion):
 		raise ParseError, \
 		    ("build count numbers must be all numeric: %s" % buildCount)
 
-class BranchName(AbstractBranch):
+class Label(AbstractBranch):
 
     """
     Stores a branch name, which is the same as a label. Branch names
@@ -295,11 +295,11 @@ class BranchName(AbstractBranch):
     def getNamespace(self):
 	return self.namespace
 
-    def getBranchName(self):
+    def getLabel(self):
 	return self.branch
 
     def __eq__(self, version):
-	if (isinstance(version, BranchName)
+	if (isinstance(version, Label)
 	     and self.host == version.host
 	     and self.namespace == version.namespace
 	     and self.branch == version.branch):
@@ -312,10 +312,10 @@ class BranchName(AbstractBranch):
 
     def __init__(self, value, template = None):
 	"""
-	Parses a branch name string into a BranchName object. A ParseError is
-	thrown if the BranchName is not well formed.
+	Parses a branch name string into a Label object. A ParseError is
+	thrown if the Label is not well formed.
 
-	@param value: String representation of a BranchName
+	@param value: String representation of a Label
 	@type value: str
 	"""
 	if value.find("/") != -1:
@@ -359,32 +359,32 @@ class BranchName(AbstractBranch):
 	if not self.branch:
 	    raise ParseError, ("branch names may not be empty: %s" % value)
 
-class LocalBranch(BranchName):
+class LocalBranch(Label):
 
     """
     Class defining the local branch.
     """
 
     def __init__(self):
-	BranchName.__init__(self, "local@local:LOCAL")
+	Label.__init__(self, "local@local:LOCAL")
 
-class EmergeBranch(BranchName):
-
-    """
-    Class defining the emerge branch.
-    """
-
-    def __init__(self):
-	BranchName.__init__(self, "local@local:EMERGE")
-
-class CookBranch(BranchName):
+class EmergeBranch(Label):
 
     """
     Class defining the emerge branch.
     """
 
     def __init__(self):
-	BranchName.__init__(self, "local@local:COOK")
+	Label.__init__(self, "local@local:EMERGE")
+
+class CookBranch(Label):
+
+    """
+    Class defining the emerge branch.
+    """
+
+    def __init__(self):
+	Label.__init__(self, "local@local:COOK")
 
 class Version(AbstractVersion):
 
@@ -519,7 +519,7 @@ class Version(AbstractVersion):
 
 	@rtype: boolean
 	"""
-	return isinstance(self.versions[-1], BranchName)
+	return isinstance(self.versions[-1], Label)
 
     def isTrunk(self):
 	"""
@@ -569,10 +569,10 @@ class Version(AbstractVersion):
 
     def label(self):
 	"""
-	Returns the BranchName object at the end of a branch. This is
+	Returns the Label object at the end of a branch. This is
 	known as a label, as is used in VersionedFiles as an index.
 
-	@rtype: BranchName
+	@rtype: Label
 	"""
 	assert(self.isBranch())
 	return self.versions[-1]
@@ -730,7 +730,7 @@ class Version(AbstractVersion):
 	lastVersion = None
 	lastBranch = None
 	while parts:
-	    lastBranch = BranchName(parts[0], template = lastBranch)
+	    lastBranch = Label(parts[0], template = lastBranch)
 	    if lastBranch.asString() == "local@local:LOCAL":
 		lastBranch = None
 		v.append(LocalBranch())

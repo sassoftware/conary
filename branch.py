@@ -21,12 +21,12 @@ from lib import log
 
 def branch(repos, branchName, branchFrom, troveName = None):
     try:
-	newBranch = versions.BranchName(branchName)
+	newBranch = versions.Label(branchName)
 
 	if branchFrom[0] == "/":
 	    branchSource = versions.VersionFromString(branchFrom)
 	else:
-	    branchSource = versions.BranchName(branchFrom)
+	    branchSource = versions.Label(branchFrom)
     except versions.ParseError, e:
 	log.error(str(e))
 	return

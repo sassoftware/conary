@@ -69,4 +69,4 @@ class NetworkConvertors(object):
 	return l.asString()
 
     def toLabel(self, l):
-	return versions.BranchName(l)
+	return versions.Label(l)

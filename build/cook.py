@@ -134,7 +134,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
     @param buildLabel: label to use to to find the branch to build on
-    @type buildBranch: versions.BranchName
+    @type buildBranch: versions.Label
     @param changeSetFile: if set, the changeset is stored in this file
     instead of committed to a repository
     @type changeSetFile: str
@@ -150,7 +150,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     @param targetLabel: label to use for the cooked troves; it is used
     as a new branch from whatever version was previously built
     default), the buildBranch is used
-    @type targetLabel: versions.BranchName
+    @type targetLabel: versions.Label
     @param resume: indicates whether to resume the previous build.  If True,
     resume at the line of last breakage.  If an integer, resume at that line.
     If 'policy', rerun the policy only.  Note that resume is only valid when
@@ -261,7 +261,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     @param targetLabel: label to use for the cooked troves; it is used
     as a new branch from whatever version was previously built
     default), the buildBranch is used
-    @type targetLabel: versions.BranchName
+    @type targetLabel: versions.Label
     """
 
     fullName = recipeClass.name
@@ -326,7 +326,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
     @param targetLabel: label to use for the cooked troves; it is used
     as a new branch from whatever version was previously built
     default), the buildBranch is used
-    @type targetLabel: versions.BranchName
+    @type targetLabel: versions.Label
     @rtype: tuple
     """
 

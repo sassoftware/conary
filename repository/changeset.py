@@ -482,12 +482,12 @@ class ChangeSet(streams.LargeStreamSet):
     def setTargetBranch(self, repos, targetBranchLabel):
 	"""
 	Retargets this changeset to create packages and files on
-	branch targetBranchName off of the source node.
+	branch targetLabel off of the source node.
 
 	@param repos: repository which will be committed to
 	@type repos: repository.Repository
 	@param targetBranchLabel: label of the branch to commit to
-	@type targetBranchLabel: versions.BranchName
+	@type targetBranchLabel: versions.Label
 	"""
 	assert(not targetBranchLabel == versions.LocalBranch())
 

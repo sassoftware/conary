@@ -65,7 +65,7 @@ class ServerProxy(xmlrpclib.ServerProxy):
 class ServerCache:
 
     def __getitem__(self, item):
-	if isinstance(item, versions.BranchName):
+	if isinstance(item, versions.Label):
 	    serverName = item.getHost()
 	elif isinstance(item, str):
 	    serverName = item

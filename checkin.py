@@ -202,7 +202,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
                       workDir, str(err))
 	    return
 
-    branch = fullBranchName(cfg.buildLabel, trv.getVersion(), 
+    branch = fullLabel(cfg.buildLabel, trv.getVersion(), 
 				   versionStr)
     state = SourceState(trv.getName(), trv.getVersion())
 
@@ -495,7 +495,7 @@ def updateSrc(repos, versionStr = None):
 
 	head = pkgList[0]
 	headVersion = head.getVersion()
-	newBranch = fullBranchName(None, headVersion, versionStr)
+	newBranch = fullLabel(None, headVersion, versionStr)
 
     changeSet = repos.createChangeSet([(pkgName, (baseVersion, None),
 					(headVersion, None), 0)])
@@ -670,7 +670,7 @@ def showOneLog(version, changeLog=''):
 	print "%s %s (no log message)\n" \
 	      %(versionStr, when)
 
-def fullBranchName(defaultLabel, version, versionStr):
+def fullLabel(defaultLabel, version, versionStr):
     """
     Converts a version string, and the version the string refers to
     (often returned by findPackage()) into the full branch name the
@@ -681,7 +681,7 @@ def fullBranchName(defaultLabel, version, versionStr):
 
     @param defaultLabel: default label we're on if versionStr is None
     (may be none if versionStr is not None)
-    @type defaultLabel: versions.BranchName
+    @type defaultLabel: versions.Label
     @param version: version of the node versionStr resolved to
     @type version: versions.Version
     @param versionStr: string from the user; likely a very abbreviated version
@@ -693,9 +693,9 @@ def fullBranchName(defaultLabel, version, versionStr):
 	if not versionStr:
 	    label = defaultLabel
 	elif versionStr[0] == "@":
-            label = versions.BranchName(defaultLabel.getHost() + versionStr)
+            label = versions.Label(defaultLabel.getHost() + versionStr)
 	else:
-	    label = versions.BranchName(versionStr)
+	    label = versions.Label(versionStr)
 
 	if version.branch().label() == label:
 	    return version.branch()

@@ -31,7 +31,7 @@ def doCommit(repos, changeSetFile, targetBranch):
 	    # we can't do this -- where would we branch from?
 	    log.error("absolute change sets cannot be retargeted")
 	    return 1
-	label = versions.BranchName(targetBranch)
+	label = versions.Label(targetBranch)
 	cs.setTargetBranch(repos, label)
 
         (fd, changeSetFile) = tempfile.mkstemp()
