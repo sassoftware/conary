@@ -250,7 +250,7 @@ required.
 """)
 
 # flags to use for special situations
-Use.builddocs = False
+Use.builddocs = True
 Use.builddocs.setShortDoc('Build documentation as well as binaries')
 Use.builddocs.setLongDoc("""
 Some packages have documentation that needs to be built, not just
