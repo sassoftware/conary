@@ -86,7 +86,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 
         displayc = display.DisplayCache()
 	for troveName, versionStr in troves:
-            if not flavors[troveName]:
+            if not flavors.has_key(troveName):
 		if all or leaves:
 		    log.error('No versions for "%s" were found in the '
 			      'repository', troveName)
