@@ -160,15 +160,8 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 				     "src")
 	packageList.append((pkgname + "/sources", p, fileMap))
 
-	# FIXME this needs to use a proper mkstemp
-	csfile = tempfile.mktemp()
-
-	try:
-	    changeset.CreateFromFilesystem(packageList, version, csfile)
-	    commit.commitChangeSet(repos, cfg, csfile)
-	finally:
-	    if os.path.exists(csfile):
-		os.unlink(csfile)
+	changeSet = changeset.CreateFromFilesystem(packageList, version)
+	commit.commitChangeSet(repos, cfg, changeSet)
 
 	recipeObj.cleanup(builddir, destdir)
 
