@@ -145,29 +145,28 @@ class Package:
 	.
 	.
 	.
-	FILEIDN PATHN VERSIONN
+	FILEIDn PATHn VERSIONn
 	PACKAGE1 VERSION1
 	PACKAGE2 VERSION2
 	.
 	.
 	.
-	PACKAGEN VERSIONN
+	PACKAGEn VERSIONn
 	GROUP FILE
 
 	Group file may be empty, in which case nothing follows the newline
 	for the final file package entry.
 
 	"""
-	rc = "%d %d\n" % (len(self.idMap), len(self.packages))
-	for (fileId, (path, version)) in self.idMap.items():
-	    rc += ("%s %s %s\n" % (fileId, path, version.freeze()))
+        rc = []
+	rc.append("%d %d\n" % (len(self.idMap), len(self.packages)))
+        rc += [ "%s %s %s\n" % (x[0], x[1][0], x[1][1].freeze())
+                for x in self.idMap.iteritems() ]
 
-	for pkg in self.packages.keys():
-	    rc += pkg + " " +  \
-		   " ".join([v.asString() for v in self.packages[pkg]]) + \
-		   "\n"
-
-	return rc
+	for pkg, versions in self.packages.iteritems():
+	    rc.append("%s %s\n" %(pkg,
+                                  " ".join([v.asString() for v in versions])))
+	return "".join(rc)
 
     # returns a dictionary mapping a fileId to a (path, version, pkgName) tuple
     def applyChangeSet(self, pkgCS):
