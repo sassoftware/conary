@@ -124,7 +124,12 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     for (fileId, (path, version)) in trv.iterFileList():
 	fullPath = dir + "/" + path
 	fileObj = repos.getFileVersion(fileId, version)
-	contents = filecontents.FromRepository(repos, fileObj.sha1())
+
+	if fileObj.hasContents:
+	    contents = filecontents.FromRepository(repos, fileObj.sha1())
+	else:
+	    contents = None
+
 	fileObj.restore(contents, fullPath, 1)
 
 	state.addFile(fileId, path, version)
@@ -242,7 +247,7 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
     for (fileId, (path, version)) in state.iterFileList():
 	realPath = os.getcwd() + "/" + path
 
-	f = files.FileFromFilesystem(realPath, fileId, type = "src")
+	f = files.FileFromFilesystem(realPath, fileId)
 
 	if path.endswith(".recipe"):
 	    f.isConfig(set = True)
@@ -255,10 +260,13 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 	    # new file, so this is easy
 	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
 	    state.addFile(fileId, path, newVersion)
-	    newCont = filecontents.FromFilesystem(realPath)
-	    changeSet.addFileContents(fileId,
-				      changeset.ChangedFileTypes.file,
-				      newCont)
+
+	    if f.hasContents:
+		newCont = filecontents.FromFilesystem(realPath)
+		changeSet.addFileContents(fileId,
+					  changeset.ChangedFileTypes.file,
+					  newCont)
+
 	    pkg.addFile(fileId, path, newVersion)
 	    foundDifference = 1
 	    continue
@@ -562,8 +570,6 @@ def addFile(file):
     if not os.path.exists(file):
 	log.error("files must be created before they can be added")
 	return
-    elif not os.path.isfile(file):
-	log.error("only normal files can be part of source packages")
 
     for (fileId, (path, version)) in state.iterFileList():
 	if path == file:
@@ -610,7 +616,7 @@ def newPackage(repos, cfg, name):
 def renameFile(oldName, newName):
     state = SourceStateFromFile("SRS")
 
-    if not os.path.isfile(oldName):
+    if not os.path.exists(oldName):
 	log.error("%s does not exist or is not a regular file" % oldName)
 	return
 
