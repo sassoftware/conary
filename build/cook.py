@@ -21,10 +21,9 @@ import util
 # type could be "src"
 #
 # returns a (pkg, fileMap) tuple
-def createPackage(repos, cfg, destdir, bldPkg, version, ident, 
-		  pkgtype = "auto"):
+def createPackage(repos, cfg, destdir, bldPkg, ident, pkgtype = "auto"):
     fileMap = {}
-    p = package.Package(bldPkg.getName(), version)
+    p = package.Package(bldPkg.getName(), bldPkg.getVersion())
 
     for filePath in bldPkg.keys():
 	if pkgtype == "auto":
@@ -42,7 +41,7 @@ def createPackage(repos, cfg, destdir, bldPkg, version, ident,
         duplicateVersion = fileDB.checkBranchForDuplicate(cfg.defaultbranch,
                                                           file)
         if not duplicateVersion:
-	    p.addFile(file.id(), targetPath, version)
+	    p.addFile(file.id(), targetPath, bldPkg.getVersion())
 	else:
 	    p.addFile(file.id(), targetPath, duplicateVersion)
 
@@ -114,11 +113,11 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         os.chdir(cwd)
         
 	packageList = []
-        recipeObj.packages(cfg.packagenamespace, destdir)
+        recipeObj.packages(cfg.packagenamespace, version, destdir)
 
 	for (name, buildPkg) in recipeObj.getPackageSet().packageSet():
 	    (p, fileMap) = createPackage(repos, cfg, destdir, buildPkg,
-					 version, ident, "auto")
+					 ident, "auto")
             built.append(fullName)
 	    packageList.append((p, fileMap))
 
@@ -135,12 +134,12 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
 	srcList = []
 	srcName = cfg.packagenamespace + ":" + recipeObj.name + ":sources"
-	srcBldPkg = buildpackage.BuildPackage(srcName)
+	srcBldPkg = buildpackage.BuildPackage(srcName, version)
 	for file in recipeObj.allSources() + recipes:
             src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
 	    srcBldPkg.addFile(src)
 	
-	(p, fileMap) = createPackage(repos, cfg, destdir, srcBldPkg, version, 
+	(p, fileMap) = createPackage(repos, cfg, destdir, srcBldPkg, 
 				     ident, "src")
 	packageList.append((p, fileMap))
 

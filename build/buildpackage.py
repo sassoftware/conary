@@ -29,11 +29,15 @@ class BuildPackage(types.DictionaryType):
     def getName(self):
 	return self.name
 
+    def getVersion(self):
+	return self.version
+
     def addDirectory(self, path):
 	self[path] = BuildFile()
 
-    def __init__(self, name):
+    def __init__(self, name, version):
 	self.name = name
+	self.version = version
 	types.DictionaryType.__init__(self)
 
 class BuildPackageSet:
@@ -81,15 +85,17 @@ class PackageSpecInstance:
 
 class PackageSpecSet(dict):
     """An "ordered dictionary" containing PackageSpecInstances"""
-    def __init__(self, namePrefix, auto, explicit):
+    def __init__(self, namePrefix, version, auto, explicit):
 	"""Storage area for (sub)package definitions; keeps
 	automatic subpackage definitions (like runtime, doc,
 	etc) and explicit subpackage definitions (higher-level
 	subpackages; each automatic subpackage applies to each
 	explicit subpackage.
 
-	@param namePrefix: the prefix to use to build a full name from the
-	subpackage name, such as ":srs.specifixinc.com:tmpwatch"
+	@param namePrefix: the fully qualified name of the main package
+	such as ":srs.specifixinc.com:tmpwatch"
+	@param version: a versionObject specifying the version of the
+	package, which is used as the version of each subpackage
 	@param auto: automatic subpackage list
 	@type auto: tuple of (name, regex) or (name, (tuple, of
 	regex)) tuples
@@ -108,7 +114,7 @@ class PackageSpecSet(dict):
 	    for autospec in self.auto:
 		name = self._getname(namePrefix, explicitspec.name, 
 				     autospec.name)
-		self[name] = PackageSpecInstance(BuildPackage(name),
+		self[name] = PackageSpecInstance(BuildPackage(name, version),
                                                  explicitspec, autospec)
 		self.packageList.append(name)
 		if not self.packageMap.has_key(explicitspec.name):

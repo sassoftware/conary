@@ -375,10 +375,11 @@ class Recipe:
 	else:
 	    self.install.doInstall(self.macros)
 
-    def packages(self, namePrefix, root):
+    def packages(self, namePrefix, version, root):
 	# "None" will be replaced by explicit subpackage list
 	self.packageSpecSet = buildpackage.PackageSpecSet(
 					namePrefix + ":" + self.name,
+					version,
 					self.autoSpecList, None)
         self.packageSet = buildpackage.Auto(self.name, root,
                                             self.packageSpecSet)
