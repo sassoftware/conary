@@ -144,7 +144,7 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 	if newVersion and (
 	  recipeObj.version == newVersion.trailingVersion().getVersion()):
 	    newVersion = newVersion.copy()
-	    newVersion.incrementVersionRelease()
+	    newVersion.incrementBuildCount()
 	else:
 	    newVersion = None
 

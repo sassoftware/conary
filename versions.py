@@ -32,13 +32,17 @@ class VersionRelease(AbstractVersion):
     """
     Version element for a version/release pair. These are formatted as
     "version-release", with no hyphen allowed in either portion. The
-    release must be a simple integer.
+    release must be a simple integer or two integers separated by a
+    decimal point.
     """
 
     def __str__(self):
 	"""
 	Returns a string representation of a version/release pair.
 	"""
+	if self.buildCount != None:
+	    return "%s-%d.%d" % (self.version, self.release, self.buildCount)
+	
 	return self.version + '-' + str(self.release)
 
     def getVersion(self):
@@ -64,7 +68,16 @@ class VersionRelease(AbstractVersion):
 	"""
 	Incremements the release number.
 	"""
-	self.release = self.release + 1
+	self.release += 1
+
+    def incrementBuildCount(self):
+	"""
+	Incremements the build count
+	"""
+	if self.buildCount:
+	    self.buildCount += 1
+	else:
+	    self.buildCount = 1
 
     def __init__(self, value):
 	"""
@@ -81,19 +94,32 @@ class VersionRelease(AbstractVersion):
 	if cut == -1:
 	    raise ParseError, ("version/release pair was expected")
 	self.version = value[:cut]
-	self.release = value[cut + 1:]
-	if self.release.find("-") != -1:
-	    raise ParseError, ("version numbers may not have hyphens: %s" % value)
 
 	try:
 	    int(self.version[0])
 	except:
-	    raise ParseError, ("version numbers must be begin with a digit: %s" % value)
+	    raise ParseError, \
+		("version numbers must be begin with a digit: %s" % value)
+
+	fullRelease = value[cut + 1:]
+	cut = fullRelease.find(".") 
+	if cut != -1:
+	    self.release = fullRelease[:cut]
+	    self.buildCount = fullRelease[cut + 1:]
+	else:
+	    self.release = fullRelease
+	    self.buildCount = None
 
 	try:
 	    self.release = int(self.release)
 	except:
 	    raise ParseError, ("release numbers must be all numeric: %s" % value)
+	if self.buildCount:
+	    try:
+		self.buildCount = int(self.buildCount)
+	    except:
+		raise ParseError, \
+		    ("build count numbers must be all numeric: %s" % value)
 
 class BranchName(AbstractBranch):
 
@@ -189,7 +215,7 @@ class Version:
 	self.versions.append(verRel)
 	self.timeStamp = time.time()
 
-    def incrementVersionRelease(self):
+    def incrementRelease(self):
 	"""
 	The release number for the final element in the version is
 	incremented by one and the time stamp is reset.
@@ -197,6 +223,16 @@ class Version:
 	assert(self.isVersion())
 	
 	self.versions[-1].incrementRelease()
+	self.timeStamp = time.time()
+
+    def incrementBuildCount(self):
+	"""
+	The build count number for the final element in the version is
+	incremented by one and the time stamp is reset.
+	"""
+	assert(self.isVersion())
+	
+	self.versions[-1].incrementBuildCount()
 	self.timeStamp = time.time()
 
     def trailingVersion(self):
