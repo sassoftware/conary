@@ -102,6 +102,12 @@ class SerialNumber(object):
 
         return hashVal
 
+    def __getstate__(self):
+        return self.numList
+
+    def __setstate__(self, val):
+        self.numList = val
+
     def shadowCount(self):
         return len(self.numList) - 1
 
@@ -136,6 +142,13 @@ class Revision(AbstractRevision):
     """
 
     __slots__ = ( "version", "sourceCount", "buildCount", "timeStamp" )
+
+    def __getstate__(self):
+        return (self.version, self.sourceCount, self.buildCount, 
+                self.timeStamp)
+
+    def __setstate__(self, val):
+        (self.version, self.sourceCount, self.buildCount, self.timeStamp) = val
 
     def asString(self, versus = None, frozen = False):
 	"""
@@ -339,6 +352,12 @@ class Label(AbstractLabel):
 
     __slots__ = ( "host", "namespace", "branch" )
 
+    def __getstate__(self):
+        return (self.host, self.namespace, self.branch)
+
+    def __setstate__(self, val):
+        (self.host, self.namespace, self.branch) = val
+
     def asString(self, versus = None, frozen = False):
 	"""
 	Returns the string representation of a label.
@@ -457,14 +476,24 @@ staticLabelTable[LocalLabel.name] = LocalLabel
 staticLabelTable[EmergeLabel.name] = EmergeLabel
 staticLabelTable[CookLabel.name] = CookLabel
 
-class VersionSequence(object):
+class AbstractVersion(object):
 
-    __slots__ = ( "versions", "__weakref__" )
+    __slots__ = "__weakref__"
+
+class VersionSequence(AbstractVersion):
+
+    __slots__ = ( "versions" )
 
     """
     Abstract class representing a fully qualified version, branch, or
     shadow.
     """
+
+    def __getstate__(self):
+        return self.versions
+
+    def __setstate__(self, val):
+        self.versions = val
 
     def __cmp__(self, other):
         if self.isAfter(other):
@@ -575,7 +604,7 @@ class VersionSequence(object):
         """
 	self.versions = versionList
 
-class NewVersion(VersionSequence):
+class NewVersion(AbstractVersion):
 
     """
     Class used as a marker for new (as yet undefined) versions.

@@ -1006,7 +1006,7 @@ class TroveChangeSet(AbstractTroveChangeSet):
 		 oldFlavor, newFlavor, absolute = 0, isRedirect = False,
                  troveInfoDiff = None):
 	AbstractTroveChangeSet.__init__(self)
-	assert(isinstance(newVersion, versions.VersionSequence))
+	assert(isinstance(newVersion, versions.AbstractVersion))
 	assert(isinstance(newFlavor, deps.DependencySet))
 	assert(oldFlavor is None or isinstance(oldFlavor, deps.DependencySet))
 	self.name.set(name)

@@ -13,6 +13,7 @@
 # 
 
 import base64
+import cPickle
 from repository import changeset
 from repository import repository
 import fsrepos
@@ -897,20 +898,28 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 			   (self.toVersion(new), self.toFlavor(newFlavor)),
 			   absolute)
 
-            path = self.cache.getEntry(l, recurse, withFiles, withFileContents)
-            if path is None:
-                (cs, trovesNeeded, filesNeeded) = \
-                            self.repos.createChangeSet([ l ], 
+            cacheEntry = self.cache.getEntry(l, recurse, withFiles, 
+                                        withFileContents, excludeAutoSource)
+            if cacheEntry is None:
+                ret = self.repos.createChangeSet([ l ], 
                                         recurse = recurse, 
                                         withFiles = withFiles,
                                         withFileContents = withFileContents,
                                         excludeAutoSource = excludeAutoSource)
-                path = self.cache.addEntry(l, recurse, withFiles, 
-                                           withFileContents)
 
-                newChgSetList += _cvtTroveList(trovesNeeded)
-                allFilesNeeded += _cvtFileList(filesNeeded)
+                (cs, trovesNeeded, filesNeeded) = ret
+
+                path = self.cache.addEntry(l, recurse, withFiles, 
+                                           withFileContents, excludeAutoSource,
+                                           returnVal = (trovesNeeded, 
+                                                        filesNeeded))
+
                 cs.writeToFile(path)
+            else:
+                path, (trovesNeeded, filesNeeded) = cacheEntry
+
+            newChgSetList += _cvtTroveList(trovesNeeded)
+            allFilesNeeded += _cvtFileList(filesNeeded)
 
             fileName = os.path.basename(path)
 
@@ -1083,10 +1092,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         self.open()
 
 class NullCacheSet:
-    def getEntry(self, item, recurse, withFiles, withFileContents):
+    def getEntry(self, item, recurse, withFiles, withFileContents,
+                 excludeAutoSource):
         return None 
 
-    def addEntry(self, item, recurse, withFiles, withFileContents):
+    def addEntry(self, item, recurse, withFiles, withFileContents,
+                 excludeAutoSource, returnVal):
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
                                       suffix = '.ccs-out')
         os.close(fd)
@@ -1099,7 +1110,8 @@ class CacheSet:
 
     filePattern = "%s/cache-%s.ccs-out"
 
-    def getEntry(self, item, recurse, withFiles, withFileContents):
+    def getEntry(self, item, recurse, withFiles, withFileContents,
+                 excludeAutoSource):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
             item
 
@@ -1128,28 +1140,31 @@ class CacheSet:
 
         cu = self.db.cursor()
         cu.execute("""
-            SELECT row FROM CacheContents WHERE
+            SELECT row, returnValue FROM CacheContents WHERE
                 troveName=? AND
                 oldFlavorId=? AND oldVersionId=? AND
                 newFlavorId=? AND newVersionId=? AND
                 absolute=? AND recurse=? AND withFiles=? AND withFileContents=?
+                AND excludeAutoSource=?
             """, name, oldFlavorId, oldVersionId, newFlavorId, 
-            newVersionId, absolute, recurse, withFiles, withFileContents)
+            newVersionId, absolute, recurse, withFiles, withFileContents,
+            excludeAutoSource)
 
         row = None
-        for (row,) in cu:
+        for (row, returnVal) in cu:
             path = self.filePattern % (self.tmpDir, row)
             try:
                 fd = os.open(path, os.O_RDONLY)
                 os.close(fd)
-                return path
+                return (path, cPickle.loads(returnVal))
             except OSError:
                 cu.execute("DELETE FROM CacheContents WHERE row=?", row)
                 self.db.commit()
 
         return None
 
-    def addEntry(self, item, recurse, withFiles, withFileContents):
+    def addEntry(self, item, recurse, withFiles, withFileContents,
+                 excludeAutoSource, returnVal):
         (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) = \
             item
 
@@ -1178,9 +1193,11 @@ class CacheSet:
 
         cu = self.db.cursor()
         cu.execute("""
-            INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?, 
+                                             ?, ?, ?, ?, ?)
         """, name, oldFlavorId, oldVersionId, newFlavorId, newVersionId, 
-        absolute, recurse, withFiles, withFileContents)
+             absolute, recurse, withFiles, withFileContents, 
+             excludeAutoSource, cPickle.dumps(returnVal, protocol = -1))
 
         row = cu.lastrowid
         path = self.filePattern % (self.tmpDir, row)
@@ -1221,7 +1238,9 @@ class CacheSet:
                     absolute BOOLEAN,
                     recurse BOOLEAN,
                     withFiles BOOLEAN,
-                    withFileContents BOOLEAN)
+                    withFileContents BOOLEAN,
+                    excludeAutoSource BOOLEAN,
+                    returnValue BINARY)
             """)
             cu.execute("""
                 CREATE INDEX CacheContentsIdx ON 
