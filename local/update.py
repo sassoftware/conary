@@ -692,12 +692,12 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     for (fileId, path, version) in newPkg.iterFileList():
 	fileIds[fileId] = True
 
-    """
-    Iterating over the files in newPkg would be much more natural then
-    iterating over the ones in the old package, and then going through
-    newPkg to find what we missed. However, doing it the hard way lets
-    us iterate right over the changeset we get from the repository.
-    """
+
+    # Iterating over the files in newPkg would be much more natural
+    # then iterating over the ones in the old package, and then going
+    # through newPkg to find what we missed. However, doing it the
+    # hard way lets us iterate right over the changeset we get from
+    # the repository.
     if srcPkg:
 	fileList = [ x for x in srcPkg.iterFileList() ]
 	# need to walk changesets in order of fileid
