@@ -573,7 +573,10 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         use.setUsed(recipeObj._trackedFlags)
 
     recipeObj.setup()
-    recipeObj.checkBuildRequirements(cfg, sourceVersion, ignoreDeps=ignoreDeps)
+    try:
+        recipeObj.checkBuildRequirements(cfg, sourceVersion, ignoreDeps=ignoreDeps)
+    except CookError:
+        return
     bldInfo = buildinfo.BuildInfo(builddir)
     recipeObj.buildinfo = bldInfo
 
@@ -1045,7 +1048,9 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
 		log.error(str(msg))
                 sys.exit(1)
             if built is None:
-                # --prep
+                # --prep or perhaps an error was logged
+                if log.errorOccurred():
+                    sys.exit(1)
                 sys.exit(0)
             components, csFile = built
             for component, version, flavor in components:

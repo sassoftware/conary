@@ -30,6 +30,7 @@ import types
 #conary
 import build
 import buildpackage
+import cook
 from deps import deps
 import destdirpolicy
 import files
@@ -650,9 +651,9 @@ class PackageRecipe(Recipe):
         if missingReqs:
             if not ignoreDeps:
                 log.error("Could not find the following troves "
-                                     "needed to cook this recipe:\n"  
-                                     "%s" % '\n'.join(missingReqs))
-                sys.exit(1)
+                          "needed to cook this recipe:\n"  
+                          "%s" % '\n'.join(missingReqs))
+                raise cook.CookError, 'unresolved build dependencies'
         self.buildReqMap = reqMap
 
     def extraSource(self, action):
