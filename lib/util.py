@@ -285,7 +285,7 @@ def _permsVisit(arg, dirname, names):
 	mode = os.lstat(path)[stat.ST_MODE]
 	# has to be executable to cd, readable to list, writeable to delete
 	if stat.S_ISDIR(mode) and (mode & 0700) != 0700:
-	    log.warn("working around illegal mode 0%o at %s", mode, path)
+	    log.warning("working around illegal mode 0%o at %s", mode, path)
 	    mode |= 0700
 	    os.chmod(path, mode)
 
