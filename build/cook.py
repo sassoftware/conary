@@ -18,10 +18,10 @@ import types
 import util
 
 # type could be "src"
-def createPackage(repos, cfg, destdir, fileList, version, ident, 
+def createPackage(repos, cfg, destdir, fileList, name, version, ident, 
 		  pkgtype = "auto"):
     fileMap = {}
-    p = package.Package(version)
+    p = package.Package(name)
 
     for filePath in fileList:
 	if pkgtype == "auto":
@@ -132,11 +132,12 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
         recipeObj.packages(destdir)
 
 	for (name, buildPkg) in recipeObj.getPackageSet().packageSet():
+	    fullName = pkgname + "/" + name
 	    (p, fileMap) = createPackage(repos, cfg, destdir, buildPkg.keys(), 
-				         version, ident, "auto")
+				         fullName, version, ident, "auto")
 
-            built.append(pkgname + "/" + name)
-	    packageList.append((pkgname + "/" + name, p, fileMap))
+            built.append(fullName)
+	    packageList.append((fullName, p, fileMap))
 
         recipes = [ recipeClass.filename ]
         # add any recipe that this recipeClass decends from to the sources
@@ -154,8 +155,9 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
             src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
 	    srcList.append(src)
 	
-	(p, fileMap) = createPackage(repos, cfg, destdir, srcList, version, 
-				     ident, "src")
+	(p, fileMap) = createPackage(repos, cfg, destdir, srcList, 
+				     pkgname + "/sources", version, ident, 
+				     "src")
 	packageList.append((pkgname + "/sources", p, fileMap))
 
 	# FIXME this needs to use a proper mkstemp
