@@ -85,7 +85,7 @@ class DataStore:
     def incrementCount(self, path, fileObj = None):
 	"""
 	Increments the count by one.  it becomes one, the contents
-	of fileObj are stored into that path.
+	of fileObj are stored into that path. Return the new count.
 	"""
         countPath = path + "#"
 
@@ -108,6 +108,7 @@ class DataStore:
 	    os.ftruncate(countFile, 0)
 	    os.write(countFile, "%d\n" % val)
 	    os.close(countFile)
+            return val
 	else:
 	    # new file, try to be the one who creates it
 	    newPath = path + ".new"
@@ -134,6 +135,7 @@ class DataStore:
 	    dest.close()
 	    # this closes fd for us
 	    fObj.close()
+            return 1
 
     # add one to the reference count for a file which already exists
     # in the archive
@@ -157,8 +159,8 @@ class DataStore:
     def addFile(self, f, hash):
 	path = self.hashToPath(hash)
         self.makeDir(path)
-	self.incrementCount(path, fileObj = f)
-        if self.logFile:
+	newCount = self.incrementCount(path, fileObj = f)
+        if newCount == 1 and self.logFile:
             open(self.logFile, "a").write(path + "\n")
 
     # returns a python file object for the file requested

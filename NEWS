@@ -1,4 +1,4 @@
-Changes in 0.15.0:
+Changes in 0.50.0:
   * Redirections work
   * Sped up group generation
   * Troves which reference other troves (groups and packages) can now specify
@@ -9,6 +9,7 @@ Changes in 0.15.0:
     macros interpolated, as in r.Requires('%(bindir)s/foo', ...)
   * Groups can have requirements now
   * protocol-level getFileContents works on multiple files simultaneously
+  * repository log had too many files added to it
 
 Changes in 0.14.12:
   * The shadow command looks at buildLabel instead of following
