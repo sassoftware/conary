@@ -231,7 +231,7 @@ class HttpHandler(HtmlEngine):
         p2 = fields["password2"].value
 
         self.htmlPageTitle("Change Password")
-        if oldPassword and authToken[1] != oldPassword:
+        if authToken[1] != oldPassword and authToken[0] == username:
             self.writeFn("""<div class="warning">Error: old password is incorrect</div>""")
         elif p1 != p2:
             self.writeFn("""<div class="warning">Error: passwords do not match</div>""")
