@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2004 Specifix, Inc.
+ * All rights reserved
+ *
+ */
+
 #include <Python.h>
 
 #include <gelf.h>
