@@ -38,7 +38,12 @@ import versions
 import updatecmd
 
 def usage():
-    print "Usage: localoutofdate [--missing] [--update] [--except <exception,...>]"
+    print """\
+Usage: localoutofdate [--missing] [--update] [--except <exception,...>]"
+                      [--display|--display-only <displayparam>,<displayparam>]
+
+        display parameters: [no]change,name,local,version,repo
+         """                      
     return 1
 
 sys.excepthook = util.genExcepthook()
@@ -65,7 +70,11 @@ def main(argv):
             continue
         elif arg == '--missing':
             listMissing = True
-        elif arg == '--display':
+        elif arg == '--display' or arg == '--display-only':
+            disptype = arg
+            if arg == '--display-only':
+                for param in display.keys():
+                    display[param] = False
             arg = args[0]
             args = args[1:]
             params = arg.split(',')
@@ -122,8 +131,8 @@ def main(argv):
         try:
             versionList = repos.getTroveLeavesByLabel(labelDbpkgs, label)
         except repository.OpenError, e:
-            print "Warning: could not access %s: %s" % (label.asString(), e)
-            print "Skipping packages %s" % labelDbpkgs
+            print >>sys.stderr, "Warning: could not access %s: %s" % (label.asString(), e)
+            print >>sys.stderr, "Skipping packages %s" % labelDbpkgs
             continue
         for pkg in labelDbpkgs:
             dbVersions = labelPkgs[label][pkg]
