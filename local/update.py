@@ -609,6 +609,8 @@ class FilesystemJob:
 		    self._rename(rootFixup + fsPath, rootFixup + headPath,
 		                 "renaming %s to %s" % (fsPath, headPath))
 
+                    # XXX is this correct?  all the other addFiles use
+                    # the headFileId, not the fsFileId
 		    fsPkg.addFile(pathId, headPath, fsVersion, fsFileId)
 		    finalPath = headPath
 		else:
@@ -847,8 +849,7 @@ class FilesystemJob:
 		# XXX this doesn't even attempt to merge file permissions
 		# and such; the good part of that is differing owners don't
 		# break things
-		fsPkg.addFile(pathId, finalPath, headFileVersion, 
-                              fsFile.fileId())
+		fsPkg.addFile(pathId, finalPath, headFileVersion, headFileId)
 	    else:
 		fullyUpdated = False
 

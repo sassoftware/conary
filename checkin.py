@@ -901,19 +901,13 @@ def merge(repos):
     newState = newPkgs.next()
     assert(util.assertIteratorAtEnd(newPkgs))
 
-    # create a new branched version
-    branch = state.getVersion().branch()
-    version = branch.createVersion(newState.getVersion().trailingRevision())
-
-    # set the version of the source componet to the new version on the branch
     if newState.getVersion() == pkgCs.getNewVersion():
-	newState.changeVersion(version)
+        # create a new branched version - this is the same versions as you
+        # would get when checking out a fresh shadow.
+        branch = state.getVersion().branch()
+        version = branch.createVersion(newState.getVersion().trailingRevision())
 
-    # set each file that is currently not on the branch to the new
-    # version on the branch
-    for pathId, path, fileId, v in newState.iterFileList():
-        if v == pkgCs.getNewVersion():
-            newState.updateFile(pathId, None, version, None)
+	newState.changeVersion(version)
 
     newState.write("CONARY")
 

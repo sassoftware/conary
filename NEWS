@@ -2,6 +2,9 @@ Changes in 0.50.4:
   * Most rollback information is stored as a reference to a repository
     instead of storing full rollback data on the local system. The
     localRollbacks flag in conaryrc allows the old behavior to remain.
+  * The CONARY state after a merge operation on a shadow now has the
+    correct fileId for files that are not different than the parent
+    version.
 
 Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 
