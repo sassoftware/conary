@@ -571,15 +571,18 @@ class PackageRecipe(Recipe):
 class GroupRecipe(Recipe):
 
     def addTrove(self, name, versionStr = None):
-	try:
-	    pkgList = self.repos.findTrove(self.label, name, self.flavor, 
-					   versionStr = versionStr)
-	except repository.PackageNotFound, e:
-	    raise RecipeFileError, str(e)
+        self.addTroveList.append((name, versionStr))
 
-        l = self.troveVersions.get(name, [])
-        l.extend([ x.getVersion() for x in pkgList ])
-        self.troveVersions[name] = l
+    def findTroves(self):
+        for (name, versionStr) in self.addTroveList:
+            try:
+                pkgList = self.repos.findTrove(self.label, name, self.flavor, 
+                                               versionStr = versionStr)
+            except repository.PackageNotFound, e:
+                raise RecipeFileError, str(e)
+            l = self.troveVersions.get(name, [])
+            l.extend([ x.getVersion() for x in pkgList ])
+            self.troveVersions[name] = l
 
     def getTroveList(self):
 	return self.troveVersions
@@ -590,6 +593,7 @@ class GroupRecipe(Recipe):
 	self.troveVersions = {}
 	self.label = branch.label()
 	self.flavor = flavor
+        self.addTroveList = []
 
 class FilesetRecipe(Recipe):
 

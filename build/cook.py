@@ -269,6 +269,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
 
     try:
 	recipeObj.setup()
+        recipeObj.findTroves()
     except recipe.RecipeFileError, msg:
 	raise CookError(str(msg))
 
