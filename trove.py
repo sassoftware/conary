@@ -33,9 +33,11 @@ class Package:
 
 	return l
 
-    def write(self, dataFile):
+    def formatString(self):
+	str = ""
 	for (file, version) in self.files.items():
-	    dataFile.write("%s %s\n" % (file, version))
+	    str = str + ("%s %s\n" % (file, version))
+	return str
 
     def __init__(self, name):
 	self.files = {}
@@ -61,8 +63,7 @@ class PackageSet:
 	util.mkdirChain(os.path.split(self.pkgPath)[0])
 	f = versioned.open(self.pkgPath, "w")
 	for (version, package) in self.packages.items():
-	    f.createVersion(version)
-	    package.write(f)
+	    f.addVersion(version, package.formatString())
 	f.close()
 
     def getVersion(self, version):
@@ -85,13 +86,16 @@ class PackageSet:
     def __init__(self, reppath, name):
 	self.name = name
 	self.pkgPath = reppath + "/pkgs/" + self.name
+	self.packages = {}
+
+	if not os.path.exists(self.pkgPath): return
 
 	f = versioned.open(self.pkgPath, "r")
 	versions = f.versionList()
-	self.packages = {}
 	for version in versions:
-	    f.setVersion(version)
-	    self.packages[version] = PackageFromFile(name, f)
+	    f1 = f.getVersion(version)
+	    self.packages[version] = PackageFromFile(name, f1)
+	    f1.close()
 
 	f.close()
 

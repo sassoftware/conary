@@ -376,13 +376,16 @@ class SourceFile(RegularFile):
 class FileDB:
 
     def read(self):
-	f = versioned.open(self.dbfile, "r")
 	self.versions = {}
+	if not os.path.exists(self.dbfile): return
+
+	f = versioned.open(self.dbfile, "r")
 
 	for version in f.versionList():
-	    f.setVersion(version)
-	    line = f.read()
+	    f1 = f.getVersion(version)
+	    line = f1.read()
 	    self.versions[version] = FileFromInfoLine(self.path, version, line)
+	    f1.close()
 
 	f.close()
 
@@ -411,8 +414,7 @@ class FileDB:
 
 	f = versioned.open(self.dbfile, "w")
 	for (version, file) in self.versions.items():
-	    f.createVersion(version)
-	    f.write("%s\n" % file.infoLine())
+	    f.addVersion(version, "%s\n" % file.infoLine())
 
 	f.close()
 
