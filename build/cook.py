@@ -94,7 +94,10 @@ class _IdGen:
 		# sha1 hash of it since that's how it's indexed
 		# in the file store
 		f = repos.getFileVersion(fileId, version)
-		lcache.addFileHash(path, f.sha1())
+                # it only makes sense to fetch regular files, skip
+                # anything that isn't
+                if isinstance(f, files.RegularFile):
+                    lcache.addFileHash(path, f.sha1())
 
 def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None, 
 	       prep=True, macros=()):
