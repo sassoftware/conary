@@ -28,7 +28,7 @@ class SrsConfiguration:
 	for item in keys:
 	    if type(self.__dict__[item]) is str:
 		print "%-20s %s" % (item, self.__dict__[item])
-	    elif self.__dict__[item].__class__ == versions.Version:
+	    elif isinstance(self.__dict__[item], versions.Version):
 		print "%-20s %s" % (item, self.__dict__[item].asString())
 
     def __init__(self):
