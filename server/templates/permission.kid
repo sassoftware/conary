@@ -1,21 +1,19 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<?python #
-from templates import library
-?>
-
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:py="http://naeblis.cx/ns/kid#">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://purl.org/kid/ns#"
+      py:extends="'library.kid'">
     <!-- creates a selection dropdown based on a list, optionally adding an ALL
          option at the top of the list. -->
     <select py:def="makeSelect(elementName, items, all = False)"
-            name="{elementName}">
+            name="${elementName}">
         <option py:if="all" value="">ALL</option>
         <option py:for="value in sorted(items)"
-                py:content="value" value="{value}"/>
+                py:content="value" value="${value}"/>
     </select>
 
-    {library.html_header(pageTitle)}
+    ${html_header(pageTitle)}
     <body>
-        <h2>{pageTitle}</h2>
+        <h2>${pageTitle}</h2>
 
         <form method="post" action="addPerm">
             <table class="add-form">
@@ -46,6 +44,6 @@ from templates import library
             <p><input type="submit" value="Add"/></p>
         </form>
 
-        {library.html_footer()}
+        ${html_footer()}
     </body>
 </html>

@@ -1,10 +1,10 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <html xmlns="http://www.w3.org/1999/xhtml"
-      xmlns:py="http://naeblis.cx/ns/kid#">
+      xmlns:py="http://purl.org/kid/ns#">
 
     <!-- define the HTML header -->
     <head py:def="html_header(title)">
-        <title>{title}</title>
+        <title>${title}</title>
         <link rel="stylesheet" type="text/css" href="style.css" />
         <script language="javascript1.2" src="library.js" />
     </head>
