@@ -22,8 +22,6 @@ from deps import deps
 class _Method(xmlrpclib._Method):
 
     def __call__(self, *args):
-        result = self.__send(self.__name, args)
-	return result
         isException, result = self.__send(self.__name, args)
 	if not isException:
 	    return result
