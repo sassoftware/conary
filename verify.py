@@ -40,8 +40,8 @@ def verify(troveNameList, db, cfg, all=False):
         log.error("must specify either a trove or --all")
         return 1
     elif not troveNames:
-	troveNames = [ (x, None) for x in db.iterAllTroveNames() \
-                                          if x.find(':') == -1 ]
+	troveNames = [ (x, None, None) for x in db.iterAllTroveNames() \
+                                                  if x.find(':') == -1 ]
 	troveNames.sort()
     for (troveName, versionStr, flavor) in troveNames:
         try:
