@@ -344,7 +344,7 @@ class VersionedFile:
 	l = self.mapBranchNickname(nick)
 	i = 0
 	for (i, b) in enumerate(l):
-	    if b.equal(branch): 
+	    if b == branch: 
 		del l[i]
 		break
 
@@ -390,7 +390,7 @@ class VersionedFile:
 	(prev, next) = self._getVersionInfo(version)
 
 	# if this is the head of the branch we need to move the head back
-	if self.branchMap[branchStr].equal(version):
+	if self.branchMap[branchStr] == version:
 	    # we were the only item, so the branch needs to be emptied
 	    if not prev:
 		self.branchMap[branchStr] = None

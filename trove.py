@@ -88,7 +88,7 @@ class Package:
 	if self.packages.has_key(name):
 	    i = 0
 	    for ver in self.packages[name]:
-		if ver.equal(version): break
+		if ver == version: break
 		i = i + 1
 
 	    if i == len(self.packages[name]):
@@ -123,7 +123,7 @@ class Package:
 	@type missingOkay: boolean
 	"""
 	for i, ver in enumerate(self.packages[name]):
-	    if ver.equal(version): break
+	    if ver == version: break
 	if i != len(self.packages[name]):
 	    del(self.packages[name][i])
 	    if not self.packages[name]:
@@ -328,7 +328,7 @@ class Package:
 	    if selfPath != themPath:
 		newPath = selfPath
 
-	    if not selfVersion.equal(themVersion):
+	    if not selfVersion == themVersion:
 		newVersion = selfVersion
 		filesNeeded.append((id, themVersion, selfVersion, selfPath))
 
@@ -361,7 +361,7 @@ class Package:
 	    for (i, version) in enumerate(ourVersions):
 		match = 0 
 		for (j, v) in enumerate(theirVersions):
-		    if v.equal(version):
+		    if v == version:
 			match = 1
 			break
 
@@ -422,9 +422,9 @@ class Package:
 		    parentNode = None
 
 		    for other in removed[name]:
-			if other.branch().equal(branch):
+			if other.branch() == branch:
 			    sameBranch = other
-			if parent and other.equal(parent):
+			if parent and other == parent:
 			    parentNode = other
 
 		    if sameBranch:
@@ -525,7 +525,7 @@ class PackageChangeSet:
 	for (theName, list) in self.packages.iteritems():
 	    if theName != name: continue
 	    for (i, (change, ver)) in enumerate(list):
-		if ver.equal(old):
+		if ver == old:
 		    list[i] = (change, new)
 		    return
 
@@ -747,7 +747,7 @@ def walkPackageSet(repos, pkg):
 	if seen.has_key(name):
 	    match = False
 	    for ver in seen[name]:
-		if version.equal(ver):
+		if version == ver:
 		    match = True
 		    break
 	    if match: continue

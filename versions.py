@@ -18,7 +18,7 @@ class AbstractVersion:
     Ancestor class for all versions (as opposed to branches)
     """
 
-    def equal(self, version):
+    def __eq__(self, version):
 	"""
 	Compares two version-type objects and tells if they are the same
 	or not.
@@ -92,9 +92,6 @@ class VersionRelease(AbstractVersion):
 	"""
 
 	return self.version
-
-    def equal(self, version):
-	return self == version
 
     def __eq__(self, version):
 	if (type(self) == type(version) and self.version == version.version
@@ -190,17 +187,6 @@ class BranchName(AbstractBranch):
 
     def getHost(self):
 	return self.host
-
-    def equal(self, version):
-	"""
-	Compares the BranchName object to another object, and returns
-	true if they refer to the same branch.
-
-	@param version: version to compare against
-	@type version: instance
-	@rtype: boolean
-	"""
-	return self == version
 
     def __eq__(self, version):
 	if (isinstance(version, BranchName)
@@ -343,18 +329,9 @@ class Version:
 	if len(other.versions) != len(list): return 0
 
 	for i in range(0, len(list)):
-	    if not list[i].equal(other.versions[i]): return 0
+	    if not list[i] == other.versions[i]: return 0
 	
 	return 1
-
-    def equal(self, other):
-	"""
-	Compares this object to another Version object to see if they
-	are the same.
-
-	@rtype: boolean
-	"""
-	return self == other
 
     def __eq__(self, other):
 	if not isinstance(other, Version): return False
@@ -381,7 +358,7 @@ class Version:
 
 	if defaultBranch and len(defaultBranch.versions) < len(self.versions):
 	    start = Version(self.versions[0:len(defaultBranch.versions)], 0)
-	    if start.equal(defaultBranch):
+	    if start == defaultBranch:
 		list = self.versions[len(defaultBranch.versions):]
 		s = ""
 

@@ -42,7 +42,7 @@ class ChangeSet:
 	    for (fileId, path, version) in list:
 		assert(self.files.has_key(fileId))
 		(oldVersion, newVersion, info) = self.files[fileId]
-		assert(newVersion.equal(version))
+		assert(newVersion == version)
 
 		l = info.split()
 		if (l[0] == "src" or l[0] == "f") and l[1] != "-":
@@ -309,7 +309,7 @@ class ChangeSet:
 		    invertedPkg.changedFile(fileId, None, curVersion)
 
 		(oldVersion, newVersion, csInfo) = self.files[fileId]
-		assert(curVersion.equal(oldVersion))
+		assert(curVersion == oldVersion)
 
 		origFile = db.getFileVersion(fileId, oldVersion)
 		newFile = db.getFileVersion(fileId, oldVersion)
@@ -406,7 +406,7 @@ class ChangeSet:
 	@param targetBranchLabel: label of the branch to commit to
 	@type targetBranchLabel: versions.BranchName
 	"""
-	assert(not targetBranchLabel.equal(versions.LocalBranch()))
+	assert(not targetBranchLabel == versions.LocalBranch())
 
 	packageVersions = {}
 
@@ -459,7 +459,7 @@ class ChangeSet:
 		    if change != '+': continue
 
 		    for (oldVer, newVer) in packageVersions[name]:
-			if oldVer.equal(version):
+			if oldVer == version:
 			    pkgCs.updateChangedPackage(name, oldVer, newVer)
 
 	# this has to be true, I think...

@@ -166,7 +166,7 @@ class FilesystemJob:
 	@rtype: package.Package
 	"""
 	if basePkg:
-	    assert(pkgCs.getOldVersion().equal(basePkg.getVersion()))
+	    assert(pkgCs.getOldVersion() == basePkg.getVersion())
 	fullyUpdated = 1
 	cwd = os.getcwd()
 

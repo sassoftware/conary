@@ -33,7 +33,7 @@ class AbstractDatabase(repository.AbstractRepository):
 	    return self.stash.getPackageVersion(name, version)
 
 	l = [ x for x in self.troveDb.iterFindByName(name)
-		 if version.equal(x.getVersion())]
+		 if version == x.getVersion()]
 	if not l:
 	    raise repository.PackageMissing(name, version)
 	assert(len(l) == 1)
@@ -41,7 +41,7 @@ class AbstractDatabase(repository.AbstractRepository):
 
     def pkgLatestVersion(self, name, branch):
 	return [ x.getVersion() for x in self.troveDb.iterFindByName(name)
-		     if branch.equal(x.getVersion().branch())][0]
+		     if branch == x.getVersion().branch()][0]
 
     def hasPackage(self, name):
 	return self.troveDb.hasByName(name)
@@ -50,14 +50,14 @@ class AbstractDatabase(repository.AbstractRepository):
 	rc = []
 	for x in self.troveDb.iterFindByName(name):
 	    b = x.getVersion().branch()
-	    if b.branchNickname().equal(nick):
+	    if b.branchNickname() == nick:
 		rc.append(b)
 
 	return rc
 
     def getLatestPackage(self, name, branch):
 	return [ x for x in self.troveDb.iterFindByName(name)
-		     if branch.equal(x.getVersion().branch())][0]
+		     if branch == x.getVersion().branch()][0]
 
     def getPackageVersionList(self, name):
 	return [ x.getVersion() for x in self.troveDb.iterFindByName(name) ]
@@ -110,7 +110,7 @@ class AbstractDatabase(repository.AbstractRepository):
 
 	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
 		fileObj = job.getFile(fileId)
-		assert(newVersion.equal(fileObj.version()))
+		assert(newVersion == fileObj.version())
 		
 		oldFile = None
 		if oldVersion:
@@ -164,7 +164,7 @@ class AbstractDatabase(repository.AbstractRepository):
 	    except KeyError:
 		continue
 
-	    assert(pkgCs.getNewVersion().equal(version))
+	    assert(pkgCs.getNewVersion() == version)
 	    oldVersion = pkgCs.getOldVersion()
 	    if not oldVersion: continue
 
@@ -179,7 +179,7 @@ class AbstractDatabase(repository.AbstractRepository):
 			for otherVersion in otherList:
 			    match = False
 			    if otherName == subName and \
-				    otherVersion.equal(subVersion):
+				    otherVersion == subVersion:
 				match = True
 				break
 

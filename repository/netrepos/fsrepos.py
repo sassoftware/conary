@@ -303,9 +303,9 @@ class FilesystemRepository(AbstractRepository):
 		    elif otherOld and not oldVersion:
 			same = False
 		    else:
-			same = otherOld.equal(newVersion)
+			same = otherOld == newVersion
 
-		    if same and otherNew.equal(newVersion):
+		    if same and otherNew == newVersion:
 			match = True
 			break
 		
@@ -653,7 +653,7 @@ class ChangeSetJob:
 
 	    # we should have had a package which requires this (new) version
 	    # of the file
-	    assert(newVer.equal(fileMap[fileId][1]))
+	    assert(newVer == fileMap[fileId][1])
 
 	    if file.hasContents and restoreContents:
 		fileContents = None

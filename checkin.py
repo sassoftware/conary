@@ -88,7 +88,7 @@ class SourceStateFromFile(SourceState):
 def _verifyAtHead(repos, headPkg, state):
     headVersion = repos.pkgLatestVersion(state.getName(), 
 					 state.getBranch())
-    if not headVersion.equal(state.getVersion()):
+    if not headVersion == state.getVersion():
 	return False
 
     # make sure the files in this directory are based on the same
@@ -99,7 +99,7 @@ def _verifyAtHead(repos, headPkg, state):
 	    # new file, it shouldn't be in the old package at all
 	else:
 	    srcFileVersion = headPkg.getFile(fileId)[1]
-	    if not version.equal(srcFileVersion):
+	    if not version == srcFileVersion:
 		return False
 
     return True
@@ -215,7 +215,7 @@ def diff(repos, versionStr = None):
     except OSError:
         return
 
-    if state.getVersion().equal(versions.NewVersion()):
+    if state.getVersion() == versions.NewVersion():
 	log.error("no versions have been committed")
 	return
 
@@ -291,7 +291,7 @@ def updateSrc(repos, versionStr = None):
 	head = repos.getLatestPackage(pkgName, state.getBranch())
 	newBranch = None
 	headVersion = head.getVersion()
-	if headVersion.equal(baseVersion):
+	if headVersion == baseVersion:
 	    log.info("working directory is already based on head of branch")
 	    return
     else:
@@ -322,7 +322,7 @@ def updateSrc(repos, versionStr = None):
     assert(len(newPkgs) == 1)
     newState = newPkgs[0]
 
-    if newState.getVersion().equal(pkgCs.getNewVersion()) and newBranch:
+    if newState.getVersion() == pkgCs.getNewVersion() and newBranch:
 	newState.changeBranch(newBranch)
 
     newState.write("SRS")

@@ -155,7 +155,7 @@ def fullBranchName(defaultNick, version, versionStr):
 	else:
 	    nick = versions.BranchName(versionStr)
 
-	if version.branch().branchNickname().equal(nick):
+	if version.branch().branchNickname() == nick:
 	    return version.branch()
 	else:
 	    # this must be the node the branch was created at, otherwise
@@ -187,7 +187,7 @@ def nextVersion(versionStr, currentVersion, currentBranch, binary = True):
 	if binary:
 	    newVersion.incrementBuildCount()
     elif currentVersion.trailingVersion().getVersion() == versionStr and \
-         currentBranch.equal(currentVersion.branch()):
+         currentBranch == currentVersion.branch():
 	newVersion = currentVersion.copy()
 	if binary:
 	    newVersion.incrementBuildCount()

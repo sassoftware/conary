@@ -54,7 +54,7 @@ class TroveDatabase:
 	for trvId in self.nameIdx.iterGetEntries(name):
 	    trv = self._getPackage(trvId)
 
-	    if not trv.getVersion().equal(version):
+	    if not trv.getVersion() == version:
 		continue
 
 	    del self.trvs[trvId]
@@ -69,7 +69,7 @@ class TroveDatabase:
 	    for (inclName, versionList) in trv.iterPackageList():
 		if inclName == name: 
 		    for inclVersion in versionList:
-			if inclVersion.equal(version):
+			if inclVersion == version:
 			    updateTrove = True
 			    trv.delPackageVersion(name, version, 
 						  missingOkay = False)
