@@ -673,7 +673,6 @@ def fieldsChanged(diff):
     while i < len(diff):
 	streamId, size = struct.unpack("!BH", diff[i:i+3])
 	i += 3
-	if not size: continue
 
 	name = cl.streamDict[streamId][1]
 	
