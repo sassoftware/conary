@@ -17,7 +17,6 @@ import patch
 import repository
 import util
 import versions
-import bsddb
 
 from repository import DataStoreRepository
 from repository import AbstractRepository
