@@ -312,30 +312,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         else:
             self.commit()
 
-    def _getLocalOrRemoteTrove(self, troveName, troveVersion, troveFlavor,
-                               withFiles = True):
-	# the get trove netclient provides doesn't work with a FilesystemRepository
-	# (it needs to create a change set which gets passed)
-	if troveVersion.branch().label().getHost() == self.name:
-	    return self.getTrove(troveName, troveVersion, troveFlavor,
-                                          withFiles = withFiles)
-	else:
-	    return self.reposSet.getTrove(troveName, troveVersion, troveFlavor,
-                                          withFiles = withFiles)
-
-    def _getLocalOrRemoteFileVersions(self, l):
-	# this assumes all of the files are from the same server!
-
-	if l[0][1].branch().label().getHost() == self.name:
-	    d = self.getFileVersions(l)
-	else:
-	    d = {}
-	    for (fileId, fileVersion) in l:
-		d[(fileId, fileVersion)] = self.getFileVersion(fileId, 
-							       fileVersion)
-
-	return d
-
     def resolveRequirements(self, label, depSetList):
         return self.troveStore.resolveRequirements(label, depSetList)
 
@@ -372,6 +348,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	cs = changeset.ChangeSetFromRepository(self)
 	for (name, (oldV, oldFlavor), (newV, newFlavor), absolute) in troveList:
 	    cs.addPrimaryPackage(name, newV, newFlavor)
+
+        externalTroveList = []
+        externalFileList = []
 
 	dupFilter = {}
 
@@ -427,13 +406,21 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    
 		continue
 
-	    new = self._getLocalOrRemoteTrove(troveName, newVersion, newFlavor,
-                                              withFiles = withFiles)
+            if newVersion.branch().label().getHost() != self.name or \
+               (oldVersion and 
+                oldVersion.branch().label().getHost() != self.name):
+                # don't try to make changesets between repositories; the
+                # client can do that itself
+                externalTroveList = (troveName, (oldVersion, oldFlavor),
+                                     (newVersion, newFlavor), absolute)
+                continue
+
+            new = self.getTrove(troveName, newVersion, newFlavor, 
+                                withFiles = withFiles)
 	 
 	    if oldVersion:
-		old = self._getLocalOrRemoteTrove(troveName, oldVersion, 
-						  oldFlavor,
-                                                  withFiles = withFiles)
+                old = self.getTrove(troveName, oldVersion, oldFlavor,
+                                    withFiles = withFiles)
 	    else:
 		old = None
 
@@ -450,25 +437,29 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    # sort the set of files we need into bins based on the server
 	    # name
 	    serverIdx = {}
+            getList = []
+            newFilesNeeded = []
 	    for (fileId, oldFileVersion, newFileVersion, oldPath, newPath) in \
-									filesNeeded:
-		if oldFileVersion:
-		    serverName = oldFileVersion.branch().label().getHost()
-		    if serverIdx.has_key(serverName):
-			serverIdx[serverName].append((fileId, oldFileVersion))
-		    else:
-			serverIdx[serverName] = [ (fileId, oldFileVersion) ]
+                                                            filesNeeded:
+                # if either the old or new file version is on a different
+                # repository, creating this diff is someone else's problem
+                if newFileVersion.branch().label().getHost() != self.name or \
+                   (oldFileVersion and
+                    oldFileVersion.branch().label().getHost() != self.name):
+                    externalFileList.append((fileId, oldFileVersion,
+                                             newFileVersion, oldPath,
+                                             newPath))
+                else:
+                    newFilesNeeded.append((fileId, oldFileVersion,
+                                             newFileVersion, oldPath,
+                                             newPath))
+                    if oldFileVersion:
+                        getList.append((fileId, oldFileVersion))
+                    getList.append((fileId, newFileVersion))
 
-		serverName = newFileVersion.branch().label().getHost()
-		if serverIdx.has_key(serverName):
-		    serverIdx[serverName].append((fileId, newFileVersion))
-		else:
-		    serverIdx[serverName] = [ (fileId, newFileVersion) ]
-
-	    idIdx = {}
-	    for serverName, l in serverIdx.iteritems():
-		allFiles = self._getLocalOrRemoteFileVersions(l)
-		idIdx.update(allFiles)
+            filesNeeded = newFilesNeeded
+            del newFilesNeeded
+            idIdx = self.getFileVersions(getList)
 
             # Walk this in reverse order. This may seem odd, but the
             # order in the final changeset is set by sorting that happens
@@ -532,7 +523,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    cs.addFileContents(fileId, contType, cont, 
 				       newFile.flags.isConfig())
 
-	return cs
+	return (cs, externalTroveList, externalFileList)
 
     def close(self):
 	if self.troveStore is not None:

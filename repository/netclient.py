@@ -377,7 +377,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             chgSetList = []
 
             for serverName, job in serverJobs.iteritems():
-                urlList = self.c[serverName].getChangeSet(job, recurse, 
+                (urlList, extraTroveList, extraFileList) = \
+                    self.c[serverName].getChangeSet(job, recurse, 
                                                 withFiles, withFileContents)
 
                 for url in urlList:

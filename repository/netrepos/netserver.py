@@ -351,6 +351,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             withFiles = True
 
         urlList = []
+        newChgSetList = []
+        allFilesNeeded = []
 
         # XXX all of these cache lookups should be a single operation through a 
         # temporary table
@@ -372,10 +374,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             path = self.cache.getEntry(l, withFiles)
             if path is None:
-                cs = self.repos.createChangeSet([ l ], recurse = recurse, 
+                (cs, trovesNeeded, filesNeeded) = \
+                            self.repos.createChangeSet([ l ], 
+                                        recurse = recurse, 
                                         withFiles = withFiles,
                                         withFileContents = withFileContents)
                 path = self.cache.addEntry(l, withFiles)
+                newChgSetList += trovesNeeded
+                allFilesNeeded += filesNeeded
                 cs.writeToFile(path)
 
             fileName = os.path.basename(path)
@@ -383,7 +389,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             urlList.append(os.path.join(self.urlBase, 
                                         "changeset?%s" % fileName[:-4]))
 
-        return urlList
+        if clientVersion < 10:
+            return urlList
+        else:
+            return urlList, newChgSetList, allFilesNeeded
 
     def iterAllTroveNames(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
