@@ -773,49 +773,53 @@ class DanglingSymlinks(policy.Policy):
     invariantexceptions = (
 	'%(testdir)s/.*', )
     targetexceptions = [
-	'.*consolehelper',
-	'/proc/', # provided by the kernel, no package
+        # ('filterexp', 'requirement')
+	('.*consolehelper', 'usermode:runtime'),
+	('/proc(/.*)?', None), # provided by the kernel, no package
     ]
-    # XXX consider automatic file dependencies for dangling symlinks?
-    # XXX if so, then we'll need exceptions for that too, for things
-    # XXX like symlinks into /proc
     def doProcess(self, recipe):
 	self.rootdir = self.rootdir % recipe.macros
 	self.targetFilters = []
 	self.macros = recipe.macros # for filterExpression
-	for targetitem in self.targetexceptions:
+	for targetitem, requirement in self.targetexceptions:
 	    filterargs = self.filterExpression(targetitem)
-	    self.targetFilters.append(filter.Filter(*filterargs))
+	    self.targetFilters.append((filter.Filter(*filterargs), requirement))
 	policy.Policy.doProcess(self, recipe)
 
-    def doFile(self, file):
+    def doFile(self, path):
 	d = self.macros.destdir
-	f = util.joinPaths(d, file)
+	f = util.joinPaths(d, path)
+        recipe = self.recipe
 	if os.path.islink(f):
 	    contents = os.readlink(f)
 	    if contents[0] == '/':
-		log.warning('Absolute symlink %s points to %s, should probably be relative', file, contents)
+		log.warning('Absolute symlink %s points to %s, should probably be relative', path, contents)
 		return
-	    abscontents = util.joinPaths(os.path.dirname(file), contents)
-	    if abscontents in self.recipe.autopkg.pathMap:
-		pkgMap = self.recipe.autopkg.pkgMap
-		if pkgMap[abscontents] != pkgMap[file] and \
-		   not file.endswith('.so') and \
-		   not pkgMap[file].getName().endswith(':test'):
+	    abscontents = util.joinPaths(os.path.dirname(path), contents)
+	    if abscontents in recipe.autopkg.pathMap:
+		pkgMap = recipe.autopkg.pkgMap
+		if pkgMap[abscontents] != pkgMap[path] and \
+		   not path.endswith('.so') and \
+		   not pkgMap[path].getName().endswith(':test'):
 		    # warn about suspicious cross-component symlink
 		    log.warning('symlink %s points from package %s to %s',
-				file, pkgMap[file].getName(),
+				path, pkgMap[path].getName(),
 				pkgMap[abscontents].getName())
 	    else:
-		for targetFilter in self.targetFilters:
+		for targetFilter, requirement in self.targetFilters:
 		    if targetFilter.match(abscontents):
 			# contents are an exception
 			log.debug('allowing special dangling symlink %s -> %s',
-				  file, contents)
+				  path, contents)
+                        if requirement:
+                            log.debug('automatically adding requirement'
+                                      ' %s for symlink %s', requirement, path)
+                            recipe.Requires(requirement,
+                                            util.literalRegex(path))
 			return
-		self.recipe.reportErrors(
+		recipe.reportErrors(
 		    "Dangling symlink: %s points to non-existant %s (%s)"
-		    %(file, contents, abscontents))
+		    %(path, contents, abscontents))
 
 
 class AddModes(policy.Policy):
