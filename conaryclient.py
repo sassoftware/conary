@@ -54,10 +54,11 @@ class ConaryClient:
 
     def updateTrove(self, pkg, versionStr, replaceFiles = False,
                     tagScript = None, keepExisting = None):
-        """Updates a trove on the local system to the latest version in the respository that
-           the trove was initially installed from."""
+        """Updates a trove on the local system to the latest version 
+            in the respository that the trove was initially installed from."""
         self._prepareRoot()
-
+        if not self.db.writeAccess():
+            raise UpdateError, "Write permission denied on conary database %s" % self.db.dbpath
         if self.db.hasPackage(pkg):
             labels = [ x.getVersion().branch().label()
                        for x in self.db.findTrove(pkg) ]

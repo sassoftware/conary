@@ -140,7 +140,11 @@ class SqlDbRepository(repository.DataStoreRepository,
 
 	self.commitChangeSet(cs, tagScript = tagScript)
 
+    def writeAccess(self):
+        return os.access(self.dbpath, os.W_OK)
+
     def __init__(self, path):
+        self.dbpath = path + "/conarydb"
 	repository.DataStoreRepository.__init__(self, path)
 	repository.AbstractRepository.__init__(self)
 	self.db = sqldb.Database(path + "/conarydb")
