@@ -24,6 +24,7 @@ from lib.sha1helper import sha1ToString
 from repository import repository
 
 _troveFormat  = "%-39s %s"
+_troveFormatWithFlavor  = "%-39s %s%s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
 
@@ -33,11 +34,14 @@ class DisplayCache:
         self._cache = {}
 
     def cache(self, troveName, versionList, fullVersions=False):
-        """ Cache the correct display output, given a version list 
-            for a trove.  The assumption is that the shortest 
-            version string should be given, starting with the verison-release,
-            followed by the label/version-release, and finally 
-            falling back and displaying the entire version """
+        """Add entries to the DisplayCache
+        
+        Cache the correct display output, given a version list for a
+        trove.  The assumption is that the shortest version string
+        should be given, starting with the verison-release, followed
+        by the label/version-release, and finally falling back and
+        displaying the entire version
+        """
         _cache = self._cache
         short = {}
         passed = True
@@ -84,15 +88,17 @@ class DisplayCache:
                 _cache[troveName][version] = version.asString()
 
     def clearCache(self, name):
-        """ Cleans out the cache entry for a trove for garbage collection """
+        """Cleans out the cache entry for a trove for garbage collection"""
         del self._cache[name]
 
     def cacheAll(self, troveDict, fullVersions=False):
-        """ Prepares the version cache to choose the correct 
-            version to display. TroveDict should be a trove[name] => [versions]
-            dict. 
-            XXX eventually this should be a [name] => [(version,flavor)]
-            So that we can print the short version if they differ in flavors
+        """Add entries to the DisplayCache from a dictionary
+        
+        Prepares the version cache to choose the correct 
+        version to display. TroveDict should be a trove[name] => [versions]
+        dict. 
+        XXX eventually this should be a [name] => [(version,flavor)]
+        So that we can print the short version if they differ in flavors
         """
         for troveName in troveDict.keys():
             self.cache(troveName, troveDict[troveName], fullVersions)
@@ -146,10 +152,34 @@ def parseTroveStrings(troveNameList):
     return troveNames, hasVersions
 
 
+def _formatFlavor(flavor):
+    return '\n   ' + '\n   '.join(str(flavor).split('\n'))
+
+
+def _printOneTrove(db, troveName, fullVersions):
+    displayC = DisplayCache()
+    troveVersions = db.getTroveVersionList(troveName)
+    if not troveVersions:
+        log.error("%s is not installed", troveName)
+        return
+    versionDict = {}.fromkeys(troveVersions)
+    troveDict = db.getTroveVersionFlavors({troveName: troveVersions})
+    displayC.cache(troveName, troveVersions, fullVersions)
+
+    for version in troveVersions:
+        if len(troveDict[troveName][version]) > 1:
+            # if there is more than one instance of a version
+            # installed, show the flavor information
+            for flavor in troveDict[troveName][version]:
+                print _troveFormatWithFlavor %(troveName,
+                                               displayC[troveName, version],
+                                               _formatFlavor(flavor))
+        else:
+            print _troveFormat %(troveName, displayC[troveName, version])
+
 def displayTroves(db, troveNameList = [], pathList = [], ls = False, 
                   ids = False, sha1s = False, fullVersions = False, 
                   tags = False):
-   
     (troveNames, hasVersions) = parseTroveStrings(troveNameList)
     pathList = [os.path.abspath(util.normpath(x)) for x in pathList]
     
@@ -162,19 +192,11 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
             for trove in db.iterTrovesByPath(path):
                 troveNames.append((trove.getName(), [ trove.getVersion() ]))
 
-        displayC = DisplayCache()
         for troveName, versionList in troveNames:
-            if not versionList:
-                versionList = db.getTroveVersionList(troveName)
-                if not versionList:
-                    log.error("trove %s is not installed", troveName)
-                    continue
-
-            displayC.cache(troveName, versionList, fullVersions)
-
-            for version in versionList:
-                print _troveFormat % (troveName, displayC[troveName, version])
-            displayC.clearCache(troveName)
+            # we should never have a version list, since we check
+            # "not hasVersions" above
+            assert(versionList is None)
+            _printOneTrove(db, troveName, fullVersions)
         return
 
     for path in pathList:

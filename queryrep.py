@@ -23,9 +23,10 @@ import time
 
 from lib.sha1helper import sha1ToString
 
-_troveFormat  = "%-39s %s"
-_fileFormat = "    %-35s %s"
-_grpFormat  = "  %-37s %s"
+_troveFormat  = display._troveFormat
+_troveFormatWithFlavor = display._troveFormatWithFlavor
+_fileFormat = display._fileFormat
+_grpFormat  = display._grpFormat
 
 def displayTroves(repos, cfg, troveList = [], all = False, ls = False, 
                   ids = False, sha1s = False, leaves = False, 
@@ -106,12 +107,13 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
                 continue
 
             displayc.cache(troveName, flavors[troveName], fullVersions)
-
+            
 	    for version in flavors[troveName].keys():
 		for flavor in flavors[troveName][version]:
 		    if all:
-			print "%-30s %-15s %s" % (troveName, flavor,
-						  displayc[troveName, version])
+			print _troveFormatWithFlavor %(
+                            troveName, displayc[troveName, version],
+                            display._formatFlavor(flavor))
 		    elif not all and (flavor is None or cfg.flavor.satisfies(flavor)):
 			print _troveFormat % (troveName, 
 					      displayc[troveName, version])
