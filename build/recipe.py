@@ -344,27 +344,28 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
 
 
 def loadRecipe(troveSpec, label=None):
-    """Load a recipe so that its class/data can be used in another recipe.
+    """
+    Load a recipe so that its class/data can be used in another recipe.
 
     If a complete version is not specified in the trovespec, the version of 
     the recipe to load will be based on what is installed on the system.  
-    For example, if loadRecipe('foo') was called, and foo with version
-    /bar.org@bar:devel/4.1-1-1 was installed on the system, foo:source with
-    version /bar.org@bar:devel/4.1-1 will be loaded.  The recipe will also
-    be loaded with the installed package's flavor.
+    For example, if C{loadRecipe('foo')} is called, and package C{foo} with
+    version C{/bar.org@bar:devel/4.1-1-1} is installed on the system, then
+    C{foo:source} with version C{/bar.org@bar:devel/4.1-1} will be loaded.
+    The recipe will also be loaded with the installed package's flavor.
 
-    If the package is not installed anywhere on the system, the labelPath 
+    If the package is not installed anywhere on the system, the C{labelPath}
     will be searched without reference to the installed system.  
 
-    @param troveSpec: name[=version][[flavor]] specification of the trove to
-    load.  The flavor given will be used to find the given recipe and also
-    to set the flavor of the loaded recipe.
-    @param label: label string or list of label strings to search for the 
-    given recipe.  
-    Defaults to the labels listed in the version in the 
-    including recipe.  For example, if called from recipe with version
-    /conary.specifix.com@spx:devel//shadow/1.0-1-1, the default labelPath
-    would be [conary.specifix.com@spx:shadow, conary.specifix.com@spx:devel]
+    @param troveSpec: C{name}I{[}C{=I{version}}I{][}C{[I{flavor}]}I{]}
+    specification of the trove to load.  The flavor given will be used
+    to find the given recipe and also to set the flavor of the loaded recipe.
+    @param label: label string to search for the given recipe.  
+    Defaults to the labels listed in the version in the including recipe.
+    For example, if called from recipe with version
+    C{/conary.specifix.com@spx:devel//shadow/1.0-1-1},
+    the default C{labelPath} that would be constructed would be:
+    C{[conary.specifix.com@spx:shadow, conary.specifix.com@spx:devel]}
     """
 
     def _findInstalledVersion(db, labelPath, name, versionStr, flavor):
@@ -373,7 +374,7 @@ def loadRecipe(troveSpec, label=None):
             found along the label path.
 
             The version and flavor of the first found installed trove is 
-            returned, or none if no trove is found.
+            returned, or C{None} if no trove is found.
         """
         # first search on the labelPath.  
         try:
