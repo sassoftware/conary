@@ -187,6 +187,16 @@ files in the site-lisp directory and should not have an :emacs
 component.
 """)
 
+Use.krb = True
+Use.krb.setShortDoc('Enable support for Kerberos (V5)')
+Use.krb.setLongDoc("""
+Build the Kerberos package, and include support for the Kerberos
+package in other packages.  You may want to disable Kerberos during
+the early stages of bootstrapping a new architecture, or to make
+a smaller installable image where network single sign-on is not
+required.
+""")
+
 # flags to use for special situations
 Use.builddocs = True
 Use.builddocs.setShortDoc('Build documentation as well as binaries')
