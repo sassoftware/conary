@@ -81,24 +81,6 @@ class Flavors:
 
 class FlavorScores:
 
-    table = ( 
-          (deps.FLAG_SENSE_REQUIRED,   deps.FLAG_SENSE_REQUIRED,         2),
-          (deps.FLAG_SENSE_REQUIRED,   deps.FLAG_SENSE_PREFERRED,        1),
-          (deps.FLAG_SENSE_REQUIRED,   deps.FLAG_SENSE_PREFERNOT, -1000000),
-
-          (deps.FLAG_SENSE_DISALLOWED, deps.FLAG_SENSE_REQUIRED,  -1000000),
-          (deps.FLAG_SENSE_DISALLOWED, deps.FLAG_SENSE_PREFERRED, -1000000),
-          (deps.FLAG_SENSE_DISALLOWED, deps.FLAG_SENSE_PREFERNOT,        1),
-
-          (deps.FLAG_SENSE_PREFERRED,  deps.FLAG_SENSE_REQUIRED,         1),
-          (deps.FLAG_SENSE_PREFERRED,  deps.FLAG_SENSE_PREFERRED,        2),
-          (deps.FLAG_SENSE_PREFERRED,  deps.FLAG_SENSE_PREFERNOT,       -1),
-
-          (deps.FLAG_SENSE_PREFERNOT,  deps.FLAG_SENSE_REQUIRED,        -2),
-          (deps.FLAG_SENSE_PREFERNOT,  deps.FLAG_SENSE_PREFERRED,       -1),
-          (deps.FLAG_SENSE_PREFERNOT,  deps.FLAG_SENSE_PREFERNOT,        1) 
-        )
-
     def __init__(self, db):
         cu = db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
@@ -110,6 +92,7 @@ class FlavorScores:
             cu.execute("""CREATE INDEX FlavorScoresIdx ON 
                                     FlavorScores(request, present)""")
 
-            for tup in self.table:
-                cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)", tup)
+            for (request, present), value in deps.flavorScores.iteritems():
+                cu.execute("INSERT INTO FlavorScores VALUES(?,?,?)", 
+                           request, present, value)
                             
