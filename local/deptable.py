@@ -31,7 +31,7 @@ def createDepTable(cu, name, isTemp):
     cu.execute("CREATE INDEX %sIdx ON %s(class, name, flag)" % 
                (name, name), start_transaction = (not tmp))
 
-def createDepUserTable(cu, name, isTemp):
+def createRequiresTable(cu, name, isTemp):
     if isTemp:
         tmp = "TEMPORARY"
     else:
@@ -39,7 +39,25 @@ def createDepUserTable(cu, name, isTemp):
 
     cu.execute("""CREATE %s TABLE %s(instanceId integer,
                                   depId integer,
+                                  depNum integer,
                                   depCount integer
+                                 )""" % (tmp, name),
+               start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
+               start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %sIdx2 ON %s(depId)" % (name, name),
+               start_transaction = (not isTemp))
+    cu.execute("CREATE INDEX %sIdx3 ON %s(depNum)" % (name, name),
+               start_transaction = (not isTemp))
+
+def createProvidesTable(cu, name, isTemp):
+    if isTemp:
+        tmp = "TEMPORARY"
+    else:
+        tmp = ""
+
+    cu.execute("""CREATE %s TABLE %s(instanceId integer,
+                                  depId integer
                                  )""" % (tmp, name),
                start_transaction = (not isTemp))
     cu.execute("CREATE INDEX %sIdx ON %s(instanceId)" % (name, name),
@@ -55,13 +73,21 @@ class DepTable:
         if 'Dependencies' not in tables:
             createDepTable(cu, name, False)
 
-class DepUser:
+class DepRequires:
     def __init__(self, db, name):
         cu = db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if name not in tables:
-            createDepUserTable(cu, name, False)
+            createRequiresTable(cu, name, False)
+
+class DepProvides:
+    def __init__(self, db, name):
+        cu = db.cursor()
+        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+        tables = [ x[0] for x in cu ]
+        if name not in tables:
+            createProvidesTable(cu, name, False)
 
 class DependencyTables:
 
@@ -75,6 +101,8 @@ class DependencyTables:
                                               name STRING,
                                               flag STRING)""" % name,
                    start_transaction = False)
+        cu.execute("CREATE INDEX %sIdx ON %s(troveId, class, name, flag)"
+                        % (name, name), start_transaction = False)
 
     def _populateTmpTable(self, cu, name, depList, troveNum, requires, 
                           provides, multiplier = 1):
@@ -134,8 +162,12 @@ class DependencyTables:
             cu.execute("UPDATE %s SET depId=depId * %d"  
                            % (depTable, multiplier), start_transaction = False)
 
+        cu.execute("SELECT COUNT(*) FROM %(reqTable)s" % substDict)
+        substDict['reqLen'] = cu.next()[0]
+
         cu.execute("""INSERT INTO %(reqTable)s 
-                    SELECT %(tmpName)s.troveId, depId, flagCount FROM
+                    SELECT %(tmpName)s.troveId, depId, 
+                           %(reqLen)d + depNum , flagCount FROM
                         %(tmpName)s JOIN %(allDeps)s ON
                             %(tmpName)s.class == %(allDeps)s.class AND
                             %(tmpName)s.name == %(allDeps)s.name AND
@@ -148,7 +180,7 @@ class DependencyTables:
             return
 
         cu.execute("""INSERT INTO %(provTable)s SELECT 
-                            %(tmpName)s.troveId, depId, flagCount FROM
+                            %(tmpName)s.troveId, depId FROM
                         %(tmpName)s JOIN %(allDeps)s ON
                             %(tmpName)s.class == %(allDeps)s.class AND
                             %(tmpName)s.name == %(allDeps)s.name AND
@@ -233,39 +265,60 @@ class DependencyTables:
 
         cu.execute("DROP TABLE suspectDeps")
 
-    def _resolveStmt(self, providesTable = "Provides", 
-                     depTable = "Dependencies",
-                     requiresTable = "Requires",
-                     includeUnresolved = False):
-        substTable = { 'provides' : providesTable,
-                       'requires' : requiresTable,
-                       'deptable' : depTable }
+    #def _resolveStmt(self, providesTable = "Provides", 
+    #                 depTable = "Dependencies",
+    #                 requiresTable = "Requires",
+    #                 includeUnresolved = False):
+    def _resolveStmt(self, tableList):
+        """
+        tableList is a list of (requiresTable, providesTable, depTable)
+        tuples
+        """
 
-        if includeUnresolved:
-            substTable['jointype'] = 'LEFT OUTER JOIN'
-        else:
-            substTable['jointype'] = 'JOIN'
+        subselect = ""
+
+        for (reqTable, provTable, depTable) in tableList:
+            substTable = { 'provides' : "%-15s" % provTable,
+                           'requires' : "%-15s" % reqTable,
+                           'deptable' : "%-15s" % depTable }
+
+            if subselect:
+                subselect += """\
+                     UNION ALL\n"""
+
+            subselect += """\
+                       SELECT %(requires)s.depId      AS reqDepId,
+                              %(requires)s.instanceId AS reqInstId,
+                              %(provides)s.depId      AS provDepId,
+                              %(provides)s.instanceId AS provInstId,
+                              %(deptable)s.class      AS class,
+                              %(deptable)s.name       AS name,
+                              %(deptable)s.flag       AS flag
+                         FROM %(requires)s JOIN %(provides)s ON
+                              %(requires)s.depId = %(provides)s.depId
+                         JOIN %(deptable)s ON
+                              %(requires)s.depId = %(deptable)s.depId\n""" \
+                    % substTable
+            
 
         return """
                 SELECT depCheck.depNum as depNum,
-                        %(provides)s.instanceId as rsvInstanceId
-                    FROM %(requires)s %(jointype)s %(provides)s ON
-                        %(requires)s.depId == %(provides)s.depId
-                    JOIN %(deptable)s ON
-                        %(requires)s.depId == %(deptable)s.depId
+                       Matched.provInstId as rsvInstanceId
+                    FROM (
+%s                       ) AS Matched
                     JOIN DepCheck ON
-                        %(requires)s.instanceId == DepCheck.troveId AND
-                        %(deptable)s.class == DepCheck.class AND
-                        %(deptable)s.name == DepCheck.name AND
-                        %(deptable)s.flag == DepCheck.flag
+                        Matched.reqInstId == DepCheck.troveId AND
+                        Matched.class == DepCheck.class AND
+                        Matched.name == DepCheck.name AND
+                        Matched.flag == DepCheck.flag
                     WHERE
                         NOT DepCheck.isProvides
                     GROUP BY
                         DepCheck.depNum,
-                        %(provides)s.instanceId
+                        Matched.provInstId
                     HAVING
                         COUNT(DepCheck.troveId) == DepCheck.flagCount
-                """ % substTable
+                """ % subselect
 
     def check(self, changeSet):
         def _depItemsToSet(depInfoList):
@@ -299,20 +352,20 @@ class DependencyTables:
             # this only works for databases (not repositories)
             if not depIdList: return []
 
-            cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depId INTEGER)",
+            cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)",
                        start_transaction = False)
-            for depId in depIdList:
-                cu.execute("INSERT INTO BrokenDeps VALUES (?)", depId,
+            for depNum in depIdList:
+                cu.execute("INSERT INTO BrokenDeps VALUES (?)", depNum,
                            start_transaction = False)
 
             cu.execute("""
                     SELECT DISTINCT troveName, class, name, flag FROM 
-                        BrokenDeps JOIN Dependencies ON
-                            BrokenDeps.depId == Dependencies.depId
-                        JOIN Requires ON
-                            Dependencies.depId == Requires.depId
+                        BrokenDeps JOIN Requires ON 
+                            BrokenDeps.depNum = Requires.DepNum
+                        JOIN Dependencies ON
+                            Requires.depId = Dependencies.depId
                         JOIN DBInstances ON
-                            DBInstances.instanceId == Requires.instanceId
+                            Requires.instanceId = DBInstances.instanceId
                 """, start_transaction = False)
 
             failedSets = {}
@@ -340,8 +393,8 @@ class DependencyTables:
         cu.execute("CREATE TEMPORARY VIEW AllDeps AS SELECT * FROM "
                    "Dependencies UNION SELECT * FROM TmpDependencies",
                    start_transaction = False)
-        createDepUserTable(cu, 'TmpProvides', isTemp = True)
-        createDepUserTable(cu, 'TmpRequires', isTemp = True)
+        createProvidesTable(cu, 'TmpProvides', isTemp = True)
+        createRequiresTable(cu, 'TmpRequires', isTemp = True)
     
         # build the table of all the requirements we're looking for
         depList = [ None ]
@@ -397,55 +450,47 @@ class DependencyTables:
                         start_transaction = False)
             cu.execute("DROP TABLE RemovedTroves", start_transaction = False)
 
-        cu.execute("""CREATE TEMPORARY VIEW AllProvides AS
-                        SELECT * FROM Provides
-                        UNION
-                        SELECT * FROM TmpProvides""",
-                   start_transaction = False)
-
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
                             "TmpProvides", "AllDeps", multiplier = -1)
 
         # check the dependencies for anything which depends on things which
         # we've removed
-        #cu.execute("""
-        #        INSERT INTO TmpRequires SELECT 
-        #            DISTINCT Requires.instanceId, Requires.depId, 
-        #                     Requires.depCount
-        #        FROM RemovedTroveIds JOIN Provides ON
-        #            RemovedTroveIds.troveId == Provides.instanceId
-        #        JOIN Requires ON
-        #            Provides.depId = Requires.depId
-        #""", start_transaction = False)
+        cu.execute("""
+                INSERT INTO TmpRequires SELECT 
+                    DISTINCT Requires.instanceId, Requires.depId, 
+                             Requires.depNum, Requires.depCount
+                FROM RemovedTroveIds JOIN Provides ON
+                    RemovedTroveIds.troveId == Provides.instanceId
+                JOIN Requires ON
+                    Provides.depId = Requires.depId
+        """, start_transaction = False)
 
-        #cu.execute("""
-        #        INSERT INTO DepCheck SELECT
-        #            Requires.instanceId, Dependencies.depId,
-        #            Requires.DepCount, 0, Dependencies.class,
-        #            Dependencies.name, Dependencies.flag
-        #        FROM RemovedTroveIds JOIN Provides ON
-        #            RemovedTroveIds.troveId == Provides.instanceId
-        #        JOIN Requires ON
-        #            Provides.depId = Requires.depId
-        #        JOIN Dependencies ON
-        #            Dependencies.depId == Requires.depId
-        #""", start_transaction = False)
+        cu.execute("""
+                INSERT INTO DepCheck SELECT
+                    Requires.instanceId, Requires.depNum,
+                    Requires.DepCount, 0, Dependencies.class,
+                    Dependencies.name, Dependencies.flag
+                FROM RemovedTroveIds JOIN Provides ON
+                    RemovedTroveIds.troveId == Provides.instanceId
+                JOIN Requires ON
+                    Provides.depId = Requires.depId
+                JOIN Dependencies ON
+                    Dependencies.depId == Requires.depId
+        """, start_transaction = False)
 
         # dependencies which could have been resolved by something in
         # RemovedIds, but instead weren't resolved at all are considered
         # "unresolvable" dependencies. (they could be resolved by something
         # in the repository, but that something is being explicitly removed
         # and adding it back would be a bit rude!)
-        #import lib
-        #lib.epdb.st()
         cu.execute("""
                 SELECT depNum, rsvInstanceId, RemovedTroveIds.troveId FROM
                     (%s) LEFT OUTER JOIN RemovedTroveIds ON
                         rsvInstanceId == RemovedTroveIds.troveId
-                """ % self._resolveStmt(depTable = "AllDeps",
-                                         requiresTable = "TmpRequires",
-                                         providesTable = "AllProvides"), 
-                start_transaction = False)
+                """ % self._resolveStmt([ 
+                            ("TmpRequires", "Provides",    "Dependencies"),
+                            ("TmpRequires", "TmpProvides", "TmpDependencies") ])
+                , start_transaction = False)
 
         # None in depList means the dependency got resolved; we track
         # would have been resolved by something which has been removed as
@@ -454,8 +499,8 @@ class DependencyTables:
         # depNum is the dependency number
         #    negative ones are for dependencies being added (and they index
         #    depList); positive ones are for dependencies broken by an
-        #    erase (and need to be looked up in the repository to get
-        #    a nice description)
+        #    erase (and need to be looked up in the Requires table in the 
+        #    database to get a nice description)
         # resolvingInstanceId is an instanceId which resolved this dependency
         #    since we only see resolved dependencies here, it must be set
         # removedInstanceId != None means that the dependency was resolved by 
@@ -501,7 +546,6 @@ class DependencyTables:
         cu.execute("DROP TABLE TmpDependencies", start_transaction= False)
         cu.execute("DROP TABLE TmpRequires", start_transaction= False)
         cu.execute("DROP TABLE TmpProvides", start_transaction= False)
-        cu.execute("DROP VIEW AllProvides", start_transaction= False)
         cu.execute("DROP TABLE DepCheck", start_transaction = False)
         cu.execute("DROP TABLE RemovedTroveIds", start_transaction = False)
 
@@ -517,7 +561,7 @@ class DependencyTables:
         cu.execute("CREATE TEMPORARY VIEW AllDeps AS SELECT * FROM "
                    "Dependencies UNION SELECT * FROM TmpDependencies",
                    start_transaction = False)
-        createDepUserTable(cu, 'TmpRequires', isTemp = True)
+        createRequiresTable(cu, 'TmpRequires', isTemp = True)
 
         cu.execute("""
                 CREATE TEMPORARY VIEW providesBranch AS 
@@ -558,9 +602,8 @@ class DependencyTables:
                         Instances.versionId == Nodes.versionId
                       ORDER BY
                         Nodes.finalTimestamp DESC
-                    """ % self._resolveStmt(providesTable = "providesBranch",
-                                            requiresTable = "TmpRequires",
-                                            depTable = "AllDeps"),
+                    """ % self._resolveStmt( [ 
+                          ("TmpRequires", "providesBranch", "Dependencies") ] ),
                     start_transaction = False)
         result = {}
         handled = {}
@@ -593,5 +636,5 @@ class DependencyTables:
     def __init__(self, db):
         self.db = db
         DepTable(db, "Dependencies")
-        DepUser(db, 'Provides')
-        DepUser(db, 'Requires')
+        DepProvides(db, 'Provides')
+        DepRequires(db, 'Requires')
