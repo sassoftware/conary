@@ -20,13 +20,13 @@ def usage(rc = 1):
     print "       srs source remove <file> [<file2> <file3> ...]"
     print "       srs source rename <oldfile> <newfile>"
     print "       srs source update <version>"
-    sys.exit(rc)
+    return rc
 
 def sourceCommand(cfg, args, argSet):
     if not args:
-	usage()
+	return usage()
     elif (args[0] == "add"):
-	if len(args) < 2: usage()
+	if len(args) < 2: return usage()
         for f in args[1:]:
             checkin.addFile(f)
     elif (args[0] == "checkout"):
@@ -36,45 +36,47 @@ def sourceCommand(cfg, args, argSet):
 	else:
 	    dir = None
 
-	if argSet or (len(args) < 2 or len(args) > 3): usage()
+	if argSet or (len(args) < 2 or len(args) > 3): return usage()
 	repos = repository.FilesystemRepository(cfg.reppath, "r")
 
 	args = [repos, cfg, dir] + args[1:]
 	checkin.checkout(*args)
     elif (args[0] == "commit"):
-	if argSet or len(args) != 1: usage()
+	if argSet or len(args) != 1: return usage()
 	repos = repository.FilesystemRepository(cfg.reppath, "w")
 
 	checkin.commit(repos)
     elif (args[0] == "diff"):
-	if argSet or not args or len(args) > 2: usage()
+	if argSet or not args or len(args) > 2: return usage()
 	repos = repository.FilesystemRepository(cfg.reppath, "r")
 
 	args[0] = repos
 	checkin.diff(*args)
     elif (args[0] == "remove"):
-	if len(args) < 2: usage()
+	if len(args) < 2: return usage()
         for f in args[1:]:
             checkin.removeFile(f)
     elif (args[0] == "rename"):
-	if len(args) != 3: usage()
+	if len(args) != 3: return usage()
 	checkin.renameFile(args[1], args[2])
     elif (args[0] == "newpkg"):
-	if len(args) != 2: usage()
+	if len(args) != 2: return usage()
 	
 	try:
 	    repos = repository.FilesystemRepository(cfg.reppath, "r")
-	except OSError:
+	except repository.OpenError:
 	    repos = None
 
 	checkin.newPackage(repos, cfg, args[1])
     elif (args[0] == "update"):
-	if argSet or not args or len(args) > 2: usage()
+	if argSet or not args or len(args) > 2: return usage()
 	repos = repository.FilesystemRepository(cfg.reppath, "r")
 
 	args[0] = repos
 	checkin.updateSrc(*args)
     elif (args[0] == "usage"):
-	usage(rc = 0)
+	return usage(rc = 0)
     else:
-	usage()
+	return usage()
+
+    return 0
