@@ -19,6 +19,7 @@ python_files = __init__.py	\
 	display.py		\
 	filecontainer.py	\
 	files.py		\
+	fixedglob.py		\
 	importrpm.py		\
 	lookaside.py		\
 	package.py		\
