@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-CFLAGS=-Wall -I/usr/include/python2.3 -fPIC
+CFLAGS=-Wall -I$(PYINCLUDE) -fPIC
 
 python_files=__init__.py
 python_modules=elfmodule.so
