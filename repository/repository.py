@@ -17,11 +17,12 @@ import bsddb
 
 class Repository:
 
-    # returns (pkgList, fileList, fileMap, oldFileList, oldPackageList) tuple, 
-    # which forms a todo for how to apply the change set; that tuple is used to
-    # either commit the change set or to reroot the change set against
-    # another target
-    def _buildChangeSetJob(self, cs):
+    # returns 
+    # (pkgList, fileList, fileMap, oldFileList, oldPackageList, erasePkgs) 
+    # tuple, which forms a todo for how to apply the change set; that tuple 
+    # is used to either commit the change set or to reroot the change set 
+    # against another target
+    def _buildChangeSetJob(self, sourcePath, cs):
 	pkgList = []
 	fileMap = {}
 	fileList = []
@@ -84,7 +85,24 @@ class Repository:
 	    assert(newVer.equal(fileMap[fileId][1]))
 	    fileList.append((fileId, newVer, file, skipRestoreContents))
 
-	return (pkgList, fileList, fileMap, oldFileList, oldPackageList)
+	# make sure the packages which need to be removed are installed
+	erasedPackages = []
+	erasedFiles = []
+	for (pkgName, version) in cs.getOldPackageList():
+	    pkg = self.getPackageVersion(pkgName, version)
+	    erasedPackages.append(pkg)
+
+	    for (fileId, path, version) in pkg.fileList():
+		file = self.getFileVersion(fileId, version)
+		if isinstance(file, files.SourceFile):
+		    basePkgName = pkgName.split(':')[-2]
+		    d = { 'pkgname' : basePkgName }
+		    path = (sourcePath) % d + "/" + path
+		erasedFiles.append((fileId, path, version))
+		    
+
+	return (pkgList, fileList, fileMap, oldFileList, oldPackageList,
+	        erasedPackages, erasedFiles)
 
     def _getPackageSet(self, name):
 	return _PackageSet(self.pkgDB, name)
@@ -93,8 +111,9 @@ class Repository:
 	return _FileDB(self.fileDB, fileId)
 
     def commitChangeSet(self, sourcePathTemplate, cs, eraseOld = 0):
-	(pkgList, fileList, fileMap, oldFileList, oldPackageList) = \
-	    self._buildChangeSetJob(cs)
+	(pkgList, fileList, fileMap, oldFileList, oldPackageList, 
+	 eraseList, eraseFiles) = self._buildChangeSetJob(sourcePathTemplate, 
+							  cs)
 
 	# we can't erase the oldVersion for abstract change sets
 	assert(not(cs.isAbstract() and eraseOld))
@@ -136,6 +155,25 @@ class Repository:
 		    path = (sourcePathTemplate) % d + "/" + path
 
 		self.storeFileFromChangeset(cs, file, path, skipRestore)
+
+	    # remove packages we don't need anymore, including the files
+	    for pkg in eraseList:
+		pkgSet = self._getPackageSet(pkg.getName())
+		pkgSet.eraseVersion(pkg.getVersion())
+		pkgSet.close()
+
+	    eraseFiles = [ (x[1], x[0], x[2]) for x in eraseFiles ]
+	    eraseFiles.sort()
+	    eraseFiles.reverse()
+
+	    for (path, fileId, version) in eraseFiles:
+		print path
+		infoFile = self._getFileDB(fileId)
+		file = infoFile.getVersion(version)
+		self.removeFile(file, path)
+		infoFile.eraseVersion(version)
+		infoFile.close()
+
 	except:
 	    # something went wrong; try to unwind our commits
 	    for fileId in filesDone:
@@ -165,11 +203,15 @@ class Repository:
 		pkgSet.eraseVersion(pkgVersion)
 		pkgSet.close()
 
-    # packageList is a list of (pkgName, oldVersion, newVersion) tuples
+    # packageList is a list of (pkgName, oldVersion, newVersion, abstract) 
+    # tuples
+    #
+    # if oldVersion == None and abstract == 0, then the package is assumed
+    # to be new for the purposes of the change set
     def createChangeSet(self, packageList):
 	cs = changeset.ChangeSetFromRepository(self)
 
-	for (packageName, oldVersion, newVersion) in packageList:
+	for (packageName, oldVersion, newVersion, abstract) in packageList:
 	    # look up these versions to get versions w/ timestamps
 	    pkgSet = self._getPackageSet(packageName)
 
@@ -182,8 +224,7 @@ class Repository:
 	    else:
 		old = None
 
-	    (pkgChgSet, filesNeeded) = new.diff(old, 
-						abstract = (not oldVersion))
+	    (pkgChgSet, filesNeeded) = new.diff(old, abstract = abstract)
 	    cs.newPackage(pkgChgSet)
 
 	    for (fileId, oldVersion, newVersion) in filesNeeded:
@@ -206,9 +247,11 @@ class Repository:
 	return self.contentsStore.openFile(fileId)
 
     def newFileContents(self, fileId, srcFile):
+	# if targetFile is None the file is already in the store
 	targetFile = self.contentsStore.newFile(fileId)
-	targetFile.write(srcFile.read())
-	targetFile.close()
+	if targetFile:
+	    targetFile.write(srcFile.read())
+	    targetFile.close()
 
     def hasFileContents(self, fileId):
 	return self.contentsStore.hasFile(fileId)
