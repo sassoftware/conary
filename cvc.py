@@ -23,6 +23,7 @@ from lib import util
 from lib import log
 from local import database
 from build import cook
+import deps
 from repository import netclient
 from repository.netclient import NetworkRepositoryClient
 import branch
@@ -120,6 +121,26 @@ def realMain(cfg, argv=sys.argv):
     if argSet.has_key('version'):
         print constants.version
         sys.exit(0)
+    # XXX initialization of lots of this stuff should likely live somewhere
+    # else, instead of conary.py, so that other applications do not
+    # have to duplicate this code.
+    if cfg.useDir:
+        # the flavor from the rc file wins
+        useFlags = conarycfg.UseFlagDirectory(cfg.useDir)
+        useFlags.union(cfg.flavor, 
+                       mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
+        cfg.flavor = useFlags
+
+    if not deps.deps.DEP_CLASS_IS in cfg.flavor.getDepClasses():
+        insSet = deps.deps.DependencySet()
+        for dep in deps.arch.currentArch:
+            insSet.addDep(deps.deps.InstructionSetDependency, dep)
+        cfg.flavor.union(insSet)
+
+    # default the buildFlavor to be the same as the system flavor, unless
+    # it is specified in the config file
+    if not cfg.buildFlavor:
+        cfg.buildFlavor = cfg.flavor.copy()
 
     sourceCommand(cfg, otherArgs[1:], argSet)
 
