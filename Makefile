@@ -5,9 +5,10 @@
 
 VERSION = 0.1
 distdir = srs-$(VERSION)
-prefix = $(DESTDIR)/usr
+prefix = /usr
 srsdir = $(prefix)/share/srs
 bindir = $(prefix)/bin
+PYTHON = python2.3
 
 python_files = __init__.py	\
 	branch.py		\
@@ -71,13 +72,15 @@ srs.recipe: srs.recipe.in
 	sed s,@VERSION@,$(VERSION),g $< > $@
 
 install: all
-	mkdir -p $(srsdir) $(bindir)
+	mkdir -p $(DESTDIR)$(srsdir) $(DESTDIR)$(bindir)
 	for f in $(python_files) $(bin_files); do \
-		cp -a $$f $(srsdir)/$$f; \
+		cp -a $$f $(DESTDIR)$(srsdir)/$$f; \
 	done
-	install -m 755 srs-wrapper $(bindir)
+	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(srsdir)', ddir='$(srsdir)', quiet=1)"
+	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(srsdir)', ddir='$(srsdir)', quiet=1)"
+	install -m 755 srs-wrapper $(DESTDIR)$(bindir)
 	for f in $(bin_files); do \
-		ln -sf srs-wrapper $(bindir)/$$f; \
+		ln -sf srs-wrapper $(DESTDIR)$(bindir)/$$f; \
 	done
 
 dist: $(dist_files)
@@ -102,21 +105,21 @@ bootstrap:
 		echo "/opt isn't writable, this won't work"; \
 		exit 1; \
 	fi
-	time python2.3 ./srs-bootstrap --bootstrap group-bootstrap
+	time $(PYTHON) ./srs-bootstrap --bootstrap group-bootstrap
 
 bootstrap-continue:
 	@if ! [ -d /opt/ -a -w /opt/ ]; then \
 		echo "/opt isn't writable, this won't work"; \
 		exit 1; \
 	fi
-	time python2.3 ./srs-bootstrap --bootstrap --onlyunbuilt group-bootstrap
+	time $(PYTHON) ./srs-bootstrap --bootstrap --onlyunbuilt group-bootstrap
 
 
 deps.dot:
-	python2.3 ./srs-bootstrap --dot `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` > deps.dot
+	$(PYTHON) ./srs-bootstrap --dot `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` > deps.dot
 
 pychecker:
-	python2.3 /usr/lib/python2.2/site-packages/pychecker/checker.py *.py
+	$(PYTHON) /usr/lib/python2.2/site-packages/pychecker/checker.py *.py
 
 test:
 	make -C test $@
