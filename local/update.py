@@ -174,7 +174,7 @@ class FilesystemJob:
 
     ptrCmp = staticmethod(ptrCmp)
 
-    def apply(self, tagSet = {}, tagScript = None):
+    def apply(self, tagSet = {}, tagScript = None, journal = None):
 	# this is run after the changes are in the database (but before
 	# they are committed
 	tagCommands = []
@@ -238,7 +238,7 @@ class FilesystemJob:
                 
                 contType, contents = self.changeSet.getFileContents(pathId)
                 assert(contType == changeset.ChangedFileTypes.file)
-                fileObj.restore(contents, self.root, target)
+                fileObj.restore(contents, self.root, target, journal=journal)
                 del delayedRestores[match[0]]
 
                 if fileObj.hasContents and fileObj.linkGroup.value():
@@ -282,7 +282,7 @@ class FilesystemJob:
 
                         continue
 
-	    fileObj.restore(contents, self.root, target)
+	    fileObj.restore(contents, self.root, target, journal=journal)
             if ptrTargets.has_key(pathId):
                 ptrTargets[pathId] = target
 	    log.debug(msg, target)
@@ -309,7 +309,7 @@ class FilesystemJob:
                     self.linkGroups[linkGroup] = target
 
             fileObj.restore(filecontents.FromFilesystem(ptrTargets[ptrId]),
-                            self.root, target)
+                            self.root, target, journal=journal)
             log.debug(msg, target)
 
         del delayedRestores

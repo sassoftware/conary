@@ -237,7 +237,7 @@ class Database(SqlDbRepository):
     def commitChangeSet(self, cs, isRollback = False, toStash = True,
                         replaceFiles = False, tagScript = None,
 			keepExisting = False, test = False,
-                        justDatabase = False):
+                        justDatabase = False, journal = None):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -390,7 +390,7 @@ class Database(SqlDbRepository):
             return
 
         if not justDatabase:
-            fsJob.apply(tagSet, tagScript)
+            fsJob.apply(tagSet, tagScript, journal)
 
         for (troveName, troveVersion, troveFlavor, pathIdList) in fsJob.iterUserRemovals():
             self.db.removeFilesFromTrove(troveName, troveVersion, 
