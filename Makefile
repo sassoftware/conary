@@ -50,7 +50,15 @@ python_files = __init__.py	\
 	versions.py
 
 bin_files = conary cvc
-extra_files = conary-wrapper.in Makefile Make.rules conary.1 LICENSE constants.py.in
+extra_files = \
+	LICENSE			\
+	Make.rules 		\
+	Makefile		\
+	NEWS			\
+	conary-wrapper.in	\
+	conary.1		\
+	constants.py.in
+
 dist_files = $(python_files) $(bin_files) $(extra_files)
 
 generated_files = conary-wrapper *.pyo *.pyc 
