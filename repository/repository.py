@@ -639,8 +639,9 @@ class ChangeSetJob:
 	for (fileId, fileObj, oldPath, oldfile, pkgName, oldTroveVersion,
 	     troveFlavor, newVersion, oldVersion, restoreContents) in \
 							configRestoreList:
-	    (contType, fileContents) = cs.getFileContents(fileId)
-	    if contType == changeset.ChangedFileTypes.diff:
+            if cs.configFileIsDiff(fileId):
+                (contType, fileContents) = cs.getFileContents(fileId)
+
 		assert(fileObj.flags.isConfig())
 		# the content for this file is in the form of a
 		# diff, which we need to apply against the file in
@@ -663,6 +664,8 @@ class ChangeSetJob:
 		if failedHunks:
 		    fileContents = filecontents.WithFailedHunks(
 					fileContents, failedHunks)
+            else:
+                fileContents = filecontents.FromChangeSet(cs, fileId)
 
 	    self.addFileContents(fileObj.contents.sha1(), newVersion, 
 				 fileContents, restoreContents, 1)

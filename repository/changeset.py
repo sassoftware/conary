@@ -645,11 +645,11 @@ class ChangeSetFromFile(ChangeSet):
                     cont = filecontents.FromFile(f)
 
                     # cache all config file contents
-                    if tagInfo[0] == '1':
-                        str = cont.get().read()
-                        size = len(str)
-                        self.configCache[name] = (tag, str)
-                        cont = filecontents.FromString(str)
+                    #if tagInfo[0] == '1':
+                    #    str = cont.get().read()
+                    #    size = len(str)
+                    #    self.configCache[name] = (tag, str)
+                    #    cont = filecontents.FromString(str)
                     
                     # we found the one we're looking for, break out
                     if name == fileId:
@@ -746,7 +746,6 @@ def fileContentsDiff(oldFile, oldCont, newFile, newCont):
 	if first and first[-1][-1] == '\n' and \
 		    second and second[-1][-1] == '\n':
 	    diff = difflib.unified_diff(first, second, 
-					newCont.get().readlines(),
 					"old", "new")
 	    diff.next()
 	    diff.next()

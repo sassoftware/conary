@@ -256,6 +256,7 @@ class Database(SqlDbRepository):
 	    # we ignore pkgsNeeded; it doesn't mean much in this case
 	    (pkgChgSet, filesNeeded, pkgsNeeded) = newPkg.diff(old, absolute = 0)
 	    cs.newPackage(pkgChgSet)
+            filesNeeded.sort()
 
 	    for (fileId, oldVersion, newVersion, oldPath, newPath) in filesNeeded:
 		(fileObj, fileVersion) = job.getFile(fileId)
