@@ -16,6 +16,7 @@ import util
 import versions
 import xmlrpclib
 import xmlshims
+from deps import deps
 
 class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 			      repository.AbstractRepository):
@@ -70,6 +71,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	    d[troveName] = [ self.toVersion(x) for x in troveVersions ]
 
 	return d
+
+    def getTroveFlavorsLatestVersion(self, troveName, branch):
+	return [ (versions.VersionFromString(x[1]),
+		  deps.ThawDependencySet(x[0])) for x in 
+                 self.s.getTroveFlavorsLatestVersion(troveName, 
+                                                     branch.asString()) ]
 
     def getTroveVersionList(self, troveNameList):
 	d = self.s.getTroveVersionList(troveNameList)
