@@ -113,7 +113,7 @@ def _markConfig(recipe, filename):
     for package in packages.keys():
 	if filename in packages[package]:
             log.debug('config: %s', filename)
-	    packages[package][filename].isConfig(True)
+	    packages[package][filename].flags.isConfig(True)
 
 class EtcConfig(policy.Policy):
     """

@@ -4,6 +4,7 @@
 #
 import copy
 import difflib
+import files
 import helper
 import log
 import patch
@@ -494,7 +495,7 @@ class PackageChangeSet:
 	    else:
 		f.write("\tchanged %s\n" % fileId)
 	    change = changeSet.getFileChange(fileId)
-	    print "\t\t%s" % change
+	    print "\t\t%s" % " ".join(files.fieldsChanged(change))
 
 	for fileId in self.oldFiles:
 	    f.write("\tremoved %s(.*)%s\n" % (fileId[:6], fileId[-6:]))

@@ -22,7 +22,7 @@ class LocalRepository(FilesystemRepository):
 	this is called when a Repository wants to store a file; we store
 	config files only (since we made to patch them later)
 	"""
-	if file.isConfig():
+	if file.flags.isConfig():
 	    return FilesystemRepository.storeFileFromContents(self, 
 				contents, file, restoreContents)
 
@@ -45,7 +45,7 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 
 	self.undoObj.reset()
 	for (fileId, fileVersion, fileObj) in self.oldFileList():
-	    if fileObj.hasContents and fileObj.isConfig():
+	    if fileObj.hasContents and fileObj.flags.isConfig():
 		self.repos.removeFileContents(fileObj.sha1())
 
     # remove the specified file 

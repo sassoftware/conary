@@ -19,23 +19,31 @@ _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_INITSCRIPT = 1 << 1
 _FILE_FLAG_SHLIB = 1 << 2
 
-_INFO_STREAM	    = 0
-_SHORT_STREAM	    = 1
-_INT_STREAM	    = 2
-_LONGLONG_STREAM    = 3
+_STREAM_INFO	    = 0
+_STREAM_SHORT	    = 1
+_STREAM_INT	    = 2
+_STREAM_LONGLONG    = 3
 _STRING_STREAM	    = 4
 _STREAM_DEVICE	    = 5
 _STREAM_SIZESHA1    = 6
 _STREAM_INODE	    = 7
+_STREAM_FLAGS	    = 7
+_STREAM_MTIME	    = 7
 
 class InfoStream:
 
-    streamId = _INFO_STREAM
+    streamId = _STREAM_INFO
 
     def freeze(self):
 	raise NotImplementedError
 
     def diff(self, them):
+	raise NotImplementedError
+
+    def set(self, val):
+	raise NotImplementedError
+
+    def merge(self, val):
 	raise NotImplementedError
 
     def twm(self, diff, base):
@@ -52,6 +60,13 @@ class NumericStream(InfoStream):
     def value(self):
 	return self.val
 
+    def set(self, val):
+	self.val = val
+
+    def merge(self, other):
+	if other.val != None:
+	    self.val = other.val
+
     def freeze(self):
 	return struct.pack(self.format, self.val)
 
@@ -65,20 +80,20 @@ class NumericStream(InfoStream):
 	self.val = struct.unpack(self.format, frz)[0]
 
     def twm(self, diff, base):
-	if not diff: return True
+	if not diff: return False
 
 	newSize = struct.unpack(self.format, diff)[0]
 	if self.val == base.val:
 	    self.val = newSize
-	    return True
-	elif base.val != newSize:
 	    return False
+	elif base.val != newSize:
+	    return True
 
     def __eq__(self, other):
 	return other.__class__ == self.__class__ and \
 	       self.val == other.val
 
-    def __init__(self, val):
+    def __init__(self, val = None):
 	if type(val) == str:
 	    self.thaw(val)
 	else:
@@ -86,19 +101,34 @@ class NumericStream(InfoStream):
 
 class ShortStream(NumericStream):
 
-    streamId = _SHORT_STREAM
+    streamId = _STREAM_SHORT
 
     format = "!H"
 
 class IntStream(NumericStream):
 
-    streamId = _INT_STREAM
+    streamId = _STREAM_INT
 
     format = "!I"
 
+class MtimeStream(NumericStream):
+
+    streamId = _STREAM_MTIME
+
+    format = "!I"
+
+    def __eq__(self, other):
+	# don't ever compare mtimes
+	return True
+
+    def twm(self, diff, base):
+	# and don't let merges fail
+	NumericStream.twm(self, diff, base)
+	return False
+
 class LongLongStream(NumericStream):
 
-    streamId = _LONGLONG_STREAM
+    streamId = _STREAM_LONGLONG
 
     format = "!Q"
 
@@ -111,6 +141,13 @@ class StringStream(InfoStream):
 
     def value(self):
 	return self.s
+
+    def set(self, val):
+	self.s = val
+
+    def merge(self, other):
+	if other.s != None:
+	    self.s = other.s
 
     def freeze(self):
 	return self.s
@@ -125,32 +162,25 @@ class StringStream(InfoStream):
 	self.s = frz
 
     def twm(self, diff, base):
-	if not diff: return True
+	if not diff: return False
 
 	if self.s == base.s:
 	    self.s = diff
-	    return True
-	elif base.s != diff:
 	    return False
+	elif base.s != diff:
+	    return True
 
     def __eq__(self, other):
 	return other.__class__ == self.__class__ and \
 	       self.s == other.s
 
-    def __init__(self, s):
+    def __init__(self, s = None):
 	self.s = s
 
 class TupleStream(InfoStream):
 
     def __eq__(self, other):
-	if other.__class__ != self.__class__:
-	    return False
-
-	for i in xrange(len(self.makeup)):
-	    if self.items[i] != other.items[i]:
-		return False
-
-	return True
+	return other.__class__ == self.__class__ and other.items == self.items
 
     def freeze(self):
 	rc = []
@@ -162,6 +192,10 @@ class TupleStream(InfoStream):
 		rc.append(struct.pack(size, len(s)) + s)
 
 	return "".join(rc)
+
+    def merge(self, other):
+	for i in xrange(len(self.makeup)):
+	    self.items[i].merge(other.items[i])
 
     def diff(self, them):
 	code = 0
@@ -180,7 +214,7 @@ class TupleStream(InfoStream):
     def twm(self, diff, base):
 	what = struct.unpack("B", diff[0])[0]
 	idx = 1
-	worked = True
+	conflicts = False
 
 	for (i, (name, itemType, size)) in enumerate(self.makeup):
 	    if what & (1 << i):
@@ -200,11 +234,11 @@ class TupleStream(InfoStream):
 
 		d = diff[idx:size]
 
-		worked = worked and self.items[i].twm(diff[idx:idx + size], 
-						      base.items[i])
+		conflicts = conflicts or \
+		    self.items[i].twm(diff[idx:idx + size], base.items[i])
 		idx += size
 
-	return worked
+	return conflicts
 
     def thaw(self, s):
 	self.items = []
@@ -229,8 +263,17 @@ class TupleStream(InfoStream):
 
 	    idx += size
 
-    def __init__(self, first, *rest):
-	if type(first) == str and not rest:
+    def __deepcopy__(self, memo):
+	# trying to copy the lambda this uses causes problems; this
+	# avoids them
+	return self.__class__(self.freeze())
+
+    def __init__(self, first = None, *rest):
+	if first == None:
+	    self.items = []
+	    for (i, (name, itemType, size)) in enumerate(self.makeup):
+		self.items.append(itemType())
+	elif type(first) == str and not rest:
 	    self.thaw(first)
 	else:
 	    all = (first, ) + rest
@@ -240,6 +283,9 @@ class TupleStream(InfoStream):
 
 	for (i, (name, itemType, size)) in enumerate(self.makeup):
 	    self.__dict__[name] = lambda num = i: self.items[num].value()
+	    setName = "set" + name[0].capitalize() + name[1:]
+	    self.__dict__[setName] = \
+		lambda val, num = i: self.items[num].set(val)
 
 class DeviceStream(TupleStream):
 
@@ -248,8 +294,7 @@ class DeviceStream(TupleStream):
 
 class RegularFileStream(TupleStream):
 
-    makeup = (("size", LongLongStream, 8), ("flags", ShortStream, 2),
-              ("sha1", StringStream, 40))
+    makeup = (("size", LongLongStream, 8), ("sha1", StringStream, 40))
     streamId = _STREAM_SIZESHA1
 
 class InodeStream(TupleStream):
@@ -259,7 +304,7 @@ class InodeStream(TupleStream):
     """
 
     # this is permissions, mtime, owner, group
-    makeup = (("perms", ShortStream, 2), ("mtime", IntStream, 4), 
+    makeup = (("perms", ShortStream, 2), ("mtime", MtimeStream, 4), 
               ("owner", StringStream, "B"), ("group", StringStream, "B"))
     streamId = _STREAM_INODE
 
@@ -324,75 +369,9 @@ class InodeStream(TupleStream):
 	       self.owner() == other.owner() and \
 	       self.group() == other.group()
 
-class FileMode:
-    def merge(self, mode):
-        """merge another instance of a FileMode into this one"""
-        if mode.thePerms is not None:
-            self.thePerms = mode.thePerms
-        if mode.theOwner is not None:
-            self.theOwner = mode.theOwner 
-        if mode.theGroup is not None:
-            self.theGroup = mode.theGroup
-        if mode.thePerms is not None:
-            self.thePerms = mode.thePerms
-        if mode.theMtime is not None:
-            self.theMtime = mode.theMtime
-        if mode.theSize is not None:
-            self.theSize = mode.theSize
-        if mode.theFlags is not None:
-            self.theFlags = mode.theFlags
+class FlagsStream:
 
-    def triplet(self, code, setbit = 0):
-	l = [ "-", "-", "-" ]
-	if code & 4:
-	    l[0] = "r"
-	    
-	if code & 2:
-	    l[1] = "w"
-
-	if setbit:
-	    if code & 1:
-		l[2] = "s"
-	    else:
-		l[2] = "S"
-	elif code & 1:
-	    l[2] = "x"
-	    
-	return l
-
-    def perms(self, new = None):
-	if (new != None and new != "-"):
-	    self.thePerms = new
-
-	return self.thePerms
-
-    def acls(self, new = None):
-	# we need to implement storing ACLs
-	pass
-
-    def eas(self, new = None):
-	# we need to implement storing EAs
-	pass
-
-    def flags(self, new = None):
-	if (new != None and new != "-"):
-	    self.theFlags = new
-
-        if self.theFlags is not None:
-            return self.theFlags
-        else:
-            return 0
-
-    def _isFlag(self, flag, set):
-	if set != None:
-            if self.theFlags is None:
-                self.theFlags = 0x0
-	    if set:
-		self.theFlags |= flag
-	    else:
-		self.theFlags &= ~(flag)
-
-	return (self.theFlags and self.theFlags & flag)
+    streamId = _STREAM_FLAGS
 
     def isConfig(self, set = None):
 	return False
@@ -406,59 +385,26 @@ class FileMode:
 	return False
 	return self._isFlag(_FILE_FLAG_SHLIB, set)
 
-    def infoLine(self):
-	return "0%o %s %s %s %s 0x%x" % (self.thePerms, self.theOwner, 
-                                         self.theGroup, self.theSize,
-                                         self.theMtime, self.flags())
-    
-    def same(self, other, ignoreOwner = False):
-	if self.__class__ != other.__class__: return 0
+    def freeze(self):
+	return struct.pack("!I", 0)
 
-	if (self.thePerms == other.thePerms and
-		self.theFlags == other.theFlags and
-		self.theSize == other.theSize):
-	    if ignoreOwner: return True
+    def diff(self, them):
+	return ""
 
-	    return (self.theOwner == other.theOwner and
-		    self.theGroup == other.theGroup)
+    def twm(self, diff, base):
+	pass
 
-	return False
+    def merge(self, other):
+	pass
 
-    def _applyChangeLine(self, line):
-	(p, o, g, s, m, f) = line.split()
-	if p == "-": 
-	    p = None
-	else:
-	    p = int(p, 8)
+    def __init__(self, *args):
+	pass
 
-	if f == "-":
-	    f = None
-	else:
-	    f = int(f, 16)
-
-	self.perms(p)
-	self.owner(o)
-	self.group(g)
-	self.mtime(m)
-	self.size(s)
-	self.flags(f)
-
-    def __init__(self, info = None):
-	if info:
-	    self._applyChangeLine(info)
-	else:
-	    self.thePerms = None
-	    self.theOwner = None
-	    self.theGroup = None
-	    self.theMtime = None
-	    self.theSize = None
-	    self.theFlags = None
-	
-class File(FileMode):
+class File:
 
     lsTag = None
     hasContents = 0
-    streamList = ( ("inode", InodeStream), )
+    streamList = ( ("inode", InodeStream), ("flags", FlagsStream) )
 
     def modeString(self):
 	l = self.inode.permsString()
@@ -472,9 +418,6 @@ class File(FileMode):
 
     def copy(self):
 	return copy.deepcopy(self)
-
-    def infoLine(self):
-	return self.infoTag + " " + FileMode.infoLine(self)
 
     def id(self, new = None):
 	if new:
@@ -511,37 +454,22 @@ class File(FileMode):
 
 	os.lchown(target, uid, gid)
 
-    def applyChange(self, line, ignoreContents = 0):
-	"""
-	public interface to _applyChangeLine
-	
-	returns 1 if the change worked, 0 if the file changed too much for
-	the change to apply (which means this is a different file type).
-
-	@param line: change line
-	@type line: str
-	@param ignoreContents: don't merge the sha1's (ignored for most file 
-        types)
-	@type ignoreContents: boolean
-	"""
-	(tag, line) = line.split(None, 1)
-	assert(tag == self.infoTag)
-	self._applyChangeLine(line)
-
     def initializeStreams(self, data):
-	if not data: return
+	if not data: 
+	    for (name, streamType) in self.streamList:
+		self.__dict__[name] = streamType()
+	else:
+	    # skip over the file type for now
+	    i = 1
+	    for (name, streamType) in self.streamList:
+		(streamId, size) = struct.unpack("!BH", data[i:i+3])
+		assert(streamId == streamType.streamId)
+		i += 3
+		self.__dict__[name] = streamType(data[i:i + size])
+		i += size
 
-	# skip over the file type for now
-	i = 1
-	for (name, streamType) in self.streamList:
-	    (streamId, size) = struct.unpack("!BH", data[i:i+3])
-	    assert(streamId == streamType.streamId)
-	    i += 3
-	    self.__dict__[name] = streamType(data[i:i + size])
-	    i += size
-
-	# FIXME
-	#assert(i == len(data))
+	    # FIXME
+	    #assert(i == len(data))
 
     def diff(self, other):
 	if self.lsTag != other.lsTag:
@@ -563,18 +491,18 @@ class File(FileMode):
 	assert(self.lsTag == base.lsTag)
 	assert(self.lsTag == diff[1])
 	i = 2
-	worked = True
+	conflicts = False
 	
 	for (name, streamType) in self.streamList:
 	    size = struct.unpack("!H", diff[i:i+2])[0]
 	    i += 2
 	    w = self.__dict__[name].twm(diff[i:i+size], base.__dict__[name])
 	    i += size
-	    worked = worked and w
+	    conflicts = conflicts or w
 
 	assert(i == len(diff))
 
-	return worked
+	return conflicts
 
     def __eq__(self, other):
 	if other.lsTag != self.lsTag: return False
@@ -596,7 +524,6 @@ class File(FileMode):
         #assert(self.__class__ is not File)
 	self.theId = fileId
 	self.infoTag = infoTag
-	FileMode.__init__(self, info)
 	self.initializeStreams(streamData)
 
 class SymbolicLink(File):
@@ -614,15 +541,11 @@ class SymbolicLink(File):
     def sizeString(self):
 	return "%8d" % len(self.target.value())
 
-    def infoLine(self):
-	return "l %s %s" % (self.theLinkTarget, FileMode.infoLine(self))
-
     def same(self, other, ignoreOwner = False):
-	if self.__class__ != other.__class__: return 0
-
-	# recursing does a permission check, which doens't apply 
+	# inherited method does a permission check, which doens't apply 
 	# to symlinks under Linux
-	return self.theLinkTarget == other.theLinkTarget
+	return self.__class__ != other.__class__ and \
+	       self.target == other.target
 
     def chmod(self, target):
 	# chmod() on a symlink follows the symlink
@@ -638,11 +561,6 @@ class SymbolicLink(File):
         util.mkdirChain(os.path.dirname(target))
 	os.symlink(self.theLinkTarget, target)
 	File.restore(self, target, restoreContents, skipMtime = 1)
-
-    def _applyChangeLine(self, line):
-	(target, line) = line.split(None, 1)
-	self.linkTarget(target)
-	File._applyChangeLine(self, line)
 
     def __init__(self, fileId, line = None):
 	if (line):
@@ -692,9 +610,6 @@ class Directory(File):
 
     lsTag = "d"
 
-    def same(self, other, ignoreOwner = False):
-	return File.same(self, other)
-
     def restore(self, fileContents, target, restoreContents):
 	if not os.path.isdir(target):
 	    util.mkdirChain(target)
@@ -718,10 +633,6 @@ class DeviceFile(File):
 
     def sizeString(self):
 	return "%3d, %3d" % (self.major, self.minor)
-
-    def infoLine(self):
-	return "%c %d %d %s" % (self.infoTag, self.major, self.minor,
-				  FileMode.infoLine(self))
 
     def same(self, other, ignoreOwner = False):
 	if self.__class__ != other.__class__: return 0
@@ -757,22 +668,6 @@ class DeviceFile(File):
 	
 	return (self.infoTag, self.major, self.minor)
 
-    def _applyChangeLine(self, line):
-	(ma, mi, line) = line.split(None, 2)
-
-	if ma == "-":
-	    ma = None
-	else:
-	    ma = int(ma)
-	    
-	if mi == "-":
-	    mi = None
-	else:
-	    mi = int(mi)
-
-	self.majorMinor(ma, mi)
-	File._applyChangeLine(self, line)
-
     def __init__(self, fileId, info = None):
 	if (info):
 	    self._applyChangeLine(info)
@@ -805,19 +700,6 @@ class RegularFile(File):
     def sizeString(self):
 	return "%8d" % self.contents.size()
 
-    def applyChange(self, line, ignoreContents = 0):
-	if ignoreContents:
-	    l = line.split()
-	    l[1] = "-"			# sha1
-	    l[5] = "-"			# size
-	    line = " ".join(l)
-	
-	File.applyChange(self, line)
-
-    def infoLine(self):
-	return "%s %s %s" % (self.infoTag, self.thesha1, 
-			     FileMode.infoLine(self))
-
     def same(self, other, ignoreOwner = False):
 	if self.__class__ != other.__class__: return 0
 
@@ -843,11 +725,6 @@ class RegularFile(File):
 	    f.close()
 
 	File.restore(self, target, restoreContents)
-
-    def _applyChangeLine(self, line):
-	(sha, line) = line.split(None, 1)
-	self.sha1(sha)
-	File._applyChangeLine(self, line)
 
     def __init__(self, fileId, info = None, infoTag = "f", streamData = None):
 	if (info):
@@ -908,41 +785,21 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
 
     f.inode = inode
 
-    f.perms(s.st_mode & 07777)
+    #f.perms(s.st_mode & 07777)
 
-    f.flags(0)
+    #f.flags(0)
     
     # assume we have a match if the FileMode and object type match
     if possibleMatch and (possibleMatch.__class__ == f.__class__):
-	f.flags(possibleMatch.flags())
-	if FileMode.same(f, possibleMatch):
+	if f.inode == possibleMatch.inode:
 	    return possibleMatch
-	f.flags(0)
 
     if needsSha1:
 	sha1 = sha1helper.hashFile(path)
-	f.contents = RegularFileStream(s.st_size, f.flags(), sha1)
+	f.contents = RegularFileStream(s.st_size, sha1)
+	f.flags = FlagsStream(f.flags)
 
     return f
-
-def FileFromInfoLine(infoLine, fileId):
-    (type, infoLine) = infoLine.split(None, 1)
-    if type == "f":
-	return RegularFile(fileId, infoLine)
-    elif type == "l":
-	return SymbolicLink(fileId, infoLine)
-    elif type == "d":
-	return Directory(fileId, infoLine)
-    elif type == "p":
-	return NamedPipe(fileId, infoLine)
-    elif type == "c":
-	return CharacterDevice(fileId, infoLine)
-    elif type == "b":
-	return BlockDevice(fileId, infoLine)
-    elif type == "s":
-	return Socket(fileId, infoLine)
-    else:
-	raise FilesError("bad infoLine %s" % infoLine)
 
 def ThawFile(frz, fileId):
     if frz[0] == "-":

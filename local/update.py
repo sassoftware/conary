@@ -42,8 +42,8 @@ class FilesystemJob:
     def _restore(self, fileObj, target, msg, contentsOverride = ""):
 	self.restores.append((fileObj.id(), fileObj, target, contentsOverride, 
 			      msg))
-	self.runLdconfig = self.runLdconfig | fileObj.isShLib()
-	if fileObj.isInitScript() and not os.path.exists(target):
+	self.runLdconfig = self.runLdconfig | fileObj.flags.isShLib()
+	if fileObj.flags.isInitScript() and not os.path.exists(target):
 	    self.initScripts.append(target)
 
     def _remove(self, fileObj, target, msg):
@@ -306,23 +306,23 @@ class FilesystemJob:
 		
 		headChanges = changeSet.getFileChange(fileId)
 		headFile = baseFile.copy()
-		headFile.applyChange(headChanges)
-		fsFile.isConfig(headFile.isConfig())
+		headFile.twm(headChanges, headFile)
+		fsFile.flags.isConfig(headFile.flags.isConfig())
 		fsChanges = fsFile.diff(baseFile)
 
 	    attributesChanged = False
 
-	    if (basePkg and headFileVersion
-                and not fsFile.same(headFile, ignoreOwner = True)):
+	    # XXX X this needs to ignore the owner for source packages, but
+	    # not for binary packages!
+	    if basePkg and headFileVersion and not fsFile == headFile:
 		# something has changed for the file
 		if flags & MERGE:
-		    (conflicts, mergedChanges) = files.mergeChangeLines(
-						    headChanges, fsChanges)
-		    if mergedChanges and (not conflicts or
-					  files.contentConflict(mergedChanges)):
-			fsFile.applyChange(mergedChanges, ignoreContents = 1)
+		    # XXX for all we know, headChanges is empty!
+		    conflicts = fsFile.twm(headChanges, baseFile)
+		    if not conflicts:
 			attributesChanged = True
 		    else:
+			assert(0)
 			contentsOkay = False
 			self.errors.append("file attributes conflict for %s"
 						% realPath)
@@ -337,7 +337,8 @@ class FilesystemJob:
 	    beenRestored = False
 
 	    if headFileVersion and headFile.hasContents and \
-	       fsFile.hasContents and fsFile.sha1() != headFile.sha1():
+	       fsFile.hasContents and \
+	       fsFile.contents.sha1() != headFile.contents.sha1():
 		# the contents have changed... let's see what to do
 
 		# get the contents if the version on head has contents, and
@@ -349,7 +350,8 @@ class FilesystemJob:
 		# this file)
 		if (headFile.hasContents
                     and (not baseFile.hasContents
-                         or headFile.sha1() != baseFile.sha1())):
+                         or headFile.contents.sha1() != 
+			    baseFile.contents.sha1())):
 		    headFileContType = changeSet.getFileContentsType(fileId)
 		else:
 		    headFileContType = None
@@ -381,7 +383,7 @@ class FilesystemJob:
 		elif headFile.same(baseFile, ignoreOwner = True):
 		    # it changed in just the filesystem, so leave that change
 		    log.debug("preserving new contents of %s" % realPath)
-		elif fsFile.isConfig() or headFile.isConfig():
+		elif fsFile.flags.isConfig() or headFile.flags.isConfig():
 		    # it changed in both the filesystem and the repository; our
 		    # only hope is to generate a patch for what changed in the
 		    # repository and try and apply it here
@@ -538,7 +540,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
 				     possibleMatch = srcFile)
 
 	if path.endswith(".recipe"):
-	    f.isConfig(set = True)
+	    f.flags.isConfig(set = True)
 
 	if not srcPkg or not srcPkg.hasFile(fileId):
 	    # if we're committing against head, this better be a new file.
@@ -546,20 +548,22 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
 	    # be.
 	    assert(srcPkg or isinstance(version, versions.NewVersion))
 	    # new file, so this is easy
-	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
+	    changeSet.addFile(fileId, None, newVersion, f.freeze())
 	    newPkg.addFile(fileId, path, newVersion)
 
 	    if f.hasContents:
 		newCont = filecontents.FromFilesystem(realPath)
 		changeSet.addFileContents(fileId,
 					  changeset.ChangedFileTypes.file,
-					  newCont, f.isConfig())
+					  newCont, f.flags.isConfig())
 	    continue
 
 	oldVersion = srcPkg.getFile(fileId)[1]	
 	(oldFile, oldCont) = repos.getFileVersion(fileId, oldVersion,
 						  withContents = 1)
-        if not f.same(oldFile, ignoreOwner = True):
+	# XXX X this needs to ignore the owner for source packages, but
+	# not for binary packages!
+	if not f == oldFile:
 	    newPkg.addFile(fileId, path, newVersion)
 
 	    (filecs, hash) = changeset.fileChangeSet(fileId, oldFile, f)
@@ -569,7 +573,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
 		(contType, cont) = changeset.fileContentsDiff(oldFile, oldCont,
                                                               f, newCont)
 						
-		changeSet.addFileContents(fileId, contType, cont, f.isConfig())
+		changeSet.addFileContents(fileId, contType, cont, 
+					  f.flags.isConfig())
 
     (csPkg, filesNeeded, pkgsNeeded) = newPkg.diff(srcPkg)
     assert(not pkgsNeeded)

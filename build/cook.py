@@ -46,12 +46,14 @@ def _createPackage(repos, branch, bldPkg, ident):
             f = files.FileFromFilesystem(realPath, fileId,
                                          requireSymbolicOwnership=True)
 	    # setuid or setgid must be set explicitly in buildFile
-	    f.thePerms &= 01777
+	    # XXX there must be a better way
+	    f.inode.setPerms(f.inode.perms() & 01777)
         else:
             raise CookError("unable to create file object for package")
 
         # set ownership, flags, etc
-        f.merge(buildFile)
+        f.inode.merge(buildFile.inode)
+	f.flags.merge(buildFile.flags)
         
         if not fileVersion:
 	    p.addFile(f.id(), path, bldPkg.getVersion())
@@ -243,12 +245,12 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
     for (fileId, path, version) in recipeObj.iterFileList():
 	fileset.addFile(fileId, path, version)
 	fileObj = repos.getFileVersion(fileId, version)
-	changeSet.addFile(fileId, None, version, fileObj.infoLine())
+	changeSet.addFile(fileId, None, version, fileObj.freeze())
 	if fileObj.hasContents:
 	    changeSet.addFileContents(fileId, changeset.ChangedFileTypes.file,
 			filecontents.FromRepository(repos, 
 				    fileObj.contents.sha1(), fileObj.size()),
-			fileObj.isConfig())
+			fileObj.flags.isConfig())
 
     filesetDiff = fileset.diff(None, abstract = 1)[0]
     changeSet.newPackage(filesetDiff)

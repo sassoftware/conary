@@ -129,7 +129,7 @@ class AbstractDatabase(repository.AbstractRepository):
 				    oldCont, fileObj.file(), cont)
 
 		    cs.addFileContents(fileId, contType, cont, 
-					fileObj.file().isConfig())
+					fileObj.file().flags.isConfig())
 
 	assert(not cs.validate())
 

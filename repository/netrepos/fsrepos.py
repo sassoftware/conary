@@ -91,7 +91,7 @@ class FilesystemRepository(AbstractRepository):
 	if withContents:
 	    if file.hasContents:
 		cont = filecontents.FromRepository(self, file.contents.sha1(), 
-						   file.size())
+						   file.contents.size())
 	    else:
 		cont = None
 
@@ -360,7 +360,7 @@ class FilesystemRepository(AbstractRepository):
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
 		    cs.addFileContents(fileId, contType, cont, 
-				       newFile.isConfig())
+				       newFile.flags.isConfig())
 
 	return cs
 
@@ -585,7 +585,7 @@ class ChangeSetJob:
 	    # file to multiple locations.
 	    if self.repos.storeFileFromContents(newFile.getContents(), file, 
 						 newFile.restoreContents()):
-		self.undoObj.addedFileContents(file.sha1())
+		self.undoObj.addedFileContents(file.contents.sha1())
 
 	# This doesn't actually remove anything! we never allow bits
 	# to get erased from repositories. The database, which is a child
@@ -636,19 +636,19 @@ class ChangeSetJob:
 
 	# Create the file objects we'll need for the commit. This handles
 	# files which were added and files which have changed
-	for (fileId, (oldVer, newVer, infoLine)) in cs.getFileList():
+	for (fileId, (oldVer, newVer, diff)) in cs.getFileList():
 	    restoreContents = 1
 	    if oldVer:
 		oldfile = repos.getFileVersion(fileId, oldVer)
 		file = repos.getFileVersion(fileId, oldVer)
-		file.applyChange(infoLine)
+		file.twm(diff, oldfile)
 		
 		if file.hasContents and oldfile.hasContents and	    \
-		   file.sha1() == oldfile.sha1():
+		   file.contents.sha1() == oldfile.contents.sha1():
 		    restoreContents = 0
 	    else:
 		# this is for new files
-		file = files.ThawFile(infoLine, fileId)
+		file = files.ThawFile(diff, fileId)
 
 	    # we should have had a package which requires this (new) version
 	    # of the file

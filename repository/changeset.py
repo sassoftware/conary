@@ -292,7 +292,7 @@ class ChangeSet:
 		# not changed*. If they have changed, they'll show up as
 		# members of the local branch, and their contents will be
 		# saved as part of that change set.
-		if origFile.isConfig():
+		if origFile.flags.isConfig():
 		    cont = filecontents.FromRepository(db, 
 						       origFile.contents.sha1(),
 						       origFile.size())
@@ -326,7 +326,7 @@ class ChangeSet:
 
 		origFile = db.getFileVersion(fileId, oldVersion)
 		newFile = db.getFileVersion(fileId, oldVersion)
-		newFile.applyChange(csInfo)
+		newFile.twm(csInfo, origFile)
 
 		rollback.addFile(fileId, newVersion, oldVersion, 
 				  origFile.diff(newFile))
@@ -339,8 +339,8 @@ class ChangeSet:
 		# still be available from the database when the rollback
 		# gets applied. We may be able to get away with just reversing
 		# a diff rather then saving the full contents
-		if (origFile.sha1() != newFile.sha1()) and	    \
-		   (origFile.isConfig() or newFile.isConfig()):
+		if (origFile.contents.sha1() != newFile.contents.sha1()) and \
+		   (origFile.flags.isConfig() or newFile.flags.isConfig()):
 		    (contType, cont) = self.getFileContents(newFile.id())
 		    if contType == ChangedFileTypes.diff:
 			f = cont.get()
@@ -354,14 +354,14 @@ class ChangeSet:
 				    origFile.contents.sha1(), origFile.size())
 			rollback.addFileContents(fileId,
 						 ChangedFileTypes.file, cont,
-						 newFile.isConfig())
-		elif origFile.sha1() != newFile.sha1():
+						 newFile.flags.isConfig())
+		elif origFile.contents.sha1() != newFile.contents.sha1():
 		    # this file changed, so we need the contents
 		    fullPath = db.root + curPath
 		    fsFile = files.FileFromFilesystem(fullPath, fileId,
 				possibleMatch = origFile)
 
-		    if fsFile.sha1() == origFile.sha1():
+		    if fsFile.contents.sha1() == origFile.contents.sha1():
 			# the contents in the file system are right
 			cont = filecontents.FromFilesystem(fullPath)
 		    else:
@@ -372,8 +372,8 @@ class ChangeSet:
 
 		    rollback.addFileContents(fileId,
 					     ChangedFileTypes.file, cont,
-					     origFile.isConfig() or
-					     newFile.isConfig())
+					     origFile.flags.isConfig() or
+					     newFile.flags.isConfig())
 
 	    rollback.newPackage(invertedPkg)
 
@@ -383,7 +383,7 @@ class ChangeSet:
 	    rollback.newPackage(pkgDiff)
 	    for (fileId, path, fileVersion) in pkg.iterFileList():
 		fileObj = db.getFileVersion(fileId, fileVersion)
-		rollback.addFile(fileId, None, fileVersion, fileObj.infoLine())
+		rollback.addFile(fileId, None, fileVersion, fileObj.freeze())
 		if fileObj.hasContents:
 		    fullPath = db.root + path
 		    fsFile = files.FileFromFilesystem(fullPath, fileId,
@@ -400,7 +400,7 @@ class ChangeSet:
 
 		    rollback.addFileContents(fileId,
 					     ChangedFileTypes.file, cont,
-					     fsFile.isConfig())
+					     fsFile.flags.isConfig())
 
 	return rollback
 
@@ -614,12 +614,11 @@ def fileChangeSet(fileId, old, new):
     hash = None
 
     if old and old.__class__ == new.__class__:
-	assert(0)
 	diff = new.diff(old)
 	if isinstance(new, files.RegularFile) and      \
 		  isinstance(old, files.RegularFile)   \
-		  and new.sha1() != old.sha1():
-	    hash = new.sha1()
+		  and new.contents.sha1() != old.contents.sha1():
+	    hash = new.contents.sha1()
     else:
 	# different classes; these are always written as abstract changes
 	old = None
@@ -630,7 +629,7 @@ def fileChangeSet(fileId, old, new):
     return (diff, hash)
 
 def fileContentsDiff(oldFile, oldCont, newFile, newCont):
-    if oldFile and oldFile.isConfig() and newFile.isConfig():
+    if oldFile and oldFile.flags.isConfig() and newFile.flags.isConfig():
 	diff = difflib.unified_diff(oldCont.get().readlines(),
 				    newCont.get().readlines(),
 				    "old", "new")
@@ -664,7 +663,7 @@ def CreateFromFilesystem(pkgList):
 	    if hash:
 		cs.addFileContents(fileId, ChangedFileTypes.file,
 			  filecontents.FromFilesystem(realPath),
-			  file.isConfig())
+			  file.flags.isConfig())
 
     return cs
 

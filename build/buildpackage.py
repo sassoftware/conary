@@ -15,7 +15,7 @@ import re
 import os
 import files
 
-class BuildFile(files.FileMode):
+class BuildFile(files.File):
     def getRealPath(self):
         return self.realPath
 
@@ -23,7 +23,7 @@ class BuildFile(files.FileMode):
         return self.type
 
     def __init__(self, realPath, type):
-        files.FileMode.__init__(self)
+        files.File.__init__(self, None)
         self.realPath = realPath
         self.type = type
 
