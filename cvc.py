@@ -31,8 +31,7 @@ def sourceCommand(cfg, args, argSet):
 	return usage()
     elif (args[0] == "add"):
 	if len(args) < 2: return usage()
-        for f in args[1:]:
-            checkin.addFile(f)
+	checkin.addFiles(args[1:])
     elif (args[0] == "checkout"):
 	if argSet.has_key("dir"):
 	    dir = argSet['dir']

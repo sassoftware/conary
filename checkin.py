@@ -438,31 +438,36 @@ def updateSrc(repos, versionStr = None):
 
     newState.write("CONARY")
 
-def addFile(file):
+def addFiles(fileList):
     try:
         state = SourceStateFromFile("CONARY")
     except OSError:
         return
 
-    try:
-	os.lstat(file)
-    except OSError:
-	log.error("files must be created before they can be added")
-	return
+    for file in fileList:
+	try:
+	    os.lstat(file)
+	except OSError:
+	    log.error("file %s does not exist", file)
+	    continue
 
-    for (fileId, path, version) in state.iterFileList():
-	if path == file:
-	    log.error("file %s is already part of this source component" % path)
-	    return
+	for (fileId, path, version) in state.iterFileList():
+	    if path == file:
+		log.error("file %s is already part of this source component" % path)
+		continue
 
-    fileMagic = magic.magic(file)
-    if fileMagic and fileMagic.name == "changeset":
-	log.error("do not add changesets to source components")
-	return
+	fileMagic = magic.magic(file)
+	if fileMagic and fileMagic.name == "changeset":
+	    log.error("do not add changesets to source components")
+	    continue
+	elif file == "CONARY":
+	    log.error("refusing to add CONARY to the list of managed sources")
+	    continue
 
-    fileId = cook.makeFileId(os.getcwd(), file)
+	fileId = cook.makeFileId(os.getcwd(), file)
 
-    state.addFile(fileId, file, versions.NewVersion())
+	state.addFile(fileId, file, versions.NewVersion())
+
     state.write("CONARY")
 
 def removeFile(file):
