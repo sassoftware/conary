@@ -13,3 +13,5 @@ class Srs(Recipe):
 
     def setup(self):
 	self.addArchive("srs-%(version)s.tar.bz2")
+	self.Make()
+	self.MakeInstall()
