@@ -100,7 +100,7 @@ bootstrap-continue:
 		echo "/opt isn't writable, this won't work"; \
 		exit 1; \
 	fi
-	time python2.3 ./srs-bootstrap `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` --skip=$$(for i in `./srs replist | cut -d: -f 1 | sort | uniq`; do echo -n $$i,; done)
+	time python2.3 ./srs-bootstrap `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` --onlyunbuilt
 
 
 deps.dot:
