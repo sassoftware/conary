@@ -13,8 +13,6 @@
 #
 
 python_files = apachehooks.py \
-               fmtroves.py    \
-               metadata.py    \
 	       server.py      \
                http.py        \
                htmlengine.py

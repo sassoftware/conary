@@ -38,7 +38,9 @@ python_files = __init__.py	\
 	datastore.py		\
 	display.py		\
 	files.py		\
+        fmtroves.py             \
 	importrpm.py		\
+        metadata.py             \
 	queryrep.py		\
 	rollbacks.py		\
 	rpmhelper.py		\
