@@ -76,7 +76,7 @@ class Package:
     def hasFile(self, fileId):
 	return self.idMap.has_key(fileId)
 
-    def addPackageVersion(self, name, version):
+    def addPackageVersion(self, name, version, presentOkay = False):
 	"""
 	Adds a single version of a package.
 
@@ -86,7 +86,16 @@ class Package:
 	@type version: versions.Version
 	"""
 	if self.packages.has_key(name):
-	    self.packages[name].append(version)
+	    i = 0
+	    for ver in self.packages[name]:
+		if ver.equal(version): break
+		i = i + 1
+
+	    if i == len(self.packages[name]):
+		self.packages[name].append(version)
+	    elif not redundantOkay:
+		# FIXME, this isn't the right thing to do
+		raise IOError
 	else:
 	    self.packages[name] = [ version ]
 
@@ -100,6 +109,28 @@ class Package:
 	@type versionList: list of versions.Version
 	"""
 	self.packages[name] = versionList
+
+    def delPackageVersion(self, name, version, missingOkay):
+	"""
+	Removes a single version of a package.
+
+	@param name: name of the package
+	@type name: str
+	@param version: version of the package
+	@type version: versions.Version
+	@param missingOkay: should we raise an error if the version isn't
+	part of this trove?
+	@boolean missingOkay: boolean
+	"""
+	for i, ver in enumerate(self.packages[name]):
+	    if ver.equal(version): break
+	if i != len(self.packages[name]):
+	    del(self.packages[name][i])
+	    if not self.packages[name]:
+		del self.packages[name]
+	elif not missingOkay:
+	    # FIXME, this isn't the right thing to do
+	    raise IOError
 
     def getPackageList(self):
 	"""
@@ -204,23 +235,31 @@ class Package:
 	for fileId in pkgCS.getOldFileList():
 	    self.removeFile(fileId)
 
-	# merge the included packages
-	for (name, list) in pkgCS.getChangedPackages():
-	    for (oper, version) in list:
-		if oper == '+':
-		    self.addPackageVersion(name, version)
-		elif oper == "-":
-		    for i, ver in enumerate(self.packages[name]):
-			if ver.equal(version): break
-		    if i == len(self.packages[name]):
-			# FIXME, this isn't the right thing to do
-			raise IOError
-
-		    del(self.packages[name][i])
-		    if not self.packages[name]:
-			del self.packages[name]
+	self.mergePackageListChanges(pkgCS.iterChangedPackages())
 
 	return fileMap
+
+    def mergePackageListChanges(self, changeList, redundantOkay = False):
+	"""
+	Merges a set of changes to the included package list into this
+	package.
+
+	@param list: A list or generator specifying a set of package changes;
+	this is the same as returned by PackageChangeSet.iterChangedPackages()
+	@type list: (name, list) tuple
+	@param redundantOkay: Redundant changes are normally considered errors
+	@type redundantOkay: boolean
+	"""
+
+	for (name, list) in changeList:
+	    for (oper, version) in list:
+		if oper == '+':
+		    self.addPackageVersion(name, version, 
+					   presentOkay = redundantOkay)
+
+		elif oper == "-":
+		    self.delPackageVersion(name, version, 
+					   missingOkay = redundantOkay)
 
     def diff(self, them, abstract = 0):
 	"""
@@ -452,8 +491,8 @@ class PackageChangeSet:
     def getChangedFileList(self):
 	return self.changedFiles
 
-    def getChangedPackages(self):
-	return self.packages.items()
+    def iterChangedPackages(self):
+	return self.packages.iteritems()
 
     def newPackageVersion(self, name, version):
 	"""
