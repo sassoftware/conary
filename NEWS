@@ -1,9 +1,3 @@
-Changes in 0.11.11
-  * when a trove is installed for the first time, it comes from a single
-    repository
-  * didn't handle file types changing on update
-  * fixed problem assigning depNums
-
 Changes in 0.11.10
   * changed flavor tracking when loadRecipe() is used to only track
     flavors in loaded recipes that are superclasses of the recipe
@@ -13,6 +7,10 @@ Changes in 0.11.10
     as the loading recipe does not subclass the Python class.)
   * add conary verify command for comparing the local system's state to 
     the state it was in at install time
+  * when a trove is installed for the first time, it comes from a single
+    repository
+  * didn't handle file types changing on update
+  * fixed problem assigning depNums
 
 Changes in 0.11.9
   * change the order of permissions setting (chmod after chown)
