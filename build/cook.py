@@ -17,7 +17,7 @@ def cook(repos, cfg, recipeFile):
     if recipeFile[0] != "/":
 	raise IOError, "recipe file names must be absolute paths"
 
-    for (name, theClass) in classList.items():
+    for (name, recipeClass) in classList.items():
 	print "Building", name
 
 	# find the files and ids which were owned by the last version of
@@ -31,29 +31,25 @@ def cook(repos, cfg, recipeFile):
 		for (id, path, version) in pkg.fileList():
 		    fileIdMap[path] = id
 
-	id = idgen(fileIdMap)
+	ident = IdGen(fileIdMap)
 
-	d = {}
-	d['pkgname'] = name
+        srcdirs = [ os.path.dirname(recipeFile), cfg.sourcepath % {'pkgname': name} ]
+	recipeObj = recipeClass(cfg, srcdirs)
 
-	srcdirs = [ os.path.dirname(recipeFile), cfg.sourcepath % d ]
+	ourBuildDir = cfg.buildpath + "/" + recipeObj.name
 
-	recp = theClass(srcdirs)
+	recipeObj.setup()
+	recipeObj.unpackSources(ourBuildDir)
+	recipeObj.doBuild(ourBuildDir)
 
-	ourBuildDir = cfg.buildpath + "/" + recp.name
-
-	recp.setup()
-	recp.unpackSources(ourBuildDir)
-	recp.doBuild(ourBuildDir)
-
-	rootDir = "/var/tmp/srs/%s-%d" % (recp.name, int(time.time()))
+	rootDir = "/var/tmp/srs/%s-%d" % (recipeObj.name, int(time.time()))
         util.mkdirChain(rootDir)
-	recp.doInstall(ourBuildDir, rootDir)
+	recipeObj.doInstall(ourBuildDir, rootDir)
 
-        recp.packages(rootDir)
-        pkgSet = recp.getPackageSet()
+        recipeObj.packages(rootDir)
+        pkgSet = recipeObj.getPackageSet()
 
-        pkgname = cfg.packagenamespace + "/" + recp.name
+        pkgname = cfg.packagenamespace + "/" + recipeObj.name
 
 	for (name, buildPkg) in pkgSet.packageSet():
             built.append(pkgname + "/" + name)
@@ -61,29 +57,29 @@ def cook(repos, cfg, recipeFile):
 
 	    for filePath in buildPkg.keys():
 		realPath = rootDir + filePath
-		f = files.FileFromFilesystem(realPath, id(filePath))
+		f = files.FileFromFilesystem(realPath, ident(filePath))
 		fileList.append((f, realPath, filePath))
 
-	    commit.finalCommit(repos, cfg, pkgname + "/" + name, recp.version,
+	    commit.finalCommit(repos, cfg, pkgname + "/" + name, recipeObj.version,
 			       fileList)
 
 	recipeName = os.path.basename(recipeFile)
-	f = files.FileFromFilesystem(recipeFile, id(recipeName), type = "src")
+	f = files.FileFromFilesystem(recipeFile, ident(recipeName), type = "src")
 	fileList = [ (f, recipeFile, recipeName) ]
 
-	for file in recp.allSources():
+	for file in recipeObj.allSources():
             src = util.findFile(file, srcdirs)
 	    srcName = os.path.basename(src)
-	    f = files.FileFromFilesystem(src, id(srcName), type = "src")
+	    f = files.FileFromFilesystem(src, ident(srcName), type = "src")
 	    fileList.append((f, src, srcName))
 
 	commit.finalCommit(repos, cfg, pkgname + "/sources",
-			   recp.version, fileList)
+			   recipeObj.version, fileList)
 
-	recp.cleanup(ourBuildDir, rootDir)
+	recipeObj.cleanup(ourBuildDir, rootDir)
     return built
 
-class idgen:
+class IdGen:
 
     def __call__(self, path):
 	if self.map.has_key(path):

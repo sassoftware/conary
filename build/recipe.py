@@ -158,11 +158,12 @@ class Recipe:
     def getPackageSet(self):
         return self.packageSet
 
-    def __init__(self, srcdirs):
+    def __init__(self, cfg, srcdirs):
 	self.tarballs = []
 	self.patches = []
 	self.sources = []
 	self.signatures = {}
+        self.cfg = cfg
 	self.srcdirs = srcdirs
 	self.theMainDir = self.name + "-" + self.version
 	self.build = build.Make()
