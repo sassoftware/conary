@@ -274,6 +274,8 @@ class LocalRepository(Repository):
 
 	if oldVersion == None and abstract == 0, then the package is assumed
 	to be new for the purposes of the change set
+
+	if newVersion == None then the package is being removed
 	"""
 	cs = changeset.ChangeSetFromRepository(self)
 
@@ -311,6 +313,17 @@ class LocalRepository(Repository):
 		dupFilter[packageName].append((oldVersion, newVersion))
 	    else:
 		dupFilter[packageName] = [ (oldVersion, newVersion) ]
+
+	    if not newVersion:
+		# remove this package and any subpackages
+		old = self.getPackageVersion(packageName, oldVersion)
+		cs.oldPackage(packageName, oldVersion)
+		for (name, verList) in old.getPackageList():
+		    for ver in verList:
+			ver = self.pkgGetFullVersion(name, ver)
+			packageList.append((name, ver, None, abstract))
+		    
+		continue
 		    
 	    new = self.getPackageVersion(packageName, newVersion)
 	 

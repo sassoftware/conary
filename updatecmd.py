@@ -81,8 +81,8 @@ def doErase(db, cfg, pkg, versionStr = None):
 	return
 
     list = []
-    cs = changeset.ChangeSet()
     for pkg in pkgList:
-	cs.oldPackage(pkg.getName(), pkg.getVersion())
-	
+	list.append((pkg.getName(), pkg.getVersion(), None, False))
+
+    cs = db.createChangeSet(list)
     db.commitChangeSet(cs)
