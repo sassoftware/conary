@@ -76,7 +76,7 @@ class XMLOpener(urllib.FancyURLopener):
         else:
 	    raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
 
-def getrealhost(self, host):
+def getrealhost(host):
     """ Slice off username/passwd and portnum """
     atpoint = host.find('@') + 1
     colpoint = host.rfind(':')
