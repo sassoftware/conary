@@ -403,7 +403,7 @@ class WarnWriteable(policy.Policy):
     Unless a mode has been set explicitly (i.e. with SetModes), warn
     about group- or other-writeable files.
     """
-    # Needs to run after AddModes in order to access the pathMap
+    # Needs to run after AddModes because AddModes sets exceptions
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.islink(fullpath):
@@ -419,6 +419,26 @@ class WarnWriteable(policy.Policy):
 		type = "file"
 	    log.warning('Possibly inappropriately writeable permission'
 			' 0%o for %s %s', mode & 0777, type, file)
+
+
+class WarnIgnoredSetuid(policy.Policy):
+    """
+    Files/directories that are setuid/setgid in the filesystem
+    but do not have that mode explicitly set in the recipe will
+    be packaged without setuid/setgid bits set.  This might be
+    a bug, so flag it with a warning.
+    """
+    def doFile(self, file):
+	fullpath = ('%(destdir)s/'+file) %self.macros
+	mode = os.lstat(fullpath)[stat.ST_MODE]
+	if mode & 06000 and \
+	   not self.recipe.autopkg.pathMap[file].inode.perms() & 06000:
+	    if stat.S_ISDIR(mode):
+		type = "directory"
+	    else:
+		type = "file"
+	    log.warning('%s %s has unpackaged set{u,g}id mode 0%o in filesystem'
+			%(type, file, mode&06777))
 
 
 class Ownership(policy.Policy):
@@ -503,6 +523,7 @@ def DefaultPolicy():
 	MakeDevices(),
 	AddModes(),
 	WarnWriteable(),
+	WarnIgnoredSetuid(),
 	Ownership(),
 	ExcludeDirectories(),
     ]
