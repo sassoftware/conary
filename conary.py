@@ -67,7 +67,7 @@ def usage(rc = 1):
     print ""
     print "cook flags:    --macros"
     print "               --prep"
-    print "		  --debug-exceptions"
+    print "               --debug-exceptions"
     print "               --target-branch <branch>"
     print ""
     print "pkglist flags: --full-versions"
