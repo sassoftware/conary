@@ -336,11 +336,11 @@ class VersionedFile:
 	self._readBranchMap()
 	return [ x.branch() for x in self.branchMap.values() ]
 
-    def __init__(self, db, filename):
+    def __init__(self, db, filename, createBranches):
 	self.db = db
 	self.key = filename
 	self.branchMap = None
-	self.createBranches = 1
+	self.createBranches = createBranches
 
 class Database:
     """
@@ -360,7 +360,7 @@ class Database:
         @rtype: VersionedFile
 	"""
 	assert(issubclass(fileClass, VersionedFile))
-	return fileClass(self.db, file)
+	return fileClass(self.db, file, self.createBranches)
 
     def __del__(self):
         self.close()
@@ -370,10 +370,11 @@ class Database:
             self.db.close()
             self.db = None
 
-    def __init__(self, path, mode = "r"):
+    def __init__(self, path, createBranches, mode = "r"):
 	# this lets __del__ work right if dbhash.open throws an exception
 	self.db = None
 	self.db = dbhash.open(path, mode)
+	self.createBranches = createBranches
 
 class FileIndexedDatabase(Database):
     """
@@ -425,8 +426,8 @@ class FileIndexedDatabase(Database):
 	"""
 	return self.files.keys()
 
-    def __init__(self, path, mode = "r"):
-	Database.__init__(self, path, mode)
+    def __init__(self, path, createBranches, mode = "r"):
+	Database.__init__(self, path, createBranches, mode)
 	self._readMap()
 
 class VersionedFileError(Exception):

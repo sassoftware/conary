@@ -23,13 +23,13 @@ from versioned import VersionedFile
 
 class Repository:
 
-    createBranches = 0
+    createBranches = 1
 
     def _getPackageSet(self, name):
-	return _PackageSet(self.pkgDB, name, self.createBranches)
+	return _PackageSet(self.pkgDB, name)
 
     def _getFileDB(self, fileId):
-	return _FileDB(self.fileDB, fileId, self.createBranches)
+	return _FileDB(self.fileDB, fileId)
 
     def getPackageList(self, groupName = ""):
 	if self.pkgDB.hasFile(groupName):
@@ -158,8 +158,10 @@ class LocalRepository(Repository):
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
 
         try:
-            self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", mode)
-            self.fileDB = versioned.Database(self.top + "/files.db", mode)
+            self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", 
+						   self.createBranches, mode)
+            self.fileDB = versioned.Database(self.top + "/files.db", 
+					     self.createBranches, mode)
         # XXX this should be translated into a generic versioned.DatabaseError
         except bsddb.error:
             # an error occured, close our databases and relinquish the lock
@@ -282,11 +284,11 @@ class _PackageSetClass(VersionedFile):
     def getLatestPackage(self, branch):
 	return self.getVersion(self.findLatestVersion(branch))
 
-    def __init__(self, db, name):
-	VersionedFile.__init__(self, db, name)
+    def __init__(self, db, name, createBranches):
+	VersionedFile.__init__(self, db, name, createBranches)
 	self.name = name
 
-def _PackageSet(db, name, createBranches):
+def _PackageSet(db, name):
     return db.openFile(name, fileClass = _PackageSetClass)
 
 class _FileDBClass(VersionedFile):
@@ -306,11 +308,11 @@ class _FileDBClass(VersionedFile):
 	f1.close()
 	return file
 
-    def __init__(self, db, fileId):
-	VersionedFile.__init__(self, db, fileId)
+    def __init__(self, db, fileId, createBranches):
+	VersionedFile.__init__(self, db, fileId, createBranches)
 	self.fileId = fileId
 
-def _FileDB(db, fileId, createBranches):
+def _FileDB(db, fileId):
     return db.openFile(fileId, fileClass = _FileDBClass)
 
 class ChangeSetJobFile:
