@@ -74,9 +74,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
     def do_GET(self):
 	self.cleanup = None
-        print "GET"
 	SimpleHTTPRequestHandler.do_GET(self)
-        print "done"
 	if self.cleanup:
 	    os.unlink(self.cleanup)
 
