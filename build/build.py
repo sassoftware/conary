@@ -50,6 +50,16 @@ class BuildAction(util.Action):
 	if self.use:
 	    self.do(recipe.macros)
 
+    def do(self, macros):
+        """
+        Do the build action
+
+        @param macros: macro set to be used for expansion
+        @type macros: recipe.Macros
+        """
+        raise AssertionError, "do method not implemented"
+
+
 class BuildCommand(BuildAction, util.ShellCommand):
     """
     Pure virtual class which implements the do method,
