@@ -82,18 +82,6 @@ class ChangeSet:
 	self.files = {}
 	pass
 
-# old, oldStr may be None
-def packageChangeSet(packageName, old, oldStr, new, newStr):
-    (rc, filesNeeded) = new.diff(old)
-
-    if not old:
-	oldStr = "(none)"
-
-    rc = "SRS PKG CHANGESET %s %s %s %d\n" % (packageName, oldStr, newStr, 
-					      rc.count("\n")) + rc
-    
-    return (rc, filesNeeded)
-	
 # old may be None
 def fileChangeSet(fileId, old, oldVersion, new, newVersion):
     hash = None
@@ -130,9 +118,8 @@ def CreateFromFilesystem(pkgList, version, outFileName):
     hashMap = {}
 
     for (packageName, pkg, fileMap) in pkgList:
-	(newcs, filesNeeded) = packageChangeSet(packageName, None, None, pkg,
-						version.asString())
-	cs = cs + newcs
+	(chgSet, filesNeeded) = pkg.diff(None, None, version)
+	cs = cs + chgSet.asString()
 
 	for (fileId, oldVersion, newVersion) in filesNeeded:
 	    (file, realPath, filePath) = fileMap[fileId]
@@ -170,15 +157,11 @@ def CreateFromRepository(repos, packageList, outFileName):
      
 	if oldVersion:
 	    old = pkgSet.getVersion(oldVersion)
-	    oldVerStr = oldVersion.asString()
 	else:
 	    old = None
-	    oldVerStr = None
 
-	(newCs, filesNeeded) = packageChangeSet(packageName, old, 
-						oldVerStr, new, 
-						newVersion.asString())
-	cs = cs + newCs
+	(chgSet, filesNeeded) = new.diff(old, oldVersion, newVersion)
+	cs = cs + chgSet.asString()
 
 	for (fileId, oldVersion, newVersion) in filesNeeded:
 	    filedb = repos.getFileDB(fileId)
