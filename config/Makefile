@@ -14,6 +14,8 @@
 
 SUBDIRS=arch use
 
+dist_files = Makefile
+
 all: default-subdirs
 
 install: install-subdirs

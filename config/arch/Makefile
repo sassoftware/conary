@@ -22,7 +22,7 @@ arch_files =	alpha	\
 		x86	\
 		x86_64
 
-dist_files = $(arch_files)
+dist_files = Makefile $(arch_files)
 
 all: default-all
 

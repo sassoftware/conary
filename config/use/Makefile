@@ -39,7 +39,7 @@ use_files =	alternatives	\
 		X		\
 		xfce
 
-dist_files = $(use_files)
+dist_files = Makefile $(use_files)
 
 all: default-all
 
