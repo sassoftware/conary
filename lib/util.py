@@ -27,11 +27,12 @@ def searchFile(file, searchdirs, error=None):
         s = "%s/%s" %(dir, file)
         if os.path.exists(s):
             return s
-    if error: raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT))
+    if error:
+        raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT))
+    return None
 
 def findFile(file, searchdirs):
     return searchFile(file, searchdirs, error=1)
-    
 
 def excepthook(type, value, tb):
     sys.excepthook = sys.__excepthook__
