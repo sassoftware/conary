@@ -1,0 +1,58 @@
+.\" Copyright (c) 2005 Specifix, Inc.
+.TH YUCK 1 "16 February 2005" "Specifix, Inc."
+.SH NAME
+yuck \- temporary hack for updating conary-based systems
+.SH SYNOPSIS
+.B yuck [--missing] [--update] [--except <exception,...>]
+.br
+\ \ \ \ \ [--display|--display-only <displayparam>,<displayparam>]
+.SH DESCRIPTION
+\fByuck\fP is a temporary hack to allow you to update a
+conary-based system.  It will go away as soon as planned
+enhancements to groups make it unnecessary.
+.SH REFERENCE
+.TP
+.PD 0
+--display
+.TP
+.PD
+--display-only \fIdiplayparam[,displayparm...]
+Tell what parameters (columns) to display.  Choices are:
+[no]change, name, local, version, repo
+.TP
+.PD
+--except \fIexception[,exception...]
+Ignore troves named as exceptions.  Particularly useful for
+--except kernel
+.TP
+.PD
+--missing
+show troves on your installLabelPath that are not installed on
+your system
+.TP
+.PD
+--update
+Attempt to install troves that are noted as out of date (or,
+with --missing, that are missing)
+.SH BUGS
+Yuck exists.  You can consider this a bug.
+Nevertheless, you can report bugs at http://bugs.specifix.com/
+.\"
+.\"
+.\"
+.SH "SEE ALSO"
+conary(1)
+.br
+cvc(1)
+.br
+cvcdesc(1)
+.br
+http://www.specifix.com/
+.br
+http://wiki.specifix.com/
+.br
+http://www.specifix.com/technology/conary.html
+.I An Introduction to the Conary Software Provisioning System
+.br
+http://www.specifix.com/technology/techoverview/
+.I Repository-based System Management Using Conary

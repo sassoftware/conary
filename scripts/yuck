@@ -39,8 +39,8 @@ import updatecmd
 
 def usage():
     print """\
-Usage: localoutofdate [--missing] [--update] [--except <exception,...>]"
-                      [--display|--display-only <displayparam>,<displayparam>]
+Usage: yuck [--missing] [--update] [--except <exception,...>]"
+            [--display|--display-only <displayparam>,<displayparam>]
 
         display parameters: [no]change,name,local,version,repo
          """                      

@@ -7,6 +7,8 @@ Changes in 0.14.11:
   * no default flavor is presumed for local operations (erase, q)
   * changed getPackageBranchPathIds to base64 encode the filename in
     order to ensure that the resulting XML-RPC will be UTF-8 clean.
+  * localoutofdate renamed to "yuck", a man page added, and the script
+    and man page are now installed on the system.
 
 Changes in 0.14.10:
   * FlavorMap sense wasn't set right for base instruction set
