@@ -20,7 +20,8 @@ def createCacheEntry(cfg, name, location, infile):
     # cache needs to be hierarchical to avoid collisions, thus we
     # use location so that files with the same name and different
     # contents in different packages do not collide
-    cachedname = createCacheName(cfg, name, location)
+    filename = name[5:]
+    cachedname = createCacheName(cfg, filename, location)
     f = open(cachedname, "w+")
     while 1:
         buf = infile.read(1024 * 128)
@@ -29,6 +30,14 @@ def createCacheEntry(cfg, name, location, infile):
         f.write(buf)
     f.close()
     infile.close()
+
+    # work around FTP bug (msw had a better way?)
+    if name.startswith("ftp://"):
+	if os.stat(cachedname).st_size == 0:
+	    os.unlink(cachedname)
+	    createNegativeCacheEntry(cfg, name[5:], location)
+	    return None
+
     return cachedname
 
 def createNegativeCacheEntry(cfg, name, location):
@@ -110,7 +119,7 @@ def searchAll(cfg, repCache, name, location, srcdirs):
         if url is None:
             return None
 
-	rc = createCacheEntry(cfg, name[5:], location, url)
+	rc = createCacheEntry(cfg, name, location, url)
 	return rc
 
     return None
