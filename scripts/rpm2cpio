@@ -1,0 +1,55 @@
+#!/usr/bin/python2.3
+# -*- mode: python -*-
+#
+# Copyright (c) 2004 Specifix, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+import os
+import sys
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+	fullPath = os.path.dirname(sys.argv[0])
+    else:
+	fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.append(os.path.dirname(fullPath))
+
+import gzip
+import rpmhelper
+
+def usage():
+    print "Usage: rpm2cpio <rpmpackage> | cpio -ivumd"
+    return 1
+
+def main(argv):
+    listMissing = False
+    if len(argv) > 2 or len(argv) < 2:
+        return usage()
+    try:
+        r = file(argv[1], 'r')
+    except:
+        return usage()
+
+    rpmhelper.seekToData(r)
+    gz = gzip.GzipFile(fileobj=r)
+    while 1:
+	buf = gz.read(4096)
+	if not buf:
+	    break
+	sys.stdout.write(buf)
+    
+                
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
