@@ -18,6 +18,8 @@ Changes in 0.50.3:
     installed by default.
   * File versions are now properly set to a branched version after a
     merge operation
+  * cvc commit aborts again when the current versions of files are not
+    the latest versions
 
 Changes in 0.50.2:
   * Any %(lib)s-derived path (/%(lib)s, %(libdir)s, %(krbprefix)s/%(lib)s,
