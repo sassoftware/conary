@@ -55,13 +55,13 @@ class BuildPackage(dict):
 	self[path] = BuildFile(realPath, type)
 
     def addDevice(self, path, devtype, major, minor,
-                  user='root', group='root', perms=0660):
+                  owner='root', group='root', perms=0660):
         """
         Add a device node to the build package
 
         @param path: the destination of the device node in the package
         """
-	self[path] = BuildDeviceFile(devtype, major, minor, user, group, perms)
+	self[path] = BuildDeviceFile(devtype, major, minor, owner, group, perms)
 
     def getName(self):
         """
@@ -164,13 +164,13 @@ class AutoBuildPackage:
         pkg.addFile(path, realPath)
 
     def addDevice(self, path, devtype, major, minor,
-                  user='root', group='root', perms=0660):
+                  owner='root', group='root', perms=0660):
         """
         Add a device to the correct BuildPackage instance by matching
         the file name against the main package and sub-package filters
         """
         pkg = self.findPackage(path)
-        pkg.addDevice(path, devtype, major, minor, user, group, perms)
+        pkg.addDevice(path, devtype, major, minor, owner, group, perms)
 
     def getPackages(self):
         """
