@@ -71,7 +71,7 @@ class Flag(dict):
 
     def __str__(self):
         if self._alias:
-            return "%s (alias %s): %s" % (self._fullName(), self._name(),
+            return "%s (alias %s): %s" % (self._fullName(), self._alias,
                                                              self._value)
         else:
             return "%s: %s" % (self._fullName(), self._value)
