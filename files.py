@@ -272,6 +272,16 @@ class File(streams.StreamSet):
 		   FILE_STREAM_TAGS :  (streams.StringsStream, "tags") }
     __slots__ = [ "thePathId", "inode", "flags", "tags" ]
 
+    def diff(self, other):
+	if self.lsTag != other.lsTag:
+	    d = self.freeze()
+	    return struct.pack(self.headerFormat, 0, len(d)) + d
+
+	rc = [ "\x01", self.lsTag ]
+        rc.append(StreamSet.diff(other))
+
+	return "".join(rc)
+
     def modeString(self):
 	l = self.inode.permsString()
 	return self.lsTag + string.join(l, "")

@@ -90,14 +90,17 @@ class ChangeLog(AbstractChangeLog):
 
     __slots__ = [ 'items' ]
 
-    def __init__(self, name, contact, message):
-	assert(not message or message[-1] == '\n')
+    def __init__(self, name, contact = None, message = None):
+        if contact is None:
+            AbstractChangeLog.__init__(self, data = name)
+        else:
+            assert(not message or message[-1] == '\n')
 
-	AbstractChangeLog.__init__(self)
+            AbstractChangeLog.__init__(self)
 
-	self.setName(name)
-	self.setContact(contact)
-	self.setMessage(message)
+            self.setName(name)
+            self.setContact(contact)
+            self.setMessage(message)
 
 class ThawChangeLog(AbstractChangeLog):
 

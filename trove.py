@@ -23,6 +23,11 @@ import streams
 import struct
 import versions
 from deps import deps
+from changelog import AbstractChangeLog
+from streams import StringStream
+from streams import FrozenVersionStream
+from streams import DependenciesStream
+from streams import ByteStream
 
 class Trove:
     """
@@ -227,7 +232,8 @@ class Trove:
 	(csg, pcl, fcl) = self.diff(them)
 	return (not pcl) and (not fcl) and (not csg.getOldFileList()) \
             and self.getRequires() == them.getRequires() \
-            and self.getProvides() == them.getProvides()
+            and self.getProvides() == them.getProvides() \
+            and self.getTroveInfo() == them.getTroveInfo()
 
     def __ne__(self, them):
 	return not self == them
@@ -259,20 +265,23 @@ class Trove:
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
 	if them:
+            troveInfoDiff = self.troveInfo.diff(them.troveInfo)
 	    themMap = them.idMap
 	    chgSet = TroveChangeSet(self.name, self.changeLog,
 				      them.getVersion(),	
 				      self.getVersion(),
 				      them.getFlavor(), self.getFlavor(),
 				      absolute = False,
-                                      isRedirect = self.redirect)
+                                      isRedirect = self.redirect,
+                                      troveInfoDiff = troveInfoDiff)
 	else:
 	    themMap = {}
 	    chgSet = TroveChangeSet(self.name, self.changeLog,
 				      None, self.getVersion(),
 				      None, self.getFlavor(),
 				      absolute = absolute,
-                                      isRedirect = self.redirect)
+                                      isRedirect = self.redirect,
+                                      troveInfoDiff = "")
 
 	# dependency and flavor information is always included in total;
 	# this lets us do dependency checking w/o having to load packages
@@ -553,6 +562,9 @@ class Trove:
     def getChangeLog(self):
         return self.changeLog
 
+    def getTroveInfo(self):
+        return self.troveInfo
+
     def __init__(self, name, version, flavor, changeLog, isRedirect = False):
         assert(flavor is not None)
 	self.idMap = {}
@@ -564,6 +576,7 @@ class Trove:
         self.requires = None
 	self.changeLog = changeLog
         self.redirect = isRedirect
+        self.troveInfo = TroveInfo()
 
 class ReferencedTroveSet(dict, streams.InfoStream):
 
@@ -638,8 +651,15 @@ class OldFileStream(list, streams.InfoStream):
 	if data is not None:
 	    self.thaw(data)
 
-_TROVEINFO_TAG_TROVESIZE    = 0
-_TROVEINFO_TAG_SOURCETROVE  = 1
+_TROVEINFO_TAG_SIZE        = 0
+_TROVEINFO_TAG_SOURCENAME  = 1
+
+class TroveInfo(streams.StreamSet):
+    ignoreUnknown = True
+    streamDict = {
+        _TROVEINFO_TAG_SIZE       : ( streams.LongLongStream, 'size'       ),
+        _TROVEINFO_TAG_SOURCENAME : ( streams.StringStream  , 'sourceName' )
+    }
 
 class ReferencedFileList(list, streams.InfoStream):
 
@@ -726,6 +746,7 @@ _STREAM_TCS_CHG_FILES       = 10
 _STREAM_TCS_OLD_FLAVOR      = 11
 _STREAM_TCS_NEW_FLAVOR      = 12
 _STREAM_TCS_IS_REDIRECT     = 13
+_STREAM_TCS_TROVEINFO       = 14
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
@@ -733,21 +754,22 @@ _TCS_TYPE_RELATIVE = 2
 class AbstractTroveChangeSet(streams.LargeStreamSet):
 
     streamDict = { 
-	_STREAM_TCS_NAME	: (streams.StringStream,       "name"        ),
-        _STREAM_TCS_OLD_VERSION : (streams.FrozenVersionStream,"oldVersion"  ),
-        _STREAM_TCS_NEW_VERSION : (streams.FrozenVersionStream,"newVersion"  ),
-        _STREAM_TCS_REQUIRES    : (streams.DependenciesStream, "requires"    ),
-        _STREAM_TCS_PROVIDES    : (streams.DependenciesStream, "provides"    ),
-        _STREAM_TCS_CHANGE_LOG  : (changelog.AbstractChangeLog,"changeLog"   ),
-        _STREAM_TCS_OLD_FILES   : (OldFileStream,	       "oldFiles"    ),
-        _STREAM_TCS_TYPE        : (streams.IntStream,          "tcsType"     ),
-        _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,         "packages"    ),
-        _STREAM_TCS_NEW_FILES   : (ReferencedFileList,         "newFiles"    ),
-        _STREAM_TCS_CHG_FILES   : (ReferencedFileList,         "changedFiles"),
-        _STREAM_TCS_OLD_FLAVOR  : (streams.DependenciesStream, "oldFlavor"   ),
-        _STREAM_TCS_NEW_FLAVOR  : (streams.DependenciesStream, "newFlavor"   ),
-        _STREAM_TCS_IS_REDIRECT : (streams.ByteStream,         "isRedirect"  ),
-     }
+	_STREAM_TCS_NAME	: (StringStream,         "name"          ),
+        _STREAM_TCS_OLD_VERSION : (FrozenVersionStream,  "oldVersion"    ),
+        _STREAM_TCS_NEW_VERSION : (FrozenVersionStream,  "newVersion"    ),
+        _STREAM_TCS_REQUIRES    : (DependenciesStream,   "requires"      ),
+        _STREAM_TCS_PROVIDES    : (DependenciesStream,   "provides"      ),
+        _STREAM_TCS_CHANGE_LOG  : (AbstractChangeLog,    "changeLog"     ),
+        _STREAM_TCS_OLD_FILES   : (OldFileStream,	 "oldFiles"      ),
+        _STREAM_TCS_TYPE        : (streams.IntStream,    "tcsType"       ),
+        _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,   "packages"      ),
+        _STREAM_TCS_NEW_FILES   : (ReferencedFileList,   "newFiles"      ),
+        _STREAM_TCS_CHG_FILES   : (ReferencedFileList,   "changedFiles"  ),
+        _STREAM_TCS_OLD_FLAVOR  : (DependenciesStream,   "oldFlavor"     ),
+        _STREAM_TCS_NEW_FLAVOR  : (DependenciesStream,   "newFlavor"     ),
+        _STREAM_TCS_IS_REDIRECT : (ByteStream,           "isRedirect"    ),
+        _STREAM_TCS_TROVEINFO   : (StringStream,         "troveInfoDiff" ),
+    }
 
     ignoreUnknown = True
 
@@ -773,6 +795,9 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 
     def getName(self):
 	return self.name.value()
+
+    def getTroveInfoDiff(self):
+        return self.troveInfoDiff.value()
 
     def getChangeLog(self):
 	return self.changeLog
@@ -945,7 +970,8 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 class TroveChangeSet(AbstractTroveChangeSet):
 
     def __init__(self, name, changeLog, oldVersion, newVersion, 
-		 oldFlavor, newFlavor, absolute = 0, isRedirect = False):
+		 oldFlavor, newFlavor, absolute = 0, isRedirect = False,
+                 troveInfoDiff = None):
 	AbstractTroveChangeSet.__init__(self)
 	assert(isinstance(newVersion, versions.VersionSequence))
 	assert(isinstance(newFlavor, deps.DependencySet))
@@ -964,6 +990,7 @@ class TroveChangeSet(AbstractTroveChangeSet):
 	self.oldFlavor.set(oldFlavor)
 	self.newFlavor.set(newFlavor)
         self.isRedirect.set(isRedirect)
+        self.troveInfoDiff.set(troveInfoDiff)
 
 class ThawTroveChangeSet(AbstractTroveChangeSet):
 

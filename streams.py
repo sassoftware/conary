@@ -25,8 +25,11 @@ class InfoStream(object):
 
     __slots__ = ()
 
-    def copy(self):
+    def __deepcopy__(self, mem = None):
         return self.__class__(self.freeze())
+
+    def copy(self):
+        return self.__deepcopy__()
     
     def freeze(self, skipSet = None):
 	raise NotImplementedError
@@ -59,6 +62,9 @@ class NumericStream(InfoStream):
 	self.val = val
 
     def freeze(self, skipSet = None):
+        if self.val is None:
+            return ""
+
 	return struct.pack(self.format, self.val)
 
     def diff(self, them):
@@ -500,11 +506,8 @@ class StreamSet(InfoStream):
 	    assert(i == dataLen)
 
     def diff(self, other):
-	if self.lsTag != other.lsTag:
-	    d = self.freeze()
-	    return struct.pack(self.headerFormat, 0, len(d)) + d
+        rc = []
 
-	rc = [ "\x01", self.lsTag ]
 	for streamId, (streamType, name) in self.streamDict.iteritems():
 	    d = self.__getattribute__(name).diff(other.__getattribute__(name))
             if d is not None:
