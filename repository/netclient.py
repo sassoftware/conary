@@ -881,7 +881,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for server, itemList in byServer.iteritems():
             fileList = [ (self.fromFileId(x[1][0]), 
                           self.fromVersion(x[1][1])) for x in itemList ]
-            (url, sizes) = self.c[fileVersion].getFileContents(fileList)
+            (url, sizes) = self.c[server].getFileContents(fileList)
             assert(len(sizes) == len(fileList))
 
             inF = urllib.urlopen(url)
