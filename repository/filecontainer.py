@@ -131,6 +131,18 @@ class FileContainerFile:
 	    self.pos = self.pos + bytes
 	    return self.file.read(bytes)
 
+    def readline(self):
+	# XXX THIS IS HORRIBLE. I'd really like readline and readlines
+	# to go away completely
+	s = ""
+	a = self.read(1)
+	while a and a != "\n":
+	    s += a
+	    a = self.read(1)
+
+	if a == "\n": s += a
+	return s
+
     def readlines(self):
 	list = self.read().split('\n')
 	list2 = []
