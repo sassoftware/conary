@@ -230,7 +230,7 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
 
     fullName = cfg.packagenamespace + ":" + recipeClass.name
 
-    recipeObj = recipeClass(repos, cfg)
+    recipeObj = recipeClass(repos, cfg, buildBranch)
     recipeObj.setup()
 
     changeSet = changeset.ChangeSet()
