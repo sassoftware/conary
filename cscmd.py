@@ -1,6 +1,12 @@
-import helper 
-import package
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 from local import update
+import helper
+import log
+import package
 import versions
 
 def ChangeSetCommand(repos, cfg, pkgName, outFileName, oldVersionStr, \
@@ -26,8 +32,6 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
 	return
 
     list = []
-    dupFilter = {}
-    i = 0
     for outerPackage in pkgList:
 	for pkg in package.walkPackageSet(db, outerPackage):
 	    ver = pkg.getVersion()
@@ -44,10 +48,8 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
 	  outerPackage.getVersion().fork(
 		versions.LocalBranch(), sameVerRel = 1))
 
-    hasChanges = False
     for (changed, fsPkg) in result[1]:
 	if changed:
-	    hasChanges = True
 	    break
 
     if not changed:
