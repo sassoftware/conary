@@ -1500,16 +1500,33 @@ class Flavor(policy.Policy):
     Drives flavor mechanism: to avoid marking a file's flavor:
     C{r.Flavor(exceptions=I{filterexp})}
     """
+    def doProcess(self, recipe):
+	self.libRe = re.compile(
+            '^(%(libdir)s'
+            '|/%(lib)s'
+            '|%(x11prefix)s/%(lib)s'
+            '|%(krbprefix)s/%(lib)s)/' %recipe.macros)
+        self.baseIsnset = use.Arch.getCurrentArch()._name
+	policy.Policy.doProcess(self, recipe)
+
+    def hasLib(self, path):
+        return self.libRe.match(path)
+
     def doFile(self, path):
 	pkgMap = self.recipe.autopkg.pkgMap
 	if path not in pkgMap:
 	    return
 	pkg = pkgMap[path]
-        if path not in pkg.isnsetMap:
-            return
 	f = pkg.getFile(path)
+        if path in pkg.isnsetMap:
+            isnset = pkg.isnsetMap[path]
+        elif self.hasLib(path) and f.hasContents:
+            # all possible paths in a %(lib)s-derived path get default
+            # instruction set assigned if they don't have one already
+            isnset = self.baseIsnset
+        else:
+            return
 	set = deps.DependencySet()
-        isnset = pkg.isnsetMap[path]
         set.addDep(deps.InstructionSetDependency, deps.Dependency(isnset, []))
         # get the Arch.* dependencies
         set.union(use.createFlavor(None, use.Arch._iterUsed()))
