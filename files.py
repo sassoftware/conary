@@ -451,22 +451,8 @@ class SourceFile(RegularFile):
 
 class FileDB:
 
-    # see if the head of the specified branch is a duplicate
-    # of the file object passed; it so return the version object
-    # for that duplicate
-    def checkBranchForDuplicate(self, branch, file):
-	version = self.f.findLatestVersion(branch)
-	if not version:
-	    return None
-
-	f1 = self.f.getVersion(version)
-	lastFile = FileFromInfoLine(f1.read(), self.fileId)
-	f1.close()
-
-	if file.same(lastFile):
-	    return version
-
-	return None
+    def getLatestVersion(self, branch):
+	return self.f.findLatestVersion(branch)
 
     def addVersion(self, version, file):
 	if self.f.hasVersion(version):

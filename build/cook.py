@@ -18,6 +18,21 @@ import time
 import types
 import util
 
+# see if the head of the specified branch is a duplicate
+# of the file object passed; it so return the version object
+# for that duplicate
+def checkBranchForDuplicate(repos, fileId, branch, file):
+    version = repos.fileLatestVersion(fileId, branch)
+    if not version:
+	return None
+
+    lastFile = repos.getFileVersion(fileId, version)
+
+    if file.same(lastFile):
+	return version
+
+    return None
+
 # type could be "src"
 #
 # returns a (pkg, fileMap) tuple
@@ -36,10 +51,8 @@ def createPackage(repos, cfg, destdir, bldPkg, ident, pkgtype = "auto"):
 	file = files.FileFromFilesystem(realPath, ident(targetPath), 
 					type = pkgtype)
 
-	fileDB = repos.getFileDB(file.id())
-
-        duplicateVersion = fileDB.checkBranchForDuplicate(cfg.defaultbranch,
-                                                          file)
+	duplicateVersion = checkBranchForDuplicate(repos, file.id(),
+						   cfg.defaultbranch, file)
         if not duplicateVersion:
 	    p.addFile(file.id(), targetPath, bldPkg.getVersion())
 	else:

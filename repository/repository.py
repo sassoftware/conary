@@ -194,7 +194,15 @@ class Repository:
 
     def getPackageVersionList(self, pkgName):
 	return package.PackageSet(self.pkgDB, pkgName).versionList()
+
+    def fileLatestVersion(self, fileId, branch):
+	fileDB = self.getFileDB(fileId)
+	return fileDB.getLatestVersion(branch)
 	
+    def getFileVersion(self, fileId, version):
+	fileDB = self.getFileDB(fileId)
+	return fileDB.getVersion(version)
+
     def storeFileFromChangeset(self, chgSet, file, pathToFile):
 	if isinstance(file, files.RegularFile):
 	    f = chgSet.getFileContents(file.sha1())
