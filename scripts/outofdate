@@ -39,16 +39,15 @@ repos = helper.openRepository(cfg.repositoryMap)
 troves = [ x for x in repos.iterAllTroveNames(cfg.installLabel.getHost()) ]
 pkgs = [ p for p in troves if p.find(':') == -1 ]
 sources = [ p for p in troves if p.endswith(':source') ]
-versions = repos.getTroveLeavesByLabel(pkgs, cfg.installLabel)
-sourceversions = repos.getTroveLeavesByLabel(sources, cfg.installLabel)
+versions = repos.getTroveLeavesByLabel(pkgs + sources, cfg.installLabel)
 
 
 pkgs.sort()
 for pkg in pkgs:
     sourcepkg = pkg + ':source'
-    if pkg in versions and sourcepkg in sourceversions: 
+    if pkg in versions and sourcepkg in versions: 
 	v = versions[pkg][0]
-	sv = sourceversions[sourcepkg][0]
+	sv = versions[sourcepkg][0]
 	vt = v.trailingVersion()
 	svt = sv.trailingVersion()
 	if (v.branch(),vt.getVersion(),vt.getRelease()) != (v.branch(),svt.getVersion(),svt.getRelease()):
