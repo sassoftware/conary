@@ -314,11 +314,13 @@ def updateSrc(repos, versionStr = None):
     assert(len(packageChanges) == 1)
     pkgCs = packageChanges[0]
 
-    basePkg = repos.getPackageVersion(state.getName(), 
-				      state.getVersion())
+    fsJob = update.FilesystemJob(repos, changeSet, 
+				 { state.getName() : state }, "" )
+    fsJob.apply()
+    newPkgs = fsJob.getNewPackageList()
+    assert(len(newPkgs) == 1)
+    newState = newPkgs[0]
 
-    newState = update._applyPackageChangeSet(repos, pkgCs, changeSet, basePkg, 
-					     state, None)
     if newState.getVersion().equal(pkgCs.getNewVersion()) and newBranch:
 	newState.changeBranch(newBranch)
 

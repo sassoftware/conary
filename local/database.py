@@ -169,17 +169,19 @@ class Database(repository.LocalRepository):
 	undo = repository.ChangeSetUndo(self)
 
 	try:
+	    # add new packages
 	    job.commit(undo)
+	    # build the list of things to commit
+	    fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root)
+	    # remove old packages
+	    job.removals(undo)
 	except:
 	    # this won't work it things got too far, but it won't hurt
 	    # anything either
 	    undo.undo()
 	    raise
 
-	# commit the changes to the file system
-	update.applyChangeSet(self, cs, fsPkgDict, self.root)
-
-	job.removals(undo)
+	fsJob.apply()
 
     # this is called when a Repository wants to store a file; we never
     # want to do this; we copy files onto the filesystem after we've
