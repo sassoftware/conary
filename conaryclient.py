@@ -103,7 +103,7 @@ class ConaryClient:
                     raise UpdateError, \
                         "Package %s cooked locally, not updating" % troveName
             else:
-                labels = [ self.cfg.installLabel ]
+                labels = self.cfg.installLabelPath
 
             newList = []
             for label in labels:
