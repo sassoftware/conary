@@ -347,8 +347,9 @@ class FilesystemJob:
             # such as SHLIB or INITSCRIPT
             oldFile.flags.set(oldFile.flags.value() & files._FILE_FLAG_CONFIG)
             
-	    if not oldFile.metadataEqual(localFile, 
-					    ignoreOwnerGroup = noIds):
+	    # don't worry about metadata changes, just content changes
+	    if oldFile.hasContents and localFile.hasContents and \
+			oldFile.contents != localFile.contents:
 		self.errors.append("%s has changed but has been removed "
 				   "on head" % path)
 		continue
