@@ -668,7 +668,7 @@ def beingTraced():
         frame = frame.f_back
     return False
 
-def set_trace_cond(cond=None, **kw):
+def set_trace_cond(*args, **kw):
     """ Sets a condition for set_trace statements that have the 
         specified marker.  A condition can either callable, in
         which case it should take one argument, which is the 
@@ -678,8 +678,8 @@ def set_trace_cond(cond=None, **kw):
     """
     for key, val in kw.iteritems():
         Epdb.set_trace_cond(key, val)
-    if not kw or cond is not None:
-        Epdb.set_trace_cond('default', cond)
+    for arg in args:
+        Epdb.set_trace_cond(arg, True)
 stc = set_trace_cond
 
 def reset_trace_count(marker='default'):
