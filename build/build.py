@@ -456,11 +456,11 @@ class InstallSymlinks(_FileAction):
         for source in sources:
             if targetIsDir:
                 to = dest + os.sep + os.path.basename(source)
-		setComponents(toFile %macros + os.sep +
-			      os.path.basename(source))
+		self.setComponents(toFile %macros + os.sep +
+			           os.path.basename(source))
             else:
                 to = dest
-		setComponents(toFile %macros)
+		self.setComponents(toFile %macros)
 	    if os.path.exists(to) or os.path.islink(to):
 		os.remove(to)
             log.debug('creating symlink %s -> %s' %(to, source))
