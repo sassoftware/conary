@@ -180,6 +180,9 @@ class ChangeSet:
 		origFile = db.getFileVersion(fileId, version)
 		rollback.addFile(fileId, None, version, origFile.diff(None))
 
+		if not isinstance(origFile, files.RegularFile):
+		    continue
+
 		# We only have the contents of config files available
 		# from the db. Files which aren't in the db
 		# we'll gather from the filesystem *as long as they have
@@ -222,6 +225,9 @@ class ChangeSet:
 
 		rollback.addFile(fileId, newVersion, oldVersion, 
 				  origFile.diff(newFile))
+
+		if not isinstance(origFile, files.RegularFile):
+		    continue
 
 		# if a config file has changed between versions, save
 		# it; if it hasn't changed the unmodified version will
