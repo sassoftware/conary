@@ -26,11 +26,13 @@ class TagFile(conarycfg.ConfigFile):
 
     # lists all legal options for "implements"
     implementsCheck = {'files': ('update', 'preremove', 'remove'),
-		       'self':  ('update', 'preremove')}
+		       'description':  ('update', 'preremove'),
+		       'handler':  ('update', 'preremove'),
+                      }
     # ...and "datasource"
     datasourceCheck = ['args', 'stdin']
 
-    def __init__(self, filename, macros = {}):
+    def __init__(self, filename, macros = {}, warn=False):
 	self.defaults = {
 	    'file'		: '',
 	    'name'		: '', 
@@ -52,6 +54,14 @@ class TagFile(conarycfg.ConfigFile):
 		    raise conarycfg.ParseError, \
 			'missing type/action in "implements %s"' %item
 		key, val = item.split(" ")
+                # deal with self->handler protocol change
+                if key == 'self':
+                    if warn:
+                        # at cook time
+                        raise conarycfg.ParseError, \
+                            'change "implements self" to "implements handler" in %s' %filename
+                    else:
+                        key == 'handler'
 		if key not in self.implementsCheck:
 		    raise conarycfg.ParseError, \
 			'unknown type %s in "implements %s"' %(key, item)

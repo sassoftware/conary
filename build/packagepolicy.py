@@ -475,7 +475,7 @@ class TagSpec(policy.Policy):
 	    if os.path.isdir(directory):
 		for filename in os.listdir(directory):
 		    path = util.joinPaths(directory, filename)
-		    self.tagList.append(tags.TagFile(path, recipe.macros))
+		    self.tagList.append(tags.TagFile(path, recipe.macros, True))
 
 	# instantiate filters
 	d = {}
