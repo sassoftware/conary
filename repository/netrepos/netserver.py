@@ -377,7 +377,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 else:
                     oldTroveV = 0
                     oldFileV = 0
-                    oldTroveV = 0
+                    oldTroveF = 0
 
                 newTroveV = self.fromVersion(newTroveV)
                 newFileV = self.fromVersion(newFileV)

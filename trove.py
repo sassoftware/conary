@@ -283,7 +283,7 @@ class Trove:
 
 	for id in addedIds:
 	    (selfPath, selfVersion) = self.idMap[id]
-	    filesNeeded.append((id, None, selfVersion, None, selfPath))
+	    filesNeeded.append((id, None, selfVersion))
 	    chgSet.newFile(id, selfPath, selfVersion)
 
 	for id in sameIds.keys():

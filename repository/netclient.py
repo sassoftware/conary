@@ -378,8 +378,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         def _cvtFileList(l):
             new = []
-            for (fileId, troveName, (oldTroveV, oldFileV),
-                                    (newTroveV, newFileV)) in l:
+            for (fileId, troveName, (oldTroveV, oldTroveF, oldFileV),
+                                    (newTroveV, newTroveF, newFileV)) in l:
                 if oldTroveV == 0:
                     oldTroveV = None
                     oldFileV = None
@@ -424,7 +424,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                                 withFiles, withFileContents)
 
                 extraTroveList = _cvtTroveList(extraTroveList)
-                extraFileList = _cvtFileList(extraFileList)
+                filesNeeded += _cvtFileList(extraFileList)
 
                 for url in urlList:
                     inF = urllib.urlopen(url)
@@ -458,7 +458,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                             os.unlink(tmpName)
                         raise
 
-            if ourJobList and not internalCs:
+            if (ourJobList or filesNeeded) and not internalCs:
                 internalCs = repository.changeset.ChangeSet()
 
             # generate this change set, and put any recursive generation
@@ -517,8 +517,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             for (key, fileObj) in zip(need, fileObjs):
                 fileDict[key] = fileObj
 
-            for (fileId, troveName, (oldTroveVersion, oldFileVersion),
-                                    (newTroveVersion, newFileVersion)) \
+            for (fileId, troveName, 
+                    (oldTroveVersion, oldTroveF, oldFileVersion),
+                    (newTroveVersion, newTroveF, newFileVersion)) \
                                 in filesNeeded:
                 if oldFileVersion:
                     oldFileObj = fileDict[(fileId, oldFileVersion)]
@@ -534,7 +535,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                    filecs)
 
                 if withFileContents and hash:
-                    cont = self.getFileContents(troveName, newTroveVersion, 
+                    if filesNeeded:
+                        import pdb
+                        pdb.set_trace()
+                    # pull the contents from the trove it was originall
+                    # built in
+                    cont = self.getFileContents(troveName, newFileVersion,
                                         newTroveFlavor, fileId, newFileVersion)
                     internalCs.addFileContents(fileId, 
                                    repository.changeset.ChangedFileTypes.file, 
