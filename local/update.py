@@ -40,15 +40,13 @@ class FilesystemJob:
 
     def _restore(self, fileObj, target, contents, msg):
 	self.restores.append((fileObj, target, contents, msg))
+	self.runLdconfig = 1 | fileObj.isShLib()
 
     def _remove(self, fileObj, target, msg):
 	self.removes[target] = (fileObj, msg)
 
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
-
-    def mustRunLdconfig(self):
-	self.runLdconfig = True
 
     def apply(self):
 	for (oldPath, newPath, msg) in self.renames:
@@ -76,13 +74,14 @@ class FilesystemJob:
 
 	if self.runLdconfig:
 	    p = "/sbin/ldconfig"
-	    if os.getpid():
+	    if os.getuid():
 		log.warning("ldconfig skipped (insufficient permissions)")
 	    elif not os.access(os.path.join(self.root, p), os.X_OK):
 		log.warning("/sbin/ldconfig is not available")
 	    else:
-		child = os.fork()
-		if child == -1:
+		log.debug("running ldconfig")
+		pid = os.fork()
+		if not pid:
 		    os.chdir(self.root)
 		    os.chroot(self.root)
 		    os.execl(p, p)
@@ -167,6 +166,7 @@ class FilesystemJob:
 		headFileContents = None
 	    self._restore(headFile, headRealPath, headFileContents,
 	                  "creating %s" % headRealPath)
+
 	    fsPkg.addFile(fileId, headPath, headFileVersion)
 
 	for fileId in pkgCs.getOldFileList():
@@ -410,6 +410,7 @@ class FilesystemJob:
 	self.errors = []
 	self.newFiles = []
 	self.runLdconfig = False
+	self.root = root
 
 	for pkgCs in changeSet.getNewPackageList():
 	    # skip over empty change sets
