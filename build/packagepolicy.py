@@ -105,8 +105,6 @@ class _filterSpec(policy.Policy):
 class ComponentSpec(_filterSpec):
     """
     Determines which component each file is in.
-    @keyword catchall: The component name which gets all otherwise
-    unassigned files.  Default: C{runtime}
     """
     baseFilters = (
 	# automatic subpackage names and sets of regexps that define them
@@ -132,6 +130,13 @@ class ComponentSpec(_filterSpec):
     )
     keywords = { 'catchall': 'runtime' }
 
+    def __init__(self, *args, **keywords):
+        """
+        @keyword catchall: The component name which gets all otherwise
+        unassigned files.  Default: C{runtime}
+        """
+        _filterSpec.__init__(self, *args, **keywords)
+
     def doProcess(self, recipe):
 	compFilters = []
 	self.macros = recipe.macros
@@ -153,8 +158,6 @@ class ComponentSpec(_filterSpec):
 class PackageSpec(_filterSpec):
     """
     Determines which package each file is in.
-    @keyword compFilters: for internal use only -- C{ComponentSpec}
-    uses this keyword to pass information to PackageSpec.  Do not touch.
     """
     keywords = { 'compFilters': None }
 
