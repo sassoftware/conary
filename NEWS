@@ -3,6 +3,7 @@ Changes in 0.10.11:
     sets for better efficiency
   * chained dependency resolution caused duplicate troves in the final
     changeset (and a lot of extra work)
+  * added --config to stand alone repository
 
 Changes in 0.10.10:
   * changesets get downloaded into a single (meta) file instead of lots
