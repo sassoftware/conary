@@ -58,8 +58,6 @@ class ConaryClient:
         """Updates a trove on the local system to the latest version 
             in the respository that the trove was initially installed from."""
         self._prepareRoot()
-        if not self.db.writeAccess():
-            raise UpdateError, "Write permission denied on conary database %s" % self.db.dbpath
         if self.db.hasPackage(pkg):
             labels = [ x.getVersion().branch().label()
                        for x in self.db.findTrove(pkg) ]
@@ -68,8 +66,10 @@ class ConaryClient:
             labels = {}.fromkeys(labels).keys()
             
             # check for locally-cooked troves
-            if True in [isinstance(x, versions.CookBranch) for x in labels]:
-                raise UpdateError, "package %s cooked locally, not updating" % pkg
+            if True in [isinstance(x, versions.CookBranch) or
+                        isinstance(x, versions.EmergeBranch)
+                        for x in labels]:
+                raise UpdateError, "Package %s cooked locally, not updating" % pkg
         else:
             labels = [ self.cfg.installLabel ]
 
@@ -141,4 +141,6 @@ class ConaryClient:
         """Prepares the installation root for trove updates and change set applications."""
         if not os.path.exists(self.cfg.root):
             util.mkdirChain(self.cfg.root)
+        if not self.db.writeAccess():
+            raise UpdateError, "Write permission denied on conary database %s" % self.db.dbpath
 

@@ -35,7 +35,7 @@ import tempfile
 import time
 import trove
 import types
-import updatecmd
+import conaryclient
 from lib import util
 import versions
 
@@ -609,11 +609,15 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
         raise CookError(str(e))
 
     if emerge:
-	try:
-	    updatecmd.doUpdate(None, cfg, changeSetFile)
-	finally:
-	    os.unlink(changeSetFile)
-
+        client = conaryclient.ConaryClient(repos, cfg)
+        try:
+            client.applyChangeSet(changeSetFile)
+        except (conaryclient.UpdateError, repository.CommitError), e:
+            log.error(e)
+            log.error("Not committing changeset: please apply %s by hand" % changeSetFile)
+        else: 
+            os.unlink(changeSetFile)
+            built = (built[0], None)
     return built
 
 class CookError(Exception):
@@ -656,7 +660,10 @@ def cookCommand(cfg, args, prep, macros, buildBranch = None, emerge = False, res
             for component, version in components:
                 print "Created component:", component, version
             if csFile is None:
-                print 'Changeset committed to the repository.'
+                if emerge == True:
+                    print 'Changeset committed to local system.'
+                else:
+                    print 'Changeset committed to the repository.'
             else:
                 print 'Changeset written to:', csFile
             sys.exit(0)
