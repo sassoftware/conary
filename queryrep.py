@@ -5,7 +5,6 @@
 
 from repository import repository
 import files
-import helper
 import log
 
 _pkgFormat  = "%-39s %s"
