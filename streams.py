@@ -31,7 +31,7 @@ _STREAM_REQUIRES    = 7
 _STREAM_TAGS	    = 8
 _STREAM_TARGET	    = 9
 
-_STREAM_TROVE_CHANGESET	    = 0x00010000
+_STREAM_TROVE_CHANGE_SET = 100
 
 class InfoStream(object):
 
@@ -206,7 +206,10 @@ class FrozenVersionStream(InfoStream):
 	    self.v = other.v
 
     def freeze(self):
-	return self.v.freeze()
+	if self.v:
+	    return self.v.freeze()
+	else:
+	    return ""
 
     def diff(self, them):
 	if self.v != them.v:
@@ -446,15 +449,6 @@ class TupleStream(InfoStream):
 		items.append(itemType(all[i]))
 	    self.items = items
 
-def streamSetDictToList(d):
-    vals = d.keys()
-    m = max(vals)
-    l = range(m + 1)
-    for v in vals:
-	l[v] = d[v]
-
-    return l
-
 class StreamSet(InfoStream):
 
     def __init__(self, data = None):
@@ -467,7 +461,7 @@ class StreamSet(InfoStream):
 	    while i < dataLen:
                 assert(i < dataLen)
 		(streamId, size) = struct.unpack("!BH", data[i:i+3])
-		(streamType, name) = self.streamList[streamId]
+		(streamType, name) = self.streamDict[streamId]
 		i += 3
 		self.__setattr__(name, streamType(data[i:i + size]))
 		i += size

@@ -224,7 +224,6 @@ class File(streams.StreamSet):
     streamDict = { streams._STREAM_INODE : (InodeStream, "inode"),
                    streams._STREAM_FLAGS : (FlagsStream, "flags"),
 		   streams._STREAM_TAGS :  (streams.StringsStream, "tags") }
-    streamList = streams.streamSetDictToList(streamDict)
     __slots__ = [ "theId", "inode", "flags", "tags" ]
 
     def modeString(self):
@@ -313,7 +312,6 @@ class SymbolicLink(File):
     lsTag = "l"
     streamDict = { streams._STREAM_TARGET : (streams.StringStream, "target") }
     streamDict.update(File.streamDict)
-    streamList = streams.streamSetDictToList(streamDict)
     __slots__ = "target"
 
     def sizeString(self):
@@ -378,7 +376,6 @@ class DeviceFile(File):
 
     streamDict = { streams._STREAM_DEVICE : (DeviceStream, "devt") }
     streamDict.update(File.streamDict)
-    streamList = streams.streamSetDictToList(streamDict)
     __slots__ = [ 'devt' ]
 
     def sizeString(self):
@@ -419,7 +416,6 @@ class RegularFile(File):
         streams._STREAM_FLAVOR   : (streams.DependenciesStream, 'flavor' ) }
 
     streamDict.update(File.streamDict)
-    streamList = streams.streamSetDictToList(streamDict)
     __slots__ = ('contents', 'provides', 'requires', 'flavor')
 
     lsTag = "-"

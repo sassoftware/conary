@@ -608,10 +608,10 @@ def showOneLog(version, changeLog=''):
     else:
 	versionStr = version.trailingVersion().asString()
 
-    if changeLog:
+    if changeLog.getName():
 	print "%s %s (%s) %s" % \
-	    (versionStr, changeLog.name, changeLog.contact, when)
-	lines = changeLog.message.split("\n")
+	    (versionStr, changeLog.getName(), changeLog.getContact(), when)
+	lines = changeLog.getMessage().split("\n")
 	for l in lines:
 	    print "    %s" % l
     else:

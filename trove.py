@@ -18,6 +18,8 @@ Implements troves (packages, components, etc.) for the repository
 import changelog
 import copy
 import files
+import streams
+import struct
 import versions
 from deps import deps
 
@@ -547,7 +549,23 @@ class Trove:
         self.requires = None
 	self.changeLog = changeLog
 
-class TroveChangeSet:
+_STREAM_TCS_NAME        = streams._STREAM_TROVE_CHANGE_SET + 0
+_STREAM_TCS_OLD_VERSION = streams._STREAM_TROVE_CHANGE_SET + 1
+_STREAM_TCS_NEW_VERSION = streams._STREAM_TROVE_CHANGE_SET + 2
+_STREAM_TCS_REQUIRES    = streams._STREAM_TROVE_CHANGE_SET + 3
+_STREAM_TCS_PROVIDES    = streams._STREAM_TROVE_CHANGE_SET + 4
+_STREAM_TCS_CHANGE_LOG  = streams._STREAM_TROVE_CHANGE_SET + 5
+
+class AbstractTroveChangeSet(streams.StreamSet):
+
+    streamDict = { 
+	_STREAM_TCS_NAME	: (streams.StringStream,        "name"),
+        _STREAM_TCS_OLD_VERSION : (streams.FrozenVersionStream, "oldVersion" ),
+        _STREAM_TCS_NEW_VERSION : (streams.FrozenVersionStream, "newVersion" ),
+        _STREAM_TCS_REQUIRES    : (streams.DependenciesStream,  "requires" ),
+        _STREAM_TCS_PROVIDES    : (streams.DependenciesStream,  "provides" ),
+        _STREAM_TCS_CHANGE_LOG  : (changelog.AbstractChangeLog, "changeLog" ),
+     }
 
     """
     Represents the changes between two packages and forms part of a
@@ -570,25 +588,25 @@ class TroveChangeSet:
 	return self.oldFiles
 
     def getName(self):
-	return self.name
+	return self.name.value()
 
     def getChangeLog(self):
 	return self.changeLog
 
     def changeOldVersion(self, version):
-	self.oldVersion = version
+	self.oldVersion.set(version)
 
     def changeNewVersion(self, version):
-	self.newVersion = version
+	self.newVersion.set(version)
 
     def changeChangeLog(self, cl):
 	self.changeLog = cl
 
     def getOldVersion(self):
-	return self.oldVersion
+	return self.oldVersion.value()
 
     def getNewVersion(self):
-	return self.newVersion
+	return self.newVersion.value()
 
     # path and/or version can be None
     def changedFile(self, fileId, path, version):
@@ -658,21 +676,21 @@ class TroveChangeSet:
 
 	if self.isAbsolute():
 	    f.write("absolute ")
-	elif self.oldVersion:
-	    f.write("from %s to " % self.oldVersion.asString())
+	elif self.getOldVersion():
+	    f.write("from %s to " % self.getOldVersion.asString())
 	else:
 	    f.write("new ")
 
-	f.write("%s\n" % self.newVersion.asString())
+	f.write("%s\n" % self.getNewVersion().asString())
 
         def depformat(name, dep, f):
             f.write('\t%s: %s\n' %(name,
                                    str(dep).replace('\n', '\n\t%s'
                                                     %(' '* (len(name)+2)))))
-        if self.requires:
-            depformat('Requires', self.requires, f)
-        if self.provides:
-            depformat('Provides', self.provides, f)
+        if self.getRequires():
+            depformat('Requires', self.getRequires(), f)
+        if self.getProvides():
+            depformat('Provides', self.getProvides(), f)
         if self.oldFlavor:
             depformat('Old Flavor', self.oldFlavor, f)
         if self.newFlavor:
@@ -735,16 +753,13 @@ class TroveChangeSet:
 	lines = 0
 
 	if self.absolute:
-            rc.append("ABS %s %s\n" % (self.name, self.newVersion.freeze()))
-	elif not self.oldVersion:
-	    rc.append("NEW %s %s\n" % (self.name, self.newVersion.freeze()))
+            rc.append("ABS\n")
+	elif not self.getOldVersion():
+	    rc.append("NEW\n")
 	else:
-	    rc.append("CS %s %s %s\n" % (self.name, self.oldVersion.freeze(),
-                                         self.newVersion.freeze()))
-        if self.requires:
-            rc.append("REQUIRES %s\n" % (self.requires.freeze()))
-        if self.provides:
-            rc.append("PROVIDES %s\n" % (self.provides.freeze()))
+	    rc.append("CS\n")
+        if self.getProvides():
+            rc.append("PROVIDES %s\n" % (self.getProvides().freeze()))
 
         if self.oldFlavor and self.newFlavor:
             rc.append("FLAVOR %s %s\n" % (self.oldFlavor.freeze(),
@@ -753,11 +768,6 @@ class TroveChangeSet:
             rc.append("FLAVOR %s -\n" % (self.oldFlavor.freeze()))
 	elif not self.oldFlavor and self.newFlavor:
             rc.append("FLAVOR - %s\n" % (self.newFlavor.freeze()))
-
-	if self.changeLog:
-	    frz = self.changeLog.freeze()
-	    rc.append("CL %d\n" % frz.count("\n"))
-	    rc.append(frz)
 
 	for id in self.getOldFileList():
 	    rc.append("-%s\n" % id)
@@ -793,19 +803,25 @@ class TroveChangeSet:
 	if lines:
 	    rc.append("\n".join(lines) + "\n")
 
-	return "".join(rc)
+	newStyle = ""
+	rc = "".join(rc)
+
+	final = struct.pack("!H", len(rc)) + rc + \
+		    streams.StreamSet.freeze(self)
+
+	return final
 
     def setProvides(self, provides):
-        self.provides = provides
+	self.provides.set(provides)
 
     def getProvides(self):
-        return self.provides
+        return self.provides.value()
 
     def setRequires(self, requires):
-        self.requires = requires
+	self.requires.set(requires)
 
     def getRequires(self):
-        return self.requires
+        return self.requires.value()
 
     def getOldFlavor(self):
         return self.oldFlavor
@@ -813,37 +829,35 @@ class TroveChangeSet:
     def getNewFlavor(self):
         return self.newFlavor
 
+    def __init__(self, data = None):
+	streams.StreamSet.__init__(self, data)
+
+class TroveChangeSet(AbstractTroveChangeSet):
+
     def __init__(self, name, changeLog, oldVersion, newVersion, 
 		 oldFlavor, newFlavor, absolute = 0):
+	AbstractTroveChangeSet.__init__(self)
 	assert(isinstance(newVersion, versions.AbstractVersion))
 	assert(not newFlavor or isinstance(newFlavor, deps.DependencySet))
 	assert(not oldFlavor or isinstance(oldFlavor, deps.DependencySet))
-	self.name = name
-	self.oldVersion = oldVersion
-	self.newVersion = newVersion
-	self.changeLog = changeLog
+	self.name.set(name)
+	self.oldVersion.set(oldVersion)
+	self.newVersion.set(newVersion)
+	if changeLog:
+	    self.changeLog = changeLog
 	self.newFiles = []
 	self.oldFiles = []
 	self.changedFiles = []
 	self.absolute = absolute
 	self.packages = {}
-        self.provides = None
-        self.requires = None
+        self.provides.set(None)
+        self.requires.set(None)
 	self.oldFlavor = oldFlavor
 	self.newFlavor = newFlavor
 
-class ThawTroveChangeSet(TroveChangeSet):
+class ThawTroveChangeSet(AbstractTroveChangeSet):
 
     def parse(self, line):
-        if line.startswith('REQUIRES '):
-            dep = line.split(' ', 1)[1]
-            self.setRequires(deps.ThawDependencySet(dep))
-            return
-        if line.startswith('PROVIDES '):
-            dep = line.split(' ', 1)[1]
-            self.setProvides(deps.ThawDependencySet(dep))
-            return
-        
 	action = line[0]
 
 	if action == "+" or action == "~":
@@ -889,24 +903,20 @@ class ThawTroveChangeSet(TroveChangeSet):
 	self.changedFiles.sort()
 
     def __init__(self, buf):
+	oldSize = struct.unpack("!H", buf[0:2])[0]
+	newStyle = buf[oldSize + 2:]
+	buf = buf[2:oldSize + 2]
+
+	AbstractTroveChangeSet.__init__(self, newStyle)
+
 	lines = buf.split("\n")[:-1]
 	header = lines[0]
 
 	l = header.split()
 
 	pkgType = l[0]
-	pkgName = l[1]
 
-	if pkgType == "CS":
-	    oldVersion = versions.ThawVersion(l[2])
-	    rest = 3
-	elif pkgType == "NEW" or pkgType == "ABS":
-	    oldVersion = None
-	    rest = 2
-	else:
-	    raise IOError, "invalid line in change set %s" % file
-
-	newVersion = versions.ThawVersion(l[rest])
+	oldVersion = None
 
 	# find the flavor
 	oldFlavor = None
@@ -935,9 +945,13 @@ class ThawTroveChangeSet(TroveChangeSet):
 		del lines[i: first + cnt]
                 break
 
-	TroveChangeSet.__init__(self, pkgName, changeLog, oldVersion, 
-				newVersion, oldFlavor, newFlavor, 
-				absolute = (pkgType == "ABS"))
+	self.newFiles = []
+	self.oldFiles = []
+	self.changedFiles = []
+	self.absolute = (pkgType == "ABS")
+	self.packages = {}
+	self.oldFlavor = oldFlavor
+	self.newFlavor = newFlavor
         
 	for line in lines:
 	    self.parse(line)

@@ -23,8 +23,8 @@ import tempfile
 class AbstractChangeLog(streams.TupleStream):
 
     __slots__ = [ 'items' ]
-    makeup = ( ("name",    streams.StringStream, "!B"), 
-	       ("contact", streams.StringStream, "!B"),
+    makeup = ( ("name",    streams.StringStream, "B"), 
+	       ("contact", streams.StringStream, "B"),
 	       ("message", streams.StringStream, "!H") )
 
     def getName(self):
@@ -47,7 +47,11 @@ class AbstractChangeLog(streams.TupleStream):
 	return self.items[2].set(value)
 
     def freeze(self):
-	return streams.TupleStream.freeze(self)
+	if self.items[0].value() or self.items[1].value() or \
+	   self.items[2].value():
+	    return streams.TupleStream.freeze(self)
+	else:
+	    return ""
 
     def getMessageFromUser(self):
 	editor = os.environ.get("EDITOR", "/bin/vi")
@@ -77,6 +81,10 @@ class AbstractChangeLog(streams.TupleStream):
 	    return False
 
 	return self.items == other.items
+
+    def __init__(self, data = None):
+	if data == "": data = None
+	streams.TupleStream.__init__(self, data)
 
 class ChangeLog(AbstractChangeLog):
 
