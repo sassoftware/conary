@@ -543,7 +543,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         def _getLocalTroves(troveList):
             if not self.localRep or not troveList:
-                return troveList
+                return [ None ] * len(troveList)
 
             return self.localRep.getTroves(troveList)
 
