@@ -68,4 +68,4 @@ class Flavors:
 	try:
 	    return deps.deps.ThawDependencySet(cu.next()[0])
 	except StopIteration:
-            raise KeyError, theId
+            raise KeyError, flavorId
