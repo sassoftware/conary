@@ -141,7 +141,6 @@ class Cursor:
                     startingTransaction = True
                 elif (len(SQL) >= 6 and SQL[:6].upper()
                       not in ("SELECT", "VACUUM", "DETACH")):
-                    print 'start transaction', SQL
                     self.con._begin()
 
         if len(parms) == 1 and (isinstance(parms[0], tuple) or
