@@ -691,8 +691,7 @@ class DependencyTables:
                 continue
 
             d = depSolutions[depId].setdefault(troveName, {}) 
-            l = d.setdefault((versionStr, flavorStr), [])
-            l.append((versionStr, flavorStr))
+            d[versionStr, flavorStr] = True
 
             if not troveNameSolutions.has_key((troveName, depId)):
                 troveNameSolutions[(troveName, depId)] = True
