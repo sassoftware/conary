@@ -473,6 +473,33 @@ class ExcludeDirectories(policy.Policy):
 	del self.recipe.autopkg.pathMap[path]
 
 
+class WarnOnModes(policy.Policy):
+    invariantinclusions = [ ('.*') ]
+    def doFile(self, file):
+	fullpath = self.macros['destdir'] + os.sep + file
+	mode = os.lstat(fullpath)[stat.ST_MODE]
+	if os.path.islink(fullpath): #link is always 0777
+	    return
+
+	mode = mode & 07777
+	if self.recipe.autopkg.pathMap.has_key(file):
+	    pkgmode = self.recipe.autopkg.pathMap[file].inode.perms()
+	else:
+	    pkgmode = None
+	
+	if pkgmode and pkgmode & 07000: #pkg bits specifically set
+	    return
+	if mode & 07000:
+	   log.warning("%s has suid/guid bits 0%o" %(file, mode))
+	   #ignore packages with suid bits recognized by package
+	elif not ((mode == 0755) or (mode == 0644)):
+	    if not (os.path.isdir(fullpath) and mode == 0775):
+		log.warning(
+		    "%s has strange mode 0%o"
+		    %(file, mode))
+
+
+
 
 def DefaultPolicy():
     """
@@ -495,6 +522,7 @@ def DefaultPolicy():
 	WarnWriteable(),
 	Ownership(),
 	ExcludeDirectories(),
+	WarnOnModes(),
     ]
 
 

@@ -256,6 +256,7 @@ Arch.x86.setShortDoc('True if any IA32 architecture is set')
 Arch.x86_64 = False
 Arch.sparc = False
 Arch.sparc64 = False
+Arch.ppc = False
 Arch.ppc64 = False
 Arch.ia64 = False
 Arch.s390 = False

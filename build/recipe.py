@@ -119,6 +119,44 @@ class Macros(dict):
 	return new
 
 
+class PassiveMacros(dict):
+    def __setitem__(self, name, value):
+        # only expand references to ourself
+        d = {name: self.get(name)}
+        # escape any macros in the new value
+        value = value.replace('%', '%%')
+        # unescape refrences to ourself
+        value = value.replace('%%%%(%s)s' %name, '%%(%s)s'%name)
+        # expand our old value when defining the new value
+ 	dict.__setitem__(self, name, value % d)
+        
+    def __getitem__(self, name):
+	if name in self:
+	    return dict.__getitem__(self, name) %self
+	return '%%(%s)s' % name
+    
+    def addMacros(self, *macroSet):
+	# must be in order; later macros in the set can depend on
+	# earlier ones
+	# for ease of use, we allow passing in a tuple of tuples, or
+	# a simple set of tuples
+	if len(macroSet) == 1 and type(macroSet[0]) is tuple:
+	    # we were passed a tuple of tuples (like baseMacros)
+	    macroSet = macroSet[0]
+        if len(macroSet) > 0 and type(macroSet[0]) is not tuple:
+            # we were passed something like ('foo', 'bar')
+            macroSet = (macroSet,)
+	for key, value in macroSet:
+	    self[key] = value
+    
+    def copy(self):
+	new = Macros()
+	new.update(self)
+	return new
+
+
+
+
 def _extractSourceFromRPM(rpm, targetfile):
     filename = os.path.basename(targetfile)
     directory = os.path.dirname(targetfile)
