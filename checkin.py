@@ -365,30 +365,23 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	    continue
 	    
 	sys.stdout.write(dispStr + ": changed\n")
+        
 	sys.stdout.write("Index: %s\n%s\n" %(path, '=' * 68))
 
 	csInfo = changeSet.getFileChange(fileId)
-	sys.stdout.write('\n'.join(files.fieldsChanged(csInfo)))
+	print '\n'.join(files.fieldsChanged(csInfo))
 
-        sys.stdout.write('\n--- %s %s\n+++ %s %s\n'
-                         %(path, newPackage.getVersion().asString(),
-                           path, newVersion.asString()))
-        
 	if files.contentsChanged(csInfo):
 	    contType = changeSet.getFileContentsType(fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
+                sys.stdout.write('--- %s %s\n+++ %s %s\n'
+                                 %(path, newPackage.getVersion().asString(),
+                                   path, newVersion.asString()))
+
 	        contents = changeSet.getFileContents(fileId)[1]
 		lines = contents.get().readlines()
 		str = "".join(lines)
 		print str
-		print
-	    else:
-		# this happens for config files w/ don't include trailing
-		# new lines as we don't generate diffs in that case
-		lines = contents.get().readlines()
-		print "@@ -0,0 +1,%d @@" % len(lines)
-		for l in lines:
-		    print "+%s" % l,
 		print
 
     for fileId in pkgCs.getOldFileList():
