@@ -127,12 +127,14 @@ elif (otherArgs[1] == "cook"):
             file = "%s/%s" % (os.getcwd(), file)
         # we want to fork here to isolate changes the recipe might make
         # in the environment (such as environment variables)
+        signal.signal(signal.SIGTTOU, signal.SIG_IGN)
         pid = os.fork()
         if not pid:
+            os.setpgrp()
+            os.tcsetpgrp(0, os.getpid())
             cook.cook(repos, cfg, file, prep=prep)
             sys.exit(0)
         else:
-            os.setpgid(pid, pid)
             try:
                 (id, status) = os.waitpid(pid, 0);
             except KeyboardInterrupt:
