@@ -139,11 +139,13 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		      info, tags, deps, fullVersions):
+    withFiles = ids
+
     try:
 	troveList = repos.findTrove(cfg.installLabelPath, troveName, 
 				    cfg.flavor, versionStr,
                                     acrossRepositories = True,
-                                    withFiles = False)
+                                    withFiles = withFiles)
     except repository.PackageNotFound, e:
 	log.error(str(e))
 	return
@@ -170,10 +172,13 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 	    for (fileId, path, version, fObj) in iter:
 		print "%-59s %s" % (path, " ".join(fObj.tags))
 	elif sha1s:
-	    for (fileId, path, version) in trove.iterFileList():
-		file = repos.getFileVersion(fileId, version)
-		if file.hasContents:
-		    print "%s %s" % (sha1ToString(file.contents.sha1()), path)
+            iter = repos.iterFilesInTrove(trove.getName(), 
+                            trove.getVersion(), trove.getFlavor(), 
+                            sortByPath = True, withFiles = True)
+            for (fileId, path, version, fileObj) in iter:
+		if fileObj.hasContents:
+		    print "%s %s" % (sha1ToString(fileObj.contents.sha1()), 
+                                     path)
 	elif info:
 	    buildTime = time.strftime("%c",
 				time.localtime(version.timeStamps()[-1]))

@@ -88,6 +88,7 @@ def usage(rc = 1):
     print "                --ls"
     print "                --sha1s"
     print "                --tags"
+    print ""
     print "showcs flags:   --full-versions"
     print "                --info"
     print "                --ls"
@@ -347,14 +348,21 @@ def realMain(cfg, argv=sys.argv):
     elif (otherArgs[1] == "showcs" or otherArgs[1] == "scs"):
         ls = argSet.has_key('ls')
 	if ls: del argSet['ls']
+
         tags = argSet.has_key('tags')
 	if tags: del argSet['tags']
+
         info = argSet.has_key('info')
 	if info: del argSet['info']
+
         showChanges = argSet.has_key('show-changes')
 	if showChanges: del argSet['show-changes']
+
         fullVersions = argSet.has_key('full-versions')
 	if fullVersions: del argSet['full-versions']
+
+        if argSet: return usage()
+
         changeset = otherArgs[2]
         component = None
         if len(otherArgs) > 3:
