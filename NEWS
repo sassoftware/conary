@@ -6,6 +6,7 @@ Changes in 0.50.6:
     elegant)
   * merged update and erase code paths in conaryclient
   * update and erase now take +,- modifiers on trove names
+  * added --info to see what an update or erase command will do
 
 Changes in 0.50.5:
   * Streams return their value through __call__ instead of value()
