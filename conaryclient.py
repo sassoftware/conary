@@ -275,13 +275,22 @@ class ConaryClient:
 
     def eraseTrove(self, troveList, tagScript = None):
         list = []
+
+	cs = changeset.ChangeSet()
+
         for (troveName, versionStr) in troveList:
             troves = self.db.findTrove(troveName, versionStr)
 
-            for t in troves:
-                list.append((t.getName(), t.getVersion(), t.getFlavor()))
- 
-        self.db.eraseTroves(list, tagScript = tagScript)
+            for outerTrove in troves:
+                for trove in self.db.walkTroveSet(outerTrove, 
+                                                 ignoreMissing = True):
+                    cs.oldPackage(trove.getName(), trove.getVersion(), 
+                                  trove.getFlavor())
+
+        #(depList, cannotResolve) = self.db.depCheck(cs)
+        #print depList, cannotResolve
+
+	self.db.commitChangeSet(cs, tagScript = tagScript)
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):
