@@ -37,8 +37,6 @@ class Database(repository.LocalRepository):
     def getPackageVersion(self, name, version):
 	pkg = repository.LocalRepository.getPackageVersion(self, name, version)
 	if not version.isLocal(): return pkg
-	head = self.pkgLatestVersion(name, version.branch())
-	if not version.equal(head): return pkg
 
 	for (fileId, path, fileVersion) in pkg.fileList():
 	    parentVersion = fileVersion.parent()
@@ -52,11 +50,9 @@ class Database(repository.LocalRepository):
 	return pkg
 
     # like getPackageVersion, we need to look to the filesystem for file
-    # versions which are at the head of our local branch; this means that
-    # we require the path to get information on some versions
+    # versions which are on the local branch
     def getFileVersion(self, fileId, version, path = None, withContents = 0):
-	head = self.fileLatestVersion(fileId, version.branch())
-	if not version.isLocal() or (head and not version.equal(head)):
+	if not version.isLocal():
 	    (file, contents) = repository.LocalRepository.getFileVersion(
 					self, fileId, version, withContents = 1)
 
