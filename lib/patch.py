@@ -54,8 +54,12 @@ def patch(oldLines, unifiedDiff):
 	    raise BadHunk
 	if (toStart + toCount != len(result)):
 	    raise BadHunk
+
+    while (fromLine < len(oldLines)):
+	result.append(oldLines[fromLine])
+	fromLine = fromLine + 1
 	
-	return result
+    return result
 		
 class BadHunkHeader(Exception):
 
