@@ -81,7 +81,7 @@ class HttpHandler(HtmlEngine):
 
         needWrite = self.commands[cmd][2][1]
         needAdmin = self.commands[cmd][2][2]
-        if not self.repServer.auth.check(authToken, write=needWrite, admin=needAdmin):
+        if not self.repServer.repos.auth.check(authToken, write=needWrite, admin=needAdmin):
             raise InsufficientPermission
 
         if cmd == "":
