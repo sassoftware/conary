@@ -252,7 +252,6 @@ class NormalizeManPages(policy.Policy):
 			matchlist = match.group(1).split('/')
 			l = len(matchlist)
 			if l == 1 or matchlist[l-2] == section:
-			    print 'foo', name
 			    # no directory specified, or in the same
 			    # directory:
 			    log.debug('replacing %s (%s) with symlink %s',
@@ -261,7 +260,6 @@ class NormalizeManPages(policy.Policy):
 			    os.remove(path)
 			    os.symlink(os.path.basename(match.group(1)), path)
 			else:
-			    print name
 			    # either the canonical .so manN/foo.N or an
 			    # absolute path /usr/share/man/manN/foo.N
 			    # .so is relative to %(mandir)s and the other
