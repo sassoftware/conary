@@ -94,8 +94,6 @@ class ServerCache:
 		raise repository.OpenError('Error occured opening repository '
 			    '%s: %s' % (url, e[1]))
 	    except Exception, e:
-		import pdb
-		pdb.set_trace()
 		raise repository.OpenError('Error occured opening repository '
 			    '%s: %s' % (url, str(e)))
 
