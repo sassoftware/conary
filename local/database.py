@@ -93,26 +93,21 @@ class Database(repository.LocalRepository):
 
 	# this has an empty source path template, which is only used to
 	# construct the eraseFiles list anyway
-	(pkgList, fileList, fileMap, oldFileList, oldPackageList, 
-	    eraseList, eraseFiles) = self._buildChangeSetJob("", absSet)
+	job = repository.ChangeSetJob(self, absSet)
 
 	# abstract change sets cannot have eraseLists
-	assert(not eraseList)
-	assert(not eraseFiles)
+	#assert(not eraseList)
+	#assert(not eraseFiles)
 
 	cs = changeset.ChangeSetFromAbstractChangeSet(absSet)
 
-	# we want to look up file objects by fileId
-	idToFile = {}
-	for (fileId, fileVersion, file, saveContents) in fileList:
-	    idToFile[fileId] = (fileVersion, file)
-
-	for (pkgName, newPkg, newVersion) in pkgList:
+	for newPkg in job.newPackageList():
 	    # FIXME
 	    #
 	    # this shouldn't be against branch, it should be against
 	    # the version of the package already installed on the
 	    # system. unfortunately we can't represent that yet. 
+	    pkgName = newPkg.getName()
 	    oldVersion = self.pkgLatestVersion(pkgName, branch)
 	    if not oldVersion:
 		# new package; the Package.diff() right after this never
@@ -121,21 +116,19 @@ class Database(repository.LocalRepository):
 	    else:
 		old = self.getPackageVersion(pkgName, oldVersion)
 
-	    (pkgChgSet, filesNeeded) = newPkg.diff(old)
+	    (pkgChgSet, filesNeeded) = newPkg.diff(old, abstract = 0)
 	    cs.newPackage(pkgChgSet)
 
-	    for (fileId, oldVersion, newVersion) in filesNeeded:
-		filedb = self._getFileDB(fileId)
-
-		(ver, newFile) = idToFile[fileId]
-		assert(ver.equal(newVersion))
+	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
+		fileObj = job.getFile(fileId)
+		assert(newVersion.equal(fileObj.version()))
 
 		oldFile = None
 		if oldVersion:
-		    oldFile = filedb.getVersion(oldVersion)
+		    oldFile = self.getFileVersion(fileId, oldVersion)
 
 		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
-							 newFile)
+							 fileObj.file())
 
 		cs.addFile(fileId, oldVersion, newVersion, filecs)
 		if hash: cs.addFileContents(hash)
