@@ -486,7 +486,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
     recipeObj.populateLcache()
     
-    builddir = cfg.buildPath + "/" + recipeObj.name
+    builddir = util.normpath(os.cfg.buildPath) + "/" + recipeObj.name
     use.track(True)
     if recipeObj._trackedFlags is not None:
         use.setUsed(recipeObj._trackedFlags)
