@@ -233,6 +233,9 @@ def commit(repos, cfg, message):
 	log.info("no changes have been made to commit")
 	return
 
+    if message and message[-1] != '\n':
+	message += '\n'
+
     cl = changelog.ChangeLog(cfg.name, cfg.contact, message)
     if message is None and not cl.getMessage():
 	log.error("no change log message was given")
