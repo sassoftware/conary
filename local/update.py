@@ -41,7 +41,7 @@ def _applyPackageChangeSet(repos, pkgCs, basePkg, fsPkg, root):
     @param basePkg: the package the stuff in the filesystem came from
     @type basePkg: package.Package
     @param fsPkg: the package representing what's in the filesystem now
-    @type basePkg: package.Package
+    @type fsPkg: package.Package
     @param root: root directory to apply changes to (this is ignored for
     source management, which uses the cwd)
     @type root: str

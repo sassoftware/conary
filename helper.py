@@ -185,7 +185,7 @@ def nextVersion(versionStr, currentVersion, currentBranch, binary = True):
     @type versionStr: string
     @param currentVersion: version of current head
     @type currentVersion: versions.Version
-    @parm currentBranch: branch the new version should be on
+    @param currentBranch: branch the new version should be on
     @type currentBranch: versions.Version
     @param binary: true if this version should use the binary build field
     @type binary: boolean
