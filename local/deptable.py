@@ -436,8 +436,8 @@ class DependencyTables:
         # "unresolvable" dependencies. (they could be resolved by something
         # in the repository, but that something is being explicitly removed
         # and adding it back would be a bit rude!)
-        import lib
-        lib.epdb.st()
+        #import lib
+        #lib.epdb.st()
         cu.execute("""
                 SELECT depNum, rsvInstanceId, RemovedTroveIds.troveId FROM
                     (%s) LEFT OUTER JOIN RemovedTroveIds ON
