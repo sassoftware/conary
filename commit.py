@@ -61,6 +61,7 @@ def commitChangeSet(repos, cfg, cs):
 
 	for (fileId, fileVersion, file) in fileList:
 	    infoFile = repos.getFileDB(fileId)
+	    pathInPkg = fileMap[fileId][0]
 
 	    # this version may already exist, abstract change sets
 	    # include redundant files quite often
@@ -68,18 +69,22 @@ def commitChangeSet(repos, cfg, cs):
 		infoFile.addVersion(fileVersion, file)
 		infoFile.close()
 		filesDone.append(fileId)
-		if isinstance(file, files.RegularFile):
-		    filesToArchive.append(file)
+		filesToArchive.append((file, pathInPkg))
 
-	for file in filesToArchive:
-		f = cs.getFileContents(file.sha1())
-		file.archive(repos, f)
-		f.close()
+	for (file, path) in filesToArchive:
+	    if isinstance(file, files.SourceFile):
+		#path = (cfg.sourcepath) % cfg + "/" + path
+		#path =
+		#d = {}
+		#d['pkgname'] = mainPackageName
+		path = "/sources/" + path
+
+	    repos.storeFileFromChangeset(cs, file, path)
     except:
 	# something went wrong; try to unwind our commits
 	for fileId in filesDone:
 	    infoFile = repos.getFileDB(fileId)
-	    (fileVersion, path) = fileMap[fileId]
+	    (path, fileVersion) = fileMap[fileId]
 	    infoFile.eraseVersion(fileVersion)
 
 	for (pkgSet, newVersion) in pkgsDone:
