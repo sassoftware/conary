@@ -611,6 +611,7 @@ def set_trace_cond(cond=None, **kw):
         Epdb.set_trace_cond(key, val)
     if not kw or cond is not None:
         Epdb.set_trace_cond('default', cond)
+stc = set_trace_cond
 
 def reset_trace_count(marker='default'):
     """ Resets the number a set_trace for a marker has been 
