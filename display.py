@@ -3,6 +3,7 @@
 # All rights reserved
 #
 import files
+import helper
 import log
 import package
 import versions
@@ -59,14 +60,14 @@ def _versionList(repos, pkgName):
     return l
 
 def _displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
-    if versionStr[0] != "/":
-	versionStr = cfg.defaultbranch.asString() + "/" + versionStr
-    version = versions.VersionFromString(versionStr)
+    try:
+	pkg = helper.findPackage(repos, cfg.packagenamespace, cfg.defaultbranch,
+				 pkgName, versionStr)
+    except helper.PackageNotFound, e:
+	log.error(str(e))
+	return
 
-    if version.isBranch():
-	pkg = repos.getLatestPackage(pkgName, version)
-    else:
-	pkg = repos.getPackageVersion(pkgName, version)
+    version = pkg.getVersion()
 
     if not ls:
 	print _pkgFormat % (
