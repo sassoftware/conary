@@ -757,7 +757,6 @@ class ReadOnlyChangeSet(ChangeSet):
             next = self._nextFile()
 
     def merge(self, otherCs):
-        self.configCache.update(otherCs.configCache)
         self.files.update(otherCs.files)
         self.primaryTroveList += otherCs.primaryTroveList
         self.newPackages.update(otherCs.newPackages)
@@ -767,13 +766,31 @@ class ReadOnlyChangeSet(ChangeSet):
             assert(not self.lastCsf)
             assert(not otherCs.lastCsf)
 
+            self.configCache.update(otherCs.configCache)
+
             for entry in otherCs.fileQueue:
                 util.tupleListBsearchInsert(self.fileQueue, entry, 
                                             self.fileQueueCmp)
         else:
-            assert(isinstance(otherCs, ChangeSet))
-            # XXX
-            self.configCache.update(otherCs.fileContents)
+            assert(otherCs.__class__ ==  ChangeSet)
+
+            # make a copy. the configCache should only store diffs
+            configs = {}
+
+            for (fileId, (contType, contents)) in \
+                                    otherCs.configCache.iteritems():
+                if contType == ChangedFileTypes.diff:
+                    self.configCache[fileId] = (contType, contents)
+                else:
+                    configs[fileId] = (contType, contents)
+                    
+            wrapper = dictAsCsf(otherCs.fileContents)
+            wrapper.addConfigs(configs)
+            entry = wrapper.getNextFile()
+            if entry:
+                util.tupleListBsearchInsert(self.fileQueue, entry + (wrapper,), 
+                                            self.fileQueueCmp)
+
 
     def __init__(self, data = None):
 	ChangeSet.__init__(self, data = data)
@@ -938,3 +955,28 @@ class RootChangeSetJob(repository.ChangeSetJob):
 	self.files = {}
 	repository.ChangeSetJob.__init__(self, repos, absCs)
 
+class dictAsCsf:
+
+    def getNextFile(self):
+        if not self.items:
+            return None
+
+        (name, contType, contObj) = self.items[0]
+        del self.items[0]
+        return (name, contType, contObj.get(), contObj.size())
+
+    def addConfigs(self, contents):
+        # this is like __init__, but it knows things are config files so
+        # it tags them with a "1" and puts them at the front
+        l = [ (x[0], "1 " + x[1][0][4:], x[1][1]) 
+                        for x in contents.iteritems() ]
+        l.sort()
+        self.items = l + self.items
+
+    def __init__(self, contents):
+        # convert the dict (which is a changeSet.fileContents object) to
+        # a (name, contTag, contObj) list, where contTag is the same kind
+        # of tag we use in csf files "[0|1] [file|diff]"
+        self.items = [ (x[0], "0 " + x[1][0][4:], x[1][1]) for x in 
+                            contents.iteritems() ]
+        self.items.sort()
