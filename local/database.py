@@ -1,3 +1,8 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+
 import changeset
 import dbhash
 import files
@@ -75,7 +80,8 @@ class Database(repository.LocalRepository):
 	return open(self.root + self.fileIdMap[fileId], "r")
 
     def close(self):
-	if self.fileIdMap:
+	if self.fileIdMap is not None:
+            self.fileIdMap.close()
 	    self.fileIdMap = None
 	repository.LocalRepository.close(self)
 
