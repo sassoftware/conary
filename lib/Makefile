@@ -29,7 +29,7 @@ elfmodule_objs=elf.o
 miscmodule_objs=misc.o
 cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
 generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules)
-dist_files = $(python_files) elf.c misc.c cstreams.c Makefile
+dist_files = $(python_files) elf.c misc.c cstreams.c cstreams.h Makefile
 
 
 all: $(python_modules)
