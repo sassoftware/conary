@@ -8,9 +8,12 @@ import checkin
 import repository
 import sys
 
+argDef = {}
+argDef['dir'] = 1
+
 def usage(rc = 1):
     print "usage: srs source checkin <file>"
-    print "       srs source checkout <group> <version>"
+    print "       srs source checkout [--dir <dir>] <group> <version>"
     sys.exit(rc)
 
 def sourceCommand(cfg, args, argSet):
@@ -19,12 +22,18 @@ def sourceCommand(cfg, args, argSet):
     elif (args[0] == "usage"):
 	usage(rc = 0)
     elif (args[0] == "checkin"):
-	if len(args) != 2: usage()
+	if argSet or len(args) != 2: usage()
 	repos = repository.LocalRepository(cfg.reppath, "c")
 	checkin.checkin(repos, cfg, args[2])
     elif (args[0] == "checkout"):
-	if len(args) < 2 or len(args) > 3: usage()
+	if argSet.has_key("dir"):
+	    dir = argSet['dir']
+	    del argSet['dir']
+	else:
+	    dir = None
+
+	if argSet or (len(args) < 2 or len(args) > 3): usage()
 	repos = repository.LocalRepository(cfg.reppath, "r")
 
-	args = [repos, cfg] + args[1:]
+	args = [repos, cfg, dir] + args[1:]
 	checkin.checkout(*args)
