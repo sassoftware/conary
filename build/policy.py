@@ -77,12 +77,33 @@ class Policy(util.Action):
 	"""
 	self.addArgs(*args, **keywords)
 
+    def filterExpression(self, expression, name=None):
+	"""
+	@param expression: regular expression or tuple of
+	(regex, [setmode, [unsetmode]])
+	Create tuple that represents arguments to filter.Filter.__init__
+	"""
+	if type(expression) is str:
+	    return (expression, self.macros)
+	if type(expression) is not list:
+	    expression = list(expression)
+	expression[1:1] = [self.macros]
+	if name:
+	    while len(expression) < 4:
+		expression.append(None)
+	    expression.append(name)
+	return expression
+
+    def compileFilters(self, expressionList, filterList):
+	for expression in expressionList:
+	    expression = self.filterExpression(expression)
+	    filterList.append(filter.Filter(*expression))
+
     def doProcess(self, recipe):
 	"""
 	Invocation instance
-        @keyword macros: macros which will be expanded through dictionary
-        substitution in self.command
-        @type macros: recipe.Macros
+        @param recipe: holds the recipe object, which is used for
+	the macro set and package objects.
         @return: None
         @rtype: None
 	"""
@@ -94,21 +115,16 @@ class Policy(util.Action):
 
 	# compile the inclusions
 	self.inclusionFilters = []
-	for inclusion in self.invariantinclusions:
-	    self.inclusionFilters.append(
-		filter.Filter(inclusion, self.macros))
+	self.compileFilters(self.invariantinclusions, self.inclusionFilters)
 
 	# compile the exceptions
 	self.exceptionFilters = []
-	for exception in self.invariantexceptions:
-	    self.exceptionFilters.append(
-		filter.Filter(exception, self.macros))
+	self.compileFilters(self.invariantexceptions, self.exceptionFilters)
 	if self.exceptions:
 	    if not isinstance(self.exceptions, (tuple, list)):
+		# turn a plain string into a sequence
 		self.exceptions = (self.exceptions,)
-	    for exception in self.exceptions:
-		self.exceptionFilters.append(
-		    filter.Filter(exception, self.macros))
+	    self.compileFilters(self.exceptions, self.exceptionFilters)
 
 	# dispatch if/as appropriate
 	if self.use:
