@@ -57,6 +57,10 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
 	if bail:
 	    return
 
+        if not list:
+            sys.stderr.write("repository does not contain a package called %s\n" % pkg)
+            return
+
 	cs = repos.createChangeSet(list)
 
     if cs.isAbstract():
