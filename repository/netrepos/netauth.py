@@ -13,19 +13,16 @@
 #
 import md5
 import sqlite3
-from lib import log
 
 class NetworkAuthorization:
     def check(self, authToken, write = False, label = None, trove = None):
         if label and label.getHost() != self.name:
-            log.error("repository name mismatch")
             return False
 
         if not write and self.anonReads:
             return True
 
         if not authToken[0]:
-            log.error("no authtoken received")
             return False
 
         stmt = """
@@ -66,13 +63,10 @@ class NetworkAuthorization:
             if regExp.match(trove):
                 return True
 
-        log.error("no permissions match for (%s, %s)" % authToken)
-
         return False
         
     def checkUserPass(self, authToken, label = None):
         if label and label.getHost() != self.name:
-            log.error("repository name mismatch")
             return False
 
         stmt = "SELECT COUNT(userId) FROM Users WHERE user=? AND password=?"
