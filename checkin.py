@@ -206,10 +206,10 @@ def commit(repos):
 	newVersion = helper.nextVersion(recipeVersionStr, None,
 					state.getBranch(), binary = False)
 
-    result = update.buildLocalChanges(repos, state, srcPkg, newVersion)
+    result = update.buildLocalChanges(repos, [(state, srcPkg, newVersion)])
     if not result: return
 
-    (isDifferent, newState, changeSet) = result
+    (changeSet, ((isDifferent, newState),)) = result
 
     if not isDifferent:
 	log.info("no changes have been made to commit")
@@ -238,12 +238,12 @@ def diff(repos, versionStr = None):
     oldPackage.changeVersion(repos.pkgGetFullVersion(state.getName(), 
 			     oldPackage.getVersion()))
 
-    result = update.buildLocalChanges(repos, state, oldPackage,
-				      versions.NewVersion())
+    result = update.buildLocalChanges(repos, [(state, oldPackage, 
+					       versions.NewVersion())])
     if not result: return
 
-    (changed, newState, changeSet) = result
-    if not changed: return
+    (changeSet, ((isDifferent, newState),)) = result
+    if not isDifferent: return
 
     packageChanges = changeSet.getNewPackageList()
     assert(len(packageChanges) == 1)
@@ -317,8 +317,8 @@ def updateSrc(repos, versionStr = None):
     basePkg = repos.getPackageVersion(state.getName(), 
 				      state.getVersion())
 
-    newState = update._applyPackageChangeSet(repos, pkgCs, basePkg, state, None)
-
+    newState = update._applyPackageChangeSet(repos, pkgCs, changeSet, basePkg, 
+					     state, None)
     if newState.getVersion().equal(pkgCs.getNewVersion()) and newBranch:
 	newState.changeBranch(newBranch)
 
@@ -392,7 +392,6 @@ def renameFile(oldName, newName):
 
     for (fileId, (path, version)) in state.iterFileList():
 	if path == oldName:
-	    log.info("renaming %s to %s", oldName, newName)
 	    os.rename(oldName, newName)
 	    state.addFile(fileId, newName, version)
 	    state.write("SRS")

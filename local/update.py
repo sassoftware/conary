@@ -13,31 +13,52 @@ import filecontents
 import files
 import log
 import os
+import package
 import patch
+import stat
 import versions
 
-def applyChangeSet(changeSet, root):
+def applyChangeSet(repos, changeSet, fsPkgDict, root):
     """
     Applies a change set to the filesystem.
 
+    @param repos: the repository the current package and file information is in
+    @type repos: repository.Repository
     @param changeSet: the changeset to apply to the filesystem
     @type changeSet: changeset.ChangeSet
+    @param fsPkgDict: dictionary mapping a package name to the package
+    object representing what's currently stored in the filesystem
+    @type fsPkgDict: dict of package.Package
     @param root: root directory to apply changes to (this is ignored for
     source management, which uses the cwd)
     @type root: str
     """
     for pkgCs in changeSet.getNewPackageList():
-	_applySingleChangeSet(pkgCs, root)
+	# skip over empty change sets
+	if not pkgCs.getNewFileList() and not pkgCs.getOldFileList() and \
+	   not pkgCs.getChangedFileList():
+	    continue
 
-def _applyPackageChangeSet(repos, pkgCs, basePkg, fsPkg, root):
+	name = pkgCs.getName()
+	old = pkgCs.getOldVersion()
+	if old:
+	    basePkg = repos.getPackageVersion(name, old)
+	    _applyPackageChangeSet(repos, pkgCs, changeSet, basePkg, 
+				   fsPkgDict[name], root)
+	else:
+	    _applyPackageChangeSet(repos, pkgCs, changeSet, None, None, root)
+
+def _applyPackageChangeSet(repos, pkgCs, changeSet, basePkg, fsPkg, root):
     """
     Apply a single package change set to the filesystem. Returns a package
-    object which specifies what's on the system. 
+    object which specifies what's left on the system. 
 
     @param repos: the repository the files for basePkg are stored in
     @type repos: repository.Repository
-    @param pkgCs: the changeset to apply to the filesystem
+    @param pkgCs: the package changeset to apply to the filesystem
     @type pkgCs: package.PackageChangeSet
+    @param changeSet: the changeset pkgCs is part of
+    @type changeSet: changeset.ChangeSet
     @param basePkg: the package the stuff in the filesystem came from
     @type basePkg: package.Package
     @param fsPkg: the package representing what's in the filesystem now
@@ -47,37 +68,62 @@ def _applyPackageChangeSet(repos, pkgCs, basePkg, fsPkg, root):
     @type root: str
     @rtype: package.Package
     """
-    assert(pkgCs.getOldVersion().equal(basePkg.getVersion()))
-    assert(pkgCs.getOldVersion().equal(fsPkg.getVersion()))
+    if basePkg:
+	assert(pkgCs.getOldVersion().equal(basePkg.getVersion()))
     fullyUpdated = 1
     cwd = os.getcwd()
-    fsPkg = fsPkg.copy()
+
+    if fsPkg:
+	fsPkg = fsPkg.copy()
+    else:
+	fsPkg = package.Package(pkgCs.getName(), versions.NewVersion())
 
     for (fileId, headPath, headFileVersion) in pkgCs.getNewFileList():
-	# this gets broken links right
+	if headPath[0] == '/':
+	    headRealPath = root + headPath
+	else:
+	    headRealPath = cwd + "/" + headPath
+
+	headFile = files.FileFromInfoLine(changeSet.getFileChange(fileId),
+					  fileId)
+
 	try:
-	    os.lstat(headPath)
-	    log.error("%s is in the way of a newly created file" % headPath)
-	    fullyUpdated = 0
+	    s = os.lstat(headRealPath)
+	    if not isinstance(headFile, files.Directory) or \
+	       not stat.S_ISDIR(s.st_mode):
+		log.error("%s is in the way of a newly created file" % 
+			  headRealPath)
+		fullyUpdated = 0
+
+	    # FIXME: this isn't the right directory handling
+		
 	    continue
-	except:
+	except OSError:
 	    pass
 
-	log.info("creating %s" % headPath)
-	(headFile, headFileContents) = \
-		repos.getFileVersion(fileId, headFileVersion, withContents = 1)
-	headFile.restore(headFileContents, cwd + '/' + headPath, 1)
+	log.debug("creating %s" % headRealPath)
+
+	if headFile.hasContents:
+	    headFileContents = changeSet.getFileContents(fileId)[1]
+	else:
+	    headFileContents = None
+	headFile.restore(headFileContents, headRealPath, 1)
 	fsPkg.addFile(fileId, headPath, headFileVersion)
 
     for fileId in pkgCs.getOldFileList():
 	(path, version) = basePkg.getFile(fileId)
 	if not fsPkg.hasFile(fileId):
-	    log.info("%s has already been removed" % path)
+	    log.debug("%s has already been removed" % path)
 	    continue
+
+	if path[0] == '/':
+	    realPath = root + path
+	else:
+	    realPath = cwd + "/" + path
 
 	# don't remove files if they've been changed locally
 	try:
-	    localFile = files.FileFromFilesystem(path, fileId)
+	    localFile = files.FileFromFilesystem(realPath, fileId)
 	except OSError, exc:
 	    # it's okay if the file is missing, it just means we all agree
 	    if exc.errno == errno.ENOENT:
@@ -92,16 +138,21 @@ def _applyPackageChangeSet(repos, pkgCs, basePkg, fsPkg, root):
 	    log.error("%s has changed but has been removed on head" % path)
 	    continue
 
-	log.info("removing %s" % path)	
+	log.debug("removing %s" % path)	
 
-	os.unlink(path)
+	os.unlink(realPath)
 	fsPkg.removeFile(fileId)
 
     for (fileId, headPath, headFileVersion) in pkgCs.getChangedFileList():
 	(fsPath, fsVersion) = fsPkg.getFile(fileId)
+	if fsPath[0] == "/":
+	    rootFixup = root
+	else:
+	    rootFixup = cwd + "/"
+
 	pathOkay = 1
 	contentsOkay = 1
-	realPath = fsPath
+	finalPath = fsPath
 	# if headPath is none, the name hasn't changed in the repository
 	if headPath and headPath != fsPath:
 	    # the paths are different; if one of them matches the one
@@ -114,58 +165,74 @@ def _applyPackageChangeSet(repos, pkgCs, basePkg, fsPkg, root):
 
 	    if fsPath == basePath:
 		# the path changed in the repository, propage that change
-		log.info("renaming %s to %s" % (fsPath, headPath))
-		os.rename(fsPath, headPath)
+		log.debug("renaming %s to %s" % (fsPath, headPath))
+		os.rename(rootFixup + fsPath, rootFixup + headPath)
+
 		fsPkg.addFile(fileId, headPath, fsVersion)
-		realPath = headPath
+		finalPath = headPath
 	    else:
 		pathOkay = 0
-		realPath = fsPath	# let updates work still
+		finalPath = fsPath	# let updates work still
 		log.error("path conflict for %s (%s on head)" % 
 			  (fsPath, headPath))
-	
+
+	realPath = rootFixup + finalPath
+
 	# headFileVersion is None for renames
 	if headFileVersion:
+	    # FIXME we should be able to inspect fileChanges directly
+	    # to see if we need to go into the if statement which follows
+	    # this rather then having to look up the file from the old
+	    # pacakge for every file which has changed
+	
 	    fsFile = files.FileFromFilesystem(realPath, fileId)
-	    (headFile, headFileContents) = \
-		    repos.getFileVersion(fileId, headFileVersion, 
-					 withContents = 1)
-
-	if headFileVersion and not fsFile.same(headFile, ignoreOwner = True):
-	    # the contents have changed... let's see what to do
-	    if basePkg.hasFile(fileId):
-		baseFileVersion = basePkg.getFile(fileId)[1]
-		(baseFile, baseFileContents) = repos.getFileVersion(fileId, 
-				    baseFileVersion, withContents = 1)
-	    else:
-		baseFile = None
-
-	    if not baseFile:
+	    
+	    if not basePkg.hasFile(fileId):
+		# a file which was not in the base package was created
+		# on both the head of the branch and in the filesystem;
+		# this can happen during source management
 		log.error("new file %s conflicts with file on head of branch"
 				% realPath)
 		contentsOkay = 0
-	    elif headFile.same(baseFile, ignoreOwner = True):
+	    else:
+		baseFileVersion = basePkg.getFile(fileId)[1]
+		(baseFile, baseFileContents) = repos.getFileVersion(fileId, 
+				    baseFileVersion, withContents = 1)
+	    
+	    fileChanges = changeSet.getFileChange(fileId)
+	    headFile = baseFile.copy()
+	    headFile.applyChange(fileChanges)
+
+	    if headFile.hasContents:
+		(headFileContType, headFileContents) = \
+			changeSet.getFileContents(fileId)
+	    else:
+		headFileContents = None
+
+	if basePkg and headFileVersion and not \
+		    fsFile.same(headFile, ignoreOwner = True):
+	    # the contents have changed... let's see what to do
+
+	    if headFile.same(baseFile, ignoreOwner = True):
 		# it changed in just the filesystem, so leave that change
-		log.info("preserving new contents of %s" % realPath)
+		log.debug("preserving new contents of %s" % realPath)
 	    elif fsFile.same(baseFile, ignoreOwner = True):
 		# the contents changed in just the repository, so take
 		# those changes
-		log.info("replacing %s with contents from repository" % 
+		log.debug("replacing %s with contents from repository" % 
 				realPath)
-		baseFile.restore(baseContents, realPath, 1)
+		assert(headFileContents == changeset.ChangedFileTypes.file)
+		headFile.restore(headFileContents, realPath, 1)
 	    elif fsFile.isConfig() or headFile.isConfig():
 		# it changed in both the filesystem and the repository; our
 		# only hope is to generate a patch for what changed in the
 		# repository and try and apply it here
-		(contType, cont) = changeset.fileContentsDiff(
-			baseFile, baseFileContents,
-			headFile, headFileContents)
-		if contType != changeset.ChangedFileTypes.diff:
+		if headFileContType != changeset.ChangedFileTypes.diff:
 		    log.error("contents conflict for %s" % realPath)
 		    contentsOkay = 0
 		else:
-		    log.info("merging changes from repository into %s" % realPath)
-		    diff = cont.get().readlines()
+		    log.debug("merging changes from repository into %s" % realPath)
+		    diff = headFileContents.get().readlines()
 		    cur = open(realPath, "r").readlines()
 		    (newLines, failedHunks) = patch.patch(cur, diff)
 
@@ -190,7 +257,7 @@ def _applyPackageChangeSet(repos, pkgCs, basePkg, fsPkg, root):
 	    # break things
 	    if not headFileVersion:
 		headFileVersion = fsPkg.getFile(fileId)[1]
-	    fsPkg.addFile(fileId, realPath, headFileVersion)
+	    fsPkg.addFile(fileId, finalPath, headFileVersion)
 	else:
 	    fullyUpdated = 0
 
@@ -199,17 +266,20 @@ def _applyPackageChangeSet(repos, pkgCs, basePkg, fsPkg, root):
 
     return fsPkg
 
-def buildLocalChanges(repos, state, srcPkg, newVersion, root = ""):
+def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root = ""):
     """
-    Builds a change set against the sources in the current directory and
-    builds an in-core package object reflecting those local changes.
-    The return is a tuple with a boolean saying if anything changes, the
-    new state, the changeset, and the new package object.
+    Populates a change set against the files in the filesystem and builds
+    a package object which describes the files installed.  The return
+    is a tuple with a boolean saying if anything changes and a package
+    reflecting what's in the filesystem; the changeSet is updated as a
+    side effect.
 
     @param repos: Repository this directory is against.
     @type repos: repository.Repository
-    @param state: Current state object
-    @type state: SourceState
+    @param changeSet: Changeset to update with information for this package
+    @type changeSet: changeset.ChangeSet
+    @param curPkg: Package which is installed
+    @type curPkg: package.Package
     @param srcPkg: Package to generate the change set against
     @type srcPkg: package.Package
     @param newVersion: version to use for the newly created package
@@ -219,11 +289,10 @@ def buildLocalChanges(repos, state, srcPkg, newVersion, root = ""):
     @type root: str
     """
 
-    newState = state.copy()
-    newState.changeVersion(newVersion)
-    changeSet = changeset.ChangeSet()
+    newPkg = curPkg.copy()
+    newPkg.changeVersion(newVersion)
 
-    for (fileId, (path, version)) in newState.iterFileList():
+    for (fileId, (path, version)) in newPkg.iterFileList():
 	if path[0] == '/':
 	    realPath = root + path
 	else:
@@ -254,7 +323,7 @@ def buildLocalChanges(repos, state, srcPkg, newVersion, root = ""):
 	    assert(srcPkg or isinstance(version, versions.NewVersion))
 	    # new file, so this is easy
 	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
-	    newState.addFile(fileId, path, newVersion)
+	    newPkg.addFile(fileId, path, newVersion)
 
 	    if f.hasContents:
 		newCont = filecontents.FromFilesystem(realPath)
@@ -267,7 +336,7 @@ def buildLocalChanges(repos, state, srcPkg, newVersion, root = ""):
 	(oldFile, oldCont) = repos.getFileVersion(fileId, oldVersion,
 						  withContents = 1)
         if not f.same(oldFile, ignoreOwner = True):
-	    newState.addFile(fileId, path, newVersion)
+	    newPkg.addFile(fileId, path, newVersion)
 
 	    (filecs, hash) = changeset.fileChangeSet(fileId, oldFile, f)
 	    changeSet.addFile(fileId, oldVersion, newVersion, filecs)
@@ -278,7 +347,7 @@ def buildLocalChanges(repos, state, srcPkg, newVersion, root = ""):
 						
 		changeSet.addFileContents(fileId, contType, cont)
 
-    (csPkg, filesNeeded, pkgsNeeded) = newState.diff(srcPkg)
+    (csPkg, filesNeeded, pkgsNeeded) = newPkg.diff(srcPkg)
     assert(not pkgsNeeded)
     changeSet.newPackage(csPkg)
 
@@ -288,5 +357,31 @@ def buildLocalChanges(repos, state, srcPkg, newVersion, root = ""):
     else:
 	foundDifference = 0
 
-    return (foundDifference, newState, changeSet)
+    return (foundDifference, newPkg)
 
+def buildLocalChanges(repos, pkgList, root = ""):
+    """
+    Builds a change set against a set of files currently installed
+    and builds a package objects which describes the files installed.
+    The return is a changeset and a list of tuples, each with a boolean 
+    saying if anything changed for a package a package reflecting what's
+    in the filesystem for that package.
+
+    @param repos: Repository this directory is against.
+    @type repos: repository.Repository
+    @param pkgList: Specifies which pacakage to work on, and is a list
+    of (curPkg, srcPkg, newVersion) tuples as defined in the parameter
+    list for _localChanges()
+    @param root: root directory the files are in (ignored for sources, which
+    are assumed to be in the current directory)
+    @type root: str
+    """
+
+    changeSet = changeset.ChangeSet()
+    returnList = []
+    for (curPkg, srcPkg, newVersion) in pkgList:
+	result = _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, 
+			       root)
+	returnList.append(result)
+
+    return (changeSet, returnList)
