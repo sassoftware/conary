@@ -233,6 +233,7 @@ class Recipe:
 
     def _appendSource(self, file, keyid, type, extractDir, use, args):
 	file = file % self.macros
+	extractDir = extractDir % self.macros
 	self.sources.append((file, type, extractDir, use, args))
 	self._addSignature(file, keyid)
 
@@ -254,6 +255,7 @@ class Recipe:
 	    f = lookaside.findAll(self.cfg, self.laReposCache, file, 
 				  self.name, self.srcdirs)
 	# file already expanded, and no key can be supplied
+	extractDir = extractDir % self.macros
 	self.sources.append((file, 'tarball', extractDir, use, ()))
 
     def addPatch(self, file, level='1', backup='', keyid=None, use=None):
