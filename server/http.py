@@ -219,6 +219,8 @@ class HttpHandler(HtmlEngine):
             self.writeFn("""<div class="warning">Error: old password is incorrect</div>""")
         elif p1 != p2:
             self.writeFn("""<div class="warning">Error: passwords do not match</div>""")
+        elif oldPassword == p1:
+            self.writeFn("""<div class="warning">Error: old and new passwords identical, not changing.</div>""")
         else:
             self.repServer.auth.changePassword(authToken[0], p1)
             self.writeFn("""<div>Password successfully changed.</div>""")
