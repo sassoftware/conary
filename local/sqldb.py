@@ -396,7 +396,14 @@ class Database:
 
     def __init__(self, path):
 	self.db = sqlite3.connect(path)
-        self.db._begin()
+        try:
+            self.db._begin()
+        except sqlite3.ProgrammingError, e:
+            # ignore attepting to write to a ro database, the db
+            # might already be set up on the root filesystem while
+            # conary is being run as a non-root user
+            if str(e) != 'attempt to write a readonly database':
+                raise
 	self.troveTroves = trovetroves.TroveTroves(self.db)
 	self.troveFiles = DBTroveFiles(self.db)
 	self.instances = DBInstanceTable(self.db)
@@ -405,7 +412,8 @@ class Database:
 	self.flavors = DBFlavors(self.db)
 	self.flavorMap = DBFlavorMap(self.db)
 	self.depTables = deptable.DependencyTables(self.db)
-        self.db.commit()
+        if self.db.inTransaction:
+            self.db.commit()
 	self.streamCache = {}
 	self.needsCleanup = False
 	self.addVersionCache = {}
