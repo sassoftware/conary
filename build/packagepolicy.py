@@ -476,7 +476,7 @@ class TagSpec(policy.Policy):
     Apply tags defined by tag descriptions in both the current system
     and C{%(destdir)s} to all the files in C{%(destdir)s}; can also
     be told to apply tags manually:
-    C{r.TagSpec(I{tagname}, I{filterexp})} to add manuall, or
+    C{r.TagSpec(I{tagname}, I{filterexp})} to add manually, or
     C{r.TagSpec(I{tagname}, exceptions=I{filterexp})} to set an exception
     """
     keywords = {
