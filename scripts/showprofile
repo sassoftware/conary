@@ -5,6 +5,7 @@
 # All rights reserved
 #
 
+import cPickle
 import hotshot.stats
 import sys
 
@@ -12,11 +13,31 @@ def progress(msg):
     sys.stderr.write(msg + '\n')
     sys.stderr.flush()
 
+def usage():
+    print 'usage: %s profile [pickle output]'
+    sys.exit(1)
+
+if len(sys.argv) < 2 or len(sys.argv) > 3:
+    usage()
+
 filename = sys.argv[1]
-progress('loading %s' %filename)
-stats = hotshot.stats.load(filename)
-progress('strip dirs')
-#stats.strip_dirs()
-progress('sort stats')
-stats.sort_stats('time', 'calls')
-stats.print_stats()
+picklefilename = None
+if len(sys.argv) == 3:
+    picklefilename = sys.argv[2]
+
+if filename.endswith('.pickle'):
+    if picklefilename:
+        print 'input file is pickled and an output pickle name is specified'
+        usage()
+    f = open(filename)
+    stats = cPickle.load(f)
+else:    
+    progress('loading %s' %filename)
+    stats = hotshot.stats.load(filename)
+
+if picklefilename:
+    f = open(sys.argv[2], 'w')
+    cPickle.dump(stats, f)
+else:
+    stats.sort_stats('time', 'calls')
+    stats.print_stats()

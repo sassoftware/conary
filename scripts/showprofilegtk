@@ -5,6 +5,7 @@
 # All rights reserved
 #
 
+import cPickle
 import gobject
 import gtk
 import hotshot.stats
@@ -221,7 +222,12 @@ if __name__ == '__main__':
         sys.exit(1)
 
     filename = sys.argv[1]
-    stats = hotshot.stats.load(filename)
+    if filename.endswith('.pickle'):
+        f = open(filename)
+        stats = cPickle.load(f)
+    else:    
+        progress('loading %s' %filename)
+        stats = hotshot.stats.load(filename)
 
     app = StatWindow()
     app.populate(stats)
