@@ -112,7 +112,8 @@ static int doInspect(Elf * elf, PyObject * reqList, PyObject * provList) {
       case EM_X86_64:	    insSet = "x86-64";	    break;
       case EM_ALPHA:	    insSet = "alpha";	    break;
       default:
-	PyErr_SetString(ElfError, "unknown machine type");
+	/* we'll live */
+	return 0;
     }
 
     PyList_Append(reqList, Py_BuildValue("ss(ss)", "abi", class,
