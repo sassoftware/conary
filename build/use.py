@@ -209,6 +209,17 @@ Use.X = False
 Use.gtk = False
 Use.gnome = False
 Use.kde = False
+Use.xfce = False
+
+Use.desktop = Use.gnome | Use.kde | Use.xfce
+Use.desktop.setShortDoc('Building with support for freedesktop.org specs')
+Use.desktop.setLongDoc("""
+Set if any graphical desktop platform/environment that attempts to conform
+to the freedesktop.org specifications is enabled.  In particular, desktop
+and menu entries and the shared mime database at this time.  This flag
+should mediate dependence on implementation of these capabilities.
+""")
+
 Use.ssl = False
 Use.slang = False
 Use.netpbm = False
