@@ -2,35 +2,55 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+import files
+import log
 import package
 import versions
-import files
 
 _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
+_grpFormat  = "%-39s %s"
 
 def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
     if pkg and pkg[0] != ":":
 	pkg = cfg.packagenamespace + ":" + pkg
 
-    for pkgName in repos.getPackageList(pkg):
-	if versionStr or ls:
-            _displayPkgInfo(repos, cfg, pkgName, versionStr, ls)
-            continue
-	else:
-	    if all:
-		l = repos.getPackageVersionList(pkgName)
-	    else:
-		l = _versionList(repos, pkgName)
+    if pkg and pkg.split(":")[2].startswith("group-"):
+	nameList = pkg.split(":")
+	nameList[2] = nameList[2][6:]
+	name = ":".join(nameList)
+	version = repos.grpLatestVersion(name, cfg.defaultbranch)
+	grp = repos.getGroupVersion(name, version)
 
-	    for version in l:
-		print _pkgFormat % (
-		    package.stripNamespace(cfg.packagenamespace, pkgName),
-		    version.asString(cfg.defaultbranch))
+	for (pkg, verList) in grp.getPackageList():
+	    for ver in verList:
+		print _grpFormat % (
+			    package.stripNamespace(cfg.packagenamespace, pkg),
+			    ver.asString())
+    else:
+	list = repos.getPackageList(pkg)
+	if not list:
+	    log.warning("object %s does not exist" % pkg)
+	    return
+
+	for pkgName in list:
+	    if versionStr or ls:
+		_displayPkgInfo(repos, cfg, pkgName, versionStr, ls)
+		continue
+	    else:
+		if all:
+		    l = repos.getPackageVersionList(pkgName)
+		else:
+		    l = _versionList(repos, pkgName)
+
+		for version in l:
+		    print _pkgFormat % (
+			package.stripNamespace(cfg.packagenamespace, pkgName),
+			version.asString(cfg.defaultbranch))
 
 def _versionList(repos, pkgName):
     """
-    Returns a list of the head of all non-empty branches for a pakage.
+    Returns a list of the head of all non-empty branches for a package.
 
     @param repos: Repository to look for branches in
     @type repos: repository.Repository
