@@ -43,6 +43,9 @@ class Repository:
     def hasPackage(self, pkg):
 	return self.pkgDB.hasFile(pkg)
 
+    def getFullVersion(self, pkgName, version):
+	return self._getPackageSet(pkgName).getFullVersion(version)
+
     def hasPackageVersion(self, pkgName, version):
 	return self._getPackageSet(pkgName).hasVersion(version)
 
@@ -70,9 +73,18 @@ class Repository:
 	fileDB = self._getFileDB(fileId)
 	return fileDB.getLatestVersion(branch)
 	
-    def getFileVersion(self, fileId, version):
+    def getFileVersion(self, fileId, version, path = None, withContents = 0):
 	fileDB = self._getFileDB(fileId)
-	return fileDB.getVersion(version)
+	file = fileDB.getVersion(version)
+	if withContents:
+	    if isinstance(file, files.RegularFile): 
+		cont = FileContentsFromRepository(self, file.sha1())
+	    else:
+		cont = None
+
+	    return (file, cont)
+
+	return file
 
     def addFileVersion(self, fileId, version, file):
 	fileDB = self._getFileDB(fileId)
@@ -165,33 +177,28 @@ class LocalRepository(Repository):
 
 	for (packageName, oldVersion, newVersion, abstract) in packageList:
 	    # look up these versions to get versions w/ timestamps
-	    pkgSet = self._getPackageSet(packageName)
-
-	    new = pkgSet.getVersion(newVersion)
-	    newVersion = pkgSet.getFullVersion(newVersion)
+	    new = self.getPackageVersion(packageName, newVersion)
 	 
 	    if oldVersion:
-		old = pkgSet.getVersion(oldVersion)
-		oldVersion = pkgSet.getFullVersion(oldVersion)
+		old = self.getPackageVersion(packageName, oldVersion)
 	    else:
 		old = None
 
 	    (pkgChgSet, filesNeeded) = new.diff(old, abstract = abstract)
 	    cs.newPackage(pkgChgSet)
 
-	    for (fileId, oldVersion, newVersion) in filesNeeded:
-		filedb = self._getFileDB(fileId)
-
+	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
 		oldFile = None
 		if oldVersion:
-		    oldFile = filedb.getVersion(oldVersion)
-		newFile = filedb.getVersion(newVersion)
+		    oldFile = self.getFileVersion(fileId, oldVersion)
+		(newFile, newCont) = self.getFileVersion(fileId, newVersion,
+					    path = newPath, withContents = 1)
 
 		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
 							 newFile)
 
 		cs.addFile(fileId, oldVersion, newVersion, filecs)
-		if hash: cs.addFileContents(hash)
+		if hash: cs.addFileContents(hash, newCont)
 
 	return cs
 
@@ -258,6 +265,9 @@ class _PackageSet:
 
     def getLatestPackage(self, branch):
 	return self.getVersion(self.f.findLatestVersion(branch))
+
+    def findLatestVersion(self, branch):
+	return self.f.findLatestVersion(branch)
 
     def getLatestVersion(self, branch):
 	return self.f.findLatestVersion(branch)
@@ -478,6 +488,38 @@ class ChangeSetUndo:
     def __init__(self, repos):
 	self.reset()
 	self.repos = repos
+
+class FileContents:
+
+    def __init__(self):
+	if self.__class__ == FileContents:
+	    raise NotImplemented
+
+class FileContentsFromRepository(FileContents):
+
+    def get(self):
+	return self.repos.pullFileContentsObject(self.fileId)
+
+    def __init__(self, repos, fileId):
+	self.repos = repos
+	self.fileId = fileId
+
+class FileContentsFromFilesystem(FileContents):
+
+    def get(self):
+	return open(self.path, "r")
+
+    def __init__(self, path):
+	self.path = path
+
+class FileContentsFromChangeSet(FileContents):
+
+    def get(self):
+	return self.absCS.getFileContents(self.hash)
+
+    def __init__(self, cs, hash):
+	self.cs = cs
+	self.hash = hash
 
 class RepositoryError(Exception):
 
