@@ -224,7 +224,7 @@ class Source(_Source):
 
 class Action(_Source):
     def __init__(self, recipe, action, dir='', use=None):
-	_Source.__init__(self, recipe, '', None, dir, None, None)
+	_Source.__init__(self, recipe, '', '', dir, None, None)
 	self.action = action % self.recipe.macros
 
     def doUnpack(self):
