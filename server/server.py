@@ -46,6 +46,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
         """
         path = posixpath.normpath(urllib.unquote(path))
+	path = path.split("?", 1)[1]
         words = path.split('/')
         words = filter(None, words)
         path = FILE_PATH
@@ -114,7 +115,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	return resp
 
     def do_PUT(self):
-	path = FILE_PATH + '/' + os.path.basename(self.path) + "-in"
+	path = self.path.split("?")[-1]
+	path = FILE_PATH + '/' + path + "-in"
 
 	size = os.stat(path).st_size
 	if size != 0:

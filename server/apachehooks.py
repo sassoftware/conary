@@ -45,7 +45,7 @@ def xmlPost(repos, req):
     return apache.OK
 
 def getFile(repos, req):
-    path = repos.tmpPath + "/" + os.path.basename(req.filename) + "-out"
+    path = repos.tmpPath + "/" + req.args + "-out"
     size = os.stat(path).st_size
     req.content_type = "application/x-conary-change-set"
     req.sendfile(path)
@@ -53,7 +53,7 @@ def getFile(repos, req):
     return apache.OK
 
 def putFile(repos, req):
-    path = repos.tmpPath + "/" + os.path.basename(req.filename) + "-in"
+    path = repos.tmpPath + "/" + req.args + "-in"
     size = os.stat(path).st_size
     if size != 0:
 	return apache.HTTP_UNAUTHORIZED
@@ -69,15 +69,24 @@ def putFile(repos, req):
     return apache.OK
 
 def handler(req):
-    if not repositories.has_key(req.filename):
-	codeStr = open(req.filename, "r").read()
+    if req.uri.endswith(".cnr"):
+	repName = req.filename
+    else:
+	repName = os.path.dirname(req.filename)
+
+    if not repositories.has_key(repName):
+	codeStr = open(repName, "r").read()
 	d = {}
 	exec codeStr in d
-	repositories[req.filename] = netserver.NetworkRepositoryServer(
-				d['reppath'], d['tmppath'], 
-				req.filename, d['authpath'])
+	urlBase = "http://%s:%d" % (req.hostname, 
+				      req.parsed_uri[apache.URI_PORT])
+	urlBase += req.uri
 
-    repos = repositories[req.filename]
+	repositories[repName] = netserver.NetworkRepositoryServer(
+				d['reppath'], d['tmppath'], 
+				urlBase, d['authpath'])
+
+    repos = repositories[repName]
 
     if req.method == "POST" and req.headers_in['Content-Type'] == "text/xml":
 	return xmlPost(repos, req)

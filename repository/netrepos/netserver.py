@@ -87,7 +87,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	fc.close()
 
 	fileName = os.path.basename(path)
-	return "%s/%s" % (self.urlBase, fileName[:-4])
+	return "%s?%s" % (self.urlBase, fileName[:-4])
 
     def getAllTroveLeafs(self, authToken, troveNames):
 	for troveName in troveNames:
@@ -179,7 +179,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	os.close(fd)
 	cs.writeToFile(path)
 	fileName = os.path.basename(path)
-	return "%s/%s" % (self.urlBase, fileName[:-4])
+	return "%s?%s" % (self.urlBase, fileName[:-4])
 
     def iterAllTroveNames(self, authToken):
 	if not self.auth.check(authToken, write = False):
@@ -190,17 +190,20 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def prepareChangeSet(self, authToken):
 	# make sure they have a valid account and permission to commit to
 	# *something*
+	#import pdb
+	#pdb.set_trace()
 	if not self.auth.check(authToken, write = True):
 	    raise InsufficientPermission
 
 	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
 	os.close(fd)
 	fileName = os.path.basename(path)
-	return "%s/%s" % (self.urlBase, fileName[:-3])
+	return "%s?%s" % (self.urlBase, fileName[:-3])
 
     def commitChangeSet(self, authToken, url):
 	assert(url.startswith(self.urlBase))
-	fileName = url[len(self.urlBase):] + "-in"
+	# +1 strips off the ? from the query url
+	fileName = url[len(self.urlBase) + 1:] + "-in"
 	path = "%s/%s" % (self.tmpPath, fileName)
 
 	try:
