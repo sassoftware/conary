@@ -82,7 +82,7 @@ def findPackage(repos, packageNamespace, defaultNick, name,
 	if not branchList:
 	    raise PackageNotFound, \
 			"branch %s does not exist for package %s" \
-			% (str(nick), name)
+			% (str(defaultNick), name)
 	
 	try:
 	    verRel = versions.VersionRelease(versionStr)
