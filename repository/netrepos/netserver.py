@@ -33,7 +33,7 @@ from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExi
 import trovestore
 import versions
 
-SERVER_VERSIONS = [ 24 ]
+SERVER_VERSIONS = [ 24, 25 ]
 CACHE_SCHEMA_VERSION = 11
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -928,15 +928,19 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
 	sugDict = self.troveStore.resolveRequirements(label, requires.keys())
 
+        result = {}
         if clientVersion == 24:
-            result = {}
             for (key, val) in sugDict.iteritems():
-                # val is (troveName, versionStr, flavorStr)*, and needs
-                # to have the flavorStr stripped, and be dedupped
-                val = {}.fromkeys([(x[0], x[1]) for x in val]).keys()
-                result[requires[key]] = val
+                # make a default choice (flavors are returned for this
+                # old version), and the version can't have timestamps here
+                result[requires[key]] = [ (x[0],
+                    versions.ThawVersion(x[1]).asString()) for x in val[0] ]
         else:
-            assert(0)
+            for (key, val) in sugDict.iteritems():
+                result[requires[key]] = val
+                
+        #for (key, val) in sugDict.iteritems():
+        #    result[requires[key]] = val
 
         return result
 

@@ -13,6 +13,7 @@
 # 
 
 from deps import deps
+import versions
 
 NO_FLAG_MAGIC = '-*none*-'
 
@@ -653,7 +654,8 @@ class DependencyTables:
                             None, ("Dependencies", "TmpDependencies"), 
                             multiplier = -1)
 
-        full = """SELECT depNum, Items.item, Versions.version, flavor FROM 
+        full = """SELECT depNum, Items.item, Versions.version, 
+                         Nodes.timeStamps, flavor FROM 
                         (%s)
                       JOIN Instances ON
                         provInstanceId == Instances.instanceId
@@ -681,7 +683,7 @@ class DependencyTables:
         solutionCount = {}
 
         saw = {}
-        for (depId, troveName, versionStr, flavorStr) in cu:
+        for (depId, troveName, versionStr, timeStamps, flavorStr) in cu:
             depId = -depId
 
             # only remember the first (newest) version of each trove for
@@ -691,7 +693,7 @@ class DependencyTables:
                 continue
 
             d = depSolutions[depId].setdefault(troveName, {}) 
-            d[versionStr, flavorStr] = True
+            d[versionStr, flavorStr] = timeStamps
 
             if not troveNameSolutions.has_key((troveName, depId)):
                 troveNameSolutions[(troveName, depId)] = True
@@ -699,9 +701,6 @@ class DependencyTables:
                 solutionCount[troveName] += 1
 
         result = {}
-
-        #import lib
-        #lib.epdb.st()
 
         for depId, troveNames in enumerate(depSolutions):
             if depId == 0: continue
@@ -716,19 +715,17 @@ class DependencyTables:
 
             # pick the trove which helped the most
             troveName = countList[-1][1]
-            choices = [ (troveName, x[0], x[1]) 
-                            for x in troveNames[troveName].keys() ]
-
-            # XXX
-            versionStr = choices[0][1]
+            choices = [ (troveName, 
+                         versions.strToFrozen(x[0][0], x[1].split(":")),
+                         x[0][1]) 
+                            for x in troveNames[troveName].items() ]
 
             depNum = depList[depId][0]
             depSet = depSetList[depNum]
             l = result.setdefault(depSet, [])
 
-            for choice in choices:
-                if choice not in l:
-                    l.append(choice)
+            if choices not in l:
+                l.append(choices)
 
         cu.execute("DROP TABLE TmpDependencies", start_transaction= False)
         cu.execute("DROP TABLE TmpRequires", start_transaction= False)
