@@ -77,7 +77,8 @@ class ConaryConfiguration:
 			   self.instructionSet)
 
 	self.read("/etc/conaryrc")
-	self.read(os.environ["HOME"] + "/" + ".conaryrc")
+	if os.environ.has_key("HOME"):
+	    self.read(os.environ["HOME"] + "/" + ".conaryrc")
 
 class ConaryCfgError(Exception):
 
