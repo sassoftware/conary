@@ -6,7 +6,7 @@
 python_files = database.py	\
 		__init__.py	\
 		localrep.py	\
-		trovedb.py	\
+		sqldb.py	\
 		update.py
 
 extra_dist = Makefile
