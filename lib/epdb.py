@@ -227,8 +227,11 @@ class Epdb(pdb.Pdb):
     def default(self, line):
         if line[-1] != '?':
             return pdb.Pdb.default(self, line)
-        self.do_define(line[:-1])
-
+        if line[-2:] == '??':
+            self.do_define(line[:-2])
+            self.do_doc(line[:-2])
+        else:
+            self.do_define(line[:-1])
 
     def do_define(self, arg):
         locals = self.curframe.f_locals
@@ -240,13 +243,10 @@ class Epdb(pdb.Pdb):
                 bases = [ x.__name__ for x in bases[1:] ]
                 bases = '(' + ', '.join(bases) + ')'
                 print "Class " + result.__name__ + bases
-                if hasattr(result, '__doc__'):
-                    print "\"\"\"%s\"\"\"" % result.__doc__
                 if hasattr(result, '__init__'):
                     result = result.__init__
                 else:
                     result = None
-                print "Init method: "
             if inspect.ismethod(result):
                 m_class = result.im_class
                 m_self = result.im_self
@@ -262,8 +262,6 @@ class Epdb(pdb.Pdb):
                 print "%s%s" % (name, argspec)
             else:
                 print type(result)
-            if hasattr(result, '__doc__'):
-                print "\"\"\"%s\"\"\"" % result.__doc__
         except:
             t, v = sys.exc_info()[:2]
             if type(t) == type(''):
@@ -271,6 +269,27 @@ class Epdb(pdb.Pdb):
             else: exc_type_name = t.__name__
             print '***', exc_type_name + ':', v
     do_def = do_define
+
+    def do_doc(self, arg):
+        locals = self.curframe.f_locals
+        globals = self.curframe.f_globals
+        try:
+            result = eval(arg + '\n', globals, locals) 
+            if hasattr(result, '__doc__'):
+                print "\"\"\"%s\"\"\"" % result.__doc__
+            if inspect.isclass(result):
+                if hasattr(result, '__init__'):
+                    self.do_define(arg + '.__init__')
+                    if hasattr(result.__init__, '__doc__'):
+                        print "\"\"\"%s\"\"\"" % result.__init__.__doc__
+                else:
+                    print "No init function"
+        except:
+            t, v = sys.exc_info()[:2]
+            if type(t) == type(''):
+                exc_type_name = t
+            else: exc_type_name = t.__name__
+            print '***', exc_type_name + ':', v
 
     def interaction(self, frame, traceback):
         pdb.Pdb.interaction(self, frame, traceback)
