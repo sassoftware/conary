@@ -1,6 +1,8 @@
 Changes in 0.10.10:
   * changesets get downloaded into a single (meta) file instead of lots
     of separate files
+  * fix several bugs in the freshmeat record parsing
+  * add a freshmeat project page URL to the metadata by default
 
 Changes in 0.10.9:
   * fixed some authorization issues with the xml-rpc repository interface
