@@ -105,7 +105,6 @@ class VersionedFile:
 	return FalseFile(self.db[_CONTENTS % (self.key, version.asString())])
 
     def findLatestVersion(self, branch):
-	matchesByTime = {}
 	self.readBranchMap()
 
 	branchStr = branch.asString()
