@@ -1273,11 +1273,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             del byBranch
 
         if byBranchNoFlavor:
-            res = self.getTroveLeavesByBranch(byBranchNoFlavorj, 
+            res = self.getTroveLeavesByBranch(byBranchNoFlavor, 
                                               bestFlavor=False)
             for name in byBranchNoFlavor:
                 if name not in res or not res[name]:
-                    missing.append(byBrancMap[name])
+                    missing.append(byBranchMap[name])
                     continue
                 pkgList = []
                 for version, flavorList in res[name].iteritems():
