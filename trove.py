@@ -295,7 +295,6 @@ class Package:
 	pkgList = []
 
 	if abstract:
-	    print "HERE", added.keys()
 	    for name in added.keys():
 		for version in added[name]:
 		    pkgList.append((name, None, version))
