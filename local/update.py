@@ -466,7 +466,7 @@ class FilesystemJob:
 		    if noIds:
 			# we don't want to merge owner/group ids in
 			# this case (something other than owner/group
-			# # changed, such as size).  simply take the
+			# changed, such as size).  simply take the
 			# head values
 			baseFile.inode.setOwner(headFile.inode.owner())
 			baseFile.inode.setGroup(headFile.inode.group())
