@@ -410,16 +410,20 @@ class _PutFiles(_FileAction):
 	    if not os.path.isdir(dest) and len(sourcelist) > 1:
 		raise TypeError, 'multiple files specified, but destination "%s" is not a directory' %dest
 	    for source in sourcelist:
-		thisdest = dest
-                if os.path.isdir(dest):
-		    thisdest = dest + os.path.basename(source)
+		self._do_one(source, dest, destlen, macros)
 
-		if self.move:
-		    util.rename(source, thisdest)
-		else:
-		    util.copyfile(source, thisdest)
-		self.setComponents(thisdest[destlen:])
-                self.chmod(macros['destdir'], thisdest[destlen:])
+    def _do_one(self, source, dest, destlen, macros):
+	thisdest = dest
+	if os.path.isdir(dest):
+	    thisdest = dest + os.path.basename(source)
+
+	if self.move:
+	    util.rename(source, thisdest)
+	else:
+	    util.copyfile(source, thisdest)
+	self.setComponents(thisdest[destlen:])
+	self.chmod(macros['destdir'], thisdest[destlen:])
+	
 
     def __init__(self, *args, **keywords):
         _FileAction.__init__(self, **keywords)
