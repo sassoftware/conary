@@ -699,7 +699,7 @@ def updateSrc(repos, versionStr = None):
 
     newState.write("CONARY")
 
-def addFiles(fileList):
+def addFiles(fileList, ignoreExisting=False):
     try:
         state = SourceStateFromFile("CONARY")
     except OSError:
@@ -715,7 +715,8 @@ def addFiles(fileList):
 	found = False
 	for (pathId, path, fileId, version) in state.iterFileList():
 	    if path == file:
-		log.error("file %s is already part of this source component" % path)
+                if not ignoreExisting:
+                    log.error("file %s is already part of this source component" % path)
 		found = True
 
 	if found: 
