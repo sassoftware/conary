@@ -388,7 +388,7 @@ class Recipe:
 	    self.build = self.defaultbuild
         elif isinstance(self.build, str):
             util.execute(self.build %self.macros)
-        elif isinstance(self.build, tuple) or isinstance(self.build, list):
+        elif isinstance(self.build, (tuple, list)):
 	    for bld in self.build:
                 if type(bld) is str:
                     util.execute(bld %self.macros)
@@ -402,7 +402,7 @@ class Recipe:
 
     def doProcess(self):
         for post in self.process:
-            post.doProcess(self, self.macros)
+            post.doProcess(self)
 
     def setConfig(self, path):
         for package in self.packages:
