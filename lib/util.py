@@ -238,14 +238,17 @@ class popen:
     def __init__(self, *args):
 	self.p = os.popen(*args)
 	self.name = self.p.name
+        
     def write(self, *args):
-	self.p.write(*args)
+	return self.p.write(*args)
+
     def read(self, *args):
-	self.p.read(*args)
+	return self.p.read(*args)
+
     def close(self, *args):
 	rc = self.p.close(*args)
 	_handle_rc(rc, self.p.name)
-
+        return rc
 
 # string extensions
 
