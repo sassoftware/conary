@@ -428,31 +428,3 @@ class _FileDB:
     def __init__(self, db, fileId):
 	self.f = db.openFile(fileId)
 	self.fileId = fileId
-
-# Exception classes
-
-class RepositoryError(Exception):
-
-    """Base class for exceptions from the system repository"""
-    pass
-
-class RollbackError(RepositoryError):
-
-    """Base class for exceptions related to applying rollbacks"""
-
-class RollbackOrderError(RollbackError):
-
-    """Raised when an attempt is made to apply rollbacks in the
-       wrong order"""
-
-    def __repr__(self):
-	return "rollback %s can not be applied out of order" % self.name
-
-    def __str__(self):
-	return repr(self)
-
-    def __init__(self, rollbackName):
-	"""Create new new RollbackOrderError
-	@param rollbackName: string represeting the name of the rollback
-	which was trying to be applied out of order"""
-	self.name = rollbackName
