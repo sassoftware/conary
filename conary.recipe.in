@@ -3,7 +3,7 @@
 # All rights reserved
 #
 
-class Srs(Recipe):
+class Srs(PackageRecipe):
     description = "The Specifix Repository System"
 
     runRequires = [ "python" ]
