@@ -177,7 +177,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
 
                 new.append(("%s (%s -> %s)" % 
                                 (x.getName(), oldTVersion.asString(),
-                                 newTVersion.asString()), 'N'))
+                                 newTVersion.asString()), kind))
 
 	    new.sort()
 	    new = [ "%s %s" % (x[1], x[0]) for x in new ]
