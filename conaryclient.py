@@ -54,86 +54,98 @@ class ConaryClient:
         self.cfg = cfg
         self.db = database.Database(cfg.root, cfg.dbPath)
 
-    def updateTrove(self, pkg, versionStr, replaceFiles = False,
+    def updateTrove(self, itemList, replaceFiles = False,
                     tagScript = None, keepExisting = None):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
+
+        @param itemList: List specifying the changes to apply. Each item
+        in the list must be a ChangeSetFromFile, the name of a trove to
+        update, or a (name, versionString) tuple. 
+        @type itemList: list
         """
         self._prepareRoot()
-        if self.db.hasPackage(pkg):
-            labels = [ x.getVersion().branch().label()
-                       for x in self.db.findTrove(pkg) ]
 
-            # this removes duplicates
-            labels = {}.fromkeys(labels).keys()
-            
-            # check for locally-cooked troves
-            if True in [isinstance(x, versions.CookBranch) or
-                        isinstance(x, versions.EmergeBranch)
-                        for x in labels]:
-                raise UpdateError, \
-                            "Package %s cooked locally, not updating" % pkg
-        else:
-            labels = [ self.cfg.installLabel ]
+        changeSetList = []
+        finalCs = None
+        for item in itemList:
+            if isinstance(item, changeset.ChangeSetFromFile):
+                if item.isAbsolute():
+                    item.rootChangeSet(self.db, keepExisting)
 
-        newList = []
-        for label in labels:
-            try:
-                newList += self.repos.findTrove(label, pkg, self.cfg.flavor, 
-                                                versionStr)
-            except repository.PackageNotFound, e:
-                pass
+                if finalCs is not None:
+                    finalCs.merge(item)
+                else:
+                    finalCs = item
 
-        if not newList:
-            raise repository.TroveMissing(pkg, labels)
+                continue
 
-        list = []
-        if keepExisting:
-            for newTrove in newList:
-                list.append((newTrove.getName(), (None, None),
-                            (newTrove.getVersion(), newTrove.getFlavor()), 0))
-            eraseList = []
-        else:
-            newItems = []
-            for newTrove in newList:
-                newItems.append((newTrove.getName(), newTrove.getVersion(),
-                                 newTrove.getFlavor()))
+            if type(item) == str:
+                troveName = item
+                versionStr = None
+            else:
+                troveName = item[0]
+                versionStr = item[1]
 
-            # everything which needs to be installed is in this list; if it's
-            # not here, it's a duplicate
-            outdated, eraseList = self.db.outdatedTroves(newItems)
-            for (name, newVersion, newFlavor), \
-                    (oldName, oldVersion, oldFlavor) in outdated.iteritems():
-                list.append((name, (oldVersion, oldFlavor),
-                                   (newVersion, newFlavor), 0))
+            if self.db.hasPackage(troveName):
+                labels = [ x.getVersion().branch().label()
+                           for x in self.db.findTrove(troveName) ]
 
-        if not list:
+                # this removes duplicates
+                labels = {}.fromkeys(labels).keys()
+                
+                # check for locally-cooked troves
+                if True in [isinstance(x, versions.CookBranch) or
+                            isinstance(x, versions.EmergeBranch)
+                            for x in labels]:
+                    raise UpdateError, \
+                        "Package %s cooked locally, not updating" % troveName
+            else:
+                labels = [ self.cfg.installLabel ]
+
+            newList = []
+            for label in labels:
+                try:
+                    newList += self.repos.findTrove(label, troveName, 
+                                                    self.cfg.flavor, versionStr)
+                except repository.PackageNotFound, e:
+                    pass
+
+            if not newList:
+                raise repository.TroveMissing(troveName, labels)
+
+            if keepExisting:
+                for newTrove in newList:
+                    changeSetList.append((newTrove.getName(), (None, None),
+                                (newTrove.getVersion(), newTrove.getFlavor()), 
+                                0))
+                eraseList = []
+            else:
+                newItems = []
+                for newTrove in newList:
+                    newItems.append((newTrove.getName(), newTrove.getVersion(),
+                                     newTrove.getFlavor()))
+
+                # everything which needs to be installed is in this list; if 
+                # it's not here, it's a duplicate
+                outdated, eraseList = self.db.outdatedTroves(newItems)
+                for (name, newVersion, newFlavor), \
+                      (oldName, oldVersion, oldFlavor) in outdated.iteritems():
+                    changeSetList.append((name, (oldVersion, oldFlavor),
+                                                (newVersion, newFlavor), 0))
+
+        if not finalCs and not changeSetList:
             raise NoNewTrovesError
 
-        cs = self.repos.createChangeSet(list)
-        list = [ x[0] for x in list ]
+        if changeSetList:
+            cs = self.repos.createChangeSet(changeSetList)
+            if finalCs:
+                finalCs.merge(cs)
+            else:
+                finalCs = cs
 
-        if not list:
-            raise NoNewTrovesError
-
-        self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
-                                tagScript = tagScript, 
-                                keepExisting = keepExisting)
-
-    def applyChangeSet(self, pkg, replaceFiles = False, tagScript = None, 
-                       keepExisting = False):
-        """
-        Applies a change set from a file to the system.
-        """
-        self._prepareRoot()
-        
-        cs = changeset.ChangeSetFromFile(pkg)
-            
-        if cs.isAbsolute():
-            cs.rootChangeSet(self.db, keepExisting)
-
-        self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
+        self.db.commitChangeSet(finalCs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 
                                 keepExisting = keepExisting)
 

@@ -75,8 +75,8 @@ def usage(rc = 1):
     print "       conary rollback     <rollback>"
     print "       conary showcs       <changeset>"
     print "       conary source       [usage]"
-    print "       conary update       <pkgname> <version>"
-    print "              update       <changeset>"
+    print "       conary update       <pkgname>[=<version>]*"
+    print "              update       <changeset>+"
     print "       conary usage"
     print "       conary --version"
     print ""
@@ -445,11 +445,10 @@ def realMain(argv=sys.argv):
 	    del argSet['tag-script']
 
 	if argSet: return usage()
-	if len(otherArgs) >=3 and len(otherArgs) <= 4:
+	if len(otherArgs) >=3:
 	    repos = openRepository(cfg.repositoryMap)
 
-	    args = [repos, cfg] + otherArgs[2:]
-	    updatecmd.doUpdate(*args, **kwargs)
+	    updatecmd.doUpdate(repos, cfg, otherArgs[2:], **kwargs)
 	else:
 	    return usage()
     elif (otherArgs[1] == "return usage"):

@@ -22,22 +22,30 @@ from lib import util
 import versions
 import conaryclient
 
-# FIXME client should instantiated once per execution of the command line conary client
+# FIXME client should instantiated once per execution of the command line 
+# conary client
 
-def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
-                              tagScript = None, keepExisting = False):
+def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None, 
+                                  keepExisting = False):
     client = conaryclient.ConaryClient(repos, cfg)
-    
-    try:
-        if os.path.exists(pkg) and os.path.isfile(pkg):
-            if versionStr:
-                log.error("Version should not be specified when a "
-                          "Conary change set is being installed.")
-                return
-            else:
-                client.applyChangeSet(pkg, replaceFiles, tagScript, keepExisting) 
+
+    applyList = []
+
+    for pkgStr in pkgList:
+        if os.path.exists(pkgStr) and os.path.isfile(pkgStr):
+            cs = changeset.ChangeSetFromFile(pkgStr)
+            applyList.append(cs)
+        elif pkgStr.find("=") >= 0:
+            l = pkgStr.split("=")
+            if len(l) != 2:
+                log.error("too many ='s in %s", pkgStr)
+                return 1
+            applyList.append((l[0], l[1]))
         else:
-            client.updateTrove(pkg, versionStr, replaceFiles, tagScript, keepExisting)
+            applyList.append(pkgStr)
+            
+    try:
+        client.updateTrove(applyList, replaceFiles, tagScript, keepExisting)
     except conaryclient.UpdateError, e:
         log.error(e)
     except repository.CommitError, e:
