@@ -31,11 +31,11 @@ class FromFilesystem(FileContents):
 class FromChangeSet(FileContents):
 
     def get(self):
-	return self.cs.getFileContents(self.hash)[1].get()
+	return self.cs.getFileContents(self.fileId)[1].get()
 
-    def __init__(self, cs, hash):
+    def __init__(self, cs, fileId):
 	self.cs = cs
-	self.hash = hash
+	self.fileId = fileId
 
 class FromString(FileContents):
 

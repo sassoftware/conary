@@ -47,7 +47,7 @@ class ChangeSet:
 			    if flags & files._FILE_FLAG_CONFIG:
 				assert(self.hasFileContents(l[1]))
 		    else:
-			assert(self.hasFileContents(l[1]))
+			assert(self.hasFileContents(fileId))
 
 	    # old files should not have any file entries
 	    for fileId in pkg.getOldFileList():
@@ -83,11 +83,11 @@ class ChangeSet:
     def getOldPackageList(self):
 	return self.oldPackages
 
-    def addFileContents(self, hash, contType, contents):
-	self.fileContents[hash] = (contType, contents)
+    def addFileContents(self, fileId, contType, contents):
+	self.fileContents[fileId] = (contType, contents)
 
-    def getFileContents(self, hash):
-	return self.fileContents[hash]
+    def getFileContents(self, fileId):
+	return self.fileContents[fileId]
 
     def hasFileContents(self, hash):
 	return self.fileContents.has_key(hash)
@@ -212,7 +212,7 @@ class ChangeSet:
 		# saved as part of that change set.
 		if origFile.isConfig():
 		    cont = filecontents.FromRepository(db, origFile.sha1())
-		    rollback.addFileContents(origFile.sha1(), 
+		    rollback.addFileContents(fileId,
 					     ChangedFileTypes.file, cont)
 		else:
 		    if isinstance(origFile, files.SourceFile):
@@ -227,7 +227,7 @@ class ChangeSet:
 
 		    if fsFile.same(origFile):
 			cont = filecontents.FromFilesystem(fullPath)
-			rollback.addFileContents(origFile.sha1(), 
+			rollback.addFileContents(fileId,
 						 ChangedFileTypes.file, cont)
 
 	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
@@ -258,17 +258,17 @@ class ChangeSet:
 		# a diff rather then saving the full contents
 		if (origFile.sha1() != newFile.sha1()) and	    \
 		   (origFile.isConfig() or newFile.isConfig()):
-		    (contType, cont) = self.getFileContents(newFile.sha1())
+		    (contType, cont) = self.getFileContents(newFile.id())
 		    if contType == ChangedFileTypes.diff:
 			f = cont.get()
 			diff = "".join(patch.reverse(f.readlines()))
 			f.seek(0)
 			cont = filecontents.FromString(diff)
-			rollback.addFileContents(origFile.sha1(), 
+			rollback.addFileContents(fileId,
 						 ChangedFileTypes.diff, cont)
 		    else:
 			cont = filecontents.FromRepository(db, origFile.sha1())
-			rollback.addFileContents(origFile.sha1(), 
+			rollback.addFileContents(fileId,
 						 ChangedFileTypes.file, cont)
 		elif origFile.sha1() != newFile.sha1():
 		    # if a file which isn't a config file has changed, and
@@ -288,7 +288,7 @@ class ChangeSet:
 
 		    if fsFile.same(origFile):
 			cont = filecontents.FromFilesystem(fullPath)
-			rollback.addFileContents(origFile.sha1(), 
+			rollback.addFileContents(fileId,
 						 ChangedFileTypes.file, cont)
 
 	    rollback.newPackage(invertedPkg)
@@ -322,9 +322,9 @@ class ChangeSetFromRepository(ChangeSet):
 
 class ChangeSetFromAbstractChangeSet(ChangeSet):
 
-    def addFileContents(self, hash):
-	return ChangeSet.addFileContents(self, hash, ChangedFileTypes.file,
-		    filecontents.FromChangeSet(self.absCS, hash))
+    def addFileContents(self, fileId):
+	return ChangeSet.addFileContents(self, fileId, ChangedFileTypes.file,
+		    filecontents.FromChangeSet(self.absCS, fileId))
 
     def __init__(self, absCS):
 	self.absCS = absCS
@@ -332,9 +332,9 @@ class ChangeSetFromAbstractChangeSet(ChangeSet):
 
 class ChangeSetFromFile(ChangeSet):
 
-    def getFileContents(self, hash):
-	f = self.csf.getFile(hash)
-	tag = "cft-" + self.csf.getTag(hash)
+    def getFileContents(self, fileId):
+	f = self.csf.getFile(fileId)
+	tag = "cft-" + self.csf.getTag(fileId)
 
 	return (tag, filecontents.FromFile(f))
 
@@ -458,7 +458,7 @@ def CreateFromFilesystem(pkgList):
 	    cs.addFile(fileId, oldVersion, newVersion, filecs)
 
 	    if hash:
-		cs.addFileContents(hash, ChangedFileTypes.file,
+		cs.addFileContents(fileId, ChangedFileTypes.file,
 			  filecontents.FromFilesystem(realPath))
 
     return cs

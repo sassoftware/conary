@@ -297,7 +297,7 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
 	    state.addFile(fileId, path, newVersion)
 	    newCont = filecontents.FromFilesystem(realPath)
-	    changeSet.addFileContents(f.sha1(), 
+	    changeSet.addFileContents(fileId,
 				      changeset.ChangedFileTypes.file,
 				      newCont)
 	    pkg.addFile(fileId, path, newVersion)
@@ -321,7 +321,7 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 		(contType, cont) = changeset.fileContentsDiff(oldFile, oldCont,
 					f, newCont)
 						
-		changeSet.addFileContents(hash, contType, cont)
+		changeSet.addFileContents(fileId, contType, cont)
 				   
 	else:
 	    pkg.addFile(f.id(), path, duplicateVersion)
@@ -382,7 +382,7 @@ def diff(repos):
 
 	sha1 = csInfo.split()[1]
 	if sha1 != "-":
-	    (contType, contents) = changeSet.getFileContents(sha1)
+	    (contType, contents) = changeSet.getFileContents(fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
 		lines = contents.get().readlines()
 		str = "    " + "    ".join(lines)

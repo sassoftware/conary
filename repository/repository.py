@@ -339,8 +339,7 @@ class LocalRepository(Repository):
 		if hash:
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
-
-		    cs.addFileContents(hash, contType, cont)
+		    cs.addFileContents(fileId, contType, cont)
 
 	return cs
 
@@ -608,7 +607,7 @@ class ChangeSetJob:
 	    assert(newVer.equal(fileMap[fileId][1]))
 
 	    if file.hasContents and restoreContents:
-		(contType, fileContents) = cs.getFileContents(file.sha1())
+		(contType, fileContents) = cs.getFileContents(fileId)
 		if contType == changeset.ChangedFileTypes.diff:
 		    # the content for this file is in the form of a diff,
 		    # which we need to apply against the file in the repository

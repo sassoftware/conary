@@ -533,6 +533,7 @@ class SourceFile(RegularFile):
 def FileFromFilesystem(path, fileId, type = None, possibleMatch = None,
                        requireSymbolicOwnership = False):
     s = os.lstat(path)
+    possibleMatch = None
 
     needsSha1 = 0
 

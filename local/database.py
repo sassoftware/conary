@@ -133,7 +133,7 @@ class Database(repository.LocalRepository):
 
 		cs.addFile(fileId, oldVersion, newVersion, filecs)
 		if hash: 
-		    cs.addFileContents(hash)
+		    cs.addFileContents(fileId)
 
 	assert(not cs.validate())
 
@@ -313,9 +313,6 @@ class Database(repository.LocalRepository):
 # This builds a job which applies both a change set and the local changes
 # which are needed.
 class DatabaseChangeSetJob(repository.ChangeSetJob):
-
-    def createChangeSet(self, packageList):
-	raise NotImplemented
 
     def commit(self, undo, root):
 	repository.ChangeSetJob.commit(self, undo)
