@@ -15,7 +15,10 @@ for p in packages:
 	version = version[:lastdash]
 	versions[package] = version
 
-for p in versions.keys():
+keys = [ x for x in versions.keys()]
+keys.sort()
+
+for p in keys:
     if p in sourcevers:
 	if sourcevers[p] != versions[p]:
 	    print "%-35s%-25s%-20s" % (p + ':', versions[p], sourcevers[p])
