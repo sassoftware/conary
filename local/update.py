@@ -74,7 +74,15 @@ class FilesystemJob:
 	paths.reverse()
 	for target in paths:
 	    (fileObj, msg) = self.removes[target]
-	    fileObj.remove(target)
+
+	    # don't worry about files which don't exist
+	    try:
+		os.lstat(target)
+	    except OSError:
+		pass	
+	    else:
+		fileObj.remove(target)
+
 	    log.debug(msg)
 
 	for (target, str, msg) in self.newFiles:
@@ -236,6 +244,11 @@ class FilesystemJob:
 	    fsPkg.removeFile(fileId)
 
 	for (fileId, headPath, headFileVersion) in pkgCs.getChangedFileList():
+	    if not fsPkg.hasFile(fileId):
+		# the file was removed from the local system; this change
+		# wins
+		continue
+
 	    (fsPath, fsVersion) = fsPkg.getFile(fileId)
 	    if fsPath[0] == "/":
 		rootFixup = root
