@@ -23,7 +23,7 @@ def doUpdate(cfg, root, pkgName, binaries = 1, sources = 0):
     if (not len(pkgSet.versionList())):
 	raise KeyError, "no versions exist of %s" % pkgName
 
-    (version, pkg) = pkgSet.getLatest()
+    pkg = pkgSet.getLatestPackage(cfg.defaultbranch)
 
     fileList = []
     packageFiles = []
