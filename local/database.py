@@ -161,7 +161,7 @@ class Database(repository.LocalRepository):
 	    errList = fsJob.getErrorList()
 	    if errList:
 		for err in errList: log.error(err)
-		undo.undo()
+		#undo.undo()
 		# FIXME need a --force for this
 		#return
 
