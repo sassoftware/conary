@@ -47,7 +47,16 @@ elif len(sys.argv) == 3:
     if len(name) == 40:
 	name = sha1helper.sha1FromString(name)
 
-    f = c.getFile(name)[1]
+    nf = c.getNextFile()
+    while nf:
+        if not nf:
+            print "%s not found", sha1helper.sha1ToString(name)
+            sys.exit(0)
+        (fname, tag, f, size) = nf
+        if fname == name:
+            break
+        nf = c.getNextFile()
+
     sys.stdout.write(f.read())
     f.close()
 else:
