@@ -28,6 +28,8 @@ import versions
 
 class Database(repository.LocalRepository):
 
+    createBranches = 1
+
     # If the request is for the head element of the local branch, we need
     # to be a bit careful with the file list. It currently contains the
     # branched version of each file, but we want to contain the non-branch
