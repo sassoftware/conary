@@ -2,10 +2,10 @@ Changes in 0.10.5:
   * The local database is used for fetching file information (but not
     contents), reducing network traffic when creating change sets
     across repositories.
-  * Update works on troves which were cooked and emerged
+  * Update works on troves which were locally cooked or emerged
   * Internal changes to move toward getFileContents() working in batches
     rather then on individual files. For now this prevents the repository
-    from copying files between the content store and /tmp to server them.
+    from copying files between the content store and /tmp to serve them.
 
 Changes in 0.10.4:
   * Bug fixes for updating from absolute change sets (which basically
