@@ -25,7 +25,7 @@ def finalCommit(reppath, pkgName, version, root, fileList):
 	    infoFile.addVersion(version, file)
 
 	    if file.__class__ == files.SourceFile:
-		p.addSource("/" + pkgName + "/" + file.fileName(), 
+		p.addSource("/" + file.fileName(), 
 			    file.version())
 	    else:
 		p.addFile(file.path(), file.version())

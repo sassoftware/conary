@@ -14,6 +14,7 @@ import pwd
 import grp
 import util
 import types
+import zipfile
 
 class FileMode:
 
@@ -314,18 +315,27 @@ class RegularFile(File):
 	return 0
 
     def restore(self, reppath, srcpath, root):
-	source = self.pathInRep(reppath) + ".contents/" + self.uniqueName() 
+	zip = zipfile.ZipFile(self.pathInRep(reppath) + ".contents")
 	target = root + self.path()
 	path = os.path.dirname(target)
 	util.mkdirChain(path)
-	shutil.copyfile(source, target)
+	f = open(target, "w")
+	f.write(zip.read(self.uniqueName()))
+	f.close()
+	zip.close()
 	File.restore(self, reppath, srcpath, root)
 
     def archive(self, reppath, root):
+	util.mkdirChain(self.pathInRep(reppath))
 	dest = self.pathInRep(reppath) + '.contents'
-	util.mkdirChain(dest)
-	dest = dest + "/" + self.uniqueName()
-	shutil.copyfile(root + "/" + self.path(), dest)
+
+	if os.path.exists(dest):
+	    zip = zipfile.ZipFile(dest, "r")
+	else:
+	    zip = zipfile.ZipFile(dest, "w")
+
+	zip.write(root + "/" + self.path(), self.uniqueName())
+	zip.close()
 
     def __init__(self, path, version = None, info = None):
 	if (info):
@@ -338,12 +348,14 @@ class RegularFile(File):
 class SourceFile(RegularFile):
 
     def restore(self, reppath, srcpath, root):
-	source = self.pathInRep(reppath) + ".contents/" + self.uniqueName()
+	zip = zipfile.ZipFile(self.pathInRep(reppath) + ".contents")
 	target = root + srcpath + "/" + self.fileName()
 	path = os.path.dirname(target)
 	util.mkdirChain(path)
-	shutil.copyfile(source, target)
-	File.restore(self, reppath, srcpath, root)
+	f = open(target, "w")
+	f.write(zip.read(self.uniqueName()))
+	f.close()
+	zip.close()
 
     def fileName(self):
 	return self.pkgName + "/" + os.path.basename(self.path())
@@ -412,7 +424,7 @@ class FileDB:
 	self.dbfile = path + ".info"
 	self.read()
 
-def FileFromFilesystem(pkgName, root, path, type = "auto"):
+def FileFromFilesystem(root, path, type = "auto"):
     s = os.lstat(root + path)
 
     if (type == "src"):
@@ -461,6 +473,9 @@ def FileFromInfoLine(path, version, infoLine):
     elif type == "s":
 	return Socket(path, version, infoLine)
     elif type == "src":
-	return SourceFile(path, version, infoLine)
+	# this is horrible. trule horrible. hideous, really.
+	parts = string.split(path, "/")
+	pkgName = parts[-2]
+	return SourceFile(pkgName, path, version, infoLine)
     else:
 	raise KeyError, "bad infoLine %s" % infoLine

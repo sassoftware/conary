@@ -52,6 +52,7 @@ class File:
 	    self.readOnly = 1
 
 	if (mode == "r+" or mode == "r") and not os.path.exists(filename):
+	    print filename, "dne"
 	    return
 	elif mode == "w":
 	    f = __builtin__.open(filename, "w")

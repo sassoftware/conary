@@ -18,7 +18,7 @@ class Package:
 	self.files["/sources" + path] = version
 
     def fileList(self):
-	return self.files.items()
+	l = []
 	for (path, file) in self.files.items():
 	    if path[:6] == "/files":
 		l.append((path, file))
