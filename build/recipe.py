@@ -192,15 +192,21 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
     name = filename[:-len('.recipe')]
 
     try:
-	version = repos.getTroveLatestVersion(component, cfg.defaultbranch)
-        sourceComponent = repos.getTrove(component, version, None)
+	pkgs = repos.findTrove(cfg.buildlabel, component, None)
+	if len(pkgs) > 1:
+	    raise RecipeFileError("source component %s has multiple versions "
+				  "with label %s", component,
+				  cfg.buildLabel.asString())
+
+	sourceComponent = pkgs[0]
     except repository.PackageMissing:
         raise RecipeFileError, 'cannot find source component %s' % component
 
     srcFileInfo = None
-    for (fileId, path, version) in repos.iterFilesInTrove(sourceComponent.getName(),
-                                                          sourceComponent.getVersion(),
-                                                          sourceComponent.getFlavor()):
+    for (fileId, path, version) in repos.iterFilesInTrove(
+					      sourceComponent.getName(),
+					      sourceComponent.getVersion(),
+					      sourceComponent.getFlavor()):
         if path == filename:
             srcFileInfo = (fileId, version)
             break
