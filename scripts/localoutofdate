@@ -63,9 +63,9 @@ def main(argv):
             updateExceptions = arg.split(',')
             lastArg = ''
             continue
-        if arg == '--missing':
+        elif arg == '--missing':
             listMissing = True
-        if arg == '--display':
+        elif arg == '--display':
             arg = args[0]
             args = args[1:]
             params = arg.split(',')
