@@ -346,7 +346,7 @@ class PackageRecipe(Recipe):
 
     def _appendSource(self, filename, keyid, type, extractDir, use, args):
 	filename = filename % self.macros
-	self.sources.append((filename, type, extractDir, use, args))
+	self._sources.append((filename, type, extractDir, use, args))
 	self._addSignature(filename, keyid)
 
     def addArchive(self, filename, extractDir='', keyid=None, use=None):
@@ -398,7 +398,7 @@ class PackageRecipe(Recipe):
 
     def allSources(self):
         sources = []
-        for (filename, filetype, extractDir, use, args) in self.sources:
+        for (filename, filetype, extractDir, use, args) in self._sources:
 	    if filename: # no file for an action
 		sources.append(filename)
 	for signaturelist in self.signatures.values():
@@ -441,7 +441,7 @@ class PackageRecipe(Recipe):
         the package recipe
         """
         files = []
-	for (filename, filetype, targetdir, use, args) in self.sources:
+	for (filename, filetype, targetdir, use, args) in self._sources:
 	    if filetype in ('tarball', 'patch', 'source'):
 		f = lookaside.findAll(self.cfg, self.laReposCache, filename, 
                                       self.name, self.srcdirs)
@@ -455,7 +455,7 @@ class PackageRecipe(Recipe):
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
 
-	for (filename, filetype, targetdir, use, args) in self.sources:
+	for (filename, filetype, targetdir, use, args) in self._sources:
 
 	    if use != None:
 		if type(use) is not tuple:
@@ -548,18 +548,18 @@ class PackageRecipe(Recipe):
 	self.addMacros(('builddir', builddir),
                        ('destdir', root))
         
-        if self.build is None:
+        if self._build is None:
             pass
-        elif isinstance(self.build, str):
-            util.execute(self.build %self.macros)
-        elif isinstance(self.build, (tuple, list)):
-	    for bld in self.build:
+        elif isinstance(self._build, str):
+            util.execute(self._build %self.macros)
+        elif isinstance(self._build, (tuple, list)):
+	    for bld in self._build:
                 if type(bld) is str:
                     util.execute(bld %self.macros)
                 else:
                     bld.doBuild(self)
 	else:
-	    self.build.doBuild(self)
+	    self._build.doBuild(self)
 
     def addProcess(self, post):
 	self.process[:0] = [post] # prepend so that policy is done last
@@ -596,7 +596,7 @@ class PackageRecipe(Recipe):
 	"""
         if not name.startswith('_'):
 	    if name in build.__dict__:
-		return _recipeHelper(self.build, build.__dict__[name])
+		return _recipeHelper(self._build, build.__dict__[name])
 	    for (policy, list) in (
 		(destdirpolicy, self.destdirPolicy),
 		(packagepolicy, self.packagePolicy)):
@@ -639,7 +639,7 @@ class PackageRecipe(Recipe):
     
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros=()):
         assert(self.__class__ is not Recipe)
-	self.sources = []
+	self._sources = []
 	# XXX fixme: convert to proper documentation string
 	# sources is list of (file, filetype, targetdir, use, (args)) tuples,
 	# where:
@@ -664,7 +664,7 @@ class PackageRecipe(Recipe):
 	self.laReposCache = laReposCache
 	self.srcdirs = srcdirs
 	self.theMainDir = self.name + "-" + self.version
-	self.build = []
+	self._build = []
 	# what needs to be done to massage the installed tree
         self.process = []
         self.destdirPolicy = destdirpolicy.DefaultPolicy()
