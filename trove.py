@@ -13,18 +13,20 @@ import versions
 class Package:
 
     def addFile(self, id, path, version):
-	self.files[id] = (path, version)
+	self.files[path] = (id, path, version)
 
     def fileList(self):
 	l = []
-	for (fileId, (path, version)) in self.files.items():
-	    l.append((fileId, path, version))
+        paths = self.files.keys()
+        paths.sort()
+        for path in paths:
+	    l.append(self.files[path])
 
 	return l
 
     def formatString(self):
 	str = ""
-	for (fileId, (path, version)) in self.files.items():
+	for (fileId, path, version) in self.files.values():
 	    str = str + ("%s %s %s\n" % (fileId, path, version.asString()))
 	return str
 
