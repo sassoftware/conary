@@ -428,8 +428,14 @@ def commit(repos, cfg, message):
         # set instead (yeah, a bit of a hack). this can happen on shadows
         fileMap = {}
         for (pathId, path, fileId, version) in state.iterFileList():
-            fullPath = os.path.join(os.getcwd(), path)
-            fileObj = files.FileFromFilesystem(fullPath, pathId)
+            fullPath = state.pathMap.get(path, None)
+            if fullPath is None:
+                fullPath = os.path.join(os.getcwd(), path)
+                fileObj = files.FileFromFilesystem(fullPath, pathId)
+            else:
+                fileObj = files.FileFromFilesystem(fullPath, pathId)
+                fileObj.flags.isAutoSource(set = True)
+
             fileMap[pathId] = (fileObj, fullPath, path)
             
         changeSet = changeset.CreateFromFilesystem([ (newState, fileMap) ])
