@@ -3,7 +3,10 @@
 # All rights reserved
 #
 
-"""Classes for version structures and strings"""
+"""
+Classes for version structures. All of these types (except the abstract
+ones) are hashable and implement __eq__().
+"""
 
 import copy
 import time
@@ -41,6 +44,12 @@ class NewVersion(AbstractVersion):
 
     def isLocal(self):
 	return False
+
+    def __hash__(self):
+	return hash("@NEW@")
+
+    def __eq__(self, other):
+	return self.__class__ == other.__class__
 
     def __init__(self):
 	self.timeStamp = 1
@@ -85,11 +94,17 @@ class VersionRelease(AbstractVersion):
 	return self.version
 
     def equal(self, version):
+	return self == version
+
+    def __eq__(self, version):
 	if (type(self) == type(version) and self.version == version.version
 		and self.release == version.release
 		and self.buildCount == version.buildCount):
 	    return 1
 	return 0
+
+    def __hash__(self):
+	return hash(self.version) ^ hash(self.release) ^ hash(self.buildCount)
 
     def incrementRelease(self):
 	"""
@@ -185,12 +200,19 @@ class BranchName(AbstractBranch):
 	@type version: instance
 	@rtype: boolean
 	"""
+	return self == version
+
+    def __eq__(self, version):
 	if (isinstance(version, BranchName)
 	     and self.host == version.host
 	     and self.namespace == version.namespace
 	     and self.branch == version.branch):
 	    return 1
 	return 0
+
+    def __hash__(self):
+	i = hash(self.host) ^ hash(self.namespace) ^ hash(self.branch)
+	return i
 
     def __init__(self, value, template = None):
 	"""
@@ -332,9 +354,19 @@ class Version:
 
 	@rtype: boolean
 	"""
+	return self == other
+
+    def __eq__(self, other):
 	if not isinstance(other, Version): return False
 	return self._listsEqual(self.versions, other)
 
+    def __hash__(self):
+	i = 0
+	for ver in self.versions:
+	    i ^= hash(ver)
+
+	return i
+	    
     def asString(self, defaultBranch = None):
 	"""
 	Returns a string representation of the version.
