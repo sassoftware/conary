@@ -112,7 +112,7 @@ class _IdGen:
 # -------------------- public below this line -------------------------
 
 def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None, 
-	       prep=True, macros={}, buildBranch = None, targetVersion = None, 
+	       prep=True, macros={}, buildBranch = None, targetLabel = None, 
 	       resume = None):
     """
     Turns a recipe object into a change set, and sometimes commits the
@@ -138,9 +138,10 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     this branch does not need to contain timestamps; they'll be looked up if
     they are missing.
     @type buildBranch: versions.Version
-    @param targetVersion: version to use for the cooked troves; if None (the
-    default), the version used is the next version on the buildBranch 
-    @type targetVersion: versions.Version
+    @param targetLabel: label to use for the cooked troves; it is used
+    as a new branch from whatever version was previously built
+    default), the buildBranch is used
+    @type targetLabel: versions.BranchName
     @param resume: indicates whether to resume the previous build.  If True,
     resume at the line of last breakage.  If an integer, resume at that line.
     If 'policy', rerun the policy only.  Note that resume is only valid when
@@ -202,14 +203,14 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     if issubclass(recipeClass, recipe.PackageRecipe):
 	ret = cookPackageObject(repos, cfg, recipeClass, buildBranch,
                                 prep = prep, macros = macros,
-				targetVersion = targetVersion,
+				targetLabel = targetLabel,
 				resume = resume)
     elif issubclass(recipeClass, recipe.GroupRecipe):
 	ret = cookGroupObject(repos, cfg, recipeClass, buildBranch, 
-			      macros = macros, targetVersion = targetVersion)
+			      macros = macros, targetLabel = targetLabel)
     elif issubclass(recipeClass, recipe.FilesetRecipe):
 	ret = cookFilesetObject(repos, cfg, recipeClass, buildBranch, 
-				macros = macros, targetVersion = targetVersion)
+				macros = macros, targetLabel = targetLabel)
     else:
         raise AssertionError
 
@@ -230,7 +231,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     return built
 
 def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
-		    targetVersion = None):
+		    targetLabel = None):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -248,9 +249,10 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     @param macros: set of macros for the build
     @type macros: dict
     @rtype: tuple
-    @param targetVersion: version to use for the cooked troves; if None (the
-    default), the version used is the next version on the buildBranch 
-    @type targetVersion: versions.Version
+    @param targetLabel: label to use for the cooked troves; it is used
+    as a new branch from whatever version was previously built
+    default), the buildBranch is used
+    @type targetLabel: versions.BranchName
     """
 
     fullName = recipeClass.name
@@ -279,10 +281,14 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
 		    if flavor:
 			grpFlavor.union(flavor)
 
-    if not targetVersion:
-	targetVersion = helper.nextVersion(repos, fullName, 
-					   recipeClass.version, grpFlavor, 
-					   buildBranch, binary = True)
+    targetVersion = helper.nextVersion(repos, fullName, 
+				       recipeClass.version, grpFlavor, 
+				       buildBranch, binary = True)
+
+    if targetLabel:
+	targetVersion = targetVersion.fork(targetLabel)
+	targetVersion.trailingVersion().incrementBuildCount()
+
     grp.changeVersion(targetVersion)
 
     grpDiff = grp.diff(None, absolute = 1)[0]
@@ -293,7 +299,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     return (changeSet, built, None)
 
 def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
-		      targetVersion = None):
+		      targetLabel = None):
     """
     Turns a fileset recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -309,9 +315,10 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
     @type buildBranch: versions.Version
     @param macros: set of macros for the build
     @type macros: dict
-    @param targetVersion: version to use for the cooked troves; if None (the
-    default), the version used is the next version on the buildBranch 
-    @type targetVersion: versions.Version
+    @param targetLabel: label to use for the cooked troves; it is used
+    as a new branch from whatever version was previously built
+    default), the buildBranch is used
+    @type targetLabel: versions.BranchName
     @rtype: tuple
     """
 
@@ -337,10 +344,13 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 	# source of an update, but it saves sending files across the
 	# network for no reason
 
-    if not targetVersion:
-	targetVersion = helper.nextVersion(repos, fullName, 
-					   recipeClass.version, flavor, 
-					   buildBranch, binary = True)
+    targetVersion = helper.nextVersion(repos, fullName, 
+				       recipeClass.version, flavor, 
+				       buildBranch, binary = True)
+
+    if targetLabel:
+	targetVersion = targetVersion.fork(targetLabel)
+	targetVersion.trailingVersion().incrementBuildCount()
 
     fileset = trove.Trove(fullName, targetVersion, flavor, None)
     for (fileId, path, version) in l:
@@ -353,7 +363,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
     return (changeSet, built, None)
 
 def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True, 
-		      macros={}, targetVersion = None, resume = None):
+		      macros={}, targetLabel = None, resume = None):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -501,9 +511,12 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     for buildPkg in bldList:
 	flavor.union(buildPkg.flavor)
 
-    if not targetVersion:
-	targetVersion = helper.nextVersion(repos, grpName, recipeClass.version, 
-					   flavor, buildBranch, binary = True)
+    targetVersion = helper.nextVersion(repos, grpName, recipeClass.version, 
+				       flavor, buildBranch, binary = True)
+
+    if targetLabel:
+	targetVersion = targetVersion.fork(targetLabel)
+	targetVersion.trailingVersion().incrementBuildCount()
 
     grp = trove.Trove(grpName, targetVersion, flavor, None)
 
@@ -558,7 +571,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 
     buildList = []
     changeSetFile = None
-    targetVersion = None
+    targetLabel = None
 
     if item.endswith('.recipe') and os.path.isfile(item):
 	if emerge:
@@ -581,24 +594,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 	srcName = recipeClass.name + ":source"
 	versionDict = repos.getTroveLeavesByLabel([srcName], cfg.buildLabel)
 	versionList = versionDict[srcName]
-
-	if versionList:
-	    match = None
-	    if len(versionList) != 1:
-		for version in versionList:
-		    if version.branch() == buildBranch:
-			match = version
-
-		if match is None:
-		    raise CookError("trove %s has multiple sources on %s" %
-				(recipeClass.name, cfg.buildLabel.asString()))
-		v = match
-	    else:
-		v = versionList[0]
-
-	    targetVersion = v.fork(versions.CookBranch(), sameVerRel = True)
-	else:
-	    cfg.buildLabel = versions.CookBranch()
+	targetLabel = versions.CookBranch()
     else:
 	if resume:
 	    raise CookError('Cannot use --resume argument when cooking in repository')
@@ -613,8 +609,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 	if emerge:
 	    (fd, changeSetFile) = tempfile.mkstemp('.ccs', "emerge-%s-" % item)
 	    os.close(fd)
-	    targetVersion = version.fork(versions.EmergeBranch(),
-				         sameVerRel = True)
+	    targetLabel = versions.EmergeBranch()
 
     built = None
     try:
@@ -622,7 +617,7 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
                             changeSetFile = changeSetFile,
                             prep = prep, macros = macros,
 			    buildBranch = buildBranch, 
-			    targetVersion = targetVersion,
+			    targetLabel = targetLabel,
 			    resume = resume)
         if troves:
             built = (tuple(troves), changeSetFile)
