@@ -572,8 +572,8 @@ class File(object):
 
 	global userCache, groupCache
 
-	uid = userCache[self.inode.owner()]
-	gid = groupCache[self.inode.group()]
+	uid = userCache.lookup(root, self.inode.owner())
+	gid = groupCache.lookup(root, self.inode.group())
 
 	os.lchown(target, uid, gid)
 
@@ -986,16 +986,25 @@ def tupleChanged(cl, diff):
 
 class UserGroupIdCache:
 
-    def __getitem__(self, name):
+    def lookup(self, root, name):
 	theId = self.cache.get(name, None)
 	if theId is not None:
 	    return theId
+
+	if root and root != '/':
+	    curDir = os.open(".", os.O_RDONLY)
+	    os.chdir("/")
+	    os.chroot(root)
 	
 	try:
 	    theId = self.lookupFn(name)[2]
 	except KeyError:
 	    log.warning('%s %s does not exist - using root', self.name, name)
 	    theId = 0
+
+	if root and root != '/':
+	    os.chroot(".")
+	    os.fchdir(curDir)
 
 	self.cache[name] = theId
 	return theId
