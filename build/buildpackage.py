@@ -102,9 +102,9 @@ class BuildPackageGenerator:
                                      autospec.name)
                 package = BuildPackage(name, version)
 		self.packages[name] = package
-		if not self.packageMap.has_key(explicitspec.name):
-		    self.packageMap[explicitspec.name] = {}
-		self.packageMap[explicitspec.name][autospec.name] = package
+		if not self.packageMap.has_key(explicitspec):
+		    self.packageMap[explicitspec] = {}
+		self.packageMap[explicitspec][autospec] = package
 
     def _getname(self, prefix, subname, autoname):
         """Returns the full name of the package when subname could be None"""
@@ -124,7 +124,7 @@ class BuildPackageGenerator:
 	    if explicitspec.match(path):
 		for autospec in self.auto:
 		    if autospec.match(path):
-			pkg = self.packageMap[explicitspec.name][autospec.name]
+			pkg = self.packageMap[explicitspec][autospec]
                         pkg.addFile(path)
 			break
 		break
