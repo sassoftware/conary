@@ -25,6 +25,7 @@ def usage():
     print "       srs cook    [--prep] <first.recipe> <second.recipe> ..."
     print "       srs commit  <file>"
     print "       srs pkglist <pkgname> <version>"
+    print "       srs replist <pkgname> <version>"
     print "       srs update  <pkgname> <version>"
     print "                   <pkgfile>"
     print ""
@@ -34,7 +35,6 @@ def usage():
     print "               --root <root>"
     print ""
     print "pkglist flags: --all"
-    print "               --repos"
     sys.exit(0)
 
 otherArgs = [ sys.argv[0] ]
@@ -52,7 +52,6 @@ cfgMap["root"] = "root"
 argDef["config"] = 2
 argDef["all"] = 0
 argDef["prep"] = 0
-argDef["repos"] = 0
 
 for arg in cfgMap.keys():
     argDef[arg] = 1
@@ -153,13 +152,12 @@ elif (otherArgs[1] == "cook"):
                     os.kill(-pid, signal.SIGINT)
         os.tcsetpgrp(0, os.getpgrp())
                 
-elif (otherArgs[1] == "pkglist"):
+elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
     all = argSet.has_key('all')
     if all: del argSet['all']
 
-    if argSet.has_key('repos'):
+    if otherArgs[1] == "replist":
 	queryRepos = repository.Repository(cfg.reppath, "r")
-	del argSet['repos']
     else:
 	queryRepos = repository.Database(cfg.root, cfg.dbpath, "r")
 
