@@ -111,6 +111,11 @@ class ComponentSpec(_filterSpec):
 	recipe.PackageSpec(compFilters=compFilters)
 
 class PackageSpec(_filterSpec):
+    """
+    FIXME
+    @keyword compFilters: reserved for C{ComponentSpec} to pass information
+    needed by C{PackageSpec}.
+    """
     keywords = { 'compFilters': None }
 
     def doProcess(self, recipe):
@@ -183,6 +188,9 @@ class Config(policy.Policy):
 	"""
 	if args:
 	    self.inclusions.extend(args)
+	inclusions = keywords.pop('inclusions', None)
+	if inclusions:
+	    self.inclusions.append(exceptions)
 	policy.Policy.updateArgs(self, [], **keywords)
 
     def doProcess(self, recipe):
@@ -395,6 +403,8 @@ class Ownership(policy.Policy):
 	for (f, owner, group) in self.fileFilters:
 	    if f.match(path):
 		self._markOwnership(path, owner, group)
+		if os.path.isdir(self.macros['destdir'] + os.sep + path):
+		    self.recipe.ExcludeDirectories(exceptions=path)
 		return
 	self._markOwnership(path, 'root', 'root')
 
@@ -406,6 +416,27 @@ class Ownership(policy.Policy):
 		pkgfile.inode.setOwner(owner)
 	    if group:
 		pkgfile.inode.setGroup(group)
+
+
+class ExcludeDirectories(policy.Policy):
+    """
+    In SRS, there are only two reasons to package a directory: the
+    directory needs permissions other than 0755, or it must exist
+    even if it is empty.
+
+    In order to include a directory in a package, call
+    C{self.SetMode(path, mode)} where C{mode} is not C{0755},
+    or call C{ExcludeDirectories(exceptions=path)} if the
+    directory mode is C{0755}
+    """
+    invariantinclusions = [ ('.*', stat.S_IFDIR) ]
+
+    def doFile(self, path):
+	log.debug('excluding directory: %s', path)
+	del self.recipe.autopkg.pkgMap[path][path]
+	del self.recipe.autopkg.pkgMap[path]
+	del self.recipe.autopkg.pathMap[path]
+
 
 
 def DefaultPolicy():
@@ -426,6 +457,7 @@ def DefaultPolicy():
 	MakeDevices(),
 	AddModes(),
 	Ownership(),
+	ExcludeDirectories(),
     ]
 
 

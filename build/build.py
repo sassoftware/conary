@@ -336,6 +336,8 @@ class _FileAction(BuildAction):
 	    os.chmod(destdir+os.sep+path, self.mode & 01777)
 	    if self.mode & 06000:
 		self.recipe.AddModes(self.mode, path)
+	    if os.path.isdir(destdir+os.sep+path) and self.mode != 0755:
+		self.recipe.ExcludeDirectories(exceptions=path)
 
     def setComponents(self, paths):
 	"""

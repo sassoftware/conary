@@ -74,7 +74,15 @@ class Policy(util.Action):
 	is invoked automatically by recipe.py when a recipe references
 	a policy object.  It acts rather like __init__ except that it
 	can meaningfully be called more than once for an object.
+
+	Some keyword arguments (at least C{exceptions}) should be
+	appended rather than replaced.
 	"""
+	exceptions = keywords.pop('exceptions', None)
+	if exceptions:
+	    if not self.exceptions:
+		self.exceptions = []
+	    self.exceptions.append(exceptions)
 	self.addArgs(*args, **keywords)
 
     def filterExpression(self, expression, name=None):

@@ -127,8 +127,10 @@ class AutoBuildPackage:
 		if main not in self.packageMap:
 		    self.packageMap[main] = {}
 		self.packageMap[main][comp] = self.packages[name]
-	# dictionary from pathnames to packages
+	# dictionary from pathnames to fileobjects
 	self.pathMap = {}
+	# dictionary from pathnames to packages
+	self.pkgMap = {}
 
     def _getname(self, pkgname, compname):
         return string.join((pkgname, compname), ':')
@@ -154,6 +156,7 @@ class AutoBuildPackage:
         pkg = self.findPackage(path)
         pkg.addFile(path, realPath)
 	self.pathMap[path] = pkg[path]
+	self.pkgMap[path] = pkg
 
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
@@ -164,6 +167,7 @@ class AutoBuildPackage:
         pkg = self.findPackage(path)
         pkg.addDevice(path, devtype, major, minor, owner, group, perms)
 	self.pathMap[path] = pkg[path]
+	self.pkgMap[path] = pkg
 
     def getPackages(self):
         """
