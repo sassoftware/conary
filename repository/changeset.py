@@ -540,7 +540,7 @@ class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 	self.absCS = absCS
 	ChangeSet.__init__(self)
 
-class FileIdsConflictError(Exception): pass
+class PathIdsConflictError(Exception): pass
 
 class ReadOnlyChangeSet(ChangeSet):
 
@@ -553,7 +553,7 @@ class ReadOnlyChangeSet(ChangeSet):
         if a[0] < b[0]:
             return -1
         elif a[0] == b[0]:
-            raise FileIdsConflictError
+            raise PathIdsConflictError
         else:
             return 1
 
