@@ -64,7 +64,7 @@ class ChangeSet:
 	assert(not csPkg.getOldVersion() or csPkg.getOldVersion().timeStamp)
 	assert(csPkg.getNewVersion().timeStamp)
 
-	self.newPackages.append(csPkg)
+	self.newPackages[csPkg.getName()] = csPkg
 	if csPkg.isAbstract():
 	    self.abstract = 1
 
@@ -73,7 +73,13 @@ class ChangeSet:
 	self.oldPackages.append((name, version))
 
     def getNewPackageList(self):
-	return self.newPackages
+	return self.newPackages.values()
+
+    def getNewPackage(self, name):
+	return self.newPackages[name]
+
+    def hasNewPackage(self, name):
+	return self.newPackages.has_key(name)
 
     def getOldPackageList(self):
 	return self.oldPackages
@@ -91,11 +97,11 @@ class ChangeSet:
 	return self.files.items()
 
     def remapPaths(self, map):
-	for pkgCs in self.newPackages:
+	for pkgCs in self.newPackages.values():
 	    pkgCs.remapPaths(map)
 
     def formatToFile(self, cfg, f):
-	for pkg in self.newPackages:
+	for pkg in self.newPackages.values():
 	    pkg.formatToFile(self, cfg, f)
 	for (pkgName, version) in self.oldPackages:
 	    print pkgName, "removed", version.asString(cfg.defaultbranch)
@@ -205,7 +211,7 @@ class ChangeSet:
 	return inversion
 
     def __init__(self):
-	self.newPackages = []
+	self.newPackages = {}
 	self.oldPackages = []
 	self.files = {}
 	self.fileContents = {}
