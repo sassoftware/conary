@@ -191,14 +191,43 @@ class VersionedFile:
 	    self._writeVersionInfo(next, version, child)
 
 	self.db[_CONTENTS % (self.key, versionStr)] = data
-	self.branchMap[branchStr] = version
 
-	self.writeBranchMap()
+	# if this is the new head of the branch, update the branch map
+	if not next:
+	    self.branchMap[branchStr] = version
+	    self.writeBranchMap()
+
 	#self.db.sync()
 
     def eraseVersion(self, version):
+	self.readBranchMap()
+
 	versionStr = version.asString()
+	branchStr = version.branch().asString()
+
+	(node, prev, next) = self._getVersionInfo(version)
+
+	# if this is the head of the branch we need to move the head back
+	if self.branchMap[branchStr].equal(version):
+	    # we were the only item, so the branch needs to be removed
+	    if not prev:
+		del self.branchMap[branchStr]
+	    else:
+		self.branchMap[branchStr] = version
+
+	    self.writeBranchMap()
+
+	if prev:
+	    thePrev = self._getVersionInfo(version)[1]
+	    self._writeVersionInfo(prev, thePrev, next)
+	
+	if next:
+	    theNext = self._getVersionInfo(version)[2]
+	    self._writeVersionInfo(next, prev, theNext)
+
 	del self.db[_CONTENTS % (self.key, versionStr)]
+	del self.db[_VERSION_INFO % (self.key, versionStr)]
+
 	#self.db.sync()
 
     def hasVersion(self, version):
