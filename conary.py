@@ -127,6 +127,7 @@ def realMain(argv=sys.argv):
     argDef["full-versions"] = NO_PARAM
     argDef["ids"] = NO_PARAM
     argDef["info"] = NO_PARAM
+    argDef["install-label"] = MULT_PARAM
     argDef["keep-existing"] = NO_PARAM
     argDef["leaves"] = NO_PARAM
     argDef["path"] = ONE_PARAM
@@ -151,6 +152,13 @@ def realMain(argv=sys.argv):
     if argSet.has_key('version'):
         print constants.version
         sys.exit(0)
+
+    l = []
+    for labelStr in argSet.get('install-label', []):
+        l.append(versions.Label(labelStr))
+    if l:
+        cfg.installLabelPath = l
+        del argSet['install-label']
 
     if not cfg.installLabelPath:
         print >> sys.stderr, "installLabelPath is not set"
