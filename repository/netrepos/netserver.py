@@ -21,7 +21,7 @@ import md5
 import os
 import re
 import sha1helper
-import sqlite
+import sqlite3
 import tempfile
 import util
 import xmlshims
@@ -422,7 +422,7 @@ class NetworkAuthorization:
 
     def __init__(self, dbpath, name, anonymousReads = False):
 	self.name = name
-	self.db = sqlite.connect(dbpath)
+	self.db = sqlite3.connect(dbpath)
 	self.anonReads = anonymousReads
 	self.reCache = {}
 

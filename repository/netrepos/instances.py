@@ -12,7 +12,7 @@
 # full details.
 # 
 
-import sqlite
+import sqlite3
 
 from sha1helper import encodeFileId, decodeFileId
 
@@ -153,7 +153,7 @@ class FileStreams:
 	fileId = encodeFileId(fileId)
         cu = self.db.cursor()
         cu.execute("INSERT INTO FileStreams VALUES (NULL, %s, %d, %d, %s)",
-                   (fileId, versionId, sqlite.encode(stream)))
+                   (fileId, versionId, sqlite3.encode(stream)))
 	return cu.lastrowid
         
     def __delitem__(self, key):

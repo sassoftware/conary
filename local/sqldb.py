@@ -16,20 +16,14 @@ import deps.arch
 import deps.deps
 import files
 import idtable
-import sqlite
+import sqlite3
 import trove
 import trovetroves
 import versions
 import versiontable
 
 # these will go away once we switch internal fileids
-import sha1helper
-
-def encodeFileId(fileId):
-    return sqlite.encode(sha1helper.sha1FromString(fileId))
-
-def decodeFileId(fileId):
-    return sha1helper.sha1ToString(fileId)
+from sha1helper import encodeFileId, decodeFileId
 
 class Tags(idtable.CachedIdTable):
 
@@ -129,7 +123,7 @@ class DBTroveFiles:
         cu.execute("""
 	    INSERT INTO DBTroveFiles VALUES (NULL, %s, %d, %s, %d, %d, %s)
 	""",
-	   (fileId, versionId, path, instanceId, 1, sqlite.encode(stream)))
+	   (fileId, versionId, path, instanceId, 1, sqlite3.encode(stream)))
 
 	streamId = cu.lastrowid
 
@@ -143,7 +137,7 @@ class DBTroveFiles:
         cu = self.db.cursor()
 	cu.execute("UPDATE DBTroveFiles SET versionId=%d, stream=%s "
 		   "WHERE fileId=%s AND versionId=%d AND instanceId=%d",
-		   newVersionId, sqlite.encode(newStream), fileId, 
+		   newVersionId, sqlite3.encode(newStream), fileId, 
 		   oldVersionId, instanceId)
 
     def iterPath(self, path):
@@ -412,7 +406,7 @@ class DBFlavorMap(idtable.IdMapping):
 class Database:
 
     def __init__(self, path):
-	self.db = sqlite.connect(path)
+	self.db = sqlite3.connect(path)
         self.db._begin()
 	self.troveTroves = trovetroves.TroveTroves(self.db)
 	self.troveFiles = DBTroveFiles(self.db)

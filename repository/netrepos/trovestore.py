@@ -19,7 +19,7 @@ import instances
 import items
 import files
 import flavors
-import sqlite
+import sqlite3
 import trove
 import trovefiles
 import versionops
@@ -61,7 +61,7 @@ class LocalRepVersionTable(versiontable.VersionTable):
 class TroveStore:
 
     def __init__(self, path):
-	self.db = sqlite.connect(path, timeout = 30000)
+	self.db = sqlite3.connect(path, timeout = 30000)
 
 	cu = self.db.cursor()
 	#cu.execute("PRAGMA temp_store = MEMORY", start_transaction = False)
@@ -86,7 +86,7 @@ class TroveStore:
     def __del__(self):
         try:
             self.db.close()
-        except sqlite.ProgrammingError:
+        except sqlite3.ProgrammingError:
             pass
         del self.db
 
@@ -665,7 +665,7 @@ class TroveStore:
 	versionId = self.getVersionId(fileVersion, self.fileVersionCache)
 
 	if fileObj:
-	    stream = sqlite.encode(fileObj.freeze())
+	    stream = sqlite3.encode(fileObj.freeze())
 	    cu.execute("INSERT INTO NewFiles VALUES(%s, %d, %s, %s)", 
 		       (encodeFileId(fileId), versionId, stream, path))
 	else:

@@ -52,3 +52,12 @@ def sha1FromString(val):
     return struct.pack("!5I", int(val[ 0: 8], 16), 
 			int(val[ 8:16], 16), int(val[16:24], 16), 
 			int(val[24:32], 16), int(val[32:40], 16))
+
+import sqlite3
+
+def encodeFileId(fileId):
+    return sqlite3.encode(sha1FromString(fileId))
+
+def decodeFileId(fileId):
+    return sha1ToString(fileId)
+
