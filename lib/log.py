@@ -36,6 +36,12 @@ def debug(*args):
 def errorOccurred():
     return hdlr.error
 
+def setVerbosity(val):
+    if val < 1:
+        logger.setLevel(logging.WARNING)
+    else:
+        logger.setLevel(logging.DEBUG)
+
 class ErrorCheckingHandler(logging.StreamHandler):
     def __init__(self, *args, **keywords):
         self.error = False

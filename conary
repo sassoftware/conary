@@ -111,6 +111,12 @@ while i < len(sys.argv):
 
     i = i + 1
 
+if '-v' in otherArgs:
+    otherArgs.remove('-v')
+    log.setVerbosity(1)
+else:
+    log.setVerbosity(0)
+
 profile = False
 if argSet.has_key('profile'):
     import hotshot
@@ -171,6 +177,7 @@ elif (otherArgs[1] == "config"):
     else:
 	cfg.display()
 elif (otherArgs[1] == "cook"):
+    log.setVerbosity(1)
     macros = ()
     prep = 0
     if argSet.has_key('prep'):
