@@ -4,16 +4,17 @@
 # All rights reserved
 #
 
+import changeset
 import commit
 import cook
+import display
 import os
+import repository
+import signal
 import srscfg
 import sys
 import update
 import util
-import repository
-import display
-import signal
 
 sys.excepthook = util.excepthook
 
@@ -95,6 +96,18 @@ if (len(otherArgs) < 2):
     usage()
 elif (otherArgs[1] == "import"):
     print "this is broken"
+elif (otherArgs[1] == "changeset"):
+    # current usage is "package oldversion newversion"
+    if len(otherArgs) != 5 and len(otherArgs) != 4:
+	usage()
+
+    name = otherArgs[2]
+    if len(otherArgs) == 5:
+	(old, new) = (otherArgs[3], otherArgs[4])
+    else:
+	(old, new) = (None, otherArgs[3])
+
+    changeset.ChangeSet(repos, cfg, name, sys.stdout, old, new)
 elif (otherArgs[1] == "cook"):
     prep = 0
     if argSet.has_key('prep'):

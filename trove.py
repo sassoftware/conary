@@ -30,6 +30,64 @@ class Package:
 	    str = str + ("%s %s %s\n" % (fileId, path, version.asString()))
 	return str
 
+    def idmap(self):
+	map = {}
+	for (fileId, path, version) in self.files.values():
+	    map[fileId] = (path, version)
+
+	return map
+
+    def diff(self, them):
+	# find all of the file ids which have been added, removed, and
+	# stayed the same
+	selfMap = self.idmap()
+
+	if them:
+	    themMap = them.idmap()
+	else:
+	    themMap = {}
+
+	rc = ""
+
+	removedIds = []
+	addedIds = []
+	sameIds = {}
+	filesNeeded = []
+
+	allIds = selfMap.keys() + themMap.keys()
+	for id in allIds:
+	    inSelf = selfMap.has_key(id)
+	    inThem = themMap.has_key(id)
+	    if inSelf and inThem:
+		sameIds[id] = None
+	    elif inSelf:
+		addedIds.append(id)
+	    else:
+		removedIds.append(id)
+
+	for id in removedIds:
+	    rc = rc + "-%s\n" % id
+
+	for id in addedIds:
+	    (selfPath, selfVersion) = selfMap[id]
+	    rc = rc + "+%s %s %s\n" % (id, selfPath, selfVersion.asString())
+	    filesNeeded.append((id, None, selfVersion))
+
+	for id in sameIds.keys():
+	    
+	    (selfPath, selfVersion) = selfMap[id]
+	    (themPath, themVersion) = themMap[id]
+
+	    if selfPath != themPath:
+		rc = rc + "~%s path %s %s\n" % (id, themPath, selfPath)
+
+	    if not selfVersion.equal(themVersion):
+		rc = rc + "~%s version %s %s\n" % \
+		    (id, themVersion.asString(), selfVersion.asString())
+		filesNeeded.append((id, themVersion, selfVersion))
+
+	return (rc, filesNeeded)
+
     def __init__(self, name):
 	self.files = {}
 	self.name = name
@@ -73,6 +131,26 @@ class PackageSet:
 
     def getLatestVersion(self, branch):
 	return self.f.findLatestVersion(branch)
+
+    def changeSet(self, oldVersion, newVersion):
+	if oldVersion:
+	    old = self.getVersion(oldVersion)
+	else:
+	    old = None
+
+	new = self.getVersion(newVersion)
+	newStr = newVersion.asString()
+
+	(rc, filesNeeded) = new.diff(old)
+
+	if oldVersion:
+	    oldStr = oldVersion.asString()
+	else:
+	    oldStr = "(none)"
+
+	rc = "SRS PKG CHANGESET %s %s %s %d\n" % (self.name, oldStr, newStr, 
+						  rc.count("\n")) + rc
+	return rc
 	
     def close(self):
 	self.f.close()
