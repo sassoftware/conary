@@ -183,7 +183,7 @@ class Version:
 	"""
 	Returns the AbstractVersion object at the end of the version.
 
-	@type: AbstactVersion
+	@rtype: AbstactVersion
 	"""
 	assert(self.isVersion())
 
@@ -330,7 +330,7 @@ class Version:
 	Tests whether the parameter is a version earlier then this object.
 
 	@param other: Object to test against
-	@param other: Version
+	@type other: Version
 	@rtype: boolean
 	"""
 	return self.timeStamp < other.timeStamp
@@ -340,7 +340,7 @@ class Version:
 	Tests whether the parameter is a version later then this object.
 
 	@param other: Object to test against
-	@param other: Version
+	@type other: Version
 	@rtype: boolean
 	"""
 	return self.timeStamp > other.timeStamp

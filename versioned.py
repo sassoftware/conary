@@ -316,8 +316,8 @@ class VersionedFile:
 
 	@param nick: Nickname
 	@type nick: versions.BranchName
-	@param versionList: List of branches nick refers to
-	@type versionList: list of versions.Version object
+	@param branchList: List of branches nick refers to
+	@type branchList: list of versions.Version object
 	"""
 
 	key = _BRANCH_NICK % (self.key, str(nick))
