@@ -54,17 +54,17 @@ class HttpHandler:
              
              # user administration commands
              "userlist":       (self.userlistCmd, "User Administration",    
-                               (True, True, True)),
+                               (True, False, True)),
              "addPermForm":    (self.addPermFormCmd, "Add Permission",
-                               (True, True, True)),
+                               (True, False, True)),
              "addPerm":        (self.addPermCmd, "Add Permission",
-                               (True, True, True)),
+                               (True, False, True)),
              "deletePerm":     (self.deletePermCmd, "Delete Permission",
-                               (True, True, True)),
+                               (True, False, True)),
              "addUserForm":    (self.addUserFormCmd, "Add User",            
-                               (True, True, True)),
+                               (True, False, True)),
              "addUser":        (self.addUserCmd, "Add User",                
-                               (True, True, True)),
+                               (True, False, True)),
              
              # change password commands
              "chPassForm":     (self.chPassFormCmd, "Change Password",
