@@ -373,7 +373,7 @@ def cookPackageObject(repos, cfg, recipeClass, newVersion, buildBranch,
         troveList = []
         for trove in troves:
             ident.populate(repos, trove)
-            troveList += [ x for x in pkg.iterTroveList() ]
+            troveList += [ x for x in trove.iterTroveList() ]
 
     for buildPkg in recipeObj.getPackages(newVersion):
 	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, ident)
