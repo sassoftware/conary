@@ -64,6 +64,7 @@ baseMacros = (
     ('march'		, 'i386'), # "machine arch"
     ('os'		, 'linux'),
     ('target'		, 'i386-unknown-linux'),
+    ('strip'		, 'strip'),
 )
 
 crossMacros = (
