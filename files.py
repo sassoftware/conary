@@ -84,7 +84,7 @@ class FileMode:
 	return "%o %s %s %s" % (self.thePerms, self.theOwner, self.theGroup,
 				self.theMtime)
 
-    def compare(self, other):
+    def same(self, other):
 	if self.thePerms == other.thePerms and \
 	   self.theOwner == other.theOwner and \
 	   self.theGroup == other.theGroup:
@@ -178,7 +178,7 @@ class SymbolicLink(File):
     def infoLine(self):
 	return "l %s %s" % (self.theLinkTarget, File.infoLine(self))
 
-    def compare(self, other):
+    def same(self, other):
 	if self.theLinkTarget == other.theLinkTarget:
 	    # recursing does a permission check, which doens't apply 
 	    # to symlinks under Linux
@@ -214,8 +214,8 @@ class Socket(File):
     def infoLine(self):
 	return "s %s" % (File.infoLine(self))
 
-    def compare(self, other):
-	return File.compare(self, other)
+    def same(self, other):
+	return File.same(self, other)
 
     def copy(self, source, target):
 	pass
@@ -228,8 +228,8 @@ class NamedPipe(File):
     def infoLine(self):
 	return "p %s" % (File.infoLine(self))
 
-    def compare(self, other):
-	return File.compare(self, other)
+    def same(self, other):
+	return File.same(self, other)
 
     def restore(self, reppath, srcpath, root):
 	target = root + self.path()
@@ -246,8 +246,8 @@ class Directory(File):
     def infoLine(self):
 	return "d %s" % (File.infoLine(self))
 
-    def compare(self, other):
-	return File.compare(self, other)
+    def same(self, other):
+	return File.same(self, other)
 
     def restore(self, reppath, srcpath, root):
 	target = root + self.path()
@@ -265,10 +265,10 @@ class DeviceFile(File):
 	return "v %c %d %d %s" % (self.type, self.major, self.minor,
 				  File.infoLine(self))
 
-    def compare(self, other):
+    def same(self, other):
 	if (self.type == other.type and self.major == other.major and
 			self.minor == other.minor):
-	    return File.compare(self, other)
+	    return File.same(self, other)
 	
 	return 0
 
@@ -312,9 +312,9 @@ class RegularFile(File):
     def infoLine(self):
 	return "f %s %s" % (self.thesha1, File.infoLine(self))
 
-    def compare(self, other):
+    def same(self, other):
 	if self.thesha1 == other.thesha1:
-	    return File.compare(self, other)
+	    return File.same(self, other)
 
 	return 0
 
@@ -375,48 +375,52 @@ class SourceFile(RegularFile):
 
 class FileDB:
 
-    def read(self):
-	self.versions = {}
-	if not os.path.exists(self.dbfile): return
+    # see if the head of the specified branch is a duplicate
+    # of the file object passed; it so return the version object
+    # for that duplicate
+    def checkBranchForDuplicate(self, branch, file):
+	version = self.f.findLatestVersion(branch)
+	if not version:
+	    return None
 
-	f = versioned.open(self.dbfile, "r")
+	f1 = self.f.getVersion(version)
+	lastFile = FileFromInfoLine(self.path, version, f1.read())
+	f1.close()
 
-	for version in f.versionList():
-	    f1 = f.getVersion(version)
-	    line = f1.read()
-	    self.versions[version] = FileFromInfoLine(self.path, version, line)
-	    f1.close()
+	if file.same(lastFile):
+	    return version
 
-	f.close()
+	return None
 
     def findVersion(self, file):
 	for (v, f) in self.versions.items():
-	    if type(f) == type(file) and f.compare(file):
+	    if type(f) == type(file) and f.same(file):
 		return (v, f)
 
 	return None
 
     def addVersion(self, version, file):
-	if self.versions.has_key(version):
+	if self.f.hasVersion(version):
 	    raise KeyError, "duplicate version for database"
-	else:
-	    if file.pathInRep(self.reppath) + ".info" != self.dbfile:
-		raise KeyError, "path mismatch for file database"
+	#else:
+	    #if file.pathInRep(self.reppath) + ".info" != self.dbfile:
+		#raise KeyError, "path mismatch for file database"
 	
-	self.versions[version] = file
+	self.f.addVersion(version, "%s\n" % file.infoLine())
 
     def getVersion(self, version):
-	return self.versions[version]
+	f1 = self.f.getVersion(version)
+	file = FileFromInfoLine(self.path, version, f1.read())
+	f1.close()
+	return file
 
-    def write(self):
-	dir = os.path.split(self.dbfile)[0]
-	util.mkdirChain(dir)
+    def close(self):
+	if self.f:
+	    self.f.close()
+	    self.f = None
 
-	f = versioned.open(self.dbfile, "w")
-	for (version, file) in self.versions.items():
-	    f.addVersion(version, "%s\n" % file.infoLine())
-
-	f.close()
+    def __del__(self):
+	self.close()
 
     # path is the *full* *absolute* path to the file in the repository
     def __init__(self, reppath, path):
@@ -426,8 +430,12 @@ class FileDB:
 	parts = string.split(path[len(reppath):], "/")
 	self.path = "/" + string.join(parts[2:], "/")
 
-	self.dbfile = path + ".info"
-	self.read()
+	dbfile = path + ".info"
+	util.mkdirChain(os.path.dirname(dbfile))
+	if os.path.exists(dbfile):
+	    self.f = versioned.open(dbfile, "r+")
+	else:
+	    self.f = versioned.open(dbfile, "w+")
 
 def FileFromFilesystem(pkgName, root, path, type = "auto"):
     s = os.lstat(root + path)
