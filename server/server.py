@@ -46,7 +46,7 @@ from lib import util
 from http import HttpHandler
 from htmlengine import HtmlEngine
 
-FILE_PATH="/tmp/conary-server"
+DEFAULT_FILE_PATH="/tmp/conary-server"
 
 class HttpRequests(SimpleHTTPRequestHandler):
     
@@ -272,6 +272,7 @@ class ServerConfig(ConfigFile):
     defaults = {
 	'port'			:   '8000',
 	'repositoryMap'         : [ STRINGDICT, {} ],
+	'tmpFilePath'           : DEFAULT_FILE_PATH,
     }
 
     def __init__(self, path="serverrc"):
@@ -287,15 +288,19 @@ if __name__ == '__main__':
     cfgMap = {
 	'port'	: 'port',
 	'map'	: 'repositoryMap',
+	'tmp-file-path' : 'tmpFilePath',
     }
+
+    cfg = ServerConfig()
+
+    argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
+
+    FILE_PATH = cfg.tmpFilePath
 
     if not os.path.isdir(FILE_PATH):
 	print FILE_PATH + " needs to be a directory"
 	sys.exit(1)
 
-    cfg = ServerConfig()
-
-    argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
 
     if len(otherArgs) == 5:
         cfg.read(otherArgs.pop())
