@@ -13,6 +13,7 @@
 #
 import md5
 import sqlite3
+import re
 
 class NetworkAuthorization:
     def check(self, authToken, write = False, label = None, trove = None):
