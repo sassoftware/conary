@@ -28,7 +28,7 @@ sys.path.append(os.path.dirname(fullPath))
 
 import conarycfg
 from lib import util
-import helper
+from repository import netclient
 sys.excepthook = util.genExcepthook()
 
 def usage():
@@ -46,7 +46,7 @@ def main(argv):
         args.remove(arg)
 
     cfg = conarycfg.ConaryConfiguration()
-    repos = helper.openRepository(cfg.repositoryMap)
+    repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
     troves = [ x for x in repos.iterAllTroveNames(cfg.installLabel.getHost()) ]
     pkgs = [ p for p in troves if p.find(':') == -1 ]
     sources = [ p for p in troves if p.endswith(':source') ]
