@@ -68,8 +68,11 @@ class ComponentSpec(_filterSpec):
 	# the extras need to come first in order to override decisions
 	# in the base subfilters
 	for (name, patterns) in self.extraFilters:
-	    compFilters.append(buildpackage.Filter(name %macros, patterns, macros))
+	    name = name %macros
+	    assert(name != 'sources')
+	    compFilters.append(buildpackage.Filter(name, patterns, macros))
 	for (name, patterns) in self.baseFilters:
+	    assert(name != 'sources')
 	    compFilters.append(buildpackage.Filter(name, patterns, macros))
 
 	# pass these down to PackageSpec for building the package
