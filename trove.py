@@ -20,9 +20,11 @@ class Package:
 
     def fileList(self):
 	l = []
-	for (path, file) in self.files.items():
+        paths = self.files.keys()
+        paths.sort()
+        for path in paths:
 	    if path[:6] == "/files":
-		l.append((path, file))
+		l.append((path, self.files[path]))
 
 	return l
 
@@ -155,9 +157,12 @@ def Auto(name, root):
 
 def autoVisit(arg, dir, files):
     (root, pkg, man) = arg
-
+    dir = dir[len(root):]
     for file in files:
-	path = dir[len(root):] + "/" + file
+        if dir:
+            path = dir + '/' + file
+        else:
+            path = '/' + file
 	if not os.path.isdir(path):
 	    if path[:15] == "/usr/share/man/":
 		man.addFile(path)
