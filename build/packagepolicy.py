@@ -172,6 +172,26 @@ class Config(policy.Policy):
 		    _markConfig(self.recipe, file)
 
 
+class BinariesInBindirs(policy.Policy):
+    """
+    Directories that are specifically for binaries should only have
+    files that have some executable bit set.
+    """
+    invariantinclusions = [
+	'%(bindir)s/',
+	'%(essentialbindir)s/',
+	'%(sbindir)s/',
+	'%(essentialsbindir)s/',
+    ]
+
+    def doFile(self, file):
+	mode = os.lstat(self.macros['destdir'] + os.sep + file)[stat.ST_MODE]
+	if not mode & 0111:
+	    raise PackagePolicyError(
+		"%s has mode 0%o with no executable permission in bindir"
+		%(file, mode))
+	
+
 class InitScript(policy.Policy):
     """
     Mark initscripts as such so that chkconfig will be run.
@@ -391,6 +411,7 @@ def DefaultPolicy():
 	PackageSpec(),
 	EtcConfig(),
 	Config(),
+	BinariesInBindirs(),
 	InitScript(),
 	SharedLibrary(),
 	ParseManifest(),
@@ -398,3 +419,7 @@ def DefaultPolicy():
 	AddModes(),
 	Ownership(),
     ]
+
+
+class PackagePolicyError(policy.PolicyError):
+    pass
