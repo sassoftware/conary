@@ -7,6 +7,7 @@ import versioned
 import string
 import types
 import util
+import versions
 
 # this is the repositories idea of a package
 class Package:
@@ -48,6 +49,7 @@ class PackageFromFile(Package):
     def read(self, dataFile):
 	for line in dataFile.readLines():
 	    (path, version) = string.split(line)
+	    version = versions.VersionFromString(version)
 	    if path[:8] == "/sources":
 		self.addSource(path[8:], version)
 	    else:
@@ -59,45 +61,48 @@ class PackageFromFile(Package):
 
 # this is a set of all of the versions of a single packages 
 class PackageSet:
-    def write(self):
-	util.mkdirChain(os.path.split(self.pkgPath)[0])
-	f = versioned.open(self.pkgPath, "w")
-	for (version, package) in self.packages.items():
-	    f.addVersion(version, package.formatString())
-	f.close()
-
     def getVersion(self, version):
-	return self.packages[version]
+	f1 = self.f.getVersion(version)
+	p = PackageFromFile(name, f1)
+	f1.close()
+	return p
 
     def hasVersion(self, version):
-	return self.packages.has_key(version)
+	return self.f.hasVersion(version)
 
-    def createVersion(self, version):
-	self.packages[version] = Package(version)
-	return self.packages[version]
+    def addVersion(self, version, package):
+	self.f.addVersion(version, package.formatString())
 
     def versionList(self):
-	return self.packages.keys()
+	return self.f.versionList()
 
-    def getLatest(self):
-	v = versioned.latest(self.packages.keys())
-	return (v, self.packages[v])
+    def getLatestPackage(self, branch):
+	version = self.f.findLatestVersion(branch)
+	f1 = self.f.getVersion(version)
+	p = PackageFromFile(self.name, f1)
+	f1.close()
+	return p
+
+    def getLatestVersion(self, branch):
+	return self.f.findLatestVersion(branch)
 	
+    def close(self):
+	self.f.close()
+	self.f = None
+
+    def __del__(self):
+	if self.f: self.close()
+
     def __init__(self, reppath, name):
 	self.name = name
 	self.pkgPath = reppath + "/pkgs/" + self.name
 	self.packages = {}
 
-	if not os.path.exists(self.pkgPath): return
-
-	f = versioned.open(self.pkgPath, "r")
-	versions = f.versionList()
-	for version in versions:
-	    f1 = f.getVersion(version)
-	    self.packages[version] = PackageFromFile(name, f1)
-	    f1.close()
-
-	f.close()
+	util.mkdirChain(os.path.dirname(self.pkgPath))
+	if os.path.exists(self.pkgPath):
+	    self.f = versioned.open(self.pkgPath, "r+")
+	else:
+	    self.f = versioned.open(self.pkgPath, "w+")
 
 #----------------------------------------------------------------------------
 
