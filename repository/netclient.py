@@ -271,7 +271,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	inF = urllib.urlopen(url)
 	(fd, path) = tempfile.mkstemp()
-	#os.unlink(path)
+	os.unlink(path)
 	outF = os.fdopen(fd, "r+")
 	util.copyfileobj(inF, outF)
 	del inF
