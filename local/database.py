@@ -148,8 +148,7 @@ class Database(repository.LocalRepository):
 	map = ( ( None, sourcePath + "/" ), )
 	cs.remapPaths(map)
 
-	# create the change set from A->A.local; this forms part of the
-	# rollback
+	# create the change set from A->A.local
 	list = []
 	for pkg in cs.getNewPackageList():
 	    name = pkg.getName()
@@ -161,9 +160,11 @@ class Database(repository.LocalRepository):
 
 	localChanges = self.createChangeSet(list)
 
-	#if makeRollback:
-	#    inverse = cs.invert(self, availableFiles = 1)
-	#    self.addRollback(inverse)
+	if makeRollback:
+	    # rollbacks have two pieces, B->A and A->A.local; applying
+	    # both of them gets us back where we started
+	    inverse = cs.invert(self, availableFiles = 1)
+	    self.addRollback(inverse, localChanges)
 
 	# Build and commit A->B
 	job = repository.ChangeSetJob(self, cs)
@@ -214,9 +215,12 @@ class Database(repository.LocalRepository):
 	else:
 	    self.readRollbackStatus()
 
-    def addRollback(self, changeset):
-	fn = self.rollbackCache + ("/r.%d" % (self.lastRollback + 1))
-	changeset.writeToFile(fn)
+    def addRollback(self, dbChangeset, localChangeset):
+	dbFn = self.rollbackCache + ("/r.d.%d" % (self.lastRollback + 1))
+	dbChangeset.writeToFile(dbFn)
+
+	localFn = self.rollbackCache + ("/r.l.%d" % (self.lastRollback + 1))
+	localChangeset.writeToFile(localFn)
 
 	self.lastRollback += 1
 	self.writeRollbackStatus()
@@ -266,8 +270,15 @@ class Database(repository.LocalRepository):
     def getRollback(self, name):
 	if not self.hasRollback(name): return None
 
-	return changeset.ChangeSetFromFile(self.rollbackCache + "/" + name,
-					   justContentsForConfig = 1)
+	num = int(name[2:])
+
+	rc = []
+	for ch in [ "d", "l" ]:
+	    name = self.rollbackCache + "/" + "r.%c.%d" % (ch, num)
+	    rc.append(changeset.ChangeSetFromFile(name,
+						  justContentsForConfig = 1))
+
+	return rc
 
     def applyRollbackList(self, names):
 	last = self.lastRollback

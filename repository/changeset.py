@@ -185,7 +185,9 @@ class ChangeSet:
 
 		if (not availableFiles) or \
 			    repos.hasFileContents(origFile.sha1()):
-		    inversion.addFileContents(origFile.sha1())
+			cont = repository.FileContentsFromRepository(repos, 
+						      origFile.sha1())
+			inversion.addFileContents(origFile.sha1(), cont)
 
 	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
 		(curPath, curVersion) = pkg.getFile(fileId)
@@ -204,7 +206,9 @@ class ChangeSet:
 		if origFile.sha1() != newFile.sha1():
 		    if (not availableFiles) or \
 				repos.hasFileContents(origFile.sha1()):
-			inversion.addFileContents(origFile.sha1())
+			cont = repository.FileContentsFromRepository(repos, 
+						      origFile.sha1())
+			inversion.addFileContents(origFile.sha1(), cont)
 
 	    inversion.newPackage(invertedPkg)
 

@@ -13,17 +13,19 @@ def listRollbacks(db, cfg):
 	print "%s:" % rollbackName
 
 	rb = db.getRollback(rollbackName)
+	for cs in rb:
+	    for pkg in cs.getNewPackageList():
+		print "\t%s %s -> %s" % \
+		    (package.stripNamespace(cfg.packagenamespace, 
+					    pkg.getName()),
+		     pkg.getOldVersion().asString(cfg.defaultbranch), 
+		     pkg.getNewVersion().asString(cfg.defaultbranch))
 
-	for pkg in rb.getNewPackageList():
-	    print "\t%s %s -> %s" % \
-		(package.stripNamespace(cfg.packagenamespace, pkg.getName()),
-		 pkg.getNewVersion().asString(cfg.defaultbranch), 
-		 pkg.getOldVersion().asString(cfg.defaultbranch))
-
-	for (pkg, version) in rb.getOldPackageList():
-	    print "\t%s %s added" %  \
-			    (package.stripNamespace(cfg.packagenamespace, pkg), 
-			     version.asString(cfg.defaultbranch))
+	    for (pkg, version) in cs.getOldPackageList():
+		print "\t%s %s added" %  \
+				(package.stripNamespace(cfg.packagenamespace, 
+							pkg), 
+				 version.asString(cfg.defaultbranch))
 
 	print
 
