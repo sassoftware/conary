@@ -447,6 +447,8 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	# are already in the filesystem (as members of A.local, and now they'll
 	# be members of B.local as well)
 	skipPaths = {}
+	self.paths = {}
+
 	if retargetLocal:
 	    for f in self.newFileList():
 		skipPaths[f.path()] = 1
@@ -454,7 +456,6 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	    for f in self.newFileList():
 		self.paths[f.path()] = (f, localCs)
 
-	self.paths = {}
 	for f in origJob.newFileList():
 	    if not skipPaths.has_key(f.path()):
 		self.paths[f.path()] = (f, origJob.cs)
