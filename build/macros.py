@@ -56,7 +56,7 @@ class Macros(dict):
     # or in a config file and use it despite the value being 
     # set subsequently within the recipe
      
-   def _override(self, key, value):
+    def _override(self, key, value):
 	self.__overrides[key] = value
 
     def __setattr__(self, name, value):
