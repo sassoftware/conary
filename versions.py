@@ -858,3 +858,6 @@ class ParseError(VersionsError):
 
 thawedVersionCache = weakref.WeakValueDictionary()
 stringVersionCache = weakref.WeakValueDictionary()
+
+ACookBranch = CookBranch()
+AnEmergeBranch = EmergeBranch()

@@ -637,9 +637,7 @@ class TroveStore:
 	else:
 	    changeLog = None
 
-        if troveFlavor is None:
-            import lib
-            lib.epdb.st()
+        assert(troveFlavor is not None)
 
 	trv = trove.Trove(troveName, troveVersion, troveFlavor,
 			      changeLog)
