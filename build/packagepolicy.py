@@ -152,7 +152,7 @@ class EtcConfig(policy.Policy):
     """
     Mark all files below /etc as config files
     """
-    invariantsubtree = [ '%(sysconfdir)s' ]
+    invariantsubtrees = [ '%(sysconfdir)s' ]
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros

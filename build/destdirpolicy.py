@@ -34,6 +34,44 @@ class RemoveExtraLibs(policy.Policy):
     def doFile(self, path):
 	util.remove(self.macros['destdir']+path)
 
+class FixupMultilibPaths(policy.Policy):
+    """
+    Fix up (and warn) when programs do not know about %(lib) and they
+    are supposed to be installing to lib64
+    FIXME: must test when we have a multilib platform!
+    """
+    invariantinclusions = [
+	'*.\.(so.*|a)$',
+    ]
+
+    def __init__(self, *args, **keywords):
+	self.dirmap = {
+	    '/lib':            '/%(lib)s',
+	    '%(prefix)s/lib':  '%(libdir)s',
+	}
+	self.invariantsubtrees = self.dirmap.keys()
+	policy.Policy.__init__(self, *args, **keywords)
+
+    def test(self):
+	if self.macros['lib'] == 'lib':
+	    # no need to do anything
+	    return False
+	for d in self.invariantsubtrees:
+	    self.dirmap[d %self.macros] = self.dirmap[d] %self.macros
+	return True
+
+    def doFile(self, path):
+	basename = os.path.basename(path)
+	target = util.joinPaths(self.dirmap[self.currentsubtree], basename)
+	if os.path.exists(self.macros['destdir'] + os.sep + target):
+	    raise DestdirPolicyError(
+		"Conflicting library files %s and %s installed" %(
+		    path, target))
+	util.mkdirChain(self.macros['destdir'] + os.sep +
+			self.macros['initdir'])
+	util.rename(self.macros['destdir'] + path,
+	              self.macros['destdir'] + target)
+
 class RemoveBackupFiles(policy.Policy):
     """
     Kill editor and patch backup files
@@ -246,9 +284,8 @@ class NormalizeInitscripts(policy.Policy):
 		    path, target))
 	util.mkdirChain(self.macros['destdir'] + os.sep +
 			self.macros['initdir'])
-	util.copytree(self.macros['destdir'] + path,
-	              self.macros['destdir'] + target)
-	os.remove(self.macros['destdir'] + path)
+	util.rename(self.macros['destdir'] + path,
+	            self.macros['destdir'] + target)
 
 
 class RelativeSymlinks(policy.Policy):
@@ -278,6 +315,7 @@ def DefaultPolicy():
     return [
 	SanitizeSonames(),
 	RemoveExtraLibs(),
+	FixupMultilibPaths(),
 	RemoveBackupFiles(),
 	Strip(),
 	NormalizeGzip(),

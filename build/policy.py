@@ -26,7 +26,7 @@ class Policy(util.Action):
     well, but should use the same rules if they do use them.  All of
     them have C{self.macros} applied before use.
 
-    @cvar invariantsubtree: if invariantsubtree is not empty,
+    @cvar invariantsubtrees: if invariantsubtrees is not empty,
     then it is a list of subtrees (relative to C{%(destdir)s}) to
     walk INSTEAD of walking the entire C{%(destdir)s} tree.
 
@@ -42,7 +42,7 @@ class Policy(util.Action):
     exceptions being applied is an invariant condition of the C{doFile}
     method.
     """
-    invariantsubtree = []
+    invariantsubtrees = []
     invariantexceptions = []
     invariantinclusions = []
 
@@ -136,11 +136,22 @@ class Policy(util.Action):
 	    if hasattr(self.__class__, 'do'):
 		self.do()
 	    elif hasattr(self.__class__, 'doFile'):
-		if not self.invariantsubtree:
-		    self.invariantsubtree.append('/')
-		for subtree in self.invariantsubtree:
-		    os.path.walk(('%(destdir)s'+subtree) %self.macros,
-				 _walkFile, self)
+		if not self.invariantsubtrees:
+		    self.invariantsubtrees.append('/')
+		for self.currentsubtree in self.invariantsubtrees:
+		    os.path.walk(
+			('%(destdir)s'+self.currentsubtree) %self.macros,
+			self.walkDir, None)
+
+    def walkDir(self, ignore, dirname, names):
+	# chop off bit not useful for comparison
+	destdirlen = len(self.macros['destdir'])
+	path=dirname[destdirlen:]
+	for name in names:
+	   thispath = path + os.sep + name
+	   if policyInclusion (self, thispath) and \
+	      not policyException(self, thispath):
+	       self.doFile(util.normpath(thispath))
 
 class PolicyError(Exception):
     """
@@ -158,15 +169,6 @@ class PolicyError(Exception):
 
 # internal helpers
 
-def _walkFile(policyObj, dirname, names):
-    # chop off bit not useful for comparison
-    destdirlen = len(policyObj.macros['destdir'])
-    path=dirname[destdirlen:]
-    for name in names:
-       thispath = path + os.sep + name
-       if policyInclusion (policyObj, thispath) and \
-          not policyException(policyObj, thispath):
-           policyObj.doFile(util.normpath(thispath))
 
 # external helpers
 
