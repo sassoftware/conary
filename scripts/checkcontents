@@ -98,8 +98,8 @@ def main(argv):
                 fileVersion = db.db.versionTable.getBareId(versionId)
                 print troveName, troveVersion.asString(), path, \
                       '(sha1: %s)' %h, 'missing from data store',
-                if (fileVersion.isLocal() or fileVerison.isEmerge()
-                    or troveVersion.isLocalCook()):
+                if (fileVersion.isLocal() or fileVersion.isEmerge()
+                    or fileVersion.isLocalCook()):
                     print ('but this trove was built locally so the contents '
                            'can not be restored'),
                 else:
