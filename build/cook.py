@@ -18,6 +18,8 @@ import package
 import recipe
 import repository
 import sha1helper
+import signal
+import sys
 import time
 import types
 import util
@@ -258,3 +260,53 @@ class CookError(Exception):
 
     def __str__(self):
 	return repr(self)
+
+def cookCommand(cfg, args, prep, macros):
+    # this ensures the repository exists
+    repos = repository.LocalRepository(cfg.reppath, "c")
+    repos.close()
+
+    for file in args:
+        if file[0] != '/':
+            file = "%s/%s" % (os.getcwd(), file)
+        # we want to fork here to isolate changes the recipe might make
+        # in the environment (such as environment variables)
+        signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+        pid = os.fork()
+        if not pid:
+            # child, set ourself to be the foreground process
+            os.setpgrp()
+            os.tcsetpgrp(0, os.getpgrp())
+	    repos = repository.LocalRepository(cfg.reppath, "r")
+            try:
+                built = doCook(repos, cfg, file, prep=prep, macros=macros)
+            except CookError, msg:
+		log.error(str(msg))
+                sys.exit(1)
+            for (pkg, version) in built:
+                print "Committed", pkg, version, "to the repository"
+            sys.exit(0)
+        else:
+            while 1:
+                try:
+                    # XXX replace 2 with os.WUNTRACED in python 2.3
+                    (id, status) = os.waitpid(pid, 2)
+                    if os.WIFSTOPPED(status):
+                        # if our child has been stopped (Ctrl+Z or similar)
+                        # stop ourself
+                        os.kill(os.getpid(), os.WSTOPSIG(status))
+                        # when we continue, place our child back
+                        # in the foreground process group
+                        os.tcsetpgrp(0, pid)
+                        # tell the child to continue
+                        os.kill(-pid, signal.SIGCONT)
+                    else:
+                        # if our child exited with a non-0 status, exit
+                        # with that status
+                        if os.WEXITSTATUS(status):
+                            sys.exit(os.WEXITSTATUS(status))
+                        break
+                except KeyboardInterrupt:
+                    os.kill(-pid, signal.SIGINT)
+        # make sure that we are the foreground process again
+        os.tcsetpgrp(0, os.getpgrp())
