@@ -142,7 +142,7 @@ Choose a branch: %s
 
         if "version" in metadata:
             # the only number that matters in the metadata version is the source revision
-            versionStr = metadata["version"].trailingVersion().asString().split("-")[-2]
+            versionStr = metadata["version"].trailingVersion().asString().split("-")[-1]
         else:
             versionStr = "Initial Version"
 

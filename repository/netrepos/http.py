@@ -127,7 +127,7 @@ class HttpHandler(HtmlEngine):
         )
 
         self.htmlPageTitle("Update Successful")
-        self.htmlUpdateSuccessful(troveName, branch.asString())
+        self.htmlUpdateSuccessful(troveName, branch.asString().split("/")[-1])
         
     def invalidCmd(self, authToken, fields):
         # XXX this is a fake server error, we should raise an exception
