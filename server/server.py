@@ -140,6 +140,15 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
 	self.send_response(200, 'OK')
 
+class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
+
+    def reset(self):
+	del self.repos
+	shutil.rmtree(self.repPath)
+	self.repos = fsrepos.FilesystemRepository(self.name, self.repPath,
+						  self.map)
+
+
 class ServerConfig(ConfigFile):
 
     defaults = {
@@ -182,9 +191,8 @@ if __name__ == '__main__':
 
     baseUrl="http://%s:%s/" % (os.uname()[1], cfg.port)
 
-    netRepos = NetworkRepositoryServer(otherArgs[1], FILE_PATH, baseUrl,
-				       otherArgs[2], otherArgs[3],
-				       cfg.repositoryMap)
+    netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH, 
+			baseUrl, otherArgs[2], otherArgs[3], cfg.repositoryMap)
 
     port = int(cfg.port)
     httpServer = HTTPServer(("", port), HttpRequests)
