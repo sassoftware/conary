@@ -14,7 +14,7 @@ REP_PATH="/home/ewt/srs/srsrep"
 
 BUFFER=1024 * 256
 
-def xmlPost(req):
+def xmlPost(repos, req):
     if not req.headers_in.has_key('Authorization'):
 	user = None
 	pw = None
@@ -38,10 +38,9 @@ def xmlPost(req):
     (params, method) = xmlrpclib.loads(req.read())
 
     try:
-	result = netRepos.__class__.__dict__[method](netRepos, authToken, 
-						     *params)
+	result = repos.__class__.__dict__[method](repos, authToken, *params)
     except netserver.InsufficientPermission:
-	return apache.FORBIDDEN
+	return apache.HTTP_FORBIDDEN
 
     resp = xmlrpclib.dumps((result,), methodresponse=1)
     req.content_type = "text/xml"
@@ -49,7 +48,7 @@ def xmlPost(req):
 
     return apache.OK
 
-def getFile(req):
+def getFile(repos, req):
     path = FILE_PATH + "/" + os.path.basename(req.filename) + "-out"
     size = os.stat(path).st_size
     req.content_type = "application/x-conary-change-set"
@@ -57,7 +56,7 @@ def getFile(req):
     os.unlink(path)
     return apache.OK
 
-def putFile(req):
+def putFile(repos, req):
     path = FILE_PATH + "/" + os.path.basename(req.filename) + "-in"
     size = os.stat(path).st_size
     if size != 0:
@@ -74,13 +73,23 @@ def putFile(req):
     return apache.OK
 
 def handler(req):
+    if not repositories.has_key(req.filename):
+	codeStr = open(req.filename, "r").read()
+	d = {}
+	exec codeStr in d
+	repositories[req.filename] = netserver.NetworkRepositoryServer(
+				d['reppath'], d['tmppath'], 
+				req.filename, d['authpath'])
+
+    repos = repositories[req.filename]
+
     if req.method == "POST" and req.headers_in['Content-Type'] == "text/xml":
-	return xmlPost(req)
+	return xmlPost(repos, req)
     elif req.method == "GET":
-	return getFile(req)
+	return getFile(repos, req)
     elif req.method == "PUT":
-	return putFile(req)
+	return putFile(repos, req)
     else:
 	return apache.METHOD_NOT_ALLOWED
 
-netRepos = netserver.NetworkRepositoryServer(REP_PATH, FILE_PATH, BASE_URL)
+repositories = {}
