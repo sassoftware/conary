@@ -187,6 +187,11 @@ class Trove:
 	self.changeVersion(pkgCS.getNewVersion())
 	self.changeFlavor(pkgCS.getNewFlavor())
 
+        if pkgCS.isAbsolute():
+            self.troveInfo.thaw(pkgCS.getTroveInfoDiff())
+        else:
+            self.troveInfo.twm(pkgCS.getTroveInfoDiff(), self.troveInfo)
+
 	return fileMap
 
     def mergeTroveListChanges(self, changeList, redundantOkay = False):
@@ -284,7 +289,7 @@ class Trove:
 				      None, self.getFlavor(),
 				      absolute = absolute,
                                       isRedirect = self.redirect,
-                                      troveInfoDiff = "")
+                                      troveInfoDiff = self.troveInfo.freeze())
 
 	# dependency and flavor information is always included in total;
 	# this lets us do dependency checking w/o having to load packages
