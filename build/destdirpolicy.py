@@ -28,16 +28,18 @@ to remove a file from consideration and C{inclusions=I{filterexp}} to list
 a file as explicitly included.  Most policies default to all the files
 they would need to apply to, so C{exceptions} is the most common.
 """
+import errno
+import os
+import re
+import shutil
+import stat
 
+#conary imports
 from lib import log
 from lib import magic
 from lib import util
 import macros
-import os
 import policy
-import re
-import shutil
-import stat
 
 # used in multiple places, should be maintained in one place
 # probably needs to migrate to some form of configuration
@@ -681,11 +683,14 @@ class Strip(policy.Policy):
         if self.debuginfo:
             for file in sorted(self.debugfiles):
                 builddirpath = '%(topbuilddir)s/' % self.dm +file
-                if os.path.exists(builddirpath):
-                    dir = os.path.dirname(file)
-                    util.mkdirChain('%(destdir)s%(debugsrcdir)s/'%self.dm +dir)
+                dir = os.path.dirname(file)
+                util.mkdirChain('%(destdir)s%(debugsrcdir)s/'%self.dm +dir)
+                try:
                     shutil.copy2(builddirpath,
                                  '%(destdir)s%(debugsrcdir)s/'%self.dm +file)
+                except IOError, msg:
+                    if msg.errno == errno.ENOENT:
+                        pass
 
 class NormalizeCompression(policy.Policy):
     """
