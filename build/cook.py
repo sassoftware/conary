@@ -458,24 +458,6 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     
     grpName = recipeClass.name
 
-    # build up the name->fileid mapping so we reuse fileids wherever
-    # possible; we do this by looking in the database for the latest
-    # group for each flavor avalable on the branch and recursing
-    # through its subpackages; this mechanism continues to work as
-    # subpackages come and go.
-    ident = _IdGen()
-    try:
-        versionList = repos.getTroveFlavorsLatestVersion(grpName, buildBranch)
-    except repository.PackageNotFound:
-        versionList = []
-    troveList = [ (grpName, x[0], x[1]) for x in versionList ]
-    while troveList:
-        troves = repos.getTroves(troveList)
-        troveList = []
-        for trv in troves:
-            ident.populate(repos, trv)
-            troveList += [ x for x in trv.iterTroveList() ]
-
     requires = deps.deps.DependencySet()
     provides = deps.deps.DependencySet()
     flavor = deps.deps.DependencySet()
@@ -498,13 +480,35 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	targetVersion.trailingVersion().incrementBuildCount()
 
 
+    # build up the name->fileid mapping so we reuse fileids wherever
+    # possible; we do this by looking in the database for the latest
+    # packages for each flavor available on the branch and recursing
+    # through their subpackages; this mechanism continues to work as
+    # packages and subpackages come and go.
     packageList = []
     grpMap = {}
+    ident = _IdGen()
     for buildPkg in bldList:
         compName = buildPkg.getName()
         main, comp = compName.split(':')
         if main not in grpMap:
             grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
+
+        try:
+            versionList = repos.getTroveFlavorsLatestVersion(main, buildBranch)
+        except repository.PackageNotFound:
+            versionList = []
+        troveList = [ (main, x[0], x[1]) for x in versionList ]
+        while troveList:
+            troves = repos.getTroves(troveList)
+            troveList = []
+            for trv in troves:
+                ident.populate(repos, trv)
+                troveList += [ x for x in trv.iterTroveList() ]
+
+    for buildPkg in bldList:
+        compName = buildPkg.getName()
+        main, comp = compName.split(':')
         grp = grpMap[main]
 
 	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, 
