@@ -282,7 +282,26 @@ class ServerConfig(ConfigFile):
 
 def usage():
     print "usage: %s repospath authdb reposname [config file]" %sys.argv[0]
+    print "       %s --add-user <username> authdb" %sys.argv[0]
     sys.exit(1)
+
+def addUser(userName, otherArgs):
+    if len(otherArgs) != 2:
+        usage()
+
+    from repository.netrepos import netauth
+    from getpass import getpass
+
+    na = netauth.NetworkAuthorization(otherArgs[1], None)
+
+    pw1 = getpass('Password:')
+    pw2 = getpass('Reenter password :')
+
+    if pw1 != pw2:
+        print "Passwords do not match."
+        return 1
+
+    na.add(userName, pw1, admin = True)
 
 if __name__ == '__main__':
     argDef = {}
@@ -295,20 +314,30 @@ if __name__ == '__main__':
     cfg = ServerConfig()
 
     argDef["config"] = options.MULT_PARAM
+    argDef['add-user'] = options.ONE_PARAM
+    argDef['help'] = options.ONE_PARAM
 
     argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
 
     FILE_PATH = cfg.tmpFilePath
 
+    if argSet.has_key('help'):
+        usage()
+
+    if argSet.has_key('add-user'):
+        sys.exit(addUser(argSet['add-user'], otherArgs))
+
     if not os.path.isdir(FILE_PATH):
 	print FILE_PATH + " needs to be a directory"
 	sys.exit(1)
-
+    if not os.access(FILE_PATH, os.R_OK | os.W_OK | os.X_OK):
+        print FILE_PATH + " needs to allow full read/write access"
+        sys.exit(1)
 
     if len(otherArgs) == 5:
         cfg.read(otherArgs.pop())
 
-    if len(otherArgs) != 4:
+    if len(otherArgs) != 4 or otherArgs:
 	usage()
 
     profile = 0
