@@ -347,7 +347,23 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	return filecontents.FromGzFile(gzfile)
 
+    def commitChangeSetFile(self, fName):
+        cs = repository.changeset.ChangeSetFromFile(fName)
+        return self._commit(cs, fName)
+
     def commitChangeSet(self, chgSet):
+	(outFd, path) = tempfile.mkstemp()
+	os.close(outFd)
+	chgSet.writeToFile(path)
+
+	try:
+            result = self._commit(chgSet, path)
+        finally:
+            os.unlink(path)
+
+        return result
+
+    def _commit(self, chgSet, fName):
 	serverName = None
 	for pkg in chgSet.iterNewPackageList():
 	    v = pkg.getOldVersion()
@@ -361,16 +377,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 		serverName = v.branch().label().getHost()
 	    assert(serverName == v.branch().label().getHost())
 	    
-	(outFd, path) = tempfile.mkstemp()
-	os.close(outFd)
-	chgSet.writeToFile(path)
-
 	url = self.c[serverName].prepareChangeSet()
 
-	try:
-	    self._putFile(url, path)
-	finally:
-	    os.unlink(path)
+        self._putFile(url, fName)
 
 	self.c[serverName].commitChangeSet(url)
 

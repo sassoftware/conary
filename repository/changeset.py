@@ -617,7 +617,11 @@ class ChangeSetFromFile(ChangeSet):
 	    size = len(str)
 	else:
             while True:
-                rc = self.csf.getNextFile()
+                if self.nextFile:
+                    rc = self.nextFile
+                    self.nextFile = None
+                else:
+                    rc = self.csf.getNextFile()
 
                 # we have reached the end, without finding our fileId
                 if rc is None:
@@ -652,19 +656,12 @@ class ChangeSetFromFile(ChangeSet):
 	return self.csf.hasFile(hash)
 
     def writeAllContents(self, csf):
-	rc = self.csf.getNextFile()
-	while rc is not None:
-	    (fileId, tag, f, size) = rc
-	    cont = filecontents.FromFile(f, size)
-	    csf.addFile(fileId, cont, tag)
-
-	    rc = self.csf.getNextFile()
+        assert(0)
 
     def __init__(self, file, justContentsForConfig = 0, skipValidate = 1):
 	f = open(file, "r")
 	self.csf = filecontainer.FileContainer(f)
 	f.close()
-	#return
 
 	(name, tagInfo, control, size) = self.csf.getNextFile()
         assert(name == "CONARYCHANGESET")
@@ -688,6 +685,29 @@ class ChangeSetFromFile(ChangeSet):
 
 	if not skipValidate:
 	    self.validate(justContentsForConfig)
+
+        # load the diff cache
+        nextFile = self.csf.getNextFile()
+        while nextFile:
+            name, tagInfo, f, size = nextFile
+
+            tag = 'cft-' + tagInfo.split()[1]
+
+            # cache all config file contents
+            #if tag != ChangedFileTypes.diff:
+                #break
+            if tagInfo[0] == '0':
+                break
+
+            cont = filecontents.FromFile(f)
+            str = cont.get().read()
+            size = len(str)
+            self.configCache[name] = (tag, str)
+            cont = filecontents.FromString(str)
+
+            nextFile = self.csf.getNextFile()
+
+        self.nextFile = nextFile
 
 # old may be None
 def fileChangeSet(fileId, old, new):
