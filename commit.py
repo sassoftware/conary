@@ -8,9 +8,7 @@ import files
 import package
 import sys
 
-def commitChangeSet(repos, cfg, changeSetFile):
-    cs = changeset.ChangeSetFromFile(changeSetFile)
-
+def commitChangeSet(repos, cfg, cs):
     pkgList = []
     fileMap = {}
 
@@ -88,3 +86,8 @@ def commitChangeSet(repos, cfg, changeSetFile):
 	    pkgSet.eraseVersion(newVersion)
 
 	raise 
+
+
+def doCommit(repos, cfg, changeSetFile):
+    cs = changeset.ChangeSetFromFile(changeSetFile)
+    commitChangeSet(repos, cfg, cs)
