@@ -259,7 +259,7 @@ def checkout(repos, cfg, workDir, name):
 
     state.write(workDir + "/CONARY")
 
-def commit(repos, cfg, message, sourceCheck = False):
+def commit(repos, cfg, message):
     if cfg.name is None or cfg.contact is None:
 	log.error("name and contact information must be set for commits")
 	return
@@ -296,17 +296,16 @@ def commit(repos, cfg, message, sourceCheck = False):
     # fetch all the sources
     recipeClass = loader.getRecipe()
     if issubclass(recipeClass, recipe.PackageRecipe):
-        if sourceCheck is True:
-            lcache = lookaside.RepositoryCache(repos)
-            srcdirs = [ os.path.dirname(recipeClass.filename),
-                        cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
-            recipeObj = recipeClass(cfg, lcache, srcdirs)
-            recipeObj.populateLcache()
-            level = log.getVerbosity()
-            log.setVerbosity(log.INFO)
-            recipeObj.setup()
-            recipeObj.fetchAllSources()
-            log.setVerbosity(level)
+        lcache = lookaside.RepositoryCache(repos)
+        srcdirs = [ os.path.dirname(recipeClass.filename),
+                    cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
+        recipeObj = recipeClass(cfg, lcache, srcdirs)
+        recipeObj.populateLcache()
+        level = log.getVerbosity()
+        log.setVerbosity(log.INFO)
+        recipeObj.setup()
+        recipeObj.fetchAllSources()
+        log.setVerbosity(level)
         
     recipeVersionStr = recipeClass.version
 

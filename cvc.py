@@ -76,7 +76,6 @@ def usage(rc = 1):
     print "               --target-branch <branch>"
     print ""
     print "commit flags:  --message <msg>"
-    print "               --no-source-check"
     return rc
 
 def realMain(cfg, argv=sys.argv):
@@ -95,7 +94,6 @@ def realMain(cfg, argv=sys.argv):
     argDef["dir"] = ONE_PARAM
     argDef["macros"] = ONE_PARAM
     argDef["message"] = ONE_PARAM
-    argDef["no-source-check"] = NO_PARAM
     argDef["no-clean"] = NO_PARAM
     argDef["prep"] = NO_PARAM
     argDef["profile"] = NO_PARAM
@@ -158,9 +156,6 @@ def sourceCommand(cfg, args, argSet):
         log.setVerbosity(log.INFO)
 	message = argSet.get("message", None)
         sourceCheck = True
-        if argSet.has_key("no-source-check"):
-            sourceCheck = False
-            del argSet['no-source-check']
 
 	if message is not None:
 	    del argSet['message']
@@ -168,7 +163,7 @@ def sourceCommand(cfg, args, argSet):
 	if argSet or len(args) != 1: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
-	checkin.commit(repos, cfg, message, sourceCheck = sourceCheck)
+	checkin.commit(repos, cfg, message)
         log.setVerbosity(level)
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
