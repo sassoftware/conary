@@ -134,48 +134,69 @@ def CreateFromFilesystem(pkgList, version, outFileName):
 
     csf.close()
 
+# packageList is a list of (pkgName, oldVersion, newVersion) tuples
+def CreateFromRepository(repos, packageList, outFileName):
+
+    cs = ""
+    hashList = []
+
+    for (packageName, oldVersion, newVersion) in packageList:
+	pkgSet = repos.getPackageSet(packageName)
+
+	new = pkgSet.getVersion(newVersion)
+     
+	if oldVersion:
+	    old = pkgSet.getVersion(oldVersion)
+
+	(newCs, filesNeeded) = packageChangeSet(packageName, old, 
+						oldVersion.asString(), new, 
+						newVersion.asString())
+	cs = cs + newCs
+
+	for (fileId, oldVersion, newVersion) in filesNeeded:
+	    filedb = repos.getFileDB(fileId)
+
+	    oldFile = None
+	    if oldVersion:
+		oldFile = filedb.getVersion(oldVersion)
+	    newFile = filedb.getVersion(newVersion)
+
+	    (filecs, hash) = fileChangeSet(fileId, oldFile, newFile)
+	    cs = cs + filecs
+	    if hash: hashList.append(hash)
+
+    try:
+	outFile = open(outFileName, "w+")
+	csf = filecontainer.FileContainer(outFile)
+	outFile.close()
+
+	csf.addFile("SRSCHANGESET", cs, "")
+
+	for hash in hashList:
+	    f = repos.pullFileContentsObject(hash)
+	    csf.addFile(hash, f, "")
+	    f.close()
+
+	csf.close()
+    except:
+	os.unlink(outFileName)
+	raise
+
 def ChangeSetCommand(repos, cfg, packageName, outFileName, oldVersionStr, \
 	      newVersionStr):
     if packageName[0] != "/":
 	packageName = cfg.packagenamespace + "/" + packageName
 
-    pkgSet = repos.getPackageSet(packageName)
-
     newVersion = versions.VersionFromString(newVersionStr, cfg.defaultbranch)
-    new = pkgSet.getVersion(newVersion)
- 
+
     if (oldVersionStr):
 	oldVersion = versions.VersionFromString(oldVersionStr, 
 					        cfg.defaultbranch)
-	old = pkgSet.getVersion(oldVersion)
     else:
-	old = None
+	oldVersion = None
 
-    (cs, filesNeeded) = packageChangeSet(packageName, old, oldVersionStr, 
-					 new, newVersionStr)
-					 
-    hashList = []
-    for (fileId, oldVersion, newVersion) in filesNeeded:
-	filedb = repos.getFileDB(fileId)
+    list = []
+    for name in repos.getPackageList(packageName):
+	list.append((name, oldVersion, newVersion))
 
-	oldFile = None
-	if oldVersion:
-	    oldFile = filedb.getVersion(oldVersion)
-	newFile = filedb.getVersion(newVersion)
-
-	(filecs, hash) = fileChangeSet(fileId, oldFile, newFile)
-	cs = cs + filecs
-	if hash: hashList.append(hash)
-
-    outFile = open(outFileName, "w+")
-    csf = filecontainer.FileContainer(outFile)
-    outFile.close()
-
-    csf.addFile("SRSCHANGESET", cs, "")
-
-    for hash in hashList:
-	f = repos.pullFileContentsObject(hash)
-	csf.addFile(hash, f, "")
-	f.close()
-
-    csf.close()
+    CreateFromRepository(repos, list, outFileName)
