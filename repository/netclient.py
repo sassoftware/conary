@@ -79,7 +79,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	return d
 
     def getTroveLeavesByLabel(self, troveNameList, label):
-	d = self.s.getTroveLeavesByLabel(troveNameList, self.fromLabel(label))
+	d = self.s.getTroveLeavesByLabel(troveNameList, label.asString())
 	for troveName, troveVersions in d.iteritems():
 	    d[troveName] = [ self.toVersion(x) for x in troveVersions ]
 
