@@ -125,7 +125,7 @@ static PyObject* tc_BINARY;
 
 static int process_record(void* p_data, int num_fields, char** p_fields, char** p_col_names);
 
-PySQLite_DECLARE_MODINIT_FUNC(init_sqlite);
+PySQLite_DECLARE_MODINIT_FUNC(init_sqlite3);
 static void _con_dealloc(pysqlc *self);
 static PyObject* sqlite_version_info(PyObject* self, PyObject* args);
 static PyObject* pysqlite_connect(PyObject *self, PyObject *args, PyObject *kwargs);
@@ -1754,7 +1754,7 @@ static PyMethodDef _con_methods[] =
     { NULL, NULL}
 };
 
-PySQLite_MODINIT_FUNC(init_sqlite)
+PySQLite_MODINIT_FUNC(init_sqlite3)
 {
     PyObject *module, *dict;
     PyObject* sqlite_version;
@@ -1764,7 +1764,7 @@ PySQLite_MODINIT_FUNC(init_sqlite)
     pysqlc_Type.ob_type = &PyType_Type;
     pysqlrs_Type.ob_type = &PyType_Type;
 
-    module = Py_InitModule("_sqlite", pysqlite_functions);
+    module = Py_InitModule("_sqlite3", pysqlite_functions);
 
     if (!(dict = PyModule_GetDict(module)))
     {
