@@ -113,7 +113,7 @@ def post(repos, httpHandler, req):
         except netserver.InsufficientPermission:
             return apache.HTTP_FORBIDDEN
         except:
-            traceback(req)
+            writeTraceback(req)
 
     return apache.OK
 
@@ -142,7 +142,7 @@ def get(repos, httpHandler, req):
         except netserver.InsufficientPermission:
             return apache.HTTP_FORBIDDEN
         except:
-            traceback(req)
+            writeTraceback(req)
         return apache.OK
 
     localName = repos.tmpPath + "/" + req.args + "-out"
@@ -197,7 +197,7 @@ def putFile(repos, req):
 
     return apache.OK
 
-def traceback(wfile):
+def writeTraceback(wfile):
     kid_error.write(wfile, pageTitle = "Error",
                            error = traceback.format_exc())
 

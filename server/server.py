@@ -109,7 +109,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
             except netserver.InsufficientPermission:
                 self.send_response(403)
             except:
-                self.traceback()
+                self.writeTraceback()
         else:
             urlPath = posixpath.normpath(urllib.unquote(self.path))
             localName = FILE_PATH + "/" + urlPath.split('?', 1)[1] + "-out"
@@ -173,7 +173,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
         except netserver.InsufficientPermission:
             self.send_response(403)
         except:
-            self.traceback()
+            self.writeTraceback()
 
     def getAuth(self):
         info = self.headers.get('Authorization', None)
@@ -217,7 +217,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
         self.end_headers()
         return None
       
-    def traceback(self):
+    def writeTraceback(self):
         kid_error.write(self.wfile, pageTitle = "Error",
                         error = traceback.format_exc())
         
