@@ -74,6 +74,7 @@ baseMacros = {
     # arguments/flags (empty ones are for documentation; non-existant = empty)
     'cc'		: 'gcc',
     'cxx'		: 'g++',
+    'cxxflags'          : '',    # cxx specific flags
     'cflags'            : '-O2', # -g when we have debuginfo
     'cppflags'		: '', # just for providing in recipes
     'ldflags'		: '', # -g when we have debuginfo

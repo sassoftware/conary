@@ -156,7 +156,7 @@ class Configure(BuildCommand):
     template = (
 	'cd %%(builddir)s/%%(subDir)s; '
 	'%%(mkObjdir)s '
-	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 	' CPPFLAGS="%%(cppflags)s"'
 	' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
 	' %(preConfigure)s %%(configure)s'
@@ -258,7 +258,7 @@ class Make(BuildCommand):
     # makefile, then it takes a command-line argument to override
     # them.
     template = ('cd %%(builddir)s/%(subDir)s; '
-	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s"'
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
                 ' %(preMake)s make %%(overrides)s'
@@ -285,7 +285,8 @@ class Make(BuildCommand):
 	macros = macros.copy()
 	if self.forceFlags:
 	    # XXX should this be just '-e'?
-	    macros['overrides'] = ('CFLAGS="%(cflags)s" CXXFLAGS="%(cflags)s"'
+	    macros['overrides'] = ('CFLAGS="%(cflags)s"'
+                                   ' CXXFLAGS="%(cflags)s %(cxxflags)s"'
 			           ' CPPFLAGS="%(cppflags)s"'
 	                           ' LDFLAGS="%(ldflags)s"')
 	else:
@@ -299,7 +300,7 @@ class MakeParallelSubdir(Make):
     C{r.MakeParallelSubdir(I{makeargs})}
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
-	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s"'
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
                 ' %(preMake)s make %%(overrides)s'
@@ -315,7 +316,7 @@ class MakeInstall(Make):
     C{MakePathsInstall} instead, or as a last option, C{Make}.
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
-	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 		' CPPFLAGS="%%(cppflags)s"'
 		' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
                 ' %(preMake)s make %%(overrides)s'
@@ -342,7 +343,7 @@ class MakePathsInstall(Make):
     """
     template = (
 	'cd %%(builddir)s/%(subDir)s; '
-	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s %%(cxxflags)s"'
 	' CPPFLAGS="%%(cppflags)s"'
 	' LDFLAGS="%%(ldflags)s" CC=%%(cc)s CXX=%%(cxx)s'
 	' %(preMake)s make %%(overrides)s'
