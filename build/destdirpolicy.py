@@ -59,10 +59,11 @@ class FixupMultilibPaths(policy.Policy):
     """
     Fix up (and warn) when programs do not know about %(lib) and they
     are supposed to be installing to lib64
-    FIXME: must test when we have a multilib platform!
+
+    FIXME: should limit itself to ELF objects once Filter evaluates magic
     """
     invariantinclusions = [
-	'*.\.(so.*|a)$',
+	'.*\.(so.*|a)$',
     ]
 
     def __init__(self, *args, **keywords):
@@ -83,17 +84,17 @@ class FixupMultilibPaths(policy.Policy):
 
     def doFile(self, path):
 	basename = os.path.basename(path)
-	target = util.joinPaths(self.dirmap[self.currentsubtree], basename)
-	if os.path.exists(self.macros['destdir'] + os.sep + target):
+	targetdir = self.dirmap[self.currentsubtree %self.macros]
+	target = util.joinPaths(targetdir, basename)
+	destdir = self.macros['destdir']
+	if os.path.exists(destdir + os.sep + target):
 	    raise DestdirPolicyError(
 		"Conflicting library files %s and %s installed" %(
 		    path, target))
 	log.warning('Multilib error: file %s found in wrong directory,'
 		    'attempting to fix...' %path)
-	util.mkdirChain(self.macros['destdir'] + os.sep +
-			self.macros['initdir'])
-	util.rename(self.macros['destdir'] + path,
-	              self.macros['destdir'] + target)
+	util.mkdirChain(destdir + targetdir)
+	util.rename(destdir + path, destdir + target)
 
 class RemoveBackupFiles(policy.Policy):
     """
