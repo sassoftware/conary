@@ -638,6 +638,9 @@ class OldFileStream(list, streams.InfoStream):
 	if data is not None:
 	    self.thaw(data)
 
+_TROVEINFO_TAG_TROVESIZE    = 0
+_TROVEINFO_TAG_SOURCETROVE  = 1
+
 class ReferencedFileList(list, streams.InfoStream):
 
     def freeze(self, skipSet = None):
@@ -746,7 +749,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         _STREAM_TCS_IS_REDIRECT : (streams.ByteStream,         "isRedirect"  ),
      }
 
-     ignoreUnknown = True
+    ignoreUnknown = True
 
     """
     Represents the changes between two packages and forms part of a
