@@ -440,6 +440,8 @@ def main():
 	print >> sys.stderr, str(e)
     except database.OpenError, e:
 	print >> sys.stderr, str(e)
+    except repository.repository.OpenError, e:
+	print >> sys.stderr, str(e)
 	    
 if __name__ == "__main__":
     sys.exit(main())
