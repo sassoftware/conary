@@ -186,6 +186,13 @@ class ChangeSet:
 	    invertedPkg = package.PackageChangeSet(pkgCs.getName(), 
 			       pkgCs.getNewVersion(), pkgCs.getOldVersion())
 
+	    for (name, list) in pkgCs.getChangedPackages():
+		for (oper, version) in list:
+		    if oper == '+':
+			invertedPkg.oldPackageVersion(name, version)
+		    elif oper == "-":
+			invertedPkg.newPackageVersion(name, version)
+
 	    for (fileId, path, version) in pkgCs.getNewFileList():
 		invertedPkg.oldFile(fileId)
 
