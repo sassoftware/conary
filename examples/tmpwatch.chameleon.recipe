@@ -4,15 +4,7 @@
 #
 
 class tmpwatch(Recipe):
-    description = """The tmpwatch utility recursively searches through specified
-directories and removes files which have not been accessed in a
-specified period of time. Tmpwatch is normally used to clean up
-directories that are used for temporarily holding files (for example,
-/tmp). Tmpwatch ignores symlinks, will not switch filesystems, and
-only removes empty directories and regular files."""
-
     buildRequires = [ "glibc" ]
-    runRequires = [ "cron" ]
 
     name = "tmpwatch"
     version = "2.9.0"
@@ -33,4 +25,4 @@ only removes empty directories and regular files."""
 	self.Make()
 	self.MakeInstall(rootVar = "ROOT")
 	self.InstallFiles("crond-tmpwatch", 
-			  "/etc/cron.daily/tmpwatch", 0755)
+			  "/etc/cron.daily/tmpwatch", mode=0755)
