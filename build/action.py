@@ -91,7 +91,7 @@ class Action:
             # keep a dictionary of all of the keywords (including the parent
             # keywords)
             if key not in self.__dict__.keys():
-                self.error(TypeError, "%s.__init__() got an unexpected keyword argument "
+                raise TypeError, "%s.__init__() got an unexpected keyword argument "
                                   "'%s'" % (self.__class__.__name__, key))
         # copy the keywords into our dict, overwriting the defaults
         self.__dict__.update(keywords)
