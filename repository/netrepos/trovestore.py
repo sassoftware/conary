@@ -46,6 +46,7 @@ class TroveStore:
 
     def __init__(self, path):
 	self.db = sqlite.connect(path, timeout = 30000)
+        self.begin()
 	self.troveTroves = trovecontents.TroveTroves(self.db)
 	self.troveFiles = trovecontents.TroveFiles(self.db)
 	self.fileStreams = instances.FileStreams(self.db)
@@ -56,6 +57,8 @@ class TroveStore:
 	self.versionOps = versionops.SqlVersioning(self.db, self.versionTable,
                                                    self.branchTable)
 	self.flavors = flavors.Flavors(self.db)
+        self.db.commit()
+        
 	self.streamIdCache = {}
 	self.needsCleanup = False
 	self.filesToAdd = {}
