@@ -433,8 +433,7 @@ def cookCommand(cfg, args, prep, macros):
         else:
             while 1:
                 try:
-                    # XXX replace 2 with os.WUNTRACED in python 2.3
-                    (id, status) = os.waitpid(pid, 2)
+                    (id, status) = os.waitpid(pid, os.WUNTRACED)
                     if os.WIFSTOPPED(status):
                         # if our child has been stopped (Ctrl+Z or similar)
                         # stop ourself
