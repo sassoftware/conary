@@ -187,8 +187,6 @@ class VersionedFile:
 	s = self.db[_VERSION_INFO % (self.key, version.asString())]
 	l = s.split()
 
-	v = versions.ThawVersion(l[0])
-
 	if l[1] == "-":
 	    previous = None
 	else:
