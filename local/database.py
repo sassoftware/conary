@@ -157,6 +157,7 @@ class Database(repository.LocalRepository):
 		if self.hasPackage(name) and old:
 		    branch = old.fork(versions.LocalBranch(), sameVerRel = 0)
 		    new = self.pkgLatestVersion(name, branch)
+		    assert(new)
 		    list.append((name, old, new, 0))
 
 	    localChanges = self.createChangeSet(list)
