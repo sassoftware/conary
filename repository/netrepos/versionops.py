@@ -165,10 +165,10 @@ class Nodes:
 
     def addRow(self, itemId, branchId, versionId, timeStamps):
         cu = self.db.cursor()
-	cu.execute("INSERT INTO Nodes VALUES (NULL, ?, ?, ?, ?, %.3f)",
+	cu.execute("INSERT INTO Nodes VALUES (NULL, ?, ?, ?, ?, ?)",
 		   itemId, branchId, versionId, 
 		   ":".join(["%.3f" % x for x in timeStamps]),
-		   timeStamps[-1],)
+		   '%.3f' %timeStamps[-1])
 	return cu.lastrowid
 		    
     def hasItemId(self, itemId):
