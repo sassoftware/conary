@@ -13,7 +13,6 @@ argDef['dir'] = 1
 
 def usage(rc = 1):
     print "usage: srs source add <file>"
-    print "       srs source checkin <file>"
     print "       srs source checkout [--dir <dir>] <group> <version>"
     print "       srs source commit"
     print "       srs source diff"
@@ -29,10 +28,6 @@ def sourceCommand(cfg, args, argSet):
     elif (args[0] == "add"):
 	if len(args) != 2: usage()
 	checkin.addFile(args[1])
-    elif (args[0] == "checkin"):
-	if argSet or len(args) != 2: usage()
-	repos = repository.LocalRepository(cfg.reppath, "c")
-	checkin.checkin(repos, cfg, args[2])
     elif (args[0] == "checkout"):
 	if argSet.has_key("dir"):
 	    dir = argSet['dir']
