@@ -623,6 +623,33 @@ class TroveStore:
 
 	return trv
 
+    def findFileVersion(self, troveName, troveVersion, fileId, fileVersion):
+        cu = db.cursor()
+        cu.execute("""
+                SELECT fsStream from Versions JOIN 
+                        JOIN Instances ON
+                            Versions.versionId == Instances.versionId 
+                        JOIN Items
+                            Items.itemId == Instances.instanceId JOIN
+                        JOIN TroveFiles ON
+                            Instances.instanceId == TroveFiles.instanceId 
+                        JOIN (
+                            SELECT stream AS fsStream FROM
+                                FileStreams JOIN Versions ON
+                                    FileStreams.versionId == Versions.versionId
+                                WHERE fileId == ? AND version == ?
+                            )
+                        WHERE
+                            Item.item == ? AND
+                            Versions.version == ?
+            """, fileId, fileVersion.asString(), troveName, 
+                 troveVersion.asString())
+                            
+        for (stream,) in cu:
+            return stream
+
+        return None
+
     def iterFilesInTrove(self, troveName, troveVersion, troveFlavor,
                          sortByPath = False, withFiles = False):
 	if sortByPath:

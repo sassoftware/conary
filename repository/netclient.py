@@ -541,7 +541,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     # pull the contents from the trove it was originall
                     # built in
                     cont = self.getFileContents(troveName, newFileVersion,
-                                        newTroveFlavor, fileId, newFileVersion)
+                                        fileId, newFileVersion)
                     internalCs.addFileContents(fileId, 
                                    repository.changeset.ChangedFileTypes.file, 
                                    cont, 
@@ -599,14 +599,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 				   self.fromFileId(fileId), 
 				   self.fromVersion(version)))
 
-    def getFileContents(self, troveName, troveVersion, troveFlavor, fileId,
+    def getFileContents(self, troveName, troveVersion, fileId,
 		        fileVersion, fileObj = None):
 	# we try to get the file from the trove which originally contained
 	# it since we know that server has the contents; other servers may
 	# not
 	url = self.c[fileVersion].getFileContents(troveName, 
 		    self.fromVersion(fileVersion), 
-		    self.fromFlavor(troveFlavor),
 		    self.fromFileId(fileId), self.fromVersion(fileVersion))
 
 	inF = urllib.urlopen(url)

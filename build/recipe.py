@@ -235,7 +235,6 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
 	if filePath == filename:
 	    inF = repos.getFileContents(sourceComponent.getName(),
 					sourceComponent.getVersion(),
-					sourceComponent.getFlavor(), 
                                         fileId, fileVersion).get()
 	    break
     

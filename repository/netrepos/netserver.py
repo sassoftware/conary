@@ -210,7 +210,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return l, verList, dirList
 
     def getFileContents(self, authToken, clientVersion, troveName, 
-                            troveVersion, troveFlavor, fileId, fileVersion):
+                            troveVersion, fileId, fileVersion):
         if clientVersion <= 8:
             path = fileId
             fileId = None

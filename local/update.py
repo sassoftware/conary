@@ -259,7 +259,7 @@ class FilesystemJob:
                 if fileObj.flags.isConfig() and not fileObj.flags.isSource():
                     # take the config file from the local database
                     contents = self.repos.getFileContents(
-                                    None, None, None, None, None, fileObj)
+                                    None, None, None, None, fileObj)
                 elif fileObj.linkGroup.value() and \
                         self.linkGroups.has_key(fileObj.linkGroup.value()):
                     # this creates links whose target we already know
@@ -699,7 +699,6 @@ class FilesystemJob:
 
 			baseLineF = repos.getFileContents(pkgCs.getName(),
 					pkgCs.getOldVersion(), 
-					pkgCs.getOldFlavor(),
                                         fileId,
 					basePkg.getFile(fileId)[1]).get()
 
@@ -996,7 +995,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
 
 		if srcFile.hasContents:
 		    srcCont = repos.getFileContents(srcPkg.getName(),
-				srcPkg.getVersion(), srcPkg.getFlavor(), 
+				srcPkg.getVersion(), 
 				fileId, srcFileVersion)
 
                     (contType, cont) = changeset.fileContentsDiff(srcFile, srcCont,
