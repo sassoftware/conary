@@ -218,7 +218,11 @@ class PackageChangeSet:
 	for (fileId, path, version) in self.newFiles:
 	    f.write("\tadded %s (%s(.*)%s)\n" % (path, fileId[:6], fileId[-6:]))
 	for (fileId, path, version) in self.changedFiles:
-	    f.write("\tchanged %s\n" % fileId)
+	    if path:
+		f.write("\tchanged %s (%s(.*)%s)\n" % 
+			(path, fileId[:6], fileId[-6:]))
+	    else:
+		f.write("\tchanged %s\n" % fileId)
 	    change = changeSet.getFileChange(fileId)
 	    print "\t\t%s" % change
 	for fileId in self.oldFiles:
