@@ -7,7 +7,7 @@ Changes in 0.12.5
     of the builddir
   * most build commands (r.Make, r.Create, etc.), will work in either builddir
     or destdir, depending on whether they are given relative or absolute 
-    directories
+    paths
   * add dir keyword for r.Run
   * include /usr/bin/rpm2cpio
 
