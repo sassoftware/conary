@@ -238,7 +238,7 @@ class ConaryClient:
 
         return csList
 
-    def _mergeGroupChanges(self, cs):
+    def _mergeGroupChanges(self, cs, keepExisting):
         # Updates a change set by removing troves which don't need
         # to be updated do to local state. It also removes troves which
         # don't need to be installed because they're new, but aren't to
@@ -247,6 +247,8 @@ class ConaryClient:
 
         primaries = cs.getPrimaryTroveList()
         inclusions = {}
+        outdated = {}
+        addList = []
 
         # find the troves which include other troves; they give useful
         # hints as to which ones should be excluded due to byDefault
@@ -279,10 +281,23 @@ class ConaryClient:
                     cs.delNewPackage(*item)
                 else:
                     # check the exclude list
+                    skipped = False
                     for reStr, regExp in self.cfg.excludeTroves:
                         if regExp.match(name):
                             cs.delNewPackage(*item)
+                            skipped = True
                             break
+
+                    if not skipped and self.db.hasPackage(oldItem[0]) \
+                                   and not keepExisting \
+                                   and not outdated.has_key(oldItem):
+                        # we have a different version of the trove already
+                        # installed. we need to change this to be relative to
+                        # the version already installed (unless that version
+                        # is being removed by something else in the change
+                        # set
+                        cs.delNewPackage(*item)
+                        addList.append(item)
             elif not self.db.hasTrove(*oldItem):
                 # the old version isn't present, so we don't want this
                 # one either
@@ -293,6 +308,29 @@ class ConaryClient:
         for item in cs.getOldPackageList():
             if not self.db.hasTrove(*item):
                 cs.delOldPackage(*item)
+
+        removeSet = dict.fromkeys(
+            [ (x.getName(), x.getOldVersion(), x.getOldFlavor() )
+                            for x in cs.iterNewPackageList() ])
+
+        outdated, eraseList = self.db.outdatedTroves(addList)
+        csList = []
+        for (name, newVersion, newFlavor), \
+              (oldName, oldVersion, oldFlavor) in outdated.iteritems():
+            # don't let multiple items remove the same old item
+            if removeSet.has_key((name, oldVersion, oldFlavor)):
+                csList.append((name, (None, None),
+                                     (newVersion, newFlavor), False))
+                continue
+
+            if cs.hasOldPackage(name, oldVersion, oldFlavor):
+                cs.delOldPackage(name, oldVersion, oldFlavor)
+
+            removeSet[(name, oldVersion, oldFlavor)] = True
+            csList.append((name, (oldVersion, oldFlavor),
+                                 (newVersion, newFlavor), False))
+
+        return csList
             
     def _updateChangeSet(self, itemList, keepExisting = None, recurse = True):
         """
@@ -394,10 +432,16 @@ class ConaryClient:
             cs = self.repos.createChangeSet(redirectCsList, withFiles = False,
                                             primaryTroveList = [], 
                                             recurse = False)
-            redirectCsList = self._processRedirects(cs)
-            finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
+            newRedirectCsList = self._processRedirects(cs)
+            finalCs.merge(cs, (self.repos.createChangeSet, redirectCsList))
+            redirectCsList = newRedirectCsList
 
-        self._mergeGroupChanges(finalCs)
+        mergeItemList = self._mergeGroupChanges(finalCs, keepExisting)
+        if mergeItemList:
+            cs = self.repos.createChangeSet(mergeItemList, withFiles = False,
+                                            primaryTroveList = [], 
+                                            recurse = False)
+            finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
 
         return finalCs
 
@@ -450,9 +494,6 @@ class ConaryClient:
         newCs = self.repos.createChangeSet(changedTroves.keys(), 
                                            recurse = False)
         cs.merge(newCs)
-
-        import lib
-        lib.epdb.st('f')
 
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, 

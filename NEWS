@@ -4,6 +4,8 @@ Changes in 0.50.5:
   * conary config now takes --show-passwords option, and does not pretty
     print config file values when not printing to screen.  This means that 
     conary config > <file> will result in a valid configuration file.
+  * Updating groups didn't work when the group referenced troves as new
+    which were already installed on the system
 
 Changes in 0.50.4:
   * Most rollback information is stored as a reference to a repository
