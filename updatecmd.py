@@ -32,7 +32,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None, replaceFiles = False):
             if cs.isAbstract():
                 cs = db.rootChangeSet(cs, cfg.defaultbranch)
 
-	    list = [ x.getName() for x  in cs.getNewPackageList() ]
+	    list = [ x.getName() for x  in cs.iterNewPackageList() ]
 	    if versionStr:
 		sys.stderr.write("Verison should not be specified when a "
 				 "SRS change set is being installed.\n")

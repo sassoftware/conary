@@ -349,3 +349,10 @@ def checkPath(binary):
 def joinPaths(*args):
     return normpath(os.sep.join(args))
 
+def assertIteratorAtEnd(iter):
+    try:
+	iter.next()
+	assert(0)
+    except StopIteration:
+	return True
+

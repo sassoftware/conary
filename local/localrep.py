@@ -69,7 +69,7 @@ class LocalRepositoryChangeSetJob(fsrepos.ChangeSetJob):
 	# those files candidates for removal package change sets also know 
 	# when file paths have changed, and those old paths are also candidates
 	# for removal
-	for csPkg in cs.getNewPackageList():
+	for csPkg in cs.iterNewPackageList():
 	    name = csPkg.getName()
 	    oldVersion = csPkg.getOldVersion()
 

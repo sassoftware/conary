@@ -133,8 +133,8 @@ class FilesystemJob:
     def getErrorList(self):
 	return self.errors
 
-    def getNewPackageList(self):
-	return self.newPackages
+    def iterNewPackageList(self):
+	return iter(self.newPackages)
 
     def getOldPackageList(self):
 	return self.oldPackages
@@ -466,7 +466,7 @@ class FilesystemJob:
 	self.initScripts = []
 	self.changeSet = changeSet
 
-	for pkgCs in changeSet.getNewPackageList():
+	for pkgCs in changeSet.iterNewPackageList():
 	    name = pkgCs.getName()
 	    old = pkgCs.getOldVersion()
 	    if old:

@@ -145,7 +145,7 @@ class AbstractDatabase(repository.AbstractRepository):
         if replaceFiles:
             flags |= update.REPLACEFILES
 
-	for pkg in cs.getNewPackageList():
+	for pkg in cs.iterNewPackageList():
 	    if pkg.getName().endswith(":sources"): raise SourcePackageInstall
 
 	# Make sure this change set doesn't unintentionally restore troves
@@ -191,7 +191,7 @@ class AbstractDatabase(repository.AbstractRepository):
 
 	# create the change set from A->A.local
 	pkgList = []
-	for newPkg in cs.getNewPackageList():
+	for newPkg in cs.iterNewPackageList():
 	    name = newPkg.getName()
 	    old = newPkg.getOldVersion()
 	    if self.stash.hasPackage(name) and old:
@@ -251,7 +251,7 @@ class AbstractDatabase(repository.AbstractRepository):
 	fsJob.apply()
 
 	# it would be nice if this could be undone on failure
-	for pkg in fsJob.getNewPackageList():
+	for pkg in fsJob.iterNewPackageList():
 	    self.troveDb.addTrove(pkg)
 	for (name, version) in fsJob.getOldPackageList():
 	    self.troveDb.delTrove(name, version)

@@ -613,7 +613,7 @@ class ChangeSetJob:
 	# file objects which map up with them are created later, but
 	# we do need a map from fileId to the path and version of the
 	# file we need, so build up a dictionary with that information
-	for csPkg in cs.getNewPackageList():
+	for csPkg in cs.iterNewPackageList():
 	    newVersion = csPkg.getNewVersion()
 	    old = csPkg.getOldVersion()
 	    pkgName = csPkg.getName()

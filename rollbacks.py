@@ -15,7 +15,7 @@ def listRollbacks(db, cfg):
 	rb = db.getRollback(rollbackName)
 	for cs in rb:
 	    list = []
-	    for pkg in cs.getNewPackageList():
+	    for pkg in cs.iterNewPackageList():
 		list.append((pkg.getName(), pkg))
 
 	    list.sort()

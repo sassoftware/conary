@@ -12,6 +12,7 @@ import package
 import recipe
 import sys
 import update
+import util
 import versioned
 import versions
 
@@ -240,9 +241,9 @@ def diff(repos, versionStr = None):
     (changeSet, ((isDifferent, newState),)) = result
     if not isDifferent: return
 
-    packageChanges = changeSet.getNewPackageList()
-    assert(len(packageChanges) == 1)
-    pkgCs = packageChanges[0]
+    packageChanges = changeSet.iterNewPackageList()
+    pkgCs = packageChanges.next()
+    assert(util.assertIteratorAtEnd(packageChanges))
 
     for (fileId, path, newVersion) in pkgCs.getNewFileList():
 	print "%s: new" % path
@@ -308,9 +309,9 @@ def updateSrc(repos, versionStr = None):
 
     changeSet = repos.createChangeSet([(pkgName, baseVersion, headVersion, 0)])
 
-    packageChanges = changeSet.getNewPackageList()
-    assert(len(packageChanges) == 1)
-    pkgCs = packageChanges[0]
+    packageChanges = changeSet.iterNewPackageList()
+    pkgCs = packageChanges.next()
+    assert(util.assertIteratorAtEnd(packageChanges))
 
     fsJob = update.FilesystemJob(repos, changeSet, 
 				 { state.getName() : state }, "" )
@@ -318,9 +319,9 @@ def updateSrc(repos, versionStr = None):
     if errList:
 	for err in errList: log.error(err)
     fsJob.apply()
-    newPkgs = fsJob.getNewPackageList()
-    assert(len(newPkgs) == 1)
-    newState = newPkgs[0]
+    newPkgs = fsJob.iterNewPackageList()
+    newState = newPkgs.next()
+    assert(util.assertIteratorAtEnd(newPkgs))
 
     if newState.getVersion() == pkgCs.getNewVersion() and newBranch:
 	newState.changeBranch(newBranch)

@@ -29,7 +29,7 @@ class ChangeSet:
 	return self.local
 
     def validate(self, justContentsForConfig = 0):
-	for pkg in self.getNewPackageList():
+	for pkg in self.iterNewPackageList():
 	    # if this is abstract, we can't have any removed or changed files
 	    if not pkg.getOldVersion():
 		assert(not pkg.getChangedFileList())
@@ -88,8 +88,8 @@ class ChangeSet:
 	assert(version.timeStamp)
 	self.oldPackages.append((name, version))
 
-    def getNewPackageList(self):
-	return self.newPackages.values()
+    def iterNewPackageList(self):
+	return self.newPackages.itervalues()
 
     def getNewPackage(self, name):
 	return self.newPackages[name]
@@ -178,7 +178,7 @@ class ChangeSet:
 	for (name, version) in self.primaryPackageList:
 	    rc.append("%s %s\n" % (name, version.asString()))
 
-	for pkg in self.getNewPackageList():
+	for pkg in self.iterNewPackageList():
             rc.append(pkg.freeze())
 
 	for (pkgName, version) in self.getOldPackageList():
@@ -234,7 +234,7 @@ class ChangeSet:
 
 	rollback = ChangeSetFromRepository(db)
 
-	for pkgCs in self.getNewPackageList():
+	for pkgCs in self.iterNewPackageList():
 	    if not pkgCs.getOldVersion():
 		# this was a new package, and the inverse of a new
 		# package is an old package
@@ -410,7 +410,7 @@ class ChangeSet:
 
 	packageVersions = {}
 
-	for pkgCs in self.getNewPackageList():
+	for pkgCs in self.iterNewPackageList():
 	    name = pkgCs.getName()
 	    oldVer = pkgCs.getOldVersion()
 	    ver = pkgCs.getNewVersion()
@@ -448,7 +448,7 @@ class ChangeSet:
 			    # this replaces the existing file 
 			    self.addFile(fileId, oldVer, newVer, csInfo)
 
-	for pkgCs in self.getNewPackageList():
+	for pkgCs in self.iterNewPackageList():
 	    # the implemented of updateChangedPackage makes this whole thing
 	    # O(n^2) (n is the number of packages changed in pkgCs), which is
 	    # just silly. if large groups are added like this the effect could
