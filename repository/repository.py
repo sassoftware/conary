@@ -66,22 +66,32 @@ class Repository:
 	# Create the file objects we'll need for the commit. This handles
 	# files which were added and files which have changed
 	for (fileId, (oldVer, newVer, infoLine)) in cs.getFileList():
+	    skipRestoreContents = 0
 	    if oldVer:
 		fileDB = self._getFileDB(fileId)
+		oldfile = fileDB.getVersion(oldVer)
+
 		file = fileDB.getVersion(oldVer)
 		file.applyChange(infoLine)
-		del fileDB
+		
+		if isinstance(file, files.RegularFile) and \
+		   isinstance(oldfile, files.RegularFile) and \
+		   file.sha1() == oldfile.sha1():
+		    skipRestoreContents = 1
 	    else:
 		file = files.FileFromInfoLine(infoLine, fileId)
 
 	    assert(newVer.equal(fileMap[fileId][1]))
-	    fileList.append((fileId, newVer, file))
+	    fileList.append((fileId, newVer, file, skipRestoreContents))
 
 	return (pkgList, fileList, fileMap, oldFileList, oldPackageList)
 
     def commitChangeSet(self, sourcePathTemplate, cs, eraseOld = 0):
 	(pkgList, fileList, fileMap, oldFileList, oldPackageList) = \
 	    self._buildChangeSetJob(cs)
+
+	print len(fileList)
+	print fileList
 
 	# we can't erase the oldVersion for abstract change sets
 	assert(not(cs.isAbstract() and eraseOld))
@@ -96,7 +106,7 @@ class Repository:
 		pkgSet.addVersion(newVersion, newPkg)
 		pkgsDone.append((pkgSet, newVersion))
 
-	    for (fileId, fileVersion, file) in fileList:
+	    for (fileId, fileVersion, file, skipRestoreContents) in fileList:
 		infoFile = self._getFileDB(fileId)
 		pathInPkg = fileMap[fileId][0]
 		pkgName = fileMap[fileId][2]
@@ -107,7 +117,8 @@ class Repository:
 		    infoFile.addVersion(fileVersion, file)
 		    infoFile.close()
 		    filesDone.append(fileId)
-		    filesToArchive[pathInPkg] = ((file, pathInPkg, pkgName))
+		    filesToArchive[pathInPkg] = \
+			(file, pathInPkg, pkgName, skipRestoreContents)
 
 	    # sort paths and store in order (to make sure that directories
 	    # are stored before the files that reside in them in the case of
@@ -115,13 +126,13 @@ class Repository:
 	    pathsToArchive = filesToArchive.keys()
 	    pathsToArchive.sort()
 	    for pathInPkg in pathsToArchive:
-		(file, path, pkgName) = filesToArchive[pathInPkg]
+		(file, path, pkgName, skipRestore) = filesToArchive[pathInPkg]
 		if isinstance(file, files.SourceFile):
 		    basePkgName = pkgName.split(':')[-2]
 		    d = { 'pkgname' : basePkgName }
 		    path = (sourcePathTemplate) % d + "/" + path
 
-		self.storeFileFromChangeset(cs, file, path)
+		self.storeFileFromChangeset(cs, file, path, skipRestore)
 	except:
 	    # something went wrong; try to unwind our commits
 	    for fileId in filesDone:
@@ -296,8 +307,8 @@ class Repository:
 	fileDB = self._getFileDB(fileId)
 	return fileDB.getVersion(version)
 
-    def storeFileFromChangeset(self, chgSet, file, pathToFile):
-	if isinstance(file, files.RegularFile):
+    def storeFileFromChangeset(self, chgSet, file, pathToFile, skipContents):
+	if not skipContents and isinstance(file, files.RegularFile):
 	    f = chgSet.getFileContents(file.sha1())
 	    file.archive(self, f)
 	    f.close()
@@ -341,8 +352,8 @@ class Repository:
 # This is a repository which includes a mapping from a sha1 to a path
 class Database(Repository):
 
-    def storeFileFromChangeset(self, chgSet, file, pathToFile):
-	file.restore(chgSet, self.root + pathToFile)
+    def storeFileFromChangeset(self, chgSet, file, pathToFile, skipContents):
+	file.restore(chgSet, self.root + pathToFile, skipContents)
 	if isinstance(file, files.RegularFile):
 	    self.fileIdMap[file.sha1()] = pathToFile
 
