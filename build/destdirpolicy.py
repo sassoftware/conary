@@ -704,6 +704,28 @@ class NormalizeInitscripts(policy.Policy):
 	            self.macros['destdir'] + target)
 
 
+class NormalizeAppDefaults(policy.Policy):
+    """
+    There is some disagreement about where to put X app-defaults
+    files; this policy resolves that disagreement, and no exceptions
+    are recommended.
+    """
+    def do(self):
+        e = '%(destdir)s/%(sysconfdir)s/X11/app-defaults' % self.macros
+        if not os.path.isdir(e):
+            return
+
+        x = '%(destdir)s/%(x11prefix)s/lib/X11/app-defaults' % self.macros
+        log.warning('app-default files misplaced in'
+                    ' %(sysconfdir)s/X11/app-defaults' % self.macros)
+        if os.path.islink(x):
+            util.remove(x)
+        util.mkdirChain(x)
+        for file in os.listdir(e):
+            util.rename(util.joinPaths(e, file),
+                        util.joinPaths(x, file))
+
+
 class RelativeSymlinks(policy.Policy):
     """
     Makes all symlinks relative; create absolute symlinks in your
@@ -745,6 +767,7 @@ def DefaultPolicy(recipe):
 	NormalizeManPages(recipe),
 	NormalizeInfoPages(recipe),
 	NormalizeInitscripts(recipe),
+        NormalizeAppDefaults(recipe),
 	RelativeSymlinks(recipe),
     ]
 
