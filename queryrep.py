@@ -57,8 +57,13 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
 
 	for troveName in troves:
             if not flavors[troveName]:
-                log.error('No versions for "%s" were found in the repository',
-                          troveName)
+		if all or leaves:
+		    log.error('No versions for "%s" were found in the '
+			      'repository', troveName)
+		else:
+		    log.error('No versions with label "%s" for "%s" were '
+			      'found in the repository.', 
+			      cfg.installLabel.asString(), troveName)
                 continue
 
 	    versionStrs = {}
