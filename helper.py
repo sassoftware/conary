@@ -11,11 +11,12 @@ import repository
 import versions
 
 def findPackage(repos, packageNamespace, defaultBranch, name, 
-		versionStr = None, forceGroup = 0):
+		versionStr = None, forceGroup = 0, oneMatch = 1):
     """
     Looks up a package in the given repository based on the name and
     version provided. If any errors are occured, PackageNotFound is
-    raised with an appropriate error message.
+    raised with an appropriate error message. Multiple matches could
+    be found if versionStr refers to a branch nickname.
 
     @param repos: Repository to look for the package in
     @type repos: repository.Repository
@@ -29,7 +30,7 @@ def findPackage(repos, packageNamespace, defaultBranch, name,
     @type version: str
     @param forceGroup: If true the name should specify a group
     @type forceGroup: boolean
-    @rtype: package.Package or None
+    @rtype: list of package.Package
     """
 
     if name[0] != ":":
@@ -46,22 +47,51 @@ def findPackage(repos, packageNamespace, defaultBranch, name,
 	    raise PackageNotFound,  \
 		    "only groups may be checked out of the repository"
 
-    if not versionStr:
-	version = defaultBranch
+    # a version is a branch nickname if
+    #   1. it exists
+    #   2. it doesn't being with / (it isn't fully qualified)
+    #   3. it only has one element (no /)
+    #   4. it contains an @ sign
+    if versionStr and versionStr[0] != "/" and  \
+	    (versionStr.find("/") == -1) and versionStr.count("@"):
+	try:
+	    nick = versions.BranchName(versionStr)
+	except versions.ParseError:
+	    raise PackageMissing, "invalid version %s" % versionStr
+
+	branchList = repos.getPackageNickList(name, nick)
+	if not branchList:
+	    raise PackageMissing, "branch %s does not exist for package %s" \
+			% (str(nick), name)
+
+	pkgList = []
+	for branch in branchList:
+	    pkgList.append(repos.getLatestPackage(name, branch))
     else:
-	if versionStr[0] != "/":
-	    versionStr = defaultBranch.asString() + "/" + versionStr
-	version = versions.VersionFromString(versionStr)
+	if (not versionStr or versionStr[0] != "/") and (not defaultBranch):
+	    if not defaultBranch:
+		raise PackageNotFound, \
+		    "fully qualified version or branch nickname expected"
 
-    try:
-	if version.isBranch():
-	    pkg = repos.getLatestPackage(name, version)
+	if not versionStr:
+	    version = defaultBranch
 	else:
-	    pkg = repos.getPackageVersion(name, version)
-    except repository.PackageMissing, e:  
-	raise PackageNotFound, str(e)
+	    if versionStr[0] != "/":
+		versionStr = defaultBranch.asString() + "/" + versionStr
 
-    return pkg
+	    version = versions.VersionFromString(versionStr)
+
+	try:
+	    if version.isBranch():
+		pkg = repos.getLatestPackage(name, version)
+	    else:
+		pkg = repos.getPackageVersion(name, version)
+	except repository.PackageMissing, e:  
+	    raise PackageNotFound, str(e)
+
+	pkgList = [ pkg ]
+
+    return pkgList
 
 class PackageNotFound(Exception):
 
