@@ -370,7 +370,7 @@ def addFile(file):
 
     for (fileId, path, version) in state.iterFileList():
 	if path == file:
-	    log.error("file %s is already part of this source package" % path)
+	    log.error("file %s is already part of this source component" % path)
 	    return
 
     fileId = cook.makeFileId(os.getcwd(), file)
