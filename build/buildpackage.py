@@ -57,9 +57,10 @@ class BuildPackage(dict):
 
         @param path: the destination of the device node in the package
         """
+        f = BuildDeviceFile(devtype, major, minor, owner, group, perms)
 	# blech.
 	f.realPath = None
-	self[path] = BuildDeviceFile(devtype, major, minor, owner, group, perms)
+	self[path] = f
 
     def getName(self):
         """
@@ -111,8 +112,7 @@ class AutoBuildPackage:
 	    for comp in self.compFilters:
 		name = self._getname(main.name, comp.name)
 		if name not in self.packages:
-		    package = BuildPackage(name, version)
-		    self.packages[name] = package
+		    self.packages[name] = BuildPackage(name, version)
 		if main not in self.packageMap:
 		    self.packageMap[main] = {}
 		self.packageMap[main][comp] = self.packages[name]
