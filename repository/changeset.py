@@ -92,14 +92,16 @@ class ChangeSetNewPackageList(dict, streams.InfoStream):
 	    self.thaw(data)
 	    
 
-_STREAM_CS_PRIMARY = 1
-_STREAM_CS_PKGS    = 2
+_STREAM_CS_PRIMARY  = 1
+_STREAM_CS_PKGS     = 2
+_STREAM_CS_OLD_PKGS = 3
 
 class ChangeSet(streams.LargeStreamSet):
 
     streamDict = { 
         _STREAM_CS_PRIMARY :(streams.ReferencedTroveList, "primaryTroveList" ),
         _STREAM_CS_PKGS    :(ChangeSetNewPackageList,     "newPackages"      ),
+        _STREAM_CS_OLD_PKGS:(streams.ReferencedTroveList, "oldPackages"      ),
     }
 
     def isAbsolute(self):
@@ -245,19 +247,6 @@ class ChangeSet(streams.LargeStreamSet):
 
 	rc = []
 
-	for pkg in self.iterNewPackageList():
-	    s = pkg.freeze()
-	    rc.append("PKG %d\n" % len(s))
-            rc.append(s)
-
-	for (pkgName, version, flavor) in self.getOldPackageList():
-	    if flavor:
-		rc.append("PKG RMVD %s %s %s\n" % 
-			  (pkgName, version.freeze(), flavor.freeze()))
-	    else:
-		rc.append("PKG RMVD %s %s\n" % 
-			  (pkgName, version.freeze()))
-	
 	fileList = [ None,]
 	totalLen = 0
 	for (fileId, (oldVersion, newVersion, csInfo)) in self.files.iteritems():
@@ -556,7 +545,6 @@ class ChangeSet(streams.LargeStreamSet):
 
     def __init__(self, data = None):
 	streams.LargeStreamSet.__init__(self, data)
-	self.oldPackages = []
 	self.files = {}
 	self.earlyFileContents = {}
 	self.lateFileContents = {}
@@ -648,40 +636,7 @@ class ChangeSetFromFile(ChangeSet):
 	while line:
 	    header = line[:-1]
 
-	    if header.startswith("PRIMARIES "):
-		size = int(header.split()[1])
-		if size:
-		    buf = control.read(size)
-		    items = buf.split("\0")
-
-		    assert(len(items) % 3 == 0)
-		    i = 0
-		    while i < len(items):
-			name = items[i]
-			version = items[i + 1]
-			flavor = items[i + 2]
-			i += 3
-			version = versions.VersionFromString(version)
-			if flavor:
-			    flavor = deps.ThawDependencySet(flavor)
-			else:
-			    flavor = None
-			self.primaryPackageList.append((name, version, flavor))
-	    elif header.startswith("PKG RMVD "):
-		fields = header.split()
-		(pkgName, verStr) = fields[2:4]
-		version = versions.ThawVersion(verStr)
-		if len(fields) == 5:
-		    flavor = deps.ThawDependencySet(fields[4])
-		else:
-		    flavor = None
-		self.oldPackage(pkgName, version, flavor)
-	    elif header.startswith("PKG "):
-		size = int(header.split()[1])
-		buf = control.read(size)
-		pkg = trove.ThawTroveChangeSet(buf)
-		self.newPackage(pkg)
-	    elif header.startswith("FILES "):
+	    if header.startswith("FILES "):
 		size = int(header.split()[1])
 
 		buf = control.read(size)
