@@ -294,7 +294,9 @@ class FileContainer:
 	    self.close()
 
     def fileList(self):
-	return self.entries.keys()
+        files = self.entries.keys()
+        files.sort()
+	return files
 
     # file is a python file object which refers to the file container
     # if that file is empty (size 0) the file container is immediately
