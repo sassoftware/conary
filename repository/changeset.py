@@ -72,17 +72,16 @@ class ChangeSet:
 	new = csPkg.getNewVersion()
 	assert(not old or old.timeStamp)
 	assert(new.timeStamp)
-	assert(not self.newPackages.has_key(csPkg.getName()))
 
-	self.newPackages[csPkg.getName()] = csPkg
+	self.newPackages[(csPkg.getName(), csPkg.getNewVersion())] = csPkg
 
 	if csPkg.isAbstract():
 	    self.abstract = 1
 	if (old and old.isLocal()) or new.isLocal():
 	    self.local = 1
 
-    def delNewPackage(self, name):
-	del self.newPackages[name]
+    def delNewPackage(self, name, version):
+	del self.newPackages[(name, version)]
 
     def oldPackage(self, name, version):
 	assert(version.timeStamp)
@@ -91,11 +90,8 @@ class ChangeSet:
     def iterNewPackageList(self):
 	return self.newPackages.itervalues()
 
-    def getNewPackage(self, name):
-	return self.newPackages[name]
-
-    def hasNewPackage(self, name):
-	return self.newPackages.has_key(name)
+    def getNewPackageVersion(self, name, version):
+	return self.newPackages[(name, version)]
 
     def getOldPackageList(self):
 	return self.oldPackages
@@ -139,7 +135,7 @@ class ChangeSet:
 	return self.files.has_key(fileId)
 
     def remapPaths(self, map):
-	for pkgCs in self.newPackages.values():
+	for pkgCs in self.newPackages.itervalues():
 	    dict = { 'pkgname' : pkgCs.getName().split(":")[0],
 		     'branchnick' : 
 			str(pkgCs.getNewVersion().branch().branchNickname()) }
@@ -151,7 +147,7 @@ class ChangeSet:
 	    f.write("\t%s %s\n" % (pkgName, version.asString()))
 	f.write("\n")
 
-	for pkg in self.newPackages.values():
+	for pkg in self.newPackages.itervalues():
 	    pkg.formatToFile(self, cfg, f)
 	for (pkgName, version) in self.oldPackages:
 	    f.write(pkgName, "removed\n", 

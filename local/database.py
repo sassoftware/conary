@@ -160,11 +160,10 @@ class AbstractDatabase(repository.AbstractRepository):
 	remove = {}
 	for (name, version) in cs.getPrimaryPackageList():
 	    try:
-		pkgCs = cs.getNewPackage(name)
+		pkgCs = cs.getNewPackageVersion(name, version)
 	    except KeyError:
 		continue
 
-	    assert(pkgCs.getNewVersion() == version)
 	    oldVersion = pkgCs.getOldVersion()
 	    if not oldVersion: continue
 
