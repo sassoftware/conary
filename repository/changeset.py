@@ -8,6 +8,7 @@ import files
 import package
 import versions
 import os
+import repository
 
 class ChangeSet:
 
@@ -55,14 +56,20 @@ class ChangeSet:
 	raise NotImplementedError
 
     def addFile(self, fileId, oldVersion, newVersion, csInfo):
+	assert(not oldVersion or oldVersion.timeStamp)
+	assert(newVersion.timeStamp)
 	self.files[fileId] = (oldVersion, newVersion, csInfo)
     
-    def newPackage(self, pkg):
-	self.newPackages.append(pkg)
-	if pkg.isAbstract():
+    def newPackage(self, csPkg):
+	assert(not csPkg.getOldVersion() or csPkg.getOldVersion().timeStamp)
+	assert(csPkg.getNewVersion().timeStamp)
+
+	self.newPackages.append(csPkg)
+	if csPkg.isAbstract():
 	    self.abstract = 1
 
     def oldPackage(self, name, version):
+	assert(version.timeStamp)
 	self.oldPackages.append((name, version))
 
     def getNewPackageList(self):
@@ -71,8 +78,14 @@ class ChangeSet:
     def getOldPackageList(self):
 	return self.oldPackages
 
-    def addFileContents(self, hash):
-	self.fileContents.append(hash)
+    def addFileContents(self, hash, contents):
+	self.fileContents[hash] = contents
+
+    def getFileContents(self, hash):
+	return self.fileContents[hash].get()
+
+    def hasFileContents(self, hash):
+	return self.fileContents.has_key(hash)
 
     def getFileList(self):
 	return self.files.items()
@@ -120,7 +133,7 @@ class ChangeSet:
 
 	    csf.addFile("SRSCHANGESET", self.headerAsString(), "")
 
-	    for hash in self.fileContents:
+	    for hash in self.fileContents.keys():
 		f = self.getFileContents(hash)
 		csf.addFile(hash, f, "")
 		f.close()
@@ -192,35 +205,21 @@ class ChangeSet:
 	return inversion
 
     def __init__(self):
-	assert(self.__class__ != ChangeSet)
 	self.newPackages = []
 	self.oldPackages = []
 	self.files = {}
-	self.fileContents = []
+	self.fileContents = {}
 	self.abstract = 0
-
-class ChangeSetFromFilesystem(ChangeSet):
-
-    def getFileContents(self, fileId):
-	return open(self.fileMap[fileId])
-
-    def hasFileContents(self, fileId):
-	return self.fileMap.has_key(fileId)
-
-    def addFilePointer(self, fileId, path):
-	self.fileMap[fileId] = path
-
-    def __init__(self):
-	self.fileMap = {}
-	ChangeSet.__init__(self)
 
 class ChangeSetFromRepository(ChangeSet):
 
-    def getFileContents(self, fileId):
-	return self.repos.pullFileContentsObject(fileId)
-
-    def hasFileContents(self, fileId):
-	return self.repos.hasFileContents(fileId)
+    def newPackage(self, pkg):
+	# add the time stamps to the package version numbers
+	pkg.changeOldVersion(self.repos.getFullVersion(pkg.getName(),
+						       pkg.getOldVersion()))
+	pkg.changeNewVersion(self.repos.getFullVersion(pkg.getName(),
+						       pkg.getNewVersion()))
+	ChangeSet.newPackage(self, pkg)
 
     def __init__(self, repos):
 	self.repos = repos
@@ -228,11 +227,9 @@ class ChangeSetFromRepository(ChangeSet):
 
 class ChangeSetFromAbstractChangeSet(ChangeSet):
 
-    def getFileContents(self, fileId):
-	return self.absCS.getFileContents(fileId)
-
-    def hasFileContents(self, fileId):
-	return self.absCS.hasFileContents(fileId)
+    def addFileContents(self, hash):
+	return ChangeSet.addFileContents(hash, 
+			    repostitory.FileContentsFromChangeSet(cs, hash))
 
     def __init__(self, absCS):
 	self.absCS = absCS
@@ -334,20 +331,21 @@ def fileChangeSet(fileId, old, new):
 # expects a list of (pkg, fileMap) tuples
 #
 def CreateFromFilesystem(pkgList):
-    cs = ChangeSetFromFilesystem()
+    cs = ChangeSet()
 
     for (pkg, fileMap) in pkgList:
         version = pkg.getVersion()
 	(pkgChgSet, filesNeeded) = pkg.diff(None, abstract = 1)
 	cs.newPackage(pkgChgSet)
 
-	for (fileId, oldVersion, newVersion) in filesNeeded:
+	for (fileId, oldVersion, newVersion, path) in filesNeeded:
 	    (file, realPath, filePath) = fileMap[fileId]
 	    (filecs, hash) = fileChangeSet(fileId, None, file)
 	    cs.addFile(fileId, oldVersion, newVersion, filecs)
 
 	    if hash:
-		cs.addFilePointer(hash, realPath)
+		cs.addFileContents(hash, 
+			  repository.FileContentsFromFilesystem(realPath))
 
     return cs
 
@@ -392,7 +390,7 @@ def CreateAgainstLocal(cfg, db, pkgList):
 	(pkgChgSet, filesNeeded) = localPkg.diff(dbPkg)
 	cs.newPackage(pkgChgSet)
 
-	for (fileId, oldVersion, newVersion) in filesNeeded:
+	for (fileId, oldVersion, newVersion, path) in filesNeeded:
 	    (dbFile, localFile, fullPath)  = changedFiles[fileId]
 	    (filecs, hash) = fileChangeSet(fileId, dbFile, localFile)
 	    cs.addFile(fileId, oldVersion, newVersion, filecs)
