@@ -182,8 +182,7 @@ class NamedPipe(File):
 
     def copy(self, source, target):
 	if not os.path.exists(target):
-	    # FIXME os.mknod is in 2.3
-	    os.system("mknod %s p" % target)
+	    os.mkfifo(target)
 
     def __init__(self, path, version = None, info = None):
 	File.__init__(self, path, version, info)
@@ -218,6 +217,7 @@ class DeviceFile(File):
 
     def copy(self, source, target):
 	if not os.path.exists(target):
+	    # FIXME os.mknod is in 2.3
 	    os.system("mknod %s %c %d %d" % (target, self.type, self.major,
 					    self.minor))
 
