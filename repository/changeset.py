@@ -21,16 +21,18 @@ class ChangeSet:
 		assert(not pkg.getChangedFileList())
 		assert(not pkg.getOldFileList())
 
+	    list = pkg.getNewFileList() + pkg.getChangedFileList()
+
 	    # new and changed files need to have a file entry for the right 
 	    # version along with the contents for files which have any
-	    for (fileId, path, version) in pkg.getNewFileList():
+	    for (fileId, path, version) in list:
 		assert(self.files.has_key(fileId))
 		(oldVersion, newVersion, info) = self.files[fileId]
 		assert(newVersion.equal(version))
 
-		file = files.FileFromInfoLine(info, fileId)
-		if isinstance(file, files.RegularFile) and file.sha1():
-		    assert(self.hasFileContents(file.sha1()))
+		l = info.split()
+		if (l[0] == "src" or l[0] == "f") and l[1] != "-":
+		    assert(self.hasFileContents(l[1]))
 
 	    # old files should not have any file entries
 	    for fileId in pkg.getOldFileList():
@@ -237,8 +239,8 @@ class ChangeSetFromFile(ChangeSet):
 		if oldVerStr == "(none)":
 		    oldVersion = None
 		else:
-		    oldVersion = versions.VersionFromString(oldVerStr)
-		newVersion = versions.VersionFromString(newVerStr)
+		    oldVersion = versions.ThawVersion(oldVerStr)
+		newVersion = versions.ThawVersion(newVerStr)
 		self.addFile(fileId, oldVersion, newVersion, lines[i][:-1])
 		i = i + 1
 	    else:
@@ -258,7 +260,7 @@ def fileChangeSet(fileId, old, new):
     if old and old.__class__ == new.__class__:
 	diff = new.diff(old)
 	if isinstance(new, files.RegularFile) and      \
-		  isinstance(old, files.RegularFile) \
+		  isinstance(old, files.RegularFile)   \
 		  and new.sha1() != old.sha1():
 	    hash = new.sha1()
     else:
