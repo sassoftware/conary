@@ -59,11 +59,11 @@ class TagFile(conarycfg.ConfigFile):
                 if key == 'self':
                     if warn:
                         # at cook time
-                        log.warn('change "implements self" to'
-                                 ' "implements handler" in %s' %filename)
+                        log.warning('change "implements self" to'
+                                    ' "implements handler" in %s' %filename)
                         #raise conarycfg.ParseError, \
                         #    'change "implements self" to "implements handler" in %s' %filename
-                    key == 'handler'
+                    key = 'handler'
 		if key not in self.implementsCheck:
 		    raise conarycfg.ParseError, \
 			'unknown type %s in "implements %s"' %(key, item)
