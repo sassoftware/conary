@@ -14,6 +14,11 @@ configuration sufficient to build.
 """
 
 class Flag:
+    """
+    Implements the object for a single flag; contains the value
+    of the flag, and optionally a short summary (a sentence
+    fragment) and a longer description (can be multiple paragraphs).
+    """
     def __init__(self, value):
         self.value = value
         self.short = ""
@@ -42,7 +47,8 @@ class UseClass:
     Magic is used to make the initialization of the object easy.
     """
 
-    def __init__(self):
+    def __init__(self, showdefaults=True):
+	self.showdefaults = showdefaults
         self.initialized = False
 	self.frozen = False
         self.flags = {}
@@ -98,36 +104,95 @@ def _addDocs(obj):
     keys.sort()
     for key in keys:
         flag = obj.flags[key]
+	dflt = ''
+	if obj.showdefaults:
+	    dflt = 'Default=C{%s}; ' %str(flag.value)
         desc = flag.short
         if not desc:
             desc = '%s flag' %key
-        __doc__ += '  - C{%s}: %s.  Default=C{%s}\n'% (key, desc, str(flag.value))
+        __doc__ += '@flag %s: %s%s.\n'% (key, dflt, desc)
+    __doc__ += '\n\nMore details:\n\n'
+    for key in keys:
+        flag = obj.flags[key]
         if flag.long:
-            __doc__ += '      - ' + flag.long + '\n'
+            __doc__ += 'C{'+key+'}: ' + flag.long + '\n\n'
 
+
+__extra_epydoc_fields__ = [
+    ('flag', 'Flag', 'Flags')
+]
 __doc__ += """
+@sort: Use, Arch
 @type Use: UseClass
 @var Use: Set of flags defined for this build, with their boolean status.
 The Use flags have the following meanings:
 """
-Use = UseClass()
+Use = UseClass(showdefaults=True)
+
 Use.pcre = True
-Use.pcre.setLongDoc('Use the Perl-compatible regex library')
-Use.pcre.setLongDoc('This is a long description.  It has a lot of words, '
-                    'background, etc.  blah blah blah')
+Use.pcre.setShortDoc('Use the Perl-compatible regex library')
+Use.pcre.setLongDoc("""
+The perl-compatible regular expression library can be used by
+several programs to increase the power and uniformity of
+available regular expressions.  It adds a dependency and should
+generally be disabled for embedded builds.
+""")
+
 Use.gcj = True
-Use.gcj.setShortDoc('Include gcj (Java) support in gcc; use gcj to enable Java')
+Use.gcj.setShortDoc('Use the gcj implementation of Java')
+Use.gcj.setLongDoc("""
+Include gcj (Java) support in gcc;
+use gcj to enable Java in other applications.
+""")
+
 Use.gnat = False
+Use.gnat.setShortDoc('Enable the gnat implementation of Ada')
+Use.gnat.setLongDoc("""
+Include gnat (Ada) support in gcc;
+use gnat to enable Ada in other applications.
+""")
+
 Use.selinux = False
+Use.selinux.setShortDoc('Enable support for SELinux')
+Use.selinux.setLongDoc("""
+Build support for the Security-Enhanced Linux Role-based Access
+Control system.  Adds dependencies on particular filesystems,
+Linux 2.6 or later kernel, and multiple SELinux tools.  Unlikely
+to be appropriate for deeply embedded systems.
+""")
+
 Use.pam = True
+Use.pam.setShortDoc('Enable support for PAM')
+Use.pam.setLongDoc("""
+Pluggable Authentication Modules (PAM) makes most system authentication
+happen in a unified way, but adds a dependency on PAM libraries, and
+requires shared libraries.  You may want to disable PAM during the
+early stages of bootstrapping a new architecture.
+""")
+
 Use.dietlibc = False
 Use.bootstrap = False
 Use.python = True
 Use.perl = True
 Use.readline = True
 Use.gdbm = True
+
 # flags to use for special situations
-Use.builddocs = True	# embedded targets should have False
+Use.builddocs = True
+Use.builddocs.setShortDoc('Build documentation as well as binaries')
+Use.builddocs.setLongDoc("""
+Some packages have documentation that needs to be built, not just
+installed.  Examples include SGML, TeX, groff documents other than
+man pages, and texinfo (but not precompiled info pages).  This does
+not include man pages, precompiled info pages, and other files
+installed on the system in essentially the same form they are
+provided.  Simple substitution (sed -i 's/@FOO@/foo/) does not
+count as "building documentation".
+
+The purpose of this flag is to disable unnecessary build depedencies
+for embedded targets.
+""")
+
 # temporarily disabled until we build appropriate packages
 Use.tcl = False
 Use.tk = False
@@ -144,10 +209,10 @@ _addDocs(Use)
 
 __doc__ += """
 @type Arch: UseClass
-@var Arch: Set of architectures defined for this build, with their boolean status
+@var Arch: Set of architectures defined for this build, with their boolean status.
 The Arch flags have the following meanings:
 """
-Arch = UseClass()
+Arch = UseClass(showdefaults=False)
 Arch.i386 = True
 Arch.i486 = True
 Arch.i586 = True
@@ -160,6 +225,7 @@ Arch.ia64 = False
 Arch.s390 = False
 Arch.s390x = False
 Arch.x86 = Arch.i386 | Arch.i486 | Arch.i586 | Arch.i686
+Arch.x86.setShortDoc('True if any IA32 architecture is set')
 Arch._freeze()
 _addDocs(Arch)
 
