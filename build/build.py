@@ -841,6 +841,26 @@ class TestSuite(_FileAction):
     command_path = '%(thistestdir)s/conary-test-command' 
     testsuite_path = '%(thistestdir)s/conary-testsuite-%(identifier)s'
 
+    commandScript = '''#!/bin/sh -x
+# run this script to execute the test suite
+failed=0
+for test in conary-testsuite-*; do
+    ./$test || failed=$?
+done
+exit $failed
+'''
+
+    testSuiteScript = '''#!/bin/sh -x
+# testsuite 
+pushd ./%(dir)s
+# BEGIN Recipe supplied code 
+%(command)s
+# END Recipe supplied code
+exitstatus=$?
+popd
+exit $exitstatus
+'''
+
     def __init__(self, recipe, *args, **keywords):
         _FileAction.__init__(self, recipe, *args, **keywords)
 	if len(args) > 2:
@@ -865,16 +885,7 @@ class TestSuite(_FileAction):
 	if not os.path.exists(fullpath):
 	    util.mkdirChain(os.path.dirname(fullpath))
 	    f = open(fullpath, 'w')
-	    f.write('''#!/bin/sh -x
-# run this script to execute the test suite
-failed=0
-for test in conary-testsuite-*; do
-    if ! ./$test; then
-	failed=$?
-    fi
-done
-exit $failed
-''')
+	    f.write(self.commandScript)
 	    self.chmod(self.macros.destdir, path)
 	    self.setComponents(path)
 
@@ -891,16 +902,7 @@ exit $failed
 	fullpath = self.macros.destdir + path
 	if not os.path.exists(fullpath):
 	    f = open(fullpath, 'w')
-	    f.write('''#!/bin/sh -x
-# testsuite 
-pushd ./%(dir)s
-# BEGIN Recipe supplied code 
-%(command)s
-# END Recipe supplied code
-exitstatus=$?
-popd
-exit $exitstatus
-''' % self.macros)
+	    f.write(self.testSuiteScript % self.macros)
 	    self.chmod(self.macros.destdir, path)
     
     def mungeMakeCommand(self):
