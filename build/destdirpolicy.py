@@ -60,7 +60,7 @@ class NormalizeGzip(policy.Policy):
     ]
     def doFile(self, path):
 	util.execute('gunzip %s/%s' %(self.macros['destdir'], path));
-	util.execute('gzip -n -9 %s/%s' %(self.macors['destdir'], path[:-3]))
+	util.execute('gzip -n -9 %s/%s' %(self.macros['destdir'], path[:-3]))
 
 class NormalizeManPages(policy.Policy):
     """
