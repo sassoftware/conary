@@ -325,6 +325,16 @@ class Database(Repository):
 
 	os.rename(newStatus, self.rollbackStatus)
 
+    def getRollbackList(self):
+	f = open(self.rollbackStatus)
+	(first, last) = f.read()[:-1].split()
+	first = int(first)
+	last = int(last)
+
+	list = []
+	for i in range(first, last):
+	    list.append(self.rollbackCache + "/r.%d" % i)
+
     def __init__(self, root, path, mode = "c"):
 	self.root = root
 	fullPath = root + "/" + path
