@@ -74,7 +74,7 @@ def cook(repos, cfg, recipeFile):
 	fileList = [ (f, recipeFile, recipeName) ]
 
 	for file in recipeObj.allSources():
-            src = lookaside.findAll(file, recipeObj.name, srcdirs)
+            src = lookaside.findAll(cfg, file, recipeObj.name, srcdirs)
 	    srcName = os.path.basename(src)
 	    f = files.FileFromFilesystem(src, ident(srcName), type = "src")
 	    fileList.append((f, src, srcName))
