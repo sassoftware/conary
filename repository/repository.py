@@ -164,12 +164,15 @@ class Repository:
 	cs = changeset.ChangeSetFromRepository(self)
 
 	for (packageName, oldVersion, newVersion) in packageList:
+	    # look up these versions to get versions w/ timestamps
 	    pkgSet = self._getPackageSet(packageName)
 
 	    new = pkgSet.getVersion(newVersion)
+	    newVersion = pkgSet.getFullVersion(newVersion)
 	 
 	    if oldVersion:
 		old = pkgSet.getVersion(oldVersion)
+		oldVersion = pkgSet.getFullVersion(oldVersion)
 	    else:
 		old = None
 
@@ -464,6 +467,9 @@ class _PackageSet:
 	p = package.PackageFromFile(self.name, f1, version)
 	f1.close()
 	return p
+
+    def getFullVersion(self, version):
+	return self.f.getFullVersion(version)
 
     def hasVersion(self, version):
 	return self.f.hasVersion(version)
