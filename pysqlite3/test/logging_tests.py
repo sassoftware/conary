@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import testsupport
 import StringIO, unittest
-import sqlite
+import sqlite3 as sqlite
 
 class LogFileTemplate:
     def write(self, s):

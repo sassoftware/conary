@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import testsupport
 import os, unittest, sys
-import sqlite
+import sqlite3 as sqlite
 
 class PgResultSetTests(unittest.TestCase, testsupport.TestSupport):
     def setUp(self):

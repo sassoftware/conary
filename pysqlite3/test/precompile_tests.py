@@ -15,7 +15,7 @@
 
 import testsupport
 import unittest
-import sqlite
+import sqlite3 as sqlite
 
 class PrecompiledTests(unittest.TestCase, testsupport.TestSupport):
     def setUp(self):

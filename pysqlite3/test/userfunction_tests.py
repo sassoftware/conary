@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import testsupport
 import os, string, sys, types, unittest
-import sqlite
+import sqlite3 as sqlite
 
 def intreturner(x):
     return int(x) * 2

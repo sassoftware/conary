@@ -2,8 +2,8 @@
 #-*- coding: ISO-8859-1 -*-
 import testsupport
 import os, string, sys, types, unittest
-import sqlite
-import _sqlite
+import sqlite3 as sqlite
+import _sqlite3 as _sqlite
 
 try:
     from mx.DateTime import Date, Time, DateTime, DateTimeDelta, DateFrom, \

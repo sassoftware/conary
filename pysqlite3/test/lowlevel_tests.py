@@ -9,8 +9,8 @@ facilitate coverage testing with the help of gcov.
 from __future__ import nested_scopes
 import testsupport
 import os, unittest, re
-import _sqlite
-from sqlite import ProgrammingError
+import _sqlite3 as _sqlite
+from sqlite3 import ProgrammingError
 
 class lowlevelTestCases(unittest.TestCase, testsupport.TestSupport):
     def setUp(self):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import testsupport
 import os, string, sys, types, unittest, weakref
-import sqlite
+import sqlite3 as sqlite
 
 class DBAPICompliance(unittest.TestCase):
     def CheckAPILevel(self):
