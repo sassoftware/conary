@@ -72,8 +72,12 @@ class SourceState:
 	    elif fields[0] == "branch":
 		self.setTroveBranch(versions.VersionFromString(fields[1]))
 	    elif fields[0] == "file":
-		self.addFile(fields[1], fields[2], 
-			     versions.VersionFromString(fields[3]))
+		if fields[3] == "@NEW@":
+		    version = None
+		else:
+		    version = versions.VersionFromString(fields[3])
+
+		self.addFile(fields[1], fields[2], version)
 
     def write(self, filename):
 	f = open(filename, "w")
@@ -82,7 +86,10 @@ class SourceState:
 	f.write("branch %s\n" % self.troveBranch.asString())
 
 	for (fileId, (path, version)) in self.files.iteritems():
-	    f.write("file %s %s %s\n" % (fileId, path, version.asString()))
+	    if version:
+		f.write("file %s %s %s\n" % (fileId, path, version.asString()))
+	    else:
+		f.write("file %s %s %s\n" % (fileId, path, "@NEW@"))
 
     def __init__(self, filename = None):
 	self.files = {}
@@ -222,9 +229,14 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 	# versions as those in the package at head
 	bail = 0
 	for (fileId, (path, version)) in state.getFileList():
-	    srcVersion = srcPkg.getFile(fileId)[1]
-	    if not version.equal(srcVersion):
-		log.error("%s is not at head; use update" % path)
+	    if not version:
+		assert(not srcPkg.hasFile(fileId))
+		# new file, it shouldn't be in the old package at all
+	    else:
+		srcFileVersion = srcPkg.getFile(fileId)[1]
+		if not version.equal(srcFileVersion):
+		    log.error("%s is not at head; use update" % path)
+		    bail = 1
     
 	if bail: return
 
@@ -260,7 +272,6 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
     state.setTroveVersion(newVersion)
 
     pkg = package.Package(state.getTroveName(), newVersion)
-    fileMap = {}
     changeSet = changeset.ChangeSet()
 
     foundDifference = 0
@@ -272,6 +283,18 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 
 	if path.endswith(".recipe"):
 	    f.isConfig(set = True)
+
+	if not version:
+	    # new file, so this is easy
+	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
+	    state.addFile(fileId, path, newVersion)
+	    newCont = filecontents.FromFilesystem(realPath)
+	    changeSet.addFileContents(f.sha1(), 
+				      changeset.ChangedFileTypes.file,
+				      newCont)
+	    pkg.addFile(fileId, path, newVersion)
+	    foundDifference = 1
+	    continue
 
 	duplicateVersion = cook.checkBranchForDuplicate(repos, 
 						    state.getTroveBranch(), f)
@@ -295,15 +318,13 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
 	else:
 	    pkg.addFile(f.id(), path, duplicateVersion)
 
-        fileMap[f.id()] = (f, realPath, path)
-
     (csPkg, filesNeeded, pkgsNeeded) = pkg.diff(srcPkg)
     assert(not pkgsNeeded)
     changeSet.newPackage(csPkg)
 
     return (foundDifference, state, changeSet, srcPkg)
 
-def commit(repos, cfg):
+def commit(repos):
     # we need to commit based on changes to the head of a branch
     result = buildChangeSet(repos, needsHead = True)
     if not result: return
@@ -316,7 +337,7 @@ def commit(repos, cfg):
 	repos.commitChangeSet(changeSet)
 	state.write("SRS")
 
-def diff(repos, cfg):
+def diff(repos):
 
     result = buildChangeSet(repos)
     if not result: return
@@ -328,10 +349,13 @@ def diff(repos, cfg):
     assert(len(packageChanges) == 1)
     pkgCs = packageChanges[0]
 
+    for (fileId, path, newVersion) in pkgCs.getNewFileList():
+	print "%s: new" % path
+
     for (fileId, path, newVersion) in pkgCs.getChangedFileList():
 	if not path:
 	    path = oldPackage.getFile(fileId)[0]
-	print "%s:" % path
+	print "%s: changed" % path
 
 	csInfo = changeSet.getFileChange(fileId)
 	print "    %s" % csInfo
@@ -346,7 +370,7 @@ def diff(repos, cfg):
 		print str
 		print
 	
-def update(repos, cfg):
+def update(repos):
     if not os.path.isfile("SRS"):
 	log.error("SRS file must exist in the current directory for source commands")
 	return
@@ -468,4 +492,27 @@ def update(repos, cfg):
     if fullyUpdated:
 	state.setTroveVersion(headVersion)
 
+    state.write("SRS")
+
+def addFile(repos, file):
+    if not os.path.isfile("SRS"):
+	log.error("SRS file must exist in the current directory for source commands")
+	return
+
+    state = SourceState("SRS")
+
+    if not os.path.exists(file):
+	log.error("files must be created before they can be added")
+	return
+    elif not os.path.isfile(file):
+	log.error("only normal files can be part of source packages")
+
+    for (fileId, (path, version)) in state.getFileList():
+	if path == file:
+	    log.error("file %s is already part of this source package" % path)
+	    return
+
+    fileId = cook.makeFileId(os.getcwd(), path)
+
+    state.addFile(fileId, file, None)
     state.write("SRS")
