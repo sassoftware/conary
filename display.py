@@ -22,7 +22,11 @@ def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
 		l = repos.getPackageVersionList(pkgName)
 		versions.versionSort(l)
 	    else:
-		l = ( repos.pkgLatestVersion(pkgName, cfg.defaultbranch), )
+                version = repos.pkgLatestVersion(pkgName, cfg.defaultbranch)
+                if version:
+                    l = ( version, )
+                else:
+                    l = ()
 	    
 	    for version in l:
 		print _pkgFormat % (
