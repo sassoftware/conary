@@ -10,6 +10,7 @@ ones) are hashable and implement __eq__().
 
 import copy
 import time
+import weakref
 
 class AbstractVersion(object):
 
@@ -17,7 +18,7 @@ class AbstractVersion(object):
     Ancestor class for all versions (as opposed to branches)
     """
 
-    __slots__ = ()
+    __slots__ = ( "__weakref__" )
 
     def __init__(self):
 	pass
@@ -54,7 +55,7 @@ class AbstractBranch(object):
     Ancestor class for all branches (as opposed to versions)
     """
 
-    __slots__ = ()
+    __slots__ = ( "__weakref__" )
 
     def __init__(self):
 	pass
@@ -268,7 +269,7 @@ class Version(object):
     ordering.
     """
 
-    __slots__ = ( "versions", "timeStamp" )
+    __slots__ = ( "versions", "timeStamp", "__weakref__" )
 
     def appendVersionRelease(self, version, release):
 	"""
@@ -573,7 +574,13 @@ class Version(object):
 def ThawVersion(ver):
     if ver == "@NEW@":
 	return NewVersion()
-    return _ThawVersion(ver)
+
+    if thawedVersionCache.has_key(ver):
+	return thawedVersionCache[ver]
+
+    v = _ThawVersion(ver)
+    thawedVersionCache[ver] = v
+    return v
 
 class _ThawVersion(Version):
 
@@ -600,6 +607,7 @@ class _ThawVersion(Version):
 def VersionFromString(ver, defaultBranch = None):
     if ver == "@NEW@":
 	return NewVersion()
+
     return _VersionFromString(ver, defaultBranch)
 
 class _VersionFromString(Version):
@@ -650,3 +658,5 @@ class ParseError(VersionsError):
 
     def __init__(self, str):
 	self.str = str
+
+thawedVersionCache = weakref.WeakValueDictionary()
