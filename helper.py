@@ -144,7 +144,7 @@ def nextVersion(repos, troveName, versionStr, troveFlavor, currentBranch,
 	    if version.onBranch(newVersionBranch) and \
 		version.sameVersion(newVersion) and \
 		(not lastOnBranch or version.isAfter(lastOnBranch)):
-		lastOnBranch = newVersion
+		lastOnBranch = version
 
 	if lastOnBranch:
 	    newVersion = lastOnBranch.copy()
