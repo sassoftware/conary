@@ -190,9 +190,11 @@ class ConaryClient:
             # don't install the redirection itself
             delDict[item] = True
 
+            followRedirect = True
+
             # but do remove the trove this redirection replaces. if it
             # isn't installed, we don't want this redirection or the
-            # item it points to
+            # items it points to
             if troveCs.getOldVersion():
                 oldItem = (troveCs.getName(), troveCs.getOldVersion(),
                            troveCs.getOldFlavor())
@@ -201,9 +203,24 @@ class ConaryClient:
                     cs.oldPackage(*oldItem)
                 else:
                     # erase the target(s) of the redirection
+                    followRedirect = False
                     for (name, changeList) in troveCs.iterChangedTroves():
                         for (changeType, version, flavor, byDef) in changeList:
                             delDict[(name, version, flavor)] = True
+
+            if followRedirect:
+                # now go through the targets of the redirection, remove them,
+                # and let them get readded later. this seems silly, but it
+                # lets the normal code which processes old versions be used
+                #
+                # the "remove them" bit is actually only needed for redirects
+                # built with the original cook code. modern redirects don't
+                # contain the extraneous bits to begin with.
+                for (name, changeList) in troveCs.iterChangedTroves():
+                    for (changeType, version, flavor, byDef) in changeList:
+                        if changeType == '-': continue
+                        delDict[(name, version, flavor)] = True
+                        troveList.append((name, version, flavor))
 
         for item in delDict.iterkeys():
             cs.delNewPackage(*item)
@@ -312,6 +329,9 @@ class ConaryClient:
                 #        labels = [ None ]
                 #    
                 #    pass
+
+        # remove duplicates
+        newItems = dict.fromkeys(newItems).keys()
 
         if keepExisting:
             for (name, version, flavor) in newItems:
