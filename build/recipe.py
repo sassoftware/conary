@@ -211,7 +211,6 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
 	    raise RecipeFileError("source component %s has multiple versions "
 				  "with label %s", component,
 				  cfg.buildLabel.asString())
-
 	sourceComponent = pkgs[0]
     except repository.TroveMissing:
         raise RecipeFileError, 'cannot find source component %s' % component
@@ -242,7 +241,8 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
         loader = RecipeLoader(recipeFile, cfg, repos, component)
     finally:
         os.unlink(recipeFile)
-    
+    recipe = loader.getRecipe()
+    recipe._trove = sourceComponent.copy()
     return (loader, sourceComponent.getVersion())
 
 def loadRecipe(file, sourcecomponent=None):
@@ -297,12 +297,14 @@ class _policyUpdater:
 
 class Recipe:
     """Virtual base class for all Recipes"""
+    _trove = None
+
     def __init__(self):
         assert(self.__class__ is not Recipe)
 
 class PackageRecipe(Recipe):
     buildRequires = []
-
+    
     def mainDir(self, new = None):
 	if new:
 	    self.theMainDir = new % self.macros

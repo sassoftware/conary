@@ -390,16 +390,27 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 		cfg.sourcePath % {'pkgname': recipeClass.name} ]
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
 
-    # populate the repository source lookaside cache from the :source component
-    # XXXXXXX Ack, this will get the latest version of file that's in a
-    #         :source component -- not the version of the file that comes
-    #         from the same version as the recipe we're currently cooking!
-    srcName = fullName + ':source'
-    try:
-        srcVersion = repos.getTroveLatestVersion(srcName, buildBranch)
-    except repository.TroveMissing:
-        srcVersion = None
-    if srcVersion:
+    # build a list containing this recipe class and any ancestor class
+    # from which it descends
+    classes = [ recipeClass ]
+    bases = list(recipeClass.__bases__)
+    while bases:
+        parent = bases.pop()
+        bases.extend(list(parent.__bases__))
+        if issubclass(parent, recipe.PackageRecipe):
+            classes.append(parent)
+
+    # reverse the class list, this way the files will be found in the
+    # youngest descendant first
+    classes.reverse()
+    
+    # populate the repository source lookaside cache from the :source
+    # components
+    for rclass in classes:
+        if not rclass._trove:
+            continue
+        srcName = rclass._trove.getName()
+        srcVersion = rclass._trove.getVersion()
         for f in repos.iterFilesInTrove(srcName, srcVersion, None,
                                         withFiles=True):
             fileId, path, version, fileObj = f
