@@ -290,11 +290,17 @@ def _copyVisit(arg, dirname, names):
     sourcelist = arg[0]
     sourcelen = arg[1]
     dest = arg[2]
+    filemode = arg[3]
+    dirmode = arg[4]
+    if dirmode:
+	os.chmod(dirname, dirmode)
     for name in names:
+	if filemode:
+	    os.chmod(dirname+os.sep+name, filemode)
 	sourcelist.append(os.path.normpath(
 	    dest + os.sep + dirname[sourcelen:] + os.sep + name))
 
-def copytree(sources, dest, symlinks=False):
+def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
     """
     Copies tree(s) from sources to dest, returning a list of
     the filenames that it has written.
@@ -305,15 +311,20 @@ def copytree(sources, dest, symlinks=False):
 	    dest = '%s/%s' %(dest, os.path.basename(source))
 	    log.debug('copying [tree] %s to %s', source, dest)
 	    shutil.copytree(source, dest, symlinks)
+	    if dirmode:
+		os.chmod(dest, dirmode)
 	    os.path.walk(source, _copyVisit,
-			 (sourcelist, len(source), dest))
+			 (sourcelist, len(source), dest, filemode, dirmode))
 	else:
 	    log.debug('copying [file] %s to %s', source, dest)
 	    shutil.copy2(source, dest)
 	    if dest.endswith('/'):
-		sourcelist.append(dest + os.sep + os.path.basename(source))
+		thisdest = dest + os.sep + os.path.basename(source)
 	    else:
-		sourcelist.append(dest)
+		thisdest = dest
+	    if filemode:
+		os.chmod(thisdest, filemode)
+	    sourcelist.append(thisdest)
     return sourcelist
 
 def checkPath(binary):

@@ -575,7 +575,9 @@ class InstallDocs(_FileAction):
     into the destdir in the appropriate directory.
     """
     keywords = {'devel' :  False,
-                'subdir':  ''}
+                'subdir':  '',
+		'mode': 0644,
+		'dirmode': 0755}
     
     def do(self, macros):
 	macros = macros.copy()
@@ -586,7 +588,9 @@ class InstallDocs(_FileAction):
 	dest = '%(destdir)s'%macros + base
 	util.mkdirChain(os.path.dirname(dest))
 	for path in self.paths:
-	    for newpath in util.copytree(path %macros, dest, True):
+	    for newpath in util.copytree(path %macros, dest, True,
+					 filemode=self.mode,
+					 dirmode=self.dirmode):
 		self.setComponents(newpath[destlen:])
 
     def __init__(self, *args, **keywords):
