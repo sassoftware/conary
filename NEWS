@@ -1,3 +1,15 @@
+Changes in 0.9.3:
+  * New "cvc annotate" feature
+  * Man page updates
+  * Changesets which remove a file and replace it now apply correctly.
+  * "cvc update" no longer complains and fails to update the CONARY
+    state file properly  when ownerships differ
+  * FileId generation now looks for previous versions of all the
+    packages that have just been created, not just the name of the
+    recipe.
+  * Cooking as root is no longer allowed
+  * Miscellaneous bug fixes.  
+
 Changes in 0.9.2:
  * Bug fixes:
    * Applying changesets that have more than one hard link groups
@@ -112,4 +124,3 @@ Changes in 0.6.6:
  * improved inline documentation
  * optimizations for both space and time
  * numerous bugfixes
-
