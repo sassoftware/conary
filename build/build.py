@@ -805,25 +805,27 @@ class Remove(BuildAction):
 
 class Replace(BuildAction):
 
-    r""" Substitute text in a file: 
-         C{Replace((<pattern>, <sub>)+, path+)} 
-         or C{Replace(<pattern>, <sub>, path+)}. 
-        
-         Replaces <sub> for <pattern> in files, using python regexp rules.  
-         Note that Replace cannot do multi line substitutions.  For complicated
-         replacements, sed is appropriate, however, Replace performs error
-         checking that sed does not.
-         
-         Remember that python will interpret \1-\7 as octal characters;
-         you must either escape the backslash: \\1, or make the string
-         raw by prepending r to the string (e.g. r.Replace('(a)', r'\1bc') 
+    r"""
+    Substitute text in a file: 
+    C{Replace(I{pattern}, I{sub}, I{path}+)} or
+    C{Replace((I{pattern}, I{sub})+, I{path}+)}.
+    
+    Replaces I{sub} for I{pattern} in files, using python regexp rules.  
+    Note that C{Replace()} cannot do multi-line substitutions.  For more
+    complicated replacements, sed is appropriate.  However, C{Replace()}
+    performs error checking that sed does not; C{Replace()} assumes by
+    default that you meant for substitutions to take place..
+    
+    Remember that python will interpret C{\1}-C{\7} as octal characters;
+    you must either escape the backslash: C{\\1} or make the string
+    raw by prepending C{r} to the string (e.g. C{r.Replace('(a)', r'\1bc'))}
  
-         @keyword lines: Determines the lines to which the replacement applies
-         @type lines: tuple (start, end) or int
-         @keyword allowNoChange: do not raise an error if <pattern> did not 
-                                 apply
-         @type allowNoChange: bool
-         @default allowNoChange: False
+    @keyword lines: Determines the lines to which the replacement applies
+    @type lines: tuple (start, end) or int
+    @default lines: all
+    @keyword allowNoChange: do not raise an error if C{I{pattern}} did not apply
+    @type allowNoChange: bool
+    @default allowNoChange: False
     """
         
 
@@ -851,13 +853,12 @@ class Replace(BuildAction):
         for pattern, sub in self.regexps:
             if self.octalchars.match(sub):
                 self.init_error(TypeError,
-                     "Found octal char in substitution string --  "
-                     " probably you forgot to make the string raw by "
-                     " prepending it with a r, eg r'foo' ")
+                    r'Illegal octal character in substitution string "%s":'
+                    r' prepend "r", as in r"\1"' %sub)
 
         if not args:
 	    self.init_error(TypeError, 
-                            'not enough arguments - no files supplied')
+                            'not enough arguments: no file glob supplied')
         self.paths = args[:]
         
         if self.lines:
@@ -867,7 +868,7 @@ class Replace(BuildAction):
                 self.min = self.max = self.lines
             if min(self.min, self.max, 1) != 1:
                 self.init_error(RuntimeError, 
-                                "r.Replace line indices start at 1")
+                                "Replace() line indices start at 1, like sed")
         else:
             self.min = self.max = None
 
@@ -1303,11 +1304,11 @@ class ConsoleHelper(BuildAction):
 
 
 def _expandPaths(paths, macros):
-    """ Expand braces, globs, and macros in path names, and root all
-        path names to either the build dir or dest dir.  
-        Relative paths (not starting with a /) are
-        relative to builddir.  All absolute paths to are relative to 
-        destdir.  
+    """
+    Expand braces, globs, and macros in path names, and root all path names
+    to either the build dir or dest dir.  Relative paths (not starting with
+    a /) are relative to builddir.  All absolute paths to are relative to 
+    destdir.  
     """
     destdir = macros.destdir
     builddir = macros.builddir
@@ -1315,8 +1316,10 @@ def _expandPaths(paths, macros):
     for path in paths:
         if path[0] == '/':
             if path.startswith(destdir):
-                log.warning("remove destdir from path name -- absolute"
-                            " paths are automatically within destdir ")
+                log.warning(
+                    "remove destdir from path name %s;"
+                    " absolute paths are automatically relative to destdir"
+                    %path)
             else:
                 path = destdir + path
         else:
@@ -1329,4 +1332,3 @@ def _expandPaths(paths, macros):
     if notfound:
         raise RuntimeError, "No such files %s" % ' '.join(notfound)
     return expPaths
-
