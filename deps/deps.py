@@ -152,6 +152,8 @@ class DependencyClass:
 	return val
 
     def __eq__(self, other):
+        if other is None:
+            return False
 	return self.tag == other.tag and \
 	       self.members == other.members
 
