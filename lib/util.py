@@ -29,7 +29,8 @@ def searchFile(file, searchdirs, error=None):
     if error: raise OSError, (errno.ENOENT, os.strerror(errno.ENOENT))
 
 def findFile(file, searchdirs):
-    s = searchFile(file, searchdirs, error=1)
+    return searchFile(file, searchdirs, error=1)
+    
 
 def excepthook(type, value, tb):
     sys.excepthook = sys.__excepthook__
