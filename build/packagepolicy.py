@@ -383,11 +383,39 @@ class TagDescription(policy.Policy):
 	    self.recipe.autopkg.pathMap[file].tags.set("tagdescription")
 
 
-class Tags(policy.Policy):
+class TagSpec(policy.Policy):
     """
     Apply tags defined by tag descriptions in both the current system
     and %(destdir)s to all the files in %(destdir)s.
     """
+    keywords = {
+	'included': {},
+	'excluded': {}
+    }
+
+    def updateArgs(self, *args, **keywords):
+	"""
+	Call as::
+	    C{TagSpec(I{tagname}, I{filterexp})}
+	or::
+	    C{TagSpec(I{tagname}, exceptions=I{filterexp})}
+	where C{I{filterexp}} is either a regular expression or a
+	tuple of C{(regexp[, setmodes[, unsetmodes]])}
+	"""
+	if args:
+	    args = list(args)
+	    tagname = args.pop(0)
+	    if args:
+		if tagname not in self.included:
+		    self.included[tagname] = []
+		self.included[tagname].append(args.pop())
+	    if 'exceptions' in keywords:
+		# not the usual exception handling
+		if tagname not in self.excluded:
+		    self.excluded[tagname] = []
+		self.excluded[tagname].append(keywords.pop('exceptions'))
+	policy.Policy.updateArgs(self, [], **keywords)
+
     def doProcess(self, recipe):
 	self.tagList = []
 	# read the system and %(destdir)s tag databases
@@ -397,21 +425,53 @@ class Tags(policy.Policy):
 		for filename in os.listdir(directory):
 		    path = util.joinPaths(directory, filename)
 		    self.tagList.append(tags.TagFile(path, recipe.macros))
+
+	# instantiate filters
+	d = {}
+	for tagname in self.included:
+	    l = []
+	    for item in self.included[tagname]:
+		l.append(filter.Filter(item, recipe.macros))
+	    d[tagname] = l
+	self.included = d
+
+	d = {}
+	for tagname in self.excluded:
+	    l = []
+	    for item in self.excluded[tagname]:
+		l.append(filter.Filter(item, recipe.macros))
+	    d[tagname] = l
+	self.excluded = d
+
 	policy.Policy.doProcess(self, recipe)
+
+
+    def markTag(self, name, tag, file):
+	log.debug('%s: %s', name, file)
+	self.recipe.autopkg.pathMap[file].tags.set(tag)
 
     def doFile(self, file):
 	fullpath = self.recipe.macros.destdir+file
 	if not os.path.isfile(fullpath) or not util.isregular(fullpath):
 	    return
-	# XXX need an exception/opt-in system here
+	for tag in self.included:
+	    for filt in self.included[tag]:
+		if filt.match(file):
+		    self.markTag(tag, tag, file)
 	for tag in self.tagList:
 	    if tag.match(file):
 		if tag.name:
 		    name = tag.name
 		else:
 		    name = tag.tag
-		log.debug('%s: %s', name, file)
-		self.recipe.autopkg.pathMap[file].tags.set(tag.tag)
+		if tag.tag in self.excluded:
+		    for filt in self.excluded[tag.tag]:
+			# exception handling is per-tag, so handled specially
+			if filt.match(file):
+			    log.debug('ignoring tag match for %s: %s',
+				      name, file)
+			    return
+		self.markTag(name, tag.tag, file)
 
 
 class ParseManifest(policy.Policy):
@@ -750,7 +810,8 @@ def DefaultPolicy():
 	Config(),
 	SharedLibrary(),
 	InitScript(),
-	Tags(),
+	TagDescription(),
+	TagSpec(),
 	ParseManifest(),
 	MakeDevices(),
 	DanglingSymlinks(),
