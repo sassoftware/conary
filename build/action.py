@@ -34,7 +34,7 @@ def checkUse(use):
     @param use: Flags telling whether to take action
     @type use: None, boolean, or tuple of booleans
     """
-    if use == None:
+    if use is None:
 	return True
     if type(use) is not tuple:
 	use = (use,)

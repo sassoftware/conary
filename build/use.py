@@ -120,6 +120,8 @@ class Flag(dict):
         return self._value
 
     def __eq__(self, other):
+        if not isinstance(other, (Flag, bool)):
+            return False
         return bool(self) == bool(other)
 
     def __ne__(self, other):
