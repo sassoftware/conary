@@ -59,6 +59,7 @@ class ComponentSpec(_filterSpec):
 		       '%(datadir)s/(gtk-doc|doc|man|info)')),
 	('locale',    ('%(datadir)s/locale/',
 		       '%(datadir)s/locale')),
+	('emacs',     ('%(datadir)s/emacs/site-lisp/.*',))
 	('runtime',   ('.*',)),
     )
 

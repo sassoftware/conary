@@ -174,6 +174,15 @@ Use.perl = True
 Use.readline = True
 Use.gdbm = True
 
+Use.emacs = True
+Use.emacs.setShortDoc('Enable support for the EMACS editor')
+Use.emacs.setLongDoc("""
+Build the EMACS editor, and include support for the EMACS editor
+in other packages.  If not Use.emacs, packages should not have
+files in the site-lisp directory and should not have an :emacs
+component.
+""")
+
 # flags to use for special situations
 Use.builddocs = True
 Use.builddocs.setShortDoc('Build documentation as well as binaries')
