@@ -67,8 +67,7 @@ class InfoStream(object):
 	"""
 	Performs a three way merge. Base is the original information,
 	diff is one of the changes, and self is the (already changed)
-	object. Returns a boolean saying whether or not the merge was
-	successful.
+	object. Returns a boolean saying whether or not the merge failed
 	"""
 	raise NotImplementedError
 
@@ -113,6 +112,8 @@ class NumericStream(InfoStream):
 	    return False
 	elif base.val != newVal:
 	    return True
+
+	return False
 
     def __eq__(self, other):
 	return other.__class__ == self.__class__ and \
@@ -190,6 +191,8 @@ class StringStream(InfoStream):
 	elif base.s != diff:
 	    return True
 
+	return False
+
     def __eq__(self, other):
 	return other.__class__ == self.__class__ and \
 	       self.s == other.s
@@ -231,7 +234,7 @@ class DependenciesStream(InfoStream):
 	if not diff: return False
 
         self.thaw(diff)
-        return True
+        return False
 
     def __eq__(self, other):
 	return other.__class__ == self.__class__ and self.deps == other.deps
@@ -290,7 +293,7 @@ class StringsStream(InfoStream):
 	if not diff:
 	    return False
         self.thaw(diff)
-        return True
+        return False
 
     def __eq__(self, other):
 	return other.__class__ == self.__class__ and self.l == other.l
