@@ -14,6 +14,11 @@ class AbstractVersion:
     def __init__(self):
 	pass
 
+class AbstractBranch:
+
+    def __init__(self):
+	pass
+
 class VersionRelease(AbstractVersion):
 
     def __str__(self):
@@ -49,7 +54,7 @@ class VersionRelease(AbstractVersion):
 	except:
 	    raise KeyError, ("release numbers must be all numeric: %s" % value)
 
-class BranchName(AbstractVersion):
+class BranchName(AbstractBranch):
 
     def __str__(self):
 	return self.host + '@' + str(self.branch)
@@ -62,36 +67,16 @@ class BranchName(AbstractVersion):
 
     def __init__(self, value):
 	# throws an exception if no @ is found
-	#cut = value.index("@")
 	(self.host, self.branch) = value.split("@", 1)
-	#self.host = value[:cut]
-	#self.branch = value[cut + 1:]
 	if self.branch.find("@") != -1:
 	    raise KeyError, ("branch names may not have @ signs: %s" % value)
 
-class AbstractVersion:
+class LocalBranch(BranchName):
 
-    def equal(self, other):
-	raise NotImplemented
+    def __init__(self):
+	BranchName.__init__(self, "localhost@LOCAL")
 
-    def isBranch(self):
-	raise NotImplemented
-
-    def isVersion(self):
-	raise NotImplemented
-
-class LocalVersion(AbstractVersion):
-
-    def equal(self, other):
-	return (self.__class__ == other.__class__)
-
-    def isBranch(self):
-	return 0
-
-    def isVersion(self):
-	return 1
-
-class Version(AbstractVersion):
+class Version:
 
     def appendVersionRelease(self, version, release):
 	assert(self.isBranch())
@@ -156,6 +141,15 @@ class Version(AbstractVersion):
     def copy(self):
         return copy.deepcopy(self)
 
+    def fork(self, branch, sameVerRel = 1):
+	assert(isinstance(branch, AbstractBranch))
+	newlist = [ branch ]
+
+	if sameVerRel:
+	    newlist.append(self.versions[-1])
+
+	return Version(self.versions + newlist, time.time())
+
     def parseVersionString(self, ver, defaultBranch = None):
 	if ver[0] != "/":
             # XXX broken code, no defaultBranch in this scope
@@ -169,7 +163,10 @@ class Version(AbstractVersion):
 
 	v = []
 	while parts:
-	    v.append(BranchName(parts[0]))
+	    if parts[0] == "localhost@LOCAL":
+		v.append(LocalBranch())
+	    else:
+		v.append(BranchName(parts[0]))
 
 	    if len(parts) >= 2:
 		v.append(VersionRelease(parts[1]))
@@ -193,7 +190,7 @@ class ThawVersion(Version):
 
 	Version.__init__(self, v, timeVal)
 
-class VersionString(Version):
+class VersionFromString(Version):
 
     def __init__(self, ver, defaultBranch = None):
 	if ver[0] != "/":
@@ -202,9 +199,3 @@ class VersionString(Version):
 	v = self.parseVersionString(ver, defaultBranch)
 
 	Version.__init__(self, v, 0)
-
-def VersionFromString(ver, defaultBranch = None):
-    if ver == "LOCAL":
-	return LocalVersion()
-
-    return VersionString(ver, defaultBranch)
