@@ -37,6 +37,8 @@ import versions
     STRINGPATH, 
     INT) = range(11)
 
+BOOLEAN=BOOL
+
 class ConfigFile:
 
     defaults = {}
