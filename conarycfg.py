@@ -60,7 +60,7 @@ class ConfigFile:
     def execCmd(self, key, val, file):
 	if key == 'includeConfigFile':
 	    for cfgfile in util.braceGlob(val):
-		self.read(cfgfile)
+		self.read(cfgfile, exception=True)
 
     def checkKey(self, key):
 	lckey = key.lower()
