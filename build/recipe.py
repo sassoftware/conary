@@ -145,7 +145,7 @@ class RecipeLoader(types.DictionaryType):
         sys.modules[self.file] = self.module
         f = open(filename)
 
-        exec 'from recipe import Recipe' in self.module.__dict__
+        exec 'from recipe import PackageRecipe' in self.module.__dict__
         exec 'from recipe import loadRecipe' in self.module.__dict__
         exec 'import build, os, package, sys, util' in self.module.__dict__
         exec 'from use import Use, Arch' in self.module.__dict__
@@ -235,6 +235,10 @@ class _policyUpdater:
 	self.theobject.updateArgs(*args, **keywords)
 
 class Recipe:
+
+    pass
+
+class PackageRecipe(Recipe):
     buildRequires = []
     runRequires = []
 
@@ -570,10 +574,6 @@ class Recipe:
 	self.macros['version'] = self.version
 	if extraMacros:
 	    self.addMacros(extraMacros)
-
-class PackageRecipe(Recipe):
-
-    pass
 
 class RecipeFileError(Exception):
     def __init__(self, msg):
