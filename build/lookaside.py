@@ -96,6 +96,9 @@ def searchAll(cfg, repCache, name, location, srcdirs):
                 if msg.code == 404:
                     createNegativeCacheEntry(cfg, name[5:], location)
                     return None
+            except urllib2.URLError:
+                createNegativeCacheEntry(cfg, name[5:], location)
+                return None
             except IOError, msg:
                 # only retry for server busy.
                 if 'ftp error] 421' in msg:
@@ -105,9 +108,6 @@ def searchAll(cfg, repCache, name, location, srcdirs):
                 else:
                     createNegativeCacheEntry(cfg, name[5:], location)
                     return None
-            except urllib2.URLError:
-                createNegativeCacheEntry(cfg, name[5:], location)
-                return None
         if url is None:
             return None
 
