@@ -1,8 +1,23 @@
+#
+# Copyright (c) 2004 Specifix, Inc.
+# All rights reserved
+#
+"""
+The rpmhelper module contains functions to assist in dealing with rpm
+files.
+"""
+
 import struct
 
-# takes a python file object (positioned at the start of an rpm) and
-# positions the file pointer at the gzipped cpio archive attached to it
 def seekToData(f):
+    """
+    Accepts a python file object (positioned at the start of an rpm)
+    and positions the file pointer at the gzipped cpio archive
+    attached to it
+    @param f: python file object to posititon at the gzipped cpio archive
+    @type f: file
+    @rtype: None
+    """
     lead = f.read(96)
     leadMagic = struct.unpack("!i", lead[0:4])[0]
 
