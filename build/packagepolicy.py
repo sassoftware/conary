@@ -1385,7 +1385,7 @@ class Flavor(policy.Policy):
                        deps.Dependency('x86', []))
         elif isnset == 'x86_64':
             set.addDep(deps.InstructionSetDependency,
-                       deps.Dependency('x86', ['x86_64']))
+                       deps.Dependency('x86_64', []))
         else:
             set.addDep(deps.InstructionSetDependency,
                        deps.Dependency(isnset, []))
