@@ -15,6 +15,7 @@
 
 """ Extended pdb """
 import stackutil
+import inspect
 import pdb
 import os
 import re
@@ -173,7 +174,6 @@ class Epdb(pdb.Pdb):
             locals = self.curframe.f_locals
             globals = self.curframe.f_globals
             try:
-                print "Evaluating %s" % cond
                 cond = eval(cond + '\n', globals, locals) 
                 # test to be sure that what we code is a 
                 # function that can take one arg and return a bool
@@ -223,6 +223,54 @@ class Epdb(pdb.Pdb):
             pdb.Pdb.do_list(self, arg)
 
     do_l = do_list
+
+    def default(self, line):
+        if line[-1] != '?':
+            return pdb.Pdb.default(self, line)
+        self.do_define(line[:-1])
+
+
+    def do_define(self, arg):
+        locals = self.curframe.f_locals
+        globals = self.curframe.f_globals
+        try:
+            result = eval(arg + '\n', globals, locals) 
+            if inspect.isclass(result):
+                bases = inspect.getmro(result)
+                bases = [ x.__name__ for x in bases[1:] ]
+                bases = '(' + ', '.join(bases) + ')'
+                print "Class " + result.__name__ + bases
+                if hasattr(result, '__doc__'):
+                    print "\"\"\"%s\"\"\"" % result.__doc__
+                if hasattr(result, '__init__'):
+                    result = result.__init__
+                else:
+                    result = None
+                print "Init method: "
+            if inspect.ismethod(result):
+                m_class = result.im_class
+                m_self = result.im_self
+                m_func = result.im_func
+                name = m_class.__name__ + '.' +  m_func.__name__
+                if m_self:
+                    name = "<Bound>"  + name
+                argspec = inspect.formatargspec(*inspect.getargspec(m_func))
+                print "%s%s" % (name, argspec)
+            elif inspect.isfunction(result):
+                name = result.__name__
+                argspec = inspect.formatargspec(*inspect.getargspec(result))
+                print "%s%s" % (name, argspec)
+            else:
+                print type(result)
+            if hasattr(result, '__doc__'):
+                print "\"\"\"%s\"\"\"" % result.__doc__
+        except:
+            t, v = sys.exc_info()[:2]
+            if type(t) == type(''):
+                exc_type_name = t
+            else: exc_type_name = t.__name__
+            print '***', exc_type_name + ':', v
+    do_def = do_define
 
     def interaction(self, frame, traceback):
         pdb.Pdb.interaction(self, frame, traceback)
