@@ -357,7 +357,6 @@ static int pysqlite3_exec(sqlite3 *db, const char *zSql,
   sqlite3_stmt *pStmt = 0;
 
   int nRetry = 0;
-  int i;
 
   if( zSql==0 ) return SQLITE_OK;
   while( (rc==SQLITE_OK || (rc==SQLITE_SCHEMA && (++nRetry)<2)) && zSql[0] ){
@@ -381,6 +380,7 @@ static int pysqlite3_exec(sqlite3 *db, const char *zSql,
         while( isspace(zSql[0]) ) zSql++;
     }
   }
+  return rc;
 }
 
 static char pysqlite_connect_doc[] =
@@ -1310,10 +1310,6 @@ static PyObject* _con_prepare(pysqlc* self, PyObject *args)
     int sql_len;
     char* sql;
     pysqlstmt* pystmt;
-    char *errmsg;
-    char* buf;
-    char* iterator;
-    char* token;
     const char* query_tail;
     PyObject* logfile_writemethod;
     PyObject* logfile_writeargs;
@@ -1956,7 +1952,6 @@ Reset the virtual machine associated with a stmtiled SQL statement.";
 
 static PyObject* _stmt_reset(pysqlstmt *self, PyObject *args)
 {
-    char *errmsg;
     int result;
 
     if (!PyArg_ParseTuple(args,""))
@@ -1986,7 +1981,6 @@ Frees the virtual machine associated with a stmtiled SQL statement.";
 
 static PyObject* _stmt_finalize(pysqlstmt *self, PyObject *args)
 {
-    char *errmsg;
     int result;
 
     if (!PyArg_ParseTuple(args,""))
@@ -2082,7 +2076,6 @@ static PyMethodDef _stmt_methods[] =
 static void
 _stmt_dealloc(pysqlstmt* self)
 {
-    char *errmsg = NULL;
     int result, have_error;
     PyObject *err_type, *err_value, *err_traceback;
     have_error = PyErr_Occurred() ? 1 : 0;
