@@ -315,17 +315,23 @@ class TupleStream(InfoStream):
 
 class DeviceStream(TupleStream):
 
+    __slots__ = []
+
     makeup = (("major", IntStream, 4), ("minor", IntStream, 4))
     makeupDict = _makeTupleDict(makeup)
     streamId = _STREAM_DEVICE
 
 class RegularFileStream(TupleStream):
 
+    __slots__ = []
+
     makeup = (("size", LongLongStream, 8), ("sha1", StringStream, 40))
     streamId = _STREAM_SIZESHA1
     makeupDict = _makeTupleDict(makeup)
 
 class InodeStream(TupleStream):
+
+    __slots__ = []
 
     """
     Stores basic inode information on a file: perms, owner, group.
