@@ -6,6 +6,7 @@ Changes in 0.10.9:
   * fixed a bug with distributed branches
   * users can change their passwords through the repository's web api
   * improved logic apachehooks use to find top level URL
+  * fixed bug in server side repository resolution
 
 Changes in 0.10.8:
   * changed iterAllTroves() to troveNames(), which searches a single
