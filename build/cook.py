@@ -414,16 +414,18 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	if os.path.exists(builddir):
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
-	bldInfo.begin()
-	recipeObj.unpackSources(builddir)
+    else:
+	bldInfo.read()
+
+    bldInfo.begin()
+    recipeObj.unpackSources(builddir, resume)
     # if we're only extracting, continue to the next recipe class.
     if prep:
 	return
 	
     cwd = os.getcwd()
     try:
-	if resume:
-	    bldInfo.read()
+	if resume and 'destdir' in bldInfo:
 	    destdir = bldInfo.destdir
 	    bldInfo.begin()
 	    bldInfo.destdir = destdir
@@ -436,6 +438,9 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	    bldInfo.destdir = destdir
 	os.chdir(builddir + '/' + recipeObj.mainDir())
 	recipeObj.doBuild(builddir, destdir, resume=resume)
+	if resume and resume != "policy" and recipeObj.resumeList[-1][1]:
+	    log.info('Finished Building %s Lines %s, Not Running Policy', recipeClass.name, resume)
+	    return
 	log.info('Processing %s', recipeClass.name)
 	recipeObj.doDestdirProcess() # includes policy
 	bldInfo.stop()

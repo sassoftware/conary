@@ -356,12 +356,58 @@ class PackageRecipe(Recipe):
     def prepSources(self):
 	for source in self._sources:
 	    source.doPrep()
-    
-    def unpackSources(self, builddir):
-	self.prepSources()
+
+    def processResumeList(self, resume):
+	resumelist = []
+	if resume:
+	    lines = resume.split(',')
+	    for lines in resume.split(','):
+		if ':' in lines:
+		    begin, end = lines.split(':')
+		    if begin:
+			begin = int(begin)
+		    if end:
+			end = int(end)
+		    resumelist.append([begin, end])
+		else:
+		    resumelist.append([int(lines), int(lines)])
+	    if len(resumelist) == 1 and resumelist[0][0] == resumelist[0][1]:
+		resumelist[0][1] = False
+	self.resumeList = resumelist
+
+    def iterResumeList(self, actions):
+	resume = self.resumeList
+	resumeBegin = resume[0][0]
+	resumeEnd = resume[0][1]
+	for action in actions:
+	    if not resumeBegin or action.linenum >= resumeBegin:
+		if not resumeEnd or action.linenum <= resumeEnd:
+		    yield action
+		elif resumeEnd:
+		    resume = resume[1:]
+		    if not resume:
+			return
+		    resumeBegin = resume[0][0]
+		    resumeEnd = resume[0][1]
+		    if action.linenum == resumeBegin:
+			yield action
+
+    def unpackSources(self, builddir, resume=None):
 	self.macros.builddir = builddir
-	for source in self._sources:
-	    source.doAction()
+
+	if resume == 'policy':
+	    return
+	elif resume:
+	    log.debug("Resuming on line(s) %s" % resume)
+	    # note resume lines must be in order
+	    self.processResumeList(resume)
+	    for source in self.iterResumeList(self._sources):
+		source.doPrep()
+		source.doAction()
+	else:
+	    for source in self._sources:
+		source.doPrep()
+		source.doAction()
 
     def extraBuild(self, action):
 	"""
@@ -379,11 +425,8 @@ class PackageRecipe(Recipe):
 	if resume == 'policy':
 	    return
 	if resume:
-	    resume = int(resume)
-	    log.debug("Resuming on line %d" % resume)
-	    for bld in self._build:
-		if bld.linenum >= resume:
-		    bld.doAction()
+	    for bld in self.iterResumeList(self._build):
+		bld.doAction()
 	else:
 	    for bld in self._build:
 		bld.doAction()
