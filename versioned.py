@@ -60,7 +60,7 @@ class FalseFile:
 	self.pos = self.pos + amount
 	return self.contents[oldpos:self.pos]
 
-    def readLines(self):
+    def readlines(self):
 	list = self.read().split('\n')
 	list2 = []
 

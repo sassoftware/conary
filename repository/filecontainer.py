@@ -150,7 +150,7 @@ class FileContainerFile:
 	    self.file.seek(self.pos)
 	    return self.file.read(count)
 
-    def readLines(self):
+    def readlines(self):
 	list = self.read().split('\n')
 	list2 = []
 

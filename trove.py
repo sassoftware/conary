@@ -297,7 +297,7 @@ class PackageChangeSet:
 class PackageFromFile(Package):
 
     def read(self, dataFile):
-	for line in dataFile.readLines():
+	for line in dataFile.readlines():
 	    (fileId, path, version) = line.split()
 	    version = versions.ThawVersion(version)
 	    self.addFile(fileId, path, version)

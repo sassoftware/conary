@@ -30,7 +30,7 @@ if len(sys.argv) > 2:
 				f.versionList(branch)))
     else:
 	final = f.getVersion(versions.VersionFromString(sys.argv[3], cfg.defaultbranch))
-	sys.stdout.write("".join(final.readLines()))
+	sys.stdout.write("".join(final.readlines()))
 else:
     db = versioned.FileIndexedDatabase(sys.argv[1])
     print "\n".join(db.fileList())

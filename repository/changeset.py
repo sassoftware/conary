@@ -82,8 +82,6 @@ class ChangeSet:
 	return self.oldPackages
 
     def addFileContents(self, hash, contType, contents):
-	assert(contType == ChangedFileTypes.file)
-
 	self.fileContents[hash] = (contType, contents)
 
     def getFileContents(self, hash):
@@ -322,7 +320,7 @@ class ChangeSetFromFile(ChangeSet):
 
 	control = self.csf.getFile("SRSCHANGESET")
 
-	lines = control.readLines()
+	lines = control.readlines()
 	i = 0
 	while i < len(lines):
 	    header = lines[i][:-1]
