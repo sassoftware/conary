@@ -1,4 +1,18 @@
 #!/usr/bin/env python
+#
+# Copyright (c) 2004 Specifix, Inc.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted, provided
+# that the above copyright notice appear in all copies and that both that
+# copyright notice and this permission notice appear in supporting
+# documentation,
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.
+#
+
 import testsupport
 import unittest
 import sqlite
@@ -10,6 +24,7 @@ class PrecompiledTests(unittest.TestCase, testsupport.TestSupport):
         self.cur = self.cnx.cursor()
         self.cur.execute("CREATE TABLE TEST(FOO INTEGER)")
         self.cur.execute("INSERT INTO TEST(FOO) VALUES (%i)", (5,))
+        self.cur.execute("INSERT INTO TEST(FOO) VALUES (%i)", (10,))
 
     def tearDown(self):
         try:
@@ -23,15 +38,23 @@ class PrecompiledTests(unittest.TestCase, testsupport.TestSupport):
     def CheckPrecompiled(self):
         prec = self.cnx.prepare("SELECT * FROM TEST")
         row = prec.fetchone()
-        print row
         if row != (5,):
-            self.fail("expected (5,), got" + row)
+            self.fail("expected (5,), got " + str(row))
         prec.reset()
         row = prec.fetchone()
-        print row
         if row != (5,):
-            self.fail("expected (5,), got" + row)
-
+            self.fail("expected (5,), got " + str(row))
+        row = prec.fetchone()
+        if row != (10,):
+            self.fail("expected (10,), got " + str(row))
+            
+    def CheckBind(self):
+        prec = self.cnx.prepare("SELECT * FROM TEST WHERE FOO=?")
+        prec.execute((10,))
+        row = prec.fetchone()
+        if row != (10,):
+            self.fail("expected (10,), got " + str(row))
+        
     def CheckMultipleStatements(self):
         try:
             prec = self.cnx.prepare("SELECT * FROM TEST; SELECT * FROM TEST")

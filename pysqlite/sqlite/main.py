@@ -166,10 +166,12 @@ class PrecompiledCursor:
         self.con.cursors[id(self)] = self
         self.precomp = self.con.db.prepare(sql)
         self.rowclass = rowclass
-        self.description = ()
+        self.description = None
 
     def fetchone(self):
         row = self.precomp.step()
+        if row is None:
+            return None
         if self.precomp.col_defs != self.description:
             self.description = self.precomp.col_defs
             if issubclass(self.rowclass, PgResultSet):
@@ -192,7 +194,21 @@ class PrecompiledCursor:
 
     def reset(self):
         self.precomp.reset()
-            
+
+    def execute(self, parms=None):
+        if parms:
+            if len(parms) == 1 and \
+               (type(parms[0]) in (DictType, ListType, TupleType) or \
+                        isinstance(parms[0], PgResultSet)):
+                #parms = (self._unicodeConvert(parms[0]),)
+                parms = _quoteall(parms[0])
+            else:
+                #parms = self._unicodeConvert(parms)
+                parms = tuple(map(_quote, parms))
+        
+            for num, parm in enumerate(parms):
+                self.precomp.bind(num + 1, str(parm))
+
 class Cursor:
     """Abstract cursor class implementing what all cursor classes have in
     common."""

@@ -1825,6 +1825,11 @@ static PyObject* _precomp_reset(pysqlprecomp *self, PyObject *args)
 {
     char *errmsg;
     int result;
+
+    if (!PyArg_ParseTuple(args,""))
+    {
+        return NULL;
+    }
     
     result = sqlite_reset(self->p_vm, &errmsg);
     if (result != SQLITE_OK) {
@@ -1842,6 +1847,20 @@ Bind arguments to a precompiled SQL statement.";
 
 static PyObject* _precomp_bind(pysqlprecomp *self, PyObject *args)
 {
+    char *buf, *errmsg = NULL;
+    int idx, len, result;
+    
+    if (!PyArg_ParseTuple(args, "is#", &idx, &buf, &len))
+    {
+        return NULL;
+    }
+
+    result = sqlite_bind(self->p_vm, idx, buf, len + 1, 1);
+    if (result != SQLITE_OK) {
+	_seterror(result, errmsg);
+	return NULL;
+    }
+    
     Py_INCREF(Py_None);
     return Py_None;
 }
