@@ -119,6 +119,9 @@ class DependencyTables:
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
                     if flags:
                         for (flag, sense) in flags:
+                            # conary 0.12.0 had mangled flags; this check
+                            # prevents them from making it into any repository
+                            assert("'" not in flag)
                             assert(sense == deps.FLAG_SENSE_REQUIRED)
                             cu.execute("INSERT INTO %s VALUES(?, ?, ?, ?, "
                                                 "?, ?, ?)" % name,

@@ -3,6 +3,9 @@ Changes in 0.12.1
   * getTroveLeavesByBranch did extra demarshalling of the flavor
   * repquery didn't deal with nonexistant troves well
   * dependency failures on erase didn't reassemble dependency flags properly
+  * fixed bug in dependency sets creation which caused dependency flags
+    to get mangled
+  * added a check to prevent mangled flags from getting committed
 
 Changes in 0.12.0
   * document config command, and display supplied macro/use/arch information 
