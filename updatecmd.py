@@ -48,8 +48,8 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
     except repository.CommitError, e:
         log.error(e)
 
-def doErase(db, cfg, pkg, versionStr = None, tagScript = None):
-    client = conaryclient.ConaryClient(None, cfg)
+def doErase(cfg, pkg, versionStr = None, tagScript = None):
+    client = conaryclient.ConaryClient(cfg=cfg)
     
     try:
         client.eraseTrove(pkg, versionStr, tagScript)
