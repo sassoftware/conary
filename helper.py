@@ -77,10 +77,11 @@ def nextVersion(repos, troveName, versionStr, troveFlavor, currentBranch,
     @param binary: true if this version should use the binary build field
     @type binary: boolean
     """
-
     currentVersions = repos.getTroveFlavorsLatestVersion(troveName, 
 							 currentBranch)
 
+    if not troveFlavor:
+        troveFlavor = None
     # find the latest version of this trove and the latest version of
     # this flavor of this trove
     latestForFlavor = None
