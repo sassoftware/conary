@@ -64,7 +64,7 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
 
 
         client.updateTrove(cs, replaceFiles, tagScript, keepExisting,
-                           #depCheck)
+                           depCheck)
     except conaryclient.UpdateError, e:
         log.error(e)
     except repository.CommitError, e:
