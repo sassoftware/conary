@@ -17,6 +17,7 @@ import util
 import fixedglob
 import log
 import re
+from use import Use
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
@@ -362,9 +363,11 @@ class _FileAction(BuildAction):
 class InstallDesktopfile(BuildCommand, _FileAction):
     """
     The InstallDesktopfile class should be used to provide categories
-    (and vendor, if necessary) for files in /usr/share/applications/
+    (and vendor, if necessary) for files in /usr/share/applications/,
+    if the target has enabled building desktop files.
     """
-    template = ('desktop-file-validate %(args)s; '
+    template = ('cd %%(builddir)s; '
+		'desktop-file-validate %(args)s; '
 		'desktop-file-install --vendor %(vendor)s'
 		' --dir %%(destdir)s/%%(datadir)s/applications'
 		' %%(category)s'
@@ -372,13 +375,13 @@ class InstallDesktopfile(BuildCommand, _FileAction):
     keywords = {'vendor': 'net',
 		'categories': None}
 
-    # XXX fixme should this be do, not doBuild?  Probably.
-    # otherwise, need explanation of why use not honored...
     def doBuild(self, recipe):
+	if not Use.desktop or not self.use:
+	    return
 	macros = recipe.macros.copy()
         if self.categories:
-	    macros['category'] = '--add-category %s' %self.categories
-	BuildCommand.doBuild(self, macros)
+	    macros['category'] = '--add-category "%s"' %self.categories
+	self.do(macros)
 	for file in self.arglist:
 	    self.setComponents('%(datadir)s/applications'+file)
 
