@@ -43,6 +43,7 @@ import struct
 import os
 import sys
 import types
+import string
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
 
@@ -143,6 +144,15 @@ class FileContainerFile:
 	    self.pos = self.pos + bytes
 	    self.file.seek(self.pos)
 	    return self.file.read(count)
+
+    def readLines(self):
+	list = string.split(self.read(), "\n")
+	list2 = []
+
+	# cut off the last element (which wasn't newline terminated anyway)
+	for item in list[:-1]:
+	    list2.append(item + "\n")
+	return list2
 	    
     def __init__(self, file, offset, size):
 	self.file = file
@@ -262,6 +272,9 @@ class FileContainer:
 	if not self.entries.has_key(fileName):
 	    raise KeyError, ("file %s is not in the collection") % fileName
 	return self.entries[fileName].data
+
+    def hasFile(self, hash):
+	return self.entries.has_key(hash)
 
     def updateTag(self, fileName, newTag):
 	if not self.entries.has_key(fileName):
