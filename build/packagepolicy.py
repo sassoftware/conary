@@ -1242,7 +1242,7 @@ class _Utilize(policy.Policy):
     def doFile(self, path):
 	for (f, item) in self.fileFilters:
 	    if f.match(path):
-		self._markItem(path, thing)
+		self._markItem(path, item)
 		return
 
 
