@@ -10,6 +10,8 @@ Changes in 0.50.4:
   * Sped up Strip, NormalizeInitscriptLocation, NormalizePamConfig,
     TagDescription, and TagHandler policies by limiting them to
     only appropriate directories.
+  * Fixed :debuginfo to work with binaries built from more than one
+    source file.
 
 Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 

@@ -655,9 +655,12 @@ class Strip(policy.Policy):
                 if os.path.exists(debuglibpath):
                     return
 
-                self.debugfiles.update(frozenset([x[:-1] for x in util.popen(
+                # null-separated AND terminated list, so we need to throw
+                # away the last (empty) item before updating self.debugfiles
+                self.debugfiles |= set(util.popen(
                     '%(debugedit)s -b %(topbuilddir)s -d %(debugsrcdir)s'
-                    ' -l /dev/stdout '%self.dm +fullpath).readlines()]))
+                    ' -l /dev/stdout '%self.dm
+                    +fullpath).read().split('\x00')[:-1])
                 util.mkdirChain(debuglibdir)
                 util.execute('%s -f %s %s' %(
                     self.dm.strip, debuglibpath, fullpath))
@@ -676,9 +679,7 @@ class Strip(policy.Policy):
 
     def postProcess(self):
         if self.debuginfo:
-            debugfiles = list(self.debugfiles)
-            debugfiles.sort()
-            for file in debugfiles:
+            for file in sorted(self.debugfiles):
                 dir = os.path.dirname(file)
                 util.mkdirChain('%(destdir)s%(debugsrcdir)s/'%self.dm +dir)
                 shutil.copy2('%(topbuilddir)s/'%self.dm +file,
