@@ -249,7 +249,8 @@ def cookFilesetObject(repos, cfg, recipeClass, newVersion, buildBranch,
 	if fileObj.hasContents:
 	    changeSet.addFileContents(fileId, changeset.ChangedFileTypes.file,
 			filecontents.FromRepository(repos, 
-				    fileObj.contents.sha1(), fileObj.size()),
+				    fileObj.contents.sha1(), 
+				    fileObj.contents.size()),
 			fileObj.flags.isConfig())
 
     filesetDiff = fileset.diff(None, abstract = 1)[0]
