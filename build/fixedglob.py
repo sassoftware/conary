@@ -3,6 +3,7 @@
 import os
 import fnmatch
 import re
+import errno
 
 __all__ = ["glob"]
 
@@ -26,7 +27,13 @@ def glob(pathname):
         for dirname in list:
             if basename or os.path.isdir(dirname):
                 name = os.path.join(dirname, basename)
-                result.append(name)
+		try:
+		    os.lstat(name)
+		except OSError, err:
+		    if err.errno != errno.ENOENT:
+			raise
+		else:
+		    result.append(name)
     else:
         result = []
         for dirname in list:
