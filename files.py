@@ -108,7 +108,10 @@ class FileMode:
 
     def mtime(self, new = None):
 	if (new != None and new != "-"):
-	    self.theMtime = new
+	    if type(new) == types.IntType:
+		self.theMtime = new
+	    else:
+		self.theMtime = int(new)
 
 	return self.theMtime
 
@@ -222,6 +225,7 @@ class File(FileMode):
     def restore(self, target, skipContents):
 	self.chmod(target)
 	self.setOwnerGroup(target)
+	os.utime(target, (self.theMtime, self.theMtime))
 
     def chmod(self, target):
 	os.chmod(target, self.thePerms)
