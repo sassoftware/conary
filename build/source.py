@@ -182,7 +182,7 @@ class Archive(_Source):
 
 	if f.endswith(".bz2") or f.endswith(".tbz2"):
 	    tarflags = "-jxf"
-	elif f.endswith(".gz") or f.endswith(".tgz"):
+	elif f.endswith(".gz") or f.endswith(".tgz") or f.endswith(".Z"):
 	    tarflags = "-zxf"
 	else:
 	    raise SourceError, "unknown archive compression"
