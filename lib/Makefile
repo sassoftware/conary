@@ -40,6 +40,8 @@ elfmodule.so: $(elfmodule_objs)
 miscmodule.so: $(miscmodule_objs)
 	$(CC) -shared -o $@ $< -lelf
 
+$(cstreamsmodule_objs): cstreams.h
+
 cstreamsmodule.so: $(cstreamsmodule_objs)
 	$(CC) -shared -o $@ $^ -lelf
 
