@@ -4,7 +4,7 @@
 # All rights reserved
 #
 
-PYTHONORDER="python2.3 python23 python2.2 python22 python"
+PYTHONORDER="/usr/lib/srs/bin/python2.3 python2.3 python23 python"
 
 for p in $PYTHONORDER; do
     if type $p > /dev/null 2>&1; then
