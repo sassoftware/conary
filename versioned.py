@@ -322,7 +322,7 @@ class VersionedFile:
     def branchList(self):
 	"""Returns a list of all of the branches available.
 
-	    @type: list of versions.Version
+        @rtype: list of versions.Version
 	"""
 	self._readBranchMap()
 	return [ x.branch() for x in self.branchMap.values() ]
