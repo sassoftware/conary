@@ -449,6 +449,10 @@ class PackageRecipe(Recipe):
 	    policy.doProcess(self)
         return self.autopkg.getPackages()
 
+    def getUnpackagedComponentNames(self):
+        # someday, this will probably be per-branch policy
+        return ('test', 'debuginfo')
+
 
     def disableParallelMake(self):
         self.macros.parallelmflags = ''
