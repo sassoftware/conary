@@ -311,9 +311,6 @@ class Socket(File):
     def same(self, other):
 	return File.same(self, other)
 
-    def copy(self, source, target):
-	pass
-
     def restore(self, changeSet, target):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
