@@ -7,6 +7,7 @@
 # index. the hash can be any arbitrary string of at least 5 bytes in length;
 # it is assumed the keys are unique
 
+import gzip
 import os
 
 class DataStore:
@@ -73,8 +74,7 @@ class DataStore:
 	if not os.path.exists(dir):
 	    os.mkdir(dir)
 
-	dest = open(path, "w")
-	return dest
+	return gzip.GzipFile(path, "w", 9)
 
     # file should be a python file object seek'd to the beginning
     # this messes up the file pointer
@@ -87,7 +87,7 @@ class DataStore:
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):
 	path = self.hashToPath(hash)[1]
-	return open(path, mode)
+	return gzip.GzipFile(path, mode)
 
     def removeFile(self, hash):
 	(dir, path) = self.hashToPath(hash)
