@@ -53,6 +53,7 @@ def usage(rc = 1):
     print "       cvc diff"
     print "       cvc log [<branch>]"
     print "       cvc newpkg <name>"
+    print "       cvc merge"
     print "       cvc rdiff <name> <oldver> <newver>"
     print "       cvc remove <file> [<file2> <file3> ...]"
     print "       cvc rename <oldfile> <newfile>"

@@ -160,6 +160,11 @@ or for \fI<branch>\fP if specified.
 Creates a new package.  This modifies the repository, and is
 irreversable, so use this command with care.
 .TP
+.B merge
+Run from a source directory containing a shadow, this merges changes made
+on the parent branch since the last \fBshadow\fP or \fBmerge\fP command
+into the shadow.
+.TP
 .B rdiff \fI<name> <oldver> <newver>\fP
 This source command operates only on the repository, not on a
 source directory.  It creates a diff between two versions of
