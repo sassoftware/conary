@@ -15,9 +15,17 @@ _VERSION_MAP = "VMAP-%s"
 _BRANCH_MAP = "BMAP-%s"
 _CONTENTS = "%s %s"
 
-# implements a simple versioned file on top of a FileContainer; the version
-# string is used as the file name, and branch marks are stored as extra data 
-# for the file
+# implements a set of versioned files on top of a single hashed db file
+#
+# FileIndexedDatabase provides a list of files present, and stores that
+# list in the _FILE_MAP entry
+#
+# Each file has a list of versions available provided by _VERSION_MAP, which
+#   also ties a version string to a frozen version (which includes sequencing
+#   information [a timestamp])
+# Each file has a mapping of branch names to the head of that branch
+#   stored as _BRANCH_MAP
+# The contents of each file are stored as _CONTENTS
 #
 # the versions are expected to be Version objects as defined by the versions
 # module
@@ -82,14 +90,13 @@ class VersionedFile:
 	versionList = self.db[_VERSION_MAP % self.key].split('\n')[:-1]
 
 	for mapString in versionList:
-	    (versionString, versionTime) = mapString.split()
-	    self.versionMap[versionString] = \
-		(versions.VersionFromString(versionString), float(versionTime))
+	    ver = versions.ThawVersion(mapString)
+	    self.versionMap[ver.asString()] = ver
 
     def writeVersionMap(self):
 	rc = ""
-	for (versionString, (version, time)) in self.versionMap.items():
-	    rc += "%s %.3f\n" % (versionString, time)
+	for version in self.versionMap.values():
+	    rc += "%s\n" % version.freeze()
 	self.db[_VERSION_MAP % self.key] = rc
 
     # the branch map maps a fully qualified branch version to the latest
@@ -141,7 +148,7 @@ class VersionedFile:
 	if type(data) is not str:
 	    data = data.read()
 	self.db[_CONTENTS % (self.key, versionStr)] = data
-	self.versionMap[versionStr] = (version, time.time())
+	self.versionMap[versionStr] = version
 	self.branchMap[branchStr] = version
 
 	self.writeVersionMap()
@@ -164,11 +171,8 @@ class VersionedFile:
     # returns a list of version objects
     def versionList(self):
 	self.readVersionMap()
+	return self.versionMap.values()
 	    
-	list = []
-	for (version, time) in self.versionMap.values():
-	    list.append(version)
-
 	return list
 
     def __init__(self, db, filename):
