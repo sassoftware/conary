@@ -67,16 +67,15 @@ class RecipeLoader(types.DictionaryType):
         exec 'filename = "%s"' %(file) in self.module.__dict__
         code = compile(f.read(), file, 'exec')
         exec code in self.module.__dict__
-        for (key, value) in  self.module.__dict__.items():
-            if type(value) == types.ClassType:
-                # make sure the class is derived from something
+        for (name, obj) in  self.module.__dict__.items():
+            if type(obj) == types.ClassType:
+                # make sure the class is derived from Recipe
                 # and has a name
-                # XXX better test?
-                if value.__dict__.has_key('ignore'):
+                if obj.__dict__.has_key('ignore'):
                     continue
-                if len(value.__bases__) > 0 and 'name' in dir(value):
-                    value.__dict__['filename'] = file
-                    self[key] = value
+                if issubclass(obj, Recipe) and obj.__dict__.has_key('name'):
+                    obj.__dict__['filename'] = file
+                    self[name] = obj
 
     def __del__(self):
         try:

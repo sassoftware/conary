@@ -64,7 +64,7 @@ class ManualConfigure(Configure):
     template = 'cd %%s; %%s %(preConfigure)s %%s %(args)s'
 
 class Make(ShellCommand):
-    template = 'cd %%s; %(preMake)s make %(args)s'
+    template = 'cd %%s; %(preMake)s make -j4 %(args)s'
     keywords = {'preMake': ''}
     
     def doBuild(self, dir):
