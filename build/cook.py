@@ -216,7 +216,11 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
     fullName = recipeClass.name
 
     recipeObj = recipeClass(repos, cfg, buildBranch, cfg.flavor)
-    recipeObj.setup()
+
+    try:
+	recipeObj.setup()
+    except recipe.RecipeFileError, msg:
+	raise CookError(str(msg))
 
     nextVersion = helper.nextVersion(repos, fullName, recipeClass.version, 
 				     None, buildBranch, binary = True)
