@@ -32,7 +32,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=6
+CLIENT_VERSION=7
 
 class _Method(xmlrpclib._Method):
 
@@ -246,19 +246,21 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             raise repository.TroveMissing(troveName, branch)
 	return self.thawVersion(v)
 
-    def getTrove(self, troveName, troveVersion, troveFlavor):
-	rc = self.getTroves([(troveName, troveVersion, troveFlavor)])
+    def getTrove(self, troveName, troveVersion, troveFlavor, withFiles = True):
+	rc = self.getTroves([(troveName, troveVersion, troveFlavor)],
+                            withFiles = withFiles)
 	if rc[0] is None:
 	    raise repository.TroveMissing(troveName, version = troveVersion)
 
 	return rc[0]
 
-    def getTroves(self, troves):
+    def getTroves(self, troves, withFiles = True):
 	chgSetList = []
 	for (name, version, flavor) in troves:
 	    chgSetList.append((name, (None, None), (version, flavor), True))
 	
 	cs = self._getChangeSet(chgSetList, recurse = False, 
+                                withFiles = withFiles,
                                 withFileContents = False)
 
 	l = []
