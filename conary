@@ -64,7 +64,7 @@ def usage(rc = 1):
 def openRepository(path, mode):
     try:
         repos = repository.LocalRepository(path, mode)
-    except repository.RepositoryError, e:
+    except repository.OpenError, e:
         log.error('Unable to open repository %s: %s', path, str(e))
         sys.exit(1)
     return repos
@@ -72,7 +72,7 @@ def openRepository(path, mode):
 def openDatabase(root, path, mode):
     try:
         db = database.Database(root, path, mode)
-    except repository.RepositoryError, e:
+    except repository.OpenError, e:
         log.error('Unable to open database %s%s%s: %s', root, os.sep, path, str(e))
         sys.exit(1)
     return db
@@ -276,7 +276,7 @@ elif (otherArgs[1] == "update"):
         del argSet['replacefiles']
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
-	repos = repository.LocalRepository(cfg.reppath, "r")
+	repos = openRepository(cfg.reppath, "r")
 	db = openDatabase(cfg.root, cfg.dbpath, "c")
 
 	args = [repos, db, cfg] + otherArgs[2:]
