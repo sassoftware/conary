@@ -116,6 +116,8 @@ def realMain(argv=sys.argv):
 
     cfgMap["build-label"] = "buildLabel"
     cfgMap["install-label"] = "installLabel"
+    cfgMap["install-branch"] = "installLabel"
+    cfgMap["repository-path"] = "repositoryPath"
     cfgMap["root"] = "root"
 
     (NO_PARAM,  ONE_PARAM)  = (options.NO_PARAM, options.ONE_PARAM)
@@ -155,6 +157,12 @@ def realMain(argv=sys.argv):
 
     if cfg.installLabel is None:
         print >> sys.stderr, "installLabel is not set"
+        sys.exit(1)
+    if cfg.repositoryPath is None:
+        print >> sys.stderr, "repositoryPath is not set"
+        sys.exit(1)
+    if cfg.installBranch is None:
+        print >> sys.stderr, "installBranch is not set"
         sys.exit(1)
 
     profile = False

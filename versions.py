@@ -70,7 +70,7 @@ class NewVersion(AbstractVersion):
     def branch(self):
 	return None
 
-class AbstractBranch(object):
+class AbstractLabel(object):
 
     """
     Ancestor class for all branches (as opposed to versions)
@@ -265,18 +265,17 @@ class VersionRelease(AbstractVersion):
 		raise ParseError, \
 		    ("build count numbers must be all numeric: %s" % buildCount)
 
-class Label(AbstractBranch):
+class Label(AbstractLabel):
 
     """
-    Stores a branch name, which is the same as a label. Branch names
-    are of the form hostname@branch.
+    Stores a label. Labels are of the form hostname@branch.
     """
 
     __slots__ = ( "host", "namespace", "branch" )
 
     def asString(self, versus = None, frozen = False):
 	"""
-	Returns the string representation of a branch name.
+	Returns the string representation of a label.
 	"""
 	if versus:
 	    if self.host == versus.host:
@@ -312,14 +311,14 @@ class Label(AbstractBranch):
 
     def __init__(self, value, template = None):
 	"""
-	Parses a branch name string into a Label object. A ParseError is
+	Parses a label string into a Label object. A ParseError is
 	thrown if the Label is not well formed.
 
 	@param value: String representation of a Label
 	@type value: str
 	"""
 	if value.find("/") != -1:
-	    raise ParseError, "/ should not appear in a branch name"
+	    raise ParseError, "/ should not appear in a label"
 
 	i = value.count(":")
 	if i > 1:
@@ -346,7 +345,7 @@ class Label(AbstractBranch):
 	else:
 	    if value.find("@") == -1:
 		if not template:
-		    raise ParseError, "@ expected before branch namespace"
+		    raise ParseError, "@ expected before label namespace"
 	    
 		self.host = template.host
 		(self.namespace, self.branch) = value.split(":")
@@ -357,7 +356,7 @@ class Label(AbstractBranch):
 	if not self.namespace:
 	    raise ParseError, ("namespace may not be empty: %s" % value)
 	if not self.branch:
-	    raise ParseError, ("branch names may not be empty: %s" % value)
+	    raise ParseError, ("branch tag not be empty: %s" % value)
 
 class LocalBranch(Label):
 
@@ -386,11 +385,33 @@ class CookBranch(Label):
     def __init__(self):
 	Label.__init__(self, "local@local:COOK")
 
+class BranchName:
+
+    def asString(self):
+        return "%s:%s" % (self.namespace, self.branch)
+
+    def __init__(self, value):
+        i = value.count(":")
+	if i == -1:
+            raise ParseError, "colon expected before branch name"
+        elif i > 1:
+            raise ParseError, "unexpected colon in branch name"
+	    
+        if value.find("@") != -1:
+            raise ParseError, "@ is not allowed in a branch name"
+
+        self.namespace, self.branch = value.split(":")
+
+	if not self.namespace:
+	    raise ParseError, ("namespace may not be empty: %s" % value)
+	if not self.branch:
+	    raise ParseError, ("labels may not be empty: %s" % value)
+
 class Version(AbstractVersion):
 
     """
-    Class representing a version. Versions are a list of AbstractBranch,
-    AbstractVersion sequences. If the last item is an AbstractBranch (meaning
+    Class representing a version. Versions are a list of AbstractLabel,
+    AbstractVersion sequences. If the last item is an AbstractLabel (meaning
     an odd number of objects are in the list, the version represents
     a branch. A version includes a time stamp, which is used for
     ordering.
@@ -637,14 +658,14 @@ class Version(AbstractVersion):
 	Creates a new branch from this version. 
 
 	@param branch: Branch to create for this version
-	@type branch: AbstractBranch
+	@type branch: AbstractLabel
 	@param sameVerRel: If set, the new branch is turned into a version
 	on the branch using the same version and release as the original
 	verison.
 	@type sameVerRel: boolean
 	@rtype: Version 
 	"""
-	assert(isinstance(branch, AbstractBranch))
+	assert(isinstance(branch, AbstractLabel))
 	newlist = [ branch ]
 
 	if sameVerRel:
@@ -754,7 +775,7 @@ class Version(AbstractVersion):
 	return v
 
     """
-    Creates a Version object from a list of AbstractBranch and AbstractVersion
+    Creates a Version object from a list of AbstractLabel and AbstractVersion
     objects.
     """
     def __init__(self, versionList):

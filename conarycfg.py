@@ -32,7 +32,8 @@ import versions
     STRINGLIST, 
     CALLBACK, 
     EXEC, 
-    STRINGPATH) = range(8)
+    BRANCHNAME,
+    STRINGPATH) = range(9)
 
 class ConfigFile:
 
@@ -94,6 +95,11 @@ class ConfigFile:
 	    self.__dict__[key] = val.split(":")
 	elif type == CALLBACK:
 	    self.__dict__[key]('set', key, val)
+	elif type == BRANCHNAME:
+	    try:
+		self.__dict__[key] = versions.BranchName(val)
+	    except versions.ParseError, e:
+		raise versions.ParseError, str(e)
 	elif type == LABEL:
 	    try:
 		self.__dict__[key] = versions.Label(val)
@@ -121,6 +127,8 @@ class ConfigFile:
 	    if t == STRING:
 		print "%-25s %s" % (item, self.__dict__[item])
 	    elif t == LABEL:
+		print "%-25s %s" % (item, self.__dict__[item].asString())
+	    elif t == BRANCHNAME:
 		print "%-25s %s" % (item, self.__dict__[item].asString())
 	    elif t == STRINGPATH:
 		print "%-25s %s" % (item, ":".join(self.__dict__[item]))
@@ -161,18 +169,17 @@ class ConaryConfiguration(ConfigFile):
 	'debugRecipeExceptions' : [ BOOL, False ], 
 	'dumpStackOnError'      : [ BOOL, True ], 
 	'installLabel'		: [ LABEL, None ],
+        'installBranch'         : [ BRANCHNAME, None ],
 	'instructionSet'	: deps.arch.current(),
 	'lookaside'		: '/var/cache/conary',
 	'name'			: None,
 	'repositoryMap'	        : [ STRINGDICT, {} ],
+	'repositoryPath'	: [ STRINGPATH, [] ],
 	'root'			: '/',
-	'sourceSearchDir'	: '.',
 	'sourceSearchDir'	: '.',
 	'tmpDir'		: '/var/tmp/',
     }
 
-    
-   
     def __init__(self, readConfigFiles=True):
 	ConfigFile.__init__(self)
 
