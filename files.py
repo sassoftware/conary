@@ -184,7 +184,7 @@ class FileMode:
 
 	return 0
 
-    def applyChangeLine(self, line):
+    def _applyChangeLine(self, line):
 	(p, o, g, s, m, f) = line.split()
 	if p == "-": 
 	    p = None
@@ -205,7 +205,7 @@ class FileMode:
 
     def __init__(self, info = None):
 	if info:
-	    self.applyChangeLine(info)
+	    self._applyChangeLine(info)
 	else:
 	    self.thePerms = None
 	    self.theOwner = None
@@ -271,14 +271,14 @@ class File(FileMode):
 	# this should happen unconditionally
 	os.chown(target, uid, gid)
 
-    # public interface to applyChangeLine
+    # public interface to _applyChangeLine
     #
     # returns 1 if the change worked, 0 if the file changed too much for
     # the change to apply (which means this is a different file type)
     def applyChange(self, line):
 	(tag, line) = line.split(None, 1)
 	assert(tag == self.infoTag)
-	self.applyChangeLine(line)
+	self._applyChangeLine(line)
 
     def __init__(self, fileId, info = None, infoTag = None):
         assert(self.__class__ is not File)
@@ -323,14 +323,14 @@ class SymbolicLink(File):
 	os.symlink(self.theLinkTarget, target)
 	File.restore(self, target, restoreContents, skipMtime = 1)
 
-    def applyChangeLine(self, line):
+    def _applyChangeLine(self, line):
 	(target, line) = line.split(None, 1)
 	self.linkTarget(target)
-	File.applyChangeLine(self, line)
+	File._applyChangeLine(self, line)
 
     def __init__(self, fileId, line = None):
 	if (line):
-	    self.applyChangeLine(line)
+	    self._applyChangeLine(line)
 	else:
 	    self.theLinkTarget = None
 
@@ -437,7 +437,7 @@ class DeviceFile(File):
 	
 	return (self.infoTag, self.major, self.minor)
 
-    def applyChangeLine(self, line):
+    def _applyChangeLine(self, line):
 	(ma, mi, line) = line.split(None, 2)
 
 	if ma == "-":
@@ -451,11 +451,11 @@ class DeviceFile(File):
 	    mi = int(mi)
 
 	self.majorMinor(ma, mi)
-	File.applyChangeLine(self, line)
+	File._applyChangeLine(self, line)
 
     def __init__(self, fileId, info = None):
 	if (info):
-	    self.applyChangeLine(info)
+	    self._applyChangeLine(info)
 
 	File.__init__(self, fileId, info, infoTag = self.infoTag)
 
@@ -513,14 +513,14 @@ class RegularFile(File):
 
 	File.restore(self, target, restoreContents)
 
-    def applyChangeLine(self, line):
+    def _applyChangeLine(self, line):
 	(sha, line) = line.split(None, 1)
 	self.sha1(sha)
-	File.applyChangeLine(self, line)
+	File._applyChangeLine(self, line)
 
     def __init__(self, fileId, info = None, infoTag = "f"):
 	if (info):
-	    self.applyChangeLine(info)
+	    self._applyChangeLine(info)
 	else:
 	    self.thesha1 = None
 
