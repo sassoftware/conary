@@ -60,10 +60,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             # the first argument is a version number
 	    r = method(authToken, *args)
 	    return (False, r)
-
-            # the first argument is a version number
-	    r = self.__getattribute__(method)(authToken, *args)
-	    return (False, r)
 	except repository.TroveMissing, e:
             condRollback()
 	    if not e.troveName:
