@@ -20,6 +20,7 @@ import log
 import md5
 import os
 import re
+import sha1helper
 import sqlite
 import tempfile
 import util
@@ -148,7 +149,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 					    troveFlavor, withFiles = True):
 	    if tpath != path or tversion != fileVersion: continue
 
-	    inF = self.repos.contentsStore.openRawFile(fileObj.contents.sha1())
+	    inF = self.repos.contentsStore.openRawFile(
+			    sha1helper.sha1ToString(fileObj.contents.sha1()))
 
 	    (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
 					  suffix = '.cf-out')
