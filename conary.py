@@ -339,7 +339,7 @@ def realMain():
 	    kwargs['replaceFiles'] = True
 	    del argSet['replace-files']
 
-	replaceFiles = argSet.has_key('keep-existing')
+	keepExisting = argSet.has_key('keep-existing')
 	if keepExisting:
 	    kwargs['keepExisting'] = True
 	    del argSet['keep-existing']
