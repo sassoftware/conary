@@ -1,3 +1,6 @@
+Changes in 0.12.5
+  * reworked dependency resolution a bit for a big speedup in the server
+
 Changes in 0.12.4
   * set more arch flags for x86 and x86_64
   * troves can have multiple instruction set flavors now

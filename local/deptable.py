@@ -272,7 +272,8 @@ class DependencyTables:
 
         cu.execute("DROP TABLE suspectDeps")
 
-    def _resolveStmt(self, requiresTable, providesTableList, depTableList):
+    def _resolveStmt(self, requiresTable, providesTableList, depTableList,
+                     providesLabel = None):
         subselect = ""
 
         depTableClause = ""
@@ -312,8 +313,30 @@ class DependencyTables:
                               %(flag)s AS flag
                          FROM %(requires)s JOIN %(provides)s ON
                               %(requires)s.depId = %(provides)s.depId
+""" % substTable
+
+            if providesLabel:
+                subselect += """\
+                           JOIN Instances ON
+                              %(provides)s.instanceId = Instances.instanceId
+                           JOIN Nodes ON
+                              Instances.itemId = Nodes.itemId AND
+                              Instances.versionId = Nodes.versionId
+                           JOIN LabelMap ON
+                              LabelMap.itemId = Nodes.itemId AND
+                              LabelMap.branchId = Nodes.branchId
+                           JOIN Labels ON
+                              Labels.labelId = LabelMap.labelId
+""" % substTable
+
+            subselect += """\
 %(depClause)s""" % substTable
             
+            if providesLabel:
+                subselect += """\
+                            WHERE 
+                              Labels.label = '%s'
+""" % providesLabel
 
         return """
                 SELECT depCheck.depNum as depNum,
@@ -602,23 +625,6 @@ class DependencyTables:
                    start_transaction = False)
         createRequiresTable(cu, 'TmpRequires', isTemp = True)
 
-        cu.execute("""
-                CREATE TEMPORARY VIEW providesBranch AS 
-                    SELECT provides.depId AS depId,
-                           provides.instanceId AS instanceId FROM 
-                    LabelMap JOIN Nodes ON
-                        LabelMap.itemId == Nodes.itemId AND
-                        LabelMap.branchId == Nodes.branchId
-                    JOIN Instances ON
-                        Instances.itemId == Nodes.itemId AND
-                        Instances.versionId == Nodes.versionId
-                    JOIN Provides ON
-                        Provides.instanceId == Instances.instanceId 
-                    WHERE
-                        LabelMap.labelId == 
-                            (SELECT labelId FROM Labels WHERE Label='%s')
-        """ % label.asString(), start_transaction = False)
-
         depList = [ None ]
         for i, depSet in enumerate(depSetList):
             self._populateTmpTable(cu, "DepCheck", depList, -i - 1, 
@@ -628,7 +634,7 @@ class DependencyTables:
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
                             None, "AllDeps", multiplier = -1)
 
-        cu.execute("""SELECT depNum, Items.item, Versions.version FROM 
+        full = """SELECT depNum, Items.item, Versions.version FROM 
                         (%s)
                       JOIN Instances ON
                         provInstanceId == Instances.instanceId
@@ -642,8 +648,10 @@ class DependencyTables:
                       ORDER BY
                         Nodes.finalTimestamp DESC
                     """ % self._resolveStmt( "TmpRequires", 
-                                ("providesBranch",), ("Dependencies",) ),
-                    start_transaction = False)
+                                ("Provides",), ("Dependencies",),
+                                providesLabel = label.asString())
+                    
+        cu.execute(full,start_transaction = False)
         result = {}
         handled = {}
         for (depId, troveName, versionStr) in cu:
@@ -666,7 +674,6 @@ class DependencyTables:
         cu.execute("DROP TABLE TmpDependencies", start_transaction= False)
         cu.execute("DROP TABLE TmpRequires", start_transaction= False)
         cu.execute("DROP TABLE DepCheck", start_transaction = False)
-        cu.execute("DROP VIEW providesBranch", start_transaction = False)
 
         assert(not self.db.inTransaction)
 
