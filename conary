@@ -27,7 +27,8 @@ def usage():
     print "       srs commit  <file>"
     print "       srs pkglist <pkgname> <version>"
     print "       srs replist <pkgname> <version>"
-    print "       srs rollbacks"
+    print "       srs rblist"
+    print "       srs rollback"
     print "       srs update  <pkgname> <version>"
     print "                   <pkgfile>"
     print ""
@@ -205,8 +206,12 @@ elif (otherArgs[1] == "config"):
 	usage()
     else:
 	cfg.display()
-elif (otherArgs[1] == "rollbacks"):
-    db = repository.Database(cfg.root, cfg.dbpath, "c")
+elif (otherArgs[1] == "rblist"):
+    db = repository.Database(cfg.root, cfg.dbpath, "r")
     rollbacks.listRollbacks(db, cfg)
+elif (otherArgs[1] == "rollback"):
+    db = repository.Database(cfg.root, cfg.dbpath, "c")
+    args = [db, cfg] + otherArgs[2:]
+    rollbacks.apply(*args)
 else:
     usage()
