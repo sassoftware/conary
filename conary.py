@@ -62,7 +62,7 @@ def usage(rc = 1):
     print "       conary repquery     <pkgname> [<version>]"
     print "       conary rblist"
     print "       conary rollback     <rollback>"
-    print "       conary showchangeset <changeset>"
+    print "       conary showcs       <changeset>"
     print "       conary source       [usage]"
     print "       conary update       <pkgname> <version>"
     print "              update       <changeset>"
@@ -361,7 +361,7 @@ def realMain():
 	db = openDatabase(cfg.root, cfg.dbPath)
 	args = [db, cfg] + otherArgs[2:]
 	rollbacks.apply(*args)
-    elif (otherArgs[1] == "showchangeset" or otherArgs[1] == "scs"):
+    elif (otherArgs[1] == "showcs" or otherArgs[1] == "scs"):
 	changesets = otherArgs[2:]
 	for changeset in changesets:
 	    cs = repository.changeset.ChangeSetFromFile(changeset)
