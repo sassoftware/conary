@@ -274,7 +274,7 @@ class ChangeSet:
 		    # if a file which isn't a config file has changed, and
 		    # the right version of the file is available in the
 		    # filesystem, go ahead and grab it (otherwise we'll
-		    # leave it to the local branch change set to preserver
+		    # leave it to the local branch change set to preserve
 		    # the contents)
 		    if isinstance(origFile, files.SourceFile):
 			type = "src"
@@ -286,7 +286,7 @@ class ChangeSet:
 		    fsFile = files.FileFromFilesystem(fullPath, fileId,
 				type = type, possibleMatch = origFile)
 
-		    if fsFile.same(origFile):
+		    if fsFile.sha1() == origFile.sha1():
 			cont = filecontents.FromFilesystem(fullPath)
 			rollback.addFileContents(fileId,
 						 ChangedFileTypes.file, cont)
