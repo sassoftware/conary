@@ -14,8 +14,6 @@
 # full details.
 #
 
-echo $* > /tmp/EWT
-
 if [ $0 = "changemail" ]; then
     CONARY=../conary
 else
