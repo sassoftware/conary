@@ -2,47 +2,48 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+"""
+Provides a file which can store multiple files inside of it.
 
-# provides a file which can store multiple files inside of it
-# a table of contents is utilized, and the caller can attach arbitrary
-# data to an entry in the table. no compression is used, but that could
-# be changed
-#
-# the data attached to table entries can be modified, but doing so isn't
-# particularly efficient (the entire table gets rewritten)
-#
-# the last file added to the container can be erased from it. this is
-# to allow operations to be reverted
+A table of contents is utilized, and the caller can attach arbitrary
+data to an entry in the table. No compression is used, but that could
+be changed.
 
-# the file format is:
-#
-# - magic
-# - file 1
-# - file 2
-# .
-# .
-# .
-# - file N
-# - file table entry 1
-# - file table entry 2
-# -                  .
-# -                  .
-# -                  .
-# - file table entry N
-# total # of bytes in file tables
-#
-# each file table entry looks like:
-#   length of entry (4 bytes), not including these 4 bytes
-#   length of file name (4 bytes)
-#   file name 
-#   file offset (4 bytes)
-#   file size (4 bytes)
-#   length of arbitrary data (4 bytes)
-#   entries in file table (4 bytes)
-#   arbitrary file table data
-#
-# this could, and probably should, be reimplemented using tar as the 
-# underlying format and the file table stored as a magic file at the end
+The data attached to table entries can be modified, but doing so isn't
+particularly efficient (the entire table gets rewritten).
+
+The last file added to the container can be erased from it. This is
+to allow operations to be reverted.
+
+The file format is::
+  - magic
+  - file 1
+  - file 2
+  .
+  .
+  .
+  - file N
+  - file table entry 1
+  - file table entry 2
+  -                  .
+  -                  .
+  -                  .
+  - file table entry N
+  total # of bytes in file tables
+
+Each file table entry looks like::
+  length of entry (4 bytes), not including these 4 bytes
+  length of file name (4 bytes)
+  file name 
+  file offset (4 bytes)
+  file size (4 bytes)
+  length of arbitrary data (4 bytes)
+  entries in file table (4 bytes)
+  arbitrary file table data
+
+This could, and probably should, be reimplemented using tar as the 
+underlying format and the file table stored as a magic file at the end.
+"""
 
 import struct
 import os
