@@ -12,6 +12,10 @@
 # full details.
 #
 
+"""
+Provides superclasses for build and policy.
+"""
+
 from lib import epdb
 from lib import log
 import os

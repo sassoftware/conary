@@ -11,6 +11,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+
+"""
+Provides a lookaside cache for storing files locally, including
+downloads and unpacking layers of files.
+"""
+
 import errno
 import os
 from lib import util
