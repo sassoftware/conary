@@ -42,7 +42,10 @@ class RecipeLoader(types.DictionaryType):
                     self[key] = value
 
     def __del__(self):
-        del sys.modules[self.file]
+        try:
+            del sys.modules[self.file]
+        except:
+            pass
 
 # XXX this should be extended to load a recipe from srs
 def loadRecipe(file):
@@ -52,7 +55,7 @@ def loadRecipe(file):
         file = recipepath + '/' + file
     recipes = RecipeLoader(file)
     for name, recipe in recipes.items():
-        # XXX hack to hide parent recipies
+        # XXX hack to hide parent recipes
         recipe.ignore = 1
         callerGlobals[name] = recipe
         # stash a reference to the module in the namespace
