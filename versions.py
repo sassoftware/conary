@@ -566,18 +566,6 @@ class Version(AbstractVersion):
     def __deepcopy__(self, mem):
 	return Version(copy.deepcopy(self.versions[:]))
 
-    def canon(self):
-	"""
-	Returns the canonical version object for this object. For example,
-	the canonical version of /label/ver1/label/ver1 is /label/ver1
-	(as it's the top node on a branch).
-	"""
-	if self.isBranch() or len(self.versions) < 4: return self
-	if self.versions[-1] == self.versions[-3]:
-	    return self.parent()
-
-	return self
-
     def fork(self, branch, sameVerRel = True):
 	"""
 	Creates a new branch from this version. 
