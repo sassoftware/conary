@@ -112,15 +112,18 @@ class FilesystemJob:
 	    tagInfo = tagSet[tag]
 
 	    if "files preremove" in tagInfo.implements:
-		cmd = [ tagInfo.tag, "files", "preremove"] + \
+		cmd = [ tagInfo.file, "files", "preremove"] + \
 			    [ x[rootLen:] for x in l ]
 		tagCommands.append(cmd)
 	    
-	if tagCommands and tagScript:
-	    f = open(tagScript, "a")
-	    for cmd in tagCommands:
-		f.write("# %s\n" % " ".join(cmd))
-	    f.close()
+	if tagCommands:
+	    if tagScript:
+		f = open(tagScript, "a")
+		for cmd in tagCommands:
+		    f.write("# %s\n" % " ".join(cmd))
+		f.close()
+	    else:
+		runTagCommands(self.root, tagCommands)
 
 	tagCommands = []
 
@@ -212,15 +215,18 @@ class FilesystemJob:
 	    tagInfo = tagSet[tag]
 
 	    if "files remove" in tagInfo.implements:
-		cmd = [ tagInfo.tag, "files", "remove"] + \
+		cmd = [ tagInfo.file, "files", "remove"] + \
 			    [ x[rootLen:] for x in l ]
 		tagCommands.append(cmd)
 	    
-	if tagCommands and tagScript:
-	    f = open(tagScript, "a")
-	    f.write("\n".join([" ".join(x) for x in tagCommands]))
-	    f.write("\n")
-	    f.close()
+	if tagCommands:
+	    if tagScript:
+		f = open(tagScript, "a")
+		f.write("\n".join([" ".join(x) for x in tagCommands]))
+		f.write("\n")
+		f.close()
+	    else:
+		runTagCommands(self.root, tagCommands)
 
     def getErrorList(self):
 	return self.errors
@@ -864,3 +870,26 @@ def shlibAction(root, shlibList):
 	if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
 	    log.error("ldconfig failed")
 
+def runTagCommands(root, cmdList):
+    uid = os.getuid()
+
+    for cmd in cmdList:
+	log.debug("running %s", " ".join(cmd))
+	if root != '/' and uid:
+	    continue
+
+	pid = os.fork()
+	if not pid:
+	    if root != '/':
+		os.chdir(root)
+		os.chroot(root)
+
+	    try:
+		os.execl(cmd[0], cmd)
+	    except:
+		pass
+	    os._exit(1)
+
+	(id, status) = os.waitpid(pid, 0)
+	if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
+	    log.error("%s failed", cmd[0])
