@@ -19,6 +19,8 @@ import util
 import buildpackage
 
 # type could be "src"
+#
+# returns a (pkg, fileMap) tuple
 def createPackage(repos, cfg, destdir, fileList, name, version, ident, 
 		  pkgtype = "auto"):
     fileMap = {}
@@ -46,8 +48,7 @@ def createPackage(repos, cfg, destdir, fileList, name, version, ident,
 
         fileMap[file.id()] = (file, realPath, targetPath)
 
-    p.setFileMap(fileMap)
-    return p
+    return (p, fileMap)
 
 def cook(repos, cfg, recipeFile, prep=0, macros=()):
     repos.open("r")
@@ -119,12 +120,11 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
 	for (name, buildPkg) in recipeObj.getPackageSet().packageSet():
 	    fullName = pkgname + ":" + name
-	    p = createPackage(repos, cfg, destdir,
-                              buildPkg.keys(), fullName,
-                              version, ident, "auto")
+	    (p, fileMap) = createPackage(repos, cfg, destdir, buildPkg.keys(), 
+					 fullName, version, ident, "auto")
             
             built.append(fullName)
-	    packageList.append(p)
+	    packageList.append((p, fileMap))
 
         recipes = [ recipeClass.filename ]
         # add any recipe that this recipeClass decends from to the sources
@@ -142,10 +142,10 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
             src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
 	    srcList.append(src)
 	
-	p = createPackage(repos, cfg, destdir, srcList, 
-                          pkgname + ":sources", version, ident, 
-                          "src")
-	packageList.append(p)
+	(p, fileMap) = createPackage(repos, cfg, destdir, srcList, 
+				     pkgname + ":sources", version, ident, 
+				     "src")
+	packageList.append((p, fileMap))
 
 	changeSet = changeset.CreateFromFilesystem(packageList)
 	repos.commitChangeSet(cfg.sourcepath, changeSet)

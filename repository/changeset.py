@@ -169,14 +169,13 @@ def fileChangeSet(fileId, old, new):
 
 # this creates the changeset against None
 #
-# expects a list of Packages
+# expects a list of (pkg, fileMap) tuples
 #
 def CreateFromFilesystem(pkgList):
     cs = ChangeSetFromFilesystem()
 
-    for pkg in pkgList:
+    for (pkg, fileMap) in pkgList:
         version = pkg.getVersion()
-        fileMap = pkg.getFileMap()
         packageName = pkg.getName()
 	(pkgChgSet, filesNeeded) = pkg.diff(None, None, version)
 	cs.addPackage(pkgChgSet)

@@ -24,12 +24,6 @@ class Package:
     def changeVersion(self, version):
         self.version = version
     
-    def getFileMap(self):
-        return self.fileMap
-    
-    def setFileMap(self, map):
-        self.fileMap = map
-
     def addFile(self, fileId, path, version):
 	self.files[path] = (fileId, path, version)
 	self.idMap[fileId] = (path, version)
