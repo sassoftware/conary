@@ -2,10 +2,9 @@ import group
 import versions
 
 def checkin(repos, cfg, file):
-    grp = group.Group()
     f = open(file, "r")
-    simpleVer = grp.parseFile(f, cfg.packagenamespace, repos)
-    if not simpleVer: return
+    grp = group.GroupFromTextFile(f, cfg.packagenamespace, repos)
+    simpleVer = grp.getSimpleVersion()
 
     ver = repos.grpLatestVersion(grp.getName(), cfg.defaultbranch)
     if not ver:
