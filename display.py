@@ -115,8 +115,12 @@ def printFile(fileObj, path, prefix='', verbose=True, tags=False, sha1s=False,
         name = path
     if tags and fileObj.tags:
         taglist = ' [' + ' '.join(fileObj.tags) + ']' 
-    if sha1s and fileObj.contents:
-        sha1 = sha1ToString(fileObj.contents.sha1()) + ' '
+    if sha1s:
+        if hasattr(fileObj, 'contents') and fileObj.contents:
+            sha1 = sha1ToString(fileObj.contents.sha1()) + ' '
+        else:
+            sha1 = ' '*41
+
     if fileIds and fileId:
         id = sha1ToString(fileId) + ' '
     if verbose: 

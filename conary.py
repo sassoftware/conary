@@ -352,6 +352,12 @@ def realMain(cfg, argv=sys.argv):
         tags = argSet.has_key('tags')
 	if tags: del argSet['tags']
 
+        sha1s = argSet.has_key('sha1s')
+	if sha1s: del argSet['sha1s']
+
+        ids = argSet.has_key('ids')
+	if ids: del argSet['ids']
+
         info = argSet.has_key('info')
 	if info: del argSet['info']
 
@@ -363,6 +369,9 @@ def realMain(cfg, argv=sys.argv):
 
         if argSet: return usage()
 
+        if len(otherArgs) < 3:
+            showchangeset.usage()
+            return 1
         changeset = otherArgs[2]
         component = None
         if len(otherArgs) > 3:
@@ -371,7 +380,8 @@ def realMain(cfg, argv=sys.argv):
 	db = database.Database(cfg.root, cfg.dbPath)
 	repos = openRepository(cfg.repositoryMap)
         showchangeset.displayChangeSet(db, repos, cs, component, cfg, ls, 
-                                        tags, info, fullVersions, showChanges)
+                                        tags, info, fullVersions, showChanges, 
+                                        ids=ids, sha1s=sha1s)
     elif (otherArgs[1] == "update"):
 	kwargs = {}
 
