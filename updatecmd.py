@@ -6,11 +6,9 @@ import changeset
 import helper
 import log
 import os
-import package
 import repository
 import sys
 import util
-import versions
 
 def doUpdate(repos, db, cfg, pkg, versionStr = None):
     cs = None

@@ -10,7 +10,6 @@ import files
 import os
 import package
 import patch
-import repository
 import versions
 
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff")

@@ -7,7 +7,6 @@ import changeset
 import helper
 import log
 import package
-import versions
 
 def checkin(repos, cfg, file):
     f = open(file, "r")

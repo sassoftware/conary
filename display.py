@@ -6,7 +6,6 @@ import files
 import helper
 import log
 import package
-import versions
 
 _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
