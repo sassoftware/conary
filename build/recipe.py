@@ -229,10 +229,10 @@ class RecipeLoader:
                         and obj is not PackageRecipe) or \
                (issubclass(obj, RedirectRecipe) 
                         and obj is not RedirectRecipe):
-                if recipename[0] not in string.ascii_letters:
+                if recipename[0] not in string.ascii_letters + string.digits:
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name must start '
-                        'with an ascii letter.' %basename)
+                        'with an ascii letter or digit.' %basename)
                 if recipename.startswith('group-'):
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name cannot '
