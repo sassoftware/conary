@@ -78,7 +78,7 @@ def handler(req):
 	else:
 	    port = 80
 
-	urlBase = "http://%s:%d" % (req.hostname, port)
+	urlBase = "http://%s:%d" % (req.server.server_hostname, port)
 	
 	urlBase += req.uri
 
@@ -90,7 +90,7 @@ def handler(req):
 	repositories[repName] = netserver.NetworkRepositoryServer(
 				d['reppath'], d['tmppath'], 
 				urlBase, d['authpath'],
-				d['servername'],
+				d['servername'], {},
 				commitAction = commitAction)
 
     repos = repositories[repName]
