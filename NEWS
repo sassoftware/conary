@@ -8,7 +8,8 @@ Changes in 0.14.4:
   * packagepolicy now automatically adds usermode:runtime requirement to files
     that are dangling symlinks to consolehelper
   * the templating engine for the web interface to the server has been
-    changed to kid
+    changed to kid; kid and elementtree are now required to run a server.
+  * the web interface now supports limited editing of ACLs
   * the server now only supports protocol version 26 (it was a mistake
     to leave in support for 24 and 25)
   * old code that supported ancient protocol versions has been
