@@ -78,7 +78,7 @@ class UseClass:
         flags = self.__dict__.get('flags', {})
         if flags.has_key(name):
             return flags[name]
-        return getattr(self. name)
+        raise AttributeError, "class %s has no attribute '%s'" % (self.__class__.__name__, name)
 
     def addFlag(self, name, value):
         if self.frozen:
