@@ -163,6 +163,11 @@ static int doInspect(int fd, Elf * elf, PyObject * reqList,
 	elf_getshstrndx (elf, &shstrndx);
 	name = elf_strptr (elf, shstrndx, shdr.sh_name);
 
+	if (shdr.sh_type == SHT_NOBITS) {
+	    /* this section has no data, skip it */
+	    continue;
+	}
+	
 	if (!strcmp(name, ".dynamic")) {
 	    data = elf_getdata(sect, NULL);
 
