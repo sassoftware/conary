@@ -187,14 +187,19 @@ class RecipeLoader(types.DictionaryType):
             raise RecipeFileError(msg)
         exec code in self.module.__dict__
         for (name, obj) in  self.module.__dict__.items():
-            if type(obj) == types.ClassType:
-                # make sure the class is derived from Recipe
-                # and has a name
-                if obj.__dict__.has_key('ignore'):
-                    continue
-                if issubclass(obj, Recipe) and obj.__dict__.has_key('name'):
-                    obj.__dict__['filename'] = filename
-                    self[name] = obj
+            if type(obj) is not types.ClassType:
+                continue
+            if obj.__dict__.has_key('ignore'):
+                continue
+            # make sure the class is derived from Recipe
+            # and has a name
+            if issubclass(obj, Recipe) and obj.__dict__.has_key('name'):
+                if obj.name.startswith('group-'):
+                    raise RecipeFileError(
+                        'Error in recipe file "%s": name cannot '
+                        'begin with "group-"' %os.path.basename(filename))
+                obj.__dict__['filename'] = filename
+                self[name] = obj
 
     def __del__(self):
         try:
