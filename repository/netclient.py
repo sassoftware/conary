@@ -32,10 +32,13 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
+CLIENT_VERSION=5
+
 class _Method(xmlrpclib._Method):
 
     def __call__(self, *args):
-        isException, result = self.__send(self.__name, args)
+        newArgs = ( CLIENT_VERSION, ) + args
+        isException, result = self.__send(self.__name, newArgs)
 	if not isException:
 	    return result
 
@@ -87,7 +90,7 @@ class ServerCache:
 	    self.cache[serverName] = server
 
 	    try:
-		if server.checkVersion(4) != 4:
+		if server.checkVersion() != CLIENT_VERSION:
 		    raise repository.OpenError('Server version too old')
 	    except Exception, e:
                 if isinstance(e, socket.error):
