@@ -5,6 +5,7 @@
 # All rights reserved
 #
 
+import branch
 import changeset
 import checkin
 import commit
@@ -30,7 +31,8 @@ sys.excepthook = util.excepthook
 cfg = srscfg.SrsConfiguration()
 
 def usage():
-    print "usage: srs changeset <pkg> [<oldver>] <newver> <outfile>"
+    print "usage: srs branch <newbranch> <branchfrom> [<trove>]"
+    print "       srs changeset <pkg> [<oldver>] <newver> <outfile>"
     print "       srs cook    [--prep] [--macros file] <first.recipe> <second.recipe> ..."
     print "       srs checkin <file>"
     print "       srs checkout <group> <file> <version>"
@@ -252,6 +254,12 @@ elif (otherArgs[1] == "rollback"):
     db = database.Database(cfg.root, cfg.dbpath, "c")
     args = [db, cfg] + otherArgs[2:]
     rollbacks.apply(*args)
+elif (otherArgs[1] == "branch"):
+    if len(otherArgs) < 4 or len(otherArgs) > 5: usage()
+    repos = repository.LocalRepository(cfg.reppath, "c")
+
+    args = [repos ] + otherArgs[2:]
+    branch.branch(*args)
 elif (otherArgs[1] == "checkin"):
     if len(otherArgs) != 3: usage()
     repos = repository.LocalRepository(cfg.reppath, "c")

@@ -10,6 +10,7 @@ srsdir = $(prefix)/share/srs
 bindir = $(prefix)/bin
 
 python_files = __init__.py	\
+	branch.py		\
 	build.py		\
 	buildpackage.py		\
 	database.py		\

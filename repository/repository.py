@@ -12,11 +12,13 @@ import difflib
 import fcntl
 import filecontents
 import files
+import log
 import os
 import package
 import patch
 import util
 import versioned
+import versions
 import bsddb
 
 from versioned import VersionedFile
@@ -72,6 +74,10 @@ class Repository:
     def getPackageBranchList(self, pkgName):
 	return self._getPackageSet(pkgName).branchList()
 
+    def createTroveBranch(self, pkgName, branch):
+	log.debug("creating branch %s for %s", branch.asString(), pkgName)
+	return self._getPackageSet(pkgName).createBranch(branch)
+
     ### File functions
 
     def fileLatestVersion(self, fileId, branch):
@@ -102,6 +108,10 @@ class Repository:
     def eraseFileVersion(self, fileId, version):
 	fileDB = self._getFileDB(fileId)
 	fileDB.eraseVersion(version)
+
+    def createFileBranch(self, fileId, branch):
+	log.debug("creating branch %s for %s" % (branch.asString(), fileId))
+	return self._getFileDB(fileId).createBranch(branch)
 
     def storeFileFromContents(self, chgSet, file, restoreContents):
 	raise NotImplemented
@@ -146,6 +156,75 @@ class LocalRepository(Repository):
     def hasFileContents(self, fileId):
 	return self.contentsStore.hasFile(fileId)
 
+    def createBranch(self, newBranch, where, troveName = None):
+	"""
+	Creates a branch for the troves in the repository. This
+	operations is recursive, with any required troves and files
+	also getting branched. Duplicate branches can be created,
+	but only if one of the following is true::
+	 
+	  1. where specifies a particular version to branch from
+	  2. the branch does not yet exist and where is a branch nickname which matches multiple existing branches
+
+	Where specifies the node branches are created from for the
+	trove troveName (or all of the troves if troveName is empty).
+	Any troves or files branched due to inclusion in a branched
+	trove will be branched at the version required by the object
+	including it. If different versions of objects are included
+	from multiple places, bad things will happen (an incomplete
+	branch will be formed). More complicated algorithms for branch
+	will fix this, but it's not clear doing so is necessary.
+
+	@param newBranch: Nickname of the new branch
+	@type newBranch: versions.BranchName
+	@param where: Where the branch should be created from
+	@type where: versions.Version or versions.BranchName
+	@param troveName: Name of the trove to branch; none if all
+	troves in the repository should be branched.
+	@type troveName: str
+	"""
+	if not troveName:
+	    troveList = self.getAllTroveNames()
+	else:
+	    troveList = [ troveName ]
+
+	troveList = [ (x, where) for x in troveList ]
+
+	branchedTroves = {}
+	branchedFiles = {}
+
+	while troveList:
+	    troveName = troveList[0][0]
+	    location = troveList[0][1]
+	    del troveList[0]
+
+	    if branchedTroves.has_key(troveName): continue
+	    branchedTroves[troveName] = 1
+
+	    list = []
+	    if isinstance(location, versions.Version):
+		list.append(location)
+	    else:
+		branchList = self.getPackageNickList(troveName, location)
+		for branch in branchList:
+		    v = self.pkgLatestVersion(troveName, branch)
+		    list.append(v)
+
+	    for version in list:
+		pkg = self.getPackageVersion(troveName, version)
+		branchedVersion = version.fork(newBranch, sameVerRel = 0)
+		self.createTroveBranch(troveName, branchedVersion)
+
+		for (fileId, path, version) in pkg.fileList():
+		    if branchedFiles.has_key(fileId): continue
+		    branchedFiles[fileId] = 1
+
+		    branchedVersion = version.fork(newBranch, sameVerRel = 0)
+		    self.createFileBranch(fileId, branchedVersion)
+
+		for (name, version) in pkg.getPackageList():
+		    troveList.append((name, version))
+		    
     def open(self, mode):
 	if self.pkgDB:
 	    self.close()
