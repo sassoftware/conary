@@ -163,8 +163,7 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
 
     return built
 
-def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch, 
-		      macros={}):
+def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -188,6 +187,9 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
 
     recipeObj = recipeClass(repos, cfg, buildBranch)
     recipeObj.setup()
+
+    nextVersion = helper.nextVersion(repos, fullName, recipeClass.version, 
+				     None, buildBranch, binary = True)
 
     grp = package.Package(fullName, newVersion, None)
 
