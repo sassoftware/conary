@@ -440,7 +440,20 @@ and can also live independently as files.
 .\"
 .\"
 .SH EXAMPLES
-Coming soon to a man page near you!
+.TP 4
+.B Branching
+cvc branch conary.example.com@spx:example-foo conary.specifix.com@spx:linux foo:source
+.br
+This creates a branch in the conary.example.com repository of the
+foo:source trove, based on the version of foo in the main specifix repository.
+You can now check out this branch and work on it:
+.br
+cvc checkout --build-label conary.example.com@spx:example-foo foo
+.br
+Committing changes to that copy of foo:source will go into the
+conary.example.com repository on the spx:example-foo branch.
+.P
+More examples coming soon to a man page near you!
 .\"
 .\"
 .\"
