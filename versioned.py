@@ -257,10 +257,10 @@ class VersionedFile:
 	#self.db.sync()
 
     def eraseVersion(self, version):
-	"""Removes a versoin of the file.
+	"""Removes a version of the file.
 
 	    @param version; The version of the file to remove
-	    @type versoin: versions.Version
+	    @type version: versions.Version
 	"""
 	self._readBranchMap()
 
@@ -296,7 +296,7 @@ class VersionedFile:
 	"""Tells whether or not a particular version of the file exists.
 
 	    @param version; The version of the file to remove
-	    @type versoin: versions.Version
+	    @type version: versions.Version
 	"""
 	return self.db.has_key(_VERSION_INFO % (self.key, version.asString()))
 
