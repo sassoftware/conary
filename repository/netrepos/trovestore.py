@@ -376,7 +376,6 @@ class TroveStore:
 		INSERT INTO NewFiles VALUES(%d, %s, %d, %d, %s, %s)
 	    """, (troveInstanceId, fileId, versionId, flavorId, stream, path))
 
-	cu.execute("CREATE INDEX NewFilesIdx on NewFiles(fileId, versionId)")
         cu.execute("""
 	    INSERT INTO FileStreams SELECT NULL,
 					   NewFiles.fileId,
@@ -396,7 +395,6 @@ class TroveStore:
 		    NewFiles.fileId = FileStreams.fileId AND
 		    NewFiles.versionId = FileStreams.versionId
                     """)
-        cu.execute("DROP INDEX NewFilesIdx")
         cu.execute("DROP TABLE NewFiles")
 
 	for (name, version, flavor) in trove.iterTroveList():
