@@ -15,6 +15,7 @@ import rpmhelper
 import gzip
 
 baseMacros = (
+    # paths
     ('prefix'		, '/usr'),
     ('sysconfdir'	, '/etc'),
     ('lib'              , 'lib'),  # may be overridden with 'lib64'
@@ -28,6 +29,8 @@ baseMacros = (
     ('datadir'		, '/usr/share'),
     ('mandir'		, '%(datadir)s/man'),
     ('infodir'		, '%(datadir)s/info'),
+    # arguments/flags
+    ('cflags'           , '-O2'),
     ('mflags'		, ''),
     ('parallelmflags'   , ''),
 )
