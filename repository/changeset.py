@@ -874,8 +874,11 @@ def fileChangeSet(fileId, old, new):
 
     return (diff, hash)
 
+def fileContentsUseDiff(oldFile, newFile):
+    return oldFile and oldFile.flags.isConfig() and newFile.flags.isConfig()
+
 def fileContentsDiff(oldFile, oldCont, newFile, newCont):
-    if oldFile and oldFile.flags.isConfig() and newFile.flags.isConfig():
+    if fileContentsUseDiff(oldFile, newFile):
 	first = oldCont.get().readlines()
 	second = newCont.get().readlines()
 

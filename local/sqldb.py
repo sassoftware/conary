@@ -605,15 +605,15 @@ class Database:
 	""", start_transaction = False)
 
 	versionStrs = {}
-	for (fileId, version) in l:
+	for i, (fileId, version) in enumerate(l):
 	    if versionStrs.has_key(version):
 		vs = versionStrs[version]
 	    else:
 		vs = version.asString()
 		versionStrs[version] = vs
 
-	    cu.execute("INSERT INTO getFilesTbl VALUES (NULL, ?, ?)", 
-		       fileId, vs,
+	    cu.execute("INSERT INTO getFilesTbl VALUES (?, ?, ?)", 
+		       i, fileId, vs,
 		       start_transaction = False)
 	del versionStrs
 

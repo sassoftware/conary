@@ -21,6 +21,7 @@ import httplib
 from lib import log
 import os
 import repository
+import changeset
 import socket
 import tempfile
 import transport
@@ -411,7 +412,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         if not chgSetList:
             # no need to work hard to find this out
-            return repository.changeset.ReadOnlyChangeSet()
+            return changeset.ReadOnlyChangeSet()
 
         cs = None
         firstPath = target
@@ -455,8 +456,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         outF.close()
 
                         if not firstPath:
-                            newCs = repository.changeset.ChangeSetFromFile(
-                                            tmpName)
+                            newCs = changeset.ChangeSetFromFile(tmpName)
                             os.unlink(tmpName)
 
                             if not cs:
@@ -471,7 +471,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         raise
 
             if (ourJobList or filesNeeded) and not internalCs:
-                internalCs = repository.changeset.ChangeSet()
+                internalCs = changeset.ChangeSet()
 
             # generate this change set, and put any recursive generation
             # which is needed onto the chgSetList for the next pass
@@ -549,6 +549,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             del fd
 
             contentsNeeded = []
+            fileJob = []
 
             for (fileId, troveName, 
                     (oldTroveVersion, oldTroveF, oldFileVersion),
@@ -561,28 +562,49 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 newFileObj = fileDict[(fileId, newFileVersion)]
 
-		(filecs, hash) = repository.changeset.fileChangeSet(fileId, 
-                                                oldFileObj, newFileObj)
+		(filecs, hash) = changeset.fileChangeSet(fileId, oldFileObj, 
+                                                         newFileObj)
 
 		internalCs.addFile(fileId, oldFileVersion, newFileVersion, 
                                    filecs)
 
                 if withFileContents and hash:
-                    # pull the contents from the trove it was originall
+                    # pull contents from the trove it was originally
                     # built in
-                    contentsNeeded.append( (troveName, newFileVersion, 
-                                      fileId, newFileVersion, newFileObj) )
+                    items = []
+                    if changeset.fileContentsUseDiff(oldFileObj, newFileObj):
+                        items.append( (troveName, oldFileVersion, 
+                                      fileId, oldFileVersion, oldFileObj) ) 
 
-            contentList = self.getFileContents(contentsNeeded, tmpFile = tmpF)
-            for (item, contents) in zip(contentsNeeded, contentList):
-                fileId = item[2]
-                newFileObj = item[4]
-            
-                internalCs.addFileContents(fileId, 
-                               repository.changeset.ChangedFileTypes.file, 
-                               contents, 
-                               newFileObj.flags.isConfig())
+                    items.append( (troveName, newFileVersion, 
+                                    fileId, newFileVersion, newFileObj) )
+                    contentsNeeded += items
+                    fileJob += (items,)
 
+            contentList = self.getFileContents(contentsNeeded, tmpFile = tmpF,
+                                               lookInLocal = True)
+
+            i = 0
+            for item in fileJob:
+                fileId = item[0][2]
+                fileObj = item[0][4]
+                contents = contentList[i]
+                i += 1
+
+                if len(item) == 1:
+                    internalCs.addFileContents(fileId, 
+                                   changeset.ChangedFileTypes.file, 
+                                   contents, 
+                                   newFileObj.flags.isConfig())
+                else:
+                    newFileObj = item[0][4]
+                    newContents = contentList[i]
+                    i += 1
+
+                    (contType, cont) = changeset.fileContentsDiff(fileObj, 
+                                            contents, newFileObj, newContents)
+                    internalCs.addFileContents(fileId, contType,
+                                               cont, True)
 
         if not cs and internalCs:
             cs = internalCs
@@ -593,7 +615,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         if target and cs:
             if not firstPath:
-                newCs = repository.changeset.ChangeSetFromFile(target)
+                newCs = changeset.ChangeSetFromFile(target)
                 os.unlink(target)
                 # doing the merge this way works even if cs is from internalCs
                 newCs.merge(cs)
@@ -647,6 +669,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def getFileContents(self, fileList, tmpFile = None, lookInLocal = False):
         contents = [ None ] * len(fileList)
 
+        if self.localRep and lookInLocal:
+            for i, item in enumerate(fileList):
+                if len(item) < 5: continue
+
+                sha1 = item[4].contents.sha1()
+                if self.localRep._hasFileContents(sha1):
+                    contents[i] = self.localRep.getFileContents([item])[0]
+
         for i, item in enumerate(fileList):
             if contents[i] is not None:
                 continue
@@ -686,7 +716,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return contents
 
     def commitChangeSetFile(self, fName):
-        cs = repository.changeset.ChangeSetFromFile(fName)
+        cs = changeset.ChangeSetFromFile(fName)
         return self._commit(cs, fName)
 
     def commitChangeSet(self, chgSet):

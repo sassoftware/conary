@@ -716,6 +716,9 @@ class FilesystemJob:
 				      "from repository",
 				      contentsOverride = headFileContents)
 		    else:
+                        # switch the fsFile to the sha1 for the new file
+                        if fsFile.hasContents:
+                            fsFile.contents.setSha1(headFile.contents.sha1())
 			self._restore(fsFile, realPath, 
 				      "replacing %s with contents "
 				      "from repository")
