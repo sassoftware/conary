@@ -13,7 +13,7 @@
 #
 from repository import changeset
 from repository import repository
-import filecontainer
+from repository import filecontainer
 import log
 import os
 import tempfile

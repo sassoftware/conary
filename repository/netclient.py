@@ -13,7 +13,6 @@
 #
 
 import exceptions
-import filecontainer
 import filecontents
 import gzip
 import httplib
