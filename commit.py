@@ -46,9 +46,13 @@ def doCommit(repos, changeSetFile, targetBranch):
         # hopefully the file hasn't changed underneath us since we
         # did the check at the top of doCommit().  We should probably
         # add commitChangeSet method that takes a fd.
-        repos.commitChangeSetFile(changeSetFile)
-    except repository.CommitError, e:
-	print e
+        try:
+            repos.commitChangeSetFile(changeSetFile)
+        except repository.CommitError, e:
+            print e
+    finally:
+        if targetBranch:
+            os.unlink(changeSetFile)
 	
 def doLocalCommit(db, changeSetFile):
     cs = changeset.ChangeSetFromFile(changeSetFile)

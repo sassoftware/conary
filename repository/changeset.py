@@ -624,6 +624,8 @@ class ChangeSetFromFile(ChangeSet):
 	    cont = filecontents.FromString(str)
 	    size = len(str)
 	else:
+            self.filesRead = True
+
             while True:
                 if self.nextFile:
                     rc = self.nextFile
@@ -664,7 +666,29 @@ class ChangeSetFromFile(ChangeSet):
 	return self.csf.hasFile(hash)
 
     def writeAllContents(self, csf):
-        assert(0)
+        # diffs go out, then we write out whatever contents are left
+        assert(not self.filesRead)
+        self.filesRead = True
+
+        idList = self.configCache.keys()
+        idList.sort()
+
+	for hash in idList:
+	    (tag, str) = self.configCache[hash]
+            csf.addFile(hash, filecontents.FromString(str), "1 diff")
+
+        while True:
+            if self.nextFile:
+                rc = self.nextFile
+                self.nextFile = None
+            else:
+                rc = self.csf.getNextFile()
+
+            if not rc:
+                break
+
+            name, tagInfo, f, size = rc
+            csf.addFile(name, filecontents.Fromfile(f, size = size), tagInfo)
 
     def __init__(self, file, justContentsForConfig = 0, skipValidate = 1):
 	f = open(file, "r")
@@ -688,8 +712,7 @@ class ChangeSetFromFile(ChangeSet):
 		self.local = 1
 
 	self.configCache = {}
-	self.earlyFileContents = None
-	self.lateFileContents = None
+        self.filesRead = False
 
 	if not skipValidate:
 	    self.validate(justContentsForConfig)
