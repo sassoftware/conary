@@ -134,6 +134,48 @@ def findPackage(repos, packageNamespace, defaultNick, name,
 
     return pkgList
 
+def fullBranchName(nameSpace, defaultNick, version, versionStr):
+    """
+    Converts a version string, and the version the string refers to
+    (often returned by findPackage()) into the full branch name the
+    node is on. This is different from version.branch() when versionStr
+    refers to the head of an empty branch, in which case version() will
+    be the version the branch was forked from rather then a version on
+    that branch.
+
+    @param nameSpace: repository branches are on when versionStr begins 
+    with @ (may be none if versionStr doesn't begin with an @)
+    @type nameSpace: str
+    @param defaultNick: branch nickname we're on if versionStr is None
+    (may be none if versionStr is not None)
+    @type defaultNick: versions.BranchName
+    @param version: version of the node versionStr resolved to
+    @type version: versions.Version
+    @param versionStr: string from the user; likely a very abbreviated version
+    @type versionStr: str
+    """
+    if not versionStr or (versionStr[0] != "/" and  \
+	# branch nickname was given
+	    (versionStr.find("/") == -1) and versionStr.count("@")):
+	if not versionStr:
+	    nick = defaultNick
+	elif versionStr[0] == "@":
+	    nick = versions.BranchName(nameSpace, versionStr)
+	else:
+	    nick = versions.BranchName(versionStr)
+
+	if version.branch().branchNickname().equal(nick):
+	    return version.branch()
+	else:
+	    # this must be the node the branch was created at, otherwise
+	    # we'd be on it
+	    return version.fork(nick, sameVerRel = 0)
+    elif version.isBranch():
+	return version
+	state.setTroveBranch(version)
+    else:
+	return version.branch()
+
 class PackageNotFound(Exception):
 
     def __str__(self):
