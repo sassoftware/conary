@@ -6,6 +6,7 @@ Changes in 0.10.5:
   * Internal changes to move toward getFileContents() working in batches
     rather then on individual files. For now this prevents the repository
     from copying files between the content store and /tmp to serve them.
+  * Arch flags are now included in flavors
 
 Changes in 0.10.4:
   * Bug fixes for updating from absolute change sets (which basically
