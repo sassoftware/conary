@@ -20,16 +20,16 @@ sys.excepthook = util.excepthook
 
 cfg = srscfg.SrsConfiguration()
 
-repos = repository.Repository(cfg.reppath)
-
 def usage():
-    print "usage: srs import  <file.rpm>"
+    print "usage: srs changeset <pkg> <outfile> [<oldver>] <newver>"
+    print "       srs cook    [--prep] <first.recipe> <second.recipe> ..."
+    print "       srs commit  <file>"
     print "       srs pkglist <pkg> <version>"
     print "       srs update  <pkg> <version>"
-    print "       srs cook    [--prep] <first.recipe> <second.recipe> ..."
     print ""
     print "common flags:  --branch <defaultbranch>"
     print '               --config "<item> <value>"'
+    print "               --repos <repository-path>"
     print "               --root <root>"
     print ""
     print "pkglist flags: --all"
@@ -43,7 +43,8 @@ cfgMap = {}
 # 1 - arg may occur once, w/ parameter
 # 2 - arg may occur N times, w/ parameter
 
-cfgMap["branch"] = "defaultBranch"
+cfgMap["branch"] = "defaultbranch"
+cfgMap["repos"] = "reppath"
 cfgMap["root"] = "root"
 
 argDef["config"] = 2
@@ -92,12 +93,14 @@ for (arg, name) in cfgMap.items():
 	cfg.configLine("%s %s" % (name, argSet[arg]))
 	del argSet[arg]
 
+repos = repository.Repository(cfg.reppath)
+
 if (len(otherArgs) < 2):
     usage()
 elif (otherArgs[1] == "import"):
     print "this is broken"
 elif (otherArgs[1] == "changeset"):
-    # current usage is "package oldversion newversion"
+    # current usage is "package file oldversion newversion"
     if len(otherArgs) != 5 and len(otherArgs) != 6:
 	usage()
 
@@ -109,7 +112,10 @@ elif (otherArgs[1] == "changeset"):
 	(old, new) = (None, otherArgs[3])
 	outFile = otherArgs[4]
 
-    changeset.ChangeSet(repos, cfg, name, outFile, old, new)
+    changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
+elif (otherArgs[1] == "commit"):
+    for changeSet in otherArgs[2:]:
+	commit.commitChangeSet(repos, cfg, changeSet)
 elif (otherArgs[1] == "cook"):
     prep = 0
     if argSet.has_key('prep'):
