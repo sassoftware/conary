@@ -246,21 +246,6 @@ class FlagsStream(streams.IntStream):
     def isTransient(self, set = None):
 	return self._isFlag(_FILE_FLAG_TRANSIENT, set)
 
-    def isInitScript(self, set = None):
-	'legacy, not used for new packages'
-	assert(0)
-	return self._isFlag(_FILE_FLAG_INITSCRIPT, set)
-
-    def isShLib(self, set = None):
-	'legacy, not used for new packages'
-	assert(0)
-	return self._isFlag(_FILE_FLAG_SHLIB, set)
-
-    def isGconfSchema(self, set = None):
-	'legacy, not used for new packages'
-	assert(0)
-	return self._isFlag(_FILE_FLAG_GCONFSCHEMA, set)
-
     def _isFlag(self, flag, set):
 	if set != None:
             if self.val is None:
