@@ -855,7 +855,7 @@ class GroupRecipe(Recipe):
     def getTroveList(self):
 	return self.troveVersionFlavors
 
-    def __init__(self, repos, cfg, label, flavor):
+    def __init__(self, repos, cfg, label, flavor, extraMacros={}):
 	self.repos = repos
 	self.cfg = cfg
 	self.troveVersionFlavors = {}
@@ -863,6 +863,8 @@ class GroupRecipe(Recipe):
 	self.flavor = flavor
         self.addTroveList = []
         self.requires = deps.DependencySet()
+        self.macros = macros.Macros()
+        self.macros.update(extraMacros)
 
 class RedirectRecipe(Recipe):
     Flags = use.LocalFlags
@@ -938,13 +940,15 @@ class RedirectRecipe(Recipe):
     def getRedirections(self):
 	return self.redirections
 
-    def __init__(self, repos, cfg, label, flavor):
+    def __init__(self, repos, cfg, label, flavor, extraMacros={}):
 	self.repos = repos
 	self.cfg = cfg
         self.redirections = {}
 	self.label = label
 	self.flavor = flavor
         self.addTroveList = []
+        self.macros = macros.Macros()
+        self.macros.update(extraMacros)
 
 
 class FilesetRecipe(Recipe):
@@ -1042,13 +1046,15 @@ class FilesetRecipe(Recipe):
 	for (pathId, (path, fileId, version)) in self.files.iteritems():
 	    yield (pathId, path, fileId, version)
 	    
-    def __init__(self, repos, cfg, label, flavor):
+    def __init__(self, repos, cfg, label, flavor, extraMacros={}):
 	self.repos = repos
 	self.cfg = cfg
 	self.files = {}
 	self.paths = {}
 	self.label = label
 	self.flavor = flavor
+        self.macros = macros.Macros()
+        self.macros.update(extraMacros)
 	
 class RecipeFileError(Exception):
     def __init__(self, msg):

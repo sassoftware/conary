@@ -11,6 +11,8 @@ Changes in 0.50.1:
     work with perl as well as python.
   * client/server protocol negotiation is a whole lot smarter now
   * getChangeSet() results in a single URL rather than one per primary trove
+  * group, fileset, and redirect recipes have macros that contain the
+    buildlabel and buildbranch.
 
 Changes in 0.50.0:
   * Redirections work

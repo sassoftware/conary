@@ -313,8 +313,8 @@ def cookRedirectObject(repos, cfg, recipeClass, sourceVersion, macros={},
 
     fullName = recipeClass.name
 
-    recipeObj = recipeClass(repos, cfg, 
-                            sourceVersion.branch().label(), cfg.flavor)
+    recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
+                            cfg.flavor, macros)
 
     try:
         use.track(True)
@@ -394,8 +394,8 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
 
     fullName = recipeClass.name
 
-    recipeObj = recipeClass(repos, cfg, 
-                            sourceVersion.branch().label(), cfg.flavor)
+    recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(),
+                            cfg.flavor, macros)
 
     try:
         use.track(True)
@@ -466,7 +466,7 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
     fullName = recipeClass.name
 
     recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
-                            cfg.flavor)
+                            cfg.flavor, macros)
     recipeObj.setup()
 
     changeSet = changeset.ChangeSet()
