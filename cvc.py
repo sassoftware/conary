@@ -24,9 +24,7 @@ def sourceCommand(cfg, args, argSet):
 	usage()
     elif (args[0] == "add"):
 	if len(args) != 2: usage()
-	repos = repository.LocalRepository(cfg.reppath, "c")
-
-	checkin.addFile(repos, args[1])
+	checkin.addFile(args[1])
     elif (args[0] == "checkin"):
 	if argSet or len(args) != 2: usage()
 	repos = repository.LocalRepository(cfg.reppath, "c")
@@ -55,6 +53,9 @@ def sourceCommand(cfg, args, argSet):
 
 	if argSet or len(args) != 1: usage()
 	checkin.diff(repos)
+    elif (args[0] == "remove"):
+	if len(args) != 2: usage()
+	checkin.removeFile(args[1])
     elif (args[0] == "update"):
 	if len(args) != 1: usage()
 	repos = repository.LocalRepository(cfg.reppath, "r")

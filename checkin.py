@@ -5,6 +5,7 @@
 
 import changeset
 import cook
+import errno
 import filecontents
 import files
 import helper
@@ -26,6 +27,17 @@ class SourceState:
 
     def addFile(self, fileId, path, version):
 	self.files[fileId] = (path, version)
+
+    def removeFile(self, fileId):
+	del self.files[fileId]
+
+    def removeFilePath(self, file):
+	for (fileId, (path, version)) in self.getFileList():
+	    if path == file: 
+		del self.files[fileId]
+		return True
+
+	return False
 
     def setTroveName(self, name):
 	self.troveName = name
@@ -322,6 +334,9 @@ def buildChangeSet(repos, srcVersion = None, needsHead = False):
     assert(not pkgsNeeded)
     changeSet.newPackage(csPkg)
 
+    if csPkg.getOldFileList():
+	foundDifference = 1
+
     return (foundDifference, state, changeSet, srcPkg)
 
 def commit(repos):
@@ -349,6 +364,7 @@ def diff(repos):
     assert(len(packageChanges) == 1)
     pkgCs = packageChanges[0]
 
+
     for (fileId, path, newVersion) in pkgCs.getNewFileList():
 	print "%s: new" % path
 
@@ -369,6 +385,10 @@ def diff(repos):
 		print
 		print str
 		print
+
+    for fileId in pkgCs.getOldFileList():
+	path = oldPackage.getFile(fileId)[0]
+	print "%s: removed" % path
 	
 def update(repos):
     if not os.path.isfile("SRS"):
@@ -394,6 +414,54 @@ def update(repos):
 				      state.getTroveVersion())
 
     fullyUpdated = 1
+
+    for (fileId, headPath, headVersion) in pkgCs.getNewFileList():
+	# this gets broken links right
+	try:
+	    os.lstat(headPath)
+	except:
+	    log.error("%s is in the way of a newly created file" % headPath)
+	    fullyUpdated = 0
+	    continue
+
+	log.info("creating %s" % headPath)
+	(headFile, headFileContents) = \
+		repos.getFileVersion(fileId, headVersion, withContents = 1)
+	src = repos.pullFileContentsObject(headFile.sha1())
+	dest = open(headPath, "w")
+	util.copyfileobj(src, dest)
+	del src
+	del dest
+
+    for fileId in pkgCs.getOldFileList():
+	(path, version) = basePkg.getFile(fileId)
+	if not state.hasFile(fileId):
+	    log.info("%s has already been removed" % path)
+	    continue
+
+	# don't remove files if they've been changed locally
+	try:
+	    localFile = files.FileFromFilesystem(path, fileId, type = "src")
+	except OSError, exc:
+	    # it's okay if the file is missing, it just means we all agree
+	    if exc.errno == errno.ENOENT:
+		state.removeFile(fileId)
+		continue
+	    else:
+		raise
+
+	oldFile = repos.getFileVersion(fileId, version)
+
+
+	if not oldFile.same(localFile):
+	    log.error("%s has changed but has been removed on head" % path)
+	    continue
+
+	log.info("removing %s" % path)	
+
+	os.unlink(path)
+	state.removeFile(fileId)
+
     for (fileId, headPath, headVersion) in pkgCs.getChangedFileList():
 	(fsPath, fsVersion) = state.getFile(fileId)
 	pathOkay = 1
@@ -494,7 +562,7 @@ def update(repos):
 
     state.write("SRS")
 
-def addFile(repos, file):
+def addFile(file):
     if not os.path.isfile("SRS"):
 	log.error("SRS file must exist in the current directory for source commands")
 	return
@@ -515,4 +583,20 @@ def addFile(repos, file):
     fileId = cook.makeFileId(os.getcwd(), path)
 
     state.addFile(fileId, file, None)
+    state.write("SRS")
+
+def removeFile(file):
+    if not os.path.isfile("SRS"):
+	log.error("SRS file must exist in the current directory for source commands")
+	return
+
+    state = SourceState("SRS")
+
+    if os.path.exists(file):
+	log.error("files must be removed from the filesystem first")
+	return
+
+    if not state.removeFilePath(file):
+	log.error("file %s is not under management" % file)
+
     state.write("SRS")
