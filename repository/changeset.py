@@ -207,7 +207,11 @@ class ChangeSet:
 
 	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
 		(curPath, curVersion) = pkg.getFile(fileId)
-		invertedPkg.changedFile(fileId, curPath, curVersion)
+
+		if newPath:
+		    invertedPkg.changedFile(fileId, curPath, curVersion)
+		else:
+		    invertedPkg.changedFile(fileId, None, curVersion)
 
 		(oldVersion, newVersion, csInfo) = self.files[fileId]
 		assert(curVersion.equal(oldVersion))
