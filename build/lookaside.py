@@ -28,7 +28,13 @@ import urllib2
 
 # location is normally the package name
 
+def _truncateName(name):
+    if name.startswith("http://") or name.startswith("ftp://"):
+        return name[5:]
+    return name
+
 def createCacheName(cfg, name, location, negative=''):
+    name = _truncateName(name)
     cachedname = os.sep.join((cfg.lookaside, negative + location, name))
     util.mkdirChain(os.path.dirname(cachedname))
     return cachedname
@@ -37,8 +43,7 @@ def _createCacheEntry(cfg, name, location, infile):
     # cache needs to be hierarchical to avoid collisions, thus we
     # use location so that files with the same name and different
     # contents in different packages do not collide
-    filename = name[5:]
-    cachedname = createCacheName(cfg, filename, location)
+    cachedname = createCacheName(cfg, name, location)
     f = open(cachedname, "w+")
     while 1:
         buf = infile.read(1024 * 128)
@@ -57,8 +62,13 @@ def _createCacheEntry(cfg, name, location, infile):
 
     return cachedname
 
-def _createNegativeCacheEntry(cfg, name, location):
+def _createNegativeCacheName(cfg, name, location):
+    name = _truncateName(name)
     negativeEntry = createCacheName(cfg, name, location, 'NEGATIVE' + os.sep)
+    return negativeEntry
+
+def _createNegativeCacheEntry(cfg, name, location):
+    negativeEntry = _createNegativeCacheName(cfg, name, location)
     open(negativeEntry, "w+").close()
 
 def _searchCache(cfg, name, location):
@@ -67,8 +77,7 @@ def _searchCache(cfg, name, location):
     if name.startswith("http://") or name.startswith("ftp://"):
 
 	# check for negative cache entries to avoid spamming servers
-	negativeName = os.sep.join((cfg.lookaside, 'NEGATIVE',
-                                    location, name[5:]))
+        negativeName = _createNegativeCacheName(cfg, name, location)
 	if os.path.exists(negativeName):
 	    if time.time() > 60*60 + os.path.getmtime(negativeName):
 		os.remove(negativeName)
@@ -78,7 +87,7 @@ def _searchCache(cfg, name, location):
                 return -1
 
 	# exact match first, then look for cached responses from other servers
-	positiveName = createCacheName(cfg, name[5:], location)
+	positiveName = createCacheName(cfg, name, location)
 	if os.path.exists(positiveName):
 	    return positiveName
 	return util.searchPath(basename, os.sep.join((cfg.lookaside,
@@ -94,7 +103,7 @@ def _searchRepository(cfg, repCache, name, location):
 
     if repCache.hasFileName(basename):
 	log.debug('found %s in repository', name)
-	return repCache.cacheFile(cfg, basename, location)
+	return repCache.cacheFile(cfg, name, location)
 
     return None
 
@@ -109,10 +118,10 @@ def fetchURL(cfg, name, location):
             break
         except urllib2.HTTPError, msg:
             if msg.code == 404:
-                _createNegativeCacheEntry(cfg, name[5:], location)
+                _createNegativeCacheEntry(cfg, name, location)
                 return None
         except urllib2.URLError:
-            _createNegativeCacheEntry(cfg, name[5:], location)
+            _createNegativeCacheEntry(cfg, name, location)
             return None
         except socket.error, err:
             num, msg = err
@@ -123,7 +132,7 @@ def fetchURL(cfg, name, location):
                 time.sleep(10)
                 retries += 1
             else:
-                _createNegativeCacheEntry(cfg, name[5:], location)
+                _createNegativeCacheEntry(cfg, name, location)
                 return None
         except IOError, msg:
             # only retry for server busy.
@@ -133,7 +142,7 @@ def fetchURL(cfg, name, location):
                 time.sleep(10)
                 retries += 1
             else:
-                _createNegativeCacheEntry(cfg, name[5:], location)
+                _createNegativeCacheEntry(cfg, name, location)
                 return None
     if url is None:
         return None
@@ -192,22 +201,30 @@ class RepositoryCache:
 
     def cacheFile(self, cfg, fileName, location):
 	cachedname = createCacheName(cfg, fileName, location)
-        if fileName in self.cacheMap:
+        basename = os.path.basename(fileName)
+
+        if basename in self.cacheMap:
             # don't check sha1 twice
-            return self.cacheMap[fileName]
+            return self.cacheMap[basename]
 	(troveName, troveVersion, pathId, troveFile, fileId,
-                    troveFileVersion, sha1) = self.nameMap[fileName]
+                    troveFileVersion, sha1) = self.nameMap[basename]
         sha1Cached = None
 	if os.path.exists(cachedname):
             sha1Cached = sha1helper.sha1FileBin(cachedname)
         if sha1Cached != sha1:
+            if sha1Cached:
+                log.debug('%s sha1 %s != %s; fetching new...', basename,
+                          sha1helper.sha1ToString(sha1),
+                          sha1helper.sha1ToString(sha1Cached))
+            else:
+                log.debug('%s not yet cached, fetching...', basename)
             f = self.repos.getFileContents(
                 [ (fileId, troveFileVersion) ])[0].get()
             util.copyfileobj(f, open(cachedname, "w"))
             fileObj = self.repos.getFileVersion(
                 pathId, fileId, troveFileVersion)
             fileObj.chmod(cachedname)
-        self.cacheMap[fileName] = cachedname
+        self.cacheMap[basename] = cachedname
 	return cachedname
 
     def __init__(self, repos):
