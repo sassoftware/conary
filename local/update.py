@@ -52,7 +52,7 @@ class FilesystemJob:
 	    log.debug(msg)
 
 	for (fileObj, target, contents, msg) in self.restores:
-	    fileObj.restore(contents, target, 1)
+	    fileObj.restore(contents, target, contents != None)
 	    log.debug(msg)
 
 	paths = self.removes.keys()
@@ -64,6 +64,7 @@ class FilesystemJob:
 	    log.debug(msg)
 
 	for (target, str, msg) in self.newFiles:
+	    os.unlink(target)
 	    f = open(target, "w")
 	    f.write(str)
 	    f.close()
@@ -242,6 +243,8 @@ class FilesystemJob:
 		fsFile.isConfig(headFile.isConfig())
 		fsChanges = fsFile.diff(baseFile)
 
+	    attributesChanged = False
+
 	    if (basePkg and headFileVersion
                 and not fsFile.same(headFile, ignoreOwner = True)):
 		# something has changed for the file
@@ -251,16 +254,20 @@ class FilesystemJob:
 		    if mergedChanges and (not conflicts or
 					  files.contentConflict(mergedChanges)):
 			fsFile.applyChange(mergedChanges, ignoreContents = 1)
+			attributesChanged = True
 		    else:
 			contentsOkay = False
 			self.errors.append("file attributes conflict for %s"
 						% realPath)
 		else:
 		    fsFile.applyChange(headChanges, ignoreContents = 1)
+		    attributesChanged = True
 
 	    else:
 		conflicts = True
 		mergedChanges = None
+
+	    beenRestored = False
 
 	    if headFileVersion and headFile.hasContents and \
 	       fsFile.hasContents and fsFile.sha1() != headFile.sha1():
@@ -293,9 +300,10 @@ class FilesystemJob:
 			headFileContents = \
 			    filecontents.FromString("".join(newLines))
 
-		    self._restore(headFile, realPath, headFileContents,
+		    self._restore(fsFile, realPath, headFileContents,
                                   "replacing %s with contents "
                                   "from repository" % realPath)
+		    beenRestored = True
 		elif headFile.same(baseFile, ignoreOwner = True):
 		    # it changed in just the filesystem, so leave that change
 		    log.debug("preserving new contents of %s" % realPath)
@@ -311,10 +319,12 @@ class FilesystemJob:
 			cur = open(realPath, "r").readlines()
 			diff = headFileContents.get().readlines()
 			(newLines, failedHunks) = patch.patch(cur, diff)
-				
-			self._createFile(realPath, "".join(newLines),
+
+			cont = filecontents.FromString("".join(newLines))
+			self._restore(fsFile, realPath, cont,
 			      "merging changes from repository into %s" % 
 			      realPath)
+			beenRestored = True
 
 			if failedHunks:
 			    self._createFile(
@@ -328,6 +338,11 @@ class FilesystemJob:
 		else:
 		    self.errors.append("file contents conflict for %s" % realPath)
 		    contentsOkay = 0
+
+	    if attributesChanged and not beenRestored:
+		self._restore(fsFile, realPath, None,
+		      "merging changes from repository into %s" % 
+		      realPath)
 
 	    if pathOkay and contentsOkay:
 		# XXX this doesn't even attempt to merge file permissions
