@@ -61,9 +61,9 @@ def loadRecipe(file):
         
 class Recipe:
 
-    def addSignature(self, file, fingerprint):
-	# do not search unless a gpg fingerprint is specified
-	if not fingerprint:
+    def addSignature(self, file, keyid):
+	# do not search unless a gpg keyid is specified
+	if not keyid:
 	    return
 	gpg = lookaside.searchAll(self.cfg, '%s.sign' %(file), self,name, self.srcdirs)
 	if not gpg:
@@ -73,11 +73,11 @@ class Recipe:
 		self.signatures[file] = []
 	    self.signatures[file].append(gpg)
 
-    def addTarball(self, file, extractDir='', fingerprint=None):
+    def addTarball(self, file, extractDir='', keyid=None):
 	self.tarballs.append((file, extractDir))
-	self.addSignature(file, fingerprint)
+	self.addSignature(file, keyid)
 
-    def addSourceFromRPM(self, rpm, file, extractDir='', fingerprint=None):
+    def addSourceFromRPM(self, rpm, file, extractDir='', keyid=None):
 	f = lookaside.searchAll(self.cfg, os.path.basename(file), self.name, self.srcdirs)
 	if not f:
 	    r = lookaside.findAll(self.cfg, rpm, self.name, self.srcdirs)
@@ -85,15 +85,15 @@ class Recipe:
 	    os.system("cd %s; rpm2cpio %s | cpio -ium %s" %(os.path.dirname(c), r, file))
 	    f = lookaside.findAll(self.cfg, file, self.name, self.srcdirs)
 	self.tarballs.append((file, extractDir))
-	self.addSignature(f, fingerprint)
+	self.addSignature(f, keyid)
 
-    def addPatch(self, file, level='0', backup='', fingerprint=None):
+    def addPatch(self, file, level='0', backup='', keyid=None):
 	self.patches.append((file, level, backup))
-	self.addSignature(file, fingerprint)
+	self.addSignature(file, keyid)
 
-    def addSource(self, file, fingerprint=None):
+    def addSource(self, file, keyid=None):
 	self.sources.append(file)
-	self.addSignature(file, fingerprint)
+	self.addSignature(file, keyid)
 
     def allSources(self):
         sources = []
@@ -120,7 +120,8 @@ class Recipe:
         if not self.signatures.has_key(file):
             return
 	for signature in self.signatures[file]:
-	    # FIXME: try to fetch key by fingerprint if necessary
+	    # FIXME: try to fetch key by keyid if necessary
+	    # gpg --keyserver pgp.mit.edu --recv-keys 0x<keyid>
 	    if os.system("gpg --no-secmem-warning --verify %s %s"
 			  %(signature, filepath)):
 		raise RuntimeError, "GPG signature %s failed" %(signature)
