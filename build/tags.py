@@ -18,6 +18,7 @@ Module implementing tag file handling
 
 import conarycfg
 import filter
+import log
 import os
 
 EXCLUDE, INCLUDE = range(2)
@@ -58,10 +59,11 @@ class TagFile(conarycfg.ConfigFile):
                 if key == 'self':
                     if warn:
                         # at cook time
-                        raise conarycfg.ParseError, \
-                            'change "implements self" to "implements handler" in %s' %filename
-                    else:
-                        key == 'handler'
+                        log.warn('change "implements self" to'
+                                 ' "implements handler" in %s' %filename)
+                        #raise conarycfg.ParseError, \
+                        #    'change "implements self" to "implements handler" in %s' %filename
+                    key == 'handler'
 		if key not in self.implementsCheck:
 		    raise conarycfg.ParseError, \
 			'unknown type %s in "implements %s"' %(key, item)
