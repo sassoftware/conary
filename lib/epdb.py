@@ -255,7 +255,14 @@ class Epdb(pdb.Pdb):
         methods = self._getMembersOfType(obj, 'm')
         methods.sort()
         for (methodName, method) in methods:
-            self._define(method)
+            try:
+                self._define(method)
+            except:
+                if hasattr(obj, '__name__'):
+                    prefix = obj.__name__
+                else:
+                    prefix = obj.__class__.__name__
+                print prefix + '.' + methodName
 
     def _showdata(self, obj):
         data = self._getMembersOfType(obj, 'd')
@@ -337,7 +344,6 @@ class Epdb(pdb.Pdb):
             if hasattr(obj, '__init__') and inspect.isroutine(obj.__init__):
                 try:
                     initfn = obj.__init__.im_func
-                
                     argspec = inspect.getargspec(initfn)
                     # get rid of self from arg list...
                     fnargs = argspec[0][1:] 
@@ -348,15 +354,17 @@ class Epdb(pdb.Pdb):
             else:
                 argspec = ''
             print "Class " + obj.__name__ + argspec + bases
-        elif inspect.ismethod(obj):
+        elif inspect.ismethod(obj) or type(obj).__name__ == 'method-wrapper':
             m_class = obj.im_class
             m_self = obj.im_self
             m_func = obj.im_func
             name = m_class.__name__ + '.' +  m_func.__name__
-            if m_self:
-                name = "<Bound>"  + name
+            #if m_self:
+            #    name = "<Bound>"  + name
             argspec = inspect.formatargspec(*inspect.getargspec(m_func))
             print "%s%s" % (name, argspec)
+        elif type(obj).__name__ == 'builtin_function_or_method':
+            print obj
         elif inspect.isfunction(obj):
             name = obj.__name__
             argspec = inspect.formatargspec(*inspect.getargspec(obj))
