@@ -328,6 +328,12 @@ class Database(SqlDbRepository):
 
 	# -------- database and system are updated below this line ---------
 
+	# XXX we have to do this before files get removed from the database,
+	# which is a bit unfortunate since this rollback isn't actually
+	# valid until a bit later
+	if not isRollback:
+	    self.addRollback(inverse, localChanges)
+
 	# Build A->B
 	if toStash:
 	    # this updates the database from the changeset; the change
@@ -340,11 +346,6 @@ class Database(SqlDbRepository):
 	    for err in errList: log.error(err)
 	    # FIXME need a --force for this
 	    return
-
-	# everything is in the database... save this so we can undo
-	# it later. 
-	if not isRollback:
-	    self.addRollback(inverse, localChanges)
 
 	fsJob.apply()
 
