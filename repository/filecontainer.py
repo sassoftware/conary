@@ -195,6 +195,17 @@ class FileContainer:
 	    self.entries[entry.name] = entry
 	    entryCount = entryCount - 1
 
+    def cork(self):
+        # prevents file table entries from being written until uncork()
+        # is called
+        self.corked = True
+
+    def uncork(self):
+        # writes out the file table and allows file table entries to
+        # be written again
+        self.corked = False
+        self.writeTable()
+
     def writeTable(self, newEntry = None):
 	# writes out the table of contents at the current
 	# position in the file (which should be the end!), including
@@ -203,6 +214,9 @@ class FileContainer:
 	# this should be used carefully w/ a proper try/finally outside
 	# of the invocation to prevent corruption
 	pos = self.file.tell()
+        if self.corked:
+            self.tableOffset = pos
+            return
 	for entry in self.entries.values():
 	    entry.write(self.file)
 	count = len(self.entries.keys())
@@ -306,6 +320,7 @@ class FileContainer:
     # initialized. we make our own copy of the file so the caller can
     # close it if they like
     def __init__(self, file):
+        self.corked = False
 	# make our own copy of this file which nobody can close underneath us
 	self.file = os.fdopen(os.dup(file.fileno()), file.mode)
 	# this keeps us from closing the file

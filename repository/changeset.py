@@ -152,8 +152,10 @@ class ChangeSet:
 
 	    csf.addFile("SRSCHANGESET", self.headerAsString(), "")
 
+            csf.cork()
 	    for (hash, (contType, f)) in self.fileContents.iteritems():
 		csf.addFile(hash, f.get(), contType[4:])
+            csf.uncork()
 
 	    csf.close()
 	except:
