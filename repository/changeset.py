@@ -14,11 +14,20 @@ import os
 import package
 import patch
 import repository
+import struct
 import update
 import versioned
 import versions
 
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff")
+
+class FileInfo(files.TupleStream):
+
+    # fileId, oldVersion, newVersion, csInfo
+    makeup = (("fileId", files.StringStream, 40), 
+	      ("oldVersion", files.StringStream, "!H"),
+	      ("newVersion", files.StringStream, "!H"), 
+	      ("csInfo", files.StringStream, "B"))
 
 class ChangeSet:
 
@@ -180,16 +189,21 @@ class ChangeSet:
 	for (pkgName, version) in self.getOldPackageList():
 	    rc.append("PKG RMVD %s %s\n" % (pkgName, version.freeze()))
 	
+	fileList = [ None,]
+	totalLen = 0
 	for (fileId, (oldVersion, newVersion, csInfo)) in self.files.iteritems():
 	    if oldVersion:
 		oldStr = oldVersion.freeze()
 	    else:
 		oldStr = "(none)"
 
-	    rc.append("FILE CS %s %s %s\n%s\n" %
-                      (fileId, oldStr, newVersion.freeze(), csInfo))
+	    s = FileInfo(fileId, oldStr, newVersion.freeze(), csInfo).freeze()
+	    fileList.append(struct.pack("!I", len(s)) + s)
+	    totalLen += len(fileList[-1])
+
+	fileList[0] = "FILES %d\n" % totalLen
 	
-	return "".join(rc)
+	return "".join(rc + fileList)
 
     def writeContents(self, csf, contents, early):
 	# these are kept sorted so we know which one comes next
@@ -511,19 +525,17 @@ class ChangeSetFromFile(ChangeSet):
 
 	control = self.csf.getFile("SRSCHANGESET")
 
-	lines = control.readlines()
-	i = 0
-	while i < len(lines):
-	    header = lines[i][:-1]
-	    i += 1
+	line = control.readline()
+	while line:
+	    header = line[:-1]
 
 	    if header.startswith("PRIMARIES "):
 		lineCount = int(header.split()[1])
 		while lineCount:
-		    (name, version) = lines[i].split()
+		    line = control.readline()
+		    (name, version) = line.split()
 		    version = versions.VersionFromString(version)
 		    self.primaryPackageList.append((name, version))
-		    i += 1
 		    lineCount -= 1
 
 	    elif header.startswith("PKG RMVD "):
@@ -551,26 +563,38 @@ class ChangeSetFromFile(ChangeSet):
 		pkg = package.PackageChangeSet(pkgName, oldVersion, newVersion,
 				       abstract = (pkgType == "ABS"))
 
-		end = i + lineCount
-		while i < end:
-		    pkg.parse(lines[i][:-1])
-		    i = i + 1
+		while lineCount:
+		    line = control.readline()
+		    pkg.parse(line[:-1])
+		    lineCount -= 1
 
 		self.newPackage(pkg)
-	    elif header.startswith("FILE CS "):
-		(fileId, oldVerStr, newVerStr) = header.split()[2:5]
-		if oldVerStr == "(none)":
-		    oldVersion = None
-		else:
-		    oldVersion = versions.ThawVersion(oldVerStr)
-		newVersion = versions.ThawVersion(newVerStr)
-		self.addFile(fileId, oldVersion, newVersion, lines[i][:-1])
-		i = i + 1
+	    elif header.startswith("FILES "):
+		size = int(header.split()[1])
+
+		buf = control.read(size)
+		i = 0
+		while i < len(buf):
+		    size = struct.unpack("!I", buf[i:i+4])[0]
+		    i += 4
+		    info = FileInfo(buf[i:i+size])
+		    i += size
+		    
+		    oldVerStr = info.oldVersion()
+
+		    if oldVerStr == "(none)":
+			oldVersion = None
+		    else:
+			oldVersion = versions.ThawVersion(oldVerStr)
+		    newVersion = versions.ThawVersion(info.newVersion())
+		    self.addFile(info.fileId(), oldVersion, newVersion, 
+				 info.csInfo())
+
 	    else:
 		print header
 		raise IOError, "invalid line in change set %s" % file
 
-	    header = control.read()
+	    line = control.readline()
 
 	# pull in the config files
 	idList = []
