@@ -647,7 +647,7 @@ class ThawPackageChangeSet(PackageChangeSet):
 	pkgName = l[1]
 
 	if pkgType == "CS":
-	    oldVersion = versions.ThawVersion(l[3])
+	    oldVersion = versions.ThawVersion(l[2])
 	    rest = 3
 	elif pkgType == "NEW" or pkgType == "ABS":
 	    oldVersion = None
