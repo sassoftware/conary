@@ -231,11 +231,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
     except recipe.RecipeFileError, msg:
 	raise CookError(str(msg))
 
-    nextVersion = helper.nextVersion(repos, fullName, recipeClass.version, 
-				     None, buildBranch, binary = True)
-
     grpFlavor = deps.deps.DependencySet()
-    grp = package.Trove(fullName, nextVersion, grpFlavor, None)
+    grp = package.Trove(fullName, versions.NewVersion(), grpFlavor, None)
 
     d = {}
     for (name, versionList) in recipeObj.getTroveList().iteritems():
@@ -250,6 +247,10 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={}):
 		    grp.addTrove(name, v, flavor)
 		    if flavor:
 			grpFlavor.union(flavor)
+
+    nextVersion = helper.nextVersion(repos, fullName, recipeClass.version, 
+				     grpFlavor, buildBranch, binary = True)
+    grp.changeVersion(nextVersion)
 
     grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet = changeset.ChangeSet()
