@@ -30,6 +30,7 @@ else:
 sys.path.append(os.path.dirname(fullPath))
 
 import conarycfg
+from deps import deps
 from local import database
 from lib import util
 from repository import netclient
@@ -42,7 +43,7 @@ def usage():
 Usage: yuck [--missing] [--update] [--except <exception,...>]"
             [--display|--display-only <displayparam>,<displayparam>]
 
-        display parameters: [no]change,name,local,version,repo
+        display parameters: [no]change,name,local,version,repo,flavor
          """                      
     return 1
 
@@ -52,11 +53,12 @@ sys.excepthook = util.genExcepthook()
 def main(argv):
     listMissing = False
     doUpdate = False
-    updateExceptions = []
+    updateExceptions = ['kernel']
     display = {}
-    displayOrder = ['change', 'name', 'local', 'version', 'repo']
+    displayOrder = ['change', 'name', 'local', 'version', 'flavor', 'repo']
     for param in displayOrder:
         display[param] = True
+    display['flavor'] = False
     args = argv[1:]
     lastArg = ''
     while args:
@@ -110,8 +112,8 @@ def main(argv):
     for pkg in dbpkgs:
         if pkg in updateExceptions:
             continue
-        dbVersions = db.getTroveVersionList(pkg)
-        for v in dbVersions:
+        dbVersions = db.getTroveVersionList(pkg, withFlavors=True)
+        for v,f in dbVersions:
             branch = v.branch()
             if isinstance(branch.label(), versions.CookLabel) or\
                isinstance(branch.label(), versions.EmergeLabel):
@@ -120,40 +122,53 @@ def main(argv):
                 branchPkgs[branch] = {}
             if pkg not in branchPkgs[branch]:
                 branchPkgs[branch][pkg] = []
-            branchPkgs[branch][pkg].append(v)
+            branchPkgs[branch][pkg].append((v, f))
+    query = {}
+    for branch in branchPkgs:
+        host = branch.label().getHost()
+        if host not in query:
+            query[host] = {}
+        for pkg in branchPkgs[branch]:
+            if pkg not in query:
+                query[host][pkg] = {}
+            for v, f in branchPkgs[branch][pkg]:
+                # XXX this fails when multiple versions are installed from the 
+                # same branch -- only one new version is returned 
+                queryflavor = cfg.flavor.copy()
+                queryflavor.union(f, mergeType=deps.DEP_MERGE_TYPE_OVERRIDE)
+                query[host][pkg][branch] = [queryflavor]
     dbpkgs.sort()
+
 
     updates = []
     notavail = []
-    for branch in branchPkgs.keys():
-        branchDbPkgs = branchPkgs[branch].keys()
-        branchDbPkgs.sort()
+    for host in query:
         try:
-            versionList = repos.getTroveLeavesByBranch(
-                                dict.fromkeys(branchDbPkgs, {branch : None}))
+            versionList = repos.getTroveLeavesByBranch(query[host])
         except repository.OpenError, e:
-            print >>sys.stderr, "Warning: could not access %s: %s" % (branch.asString(), e)
-            print >>sys.stderr, "Skipping packages %s" % branchDbPkgs
+            print >>sys.stderr, "Warning: could not access %s: %s" % (host, e)
+            print >>sys.stderr, "Skipping packages %s" % query[host].keys()
             continue
-        for pkg in branchDbPkgs:
-            dbVersions = branchPkgs[branch][pkg]
-            try:
-                repoVersions = versionList[pkg].keys()
-            except KeyError:
-                repoVersions = []
-            # only look for updates to this version on the same branch
-            for lv in dbVersions:
-                if not repoVersions:
-                    
-                    lvt = lv.trailingRevision()
-                    notavail.append((branch, pkg, lv, None))
-                else:
-                    repoVersions.sort()
-                    v = repoVersions[-1]
-                    if v.isAfter(lv) and v not in dbVersions:
-                        updates.append((branch, pkg, lv, v))
-
+        for pkg in query[host]:
+            for branch in query[host][pkg]:
+                dbVersions = branchPkgs[branch][pkg]
+                try:
+                    repoVersions = versionList[pkg].keys()
+                except KeyError:
+                    repoVersions = []
+                # only look for updates to this version on the same branch
+                for lv,flavor in dbVersions:
+                    if not repoVersions:
+                        lvt = lv.trailingRevision()
+                        notavail.append((branch.asString(), pkg, lv, None, ''))
+                    else:
+                        repoVersions.sort()
+                        v = repoVersions[-1]
+                        f = deps.formatFlavor(versionList[pkg][v][0])
+                        if v.isAfter(lv) and v not in dbVersions:
+                            updates.append((branch.asString(), pkg, lv, v, f))
     maxL = 0
+    maxF = 0
     maxP = 0
     maxLV = 0
     if notavail:
@@ -162,9 +177,10 @@ def main(argv):
         maxV = 0
 
     
-    for (label, pkg, lv, v) in updates + notavail:
-        maxL = max(maxL, len(label.asString()))
+    for (label, pkg, lv, v, f) in updates + notavail:
+        maxL = max(maxL, len(label))
         maxP = max(maxP, len(pkg))
+        maxF = max(maxF, len(f))
         maxLV = max(maxLV, len(lv.trailingRevision().asString()))
         if v:
             maxV = max(maxV, len(v.trailingRevision().asString()))
@@ -173,6 +189,7 @@ def main(argv):
     displayVars['repo'] = ("%-*s" , [maxL])
     displayVars['change'] = ("%-3s" , [])
     displayVars['name'] = ("%-*s" , [maxP + 3])
+    displayVars['flavor'] = ("%-*s" , [maxF + 3])
     displayVars['local'] = ("%-*s" , [maxLV + 3])
     displayVars['version'] = ("%-*s" , [maxV + 3])
 
@@ -181,8 +198,10 @@ def main(argv):
         displayStr.append(displayVars[param][0])
     displayStr = ''.join(displayStr)
     
+    updates.sort()
+    notavail.sort()
 
-    for (label, pkg, lv, v) in updates + notavail:
+    for (label, pkg, lv, v, f) in updates + notavail:
         lvt = lv.trailingRevision()
         if v:
             vt = v.trailingRevision()
@@ -200,8 +219,9 @@ def main(argv):
         displayVals = {}
         displayVals['local'] = lvt
         displayVals['version'] = vt
+        displayVals['flavor'] = f
         displayVals['change'] = change
-        displayVals['repo'] = label.asString()
+        displayVals['repo'] = label
         displayVals['name'] =  pkg
         
 
@@ -214,7 +234,7 @@ def main(argv):
         print displayStr % tuple(displayArgs)
         #print "%s  %-*s   %-*s   %-*s    %-*s" % (change, maxP, pkg, maxLV, lvt, maxV, vt, maxL, label.asString())
         if doUpdate:
-            updatecmd.doUpdate(cfg, [ "%s=%s" %(pkg, v.asString()) ])
+            updatecmd.doUpdate(cfg, [ "%s=%s[%s]" %(pkg, v.asString(), f) ])
 
     if listMissing:
         missing = []
