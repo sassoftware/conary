@@ -364,10 +364,11 @@ class PackageRecipe(Recipe):
     def addSource(self, filename, keyid=None, extractDir='',
                   apply=None, use=None, macros=False):
 	self._appendSource(filename, keyid, 'source', extractDir, use,
-                           (apply, macros))
+                           (apply %self.macros, macros))
 
     def addAction(self, action, targetdir='', use=None):
-	self._appendSource('', '', 'action', targetdir, use, (action))
+	self._appendSource('', '', 'action', targetdir, use,
+			   (action %self.macros))
 
     def addBuild(self, action):
         self._build.append(action)
