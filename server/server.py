@@ -26,7 +26,7 @@ import netserver
 from netserver import NetworkRepositoryServer
 
 FILE_PATH="/tmp/conary-server"
-BASE_URL="http://%s:8001/" % os.uname()[1]
+BASE_URL="http://%s:8000/" % os.uname()[1]
 
 #class SRSServer(SimpleXMLRPCServer):
 
@@ -141,7 +141,7 @@ if __name__ == '__main__':
     netRepos = NetworkRepositoryServer(sys.argv[2], FILE_PATH, BASE_URL,
 				       sys.argv[3])
 
-    httpServer = HTTPServer(("", 8001), HttpRequests)
+    httpServer = HTTPServer(("", 8000), HttpRequests)
 
     fds = {}
     fds[httpServer.fileno()] = httpServer
