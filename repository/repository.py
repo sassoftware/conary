@@ -33,21 +33,8 @@ class Repository:
 
     ### Package access functions
 
-    def getPackageList(self, groupName = ""):
-	if self.pkgDB.hasFile(groupName):
-	    return [ groupName ]
-
-	allPackages = self.pkgDB.fileList()
-	list = []
-	groupName = groupName + ":"
-
-	for pkgName in allPackages:
-	    if pkgName.startswith(groupName):
-		list.append(pkgName)
-
-	list.sort()
-
-	return list
+    def getAllPackageNames(self):
+	return self.pkgDB.fileList()
 
     def hasPackage(self, pkg):
 	return self.pkgDB.hasFile(pkg)
