@@ -25,7 +25,9 @@ class SrsConfiguration:
 	keys.sort()
 	for item in keys:
 	    if type(self.__dict__[item]) == types.StringType:
-		print "%-15s %s" % (item, self.__dict__[item])
+		print "%-20s %s" % (item, self.__dict__[item])
+	    elif self.__dict__[item].__class__ == versions.Version:
+		print "%-20s %s" % (item, self.__dict__[item].asString())
 
     def __init__(self):
 	self.reppath = "/var/lib/srsrep"
@@ -42,3 +44,7 @@ class SrsConfiguration:
 	    self.defaultbranch = versions.VersionFromString(self.defaultbranch)
 	else:
 	    self.defaultbranch = versions.VersionFromString("/localhost/local")
+
+	if self.defaultbranch.isVersion():
+	    sys.write.stderr("The configured default branch %s specifies " +
+		 "version, not a branch.\n" % self.defaultbranch.asString())
