@@ -47,7 +47,7 @@ class Action:
         ascend to the topmost class and pick up the keywords as we work
         back to our class, to allow proper overriding.
         """
-        baselist = []
+        baselist = [self.__class__]
         bases = list(self.__class__.__bases__)
         while bases:
 	    parent = bases.pop()
@@ -57,8 +57,6 @@ class Action:
         for base in baselist:
             if 'keywords' in base.__dict__:
                 self.__dict__.update(base.__dict__['keywords'])
-        if 'keywords' in self.__class__.__dict__:
-            self.__dict__.update(self.__class__.keywords)
 
     def addArgs(self, *args, **keywords):
         # check to make sure that we don't get a keyword we don't expect
