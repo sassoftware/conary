@@ -111,13 +111,11 @@ def _getRecipeVersion(recipeFile):
     try:
         loader = recipe.RecipeLoader(recipeFile)
     except recipe.RecipeFileError, e:
-	log.error("unable to load recipe file %s: %s",
-                  state.getRecipeFileName(), str(e))
+	log.error("unable to load recipe file %s: %s", recipeFile, str(e))
         return None
     
     if not loader:
-	log.error("unable to load a valid recipe class from %s",
-                  state.getRecipeFileName())
+	log.error("unable to load a valid recipe class from %s", recipeFile)
 	return None
 
     assert(len(loader.values()) == 1)
