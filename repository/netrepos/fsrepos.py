@@ -54,6 +54,12 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 								   labelStr) ]
 
 	return d
+
+    def getTroveFlavorsLatestVersion(self, troveName, branch):
+	return [ (versions.VersionFromString(x[0]),
+		  deps.ThawDependencySet([1])) for x in 
+		    self.troveStore.iterTrovePerFlavorLeafs(troveName, 
+							    branch.asString()) ]
 	
     def getTroveVersionFlavors(self, troveDict):
 	newD = {}
@@ -188,8 +194,14 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	self.troveStore = trovestore.TroveStore(self.sqlDB)
 
     def commitChangeSet(self, cs):
-	job = ChangeSetJob(self, cs)
-	self.commit()
+	self.troveStore.begin()
+	try:
+	    job = ChangeSetJob(self, cs)
+	except:
+	    self.rollback
+	    raise
+	else:
+	    self.commit()
 
     def close(self):
 	if self.troveStore is not None:

@@ -303,7 +303,7 @@ class IdealRepository(AbstractTroveDatabase):
 	"""
 	raise NotImplementedError
 
-    def getTroveLatestVersionFlavors(self, troveName, branch):
+    def getTroveFlavorsLatestVersion(self, troveName, branch):
 	"""
 	Returns a list of the most recent version for each flavor of a
         trove available on a particular branch. If that branch doesn't

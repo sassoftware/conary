@@ -45,7 +45,8 @@ class LocalRepVersionTable(versionops.VersionTable):
 class TroveStore:
 
     def __init__(self, path):
-	self.db = sqlite.connect(path, timeout = 30000)
+	import sys
+	self.db = sqlite.connect(path, timeout = 30000, command_logfile = sys.stderr)
 	self.troveTroves = trovecontents.TroveTroves(self.db)
 	self.troveFiles = trovecontents.TroveFiles(self.db)
 	self.fileStreams = instances.FileStreams(self.db)
@@ -531,6 +532,17 @@ class TroveStore:
 		yield (fileId, path, version, fileObj)
 	    else:
 		yield (fileId, path, version)
+
+    def iterTrovePerFlavorLeafs(troveName, branch):
+	cu = db.cursor()
+	cu.execute("""
+	   SELECT Instances.versionId, Instances.flavorId, finalTimeStamp FROM 
+		Nodes JOIN Instances ON Nodes.itemId=Instances.itemId AND 
+				        Nodes.versionId=Instances.versionId 
+	   WHERE Nodes.itemId=(SELECT itemId from Items WHERE item=%s)
+	     AND branchId=(SELECT branchId from Branch WHERE branch=%s)
+	   ORDER BY finalTimeStamp;
+	""", troveName, branch)
 	    
     def addFile(self, fileObj, fileVersion):
 	self.filesToAdd[(fileObj.id(), fileVersion)] = fileObj
@@ -549,6 +561,16 @@ class TroveStore:
 	# we automatically remove files when no troves reference them. 
 	# cool, huh?
 	pass
+
+    def begin(self):
+	"""
+	Force the database to begin a transaction; this locks the database
+	so no one can touch it until a commit() or rollback().
+	"""
+	self.db._begin()
+
+    def rollback(self):
+	self.db.rollback()
 
     def commit(self):
 	if self.needsCleanup:
