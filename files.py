@@ -1,4 +1,3 @@
-#
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
@@ -144,8 +143,14 @@ class StringStream(InfoStream):
 class TupleStream(InfoStream):
 
     def __eq__(self, other):
-	return other.__class__ == self.__class__ and \
-	       self.items == other.items
+	if other.__class__ != self.__class__:
+	    return False
+
+	for i in xrange(len(self.makeup)):
+	    if self.items[i] != other.items[i]:
+		return False
+
+	return True
 
     def freeze(self):
 	rc = []
@@ -159,7 +164,6 @@ class TupleStream(InfoStream):
 	return "".join(rc)
 
     def diff(self, them):
-
 	code = 0
 	rc = []
 	for (i, (name, itemType, size)) in enumerate(self.makeup):
@@ -314,6 +318,12 @@ class InodeStream(TupleStream):
 	else:
 	    return time.strftime("%b %e  %Y", timeSet)
 
+    def __eq__(self, other):
+	return self.__class__ == other.__class__ and \
+	       self.perms() == other.perms() and\
+	       self.owner() == other.owner() and \
+	       self.group() == other.group()
+
 class FileMode:
     def merge(self, mode):
         """merge another instance of a FileMode into this one"""
@@ -364,36 +374,6 @@ class FileMode:
 	# we need to implement storing EAs
 	pass
 
-    def owner(self, new = None):
-	if (new != None and new != "-"):
-	    self.theOwner = new
-
-	return self.theOwner
-
-    def group(self, new = None):
-	if (new != None and new != "-"):
-	    self.theGroup = new
-
-	return self.theGroup
-
-    def size(self, new = None):
-	if (new != None and new != "-"):
-	    if type(new) == types.IntType:
-		self.theSize = new
-	    else:
-		self.theSize = int(new)
-
-	return self.theSize
-
-    def mtime(self, new = None):
-	if (new != None and new != "-"):
-	    if type(new) == types.IntType:
-		self.theMtime = new
-	    else:
-		self.theMtime = int(new)
-
-	return self.theMtime
-
     def flags(self, new = None):
 	if (new != None and new != "-"):
 	    self.theFlags = new
@@ -431,25 +411,6 @@ class FileMode:
                                          self.theGroup, self.theSize,
                                          self.theMtime, self.flags())
     
-    def diff(self, them):
-	if not them:
-	    return self.infoLine()
-
-	selfLine = self.infoLine().split()
-	themLine = them.infoLine().split()
-
-	if selfLine[0] == themLine[0] and len(selfLine) == len(themLine):
-	    rc = selfLine[0]
-	    for i in range(1, len(selfLine)):
-		if selfLine[i] == themLine[i]:
-		    rc +=  " -"
-		else:
-		    rc +=  " " + selfLine[i]
-
-	    return rc
-	else:
-	    return self.infoLine()
-
     def same(self, other, ignoreOwner = False):
 	if self.__class__ != other.__class__: return 0
 
@@ -579,7 +540,50 @@ class File(FileMode):
 	    self.__dict__[name] = streamType(data[i:i + size])
 	    i += size
 
+	# FIXME
 	#assert(i == len(data))
+
+    def diff(self, other):
+	if self.lsTag != other.lsTag:
+	    d = self.freeze()
+	    return struct.pack("!BH", 0, len(d)) + d
+
+	rc = [ "\x01", self.lsTag ]
+	for (name, streamType) in self.streamList:
+	    d = self.__dict__[name].diff(other.__dict__[name])
+	    rc.append(struct.pack("!H", len(d)) + d)
+
+	return "".join(rc)
+
+    def twm(self, diff, base):
+	sameType = struct.unpack("B", diff[0])
+	if not sameType: 
+	    # XXX file type changed -- we don't support this yet
+	    assert(0)
+	assert(self.lsTag == base.lsTag)
+	assert(self.lsTag == diff[1])
+	i = 2
+	worked = True
+	
+	for (name, streamType) in self.streamList:
+	    size = struct.unpack("!H", diff[i:i+2])[0]
+	    i += 2
+	    w = self.__dict__[name].twm(diff[i:i+size], base.__dict__[name])
+	    i += size
+	    worked = worked and w
+
+	assert(i == len(diff))
+
+	return worked
+
+    def __eq__(self, other):
+	if other.lsTag != self.lsTag: return False
+
+	for (name, streamType) in self.streamList:
+	    if not self.__dict__[name] == other.__dict__[name]:
+		return False
+
+	return True
 
     def freeze(self):
 	rc = [ self.lsTag ]
@@ -798,12 +802,6 @@ class RegularFile(File):
     lsTag = "-"
     hasContents = 1
 
-    def sha1(self, sha1 = None):
-	if sha1 and sha1 != "-":
-	    self.thesha1 = sha1
-
-	return self.thesha1
-
     def sizeString(self):
 	return "%8d" % self.contents.size()
 
@@ -911,11 +909,7 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
     f.inode = inode
 
     f.perms(s.st_mode & 07777)
-    f.owner(owner)
-    f.group(group)
 
-    f.mtime(s.st_mtime)
-    f.size(s.st_size)
     f.flags(0)
     
     # assume we have a match if the FileMode and object type match
@@ -928,7 +922,6 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
     if needsSha1:
 	sha1 = sha1helper.hashFile(path)
 	f.contents = RegularFileStream(s.st_size, f.flags(), sha1)
-	f.sha1(sha1)
 
     return f
 
@@ -1034,3 +1027,46 @@ def contentConflict(changeLine):
 	return fields[1] == "!" and fields[5] == "!"
 
     return False
+
+def fieldsChanged(diff):
+    sameType = struct.unpack("B", diff[0])
+    if not sameType:
+	return [ "type" ]
+    type = diff[1]
+    i = 2
+
+    if type == "-":
+	cl = RegularFile
+    elif type == "d":
+	cl = Directory
+    else:
+	assert(0)
+
+    rc = []
+
+    for (name, streamType) in cl.streamList:
+	size = struct.unpack("!H", diff[i:i+2])[0]
+	i += 2
+	if not size: continue
+	
+	if name == "inode":
+	    l = tupleChanged(InodeStream, diff[i:i+size])
+	    s = " ".join(l)
+	    rc.append("inode(%s)" % s)
+	else:
+	    rc.append(name)
+
+	i += size
+
+
+    return rc
+
+def tupleChanged(cl, diff):
+    what = struct.unpack("B", diff[0])[0]
+
+    rc = []
+    for (i, (name, itemType, size)) in enumerate(cl.makeup):
+	if what & (1 << i):
+	    rc.append(name)
+
+    return rc
