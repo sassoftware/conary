@@ -15,14 +15,15 @@
 Provides the output for the "conary showcs" command
 """
 
+import time
+import sys
+
+#conary
 import display
 import files
 from lib import log
-import time
-from repository import repository
-import sys
-
 from lib.sha1helper import sha1ToString
+from repository import repository
 
 
 def usage():
@@ -48,7 +49,7 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                     all=False, deps=False, sha1s=False, ids=False):
     (troves, hasVersions) = getTroves(cs, troveList) 
     if all:
-        ls = tags = fullVersions = deps = True
+        showChanges = ls = tags = fullVersions = deps = True
     
     if not (ls or tags or sha1s or ids):
         if hasVersions or deps:
@@ -75,14 +76,14 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
             else:
                 continue
             printedData = False
-            fileList = []
+            fileList = {}
             # create a file list of each file type
             for (pathId, path, fileId, version) in trove.getNewFileList():
-                fileList.append(('New', pathId, path, fileId, version))
+                fileList[pathId] = ('New', pathId, path, fileId, version)
             for (pathId, path, fileId, version) in trove.getChangedFileList():
-                fileList.append(('Mod', pathId, path, fileId, version))
+                fileList[pathId] = ('Mod', pathId, path, fileId, version)
             for pathId in trove.getOldFileList():
-                fileList.append(('Del', pathId, None, None, None))
+                fileList[pathId] = ('Del', pathId, None, None, None)
             if trove.changedFiles or trove.oldFiles:
                 oldTrove = getOldTrove(trove, db, repos)
                 if not oldTrove:
@@ -91,39 +92,82 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                        local system, or in repository list,
                        not printing information about this trove""") % trove.getName()
                     continue
+            pathIds = fileList.keys()
+            pathIds.sort()
+            filesByPath = {}
+            paths = {}
+            # files stored in changesets are sorted by pathId, and must be
+            # retrieved in that order.  But we want to display them by 
+            # path.  So, retrieve the info from the changeset by pathId
+            # and stored it in a dict to be retrieved after sorting by
+            # path
+            for pathId in pathIds:
+                (cType, pathId, path, fileId, version) = fileList[pathId]
 
-            for (cType, pathId, path, fileId, version) in fileList:
                 if cType == 'New':
-                    # when file is in changeset, grab it locally
                     change = cs.getFileChange(None, fileId)
-                    fileObj = files.ThawFile(change, pathId)
+                    fileList[pathId] = (cType, pathId, path, fileId, version,
+                                                                        change)
                 elif cType == 'Mod':
-                    fileObj = getFileVersion(pathId, fileId, version, db, 
-                                             repos) 
                     (oldPath, oldFileId, oldVersion) = oldTrove.getFile(pathId)
-                    oldFileObj = getFileVersion(pathId, oldFileId, version, 
-                                                db, repos)
-                    if showChanges:
-                        # special option for showing both old and new version
-                        # of changed files
-                        printChangedFile(indent + ' ', fileObj, path, 
-                            oldFileObj, oldPath, tags=tags, sha1s=sha1s, 
-                            pathId=pathId, pathIds=ids)
-                        continue
+                    filecs = cs.getFileChange(oldFileId, fileId)
                     if not path:
                         path = oldPath
+                    fileList[pathId] = (cType, pathId, path, fileId, version,
+                                        oldPath, oldFileId, filecs)
                 elif cType == 'Del':
-                    (oldPath, oldFileId, oldVersion) = oldTrove.getFile(pathId)
-                    fileObj = getFileVersion(pathId, oldFileId, oldVersion, 
-                                             db, repos)
-                    path = oldPath
-                if tags and not ls and not fileObj.tags:
-                    continue
-                prefix = indent + ' ' + cType + '  '
-                display.printFile(fileObj, path, prefix=prefix, verbose=ls, 
-                                                 tags=tags, sha1s=sha1s,
-                                                 pathId=pathId, pathIds=ids)
-                printedData = True
+                    (path, fileId, version) = oldTrove.getFile(pathId)
+                    fileList[pathId] = (cType, pathId, path, fileId, version)
+                if path not in paths:
+                    paths[path] = [pathId]
+                else:
+                    paths[path].append(pathId)
+
+            pathNames = paths.keys()
+            pathNames.sort()
+            for path in pathNames:
+                for pathId in paths[path]:
+                    cType = fileList[pathId][0]
+                    if cType == 'Del':
+                        (cType, pathId, path, 
+                         fileId, version) = fileList[pathId]
+                        fileObj = getFileVersion(pathId, fileId, version, 
+                                                                 db, repos)
+                    elif cType == 'Mod':
+                        (cType, pathId, path, fileId, version, 
+                         oldPath, oldfileId, fileCs) = fileList[pathId]
+                        if showChanges or filecs[0] == '\x01':
+                            # don't grab the old file object if we don't
+                            # need it for displaying or for a three-way 
+                            # merge to retrieve new file object
+                             oldFileObj = getFileVersion(pathId, oldFileId, 
+                                                         version, db, repos)
+                        if filecs[0] == '\x01':
+                            # file was stored as a diff
+                            fileObj = oldFileObj.copy()
+                            assert(oldFileObj.fileId() == oldFileId)
+                            fileObj.twm(filecs, fileObj)
+                            assert(oldFileObj.fileId() == oldFileId)
+                        else:
+                            fileObj = files.ThawFile(filecs, pathId)
+                        if showChanges:
+                            # special option for showing both old and new 
+                            # version of changed files
+                            printChangedFile(indent + ' ', fileObj, path, 
+                                oldFileObj, oldPath, tags=tags, sha1s=sha1s, 
+                                pathId=pathId, pathIds=ids)
+                            continue
+                    elif cType == 'New':
+                        (cType, pathId, path, 
+                             fileId, version, change) = fileList[pathId]
+                        fileObj = files.ThawFile(change, pathId)
+                    if tags and not ls and not fileObj.tags:
+                        continue
+                    prefix = indent + ' ' + cType + '  '
+                    display.printFile(fileObj, path, prefix=prefix, verbose=ls, 
+                                                     tags=tags, sha1s=sha1s,
+                                                     pathId=pathId, pathIds=ids)
+                    printedData = True
             if printedData:
                 print
             if deps:
@@ -156,7 +200,7 @@ def printChangedFile(indent, f, path, oldF, oldPath, tags=False, sha1s=False, pa
         else:
             sha1 = ' '*41
     else:
-        sha1 = ' '*41
+        sha1 = ''
 
     if f.modeString() != oldF.modeString():
         mode = f.modeString()
