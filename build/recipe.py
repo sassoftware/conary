@@ -688,7 +688,7 @@ class GroupRecipe(Recipe):
 
 class FilesetRecipe(Recipe):
 
-    def addFileFromPackage(self, pattern, pkg, recurse):
+    def addFileFromPackage(self, pattern, pkg, recurse, remapList):
 	pathMap = {}
 	for (fileId, (pkgPath, version)) in pkg.iterFileList():
 	    pathMap[pkgPath] = (fileId, version)
@@ -721,23 +721,40 @@ class FilesetRecipe(Recipe):
 	    return False
 
 	for path in matches.keys():
+	    (fileId, version) = matches[path]
+
+	    for (old, new) in remapList:
+		if path == old:
+		    path = new
+		    break
+		elif len(path) > len(old) and path.startswith(old) and \
+					      path[len(old)] == "/":
+		    path = new + path[len(old):]
+		    break
+
 	    if self.paths.has_key(path):
 		raise RecipeFileError, "%s has been included multiple times" \
 			% path
 
-	    (fileId, version) = matches[path]
 	    self.files[fileId] = (path, version)
 	    self.paths[path] = 1
 
 	return True
 
-    def addFile(self, pattern, component, versionStr = None, recurse = True):
+    def addFile(self, pattern, component, versionStr = None, recurse = True,
+		remap = []):
 	"""
 	Adds files which match pattern from version versionStr of component.
 	Pattern is glob-style, with brace expansion. If recurse is set,
 	anything below a directory which matches pattern is also included,
 	and the directory itself does not have to be part of the package.
+	Remap is a list of (oldPath, newPath) tuples. The first oldPath
+	which matches the start of a matched pattern is rewritten as
+	newPath.
 	"""
+
+	if type(remap) == tuple:
+	    remap = [ remap ]
 
 	try:
 	    pkgList = helper.findPackage(self.repos, self.cfg.packagenamespace,
@@ -753,7 +770,8 @@ class FilesetRecipe(Recipe):
 	foundIt = False
 	pkg = pkgList[0]
 	for sub in package.walkPackageSet(self.repos, pkg):
-	    foundIt = foundIt or self.addFileFromPackage(pattern, sub, recurse)
+	    foundIt = foundIt or self.addFileFromPackage(pattern, sub, recurse,
+							 remap)
 
 	if not foundIt:
 	    raise RecipeFileError, "%s does not exist in version %s of %s" % \
