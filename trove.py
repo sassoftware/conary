@@ -187,7 +187,7 @@ class Package:
 	    self.removeFile(fileId)
 
 	# merge the included packages
-	for (name, list) in pkgCS.packages.items():
+	for (name, list) in pkgCS.getChangedPackages():
 	    for (oper, version) in list:
 		if oper == '+':
 		    self.addPackageVersion(name, version)
@@ -429,6 +429,9 @@ class PackageChangeSet:
 
     def getChangedFileList(self):
 	return self.changedFiles
+
+    def getChangedPackages(self):
+	return self.packages.items()
 
     def newPackageVersion(self, name, version):
 	"""
