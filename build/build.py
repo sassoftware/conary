@@ -727,9 +727,6 @@ class Create(_FileAction):
     The Create class puts a file in the destdir.  Without contents
     specified it is rather like C{touch}; with contents specified it
     is more like C{cat > foo <<EOF ... EOF}
-    @keyword contents: The (optional) contents of the file
-    @keyword macros: Whether or not to interpolate macros into the contents
-    @keyword mode: The mode of the file (defaults to 0644)
     """
     keywords = {'contents': '',
 		'macros': True,
@@ -749,6 +746,11 @@ class Create(_FileAction):
 		self.setComponents(path)
 		self.chmod(macros['destdir'], path)
     def __init__(self, *args, **keywords):
+        """
+        @keyword contents: The (optional) contents of the file
+        @keyword macros: Whether or not to interpolate macros into the contents
+        @keyword mode: The mode of the file (defaults to 0644)
+        """
         _FileAction.__init__(self, *args, **keywords)
 	if type(args[0]) is tuple:
 	    self.paths = args[0]
