@@ -5,6 +5,7 @@ import md5
 import os
 import sqlite
 import tempfile
+import util
 import xmlshims
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -73,21 +74,31 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         else:
             return [ (x[0], x[1], self.fromVersion(x[2])) for x in gen ]
 
-    def getFileContents(self, authToken, sha1list):
-	# XXX X this isn't properly checked!
-	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.cfc-out')
-	f = os.fdopen(fd, "w")
+    def getFileContents(self, authToken, troveName, troveVersion, 
+			   troveFlavor, path):
+	troveVersion = self.toVersion(troveVersion)
+	troveFlavor = self.toFlavor(troveFlavor)
 
-	fc = filecontainer.FileContainer(f)
-	del f
-	d = self.repos.getFileContents(sha1list)
+	if not self.auth.check(authToken, write = False, trove = troveName,
+			       label = troveVersion.branch().label()):
+	    raise InsufficientPermission
 
-	for sha1 in sha1list:
-	    fc.addFile(sha1, d[sha1], "", d[sha1].fullSize)
-	fc.close()
+	# this could be much more efficient; iterating over the files is
+	# just silly
+	for (fileId, tpath, tversion, fileObj) in \
+		self.repos.iterFilesInTrove(troveName, troveVersion, 
+					    troveFlavor, withFiles = True):
+	    if tpath != path: continue
 
-	fileName = os.path.basename(path)
-	return "%s?%s" % (self.urlBase, fileName[:-4])
+	    inF = self.repos.contentsStore.openRawFile(fileObj.contents.sha1())
+
+	    (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
+					  suffix = '.cf-out')
+	    outF = os.fdopen(fd, "w")
+	    util.copyfileobj(inF, outF)
+
+	    url = "%s?%s" % ( self.urlBase, os.path.basename(path)[:-4] )
+	    return url
 
     def getAllTroveLeafs(self, authToken, troveNames):
 	for troveName in troveNames:

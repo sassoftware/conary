@@ -137,8 +137,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	file = self.troveStore.getFile(fileId, version)
 	if withContents:
 	    if file.hasContents:
-		cont = filecontents.FromRepository(self, file.contents.sha1(), 
-						   file.contents.size())
+		cont = filecontents.FromDataStore(self.contentsStore, 
+						    file.contents.sha1(), 
+						    file.contents.size())
 	    else:
 		cont = None
 
