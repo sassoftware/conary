@@ -87,6 +87,17 @@ class DanglingSymlinks(policy.Policy):
     which your package depends, you may set up an exception for that
     file for the C{DanglingSymlinks} policy.
     """
+    targetexceptions = [
+	'.*consolehelper'
+    ]
+    def doProcess(self, recipe):
+	self.targetFilters = []
+	self.macros = recipe.macros # for filterExpression
+	for targetitem in self.targetexceptions:
+	    filterargs = self.filterExpression(targetitem)
+	    self.targetFilters.append(filter.Filter(*filterargs))
+	policy.Policy.doProcess(self, recipe)
+
     def doFile(self, file):
 	d = self.macros.destdir
 	f = util.joinPaths(d, file)
@@ -98,6 +109,12 @@ class DanglingSymlinks(policy.Policy):
 	    try:
 		os.stat(f)
 	    except OSError:
+		for targetFilter in self.targetFilters:
+		    if targetFilter.match(contents):
+			# contents are an exception
+			log.debug('allowing special dangling symlink %s -> %s',
+				  file, contents)
+			return
 		raise PackagePolicyError(
 		    "Dangling symlink: %s points to non-existant %s"
 		    %(file, contents))
