@@ -1,4 +1,3 @@
-#l!/usr/bin/python2.3
 #
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
