@@ -17,13 +17,14 @@ if len(sys.argv) != 3:
 
 sys.path.append(sys.argv[1])
 
-from SimpleXMLRPCServer import SimpleXMLRPCServer
-from SimpleHTTPServer import SimpleHTTPRequestHandler
 from BaseHTTPServer import HTTPServer
-from repository import fsrepos
 from repository import changeset
-import xmlshims
+from repository import fsrepos
+from SimpleHTTPServer import SimpleHTTPRequestHandler
+from SimpleXMLRPCServer import SimpleXMLRPCServer
+import filecontainer
 import select
+import xmlshims
 
 class SRSServer(SimpleXMLRPCServer):
 
@@ -128,6 +129,22 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                      for x in gen ]
         else:
             return [ (x[0], x[1], self.fromVersion(x[2])) for x in gen ]
+
+    def getFileContents(self, sha1list):
+	(fd, path) = tempfile.mkstemp()
+	f = os.fdopen(fd, "w")
+
+	fc = filecontainer.FileContainer(f)
+	del f
+	d = self.repos.getFileContents(sha1list)
+
+	for sha1 in sha1list:
+	    fc.addFile(sha1, d[sha1], "", d[sha1].fullSize)
+	fc.close()
+
+	HttpRequests.outFiles[path] = True
+	fileName = os.path.basename(path)
+	return "http://localhost:8001/%s" % fileName
 
     def getAllTroveLeafs(self, troveNames):
 	d = {}
