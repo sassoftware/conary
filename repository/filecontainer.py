@@ -64,7 +64,8 @@ import struct
 from lib import util
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
-FILE_CONTAINER_VERSION = 2005011901
+FILE_CONTAINER_VERSION = 2005012901
+READABLE_VERSIONS = [ FILE_CONTAINER_VERSION, 2005011901 ]
 SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
@@ -82,7 +83,7 @@ class FileContainer:
 	if len(version) != 4:
 	    raise BadContainer, "invalid container version"
 	version = struct.unpack("!I", version)[0]
-	if version != FILE_CONTAINER_VERSION:
+	if version not in READABLE_VERSIONS::
 	    raise BadContainer, "unsupported file container version %d" % \
 			version
 
