@@ -19,10 +19,13 @@ dist_files = $(python_files) $(extra_dist)
 all: default-install
 
 install:
+	# see conary-wrapper symlink in ../Makefile to make scripts
+	# available in $(bindir)
 	install -m 755 rpm2cpio $(DESTDIR)$(conarydir)
-	install -m 755 yuck $(DESTDIR)$(bindir)
-	install -m 755 convertcontents $(DESTDIR)$(conarydir)
+	install -m 755 yuck $(DESTDIR)$(conarydir)
 	install -m 644 yuck.1 $(DESTDIR)$(mandir)/man1
+	install -m 755 convertcontents $(DESTDIR)$(conarydir)
+	install -m 755 conarybugz.py $(DESTDIR)$(conarydir)
 
 dist: default-dist
 
