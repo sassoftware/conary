@@ -129,19 +129,19 @@ class ShellCommand(Action):
 
 def normpath(path):
     s = os.path.normpath(path)
-    if s.startswith('//'):
+    if s.startswith(os.sep + os.sep):
 	return s[1:]
     return s
 
 def mkdirChain(*paths):
     for path in paths:
-        if path[0] != "/":
-            path = os.getcwd() + "/" + path
+        if path[0] != os.sep:
+            path = os.getcwd() + os.sep + path
             
-        paths = path.split('/')
+        paths = path.split(os.sep)
             
         for n in (range(2,len(paths) + 1)):
-            p = string.join(paths[0:n], "/")
+            p = string.join(paths[0:n], os.sep)
             if not os.path.exists(p):
                 # don't die in case of the race condition where someone
                 # made the directory after we stat'ed for it.
@@ -160,7 +160,7 @@ def mkdirChain(*paths):
 def _searchVisit(arg, dirname, names):
     file = arg[0]
     path = arg[1]
-    testname = '%s/%s' %(dirname, file)
+    testname = '%s%s%s' %(dirname, os.sep, file)
     if file in names:
 	path[0] = testname
 	del names
@@ -173,7 +173,7 @@ def searchPath(file, basepath):
 
 def searchFile(file, searchdirs, error=None):
     for dir in searchdirs:
-        s = "%s/%s" %(dir, file)
+        s = "%s%s%s" %(dir, os.sep, file)
         if os.path.exists(s):
             return s
     if error:
@@ -308,7 +308,7 @@ def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
     sourcelist = []
     for source in braceGlob(sources):
 	if os.path.isdir(source):
-	    thisdest = '%s/%s' %(dest, os.path.basename(source))
+	    thisdest = '%s%s%s' %(dest, os.sep, os.path.basename(source))
 	    log.debug('copying [tree] %s to %s', source, thisdest)
 	    shutil.copytree(source, thisdest, symlinks)
 	    if dirmode:
@@ -318,7 +318,7 @@ def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
 	else:
 	    log.debug('copying [file] %s to %s', source, dest)
 	    shutil.copy2(source, dest)
-	    if dest.endswith('/'):
+	    if dest.endswith(os.sep):
 		thisdest = dest + os.sep + os.path.basename(source)
 	    else:
 		thisdest = dest
@@ -339,8 +339,6 @@ def checkPath(binary):
             return True
     return False
 
-def joinPaths(one, two):
-    if two[0] == "/":
-	return one + two
-    return one + "/" + two
+def joinPaths(*args):
+    return normpath(os.sep.join(args))
 
