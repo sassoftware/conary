@@ -33,32 +33,54 @@ class Dependency:
 	else:
 	    return self.main
 
-    def satisfies(self, other):
+    def satisfies(self, required):
 	"""
 	Returns whether or not this dependency satisfies the argument
 	(which is a requires).
 
 	@type other: Dependency
 	"""
-	if self.main != other.main: 
+	if self.main != required.main: 
 	    return False
-	for flag in other.flags.iterkeys():
-	    if not self.flags.has_key(flag): 
+	for requiredFlag in required.flags.iterkeys():
+	    if not self.flags.has_key(requiredFlag): 
 		return False
 
 	return True
 
+    def mergeFlags(self, other):
+	"""
+	Returns a new Dependency which merges the flags from the two
+	existing dependencies. We don't want to merge in place as this
+	Dependency could be shared between many objects (via a 
+	DependencyGroup)
+	"""
+	allFlags = self.flags.copy()
+	allFlags.update(other.flags)
+
+	return Dependency(self.main, allFlags)
+
     def __init__(self, main, flags = []):
 	self.main = main
-	self.flags = {}
-	for flags in flags:
-	    self.flags[flags] = True
+	if type(flags) == dict:
+	    self.flags = flags
+	else:
+	    self.flags = {}
+	    for flags in flags:
+		self.flags[flags] = True
 
 class DependencyClass:
 
     def addDep(self, dep):
-	if self.members.has_key(dep):
-	    return
+	if self.members.has_key(dep.main):
+	    # this is a little faster then doing all of the work when
+	    # we could otherwise avoid it
+	    if dep == self.members[dep.main]: return
+
+	    # merge the flags, and add the newly created dependency
+	    # into the class
+	    dep = self.members[dep.main].mergeFlags(dep)
+	    del self.members[dep.main]
 
 	if not self.dgroup.has_key(dep):
 	    self.dgroup[dep] = dep
@@ -66,34 +88,28 @@ class DependencyClass:
 	else:
 	    grpDep = self.dgroup[dep]
 
-	self.members[grpDep] = True
+	self.members[grpDep.main] = grpDep
+	assert(not self.justOne or len(self.members) == 1)
 
-    def satisfies(self, other):
-	if self.tag != other.tag:
+    def satisfies(self, requirements):
+	if self.tag != requirements.tag:
 	    return False
 
-	for otherdep in other.members.iterkeys():
-	    if not self.members.has_key(otherdep):
-		# this optimizes if there is an exact match for the dependency,
-		# which there normally is
-		if self.exactMatch:
-		    return False
-
-		satisfied = False
-
-		for dep in self.members.iterkeys():
-		    if dep.satisfies(otherdep):
-			satisfied = True
-			break
-
-		if not satisfied:
-		    return False
+	for requiredDep in requirements.members.itervalues():
+	    if not self.members.has_key(requiredDep.main) or \
+	       not self.members[requiredDep.main].satisfies(requiredDep):
+		return False
 
 	return True
 
+    def union(self, other):
+	for otherdep in other.members.itervalues():
+	    # calling this for duplicates is a noop
+	    self.addDep(otherdep)
+
     def __hash__(self):
 	val = self.tag
-	for dep in self.members.iterkeys():
+	for dep in self.members.itervalues():
 	    val ^= hash(dep)
 
 	return val
@@ -104,7 +120,7 @@ class DependencyClass:
 
     def __str__(self):
 	return "\n".join([ "%s: %s" % (self.tagName, dep) 
-		    for dep in self.members.iterkeys() ])
+		    for dep in self.members.itervalues() ])
 
     def __init__(self, dgroup):
 	assert(self.__class__ != DependencyClass)
@@ -116,30 +132,35 @@ class AbiDependency(DependencyClass):
     tag = DEP_CLASS_ABI
     tagName = "abi"
     exactMatch = True
+    justOne = True
 
 class InstructionSetDependency(DependencyClass):
 
     tag = DEP_CLASS_IS
     tagName = "is"
     exactMatch = False
+    justOne = True
 
-class SonameDependency(DependencyClass):
+class SonameDependencies(DependencyClass):
 
     tag = DEP_CLASS_SONAME
     tagName = "soname"
     exactMatch = True
+    justOne = False
 
-class FilesDependencies(DependencyClass):
+class FileDependencies(DependencyClass):
 
     tag = DEP_CLASS_FILES
     tagName = "file"
     exactMatch = True
+    justOne = False
 
-class TrovesDependencies(DependencyClass):
+class TroveDependencies(DependencyClass):
 
     tag = DEP_CLASS_TROVES
     tagName = "trove"
     exactMatch = True
+    justOne = False
 
 class DependencySet:
 
@@ -161,6 +182,13 @@ class DependencySet:
 
 	return True
 
+    def union(self, other):
+	for tag in other.members:
+	    if self.members.has_key(tag):
+		self.members[tag].union(other.members[tag])
+	    else:
+		self.members[tag] = other.members[tag]
+
     def __str__(self):
 	return "\n".join([ str(x) for x in self.members.itervalues()])
 
@@ -169,5 +197,12 @@ class DependencySet:
 	self.members = {}
 
 class DependencyGroup(dict):
+
+    # this keeps a reference to each dependency forever, which means
+    # they never get removed from memory! this is unfortunate. we'd
+    # really like to have items removed from this list as soon as their
+    # reference count hits 1, but I don't know if that's possible. this
+    # makes it important to delete these objects once they're no longer
+    # needed
 
     pass
