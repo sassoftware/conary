@@ -56,7 +56,7 @@ def usage(rc = 1):
     print ""
     print "pkglist flags: --all"
     print "               --ls"
-    return rc
+    sys.exit(rc)
 
 otherArgs = [ sys.argv[0] ]
 argSet = {}
@@ -128,7 +128,7 @@ elif (otherArgs[1] == "branch"):
     if len(otherArgs) < 4 or len(otherArgs) > 5: usage()
     repos = repository.LocalRepository(cfg.reppath, "c")
 
-    args = [repos ] + otherArgs[2:]
+    args = [repos, cfg.packagenamespace ] + otherArgs[2:]
     branch.branch(*args)
 elif (otherArgs[1] == "changeset"):
     # current usage is "package file oldversion newversion"
