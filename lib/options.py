@@ -31,19 +31,19 @@ class OptionError(Exception):
     def __init__(self, val):
         self.val = val
 
-def processArgs(argDef, cfgMap, cfg, usage):
-    otherArgs = [ sys.argv[0] ]
+def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
+    otherArgs = [ argv[0] ]
     argSet = {}
 
     for arg in cfgMap.keys():
 	argDef[arg] = 1
 
     i = 1
-    while i < len(sys.argv):
-	if sys.argv[i][:2] != "--":
-	    otherArgs.append(sys.argv[i])
+    while i < len(argv):
+	if argv[i][:2] != "--":
+	    otherArgs.append(argv[i])
 	else:
-	    arg = sys.argv[i][2:]
+	    arg = argv[i][2:]
 	    if not argDef.has_key(arg): raise OptionError(usage())
 
 	    if argDef[arg] == NO_PARAM:
@@ -55,11 +55,11 @@ def processArgs(argDef, cfgMap, cfg, usage):
 		# XXX hack -- assume that last the last 
 		# arg is a file name and not a parameter
 		# to this function
-		if i+2 >= len(sys.argv): 
+		if i+2 >= len(argv): 
 		    argSet[arg] = True
 		    i = i + 1
 		    continue
-		next_arg = sys.argv[i+1]
+		next_arg = argv[i+1]
 		if next_arg[0:2] != '--':
 		    argSet[arg] = next_arg
 		    i = i + 2
@@ -69,18 +69,18 @@ def processArgs(argDef, cfgMap, cfg, usage):
 	    else:
 		# the argument takes a parameter
 		i = i + 1
-		if i >= len(sys.argv): raise OptionError(usage())
+		if i >= len(argv): raise OptionError(usage())
 
 		if argDef[arg] == ONE_PARAM:
 		    # exactly one parameter is allowd
 		    if argSet.has_key(arg): raise OptionError(usage())
-		    argSet[arg] = sys.argv[i]
+		    argSet[arg] = argv[i]
 		else:
 		    # multiple parameters may occur
 		    if argSet.has_key(arg):
-			argSet[arg].append(sys.argv[i])
+			argSet[arg].append(argv[i])
 		    else:
-			argSet[arg] = [sys.argv[i]]
+			argSet[arg] = [argv[i]]
 	i = i + 1
 
     if 'config-file' in argSet:
