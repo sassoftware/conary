@@ -335,6 +335,11 @@ Arch.x86.i486 = False
 Arch.x86.i586 = False
 Arch.x86.i686 = True
 Arch.x86.x86_64 = False
+Arch.x86.x86_64.setShortDoc('x86_64 base 64-bit extensions')
+Arch.x86.amd64 = False
+Arch.x86.amd64.setShortDoc('x86_64 with base AMD64 extensions')
+Arch.x86.em64t = False
+Arch.x86.em64t.setShortDoc('x86_64 with base EM64T extensions')
 Arch.x86.cmov = False
 Arch.x86.sse = False
 Arch.x86.sse2 = False
