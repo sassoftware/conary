@@ -296,8 +296,12 @@ def braceGlob(paths):
 def rmtree(paths, ignore_errors=False, onerror=None):
     for path in braceGlob(paths):
 	log.debug('deleting [tree] %s', path)
-	os.path.walk(path, _permsVisit, None)
-	shutil.rmtree(path, ignore_errors, onerror)
+	# act more like rm -rf -- allow files, too
+	if not os.path.isdir(path):
+	    os.remove(path)
+	else:
+	    os.path.walk(path, _permsVisit, None)
+	    shutil.rmtree(path, ignore_errors, onerror)
 
 def _permsVisit(arg, dirname, names):
     for name in names:
