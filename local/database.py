@@ -38,6 +38,7 @@ class Database(repository.LocalRepository):
 	pkg = repository.LocalRepository.getPackageVersion(self, name, version)
 	if not version.isLocal(): return pkg
 
+
 	for (fileId, path, fileVersion) in pkg.fileList():
 	    parentVersion = fileVersion.parent()
 
