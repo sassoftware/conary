@@ -39,6 +39,7 @@ python_files = __init__.py	\
 	rollbacks.py		\
 	rpmhelper.py		\
 	sha1helper.py		\
+	srcctl.py		\
 	srscfg.py		\
 	update.py		\
 	util.py			\
