@@ -404,6 +404,15 @@ class Ldconfig(BuildCommand):
 class _FileAction(BuildAction):
     keywords = {'component': None}
 
+    def __init__(self, recipe, *args, **keywords):
+        BuildAction.__init__(self, recipe, *args, **keywords)
+        # Add the specified package to the list of packages created by this
+        # recipe
+        if self.component and self.component.find(':') != -1:
+            package = self.component.split(':')[0]
+            if package:
+                recipe.packages[package] = True
+
     def chmod(self, destdir, path, mode=None):
 	if not mode:
 	    mode=self.mode
