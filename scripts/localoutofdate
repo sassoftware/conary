@@ -106,48 +106,49 @@ def main(argv):
     db = database.Database(cfg.root, cfg.dbPath)
     dbpkgs = [ x for x in db.iterAllTroveNames() if x.find(':') == -1 ]
     dbVersions = {}
-    labelPkgs = {}
+    branchPkgs = {}
     for pkg in dbpkgs:
         if pkg in updateExceptions:
             continue
         dbVersions = db.getTroveVersionList(pkg)
         for v in dbVersions:
-            label = v.branch().label()
-            if isinstance(label, versions.CookBranch) or\
-               isinstance(label, versions.EmergeBranch):
+            branch = v.branch()
+            if isinstance(branch.label(), versions.CookBranch) or\
+               isinstance(branch.label(), versions.EmergeBranch):
                 continue
-            if label not in labelPkgs:
-                labelPkgs[label] = {}
-            if pkg not in labelPkgs[label]:
-                labelPkgs[label][pkg] = []
-            labelPkgs[label][pkg].append(v)
+            if branch not in branchPkgs:
+                branchPkgs[branch] = {}
+            if pkg not in branchPkgs[branch]:
+                branchPkgs[branch][pkg] = []
+            branchPkgs[branch][pkg].append(v)
     dbpkgs.sort()
 
     updates = []
     notavail = []
-    for label in labelPkgs.keys():
-        labelDbpkgs = labelPkgs[label].keys()
-        labelDbpkgs.sort()
+    for branch in branchPkgs.keys():
+        branchDbPkgs = branchPkgs[branch].keys()
+        branchDbPkgs.sort()
         try:
-            versionList = repos.getTroveLeavesByLabel(labelDbpkgs, label)
+            versionList = repos.getTroveLeavesByBranch(
+                                dict.fromkeys(branchDbPkgs, {branch : None}))
         except repository.OpenError, e:
-            print >>sys.stderr, "Warning: could not access %s: %s" % (label.asString(), e)
-            print >>sys.stderr, "Skipping packages %s" % labelDbpkgs
+            print >>sys.stderr, "Warning: could not access %s: %s" % (branch.asString(), e)
+            print >>sys.stderr, "Skipping packages %s" % branchDbPkgs
             continue
-        for pkg in labelDbpkgs:
-            dbVersions = labelPkgs[label][pkg]
-            repoVersions = versionList[pkg]
+        for pkg in branchDbPkgs:
+            dbVersions = branchPkgs[branch][pkg]
+            repoVersions = versionList[pkg].keys()
             # only look for updates to this version on the same branch
             for lv in dbVersions:
                 if not repoVersions:
                     
                     lvt = lv.trailingVersion()
-                    notavail.append((label, pkg, lv, None))
-                for v in repoVersions:
-                    if lv.branch() != v.branch():
-                        continue
+                    notavail.append((branch, pkg, lv, None))
+                else:
+                    repoVersions.sort()
+                    v = repoVersions[-1]
                     if v.isAfter(lv):
-                        updates.append((label, pkg, lv, v))
+                        updates.append((branch, pkg, lv, v))
 
     maxL = 0
     maxP = 0
