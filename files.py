@@ -12,7 +12,6 @@ import util
 import types
 import time
 import lookaside
-from datastore import DataStore
 
 class FileMode:
     def merge(self, mode):
