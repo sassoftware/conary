@@ -189,6 +189,8 @@ class RecipeLoader(types.DictionaryType):
         for (name, obj) in  self.module.__dict__.items():
             if type(obj) is not types.ClassType:
                 continue
+            # if a recipe has been marked to be ignored (for example, if
+            # it was loaded from another recipe by loadRecipe()
             if obj.__dict__.has_key('ignore'):
                 continue
             # make sure the class is derived from Recipe
