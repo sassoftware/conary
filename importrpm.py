@@ -11,6 +11,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Currently-disabled module for importing RPMs
+"""
 import commit
 import cook
 import helper

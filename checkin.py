@@ -11,6 +11,12 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Actions on source components.  This includes creating new packages;
+checking in changes; checking out the latest version; displaying logs
+and diffs; creating new packages; adding, removing, and renaming files;
+and committing changes back to the repository.
+"""
 
 from build import recipe, lookaside
 from local import update

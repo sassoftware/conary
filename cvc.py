@@ -12,6 +12,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Provides the output for the "conary source" subcommands
+"""
 
 from repository import repository
 from helper import openRepository

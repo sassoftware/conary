@@ -11,6 +11,10 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Defines the datastreams stored in a changeset
+"""
+
 import struct
 
 from deps import filedeps, deps

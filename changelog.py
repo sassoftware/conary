@@ -11,6 +11,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Implements changelog entries for repository commits.
+"""
 
 import os
 import string

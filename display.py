@@ -11,6 +11,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Provides the output for the "conary query" command
+"""
 
 import files
 

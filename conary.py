@@ -13,6 +13,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+The conary main program.
+"""
 
 
 import sys

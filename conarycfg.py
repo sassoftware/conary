@@ -11,6 +11,10 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Provides Conary's generic config file format, and implements conaryrc
+handling.
+"""
 
 import deps
 import deps.arch

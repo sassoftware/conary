@@ -11,6 +11,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+"""
+Implements troves (packages, components, etc.) for the repository
+"""
 
 import changelog
 import copy
@@ -18,7 +21,6 @@ import files
 import versions
 from deps import deps
 
-# this is the repository's idea of a package
 class Trove:
     """
     Packages are groups of files and other packages, which are included by
