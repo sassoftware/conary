@@ -492,7 +492,7 @@ class TroveFinder:
 
         type = self._getVersionType(troveTup)
         sortFn = self.getVersionStrSortFn(type)
-        sortFn(troveTup, affinityTroves, f) 
+        sortFn(self, troveTup, affinityTroves, f) 
 
     ########################
     # The following functions translate from the version string in the
@@ -655,14 +655,16 @@ class TroveFinder:
             self.query[queryType] = getQueryClass(queryType)(defaultFlavor, 
                                                              labelPath, 
                                                              acrossRepositories)
+    # class variable for TroveFinder
+    #
+    # set up map from a version string type to the source fn to use
+    versionStrToSortFn = \
+             { VERSION_STR_NONE         : sortNoVersion,
+               VERSION_STR_FULL_VERSION : sortFullVersion,
+               VERSION_STR_BRANCH       : sortBranch,
+               VERSION_STR_LABEL        : sortLabel,
+               VERSION_STR_BRANCHNAME   : sortBranchName,
+               VERSION_STR_TAG          : sortTag,
+               VERSION_STR_REVISION     : sortTroveVersion,
+               VERSION_STR_TROVE_VER    : sortTroveVersion }
 
-        # set up map from a version string type to the source fn to use
-        self.versionStrToSortFn = \
-                         { VERSION_STR_NONE         : self.sortNoVersion,
-                           VERSION_STR_FULL_VERSION : self.sortFullVersion,
-                           VERSION_STR_BRANCH       : self.sortBranch,
-                           VERSION_STR_LABEL        : self.sortLabel,
-                           VERSION_STR_BRANCHNAME   : self.sortBranchName,
-                           VERSION_STR_TAG          : self.sortTag,
-                           VERSION_STR_REVISION     : self.sortTroveVersion,
-                           VERSION_STR_TROVE_VER    : self.sortTroveVersion }
