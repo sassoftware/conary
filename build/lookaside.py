@@ -111,4 +111,4 @@ def findAll(cfg, name, location, srcdirs):
 class LookAside(file):
     def __init__(cfg, name, location, srcdirs, buffered=-1):
 	f = findAll(cfg, name, location, srcdirs)
-	file.__init__(self, f, "r+", buffered)
+	file.__init__(self, f, "r", buffered)
