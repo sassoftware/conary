@@ -54,7 +54,7 @@ def magic(path, basedir=''):
     Returns a magic class with information about the file mentioned
     """
     if basedir and not basedir.endswith('/'):
-	basefir += '/'
+	basedir += '/'
     f = file(basedir+path)
     b = f.read(4096)
     f.close()
