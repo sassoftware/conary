@@ -334,7 +334,7 @@ class InstructionSetDependency(DependencyClass):
 
     tag = DEP_CLASS_IS
     tagName = "is"
-    justOne = True
+    justOne = False
     depClass = Dependency
 _registerDepClass(InstructionSetDependency)
 
@@ -516,11 +516,11 @@ def formatFlavor(flavor):
         useFlags = _singleClass(useFlags)[4:-1]
 
     if insSet and useFlags:
-        return "%s use: %s" % (insSet, useFlags)
+        return "%s is: %s" % (useFlags, insSet)
     elif insSet:
-        return insSet
+        return "is: %s" % insSet
     elif useFlags:
-        return "use: %s" % useFlags
+        return useFlags
 
     return ""
 
@@ -559,11 +559,11 @@ def parseFlavor(s, mergeBase = None):
 
     set = DependencySet()
 
-    baseInsSet = groups[1]
+    baseInsSet = groups[3]
     if baseInsSet:
         needsInsSet = False
-        if groups[2]:
-            insSetFlags = groups[2].split(",")
+        if groups[4]:
+            insSetFlags = groups[4].split(",")
             for i, flag in enumerate(insSetFlags):
                 insSetFlags[i] = _fixup(flag)
         else:
@@ -571,16 +571,18 @@ def parseFlavor(s, mergeBase = None):
 
         set.addDep(InstructionSetDependency, Dependency(baseInsSet, 
                                                         insSetFlags))
-    elif groups[0]:
+    elif groups[2]:
         needsInsSet = False
 
-    if groups[3]:
+    if groups[1]:
         needsUse = False
-        useFlags = groups[3].split(",")
+        useFlags = groups[1].split(",")
         for i, flag in enumerate(useFlags):
             useFlags[i] = _fixup(flag)
 
         set.addDep(UseDependency, Dependency("use", useFlags))
+    elif groups[0]:
+        needsUse = False
 
     if needsInsSet and mergeBase:
         insSet = mergeBase.getDepClasses().get(DEP_CLASS_IS, None)
@@ -601,9 +603,9 @@ dependencyCache = util.ObjectCache()
 ident = '(?:[_A-Za-z][0-9A-Za-z_]*)'
 flag = '(?:~?!?IDENT)'
 useFlag = '(?:!|~!)?FLAG(?:\.IDENT)?'
-archClause = '(IDENT)(?:\(( *FLAG(?: *, *FLAG)*)\))?(?:$| )'
-useClause = 'use: *(USEFLAG *(?:, *USEFLAG)*)? *'
-exp = '^(is:)? *(?:ARCHCLAUSE)? *(?:USECLAUSE)?$'
+archClause = '(is:) *(?:(IDENT)(?:\(( *FLAG(?: *, *FLAG)*)\))?)?'
+useClause = '(USEFLAG *(?:, *USEFLAG)*)? *'
+exp = '^(use:)? *(?:USECLAUSE)? *(?:ARCHCLAUSE)?$'
 
 exp = exp.replace('ARCHCLAUSE', archClause)
 exp = exp.replace('USECLAUSE', useClause)
