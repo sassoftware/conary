@@ -173,8 +173,7 @@ def get(isSecure, repos, httpHandler, req):
             self.send_error(404, "File not found")
             return None
 
-        if req.args[0:6] != "cache-" or not repos.cacheChangeSets():
-            os.unlink(localName)
+        os.unlink(localName)
 
         items = []
         totalSize = 0
@@ -193,10 +192,9 @@ def get(isSecure, repos, httpHandler, req):
     for (path, size) in items:
         req.sendfile(path)
 
-    # erase single files
-    if not localName.endswith(".cf-out") and \
-           (req.args[0:6] != "cache-" or not repos.cacheChangeSets()):
-        os.unlink(items[0][0])
+        if path.startswith(repos.tmpPath) and (req.args[0:6] != "cache-"
+               or not repos.cacheChangeSets()):
+            os.unlink(path)
 
     return apache.OK
 

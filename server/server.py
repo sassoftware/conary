@@ -145,9 +145,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 f = open(path, "r")
                 util.copyfileobj(f, self.wfile)
                 del f
-
-            if not localName.endswith(".cf-out"):
-                os.unlink(items[0][0])
+                if path.startswith(FILE_PATH):
+                    os.unlink(path)
 
     def do_POST(self):
         if self.headers.get('Content-Type', '') == 'text/xml':

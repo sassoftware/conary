@@ -36,7 +36,8 @@ from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExi
 import trovestore
 import versions
 
-SERVER_VERSIONS = [ 29 ]
+# a list of the protocols we understand
+SERVER_VERSIONS = [ 29, 30 ]
 CACHE_SCHEMA_VERSION = 12
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -814,7 +815,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             return new
 
-        urlList = []
+        pathList = []
         newChgSetList = []
         allFilesNeeded = []
 
@@ -859,12 +860,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             newChgSetList += _cvtTroveList(trovesNeeded)
             allFilesNeeded += _cvtFileList(filesNeeded)
 
-            fileName = os.path.basename(path)
+            pathList.append(path)
 
-            urlList.append(os.path.join(self.urlBase(), 
-                                        "changeset?%s" % fileName[:-4]))
+        if clientVersion < 30:
+            urls = [ os.path.join(self.urlBase(), "changeset?%s" % 
+                            os.path.basename(x)[:-4]) for x in pathList ]
+            return urls, newChgSetList, allFilesNeeded
+        elif len(pathList) == 1:
+            url = os.path.join(self.urlBase(), 
+                       "changeset?%s" % os.path.basename(pathList[0])[:-4])
+            size = os.stat(os.path.join(self.tmpPath, pathList[0])).st_size
+            return url, [ size ], newChgSetList, allFilesNeeded
 
-        return urlList, newChgSetList, allFilesNeeded
+        (fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.cf-out')
+        url = os.path.join(self.urlBase(), 
+                           "changeset?%s" % os.path.basename(path[:-4]))
+        f = os.fdopen(fd, 'w')
+        sizes = []
+        for path in pathList:
+            sizes.append(os.stat(path).st_size)
+            f.write("%s %d\n" % (path, sizes[-1]))
+        f.close()
+
+        return url, sizes, newChgSetList, allFilesNeeded
 
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
 	if not self.auth.check(authToken, write = False):
@@ -993,12 +1011,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
-        if clientVersion not in SERVER_VERSIONS:
+        if clientVersion < 29:
             raise InvalidClientVersion, \
                ("Invalid client version %s.  Server accepts client versions %s"
                 " - download a valid client from www.specifix.com" % \
                 (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
-        return SERVER_VERSIONS[-1]
+        elif clientVersion == 29:
+            return SERVER_VERSIONS[-1]
+        
+        return SERVER_VERSIONS
 
     def cacheChangeSets(self):
         return isinstance(self.cache, CacheSet)

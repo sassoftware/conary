@@ -38,7 +38,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=29
+CLIENT_VERSIONS = [ 30 ]
 
 class _Method(xmlrpclib._Method):
 
@@ -49,7 +49,10 @@ class _Method(xmlrpclib._Method):
         return self.__repr__()
 
     def __call__(self, *args):
-        newArgs = ( CLIENT_VERSION, ) + args
+        return self.doCall(CLIENT_VERSIONS[-1], *args)
+
+    def doCall(self, clientVersion, *args):
+        newArgs = ( CLIENT_VERSIONS[-1], ) + args
         isException, result = self.__send(self.__name, newArgs)
 	if not isException:
 	    return result
@@ -115,7 +118,7 @@ class ServerCache:
 	    self.cache[serverName] = server
 
 	    try:
-                server.checkVersion()
+                serverVersions = server.checkVersion()
 	    except Exception, e:
                 if isinstance(e, socket.error):
                     errmsg = e[1]
@@ -132,6 +135,18 @@ class ServerCache:
                     url = protocol + '://<user>:<pwd>@' + url.split('@')[1]
 		raise repository.OpenError('Error occured opening repository '
 			    '%s: %s' % (url, errmsg))
+
+            intersection = set(serverVersions) & set(CLIENT_VERSIONS)
+            if not intersection:
+                raise InvalidServerVersion, \
+                   ("Invalid server version.  Server accepts client "
+                    "versions %s, but this client only supports versions %s"
+                    " - download a valid client from www.specifix.com") % \
+                    (",".join([str(x) for x in serverVersions]),
+                     ",".join([str(x) for x in CLIENT_VERSIONS]))
+
+            server.serverVersion = max(intersection)
+
 	return server
 		
     def __init__(self, repMap):
@@ -591,7 +606,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             chgSetList = []
 
             for serverName, job in serverJobs.iteritems():
-                (urlList, extraTroveList, extraFileList) = \
+                (url, sizes, extraTroveList, extraFileList) = \
                     self.c[serverName].getChangeSet(job, recurse, 
                                                 withFiles, withFileContents,
                                                 excludeAutoSource)
@@ -599,32 +614,37 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 chgSetList += _cvtTroveList(extraTroveList)
                 filesNeeded += _cvtFileList(extraFileList)
 
-                urlsFetched += len(urlList)
+                urlsFetched += len(sizes)
 
-                for url in urlList:
-                    inF = urllib.urlopen(url)
+                inF = urllib.urlopen(url)
 
-                    try:
-                        # seek to the end of the file
-                        outFile.seek(0, 2)
-                        start = outFile.tell()
-                        size = util.copyfileobj(inF, outFile)
-                        f = util.SeekableNestedFile(outFile, size, start)
+                try:
+                    # seek to the end of the file
+                    outFile.seek(0, 2)
+                    start = outFile.tell()
+                    totalSize = util.copyfileobj(inF, outFile)
+                    #assert(totalSize == sum(sizes))
+                    inF.close()
+                except:
+                    if target and os.path.exists(target):
+                        os.unlink(target)
+                    elif os.path.exists(tmpName):
+                        os.unlink(tmpName)
+                    raise
 
-                        inF.close()
+                for size in sizes:
+                    f = util.SeekableNestedFile(outFile, size, start)
+                    newCs = changeset.ChangeSetFromFile(f)
 
-                        newCs = changeset.ChangeSetFromFile(f)
+                    if not cs:
+                        cs = newCs
+                    else:
+                        cs.merge(newCs)
 
-                        if not cs:
-                            cs = newCs
-                        else:
-                            cs.merge(newCs)
-                    except:
-                        if target and os.path.exists(target):
-                            os.unlink(target)
-                        elif os.path.exists(tmpName):
-                            os.unlink(tmpName)
-                        raise
+                    totalSize -= size
+                    start += size
+
+                assert(totalSize == 0)
 
             if (ourJobList or filesNeeded) and not internalCs:
                 internalCs = changeset.ChangeSet()
@@ -1239,4 +1259,7 @@ class UnknownException(repository.RepositoryError):
 	self.eArgs = eArgs
 
 class UserAlreadyExists(Exception):
+    pass
+
+class InvalidServerVersion(Exception):
     pass
