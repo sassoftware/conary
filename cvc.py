@@ -42,7 +42,7 @@ sys.excepthook = util.genExcepthook()
 def usage(rc = 1):
     print "usage: cvc add <file> [<file2> <file3> ...]"
     print "       cvc annotate <file>"
-    print "       cvc branch <newshadow> <trove>[=<version>][[flavor]]"
+    print "       cvc branch <newbranch> <trove>[=<version>][[flavor]]"
     print "       cvc checkout [--dir <dir>] <trove>[=<version>]"
     print "       cvc commit [--message <message>]"
     print '       cvc cook [--prep] [--debug-exceptions] [--macros file] '
