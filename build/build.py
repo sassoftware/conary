@@ -150,6 +150,7 @@ class GNUMakeInstall(ShellCommand):
     keywords = {'preMake': '',
 		'installtarget': 'install'}
 
+
 class _PutFile:
     def doInstall(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
@@ -223,3 +224,20 @@ class RemoveFiles:
 	self.filespec = filespec
 	self.recursive = recursive
 
+class InstallDoc:
+
+    def doInstall(self, macros):
+	if self.devel:
+	    dest = '%(destdir)s/%(develdocdir)s/%(name)s-%(version)s/' %macros
+	else:
+	    dest = '%(destdir)s/%(docdir)s/%(name)s-%(version)s/' %macros
+	util.mkdirChain(os.path.dirname(dest))
+	for path in self.paths:
+	    util.copytree(path, dest, True)
+
+    def __init__(self, paths, devel=False):
+	if type(paths) is str:
+	    self.paths = (paths,)
+	else:
+	    self.paths = paths
+	self.devel = devel

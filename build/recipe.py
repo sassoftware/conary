@@ -30,6 +30,8 @@ baseMacros = (
     ('datadir'		, '/usr/share'),
     ('mandir'		, '%(datadir)s/man'),
     ('infodir'		, '%(datadir)s/info'),
+    ('docdir'		, '%(datadir)s/doc'),
+    ('develdocdir'	, '%(datadir)s/develdoc'),
     # arguments/flags
     ('cflags'           , '-O2'),
     ('mflags'		, ''),
@@ -344,5 +346,7 @@ class Recipe:
 	self.macros = Macros()
 	self.addMacros = self.macros.addMacros
 	self.addMacros(baseMacros)
+	self.macros['name'] = self.name
+	self.macros['version'] = self.version
 	if extraMacros:
 	    self.addMacros(extraMacros)

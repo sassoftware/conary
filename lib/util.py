@@ -134,8 +134,17 @@ def remove(paths):
 
 def copyfile(source, dest):
     print '+ copying %s to %s' %(source, dest)
-    shutil.copyfile(source, dest)
+    shutil.copy2(source, dest)
 
 def rename(source, dest):
     print '+ renaming %s to %s' %(source, dest)
     os.rename(source, dest)
+
+def copytree(source, dest, symlinks=False):
+    if os.path.isdir(source):
+	dest = '%s/%s' %(dest, os.path.basename(source))
+	print '+ copying [tree] %s to %s' %(source, dest)
+	shutil.copytree(source, dest, symlinks)
+    else:
+	print '+ copying [file] %s to %s' %(source, dest)
+	shutil.copy2(source, dest)
