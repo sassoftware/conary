@@ -311,11 +311,11 @@ def realMain():
 	name = otherArgs[2]
 	outFile = otherArgs[3]
 
-	db = database.Database(cfg.root, cfg.dbPath, "r")
+	db = database.Database(cfg.root, cfg.dbPath)
 	cscmd.LocalChangeSetCommand(db, cfg, name, outFile)
     elif (otherArgs[1] == "localcommit"):
 	if len(otherArgs) < 3: return usage()
-	db = database.Database(cfg.root, cfg.dbPath, "c")
+	db = database.Database(cfg.root, cfg.dbPath)
 	for changeSet in otherArgs[2:]:
 	    commit.doLocalCommit(db, changeSet)
     elif (otherArgs[1] == "pkgquery") or (otherArgs[1] == "pq") \
