@@ -444,8 +444,8 @@ class ChangeSet(streams.LargeStreamSet):
 		# a diff rather then saving the full contents
 		if (origFile.contents.sha1() != newFile.contents.sha1()) and \
 		   origFile.flags.isConfig():
-		    (contType, cont) = self.getFileContents(newFile.id())
-		    if contType == ChangedFileTypes.diff:
+                    if self.configFileIsDiff(newFile.id()):
+                        (contType, cont) = self.getFileContents(newFile.id())
 			f = cont.get()
 			diff = "".join(patch.reverse(f.readlines()))
 			f.seek(0)
