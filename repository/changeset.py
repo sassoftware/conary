@@ -109,7 +109,7 @@ class ChangeSetFromFile(ChangeSet):
 	    header = lines[i][:-1]
 	    i = i + 1
 
-	    if header[0:18] == "SRS PKG CHANGESET ":
+	    if header.startswith("SRS PKG CHANGESET "):
 		(pkgName, oldVerStr, newVerStr, lineCount) = \
 			string.split(header)[3:7]
 
@@ -130,7 +130,7 @@ class ChangeSetFromFile(ChangeSet):
 		    i = i + 1
 
 		self.addPackage(pkg)
-	    elif header[0:19] == "SRS FILE CHANGESET ":
+	    elif header.startswith("SRS FILE CHANGESET "):
 		(fileId, oldVerStr, newVerStr) = string.split(header)[3:6]
 		if oldVerStr == "(none)":
 		    oldVersion = None
