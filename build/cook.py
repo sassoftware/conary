@@ -210,7 +210,7 @@ def cookGroupObject(repos, cfg, recipeClass, newVersion, buildBranch,
     for (name, subd) in d.iteritems():
 	for (v, flavorList) in subd.iteritems():
 	    # XXX
-	    grp.addTrove(name, v, flavors[0])
+	    grp.addTrove(name, v, flavorList[0])
 
     grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet = changeset.ChangeSet()
