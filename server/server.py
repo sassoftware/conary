@@ -15,6 +15,7 @@
 # 
 
 import base64
+import cgi
 import os
 import posixpath
 import select
@@ -73,10 +74,14 @@ class HttpRequests(SimpleHTTPRequestHandler):
         return path
 
     def do_GET(self):
-	self.cleanup = None
-	SimpleHTTPRequestHandler.do_GET(self)
-	if self.cleanup:
-	    os.unlink(self.cleanup)
+        if self.path == '/':
+            self.wfile.write("HTTP/1.0 200 OK\n")
+            netRepos.handleGet(self.wfile, self.path)
+        else:
+            self.cleanup = None
+            SimpleHTTPRequestHandler.do_GET(self)
+            if self.cleanup:
+                os.unlink(self.cleanup)
 
     def do_POST(self):
 	if not self.headers.has_key('Authorization'):
@@ -102,6 +107,18 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
 	authToken = (user, pw)
 
+        if self.headers.get('Content-Type', '') == 'text/xml':
+            return self.handleXml(authToken)
+
+        return self.handleCgi(authToken)
+        
+    def handleCgi(self, authToken):
+        self.wfile.write("HTTP/1.0 200 OK\n")
+        c = cgi.FieldStorage(fp = self.rfile, headers = self.headers, 
+                             environ = { 'REQUEST_METHOD' : 'POST' })
+        netRepos.handlePost(self.wfile, authToken, self.path, c)
+
+    def handleXml(self, authToken):
 	contentLength = int(self.headers['Content-Length'])
 	(params, method) = xmlrpclib.loads(self.rfile.read(contentLength))
 

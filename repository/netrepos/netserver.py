@@ -447,6 +447,36 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def cacheChangeSets(self):
         return isinstance(self.cache, CacheSet)
 
+    def handleGet(self, outFile, path):
+        outFile.write("Content-Type: text/html\n")
+        outFile.write("\n")
+        outFile.write("""
+<html>
+<head>
+       <title>Form Example</title>
+</head>
+<body>
+<FORM action="globals.php" method=POST>
+Type a string: <input type="text" name="myString">
+</body>
+</html>
+""")
+
+    def handlePost(self, outFile, authToken, path, fields):
+        outFile.write("Content-Type: text/html\n")
+        outFile.write("\n")
+        outFile.write("""
+<html>
+<head>
+       <title>Response Example</title>
+</head>
+<body>
+<p>
+You typed: '%s'.
+</body>
+</html>
+""" % fields['myString'].value)
+
     def __init__(self, path, tmpPath, urlBase, authDbPath, name,
 		 repositoryMap, commitAction = None, cacheChangeSets = False):
 	self.repos = fsrepos.FilesystemRepository(name, path, repositoryMap)
