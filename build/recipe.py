@@ -70,13 +70,12 @@ class Recipe:
 		self.signatures[file] = []
 	    self.signatures[file].append(gpg)
 
-
-    def addTarball(self, file):
-	self.tarballs.append(file)
+    def addTarball(self, file, extractDir=''):
+	self.tarballs.append((file, extractDir))
 	self.addSignature(file)
 
-    def addPatch(self, file):
-	self.patches.append(file)
+    def addPatch(self, file, level='0', backup=''):
+	self.patches.append((file, level, backup))
 	self.addSignature(file)
 
     def addSource(self, file):
@@ -117,7 +116,7 @@ class Recipe:
 	if os.path.exists(builddir):
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
-	for file in self.tarballs:
+	for (file, extractdir) in self.tarballs:
             f = util.findFile(file, self.srcdirs)
 	    self.checkSignatures(f, file)
             if f.endswith(".bz2"):
@@ -126,13 +125,26 @@ class Recipe:
                 tarflags = "-zxf"
             else:
                 raise RuntimeError, "unknown archive compression"
-	    os.system("tar -C %s %s %s" % (builddir, tarflags, f))
+            if extractdir:
+                destdir = '%s/%s' % (builddir, extractdir)
+                os.system("mkdir -p %s" % destdir)
+            else:
+                destdir = builddir
+	    os.system("tar -C %s %s %s" % (destdir, tarflags, f))
 	
 	for file in self.sources:
             f = util.findFile(file, self.srcdirs)
 	    destDir = builddir + "/" + self.theMainDir
 	    util.mkdirChain(destDir)
 	    shutil.copyfile(f, destDir + "/" + file)
+
+	for (file, level, backup) in self.patches:
+            # XXX handle .gz/.bz2 patch files
+            f = util.findFile(file, self.srcdirs)
+	    destDir = builddir + "/" + self.theMainDir
+            if backup:
+                backup = '-b -z %s' % backup
+            os.system('patch -d %s -p%s %s < %s' %(destDir, level, backup, f))
 
     def doBuild(self, builddir):
         if self.build is None:
