@@ -405,7 +405,7 @@ class SetModes(_FileAction):
     """
     
     def __init__(self, *args, **keywords):
-        _FileAction.__init__(self, **keywords) 
+        _FileAction.__init__(self, *args, **keywords) 
 	split = len(args) - 1
 	self.paths = args[:split]
 	self.mode = args[split]
@@ -470,7 +470,7 @@ class _PutFiles(_FileAction):
 	
 
     def __init__(self, *args, **keywords):
-        _FileAction.__init__(self, **keywords)
+        _FileAction.__init__(self, *args, **keywords)
 	split = len(args) - 1
 	self.fromFiles = args[:split]
 	self.toFile = args[split]

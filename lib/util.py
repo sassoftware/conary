@@ -31,6 +31,11 @@ def checkUse(use):
 	    return False
     return True
 
+class _AnyDict(dict):
+    """A dictionary that returns None for any key that is accessed.  Used
+    internally to verify dictionary format string expansion"""
+    def __getitem__(self, key):
+        return None
 
 class Action:
     """
@@ -77,7 +82,13 @@ class Action:
 	    self.keywords = {}
         self._applyDefaults()
 	self.addArgs(*args, **keywords)
+        # verify that there are not broken format strings
+        d = _AnyDict()
+        for arg in args:
+            if type(arg) is str and '%' in arg:
+                arg % d
 
+# XXX look at ShellCommand versus Action
 class ShellCommand(Action):
     """Base class for shell-based commands. ShellCommand is an abstract class
     and can not be made into a working instance. Only derived classes which
@@ -111,8 +122,17 @@ class ShellCommand(Action):
         assert(self.__class__ is not ShellCommand)
 	self.arglist = args
         self.args = string.join(args)
-        # pre-fill in the preMake and arguments
+        # fill in anything in the template that might be specified
+        # as a keyword.  Keywords only because a part of this class
+        # instance's dictionary if Action._applyDefaults is called.
+        # this is the case for build.BuildCommand instances, for example.
         self.command = self.template % self.__dict__
+        # verify that there are not broken format strings
+        d = _AnyDict()
+        self.command % d
+        for arg in args:
+            if type(arg) is str and '%' in arg:
+                arg % d
 
     def addArgs(self, *args, **keywords):
 	# append new arguments as well as include keywords
