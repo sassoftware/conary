@@ -141,12 +141,11 @@ class DependencyTables:
                     depList.append((troveNum, classId, dep))
 
     def _mergeTmpTable(self, cu, tmpName, depTable, reqTable, provTable,
-                       allDeps, multiplier = 1):
+                       dependencyTables, multiplier = 1):
         substDict = { 'tmpName'   : tmpName,
                       'depTable'  : depTable,
                       'reqTable'  : reqTable,
-                      'provTable' : provTable,
-                      'allDeps'   : allDeps   }
+                      'provTable' : provTable }
 
         cu.execute("""INSERT INTO %(depTable)s 
                         SELECT DISTINCT
@@ -172,29 +171,53 @@ class DependencyTables:
             base = 0
         substDict['baseReqNum'] = base + 1
 
-        cu.execute("""INSERT INTO %(reqTable)s 
-                    SELECT %(tmpName)s.troveId, depId, 
-                           %(baseReqNum)d + depNum , flagCount FROM
-                        %(tmpName)s JOIN %(allDeps)s ON
-                            %(tmpName)s.class == %(allDeps)s.class AND
-                            %(tmpName)s.name == %(allDeps)s.name AND
-                            %(tmpName)s.flag == %(allDeps)s.flag
+        if len(dependencyTables) == 1:
+            substDict['depId'] = "%s.depId" % dependencyTables
+        else:
+            substDict['depId'] = "COALESCE(%s)" % \
+                ",".join(["%s.depId" % x for x in dependencyTables])
+
+        selectClause = """\
+""" % substDict
+        selectClause = ""
+        for depTable in dependencyTables:
+            d = { 'tmpName' : substDict['tmpName'],
+                  'depTable' : depTable }
+            selectClause += """\
+                        LEFT OUTER JOIN %(depTable)s ON
+                            %(tmpName)s.class == %(depTable)s.class AND
+                            %(tmpName)s.name == %(depTable)s.name AND
+                            %(tmpName)s.flag == %(depTable)s.flag
+""" % d
+
+        repQuery = """\
+                INSERT INTO %(reqTable)s
+                    SELECT %(tmpName)s.troveId, 
+                           %(depId)s,
+                           %(baseReqNum)d + %(tmpName)s.depNum, 
+                           %(tmpName)s.flagCount 
+                        FROM %(tmpName)s 
+""" % substDict
+        repQuery += selectClause
+        repQuery += """\
                         WHERE
-                            %(tmpName)s.isProvides == 0""" % substDict,
-                   start_transaction = False)
+                            %(tmpName)s.isProvides == 0""" % substDict
+        cu.execute(repQuery, start_transaction = False)
 
         if provTable is None:   
             return
 
-        cu.execute("""INSERT INTO %(provTable)s SELECT 
-                            %(tmpName)s.troveId, depId FROM
-                        %(tmpName)s JOIN %(allDeps)s ON
-                            %(tmpName)s.class == %(allDeps)s.class AND
-                            %(tmpName)s.name == %(allDeps)s.name AND
-                            %(tmpName)s.flag == %(allDeps)s.flag
+        repQuery = """\
+                INSERT INTO %(provTable)s
+                    SELECT %(tmpName)s.troveId, 
+                           %(depId)s
+                        FROM %(tmpName)s 
+""" % substDict
+        repQuery += selectClause
+        repQuery += """\
                         WHERE
-                            %(tmpName)s.isProvides == 1""" % substDict,
-                   start_transaction = False)
+                            %(tmpName)s.isProvides == 1""" % substDict
+        cu.execute(repQuery, start_transaction = False)
 
     def get(self, cu, trv, troveId):
         for (tblName, setFn) in (('Requires', trv.setRequires),
@@ -244,7 +267,7 @@ class DependencyTables:
                         trove.getName(), NO_FLAG_MAGIC), 
                         start_transaction = False)
         self._mergeTmpTable(cu, "NeededDeps", "Dependencies", "Requires", 
-                            "Provides", "Dependencies")
+                            "Provides", ("Dependencies",))
 
         cu.execute("DROP TABLE NeededDeps", start_transaction = False)
 
@@ -428,9 +451,6 @@ class DependencyTables:
 
         self._createTmpTable(cu, "DepCheck")
         createDepTable(cu, 'TmpDependencies', isTemp = True)
-        cu.execute("CREATE TEMPORARY VIEW AllDeps AS SELECT * FROM "
-                   "Dependencies UNION SELECT * FROM TmpDependencies",
-                   start_transaction = False)
         createProvidesTable(cu, 'TmpProvides', isTemp = True)
         createRequiresTable(cu, 'TmpRequires', isTemp = True)
     
@@ -492,7 +512,9 @@ class DependencyTables:
             cu.execute("DROP TABLE RemovedTroves", start_transaction = False)
 
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
-                            "TmpProvides", "AllDeps", multiplier = -1)
+                            "TmpProvides", 
+                            ("Dependencies", "TmpDependencies"), 
+                            multiplier = -1)
 
         # check the dependencies for anything which depends on things which
         # we've removed
@@ -604,7 +626,6 @@ class DependencyTables:
 
         # no need to drop the DepCheck table since we're rolling this whole
         # transaction back anyway
-        cu.execute("DROP VIEW AllDeps", start_transaction = False)
         cu.execute("DROP TABLE TmpDependencies", start_transaction= False)
         cu.execute("DROP TABLE TmpRequires", start_transaction= False)
         cu.execute("DROP TABLE TmpProvides", start_transaction= False)
@@ -620,9 +641,6 @@ class DependencyTables:
 
         self._createTmpTable(cu, "DepCheck")
         createDepTable(cu, 'TmpDependencies', isTemp = True)
-        cu.execute("CREATE TEMPORARY VIEW AllDeps AS SELECT * FROM "
-                   "Dependencies UNION SELECT * FROM TmpDependencies",
-                   start_transaction = False)
         createRequiresTable(cu, 'TmpRequires', isTemp = True)
 
         depList = [ None ]
@@ -632,7 +650,8 @@ class DependencyTables:
 
 
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
-                            None, "AllDeps", multiplier = -1)
+                            None, ("Dependencies", "TmpDependencies"), 
+                            multiplier = -1)
 
         full = """SELECT depNum, Items.item, Versions.version FROM 
                         (%s)
@@ -670,7 +689,6 @@ class DependencyTables:
             elif (troveName, versionStr) not in l:
                 l.append((troveName, versionStr))
 
-        cu.execute("DROP VIEW AllDeps", start_transaction = False)
         cu.execute("DROP TABLE TmpDependencies", start_transaction= False)
         cu.execute("DROP TABLE TmpRequires", start_transaction= False)
         cu.execute("DROP TABLE DepCheck", start_transaction = False)
