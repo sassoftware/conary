@@ -107,9 +107,10 @@ class ComponentSpec(_filterSpec):
     baseFilters = (
 	# automatic subpackage names and sets of regexps that define them
 	# cannot be a dictionary because it is ordered; first match wins
-	('python',    ('%(libdir)s/python.*/site-packages/')),
 	('runtime',   ('%(essentiallibdir)s/security/',
-		       '/lib/security/')),
+		       '/lib/security/',
+		       '%(datadir)s/gnome/help/.*/C/')), # help menu stuff
+	('python',    ('%(libdir)s/python.*/site-packages/')),
 	('devel',     ('\.so',), stat.S_IFLNK),
 	('devel',     ('\.a',
 		       '.*/include/.*\.h',
@@ -121,7 +122,8 @@ class ComponentSpec(_filterSpec):
 	# note that gtk-doc is not well-named; it is a shared system, like info,
 	# and is used by unassociated tools (devhelp)
 	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info)/')),
-	('locale',    ('%(datadir)s/locale/')),
+	('locale',    ('%(datadir)s/locale/',
+		       '%(datadir)s/gnome/help/.*/')),
 	('emacs',     ('%(datadir)s/emacs/site-lisp/.*',)),
 	('runtime',   ('.*',)),
     )
