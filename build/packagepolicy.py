@@ -970,6 +970,79 @@ class IgnoredSetuid(policy.Policy):
 			%(type, file, mode&06777))
 
 
+
+class _userData(policy.Policy):
+    def __init__(self, *args, **keywords):
+	self.namemap = {}
+	policy.Policy.__init__(self, *args, **keywords)
+        self._publish()
+    def doFile(self, path):
+        # Ownership does all the work for subclasses of _userData
+        pass
+
+
+class User(_userData):
+    """
+    Provides information to use if Conary needs to create a user::
+    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}',
+               groupid=I{preferred_gid}, homedir='I{/home/dir}',
+               comment='I{comment}', shell='I{/path/to/shell}')}
+    The defaults are::
+      - C{group}: same name as the user
+      - C{groupid}: same id as the user
+      - C{homedir}: None
+      - C{comment}: None
+      - C{shell}: '/sbin/nologin'
+    Warning: troves do not yet store this information; this is not
+    yet a fully-implemented feature.
+    """
+    def updateArgs(self, *args, **keywords):
+        assert(len(args) == 2)
+        name, uid = args
+        group = keywords.get('group', name)
+        groupid = keywords.get('groupid', uid)
+        homedir = keywords.get('homedir', None)
+        comment = keywords.get('comment', None)
+        shell = keywords.get('shell', '/sbin/nologin')
+        self.namemap[name] = (uid, group, groupid, homedir, comment, shell)
+        self.recipe.usergrpmap[group] = name
+    def _publish(self):
+        self.recipe.usermap=self.namemap
+        self.recipe.usergrpmap={}
+
+
+class SupplementalGroup(_userData):
+    """
+    Requests the Conary ensure that a user have a supplemental group::
+    C{r.SupplementalGroup('I{user}', 'I{group}', I{preferred_gid})}
+    Warning: troves do not yet store this information; this is not
+    yet a fully-implemented feature.
+    """
+    def updateArgs(self, *args, **keywords):
+        assert(len(args) == 3)
+        user, group, groupid = args
+        self.namemap[user] = (group, groupid)
+    def _publish(self):
+        self.recipe.suppmap=self.namemap
+
+
+class Group(_userData):
+    """
+    Provides information to use if Conary needs to create a group:
+    C{r.Group('I{group}', I{preferred_gid})}
+    This is used only for groups that exist independently, never
+    for a main group created by C{r.User()}
+    Warning: troves do not yet store this information; this is not
+    yet a fully-implemented feature.
+    """
+    def updateArgs(self, *args, **keywords):
+        assert(len(args) == 2)
+        group, groupid = args
+        self.namemap[group] = (groupid,)
+    def _publish(self):
+        self.recipe.grpmap=self.namemap
+
+
 class Ownership(policy.Policy):
     """
     Sets user and group ownership of files when the default of
@@ -980,6 +1053,12 @@ class Ownership(policy.Policy):
     """
     def __init__(self, *args, **keywords):
 	self.filespecs = []
+        self.systemusers = ('root', 'bin', 'daemon', 'adm', 'lp',
+            'sync', 'shutdown', 'halt', 'mail', 'news', 'uucp',
+            'operator', 'games')
+        self.systemgroups = ('root', 'bin', 'daemon', 'sys', 'adm',
+            'tty', 'disk', 'lp', 'mem', 'kmem', 'wheel', 'mail',
+            'news', 'floppy', 'games')
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -1017,8 +1096,30 @@ class Ownership(policy.Policy):
 	pkgfile = self.recipe.autopkg.pathMap[filename]
 	if owner:
 	    pkgfile.inode.setOwner(owner)
+            if owner in self.recipe.usermap:
+                # XXX fill this in when there is something to do with it
+                log.warning('User "%s" definition ignored for file %s, not yet implemented',
+                    owner, filename)
+            elif owner not in self.systemusers:
+                log.warning('User "%s" missing definition for file %s',
+                    owner, filename)
+            if owner in self.recipe.suppmap:
+                # XXX fill this in when there is something to do with it
+                log.warning('SupplementalGroup "%s" definition ignored for file %s, not yet implemented',
+                    self.recipe.suppmap[owner][0], filename)
 	if group:
 	    pkgfile.inode.setGroup(group)
+            if group in self.recipe.grpmap:
+                # XXX fill this in when there is something to do with it
+                log.warning('Group "%s" definition ignored for file %s, not yet implemented',
+                    group, filename)
+            elif group in self.recipe.usergrpmap:
+                # maingroup for user
+                log.warning('Group "%s" definition ignored for file %s, not yet implemented',
+                    group, filename)
+            elif group not in self.systemgroups:
+                log.warning('Group "%s" missing definition for file %s',
+                    group, filename)
 
 
 class ExcludeDirectories(policy.Policy):
@@ -1320,6 +1421,9 @@ def DefaultPolicy(recipe):
 	FilesForDirectories(recipe),
 	ObsoletePaths(recipe),
 	IgnoredSetuid(recipe),
+        User(recipe),
+        SupplementalGroup(recipe),
+        Group(recipe),
 	Ownership(recipe),
 	ExcludeDirectories(recipe),
 	LinkCount(recipe),
