@@ -222,7 +222,9 @@ class InodeStream(TupleStream):
     Stores basic inode information on a file: perms, owner, group.
     """
 
-    makeup = ((ShortStream, 2), (StringStream, "B"), (StringStream, "B"))
+    # this is permissions, mtime, owner, group
+    makeup = ((ShortStream, 2), (IntStream, 4), 
+              (StringStream, "B"), (StringStream, "B"))
 
     def triplet(self, code, setbit = 0):
 	l = [ "-", "-", "-" ]
