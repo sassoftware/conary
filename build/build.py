@@ -404,7 +404,7 @@ class _FileAction(BuildAction):
 		self.recipe.ComponentSpec(component, path)
 	    if package:
 		self.recipe.PackageSpec(package, path)
-	
+
 
 class Desktopfile(BuildCommand, _FileAction):
     """
@@ -435,6 +435,22 @@ class Desktopfile(BuildCommand, _FileAction):
 	self.do(macros)
 	for file in self.arglist:
 	    self.setComponents('%(datadir)s/applications'+file)
+
+
+class Environment(util.Action):
+    """
+    Set an environment variable after all macros are available.
+
+    Call C{Environment('I{VARIABLE}', 'I{value}')} for each
+    environment variable you need to set.
+    """
+    def __init__(self, *args, **keywords):
+	assert(len(args)==2)
+	self.variable = args[0]
+	self.value = args[1]
+	util.Action.__init__(self, [], **keywords)
+    def doBuild(self, recipe):
+	os.environ[self.variable] = self.value
 
 
 class SetModes(_FileAction):
