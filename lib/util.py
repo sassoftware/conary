@@ -23,6 +23,20 @@ def mkdirChain(*paths):
             if not os.path.exists(p):
                 os.mkdir(p)
 
+def _searchVisit(arg, dirname, names):
+    file = arg[0]
+    path = arg[1]
+    testname = '%s/%s' %(dirname, file)
+    if os.path.exists(testname):
+	path[0] = testname
+	del names
+
+def searchPath(file, basepath):
+    path = [ None ]
+    # XXX replace with os.walk in python 2.3, to cut short properly
+    os.path.walk(basepath, _searchVisit, (file, path))
+    return path[0]
+
 def searchFile(file, searchdirs, error=None):
     for dir in searchdirs:
         s = "%s/%s" %(dir, file)

@@ -40,16 +40,23 @@ def searchCache(cfg, name, location):
     basename = os.path.basename(name)
 
     if name.startswith("http://") or name.startswith("ftp://"):
+
 	# check for negative cache entries to avoid spamming servers
-	negativeName = '%s/NEGATIVE/%s' %(cfg.lookaside, location)
-	f = util.searchFile(basename, [negativeName])
-	if f:
-	    if time.time() > 60*60*24*7 + os.path.getmtime(f):
+	negativeName = '%s/NEGATIVE/%s/%s' %(cfg.lookaside, location, name[5:])
+	if os.path.exists(negativeName):
+	    if time.time() > 60*60*24*7 + os.path.getmtime(negativeName):
 		os.remove(negativeName)
 		return searchCache(name, location)
 	    return None
 
-    return util.searchFile(basename, ['%s/%s' %(cfg.lookaside, location)])
+	# exact match first, then look for cached responses from other servers
+	positiveName = '%s/%s/%s' %(cfg.lookaside, location, name[5:])
+	if os.path.exists(positiveName):
+	    return positiveName
+	return util.searchPath(basename, '%s/%s/%s' %(cfg.lookaside, location,
+	                                              basename))
+    else:
+	return util.searchFile(basename, ['%s/%s' %(cfg.lookaside, location)])
 
 
 def searchRepository(cfg, name, location):
