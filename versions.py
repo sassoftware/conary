@@ -69,7 +69,29 @@ class BranchName(AbstractVersion):
 	if self.branch.find("@") != -1:
 	    raise KeyError, ("branch names may not have @ signs: %s" % value)
 
-class Version:
+class AbstractVersion:
+
+    def equal(self, other):
+	raise NotImplemented
+
+    def isBranch(self):
+	raise NotImplemented
+
+    def isVersion(self):
+	raise NotImplemented
+
+class LocalVersion(AbstractVersion):
+
+    def equal(self, other):
+	return (self.__class__ == other.__class__)
+
+    def isBranch(self):
+	return 0
+
+    def isVersion(self):
+	return 1
+
+class Version(AbstractVersion):
 
     def appendVersionRelease(self, version, release):
 	assert(self.isBranch())
@@ -171,7 +193,7 @@ class ThawVersion(Version):
 
 	Version.__init__(self, v, timeVal)
 
-class VersionFromString(Version):
+class VersionString(Version):
 
     def __init__(self, ver, defaultBranch = None):
 	if ver[0] != "/":
@@ -180,3 +202,9 @@ class VersionFromString(Version):
 	v = self.parseVersionString(ver, defaultBranch)
 
 	Version.__init__(self, v, 0)
+
+def VersionFromString(ver, defaultBranch = None):
+    if ver == "LOCAL":
+	return LocalVersion()
+
+    return VersionString(ver, defaultBranch)
