@@ -43,6 +43,8 @@ class HttpHandler:
              # metadata commands
              "":               (self.main, "Conary Repository",
                                (True, True, False)),
+             "main":           (self.main, "Conary Repository",
+                               (True, True, False)),
              "metadata":       (self.metadata, "View Metadata",          
                                (True, True, False)),
              "chooseBranch":   (self.chooseBranch, "View Metadata",
@@ -318,7 +320,7 @@ class HttpHandler:
             if admin:
                 returnLink = ("User Administration", "userlist")
             else:
-                returnLink = ("Main Menu", "")
+                returnLink = ("Main Menu", "main")
 
             self.kid_write("notice", message = "Password successfully changed",
                                      link = returnLink[0], url = returnLink[1])                             
