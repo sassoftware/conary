@@ -757,24 +757,9 @@ class PackageRecipe(Recipe):
 	self.srcdirs = srcdirs
 	self.macros = macros.Macros()
 	self.macros.update(baseMacros)
-        # XXX HACK until /etc/conary/arch can have macro values
-        # this doesn't deal with ia64 correctly, but we aren't
-        # building for ia64 right now, so it doesn't matter...
-        if use.Arch._attrs['bits64']:
-            self.macros.lib = 'lib64'
+	self.macros.update(use.Arch._getMacros())
         # allow for architecture not to be set -- this could happen 
         # when storing the recipe e.g. 
-        targetArch = use.Arch._getTargetArch()
-        if targetArch is not None:
-            self.macros.targetarch = targetArch
-        unameArch = use.Arch._getUnameArch()
-        if unameArch is not None:
-            self.macros.unamearch = unameArch
-        optFlags = use.Arch._getOptFlags()
-        if optFlags is not None:
-            self.macros.optflags = optFlags
-        else:
-            self.macros.optflags = '-O2'
 	for key in cfg.macroKeys():
 	    self.macros._override(key, cfg['macros.' + key])
 	self.macros.name = self.name

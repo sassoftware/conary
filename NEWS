@@ -18,13 +18,16 @@ Changes in 0.50.4:
   * When existing fileId's had no streams but the streams are provided
     by a later commit, those streams weren't always merged properly if
     there were multiple files for that fileId
-  * conary config output masks user/password info in repositorymaps
+  * conary config output masks user/password info in repository maps
   * the config option useDir has been changed to useDirs, and archDir has been
     changed to archDirs, to allow for tiered use/arch flag definitions, and 
     the tweaking of use and arch flag settings.  By default, useDirs and 
     archDirs look in /etc/conary/<dir>, followed by /etc/conary/distro/<dir>, 
     follwed by ~/.conary/<dir>, where dir is use or arch, depending on the 
     context.
+  * Arch files can now contain arbitrary macro definitions, and in the future
+    will contain values for macros like %(lib)s, which is lib64 
+    on some platforms.
 
 Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 

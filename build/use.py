@@ -447,32 +447,22 @@ class ArchCollection(Collection):
             bool(currentArch)
         return Collection._getAttr(self, name)
 
-    def _getUnameArch(self):
-        """ return the appropriate unameArch for the currently set 
-            build flags.
+    def _getMacro(self, key):
+        """ return the given macro value, as determined by the active arch flags
         """
         arch = self.getCurrentArch()
         if arch is None:
             return None
-        return arch._getArchMacro('unameArch')
+        return arch._getMacro(key)
 
-    def _getTargetArch(self):
-        """ return the appropriate targetArch for the currently set 
-            build flags.
-        """
-        arch = self.getCurrentArch()
-        if arch is None:
-            return None
-        return arch._getArchMacro('targetArch')
 
-    def _getOptFlags(self):
-        """ return the appropriate optimization flags for the currently set 
-            build flags.
+    def _getMacros(self):
+        """ return the macros defined by the current architecture 
         """
         arch = self.getCurrentArch()
         if arch is None:
             return None
-        return arch._getArchMacro('optFlags')
+        return arch._getMacros()
 
     def getCurrentArch(self):
         for majarch in self.itervalues():
@@ -481,16 +471,16 @@ class ArchCollection(Collection):
 
 class MajorArch(CollectionWithFlag):
     
-    def __init__(self, name, parent, track=False, archProps=None, 
-                 unameArch=None, targetArch=None, optFlags=None):
+    def __init__(self, name, parent, track=False, archProps=None, macros=None):
+        self._collectionType = SubArch
         if archProps:
             self._archProps = archProps.copy()
         else:
             self._archProps = {}
-        self._unameArch = unameArch
-        self._targetArch = targetArch
-        self._optFlags = optFlags
-        self._collectionType = SubArch
+        if not macros:
+            self._macros = {}
+        else:
+            self._macros = macros
         CollectionWithFlag.__init__(self, name, parent, track=track)
 
     def _setUsed(self, used=True):
@@ -501,11 +491,18 @@ class MajorArch(CollectionWithFlag):
             currentArch = self._parent.getCurrentArch()
             currentArch._setUsed()
 
-    def _getArchMacro(self, key):
+    def _getMacro(self, key):
         for subArch in self.itervalues():
-            if subArch._get() and getattr(subArch, '_' + key) is not None:
-                return getattr(subArch, '_' + key)
-        return getattr(self, '_' + key)
+            if subArch._get() and key in subArch._macros:
+                return subArch._macros[key]
+        return self._macros[key]
+
+    def _getMacros(self):
+        macros = self._macros.copy()
+        for subArch in self.itervalues():
+            if subArch._get():
+                macros.update(subArch._macros)
+        return macros
 
     def _getNonExistantKey(self, key):
         if self._strictMode:
@@ -554,14 +551,15 @@ class MajorArch(CollectionWithFlag):
 class SubArch(Flag):
 
     def __init__(self, name, parent, track=False, subsumes=None, 
-                 targetArch=None, unameArch=None, optFlags=None):
+                 macros=None):
         if not subsumes:
             self._subsumes = []
         else:
             self._subsumes = subsumes
-        self._unameArch = unameArch
-        self._targetArch = targetArch
-        self._optFlags = optFlags
+        if not macros:
+            self._macros = {}
+        else:
+            self._macros = macros
         Flag.__init__(self, name, parent, required=True, track=track)
 
     def _setUsed(self, used=True):

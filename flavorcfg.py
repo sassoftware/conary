@@ -33,9 +33,6 @@ class SubArchConfig(ConfigFile):
 	'buildRequired'	        : [ BOOL,   True ],
 	'shortDoc'	        : [ STRING, '' ],
 	'longDoc'	        : [ STRING, '' ],
-	'unameArch'	        : [ STRING, None ],
-	'targetArch'	        : [ STRING, None ],
-	'optFlags'	        : [ STRING, None ],
 	'macro'	                : [ STRINGDICT, {} ],
     } 
 
@@ -49,9 +46,7 @@ class ArchConfig(ConfigFile):
 	'shortDoc'	        : [ STRING, '' ],
 	'longDoc'	        : [ STRING, '' ],
         'archProp'              : [ BOOLDICT, {} ],
-	'unameArch'	        : [ STRING, None ],
-	'targetArch'	        : [ STRING, None ],
-	'optFlags'	        : [ STRING, None ],
+	'macro'	                : [ STRINGDICT, {} ],
     } 
 
 
@@ -60,6 +55,12 @@ class ArchConfig(ConfigFile):
         if line and line[0] == '[' and line[-1] == ']':
             self.setSection(line[1:-1])
             return
+        if line:
+            # handle old targetarch, optflags, and unamearch defs
+            parts = line.split(None, 1)
+            parts[0] = parts[0].lower()
+            if parts[0] in ('targetarch', 'optflags', 'unamearch'):
+                line = ' '.join(('macro', parts[0], parts[1]))
         if self.section:
             self.sections[self.section].configLine(line, file, lineno)
         else:
@@ -101,14 +102,13 @@ class ArchConfig(ConfigFile):
 		     ', '.join(sorted(self.requiredArchProps))))
 
     def addArchFlags(self):
-        if not self.unameArch:
-            self.unameArch = self.name
-        if not self.targetArch:
-            self.targetArch = self.name
+        if 'unamearch' not in self.macro:
+            self.macro['unamearch'] = self.name
+
+        if 'targetarch' not in self.macro:
+            self.macro['targetarch'] = self.name
         use.Arch._addFlag(self.name, archProps = self.archProp, 
-                          unameArch=self.unameArch, 
-                          targetArch=self.targetArch, 
-                          optFlags=self.optFlags)
+                          macros=self.macro)
         for subArchName in self.sections:
             subArch = self.sections[subArchName]
             subArch.name = subArchName
@@ -122,9 +122,7 @@ class ArchConfig(ConfigFile):
             subArch.subsumes = newSubsumes
             use.Arch[self.name]._addFlag(subArch.name,
                                          subsumes=subArch.subsumes, 
-                                         unameArch=subArch.unameArch,
-                                         targetArch=subArch.targetArch,
-                                         optFlags=subArch.optFlags)
+                                         macros=subArch.macro)
             if subArch.buildName and subArch.buildName != subArch.name:
                 use.Arch[self.name]._addAlias(subArch.name, subArch.buildName)
 
