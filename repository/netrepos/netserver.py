@@ -600,7 +600,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             d[name] = {}
             for branch, flavors in branches.iteritems():
                 if type(flavors) == list:
-                    d[name][branch] = [ self.toFlavor(x) for x in flavors ]
+                    d[name][branch] = flavors
                 else:
                     d[name][branch] = None
 

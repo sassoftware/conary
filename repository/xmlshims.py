@@ -58,7 +58,7 @@ class NetworkConvertors(object):
         assert(f is not None)
         if f is 0:
             return None
-	elif f == "none":
+	elif f is "none":
 	    return deps.deps.DependencySet()
 
 	return deps.deps.ThawDependencySet(f)
