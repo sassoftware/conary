@@ -12,6 +12,8 @@
 # full details.
 #
 
+SUBDIRS=netrepos
+
 python_files = __init__.py	\
 		changeset.py	\
 		filecontainer.py\
@@ -25,7 +27,7 @@ extra_dist = Makefile
 
 dist_files = $(python_files) $(extra_dist)
 
-all: default-all
+all: default-all default-subdirs
 
 install: install-subdirs pyfiles-install
 
