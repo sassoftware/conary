@@ -3,6 +3,7 @@ import os
 import files
 import util
 import commit
+import stat
 
 def doImport(DBPATH, rpmFile):
     scratch = DBPATH + "/scratch"
@@ -34,18 +35,37 @@ def doImport(DBPATH, rpmFile):
     groups = h['filegroupname']
     mtimes = h['filemtimes']
     md5s = h['filemd5s']
+    rdevs = h['filerdevs']
+    linktos = h['filelinktos']
 
     del h
     del ts
 
     fileList = []
     for i in range(0, len(list)):
-	f = files.RegularFile(list[i])
+	if (stat.S_ISREG(modes[i])):
+	    f = files.RegularFile(list[i])
+	    f.md5(md5s[i])
+	elif (stat.S_ISLNK(modes[i])):
+	    f = files.SymbolicLink(list[i])
+	    f.linkTarget(linktos[i])
+	elif (stat.S_ISDIR(modes[i])):
+	    f = files.Directory(list[i])
+	elif (stat.S_ISFIFO(modes[i])):
+	    f = files.NamedPipe(list[i])
+	elif (stat.S_ISBLK(modes[i])):
+	    f = files.DeviceFile(list[i])
+	    f.majorMinor("b", rdevs[i] >> 8, rdevs[i] & 0xff)
+	elif (stat.S_ISCHR(modes[i])):
+	    f = files.DeviceFile(list[i])
+	    f.majorMinor("c", rdevs[i] >> 8, rdevs[i] & 0xff)
+	else:
+	    raise TypeError, "unsupported file type for %s" % path
+
 	f.perms(modes[i] & 0777)
 	f.owner(owners[i])
 	f.group(groups[i])
 	f.mtime(mtimes[i])
-	f.md5(md5s[i])
 	fileList.append(f)
 
     util.mkdirChain(scratch)
