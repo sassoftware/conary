@@ -826,7 +826,7 @@ class Version(VersionSequence):
         """
         v = self.copy()
 
-        for item in v.items():
+        for item in v.versions:
             if isinstance(item, VersionRelease):
                 item.buildCount = None
 
