@@ -28,7 +28,7 @@ class Repository:
 	    old = csPkg.getOldVersion()
 	
 	    if self.hasPackage(csPkg.getName()):
-		pkgSet = package.PackageSet(self.pkgDB, csPkg.getName())
+		pkgSet = self._getPackageSet(csPkg.getName())
 
 		if pkgSet.hasVersion(newVersion):
 		    raise KeyError, "version %s for %s exists" % \
@@ -50,7 +50,7 @@ class Repository:
 	fileList = []
 	for (fileId, (oldVer, newVer, infoLine)) in cs.getFileList():
 	    if oldVer:
-		fileDB = self.getFileDB(fileId)
+		fileDB = self._getFileDB(fileId)
 		file = copy.deepcopy(fileDB.getVersion(oldVer))
 		file.applyChange(infoLine)
 		del fileDB
@@ -66,12 +66,12 @@ class Repository:
 	filesToArchive = {}
 	try:
 	    for (pkgName, newPkg, newVersion) in pkgList:
-		pkgSet = package.PackageSet(self.pkgDB, pkgName)
+		pkgSet = self._getPackageSet(pkgName)
 		pkgSet.addVersion(newVersion, newPkg)
 		pkgsDone.append((pkgSet, newVersion))
 
 	    for (fileId, fileVersion, file) in fileList:
-		infoFile = self.getFileDB(fileId)
+		infoFile = self._getFileDB(fileId)
 		pathInPkg = fileMap[fileId][0]
 		pkgName = fileMap[fileId][2]
 
@@ -99,7 +99,7 @@ class Repository:
 	except:
 	    # something went wrong; try to unwind our commits
 	    for fileId in filesDone:
-		infoFile = self.getFileDB(fileId)
+		infoFile = self._getFileDB(fileId)
 		(path, fileVersion) = fileMap[fileId][0:2]
 		infoFile.eraseVersion(fileVersion)
 
@@ -114,7 +114,7 @@ class Repository:
 	cs = changeset.ChangeSetFromRepository(self)
 
 	for (packageName, oldVersion, newVersion) in packageList:
-	    pkgSet = package.PackageSet(self.pkgDB, packageName)
+	    pkgSet = self._getPackageSet(packageName)
 
 	    new = pkgSet.getVersion(newVersion)
 	 
@@ -127,7 +127,7 @@ class Repository:
 	    cs.addPackage(pkgChgSet)
 
 	    for (fileId, oldVersion, newVersion) in filesNeeded:
-		filedb = self.getFileDB(fileId)
+		filedb = self._getFileDB(fileId)
 
 		oldFile = None
 		if oldVersion:
@@ -142,7 +142,10 @@ class Repository:
 
 	return cs
 
-    def getFileDB(self, fileId):
+    def _getPackageSet(self, name):
+	return package.PackageSet(self.pkgDB, name)
+
+    def _getFileDB(self, fileId):
 	return files.FileDB(self.fileDB, fileId)
 
     def pullFileContents(self, fileId, targetFile):
@@ -181,26 +184,26 @@ class Repository:
 	return self.pkgDB.hasFile(pkg)
 
     def hasPackageVersion(self, pkgName, version):
-	return package.PackageSet(self.pkgDB, pkgName).hasVersion(version)
+	return self._getPackageSet(pkgName).hasVersion(version)
 
     def pkgLatestVersion(self, pkgName, branch):
-	return package.PackageSet(self.pkgDB, pkgName).getLatestVersion(branch)
+	return self._getPackageSet(pkgName).getLatestVersion(branch)
 
     def getLatestPackage(self, pkgName, branch):
-	return package.PackageSet(self.pkgDB, pkgName).getLatestPackage(branch)
+	return self._getPackageSet(pkgName).getLatestPackage(branch)
 
     def getPackageVersion(self, pkgName, version):
-	return package.PackageSet(self.pkgDB, pkgName).getVersion(version)
+	return self._getPackageSet(pkgName).getVersion(version)
 
     def getPackageVersionList(self, pkgName):
-	return package.PackageSet(self.pkgDB, pkgName).versionList()
+	return self._getPackageSet(pkgName).versionList()
 
     def fileLatestVersion(self, fileId, branch):
-	fileDB = self.getFileDB(fileId)
+	fileDB = self._getFileDB(fileId)
 	return fileDB.getLatestVersion(branch)
 	
     def getFileVersion(self, fileId, version):
-	fileDB = self.getFileDB(fileId)
+	fileDB = self._getFileDB(fileId)
 	return fileDB.getVersion(version)
 
     def storeFileFromChangeset(self, chgSet, file, pathToFile):

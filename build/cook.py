@@ -201,8 +201,7 @@ class IdGen:
 		    # to enable a build, so we need to find the
 		    # sha1 hash of it since that's how it's indexed
 		    # in the file store
-		    filedb = repos.getFileDB(fileId)
-		    file = filedb.getVersion(version)
+		    file = repos.getFileVersion(fileId, version)
 		    lcache.addFileHash(path, file.sha1())
 
         self.map.update(fileIdMap)
