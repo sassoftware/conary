@@ -187,33 +187,60 @@ class ManualConfigure(Configure):
 
 class Make(BuildCommand):
     """
-    The Make class runs the make utility with CFLAGS and CXXFLAGS set
-    to system defaults, with system default for mflags and parallelmflags.
-    This means, among other things, that if your package does not build
-    correctly with parallelized make, you should disable parallel
-    make by using self.disableParallelMake() in your recipe.  If your
-    package can do parallel builds but needs some other mechanism,
-    then you can modify parallelmflags as necessary in your recipe.
+    The Make class runs the make utility with CFLAGS, LDFLAGS, and
+    CXXFLAGS set as environment variables to the system defaults, with
+    system default for mflags and parallelmflags.
+
+    If the package Makefile explicitly sets the *FLAGS variables,
+    then if you want to change them you will have to override them,
+    either explicitly in the recipe with self.Make('CFLAGS="%(cflags)s"'),
+    etc., or forcing them all to the system defaults by passing in the
+    forceFlags=True argument.
+
+    If your package does not build correctly with parallelized make,
+    you should disable parallel make by using self.disableParallelMake()
+    in your recipe.  If your package can do parallel builds but needs some
+    other mechanism, then you can modify parallelmflags as necessary in
+    your recipe.  You can use self.MakeParallelSubdir() if the top-level
+    make is unable to handle parallelization but all subdirectories are.
     """
+    # Passing environment variables to Make makes them defined if
+    # there is no makefile definition; if they are defined in the
+    # makefile, then it takes a command-line argument to override
+    # them.  CC we want to set unconditionally, but CFLAGS and such
+    # we want to set as hints only; to set them explicitly you need
+    # to ask for it in the recipe.
     template = ('cd %%(builddir)s/%(subDir)s; '
-                '%(preMake)s make '
-	        ' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
-		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
+	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+		' LDFLAGS="%%(ldflag)s"'
+                ' %(preMake)s make %%(overrides)s'
+		' CC=%%(cc)s'
 		' %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': '',
-                'subDir': ''}
+                'subDir': '',
+		'forceFlags': False}
 
     def __init__(self, *args, **keywords):
         """
         @keyword preMake: string to be inserted before the "make" command.
         Use preMake if you need to set an environment variable.  The
         preMake keyword cannot contain a ;
-        @keyword subDir: the sub directory to enter before running "make"
+        @keyword subDir: the subdirectory to enter before running "make"
+	@keyword forceFlags: boolean; if set, unconditionally override
+	the Makefile definitions of *FLAGS (i.e. CFLAGS, CXXFLAGS, LDFLAGS)
         """
         if 'preMake' in keywords:
             if ';' in keywords['preMake']:
                 raise TypeError, 'preMake argument cannot contain ;'
         BuildCommand.__init__(self, *args, **keywords)
+
+    def do(self, macros):
+	if self.forceFlags:
+	    macros = macros.copy()
+	    macros.update(
+		{'overrides': 'CFLAGS="%(cflags)s" CXXFLAGS="%(cflags)s"'
+	                      ' LDFLAGS="%(ldflag)s"' %macros})
+	BuildCommand.do(self, macros)
 
 class MakeParallelSubdir(Make):
     """
@@ -222,9 +249,9 @@ class MakeParallelSubdir(Make):
     parallelmflags only applied to sub-make processes.
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
-                '%(preMake)s make'
-	        ' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
-		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
+	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+		' LDFLAGS="%%(ldflag)s"'
+                ' %(preMake)s make %%(overrides)s CC=%%(cc)s'
 		' %%(mflags)s '
                 ' MAKE="make %%(mflags)s %%(parallelmflags)s" %(args)s')
 
@@ -236,20 +263,20 @@ class MakeInstall(Make):
     or as a last option, the Make class.
     """
     template = ('cd %%(builddir)s/%(subDir)s; '
-                '%(preMake)s make'
-	        ' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
-		' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
+	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+		' LDFLAGS="%%(ldflag)s"'
+                ' %(preMake)s make %%(overrides)s CC=%%(cc)s'
 		' %%(mflags)s %%(rootVarArgs)s'
 		' %(installtarget)s %(args)s')
     keywords = {'rootVar': 'DESTDIR',
 		'installtarget': 'install'}
 
     def do(self, macros):
-	macros = macros.copy()
         if self.rootVar:
+	    macros = macros.copy()
 	    macros.update({'rootVarArgs': '%s=%s'
 	                  %(self.rootVar, macros['destdir'])})
-	util.execute(self.command %macros)
+	Make.do(self, macros)
 
 class MakePathsInstall(Make):
     """
@@ -260,9 +287,9 @@ class MakePathsInstall(Make):
     """
     template = (
 	'cd %%(builddir)s/%(subDir)s; '
-	'%(preMake)s make'
-	' CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
-	' LDFLAGS="%%(ldflag)s" CC=%%(cc)s'
+	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
+	' LDFLAGS="%%(ldflag)s"'
+	' %(preMake)s make %%(overrides)s CC=%%(cc)s'
 	' %%(mflags)s'
 	' prefix=%%(destdir)s/%%(prefix)s'
 	' exec-prefix=%%(destdir)s/%%(exec_prefix)s'
