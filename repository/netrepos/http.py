@@ -12,9 +12,14 @@
 # full details.
 #
 import urllib
+import urlparse
+import xml.dom.minidom
 from fmtroves import TroveCategories
 from htmlengine import HtmlEngine
 from metadata import MDClass
+from urllib2 import urlopen
+from httplib import HTTPConnection
+
 
 class HttpHandler(HtmlEngine):
     def __init__(self, repServer):
@@ -102,17 +107,14 @@ class HttpHandler(HtmlEngine):
         self.htmlMetadataEditor(troveName, branch, metadata)
 
     def fetchFreshmeat(self, troveName):
-        from urllib2 import urlopen
-        from xml.dom.minidom import parse
-
         url = urlopen('http://freshmeat.net/projects-xml/%s/%s.xml' % (troveName, troveName))
 
-        doc = parse(url)
+        doc = xml.dom.minidom.parse(url)
         metadata = {}
         metadata[0] = [doc.getElementsByTagName("desc_short")[0].childNodes[0].data]
         metadata[1] = [doc.getElementsByTagName("desc_full")[0].childNodes[0].data]
-        metadata[2] = [doc.getElementsByTagName("url_homepage")[0].childNodes[0].data]
-
+    
+        metadata[2] = [self.resolveUrl(doc.getElementsByTagName("url_homepage")[0].childNodes[0].data)]
         metadata[3] = []
         metadata[4] = []
         for node in doc.getElementsByTagName("trove_id"):
@@ -123,10 +125,21 @@ class HttpHandler(HtmlEngine):
                 metadata[3].append(name)
             else:
                 metadata[4].append(name)
-            
 
         return metadata
 
+    def resolveUrl(self, url):
+        """Follows a redirect one level and returns the location of the HTTP 302 redirect"""
+        url = urlparse.urlparse(url)
+        connection = HTTPConnection(url[1])
+        connection.request("GET", url[2])
+        request = connection.getresponse()
+        if request.status == 302: # header "Found:", might need more here
+            realUrl = request.getheader("Location")
+        else:
+            realUrl = urlparse.urlunparse(url)
+        return realUrl
+   
     def updateMetadataCmd(self, authToken, fields):
         branch = self.repServer.thawVersion(fields["branch"].value)
         troveName = fields["troveName"].value

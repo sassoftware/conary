@@ -30,6 +30,7 @@ from repository import repository
 from local import idtable
 from local import sqldb
 from local import versiontable
+import http
 
 SERVER_VERSIONS=[6,7,8,9,10]
 
@@ -551,33 +552,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def cacheChangeSets(self):
         return isinstance(self.cache, CacheSet)
 
-    def handleGet(self, writeFn, path):
-        writeFn("""
-<html>
-<head>
-       <title>Form Example (for '%s')</title>
-</head>
-<body>
-<FORM action="action" method=POST>
-Type a string: <input type="text" name="myString">
-</body>
-</html>
-""" % path)
+    def handleGet(self, writeFn, cmd):
+        self.httpHandler.handleCmd(writeFn, cmd)
 
-    def handlePost(self, writeFn, authToken, path, fields):
-        writeFn("""
-<html>
-<head>
-       <title>Response Example</title>
-</head>
-<body>
-<p>
-You typed: '%s'.
-<p>
-Form url is: '%s'.
-</body>
-</html>
-""" % (fields['myString'].value, path))
+    def handlePost(self, writeFn, authToken, cmd, fields):
+        self.httpHandler.handleCmd(writeFn, cmd, authToken, fields)
 
     def __init__(self, path, tmpPath, urlBase, authDbPath, name,
 		 repositoryMap, commitAction = None, cacheChangeSets = False):
@@ -590,6 +569,7 @@ Form url is: '%s'.
 	self.auth = NetworkAuthorization(authDbPath, name, 
                                          anonymousReads = True)
 	self.commitAction = commitAction
+        self.httpHandler = http.HttpHandler(self)
 
         if cacheChangeSets:
             self.cache = CacheSet(path + "/cache.sql", tmpPath, SERVER_VERSION)
