@@ -41,7 +41,7 @@ def usage(rc = 1):
     print "usage: cvc add <file> [<file2> <file3> ...]"
     print "       cvc annotate <file>"
     print "       cvc branch <newbranch> <branchfrom> [<trove>]"
-    print "       cvc checkout [--dir <dir>] <trove> <version>"
+    print "       cvc checkout [--dir <dir>] <trove>[=<version>]"
     print "       cvc commit [--message <message>]"
     print '       cvc cook [--prep] [--debug-exceptions] [--macros file] '
     print '                [--use-flag  "<prefix>.<flag> <bool>"]+ '
@@ -135,7 +135,7 @@ def sourceCommand(cfg, args, argSet):
 	else:
 	    dir = None
 
-	if argSet or (len(args) < 2 or len(args) > 3): return usage()
+	if argSet or (len(args) != 2): return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	args = [repos, cfg, dir] + args[1:]

@@ -180,8 +180,14 @@ def _getRecipeLoader(cfg, repos, recipeFile):
     return loader
 
 
-def checkout(repos, cfg, workDir, name, versionStr = None):
+def checkout(repos, cfg, workDir, name):
     # We have to be careful with labels
+    parts =  name.split('=', 1) 
+    if len(parts) == 1:
+        versionStr = None
+    else:
+        versionStr = parts[1]
+        name = parts[0]
     name += ":source"
     try:
         trvList = repos.findTrove(cfg.buildLabel, name, None,
