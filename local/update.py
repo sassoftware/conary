@@ -533,8 +533,11 @@ class FilesystemJob:
 	    headFile = files.ThawFile(changeSet.getFileChange(None, headFileId), pathId)
 
             # these files are placed directly into the lookaside at build
-            # time; we don't worry about them
+            # time; we don't worry about them.  We still need to put them
+            # in the fsPkg, though, since we update the CONARY state
+            # from that and want to note these new files.
             if headFile.flags.isAutoSource():
+                fsPkg.addFile(pathId, headPath, headFileVersion, headFileId)
                 continue
 
             try:
