@@ -632,7 +632,7 @@ class Database:
         # filled in w/ None
         cu = self.db.cursor()
 
-        cu.execute("""CREATE TABLE getTrovesTbl(
+        cu.execute("""CREATE TEMPORARY TABLE getTrovesTbl(
                                 idx INTEGER PRIMARY KEY,
                                 troveName STRING,
                                 troveVersion STRING,
@@ -656,6 +656,8 @@ class Database:
         r = [ None ] * len(troveList)
         for (idx, instanceId) in cu:
             r[idx] = self._getTrove(pristine, troveInstanceId = instanceId)
+
+        cu.execute("DROP TABLE getTrovesTbl")
 
         return r
 
