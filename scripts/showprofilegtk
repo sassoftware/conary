@@ -232,7 +232,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     filename = sys.argv[1]
-    if filename.endswith('.pickle'):
+    if ".pickle" in filename:
         f = open(filename)
         stats = cPickle.load(f)
     else:    
