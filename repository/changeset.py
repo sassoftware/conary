@@ -538,17 +538,18 @@ class ChangeSetFromFile(ChangeSet):
 
 	    if header.startswith("PRIMARIES "):
 		size = int(header.split()[1])
-		buf = control.read(size)
-		items = buf.split("\0")
+		if size:
+		    buf = control.read(size)
+		    items = buf.split("\0")
 
-		assert(len(items) % 2 == 0)
-		i = 0
-		while i < len(items):
-		    name = items[i]
-		    version = items[i + 1]
-		    i += 2
-		    version = versions.VersionFromString(version)
-		    self.primaryPackageList.append((name, version))
+		    assert(len(items) % 2 == 0)
+		    i = 0
+		    while i < len(items):
+			name = items[i]
+			version = items[i + 1]
+			i += 2
+			version = versions.VersionFromString(version)
+			self.primaryPackageList.append((name, version))
 	    elif header.startswith("PKG RMVD "):
 		(pkgName, verStr) = header.split()[2:5]
 		version = versions.ThawVersion(verStr)
