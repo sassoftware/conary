@@ -56,9 +56,9 @@ def main(argv):
     outofdate = getOutOfDate(pkgs, sources, versions)
     if listMissing:
         (missing, missinggroups, missingbootstraps) = getMissing(sources, versions)
-        print "Missing BootStraps: ", missingbootstraps
-        print "Missing Groups: ", missinggroups
-        print "Missing Packages: ", missing
+        print "Missing BootStraps: ", ' '.join(missingbootstraps)
+        print "Missing Groups: ", ' '.join(missinggroups)
+        print "Missing Packages: ", ' '.join(missing)
         print ""
 
 
