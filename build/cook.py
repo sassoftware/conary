@@ -24,7 +24,6 @@ import tempfile
 import time
 import types
 import util
-import tempfile
 
 # -------------------- private below this line -------------------------
 
