@@ -59,7 +59,7 @@ class OpenedFile:
 	return self.versionMap.values()
 
     def __init__(self, file):
-	return self.open(file)
+	self.open(file)
 
 class File(OpenedFile):
     def open(self, filename, mode):
@@ -68,7 +68,7 @@ class File(OpenedFile):
 	f.close()
 
     def __init__(self, filename, mode):
-	return self.open(filename, mode);
+	self.open(filename, mode);
 
 def open(file, mode = "r"):
     if type(file) == types.StringType:
