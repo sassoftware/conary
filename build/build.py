@@ -41,7 +41,7 @@ class BuildAction(util.Action):
 	@type use: None, Use flag, or sequence of Use flags
 	"""
 	# enforce pure virtual status
-        assert(self.__class__ is not BuildCommand)
+        assert(self.__class__ is not BuildAction)
 	util.Action.__init__(self, *args, **keywords)
 	# change self.use to be a simple flag
 	self.use = util.checkUse(self.use)
