@@ -14,7 +14,7 @@
 
 all: subdirs conary-wrapper constants.py
 
-export VERSION = 0.7.0
+export VERSION = 0.7.1
 export TOPDIR = $(shell pwd)
 export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
@@ -22,7 +22,7 @@ export conarydir = $(prefix)/share/conary
 export bindir = $(prefix)/bin
 export mandir = $(prefix)/share/man
 
-SUBDIRS=build local repository lib pysqlite pysqlite3 deps
+SUBDIRS=build local repository lib pysqlite3 deps
 
 subdirs_rule=
 
