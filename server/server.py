@@ -143,10 +143,14 @@ class HttpRequests(SimpleHTTPRequestHandler):
 class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 
     def reset(self, authToken):
+        import shutil
+        from localrep import fsrepos
 	del self.repos
-	shutil.rmtree(self.repPath)
+	shutil.rmtree(self.repPath + '/contents')
+        os.unlink(self.repPath + '/sqldb')
 	self.repos = fsrepos.FilesystemRepository(self.name, self.repPath,
 						  self.map)
+        return 0
 
 class ServerConfig(ConfigFile):
 
