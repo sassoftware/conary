@@ -104,6 +104,11 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	    self.oldPackage(oldPkg)
 
 	    for pathId in csPkg.getOldFileList():
+                if not oldPkg.hasFile(pathId):
+                    # the file has already been removed from the non-pristine
+                    # version of this trove in the database, so there is
+                    # nothing to do
+                    continue
 		(oldPath, oldFileId, oldFileVersion) = oldPkg.getFile(pathId)
 		self.removeFile(pathId, oldFileId)
 

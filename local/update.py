@@ -428,14 +428,19 @@ class FilesystemJob:
     def getDirectoryCountSet(self):
 	return self.directorySet
 
-    def _setupRemoves(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
-		       flags):
+    def _setupRemoves(self, repos, pkgCs, changeSet, basePkg, fsPkg,
+                      root, flags):
         # Remove old files. if the files have already been removed, just
         # mention that fact and continue. Don't erase files which
         # have changed contents.
 	cwd = os.getcwd()
 
 	for pathId in pkgCs.getOldFileList():
+            if not basePkg.hasFile(pathId):
+                # this file was removed with 'conary remove /path', so
+                # nothing more has to be done
+		continue
+                
 	    (path, fileId, version) = basePkg.getFile(pathId)
 
 	    if not fsPkg.hasFile(pathId):
@@ -907,7 +912,7 @@ class FilesystemJob:
                 basePkg = None
 
             self._setupRemoves(repos, pkgCs, changeSet, basePkg,
-                                      newFsPkg, root, flags)
+                               newFsPkg, root, flags)
 
 	for (pkgCs, newFsPkg) in pkgList:
 	    old = pkgCs.getOldVersion()

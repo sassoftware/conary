@@ -306,6 +306,11 @@ class ChangeSet(streams.LargeStreamSet):
 		invertedPkg.oldFile(pathId)
 
 	    for pathId in pkgCs.getOldFileList():
+                if not pkg.hasFile(pathId):
+                    # this file was removed using 'conary remove /path'
+                    # so it does not go in the rollback
+                    continue
+                
 		(path, fileId, version) = pkg.getFile(pathId)
 		invertedPkg.newFile(pathId, path, fileId, version)
 
