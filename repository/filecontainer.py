@@ -69,7 +69,9 @@ SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
 
-class FileTableEntry:
+class FileTableEntry(object):
+
+    __slots__ = [ "name", "offset", "size", "data", "src" ]
 
     def write(self, file):
 	rc = (struct.pack("!i", len(self.name)) + self.name +
