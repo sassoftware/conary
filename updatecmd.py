@@ -31,7 +31,12 @@ def doUpdate(repos, cfg, pkg, versionStr = None, replaceFiles = False,
     
     try:
         if os.path.exists(pkg) and os.path.isfile(pkg):
-            client.applyChangeSet(pkg, replaceFiles, tagScript, keepExisting) 
+            if versionStr:
+                log.error("Version should not be specified when a "
+                          "Conary change set is being installed.")
+                return
+            else:
+                client.applyChangeSet(pkg, replaceFiles, tagScript, keepExisting) 
         else:
             client.updateTrove(pkg, versionStr, replaceFiles, tagScript, keepExisting)
     except conaryclient.UpdateError, e:
