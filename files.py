@@ -14,6 +14,8 @@ import socket
 import struct
 import log
 
+from deps import filedeps
+
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_INITSCRIPT = 1 << 1
 _FILE_FLAG_SHLIB = 1 << 2
@@ -30,7 +32,16 @@ _STREAM_FLAGS	    = 8
 _STREAM_MTIME	    = 9
 _STREAM_DEPS	    = 10
 
-class InfoStream:
+def _makeTupleSlots(l):
+    return [ "items", ] + [ x[0] for x in l ] + \
+		    [ "set" + x[0][0].capitalize() + x[0][1:] for x in l ]
+
+def _makeFileSlots(l):
+    return [ "theId" ] + [ x[0] for x in l ]
+
+class InfoStream(object):
+
+    __slots__ = ()
 
     streamId = _STREAM_INFO
 
@@ -59,6 +70,8 @@ class InfoStream:
 	raise NotImplementedError
 
 class NumericStream(InfoStream):
+
+    __slots__ = "val"
 
     def value(self):
 	return self.val
@@ -110,6 +123,8 @@ class ShortStream(NumericStream):
 
 class IntStream(NumericStream):
 
+    __slots__ = ( "val", )
+
     streamId = _STREAM_INT
 
     format = "!I"
@@ -140,6 +155,7 @@ class StringStream(InfoStream):
     Stores a simple string; used for the target of symbolic links
     """
 
+    __slots__ = "s"
     streamId = _STREAM_STRING
 
     def value(self):
@@ -181,6 +197,8 @@ class StringStream(InfoStream):
 	self.thaw(s)
 
 class TupleStream(InfoStream):
+
+    __slots__ = "items"
 
     def __eq__(self, other):
 	return other.__class__ == self.__class__ and other.items == self.items
@@ -283,19 +301,21 @@ class TupleStream(InfoStream):
 		self.items.append(itemType(all[i]))
 
 	for (i, (name, itemType, size)) in enumerate(self.makeup):
-	    self.__dict__[name] = lambda num = i: self.items[num].value()
+	    self.__setattr__(name, lambda num = i: self.items[num].value())
 	    setName = "set" + name[0].capitalize() + name[1:]
-	    self.__dict__[setName] = \
-		lambda val, num = i: self.items[num].set(val)
+	    self.__setattr__(setName,
+		lambda val, num = i: self.items[num].set(val))
 
 class DeviceStream(TupleStream):
 
     makeup = (("major", IntStream, 4), ("minor", IntStream, 4))
+    __slots__ = _makeTupleSlots(makeup)
     streamId = _STREAM_DEVICE
 
 class RegularFileStream(TupleStream):
 
     makeup = (("size", LongLongStream, 8), ("sha1", StringStream, 40))
+    __slots__ = _makeTupleSlots(makeup) + [ "provides", "requires" ]
     streamId = _STREAM_SIZESHA1
 
 class InodeStream(TupleStream):
@@ -307,6 +327,7 @@ class InodeStream(TupleStream):
     # this is permissions, mtime, owner, group
     makeup = (("perms", ShortStream, 2), ("mtime", MtimeStream, 4), 
               ("owner", StringStream, "B"), ("group", StringStream, "B"))
+    __slots__ = _makeTupleSlots(makeup)
     streamId = _STREAM_INODE
 
     def triplet(self, code, setbit = 0):
@@ -378,6 +399,7 @@ class InodeStream(TupleStream):
 
 class FlagsStream(IntStream):
 
+    __slots__ = "val"
     streamId = _STREAM_FLAGS
 
     def isConfig(self, set = None):
@@ -400,11 +422,12 @@ class FlagsStream(IntStream):
 
 	return (self.val and self.val & flag)
 
-class File:
+class File(object):
 
     lsTag = None
     hasContents = 0
     streamList = ( ("inode", InodeStream), ("flags", FlagsStream) )
+    __slots__ = _makeFileSlots(streamList)
 
     def modeString(self):
 	l = self.inode.permsString()
@@ -459,7 +482,7 @@ class File:
     def initializeStreams(self, data):
 	if not data: 
 	    for (name, streamType) in self.streamList:
-		self.__dict__[name] = streamType()
+		self.__setattr__(name, streamType())
 	else:
 	    # skip over the file type for now
 	    i = 1
@@ -467,7 +490,7 @@ class File:
 		(streamId, size) = struct.unpack("!BH", data[i:i+3])
 		assert(streamId == streamType.streamId)
 		i += 3
-		self.__dict__[name] = streamType(data[i:i + size])
+		self.__setattr__(name, streamType(data[i:i + size]))
 		i += size
 
 	    # FIXME
@@ -480,7 +503,7 @@ class File:
 
 	rc = [ "\x01", self.lsTag ]
 	for (name, streamType) in self.streamList:
-	    d = self.__dict__[name].diff(other.__dict__[name])
+	    d = self.__getattribute__(name).diff(other.__getattribute__(name))
 	    rc.append(struct.pack("!H", len(d)) + d)
 
 	return "".join(rc)
@@ -499,7 +522,8 @@ class File:
 	    size = struct.unpack("!H", diff[i:i+2])[0]
 	    i += 2
 	    if name != skip:
-		w = self.__dict__[name].twm(diff[i:i+size], base.__dict__[name])
+		w = self.__getattribute__(name).twm(diff[i:i+size], 
+					       base.__getattribute__(name))
 	    i += size
 	    conflicts = conflicts or w
 
@@ -511,7 +535,7 @@ class File:
 	if other.lsTag != self.lsTag: return False
 
 	for (name, streamType) in self.streamList:
-	    if not self.__dict__[name] == other.__dict__[name]:
+	    if not self._getattribute__(name) == other.__getattribute__(name):
 		return False
 
 	return True
@@ -522,10 +546,10 @@ class File:
 
 	for (name, streamType) in self.streamList:
 	    if name == 'inode':
-		if not self.__dict__[name].metadataEqual(
-		       other.__dict__[name]):
+		if not self.__getattribute__(name).metadataEqual(
+		       other.__getattribute__(name)):
 		    return False
-	    elif not self.__dict__[name] == other.__dict__[name]:
+	    elif not self.__getattribute__(name) == other.__getattribute__(name):
 		return False
 
 	return True
@@ -533,9 +557,15 @@ class File:
     def freeze(self):
 	rc = [ self.lsTag ]
 	for (name, streamType) in self.streamList:
-	    s = self.__dict__[name].freeze()
+	    s = self.__getattribute__(name).freeze()
 	    rc.append(struct.pack("!BH", streamType.streamId, len(s)) + s)
 	return "".join(rc)
+
+    def setDependency(self, requires):
+	self.requires = requires
+
+    def setProvides(self, provides):
+	self.provides = provides
 
     def __init__(self, fileId, streamData = None):
         assert(self.__class__ is not File)
@@ -546,6 +576,7 @@ class SymbolicLink(File):
 
     lsTag = "l"
     streamList = File.streamList + (("target", StringStream ),)
+    __slots__ = _makeFileSlots(streamList)
 
     def sizeString(self):
 	return "%8d" % len(self.target.value())
@@ -568,6 +599,7 @@ class SymbolicLink(File):
 class Socket(File):
 
     lsTag = "s"
+    __slots__ = _makeFileSlots(File.streamList)
 
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
@@ -581,6 +613,7 @@ class Socket(File):
 class NamedPipe(File):
 
     lsTag = "p"
+    __slots__ = _makeFileSlots(File.streamList)
 
     def restore(self, fileContents, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
@@ -592,6 +625,7 @@ class NamedPipe(File):
 class Directory(File):
 
     lsTag = "d"
+    __slots__ = _makeFileSlots(File.streamList)
 
     def restore(self, fileContents, target, restoreContents):
 	if not os.path.isdir(target):
@@ -605,6 +639,7 @@ class Directory(File):
 class DeviceFile(File):
 
     streamList = File.streamList + (("devt", DeviceStream ),)
+    __slots__ = _makeFileSlots(streamList)
 
     def sizeString(self):
 	return "%3d, %3d" % (self.devt.major(), self.devt.minor())
@@ -628,14 +663,17 @@ class DeviceFile(File):
 class BlockDevice(DeviceFile):
 
     lsTag = "b"
+    __slots__ = _makeFileSlots(DeviceFile.streamList)
 
 class CharacterDevice(DeviceFile):
 
     lsTag = "c"
+    __slots__ = _makeFileSlots(DeviceFile.streamList)
     
 class RegularFile(File):
 
     streamList = File.streamList + (('contents', RegularFileStream ),)
+    __slots__ = _makeFileSlots(DeviceFile.streamList)
 
     lsTag = "-"
     hasContents = 1
@@ -661,7 +699,13 @@ class RegularFile(File):
 
 	File.restore(self, target, restoreContents)
 
-def FileFromFilesystem(path, fileId, possibleMatch = None):
+    def __init__(self, *args, **kargs):
+	self.provides = None
+	self.requires = None
+	File.__init__(self, *args, **kargs)
+
+def FileFromFilesystem(path, fileId, possibleMatch = None,
+		       dependencyGroup = None):
                        
     s = os.lstat(path)
 
@@ -720,6 +764,12 @@ def FileFromFilesystem(path, fileId, possibleMatch = None):
     if needsSha1:
 	sha1 = sha1helper.hashFile(path)
 	f.contents = RegularFileStream(s.st_size, sha1)
+
+    if dependencyGroup != None and f.hasContents and isinstance(f, RegularFile):
+	result = filedeps.findFileDependencies(path, dependencyGroup)
+	if result != None:
+	    f.setDependency(result[0])
+	    f.setProvides(result[1])
 
     return f
 

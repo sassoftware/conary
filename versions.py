@@ -11,11 +11,13 @@ ones) are hashable and implement __eq__().
 import copy
 import time
 
-class AbstractVersion:
+class AbstractVersion(object):
 
     """
     Ancestor class for all versions (as opposed to branches)
     """
+
+    __slots__ = ()
 
     def __init__(self):
 	pass
@@ -44,7 +46,7 @@ class NewVersion(AbstractVersion):
     def __init__(self):
 	self.timeStamp = 1
 
-class AbstractBranch:
+class AbstractBranch(object):
 
     """
     Ancestor class for all branches (as opposed to versions)
@@ -61,6 +63,8 @@ class VersionRelease(AbstractVersion):
     release must be a simple integer or two integers separated by a
     decimal point.
     """
+
+    __slots__ = ( "version", "release", "buildCount" )
 
     def __str__(self, versus = None):
 	"""
@@ -163,6 +167,8 @@ class BranchName(AbstractBranch):
     are of the form hostname@branch.
     """
 
+    __slots__ = ( "host", "namespace", "branch" )
+
     def __str__(self, versus = None):
 	"""
 	Returns the string representation of a branch name.
@@ -248,7 +254,7 @@ class LocalBranch(BranchName):
     def __init__(self):
 	BranchName.__init__(self, "localhost@local:LOCAL")
 
-class Version:
+class Version(object):
 
     """
     Class representing a version. Versions are a list of AbstractBranch,
@@ -257,6 +263,8 @@ class Version:
     a branch. A version includes a time stamp, which is used for
     ordering.
     """
+
+    __slots__ = ( "versions", "timeStamp" )
 
     def appendVersionRelease(self, version, release):
 	"""
@@ -566,6 +574,8 @@ def ThawVersion(ver):
 
 class _ThawVersion(Version):
 
+    __slots__ = ( "versions", "timeStamp" )
+
     """
     Provides a version object from a frozen version string.
     """
@@ -596,6 +606,8 @@ class _VersionFromString(Version):
     The time stamp is set to 0, so this object cannot be properly ordered
     with respect to other versions.
     """
+
+    __slots__ = ( "versions", "timeStamp" )
 
     def __init__(self, ver, defaultBranch = None):
 	"""
