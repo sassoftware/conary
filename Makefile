@@ -12,7 +12,7 @@
 # full details.
 #
 
-all: subdirs conary-wrapper
+all: subdirs conary-wrapper constants.py
 
 export VERSION = 0.7.0
 export TOPDIR = $(shell pwd)
@@ -33,6 +33,7 @@ python_files = __init__.py	\
 	commit.py		\
 	conary.py		\
 	conarycfg.py		\
+	constants.py		\
 	cook.py			\
 	cscmd.py		\
 	datastore.py		\
@@ -60,7 +61,7 @@ python_files = __init__.py	\
 
 example_files = examples/tmpwatch.recipe
 bin_files = conary
-extra_files = conary-wrapper.in Makefile Make.rules conary.1 LICENSE
+extra_files = conary-wrapper.in Makefile Make.rules conary.1 LICENSE constants.py.in
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
 generated_files = conary-wrapper *.pyo *.pyc 
@@ -74,6 +75,9 @@ subdirs:
 conary-wrapper: conary-wrapper.in
 	sed s,@conarydir@,$(conarydir),g $< > $@
 	chmod 755 $@
+
+constants.py: constants.py.in
+	sed s,@version@,$(VERSION),g $< > $@
 
 install-mkdirs:
 	mkdir -p $(DESTDIR)$(bindir)

@@ -26,6 +26,7 @@ if sys.version_info < (2, 3):
 import options
 import branch
 import commit
+import constants
 import cook
 import cscmd
 from local import database
@@ -75,6 +76,7 @@ def usage(rc = 1):
     print "       conary update       <pkgname> <version>"
     print "              update       <changeset>"
     print "       conary usage"
+    print "       conary --version"
     print ""
     print "commit flags:  --target-branch <branch>"
     print ""
@@ -159,6 +161,7 @@ def realMain():
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
     argDef["target-branch"] = ONE_PARAM
+    argDef["version"] = NO_PARAM
 
     argDef.update(srcctl.argDef)
 
@@ -169,6 +172,10 @@ def realMain():
     except versions.ParseError, e:
 	print >> sys.stderr, e
 	sys.exit(1)
+
+    if argSet.has_key('version'):
+        print constants.version
+        sys.exit(0)
 
     if cfg.installLabel is None:
         print >> sys.stderr, "installLabel is not set"
