@@ -26,9 +26,9 @@ class AbstractDatabase(repository.AbstractRepository):
 	# this has an empty source path template, which is only used to
 	# construct the eraseFiles list anyway
 	
-	# we don't use repcache.buildJob here as it can't deal with
+	# we don't use stash.buildJob here as it can't deal with
 	# abstract change sets
-	job = fsrepos.ChangeSetJob(self.repcache, absSet)
+	job = fsrepos.ChangeSetJob(self.stash, absSet)
 
 	# abstract change sets cannot have eraseLists
 	#assert(not eraseList)
@@ -43,13 +43,13 @@ class AbstractDatabase(repository.AbstractRepository):
 	    # the version of the package already installed on the
 	    # system. unfortunately we can't represent that yet. 
 	    pkgName = newPkg.getName()
-	    oldVersion = self.repcache.pkgLatestVersion(pkgName, branch)
+	    oldVersion = self.stash.pkgLatestVersion(pkgName, branch)
 	    if not oldVersion:
 		# new package; the Package.diff() right after this never
 		# sets the abstract flag, so the right thing happens
 		old = None
 	    else:
-		old = self.repcache.getPackageVersion(pkgName, oldVersion)
+		old = self.stash.getPackageVersion(pkgName, oldVersion)
 
 	    # we ignore pkgsNeeded; it doesn't mean much in this case
 	    (pkgChgSet, filesNeeded, pkgsNeeded) =	    \
@@ -62,7 +62,7 @@ class AbstractDatabase(repository.AbstractRepository):
 		
 		oldFile = None
 		if oldVersion:
-		    (oldFile, oldCont) = self.repcache.getFileVersion(fileId, 
+		    (oldFile, oldCont) = self.stash.getFileVersion(fileId, 
 					    oldVersion, withContents = 1)
 
 		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
@@ -86,7 +86,7 @@ class AbstractDatabase(repository.AbstractRepository):
     # local changes includes the A->A.local portion of a rollback; if it
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
-    def commitChangeSet(self, cs, isRollback = False, toDatabase = True,
+    def commitChangeSet(self, cs, isRollback = False, toStash = True,
                         replaceFiles = False):
 	assert(not cs.isAbstract())
         flags = 0
@@ -101,13 +101,13 @@ class AbstractDatabase(repository.AbstractRepository):
 	for newPkg in cs.getNewPackageList():
 	    name = newPkg.getName()
 	    old = newPkg.getOldVersion()
-	    if self.repcache.hasPackage(name) and old:
+	    if self.stash.hasPackage(name) and old:
 		ver = old.fork(versions.LocalBranch(), sameVerRel = 1)
-		pkg = self.repcache.getPackageVersion(name, old)
+		pkg = self.stash.getPackageVersion(name, old)
 		assert(pkg)
 		pkgList.append((pkg, pkg, ver))
 
-	result = update.buildLocalChanges(self.repcache, pkgList, 
+	result = update.buildLocalChanges(self.stash, pkgList, 
 					  root = self.root)
 	if not result: return
 
@@ -117,20 +117,22 @@ class AbstractDatabase(repository.AbstractRepository):
 	    fsPkgDict[fsPkg.getName()] = fsPkg
 
 	if not isRollback:
-	    inverse = cs.makeRollback(self.repcache, configFiles = 1)
+	    inverse = cs.makeRollback(self.stash, configFiles = 1)
             flags |= update.MERGE
 
 	# Build A->B
-	if toDatabase:
-	    job = self.repcache.buildJob(cs)
+	if toStash:
+	    job = self.stash.buildJob(cs)
 
 	# build the list of changes to the filesystem
-	fsJob = update.FilesystemJob(self.repcache, cs, fsPkgDict, 
+	fsJob = update.FilesystemJob(self.stash, cs, fsPkgDict, 
 				     self.root, flags = flags)
+
+	# -------- database and system are updated below this line ---------
 
 	try:
 	    # add new packages
-	    if toDatabase: job.commit()
+	    if toStash: job.commit()
 
 	    # remove old packages
 	    errList = fsJob.getErrorList()
@@ -140,11 +142,11 @@ class AbstractDatabase(repository.AbstractRepository):
 		job.undo()
 		return
 
-	    if toDatabase: job.removals()
+	    if toStash: job.removals()
 	except:
 	    # this won't work it things got too far, but it won't hurt
 	    # anything either
-	    if toDatabase: job.undo()
+	    if toStash: job.undo()
 	    raise
 
 	# everything is in the database... save this so we can undo
@@ -255,7 +257,7 @@ class AbstractDatabase(repository.AbstractRepository):
 	for name in names:
 	    (reposCs, localCs) = self.getRollback(name)
 	    self.commitChangeSet(reposCs, isRollback = True)
-	    self.commitChangeSet(localCs, isRollback = True, toDatabase = False)
+	    self.commitChangeSet(localCs, isRollback = True, toStash = False)
 	    self.removeRollback(name)
 
     def __init__(self, root, path, mode = "r"):
@@ -273,11 +275,11 @@ class Database(AbstractDatabase):
 
     def open(self, mode):
 	AbstractDatabase.open(self, mode)
-	self.repcache = localrep.LocalRepository(self.root, self.dbpath, mode)
+	self.stash = localrep.LocalRepository(self.root, self.dbpath, mode)
 
     def close(self):
 	AbstractDatabase.close(self)
-	self.repcache = None
+	self.stash = None
 
     def __init__(self, root, path, mode = "r"):
 	AbstractDatabase.__init__(self, root, path, mode)
