@@ -417,8 +417,7 @@ class PackageSpecSet(dict):
 
 
 def Auto(name, root, specSet):
-    os.path.walk(root, autoVisit,
-                 (root, specSet))
+    os.path.walk(root, autoVisit, (root, specSet))
 
     set = BuildPackageSet(name)
     for name in specSet.packageList:
