@@ -5,11 +5,10 @@
 
 import changeset
 import filecontents
-import files
 import log
-import update
 import os
 import repository
+import update
 import versions
 
 # Many comments in this file only make sense if you consider the case
