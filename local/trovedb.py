@@ -25,6 +25,9 @@ class TroveDatabase:
 	for (fileId, (path, version)) in trv.iterFileList():
 	    method(self.pathIdx, trvId, path)
 
+	for (name, versionList) in trv.iterPackageList():
+	    method(self.partofIdx, trvId, name)
+
     def addTrove(self, trv):
 	"""
 	Add a trove to the database, along with the appropriate index
@@ -38,6 +41,15 @@ class TroveDatabase:
 	self.trvs[trvId] = str
 	self._updateIndicies(trvId, trv, Index.addEntry)
 
+    def updateTrove(self, trv):
+	"""
+	Updates a trove in the database, along with the appropriate index
+	entries.
+	"""
+	# FIXME: this could be more efficient
+	self.delTrove(trv.getName(), trv.getVersion())
+	self.addTrove(trv)
+
     def delTrove(self, name, version):
 	for trvId in self.nameIdx.iterGetEntries(name):
 	    trv = self._getPackage(trvId)
@@ -47,6 +59,25 @@ class TroveDatabase:
 
 	    del self.trvs[trvId]
 	    self._updateIndicies(trvId, trv, Index.delEntry)
+
+	for trvId in self.partofIdx.iterGetEntries(name):
+	    trv = self._getPackage(trvId)
+	    foundOne = False
+	    removeList = []
+	    for (inclName, versionList) in trv.iterPackageList():
+		if inclName == name: 
+		    for inclVersion in versionList:
+			if inclVersion.equal(version):
+			    foundOne = True
+			    trv.delPackageVersion(name, version, 
+						  missingOkay = False)
+			    break
+		    break
+
+	    if foundOne:
+		self.updateTrove(trv)
+	    else:
+		log.warning("%s not found in %s", name, trv.getName())
 
     def getAllTroveNames(self):
 	return self.nameIdx.keys()
@@ -88,8 +119,9 @@ class TroveDatabase:
 	else:
 	    self.trvs = dbhash.open(p, mode)
 
-	self.nameIdx = Index("name", top + "/names.idx", mode)
-	self.pathIdx = Index("path", top + "/paths.idx", mode)
+	self.nameIdx = Index("name", top + "/name.idx", mode)
+	self.pathIdx = Index("path", top + "/path.idx", mode)
+	self.partofIdx = Index("partof", top + "/partof.idx", mode)
 
 class Index:
 
