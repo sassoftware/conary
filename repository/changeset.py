@@ -308,11 +308,11 @@ class ChangeSet(streams.LargeStreamSet):
                                troveInfoDiff = newTroveInfoDiff)
 
 	    for (name, list) in pkgCs.iterChangedTroves():
-		for (oper, version, flavor) in list:
+		for (oper, version, flavor, byDef) in list:
 		    if oper == '+':
 			invertedPkg.oldTroveVersion(name, version, flavor)
 		    elif oper == "-":
-			invertedPkg.newTroveVersion(name, version, flavor)
+			invertedPkg.newTroveVersion(name, version, flavor, True)
 
 	    for (pathId, path, fileId, version) in pkgCs.getNewFileList():
 		invertedPkg.oldFile(pathId)

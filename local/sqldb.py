@@ -593,7 +593,8 @@ class Database:
 	    instanceId = self.getInstanceId(name, versionId, flavorId,
 					    version.timeStamps(),
 					    isPresent = False)
-	    self.troveTroves.addItem(troveInstanceId, instanceId)
+	    self.troveTroves.addItem(troveInstanceId, instanceId,
+                         trove.includeTroveByDefault(name, version, flavor))
 
         self.depTables.add(cu, trove, troveInstanceId)
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
@@ -743,7 +744,8 @@ class Database:
 	# flavor cache is already complete
 	cu = self.db.cursor()
 	cu.execute("""
-	    SELECT troveName, versionId, timeStamps, DBFlavors.flavorId, flavor FROM 
+	    SELECT troveName, versionId, byDefault, timeStamps, 
+                   DBFlavors.flavorId, flavor FROM 
 		TroveTroves INNER JOIN DBInstances INNER JOIN DBFlavors ON 
 		    TroveTroves.includedId = DBInstances.instanceId AND
 		    DBFlavors.flavorId = DBInstances.flavorId 
@@ -751,7 +753,7 @@ class Database:
 	""", troveInstanceId)
 
 	versionCache = {}
-	for (name, versionId, timeStamps, flavorId, flavorStr) in cu:
+	for (name, versionId, byDefault, timeStamps, flavorId, flavorStr) in cu:
 	    version = self.versionTable.getBareId(versionId)
 	    version.setTimeStamps([ float(x) for x in timeStamps.split(":") ])
 
@@ -763,7 +765,7 @@ class Database:
 		    flavor = deps.deps.ThawDependencySet(flavorStr)
 		    flavorCache[flavorId] = flavor
 
-	    trv.addTrove(name, version, flavor)
+	    trv.addTrove(name, version, flavor, byDefault = byDefault)
 
 	cu.execute("SELECT pathId, path, versionId, fileId, isPresent FROM "
 		   "DBTroveFiles WHERE instanceId = ?", troveInstanceId)

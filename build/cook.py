@@ -409,7 +409,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     grpFlavor.union(buildpackage._getUseDependencySet(recipeObj)) 
 
     for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
-        for (version, flavor) in versionFlavorList:
+        for (version, flavor, byDefault) in versionFlavorList:
             grpFlavor.union(flavor,
                             mergeType=deps.deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
 
@@ -417,8 +417,8 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
                       isRedirect = False)
 
     for (name, versionFlavorList) in recipeObj.getTroveList().iteritems():
-        for (version, flavor) in versionFlavorList:
-            grp.addTrove(name, version, flavor)
+        for (version, flavor, byDefault) in versionFlavorList:
+            grp.addTrove(name, version, flavor, byDefault = byDefault)
 
     targetVersion = nextVersion(repos, fullName, sourceVersion, grpFlavor,
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
@@ -684,10 +684,10 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         p.setBuildTime(buildTime)
         p.setConaryVersion(constants.version)
 	
-	# don't install :test component when you are installing
-	# the package
-	if not comp in recipeObj.getUnpackagedComponentNames():
-	    grp.addTrove(compName, p.getVersion(), p.getFlavor() or None)
+	byDefault = comp not in recipeObj.getUnpackagedComponentNames()
+        grp.addTrove(compName, p.getVersion(), p.getFlavor() or None,
+                     byDefault = byDefault)
+        if byDefault:
             grp.setSize(grp.getSize() + p.getSize())
 
     changeSet = changeset.CreateFromFilesystem(packageList)

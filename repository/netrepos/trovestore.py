@@ -417,7 +417,8 @@ class TroveStore:
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
                                             trove.isRedirect(),
 					    isPresent = False)
-	    self.troveTroves.addItem(troveInstanceId, instanceId)
+	    self.troveTroves.addItem(troveInstanceId, instanceId,
+                        trove.includeTroveByDefault(name, version, flavor))
 
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
 
@@ -562,14 +563,14 @@ class TroveStore:
 
 	trv = trove.Trove(troveName, troveVersion, troveFlavor,
 			      changeLog, isRedirect = isRedirect)
-	for instanceId in self.troveTroves[troveInstanceId]:
+	for instanceId, byDefault in self.troveTroves[troveInstanceId]:
 	    (itemId, versionId, flavorId, isPresent) = \
 		    self.instances.getId(instanceId)
 	    name = self.items.getId(itemId)
 	    flavor = self.flavors.getId(flavorId)
 	    version = self.versionTable.getId(versionId, itemId)
 
-	    trv.addTrove(name, version, flavor)
+	    trv.addTrove(name, version, flavor, byDefault = byDefault)
 
         if withFiles:
             versionCache = {}

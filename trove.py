@@ -95,7 +95,8 @@ class Trove:
     def hasFile(self, pathId):
 	return self.idMap.has_key(pathId)
 
-    def addTrove(self, name, version, flavor, presentOkay = False):
+    def addTrove(self, name, version, flavor, presentOkay = False,
+                 byDefault = True):
 	"""
 	Adds a single version of a package.
 
@@ -110,7 +111,7 @@ class Trove:
 	"""
 	if not presentOkay and self.packages.has_key((name, version, flavor)):
 	    raise TroveError, "duplicate trove included in %s" % self.name
-	self.packages[(name, version, flavor)] = True
+	self.packages[(name, version, flavor)] = byDefault
 
     def delTrove(self, name, version, flavor, missingOkay):
 	"""
@@ -142,6 +143,9 @@ class Trove:
 	@rtype: list
 	"""
 	return self.packages.iterkeys()
+
+    def includeTroveByDefault(self, name, version, flavor):
+        return self.packages[(name, version, flavor)]
 
     def hasTrove(self, name, version, flavor):
 	return self.packages.has_key((name, version, flavor))
@@ -208,14 +212,19 @@ class Trove:
 	"""
 
 	for (name, list) in changeList:
-	    for (oper, version, flavor) in list:
+	    for (oper, version, flavor, byDefault) in list:
 		if oper == '+':
 		    self.addTrove(name, version, flavor,
-					   presentOkay = redundantOkay)
+					   presentOkay = redundantOkay,
+                                           byDefault = byDefault)
 
 		elif oper == "-":
 		    self.delTrove(name, version, flavor,
 					   missingOkay = redundantOkay)
+		elif oper == "~":
+                    self.packages[(name, version, flavor)] = byDefault
+                else:
+                    assert(0)
     
     def __eq__(self, them):
 	"""
@@ -238,7 +247,9 @@ class Trove:
 	return (not pcl) and (not fcl) and (not csg.getOldFileList()) \
             and self.getRequires() == them.getRequires() \
             and self.getProvides() == them.getProvides() \
-            and self.getTroveInfo() == them.getTroveInfo()
+            and self.getTroveInfo() == them.getTroveInfo() \
+            and not([x for x in csg.iterChangedTroves()])
+
 
     def __ne__(self, them):
 	return not self == them
@@ -345,12 +356,17 @@ class Trove:
 	# now handle the packages we include
 	added = {}
 	removed = {}
+        changed = {}
 
 	for key in self.packages.iterkeys():
-	    if them and them.packages.has_key(key): continue
+	    if them and them.packages.has_key(key): 
+                if self.packages[key] != them.packages[key]:
+                    chgSet.changedTrove(key[0], key[1], key[2],
+                                        self.packages[key])
+                continue
 
 	    (name, version, flavor) = key
-	    chgSet.newTroveVersion(name, version, flavor)
+	    chgSet.newTroveVersion(name, version, flavor, self.packages[key])
 
             d = added.setdefault(name, {})
             l = d.setdefault(flavor, [])
@@ -616,7 +632,7 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 	l = []
 	for name, troveList in self.iteritems():
 	    subL = []
-	    for (change, version, flavor) in troveList:
+	    for (change, version, flavor, byDefault) in troveList:
 		version = version.freeze()
 		if flavor:
 		    flavor = flavor.freeze()
@@ -626,6 +642,10 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 		subL.append(change)
 		subL.append(version)
 		subL.append(flavor)
+                if not byDefault:
+                    subL.append('0')
+                else:
+                    subL.append('1')
 
 	    l.append(name)
 	    l += subL
@@ -655,8 +675,15 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 		else:
 		    flavor = deps.ThawDependencySet(flavor)
 
-		self[name].append((change, version, flavor))
-		i += 3
+                if change == '-':
+                    byDefault = None
+                elif l[i + 3] == '0':
+                    byDefault = False
+                else:
+                    byDefault = True
+
+		self[name].append((change, version, flavor, byDefault))
+		i += 4
 
 	    i += 1
 
@@ -863,7 +890,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
     def iterChangedTroves(self):
 	return self.packages.iteritems()
 
-    def newTroveVersion(self, name, version, flavor):
+    def newTroveVersion(self, name, version, flavor, byDefault):
 	"""
 	Adds a version of a package which appeared in newVersion.
 
@@ -873,10 +900,12 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	@type version: versions.Version
 	@param flavor: new flavor
 	@type flavor: deps.deps.DependencySet
+        @param byDefault: value of byDefault
+        @type byDefault: boolean
 	"""
 
         l = self.packages.setdefault(name, [])
-	l.append(('+', version, flavor))
+	l.append(('+', version, flavor, byDefault))
 
     def updateChangedPackage(self, name, flavor, old, new):
 	"""
@@ -912,7 +941,23 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	@type flavor: deps.deps.DependencySet
 	"""
         l = self.packages.setdefault(name, [])
-        l.append(('-', version, flavor))
+        l.append(('-', version, flavor, None))
+
+    def changedTrove(self, name, version, flavor, byDefault):
+	"""
+	Records the change in the byDefault setting of a referenced trove.
+
+	@param name: name of the trove
+	@type name: str
+	@param version: version
+	@type version: versions.Version
+	@param flavor: flavor
+	@type flavor: deps.deps.DependencySet
+        @param byDefault: New value of byDefault
+        @type byDefault: boolean
+	"""
+        l = self.packages.setdefault(name, [])
+        l.append(('~', version, flavor, byDefault))
 
     def formatToFile(self, changeSet, f):
 	f.write("%s " % self.getName())
@@ -969,7 +1014,9 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	    f.write("\tremoved %s(.*)%s\n" % (pathIdStr[:6], pathIdStr[-6:]))
 
 	for name in self.packages.keys():
-	    list = [ x[0] + x[1].asString() for x in self.packages[name] ]
+	    list = [ x[0] + x[1].asString() + 
+                     "(%d)" % x[3]
+                            for x in self.packages[name] ]
 	    f.write("\t" + name + " " + " ".join(list) + "\n")
 
     def setProvides(self, provides):

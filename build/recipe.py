@@ -21,6 +21,7 @@ import errno
 from fnmatch import fnmatchcase
 import imp
 import inspect
+from itertools import izip
 import os
 import sys
 import tempfile
@@ -782,7 +783,8 @@ class PackageRecipe(Recipe):
 class GroupRecipe(Recipe):
     Flags = use.LocalFlags
 
-    def addTrove(self, name, versionStr = None, flavor = None, source = None):
+    def addTrove(self, name, versionStr = None, flavor = None, source = None,
+                 byDefault = True):
         # XXX we likely should not accept multiple types
         # of flavors, it's not a good API
         if isinstance(flavor, deps.DependencySet) or flavor is None:
@@ -795,14 +797,14 @@ class GroupRecipe(Recipe):
                 raise ValueError, 'invalid flavor %s' % flavorStr
         else:
             raise ValueError, 'invalid flavor'
-        self.addTroveList.append((name, versionStr, flavor, source))
+        self.addTroveList.append((name, versionStr, flavor, source, byDefault))
 
     def findTroves(self):
         self.size = 0
 
         validSize = True
         troveList = []
-        for (name, versionStr, flavor, source) in self.addTroveList:
+        for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
             try:
                 desFlavor = self.cfg.buildFlavor.copy()
                 if flavor is not None:
@@ -814,16 +816,14 @@ class GroupRecipe(Recipe):
             except repository.TroveNotFound, e:
                 raise RecipeFileError, str(e)
             assert(len(pkgList) == 1)
-            troveList.append(pkgList[0])
+            troveList.append((pkgList[0], byDefault))
 
-        troves = self.repos.getTroves(troveList, withFiles = False)
-        for trove in troves:
-            name = trove.getName()
-            v = trove.getVersion()
-            f = trove.getFlavor()
+        troves = self.repos.getTroves([ x[0] for x in troveList ], 
+                                      withFiles = False)
+        for (((name, v, f), byDefault), trove) in izip(troveList, troves):
             l = self.troveVersionFlavors.get(name, [])
             if (v, f) not in l:
-                l.append((v,f))
+                l.append((v,f, byDefault))
             self.troveVersionFlavors[name] = l
             # XXX this code is to deal with troves that existed 
             # before troveInfo was added

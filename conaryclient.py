@@ -202,7 +202,7 @@ class ConaryClient:
                 else:
                     # erase the target(s) of the redirection
                     for (name, changeList) in troveCs.iterChangedTroves():
-                        for (changeType, version, flavor) in changeList:
+                        for (changeType, version, flavor, byDef) in changeList:
                             delDict[(name, version, flavor)] = True
 
         for item in delDict.iterkeys():
@@ -212,7 +212,9 @@ class ConaryClient:
 
     def _mergeGroupChanges(self, cs):
         # Updates a change set by removing troves which don't need
-        # to be updated do to local state
+        # to be updated do to local state. It also removes troves which
+        # don't need to be installed because they're new, but aren't to
+        # be installed by default.
         assert(not cs.isAbsolute())
 
         for (trvName, trvVersion, trvFlavor) in cs.getPrimaryTroveList():
@@ -220,7 +222,7 @@ class ConaryClient:
                                                      trvFlavor)
 
             for (name, changeList) in primaryTroveCs.iterChangedTroves():
-                for (changeType, version, flavor) in changeList:
+                for (changeType, version, flavor, byDef) in changeList:
                     if changeType == '-': 
                         # XXX GROUPS we should do something better here (like
                         # check this against the erase list in the
@@ -234,7 +236,9 @@ class ConaryClient:
                     if not oldItem[1]: 
                         # it's new -- it can stay as long as it isn't
                         # already installed and isn't in the exclude list
-                        if self.db.hasTrove(name, version, flavor):
+                        if not byDef:
+                            cs.delNewPackage(name, version, flavor)
+                        elif self.db.hasTrove(name, version, flavor):
                             cs.delNewPackage(name, version, flavor)
                         else:
                             for reStr, regExp in self.cfg.excludeTroves:
@@ -338,6 +342,7 @@ class ConaryClient:
             redirectCs = self._updateChangeSet(redirectTroves, 
                                   keepExisting = keepExisting, test = test)
             finalCs.merge(redirectCs)
+
         self._mergeGroupChanges(finalCs)
 
         return finalCs
@@ -376,15 +381,15 @@ class ConaryClient:
                 troves = [ (x.getName(), 
                                (x.getOldVersion(), x.getOldFlavor()),
                                (x.getNewVersion(), x.getNewFlavor()), False)
-                                    for x in theCs.iterNewPackageList() ]
+                                    for x in newCs.iterNewPackageList() ]
                 troves += [ (x[0], (x[1], x[2]), (None, None), False) 
-                                    for x in theCs.getOldPackageList() ]
+                                    for x in newCs.getOldPackageList() ]
 
                 for item in troves:
                     if changedTroves.has_key(item):
                         del changedTroves[item]
                     else:
-                        newCs.delNewPackage(x[0], x[2][0], x[2][1])
+                        newCs.delNewPackage(item[0], item[2][0], item[2][1])
                 cs.merge(newCs)
 
         newCs = self.repos.createChangeSet(changedTroves.keys(), 

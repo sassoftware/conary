@@ -271,7 +271,7 @@ def includeChildTroves(cs, troves):
         newList.append((pkg, indent))
         trove = cs.newPackages[pkg]
         for subTroveName, changes in  trove.iterChangedTroves():
-            (type, version, flavor) = changes[0]
+            (type, version, flavor, byDefault) = changes[0]
             newList.append(((subTroveName, version, flavor), indent + ' '))
     return newList
 
@@ -293,7 +293,7 @@ def getTroves(cs, troveList):
                 troveList.append((name, version, flavor))
                 trove = cs.getNewPackageVersion(name, version, flavor)
                 for subTroveName, changes in  trove.iterChangedTroves():
-                    (type, version, flavor) = changes[0]
+                    (type, version, flavor, byDefault) = changes[0]
                     del allTroves[subTroveName, version, flavor]
             troveList.extend(allTroves.keys())
         else:

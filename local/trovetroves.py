@@ -24,8 +24,9 @@ class TroveTroves:
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
         if "TroveTroves" not in tables:
-            cu.execute("CREATE TABLE TroveTroves(instanceId integer, "
-					        "includedId integer)")
+            cu.execute("""CREATE TABLE TroveTroves(instanceId INTEGER, 
+					           includedId INTEGER,
+                                                   byDefault BOOLEAN)""")
 	    cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON "
 			    "TroveTroves(instanceId)")
 	    # this index is so we can quickly tell what troves are needed
@@ -50,29 +51,13 @@ class TroveTroves:
     def __getitem__(self, key):
         cu = self.db.cursor()
 	
-        cu.execute("SELECT includedId FROM TroveTroves "
+        cu.execute("SELECT includedId, byDefault FROM TroveTroves "
 			    "WHERE instanceId=?", (key,))
 
 	for match in cu:
-	    yield match[0]
+	    yield match
 
-    def getIncludedBy(self, key):
+    def addItem(self, key, val, byDefault):
         cu = self.db.cursor()
-	
-        cu.execute("SELECT instanceId FROM TroveTroves "
-			    "WHERE includedId=?", (key,))
-
-	for match in cu:
-	    yield match[0]
-
-    def isIncluded(self, key):
-        cu = self.db.cursor()
-	
-        cu.execute("SELECT instanceId FROM TroveTroves "
-			    "WHERE includedId=?", (key,))
-
-	return cu.fetchone() is not None
-
-    def addItem(self, key, val):
-        cu = self.db.cursor()
-        cu.execute("INSERT INTO TroveTroves VALUES (?, ?)", (key, val))
+        cu.execute("INSERT INTO TroveTroves VALUES (?, ?, ?)", (key, val,
+                                                                byDefault))

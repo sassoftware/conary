@@ -36,8 +36,8 @@ from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExi
 import trovestore
 import versions
 
-SERVER_VERSIONS = [ 26, 27, 28 ]
-CACHE_SCHEMA_VERSION = 11
+SERVER_VERSIONS = [ 29 ]
+CACHE_SCHEMA_VERSION = 12
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -178,14 +178,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return metadata
     
-    def hasPackage(self, authToken, clientVersion, pkgName):
-        # XXX left for compatibility with protocol 20
-        assert(clientVersion == 20)
-	if not self.auth.check(authToken, write = False, trove = pkgName):
-	    raise InsufficientPermission
-
-	return self.troveStore.hasTrove(pkgName)
-
     def _setupFlavorFilter(self, cu, flavorSet):
         cu.execute("""CREATE TEMPORARY TABLE ffFlavor(flavorId INTEGER,
                                                     base STRING,
@@ -591,25 +583,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   withVersions = False, 
                                   versionType = self._GTL_VERSION_TYPE_LABEL)
 
-    def getTroveVersionList(self, authToken, clientVersion, troveNameFlavors,
-                            flavorFilter = 0):
-        if clientVersion >= 23:
-            troveFilter = {}
+    def getTroveVersionList(self, authToken, clientVersion, troveSpecs):
+        troveFilter = {}
 
-            for name, flavors in troveNameFlavors.iteritems():
-                if len(name) == 0:
-                    name = None
+        for name, flavors in troveSpecs.iteritems():
+            if len(name) == 0:
+                name = None
 
-                if type(flavors) is list:
-                    troveFilter[name] = { None : flavors }
-                else:
-                    troveFilter[name] = { None : None }
-        else:
-            if troveNameFlavors:
-                troveFilter = {}.fromkeys(troveNameFlavors, 
-                                            { None : [ flavorFilter ] })
+            if type(flavors) is list:
+                troveFilter[name] = { None : flavors }
             else:
-                troveFilter = { None : { None : [ 0 ] } } 
+                troveFilter[name] = { None : None }
             
         return self._getTroveList(authToken, clientVersion, troveFilter,
                                   withVersions = True, withFlavors = True)
@@ -695,25 +679,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   withFlavors = True)
         return d
 
-    def getAllTroveLeaves(self, authToken, clientVersion, troveNameFlavors,
+    def getAllTroveLeaves(self, authToken, clientVersion, troveSpecs,
                           flavorFilter = 0):
-        if clientVersion >= 23:
-            troveFilter = {}
+        troveFilter = {}
 
-            for name, flavors in troveNameFlavors.iteritems():
-                if len(name) == 0:
-                    name = None
+        for name, flavors in troveSpecs.iteritems():
+            if len(name) == 0:
+                name = None
 
-                if type(flavors) is list:
-                    troveFilter[name] = { None : flavors }
-                else:
-                    troveFilter[name] = { None : None }
-        else:
-            if troveNameFlavors:
-                troveFilter = {}.fromkeys(troveNameFlavors, 
-                                            { None : [ flavorFilter ] })
+            if type(flavors) is list:
+                troveFilter[name] = { None : flavors }
             else:
-                troveFilter = { None : { None : [ flavorFilter ] } } 
+                troveFilter[name] = { None : None }
             
         return self._getTroveList(authToken, clientVersion, troveFilter,
                                   withVersions = True, 
@@ -743,60 +720,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   latestFilter = self._GET_TROVE_VERY_LATEST,
                                   withFlavors = True, 
                                   flavorFilter = flavorSelection)
-
-    def getFilesInTrove(self, authToken, clientVersion, troveName, versionStr, 
-                        flavor, sortByPath = False, withFiles = False):
-        # XXX this method is deprecated
-        version = self.toVersion(versionStr)
-	if not self.auth.check(authToken, write = False, 
-                                     trove = troveName,
-			       label = version.branch().label()):
-	    raise InsufficientPermission
-
-        gen = self.troveStore.iterFilesInTrove(troveName,
-					       version,
-                                               self.toFlavor(flavor),
-                                               sortByPath, 
-                                               withFiles) 
-        verDict = {}
-        verList = []
-        dirDict = {}
-        dirList = []
-        l = []
-
-        for tup in gen:
-            (pathId, filePath, fileId, fileVersion) = tup[0:4]
-            if withFiles:
-                fileStream = tup[4]
-                if fileStream is None:
-                    fileObj = self.repos.getFileVersion(pathId, fileId,
-                                                        fileVersion)
-                    fileStream = fileObj.freeze()
-
-            dir = os.path.dirname(filePath)
-            fileName = os.path.basename(filePath)
-
-            dirNum = dirDict.get(dir, None)
-            if dirNum is None:
-                dirNum = len(dirDict)
-                dirDict[dir] = dirNum
-                dirList.append(dir)
-
-            verNum = verDict.get(fileVersion, None)
-            if verNum is None:
-                verNum = len(verDict)
-                verDict[fileVersion] = verNum
-                verList.append(self.fromVersion(fileVersion))
-
-            if withFiles:
-                l.append((self.fromPathId(pathId), dirNum, fileName, 
-                          self.fromFileId(fileId), verNum, 
-                          base64.encodestring(fileStream)))
-            else:
-                l.append((self.fromPathId(pathId), dirNum, fileName, 
-                          self.fromFileId(fileId), verNum))
-
-	return l, verList, dirList
 
     def getFileContents(self, authToken, clientVersion, fileId, fileVersion):
 	fileVersion = self.toVersion(fileVersion)
@@ -1056,9 +979,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         ids = {}
         for (pathId, path) in cu:
             if not ids.has_key(path):
-                if clientVersion <= 28:
-                    path = self.fromPath(path)
-                ids[path] = self.fromPathId(pathId)
+                ids[self.fromPath(path)] = self.fromPathId(pathId)
 
         return ids
 
@@ -1191,8 +1112,8 @@ class CacheSet:
                 troveName=? AND
                 oldFlavorId=? AND oldVersionId=? AND
                 newFlavorId=? AND newVersionId=? AND
-                absolute=? AND recurse=? AND withFiles=? AND withFileContents=?
-                AND excludeAutoSource=?
+                absolute=? AND recurse=? AND withFiles=?  
+                AND withFileContents=?  AND excludeAutoSource=?
             """, name, oldFlavorId, oldVersionId, newFlavorId, 
             newVersionId, absolute, recurse, withFiles, withFileContents,
             excludeAutoSource)
