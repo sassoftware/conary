@@ -417,7 +417,7 @@ class TagSpec(policy.Policy):
 	    if args:
 		if tagname not in self.included:
 		    self.included[tagname] = []
-		self.included[tagname].append(args.pop())
+		self.included[tagname].extend(args)
 	    if 'exceptions' in keywords:
 		# not the usual exception handling
 		if tagname not in self.excluded:
@@ -461,7 +461,7 @@ class TagSpec(policy.Policy):
 
     def doFile(self, file):
 	fullpath = self.recipe.macros.destdir+file
-	if not os.path.isfile(fullpath) or not util.isregular(fullpath):
+	if not util.isregular(fullpath) and not os.path.islink(fullpath):
 	    return
 	for tag in self.included:
 	    for filt in self.included[tag]:
