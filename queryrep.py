@@ -136,16 +136,16 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 	log.error(str(e))
 	return
 
-    sourceName = troveList[0].getSourceName()
-    if sourceName:
-        sourceTrove = repos.findTrove(cfg.installLabelPath, sourceName,
-                                      cfg.flavor, versionStr,
-                                      acrossRepositories = True,
-                                      withFiles = False)[0]
-    else:
-        sourceTrove = None
-
     for trove in troveList:
+        sourceName = trove.getSourceName()
+        if sourceName:
+            sourceTrove = repos.findTrove(cfg.installLabelPath, sourceName,
+                                          cfg.flavor, versionStr,
+                                          acrossRepositories = True,
+                                          withFiles = False)[0]
+        else:
+            sourceTrove = None
+
 	version = trove.getVersion()
         if ls or tags or sha1s or ids:
             outerTrove = trove
