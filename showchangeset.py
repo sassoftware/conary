@@ -135,7 +135,7 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                                                                  db, repos)
                     elif cType == 'Mod':
                         (cType, pathId, path, fileId, version, 
-                         oldPath, oldfileId, fileCs) = fileList[pathId]
+                         oldPath, oldFileId, filecs) = fileList[pathId]
                         if showChanges or filecs[0] == '\x01':
                             # don't grab the old file object if we don't
                             # need it for displaying or for a three-way 
