@@ -131,13 +131,18 @@ class Cursor:
         start_transaction = kwargs.get('start_transaction', True)
         SQL = SQL.strip()
         self._checkNotClosed("execute")
-
+        startingTransaction = False
+        
         if self.con.autocommit:
             pass
         elif start_transaction:
-            if not(self.con.inTransaction or SQL[:6].upper() == "SELECT"):
-                self.con._begin()
-                self.con.inTransaction = 1
+            if not self.con.inTransaction:
+                if len(SQL) >= 5 and SQL[:5].upper() == "BEGIN":
+                    startingTransaction = True
+                elif (len(SQL) >= 6 and SQL[:6].upper()
+                      not in ("SELECT", "VACUUM", "DETACH")):
+                    print 'start transaction', SQL
+                    self.con._begin()
 
         if len(parms) == 1 and (isinstance(parms[0], tuple) or
                                 isinstance(parms[0], list)):
@@ -147,6 +152,8 @@ class Cursor:
         for i, parm in enumerate(parms):
             self.stmt.bind(i + 1, parm)
         self.current_row = self.stmt.step()
+        if startingTransaction:
+            self.con.inTransaction = True
         self.description = self.stmt.get_description()
         self.closed = 0
         # the PEP 249 leaves the return value undefined.  This allows
@@ -332,8 +339,8 @@ class Connection:
         c.execute(sql)
 
     def _begin(self):
-        self.inTransaction = 1
         self._execute(_BEGIN)
+        self.inTransaction = 1
 
     #
     # PySQLite extensions:
