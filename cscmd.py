@@ -9,17 +9,29 @@ import log
 import package
 import versions
 
-def ChangeSetCommand(repos, cfg, pkgName, outFileName, oldVersionStr, \
+def ChangeSetCommand(repos, cfg, troveName, outFileName, oldVersionStr, \
 	      newVersionStr):
-    newVersion = versions.VersionFromString(newVersionStr, cfg.defaultbranch)
+    pkgList = repos.findTrove(cfg.installlabel, troveName, cfg.flavor,
+			      newVersionStr)
+    if len(pkgList) > 1:
+	log.error("trove %s has multiple branches named %s",
+		  troveName, newVersionStr)
+
+    newVersion = pkgList[0].getVersion()
 
     if (oldVersionStr):
-	oldVersion = versions.VersionFromString(oldVersionStr, 
-					        cfg.defaultbranch)
+	pkgList = repos.findTrove(cfg.installlabel, troveName, cfg.flavor,
+				  oldVersionStr)
+	if len(pkgList) > 1:
+	    log.error("trove %s has multiple branches named %s",
+		      troveName, oldVersionStr)
+
+	oldVersion = pkgList[0].getVersion()
+
     else:
 	oldVersion = None
 
-    list = [(pkgName, None, oldVersion, newVersion, (not oldVersion))]
+    list = [(troveName, None, oldVersion, newVersion, (not oldVersion))]
 
     cs = repos.createChangeSet(list)
     cs.writeToFile(outFileName)
