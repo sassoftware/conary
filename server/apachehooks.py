@@ -121,7 +121,12 @@ def handler(req):
 	else:
 	    port = 80
 
-	urlBase = "http://%s:%d" % (req.server.server_hostname, port) + req.uri
+	if os.path.basename(req.uri) == "changeset":
+	   rest = os.path.dirname(req.uri)
+	else:
+	   rest = req.uri
+
+	urlBase = "http://%s:%d" % (req.server.server_hostname, port) + rest
 
         if not cfg.repositoryDir:
             print "error: repositoryDir is required in %s" % req.filename
