@@ -898,7 +898,10 @@ class NormalizeInitscriptLocation(policy.Policy):
     (if, as is true for the default settings, /etc/rc.d/init.d isn't their
     official location, that is).
     """
-    invariantsubtrees = [ '/etc/rc.d/init.d/' ]
+    # need both of the next two lines to avoid following /etc/rc.d/init.d
+    # if it is a symlink
+    invariantsubtrees = [ '/etc/rc.d' ]
+    invariantinclusions = [ '/etc/rc.d/init.d/' ]
 
     def test(self):
 	return self.macros['initdir'] != '/etc/rc.d/init.d'
