@@ -18,8 +18,20 @@ import os
 import xmlrpclib
 
 import netserver
+import conarycfg
 
 BUFFER=1024 * 256
+
+class ServerConfig(conarycfg.ConfigFile):
+
+    defaults = {
+        'authDatabase'  :  None,
+        'commitAction'  :  None,
+        'repositoryMap' :  [ conarycfg.STRINGDICT, {} ],
+        'repositoryDir' :  None,
+        'serverName'    :  None,
+        'tmpDir'        :  "/var/tmp",
+    }
 
 def xmlPost(repos, req):
     if not req.headers_in.has_key('Authorization'):
@@ -83,29 +95,34 @@ def handler(req):
     repName = os.path.dirname(req.filename)
 
     if not repositories.has_key(repName):
-	codeStr = open(req.filename, "r").read()
-	d = {}
-	exec codeStr in d
+        cfg = ServerConfig()
+        cfg.read(req.filename)
 
 	if req.parsed_uri[apache.URI_PORT]:
 	    port = req.parsed_uri[apache.URI_PORT]
 	else:
 	    port = 80
 
-	urlBase = "http://%s:%d" % (req.server.server_hostname, port)
-	
-	urlBase += req.uri
+	urlBase = "http://%s:%d" % (req.server.server_hostname, port) + req.uri
 
-	if d.has_key('commitaction'):
-	    commitAction = d['commitaction']
-	else:
-	    commitAction = None
+        if not cfg.repositoryDir:
+            print "error: repositoryDir is required in %s" % req.filename
+            return
+        elif not cfg.authDatabase:
+            print "error: authDatabase is required in %s" % req.filename
+            return
+        elif not cfg.serverName:
+            print "error: serverName is required in %s" % req.filename
+            return
 
 	repositories[repName] = netserver.NetworkRepositoryServer(
-				d['reppath'], d['tmppath'], 
-				urlBase, d['authpath'],
-				d['servername'], {},
-				commitAction = commitAction)
+                                cfg.repositoryDir,
+                                cfg.tmpDir,
+				urlBase, 
+                                cfg.authDatabase,
+                                cfg.serverName,
+                                cfg.repositoryMap,
+				commitAction = cfg.commitAction)
 
     repos = repositories[repName]
 
