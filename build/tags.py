@@ -24,6 +24,7 @@ class TagFile(conarycfg.ConfigFile):
 	    'file'		: '',
 	    'name'		: '', 
 	    'description'	: '',
+	    'datasource'        : 'args',
 	    'implements'	: [ conarycfg.STRINGLIST, [] ],
 	    'exclude'		: [ conarycfg.CALLBACK, self.filterCB ],
 	    'include'		: [ conarycfg.CALLBACK, self.filterCB ],
