@@ -2,7 +2,6 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-import sys
 import errno
 import os
 import util
