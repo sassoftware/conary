@@ -190,6 +190,15 @@ class Flag(dict):
     def getUsed(self):
         return self._usedFlags
 
+    def getUsedSet(self):
+        """ Create a flag set based on used flags """
+        flagSet = nullSet()
+        for flagName,flag in self.getUsed().iteritems():
+            if not flag:
+                flag = -flag
+            flagSet = flagSet + flag
+        return flagSet
+
     def setUsed(self, usedDict):
         self._usedFlags.update(usedDict)
 
@@ -338,6 +347,9 @@ class Flag(dict):
             self[name]._set(value)
         else:
             self[name] = Flag(value=value, name=name, ref=self, createOnAccess=self._createOnAccess)
+
+def nullSet():
+    return Flag(value=None, name='__GLOBAL__')
 
 def _addShortDoc(baseobj, obj, keys, level=1):
     global __doc__
@@ -581,6 +593,9 @@ def resetUsed():
     Arch.resetUsed()
     LocalFlags.resetUsed()
 
+def getUsedSet():
+    return Arch.getUsedSet() + Use.getUsedSet() + LocalFlags.getUsedSet()
+     
 def getUsed():
     """
     A method for retreive the flags used by a recipe in dict form, separated
