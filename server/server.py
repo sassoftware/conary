@@ -160,8 +160,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 	    cs = changeset.ChangeSetFromFile(path)
 	finally:
 	    pass
-	    print "unlink", path
-	    #os.unlink(path)
+	    os.unlink(path)
 
 	fsrepos.FilesystemRepository.commitChangeSet(self, cs)
 
