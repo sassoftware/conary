@@ -22,11 +22,59 @@ import versions
 
 class Database(repository.LocalRepository):
 
-    def pullFileContentsObject(self, fileId):
-	raise NotImplemented
+    # If the request is for the head element of the local branch, we need
+    # to be a bit careful with the file list. It currently contains the
+    # branched version of each file, but we want to contain the non-branch
+    # version if the branch (that is, the local filesystem) hasn't changed
+    def getPackageVersion(self, name, version):
+	pkg = repository.LocalRepository.getPackageVersion(self, name, version)
+	if not version.isLocal(): return pkg
+	head = self.pkgLatestVersion(name, version.branch())
+	if not version.equal(head): return pkg
 
-    def hasFileContents(self, fileId):
-	raise NotImplemented
+	for (fileId, path, fileVersion) in pkg.fileList():
+	    parentVersion = fileVersion.parent()
+
+	    dbFile = self.getFileVersion(fileId, parentVersion)
+	    localFile = self.getFileVersion(fileId, fileVersion, path = path)
+
+	    if dbFile.same(localFile):
+		pkg.updateFile(fileId, path, fileVersion.parent())
+
+	return pkg
+
+    # like getPackageVersion, we need to look to the filesystem for file
+    # versions which are at the head of our local branch; this means that
+    # we require the path to get information on some versions
+    def getFileVersion(self, fileId, version, path = None, withContents = 0):
+	(file, contents) = repository.LocalRepository.getFileVersion(
+				    self, fileId, version, withContents = 1)
+	head = self.fileLatestVersion(fileId, version.branch())
+
+	if not version.isLocal() or not version.equal(head):
+	    if withContents:
+		return (file, contents)
+	    return file
+
+	assert(path)
+
+	if isinstance(file, files.SourceFile):
+	    localFile = files.FileFromFilesystem(self.root + path, fileId,
+						 type = "src")
+	else:
+	    localFile = files.FileFromFilesystem(self.root + path, fileId)
+
+	localFile.flags(file.flags())
+
+	if withContents:
+	    if isinstance(file, files.RegularFile): 
+		cont = repository.FileContentsFromFilesystem(self.root + path)
+	    else:
+		cont = None
+
+	    return (localFile, cont)
+
+	return localFile
 
     # takes an abstract change set and creates a differential change set 
     # against a branch of the repository
@@ -94,9 +142,9 @@ class Database(repository.LocalRepository):
 
 	undo = DatabaseChangeSetUndo(self)
 
-	#if makeRollback:
-	#    inverse = cs.invert(self)
-	#    self.addRollback(inverse)
+	if makeRollback:
+	    inverse = cs.invert(self, availableFiles = 1)
+	    self.addRollback(inverse)
 
 	try:
 	    job.commit(undo, self.root)
@@ -182,7 +230,8 @@ class Database(repository.LocalRepository):
     def getRollback(self, name):
 	if not self.hasRollback(name): return None
 
-	return changeset.ChangeSetFromFile(self.rollbackCache + "/" + name)
+	return changeset.ChangeSetFromFile(self.rollbackCache + "/" + name,
+					   justContentsForConfig = 1)
 
     def applyRollbackList(self, names):
 	last = self.lastRollback
@@ -279,8 +328,9 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	self.oldFiles = []
 	self.staleFiles = []
 
-	# make local branches for each package and let them get committed 
-	# with the rest of this change set
+	# Make local branches for each package and let them get committed 
+	# with the rest of this change set; note that the local branch
+	# of the package uses the local branch of the files
 	#
 	# iterate over a copy of this list as the real list keeps
 	# growing through the loop
@@ -290,6 +340,11 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	    ver = branchPkg.getVersion().fork(versions.LocalBranch(), 
 					      sameVerRel = 1)
 	    branchPkg.changeVersion(ver)
+
+	    for (fileId, path, version) in branchPkg.fileList():
+		ver = version.fork(versions.LocalBranch(), sameVerRel = 1)
+		branchPkg.updateFile(fileId, path, ver)
+
 	    self.addPackage(branchPkg)
 
 	# remove old versions of the packages which are being added; make sure
