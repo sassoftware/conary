@@ -127,6 +127,15 @@ class Cursor:
             raise _sqlite.ProgrammingError, \
                 "%s failed - the cursor is closed." % (methodname or "")
 
+    def compile(self, SQL):
+	return self.con.db.prepare(SQL)
+
+    def execstmt(self, stmt, *parms):
+	stmt.reset()
+        for i, parm in enumerate(parms):
+            stmt.bind(i + 1, parm)
+	self.current_row = stmt.step()
+
     def execute(self, SQL, *parms, **kwargs):
         start_transaction = kwargs.get('start_transaction', True)
         SQL = SQL.strip()
