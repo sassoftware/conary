@@ -2,6 +2,8 @@ Changes in 0.11.2:
   * standalone server was broken by --add-user changes in 0.11.1
   * dependency check no longer allows packages being removed to cause
     dependency failures
+  * changed how dependencies are frozen to make the order deterministic
+    (so fileId's don't change around)
 
 Changes in 0.11.1:
   * erasing troves enforces dependencies -- this requires a database 
