@@ -31,4 +31,6 @@ def branch(repos, branchName, branchFrom, troveName = None):
 	log.error(str(e))
 	return
 
-    repos.createBranch(newBranch, branchSource, [troveName])
+    dups = repos.createBranch(newBranch, branchSource, [troveName])
+    for (name, branch) in dups:
+        log.warning("%s already has branch %s", name, branch.asString())
