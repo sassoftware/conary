@@ -850,8 +850,8 @@ class NormalizeInterpreterPaths(policy.Policy):
                 f.truncate(0) # we may have shrunk the file, avoid garbage
                 f.writelines(l)
                 f.close()
-                log.warning('changing %s to %s in %s'
-                            %(line, " ".join(wordlist), path))
+                log.info('changing %s to %s in %s'
+                         %(line, " ".join(wordlist), path))
                 del self.recipe.magic[path]
 
 
