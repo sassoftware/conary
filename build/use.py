@@ -257,6 +257,7 @@ for embedded targets.
 """)
 
 # temporarily disabled until we build appropriate packages
+Use.alternatives = False
 Use.tcl = False
 Use.tk = False
 Use.X = True
