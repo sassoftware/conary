@@ -424,6 +424,16 @@ class FixupMultilibPaths(policy.Policy):
 	basename = os.path.basename(path)
 	targetdir = self.dirmap[self.currentsubtree %self.macros]
 	target = util.joinPaths(targetdir, basename)
+        fulltarget = util.joinPaths(destdir, target)
+        if os.path.exists(fulltarget):
+            tm = self.recipe.magic[target]
+            if ('abi' in m.contents and 'abi' in tm.contents 
+                and m.contents['abi'] != tm.contents['abi']):
+                # path and target both exist and are of different abis.
+                # This means that this is actually a multilib package
+                # that properly contains both lib and lib64 items,
+                # and we shouldn't try to fix them.
+                return
 	if os.path.exists(util.joinPaths(destdir, target)):
 	    raise DestdirPolicyError(
 		"Conflicting library files %s and %s installed" %(

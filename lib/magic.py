@@ -29,9 +29,12 @@ class Magic:
 class ELF(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
-	self.contents['stripped'] = elf.stripped(basedir+path)
-	self.contents['hasDebug'] = elf.hasDebug(basedir+path)
-	requires, provides = elf.inspect(basedir+path)
+        fullpath = basedir+path
+	self.contents['stripped'] = elf.stripped(fullpath)
+        if self.__class__ is ELF:
+            # ar doesn't deal with hasDebug
+            self.contents['hasDebug'] = elf.hasDebug(fullpath)
+	requires, provides = elf.inspect(fullpath)
         for req in requires:
             if req[0] == 'abi':
                 self.contents['abi'] = req[1:]
@@ -40,14 +43,14 @@ class ELF(Magic):
                 self.contents['soname'] = prov[1]
 
 
-class ar(Magic):
+class ar(ELF):
     def __init__(self, path, basedir='', buffer=''):
-	Magic.__init__(self, path, basedir)
+	ELF.__init__(self, path, basedir)
 	# no point in looking for __.SYMDEF because GNU ar always keeps
 	# symbol table up to date
-
-	# FIXME: ewt will write code to determine if ar archive
-	# has any unstripped elements; will be part of elf module
+        # ar archives, like ELF files, are investigated by our elf module.
+        # We do still want to be able to distinguish between them via magic,
+        # thus the two classes.
 
 
 class gzip(Magic):
