@@ -648,9 +648,10 @@ class PackageRecipe(Recipe):
                 missingReqs.append(buildReq)
         if missingReqs:
             if not ignoreDeps:
-                raise RuntimeError, ("Could not find the following troves "
+                log.error("Could not find the following troves "
                                      "needed to cook this recipe:\n"  
                                      "%s" % '\n'.join(missingReqs))
+                sys.exit(1)
         self.buildReqMap = reqMap
 
     def extraSource(self, action):
