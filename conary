@@ -1,0 +1,26 @@
+#!/usr/bin/python2
+
+import os
+import sys
+import util
+import importrpm
+
+DBPATH=os.getcwd() + "/srsdb"
+
+scratch = DBPATH + "/scratch"
+fileDB = DBPATH + "/files"
+util.mkdirChain(DBPATH)
+util.mkdirChain(scratch)
+util.mkdirChain(fileDB)
+
+def usage():
+    print "usage: srs import <file.rpm>"
+    sys.exit(0)
+
+if (len(sys.argv) < 2):
+    usage()
+elif (sys.argv[1] == "import"):
+    for file in sys.argv[2:]:
+	importrpm.doImport(DBPATH, file)
+else:
+    usage()
