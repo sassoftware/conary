@@ -640,32 +640,31 @@ class Database:
 	""", start_transaction = False)
 
 	for (i, (pathId, fileId, version)) in enumerate(l):
+            import lib
+            if lib.sha1helper.sha1ToString(fileId) == 'd6791c46bd23b0813f5a632cfb9dd07a28d0f2d9':
+                lib.epdb.st()
 	    cu.execute("INSERT INTO getFilesTbl VALUES (?, ?)", 
 		       i, fileId, start_transaction = False)
 
+        import lib
+        lib.epdb.st()
+
 	cu.execute("""
 	    SELECT DISTINCT row, stream FROM getFilesTbl 
-                INNER JOIN DBTroveFiles ON
+                JOIN DBTroveFiles ON
 		    getFilesTbl.fileId = DBTroveFiles.fileId
 	""")
 
-        nextRow = 0
-	for (row, stream) in cu:
-            while nextRow < row:
-                yield None
-                nextRow += 1
+        l2 = [ None ] * len(l)
 
-            nextRow += 1
-            # FILEOBJ
+	for (row, stream) in cu:
             fObj = files.ThawFile(stream, l[row][0])
             assert(l[row][1] == fObj.fileId())
-	    yield fObj
+            l2[row] = fObj
 
         cu.execute("DROP TABLE getFilesTbl", start_transaction = False)
 
-        while nextRow < len(l):
-            yield None
-            nextRow += 1
+        return l2
 
     def getTroves(self, troveList, pristine):
         # returns a list parallel to troveList, with nonexistant troves
