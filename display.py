@@ -27,7 +27,7 @@ def displayTroves(db, cfg, ls = False, ids = False, sha1s = False,
 
 	    for version in l:
 		print _troveFormat % (troveName, 
-				    version.asString(cfg.defaultbranch))
+				    version.trailingVersion().asString())
 
 def _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s):
     troveList = db.findTrove(troveName, versionStr)
@@ -57,12 +57,15 @@ def _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s):
 		if file.hasContents:
 		    print "%s %s" % (file.contents.sha1(), path)
 	else:
-	    print _troveFormat % (troveName, version.asString(cfg.defaultbranch))
+	    print _troveFormat % (troveName, 
+				  version.trailingVersion().asString())
 
 	    for (troveName, ver, flavor) in trove.iterTroveList():
-		print _grpFormat % (troveName, ver.asString(cfg.defaultbranch))
+		print _grpFormat % (troveName, 
+				    ver.trailingVersion().asString())
 
 	    fileL = [ (x[1], x[0], x[2]) for x in trove.iterFileList() ]
 	    fileL.sort()
 	    for (path, fileId, version) in fileL:
-		print _fileFormat % (path, version.asString(cfg.defaultbranch))
+		print _fileFormat % (path, 
+				     version.trailingVersion().asString())
