@@ -73,12 +73,20 @@ class HttpHandler(HtmlEngine):
     def getMetadataCmd(self, authToken, fields):
         troveName = fields['troveName'].value
         branch = fields['branch'].value
+        if 'source' in fields:
+            source = fields['source'].value
+        else:
+            source = None
 
-        self._getMetadata(troveName, branch)
+        self._getMetadata(troveName, branch, source)
 
-    def _getMetadata(self, troveName, branch):
+    def _getMetadata(self, troveName, branch, source):
         branch = self.repServer.thawVersion(branch)
-        metadata = self.troveStore.getMetadata(troveName, branch)
+
+        if source == "freshmeat":
+            metadata = self.fetchFreshmeat(troveName)
+        else:
+            metadata = self.troveStore.getMetadata(troveName, branch)
 
         # fill a stub
         if not metadata:
@@ -91,6 +99,25 @@ class HttpHandler(HtmlEngine):
                        }
 
         self.htmlMetadataEditor(troveName, branch, metadata)
+
+    def fetchFreshmeat(self, troveName):
+        from urllib2 import urlopen
+        from xml.dom.minidom import parse
+
+        url = urlopen('http://freshmeat.net/projects-xml/%s/%s.xml' % (troveName, troveName))
+
+        doc = parse(url)
+        metadata = {}
+        metadata[0] = [doc.getElementsByTagName("desc_short")[0].childNodes[0].data]
+        metadata[1] = [doc.getElementsByTagName("desc_full")[0].childNodes[0].data]
+        metadata[2] = [doc.getElementsByTagName("url_homepage")[0].childNodes[0].data]
+        metadata[3] = [doc.getElementsByTagName("license")[0].childNodes[0].data]
+
+        metadata[4] = []
+        for node in doc.getElementsByTagName("trove_id"):
+            metadata[4].append(node.childNodes[0].data)
+
+        return metadata
 
     def updateMetadataCmd(self, authToken, fields):
         branch = self.repServer.thawVersion(fields["branch"].value)

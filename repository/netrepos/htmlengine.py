@@ -140,6 +140,7 @@ Choose a branch: %s
 <input type="hidden" name="branch" value="%s" />
 <input type="hidden" name="troveName" value="%s" />
 </form>
+
 """ %   (troveName, branchStr, versionStr,
          metadata[MDClass.SHORT_DESC][0],
          metadata[MDClass.LONG_DESC][0],
@@ -152,6 +153,15 @@ Choose a branch: %s
          branchFrz, troveName)
          )
 
+        self.writeFn("""
+<form method="post" action="getMetadata">
+<input type="hidden" name="branch" value="%s" />
+<input type="hidden" name="troveName" value="%s" />
+<input type="hidden" name="source" value="freshmeat" />
+<input type="submit" value="Fetch from Freshmeat" />
+</form>
+"""     % (branchFrz, troveName)
+        )
  
     def htmlUpdateSuccessful(self, troveName, branchStr):
         self.writeFn("""Successfully updated %s's metadata on branch %s.""" 
