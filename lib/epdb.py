@@ -298,7 +298,7 @@ class Epdb(pdb.Pdb):
         if len(cmd) == 1:
             return False
         cmd, directive = cmd
-        if directive and directive not in '?cdmp':
+        if directive and directive not in '?cdmpx':
             return False
         self.do_define(cmd)
         if directive == '?':
@@ -311,6 +311,8 @@ class Epdb(pdb.Pdb):
             self.do_showmethods(cmd)
         elif directive == 'p':
             pdb.Pdb.default(self, 'print ' + cmd)
+        elif directive == 'x':
+            pdb.Pdb.default(self, 'hex(%s)' % cmd)
         return True
 
 
