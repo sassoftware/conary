@@ -39,6 +39,9 @@ class InfoStream:
 	
 class NumericStream(InfoStream):
 
+    def value(self):
+	return self.val
+
     def freeze(self):
 	return struct.pack(self.format, self.val)
 
@@ -87,6 +90,10 @@ class StringStream(InfoStream):
     """
     Stores a simple string; used for the target of symbolic links
     """
+
+    def value(self):
+	return self.s
+
     def freeze(self):
 	return self.s
 
@@ -123,7 +130,7 @@ class TupleStream(InfoStream):
 
     def freeze(self):
 	rc = []
-	for (i, (itemType, size)) in enumerate(self.makeup):
+	for (i, (name, itemType, size)) in enumerate(self.makeup):
 	    if type(size) == int or (i + 1 == len(self.makeup)):
 		rc.append(self.items[i].freeze())
 	    else:
@@ -136,7 +143,7 @@ class TupleStream(InfoStream):
 
 	code = 0
 	rc = []
-	for (i, (itemType, size)) in enumerate(self.makeup):
+	for (i, (name, itemType, size)) in enumerate(self.makeup):
 	    d = self.items[i].diff(them.items[i])
 	    if d:
 		if type(size) == int or (i + 1) == len(self.makeup):
@@ -152,7 +159,7 @@ class TupleStream(InfoStream):
 	idx = 1
 	worked = True
 
-	for (i, (itemType, size)) in enumerate(self.makeup):
+	for (i, (name, itemType, size)) in enumerate(self.makeup):
 	    if what & (1 << i):
 		if type(size) == int:
 		    pass
@@ -179,7 +186,7 @@ class TupleStream(InfoStream):
     def thaw(self, s):
 	self.items = []
 	idx = 0
-	for (i, (itemType, size)) in enumerate(self.makeup):
+	for (i, (name, itemType, size)) in enumerate(self.makeup):
 	    if type(size) == int:
 		self.items.append(itemType(s[idx:idx + size]))
 	    elif (i + 1) == len(self.makeup):
@@ -200,21 +207,24 @@ class TupleStream(InfoStream):
 	    idx += size
 
     def __init__(self, first, *rest):
-	if type(first) == str:
+	if type(first) == str and not rest:
 	    self.thaw(first)
 	else:
 	    all = (first, ) + rest
 	    self.items = []
-	    for (i, (itemType, size)) in enumerate(self.makeup):
+	    for (i, (name, itemType, size)) in enumerate(self.makeup):
 		self.items.append(itemType(all[i]))
+
+	for (i, (name, itemType, size)) in enumerate(self.makeup):
+	    self.__dict__[name] = lambda num = i: self.items[num].value()
 
 class DeviceStream(TupleStream):
 
-    makeup = ((IntStream, 4), (IntStream, 4))
+    makeup = (("major", IntStream, 4), ("minor", IntStream, 4))
 
 class SizeSha1Stream(TupleStream):
 
-    makeup = ((LongLongStream, 8), (StringStream, 20))
+    makeup = (("size", LongLongStream, 8), ("sha1", StringStream, 20))
 
 class InodeStream(TupleStream):
 
@@ -223,8 +233,8 @@ class InodeStream(TupleStream):
     """
 
     # this is permissions, mtime, owner, group
-    makeup = ((ShortStream, 2), (IntStream, 4), 
-              (StringStream, "B"), (StringStream, "B"))
+    makeup = (("perms", ShortStream, 2), ("mtime", IntStream, 4), 
+              ("owner", StringStream, "B"), ("group", StringStream, "B"))
 
     def triplet(self, code, setbit = 0):
 	l = [ "-", "-", "-" ]
