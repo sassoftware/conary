@@ -132,7 +132,7 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
     @param buildLabel: label to use to to find the branch to build on
-    @type buildBranch: versions.Label
+    @type buildLabel: versions.Label
     @param changeSetFile: if set, the changeset is stored in this file
     instead of committed to a repository
     @type changeSetFile: str
