@@ -295,8 +295,9 @@ class StringsStream(list, InfoStream):
 	del self[:]
 
 	if len(frz) != 0:
-	    self += frz.split('\0')
-        
+	    for s in frz.split('\0'):
+		self.set(s)
+
     def twm(self, diff, base):
 	if not diff:
 	    return False

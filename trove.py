@@ -555,6 +555,7 @@ _STREAM_TCS_NEW_VERSION = streams._STREAM_TROVE_CHANGE_SET + 2
 _STREAM_TCS_REQUIRES    = streams._STREAM_TROVE_CHANGE_SET + 3
 _STREAM_TCS_PROVIDES    = streams._STREAM_TROVE_CHANGE_SET + 4
 _STREAM_TCS_CHANGE_LOG  = streams._STREAM_TROVE_CHANGE_SET + 5
+_STREAM_TCS_OLD_FILES   = streams._STREAM_TROVE_CHANGE_SET + 6
 
 class AbstractTroveChangeSet(streams.StreamSet):
 
@@ -565,6 +566,7 @@ class AbstractTroveChangeSet(streams.StreamSet):
         _STREAM_TCS_REQUIRES    : (streams.DependenciesStream,  "requires" ),
         _STREAM_TCS_PROVIDES    : (streams.DependenciesStream,  "provides" ),
         _STREAM_TCS_CHANGE_LOG  : (changelog.AbstractChangeLog, "changeLog" ),
+        _STREAM_TCS_OLD_FILES   : (streams.StringsStream,       "oldFiles" ),
      }
 
     """
@@ -758,8 +760,6 @@ class AbstractTroveChangeSet(streams.StreamSet):
 	    rc.append("NEW\n")
 	else:
 	    rc.append("CS\n")
-        if self.getProvides():
-            rc.append("PROVIDES %s\n" % (self.getProvides().freeze()))
 
         if self.oldFlavor and self.newFlavor:
             rc.append("FLAVOR %s %s\n" % (self.oldFlavor.freeze(),
@@ -768,9 +768,6 @@ class AbstractTroveChangeSet(streams.StreamSet):
             rc.append("FLAVOR %s -\n" % (self.oldFlavor.freeze()))
 	elif not self.oldFlavor and self.newFlavor:
             rc.append("FLAVOR - %s\n" % (self.newFlavor.freeze()))
-
-	for id in self.getOldFileList():
-	    rc.append("-%s\n" % id)
 
 	for (id, path, version) in self.getNewFileList():
 	    rc.append("+%s %s %s\n" % (id, path, version.asString()))
@@ -846,7 +843,6 @@ class TroveChangeSet(AbstractTroveChangeSet):
 	if changeLog:
 	    self.changeLog = changeLog
 	self.newFiles = []
-	self.oldFiles = []
 	self.changedFiles = []
 	self.absolute = absolute
 	self.packages = {}
@@ -946,7 +942,6 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
                 break
 
 	self.newFiles = []
-	self.oldFiles = []
 	self.changedFiles = []
 	self.absolute = (pkgType == "ABS")
 	self.packages = {}
