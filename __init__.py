@@ -24,3 +24,9 @@ The Conary Repository System
 @group Utility: util, lookaside, rpmhelper, sha1helper, fixedglob, log, enum, magic
 @group Files: datastore, files, filecontainer
 """
+
+# automatically append conary to the path, so that internal imports in
+# conary will work
+import os
+import sys
+sys.path.append(os.path.dirname(sys.modules[__name__].__file__))
