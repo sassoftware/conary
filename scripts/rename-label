@@ -6,6 +6,7 @@ sys.path.append("/usr/share/conary")
 import sqlite3
 
 def rename(cu, old, new):
+    print 'renaming %s to %s' %(old, new)
     cu.execute("select versionid, version from versions")
     for (versionId, version) in [ x for x in cu]:
         if not versionId: continue
