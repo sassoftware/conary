@@ -24,14 +24,11 @@ only removes empty directories and regular files."""
 	self.addArchiveFromRPM("http://www.gtlib.cc.gatech.edu/pub/fedora.redhat/linux/core/development/SRPMS/tmpwatch-%(version)s-%(rpmrevision)s.src.rpm", 
 	                      "tmpwatch-%(version)s.tar.gz")
 	self.addSource("crond-tmpwatch")
-	# make the tmpwatch binary effectively always different
+	# self.macros['bugid'] must be set
 	self.addSource("tmpwatch.fakebug.patch")
 	self.build = (
-	    """
-	    sed -i "s/@BUGID@/$(dd if=/dev/random bs=2 count=1 2>/dev/null |
-	       od -x | head -1 | sed 's/[^ ]* //;s/ *//g')/" tmpwatch.fakebug.patch
-	    cat tmpwatch.fakebug.patch
-	    """,
+	    'sed -i "s/@BUGID@/%(bugid)s/" tmpwatch.fakebug.patch',
+	    'cat tmpwatch.fakebug.patch',
 	    'patch -p1 < tmpwatch.fakebug.patch'
 	)
 	self.install = (
