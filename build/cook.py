@@ -41,7 +41,7 @@ from lib import util
 import versions
 
 # -------------------- private below this line -------------------------
-def _createComponent(repos, branch, bldPkg, newVersion, ident):
+def _createComponent(repos, bldPkg, newVersion, ident):
     # returns a (trove, fileMap) tuple
     fileMap = {}
     p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
@@ -151,10 +151,10 @@ class _IdGen:
 
 # -------------------- public below this line -------------------------
 
-def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None, 
-	       prep=True, macros={}, buildBranch = None, targetLabel = None, 
-               sourceVersion = None, resume = None, alwaysBumpCount = False, 
-               allowUnknownFlags = False):
+def cookObject(repos, cfg, recipeClass, sourceVersion,
+               changeSetFile = None, prep=True, macros={}, 
+               targetLabel = None, resume = None, alwaysBumpCount = False, 
+               allowUnknownFlags = False, allowMissingSource = False):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -165,8 +165,12 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
-    @param buildLabel: label to use to to find the branch to build on
-    @type buildLabel: versions.Label
+    @param changeSetFile: if set, the changeset is stored in this file
+    instead of committed to a repository
+    @type sourceVersion: the full conary verison of the recipeClass we are 
+    cooking.  This source trove version should exist.  If you know what you
+    are doing, you can create troves with non-existant source versions 
+    by setting allowMissingSource 
     @param changeSetFile: if set, the changeset is stored in this file
     instead of committed to a repository
     @type changeSetFile: str
@@ -175,13 +179,9 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     @type prep: boolean
     @param macros: set of macros for the build
     @type macros: dict
-    @param buildBranch: branch to build on; if present buildLabel is ignored.
-    this branch does not need to contain timestamps; they'll be looked up if
-    they are missing.
-    @type buildBranch: versions.Version
     @param targetLabel: label to use for the cooked troves; it is used
     as a new branch from whatever version was previously built
-    default), the buildBranch is used
+    default), the sourceVersion label is used
     @type targetLabel: versions.Label
     @param resume: indicates whether to resume the previous build.  If True,
     resume at the line of last breakage.  If an integer, resume at that line.
@@ -192,7 +192,10 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     full version with any other existing troves with the same name, 
     even if their flavors would differentiate them.  
     @type alwaysBumpCount: bool
-    
+    @param allowMissingSource: if True, do not complain if the sourceVersion
+    specified does not point to an existing source trove.  Warning -- this
+    can lead to strange trove seupts
+    @type allowMissingSource: bool
     @rtype: list of strings
     """
 
@@ -217,81 +220,40 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
     use.allowUnknownFlags(allowUnknownFlags)
     fullName = recipeClass.name
 
-    if not buildBranch:
-	vers = repos.getTroveLeavesByLabel([fullName], 
-                                  buildLabel).get(fullName, {}).keys()
+    srcName = fullName + ':source'
 
-	if not vers:
-	    # try looking for :source
-	    srcName = fullName + ":source"
-	    vers = repos.getTroveLeavesByLabel([srcName], 
-                                  buildLabel).get(srcName, {}).keys()
+    try: 
+        trove = repos.getTrove(srcName, sourceVersion, 
+                               deps.deps.DependencySet(), withFiles = False)
+        sourceVersion = trove.getVersion()
+    except repository.TroveMissing:
+        if not allowMissingSource and targetLabel != versions.CookLabel():
+            raise RuntimeError, ('Cooking with non-existant source'
+                                 ' version %s' % sourceVersion.asString())
+    buildBranch = sourceVersion.branch()
+    assert(not buildBranch.timeStamps() or max(buildBranch.timeStamps()) != 0)
 
-        # turn the list of versions into a list of unique branches
-        branches = {}.fromkeys([ x.branch() for x in vers ]).keys()
-
-	if not branches:
-            # create the label. not crazy about always doing this (we 
-            # used to only create it if it didn't already exist, but
-            # with acls that logic doesn't work anymore; we can't tell
-            # if it exists on a branch we're not allowed to see or not)
-            buildBranch = versions.Branch([buildLabel])
-	elif len(branches) > 1:
-	    raise CookError('Multiple branches labeled %s exist for '
-			    'trove %s' % (fullName, buildLabel.asString()))
-	else:
-	    buildBranch = branches[0]
-
-	# hack
-	for version in buildBranch.versions:
-	    if isinstance(version, versions.Revision) and \
-			version.buildCount is None:
-		version.buildCount = 0
-
-
-    elif not buildBranch.timeStamps():
-	# trunk branch, go ahead and create if
-	pass
-    elif max(buildBranch.timeStamps()) == 0:
-	# need to get the timestamps (and the branch has to exist)
-	try:
-	    ver = repos.getTroveLatestVersion(fullName, buildBranch)
-	except repository.TroveMissing:
-	    raise CookError('Branch %s does not exist for trove %s'
-			    % (buildBranch.asString(), fullName))
-
-	buildBranch = ver.branch()
-	del ver
-
-    if buildBranch:
-        macros['buildbranch'] = buildBranch.asString()
-        macros['buildlabel'] = buildBranch.asString().split('/')[-1]
-    else:
-        macros['buildbranch'] = buildLabel.asString()
-        macros['buildlabel'] = buildLabel.asString()
+    macros['buildbranch'] = buildBranch.asString()
+    macros['buildlabel'] = buildBranch.label().asString()
 
     if issubclass(recipeClass, recipe.PackageRecipe):
-	ret = cookPackageObject(repos, cfg, recipeClass, buildBranch,
+	ret = cookPackageObject(repos, cfg, recipeClass, sourceVersion, 
                                 prep = prep, macros = macros,
 				targetLabel = targetLabel,
-                                sourceVersion = sourceVersion,
 				resume = resume, 
                                 alwaysBumpCount = alwaysBumpCount)
     elif issubclass(recipeClass, recipe.RedirectRecipe):
-	ret = cookGroupObject(repos, cfg, recipeClass, buildBranch, 
+	ret = cookGroupObject(repos, cfg, recipeClass,  sourceVersion,
 			      macros = macros, targetLabel = targetLabel,
-                              sourceVersion = sourceVersion,
                               alwaysBumpCount = alwaysBumpCount,
                               redirect = True)
     elif issubclass(recipeClass, recipe.GroupRecipe):
-	ret = cookGroupObject(repos, cfg, recipeClass, buildBranch, 
+	ret = cookGroupObject(repos, cfg, recipeClass, sourceVersion, 
 			      macros = macros, targetLabel = targetLabel,
-                              sourceVersion = sourceVersion,
                               alwaysBumpCount = alwaysBumpCount)
     elif issubclass(recipeClass, recipe.FilesetRecipe):
-	ret = cookFilesetObject(repos, cfg, recipeClass, buildBranch, 
+	ret = cookFilesetObject(repos, cfg, recipeClass, sourceVersion, 
 				macros = macros, targetLabel = targetLabel,
-                                sourceVersion = sourceVersion,
                                 alwaysBumpCount = alwaysBumpCount)
     else:
         raise AssertionError
@@ -312,9 +274,9 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 
     return built
 
-def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
-		    targetLabel = None, sourceVersion=None,
-                    alwaysBumpCount=False, redirect = False):
+def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
+		    targetLabel = None, alwaysBumpCount=False, 
+                    redirect = False):
     """
     Turns a group recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -326,14 +288,12 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
-    @param buildBranch: the branch the new build will be committed to
-    @type buildBranch: versions.Version
     @param macros: set of macros for the build
     @type macros: dict
     @rtype: tuple
     @param targetLabel: label to use for the cooked troves; it is used
     as a new branch from whatever version was previously built
-    default), the buildBranch is used
+    default), the label from sourceVersion is used
     @type targetLabel: versions.Label
     @param alwaysBumpCount: if True, the cooked troves will not share a 
     full version with any other existing troves with the same name, 
@@ -345,7 +305,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
 
     fullName = recipeClass.name
 
-    recipeObj = recipeClass(repos, cfg, buildBranch, cfg.flavor)
+    recipeObj = recipeClass(repos, cfg, 
+                            sourceVersion.branch().label(), cfg.flavor)
 
     try:
         use.track(True)
@@ -370,15 +331,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
         for (version, flavor) in versionFlavorList:
             grp.addTrove(name, version, flavor)
 
-    targetVersion = repos.nextVersion(fullName, recipeClass.version, grpFlavor, 
-				      buildBranch, binary = True, 
-                                      sourceVersion=sourceVersion,
-                                      alwaysBumpCount=alwaysBumpCount)
-
-    if targetLabel:
-	targetVersion = targetVersion.createBranch(targetLabel,
-                                                   withVerRel = True)
-	targetVersion.incrementBuildCount()
+    targetVersion = nextVersion(repos, fullName, sourceVersion, grpFlavor,
+                                targetLabel, alwaysBumpCount=alwaysBumpCount)
 
     grp.changeVersion(targetVersion)
     grp.setBuildTime(time.time())
@@ -393,9 +347,8 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     built = [ (grp.getName(), grp.getVersion().asString(), grp.getFlavor()) ]
     return (changeSet, built, None)
 
-def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
-		      targetLabel = None, sourceVersion=None,
-                      alwaysBumpCount=False):
+def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
+		      targetLabel = None, alwaysBumpCount=False):
     """
     Turns a fileset recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -407,13 +360,11 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
     @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
-    @param buildBranch: the branch the new build will be committed to
-    @type buildBranch: versions.Version
     @param macros: set of macros for the build
     @type macros: dict
     @param targetLabel: label to use for the cooked troves; it is used
     as a new branch from whatever version was previously built
-    default), the buildBranch is used
+    default), the sourceVersion's branch is used
     @type targetLabel: versions.Label
     @param alwaysBumpCount: if True, the cooked troves will not share a 
     full version with any other existing troves with the same name, 
@@ -424,7 +375,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 
     fullName = recipeClass.name
 
-    recipeObj = recipeClass(repos, cfg, buildBranch, cfg.flavor)
+    recipeObj = recipeClass(repos, cfg, sourceVersion.branch().label(), 
+                            cfg.flavor)
     recipeObj.setup()
 
     changeSet = changeset.ChangeSet()
@@ -448,15 +400,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 	# source of an update, but it saves sending files across the
 	# network for no reason
 
-    targetVersion = repos.nextVersion(fullName, recipeClass.version, flavor, 
-				      buildBranch, binary = True, 
-                                      sourceVersion=sourceVersion,
-                                      alwaysBumpCount=False)
-
-    if targetLabel:
-	targetVersion = targetVersion.createBranch(targetLabel,
-                                                   withVerRel = True)
-	targetVersion.trailingRevision().incrementBuildCount()
+    targetVersion = nextVersion(repos, fullName, sourceVersion, flavor, 
+                                targetLabel, alwaysBumpCount=alwaysBumpCount)
 
     fileset = trove.Trove(fullName, targetVersion, flavor, None)
 
@@ -475,8 +420,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
                                                 fileset.getFlavor()) ]
     return (changeSet, built, fileset.getFlavor())
 
-def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True, 
-		      macros={}, targetLabel = None, sourceVersion=None,
+def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True, 
+		      macros={}, targetLabel = None, 
                       resume = None, alwaysBumpCount=False):
     """
     Turns a package recipe object into a change set. Returns the absolute
@@ -492,15 +437,13 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
-    @param buildBranch: the branch the new build will be committed to
-    @type buildBranch: versions.Version
     @param prep: If true, the build stops after the package is unpacked
     and None is returned instead of a changeset.
     @type prep: boolean
     @param macros: set of macros for the build
     @type macros: dict
     @param targetLabel: label to use for the cooked troves; if None (the
-    default), the version used is the next version on the buildBranch 
+    default), the version used is the derived from sourceVersion
     @param alwaysBumpCount: if True, the cooked troves will not share a 
     full version with any other existing troves with the same name, 
     even if their flavors would differentiate them.  
@@ -586,17 +529,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     flavor = deps.deps.DependencySet()
     flavor.union(bldList[0].flavor)
 
-    targetVersion = repos.nextVersion(grpName, recipeClass.version, 
-				      flavor, buildBranch, 
-                                      binary = True, 
-                                      sourceVersion=sourceVersion, 
-                                      alwaysBumpCount=alwaysBumpCount)
-
-    if targetLabel:
-	targetVersion = targetVersion.createBranch(targetLabel, 
-                                                   withVerRel = True)
-	targetVersion.incrementBuildCount()
-
+    targetVersion = nextVersion(repos, grpName, sourceVersion, flavor, 
+                                targetLabel, alwaysBumpCount=alwaysBumpCount)
     buildTime = time.time()
 
     # build up the name->fileid mapping so we reuse fileids wherever
@@ -617,11 +551,17 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
             grpMap[main].setBuildTime(buildTime)
             grpMap[main].setConaryVersion(constants.version)
 
-        searchBranch = buildBranch
+        # XXX this used to be buildBranch, which would not be on targetLabel
+        # if given.  Does that mean that this search will fail and not
+        # find the desired ids?
+        searchBranch = targetVersion.branch()
+        if targetLabel:
+            searchBranch = searchBranch.parentBranch()
         versionDict = []
         while not versionDict and searchBranch:
             # this gives us the latest version of each flavor available
             # on the branch
+
             versionDict = repos.getTroveLeavesByBranch(
                                 { main : { searchBranch : None }})
 
@@ -643,8 +583,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
         main, comp = compName.split(':')
         grp = grpMap[main]
 
-	(p, fileMap) = _createComponent(repos, buildBranch, buildPkg, 
-					targetVersion, ident)
+	(p, fileMap) = _createComponent(repos, buildPkg, targetVersion, ident)
 
 	built.append((compName, p.getVersion().asString(), p.getFlavor()))
 	packageList.append((p, fileMap))
@@ -668,7 +607,109 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
-def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
+def guessSourceVersion(repos, name, versionStr, buildLabel, 
+                                                searchBuiltTroves=False):
+    srcName = name + ':source'
+    sourceVerison = None
+    if False and os.path.exists('CONARY'):
+        pass
+        # XXX should check sourceState here
+    else:
+        # make an attempt at a reasonable version # for this trove
+        # although the recipe we are cooking from may not be in any
+        # repository
+        versionDict = repos.getTroveLeavesByLabel([srcName], buildLabel)
+        versionList = versionDict.get(srcName, {}).keys()
+        if versionList:
+            relVersionList  = [ x for x in versionList \
+                    if x.trailingRevision().version == versionStr ] 
+            if relVersionList:
+                relVersionList.sort()
+                return relVersionList[-1]
+            else:
+                # we've got a reasonable branch to build on, but not
+                # a sourceCount.  Reset the sourceCount to 1.
+                versionList.sort()
+                return versionList[-1].branch().createVersion(
+                            versions.Revision('%s-1' % (versionStr)))
+        elif searchBuiltTroves:
+            # XXX this is generally a bad idea -- search for a matching
+            # built trove on the branch that our source version is to be
+            # built on and reuse that branch.  But it's useful for cases
+            # when you really know what you're doing and don't want to depend
+            # on a source trove being in the repository.
+            versionDict = repos.getTroveLeavesByLabel([name], buildLabel)
+            versionList = versionDict.get(name, {}).keys()
+            if versionList:
+                relVersionList  = [ x for x in versionList \
+                        if x.trailingRevision().version == versionStr ] 
+                if relVersionList:
+                    relVersionList.sort()
+                    sourceVersion = relVersionList[-1].copy()
+                    sourceVersion.trailingRevision().buildCount = None
+                    return sourceVersion
+                else:
+                    # we've got a reasonable branch to build on, but not
+                    # a sourceCount.  Reset the sourceCount to 1.
+                    versionList.sort()
+                    return versionList[-1].branch().createVersion(
+                                versions.Revision('%s-1' % (versionStr)))
+    return None
+            
+
+def nextVersion(repos, troveName, sourceVersion, troveFlavor, 
+                targetLabel=None, alwaysBumpCount=False):
+    """
+    Calculates the version to use for a newly built trove which is about
+    to be added to the repository.
+
+    @param repos: repository proxy
+    @type repos: NetworkRepositoryClient
+    @param troveName: name of the trove being built
+    @type troveName: str
+    @param sourceVersion: the source version that we are incrementing
+    @type sourceVersion: Version
+    @param troveFlavor: flavor of the trove being built
+    @type troveFlavor: deps.deps.DependencySet
+    @param alwaysBumpCount: if True, then do not return a version that 
+    matches an existing trove, even if their flavors would differentiate 
+    them, instead, increase the appropriate count.  
+    @type alwaysBumpCount: bool
+    """
+    d = repos.getTroveVersionsByBranch(
+                    { troveName : { sourceVersion.branch() : None } })
+    latest = None
+    if troveName in d:
+        relVersions = [ x for x in d[troveName] \
+                                if x.getSourceVersion() == sourceVersion ] 
+        if relVersions:
+            relVersions.sort()
+            latest = relVersions[-1].copy()
+            if alwaysBumpCount:
+                # case 1.  There is a binary trove with this source
+                # version, and we always want to bump the build count
+                latest.incrementBuildCount()
+            else:
+                relFlavors = d[troveName][latest]
+                if troveFlavor in relFlavors:
+                    # case 2.  There is a binary trove with this source
+                    # version, and our flavor matches one already existing
+                    # with this build count, so bump the build count
+                    latest.incrementBuildCount()
+                # case 3.  There is a binary trove with this source
+                # version, and our flavor does not exist at this build 
+                # count, so reuse the latest binary version
+    if not latest:
+        # case 4.  There is no binary trove derived from this source 
+        # version.  
+        latest = sourceVersion.getBinaryVersion()
+        latest.incrementBuildCount()
+    if targetLabel:
+        latest = latest.createBranch(targetLabel, withVerRel = True)
+        latest.incrementBuildCount()
+    return latest
+
+def cookItem(repos, cfg, item, prep=0, macros={}, 
 	     emerge = False, resume = None, allowUnknownFlags = False):
     """
     Cooks an item specified on the command line. If the item is a file
@@ -723,19 +764,24 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 
 	recipeClass = loader.getRecipe()
         changeSetFile = "%s-%s.ccs" % (recipeClass.name, recipeClass.version)
-
-	srcName = recipeClass.name + ":source"
-	versionDict = repos.getTroveLeavesByLabel([srcName], cfg.buildLabel)
-	versionList = versionDict.get(srcName, {}).keys()
-        sourceVersion = None
-        if versionList:
-            maxVersion = versionList[0]
-            for version in versionList[1:]:
-                if version.isAfter(maxVersion):
-                    maxVersion = version
-            sourceVersion = maxVersion
-	targetLabel = versions.CookLabel()
+        sourceVersion = guessSourceVersion(repos, recipeClass.name, 
+                                           recipeClass.version,
+                                           cfg.buildLabel)
+        if not sourceVersion:
+            # just make up a sourceCount -- there's no version in 
+            # the repository to compare against
+            sourceVersion = versions.VersionFromString('/%s/%s-1' % (
+                                                   cfg.buildLabel.asString(),
+                                                   recipeClass.version))
+        targetLabel = versions.CookLabel()
     else:
+        parts = item.split('=', 1)
+        if len(parts) == 2:
+            name, versionStr = parts
+        else:
+            name = parts[0]
+            versionStr = None
+
 	if resume:
 	    raise CookError('Cannot use --resume argument when cooking in repository')
 
@@ -746,7 +792,8 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 
         try:
             (loader, sourceVersion) = recipe.recipeLoaderFromSourceComponent(
-                                        item, item + '.recipe', cfg, repos,
+                                        name, name + '.recipe', cfg, repos,
+                                        versionStr=versionStr,
                                         label = label)[0:2]
         except recipe.RecipeFileError, msg:
             raise CookError(str(msg))
@@ -760,14 +807,14 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 
     built = None
     try:
-        troves = cookObject(repos, cfg, recipeClass, cfg.buildLabel,
+        troves = cookObject(repos, cfg, recipeClass, 
                             changeSetFile = changeSetFile,
                             prep = prep, macros = macros,
-			    buildBranch = buildBranch, 
 			    targetLabel = targetLabel,
                             sourceVersion = sourceVersion,
 			    resume = resume, 
-                            allowUnknownFlags = allowUnknownFlags)
+                            allowUnknownFlags = allowUnknownFlags,
+                            allowMissingSource=False)
         if troves:
             built = (tuple(troves), changeSetFile)
     except repository.RepositoryError, e:
@@ -801,7 +848,7 @@ class CookError(Exception):
     def __str__(self):
 	return repr(self)
 
-def cookCommand(cfg, args, prep, macros, buildBranch = None, emerge = False, 
+def cookCommand(cfg, args, prep, macros, emerge = False, 
                 resume = None, allowUnknownFlags = False):
     # this ensures the repository exists
     repos = NetworkRepositoryClient(cfg.repositoryMap)

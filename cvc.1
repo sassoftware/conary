@@ -40,9 +40,6 @@ modify, and cook source components:
 .B cook \fI[\fR\-\-prep\fI] [\fR--macros file\fI] \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR\-\-target-branch \fI<branch>\fP] \e
-.PD 0
-.TP
 .B \ \ \ \ \ [\fR\-\-resume [<linenums>|policy]] \e
 .PD 0
 .TP
@@ -55,7 +52,7 @@ modify, and cook source components:
 .B \ \ \ \ \ [\fR\-\-no-clean] [\fR\-\-unknown-flags] \e
 .PD 0
 .TP
-.B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>...
+.B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>[=<version>]...
 .PD
 
 Build a package.  If \fB\-\-prep\fP is specified, the souce code is
@@ -107,11 +104,8 @@ This can be useful for rerunning policy for a complete build using
 If the thing to be cooked ends in \fB.recipe\fP, then
 it must be a recipe file and the package will be cooked from the
 filesystem.  Otherwise, it must name a repository component and
-the package will be cooked from the repository.
-.IP
-Conary will build a changeset that is relative to the current
-\fBbuildLabel\fP unless the \fB\-\-target-branch\fP option is
-specified.
+the package will be cooked from the repository.  If a version is 
+specified, it must be a source version for that component.
 .TP 4
 .B add \fIfile...\fP
 Adds all the files listed on the command line to the source

@@ -48,7 +48,7 @@ def usage(rc = 1):
     print '       cvc cook [--prep] [--debug-exceptions] [--macros file] '
     print '                [--use-flavor  "<flavor>"] '
     print '                [--use-macro "<macro> <value>"]+ '
-    print '                <file.recipe|troveName>+'
+    print '                <file.recipe|troveName=<version>>+'
     print '       cvc describe <xml file>'
     print "       cvc diff"
     print "       cvc log [<branch>]"
@@ -75,7 +75,6 @@ def usage(rc = 1):
     print "               --prep"
     print "               --resume [policy|<linenums>]"
     print "               --debug-exceptions"
-    print "               --target-branch <branch>"
     print ""
     print "commit flags:  --message <msg>"
     print ""
@@ -107,7 +106,6 @@ def realMain(cfg, argv=sys.argv):
     argDef["sources"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
-    argDef["target-branch"] = ONE_PARAM
     argDef["use-macro"] = MULT_PARAM
     argDef["use-flavor"] = ONE_PARAM
     argDef["unknown-flags"] = NO_PARAM
@@ -285,10 +283,6 @@ def sourceCommand(cfg, args, argSet):
             exec macroSrc
             del f
             del argSet['macros']
-
-        if argSet.has_key('target-branch'):
-            buildBranch = argSet['target-branch']
-            del argSet['target-branch']
 
         if argSet: return usage()
         

@@ -878,11 +878,14 @@ class Version(VersionSequence):
         """
         newV = self.copy()
         v = newV
-
+        hasParentVersion = v.hasParentVersion()
+        trailingRevisions = []
         while v.hasParentVersion():
             v = v.parentVersion()
-            v.trailingRevision().buildCount = 0
-
+            trailingRevisions.append(v.trailingRevision())
+        for trailingRevision in trailingRevisions:
+            assert(trailingRevision.buildCount is None)
+            trailingRevision.buildCount = 0
         return newV
 
 class Branch(VersionSequence):

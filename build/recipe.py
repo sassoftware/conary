@@ -739,11 +739,11 @@ class _GroupOrRedirectRecipe(Recipe):
     def getTroveList(self):
 	return self.troveVersionFlavors
 
-    def __init__(self, repos, cfg, branch, flavor):
+    def __init__(self, repos, cfg, label, flavor):
 	self.repos = repos
 	self.cfg = cfg
 	self.troveVersionFlavors = {}
-	self.label = branch.label()
+	self.label = label
 	self.flavor = flavor
         self.addTroveList = []
 
@@ -850,12 +850,12 @@ class FilesetRecipe(Recipe):
 	for (pathId, (path, fileId, version)) in self.files.iteritems():
 	    yield (pathId, path, fileId, version)
 	    
-    def __init__(self, repos, cfg, branch, flavor):
+    def __init__(self, repos, cfg, label, flavor):
 	self.repos = repos
 	self.cfg = cfg
 	self.files = {}
 	self.paths = {}
-	self.label = branch.label()
+	self.label = label
 	self.flavor = flavor
 	
 class RecipeFileError(Exception):
