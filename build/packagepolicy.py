@@ -105,6 +105,8 @@ class _filterSpec(policy.Policy):
 class ComponentSpec(_filterSpec):
     """
     Determines which component each file is in.
+    @keyword catchall: The component name which gets all otherwise
+    unassigned files.  Default: C{runtime}
     """
     baseFilters = (
 	# automatic subpackage names and sets of regexps that define them
@@ -127,8 +129,8 @@ class ComponentSpec(_filterSpec):
 	('locale',    ('%(datadir)s/locale/',
 		       '%(datadir)s/gnome/help/.*/')),
 	('emacs',     ('%(datadir)s/emacs/site-lisp/.*',)),
-	('runtime',   ('.*',)),
     )
+    keywords = { 'catchall': 'runtime' }
 
     def doProcess(self, recipe):
 	compFilters = []
@@ -141,13 +143,18 @@ class ComponentSpec(_filterSpec):
 	    assert(name != 'source')
 	    filterargs = self.filterExpression(filteritem[1:], name=name)
 	    compFilters.append(filter.Filter(*filterargs))
+	# by default, everything that hasn't matched a filter pattern yet
+	# goes in the catchall component ('runtime' by default)
+	compFilters.append(filter.Filter('.*', self.macros, name=self.catchall))
 
 	# pass these down to PackageSpec for building the package
 	recipe.PackageSpec(compFilters=compFilters)
 
 class PackageSpec(_filterSpec):
     """
-    FIXME
+    Determines which package each file is in.
+    @keyword compFilters: for internal use only -- C{ComponentSpec}
+    uses this keyword to pass information to PackageSpec.  Do not touch.
     """
     keywords = { 'compFilters': None }
 
@@ -161,20 +168,15 @@ class PackageSpec(_filterSpec):
 
     def doProcess(self, recipe):
 	pkgFilters = []
-	macros = recipe.macros
+	self.macros = recipe.macros
 
 	for (filteritem) in self.extraFilters:
-	    filteritem = list(filteritem)
-	    while len(filteritem) < 4:
-		filteritem.append(None)
-	    name, patterns, setmode, unsetmode = filteritem
-	    pkgFilters.append(
-		filter.Filter(patterns, macros,
-			      setmode=setmode, unsetmode=unsetmode,
-			      name=name %macros))
+	    name = filteritem[0] % self.macros
+	    filterargs = self.filterExpression(filteritem[1:], name=name)
+	    pkgFilters.append(filter.Filter(*filterargs))
 	# by default, everything that hasn't matched a pattern in the
 	# main package filter goes in the package named recipe.name
-	pkgFilters.append(filter.Filter('.*', macros, name=recipe.name))
+	pkgFilters.append(filter.Filter('.*', self.macros, name=recipe.name))
 
 	# OK, all the filters exist, build an autopackage object that
 	# knows about them
@@ -184,7 +186,7 @@ class PackageSpec(_filterSpec):
 
 	# now walk the tree -- all policy classes after this require
 	# that the initial tree is built
-        recipe.autopkg.walk(macros['destdir'])
+        recipe.autopkg.walk(self.macros['destdir'])
 
 
 def _markConfig(recipe, filename):
