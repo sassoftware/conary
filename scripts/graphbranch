@@ -30,7 +30,7 @@ sys.path.append(os.path.dirname(fullPath))
 from repository.changeset import ChangeSetFromFile
 from local import database
 import conarycfg
-import util
+from lib import util
 import helper
 import queryrep
 import checkin

@@ -33,7 +33,7 @@ sys.path.append(os.path.dirname(fullPath))
 
 import conarycfg
 from local import database
-import util
+from lib import util
 sys.excepthook = util.genExcepthook()
 
 def main():
