@@ -48,7 +48,7 @@ class Dependency:
 	Returns whether or not this dependency satisfies the argument
 	(which is a requires).
 
-	@type other: Dependency
+	@type required: Dependency
 	"""
 	if self.name != required.name: 
 	    return False
