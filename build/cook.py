@@ -687,7 +687,10 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
         client = conaryclient.ConaryClient(cfg)
         try:
             changeSet = changeset.ChangeSetFromFile(changeSetFile)
-            client.applyChangeSet(changeSet)
+            (cs, depFailures, suggMap, brokenByErase) =\
+                client.updateChangeSet([changeSet], recurse=False, resolveDeps=False)
+            client.applyUpdate(cs)
+            
         except (conaryclient.UpdateError, repository.CommitError), e:
             log.error(e)
             log.error("Not committing changeset: please apply %s by hand" % changeSetFile)
