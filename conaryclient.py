@@ -36,7 +36,8 @@ class UpdateError(ClientError):
 
 class VersionSuppliedError(UpdateError):
     def __str__(self):
-        return "version should not be specified when a Conary change set is being installed"
+        return "version should not be specified when a Conary change set " \
+               "is being installed"
 
 class NoNewTrovesError(UpdateError):
     def __str__(self):
@@ -55,8 +56,10 @@ class ConaryClient:
 
     def updateTrove(self, pkg, versionStr, replaceFiles = False,
                     tagScript = None, keepExisting = None):
-        """Updates a trove on the local system to the latest version 
-            in the respository that the trove was initially installed from."""
+        """
+        Updates a trove on the local system to the latest version 
+        in the respository that the trove was initially installed from.
+        """
         self._prepareRoot()
         if self.db.hasPackage(pkg):
             labels = [ x.getVersion().branch().label()
@@ -69,14 +72,16 @@ class ConaryClient:
             if True in [isinstance(x, versions.CookBranch) or
                         isinstance(x, versions.EmergeBranch)
                         for x in labels]:
-                raise UpdateError, "Package %s cooked locally, not updating" % pkg
+                raise UpdateError, \
+                            "Package %s cooked locally, not updating" % pkg
         else:
             labels = [ self.cfg.installLabel ]
 
         newList = []
         for label in labels:
             try:
-                newList += self.repos.findTrove(label, pkg, self.cfg.flavor, versionStr)
+                newList += self.repos.findTrove(label, pkg, self.cfg.flavor, 
+                                                versionStr)
             except repository.PackageNotFound, e:
                 pass
 
@@ -113,11 +118,14 @@ class ConaryClient:
             raise NoNewTrovesError
 
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
-                                tagScript = tagScript, keepExisting = keepExisting)
- 
+                                tagScript = tagScript, 
+                                keepExisting = keepExisting)
 
-    def applyChangeSet(self, pkg, replaceFiles = False, tagScript = None, keepExisting = False):
-        """Applies a change set from a file to the system."""
+    def applyChangeSet(self, pkg, replaceFiles = False, tagScript = None, 
+                       keepExisting = False):
+        """
+        Applies a change set from a file to the system.
+        """
         self._prepareRoot()
         
         cs = changeset.ChangeSetFromFile(pkg)
@@ -126,7 +134,8 @@ class ConaryClient:
             cs.rootChangeSet(self.db, keepExisting)
 
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
-                                tagScript = tagScript, keepExisting = keepExisting)
+                                tagScript = tagScript, 
+                                keepExisting = keepExisting)
 
     def eraseTrove(self, pkg, versionStr = None, tagScript = None):
         pkgList = self.db.findTrove(pkg, versionStr)
@@ -138,9 +147,13 @@ class ConaryClient:
         self.db.eraseTroves(list, tagScript = tagScript)
 
     def _prepareRoot(self):
-        """Prepares the installation root for trove updates and change set applications."""
+        """
+        Prepares the installation root for trove updates and change 
+        set applications.
+        """
         if not os.path.exists(self.cfg.root):
             util.mkdirChain(self.cfg.root)
         if not self.db.writeAccess():
-            raise UpdateError, "Write permission denied on conary database %s" % self.db.dbpath
+            raise UpdateError, \
+                "Write permission denied on conary database %s" % self.db.dbpath
 
