@@ -273,14 +273,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def getAllTroveLeaves(self, serverName, troveNameList):
 	d = self.c[serverName].getAllTroveLeaves(troveNameList)
-	for troveName, troveVersions in d.iteritems():
-            subD = {}
-            d[troveName] = subD
-            for version, flavorList in troveVersions.iteritems():
-                version = self.thawVersion(version)
-                subD[version] = [ self.toFlavor(f) for f in flavorList ]
-
-	return d
+        return self._mergeTroveQuery({}, d)
 
     def getTroveFlavorsLatestVersion(self, troveName, branch):
 	return [ (versions.VersionFromString(x[0], 
@@ -293,42 +286,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                             flavorFilter = None):
 	d = self.c[serverName].getTroveVersionList(troveNameList, 
                                                self.fromFlavor(flavorFilter))
-
-	for troveName, troveVersions in d.iteritems():
-            subD = {}
-            d[troveName] = subD
-            for version, flavorList in troveVersions.iteritems():
-                version = self.thawVersion(version)
-                subD[version] = [ self.toFlavor(f) for f in flavorList ]
-
-	return d
+        return self._mergeTroveQuery({}, d)
 
     def getTroveLeavesByLabel(self, troveNameList, label, flavorFilter = None):
 	d = self.c[label].getTroveLeavesByLabel(troveNameList, 
 						label.asString(),
                                                 self.fromFlavor(flavorFilter))
-	for troveName, troveVersions in d.iteritems():
-            subD = {}
-            d[troveName] = subD
-            for version, flavorList in troveVersions.iteritems():
-                version = self.thawVersion(version)
-                subD[version] = [ self.toFlavor(f) for f in flavorList ]
-
-	return d
+        return self._mergeTroveQuery({}, d)
 	
     def getTroveVersionsByLabel(self, troveNameList, label, 
                                 flavorFilter = None):
 	d = self.c[label].getTroveVersionsByLabel(troveNameList, 
 						  label.asString(),
                                                   self.fromFlavor(flavorFilter))
-	for troveName, troveVersions in d.iteritems():
-            subD = {}
-            d[troveName] = subD
-            for version, flavorList in troveVersions.iteritems():
-                version = self.thawVersion(version)
-                subD[version] = [ self.toFlavor(f) for f in flavorList ]
-
-	return d
+        return self._mergeTroveQuery({}, d)
 	
     def getTroveVersionFlavors(self, troveDict, bestFlavor = False):
 
@@ -354,21 +325,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 requestD[serverName][troveName][versionStr] = \
                     [ _cvtFlavor(x) for x in flavorList ]
 
-	if not requestD:
-	    return {}
-
         newD = {}
+	if not requestD:
+	    return newD
+
         for serverName, passD in requestD.iteritems():
             result = self.c[serverName].getTroveVersionFlavors(passD, 
                                                                bestFlavor)
-
-            for troveName, troveVersions in result.iteritems():
-                if not newD.has_key(troveName):
-                    newD[troveName] = {}
-                for versionStr, flavors in troveVersions.iteritems():
-                    version = self.thawVersion(versionStr)
-                    newD[troveName][version] = \
-                                [ self.toFlavor(x) for x in flavors ]
+            self._mergeTroveQuery(newD, result)
 
 	return newD
 
@@ -992,6 +956,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	assert(not defaultFlavor or 
 	       isinstance(defaultFlavor, deps.DependencySet))
 
+        import lib
+        lib.epdb.st('f')
+
         if not type(labelPath) == list:
             labelPath = [ labelPath ]
 
@@ -1043,11 +1010,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                       ('"%s" was not found in the search path (%s)'
                        %(name, " ".join([ x.asString() for x in labelPath ])))
 	elif versionStr[0] != "/" and versionStr.find("/") == -1:
-	    # version/release was given
+	    # version/release was given. look in the affinityDatabase
+            # for the branches to look on
 	    try:
 		verRel = versions.VersionRelease(versionStr)
 	    except versions.ParseError, e:
 		raise repository.TroveNotFound, str(e)
+
+            #if affinityDatabase and affinityDatabase.hasTrove(name):
+            #    for trove in self.db.findTrove(troveName):
+            #        
+            #    labels = [ x.getVersion().branch().label()
+            #               for x in self.db.findTrove(troveName) ]
+            #else:
+                
 
             flavorDict = { name : {} }
             for label in labelPath:
