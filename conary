@@ -109,6 +109,7 @@ elif (otherArgs[1] == "cook"):
         pid = os.fork()
         if not pid:
             cook.cook(repos, cfg, file, prep=prep)
+            sys.exit(0)
         else:
             os.setpgid(pid, pid)
             try:

@@ -184,7 +184,7 @@ class Recipe:
             pass
         elif type(self.build) is str:
             os.system(self.build % {'builddir':builddir})
-        elif type(self.build) == types.TupleType:
+        elif type(self.build) is tuple:
 	    for bld in self.build:
                 if type(bld) is str:
                     os.system(bld % {'builddir':builddir})
@@ -199,7 +199,7 @@ class Recipe:
             pass
         elif type(self.install) is str:
             os.system(self.install % {'builddir':builddir, 'destdir':root})
-	elif type(self.install) == types.TupleType:
+	elif type(self.install) is tuple:
 	    for inst in self.install:
                 if type(inst) is str:
                     os.system(inst % {'builddir':builddir, 'destdir':root})
