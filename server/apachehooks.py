@@ -9,6 +9,7 @@ import netserver
 
 FILE_PATH="/tmp/conary-server"
 BASE_URL="http://localhost/~ewt"
+REP_PATH="/home/ewt/srs/srsrep"
 
 BUFFER=1024 * 256
 
@@ -55,5 +56,4 @@ def handler(req):
     else:
 	return apache.METHOD_NOT_ALLOWED
 
-netRepos = netserver.NetworkRepositoryServer("/home/ewt/srs/srsrep", "c",
-					    FILE_PATH, BASE_URL)
+netRepos = netserver.NetworkRepositoryServer(REP_PATH, FILE_PATH, BASE_URL)
