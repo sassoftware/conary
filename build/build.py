@@ -73,7 +73,7 @@ class Configure(ShellCommand):
     template = (
 	'cd %%(builddir)s; '
 	'%%(mkObjdir)s '
-	'CFLAGS=%%(cflags)s CXXFLAGS=%%(cflags)s'
+	'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
 	' %(preConfigure)s %%(configure)s'
 	# XXX host/build/target here
 	' --prefix=%%(prefix)s'
@@ -107,7 +107,6 @@ class ManualConfigure(Configure):
     template = ('cd %%(builddir)s; '
                 '%%(mkObjdir)s '
 	        '%(preConfigure)s %%(configure)s %(args)s')
-
 
 class Make(ShellCommand):
     template = ('cd %%(builddir)s; '
