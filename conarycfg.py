@@ -34,7 +34,8 @@ import versions
     CALLBACK, 
     EXEC, 
     BRANCHNAME,
-    STRINGPATH) = range(10)
+    STRINGPATH, 
+    INT) = range(11)
 
 class ConfigFile:
 
@@ -88,6 +89,11 @@ class ConfigFile:
 	    type = self.types[key]
 	if type == STRING:
 	    self.__dict__[key] = val
+	if type == INT:
+            try:
+	        self.__dict__[key] = int(val)
+	    except:
+		raise ParseError, ("%s:%s: expected integer for configuration value '%s'" % (file, self.lineno, key))
 	elif type == STRINGDICT:
 	    (idx, val) = val.split(None, 1)
 	    self.__dict__[key][idx] = val
