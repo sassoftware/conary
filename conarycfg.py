@@ -165,13 +165,16 @@ class ConaryConfiguration(ConfigFile):
     archflags = {}
     macroflags = {}
    
-    def __init__(self):
+    def __init__(self, readConfigFiles=True):
 	ConfigFile.__init__(self)
 
 	self.flavor = deps.deps.DependencySet()
 	self.flavor.addDep(deps.deps.InstructionSetDependency, 
 			   self.instructionSet)
+	if readConfigFiles:
+	    self.readFiles()
 
+    def readFiles(self):
 	self.read("/etc/conaryrc")
 	if os.environ.has_key("HOME"):
 	    self.read(os.environ["HOME"] + "/" + ".conaryrc")
