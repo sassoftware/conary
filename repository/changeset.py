@@ -873,22 +873,22 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 
 # old may be None
 def fileChangeSet(pathId, old, new):
-    hash = None
+    contentsHash = None
 
     if old and old.__class__ == new.__class__:
 	diff = new.diff(old)
 	if isinstance(new, files.RegularFile) and      \
 		  isinstance(old, files.RegularFile)   \
 		  and new.contents.sha1() != old.contents.sha1():
-	    hash = new.contents.sha1()
+	    contentsHash = new.contents.sha1()
     else:
 	# different classes; these are always written as absolute changes
 	old = None
 	diff = new.freeze()
 	if isinstance(new, files.RegularFile):
-	    hash = new.contents.sha1()
+	    contentsHash = new.contents.sha1()
 
-    return (diff, hash)
+    return (diff, contentsHash)
 
 def fileContentsUseDiff(oldFile, newFile):
     return oldFile and oldFile.flags.isConfig() and newFile.flags.isConfig()

@@ -290,8 +290,9 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 		newFile = idIdx[(pathId, newFileId)]
 
-		(filecs, hash) = changeset.fileChangeSet(pathId, oldFile, 
-							 newFile)
+		(filecs, contentsHash) = changeset.fileChangeSet(pathId,
+                                                                 oldFile, 
+                                                                 newFile)
 
 		cs.addFile(oldFileId, newFileId, filecs)
 
@@ -303,7 +304,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		# config files to config files; these need to be included
 		# unconditionally so we always have the pristine contents
 		# to include in the local database
-		if (hash or (oldFile and newFile.flags.isConfig() 
+		if (contentsHash or (oldFile and newFile.flags.isConfig() 
                                       and not oldFile.flags.isConfig())):
 		    if oldFileVersion and oldFile.hasContents:
 			oldCont = self.getFileContents(
@@ -322,13 +323,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                     # config files
                     if not newFile.flags.isConfig() and \
                                 contType == changeset.ChangedFileTypes.file:
-                        hash = newFile.contents.sha1()
-                        ptr = ptrTable.get(hash, None)
+                        contentsHash = newFile.contents.sha1()
+                        ptr = ptrTable.get(contentsHash, None)
                         if ptr is not None:
                             contType = changeset.ChangedFileTypes.ptr
                             cont = filecontents.FromString(ptr)
                         else:
-                            ptrTable[hash] = pathId
+                            ptrTable[contentsHash] = pathId
 
 		    cs.addFileContents(pathId, contType, cont, 
 				       newFile.flags.isConfig())
