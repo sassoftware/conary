@@ -828,10 +828,15 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
         while nextFile:
             name, tagInfo, f, size = nextFile
 
-            tag = 'cft-' + tagInfo.split()[1]
+            (isConfig, tag) = tagInfo.split()
+            tag = 'cft-' + tag
+            isConfig = isConfig == "1"
 
-            # cache all config file contents
-            if tag != ChangedFileTypes.diff:
+            # relative change sets only need diffs cached; absolute change
+            # sets get all of their config files cached so we can turn
+            # those into diffs. those cached values are replaced by the
+            # diffs when this happens though, so this isn't a big loss
+            if tag != ChangedFileTypes.diff and not(self.absolute and isConfig):
                 break
 
             cont = filecontents.FromFile(f)
