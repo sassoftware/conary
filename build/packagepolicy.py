@@ -75,7 +75,15 @@ class FilesInMandir(policy.Policy):
     the main cause of files in C{%(mandir)s} is confusion in packages
     about whether "mandir" means /usr/share/man or /usr/share/man/man<n>.
     """
-    invariantinclusions = [ ('%(mandir)s/[^/][^/]*$', None, stat.S_IFDIR) ]
+    invariantsubtrees = [
+        '%(mandir)s',
+        '%(x11prefix)s/man',
+        '%(krbprefix)s/man',
+    ]
+    invariantinclusions = [
+	(r'.*', None, stat.S_IFDIR),
+    ]
+    recursive = False
 
     def doFile(self, file):
 	self.recipe.reportErrors("%s is non-directory file in mandir" %file)
