@@ -1,3 +1,12 @@
+Changes in 0.9.5:
+  * new methods for specifying dependency information in recipes have
+    been added
+  * #! interpreters get added as dependencies
+  * local flag overrides now work
+  * cvc cook --resume can be used multiple times
+  * conary invokes gpg with --no-options to avoid creating or using
+    ~/.gnupg
+
 Changes in 0.9.4:
   * fixes to cvc annotate
   * flavors and dependency generation code has been refactored to be
