@@ -962,7 +962,7 @@ class CookError(Exception):
 
 def cookCommand(cfg, args, prep, macros, emerge = False, 
                 resume = None, allowUnknownFlags = False,
-                ignoreDeps = False):
+                ignoreDeps = False, profile = False):
     # this ensures the repository exists
     repos = NetworkRepositoryClient(cfg.repositoryMap)
 
@@ -979,6 +979,10 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
         signal.signal(signal.SIGTTOU, signal.SIG_IGN)
         pid = os.fork()
         if not pid:
+            if profile:
+                import hotshot
+                prof = hotshot.Profile('conary-cook.prof')
+                prof.start()
             # child, set ourself to be the foreground process
             os.setpgrp()
             try:
@@ -1018,6 +1022,8 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                     print 'Changeset committed to the repository.'
             else:
                 print 'Changeset written to:', csFile
+            if profile:
+                prof.stop()
             sys.exit(0)
         else:
             while 1:

@@ -132,9 +132,24 @@ def realMain(cfg, argv=sys.argv):
     # set the build flavor here, just to set architecture information 
     # which is used when initializing a recipe class
     use.setBuildFlagsFromFlavor(None, cfg.flavor, error=False)
-    sourceCommand(cfg, otherArgs[1:], argSet)
+    if 'profile' in argSet:
+	del argSet['profile']
+	import hotshot
+        # XXX note that this profile is currently useless for cook - 
+        # hotshot seems to not have the correct frame information about this
+        # process.
+        # Instead, the conary-cook.prof profile has information about the 
+        # forked cook process, which is generally more interesting anyway  
+	prof = hotshot.Profile('conary.prof')
+	prof.start()
+        try:
+            sourceCommand(cfg, otherArgs[1:], argSet, profile=True)
+        finally:
+            prof.stop()
+    else:
+        sourceCommand(cfg, otherArgs[1:], argSet)
 
-def sourceCommand(cfg, args, argSet):
+def sourceCommand(cfg, args, argSet, profile=False):
     if not args:
 	return usage()
     elif (args[0] == "add"):
@@ -291,7 +306,8 @@ def sourceCommand(cfg, args, argSet):
         if argSet: return usage()
         
         cook.cookCommand(cfg, args[1:], prep, macros, resume=resume, 
-                         allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps)
+                         allowUnknownFlags=unknownFlags, ignoreDeps=ignoreDeps,
+                         profile=profile)
         log.setVerbosity(level)
     elif (args[0] == "describe"):
         level = log.getVerbosity()
