@@ -164,6 +164,10 @@ if __name__ == '__main__':
 	'map'	: 'repositoryMap',
     }
 
+    if not os.path.isdir(FILE_PATH):
+	print FILE_PATH + " needs to be a directory"
+	sys.exit(1)
+
     argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
 
     if len(otherArgs) != 4:
