@@ -222,10 +222,12 @@ class File(FileMode):
 
 	return self.theId
 
-    def restore(self, target, skipContents):
+    def restore(self, target, skipContents, skipMtime = 0):
 	self.chmod(target)
 	self.setOwnerGroup(target)
-	os.utime(target, (self.theMtime, self.theMtime))
+
+	if not skipMtime:
+	    os.utime(target, (self.theMtime, self.theMtime))
 
     def chmod(self, target):
 	os.chmod(target, self.thePerms)
@@ -293,7 +295,7 @@ class SymbolicLink(File):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 	os.symlink(self.theLinkTarget, target)
-	File.restore(self, target, skipContents)
+	File.restore(self, target, skipContents, skipMtime = 1)
 
     def applyChangeLine(self, line):
 	(target, line) = line.split(None, 1)
