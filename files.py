@@ -376,7 +376,11 @@ class Directory(File):
 	File.restore(self, target, restoreContents)
 
     def remove(self, target):
-	os.rmdir(target)
+        try:
+            os.rmdir(target)
+        except OSError, err:
+            # XXX
+            print "WARNING: rmdir %s failed" %target, err
 
     def __init__(self, fileId, info = None):
 	File.__init__(self, fileId, info, infoTag = "d")
