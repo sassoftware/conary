@@ -211,7 +211,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 	    buildTime = time.strftime("%c",
 				time.localtime(version.timeStamps()[-1]))
 	    print "%-30s %s" % \
-		(("Name      : %s" % troveName,
+		(("Name      : %s" % trove.getName(),
 		 ("Build time: %s" % buildTime)))
 
 	    if fullVersions:
@@ -231,9 +231,9 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		    print "    %s" % l
 	else:
 	    if fullVersions or len(troveList) > 1:
-		print _troveFormat % (troveName, version.asString())
+		print _troveFormat % (trove.getName(), version.asString())
 	    else:
-		print _troveFormat % (troveName, 
+		print _troveFormat % (trove.getName(), 
 				      version.trailingVersion().asString())
 
 	    for (troveName, ver, flavor) in trove.iterTroveList():
