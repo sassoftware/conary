@@ -190,18 +190,23 @@ def loadRecipe(file):
         # of the recipe that loaded it, or else it will be destroyed
         callerGlobals[os.path.basename(file).replace('.', '-')] = recipes
 
-#def bootstrapRecipe(file, class, buildRequires):
-#    loadRecipe(file) # XXX not necessary if we put boostraps in main files
-#    exec """class Bootstrap%s(%s):
-#	buildRequires = %s
-#	name = "bootstrap-%s"
-#	def setup(self):
-#	    FIXMEcrossmacros(self.recipeCfg)
-#	    FIXMEcrossenv
-#	    FIXMEself.mainDir(class, self.version)
-#	    %s.setup(self)
-#    """ %(class, class, buildRequires.repr(), class, class)
+## def bootstrapRecipe(recipeClass, buildRequires, file=None):
+##     if file:
+##         loadRecipe(file)
+
+##     buildRequires = [ 'cross-gcc', 'bootstrap-glibc' ]
+##     name = 'bootstrap-' + recipeClass.name
+##     extraConfig = '--target=%(target)s --host=%(target)s'
+##     def setup(self):
+##         self.mainDir('diffutils-%s' % self.version)
+##         Diffutils.setup(self)
         
+##     bootstrap = type('Bootstrap' + recipeClass.__name__,
+##                      (recipeCLass,),
+##                      {'buildRequires': buildRequires,
+##                       'name'         : name,
+##                       'extraConfig'  : extraConfig,
+##                       'setup'        : setup})
 
 class Recipe:
     buildRequires = []
@@ -367,9 +372,6 @@ class Recipe:
 	    self.install.doInstall(self.macros)
 
     def packages(self, root):
-	self.autoSpecList = []
-	for spec in baseAutoSpec:
-	    self.autoSpecList.append(package.PackageSpec(spec[0], spec[1]))
 	# "None" will be replaced by explicit subpackage list
 	self.packageSpecSet = package.PackageSpecSet(self.autoSpecList, None)
         self.packageSet = package.Auto(self.name, root, self.packageSpecSet)
@@ -404,3 +406,6 @@ class Recipe:
 	self.macros['version'] = self.version
 	if extraMacros:
 	    self.addMacros(extraMacros)
+	self.autoSpecList = []
+	for spec in baseAutoSpec:
+	    self.autoSpecList.append(package.PackageSpec(*spec))
