@@ -324,10 +324,19 @@ def annotate(repos, filename):
         state = SourceStateFromFile("CONARY")
     except OSError:
         return
-    label = state.getVersion().branch().label()
+    branch = state.getVersion().branch()
+    label = branch.label()
     troveName = state.getName()
     # verList is in ascending order (first commit is first in list)
     verList = repos.getTroveVersionsByLabel([troveName], label)[troveName]
+
+    for (fileId, name, someFileV) in oldTrove.iterFileList():
+        if name == filename:
+            break
+
+    if not fileId:
+        log.error("%s is not a member of this source trove", fileId)
+        return
     
     # finalLines contains the current version of the file and the 
     # annotated information about its creation
@@ -352,17 +361,16 @@ def annotate(repos, filename):
         newContact = oldContact
 
         oldV = verList[i-1]
-        oldTrove = repos.findTrove(label, troveName, None, versionStr = oldV.asString())[0]
-        if not fileId:
-            # initialization case -- find the file the first time
-            # by filename -- after this we will use the id
-            for (fileId, name, oldFileV) in oldTrove.iterFileList():
-                if name == filename:
-                    break
-        else:
-            for (oldId, name, oldFileV) in oldTrove.iterFileList():
-                if oldId == fileId:
-                    break
+
+        if oldV.getVersion().branch() != branch:
+            continue
+
+        oldTrove = repos.getTrove(troveName, oldV, None)
+
+        for (oldId, name, oldFileV) in oldTrove.iterFileList():
+            if oldId == fileId:
+                break
+
         if oldFileV == newFileV:
             continue
         oldFile = repos.getFileContents(troveName, oldV, None, 
