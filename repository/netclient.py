@@ -341,7 +341,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     if not target:
                         os.unlink(name)
 
-        if mergedChangeSets:
+        if mergedChangeSets and origTarget is not None:
             cs.writeToFile(origTarget)
             cs = None
 
