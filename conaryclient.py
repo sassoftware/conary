@@ -528,29 +528,6 @@ class ConaryClient:
                                 journal = journal,
                                 localRollbacks = localRollbacks)
 
-    def eraseTrove(self, troveList, depCheck = True, tagScript = None,
-                   test = False, justDatabase = False, localRollbacks = False):
-	cs = changeset.ChangeSet()
-
-        for (troveName, versionStr, flavor) in troveList:
-            troves = self.db.findTrove(None, troveName, flavor, versionStr)
-            troves = self.db.getTroves(troves)
-            for outerTrove in troves:
-                for trove in self.db.walkTroveSet(outerTrove, 
-                                                 ignoreMissing = True):
-                    cs.oldPackage(trove.getName(), trove.getVersion(), 
-                                  trove.getFlavor())
-
-        if depCheck:
-            (depList, cannotResolve) = self.db.depCheck(cs)
-            assert(not depList)
-            if cannotResolve:
-                return cannotResolve
-            
-	self.db.commitChangeSet(cs, tagScript = tagScript, test = test,
-                                justDatabase = justDatabase,
-                                localRollbacks = localRollbacks)
-
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):
         md = {}
