@@ -11,11 +11,44 @@ import shutil
 import types
 import inspect
 import lookaside
+import rpmhelper
+import gzip
 
 def flatten(list):
     if type(list) != types.ListType: return [list]
     if list == []: return list
     return flatten(list[0]) + flatten(list[1:])
+
+
+def extractSourceFromRPM(rpm, targetfile):
+    filename = os.path.basename(targetfile)
+    directory = os.path.dirname(targetfile)
+    r = file(rpm, 'r')
+    rpmhelper.seekToData(r)
+    gz = gzip.GzipFile(fileobj=r)
+    (rpipe, wpipe) = os.pipe()
+    pid = os.fork()
+    if not pid:
+	os.dup2(rpipe, 0)
+	os.chdir(directory)
+	os.execl('/bin/cpio', 'cpio', '-ium', filename)
+	sys.exit(1)
+    while 1:
+	buf = gz.read(4096)
+	if not buf:
+	    break
+	os.write(wpipe, buf)
+    os.close(wpipe)
+    (pid, status) = os.waitpid(pid, 0)
+    if not os.WIFEXITED(status):
+	raise IOError, 'cpio died extracting %s from RPM %s' \
+	               %(filename, os.path.basename(rpm))
+    if os.WEXITSTATUS(status):
+	raise IOError, 'cpio returned failure %d extracting %s from RPM %s' \
+	               %(os.WEXITSTATUS(status), filename, os.path.basename(rpm))
+    if not os.path.exists(targetfile):
+	raise IOError, 'failed to extract source %s from RPM %s' \
+	               %(filename, os.path.basename(rpm))
 
 class RecipeLoader(types.DictionaryType):
     def __init__(self, file):
@@ -93,7 +126,7 @@ class Recipe:
 	if not f:
 	    r = lookaside.findAll(self.cfg, rpm, self.name, self.srcdirs)
 	    c = lookaside.createCacheName(self.cfg, file, self.name)
-	    os.system("cd %s; rpm2cpio %s | cpio -ium %s" %(os.path.dirname(c), r, file))
+	    extractSourceFromRPM(r, c)
 	    f = lookaside.findAll(self.cfg, file, self.name, self.srcdirs)
 	self.tarballs.append((file, extractDir))
 	self.addSignature(f, keyid)
