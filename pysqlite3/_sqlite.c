@@ -1547,7 +1547,7 @@ _stmt_dealloc(pysqlstmt* self)
     
 	if (self->p_stmt != NULL) {
 		result = sqlite3_finalize(self->p_stmt);
-		if (result != SQLITE_OK) {
+		if (result == SQLITE_MISUSE) {
 			PyObject *err_type, *err_value, *err_traceback;
 			int have_error = PyErr_Occurred() ? 1 : 0;
 	    
