@@ -585,6 +585,8 @@ class DanglingSymlinks(policy.Policy):
     which your package depends, you may set up an exception for that
     file for the C{DanglingSymlinks} policy.
     """
+    invariantexceptions = (
+	'%(testdir)s/.*', )
     targetexceptions = [
 	'.*consolehelper',
 	'/proc/', # provided by the kernel, no package

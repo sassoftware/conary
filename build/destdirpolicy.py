@@ -118,7 +118,7 @@ class TestSuiteLinks(policy.Policy):
 	# okay 
 	for (buildfile, destfile) in self.fileMap.iteritems():
 	    target = destfile
-	    link = '%(destdir)s%(thistestdir)s' % self.macros + buildfile
+	    link = util.normpath('%(destdir)s%(thistestdir)s/' % self.macros + buildfile)
 	    util.mkdirChain(os.path.dirname(link))
 	    os.symlink(target, link)
 
@@ -239,6 +239,7 @@ class TestSuiteFiles(policy.Policy):
 			    '.*/config.*',
 			    '.*/shconfig',
 			    '.*/acconfig.*',
+			    '.*/aclocal.*',
 			    '.*\.la', ]
 
     keywords = { 'build': None,
@@ -267,7 +268,7 @@ class TestSuiteFiles(policy.Policy):
 		# only install symlinks by default if they point outside of the builddir
 		if contents[0] == '/' and not contents.startswith(self.macros.builddir):
 		    util.mkdirChain(os.path.dirname(testpath))
-		    os.symlink(target, testpath)
+		    os.symlink(contents, testpath)
 	    elif os.path.isfile(fullpath):
 		util.mkdirChain(os.path.dirname(testpath))
 		util.copyfile(fullpath, testpath)
