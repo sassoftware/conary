@@ -418,6 +418,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	bldInfo.read()
 
     bldInfo.begin()
+    if resume is True:
+        resume = bldInfo.lastline
     recipeObj.unpackSources(builddir, resume)
     # if we're only extracting, continue to the next recipe class.
     if prep:
@@ -427,10 +429,6 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     try:
 	if resume and 'destdir' in bldInfo:
 	    destdir = bldInfo.destdir
-	    bldInfo.begin()
-	    bldInfo.destdir = destdir
-	    if resume is True:
-		resume = bldInfo.lastline
 	else:
 	    util.mkdirChain(builddir + '/' + recipeObj.mainDir())
 	    util.mkdirChain(cfg.tmpDir)
