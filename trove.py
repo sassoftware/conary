@@ -412,7 +412,7 @@ class Trove:
 
 		if match:
 		    changePair.append((name, added[name][newFlavor], newFlavor, 
-				       removed[name][oldFlavor], oldFlavor))
+				       match, oldFlavor))
 		    del added[name][newFlavor]
 
 	    if not added[name]:
