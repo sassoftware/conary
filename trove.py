@@ -394,7 +394,7 @@ class PackageSpecSet(dict):
 
     def _getname(self, subname, autoname):
 	"""Cheap way of saying "if subname, then subname/autoname,
-	otherwise just autoname"""
+	otherwise just autoname"."""
 	return string.lstrip(string.join((subname, autoname), '/'), '/')
     
     def add(self, path, autospec, expspec):
