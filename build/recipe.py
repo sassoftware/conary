@@ -65,9 +65,9 @@ class Recipe:
 	# do not search unless a gpg fingerprint is specified
 	if not fingerprint:
 	    return
-	gpg = lookaside.searchAll(cfg, '%s.sign' %(file), self,name, self.srcdirs)
+	gpg = lookaside.searchAll(self.cfg, '%s.sign' %(file), self,name, self.srcdirs)
 	if not gpg:
-	    gpg = lookaside.searchAll(cfg, '%s.sig' %(file), self,name, self.srcdirs)
+	    gpg = lookaside.searchAll(self.cfg, '%s.sig' %(file), self,name, self.srcdirs)
 	if gpg:
 	    if not self.signatures.has_key(file):
 		self.signatures[file] = []
@@ -78,12 +78,12 @@ class Recipe:
 	self.addSignature(file, fingerprint)
 
     def addSourceFromRPM(self, rpm, file, extractDir='', fingerprint=None):
-	f = lookaside.searchAll(cfg, os.path.basename(file), self.name, self.srcdirs)
+	f = lookaside.searchAll(self.cfg, os.path.basename(file), self.name, self.srcdirs)
 	if not f:
-	    r = lookaside.findAll(cfg, rpm, self.name, self.srcdirs)
-	    c = lookaside.createCacheName(cfg, file, self.name)
+	    r = lookaside.findAll(self.cfg, rpm, self.name, self.srcdirs)
+	    c = lookaside.createCacheName(self.cfg, file, self.name)
 	    os.system("cd %s; rpm2cpio %s | cpio -ium %s" %(os.path.dirname(c), rpm, file))
-	    f = lookaside.findAll(cfg, file, self.name, self.srcdirs)
+	    f = lookaside.findAll(self.cfg, file, self.name, self.srcdirs)
 	self.tarballs.append((file, extractDir))
 	self.addSignature(f, fingerprint)
 
@@ -130,7 +130,7 @@ class Recipe:
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
 	for (file, extractdir) in self.tarballs:
-            f = lookaside.findAll(cfg, file, self.name, self.srcdirs)
+            f = lookaside.findAll(self.cfg, file, self.name, self.srcdirs)
 	    self.checkSignatures(f, file)
             if f.endswith(".bz2"):
                 tarflags = "-jxf"
@@ -146,7 +146,7 @@ class Recipe:
 	    os.system("tar -C %s %s %s" % (destdir, tarflags, f))
 	
 	for file in self.sources:
-            f = lookaside.findAll(cfg, file, self.name, self.srcdirs)
+            f = lookaside.findAll(self.cfg, file, self.name, self.srcdirs)
 	    destDir = builddir + "/" + self.theMainDir
 	    util.mkdirChain(destDir)
 	    shutil.copyfile(f, destDir + "/" + file)
