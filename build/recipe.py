@@ -209,6 +209,10 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     name = filename[:-len('.recipe')]
     if not label:
 	label = cfg.buildLabel
+    else:
+	if '@' not in label:
+	    # copy namespace and branchname
+	    label = '%s@%s' %(label, cfg.buildLabel.split('@')[1])
 
     try:
 	pkgs = repos.findTrove(label, component, None, versionStr)
