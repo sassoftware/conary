@@ -14,7 +14,6 @@ import types
 import time
 import lookaside
 import socket
-import sys
 
 _FILE_FLAG_CONFIG = 1 << 0
 
@@ -263,9 +262,7 @@ class File(FileMode):
             print "warning: group %s does not exist - using root" %self.group()
             gid = 0
 
-	# FIXME: this needs to use lchown, which is in 2.3, and
-	# this should happen unconditionally
-	os.chown(target, uid, gid)
+	os.lchown(target, uid, gid)
 
     # public interface to _applyChangeLine
     #
@@ -413,15 +410,11 @@ class DeviceFile(File):
 
 	if os.getuid(): return
 
-	if sys.hexversion >= 0x20300f0:
-            if self.infoTag == 'c':
-                flags = stat.S_IFCHR
-            else:
-                flags = stat.S_IFBLK
-            os.mknod(target, flags, os.makedev(self.major, self.minor))
-        else:
-            os.system("mknod %s %c %d %d" % (target, self.infoTag, self.major,
-                                             self.minor))
+	if self.infoTag == 'c':
+	    flags = stat.S_IFCHR
+	else:
+	    flags = stat.S_IFBLK
+	os.mknod(target, flags, os.makedev(self.major, self.minor))
             
 	File.restore(self, target, restoreContents)
 
