@@ -156,10 +156,13 @@ class SqlDbRepository(repository.DataStoreRepository,
         return os.access(self.dbpath, os.W_OK)
 
     def __init__(self, path):
-        self.dbpath = path + "/conarydb"
-	repository.DataStoreRepository.__init__(self, path)
-	repository.AbstractRepository.__init__(self)
-	self.db = sqldb.Database(path + "/conarydb")
+        if path == ":memory:":
+            self.dbpath = path
+        else:
+            self.dbpath = path + "/conarydb"
+            repository.DataStoreRepository.__init__(self, path)
+            repository.AbstractRepository.__init__(self)
+	self.db = sqldb.Database(self.dbpath)
 
 class Database(SqlDbRepository):
 
@@ -568,20 +571,22 @@ class Database(SqlDbRepository):
     def __init__(self, root, path):
 	self.root = root
 
-	top = util.joinPaths(root, path)
+        if path == ":memory:": # memory-only db
+            SqlDbRepository.__init__(self, root)
+        else:
+            top = util.joinPaths(root, path)
 
-	self.rollbackCache = top + "/rollbacks"
-	self.rollbackStatus = self.rollbackCache + "/status"
-	if not os.path.exists(self.rollbackCache):
-	    util.mkdirChain(self.rollbackCache)
-	if not os.path.exists(self.rollbackStatus):
-	    self.firstRollback = 0
-	    self.lastRollback = -1
-	    self.writeRollbackStatus()
-	else:
-	    self.readRollbackStatus()
-
-	SqlDbRepository.__init__(self, root + path)
+            self.rollbackCache = top + "/rollbacks"
+            self.rollbackStatus = self.rollbackCache + "/status"
+            if not os.path.exists(self.rollbackCache):
+                util.mkdirChain(self.rollbackCache)
+            if not os.path.exists(self.rollbackStatus):
+                self.firstRollback = 0
+                self.lastRollback = -1
+                self.writeRollbackStatus()
+            else:
+                self.readRollbackStatus()
+            SqlDbRepository.__init__(self, root + path)
 
 # Exception classes
 
