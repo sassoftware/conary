@@ -28,6 +28,7 @@ from streams import StringStream
 from streams import FrozenVersionStream
 from streams import DependenciesStream
 from streams import ByteStream
+from lib import cstreams
 
 class Trove:
     """
@@ -715,7 +716,7 @@ _TROVEINFO_TAG_SOURCENAME  = 1
 _TROVEINFO_TAG_BUILDTIME   = 2
 _TROVEINFO_TAG_CONARYVER   = 3
 
-class TroveInfo(streams.StreamSet):
+class TroveInfo(cstreams.StreamSet):
     ignoreUnknown = True
     streamDict = {
         _TROVEINFO_TAG_SIZE       : ( streams.LongLongStream, 'size'       ),
@@ -723,6 +724,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_BUILDTIME  : ( streams.LongLongStream, 'buildTime'  ),
         _TROVEINFO_TAG_CONARYVER  : ( streams.StringStream,   'conaryVersion'),
     }
+    _streamDict = cstreams.StreamSetDef(streamDict)
 
 class ReferencedFileList(list, streams.InfoStream):
 

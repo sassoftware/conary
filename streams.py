@@ -469,10 +469,11 @@ class TupleStream(InfoStream):
 		items.append(itemType(all[i]))
 	    self.items = items
 
-class StreamSet(InfoStream):
+class LargeStreamSet(InfoStream):
 
-    headerFormat = "!BH"
-    headerSize = 3
+    headerFormat = "!HI"
+    headerSize = 6
+
     ignoreUnknown = False
 
     def __init__(self, data = None):
@@ -591,11 +592,6 @@ class ReferencedTroveList(list, InfoStream):
 	list.__init__(self)
 	if data is not None:
 	    self.thaw(data)
-
-class LargeStreamSet(StreamSet):
-
-    headerFormat = "!HI"
-    headerSize = 6
 
 class UnknownStream(Exception):
 

@@ -385,7 +385,7 @@ class ChangeSet(streams.LargeStreamSet):
 	    pkg = db.getTrove(pkgCs.getName(), pkgCs.getOldVersion(),
 			      pkgCs.getOldFlavor())
 
-            newTroveInfo = pkg.getTroveInfo().copy()
+            newTroveInfo = trove.TroveInfo(pkg.getTroveInfo().freeze())
             newTroveInfo.twm(pkgCs.getTroveInfoDiff(), newTroveInfo)
             newTroveInfoDiff = pkg.getTroveInfo().diff(newTroveInfo)
 

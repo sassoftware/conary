@@ -1,3 +1,6 @@
+Changes in 0.50.9:
+  * reimplemented StreamSet in C
+
 Changes in 0.50.8:
   * sort update --info alphabetically, display old versions, and display
     a letter summarizing the type of change

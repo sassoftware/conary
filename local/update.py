@@ -527,10 +527,10 @@ class FilesystemJob:
 	    noIds = True
             # XXX this keeps attributes from being properly merged. we
             # need a better fix (twm needs to be made much more flexible)
-            twmSkipList = [ "contents", "inode" ]
+            twmSkipList = { "contents" : True, "inode" : True }
 	else:
 	    noIds = False
-            twmSkipList = [ "contents" ]
+            twmSkipList = {  "inode" : True }
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
@@ -742,7 +742,8 @@ class FilesystemJob:
 						% realPath)
 		else:
 		    # this forces the change to apply
-		    fsFile.twm(headChanges, fsFile, skip = "contents")
+		    fsFile.twm(headChanges, fsFile, 
+                               skip = { "contents" : True })
 		    attributesChanged = True
 
 	    beenRestored = False
