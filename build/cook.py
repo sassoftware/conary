@@ -754,8 +754,11 @@ def cookCommand(cfg, args, prep, macros, buildBranch = None, emerge = False, res
                 # --prep
                 sys.exit(0)
             components, csFile = built
-            for component, version in components:
-                print "Created component:", component, version
+            for component, version, flavor in components:
+                print "Created component:", component, version,
+                if flavor:
+                    print str(flavor).replace("\n", " "),
+                print
             if csFile is None:
                 if emerge == True:
                     print 'Changeset committed to local system.'
