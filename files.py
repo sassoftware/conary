@@ -80,6 +80,25 @@ class FileMode:
 	return "%o %s %s %s" % (self.thePerms, self.theOwner, self.theGroup,
 				self.theMtime)
 
+    def diff(self, them):
+	if not them:
+	    return self.infoLine()
+
+	selfLine = string.split(self.infoLine())
+	themLine = string.split(them.infoLine())
+
+	if selfLine[0] == themLine[0] and len(selfLine) == len(themLine):
+	    rc = selfLine[0]
+	    for i in range(1, len(selfLine)):
+		if selfLine[i] == themLine[i]:
+		    rc = rc + " -"
+		else:
+		    rc = rc + " " + selfLine[i]
+
+	    return rc + "\n"
+	else:
+	    return self.infoLine()
+
     def same(self, other):
 	if self.thePerms == other.thePerms and \
 	   self.theOwner == other.theOwner and \
@@ -102,7 +121,7 @@ class FileMode:
 class File(FileMode):
 
     def infoLine(self):
-	return FileMode.infoLine(self)
+	return self.infoTag + " " + FileMode.infoLine(self)
 
     def id(self, new = None):
 	if new:
@@ -132,8 +151,9 @@ class File(FileMode):
 	# most file types don't need to do this
 	pass
 
-    def __init__(self, fileId, info = None):
+    def __init__(self, fileId, info = None, infoTag = None):
 	self.theId = fileId
+	self.infoTag = infoTag
 	FileMode.__init__(self, info)
 
 class SymbolicLink(File):
@@ -145,7 +165,7 @@ class SymbolicLink(File):
 	return self.theLinkTarget
 
     def infoLine(self):
-	return "l %s %s" % (self.theLinkTarget, File.infoLine(self))
+	return "l %s %s" % (self.theLinkTarget, FileMode.infoLine(self))
 
     def same(self, other):
 	if self.theLinkTarget == other.theLinkTarget:
@@ -175,12 +195,9 @@ class SymbolicLink(File):
 	else:
 	    self.theLinkTarget = None
 
-	File.__init__(self, fileId, info)
+	File.__init__(self, fileId, info, infoTag = "l")
 
 class Socket(File):
-
-    def infoLine(self):
-	return "s %s" % (File.infoLine(self))
 
     def same(self, other):
 	return File.same(self, other)
@@ -189,12 +206,9 @@ class Socket(File):
 	pass
 
     def __init__(self, fileId, info = None):
-	File.__init__(self, fileId, info)
+	File.__init__(self, fileId, info, infoTag = "s")
 
 class NamedPipe(File):
-
-    def infoLine(self):
-	return "p %s" % (File.infoLine(self))
 
     def same(self, other):
 	return File.same(self, other)
@@ -206,12 +220,9 @@ class NamedPipe(File):
 	File.restore(self, target)
 
     def __init__(self, fileId, info = None):
-	File.__init__(self, fileId, info)
+	File.__init__(self, fileId, info, infoTag = "p")
 
 class Directory(File):
-
-    def infoLine(self):
-	return "d %s" % (File.infoLine(self))
 
     def same(self, other):
 	return File.same(self, other)
@@ -223,13 +234,13 @@ class Directory(File):
 	File.restore(self, target)
 
     def __init__(self, fileId, info = None):
-	File.__init__(self, fileId, info)
+	File.__init__(self, fileId, info, infoTag = "d")
 
 class DeviceFile(File):
 
     def infoLine(self):
 	return "v %c %d %d %s" % (self.type, self.major, self.minor,
-				  File.infoLine(self))
+				  FileMode.infoLine(self))
 
     def same(self, other):
 	if (self.type == other.type and self.major == other.major and
@@ -263,7 +274,7 @@ class DeviceFile(File):
 	    self.major = int(self.major)
 	    self.minor = int(self.minor)
 
-	File.__init__(self, fileId, info)
+	File.__init__(self, fileId, info, infoTag = "v")
 
 class RegularFile(File):
 
@@ -274,7 +285,8 @@ class RegularFile(File):
 	return self.thesha1
 
     def infoLine(self):
-	return "f %s %s" % (self.thesha1, File.infoLine(self))
+	return "%s %s %s" % (self.infoTag, self.thesha1, 
+			     FileMode.infoLine(self))
 
     def same(self, other):
 	if self.thesha1 == other.thesha1:
@@ -302,21 +314,20 @@ class RegularFile(File):
 	repos.newFileContents(self.sha1(), file)
 	file.close()
 
-    def __init__(self, fileId, info = None):
+    def __init__(self, fileId, info = None, infoTag = "f"):
 	if (info):
 	    (self.thesha1, info) = string.split(info, None, 1)
 	else:
 	    self.thesha1 = None
 
-	File.__init__(self, fileId, info)
+	self.infoTag = infoTag
+
+	File.__init__(self, fileId, info, infoTag = self.infoTag)
 
 class SourceFile(RegularFile):
 
-    def infoLine(self):
-	return "src %s %s" % (self.thesha1, File.infoLine(self))
-
     def __init__(self, fileId, info = None):
-	RegularFile.__init__(self, fileId, info)
+	RegularFile.__init__(self, fileId, info, infoTag = "src")
 
 class FileDB:
 
@@ -356,6 +367,24 @@ class FileDB:
 	if self.f:
 	    self.f.close()
 	    self.f = None
+
+    def changeSet(self, oldVersion, newVersion):
+	if oldVersion:
+	    old = self.getVersion(oldVersion)
+	else:
+	    old = None
+
+	new = self.getVersion(newVersion)
+
+	rc = "SRS FILE CHANGESET %s\n" % (self.fileId)
+
+	if old and old.__class__ == new.__class__:
+	    rc = rc + new.diff(old)
+	else:
+	    # different classes
+	    rc = rc + new.infoLine() + "\n"
+
+	return rc
 
     def __del__(self):
 	self.close()
