@@ -22,6 +22,7 @@ import package
 import repository
 import socket
 import tempfile
+import transport
 import urllib
 import util
 import versions
@@ -80,7 +81,7 @@ class ServerCache:
 
 	    if url is None:
 		url = "http://%s/conary/" % serverName
-	    server = ServerProxy(url)
+	    server = ServerProxy(url, transport.Transport())
 	    self.cache[serverName] = server
 
 	    try:

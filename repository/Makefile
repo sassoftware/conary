@@ -18,6 +18,7 @@ python_files = __init__.py	\
 		fsrepos.py	\
 		netclient.py 	\
 		repository.py	\
+		transport.py	\
 
 extra_dist = Makefile
 
