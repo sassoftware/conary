@@ -34,7 +34,7 @@ def _checkuse(use):
     """
     if use == None:
 	return True
-    if not type(use) is tuple:
+    if type(use) is not tuple:
 	use = (use,)
     for usevar in use:
 	if not usevar:
@@ -352,7 +352,7 @@ class InstallSymlinks:
 
     def __init__(self, fromFiles, toFile, use=None):
 	# raise error early
-	if not type(fromFiles) is str:
+	if type(fromFiles) is not str:
 	    if not toFile.endswith('/'):
 		raise TypeError, 'too many targets for non-directory %s' %toFile
 	self.fromFiles = fromFiles

@@ -306,7 +306,7 @@ class Recipe:
 	for (file, filetype, targetdir, use, args) in self.sources:
 
 	    if use != None:
-		if not type(use) is tuple:
+		if type(use) is not tuple:
 		    use=(use,)
 		for usevar in use:
 		    if not usevar:
