@@ -398,7 +398,7 @@ class ChangeSet(streams.LargeStreamSet):
 		# still be available from the database when the rollback
 		# gets applied. We may be able to get away with just reversing
 		# a diff rather then saving the full contents
-		if origFile.flags.isConfig() and \
+		if origFile.flags.isConfig() and newFile.flags.isConfig() and \
                         (origFile.contents.sha1() != newFile.contents.sha1()):
                     if self.configFileIsDiff(newFile.pathId()):
                         (contType, cont) = self.getFileContents(newFile.pathId())
