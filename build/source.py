@@ -344,12 +344,15 @@ class Source(_Source):
 		    self.init_error(RuntimeError, 
 				    'do not specify a directory in both dir and'
 				    ' dest keywords')
-		else:
-		    self.dir = os.path.dirname(self.dest % recipe.macros)
-		    self.dest = fileName
-		    # unfortunately, dir is going to be macro expanded again 
-		    # later, make sure any %s in the path name survive
-		    self.dir.replace('%', '%%') 
+		elif (self.dest % recipe.macros)[-1] == '/':
+                    self.dir = self.dest
+                    self.dest = os.path.basename(self.sourcename %recipe.macros)
+                else:
+                    self.dir = os.path.dirname(self.dest % recipe.macros)
+                    self.dest = fileName
+                    # unfortunately, dir is going to be macro expanded again 
+                    # later, make sure any %s in the path name survive
+                    self.dir.replace('%', '%%') 
 	else:
 	    self.dest = os.path.basename(self.sourcename %recipe.macros)
 
