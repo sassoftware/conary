@@ -110,7 +110,7 @@ def _addDocs(obj):
         desc = flag.short
         if not desc:
             desc = '%s flag' %key
-        __doc__ += '@flag %s: %s%s.\n'% (key, dflt, desc)
+        __doc__ += '  - C{%s}: %s%s.\n'% (key, dflt, desc)
     __doc__ += '\n\nMore details:\n\n'
     for key in keys:
         flag = obj.flags[key]
@@ -118,9 +118,6 @@ def _addDocs(obj):
             __doc__ += 'C{'+key+'}: ' + flag.long + '\n\n'
 
 
-__extra_epydoc_fields__ = [
-    ('flag', 'Flag', 'Flags')
-]
 __doc__ += """
 @sort: Use, Arch
 @type Use: UseClass
