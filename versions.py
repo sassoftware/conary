@@ -633,6 +633,9 @@ class NewVersion(AbstractVersion):
     def __eq__(self, other):
 	return self.__class__ == other.__class__
 
+    def __ne__(self, other):
+	return self.__class__ != other.__class__
+
     def timeStamps(self):
 	return [ time.time() ]
 

@@ -646,7 +646,7 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
         # SourceState or some functions here to a third file?
         import checkin
         state = checkin.SourceStateFromFile('CONARY')
-        if state.name == srcName:
+        if state.name == srcName and state.version != versions.NewVersion():
             return state.version
     # make an attempt at a reasonable version # for this trove
     # although the recipe we are cooking from may not be in any
