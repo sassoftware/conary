@@ -448,7 +448,7 @@ class DependencySet:
 
 def ThawDependencySet(frz):
     depSet = DependencySet()
-    if frz is 'none' or frz is None:
+    if frz == 'none' or frz is None:
         return None
     l = frz.split('|')
     for line in l:
