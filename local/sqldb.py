@@ -742,7 +742,8 @@ class Database:
 		  troveFlavor = 0, troveFlavorId = None):
 	if not troveName:
 	    (troveName, troveVersionId, troveFlavorId) = \
-		    self.instances.getId(troveInstanceId)[0:3]
+		    self.instances.getId(troveInstanceId,
+                                         justPresent = not pristine)[0:3]
 
 	if not troveVersionId:
 	    troveVersionId = self.versionTable[troveVersion]

@@ -557,7 +557,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if not self.localRep or not troveList:
                 return [ None ] * len(troveList)
 
-            return self.localRep.getTroves(troveList)
+            return self.localRep.getTroves(troveList, pristine=True)
 
         if not chgSetList:
             # no need to work hard to find this out
