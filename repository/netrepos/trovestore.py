@@ -198,7 +198,7 @@ class TroveStore:
 
 	cu = self.db.cursor()
 	cu.execute("SELECT fileId, path, versionId FROM "
-		   "FileStreams NATURAL JOIN TroveFiles WHERE instanceId = %d", 
+		   "TroveFiles NATURAL JOIN FileStreams WHERE instanceId = %d", 
 		   troveInstanceId)
 	for (fileId, path, versionId) in cu:
 	    version = versionCache.get(versionId, None)
@@ -223,7 +223,7 @@ class TroveStore:
 	versionCache = {}
 
 	cu.execute("SELECT fileId, path, versionId, stream FROM "
-		   "FileStreams NATURAL JOIN TroveFiles "
+		   "TroveFiles NATURAL JOIN FileStreams "
 		   "WHERE instanceId = %%d %s" % sort, 
 		   troveInstanceId)
 
