@@ -26,7 +26,10 @@ class RemoveExtraLibs(policy.Policy):
     """
     Kill .la files and any other similar garbage
     """
-    invariantinclusions = ['\.la$']
+    invariantinclusions = [
+	'\.la$',
+	'%(libdir)s/python.*/site-packages/.*.a'
+    ]
 
     def doFile(self, path):
 	util.remove(self.macros['destdir']+path)
