@@ -17,11 +17,20 @@ Module implementing the "macro" dictionary class
 """
 
 class Macros(dict):
+    def __init__(self, macros={}, shadow=False):
+	if shadow:
+	    self.__macros = macros
+	else:
+	    self.update(macros)
+
     def update(self, other):
         for key, item in other.iteritems():
             self[key] = item
     
     def __setitem__(self, name, value):
+	if name[:7] == '_Macros':
+	    dict.__setitem__(self, name, value)
+	    return
         # only expand references to ourself
         d = {name: self.get(name)}
         # escape any macros in the new value
@@ -33,15 +42,23 @@ class Macros(dict):
 
     def __setattr__(self, name, value):
 	self.__setitem__(name, value)
-        
-    def __getitem__(self, name):
-	return dict.__getitem__(self, name) %self
 
+    def __getitem__(self, name):
+	if name[:7] == '_Macros':
+	    return dict.__getitem__(self, name)
+	if not name in self:
+	    # update on access
+	    # okay for this to fail bc of no __macros
+	    # -- equivalent to missing dict value
+	    value = self.__macros[name]
+	    self[name] = value
+	    return value
+	else:
+	    return dict.__getitem__(self, name) % self
+    
     def __getattr__(self, name):
 	return self.__getitem__(name)
     
-    def copy(self):
-	new = Macros()
-	new.update(self)
-	return new
-
+    def copy(self, shadow=True):
+	# shadow saves initial copying cost for a higher search cost
+	return Macros(self, shadow)
