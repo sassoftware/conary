@@ -293,12 +293,12 @@ class NormalizeInfoPages(policy.Policy):
 		    elif m.name == 'gzip' and \
 		       (m.contents['compression'] != '9' or \
 		        'name' in m.contents):
-			util.execute('gunzip %s; gzip -n -9 %s',
-				     syspath, syspath[:-3])
+			util.execute('gunzip %s; gzip -n -9 %s' %(syspath,
+                                                                  syspath[:-3])
 		    elif m.name == 'bzip':
 			# should use gzip instead
-			util.execute('bunzip2 %s; gzip -n -9 %s',
-				     syspath, syspath[:-4])
+			util.execute('bunzip2 %s; gzip -n -9 %s' %(syspath,
+                                                                  syspath[:-4])
 
 
 class NormalizeInitscripts(policy.Policy):
