@@ -163,7 +163,7 @@ class HttpHandler:
     def _getMetadata(self, fields, troveName, branch):
         branch = self.repServer.thawVersion(branch)
 
-        if "source" in fields and fields["source"] == "freshmeat":
+        if "source" in fields and fields["source"].value == "freshmeat":
             if "freshmeatName" in fields:
                 fmName = fields["freshmeatName"].value
             else:
@@ -172,7 +172,8 @@ class HttpHandler:
                 md = metadata.fetchFreshmeat(fmName)
             except metadata.NoFreshmeatRecord:
                 md = None
-                self.htmlWarning("No Freshmeat record found.")
+                self.kid_write("error", error = "No Freshmeat record found.")
+                return
         else:
             md = self.troveStore.getMetadata(troveName, branch)
 
