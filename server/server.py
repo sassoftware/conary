@@ -24,7 +24,7 @@ sys.path.append(sys.argv[1])
 from netserver import NetworkRepositoryServer
 
 FILE_PATH="/tmp/conary-server"
-BASE_URL="http://bradley:8001/"
+BASE_URL="http://%s:8001/" % os.uname()[1]
 
 class SRSServer(SimpleXMLRPCServer):
 
