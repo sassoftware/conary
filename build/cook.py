@@ -431,7 +431,7 @@ class CookError(Exception):
 
 def cookCommand(cfg, args, prep, macros):
     # this ensures the repository exists
-    repos = repository.LocalRepository(cfg.reppath, "c")
+    repos = repository.FilesystemRepository(cfg.reppath, "c")
     repos.close()
 
     for item in args:
@@ -443,7 +443,7 @@ def cookCommand(cfg, args, prep, macros):
             # child, set ourself to be the foreground process
             os.setpgrp()
             os.tcsetpgrp(0, os.getpgrp())
-	    repos = repository.LocalRepository(cfg.reppath, "r")
+	    repos = repository.FilesystemRepository(cfg.reppath, "r")
             try:
                 built = cookItem(repos, cfg, item, prep=prep, macros=macros)
             except CookError, msg:

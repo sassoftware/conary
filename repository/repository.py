@@ -132,7 +132,7 @@ class Repository:
     def __init__(self):
 	pass
 
-class LocalRepository(Repository):
+class FilesystemRepository(Repository):
 
     def storeFileFromContents(self, contents, file, restoreContents):
 	if file.hasContents:

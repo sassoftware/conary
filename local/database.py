@@ -12,7 +12,9 @@ import update
 import util
 import versions
 
-class Database(repository.LocalRepository):
+from repository import FilesystemRepository
+
+class Database(FilesystemRepository):
 
     createBranches = 1
 
@@ -152,15 +154,15 @@ class Database(repository.LocalRepository):
     # created the LocalBranch
     def storeFileFromContents(self, contents, file, restoreContents):
 	if file.isConfig():
-	    return repository.LocalRepository.storeFileFromContents(self, 
+	    return FilesystemRepository.storeFileFromContents(self, 
 				contents, file, restoreContents)
 
     def close(self):
-	repository.LocalRepository.close(self)
+	FilesystemRepository.close(self)
 
     def open(self, mode):
 	top = util.joinPaths(self.root, self.dbpath)
-	repository.LocalRepository.open(self, mode)
+	FilesystemRepository.open(self, mode)
 
 	self.rollbackCache = top + "/rollbacks"
 	self.rollbackStatus = self.rollbackCache + "/status"
@@ -260,7 +262,7 @@ class Database(repository.LocalRepository):
 	self.root = root
 	self.dbpath = path
 	fullPath = root + "/" + path + "/repcache"
-	repository.LocalRepository.__init__(self, fullPath, mode)
+	FilesystemRepository.__init__(self, fullPath, mode)
 
 # This builds a job which applies both a change set and the local changes
 # which are needed.
