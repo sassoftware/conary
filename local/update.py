@@ -307,10 +307,12 @@ class FilesystemJob:
                 # system is a directory, we're OK
                 if (isinstance(headFile, files.Directory)
                     and stat.S_ISDIR(s.st_mode)):
-                    # FIXME: this isn't the right directory handling
-                    # we will want to set ownership/permissions if
-                    # they don't conflict with any already-installed package
-                    continue
+		    # if nobody else owns this directory, set the ownership
+		    # and permissions from this package. FIXME: if it is
+		    # already owned, we just assume those permissions are
+		    # right
+		    if repos.pathIsOwned(headPath):
+			continue
                 elif not flags & REPLACEFILES:
                     self.errors.append("%s is in the way of a newly " 
                                        "created file" % headRealPath)

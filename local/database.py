@@ -142,6 +142,9 @@ class SqlDbRepository(repository.DataStoreRepository,
     def eraseTrove(self, pkgName, version, flavor):
 	self.db.eraseTrove(pkgName, version, flavor)
 
+    def pathIsOwned(self, path):
+	return self.db.pathIsOwned(path)
+
     def eraseFileVersion(self, fileId, version):
 	# files get removed with their troves
 	pass
