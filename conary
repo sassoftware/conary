@@ -96,7 +96,7 @@ for (arg, name) in cfgMap.items():
 	cfg.configLine("%s %s" % (name, argSet[arg]))
 	del argSet[arg]
 
-repos = repository.Repository(cfg.reppath)
+repos = repository.Repository(cfg.reppath, "r")
 db = repository.Database(cfg.root, cfg.dbpath)
 
 if (len(otherArgs) < 2):
@@ -116,8 +116,10 @@ elif (otherArgs[1] == "changeset"):
 	(old, new) = (None, otherArgs[3])
 	outFile = otherArgs[4]
 
+    repos.open("w")
     changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
 elif (otherArgs[1] == "commit"):
+    repos.open("w")
     for changeSet in otherArgs[2:]:
 	commit.doCommit(repos, cfg, changeSet)
 elif (otherArgs[1] == "cook"):
