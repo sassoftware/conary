@@ -763,27 +763,6 @@ class ThawTroveChangeSet(TroveChangeSet):
 	for line in lines:
 	    self.parse(line)
 
-class PackageFromFile(Package):
-
-    def __init__(self, name, dataFile, version):
-	"""
-	Initializes a PackageFromFile() object.
-
-	@param name: Fully qualified name of the package 
-	@type name: str
-	@param dataFile: File representation of a package
-	@type dataFile: file-type object
-	@param version: Fully qualified version of the package
-	@type version: versions.Version()
-	"""
-
-	Package.__init__(self, name, version)
-	self.read(dataFile)
-
-class TroveFromFile(PackageFromFile):
-
-    pass
-
 def walkPackageSet(repos, trove):
     """
     Generator returns all of the packages included by pkg, including
