@@ -17,7 +17,7 @@ import files
 
 def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     if devtype == "b":
-	f = files.BlockDeviceFile(None)
+	f = files.BlockDevice(None)
     elif devtype == "c":
 	f = files.CharacterDevice(None)
     else:
