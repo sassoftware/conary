@@ -228,3 +228,5 @@ elif (otherArgs[1] == "usage"):
     usage(rc = 0)
 else:
     usage()
+if log.errorOccurred():
+    sys.exit(1)
