@@ -11,7 +11,6 @@ import imp, sys
 import os
 import util
 import build
-import package
 import shutil
 import types
 import inspect
@@ -212,6 +211,8 @@ def loadRecipe(file):
 ##                       'setup'        : setup})
 
 class Recipe:
+    name = None
+    version = None
     buildRequires = []
     runRequires = []
 
@@ -408,6 +409,7 @@ class Recipe:
                                                 self.mainFilters,
                                                 self.subFilters)
         autopkg.walk(root)
+        #autopkg.addDevice('/dev/null', 'c', 1, 3, perms=0666)
         self.packageSet = autopkg.packageSet()
 
     def getPackageSet(self):
