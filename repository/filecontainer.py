@@ -64,12 +64,12 @@ import struct
 import util
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
-FILE_CONTAINER_VERSION = 1
+FILE_CONTAINER_VERSION = 2
 SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
 
-class FileTableEntry(object):
+class FileTableEntryFromFile1:
 
     __slots__ = [ "name", "offset", "size", "data", "src" ]
 
@@ -89,19 +89,10 @@ class FileTableEntry(object):
 	self.offset = new
 
     def writeContents(self, dest):
-	if isinstance(self.src, filecontents.FileContents):
-	    util.copyfileobj(self.src.get(), dest)
-	else:
-	    util.copyfileobj(self.src, dest)
-
-    def __init__(self, name, offset, size, data, src):
-	self.offset = offset
-	self.size = size
-	self.name = name
-	self.data = data
-	self.src = src
-
-class FileTableEntryFromFile(FileTableEntry):
+	(fileObj, size) = self.src.getWithSize()
+	dest.write(struct.pack("!HI", len(self.name), size))
+	dest.write(self.name)
+	util.copyfileobj(fileObj, dest)
 
     def __init__(self, f):
 	# read the length of the entry
@@ -172,6 +163,8 @@ class FileContainerFile:
 
 class FileContainer:
 
+    bufSize = 128 * 1024
+
     def readTable(self):
 	magic = self.file.read(4)
 	if len(magic) != 4 or magic != FILE_CONTAINER_MAGIC:
@@ -181,61 +174,93 @@ class FileContainer:
 	if len(version) != 2:
 	    raise BadContainer, "invalid container version"
 	version = struct.unpack("!H", version)[0]
-	if version != FILE_CONTAINER_VERSION:
+	if version != FILE_CONTAINER_VERSION and version != 1:
 	    raise BadContainer, "unknown file container version %d" % version
+	self.version = version
 
 	self.gzfile = gzip.GzipFile(None, "rb", None, self.file)
 
-	tableLen = self.gzfile.read(8)
-	(tableLen, entryCount) = struct.unpack("!ii", tableLen)
+	if version == 1:
+	    tableLen = self.gzfile.read(8)
+	    (tableLen, entryCount) = struct.unpack("!ii", tableLen)
 
-	while (entryCount):
-	    entry = FileTableEntryFromFile(self.gzfile)
-	    self.entries[entry.name] = entry
-	    entryCount = entryCount - 1
+	    while (entryCount):
+		entry = FileTableEntryFromFile1(self.gzfile)
+		self.entries[entry.name] = entry
+		entryCount = entryCount - 1
+
+	    early = []
+	    late = []
+	    self.entryOrder = []
+	    for entry in self.entries.values():
+		if entry.name == 'CONARYCHANGESET':
+		    self.entryOrder.append(entry.name)
+		elif entry.data[0] == '1':
+		    early.append(entry.name)
+		else:
+		    late.append(entry.name)
+
+	    early.sort()
+	    late.sort()
+	    self.entryOrder += early + late
+
+	    self.lastFetched = -1
 
 	self.contentsStart = self.gzfile.tell()
+	self.next = self.contentsStart
 
     def close(self):
-	if not self.mutable:
-	    self.file = None
-	    return
-
-	self.file.seek(SEEK_SET, 0)
-	self.file.truncate()
-	self.file.write(FILE_CONTAINER_MAGIC)
-	self.file.write(struct.pack("!H", FILE_CONTAINER_VERSION))
-
-	rest = gzip.GzipFile(None, "wb", 9, self.file)
-
-	count = len(self.entries.keys())
-
-	size = 0
-	offset = 0			# relative to the end of the table
-	for name in self.order:
-	    entry = self.entries[name]
-	    entry.setOffset(offset)
-	    size = entry.tableSize()
-	    offset += entry.size
-
-        rest.write(struct.pack("!ii", size, count))
-
-	for name in self.order:
-	    entry = self.entries[name]
-	    entry.write(rest)
-
-	for name in self.order:
-	    entry = self.entries[name]
-	    entry.writeContents(rest)
-
-	rest.close()
+	if self.mutable:
+	    self.rest.close()
 	self.file = None
     
-    def addFile(self, fileName, fileObj, tableData, fileSize):
+    def addFile(self, fileName, contents, tableData):
+	assert(isinstance(contents, filecontents.FileContents))
 	assert(self.mutable)
-	entry = FileTableEntry(fileName, -1, fileSize, tableData, fileObj)
-	self.entries[fileName] = entry
-	self.order.append(fileName)
+
+	(fileObj, size) = contents.getWithSize()
+	self.rest.write(struct.pack("!HIH", len(fileName), size, 
+			len(tableData)))
+	self.rest.write(fileName)
+	self.rest.write(tableData)
+	util.copyfileobj(fileObj, self.rest)
+
+    def getNextFile(self):
+	if self.version == 1:
+	    self.lastFetched += 1
+	    if self.lastFetched == len(self.entryOrder): 
+		return None
+
+	    entry = self.entries[self.entryOrder[self.lastFetched]] 
+	    size = entry.size
+	    tag = entry.data
+	    name = entry.name
+
+	    pos = self.gzfile.tell()
+	    offset = entry.offset + self.contentsStart
+	    if (pos != offset):
+		assert(pos < offset)
+		self.gzfile.seek(offset)	    # this is always SEEK_SET
+		assert(self.gzfile.tell() == offset)
+	else:
+	    eatCount = self.next - self.gzfile.tell()
+
+	    # in case the file wasn't completely read in (it may have
+	    # already been in the repository, for example)
+	    while eatCount > self.bufSize:
+		self.gzfile.read(self.bufSize)
+		eatCount -= self.bufSize
+	    self.gzfile.read(eatCount)
+
+	    name, tag, size = self.nextFile()
+
+	    if name is None:
+		return None
+
+	fcf = FileContainerFile(self.gzfile, size)
+	self.next = self.gzfile.tell() + size
+
+	return (name, tag, fcf, size)
 
     def getFile(self, fileName):
 	# returns a file-ish object for accessing a member of the
@@ -243,27 +268,61 @@ class FileContainer:
 	# small number of functions
 	assert(not self.mutable)
 
-	if not self.entries.has_key(fileName):
-	    raise KeyError, ("file %s is not in the collection") % fileName
+	if self.version == 1:
+	    if not self.entries.has_key(fileName):
+		raise KeyError, ("file %s is not in the collection") % fileName
 
-	entry = self.entries[fileName]
+	    entry = self.entries[fileName]
+	    self.lastFetched = self.entryOrder.index(fileName)
 
-	pos = self.gzfile.tell()
-	offset = entry.offset + self.contentsStart
-	if (pos != offset):
-	    assert(pos < offset)
-	    self.gzfile.seek(offset)	    # this is always SEEK_SET
-	    assert(self.gzfile.tell() == offset)
+	    pos = self.gzfile.tell()
+	    offset = entry.offset + self.contentsStart
+	    if (pos != offset):
+		assert(pos < offset)
+		self.gzfile.seek(offset)	    # this is always SEEK_SET
+		assert(self.gzfile.tell() == offset)
 
-	return FileContainerFile(self.gzfile, entry.size)
+	    size = entry.size
+	    tag = entry.data
+	else:
+	    eatCount = self.next - self.gzfile.tell()
 
+	    # in case the file wasn't completely read in (it may have
+	    # already been in the repository, for example)
+	    while eatCount > self.bufSize:
+		self.gzfile.read(self.bufSize)
+		eatCount -= self.bufSize
+	    self.gzfile.read(eatCount)
+
+	    name, tag, size = self.nextFile()
+	    while (name and name != fileName):
+		while size > self.bufSize:
+		    self.gzfile.read(self.bufSize)
+		    size -= self.bufSize
+		self.gzfile.read(size)
+
+		name, tag, size = self.nextFile()
+
+	    if not name:
+		raise KeyError, ("file %s is not in the collection") % fileName
+
+	fcf = FileContainerFile(self.gzfile, size)
+	self.next = self.gzfile.tell() + size
+	
+	return (tag, fcf, size)
+
+    def nextFile(self):
+	nameLen = self.gzfile.read(8)
+	if not len(nameLen):
+	    return (None, None, None)
+
+	nameLen, size, tagLen = struct.unpack("!HIH", nameLen)
+	name = self.gzfile.read(nameLen)
+	tag = self.gzfile.read(tagLen)
+	return (name, tag, size)
+	
     def getSize(self, fileName):
 	return self.entries[fileName].size
-
-    def getTag(self, fileName):
-	if not self.entries.has_key(fileName):
-	    raise KeyError, ("file %s is not in the collection") % fileName
-	return self.entries[fileName].data
 
     def hasFile(self, hash):
 	return self.entries.has_key(hash)
@@ -286,8 +345,13 @@ class FileContainer:
 	self.file.seek(0, SEEK_END)
 	self.entries = {}
 	if not self.file.tell():
-	    self.order = []
+	    self.file.seek(SEEK_SET, 0)
+	    self.file.truncate()
+	    self.file.write(FILE_CONTAINER_MAGIC)
+	    self.file.write(struct.pack("!H", FILE_CONTAINER_VERSION))
+
 	    self.mutable = True
+	    self.rest = gzip.GzipFile(None, "wb", 9, self.file)
 	else:
 	    self.file.seek(0, SEEK_SET)
 	    try:

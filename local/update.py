@@ -155,6 +155,7 @@ class FilesystemJob:
 	contents = None
 	# restore in the same order files appear in the change set
 	self.restores.sort()
+
 	for (fileId, fileObj, target, override, msg) in self.restores:
 	    # None means "don't restore contents"; "" means "take the
 	    # contents from the change set"
@@ -162,7 +163,8 @@ class FilesystemJob:
 	    if override != "":
 		contents = override
 	    elif fileObj.hasContents:
-		contents = self.changeSet.getFileContents(fileId)[1]
+		contType, contents = self.changeSet.getFileContents(fileId)
+		assert(contType != changeset.ChangedFileTypes.diff)
 	    fileObj.restore(contents, self.root, target, contents != None)
 	    log.debug(msg, target)
 
@@ -491,27 +493,19 @@ class FilesystemJob:
 
 	    if headFileVersion and headFile.hasContents and \
 	       fsFile.hasContents and \
-	       fsFile.contents.sha1() != headFile.contents.sha1():
-		# the contents have changed... let's see what to do
-
-		# get the contents if the version on head has contents, and
-		# either
-		#	1. the version from the base package doesn't have 
-		#	   contents, or
-		#	2. the file changed between head and base
-		# (if both are false, no contents would have been saved for
-		# this file)
-		if (headFile.hasContents
-                    and (not baseFile.hasContents
-                         or headFile.contents.sha1() != 
-			    baseFile.contents.sha1())):
-		    headFileContType = changeSet.getFileContentsType(fileId)
-		else:
-		    headFileContType = None
+	       fsFile.contents.sha1() != headFile.contents.sha1() and \
+	       headFile.contents.sha1() != baseFile.contents.sha1():
 
 		if (flags & REPLACEFILES) or (not flags & MERGE) or \
 			headFile.flags.isTransient() or \
 			fsFile.contents == baseFile.contents:
+
+		    if headFile.flags.isConfig():
+			(headFileContType,
+			 headFileContents) = changeSet.getFileContents(fileId)
+		    else:
+			headFileContType =changeset.ChangedFileTypes.file
+
 		    # the contents changed in just the repository, so take
 		    # those changes
 		    if headFileContType == changeset.ChangedFileTypes.diff:
@@ -523,7 +517,6 @@ class FilesystemJob:
 
 			baseLines = baseLineF.readlines()
 			del baseLineF
-			headFileContents = changeSet.getFileContents(fileId)[1]
 			diff = headFileContents.get().readlines()
 			(newLines, failedHunks) = patch.patch(baseLines, diff)
 			assert(not failedHunks)
@@ -552,7 +545,10 @@ class FilesystemJob:
 		    if headFile.contents.sha1() != baseFile.contents.sha1():
 			log.warning("preserving contents of %s (now a "
 				    "config file)" % finalPath)
-		elif fsFile.flags.isConfig() or headFile.flags.isConfig():
+		elif headFile.flags.isConfig():
+		    (headFileContType,
+		     headFileContents) = changeSet.getFileContents(fileId)
+
 		    # it changed in both the filesystem and the repository; our
 		    # only hope is to generate a patch for what changed in the
 		    # repository and try and apply it here
@@ -562,7 +558,6 @@ class FilesystemJob:
 			contentsOkay = 0
 		    else:
 			cur = open(realPath, "r").readlines()
-			headFileContents = changeSet.getFileContents(fileId)[1]
 			diff = headFileContents.get().readlines()
 			(newLines, failedHunks) = patch.patch(cur, diff)
 

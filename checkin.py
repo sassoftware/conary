@@ -380,13 +380,12 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	print '\n'.join(files.fieldsChanged(csInfo))
 
 	if files.contentsChanged(csInfo):
-	    contType = changeSet.getFileContentsType(fileId)
+	    (contType, contents) = changeSet.getFileContents(fileId)
 	    if contType == changeset.ChangedFileTypes.diff:
                 sys.stdout.write('--- %s %s\n+++ %s %s\n'
                                  %(path, newPackage.getVersion().asString(),
                                    path, newVersion.asString()))
 
-	        contents = changeSet.getFileContents(fileId)[1]
 		lines = contents.get().readlines()
 		str = "".join(lines)
 		print str

@@ -23,6 +23,9 @@ class FileContents(object):
 
     __slots__ = ()
 
+    def getWithSize(self):
+	return (self.get(), self.size())
+
     def __init__(self):
 	if self.__class__ == FileContents:
 	    raise NotImplementedError
@@ -68,8 +71,13 @@ class FromChangeSet(FileContents):
     def get(self):
 	return self.cs.getFileContents(self.fileId)[1].get()
 
+    def getWithSize(self):
+	f, size = self.cs.getFileContents(self.fileId, withSize = True)[1:]
+	f = f.get()
+	return (f, size)
+
     def size(self):
-	return self.cs.getFileSize(self.fileId)
+	assert(0)
 
     def __init__(self, cs, fileId):
 	self.cs = cs
@@ -100,23 +108,27 @@ class FromString(FileContents):
 
 class FromFile(FileContents):
 
-    __slots__ = "f"
+    __slots__ = [ "f", "theSize" ]
 
     def copy(self):
         # XXX dup the file?
         return self.__class__(self.f)
 
     def size(self):
-	pos = self.f.tell()
-	size = self.f.seek(0, SEEK_END)
-	self.f.seek(pos, SEEK_SET)
-        return size
+	if self.theSize is None:
+	    pos = self.f.tell()
+	    size = self.f.seek(0, SEEK_END)
+	    self.f.seek(pos, SEEK_SET)
+	    self.theSize = size
+
+	return self.theSize
 
     def get(self):
 	return self.f
 
-    def __init__(self, f):
+    def __init__(self, f, size = None):
 	self.f = f
+	self.theSize = size
 
 class FromGzFile(FileContents):
 

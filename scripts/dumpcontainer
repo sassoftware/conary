@@ -33,8 +33,11 @@ f = open(sys.argv[1], "r")
 c = FileContainer(f)
 f.close()
 if len(sys.argv) == 2:
-    for n in c.iterFileList():
-	print "%s (%s)" % (n, c.getTag(n))
+    rc = c.getNextFile()
+    while rc:
+	(name, tag, f, size) = rc
+	print "%s (%s)" % (name, tag)
+	rc = c.getNextFile()
 elif len(sys.argv) == 3:
     f = c.getFile(sys.argv[2])
     sys.stdout.write(f.read())

@@ -147,14 +147,16 @@ class ChangeSet:
 	else:
 	    self.lateFileContents[fileId] = (contType, contents)
 
-    def getFileContents(self, fileId):
+    def getFileContents(self, fileId, withSize = False):
 	if self.lateFileContents.has_key(fileId):
-	    return self.lateFileContents[fileId]
+	    cont = self.lateFileContents[fileId]
+	else:
+	    cont = self.earlyFileContents[fileId]
 
-	return self.earlyFileContents[fileId]
+	if not withSize:
+	    return cont
 
-    def getFileContentsType(self, fileId):
-	return self.getFileContents(fileId)[0]
+	return cont + (cont.size(), )
 
     def hasFileContents(self, hash):
 	return self.earlyFileContents.has_key(hash) or \
@@ -259,7 +261,11 @@ class ChangeSet:
 
 	for hash in idList:
 	    (contType, f) = contents[hash]
-	    csf.addFile(hash, f, tag + contType[4:], f.size())
+	    csf.addFile(hash, f, tag + contType[4:])
+
+    def writeAllContents(self, csf):
+	self.writeContents(csf, self.earlyFileContents, True)
+	self.writeContents(csf, self.lateFileContents, False)
 
     def writeToFile(self, outFileName):
 	try:
@@ -268,12 +274,8 @@ class ChangeSet:
 	    outFile.close()
 
 	    str = self.headerAsString()
-	    csf.addFile("CONARYCHANGESET", 
-			StringIO(str), "", len(str))
-
-	    self.writeContents(csf, self.earlyFileContents, True)
-	    self.writeContents(csf, self.lateFileContents, False)
-
+	    csf.addFile("CONARYCHANGESET", filecontents.FromString(str), "")
+	    self.writeAllContents(csf)
 	    csf.close()
 	except:
 	    os.unlink(outFileName)
@@ -551,21 +553,26 @@ class ChangeSetFromFile(ChangeSet):
     def getFileSize(self, fileId):
 	return self.csf.getSize(fileId)
 
-    def getFileContentsType(self, fileId):
-	tagInfo = self.csf.getTag(fileId).split()
-	return "cft-" + tagInfo[1]
-
-    def getFileContents(self, fileId):
+    def getFileContents(self, fileId, withSize = False):
 	if self.configCache.has_key(fileId):
 	    (tag, str) = self.configCache[fileId]
-	    return (tag, filecontents.FromString(str))
+	    cont = filecontents.FromString(str)
+	    size = len(str)
+	else:
+	    (tagInfo, f, size) = self.csf.getFile(fileId)
+	    tag = "cft-" + tagInfo.split()[1]
+	    cont = filecontents.FromFile(f)
 
-	f = self.csf.getFile(fileId)
-	tagInfo = self.csf.getTag(fileId).split()
-	tag = "cft-" + tagInfo[1]
+	    if tagInfo[0] == "1":
+		str = cont.get().read()
+		self.configCache[fileId] = (tag, str)
+		cont = filecontents.FromString(str)
+		size = len(str)
 
-	assert(tagInfo[0] == "0")
-	return (tag, filecontents.FromFile(f))
+	if withSize:
+	    return (tag, cont, size)
+	else:
+	    return (tag, cont)
 
     def hasFileContents(self, hash):
 	return self.csf.hasFile(hash)
@@ -574,8 +581,9 @@ class ChangeSetFromFile(ChangeSet):
 	f = open(file, "r")
 	self.csf = filecontainer.FileContainer(f)
 	f.close()
+	#return
 
-	control = self.csf.getFile("CONARYCHANGESET")
+	(tagInfo, control, size) = self.csf.getFile("CONARYCHANGESET")
 
 	line = control.readline()
 	while line:
@@ -641,52 +649,14 @@ class ChangeSetFromFile(ChangeSet):
 
 	    line = control.readline()
 
-	# pull in the config files
-	idList = []
-	for fileId in self.csf.iterFileList():
-	    if fileId == "CONARYCHANGESET": continue
-	    tags = self.csf.getTag(fileId)
-	    if tags.startswith("0 "): continue
-	    idList.append(fileId)
-	
-	idList.sort()
+    def writeAllContents(self, csf):
+	rc = self.csf.getNextFile()
+	while rc is not None:
+	    (fileId, tag, f, size) = rc
+	    cont = filecontents.FromFile(f, size)
+	    csf.addFile(fileId, cont, tag)
 
-	for fileId in idList:
-	    tags = self.csf.getTag(fileId)
-	    tag = "cft-" + tags.split()[1]
-	    self.configCache[fileId] = (tag, self.csf.getFile(fileId).read())
-
-    def writeContents(self, csf, contents, early):
-	# these are kept sorted so we know which one comes next
-	if early:
-	    tag = "1 "
-	else:
-	    tag = "0 "
-
-	idList = []
-	for fileId in self.csf.iterFileList():
-	    if fileId == "CONARYCHANGESET": continue
-	    tags = self.csf.getTag(fileId)
-	    if early and tags.startswith("0 "): 
-		continue
-	    elif not early and tags.startswith("1 "): 
-		continue
-
-	    idList.append(fileId)
-
-	idList.sort()
-
-	for fileId in idList:
-	    tags = self.csf.getTag(fileId)
-	    if early:
-		csf.addFile(fileId, StringIO(self.configCache[fileId][1]), 
-			    tags, len(self.configCache[fileId][1]))
-	    else:
-		import util, sys
-		sys.excepthook = util.excepthook
-
-		cont = filecontents.FromChangeSet(self, fileId)
-		csf.addFile(fileId, cont, tags, self.csf.getSize(fileId))
+	    rc = self.csf.getNextFile()
 
     def __init__(self, file, justContentsForConfig = 0, skipValidate = 1):
 	ChangeSet.__init__(self)

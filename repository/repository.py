@@ -576,7 +576,8 @@ class ChangeSetJob:
 	self.repos = repos
 	self.cs = cs
 
-	restoreList = []
+	configRestoreList = []
+	normalRestoreList = []
 
 	# create the package objects which need to be installed; the
 	# file objects which map up with them are created later, but
@@ -625,29 +626,30 @@ class ChangeSetJob:
 			fileObj = oldfile.copy()
 			fileObj.twm(diff, oldfile)
 
-			if fileObj.hasContents and oldfile.hasContents and	    \
+			if fileObj.hasContents and oldfile.hasContents and \
 			   fileObj.contents.sha1() == oldfile.contents.sha1() and \
 			   not (fileObj.flags.isConfig() and not 
 						    oldfile.flags.isConfig()):
 			    restoreContents = 0
 		    else:
 			fileObj = files.ThawFile(diff, fileId)
+			oldfile = None
 
 		self.addFile(troveInfo, fileId, fileObj, path, version)
 
-		# we can restore config files and files with no contents
-		# here; other files need to wait so we can do them in the
-		# right order based on the sha1 since they may be getting
-		# read from a gzip'd arghice
-		if not fileObj or not fileObj.hasContents or not restoreContents:
-		    # this means there are no contents to restore (None
-		    # means get the contents from the change set)
+		# files with contents need to be tracked so we can stick
+		# there contents in the archive "soon"; config files need
+		# extra magic for tracking since we may have to merge
+		# contents
+		if not fileObj or not fileObj.hasContents or		\
+			    not restoreContents:
+		    # this means there are no contents to restore
 		    continue
 		if self.storeOnlyConfigFiles and not fileObj.flags.isConfig():
 		    continue
 
-		fileContents = None
-
+		# we already have the contents of this file... we can go
+		# ahead and restore it reusing those contents
 		if repos._hasFileContents(fileObj.contents.sha1()):
 		    # if we already have the file in the data store we can
 		    # get the contents from there
@@ -656,53 +658,64 @@ class ChangeSetJob:
 				     fileObj.contents.sha1(), 
 				     fileObj.contents.size())
 		    contType = changeset.ChangedFileTypes.file
-		else:
-		    oldPath = newFileMap[fileId][3]
-		    contType = cs.getFileContentsType(fileId)
-		    if contType == changeset.ChangedFileTypes.diff:
-			assert(fileObj.flags.isConfig())
-			# the content for this file is in the form of a diff,
-			# which we need to apply against the file in the
-			# repository
-			assert(oldVersion)
-			(contType, fileContents) = cs.getFileContents(fileId)
-			sha1 = oldfile.contents.sha1()
-
-			f = self.repos.getFileContents(pkgName, 
-				    oldTroveVersion, troveFlavor, oldPath, 
-				    oldVersion, fileObj = oldfile).get()
-
-			oldLines = f.readlines()
-			del f
-			diff = fileContents.get().readlines()
-			(newLines, failedHunks) = patch.patch(oldLines, diff)
-			fileContents = filecontents.FromString("".join(newLines))
-
-			if failedHunks:
-			    fileContents = filecontents.WithFailedHunks(
-						fileContents, failedHunks)
-		    elif fileObj.flags.isConfig():
-			fileContents = filecontents.FromChangeSet(cs, fileId)
-
-		if fileContents is not None:
 		    self.addFileContents(fileObj.contents.sha1(), version, 
-					 fileContents, restoreContents,
+					 fileContents, restoreContents, 
 					 fileObj.flags.isConfig())
+
+		elif fileObj.flags.isConfig():
+		    tup = (fileId, fileObj, oldPath, oldfile, pkgName,
+			   oldTroveVersion, troveFlavor, version, 
+			   restoreContents)
+		    configRestoreList.append(tup)
 		else:
-		    tup = (fileObj.contents.sha1(), version, restoreContents,
-			   fileObj.flags.isConfig())
-		    restoreList.append((fileId, tup))
+		    tup = (fileId, fileObj.contents.sha1(), version, 
+			   restoreContents)
+		    normalRestoreList.append(tup)
 
 	    del newFileMap
 	    self.addPackageDone(troveInfo)
 
-	restoreList.sort()
-	for fileId, (sha1, version, restoreContents, isConfig) in restoreList:
-	    fileContents = cs.getFileContents(fileId)[1]
-	    self.addFileContents(sha1, version, fileContents, restoreContents,
-				 isConfig)
+	configRestoreList.sort()
+	normalRestoreList.sort()
 
-	del restoreList
+	for (fileId, fileObj, oldPath, oldfile, pkgName, oldTroveVersion,
+	     troveFlavor, version, restoreContents) in configRestoreList:
+	    (contType, fileContents) = cs.getFileContents(fileId)
+	    if contType == changeset.ChangedFileTypes.diff:
+		assert(fileObj.flags.isConfig())
+		# the content for this file is in the form of a
+		# diff, which we need to apply against the file in
+		# the repository
+		assert(oldVersion)
+		sha1 = oldfile.contents.sha1()
+
+		f = self.repos.getFileContents(pkgName, 
+			    oldTroveVersion, troveFlavor, oldPath, 
+			    oldVersion, fileObj = oldfile).get()
+
+		oldLines = f.readlines()
+		del f
+		diff = fileContents.get().readlines()
+		(newLines, failedHunks) = patch.patch(oldLines, 
+						      diff)
+		fileContents = filecontents.FromString(
+						"".join(newLines))
+
+		if failedHunks:
+		    fileContents = filecontents.WithFailedHunks(
+					fileContents, failedHunks)
+
+	    self.addFileContents(fileObj.contents.sha1(), version, 
+				 fileContents, restoreContents, 1)
+
+	normalRestoreList.sort()
+	for (fileId, sha1, version, restoreContents) in normalRestoreList:
+	    fileContents = filecontents.FromChangeSet(cs, fileId)
+	    self.addFileContents(sha1, version, fileContents, restoreContents,
+				 0)
+
+	del configRestoreList
+	del normalRestoreList
 
 	for (pkgName, version, flavor) in cs.getOldPackageList():
 	    pkg = self.repos.getTrove(pkgName, version, flavor)
