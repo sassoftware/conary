@@ -281,7 +281,7 @@ class Source(_Source):
     warning; a failed signature check is fatal.
     """
     def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None,
-                  use=None, apply='', macros=False):
+                  use=None, apply='', macros=False, dest=None):
 	"""
 	@param recipe: The recipe object currently being built.
 	@param sourcename: The name of the archive
@@ -304,10 +304,21 @@ class Source(_Source):
 	    C{CFLAGS = %(cflags)s}, which will cause C{%(cflags)s} to
 	    be replaced with the current setting of C{recipe.macros.cflags}.
 	    Defaults to False.
+	@param dest: If set, provides the name of the file in the build
+	    directory.  Do not include any subdirectories; use C{dir}
+	    instead for subdirectories.  Useful mainly when fetching
+	    the file from an source outside your direct control, such as
+	    a URL to a third-party web site, or copying a file out of an
+	    RPM package.
 	"""
 	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
 	self.apply = apply
 	self.applymacros = macros
+	if dest:
+	    # make sure that user did not pass subdirectory in
+	    self.dest = os.path.basename(dest)
+	else:
+	    self.dest = os.path.basename(sourcename)
 
     def doUnpack(self):
 	destDir = os.sep.join((self.builddir, self.recipe.theMainDir))
@@ -320,14 +331,12 @@ class Source(_Source):
 	if self.applymacros:
 	    log.debug('applying macros to source %s' %f)
 	    pin = file(f)
-	    pout = file(os.sep.join((destDir,
-				     os.path.basename(self.sourcename))), "w")
+	    pout = file(os.sep.join((destDir, self.dest)), "w")
 	    pout.write(pin.read()%self.recipe.macros)
 	    pin.close()
 	    pout.close()
 	else:
-	    util.copyfile(f, os.sep.join((destDir,
-					  os.path.basename(self.sourcename))))
+	    util.copyfile(f, os.sep.join((destDir, self.dest)))
 	if self.apply:
 	    util.execute(self.apply %self.recipe.macros, destDir)
 
