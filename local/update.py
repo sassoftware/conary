@@ -270,7 +270,11 @@ class FilesystemJob:
 			raise
 
 	    oldFile = repos.getFileVersion(fileId, version)
-
+            # XXX mask out any flag that isn't the config flag.
+            # There are some flags that the localFile won't have
+            # such as SHLIB or INITSCRIPT
+            oldFile.flags.set(oldFile.flags.value() & files._FILE_FLAG_CONFIG)
+            
 	    if not oldFile.metadataEqual(localFile, 
 					    ignoreOwnerGroup = noIds):
 		self.errors.append("%s has changed but has been removed "
