@@ -108,10 +108,10 @@ def _verifyAtHead(repos, headPkg, state):
 
     return True
 
-def _getRecipeLoader(recipeFile):
+def _getRecipeLoader(cfg, repos, recipeFile):
     # load the recipe; we need this to figure out what version we're building
     try:
-        loader = recipe.RecipeLoader(recipeFile)
+        loader = recipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
     except recipe.RecipeFileError, e:
 	log.error("unable to load recipe file %s: %s", recipeFile, str(e))
         return None
@@ -200,7 +200,7 @@ def commit(repos, cfg):
 		      "from the head of the branch; use update")
 	    return
 
-    loader = _getRecipeLoader(state.getRecipeFileName())
+    loader = _getRecipeLoader(cfg, repos, state.getRecipeFileName())
     if loader is None: return
 
     # fetch all the sources
