@@ -272,7 +272,7 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 	oldVersion = srcPkg.getFile(fileId)[1]	
 	(oldFile, oldCont) = repos.getFileVersion(fileId, oldVersion,
 						  withContents = 1)
-        if not f.same(oldFile):
+        if not f.same(oldFile, ignoreOwner = True):
 	    foundDifference = 1
 	    pkg.addFile(fileId, path, newVersion)
 	    state.addFile(fileId, path, newVersion)
@@ -423,6 +423,7 @@ def update(repos, versionStr = None):
 	src = repos.pullFileContentsObject(headFile.sha1())
 	dest = open(headPath, "w")
 	util.copyfileobj(src, dest)
+	#headFile.restore(headFileContents, headPath, 1)
 	state.addFile(fileId, headPath, headVersion)
 	del src
 	del dest
@@ -435,7 +436,7 @@ def update(repos, versionStr = None):
 
 	# don't remove files if they've been changed locally
 	try:
-	    localFile = files.FileFromFilesystem(path, fileId, type = "src")
+	    localFile = files.FileFromFilesystem(path, fileId)
 	except OSError, exc:
 	    # it's okay if the file is missing, it just means we all agree
 	    if exc.errno == errno.ENOENT:
@@ -446,8 +447,7 @@ def update(repos, versionStr = None):
 
 	oldFile = repos.getFileVersion(fileId, version)
 
-
-	if not oldFile.same(localFile):
+	if not oldFile.same(localFile, ignoreOwner = True):
 	    log.error("%s has changed but has been removed on head" % path)
 	    continue
 
