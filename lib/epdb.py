@@ -37,7 +37,7 @@ class Epdb(pdb.Pdb):
     # and restore stdout when done
     __old_stdout = None
     # used to track the number of times a set_trace has been seen
-    trace_counts = {'default' = [ True, 0 ]}
+    trace_counts = {'default' : [ True, 0 ]}
 
     def __init__(self):
         self._exc_type = None
