@@ -132,14 +132,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	if isinstance(where, versions.Version):
 	    kind = 'v'
 	    frz = self.fromVersion(where)
-	    if where.isBranch():
-		label = where.label()
-	    else:
-		label = where.branch().label()
 	else:
 	    kind = 'l'
 	    frz = self.fromLabel(where)
-	    label = where
 
 	newBranchStr = self.fromLabel(newBranch)
 
