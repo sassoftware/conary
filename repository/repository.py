@@ -209,10 +209,10 @@ class LocalRepository(Repository):
         try:
             self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db", 
 						   self.createBranches, mode)
-            self.fileDB = versioned.Database(self.top + "/files.db", 
-					     self.createBranches, mode)
             self.groupDB = versioned.FileIndexedDatabase(
 			    self.top + "/groups.db", self.createBranches, mode)
+            self.fileDB = versioned.Database(self.top + "/files.db", 
+					     self.createBranches, mode)
         # XXX this should be translated into a generic versioned.DatabaseError
         except bsddb.error:
             # an error occured, close our databases and relinquish the lock
@@ -299,8 +299,10 @@ class LocalRepository(Repository):
 	if self.pkgDB is not None:
             self.pkgDB.close()
             self.fileDB.close()
+	    self.groupDB.close()
 	    self.pkgDB = None
 	    self.fileDB = None
+	    self.groupDB = None
 	    os.close(self.lockfd)
             self.lockfd = -1
 
