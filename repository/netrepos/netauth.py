@@ -94,6 +94,7 @@ class NetworkAuthorization:
 
         cu.execute("INSERT INTO Permissions VALUES (?, Null, Null, ?)",
                    userId, write)
+        self.db.commit()
 
     def iterUsers(self):
         cu = self.db.cursor()
