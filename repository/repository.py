@@ -561,7 +561,7 @@ class ChangeSetJob:
 	    grpName = csGrp.getName()
 
 	    if repos.hasGroup(grpName):
-		if repos.hasGroupVersion(GrpName, newVersion):
+		if repos.hasGroupVersion(grpName, newVersion):
 		    raise CommitError, "version %s for %s is already installed" % \
 			    (newVersion.asString(), csGrp.getName())
 
