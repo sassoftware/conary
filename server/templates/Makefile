@@ -41,7 +41,7 @@ install: pyfiles-install kidfiles-install
 kidfiles-install:
 	for f in $(kid_files); do \
                 cp -a $$f $(DESTDIR)/$(conarydir)/$(DIR)/$$f; \
-		kidc $(DESTDIR)/$(conarydir)/$(DIR)/$$f; \
+		kidc $(DESTDIR)/$(conarydir)/$(DIR)/$$f ||:; \
         done
 
 dist: default-dist
