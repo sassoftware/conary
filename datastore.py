@@ -16,6 +16,7 @@ import fcntl
 import gzip
 import os
 import struct
+import time
 import util
 
 class DataStore:
@@ -32,45 +33,89 @@ class DataStore:
 	path = self.hashToPath(hash)[1]
 	return os.path.exists(path)
 
-    def modifyCount(self, path, amount):
+    def decrementCount(self, path):
+	"""
+	Decrements the count by one; it it becomes 1, the count file
+	is removed. If it becomes zero, the contents are removed.
+	"""
         countPath = path + "#"
-        oldFd = -1
-        # get the current count
-	if os.path.exists(countPath):
-	    oldFd = os.open(countPath, os.O_RDWR)
-            # exclusive lock the existing file so that we are the
-            # only process that reads the current state.
-            fcntl.lockf(oldFd, fcntl.LOCK_EX)
-            oldF = os.fdopen(oldFd)
-	    # cut off the trailing \n
-	    count = int(oldF.read()[:-1])
-	elif os.path.exists(path):
-	    count = 1
+
+	# use the count file for locking, *even if it doesn't exist*
+	countFile = os.open(countPath, os.O_RDWR | os.O_CREAT)
+	fcntl.lockf(countFile, fcntl.LOCK_EX)
+
+	val = os.read(countFile, 100)
+	if not val:
+	    # no count file, remove the file
+	    os.unlink(path)
+	    # someone may try to recreate the file in here, but it should
+	    # work fine. even if multiple processes try to, one will create
+	    # the file and the rest will block on the countFile. once
+	    # we unlink it, everything will get moving again.
+	    os.unlink(countPath)
 	else:
-	    count = 0
+	    val = int(val[:-1])
+	    if val == 1:
+		os.unlink(countPath)
+	    else:
+		val -= 1
+		os.lseek(countFile, 0, 0)
+		os.ftruncate(countFile, 0)
+		os.write(countFile, "%d\n" % val)
 
-        # modify the count
-        count += amount
+	os.close(countFile)
 
-        # write out the new count
-        if count <= 1:
-            # the count file exists and needs to be removed
-            if oldFd != -1:
-                os.unlink(countPath)
-                os.close(oldFd)
-	    return count
+    def incrementCount(self, path, fileObj = None):
+	"""
+	Increments the count by one.  it becomes one, the contents
+	of fileObj are stored into that path.
+	"""
+        countPath = path + "#"
 
-        fd = os.open(countPath + '.new', os.O_CREAT | os.O_WRONLY)
-        fcntl.lockf(fd, fcntl.LOCK_EX)
-        os.ftruncate(fd, 0)
-	os.write(fd, "%d\n" % count)
-	os.close(fd)
-	os.rename(countPath + ".new", countPath)
+	if os.path.exists(path):
+	    # if the path exists, it must be correct since we move the
+	    # contents into place atomicly. all we need to do is
+	    # increment the count
+	    countFile = os.open(countPath, os.O_RDWR | os.O_CREAT)
+	    fcntl.lockf(countFile, fcntl.LOCK_EX)
 
-        # close the fd on the existing file
-        if oldFd != -1:
-            os.close(oldFd)
-        return count
+	    val = os.read(countFile, 100)
+	    if not val:
+		val = 0
+	    else:
+		val = int(val[:-1])
+
+	    val += 1
+	    os.lseek(countFile, 0, 0)
+	    os.ftruncate(countFile, 0)
+	    os.write(countFile, "%d\n" % val)
+	    os.close(countFile)
+	else:
+	    # new file, try to be the one who creates it
+	    newPath = path + ".new"
+
+	    fd = os.open(newPath, os.O_RDWR | os.O_CREAT)
+
+	    # get a write lock on the file
+	    fcntl.lockf(fd, fcntl.LOCK_EX)
+
+	    # if the .new file doesn't exist anymore, someone else must
+	    # have gotten the write lock before we did, created the
+	    # file, and then moved it into place. when this happens
+	    # we need to update the count instead
+	    
+	    if not os.path.exists(newPath):
+		os.close(fd)
+		return self.incrementCount(path, fileObj = fileObj)
+
+	    fObj = os.fdopen(fd, "r+")
+	    dest = gzip.GzipFile(mode = "w", fileobj = fObj)
+	    util.copyfileobj(fileObj, dest)
+	    os.rename(newPath, path)
+
+	    dest.close()
+	    # this closes fd for us
+	    fObj.close()
 
     def readCount(self, path):
         # XXX this code is not used anymore
@@ -92,35 +137,22 @@ class DataStore:
     # in the archive
     def addFileReference(self, hash):
 	(dir, path) = self.hashToPath(hash)
-	self.modifyCount(path, 1)
+	self.incrementCount(path)
 	return
 
-    # list addFile, but this returns a file pointer which can be used
-    # to write the contents into the file; if it returns None the file
-    # is already in the archive
-    def newFile(self, hash):
+    # file should be a python file object seek'd to the beginning
+    # this messes up the file pointer
+    def addFile(self, f, hash):
 	(dir, path) = self.hashToPath(hash)
 
-	count = self.modifyCount(path, 1)
-	if count > 1:
-            # the file already exists, nothing to do here.
-	    return
-
 	shortPath = dir[:-3]
+
 	if not os.path.exists(shortPath):
 	    os.mkdir(shortPath)
 	if not os.path.exists(dir):
 	    os.mkdir(dir)
 
-	return gzip.GzipFile(path, "w", 9)
-
-    # file should be a python file object seek'd to the beginning
-    # this messes up the file pointer
-    def addFile(self, file, hash):
-	dest = self.newFile(hash)
-
-	if not dest: return		# it already exits
-        util.copyfileobj(file, dest)
+	self.incrementCount(path, fileObj = f)
 
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):
@@ -141,11 +173,7 @@ class DataStore:
 
     def removeFile(self, hash):
 	(dir, path) = self.hashToPath(hash)
-
-        if self.modifyCount(path, -1) > 0:
-	    return
-
-	os.unlink(path)
+	self.decrementCount(path)
 
 	try:
 	    os.rmdir(dir)
