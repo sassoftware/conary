@@ -169,22 +169,21 @@ class TroveStore:
 		       start_transaction = False)
 
 	cu.execute("""
-		SELECT Items.item, Versions.version, Nodes.timeStamps FROM
-		    (SELECT LabelMap.itemId as AitemId,
-				 LabelMap.branchId as AbranchId
-			    FROM Labels JOIN LabelMap 
-			      ON Labels.LabelId=LabelMap.LabelId 
-			    WHERE Labels.label=%s)
-		    JOIN Items 
-			ON Items.itemId=AitemId
-		    JOIN itlblb ON
-			itlblb.troveName = Items.item
-		    JOIN Latest ON 
-			AitemId=Latest.itemId AND AbranchId=Latest.branchId
-		    JOIN Nodes ON
-			AitemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
-		    JOIN Versions ON
-			Nodes.versionId = versions.versionId
+	    SELECT Items.item, Versions.version, Nodes.timeStamps FROM
+		itlblb JOIN Items ON
+		    itlblb.troveName = Items.item
+		JOIN LabelMap
+		    ON Items.itemId = LabelMap.itemId
+		JOIN (SELECT labelId as aLabelId FROM Labels 
+				WHERE Labels.label=%s)
+		    ON LabelMap.labelId = aLabelId
+		JOIN Latest ON 
+		    Items.itemId=Latest.itemId AND LabelMap.branchId=Latest.branchId
+		JOIN Nodes ON
+		    Items.itemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
+		JOIN Versions ON
+		    Nodes.versionId = versions.versionId
+	    ;
 	""", labelStr)
 
 	d = {}
