@@ -120,6 +120,9 @@ def cookObject(repos, cfg, recipeClass, buildBranch, changeSetFile = None,
     @rtype: list of strings
     """
 
+    if not (hasattr(recipeClass, 'name') and hasattr(recipeClass, 'version')):
+        raise CookError('recipe class must have name and version defined')
+
     log.info("Building %s", recipeClass.name)
     fullName = cfg.packagenamespace + ":" + recipeClass.name
 
