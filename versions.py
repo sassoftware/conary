@@ -368,6 +368,15 @@ class EmergeBranch(BranchName):
     def __init__(self):
 	BranchName.__init__(self, "localhost@local:EMERGE")
 
+class CookBranch(BranchName):
+
+    """
+    Class defining the emerge branch.
+    """
+
+    def __init__(self):
+	BranchName.__init__(self, "localhost@local:COOK")
+
 class Version(AbstractVersion):
 
     """
