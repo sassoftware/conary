@@ -1,3 +1,19 @@
+Changes in 0.9.6:
+  * dependency enforcement infrastructure has been added (the code is
+    currently disabled)
+  * bug fixes 
+    * applying a changeset that un-hardlinks files now works
+    * conary rq [trove] --info now works
+    * running "conary update [trove]" when more than one flavor of
+      [trove] exists no longer tracebacks.  It installs both flavors
+      of the trove (which is not always the desired behavior - this
+      will be addressed later)
+    * only files with execute permissions are checked for
+      #!interpreter.
+    * "conary rq [trove] --ls" no longer tracebacks when [trove]
+      exists in more than one repository
+    * various code cleanups
+
 Changes in 0.9.5:
   * new methods for specifying dependency information in recipes have
     been added
