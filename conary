@@ -61,6 +61,22 @@ def usage(rc = 1):
     print "update flags: --replacefiles"
     sys.exit(rc)
 
+def openRepository(path, mode):
+    try:
+        repos = repository.LocalRepository(path, mode)
+    except repository.RepositoryError, e:
+        log.error('Unable to open repository %s: %s', path, str(e))
+        sys.exit(1)
+    return repos
+
+def openDatabase(root, path, mode):
+    try:
+        db = database.Database(root, path, mode)
+    except repository.RepositoryError, e:
+        log.error('Unable to open database %s%s%s: %s', root, os.sep, path, str(e))
+        sys.exit(1)
+    return db
+
 otherArgs = [ sys.argv[0] ]
 argSet = {}
 argDef = {}
@@ -144,7 +160,7 @@ if (len(otherArgs) < 2):
 elif (otherArgs[1] == "branch"):
     if argSet: usage
     if len(otherArgs) < 4 or len(otherArgs) > 5: usage()
-    repos = repository.LocalRepository(cfg.reppath, "c")
+    repos = openRepository(cfg.reppath, "c")
 
     args = [repos, cfg.packagenamespace ] + otherArgs[2:]
     branch.branch(*args)
@@ -161,12 +177,12 @@ elif (otherArgs[1] == "changeset"):
 	(old, new) = (None, otherArgs[3])
 	outFile = otherArgs[4]
 
-    repos = repository.LocalRepository(cfg.reppath, "r")
+    repos = openRepository(cfg.reppath, "r")
 
     changeset.ChangeSetCommand(repos, cfg, name, outFile, old, new)
 elif (otherArgs[1] == "commit"):
     if len(otherArgs) < 3: usage()
-    repos = repository.LocalRepository(cfg.reppath, "c")
+    repos = openRepository(cfg.reppath, "c")
     for changeSet in otherArgs[2:]:
 	commit.doCommit(repos, changeSet)
 elif (otherArgs[1] == "config"):
@@ -196,7 +212,7 @@ elif (otherArgs[1] == "cook"):
 elif (otherArgs[1] == "erase"):
     if argSet: usage
     if len(otherArgs) >= 3 and len(otherArgs) <=4:
-	db = database.Database(cfg.root, cfg.dbpath, "c")
+	db = openDatabase(cfg.root, cfg.dbpath, "c")
 
 	args = [db, cfg] + otherArgs[2:]
 	updatecmd.doErase(*args)
@@ -226,9 +242,9 @@ elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
     if ls: del argSet['ls']
 
     if otherArgs[1] == "replist":
-	queryRepos = repository.LocalRepository(cfg.reppath, "r")
+	queryRepos = openRepository(cfg.reppath, "r")
     else:
-	queryRepos = database.Database(cfg.root, cfg.dbpath, "r")
+	queryRepos = openDatabase(cfg.root, cfg.dbpath, "r")
 
     if argSet: usage()
 
@@ -243,11 +259,11 @@ elif (otherArgs[1] == "pkglist" or otherArgs[1] == "replist"):
 	usage()
 elif (otherArgs[1] == "rblist"):
     if argSet: usage
-    db = database.Database(cfg.root, cfg.dbpath, "r")
+    db = openDatabase(cfg.root, cfg.dbpath, "r")
     rollbacks.listRollbacks(db, cfg)
 elif (otherArgs[1] == "rollback"):
     if argSet: usage
-    db = database.Database(cfg.root, cfg.dbpath, "c")
+    db = openDatabase(cfg.root, cfg.dbpath, "c")
     args = [db, cfg] + otherArgs[2:]
     rollbacks.apply(*args)
 elif (otherArgs[1] == "source" or otherArgs[1] == "src"):
@@ -261,7 +277,7 @@ elif (otherArgs[1] == "update"):
     if argSet: usage
     if len(otherArgs) >=3 and len(otherArgs) <= 4:
 	repos = repository.LocalRepository(cfg.reppath, "r")
-	db = database.Database(cfg.root, cfg.dbpath, "c")
+	db = openDatabase(cfg.root, cfg.dbpath, "c")
 
 	args = [repos, db, cfg] + otherArgs[2:]
 	updatecmd.doUpdate(*args, **kwargs)

@@ -241,10 +241,14 @@ class LocalRepository(Repository):
             flags |= os.O_CREAT | os.O_RDWR
 	self.lockfd = os.open(self.top + '/lock', flags)
 
-	if mode == 'r':
-	    fcntl.lockf(self.lockfd, fcntl.LOCK_SH)
-	else:
-	    fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
+        try:
+            if mode == 'r':
+                fcntl.lockf(self.lockfd, fcntl.LOCK_SH)
+            else:
+                fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
+        except IOError, e:
+            raise RepositoryError('Unable to obtain %s lock: %s' % (
+                mode == 'r' and 'shared' or 'exclusive', e.strerror))
 
 	self.pkgDB = None
 
@@ -254,7 +258,7 @@ class LocalRepository(Repository):
             self.fileDB = versioned.Database(self.top + "/files.db", 
 					     self.createBranches, mode)
         # XXX this should be translated into a generic versioned.DatabaseError
-        except bsddb.error:
+        except Exception, e:
             # an error occured, close our databases and relinquish the lock
             if self.pkgDB is not None:
                 self.pkgDB.close()
@@ -263,7 +267,7 @@ class LocalRepository(Repository):
 	    fcntl.lockf(self.lockfd, fcntl.LOCK_UN)
             os.close(self.lockfd)
             self.lockfd = -1
-            raise
+            raise RepositoryError('Unable to open repository: %s' % str(e))
 
 	self.mode = mode
 
@@ -393,7 +397,7 @@ class LocalRepository(Repository):
 
 	self.contentsStore = datastore.DataStore(self.contentsDB)
 
-	self.open(mode)
+        self.open(mode)
 
 	Repository.__init__(self)
 
