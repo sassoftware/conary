@@ -308,7 +308,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
     def _getChangeSet(self, chgSetList, recurse = True, withFiles = True,
 		      withFileContents = True, target = None):
-        # This is a bit complicated do to servers not wanting to talk
+        # This is a bit complicated due to servers not wanting to talk
         # to other servers. To make this work, we do this:
         #
         #   1. Split the list of change set requests into ones for
