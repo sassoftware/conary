@@ -116,7 +116,7 @@ Choose a branch: %s
 
     # XXX this is just a placeholder for a real editor
     def htmlMetadataEditor(self, troveName, branch, metadata):
-        branchStr = branch.asString()
+        branchStr = branch.asString().split("/")[-1]
         branchFrz = branch.freeze()
 
         if "version" in metadata:
@@ -150,12 +150,12 @@ Choose a branch: %s
 """ %   (troveName, branchStr, versionStr,
          metadata[MDClass.SHORT_DESC][0],
          metadata[MDClass.LONG_DESC][0],
-         self._genSelect(metadata[MDClass.URL], "urlList", size=4, expand=True, multiple=True),
-         self._genSelectAppender("newUrl", "urlList"),
-         self._genSelect(metadata[MDClass.LICENSE], "licenseList", size=4, expand=True, multiple=True),
-         self._genSelectAppenderList("newLicense", "licenseList", licenses),
-         self._genSelect(metadata[MDClass.CATEGORY], "categoryList", size=4, expand=True, multiple=True),
-         self._genSelectAppenderList("newCategory", "categoryList", categories), 
+         self.makeSelect(metadata[MDClass.URL], "urlList", size=4, expand=True, multiple=True),
+         self.makeSelectAppender("newUrl", "urlList"),
+         self.makeSelect(metadata[MDClass.LICENSE], "licenseList", size=4, expand=True, multiple=True),
+         self.makeSelectAppenderList("newLicense", "licenseList", licenses),
+         self.makeSelect(metadata[MDClass.CATEGORY], "categoryList", size=4, expand=True, multiple=True),
+         self.makeSelectAppenderList("newCategory", "categoryList", categories), 
          branchFrz, troveName)
          )
 
@@ -173,7 +173,7 @@ Choose a branch: %s
         self.writeFn("""Successfully updated %s's metadata on branch %s.""" 
             % (troveName, branchStr))
 
-    def _genSelectAppender(self, name, selectionName):
+    def makeSelectAppender(self, name, selectionName):
         """Generates an input box and add/remove button pair to manage a list of arbitrary
            items in a selection."""
         inputId = name + "Input"
@@ -184,12 +184,12 @@ Choose a branch: %s
             (name, inputId, selectionName, inputId, selectionName)
         return s
 
-    def _genSelectAppenderList(self, name, selectionName, items):
+    def makeSelectAppenderList(self, name, selectionName, items):
         """Generates an selection and add/remove button pair to manage a list of arbitrary
            items in a selection."""
         inputId = name + "Select"
 
-        s = self._genSelect(items, inputId, expand=True)
+        s = self.makeSelect(items, inputId, expand=True)
         s += """
 <input type="button" onClick="javascript:append('%s', '%s');" value="Add" />
 <input type="button" onClick="javascript:removeSelected('%s');" value="Remove" />
@@ -197,7 +197,7 @@ Choose a branch: %s
             (selectionName, inputId, selectionName)
         return s
 
-    def _genSelect(self, items, name, default=None, size=1, expand=False, multiple=False):
+    def makeSelect(self, items, name, default=None, size=1, expand=False, multiple=False):
         """Generate a html <select> dropdown or selection list based on a dictionary or a list.
            If 'items' is a dictionary, use the dictionary value as the option value, and display
            the key to the user. If 'items' is a list, use the list item for both."""
