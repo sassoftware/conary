@@ -455,6 +455,7 @@ class CacheSet:
                 return path
             except OSError:
                 cu.execute("DELETE FROM CacheContents WHERE row=?", row)
+                db.commit()
 
         return None
 
