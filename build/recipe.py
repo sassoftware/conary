@@ -279,7 +279,7 @@ class PackageRecipe(Recipe):
 	return self.theMainDir
 
     def nameVer(self):
-	return os.sep.join((self.name, self.version))
+	return '-'.join((self.name, self.version))
 
     def cleanup(self, builddir, destdir):
 	util.rmtree(builddir)
