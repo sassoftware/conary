@@ -4,7 +4,7 @@ import os, sys
 from distutils.core import setup
 from distutils.extension import Extension
 
-__version__ = "0.5.0"
+__version__ = "0.0.0"
 
 sqlite = "sqlite3"
 sources = ["_sqlite.c", "encode.c", "port/strsep.c"]
@@ -64,7 +64,7 @@ def main():
         DistributionMetadata.download_url = None
     
     setup ( # Distribution meta-data
-            name = "pysqlite",
+            name = "pysqlite3",
             version = __version__,
             description = "An interface to SQLite",
             long_description=long_description,
