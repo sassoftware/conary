@@ -2,16 +2,21 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
-import rpm
-import os
-import files
 import commit
+import cook
+import helper
+import os
 import stat
 import util
 
-def doImport(reppath, rpmFile):
-    scratch = reppath + "/scratch"
-    fileDB = reppath + "/files"
+from build import buildpackage
+from build import lookaside
+from repository import changeset
+
+def doImport(repos, cfg, rpmFile):
+    # this is just to avoid a warning for all srs invocations when an
+    # old rpm module is being used
+    import rpm
 
     ts = rpm.TransactionSet()
     ts.setVSFlags(~(rpm._RPMVSF_NOSIGNATURES))
@@ -28,8 +33,6 @@ def doImport(reppath, rpmFile):
     pkgVersion = h['version']
     pkgRelease = h['release']
 
-    version = "/specifix.com/" + pkgVersion + "-" + pkgRelease
-
     if (not pkgRelease):
 	print pkgFile + " does not appear to be a valid RPM"
 
@@ -38,59 +41,65 @@ def doImport(reppath, rpmFile):
     owners = h['fileusername']
     groups = h['filegroupname']
     mtimes = h['filemtimes']
-    md5s = h['filemd5s']
     rdevs = h['filerdevs']
     linktos = h['filelinktos']
     flags = h['fileflags']
 
+    buildBranch = cfg.defaultbranch
     del h
     del ts
 
+    lcache = lookaside.RepositoryCache(repos)
+    ident = cook._IdGen()
+    currentVersion = None
+    if repos.hasPackage(pkgName):
+	currentVersion = repos.pkgLatestVersion(pkgName, buildBranch)
+	pkg = repos.getPackageVersion(pkgName, currentVersion)
+	ident.populate(repos, lcache, pkg)
+
+    newVersion = helper.nextVersion(pkgVersion, currentVersion, buildBranch,
+				    binary = True)
+
     fileList = []
 
-    # this is a hack for the dev package so we don't need to be root
-    # to import it
+    buildPkg = buildpackage.BuildPackage(pkgName, newVersion)
+
     mustExtract = 0
-    for i in range(0, len(list)):
+    for i in xrange(0, len(list)):
 	if (stat.S_ISREG(modes[i])):
 	    if not (flags[i] & rpm.RPMFILE_GHOST):
-		f = files.RegularFile(list[i])
 		mustExtract = 1
-	    else:
-		continue
-	    f.md5(md5s[i])
-	elif (stat.S_ISLNK(modes[i])):
-	    f = files.SymbolicLink(list[i])
-	    f.linkTarget(linktos[i])
-	elif (stat.S_ISDIR(modes[i])):
-	    f = files.Directory(list[i])
-	elif (stat.S_ISFIFO(modes[i])):
-	    f = files.NamedPipe(list[i])
-	elif (stat.S_ISSOCK(modes[i])):
-	    f = files.Socket(list[i])
-	elif (stat.S_ISBLK(modes[i])):
-	    f = files.DeviceFile(list[i])
-	    major = (rdevs[i] & 0xffff) >> 8
-	    f.majorMinor("b", major, rdevs[i] & 0xff)
-	elif (stat.S_ISCHR(modes[i])):
-	    f = files.DeviceFile(list[i])
-	    major = (rdevs[i] & 0xffff) >> 8
-	    f.majorMinor("c", major, rdevs[i] & 0xff)
-	else:
-	    raise TypeError, "unsupported file type for %s" % list[i]
+		break
 
-	f.perms(modes[i] & 0777)
-	f.owner(owners[i])
-	f.group(groups[i])
-	f.mtime(mtimes[i])
-	fileList.append(f)
-
+    scratch = "/tmp/importrpm"
     util.mkdirChain(scratch)
 
     if mustExtract:
 	os.system("cd %s; rpm2cpio %s | cpio -iumd --quiet" % 
 		    (scratch, pkgFile))
-    commit.finalCommit(reppath, pkgName, version, scratch, fileList)
+    
+    for i in xrange(0, len(list)):
+	if (stat.S_ISBLK(modes[i])):
+	    buildPkg.addDevice(list[i], "b", (rdevs[i] & 0xff00) >> 8,
+			       rdeves[i] & 0xff, owners[i], groups[i],
+			       modes[i] & 07777)
+	elif  (stat.S_ISCHR(modes[i])):
+	    buildPkg.addDevice(list[i], "c", (rdevs[i] & 0xff00) >> 8,
+			       rdeves[i] & 0xff, owners[i], groups[i],
+			       modes[i] & 07777)
+	else:
+	    buildPkg.addFile(list[i], scratch + list[i])
+	    f = buildPkg.getFile(list[i])
+	    f.inode.setPerms(modes[i] & 07777)
+	    f.inode.setOwner(owners[i])
+	    f.inode.setGroup(groups[i])
+
+    (p, fileMap) = cook._createPackage(repos, buildBranch, buildPkg, ident)
+    packageList = [ (p, fileMap) ]
+    changeSet = changeset.CreateFromFilesystem(packageList)
+    changeSet.addPrimaryPackage(buildPkg.getName(), newVersion)
+
+    changeSet.writeToFile("FOO")
 
     if mustExtract:
 	os.system("rm -rf %s" % scratch)
