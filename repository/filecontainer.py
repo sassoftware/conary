@@ -52,7 +52,6 @@ from repository import filecontents
 import gzip
 import os
 import struct
-import types
 import util
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
