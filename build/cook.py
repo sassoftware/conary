@@ -403,7 +403,8 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     grpFlavor = deps.deps.DependencySet()
     grpFlavor.union(buildpackage._getUseDependencySet(recipeObj)) 
 
-    for groupName in recipeObj.getGroupNames():
+    groupNames = recipeObj.getGroupNames()
+    for groupName in groupNames:
         try:
             recipeObj.findTroves(groupName = groupName)
         except recipe.RecipeFileError, msg:
@@ -415,7 +416,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
                 grpFlavor.union(flavor,
                             mergeType=deps.deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
 
-    targetVersion = nextVersion(repos, fullName, sourceVersion, grpFlavor,
+    targetVersion = nextVersion(repos, groupNames, sourceVersion, grpFlavor,
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
     buildTime = time.time()
 
@@ -625,8 +626,8 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     # the first one
     flavor = deps.deps.DependencySet()
     flavor.union(bldList[0].flavor)
-
-    targetVersion = nextVersion(repos, grpName, sourceVersion, flavor, 
+    componentNames = [ x.name for x in bldList ]
+    targetVersion = nextVersion(repos, componentNames, sourceVersion, flavor, 
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
     buildTime = time.time()
 
@@ -781,7 +782,7 @@ def guessSourceVersion(repos, name, versionStr, buildLabel,
     return None
             
 
-def nextVersion(repos, troveName, sourceVersion, troveFlavor, 
+def nextVersion(repos, troveNames, sourceVersion, troveFlavor, 
                 targetLabel=None, alwaysBumpCount=False):
     """
     Calculates the version to use for a newly built trove which is about
@@ -789,7 +790,7 @@ def nextVersion(repos, troveName, sourceVersion, troveFlavor,
 
     @param repos: repository proxy
     @type repos: NetworkRepositoryClient
-    @param troveName: name of the trove being built
+    @param troveNames: name(s) of the trove(s) being built
     @type troveName: str
     @param sourceVersion: the source version that we are incrementing
     @type sourceVersion: Version
@@ -800,29 +801,48 @@ def nextVersion(repos, troveName, sourceVersion, troveFlavor,
     them, instead, increase the appropriate count.  
     @type alwaysBumpCount: bool
     """
-    d = repos.getTroveVersionsByBranch(
-                    { troveName : { sourceVersion.branch() : None } })
+    if not isinstance(troveNames, (list, tuple)):
+        troveNames = [troveNames]
+
+    # strip off any components and remove duplicates
+    troveNames = set([x.split(':')[0] for x in troveNames])
+
+    # search for all the packages that are being created by this cook - 
+    # we take the max of all of these versions as our latest.
+    query = dict.fromkeys(troveNames, {sourceVersion.branch() : None })
+    
+    d = repos.getTroveVersionsByBranch(query)
     latest = None
-    if troveName in d:
-        relVersions = [ x for x in d[troveName] \
-                                if x.getSourceVersion() == sourceVersion ] 
-        if relVersions:
-            relVersions.sort()
-            latest = relVersions[-1].copy()
-            if alwaysBumpCount:
-                # case 1.  There is a binary trove with this source
-                # version, and we always want to bump the build count
+
+    relVersions = []
+    for troveName in troveNames:
+        if troveName in d:
+            for version in d[troveName]:
+                if version.getSourceVersion() == sourceVersion:
+                    relVersions.append((version, d[troveName][version]))
+    if relVersions:
+        # all these versions only differ by build count.
+        # but we can't rely on the timestamp sort, because the build counts
+        # are on different packages that might have come from different commits
+        # XXX does this deal with shadowed versions correctly?
+        relVersions.sort(lambda a, b: cmp(a[0].trailingRevision().buildCount,
+                                          b[0].trailingRevision().buildCount))
+        latest, flavors = relVersions[-1]
+        latest = latest.copy()
+        if alwaysBumpCount:
+            # case 1.  There is a binary trove with this source
+            # version, and we always want to bump the build count
+            latest.incrementBuildCount()
+        else:
+            relFlavors = d[troveName][latest]
+            if troveFlavor in relFlavors:
+                # case 2.  There is a binary trove with this source
+                # version, and our flavor matches one already existing
+                # with this build count, so bump the build count
                 latest.incrementBuildCount()
-            else:
-                relFlavors = d[troveName][latest]
-                if troveFlavor in relFlavors:
-                    # case 2.  There is a binary trove with this source
-                    # version, and our flavor matches one already existing
-                    # with this build count, so bump the build count
-                    latest.incrementBuildCount()
-                # case 3.  There is a binary trove with this source
-                # version, and our flavor does not exist at this build 
-                # count, so reuse the latest binary version
+            # case 3.  There is a binary trove with this source
+            # version, and our flavor does not exist at this build 
+            # count, so reuse the latest binary version
     if not latest:
         # case 4.  There is no binary trove derived from this source 
         # version.  
