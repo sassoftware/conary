@@ -3,6 +3,7 @@
 # All rights reserved
 #
 import changeset
+import helper
 import log
 import os
 import package
@@ -41,44 +42,21 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
     if not cs:
         # so far no changeset (either the path didn't exist or we could not
         # read it
-	if pkg and pkg[0] != ":":
-	    pkg = cfg.packagenamespace + ":" + pkg
-
-	if versionStr and versionStr[0] != "/":
-	    versionStr = cfg.defaultbranch.asString() + "/" + versionStr
-
-	if versionStr:
-	    newVersion = versions.VersionFromString(versionStr)
-	else:
-	    newVersion = None
-
-	bail = 0
-
-	if not repos.hasPackage(pkg):
-            log.error("repository does not contain a package called %s" % 
-		      (package.stripNamespace(cfg.packagenamespace, pkg)))
-	    bail = 1
-	else:
-	    if not newVersion:
-		newVersion = repos.pkgLatestVersion(pkg, cfg.defaultbranch)
-
-	    if not newVersion or not repos.hasPackageVersion(pkg, newVersion):
-		log.error("package %s does not contain version %s" %
-			  (package.stripNamespace(cfg.packagenamespace, pkg), 
-			  newVersion.asString(cfg.defaultbranch)))
-		bail = 1
-
-	    if db.hasPackage(pkg):
-		# currentVersion could be None
-		currentVersion = db.pkgLatestVersion(pkg, 
-						     newVersion.branch())
-	    else:
-		currentVersion = None
-
-	    list = [(pkg, currentVersion, newVersion, 0)]
-
-	if bail:
+	try:
+	    pkg = helper.findPackage(repos, cfg.packagenamespace, 
+				     cfg.defaultbranch, pkg, versionStr)
+	except helper.PackageNotFound, e:
+	    log.error(str(e))
 	    return
+
+	if db.hasPackage(pkg.getName()):
+	    # currentVersion could be None
+	    currentVersion = db.pkgLatestVersion(pkg.getName(), 
+						 pkg.getVersion().branch())
+	else:
+	    currentVersion = None
+
+	list = [(pkg.getName(), currentVersion, pkg.getVersion(), 0)]
 
 	cs = repos.createChangeSet(list)
 	cs.remapPaths(map)
