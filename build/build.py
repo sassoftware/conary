@@ -642,7 +642,9 @@ class InstallDocs(_FileAction):
 	destlen = len(macros['destdir'])
 	if self.subdir:
 	    macros['subdir'] = '/%s' % self.subdir
-	base = '%(thisdocdir)s/%(subdir)s/' %macros
+	else:
+	    macros['subdir'] = ''
+	base = '%(thisdocdir)s%(subdir)s/' %macros
 	dest = '%(destdir)s'%macros + base
 	util.mkdirChain(os.path.dirname(dest))
 	for path in self.paths:
