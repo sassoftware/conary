@@ -27,13 +27,8 @@ class Macros(dict):
     def __setattr__(self, name, value):
 	self.__setitem__(name, value)
         
-    # we want keys that don't exist to default to empty strings
-    # but warn so that we can catch bugs
     def __getitem__(self, name):
-	if name in self:
-	    return dict.__getitem__(self, name) %self
-	log.warning('name %s does not exist in macros', name)
-	return ''
+	return dict.__getitem__(self, name) %self
 
     def __getattr__(self, name):
 	return self.__getitem__(name)
