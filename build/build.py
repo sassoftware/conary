@@ -832,32 +832,105 @@ class MakeDirs(_FileAction):
 	else:
 	    self.paths = args
 
-class TestCommand(_FileAction):
-    """
-    Specifies the command needed to run the test suite
-    Still not sure how we are going to PARSE what the test suite does...
-    """
-    def do(self, macros):
-	contents = self.contents + '\n'
-	path = self.path
-	fullpath = util.joinPaths(macros['destdir'], path)
-	util.mkdirChain(os.path.dirname(fullpath))
-	f = file(fullpath, 'w')
-	f.write('''#!/bin/sh -x
-# run this script to execute the test suite
-''')
-	f.write(contents % macros)
-	f.close()
-	self.setComponents(path)
-	self.chmod(macros['destdir'], path)
+class TestSuite(_FileAction):
+
+    idnum = 0
+    keywords = {'subDirs' : [], 
+		'ignore'  : []}
+
+    command_path = '%(thistestdir)s/conary-test-command' 
+    testsuite_path = '%(thistestdir)s/conary-testsuite-%(identifier)s'
 
     def __init__(self, recipe, *args, **keywords):
         _FileAction.__init__(self, recipe, *args, **keywords)
-	if len(args) != 1:
-	    raise TypeError, ("TestCommand must be passed a set of shell "
-		    "commands which will execute this package's test suite")
-	self.path = '%(thistestdir)s/conary-test-command' % recipe.macros
+	if len(args) > 2:
+	    raise TypeError, ("TestSuite must be passed a dir to run in and"
+		    "the command will execute this package's test suite")
 	self.mode=0755
 	self.component = ':test'
-	self.contents = args[0]
+	if len(args) == 0:
+	    self.dir == '.'
+	else:
+	    self.dir = args[0]
+	if len(args) < 2:
+	    self.command = 'make check-TESTS'
+	else:
+	    self.command = args[1]
+	# turn on test component
 	recipe.TestSuiteLinks(build=True)
+
+    def writeCommandScript(self):
+	path = self.command_path % self.macros
+	fullpath = self.macros.destdir + path
+	if not os.path.exists(fullpath):
+	    util.mkdirChain(os.path.dirname(fullpath))
+	    f = open(fullpath, 'w')
+	    f.write('''#!/bin/sh -x
+# run this script to execute the test suite
+failed=0
+for test in conary-testsuite-*; do
+    if ! ./$test; then
+	failed=$?
+    fi
+done
+exit $failed
+''')
+	    self.chmod(self.macros.destdir, path)
+	    self.setComponents(path)
+
+    def writeTestSuiteScript(self):
+	#id = self.dir
+	#id = id.replace('.', '')
+	#id = id.replace('*', 'star')
+	#id = id.replace('/', '-')
+	idnum = TestSuite.idnum 
+	TestSuite.idnum = idnum + 1
+	#id += str(idnum)
+	self.macros.identifier = str(idnum)
+	path = self.testsuite_path % self.macros
+	fullpath = self.macros.destdir + path
+	if not os.path.exists(fullpath):
+	    f = open(fullpath, 'w')
+	    f.write('''#!/bin/sh -x
+# testsuite 
+pushd ./%(dir)s
+# BEGIN Recipe supplied code 
+%(command)s
+# END Recipe supplied code
+exitstatus=$?
+popd
+exit $exitstatus
+''' % self.macros)
+	    self.chmod(self.macros.destdir, path)
+    
+    def mungeMakeCommand(self):
+	ignoreFiles = [ 'Makefile', 'config.status' ]
+	ignoreFiles.extend(self.ignore)
+	ignoreOpts = ' -o ' + ' -o '.join(ignoreFiles)
+	makeCmd = 'export MAKE="make' + ignoreOpts + '"\n'
+	self.command = makeCmd + '$MAKE' + self.command[:4]
+
+    def mungeMakefiles(self):
+	# special processing on automake test suites
+	filelist = [ '%(builddir)s%(dir)s/Makefile' % self.macros ]
+	for subdir in self.subDirs:
+	    self.macros.subdir = subdir
+	    filelist.append('%(builddir)s%(dir)s%(subdir)s/Makefile' % self.macros)
+	files = ' '.join(filelist)
+	util.execute(r"sed -i -e 's/check-TESTS:.*/\nconary-testprogs: $(TESTS)\n\ncheck-TESTS:\n/' " + files)
+	util.execute('cd ./%s; make conary-testprogs' % self.dir)
+	for subdir in self.subDirs:
+	    util.execute('cd ./%s%s; make conary-testprogs' % (self.dir, subdir))
+
+    def do(self, macros):
+	self.macros = macros.copy()
+	self.macros.dir = self.dir
+	self.macros.command = self.command
+	self.writeCommandScript()
+	command = self.command
+	if command[:4] == 'make':
+	    self.mungeMakeCommand()
+	    if command == 'make check' or command == 'make check-TESTS':
+		#automake check scripts, we know how to fix these
+		self.mungeMakefiles()
+	self.writeTestSuiteScript()

@@ -250,7 +250,7 @@ required.
 """)
 
 # flags to use for special situations
-Use.builddocs = True
+Use.builddocs = False
 Use.builddocs.setShortDoc('Build documentation as well as binaries')
 Use.builddocs.setLongDoc("""
 Some packages have documentation that needs to be built, not just
@@ -264,6 +264,17 @@ count as "building documentation".
 The purpose of this flag is to disable unnecessary build depedencies
 for embedded targets.
 """)
+
+Use.buildtests = True
+Use.buildtests.setShortDoc('Build test suites')
+Use.builddocs.setLongDoc("""
+Conary supports the installation of build-time test suites in a
+manner that allows them to be run later, using the installed
+package.  However, testsuites often require the compilation of
+extra files and extra post processing.  Use this flag to turn
+off building testsuites.
+""")
+
 
 # temporarily disabled until we build appropriate packages
 Use.alternatives = False
