@@ -8,6 +8,7 @@ Changes in 0.50.3:
   * Added repository findTroves call to parallelize findTrove calls.
   * Added the NonMultilibDirectories policy to prevent 32-bit troves from
     utilizing lib64 directories.
+  * the NormalizeInterpreterPath policy can now handle unwriteable files
 
 Changes in 0.50.2:
   * Any %(lib)s-derived path (/%(lib)s, %(libdir)s, %(krbprefix)s/%(lib)s,

@@ -876,8 +876,8 @@ class NormalizeInterpreterPaths(policy.Policy):
     invariantexceptions = [ '%(thisdocdir.literalRegex)s/', ]
 
     def doFile(self, path):
-	d = self.macros['destdir']
-	mode = os.lstat(util.joinPaths(d, path))[stat.ST_MODE]
+        d = util.joinPaths(self.recipe.macros.destdir, path)
+	mode = os.lstat(d)[stat.ST_MODE]
 	if not mode & 0111:
             # we care about interpreter paths only in executable scripts
             return
@@ -885,9 +885,10 @@ class NormalizeInterpreterPaths(policy.Policy):
 	if m and m.name == 'script':
             interp = m.contents['interpreter']
             if interp.find('/bin/env') != -1: # finds /usr/bin/env too...
-                line = m.contents['line']
                 # rewrite to not have env
-                d = util.joinPaths(self.recipe.macros.destdir, path)
+                line = m.contents['line']
+                # we need to be able to write the file
+                os.chmod(d, mode | 0200)
                 f = file(d, 'r+')
                 l = f.readlines()
                 l.pop(0) # we will reconstruct this line, without extra spaces
@@ -904,6 +905,8 @@ class NormalizeInterpreterPaths(policy.Policy):
                 f.truncate(0) # we may have shrunk the file, avoid garbage
                 f.writelines(l)
                 f.close()
+                # revert any change to mode
+                os.chmod(d, mode)
                 log.info('changing %s to %s in %s'
                          %(line, " ".join(wordlist), path))
                 del self.recipe.magic[path]
