@@ -54,7 +54,7 @@ class Strip(policy.Policy):
 	    if (filetext.find('current ar archive') != -1) or \
 	       (filetext.find('ELF') != -1 and
 	        filetext.find('not stripped') != -1):
-		util.execute('strip -g'+p)
+		util.execute('strip -g '+p)
 
 
 class NormalizeGzip(policy.Policy):
