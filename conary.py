@@ -43,6 +43,7 @@ def usage(rc = 1):
     print "       srs localcs      <pkg> <outfile>"
     print "       srs localcommit  <changeset>"
     print "       srs pkglist      <pkgname> [<version>]"
+    print "       srs remove       <path>"
     print "       srs replist      <pkgname> [<version>]"
     print "       srs rblist"
     print "       srs rollback     <rollback>"
@@ -275,6 +276,16 @@ def main():
 	if argSet: return usage
 	db = openDatabase(cfg.root, cfg.dbpath, "r")
 	rollbacks.listRollbacks(db, cfg)
+    elif (otherArgs[1] == "remove"):
+	if len(otherArgs) != 3: return usage()
+	if argSet: return usage
+	db = openDatabase(cfg.root, cfg.dbpath, "c")
+	fullPath = util.joinPaths(cfg.root, otherArgs[2])
+	if os.path.exists(fullPath):
+	    os.unlink(fullPath)
+	else:
+	    log.warning("%s has already been removed", fullPath)
+	db.removeFile(otherArgs[2])
     elif (otherArgs[1] == "rollback"):
 	if argSet: return usage
 	db = openDatabase(cfg.root, cfg.dbpath, "c")
