@@ -388,8 +388,9 @@ class SharedLibrary(policy.Policy):
     # needs to share with ExecutableLibraries and CheckSonames
     def updateArgs(self, *args, **keywords):
 	policy.Policy.updateArgs(self, *args, **keywords)
-	self.recipe.ExecutableLibraries(*args, **keywords)
-	self.recipe.CheckSonames(*args, **keywords)
+        # XXX there is no recipe here - only in doProcess context
+	# self.recipe.ExecutableLibraries(*args, **keywords)
+	# self.recipe.CheckSonames(*args, **keywords)
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
