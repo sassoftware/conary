@@ -10,7 +10,6 @@ from repository.localrep import versionops
 import sqlite
 import package
 import files
-import time
 import deps.arch
 import deps.deps
 import versions
@@ -272,7 +271,7 @@ class DBInstanceTable:
 	    v.setTimeStamps([ float(x) for x in t.split(":") ])
 	    return v
 	except StopIteration:
-            raise KeyError, theId
+            raise KeyError, instanceId
 
 class DBTarget:
 
