@@ -12,4 +12,5 @@
 # full details.
 #
 
-__all__ = [ "buildpackage", "recipe", "source", "macros" ]
+__all__ = [ "buildpackage", "recipe", "macros", "use", "filter", "policy",
+            "source", "build", "destdirpolicy", "packagepolicy" ]
