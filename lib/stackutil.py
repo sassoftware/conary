@@ -25,8 +25,16 @@ import xmlrpclib
 def printTraceBack(tb=None, output=sys.stderr, exc_type=None, exc_msg=None):
     if isinstance(output, str):
         output = open(output, 'w')
+
+    exc_info = sys.exc_info()
     if tb is None:
-        tb = sys.exc_info()[2]
+        tb = exc_info[2]
+
+    if exc_type is None:
+        exc_type = exc_info[0]
+
+    if exc_msg is None:
+        exc_msg = exc_info[1]
 
     if exc_type is not None:
         output.write('Exception: ')
