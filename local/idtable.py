@@ -110,6 +110,51 @@ class IdTable:
     def items(self):
 	return [ x for x in self.iteritems() ]
 
+class CachedIdTable(IdTable):
+    """
+    Provides an IdTable mapping with three differences -- ids are cached,
+    they can't be removed, and getting a tag creates it if it doesn't
+    already exist. This is designed for small tables!
+    """
+
+    def __init__(self, db, tableName, keyName, strName):
+	IdTable.__init__(self, db, tableName, keyName, strName)
+	cu = db.cursor()
+	self.cache = {}
+	self.revCache = {}
+	cu.execute("SELECT %s, %s from %s" % (keyName, strName, tableName))
+	for (idNum, s) in cu:
+	    self.cache[s] = idNum
+	    self.revCache[idNum] = s
+
+    def getId(self, theId):
+	return self.revCache[theId]
+
+    def __getitem__(self, item):
+	v = self.get(item, None)
+	if v is not None:
+	    return v
+
+	return self.addId(item)
+
+    def get(self, item, defValue):
+	return self.cache.get(item, defValue)
+
+    def addId(self, item):
+	newId = IdTable.addId(self, item)
+	self.cache[item] = newId
+	self.revCache[newId] = item
+	return newId
+
+    def getItemDict(self, itemSeq):
+	raise NotImplementedError
+	
+    def delId(self, theId):
+	raise NotImplementedError
+
+    def __delitem__(self, item):
+	raise NotImplementedError
+
 class IdPairMapping:
     """
     Maps an id tuple onto another id. The tuple can only map onto a single
