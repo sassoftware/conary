@@ -29,9 +29,8 @@ only removes empty directories and regular files."""
 	self.build = (
 	    'sed -i "s/@BUGID@/%(bugid)s/" tmpwatch.fakebug.patch',
 	    'cat tmpwatch.fakebug.patch',
-	    'patch -p1 < tmpwatch.fakebug.patch'
-	)
-	self.install = (
+	    'patch -p1 < tmpwatch.fakebug.patch',
+	    build.Make(),
 	    build.MakeInstall(rootVar = "ROOT"),
 	    build.InstallFiles("crond-tmpwatch", 
 			       "/etc/cron.daily/tmpwatch", 0755)

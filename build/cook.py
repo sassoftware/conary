@@ -121,8 +121,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
             shutil.rmtree(destdir)
         util.mkdirChain(destdir)
 	recipeObj.doBuild(builddir, destdir)
-	recipeObj.doInstall(builddir, destdir)
-        recipeObj.doPostProcess()
+        recipeObj.doProcess(destdir)
 
 	repos.open("w")
         

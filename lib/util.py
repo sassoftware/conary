@@ -14,6 +14,87 @@ import glob
 import shutil
 import string
 
+
+# build.py and policy.py need some common definitions
+
+def checkUse(use):
+    """
+    Determines whether to take an action, based on system configuration
+    @param use: Flags telling whether to take action
+    @type use: None, boolean, or tuple of booleans
+    """
+    if use == None:
+	return True
+    if type(use) is not tuple:
+	use = (use,)
+    for usevar in use:
+	if not usevar:
+	    return False
+    return True
+
+
+class Action:
+    """
+    Pure virtual base class for all actions -- classes which are
+    instantiated with data, and later asked to take an action based
+    on that data.
+
+    @cvar keywords: The keywords and default values accepted by the class at
+    """
+    def __init__(self, *args, **keywords):
+        assert(self.__class__ is not Action)
+        # initialize initialize our keywords to the defaults
+	if not self.__dict__.has_key('commonkeywords'):
+	    self.commonkeywords = {}
+	self.__dict__.update(self.commonkeywords)
+        self.__dict__.update(self.keywords)
+        # check to make sure that we don't get a keyword we don't expect
+        for key in keywords.keys():
+            if key not in self.keywords.keys() and \
+	       key not in self.commonkeywords.keys():
+                raise TypeError, ("%s.__init__() got an unexpected keyword argument "
+                                  "'%s'" % (self.__class__.__name__, key))
+        # copy the keywords into our dict, overwriting the defaults
+        self.__dict__.update(keywords)
+
+class ShellCommand(Action):
+    """Base class for shell-based commands. ShellCommand is an abstract class
+    and can not be made into a working instance. Only derived classes which
+    define the C{template} static class variable will work properly.
+
+    Note: when creating templates, be aware that they are evaulated
+    twice, in the context of two different dictionaries.
+     - keys from keywords should have a # single %, as should "args".
+     - keys passed in through the macros argument will need %% to
+       escape them for delayed evaluation; for example,
+       %%(builddir)s and %%(destdir)s
+    
+    @ivar self.command: Shell command to execute. This is built from the
+    C{template} static class variable in derived classes.
+    @type self.command: str
+    initialization time.
+    @cvar template: The string template used to build the shell command.
+    """
+    def __init__(self, *args, **keywords):
+        """Create a new ShellCommand instance that can be used to run
+        a simple shell statement
+        @param args: arguments to __init__ are stored for later substitution
+        in the shell command if it contains %(args)s
+        @param keywords: keywords are replaced in the shell command
+        through dictionary substitution
+        @raise TypeError: If a keyword is passed to __init__ which is not
+        accepted by the class.
+        @rtype: ShellCommand
+        """
+	# enforce pure virtual status
+        assert(self.__class__ is not ShellCommand)
+        self.args = string.join(args)
+        # pre-fill in the preMake and arguments
+        self.command = self.template % self.__dict__
+
+
+# Simple ease-of-use extensions to python libraries
+
 def mkdirChain(*paths):
     for path in paths:
         if path[0] != "/":

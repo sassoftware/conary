@@ -11,6 +11,7 @@ import imp, sys
 import os
 import util
 import build
+import policy
 import shutil
 import types
 import inspect
@@ -387,29 +388,12 @@ class Recipe:
 	else:
 	    self.build.doBuild(self.macros)
 
-    def doInstall(self, buildpath, root):
-        builddir = buildpath + "/" + self.mainDir()
-	self.addMacros(('builddir', builddir),
-	               ('destdir', root))
-        if self.install is None:
-            pass
-        elif type(self.install) is str:
-            util.execute(self.install %self.macros)
-        elif type(self.install) is tuple or type(self.install) is list:
-	    for inst in self.install:
-                if type(inst) is str:
-                    util.execute(inst %self.macros)
-                else:
-                    inst.doInstall(self.macros)
-	else:
-	    self.install.doInstall(self.macros)
+    def addProcess(self, post):
+        self.process.append(post)
 
-    def addPostProcess(self, post):
-        self.post.append(post)
-
-    def doPostProcess(self):
-        for post in self.post:
-            post.doPost(self)
+    def doProcess(self, destdir):
+        for post in self.process:
+            post.doProcess(self, destdir)
 
     def setConfig(self, path):
         for package in self.packages:
@@ -455,14 +439,15 @@ class Recipe:
 	#   source: (apply)
 	#     - apply is None or command to util.execute(apply)
 	self.signatures = {}
-        self.post = []
         self._devices = []
         self.cfg = cfg
 	self.laReposCache = laReposCache
 	self.srcdirs = srcdirs
 	self.theMainDir = self.name + "-" + self.version
-	self.build = build.Make()
-        self.install = build.MakeInstall()
+	# what needs to be done to get from sources to an installed tree
+	self.build = [build.Make(), build.MakeInstall()]
+	# what needs to be done to massage the installed tree
+        self.process = policy.DefaultPolicy()
 	self.macros = Macros()
 	self.addMacros = self.macros.addMacros
 	self.addMacros(baseMacros)

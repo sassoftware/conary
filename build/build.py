@@ -26,99 +26,54 @@ _permmap = {
     640: 0640,
 }
 
-def _checkuse(use):
-    """
-    Determines whether to take an action, based on system configuration
-    @param use: Flags telling whether to take action
-    @type use: None, boolean, or tuple of booleans
-    """
-    if use == None:
-	return True
-    if type(use) is not tuple:
-	use = (use,)
-    for usevar in use:
-	if not usevar:
-	    return False
-    return True
-	
-
-class ShellCommand:
-    """Base class for shell-based commands. ShellCommand is an abstract class
-    and can not be made into a working instance. Only derived classes which
-    define the C{template} static class variable will work properly.
-
-    Note: when creating templates, be aware that they are evaulated
-    twice, in the context of two different dictionaries.
-     - keys from keywords should have a # single %, as should "args".
-     - keys passed in through the macros argument will need %% to
-       escape them for delayed evaluation.  This will include at
-       least %%(builddir)s for all, and doInstall will also get
-       %%(destdir)s
-    
-    @ivar self.command: Shell command to execute. This is built from the
-    C{template} static class variable in derived classes.
-    @type self.command: str
-    @cvar keywords: The keywords and default values accepted by the class at
-    initialization time.
-    @cvar template: The string template used to build the shell command.
-    """
+class BuildAction(util.Action):
     def __init__(self, *args, **keywords):
-        """Create a new ShellCommand instance that can be used to run
-        a simple shell statement
-        @param args: arguments to __init__ are stored for later substitution
-        in the shell command if it contains %(args)s
-        @param keywords: keywords are replaced in the shell command
-        through dictionary substitution
-        @raise TypeError: If a keyword is passed to __init__ which is not
-        accepted by the class.
-        @rtype: ShellCommand
-        """
+	"""
+	@param use: Optional argument; Use flag(s) telling whether
+	to actually perform the action.
+	@type use: None, Use flag, or tuple/list of Use flags
+	"""
 	# enforce pure virtual status
-        assert(self.__class__ is not ShellCommand)
+        assert(self.__class__ is not BuildCommand)
 	# dictionary of common keywords
 	self.commonkeywords = {
-	    'use': 'None'
+	    'use': None
 	}
-        # initialize initialize our keywords to the defaults
-	self.__dict__.update(self.commonkeywords)
-        self.__dict__.update(self.keywords)
-        # check to make sure that we don't get a keyword we don't expect
-        for key in keywords.keys():
-            if key not in self.keywords.keys() and \
-	       key not in self.commonkeywords.keys():
-                raise TypeError, ("%s.__init__() got an unexpected keyword argument "
-                                  "'%s'" % (self.__class__.__name__, key))
-        # copy the keywords into our dict, overwriting the defaults
-        self.__dict__.update(keywords)
-        self.args = string.join(args)
-        # pre-fill in the preMake and arguments
-        self.command = self.template % self.__dict__
+	util.Action.__init__(self, *args, **keywords)
 	# change self.use to be a simple flag
-	self.use = _checkuse(self.use)
-
-    def doInstall(self, macros):
-        """Method which is used if the ShellCommand instance is invoked 
-        during installation
-        @param macros: macros which will be expanded through dictionary
-        substitution in self.command
-        @type macros: recipe.Macros
-        @return: None
-        @rtype: None"""
-        if self.use: util.execute(self.command %macros)
+	self.use = util.checkUse(self.use)
 
     def doBuild(self, macros):
-        """Method which is used if the ShellCommand instance is invoked 
+	if self.use:
+	    self.do(macros)
+
+class BuildCommand(BuildAction, util.ShellCommand):
+    """
+    Pure virtual class which implements the default doBuild method
+    required of build classes based on the shell command built from
+    a template.
+    """
+    def __init__(self, *args, **keywords):
+	# enforce pure virtual status
+        assert(self.__class__ is not BuildCommand)
+	BuildAction.__init__(self, *args, **keywords)
+	util.ShellCommand.__init__(self, *args, **keywords)
+
+    def do(self, macros):
+        """
+	Method which is used if the ShellCommand instance is invoked 
         during build
         @param macros: macros which will be expanded through dictionary
         substitution in self.command
         @type macros: recipe.Macros
         @return: None
-        @rtype: None"""
+        @rtype: None
+	"""
         if self.use: util.execute(self.command %macros)
 
 
 
-class Automake(ShellCommand):
+class Automake(BuildCommand):
     # note: no use of %(args)s -- which command would it apply to?
     template = ('cd %%(builddir)s; '
                 'aclocal %%(m4DirArgs)s %(acLocalArgs)s; '
@@ -131,16 +86,14 @@ class Automake(ShellCommand):
                 'm4Dir': '',
 		'automakeVer': ''}
     
-    def doBuild(self, macros):
-	if not self.use:
-	    return
+    def do(self, macros):
 	macros = macros.copy()
         if self.m4Dir:
 	    macros.update({'m4DirArgs': '-I %s' %(self.m4Dir)})
         util.execute(self.command %macros)
 
 
-class Configure(ShellCommand):
+class Configure(BuildCommand):
     """The Configure class runs an autoconf configure script with the
     default paths as defined by the macro set passed into it when doBuild
     is invoked.
@@ -182,11 +135,9 @@ class Configure(ShellCommand):
         @keyword preConfigure: Extra shell script which is inserted in front of
         the configure command.
         """
-        ShellCommand.__init__(self, *args, **keywords)
+        BuildCommand.__init__(self, *args, **keywords)
          
-    def doBuild(self, macros):
-	if not self.use:
-	    return
+    def do(self, macros):
 	macros = macros.copy()
         if self.objDir:
             macros['mkObjdir'] = 'mkdir -p %s; cd %s;' \
@@ -203,13 +154,13 @@ class ManualConfigure(Configure):
                 '%%(mkObjdir)s '
 	        '%(preConfigure)s %%(configure)s %(args)s')
 
-class Make(ShellCommand):
+class Make(BuildCommand):
     template = ('cd %%(builddir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
                 ' %(preMake)s make %%(mflags)s %%(parallelmflags)s %(args)s')
     keywords = {'preMake': ''}
 
-class MakeInstall(ShellCommand):
+class MakeInstall(BuildCommand):
     template = ('cd %%(builddir)s; '
 	        'CFLAGS="%%(cflags)s" CXXFLAGS="%%(cflags)s"'
                 ' %(preMake)s make %%(mflags)s %%(rootVarArgs)s'
@@ -218,16 +169,14 @@ class MakeInstall(ShellCommand):
                 'preMake': '',
 		'installtarget': 'install'}
 
-    def doInstall(self, macros):
-	if not self.use:
-	    return
+    def do(self, macros):
 	macros = macros.copy()
         if self.rootVar:
 	    macros.update({'rootVarArgs': '%s=%s'
 	                  %(self.rootVar, macros['destdir'])})
 	util.execute(self.command %macros)
 
-class GNUMakeInstall(ShellCommand):
+class GNUMakeInstall(BuildCommand):
     """For use at least when there is no single functional DESTDIR or similar"""
     template = (
 	'cd %%(builddir)s; '
@@ -252,7 +201,7 @@ class GNUMakeInstall(ShellCommand):
 
 
 
-class InstallDesktopfile(ShellCommand):
+class InstallDesktopfile(BuildCommand):
     template = ('desktop-file-install --vendor %(vendor)s'
 		' --dir %%(destdir)s/%%(datadir)s/applications'
 		' %%(category)s'
@@ -264,13 +213,11 @@ class InstallDesktopfile(ShellCommand):
 	macros = macros.copy()
         if self.categories:
 	    macros['category'] = '--add-category %s' %self.categories
-	ShellCommand.doBuild(self, macros)
+	BuildCommand.doBuild(self, macros)
 
 
-class _PutFiles:
-    def doInstall(self, macros):
-	if not self.use:
-	    return
+class _PutFiles(BuildAction):
+    def do(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 	util.mkdirChain(os.path.dirname(dest))
 
@@ -303,7 +250,7 @@ class _PutFiles:
 		      %(mode, _permmap[mode])
 		mode = _permmap[mode]
 	self.mode = mode
-	self.use = _checkuse(use)
+	self.use = util.checkUse(use)
     
 
 class InstallFiles(_PutFiles):
@@ -318,11 +265,9 @@ class MoveFiles(_PutFiles):
 	self.source = '%(destdir)s'
 	self.move = 1
 
-class InstallSymlinks:
+class InstallSymlinks(BuildAction):
 
-    def doInstall(self, macros):
-	if not self.use:
-	    return
+    def do(self, macros):
 	dest = macros['destdir'] + self.toFile %macros
 	util.mkdirChain(os.path.dirname(dest))
 
@@ -357,13 +302,11 @@ class InstallSymlinks:
 		raise TypeError, 'too many targets for non-directory %s' %toFile
 	self.fromFiles = fromFiles
 	self.toFile = toFile
-	self.use = _checkuse(use)
+	self.use = util.checkUse(use)
 
-class RemoveFiles:
+class RemoveFiles(BuildAction):
 
-    def doInstall(self, macros):
-	if not self.use:
-	    return
+    def do(self, macros):
 	for filespec in self.filespecs:
 	    if self.recursive:
 		util.rmtree("%s/%s" %(macros['destdir'], filespec %macros))
@@ -376,13 +319,11 @@ class RemoveFiles:
 	else:
 	    self.filespecs = filespecs
 	self.recursive = recursive
-	self.use = _checkuse(use)
+	self.use = util.checkUse(use)
 
-class InstallDocs:
+class InstallDocs(BuildAction):
 
-    def doInstall(self, macros):
-	if not self.use:
-	    return
+    def do(self, macros):
 	macros = macros.copy()
 	if self.subdir:
 	    macros['subdir'] = '/%s' % self.subdir
@@ -401,4 +342,4 @@ class InstallDocs:
 	    self.paths = paths
 	self.devel = devel
 	self.subdir = subdir
-	self.use = _checkuse(use)
+	self.use = util.checkUse(use)
