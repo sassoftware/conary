@@ -449,7 +449,7 @@ available regular expressions.  It adds a dependency and should
 generally be disabled for embedded builds.
 """)
 
-Use.tcpwrappers = False
+Use.tcpwrappers = True
 Use.tcpwrappers.setShortDoc('Use the tcp_wrappers library')
 
 Use.gcj = True
