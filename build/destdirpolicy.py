@@ -745,6 +745,11 @@ class NormalizeInterpreterPaths(policy.Policy):
     C{r.NormalizeInterpreterPaths(exceptions=I{filterexp})}
     """
     def doFile(self, path):
+	d = self.macros['destdir']
+	mode = os.lstat(util.joinPaths(d, path))[stat.ST_MODE]
+	if not mode & 0111:
+            # we care about interpreter paths only in executable scripts
+            return
         m = self.recipe.magic[path]
 	if m and m.name == 'script':
             interp = m.contents['interpreter']
