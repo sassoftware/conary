@@ -82,20 +82,22 @@ class InstallFile:
 
     def doInstall(self, dir, root):
 	dest = root + self.toFile
+	if dest[-1:] == '/':
+	    dest = dest + self.fromFile
 	util.mkdirChain(os.path.dirname(dest))
 
-	shutil.copyfile(self.toFile, dest)
+	shutil.copyfile(self.fromFile, dest)
 	os.chmod(dest, self.mode)
 
     def __init__(self, fromFile, toFile, perms = 0644):
 	self.toFile = toFile
-	self.file = fromFile
+	self.fromFile = fromFile
 	self.mode = perms
 
 class InstallSymlink:
 
     def doInstall(self, dir, root):
-	os.link(root + self.fromFile, root + self.toFile)
+	os.symlink(self.fromFile, root + self.toFile)
 
     def __init__(self, fromFile, toFile):
 	self.fromFile = fromFile
