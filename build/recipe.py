@@ -645,8 +645,15 @@ class GroupRecipe(Recipe):
     Flags = use.LocalFlags
 
     def addTrove(self, name, versionStr = None, flavor = None, source = None):
-        if flavor is not None:
+        # XXX we likely should not accept multiple types
+        # of flavors, it's not a good API
+        if isinstance(flavor, deps.DependencySet) or flavor is None:
+            # nothing needs to be done
+            pass
+        elif isinstance(flavor, use.Flag):
             flavor = flavor.asSet()
+        else:
+            raise ValueError, 'invalid flavor'
         self.addTroveList.append((name, versionStr, flavor, source))
 
     def findTroves(self):
@@ -655,8 +662,19 @@ class GroupRecipe(Recipe):
                 desFlavor = self.cfg.buildFlavor.copy()
                 if flavor is not None:
                     # specified flavor overrides the default build flavor
-                    desFlavor.union(flavor.toDependency(),
-                                    deps.DEP_MERGE_TYPE_OVERRIDE)
+                    if isinstance(flavor, use.Flag):
+                        flavor = flavor.toDependency()
+                    # XXX we likely should not accept multiple types
+                    # of flavors, it's not a good API
+                    elif (isinstance(flavor, deps.DependencySet) or
+                          flavor is None):
+                        # nothing needs to be done
+                        pass
+                    else:
+                        raise AssertionError
+                    desFlavor.union(flavor, deps.DEP_MERGE_TYPE_OVERRIDE)
+                sys.stderr.write('findtrove: %s %s %s\n' %(name, desFlavor, versionStr))
+                sys.stderr.flush()
                 pkgList = self.repos.findTrove(self.label, name, desFlavor,
                                                versionStr = versionStr)
             except repository.TroveNotFound, e:
