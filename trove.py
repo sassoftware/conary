@@ -18,6 +18,7 @@ Implements troves (packages, components, etc.) for the repository
 import changelog
 import copy
 import files
+import sha1helper
 import streams
 import struct
 import versions
@@ -47,6 +48,7 @@ class Trove:
         self.flavor = flavor
 
     def addFile(self, fileId, path, version):
+	assert(len(fileId) == 20)
 	self.idMap[fileId] = (path, version)
 
     # fileId is the only thing that must be here; the other fields could
@@ -129,42 +131,6 @@ class Trove:
 
     def hasTrove(self, name, version, flavor):
 	return self.packages.has_key((name, version, flavor))
-
-    def readFileList(self, dataFile):
-        line = dataFile.next()
-	fileCount = int(line)
-
-        for line in dataFile:
-	    fields = line.split()
-	    fileId = fields.pop(0)
-	    version = fields.pop(-1)
-	    path = " ".join(fields)
-
-	    version = versions.VersionFromString(version)
-	    self.addFile(fileId, path, version)
-
-    def freezeFileList(self):
-	"""
-	Returns a string representing file information for this trove
-	trove, which can later be read by the read() method. This is
-	only used to create the Conary control file when dealing with
-	:source component checkins, so things like trove dependency
-	information is not needed.  The format of the string is:
-
-	<file count>
-	FILEID1 PATH1 VERSION1
-	FILEID2 PATH2 VERSION2
-	.
-	.
-	.
-	FILEIDn PATHn VERSIONn
-	"""
-        assert(len(self.packages) == 0)
-        rc = []
-	rc.append("%d\n" % (len(self.idMap)))
-        rc += [ "%s %s %s\n" % (x[0], x[1][0], x[1][1].asString())
-                for x in self.idMap.iteritems() ]
-	return "".join(rc)
 
     # returns a dictionary mapping a fileId to a (path, version, pkgName) tuple
     def applyChangeSet(self, pkgCS):
@@ -595,6 +561,7 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 
     def thaw(self, data):
 	if not data: return
+	self.clear()
 
 	l = data.split("\0")
 	i = 0
@@ -624,17 +591,31 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 	if data is not None:
 	    self.thaw(data)
 
+class OldFileStream(list, streams.InfoStream):
+
+    def freeze(self):
+	return "".join(self)
+
+    def thaw(self, data):
+	i = 0
+	del self[:]
+	while i < len(data):
+	    self.append(data[i:i+20])
+	    i += 20
+	assert(i == len(data))
+
+    def __init__(self, data = None):
+	list.__init__(self)
+	if data is not None:
+	    self.thaw(data)
+
 class ReferencedFileList(list, streams.InfoStream):
 
     def freeze(self):
 	l = []
 
-	# XXX this can go away once we track binary fileids
-	sha1 = streams.Sha1Stream()
-
 	for (fileId, path, version) in self:
-	    sha1.setFromString(fileId)
-	    l.append(sha1.freeze())
+	    l.append(fileId)
 	    if not path:
 		path = ""
 
@@ -658,9 +639,7 @@ class ReferencedFileList(list, streams.InfoStream):
 
 	i = 0
 	while i < len(data):
-	    # XXX this can go away once we track binary fileids
-	    sha1 = streams.Sha1Stream(data[i:i+20])
-	    fileId = sha1.asString()
+	    fileId = data[i:i+20]
 	    i += 20
 
 	    pathLen = struct.unpack("!H", data[i:i+2])[0]
@@ -692,7 +671,9 @@ _STREAM_TCS_NEW_VERSION	    = streams._STREAM_TROVE_CHANGE_SET +  2
 _STREAM_TCS_REQUIRES	    = streams._STREAM_TROVE_CHANGE_SET +  3
 _STREAM_TCS_PROVIDES	    = streams._STREAM_TROVE_CHANGE_SET +  4
 _STREAM_TCS_CHANGE_LOG	    = streams._STREAM_TROVE_CHANGE_SET +  5
-_STREAM_TCS_OLD_FILES	    = streams._STREAM_TROVE_CHANGE_SET +  6
+# + 6 was used for a broken OLD_FILES tag; we should put this back next
+# time we break the change set format
+_STREAM_TCS_OLD_FILES	    = streams._STREAM_TROVE_CHANGE_SET + 13
 _STREAM_TCS_TYPE	    = streams._STREAM_TROVE_CHANGE_SET +  7
 _STREAM_TCS_TROVE_CHANGES   = streams._STREAM_TROVE_CHANGE_SET +  8
 _STREAM_TCS_NEW_FILES       = streams._STREAM_TROVE_CHANGE_SET +  9
@@ -712,7 +693,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         _STREAM_TCS_REQUIRES    : (streams.DependenciesStream, "requires"    ),
         _STREAM_TCS_PROVIDES    : (streams.DependenciesStream, "provides"    ),
         _STREAM_TCS_CHANGE_LOG  : (changelog.AbstractChangeLog,"changeLog"   ),
-        _STREAM_TCS_OLD_FILES   : (streams.StringsStream,      "oldFiles"    ),
+        _STREAM_TCS_OLD_FILES   : (OldFileStream,	       "oldFiles"    ),
         _STREAM_TCS_TYPE        : (streams.IntStream,          "tcsType"     ),
         _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,         "packages"    ),
         _STREAM_TCS_NEW_FILES   : (ReferencedFileList,         "newFiles"    ),
@@ -866,16 +847,18 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
                    fileobj.timeString(), name)
 
 	for (fileId, path, version) in self.changedFiles:
+	    fileIdStr = sha1helper.sha1ToString(fileId)
 	    if path:
 		f.write("\tchanged %s (%s(.*)%s)\n" % 
-			(path, fileId[:6], fileId[-6:]))
+			(path, fileIdStr[:6], fileIdStr[-6:]))
 	    else:
-		f.write("\tchanged %s\n" % fileId)
+		f.write("\tchanged %s\n" % fileIdStr)
 	    change = changeSet.getFileChange(fileId)
 	    f.write("\t\t%s\n" % " ".join(files.fieldsChanged(change)))
 
 	for fileId in self.oldFiles:
-	    f.write("\tremoved %s(.*)%s\n" % (fileId[:6], fileId[-6:]))
+	    fileIdStr = sha1helper.sha1ToString(fileId)
+	    f.write("\tremoved %s(.*)%s\n" % (fileIdStr[:6], fileIdStr[-6:]))
 
 	for name in self.packages.keys():
 	    list = [ x[0] + x[1].asString() for x in self.packages[name] ]
@@ -898,9 +881,6 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 
     def getNewFlavor(self):
         return self.newFlavor.value()
-
-    def __init__(self, data = None):
-	streams.LargeStreamSet.__init__(self, data)
 
 class TroveChangeSet(AbstractTroveChangeSet):
 

@@ -185,6 +185,7 @@ class Sha1Stream(StringStream):
 	return self.s
 
     def asString(self):
+	assert(0)
 	return "%08x%08x%08x%08x%08x" % struct.unpack("!5I", self.s)
 
     def thaw(self, data):

@@ -145,10 +145,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                      withFiles)
         if withFiles:
             for (fileId, path, version, f) in gen:
-                yield (fileId, path, self.toVersion(version), self.toFile(f))
+                yield (self.toFileId(fileId), path, self.toVersion(version), 
+		       self.toFile(f))
         else:
             for (fileId, path, version) in gen:
-                yield (fileId, path, self.toVersion(version))
+                yield (self.toFileId(fileId), path, self.toVersion(version))
 
     def getAllTroveLeafs(self, serverName, troveNames):
 	d = self.c[serverName].getAllTroveLeafs(troveNames)
@@ -316,8 +317,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	return cs
 
     def getFileVersion(self, fileId, version):
-        return self.toFile(self.c[version].getFileVersion(fileId,
-                                                 self.fromVersion(version)))
+        return self.toFile(self.c[version].getFileVersion(
+				   self.fromFileId(fileId), 
+				   self.fromVersion(version)))
 
     def getFileContents(self, troveName, troveVersion, troveFlavor, path,
 		        fileVersion, fileObj = None):

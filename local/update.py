@@ -696,7 +696,6 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     for (fileId, path, version) in newPkg.iterFileList():
 	fileIds[fileId] = True
 
-
     # Iterating over the files in newPkg would be much more natural
     # then iterating over the ones in the old package, and then going
     # through newPkg to find what we missed. However, doing it the

@@ -41,7 +41,7 @@ class FileInfo(streams.TupleStream):
 	      ("csInfo", streams.StringStream, "B"))
 
     def fileId(self):
-        return self.items[0].asString()
+        return self.items[0]
 
     def setFileId(self, value):
         return self.items[0].set(value)
@@ -65,14 +65,10 @@ class FileInfo(streams.TupleStream):
         return self.items[3].set(value)
 
     def __init__(self, first = None, oldStr = None, newVer = None, chg = None):
-	# XXX this can go away once we track binary fileids
 	if oldStr is None:
 	    streams.TupleStream.__init__(self, first)
 	else:
-	    sha1 = streams.Sha1Stream()
-	    sha1.setFromString(first)
-
-	    streams.TupleStream.__init__(self, sha1.freeze(), oldStr, newVer, chg)
+	    streams.TupleStream.__init__(self, first, oldStr, newVer, chg)
 
 class ChangeSetNewPackageList(dict, streams.InfoStream):
 
@@ -104,13 +100,8 @@ class ChangeSetNewPackageList(dict, streams.InfoStream):
 class ChangeSetFileDict(dict, streams.InfoStream):
 
     def freeze(self):
-	# XXX this can go away once we track binary fileids
-	sha1 = streams.Sha1Stream()
-	
 	fileList = []
 	for (fileId, (oldVersion, newVersion, csInfo)) in self.iteritems():
-	    sha1.setFromString(fileId)
-
 	    if oldVersion:
 		oldStr = oldVersion.asString()
 	    else:
@@ -137,7 +128,8 @@ class ChangeSetFileDict(dict, streams.InfoStream):
 		oldVersion = versions.VersionFromString(oldVerStr)
 
 	    newVersion = versions.VersionFromString(info.newVersion())
-	    self[info.fileId()] = (oldVersion, newVersion, info.csInfo())
+	    self[info.fileId().value()] = (oldVersion, newVersion, 
+					   info.csInfo())
 
     def __init__(self, data = None):
 	if data:
@@ -307,9 +299,6 @@ class ChangeSet(streams.LargeStreamSet):
 
 	for hash in idList:
 	    (contType, f) = contents[hash]
-	    # XXX this can go away once we track fileids as binary
-	    import sha1helper
-	    hash = sha1helper.sha1FromString(hash)
 	    csf.addFile(hash, f, tag + contType[4:])
 
     def writeAllContents(self, csf):
@@ -608,11 +597,8 @@ class ChangeSetFromFile(ChangeSet):
 	return self.csf.getSize(fileId)
 
     def getFileContents(self, fileId, withSize = False):
-        # XXX this can go away once we track fileids as binary
-        import sha1helper
-        binFileId = sha1helper.sha1FromString(fileId)
-	if self.configCache.has_key(binFileId):
-	    (tag, str) = self.configCache[binFileId]
+	if self.configCache.has_key(fileId):
+	    (tag, str) = self.configCache[fileId]
 	    cont = filecontents.FromString(str)
 	    size = len(str)
 	else:
@@ -628,7 +614,7 @@ class ChangeSetFromFile(ChangeSet):
                 # if we found the fileId we're looking for, or the fileId
                 # we got is a config file, cache or break out of the loop
                 # accordingly
-                if name == binFileId or tagInfo[0] == '1':
+                if name == fileId or tagInfo[0] == '1':
                     tag = 'cft-' + tagInfo.split()[1]
                     cont = filecontents.FromFile(f)
 
@@ -640,7 +626,7 @@ class ChangeSetFromFile(ChangeSet):
                         cont = filecontents.FromString(str)
                     
                     # we found the one we're looking for, break out
-                    if name == binFileId:
+                    if name == fileId:
                         break
 
 	if withSize:

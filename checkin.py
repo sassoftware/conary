@@ -29,6 +29,7 @@ import log
 import magic
 import os
 import repository
+import sha1helper
 import sys
 import time
 import trove
@@ -46,11 +47,36 @@ class SourceState(trove.Trove):
 	return False
 
     def write(self, filename):
+	"""
+	Returns a string representing file information for this trove
+	trove, which can later be read by the read() method. This is
+	only used to create the Conary control file when dealing with
+	:source component checkins, so things like trove dependency
+	information is not needed.  The format of the string is:
+
+	<file count>
+	FILEID1 PATH1 VERSION1
+	FILEID2 PATH2 VERSION2
+	.
+	.
+	.
+	FILEIDn PATHn VERSIONn
+	"""
+        assert(len(self.packages) == 0)
+
 	f = open(filename, "w")
 	f.write("name %s\n" % self.getName())
 	if self.version:
 	    f.write("version %s\n" % self.getVersion().freeze())
-	f.write(self.freezeFileList())
+
+        rc = []
+	rc.append("%d\n" % (len(self.idMap)))
+
+        rc += [ "%s %s %s\n" % (sha1helper.sha1ToString(x[0]), x[1][0], 
+				x[1][1].asString())
+                for x in self.idMap.iteritems() ]
+
+	f.write("".join(rc))
 
     def changeBranch(self, branch):
 	self.branch = branch
@@ -77,6 +103,19 @@ class SourceState(trove.Trove):
 	trove.Trove.__init__(self, name, version, None, None)
 
 class SourceStateFromFile(SourceState):
+
+    def readFileList(self, dataFile):
+        line = dataFile.next()
+	fileCount = int(line)
+
+        for line in dataFile:
+	    fields = line.split()
+	    fileId = sha1helper.sha1FromString(fields.pop(0))
+	    version = fields.pop(-1)
+	    path = " ".join(fields)
+
+	    version = versions.VersionFromString(version)
+	    self.addFile(fileId, path, version)
 
     def parseFile(self, filename):
 	f = open(filename)

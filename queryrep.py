@@ -141,7 +141,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 			 file.sizeString(), file.timeString(), name)
 	elif ids:
 	    for (fileId, path, version) in trove.iterFileList():
-		print "%s %s" % (fileId, path)
+		print "%s %s" % (sha1ToString(fileId), path)
 	elif tags:
 	    iter = repos.iterFilesInTrove(trove.getName(), trove.getVersion(),
                                           trove.getFlavor(), sortByPath = True, 

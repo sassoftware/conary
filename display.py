@@ -78,7 +78,7 @@ def _displayTroveInfo(db, cfg, troveName, versionStr, ls, ids, sha1s,
 			 file.sizeString(), file.timeString(), name)
 	elif ids:
 	    for (fileId, path, version) in trove.iterFileList():
-		print "%s %s" % (fileId, path)
+		print "%s %s" % (sha1ToString(fileId), path)
 	elif sha1s:
 	    for (fileId, path, version) in trove.iterFileList():
 		file = db.getFileVersion(fileId, version)

@@ -41,7 +41,7 @@ def hashFileBin(path):
 def hashString(buf):
     m = sha.new()
     m.update(buf)
-    return m.hexdigest()
+    return m.digest()
 
 def sha1ToString(buf):
     assert(len(buf) == 20)
@@ -56,8 +56,8 @@ def sha1FromString(val):
 import sqlite3
 
 def encodeFileId(fileId):
-    return sqlite3.encode(sha1FromString(fileId))
+    return sqlite3.encode(fileId)
 
 def decodeFileId(fileId):
-    return sha1ToString(fileId)
+    return fileId
 

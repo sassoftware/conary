@@ -16,6 +16,7 @@ import deps.deps
 import versions
 import files
 import base64
+import sha1helper
 
 class NetworkConvertors(object):
 
@@ -30,6 +31,12 @@ class NetworkConvertors(object):
 
     def toVersion(self, v):
 	return versions.VersionFromString(v)
+
+    def fromFileId(self, f):
+	return sha1helper.sha1ToString(f)
+
+    def toFileId(self, f):
+	return sha1helper.sha1FromString(f)
 
     def fromBranch(self, b):
 	return b.asString()
@@ -51,11 +58,12 @@ class NetworkConvertors(object):
 
     def toFile(self, f):
         fileId = f[:40]
-        return files.ThawFile(base64.decodestring(f[40:]), fileId)
+        return files.ThawFile(base64.decodestring(f[40:]), 
+			      self.toFileId(fileId))
 
     def fromFile(self, f):
         s = base64.encodestring(f.freeze())
-        return f.id() + s
+        return self.fromFileId(f.id()) + s
 
     def fromLabel(self, l):
 	return l.asString()
