@@ -15,6 +15,7 @@
 # implements a db-based repository
 
 import log
+import os
 import repository
 import repository.netclient
 import util
@@ -255,6 +256,16 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    self.close()
 
 	self.troveStore = trovestore.TroveStore(self.sqlDB)
+	sb = os.stat(self.sqlDB)
+	self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
+
+    def reopen(self):
+	sb = os.stat(self.sqlDB)
+
+	sqlDeviceInode = (sb.st_dev, sb.st_ino)
+	if self.sqlDeviceInode != sqlDeviceInode:
+	    del self.troveStore
+	    self.troveStore = trovestore.TroveStore(self.sqlDB)
 
     def commitChangeSet(self, cs):
         self.troveStore.begin()
@@ -464,7 +475,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    util.mkdirChain(self.top)
 	except OSError, e:
 	    raise repository.OpenError(str(e))
-	    
+
         self.open()
 
 	DataStoreRepository.__init__(self, path)
