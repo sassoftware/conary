@@ -365,6 +365,9 @@ class PackageRecipe(Recipe):
     def addAction(self, action, targetdir='', use=None):
 	self._appendSource('', '', 'action', targetdir, use, (action))
 
+    def addBuild(self, action):
+        self._build.append(action)
+
     def _extractFromRPM(self, rpm, filename):
         """
         Extracts filename from rpm file and creates an entry in the
