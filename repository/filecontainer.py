@@ -246,9 +246,14 @@ class FileContainer:
 	return (name, tag, fcf, size)
 
     def getFile(self, fileName):
-	# returns a file-ish object for accessing a member of the
-	# container in read-only mode. the object provides a very
-	# small number of functions
+	"""
+        Returns a file-like object for accessing a member of the
+	container in read-only mode. The object provides a very
+	small number of functions.
+
+        @param fileName: name of file to retrieve from the file container
+        @type fileName: str
+        """
 	assert(not self.mutable)
 
 	eatCount = self.next - self.gzfile.tell()
