@@ -100,7 +100,7 @@ class Recipe:
             pass
         elif type(self.build) == types.TupleType:
 	    for bld in self.build:
-		bld(builddir + "/" + self.mainDir())
+		bld.doBuild(builddir + "/" + self.mainDir())
 	else:
 	    self.build.doBuild(builddir + "/" + self.mainDir())
 
@@ -125,3 +125,4 @@ class Recipe:
 	self.sources = []
 	self.theMainDir = self.name + "-" + self.version
 	self.build = build.Make()
+        self.install = build.MakeInstall()
