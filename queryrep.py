@@ -118,7 +118,7 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 
 	if ls:
 	    outerTrove = trove
-	    for trove in db.walkTroveSet(outerTrove):
+	    for trove in repos.walkTroveSet(outerTrove):
 		iter = repos.iterFilesInTrove(trove.getName(), 
 				trove.getVersion(), trove.getFlavor(), 
 				sortByPath = True, withFiles = True)
