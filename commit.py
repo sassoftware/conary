@@ -46,8 +46,6 @@ def doCommit(reppath, pkgName, version, root, fileNameFile):
 	list.append(n[:-1])	# chop
     f.close()
 
-    fileDB = reppath + "/files"
-
     fileList = []
     for i in range(0, len(list)):
 	frags = string.split(list[i])

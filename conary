@@ -9,6 +9,7 @@ import package
 import update
 import commit
 import srscfg
+import cook
 
 cfg = srscfg.SrsConfiguration()
 
@@ -25,16 +26,24 @@ def usage():
 
 def displayPkgs(reppath, packageList):
     for pkgName in packageList:
-	pkgSet = package.PackageSet(reppath, pkgName)
-	l = pkgSet.versionList()
-	for version in l:
-	    print "%-24s %s" % (pkgName, version)
+	if os.path.isdir(reppath + "/pkgs/" + pkgName):
+	    files = os.listdir(reppath + "/pkgs/" + pkgName)
+	    for sub in files:
+		displayPkgs(reppath, [ pkgName + "/" + sub ])
+	else:
+	    pkgSet = package.PackageSet(reppath, pkgName)
+	    l = pkgSet.versionList()
+	    for version in l:
+		print "%-24s %s" % (pkgName, version)
 
 if (len(sys.argv) < 2):
     usage()
 elif (sys.argv[1] == "import"):
     for file in sys.argv[2:]:
 	importrpm.doImport(cfg.reppath, file)
+elif (sys.argv[1] == "cook"):
+    for file in sys.argv[2:]:
+	cook.cook(cfg.reppath, cfg.sourcepath, cfg.buildpath ,file)
 elif (sys.argv[1] == "pkglist"):
     if (len(sys.argv) == 2):
 	displayPkgs(cfg.reppath, os.listdir(cfg.reppath + "/pkgs"))
