@@ -60,7 +60,7 @@ crossMacros = (
 
 # XXX TEMPORARY - remove directories such as /usr/include from this
 # list when filesystem package is in place.
-baseAutoSpec = (
+baseSubFilters = (
     # automatic subpackage names and sets of regexps that define them
     # cannot be a dictionary because it is ordered; first match wins
     ('devel',
@@ -401,13 +401,14 @@ class Recipe:
 	    self.install.doInstall(self.macros)
 
     def packages(self, namePrefix, version, root):
-	# "None" will be replaced by explicit subpackage list
-	factory = buildpackage.BuildPackageFactory(
-            namePrefix + ":" + self.name, version, self.autoSpecList, None)
-        factory.walk(root)
-        #factory.addDevice('/dev/null', 'c', 1, 3, perms=0666)
-        #factory.addDevice('/dev/zero', 'c', 1, 5, perms=0666)
-        self.packageSet = factory.packageSet()
+        # by default, everything that hasn't matched a pattern in the
+        # main package filter goes in the package named self.name
+        self.mainFilters.append(buildpackage.Filter(self.name, '.*'))
+	autopkg = buildpackage.AutoBuildPackage(namePrefix, version,
+                                                self.mainFilters,
+                                                self.subFilters)
+        autopkg.walk(root)
+        self.packageSet = autopkg.packageSet()
 
     def getPackageSet(self):
         return self.packageSet
@@ -443,6 +444,8 @@ class Recipe:
 	self.macros['version'] = self.version
 	if extraMacros:
 	    self.addMacros(extraMacros)
-	self.autoSpecList = []
-	for spec in baseAutoSpec:
-	    self.autoSpecList.append(buildpackage.PackageSpec(*spec))
+            
+	self.subFilters = []
+	for pattern in baseSubFilters:
+	    self.subFilters.append(buildpackage.Filter(*pattern))
+	self.mainFilters = []

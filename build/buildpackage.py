@@ -49,7 +49,9 @@ class BuildDeviceFile(BuildFile):
 class BuildPackage(types.DictionaryType):
 
     def addFile(self, path, realPath, type="auto"):
-        """add a file to the build package
+        """
+        Add a file to the build package
+
         @param path: the destination of the file in the package
         @param realPath: the location of the actual file on the filesystem,
         used to obtain the contents of the file when creating a changeset
@@ -60,7 +62,9 @@ class BuildPackage(types.DictionaryType):
 
     def addDevice(self, path, devtype, major, minor,
                   user='root', group='root', perms=0660):
-        """add a device node to the build package
+        """
+        Add a device node to the build package
+
         @param path: the destination of the device node in the package
         """
 	self[path] = BuildDeviceFile(devtype, major, minor, user, group, perms)
@@ -88,8 +92,7 @@ class BuildPackageSet:
     def __init__(self):
 	self.pkgs = {}
 
-class PackageSpec:
-    
+class Filter:
     def __init__(self, name, relist):
 	self.name = name
 	tmplist = []
@@ -110,61 +113,55 @@ class PackageSpec:
 	# front-anchor searches
 	return self.regexp.search(string)
 
-class BuildPackageFactory:
-    """BuildPackageFactory creates a set of BuildPackage instances
-    and provides facilities for populating them with files according
-    to PackageSpecs.
+class AutoBuildPackage:
     """
-    def __init__(self, namePrefix, version, auto, explicit):
+    AutoBuildPackage creates a set of BuildPackage instances and
+    provides facilities for automatically populating them with files
+    according to Filters.
+    """
+    def __init__(self, namePrefix, version, mainFilters, subFilters):
         """
 	@param namePrefix: the fully qualified name of the main package
-	such as ":srs.specifixinc.com:tmpwatch"
+	such as ":srs.specifixinc.com"
 	@param version: a versionObject specifying the version of the
 	package, which is used as the version of each subpackage
-	@param auto: automatic subpackage list
-	@type auto: sequence of PackageSpec instances
-	@param explicit: explicit subpackage list
-	@type explicit: sequence of PackageSpec instances
+	@param mainFilters: Filters used to add files to main packages
+	@type mainFilters: sequence of Filter instances
+	@param subFilters: Filters used to add files to sub packages
+	@type subFilters: sequence of Filter instances
 	"""
-	self.auto = auto
-	if explicit:
-	    self.explicit = explicit
-	else:
-	    self.explicit = (PackageSpec('', '.*'), )
+	self.mainFilters = mainFilters
+        self.subFilters = subFilters
         # dictionary of all the build packages
         self.packages = {}
-        # reverse map from the explicitspec/autospec combination to
+        # reverse map from the main-package:sub-package combination to
         # the correct build package
 	self.packageMap = {}
-	for explicitspec in self.explicit:
-	    for autospec in self.auto:
-		name = self._getname(namePrefix, explicitspec.name,
-                                     autospec.name)
+	for main in self.mainFilters:
+	    for sub in self.subFilters:
+		name = self._getname(namePrefix, main.name, sub.name)
                 package = BuildPackage(name, version)
 		self.packages[name] = package
-		if not self.packageMap.has_key(explicitspec):
-		    self.packageMap[explicitspec] = {}
-		self.packageMap[explicitspec][autospec] = package
+		if not self.packageMap.has_key(main):
+		    self.packageMap[main] = {}
+		self.packageMap[main][sub] = package
 
-    def _getname(self, prefix, subname, autoname):
-        """Return the full name of the package when subname could be None"""
-	if subname:
-	    return string.join((prefix, subname, autoname), ':')
-	else:
-	    return string.join((prefix, autoname), ':')
+    def _getname(self, prefix, pkgname, subname):
+        return string.join((prefix, pkgname, subname), ':')
 
     def findPackage(self, path):
         """Return the BuildPackage that matches the path"""
-	for explicitspec in self.explicit:
-	    if explicitspec.match(path):
-		for autospec in self.auto:
-		    if autospec.match(path):
-			return self.packageMap[explicitspec][autospec]
+	for main in self.mainFilters:
+	    if main.match(path):
+		for sub in self.subFilters:
+		    if sub.match(path):
+			return self.packageMap[main][sub]
         return None
     
     def addFile(self, path, realPath):
-        """Add a path to the correct BuildPackage instance by matching
-        the file name against the the explicit and auto specs
+        """
+        Add a path to the correct BuildPackage instance by matching
+        the file name against the main-package and sub-package filters
 
         @param path: path to add to the BuildPackage
         @type path: str
@@ -175,14 +172,16 @@ class BuildPackageFactory:
 
     def addDevice(self, path, devtype, major, minor,
                   user='root', group='root', perms=0660):
-        """Add a device to the correct BuildPackage instance by matching
-        the file name against the the explicit and auto specs
+        """
+        Add a device to the correct BuildPackage instance by matching
+        the file name against the main package and sub-package filters
         """
         pkg = self.findPackage(path)
         pkg.addDevice(path, devtype, major, minor, user, group, perms)
 
     def packageSet(self):
-        """Examine the BuildPackage instances created by the factory
+        """
+        Examine the BuildPackage instances that have been created and
         return a new BuildPackageSet instance that includes only those
         which have files
         
@@ -196,8 +195,10 @@ class BuildPackageFactory:
         return set
             
     def walk(self, root):
-        """Traverse the directory tree specified by @C{root}, adding entries
+        """
+        Traverse the directory tree specified by @C{root}, adding entries
         to the BuildPackages
+
         @param root: root of path to walk
         @type root: str
         @rtype: None
@@ -205,9 +206,11 @@ class BuildPackageFactory:
         os.path.walk(root, _autoVisit, (root, self))
 
 def _autoVisit(arg, dir, files):
-    """Helper function called by os.path.walk() when
-    BuildPackageFactory.walk() is called"""
-    (root, factory) = arg
+    """
+    Helper function called by os.path.walk() when AutoBuildPackage.walk()
+    is called
+    """
+    (root, autopkg) = arg
     dir = dir[len(root):]
 
     for file in files:
@@ -216,4 +219,4 @@ def _autoVisit(arg, dir, files):
         else:
             path = '/' + file
 
-        factory.addFile(path, root + path)
+        autopkg.addFile(path, root + path)

@@ -150,7 +150,9 @@ elif (otherArgs[1] == "cook"):
             os.setpgrp()
             os.tcsetpgrp(0, os.getpgrp())
 	    repos = repository.Repository(cfg.reppath, "r")
-            cook.cook(repos, cfg, file, prep=prep, macros=macros)
+            built = cook.cook(repos, cfg, file, prep=prep, macros=macros)
+            for (pkg, version) in built:
+                print "Committed", pkg, version, "to the repository"
             sys.exit(0)
         else:
             while 1:

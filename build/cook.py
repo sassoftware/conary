@@ -76,7 +76,8 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	ident = IdGen()
         ident.populate(cfg, repos, lcache, recipeClass.name)
 
-        srcdirs = [ os.path.dirname(recipeClass.filename), cfg.sourcepath % {'pkgname': recipeClass.name} ]
+        srcdirs = [ os.path.dirname(recipeClass.filename),
+                    cfg.sourcepath % {'pkgname': recipeClass.name} ]
 	recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
 
 	nameList = repos.getPackageList(fullName)
@@ -125,7 +126,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
 	for (name, buildPkg) in recipeObj.getPackageSet().packageSet():
 	    (p, fileMap) = createPackage(repos, cfg, buildPkg, ident)
-            built.append(p.getName())
+            built.append((p.getName(), p.getVersion().asString()))
 	    packageList.append((p, fileMap))
 
         recipes = [ recipeClass.filename ]
