@@ -231,12 +231,60 @@ class Epdb(pdb.Pdb):
     do_l = do_list
 
     def default(self, line):
+        if line[0] == '!': line = line[1:]
+        if self.handle_directive(line):
+            return
+        if line == '<<EOF':
+            return self.multiline()
+        if line.strip().endswith(':'):
+            return self.multiline(line)
+        if line.count('(') > line.count(')'):
+            return self.multiline(line)
+        return pdb.Pdb.default(self, line)
+
+    def multiline(self, firstline=''):
+        full_input = []
+        if firstline:
+            print '  ' + firstline
+            full_input.append(firstline)
+        while True:
+            if self.use_rawinput:
+                try:
+                    line = raw_input('| ')
+                except EOFError:
+                    line = 'EOF'
+            else:
+                self.stdout.write('| ')
+                self.stdout.flush()
+                line = self.stdin.readline()
+                if not len(line):
+                    line = 'EOF'
+                else:
+                    line = line[:-1] # chop \n
+            if line == 'EOF':
+                break
+            full_input.append(line)
+        locals = self.curframe.f_locals
+        globals = self.curframe.f_globals
+        try:
+            code = compile('\n'.join(full_input) + '\n', '<stdin>', 'exec')
+            exec code in globals, locals
+        except:
+            t, v = sys.exc_info()[:2]
+            if type(t) == type(''):
+                exc_type_name = t
+            else: exc_type_name = t.__name__
+            print '***', exc_type_name + ':', v
+        else:
+            print ''
+
+    def handle_directive(self, line):
         cmd = line.split('?', 1)
         if len(cmd) == 1:
-            return pdb.Pdb.default(self, line)
+            return False
         cmd, directive = cmd
         if directive and directive not in '?cdmp':
-            return pdb.Pdb.default(self, line)
+            return False
         self.do_define(cmd)
         if directive == '?':
             self.do_doc(cmd)
@@ -248,6 +296,8 @@ class Epdb(pdb.Pdb):
             self.do_showmethods(cmd)
         elif directive == 'p':
             pdb.Pdb.default(self, 'print ' + cmd)
+        return True
+
 
     def do_p(self, arg):
         cmd = arg.split('?', 1)
@@ -390,7 +440,6 @@ class Epdb(pdb.Pdb):
                 exc_type_name = t
             else: exc_type_name = t.__name__
             print '***', exc_type_name + ':', v
-    do_def = do_define
 
     def do_doc(self, arg):
         locals = self.curframe.f_locals
