@@ -1076,7 +1076,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
     return (foundDifference, newPkg)
 
 def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
-                                                      forceSha1 = False):
+                                  forceSha1 = False, ignoreTransient=False):
     """
     Builds a change set against a set of files currently installed and
     builds a package object which describes the files installed.  The
@@ -1103,7 +1103,8 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
     for (curPkg, srcPkg, newVersion, flags) in pkgList:
 	result = _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, 
 			       root, flags, withFileContents=withFileContents,
-                               forceSha1=forceSha1)
+                               forceSha1=forceSha1, 
+                               ignoreTransient=ignoreTransient)
         if result is None:
             # an error occurred
             return None
