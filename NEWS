@@ -1,3 +1,11 @@
+Changes in 0.9.4:
+  * fixes to cvc annotate
+  * flavors and dependency generation code has been refactored to be
+    policy based
+  * better error handling when invalid changeset files are given to
+    conary
+  * minor code cleanups
+
 Changes in 0.9.3:
   * New "cvc annotate" feature
   * Man page updates
