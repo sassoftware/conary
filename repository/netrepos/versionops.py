@@ -243,7 +243,12 @@ class SqlVersioning:
 	else:
 	    # make sure the branch exists for this itemId
 	    labelId = self.labels[branch.label()]
-	    if not self.labelMap.has_key((itemId, labelId)):
+
+            existingBranchId = None
+            for existingBranchId in self.labelMap.get((itemId, labelId), []):
+                if existingBranchId == branchId: break
+
+            if existingBranchId != branchId:
 		self.createBranch(itemId, branch)
 
 	versionId = self.versionTable.get(version, None)

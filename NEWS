@@ -1,3 +1,6 @@
+Changes in 0.11.6
+  * branches are created as changesets now instead of as a protocol call
+
 Changes in 0.11.5
   * Internals reworked to eliminate flavor of None in favor of empty flavor
   * Added (currently unused) code to parse command line flavor specifications

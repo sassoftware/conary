@@ -107,24 +107,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return [ x for x in self.repos.troveNames(label) ]
 
-    def createBranch(self, authToken, clientVersion, newBranch, kind, 
-                     frozenLocation, troveList):
-	if not self.auth.check(authToken, write = True):
-	    raise InsufficientPermission
-
-	newBranch = self.toLabel(newBranch)
-
-	if kind == 'v':
-	    location = self.toVersion(frozenLocation)
-	elif kind == 'l':
-	    location = self.toLabel(frozenLocation)
-	else:
-	    return 0
-
-	ret = self.repos.createBranch(newBranch, location, troveList)
-        ret = [ (x[0], self.fromVersion(x[1])) for x in ret ]
-	return ret
-
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,
                        urls, categories, licenses, source, language):
@@ -500,7 +482,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 			       trove = pkgCs.getName()):
 		raise InsufficientPermission
 
-	self.repos.commitChangeSet(cs)
+	self.repos.commitChangeSet(cs, self.name)
 
 	if not self.commitAction:
 	    return True

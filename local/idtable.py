@@ -335,6 +335,21 @@ class IdPairSet(IdPairMapping):
 	    raise KeyError, key
 	return self._getitemgen(first, cu)
 
+    def get(self, key, default):
+	(first, second) = key
+
+        cu = self.db.cursor()
+	
+        cu.execute("SELECT %s FROM %s WHERE %s=? AND %s=?"
+                   % (self.item, self.tableName, self.tup1, self.tup2),
+		   (first, second))
+
+	first = cu.fetchone()
+	if not first:
+            return default
+
+	return self._getitemgen(first, cu)
+
     def getByFirst(self, first):
         cu = self.db.cursor()
 	

@@ -353,6 +353,105 @@ class ConaryClient:
 
         return md
 
+    def createBranch(self, newBranch, where, troveList = []):
+        cs = changeset.ChangeSet()
+
+	troveList = [ (x, where) for x in troveList ]
+
+	branchedTroves = {}
+	branchedFiles = {}
+        dupList = []
+        needsCommit = False
+
+	while troveList:
+            leavesByLabelOps = {}
+
+            for (troveName, location) in troveList:
+                if branchedTroves.has_key(troveName): continue
+                branchedTroves[troveName] = 1
+
+                l = leavesByLabelOps.get(location, None)
+                if l is None:
+                    l = []
+                    leavesByLabelOps[location] = l
+                l.append(troveName)
+
+            # reset for the next pass
+            troveList = []
+
+            verDict = {}
+            for (location, l) in leavesByLabelOps.iteritems():
+                if isinstance(location, versions.Version):
+                    for name in l:
+                        l = verDict.get(name, None)
+                        if l is None:
+                            l = [ location ]
+                            verDict[name] = l
+                        else:
+                            verDict[name].append(location)
+                else:
+                    verDict.update(
+                            self.repos.getTroveLeavesByLabel(l, location))
+
+            del leavesByLabelOps
+
+            flavors = self.repos.getTroveVersionFlavors(verDict)
+            del verDict
+
+            fullList = []
+            for troveName in flavors.iterkeys():
+                for (version, theFlavors) in flavors[troveName].iteritems():
+                    fullList += [ (troveName, version, x) for x in theFlavors ]
+            del flavors
+        
+            troves = self.repos.getTroves(fullList)
+            branchedTroves = {}
+
+	    for trove in troves:
+                troveName = trove.getName()
+		branchedVersion = trove.getVersion().fork(newBranch, 
+							  sameVerRel = 1)
+
+                branchedTrove = trove.copy()
+		branchedTrove.changeVersion(branchedVersion)
+
+		for (name, version, flavor) in trove.iterTroveList():
+		    troveList.append((name, version))
+
+		    branchedVersion = version.fork(newBranch, sameVerRel = 1)
+		    branchedTrove.delTrove(name, version, flavor,
+                                           missingOkay = False)
+		    branchedTrove.addTrove(name, branchedVersion, flavor)
+
+                key = (troveName, branchedVersion, trove.getFlavor())
+                branchedTroves[key] = branchedTrove.diff(None)[0]
+
+            # check for duplicates - XXX this could be more efficient with
+            # a better repository API
+            queryDict = {}
+            for (name, version, flavor) in branchedTroves.iterkeys():
+                if queryDict.has_key(name):
+                    queryDict[name].append(version)
+                else:
+                    queryDict[name] = [ version ]
+
+            matches = self.repos.getTroveVersionFlavors(queryDict)
+
+            for (name, version, flavor), troveCs in branchedTroves.iteritems():
+                if matches.has_key(name) and matches[name].has_key(version) \
+                   and flavor in matches[name][version]:
+                    # this trove has already been branched
+                    dupList.append((trove.getName(), 
+                                    trove.getVersion().branch()))
+                else:
+                    cs.newPackage(troveCs)
+                    cs.addPrimaryPackage(name, version, flavor)
+                    needsCommit = True
+
+        if needsCommit:
+            self.repos.commitChangeSet(cs)
+
+	return dupList
 
     def _prepareRoot(self):
         """

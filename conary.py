@@ -23,7 +23,6 @@ if sys.version_info < (2, 3):
     print "error: python 2.3 or greater is requried"
     sys.exit(1)
 
-import branch
 from build import cook
 import commit
 import conarycfg

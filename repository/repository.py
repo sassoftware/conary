@@ -538,11 +538,6 @@ class ChangeSetJob:
     def oldFile(self, pathId, fileVersion, fileObj):
 	pass
 
-    def addFile(self, troveId, pathId, fileObj, path, fileId, version,
-                oldFileId = None):
-	self.repos.addFileVersion(troveId, pathId, fileObj, path, 
-                                  fileId, version)
-
     def addFileContents(self, sha1, fileVersion, fileContents, 
 		restoreContents, isConfig):
 	# Note that the order doesn't matter, we're just copying
@@ -551,7 +546,7 @@ class ChangeSetJob:
 	# file to multiple locations.
 	self.repos._storeFileFromContents(fileContents, sha1, restoreContents)
 
-    def __init__(self, repos, cs):
+    def __init__(self, repos, cs, fileHostFilter = []):
 	self.repos = repos
 	self.cs = cs
 
@@ -594,7 +589,10 @@ class ChangeSetJob:
 		    oldVersion = None
                     oldFileId = None
 
-		if tuple is None or oldVersion == newVersion:
+                if fileHostFilter and \
+                 newVersion.branch().label().getHost() not in fileHostFilter:
+                    fileObj = None
+		elif tuple is None or oldVersion == newVersion:
 		    # the file didn't change between versions; we can just
 		    # ignore it
 		    fileObj = None
@@ -602,24 +600,34 @@ class ChangeSetJob:
 		    fileObj = None
 		else:
 		    diff = cs.getFileChange(oldFileId, fileId)
-		    restoreContents = 1
-		    if oldVersion:
-			oldfile = repos.getFileVersion(pathId, oldFileId,
-                                                       oldVersion)
-			fileObj = oldfile.copy()
-			fileObj.twm(diff, oldfile)
+                    if diff is None:
+                        # XXX we really should check to make sure this file
+                        # is already present rather then just blindly
+                        # skipping over it. we do make sure fileHostFilter
+                        # is empty though, keeping this skip from occuring
+                        # on databases
+                        fileObj = None
+                        if not fileHostFilter:
+                            raise KeyError
+                    else:
+                        restoreContents = 1
+                        if oldVersion:
+                            oldfile = repos.getFileVersion(pathId, oldFileId,
+                                                           oldVersion)
+                            fileObj = oldfile.copy()
+                            fileObj.twm(diff, oldfile)
 
-			if fileObj.hasContents and oldfile.hasContents and \
-			   fileObj.contents.sha1() == oldfile.contents.sha1() and \
-			   not (fileObj.flags.isConfig() and not 
-						    oldfile.flags.isConfig()):
-			    restoreContents = 0
-		    else:
-			fileObj = files.ThawFile(diff, pathId)
-			oldfile = None
+                            if fileObj.hasContents and oldfile.hasContents and \
+                               fileObj.contents.sha1() == oldfile.contents.sha1() and \
+                               not (fileObj.flags.isConfig() and not 
+                                                        oldfile.flags.isConfig()):
+                                restoreContents = 0
+                        else:
+                            fileObj = files.ThawFile(diff, pathId)
+                            oldfile = None
 
-		self.addFile(troveInfo, pathId, fileObj, path, fileId, 
-                             newVersion, oldFileId = oldFileId)
+                self.repos.addFileVersion(troveInfo, pathId, fileObj, path, 
+                                          fileId, newVersion)
 
 		# files with contents need to be tracked so we can stick
 		# there contents in the archive "soon"; config files need

@@ -199,121 +199,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def __del__(self):
 	self.close()
 
-    def createBranch(self, newBranch, where, troveList = []):
-
-	if newBranch.getHost() != self.name:
-	    raise RepositoryError("cannot create branch for %s on %s",
-		      newBranch.getHost(), self.name)
-
-        self.troveStore.begin()
-	
-	troveList = [ (x, where) for x in troveList ]
-
-	branchedTroves = {}
-	branchedFiles = {}
-        dupList = []
-
-	while troveList:
-            leavesByLabelOps = {}
-
-            for (troveName, location) in troveList:
-                if branchedTroves.has_key(troveName): continue
-                branchedTroves[troveName] = 1
-
-                l = leavesByLabelOps.get(location, None)
-                if l is None:
-                    l = []
-                    leavesByLabelOps[location] = l
-                l.append(troveName)
-
-            # reset for the next pass
-            troveList = []
-
-            troves = []
-            verDict = {}
-            localVerDict = {}
-
-            for (location, l) in leavesByLabelOps.iteritems():
-                if isinstance(location, versions.Version):
-                    serverName = location.branch().label().getHost()
-                    if serverName == self.name:
-                        d = localVerDict
-                    else:
-                        d = verDict
-
-                    for name in l:
-                        l = d.get(name, None)
-                        if l is None:
-                            l = [ location ]
-                            d[name] = l
-                        else:
-                            d[name].append(location)
-                else:
-                    serverName = location.getHost()
-
-                    if serverName == self.name:
-                        localVerDict.update(
-                            self.getTroveLeavesByLabel(l, location))
-                    else:
-                        verDict.update(self.reposSet.getTroveLeavesByLabel(l, 
-                                                                    location))
-
-            del leavesByLabelOps
-
-            flavors = self.reposSet.getTroveVersionFlavors(verDict)
-            localFlavors = self.getTroveVersionFlavors(localVerDict)
-            del verDict
-            del localVerDict
-
-            fullList = []
-            for troveName in flavors.iterkeys():
-                for (version, theFlavors) in flavors[troveName].iteritems():
-                    fullList += [ (troveName, version, x) for x in theFlavors ]
-            del flavors
-        
-            localFullList = []
-            for troveName in localFlavors.iterkeys():
-                for (version, theFlavors) in \
-                                localFlavors[troveName].iteritems():
-                    localFullList += [ (troveName, version, x) for x in 
-                                            theFlavors ]
-            del localFlavors
-        
-            troves += self.reposSet.getTroves(fullList)
-            troves += self.getTroves(localFullList)
-
-	    for trove in troves:
-                troveName = trove.getName()
-		branchedVersion = trove.getVersion().fork(newBranch, 
-							  sameVerRel = 1)
-                try:
-                    self.createTroveBranch(troveName, branchedVersion.branch())
-                except DuplicateBranch:
-                    dupList.append((troveName, branchedVersion.branch()))
-                    continue
-
-		trove.changeVersion(branchedVersion)
-
-		# make a copy of this list since we're going to update it
-		l = [ x for x in trove.iterTroveList() ]
-		for (name, version, flavor) in l:
-		    troveList.append((name, version))
-
-		    branchedVersion = version.fork(newBranch, sameVerRel = 1)
-		    trove.delTrove(name, version, flavor, False)
-		    trove.addTrove(name, branchedVersion, flavor)
-
-		troveInfo = self.addTrove(trove)
-		for (pathId, path, fileId, version) in trove.iterFileList():
-		    self.addFileVersion(troveInfo, pathId, None, path, fileId,
-                                        version)
-		self.addTroveDone(troveInfo)
-
-        # commit branch to the repository
-        self.commit()
-
-	return dupList
-		    
     def open(self):
 	if self.troveStore is not None:
 	    self.close()
@@ -332,7 +217,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    sb = os.stat(self.sqlDB)
 	    self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
 
-    def commitChangeSet(self, cs):
+    def commitChangeSet(self, cs, serverName):
 	# let's make sure commiting this change set is a sane thing to attempt
 	for pkg in cs.iterNewPackageList():
 	    v = pkg.getNewVersion()
@@ -349,7 +234,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         try:
             # a little odd that creating a class instance has the side
             # effect of modifying the repository...
-            ChangeSetJob(self, cs)
+            ChangeSetJob(self, cs, [ serverName ])
         except:
             print >> sys.stderr, "exception occurred while committing change set"
             stackutil.printTraceBack()

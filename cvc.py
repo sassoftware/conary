@@ -143,9 +143,8 @@ def sourceCommand(cfg, args, argSet):
     elif (args[0] == "branch"):
         if argSet: return usage()
         if len(args) != 4: return usage()
-        repos = NetworkRepositoryClient(cfg.repositoryMap)
 
-        args = [repos, ] + args[1:]
+        args = [cfg, ] + args[1:]
         branch.branch(*args)
     elif (args[0] == "commit"):
 	message = argSet.get("message", None)

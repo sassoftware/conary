@@ -16,10 +16,11 @@
 Implements branch command line functionality.
 """
 
+import conaryclient
 import versions
 from lib import log
 
-def branch(repos, branchName, branchFrom, troveName = None):
+def branch(cfg, branchName, branchFrom, troveName = None):
     try:
 	newBranch = versions.Label(branchName)
 
@@ -31,6 +32,8 @@ def branch(repos, branchName, branchFrom, troveName = None):
 	log.error(str(e))
 	return
 
-    dups = repos.createBranch(newBranch, branchSource, [troveName])
+    client = conaryclient.ConaryClient(cfg)
+
+    dups = client.createBranch(newBranch, branchSource, [troveName])
     for (name, branch) in dups:
         log.warning("%s already has branch %s", name, branch.asString())

@@ -215,7 +215,7 @@ class ChangeSet(streams.LargeStreamSet):
 		    (pkgName, version.asString()))
 
     def getFileChange(self, oldFileId, newFileId):
-	return self.files[(oldFileId, newFileId)]
+	return self.files.get((oldFileId, newFileId), None)
 
     def writeContents(self, csf, contents, early):
 	# these are kept sorted so we know which one comes next
