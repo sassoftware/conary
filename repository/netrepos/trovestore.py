@@ -656,29 +656,14 @@ class TroveStore:
 
 	return trv
 
-    def findFileVersion(self, troveName, troveVersion, fileId, fileVersion):
+    def findFileVersion(self, fileId, fileVersion):
         cu = self.db.cursor()
         cu.execute("""
-                SELECT fsStream from Versions 
-                        JOIN Instances ON
-                            Versions.versionId == Instances.versionId 
-                        JOIN Items ON
-                            Items.itemId == Instances.itemId 
-                        JOIN TroveFiles ON
-                            Instances.instanceId == TroveFiles.instanceId 
-                        JOIN (
-                            SELECT stream AS fsStream,
-                                   streamId AS fsStreamId FROM
-                                FileStreams JOIN Versions ON
-                                    FileStreams.versionId == Versions.versionId
-                                WHERE fileId == ? AND version == ?
-                            ) ON
-                            fsStreamId == TroveFiles.streamId
-                        WHERE
-                            Items.item == ? AND
-                            Versions.version == ?
-            """, fileId, fileVersion.asString(), troveName, 
-                 troveVersion.asString())
+                SELECT stream FROM
+                    FileStreams JOIN Versions ON
+                        FileStreams.versionId == Versions.versionId
+                    WHERE fileId == ? AND version == ?
+            """, fileId, fileVersion.asString())
                             
         for (stream,) in cu:
             return files.ThawFile(stream, fileId)

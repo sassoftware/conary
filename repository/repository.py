@@ -493,12 +493,11 @@ class DataStoreRepository:
         contentList = []
 
         for item in fileList:
-            (troveName, troveVersion, fileId, fileVersion) = item[0:4]
-            if len(item) == 5:
-                fileObj = item[4]
+            (fileId, fileVersion) = item[0:2]
+            if len(item) == 3:
+                fileObj = item[2]
             else:
-                fileObj = self.findFileVersion(troveName, troveVersion, fileId,
-                                               fileVersion)
+                fileObj = self.findFileVersion(fileId, fileVersion)
             
             if fileObj:
                 cont = filecontents.FromDataStore(self.contentsStore,
@@ -670,9 +669,8 @@ class ChangeSetJob:
 		assert(oldVersion)
 		sha1 = oldfile.contents.sha1()
 
-		f = self.repos.getFileContents([(pkgName, 
-			    oldTroveVersion, fileId, oldVersion, 
-                            oldfile)])[0].get()
+		f = self.repos.getFileContents(
+                                    [(fileId, oldVersion, oldfile)])[0].get()
 
 		oldLines = f.readlines()
 		del f

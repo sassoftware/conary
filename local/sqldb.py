@@ -600,25 +600,13 @@ class Database:
 						 justPresent = not pristine)[1]
 	return files.ThawFile(stream, fileId)
 
-    def findFileVersion(self, troveName, troveVersion, fileId, fileVersion):
+    def findFileVersion(self, fileId, fileVersion):
         cu = self.db.cursor()
-        cu.execute("""
-                SELECT stream FROM Versions 
-                        JOIN DBInstances ON
-                            Versions.versionId == DBInstances.versionId 
-                        JOIN (
-                            SELECT instanceId AS fileInstanceId,
-                                   stream AS stream FROM
-                                DBTroveFiles JOIN Versions ON
-                                    DBTroveFiles.versionId == Versions.versionId
-                                WHERE fileId == ? AND version == ?
-                            ) ON
-                            fileInstanceId == DBInstances.instanceId
-                        WHERE
-                            DBInstances.troveName == ? AND
-                            Versions.version == ?
-            """, fileId, fileVersion.asString(), troveName, 
-                 troveVersion.asString())
+        cu.execute("""SELECT stream AS stream FROM
+                            DBTroveFiles JOIN Versions ON
+                                DBTroveFiles.versionId == Versions.versionId
+                            WHERE fileId == ? AND version == ?
+            """, fileId, fileVersion.asString())
                             
         for (stream,) in cu:
             return files.ThawFile(stream, fileId)

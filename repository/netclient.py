@@ -35,7 +35,7 @@ from deps import deps
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSION=11
+CLIENT_VERSION=12
 
 class _Method(xmlrpclib._Method):
 
@@ -574,11 +574,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     # built in
                     items = []
                     if changeset.fileContentsUseDiff(oldFileObj, newFileObj):
-                        items.append( (troveName, oldFileVersion, 
-                                      fileId, oldFileVersion, oldFileObj) ) 
+                        items.append( (fileId, oldFileVersion, oldFileObj) ) 
 
-                    items.append( (troveName, newFileVersion, 
-                                    fileId, newFileVersion, newFileObj) )
+                    items.append( (fileId, newFileVersion, newFileObj) )
                     contentsNeeded += items
                     fileJob += (items,)
 
@@ -588,8 +586,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             i = 0
             for item in fileJob:
-                fileId = item[0][2]
-                fileObj = item[0][4]
+                fileId = item[0][0]
+                fileObj = item[0][2]
                 contents = contentList[i]
                 i += 1
 
@@ -599,7 +597,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                    contents, 
                                    fileObj.flags.isConfig())
                 else:
-                    newFileObj = item[0][4]
+                    newFileObj = item[0][2]
                     newContents = contentList[i]
                     i += 1
 
@@ -668,9 +666,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         if self.localRep and lookInLocal:
             for i, item in enumerate(fileList):
-                if len(item) < 5: continue
+                if len(item) < 3: continue
 
-                sha1 = item[4].contents.sha1()
+                sha1 = item[2].contents.sha1()
                 if self.localRep._hasFileContents(sha1):
                     contents[i] = self.localRep.getFileContents([item])[0]
 
@@ -678,13 +676,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if contents[i] is not None:
                 continue
 
-            (troveName, troveVersion, fileId, fileVersion) = item[0:4]
+            (fileId, fileVersion) = item[0:2]
 
             # we try to get the file from the trove which originally contained
             # it since we know that server has the contents; other servers may
             # not
-            url = self.c[fileVersion].getFileContents(troveName, 
-                        self.fromVersion(fileVersion), 
+            url = self.c[fileVersion].getFileContents(
                         self.fromFileId(fileId), self.fromVersion(fileVersion))
 
             inF = urllib.urlopen(url)

@@ -142,9 +142,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	log.debug("creating branch %s for %s", branch.asString(), pkgName)
         return self.troveStore.createTroveBranch(pkgName, branch)
 
-    def findFileVersion(self, troveName, troveVersion, fileId, fileVersion):
-        return self.troveStore.findFileVersion(troveName, troveVersion,
-                                               fileId, fileVersion)
+    def findFileVersion(self, fileId, fileVersion):
+        return self.troveStore.findFileVersion(fileId, fileVersion)
 
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False):
@@ -366,13 +365,13 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         contents = []
         
         for item in itemList:
-            (troveName, troveVersion, fileId, fileVersion) = item[0:4]
+            (fileId, fileVersion) = item[0:2]
     
             # the get trove netclient provides doesn't work with a 
             # FilesystemRepository (it needs to create a change set which gets 
             # passed)
             if fileVersion.branch().label().getHost() == self.name:
-                fileObj = item[4]
+                fileObj = item[2]
                 cont = filecontents.FromDataStore(self.contentsStore, 
                                                   fileObj.contents.sha1(), 
                                                   fileObj.contents.size())
@@ -548,12 +547,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                       and not oldFile.flags.isConfig())):
 		    if oldFileVersion :
 			oldCont = self.getFileContents(
-                            [ (troveName, oldVersion, 
-                               fileId, oldFileVersion, oldFile) ])[0]
+                            [ (fileId, oldFileVersion, oldFile) ])[0]
 
 		    newCont = self.getFileContents(
-                            [ (troveName, newVersion, 
-                               fileId, newFileVersion, newFile) ])[0]
+                            [ (fileId, newFileVersion, newFile) ])[0]
 
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)

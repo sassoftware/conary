@@ -32,7 +32,7 @@ from local import versiontable
 from netauth import NetworkAuthorization
 from netauth import InsufficientPermission
 
-SERVER_VERSIONS=[6,7,8,9,10,11]
+SERVER_VERSIONS=[6,7,8,9,10,11,12]
 CACHE_SCHEMA_VERSION=10
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -238,28 +238,37 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return l, verList, dirList
 
     def getFileContents(self, authToken, clientVersion, troveName, 
-			troveVersion, troveFlavor, fileId, fileVersion = None):
+			troveVersion, troveFlavor = None, fileId = None, 
+                        fileVersion = None):
+        # the modern prototype is 
+        #      (self, authToken, clientVersion, fileId, fileVersion)
         if clientVersion <= 8:
             path = fileId
             fileId = None
 	elif clientVersion <= 9:
             fileId = self.toFileId(fileId)
-        else:
+        elif clientVersion <= 11:
             fileVersion = fileId
             fileId = troveFlavor
             troveFlavor = None
             path = None
             fileId = self.toFileId(fileId)
+        else:
+            fileId = troveName
+            fileVersion = troveVersion
+            fileId = self.toFileId(fileId)
 
-	troveVersion = self.toVersion(troveVersion)
+        del troveName
+        del troveVersion
+        del troveFlavor
+
 	fileVersion = self.toVersion(fileVersion)
+        fileLabel = fileVersion.branch().label()
 
-	if not self.auth.check(authToken, write = False, trove = troveName,
-			       label = troveVersion.branch().label()):
+	if not self.auth.check(authToken, write = False, label = fileLabel):
 	    raise InsufficientPermission
 
-        fileObj = self.repos.findFileVersion(troveName, troveVersion,
-                                             fileId, fileVersion)
+        fileObj = self.repos.findFileVersion(fileId, fileVersion)
 
         filePath = self.repos.contentsStore.hashToPath(
                         sha1helper.sha1ToString(fileObj.contents.sha1()))
