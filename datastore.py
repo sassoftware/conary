@@ -170,16 +170,8 @@ class DataStore:
 	path = self.hashToPath(hash)
 	f = open(path, "r")
 
-	# read in the size of the file
-	f.seek(-4, 2)
-	size = f.read(4)
-	f.seek(0)
-
-	# we need the size to create a file container to pass over
-	# the wire for getFileContents()
-	size = struct.unpack("<i", size)[0]
 	gzfile = gzip.GzipFile(path, mode)
-	gzfile.fullSize = size
+	gzfile.fullSize = util.gzipFileSize(f)
 	return gzfile
 
     # returns a python file object for the file requested

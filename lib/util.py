@@ -11,6 +11,7 @@ import pdb
 import shutil
 import stat
 import string
+import struct
 import sys
 import traceback
 import weakref
@@ -449,3 +450,20 @@ class ObjectCache(weakref.WeakKeyDictionary):
 
     def __getitem__(self, key):
 	return weakref.WeakKeyDictionary.__getitem__(self, key)()
+
+def gzipFileSize(f):
+    """
+    Returns the uncompressed size of the gzipped file referenced by f
+    """
+
+    # read in the size of the file
+    old = f.tell()
+    f.seek(-4, 2)
+    size = f.read(4)
+    f.seek(old)
+
+    # we need the size to create a file container to pass over
+    # the wire for getFileContents()
+    size = struct.unpack("<i", size)[0]
+
+    return size

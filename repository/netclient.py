@@ -83,11 +83,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
 	newBranchStr = self.fromLabel(newBranch)
 
-	if label.getHost() != newBranch.getHost():
-	    log.error("cannot create label %s in repository on %s",
-		      newBranchStr, label.getHost())
-
-	self.c[where].createBranch(newBranchStr, kind, frz, troveList)
+	self.c[newBranch].createBranch(newBranchStr, kind, frz, troveList)
 
     def open(self, *args):
         pass
@@ -281,7 +277,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	del inF
 
 	outF.seek(0)
+
 	gzfile = gzip.GzipFile(fileobj = outF)
+	gzfile.fullSize = util.gzipFileSize(outF)
 
 	return gzfile
 

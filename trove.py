@@ -241,8 +241,8 @@ class Trove:
 	is True, oldVersion is always None and absolute diffs can be used.
 	Otherwise, absolute versions are not necessary, and oldVersion of None
 	means the package is new. The list of file changes is a list of
-	(fileId, oldVersion, newVersion, newPath) tuples, where newPath is the
-	path to the file in this package.
+	(fileId, oldVersion, newVersion, oldPath, newPath) tuples, where newPath is 
+	the path to the file in this package.
 
 	@param them: object to generate a change set from (may be None)
 	@type them: Group
@@ -297,7 +297,7 @@ class Trove:
 
 	for id in addedIds:
 	    (selfPath, selfVersion) = self.idMap[id]
-	    filesNeeded.append((id, None, selfVersion, selfPath))
+	    filesNeeded.append((id, None, selfVersion, None, selfPath))
 	    chgSet.newFile(id, selfPath, selfVersion)
 
 	for id in sameIds.keys():
@@ -312,7 +312,7 @@ class Trove:
 
 	    if not selfVersion == themVersion:
 		newVersion = selfVersion
-		filesNeeded.append((id, themVersion, selfVersion, selfPath))
+		filesNeeded.append((id, themVersion, selfVersion, themPath, selfPath))
 
 	    if newPath or newVersion:
 		chgSet.changedFile(id, newPath, newVersion)

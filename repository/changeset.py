@@ -738,7 +738,7 @@ def CreateFromFilesystem(pkgList):
 	(pkgChgSet, filesNeeded, pkgsNeeded) = pkg.diff(None, absolute = 1)
 	cs.newPackage(pkgChgSet)
 
-	for (fileId, oldVersion, newVersion, path) in filesNeeded:
+	for (fileId, oldVersion, newVersion, oldPath, path) in filesNeeded:
 	    (file, realPath, filePath) = fileMap[fileId]
 	    (filecs, hash) = fileChangeSet(fileId, None, file)
 	    cs.addFile(fileId, oldVersion, newVersion, filecs)

@@ -202,11 +202,10 @@ class Database(SqlDbRepository):
 					     pristine = True)
 
 	    # we ignore pkgsNeeded; it doesn't mean much in this case
-	    (pkgChgSet, filesNeeded, pkgsNeeded) =	    \
-		    newPkg.diff(old, absolute = 0)
+	    (pkgChgSet, filesNeeded, pkgsNeeded) = newPkg.diff(old, absolute = 0)
 	    cs.newPackage(pkgChgSet)
 
-	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
+	    for (fileId, oldVersion, newVersion, oldPath, newPath) in filesNeeded:
 		fileObj = job.getFile(fileId)
 		assert(newVersion == fileObj.version())
 		

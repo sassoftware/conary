@@ -109,6 +109,23 @@ class FromFile(FileContents):
     def __init__(self, f):
 	self.f = f
 
+class FromGzFile(FileContents):
+
+    __slots__ = "f"
+
+    def copy(self):
+        # XXX dup the file?
+        return self.__class__(self.f)
+
+    def size(self):
+	return self.f.fullSize
+
+    def get(self):
+	return self.f
+
+    def __init__(self, f):
+	self.f = f
+
 class WithFailedHunks(FileContents):
 
     __slots__ = ( "fc", "hunks" )
