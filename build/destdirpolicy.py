@@ -7,6 +7,7 @@ import util
 import re
 import os
 import policy
+import log
 
 """
 Module used by recipes to modify the state of the installed %(destdir)s
@@ -131,8 +132,8 @@ class NormalizeManPages(policy.Policy):
 		    match = self.soexp.search(lines[0][:-1]) # chop-chop
 		    if match:
 			# .so is relative to %(mandir)s, so add ../
-			print '+ replacing %s (%s) with symlink ../%s' \
-			      %(name, match.group(0), match.group(1))
+			log.debug('replacing %s (%s) with symlink ../%s',
+                                  name, match.group(0), match.group(1))
 			os.remove(path)
 			os.symlink(os.path.normpath('../'+match.group(1)), path)
 
@@ -200,8 +201,8 @@ class RelativeSymlinks(policy.Policy):
 		dots = "../"
 		dots *= path.count('/') - 1
 		normpath = os.path.normpath(dots + contents)
-		print 'Changing absolute symlink %s to relative symlink %s' \
-		    %(path, normpath)
+		log.debug('Changing absolute symlink %s to relative symlink %s',
+                          path, normpath)
 		os.symlink(normpath, fullpath)
 
 
