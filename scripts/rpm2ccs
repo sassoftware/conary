@@ -564,6 +564,8 @@ def main(argv):
         create = CHANGESET
     elif '--update' in argv:
         create = UPDATE
+        print '--update is not yet implemented, sorry'
+        return 1
     
     packageScripts = True
     if '--ignore-scripts' in argv:
@@ -575,6 +577,8 @@ def main(argv):
 
     commitWork=False
     if '--commit' in argv:
+        print 'warning: --commit is not yet finished'
+        return 1
         commitWork=True
 
     sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
