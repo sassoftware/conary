@@ -23,6 +23,7 @@ import os
 import package
 import patch
 import stat
+import sys
 import versions
 
 MERGE = 1 << 0
@@ -45,6 +46,9 @@ class FilesystemJob:
 
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
+
+    def mustRunLdconfig(self):
+	self.runLdconfig = True
 
     def apply(self):
 	for (oldPath, newPath, msg) in self.renames:
@@ -69,6 +73,23 @@ class FilesystemJob:
 	    f.write(str)
 	    f.close()
 	    log.debug(msg)
+
+	if self.runLdconfig:
+	    p = "/sbin/ldconfig"
+	    if os.getpid():
+		log.warning("ldconfig skipped (insufficient permissions)")
+	    elif not os.access(os.path.join(self.root, p), os.X_OK):
+		log.warning("/sbin/ldconfig is not available")
+	    else:
+		child = os.fork()
+		if child == -1:
+		    os.chdir(self.root)
+		    os.chroot(self.root)
+		    os.execl(p, p)
+		    sys.exit(1)
+		(id, status) = os.waitpid(pid, 0)
+		if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
+		    log.error("ldconfig failed")
 
     def getErrorList(self):
 	return self.errors
@@ -340,6 +361,9 @@ class FilesystemJob:
 		    self.errors.append("file contents conflict for %s" % realPath)
 		    contentsOkay = 0
 
+	    if beenRestored and fsFile.isShLib():
+		self.mustRunLdconfig()
+
 	    if attributesChanged and not beenRestored:
 		self._restore(fsFile, realPath, None,
 		      "merging changes from repository into %s" % 
@@ -385,6 +409,7 @@ class FilesystemJob:
 	self.newPackages = []
 	self.errors = []
 	self.newFiles = []
+	self.runLdconfig = False
 
 	for pkgCs in changeSet.getNewPackageList():
 	    # skip over empty change sets
