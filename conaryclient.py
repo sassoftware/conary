@@ -150,12 +150,13 @@ class ConaryClient:
                                 tagScript = tagScript, 
                                 keepExisting = keepExisting)
 
-    def eraseTrove(self, pkg, versionStr = None, tagScript = None):
-        pkgList = self.db.findTrove(pkg, versionStr)
-
+    def eraseTrove(self, troveList, tagScript = None):
         list = []
-        for p in pkgList:
-            list.append((p.getName(), p.getVersion(), p.getFlavor()))
+        for (troveName, versionStr) in troveList:
+            troves = self.db.findTrove(troveName, versionStr)
+
+            for t in troves:
+                list.append((t.getName(), t.getVersion(), t.getFlavor()))
 
         self.db.eraseTroves(list, tagScript = tagScript)
 

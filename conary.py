@@ -47,10 +47,10 @@ from repository import netclient
 sys.excepthook = util.genExcepthook()
 
 def usage(rc = 1):
-    print "usage: conary changeset <pkg>[=[<oldver>--]<newver>]* <outfile>"
+    print "usage: conary changeset <pkg>[=[<oldver>--]<newver>]+ <outfile>"
     print "       conary commit       <changeset>"
     print "       conary emerge       <troveName>+"
-    print "       conary erase        <pkgname> [<version>]"
+    print "       conary erase        <pkgname>[=<version>]+"
     print "       conary localcs      <pkg> <outfile>"
     print "       conary localcommit  <changeset>"
     print "       conary query        <pkgname>[=<version>]*"
@@ -59,8 +59,7 @@ def usage(rc = 1):
     print "       conary rblist"
     print "       conary rollback     <rollback>"
     print "       conary showcs       <changeset>"
-    print "       conary update       <pkgname>[=<version>]*"
-    print "              update       <changeset>+"
+    print "       conary update       <pkgname>[=<version>]* <changeset>*"
     print "       conary usage"
     print "       conary --version"
     print ""
@@ -207,9 +206,8 @@ def realMain(cfg, argv=sys.argv):
 
 	if argSet: return usage()
 
-	if len(otherArgs) >= 3 and len(otherArgs) <=4:
-	    args = [cfg] + otherArgs[2:]
-	    updatecmd.doErase(*args, **kwargs)
+	if len(otherArgs) >= 3:
+	    updatecmd.doErase(cfg, otherArgs[2:], **kwargs)
 	else:
 	    return usage()
     elif (otherArgs[1] == "import"):

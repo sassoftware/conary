@@ -48,10 +48,21 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
     except repository.CommitError, e:
         log.error(e)
 
-def doErase(cfg, pkg, versionStr = None, tagScript = None):
+def doErase(cfg, itemList, tagScript = None):
+    troveList = []
+    for item in itemList:
+        l = item.split("=")
+        if len(l) == 1:
+            troveList.append((l[0], None))
+        elif len(l) == 2:
+            troveList.append((l[0], l[1]))
+        else:
+            log.error("too many ='s in %s", pkgStr)
+            return 1
+
     client = conaryclient.ConaryClient(cfg=cfg)
-    
+
     try:
-        client.eraseTrove(pkg, versionStr, tagScript)
-    except repository.PackageNotFound:
-        log.error("package not found: %s", pkg)
+        client.eraseTrove(troveList, tagScript)
+    except repository.PackageNotFound, e:
+        log.error(str(e))

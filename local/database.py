@@ -531,7 +531,13 @@ class Database(SqlDbRepository):
 		pkgList.append(self.getTrove(troveName, version, flavor))
 
 	if not pkgList:
-	    raise repository.PackageNotFound
+            if versionStr:
+                raise repository.PackageNotFound, \
+                        "version %s of trove %s is not installed" % \
+                        (versionStr, troveName)
+            else:
+                raise repository.PackageNotFound, \
+                        "trove %s is not installed" % troveName
 
 	return pkgList
 
