@@ -1359,10 +1359,22 @@ class Flavor(policy.Policy):
 	if path not in pkgMap:
 	    return
 	pkg = pkgMap[path]
-        if path not in pkg.flavorMap:
+        if path not in pkg.isnsetMap:
             return
 	f = pkg.getFile(path)
-        f.flavor.set(pkg.flavorMap[path])
+	set = deps.DependencySet()
+        isnset = pkg.isnsetMap[path]
+        # XXX add Arch flag information here
+        if isnset == 'x86':
+            set.addDep(deps.InstructionSetDependency,
+                       deps.Dependency('x86', []))
+        elif isnset == 'x86_64':
+            set.addDep(deps.InstructionSetDependency,
+                       deps.Dependency('x86', ['x86_64']))
+        else:
+            set.addDep(deps.InstructionSetDependency,
+                       deps.Dependency(isnset, []))
+        f.flavor.set(set)
 	pkg.flavor.union(f.flavor.value())
 
 

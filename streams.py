@@ -19,7 +19,7 @@ import copy
 import struct
 import versions
 
-from deps import filedeps, deps
+from deps import deps
 
 class InfoStream(object):
 

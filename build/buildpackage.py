@@ -23,8 +23,9 @@ import os
 import files
 import time
 import use
+import lib.elf
 
-from deps import deps, filedeps
+from deps import deps
 
 def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     if devtype == "b":
@@ -88,12 +89,18 @@ class BuildPackage(dict):
 	self[path] = (realPath, f)
 
         if f.hasContents and isinstance(f, files.RegularFile):
-            result = filedeps.findFileDependencies(realPath)
-            if result != None:
-                self.requiresMap[path] = result[0]
-                self.providesMap[path] = result[1]
+            results = lib.elf.inspect(realPath)
+            if results != None:
+                requires, provides = results
+                abi = None
+                for depClass, main, flags in requires:
+                    if depClass == 'abi':
+                        abi = (main, flags)
+                        self.isnsetMap[path] = flags[1]
+                        break
 
-            self.flavorMap[path] = filedeps.findFileFlavor(realPath)
+                self.requiresMap[path] = self.getDepsFromElf(requires, abi)
+                self.providesMap[path] = self.getDepsFromElf(provides, abi)
 
         if linkCount > 1:
             if f.hasContents:
@@ -106,6 +113,28 @@ class BuildPackage(dict):
                 if not isinstance(f, files.Directory):
                     # no hardlinks allowed for special files other than dirs
                     self.badhardlinks.append(path)
+
+    def getDepsFromElf(self, elfinfo, abi):
+        """
+        Add dependencies from ELF information.
+
+        @param elfinfo: List provided by C{lib.elf.inspect()}
+        @param abi: tuple of abi information to blend into soname dependencies
+        """
+	set = deps.DependencySet()
+	for (depClass, main, flags) in elfinfo:
+	    if depClass == 'soname':
+                assert(abi)
+		curClass = deps.SonameDependencies
+                dep = deps.Dependency(abi[0] + "/" + main, abi[1] + flags)
+	    elif depClass == 'abi':
+		curClass = deps.AbiDependency
+                dep = deps.Dependency(main, flags)
+	    else:
+		assert(0)
+
+	    set.addDep(curClass, dep)
+        return set
 
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
@@ -140,7 +169,7 @@ class BuildPackage(dict):
         self.linkGroups = {}
         self.requiresMap = {}
         self.providesMap = {}
-        self.flavorMap = {}
+        self.isnsetMap = {}
         self.hardlinks = []
         self.badhardlinks = []
 	dict.__init__(self)
