@@ -5,6 +5,7 @@
 # All rights reserved
 #
 
+import base64
 import os
 import posixpath
 import select
@@ -65,11 +66,35 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	    os.unlink(self.cleanup)
 
     def do_POST(self):
+	if not self.headers.has_key('Authorization'):
+	    user = "anonymous"
+	    pw = None
+	else:
+	    info = self.headers['Authorization'].split()
+	    if len(info) != 2 or info[0] != "Basic":
+		self.send_response(400)
+		return
+    
+	    try:
+		authString = base64.decodestring(info[1])
+	    except:
+		self.send_response(400)
+		return
+
+	    if authString.count(":") != 1:
+		self.send_response(400)
+		return
+		
+	    (user, pw) = authString.split(":")
+
+	authToken = (user, pw)
+
 	contentLength = int(self.headers['Content-Length'])
 	(params, method) = xmlrpclib.loads(self.rfile.read(contentLength))
-	
+
 	try:
-	    result = netRepos.__class__.__dict__[method](netRepos, *params)
+	    result = netRepos.__class__.__dict__[method](netRepos, authToken,
+							 *params)
 	except:
 	    self.send_response(500)
 	    return
