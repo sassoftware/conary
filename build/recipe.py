@@ -18,6 +18,7 @@ import inspect
 import lookaside
 import rpmhelper
 import gzip
+import buildpackage
 
 baseMacros = (
     # Note that these macros cannot be represented as a dictionary,
@@ -375,8 +376,10 @@ class Recipe:
 
     def packages(self, root):
 	# "None" will be replaced by explicit subpackage list
-	self.packageSpecSet = package.PackageSpecSet(self.autoSpecList, None)
-        self.packageSet = package.Auto(self.name, root, self.packageSpecSet)
+	self.packageSpecSet = buildpackage.PackageSpecSet(self.autoSpecList,
+                                                          None)
+        self.packageSet = buildpackage.Auto(self.name, root,
+                                            self.packageSpecSet)
 
     def getPackageSet(self):
         return self.packageSet
@@ -410,4 +413,4 @@ class Recipe:
 	    self.addMacros(extraMacros)
 	self.autoSpecList = []
 	for spec in baseAutoSpec:
-	    self.autoSpecList.append(package.PackageSpec(*spec))
+	    self.autoSpecList.append(buildpackage.PackageSpec(*spec))

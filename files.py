@@ -16,6 +16,20 @@ import lookaside
 from datastore import DataStore
 
 class FileMode:
+    def merge(self, mode):
+        """merge another instance of a FileMode into this one"""
+        if mode.thePerms:
+            self.thePerms = mode.thePerms
+        if mode.theOwner:
+            self.theOwner = mode.theOwner 
+        if mode.theGroup:
+            self.theGroup = mode.theGroup
+        if mode.thePerms:
+            self.thePerms = mode.thePerms
+        if mode.theMtime:
+            self.theMtime = mode.theMtime
+        if self.theSize:
+            self.theSize = mode.theSize
 
     def triplet(self, code, setbit = 0):
 	list = [ "-", "-", "-" ]
@@ -120,9 +134,9 @@ class FileMode:
 	    rc = selfLine[0]
 	    for i in range(1, len(selfLine)):
 		if selfLine[i] == themLine[i]:
-		    rc = rc + " -"
+		    rc +=  " -"
 		else:
-		    rc = rc + " " + selfLine[i]
+		    rc +=  " " + selfLine[i]
 
 	    return rc
 	else:
