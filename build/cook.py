@@ -439,6 +439,8 @@ def cookCommand(cfg, args, prep, macros):
             # child, set ourself to be the foreground process
             os.setpgrp()
             os.tcsetpgrp(0, os.getpgrp())
+	    # make sure we do not accidentally make files group-writeable
+	    os.umask(0022)
 	    repos = fsrepos.FilesystemRepository(cfg.reppath, "r")
             try:
                 built = cookItem(repos, cfg, item, prep=prep, macros=macros)
