@@ -11,8 +11,8 @@ class ChangeSet:
 	for pkg in self.getPackageList():
 	    # if this is abstract, we can't have any removed or changed files
 	    if not pkg.getOldVersion():
-		assert(not pkg.getChangedFiles())
-		assert(not pkg.getOldFiles())
+		assert(not pkg.getChangedFileList())
+		assert(not pkg.getOldFileList())
 
 	    # new and changed files need to have a file entry for the right 
 	    # version along with the contents for files which have any
