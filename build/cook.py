@@ -11,10 +11,12 @@ resulting packages to the repository.
 import buildpackage
 import changeset
 import files
+import log
 import lookaside
 import os
 import package
 import recipe
+import repository
 import sha1helper
 import shutil
 import time
@@ -113,9 +115,7 @@ class _IdGen:
 
         self.map.update(fileIdMap)
 
-# -------------------- public below this line -------------------------
-
-def cook(repos, cfg, recipeFile, prep=0, macros=()):
+def _cook(repos, cfg, recipeFile, prep=0, macros=()):
     repos.open("r")
 
     buildBranch = cfg.defaultbranch
@@ -225,6 +225,14 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	recipeObj.cleanup(builddir, destdir)
 
     return built
+
+# -------------------- public below this line -------------------------
+
+def doCook(repos, cfg, recipeFile, prep=0, macros=()):
+    try:
+	_cook(repos, cfg, recipeFile, prep = prep, macros = macros)
+    except repository.RepositoryError, e:
+	raise CookError(str(e))
 
 class CookError(Exception):
     def __init__(self, msg):
