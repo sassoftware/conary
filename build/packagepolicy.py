@@ -102,7 +102,7 @@ class BadInterpreterPaths(policy.Policy):
             interp = m.contents['interpreter']
             if interp[0] != '/':
                 self.recipe.reportErrors(
-                    "illegal relative page interpreter %s in %s"
+                    "illegal relative interpreter path %s in %s"
                     %(interp, path))
 
 
