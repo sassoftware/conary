@@ -48,24 +48,49 @@ def main(argv):
     listMissing = False
     doUpdate = False
     updateExceptions = []
-    
+    display = {}
+    displayOrder = ['change', 'name', 'local', 'version', 'repo']
+    for param in displayOrder:
+        display[param] = True
     args = argv[1:]
     lastArg = ''
-    for arg in args:
-        if lastArg == '--except':
+    while args:
+        arg = args[0]
+        args = args[1:]
+        if arg == '--except':
+            arg = args[0]
+            args = args[1:]
             updateExceptions = arg.split(',')
             lastArg = ''
             continue
-            
         if arg == '--missing':
             listMissing = True
+        if arg == '--display':
+            arg = args[0]
+            args = args[1:]
+            params = arg.split(',')
+            for param in params:
+                if param.startswith('no'):
+                    value = False
+                    param = param[2:]
+                else:
+                    value = True
+                if param not in display:
+                    usage()
+                    print "Error: Unknown display parameter %s.  Available options: %s" % (param, displayOrder)
+                    return 1
+                display[param] = value
         elif arg == '--update':
             doUpdate = True
-        elif arg == '--except':
-            pass
         else:
-            return usage()
-        lastArg = arg
+            usage()
+            print "Error: unknown option", arg
+            return 1
+
+    # remove items from displayOrder that we don't plan on displaying:
+    for param in display.keys():
+        if not display[param]:
+            displayOrder.remove(param)
     
     cfg = conarycfg.ConaryConfiguration()
     repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
@@ -131,6 +156,19 @@ def main(argv):
         if v:
             maxV = max(maxV, len(v.trailingVersion().asString()))
 
+    displayVars = {}
+    displayVars['repo'] = ("%-*s" , [maxL])
+    displayVars['change'] = ("%-3s" , [])
+    displayVars['name'] = ("%-*s" , [maxP + 3])
+    displayVars['local'] = ("%-*s" , [maxLV + 3])
+    displayVars['version'] = ("%-*s" , [maxV + 3])
+
+    displayStr = []
+    for param in displayOrder:
+        displayStr.append(displayVars[param][0])
+    displayStr = ''.join(displayStr)
+    
+
     for (label, pkg, lv, v) in updates + notavail:
         lvt = lv.trailingVersion()
         if v:
@@ -145,7 +183,23 @@ def main(argv):
         else:
             vt = '<Not Avail>'
             change = ' '
-        print "%s  %-*s    %-*s    %-*s" % (change, maxP, pkg, maxV, vt, maxL, label.asString())
+        lvt = lvt.asString()
+        displayVals = {}
+        displayVals['local'] = lvt
+        displayVals['version'] = vt
+        displayVals['change'] = change
+        displayVals['repo'] = label.asString()
+        displayVals['name'] =  pkg
+        
+
+        
+        displayArgs = []
+        for param in displayOrder:
+            displayArgs.extend(displayVars[param][1])
+            displayArgs.append(displayVals[param])
+
+        print displayStr % tuple(displayArgs)
+        #print "%s  %-*s   %-*s   %-*s    %-*s" % (change, maxP, pkg, maxLV, lvt, maxV, vt, maxL, label.asString())
         if doUpdate:
             updatecmd.doUpdate(repos, cfg, [ "%s=%s" %(pkg, v.asString()) ])
 
