@@ -144,7 +144,7 @@ class Repository:
 	return list
 
     def hasPackage(self, pkg):
-	return package.packageSetExists(self.pkgDB, pkg)
+	return self.pkgDB.hasFile(pkg)
 	
     def storeFileFromChangeset(self, chgSet, file, pathToFile):
 	if isinstance(file, files.RegularFile):

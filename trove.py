@@ -308,6 +308,3 @@ class PackageSet:
     def __init__(self, db, name):
 	self.name = name
 	self.f = db.openFile(name)
-
-def packageSetExists(db, pkg):
-    return db.hasFile(pkg)
