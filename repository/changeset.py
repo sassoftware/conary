@@ -14,7 +14,7 @@ class ChangeSet:
     def isAbstract(self):
 	return self.abstract
 
-    def validate(self):
+    def validate(self, justContentsForConfig = 0):
 	for pkg in self.getNewPackageList():
 	    # if this is abstract, we can't have any removed or changed files
 	    if not pkg.getOldVersion():
@@ -32,7 +32,16 @@ class ChangeSet:
 
 		l = info.split()
 		if (l[0] == "src" or l[0] == "f") and l[1] != "-":
-		    assert(self.hasFileContents(l[1]))
+		    if justContentsForConfig:
+			if l[-1] == "-":
+			    # XXX just hope for the best?
+			    pass
+			else:
+			    flags = int(l[-1], 16)
+			    if flags & files._FILE_FLAG_CONFIG:
+				assert(self.hasFileContents(l[1]))
+		    else:
+			assert(self.hasFileContents(l[1]))
 
 	    # old files should not have any file entries
 	    for fileId in pkg.getOldFileList():
@@ -121,7 +130,9 @@ class ChangeSet:
 	    os.unlink(outFileName)
 	    raise
 
-    def invert(self, repos):
+    # if availableFiles is set, this includes the contents that it can
+    # find, but doesn't worry about files which it can't find
+    def invert(self, repos, availableFiles = 0):
 	assert(not self.abstract)
 	# this is easy to fix if it turns out to be necessary
 	assert(not self.oldPackages)
@@ -152,7 +163,10 @@ class ChangeSet:
 
 		origFile = repos.getFileVersion(fileId, version)
 		inversion.addFile(fileId, None, version, origFile.diff(None))
-		inversion.addFileContents(origFile.sha1())
+
+		if (not availableFiles) or \
+			    repos.hasFileContents(origFile.sha1()):
+		    inversion.addFileContents(origFile.sha1())
 
 	    for (fileId, newPath, newVersion) in pkgCs.getChangedFileList():
 		(curPath, curVersion) = pkg.getFile(fileId)
@@ -169,7 +183,9 @@ class ChangeSet:
 				  origFile.diff(newFile))
 
 		if origFile.sha1() != newFile.sha1():
-		    inversion.addFileContents(origFile.sha1())
+		    if (not availableFiles) or \
+				repos.hasFileContents(origFile.sha1()):
+			inversion.addFileContents(origFile.sha1())
 
 	    inversion.newPackage(invertedPkg)
 
@@ -289,10 +305,10 @@ class ChangeSetFromFile(ChangeSet):
 
 	    header = control.read()
 
-    def __init__(self, file):
+    def __init__(self, file, justContentsForConfig = 0):
 	ChangeSet.__init__(self)
 	self.read(file)
-	self.validate()
+	self.validate(justContentsForConfig)
 
 # old may be None
 def fileChangeSet(fileId, old, new):
