@@ -493,6 +493,10 @@ class RegularFile(File):
 
     def restore(self, fileContents, target, restoreContents):
 	if restoreContents:
+	    # this is first to let us copy the contents of a file
+	    # onto itself; the unlink helps that to work
+	    src = fileContents.get()
+
 	    if os.path.exists(target) or os.path.islink(target):
 		os.unlink(target)
 	    else:
@@ -500,7 +504,6 @@ class RegularFile(File):
 		util.mkdirChain(path)
 
 	    f = open(target, "w")
-	    src = fileContents.get()
             util.copyfileobj(src, f)
 	    f.close()
 
