@@ -184,19 +184,17 @@ class BadHunk(Exception):
     pass
 
 def reverse(lines):
-    result = []
     for line in lines:
 	if line[0] == " ":
-	    result.append(line)
+	    yield line
 	elif line[0] == "+":
-	    result.append("-" + line[1:])
+	    yield "-" + line[1:]
 	elif line[0] == "-":
-	    result.append("+" + line[1:])
+	    yield "+" + line[1:]
 	elif line[0] == "@":
 	    fields = line.split()
 	    new = [ fields[0], "-" + fields[2][1:], 
 		    "+" + fields[1][1:], fields[3] ]
-	    result.append(" ".join(new) + "\n")
+	    yield " ".join(new) + "\n"
 
-    return result
 	    
