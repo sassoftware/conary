@@ -498,9 +498,10 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 
     try:
 	count = -int(oldVersion)
-	vers = repos.getTroveVersionsByLabel([troveName],
-					     newV.branch().label())
+	vers = repos.getTroveVersionsByBranch( 
+                                { troveName : { newV.branch() : None } } )
 	vers = vers[troveName].keys()
+        vers.sort(versions.Version.compare)
 	# erase everything later then us
 	i = vers.index(newV)
 	del vers[i:]

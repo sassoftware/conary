@@ -4,6 +4,8 @@ Changes in 0.12.2
   * moved version affinity into findTrove from ConaryClient
   * fixed branch affinity so that it's actually branch affinity instead of
     label affinity
+  * rdiff changes for 0.12.0 broke negative numbers for oldVersion
+  * rdiff diff'd based on label instead of branch
 
 Changes in 0.12.1
   * repquery and query always showed dependency information
