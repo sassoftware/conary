@@ -1,3 +1,8 @@
+Changes in 0.50.8:
+  * NormalizeInterpreterPaths() policy now looks in the package currently
+    being built, as well as on the installed system, to determine how to
+    resolve #!/usr/bin/env scripts.
+
 Changes in 0.50.7:
   * Added the XInetdService action to avoid having to include
     /etc/xinetd.d/ files separately, and to make xinetd.d files

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004 Specifix, Inc.
+# Copyright (c) 2004-2005 Specifix, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -305,17 +305,19 @@ def copytree(sources, dest, symlinks=False, filemode=None, dirmode=None):
 	    sourcelist.append(thisdest)
     return sourcelist
 
-def checkPath(binary):
+def checkPath(binary, root=None):
     """
     Examine $PATH to determine if a binary exists, returns full pathname
     if it exists; otherwise None.
-
-    @todo: expand ~?
     """
     path = os.environ.get('PATH', '')
     for path in path.split(os.pathsep):
+        if root:
+            path = joinPaths(root, path)
         candidate = os.path.join(path, binary)
         if os.access(candidate, os.X_OK):
+            if root:
+                return candidate[len(root):]
             return candidate
     return None
 

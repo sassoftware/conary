@@ -959,7 +959,8 @@ class NormalizeInterpreterPaths(policy.Policy):
     invariantexceptions = [ '%(thisdocdir.literalRegex)s/', ]
 
     def doFile(self, path):
-        d = util.joinPaths(self.recipe.macros.destdir, path)
+        destdir = self.recipe.macros.destdir
+        d = util.joinPaths(destdir, path)
 	mode = os.lstat(d)[stat.ST_MODE]
 	if not mode & 0111:
             # we care about interpreter paths only in executable scripts
@@ -977,7 +978,11 @@ class NormalizeInterpreterPaths(policy.Policy):
                 l.pop(0) # we will reconstruct this line, without extra spaces
                 wordlist = [ x for x in line.split() ]
                 wordlist.pop(0) # get rid of env
-                fullintpath = util.checkPath(wordlist[0])
+                # first look in package
+                fullintpath = util.checkPath(wordlist[0], root=destdir)
+                if fullintpath == None:
+                    # then look on installed system
+                    fullintpath = util.checkPath(wordlist[0])
                 if fullintpath == None:
 		    self.recipe.reportErrors("Interpreter %s for file %s not found, could not convert from /usr/bin/env syntax " % (wordlist[0], path))
                     return
