@@ -49,12 +49,6 @@ class ChangeSet:
 		assert(not self.files.has_key(fileId))
 
 
-    def getFileContents(self, fileId):
-	raise NotImplementedError
-
-    def hasFileContents(self, fileId):
-	raise NotImplementedError
-
     def addFile(self, fileId, oldVersion, newVersion, csInfo):
 	assert(not oldVersion or oldVersion.timeStamp)
 	assert(newVersion.timeStamp)
@@ -405,57 +399,6 @@ def CreateFromFilesystem(pkgList):
 	    if hash:
 		cs.addFileContents(hash, 
 			  repository.FileContentsFromFilesystem(realPath))
-
-    return cs
-
-# creates a change set from the version of a package installed in the
-# database against the files installed on the local system
-def CreateAgainstLocal(cfg, db, pkgList):
-    cs = ChangeSetFromFilesystem()
-
-    for pkgName in pkgList:
-	allVersions = db.getPackageVersionList(pkgName)
-	if not allVersions: continue
-
-	assert(len(allVersions) == 1)
-	dbPkg = db.getPackageVersion(pkgName, allVersions[0])
-	localPkg = db.getPackageVersion(pkgName, allVersions[0])
-
-	localVersion = allVersions[0].fork(versions.LocalBranch(), 
-					   sameVerRel = 1)
-	localPkg.changeVersion(localVersion)
-
-	changedFiles = {}
-	for (fileId, path, version) in localPkg.fileList():
-	    dbFile = db.getFileVersion(fileId, version)
-
-	    if isinstance(dbFile, files.SourceFile):
-		shortName = pkgName.split(':')[-2]
-		srcPath = cfg.sourcepath % {'pkgname': shortName } 
-		realPath = cfg.root + srcPath + "/" + path
-		localFile = files.FileFromFilesystem(realPath, fileId, "src")
-	    else:
-		realPath = cfg.root + path
-		localFile = files.FileFromFilesystem(realPath, fileId)
-
-	    localFile.flags(dbFile.flags())
-
-	    if not dbFile.same(localFile):
-		fileVersion = version.fork(versions.LocalBranch(), 
-					   sameVerRel = 1)
-		localPkg.updateFile(fileId, path, fileVersion)
-		changedFiles[fileId] = (dbFile, localFile, realPath)
-
-	(pkgChgSet, filesNeeded) = localPkg.diff(dbPkg)
-	cs.newPackage(pkgChgSet)
-
-	for (fileId, oldVersion, newVersion, path) in filesNeeded:
-	    (dbFile, localFile, fullPath)  = changedFiles[fileId]
-	    (filecs, hash) = fileChangeSet(fileId, dbFile, localFile)
-	    cs.addFile(fileId, oldVersion, newVersion, filecs)
-
-	    if hash:
-		cs.addFilePointer(hash, fullPath)
 
     return cs
 
