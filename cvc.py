@@ -12,12 +12,12 @@ argDef = {}
 argDef['dir'] = 1
 
 def usage(rc = 1):
-    print "usage: srs source add <file>"
+    print "usage: srs source add <file> [<file2> <file3> ...]"
     print "       srs source checkout [--dir <dir>] <group> <version>"
     print "       srs source commit"
     print "       srs source diff"
     print "       srs source newpkg <name>"
-    print "       srs source remove"
+    print "       srs source remove <file> [<file2> <file3> ...]"
     print "       srs source rename <oldfile> <newfile>"
     print "       srs source update"
     sys.exit(rc)
@@ -26,8 +26,9 @@ def sourceCommand(cfg, args, argSet):
     if not args:
 	usage()
     elif (args[0] == "add"):
-	if len(args) != 2: usage()
-	checkin.addFile(args[1])
+	if len(args) < 2: usage()
+        for f in args[1:]:
+            checkin.addFile(f)
     elif (args[0] == "checkout"):
 	if argSet.has_key("dir"):
 	    dir = argSet['dir']
@@ -53,8 +54,9 @@ def sourceCommand(cfg, args, argSet):
 	if argSet or len(args) != 1: usage()
 	checkin.diff(repos)
     elif (args[0] == "remove"):
-	if len(args) != 2: usage()
-	checkin.removeFile(args[1])
+	if len(args) < 2: usage()
+        for f in args[1:]:
+            checkin.removeFile(f)
     elif (args[0] == "rename"):
 	if len(args) != 3: usage()
 	checkin.renameFile(args[1], args[2])
