@@ -69,6 +69,23 @@ class NetworkAuthorization:
         log.error("no permissions match for (%s, %s)" % authToken)
 
         return False
+        
+    def checkUserPass(self, authToken, label = None):
+        if label and label.getHost() != self.name:
+            log.error("repository name mismatch")
+            return False
+
+        stmt = "SELECT COUNT(userId) FROM Users WHERE user=? AND password=?"
+        m = md5.new()
+        m.update(authToken[1])
+        cu = self.db.cursor()
+        cu.execute(stmt, authToken[0], m.hexdigest())
+
+        row = cu.fetchone()
+        if row[0] > 0:
+            return True
+        else:
+            return False
 
     def add(self, user, password, write=True):
         cu = self.db.cursor()
@@ -78,6 +95,13 @@ class NetworkAuthorization:
 
         cu.execute("INSERT INTO Permissions VALUES (?, Null, Null, ?)",
                    userId, write)
+
+    def iterUsers(self):
+        cu = self.db.cursor()
+        cu.execute("""SELECT Users.user, Users.userId, Permissions.write FROM Users
+                      LEFT JOIN Permissions ON Users.userId=Permissions.userId""")
+        for row in cu:
+            yield row
 
     def __init__(self, dbpath, name, anonymousReads = False):
         self.name = name
@@ -109,4 +133,3 @@ class NetworkAuthorization:
 
 class InsufficientPermission(Exception):
     pass
-
