@@ -660,6 +660,8 @@ _STREAM_TCS_TYPE	    = streams._STREAM_TROVE_CHANGE_SET +  7
 _STREAM_TCS_TROVE_CHANGES   = streams._STREAM_TROVE_CHANGE_SET +  8
 _STREAM_TCS_NEW_FILES       = streams._STREAM_TROVE_CHANGE_SET +  9
 _STREAM_TCS_CHG_FILES       = streams._STREAM_TROVE_CHANGE_SET + 10
+_STREAM_TCS_OLD_FLAVOR      = streams._STREAM_TROVE_CHANGE_SET + 11
+_STREAM_TCS_NEW_FLAVOR      = streams._STREAM_TROVE_CHANGE_SET + 12
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
@@ -667,17 +669,19 @@ _TCS_TYPE_RELATIVE = 2
 class AbstractTroveChangeSet(streams.LargeStreamSet):
 
     streamDict = { 
-	_STREAM_TCS_NAME	: (streams.StringStream,       "name"),
-        _STREAM_TCS_OLD_VERSION : (streams.FrozenVersionStream,"oldVersion" ),
-        _STREAM_TCS_NEW_VERSION : (streams.FrozenVersionStream,"newVersion" ),
-        _STREAM_TCS_REQUIRES    : (streams.DependenciesStream, "requires" ),
-        _STREAM_TCS_PROVIDES    : (streams.DependenciesStream, "provides" ),
-        _STREAM_TCS_CHANGE_LOG  : (changelog.AbstractChangeLog,"changeLog" ),
-        _STREAM_TCS_OLD_FILES   : (streams.StringsStream,      "oldFiles" ),
-        _STREAM_TCS_TYPE        : (streams.IntStream,          "tcsType" ),
-        _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,         "packages" ),
-        _STREAM_TCS_NEW_FILES   : (ReferencedFileList,         "newFiles" ),
-        _STREAM_TCS_CHG_FILES   : (ReferencedFileList,         "changedFiles" ),
+	_STREAM_TCS_NAME	: (streams.StringStream,       "name"        ),
+        _STREAM_TCS_OLD_VERSION : (streams.FrozenVersionStream,"oldVersion"  ),
+        _STREAM_TCS_NEW_VERSION : (streams.FrozenVersionStream,"newVersion"  ),
+        _STREAM_TCS_REQUIRES    : (streams.DependenciesStream, "requires"    ),
+        _STREAM_TCS_PROVIDES    : (streams.DependenciesStream, "provides"    ),
+        _STREAM_TCS_CHANGE_LOG  : (changelog.AbstractChangeLog,"changeLog"   ),
+        _STREAM_TCS_OLD_FILES   : (streams.StringsStream,      "oldFiles"    ),
+        _STREAM_TCS_TYPE        : (streams.IntStream,          "tcsType"     ),
+        _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,         "packages"    ),
+        _STREAM_TCS_NEW_FILES   : (ReferencedFileList,         "newFiles"    ),
+        _STREAM_TCS_CHG_FILES   : (ReferencedFileList,         "changedFiles"),
+        _STREAM_TCS_OLD_FLAVOR  : (streams.DependenciesStream, "oldFlavor"   ),
+        _STREAM_TCS_NEW_FLAVOR  : (streams.DependenciesStream, "newFlavor"   ),
      }
 
     """
@@ -804,10 +808,10 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
             depformat('Requires', self.getRequires(), f)
         if self.getProvides():
             depformat('Provides', self.getProvides(), f)
-        if self.oldFlavor:
-            depformat('Old Flavor', self.oldFlavor, f)
-        if self.newFlavor:
-            depformat('New Flavor', self.newFlavor, f)
+        if self.getOldFlavor():
+            depformat('Old Flavor', self.getOldFlavor(), f)
+        if self.getNewFlavor():
+            depformat('New Flavor', self.getNewFlavor(), f)
 
 	for (fileId, path, version) in self.newFiles:
 	    #f.write("\tadded (%s(.*)%s)\n" % (fileId[:6], fileId[-6:]))
@@ -840,47 +844,6 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	    list = [ x[0] + x[1].asString() for x in self.packages[name] ]
 	    f.write("\t" + name + " " + " ".join(list) + "\n")
 
-    def freeze(self):
-	"""
-	Returns a string representation of this change set which can
-	later be parsed by parse(). The representation begins with a
-	header::
-
-         AwBS <name> <newversion> ||
-           CS <name> <oldversion> <newversion> ||
-           NEW <name> <newversion>
-         [REQUIRES <dep set>]
-         [PROVIDES <dep set>]
-         [FLAVOR <dep set>]
-	 [CL <name> <email> <linecount>
-	   <line count lines of change log>]
-         
-	The remainder of the lines, each specifies a new file, old file,
-	removed file, or a change to the set of included packages. Each of
-	these lines begins with a "+", "-", "~", or "p" respectively. 
-
-	@rtype: string
-	"""
-
-	rc = []
-	lines = 0
-
-        if self.oldFlavor and self.newFlavor:
-            rc.append("FLAVOR %s %s\n" % (self.oldFlavor.freeze(),
-					  self.newFlavor.freeze()))
-	elif self.oldFlavor and not self.newFlavor:
-            rc.append("FLAVOR %s -\n" % (self.oldFlavor.freeze()))
-	elif not self.oldFlavor and self.newFlavor:
-            rc.append("FLAVOR - %s\n" % (self.newFlavor.freeze()))
-
-	newStyle = ""
-	rc = "".join(rc)
-
-	final = struct.pack("!I", len(rc)) + rc + \
-		    streams.LargeStreamSet.freeze(self)
-
-	return final
-
     def setProvides(self, provides):
 	self.provides.set(provides)
 
@@ -894,10 +857,10 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         return self.requires.value()
 
     def getOldFlavor(self):
-        return self.oldFlavor
+        return self.oldFlavor.value()
 
     def getNewFlavor(self):
-        return self.newFlavor
+        return self.newFlavor.value()
 
     def __init__(self, data = None):
 	streams.LargeStreamSet.__init__(self, data)
@@ -921,53 +884,20 @@ class TroveChangeSet(AbstractTroveChangeSet):
 	    self.tcsType.set(_TCS_TYPE_RELATIVE)
         self.provides.set(None)
         self.requires.set(None)
-	self.oldFlavor = oldFlavor
-	self.newFlavor = newFlavor
+	self.oldFlavor.set(oldFlavor)
+	self.newFlavor.set(newFlavor)
 
 class ThawTroveChangeSet(AbstractTroveChangeSet):
 
-    def parse(self, line):
-	action = line[0]
-
-	if action == "-":
-	    self.oldFile(line[1:])
-	
-	# this makes our order match the order in the changeset
-	self.changedFiles.sort()
-
     def __init__(self, buf):
-	oldSize = struct.unpack("!I", buf[0:4])[0]
-	newStyle = buf[oldSize + 4:]
-	buf = buf[4:oldSize + 4]
+	AbstractTroveChangeSet.__init__(self, buf)
 
-	AbstractTroveChangeSet.__init__(self, newStyle)
-
-	lines = buf.split("\n")[:-1]
-
-	oldVersion = None
-
-	# find the flavor
-	oldFlavor = None
-	newFlavor = None
-	for i, l in enumerate(lines):
-	    if l.startswith("FLAVOR "):
-		lst = l.split(' ', 2)
-		oldFlavorStr, newFlavorStr = lst[1:3]
-
-		if oldFlavorStr != "-":
-		    oldFlavor = deps.ThawDependencySet(oldFlavorStr)
-
-		if newFlavorStr != "-":
-		    newFlavor = deps.ThawDependencySet(newFlavorStr)
-
-		del lines[i]
-		break
-
-	self.oldFlavor = oldFlavor
-	self.newFlavor = newFlavor
-        
-	for line in lines:
-	    self.parse(line)
+	# empty flabors should be none, not empty DependencySet Classes
+	if not self.oldFlavor.value().getDepClasses():
+	    self.oldFlavor.set(None)
+	
+	if not self.newFlavor.value().getDepClasses():
+	    self.newFlavor.set(None)
 
 class TroveError(Exception):
 
