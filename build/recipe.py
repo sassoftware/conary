@@ -55,6 +55,7 @@ baseMacros = {
     'essentiallibdir'	: '/%(lib)s',
     'libexecdir'	: '%(exec_prefix)s/libexec',
     'localstatedir'	: '/var',
+    'servicedir'        : '/var',
     'cachedir'		: '%(localstatedir)s/cache',
     'sharedstatedir'	: '%(prefix)s/com',
     'includedir'	: '%(prefix)s/include',
