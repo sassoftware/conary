@@ -86,13 +86,13 @@ class HttpHandler(HtmlEngine):
             raise InsufficientPermission
 
         if cmd == "":
-            alreadyHome = True
+	    home = None
         else:
-            alreadyHome = False
+	    home = self.repServer.urlBase
 
         self.htmlHeader(pageTitle)
         handler(authToken, fields)
-        self.htmlFooter(alreadyHome)
+        self.htmlFooter(home)
 
     def mainpage(self, authToken, fields):
         self.htmlPageTitle("Conary Repository")

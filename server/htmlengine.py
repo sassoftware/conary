@@ -109,10 +109,10 @@ tr.header {
     </head>
 <body>""" % (pageTitle, self.styleSheet))
 
-    def htmlFooter(self, alreadyHome=False):
+    def htmlFooter(self, home=None):
         self.writeFn("<hr />")
-        if not alreadyHome:
-            self.writeFn("""<a href="../">Home</a>""")
+        if home:
+            self.writeFn('<a href="%s">Home</a>' % home)
         self.writeFn("</body></html>")
 
     def htmlPickTrove(self, troveList=[], action="chooseBranch"):
