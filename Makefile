@@ -24,6 +24,7 @@ python_files = __init__.py	\
 	package.py		\
 	recipe.py		\
 	repository.py		\
+	rollbacks.py		\
 	rpmhelper.py		\
 	sha1helper.py		\
 	srscfg.py		\
