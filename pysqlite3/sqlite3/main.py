@@ -138,6 +138,9 @@ class Cursor:
         self.current_row = self.stmt.step()
         self.description = self.stmt.get_description()
         self.closed = 0
+        # the PEP 249 leaves the return value undefined.  This allows
+        # you to do "for row in cu.execute(...)"
+        return self
 
     def executemany(self, query, parm_sequence):
         self._checkNotClosed("executemany")
