@@ -148,8 +148,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             raise RuntimeError, "client is too old"
         return 0
 
-    def __init__(self, path, mode, tmpPath, urlBase):
-	self.repos = fsrepos.FilesystemRepository(path, mode)
+    def __init__(self, path, tmpPath, urlBase):
+	self.repos = fsrepos.FilesystemRepository(path)
 	self.tmpPath = tmpPath
 	self.urlBase = urlBase
 

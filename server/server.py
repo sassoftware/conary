@@ -93,7 +93,7 @@ def handler(req):
     return apache.OK
 
 if __name__ == '__main__':
-    netRepos = NetworkRepositoryServer(sys.argv[2], "c", FILE_PATH, BASE_URL)
+    netRepos = NetworkRepositoryServer(sys.argv[2], FILE_PATH, BASE_URL)
     xmlServer = SRSServer(("localhost", 8000))
     xmlServer.register_instance(netRepos)
     xmlServer.register_introspection_functions()
