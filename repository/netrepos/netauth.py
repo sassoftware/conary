@@ -196,7 +196,7 @@ class NetworkAuthorization:
     def changePassword(self, user, newPassword):
         cu = self.db.cursor()
 
-        salt = "AAAA"
+        salt = os.urandom(4)
         
         m = md5.new()
         m.update(salt)
