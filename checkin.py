@@ -82,7 +82,7 @@ class SourceStateFromFile(SourceState):
 
     def __init__(self, file):
 	if not os.path.isfile(file):
-	    log.error("SRS file must exist in the current directory for source commands")
+	    log.error("CONARY file must exist in the current directory for source commands")
 	    raise OSError  # XXX
 
 	self.parseFile(file)
@@ -175,7 +175,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
 
 	state.addFile(fileId, path, version)
 
-    state.write(workDir + "/SRS")
+    state.write(workDir + "/CONARY")
 
 def commit(repos, cfg, message):
     if cfg.name is None or cfg.contact is None:
@@ -183,7 +183,7 @@ def commit(repos, cfg, message):
 	return
 
     try:
-        state = SourceStateFromFile("SRS")
+        state = SourceStateFromFile("CONARY")
     except OSError:
         return
 
@@ -247,7 +247,7 @@ def commit(repos, cfg, message):
     pkgCs.changeChangeLog(cl)
 
     repos.commitChangeSet(changeSet)
-    newState.write("SRS")
+    newState.write("CONARY")
 
 def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     if not troveName.endswith(":source"):
@@ -295,7 +295,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 
 def diff(repos, versionStr = None):
     try:
-        state = SourceStateFromFile("SRS")
+        state = SourceStateFromFile("CONARY")
     except OSError:
         return
 
@@ -378,7 +378,7 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	
 def updateSrc(repos, versionStr = None):
     try:
-        state = SourceStateFromFile("SRS")
+        state = SourceStateFromFile("CONARY")
     except OSError:
         return
     pkgName = state.getName()
@@ -428,11 +428,11 @@ def updateSrc(repos, versionStr = None):
     if newState.getVersion() == pkgCs.getNewVersion() and newBranch:
 	newState.changeBranch(newBranch)
 
-    newState.write("SRS")
+    newState.write("CONARY")
 
 def addFile(file):
     try:
-        state = SourceStateFromFile("SRS")
+        state = SourceStateFromFile("CONARY")
     except OSError:
         return
 
@@ -455,11 +455,11 @@ def addFile(file):
     fileId = cook.makeFileId(os.getcwd(), file)
 
     state.addFile(fileId, file, versions.NewVersion())
-    state.write("SRS")
+    state.write("CONARY")
 
 def removeFile(file):
     try:
-        state = SourceStateFromFile("SRS")
+        state = SourceStateFromFile("CONARY")
     except OSError:
         return
 
@@ -469,7 +469,7 @@ def removeFile(file):
     if os.path.exists(file):
 	os.unlink(file)
 
-    state.write("SRS")
+    state.write("CONARY")
 
 def newPackage(repos, cfg, name):
     name += ":source"
@@ -488,11 +488,11 @@ def newPackage(repos, cfg, name):
 	    log.error("cannot create directory %s/%s", os.getcwd(), dir)
 	    return
 
-    state.write(dir + "/" + "SRS")
+    state.write(dir + "/" + "CONARY")
 
 def renameFile(oldName, newName):
     try:
-        state = SourceStateFromFile("SRS")
+        state = SourceStateFromFile("CONARY")
     except OSError:
         return
 
@@ -512,14 +512,14 @@ def renameFile(oldName, newName):
 	if path == oldName:
 	    os.rename(oldName, newName)
 	    state.addFile(fileId, newName, version)
-	    state.write("SRS")
+	    state.write("CONARY")
 	    return
     
     log.error("file %s is not under management" % oldName)
 
 def showLog(repos, branch = None):
     try:
-        state = SourceStateFromFile("SRS")
+        state = SourceStateFromFile("CONARY")
     except OSError:
         return
 

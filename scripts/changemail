@@ -67,5 +67,6 @@ if [ -z "$repPath" ]; then
     exit 1
 fi
 
+$CONARY src rdiff --reppath $repPath $trove -1 $version 
 $CONARY src rdiff --reppath $repPath $trove -1 $version | \
     mail -s "$trove $version" $email

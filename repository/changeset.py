@@ -258,7 +258,7 @@ class ChangeSet:
 	    outFile.close()
 
 	    str = self.headerAsString()
-	    csf.addFile("SRSCHANGESET", 
+	    csf.addFile("CONARYCHANGESET", 
 			StringIO(str), "", len(str))
 
 	    self.writeContents(csf, self.earlyFileContents, True)
@@ -559,7 +559,7 @@ class ChangeSetFromFile(ChangeSet):
 	self.csf = filecontainer.FileContainer(f)
 	f.close()
 
-	control = self.csf.getFile("SRSCHANGESET")
+	control = self.csf.getFile("CONARYCHANGESET")
 
 	line = control.readline()
 	while line:
@@ -628,7 +628,7 @@ class ChangeSetFromFile(ChangeSet):
 	# pull in the config files
 	idList = []
 	for fileId in self.csf.iterFileList():
-	    if fileId == "SRSCHANGESET": continue
+	    if fileId == "CONARYCHANGESET": continue
 	    tags = self.csf.getTag(fileId)
 	    if tags.startswith("0 "): continue
 	    idList.append(fileId)
@@ -649,7 +649,7 @@ class ChangeSetFromFile(ChangeSet):
 
 	idList = []
 	for fileId in self.csf.iterFileList():
-	    if fileId == "SRSCHANGESET": continue
+	    if fileId == "CONARYCHANGESET": continue
 	    tags = self.csf.getTag(fileId)
 	    if early and tags.startswith("0 "): 
 		continue
