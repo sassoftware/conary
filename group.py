@@ -17,7 +17,7 @@ modification. This also allows a group file to be checked out and back
 in again, and have it updated with new head versions of it's components.
 
 Group files can contain comment lines (which begin with #), and the first
-two lines should read:
+two lines should read::
 
     name NAME
     version VERSION
