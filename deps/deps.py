@@ -492,17 +492,20 @@ def formatFlavor(flavor):
     handle.
     """
     def _singleClass(depClass):
-        dep = depClass.getDeps().next()
+        l = []
+        for dep in depClass.getDeps():
+            flags = dep.getFlags()[0]
 
-        flags = dep.getFlags()[0]
+            if flags:
+                flags.sort()
+                l.append("%s(%s)" % (dep.getName()[0],
+                           ",".join([ "%s%s" % (senseMap[x[1]], x[0]) 
+                                                for x in flags])))
+            else:
+                l.append(dep.getName()[0])
 
-	if flags:
-	    flags.sort()
-	    return "%s(%s)" % (dep.getName()[0],
-                    ",".join([ "%s%s" % (senseMap[x[1]], x[0]) 
-                                            for x in flags]))
-	else:
-	    return dep.getName()[0]
+        l.sort()
+        return " ".join(l)
 
     classes = flavor.getDepClasses()
     insSet = classes.get(DEP_CLASS_IS, None)
@@ -559,18 +562,36 @@ def parseFlavor(s, mergeBase = None):
 
     set = DependencySet()
 
-    baseInsSet = groups[3]
-    if baseInsSet:
+    if groups[3]:
+        # groups[3] is base instruction set, groups[4] is the flags, and
+        # groups[5] is the next instruction set
         needsInsSet = False
-        if groups[4]:
-            insSetFlags = groups[4].split(",")
-            for i, flag in enumerate(insSetFlags):
-                insSetFlags[i] = _fixup(flag)
-        else:
-            insSetFlags = []
 
-        set.addDep(InstructionSetDependency, Dependency(baseInsSet, 
-                                                        insSetFlags))
+        # set up the loop for the next pass
+        insGroups = groups[3:]
+        while insGroups[0]:
+            # group 0 is the base, group[1] is the flags, and group[2] is
+            # the next instruction set clause
+            baseInsSet = insGroups[0]
+
+            if insGroups[1]:
+                insSetFlags = insGroups[1].split(",")
+                for i, flag in enumerate(insSetFlags):
+                    insSetFlags[i] = _fixup(flag)
+            else:
+                insSetFlags = []
+
+            set.addDep(InstructionSetDependency, Dependency(baseInsSet, 
+                                                            insSetFlags))
+
+            if not insGroups[2]:
+                break
+
+            match = archGroupRegexp.match(insGroups[2])
+            # this had to match, or flavorRegexp wouldn't have
+            assert(match)
+            insGroups = match.groups()
+
     elif groups[2]:
         needsInsSet = False
 
@@ -600,22 +621,35 @@ def parseFlavor(s, mergeBase = None):
 
 dependencyCache = util.ObjectCache()
 
-ident = '(?:[_A-Za-z][0-9A-Za-z_]*)'
+ident = '(?:[0-9A-Za-z_]+)'
 flag = '(?:~?!?IDENT)'
 useFlag = '(?:!|~!)?FLAG(?:\.IDENT)?'
-archClause = '(is:) *(?:(IDENT)(?:\(( *FLAG(?: *, *FLAG)*)\))?)?'
-useClause = '(USEFLAG *(?:, *USEFLAG)*)? *'
-exp = '^(use:)? *(?:USECLAUSE)? *(?:ARCHCLAUSE)?$'
+archFlags = '\(( *FLAG(?: *, *FLAG)*)\)'
+archClause = '(?:(IDENT)(?:ARCHFLAGS)?)?'
+archGroup = '(?:ARCHCLAUSE(?:  *(ARCHCLAUSE))*)'
+useClause = '(USEFLAG *(?:, *USEFLAG)*)?'
+flavorRegexpStr = '^(use:)? *(?:USECLAUSE)? *(?:(is:) *ARCHGROUP)?$'
 
-exp = exp.replace('ARCHCLAUSE', archClause)
-exp = exp.replace('USECLAUSE', useClause)
-exp = exp.replace('USEFLAG', useFlag)
-exp = exp.replace('FLAG', flag)
-exp = exp.replace('IDENT', ident)
+flavorRegexpStr = flavorRegexpStr.replace('ARCHGROUP', archGroup)
+flavorRegexpStr = flavorRegexpStr.replace('ARCHCLAUSE', archClause)
+flavorRegexpStr = flavorRegexpStr.replace('ARCHFLAGS', archFlags)
+flavorRegexpStr = flavorRegexpStr.replace('USECLAUSE', useClause)
+flavorRegexpStr = flavorRegexpStr.replace('USEFLAG', useFlag)
+flavorRegexpStr = flavorRegexpStr.replace('FLAG', flag)
+flavorRegexpStr = flavorRegexpStr.replace('IDENT', ident)
+flavorRegexp = re.compile(flavorRegexpStr)
 
-flavorRegexp = re.compile(exp)
+archGroupStr = archGroup.replace('ARCHCLAUSE', archClause)
+archGroupStr = archGroupStr.replace('ARCHFLAGS', archFlags)
+archGroupStr = archGroupStr.replace('USECLAUSE', useClause)
+archGroupStr = archGroupStr.replace('USEFLAG', useFlag)
+archGroupStr = archGroupStr.replace('FLAG', flag)
+archGroupStr = archGroupStr.replace('IDENT', ident)
+archGroupRegexp = re.compile(archGroupStr)
 
-del ident, flag, useFlag, archClause, useClause, exp
+
+del ident, flag, useFlag, archClause, useClause, flavorRegexpStr
+del archGroupStr
 
 # None means disallowed match
 flavorScores = {
