@@ -108,6 +108,9 @@ class Flag(dict):
     def trackUsed(self, val):
         self._track = val
 
+    def resetUsed(self):
+        self._usedFlags.clear()
+        
     def __setitem__(self, key, value):
 	if self._frozen:
 	    raise TypeError, 'flags are frozen'
@@ -379,6 +382,11 @@ _addDocs(Arch)
 
 LocalFlags = Flag(showdefaults=False)
 
+def resetUsed():
+    Use.resetUsed()
+    Arch.resetUsed()
+    LocalFlags.resetUsed()
+    
 def track(arg):
     """
     Turns Use flag tracking on or off.
