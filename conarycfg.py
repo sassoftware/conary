@@ -16,6 +16,8 @@ Provides Conary's generic config file format, and implements conaryrc
 handling.
 """
 import os
+import re
+import sre_constants
 import sys
 
 import deps
@@ -23,8 +25,6 @@ import deps.arch
 import deps.deps
 from build import use
 from lib import log,util
-import re
-import sre_constants
 import versions
 
 
@@ -149,25 +149,24 @@ class ConfigFile:
 
     def displayKey(self, key, value, type, out):
         if type == STRING:
-            out.write("%-25s %s\n" % (key, self.__dict__[key]))
+            out.write("%-25s %s\n" % (key, value))
         elif type == LABEL:
-            out.write("%-25s %s\n" % (key, self.__dict__[key].asString()))
+            out.write("%-25s %s\n" % (key, value.asString()))
         elif type == LABELLIST:
-            out.write("%-25s %s\n" % (key, " ".join([x.asString() for x in self.__dict__[key]])))
+            out.write("%-25s %s\n" % (key, " ".join(x.asString() for x in value)))
         elif type == REGEXPLIST:
-            out.write("%-25s %s\n" % (key, " ".join([x[0] for x in self.__dict__[key]])))
+            out.write("%-25s %s\n" % (key, " ".join([x[0] for x in value])))
         elif type == STRINGPATH:
-            out.write("%-25s %s\n" % (key, ":".join(self.__dict__[key])))
+            out.write("%-25s %s\n" % (key, ":".join(value)))
         elif type == STRINGDICT:
-            d = self.__dict__[key]
-            idxs = d.keys()
+            idxs = value.keys()
             idxs.sort()
             for idx in idxs:
-                out.write("%-25s %-25s %s\n" % (key, idx, d[idx]))
+                out.write("%-25s %-25s %s\n" % (key, idx, value[idx]))
         elif type == CALLBACK:
             self.__dict__[key]('display')
         elif type == FLAVOR:
-            flavorStr = deps.deps.formatFlavor(self.__dict__[key])
+            flavorStr = deps.deps.formatFlavor(value)
             flavorList = flavorStr.split(",")
 
             str = ""
@@ -183,7 +182,7 @@ class ConfigFile:
             str = str[:-1]
             out.write("%-25s %s\n" % (hdr, str))
         elif type == BOOL:
-            out.write("%-25s %s\n" % (key, bool(self.__dict__[key])))
+            out.write("%-25s %s\n" % (key, bool(value)))
         else:
             out.write("%-25s (unknown type)\n" % (key))
 
@@ -300,6 +299,18 @@ class ConaryConfiguration(ConfigFile):
         for macro in sorted(self.macroflags.keys()):
             key = 'macros.' + macro
             out.write('%-25s %-25s\n' % (key, self[key]))
+
+    def displayKey(self, key, value, type, out):
+        # mask out username and password in repository map entries
+        if key == 'repositoryMap':
+            maskedMap = {}
+            for host, map in value.iteritems():
+                maskedMap[host] = re.sub('(https?://)[^:]*:[^@]*@(.*)', 
+                                         r'\1<user>:<password>@\2',
+                                         map)
+            value = maskedMap
+
+        ConfigFile.displayKey(self, key, value, type, out)
 
 
 class ConaryCfgError(Exception):

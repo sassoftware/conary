@@ -18,6 +18,7 @@ Changes in 0.50.4:
   * When existing fileId's had no streams but the streams are provided
     by a later commit, those streams weren't always merged properly if
     there were multiple files for that fileId
+  * conary config output masks user/password info in repositorymaps
 
 Changes in 0.50.3:
   * database findTrove now has an interface that is much closer to the 
