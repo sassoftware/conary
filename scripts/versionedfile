@@ -21,7 +21,7 @@ import versioned
 cfg = srscfg.SrsConfiguration()
 
 if len(sys.argv) > 2:
-    db = versioned.Database(sys.argv[1])
+    db = versioned.Database(sys.argv[1], "r")
     f = db.openFile(sys.argv[2])
     if len(sys.argv) == 3:
 	for branch in f.branchList():
@@ -32,5 +32,5 @@ if len(sys.argv) > 2:
 	final = f.getVersion(versions.VersionFromString(sys.argv[3], cfg.defaultbranch))
 	sys.stdout.write("".join(final.readlines()))
 else:
-    db = versioned.FileIndexedDatabase(sys.argv[1])
+    db = versioned.FileIndexedDatabase(sys.argv[1], "r")
     print "\n".join(db.fileList())
