@@ -136,6 +136,9 @@ available regular expressions.  It adds a dependency and should
 generally be disabled for embedded builds.
 """)
 
+Use.tcpwrappers = False
+Use.tcpwrappers.setShortDoc('Use the tcp_wrappers library')
+
 Use.gcj = True
 Use.gcj.setShortDoc('Use the gcj implementation of Java')
 Use.gcj.setLongDoc("""
