@@ -2,6 +2,11 @@
 # Copyright (c) 2004 Specifix, Inc.
 # All rights reserved
 #
+"""
+The recipe module contains the base Recipe class, default macros,
+and miscellaneous components used by srs .recipe files
+"""
+
 import imp, sys
 import os
 import util
@@ -13,6 +18,7 @@ import inspect
 import lookaside
 import rpmhelper
 import gzip
+import warnings
 
 baseMacros = (
     # Note that these macros cannot be represented as a dictionary,
@@ -218,11 +224,16 @@ class Recipe:
 		self.signatures[file] = []
 	    self.signatures[file].append((gpg, c, keyid))
 
-    def addTarball(self, file, extractDir='', keyid=None):
+    def addArchive(self, file, extractDir='', keyid=None):
 	self.tarballs.append((file, extractDir))
 	self.addSignature(file, keyid)
 
-    def addTarballFromRPM(self, rpm, file, extractDir='', keyid=None):
+    def addTarball(self, file, extractDir='', keyid=None):
+        warnings.warn("recipe.addTarball is deprecated - use recipe.addArchive",
+                      DeprecationWarning, stacklevel=2)
+        self.addArchive(file, extractDir, keyid)
+        
+    def addArchiveFromRPM(self, rpm, file, extractDir='', keyid=None):
 	f = lookaside.searchAll(self.cfg, self.laReposCache, 
 			     os.path.basename(file), self.name, self.srcdirs)
 	if not f:
@@ -234,6 +245,11 @@ class Recipe:
 				  self.name, self.srcdirs)
 	self.tarballs.append((file, extractDir))
 	self.addSignature(f, keyid)
+
+    def addTarballFromRPM(self, rpm, file, extractDir='', keyid=None):
+        warnings.warn("recipe.addTarballFromRPM is deprecated - use recipe.addArchiveFromRPM",
+                      DeprecationWarning, stacklevel=2)
+        self.addArchiveFromRPM(rpm, file, extractDir, keyid)
 
     def addPatch(self, file, level='1', backup='', keyid=None):
 	self.patches.append((file, level, backup))
