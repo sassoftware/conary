@@ -718,9 +718,7 @@ class RegularFile(File):
 	self.requires = None
 	File.__init__(self, *args, **kargs)
 
-def FileFromFilesystem(path, fileId, possibleMatch = None,
-		       dependencyGroup = None):
-                       
+def FileFromFilesystem(path, fileId, possibleMatch = None, buildDeps = False):
     s = os.lstat(path)
 
     try:
@@ -779,8 +777,8 @@ def FileFromFilesystem(path, fileId, possibleMatch = None,
 	sha1 = sha1helper.hashFile(path)
 	f.contents = RegularFileStream(s.st_size, sha1)
 
-    if dependencyGroup != None and f.hasContents and isinstance(f, RegularFile):
-	result = filedeps.findFileDependencies(path, dependencyGroup)
+    if buildDeps and f.hasContents and isinstance(f, RegularFile):
+	result = filedeps.findFileDependencies(path)
 	if result != None:
 	    f.setDependency(result[0])
 	    f.setProvides(result[1])

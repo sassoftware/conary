@@ -1,7 +1,7 @@
 import deps
 import lib.elf
 
-def findFileDependencies(path, dgroup):
+def findFileDependencies(path):
     # returns two DependencySets, one for what the file requires and
     # another for what it provides
     results = lib.elf.inspect(path)
@@ -13,7 +13,7 @@ def findFileDependencies(path, dgroup):
     rc = []
     
     for depList in results:
-	set = deps.DependencySet(dgroup)
+	set = deps.DependencySet()
 	for (depClass, main, flags) in depList:
 	    if depClass == 'soname':
 		curClass = deps.SonameDependencies

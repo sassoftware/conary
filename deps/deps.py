@@ -32,6 +32,12 @@ class Dependency:
 	else:
 	    return self.main
 
+    def freeze(self):
+	if self.flags:
+	    return "%s %s" % (self.main, " ".join(self.flags.iterkeys()))
+	else:
+	    return self.main
+
     def satisfies(self, required):
 	"""
 	Returns whether or not this dependency satisfies the argument
@@ -67,6 +73,14 @@ class Dependency:
 	    self.flags = {}
 	    for flags in flags:
 		self.flags[flags] = True
+
+def ThawDependency(frozen):
+    l = frozen.split(" ")
+    d = Dependency(l[0], l[1:])
+    if not dependencyCache.has_key(d):
+	dependencyCache[d] = d
+
+    return dependencyCache[d]
 
 class DependencyClass:
 

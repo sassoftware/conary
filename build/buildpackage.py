@@ -13,6 +13,8 @@ import string
 import os
 import files
 
+from deps import deps
+
 def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     if devtype == "b":
 	f = files.BlockDevice(None)
@@ -42,7 +44,7 @@ class BuildPackage(dict):
         used to obtain the contents of the file when creating a changeset
         to commit to the repository
         """
-	f = files.FileFromFilesystem(realPath, None)
+	f = files.FileFromFilesystem(realPath, None, buildDeps = True)
 	f.inode.setPerms(f.inode.perms() & 01777)
 	self[path] = (realPath, f)
 
