@@ -226,6 +226,8 @@ class FileContainer:
 	util.copyfileobj(fileObj, self.rest)
 
     def getNextFile(self):
+	assert(not self.mutable)
+
 	eatCount = self.next - self.gzfile.tell()
 
 	# in case the file wasn't completely read in (it may have
@@ -244,43 +246,6 @@ class FileContainer:
 	self.next = self.gzfile.tell() + size
 
 	return (name, tag, fcf, size)
-
-    def getFile(self, fileName):
-	"""
-        Returns a file-like object for accessing a member of the
-	container in read-only mode. The object provides a very
-	small number of functions.
-
-        @param fileName: name of file to retrieve from the file container
-        @type fileName: str
-        """
-	assert(not self.mutable)
-
-	eatCount = self.next - self.gzfile.tell()
-
-	# in case the file wasn't completely read in (it may have
-	# already been in the repository, for example)
-	while eatCount > self.bufSize:
-	    self.gzfile.read(self.bufSize)
-	    eatCount -= self.bufSize
-	self.gzfile.read(eatCount)
-
-	name, tag, size = self.nextFile()
-	while (name and name != fileName):
-	    while size > self.bufSize:
-		self.gzfile.read(self.bufSize)
-		size -= self.bufSize
-	    self.gzfile.read(size)
-
-	    name, tag, size = self.nextFile()
-
-	if not name:
-	    raise KeyError, ("file %s is not in the collection") % fileName
-
-	fcf = FileContainerFile(self.gzfile, size)
-	self.next = self.gzfile.tell() + size
-	
-	return (tag, fcf, size)
 
     def nextFile(self):
 	nameLen = self.gzfile.read(8)

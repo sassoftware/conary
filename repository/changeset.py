@@ -666,7 +666,8 @@ class ChangeSetFromFile(ChangeSet):
 	f.close()
 	#return
 
-	(tagInfo, control, size) = self.csf.getFile("CONARYCHANGESET")
+	(name, tagInfo, control, size) = self.csf.getNextFile()
+        assert(name == "CONARYCHANGESET")
 
 	start = control.read()
 	ChangeSet.__init__(self, data = start)
