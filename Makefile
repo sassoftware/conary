@@ -11,9 +11,8 @@ export DISTDIR = $(TOPDIR)/srs-$(VERSION)
 export prefix = /usr
 export srsdir = $(prefix)/share/srs
 export bindir = $(prefix)/bin
-export PYTHON = python2.3
 
-SUBDIRS=build local repository test lib
+SUBDIRS=build local repository test lib pysqlite
 
 subdirs_rule=
 

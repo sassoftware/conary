@@ -4,6 +4,8 @@
 # All rights reserved
 #
 
+export PYTHON = python2.3
+
 pyfiles-install:
 	mkdir -p $(DESTDIR)$(srsdir)
 	for f in $(python_files) $(bin_files); do \
