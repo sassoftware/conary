@@ -509,7 +509,7 @@ class CacheSet:
         return path
         
     def createSchema(self, dbpath, protocolVersion):
-	self.db = sqlite3.connect(dbpath)
+	self.db = sqlite3.connect(dbpath, timeout = 30000)
         cu = self.db.cursor()
         cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
         tables = [ x[0] for x in cu ]
