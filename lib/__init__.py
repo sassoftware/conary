@@ -10,4 +10,8 @@
 # without any waranty; without even the implied warranty of merchantability
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
-#
+
+"""
+The lib module provides code utility functions which are not
+conary-specific.
+"""
