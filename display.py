@@ -62,10 +62,10 @@ def displayPkgInfo(repos, cfg, pkgName, versionStr, ls):
 	    file = filesDB.getVersion(version)
 
 	    if isinstance(file, files.SymbolicLink):
-		name = "%s -> %s" (path, files.linkTarget())
+		name = "%s -> %s" %(path, file.linkTarget())
 	    else:
 		name = path
 
 	    print "%s    1 %-8s %-8s %s %s %s" % \
 		(file.modeString(), file.owner(), file.group(), 
-		 file.sizeString(), file.timeString(), path)
+		 file.sizeString(), file.timeString(), name)
