@@ -13,7 +13,7 @@
 # full details.
 #
 
-PYTHON = $(shell [ -x /usr/bin/python2.3 ] && echo /usr/bin/python2.3 || echo /usr/lib/conary/python/bin/python2.3)
+PYTHON = $(shell [ -x /usr/bin/python2.4 ] && echo /usr/bin/python2.4 || echo /usr/lib/conary/python/bin/python2.4)
 PYINCLUDE = $(shell $(PYTHON) -c 'import os, sys; print os.sep.join((sys.prefix, "include", "python" + sys.version[:3]))')
 
 pyfiles-install:

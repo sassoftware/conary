@@ -1,4 +1,4 @@
-#!/usr/bin/python2.3
+#!/usr/bin/python2.4
 # -*- mode: python -*-
 #
 # Copyright (c) 2004 Specifix, Inc.
@@ -19,8 +19,8 @@ The conary main program.
 
 
 import sys
-if sys.version_info < (2, 3):
-    print "error: python 2.3 or greater is requried"
+if sys.version_info < (2, 4):
+    print "error: python 2.4 or greater is requried"
     sys.exit(1)
 
 #stdlib
