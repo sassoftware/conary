@@ -260,7 +260,6 @@ class FilesystemJob:
 
                         continue
 
-
 	    fileObj.restore(contents, self.root, target, contents != None)
             if ptrTargets.has_key(fileId):
                 ptrTargets[fileId] = target
@@ -273,9 +272,19 @@ class FilesystemJob:
 	for (fileId, fileObj, target, msg, ptrId) in delayedRestores:
             # we wouldn't be here if the fileObj didn't have contents and
             # no override
+
+            # the source of the link group may not have been restored
+            # yet (it could be in the delayedRestore list itself). that's
+            # fine; we just restore the contents here and make the links
+            # for everything else
             if fileObj.linkGroup.value():
-                if self._createLink(fileObj.linkGroup.value(), target):
-                    continue
+                linkGroup = fileObj.linkGroup.value()
+                if self.linkGroups.has_key(linkGroup):
+                    if self._createLink(fileObj.linkGroup.value(), target):
+                        continue
+                else:
+                    linkGroup = fileObj.linkGroup.value()
+                    self.linkGroups[linkGroup] = target
 
             fileObj.restore(filecontents.FromFilesystem(ptrTargets[ptrId]),
                             self.root, target, True)
