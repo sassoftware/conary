@@ -26,10 +26,11 @@ from build import cook
 from repository import netclient
 from repository.netclient import NetworkRepositoryClient
 import branch
-import constants
-import repository
 import checkin
 import conarycfg
+import constants
+import repository
+import versions
 import xmlrpclib
 
 argDef = {}
