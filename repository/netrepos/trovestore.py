@@ -209,25 +209,28 @@ class TroveStore:
 	# I think we might be better of intersecting subqueries rather
 	# then using all of the and's in this join
 	cu.execute("""
-	    CREATE TEMPORARY TABLE itf(item STRING, version STRING)
+	    CREATE TEMPORARY TABLE itf(item STRING, version STRING,
+				      fullVersion STRING)
 	""", start_transaction = False)
 
 	for troveName in troveDict.keys():
             outD[troveName] = {}
 	    for version in troveDict[troveName]:
                 outD[troveName][version] = []
-		s = version.canon().asString()
-		vMap[s] = version
+		canonStr = version.canon().asString()
+		versionStr = version.asString()
+		vMap[versionStr] = version
 		cu.execute("""
-		    INSERT INTO itf VALUES (%s, %s)
-		""", (troveName, s), start_transaction = False)
+		    INSERT INTO itf VALUES (%s, %s, %s)
+		""", 
+		(troveName, canonStr, versionStr), start_transaction = False)
 
 	cu.execute("""
-	    SELECT aItem, aVersion, Flavors.flavor FROM
+	    SELECT aItem, fullVersion, Flavors.flavor FROM
 		(SELECT Items.itemId AS aItemId, 
 			versions.versionId AS aVersionId,
 			Items.item AS aItem,
-			versions.version AS aVersion FROM
+			fullVersion FROM
 		    itf JOIN Items ON itf.item = Items.item
 			JOIN versions ON itf.version = versions.version)
 		JOIN instances ON
@@ -235,7 +238,7 @@ class TroveStore:
 		    aVersionId = instances.versionId
 		JOIN flavors ON
 		    instances.flavorId = flavors.flavorId
-		ORDER BY aItem, aVersion
+		ORDER BY aItem, fullVersion
 	""")
 
 	for (item, verString, flavor) in cu:
