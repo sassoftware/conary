@@ -233,7 +233,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    outF = os.fdopen(fd, "w")
 	    util.copyfileobj(inF, outF)
 
-	    url = "%s?%s" % ( self.urlBase, os.path.basename(path)[:-4] )
+            url = os.path.join(self.urlBase, 
+                               "changeset?%s" % os.path.basename(path)[:-4])
 	    return url
 
     def getAllTroveLeafs(self, authToken, clientVersion, troveNames):
@@ -407,7 +408,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	(fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.ccs-in')
 	os.close(fd)
 	fileName = os.path.basename(path)
-	return "%s?%s" % (self.urlBase, fileName[:-3])
+
+        return os.path.join(self.urlBase, "?%s" % fileName[:-3])
 
     def commitChangeSet(self, authToken, clientVersion, url):
 	assert(url.startswith(self.urlBase))
