@@ -1181,6 +1181,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 # if there are affinity troves, we use their branches as 
                 # the desired branches to search, otherwise, search all 
                 # the labelPath as in 1.3-1.5
+                for char in ' ,':
+                    if char in versionStr:
+                        raise RuntimeError, \
+                            ('%s reqests illegal version/revision %s' 
+                                                    % (name, versionStr))
                 if affinityTroves:
                     if name in verRelBranch:
                         remaining.append(tup)
