@@ -423,10 +423,11 @@ def update(repos):
 	# this gets broken links right
 	try:
 	    os.lstat(headPath)
-	except:
 	    log.error("%s is in the way of a newly created file" % headPath)
 	    fullyUpdated = 0
 	    continue
+	except:
+	    pass
 
 	log.info("creating %s" % headPath)
 	(headFile, headFileContents) = \
@@ -434,6 +435,7 @@ def update(repos):
 	src = repos.pullFileContentsObject(headFile.sha1())
 	dest = open(headPath, "w")
 	util.copyfileobj(src, dest)
+	state.addFile(fileId, headPath, headVersion)
 	del src
 	del dest
 
@@ -466,7 +468,7 @@ def update(repos):
 	os.unlink(path)
 	state.removeFile(fileId)
 
-    for (fileId, headPath, headVersion) in pkgCs.getChangedFileList():
+    for (fileId, headPath, headFileVersion) in pkgCs.getChangedFileList():
 	(fsPath, fsVersion) = state.getFile(fileId)
 	pathOkay = 1
 	contentsOkay = 1
@@ -492,12 +494,15 @@ def update(repos):
 		realPath = fsPath	# let updates work still
 		log.error("path conflict for %s (%s on head)" % 
 			  (fsPath, headPath))
+	
+	# headFileVersion is None for renames
+	if headFileVersion:
+	    fsFile = files.FileFromFilesystem(realPath, fileId, type = "src")
+	    (headFile, headFileContents) = \
+		    repos.getFileVersion(fileId, headFileVersion, 
+					 withContents = 1)
 
-	fsFile = files.FileFromFilesystem(realPath, fileId, type = "src")
-	(headFile, headFileContents) = \
-		repos.getFileVersion(fileId, headVersion, withContents = 1)
-
-	if fsFile.sha1() != headFile.sha1():
+	if headFileVersion and fsFile.sha1() != headFile.sha1():
 	    # the contents have changed... let's see what to do
 	    if basePkg.hasFile(fileId):
 		baseFileVersion = basePkg.getFile(fileId)[1]
@@ -557,7 +562,9 @@ def update(repos):
 	    # XXX this doesn't even attempt to merge file permissions
 	    # and such; the good part of that is differing owners don't
 	    # break things
-	    state.addFile(fileId, realPath, headVersion)
+	    if not headFileVersion:
+		headFileVersion = state.getFile(fileId)[1]
+	    state.addFile(fileId, realPath, headFileVersion)
 	else:
 	    fullyUpdated = 0
 
