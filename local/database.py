@@ -198,10 +198,10 @@ class Database(repository.LocalRepository):
     # this is called when a Repository wants to store a file; we never
     # want to do this; we copy files onto the filesystem after we've
     # created the LocalBranch
-    def storeFileFromChangeset(self, chgSet, file, restoreContents):
+    def storeFileFromContents(self, contents, file, restoreContents):
 	if file.isConfig():
-	    return repository.LocalRepository.storeFileFromChangeset(self, 
-				    chgSet, file, restoreContents)
+	    return repository.LocalRepository.storeFileFromContents(self, 
+				contents, file, restoreContents)
 
     def close(self):
 	repository.LocalRepository.close(self)
@@ -332,9 +332,9 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	paths = self.paths.keys()
 	paths.sort()
 	for path in paths:
-	    (newFile, fileCont) = self.paths[path]
+	    newFile = self.paths[path]
 	    fileObj = newFile.file()
-	    fileObj.restore(fileCont, root + path, 
+	    fileObj.restore(newFile.getContents(), root + path, 
 			    newFile.restoreContents())
 
 	# remove paths which are no longer valid
@@ -431,21 +431,11 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 		skipPaths[f.path()] = 1
 	else:
 	    for f in self.newFileList():
-		self.paths[f.path()] = (f, localCs)
+		self.paths[f.path()] = f
 
 	for f in origJob.newFileList():
 	    if not skipPaths.has_key(f.path()):
-		self.paths[f.path()] = (f, origJob.cs)
-
-	# now look through all of the files we're supposed to create and
-	# set the FileContents object with the actual contents of the file
-	for (path, (f, cs)) in self.paths.items():
-	    fileObj = f.file()
-	    if not fileObj.hasContents: continue
-
-	    #(t, cont) = cs.getFileContents(fileObj.sha1())
-	    self.paths[path] = (f, 
-		    repository.FileContentsFromChangeSet(cs, fileObj.sha1()))
+		self.paths[f.path()] = f
 
 	# at this point, self is job which does all of the creation of
 	# new bits. we need self to perform the removal of the old bits
