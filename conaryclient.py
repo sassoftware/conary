@@ -15,6 +15,7 @@ import os
 import util
 
 import helper
+import conarycfg
 from local import database
 from repository import repository
 from repository import changeset
@@ -34,20 +35,23 @@ class NoNewTrovesError(UpdateError):
         return "no new troves found"
 
 class ConaryClient:
-    def __init__(self, repos, cfg):
+    def __init__(self, repos, cfg = None):
+        if cfg == None:
+            cfg = conarycfg.ConaryConfiguration()
+        
         self.repos = repos
         self.cfg = cfg
+        self.db = database.Database(cfg.root, cfg.dbPath)
 
     def updateTrove(self, pkg, versionStr, replaceFiles = False,
                     tagScript = None, keepExisting = None):
         """Updates a trove on the local system to the latest version in the respository that
            the trove was initially installed from."""
-        db = database.Database(self.cfg.root, self.cfg.dbPath)
         self._prepareRoot()
 
-        if db.hasPackage(pkg):
+        if self.db.hasPackage(pkg):
             labels = [ x.getVersion().branch().label()
-                       for x in db.findTrove(pkg) ]
+                       for x in self.db.findTrove(pkg) ]
             # this removes duplicates
             labels = {}.fromkeys(labels).keys()
         else:
@@ -77,7 +81,7 @@ class ConaryClient:
 
             # everything which needs to be installed is in this list; if it's
             # not here, it's a duplicate
-            outdated, eraseList = helper.outdatedTroves(db, newItems)
+            outdated, eraseList = helper.outdatedTroves(self.db, newItems)
             for (name, newVersion, newFlavor), \
                     (oldName, oldVersion, oldFlavor) in outdated.iteritems():
                 list.append((name, (oldVersion, oldFlavor),
@@ -92,22 +96,21 @@ class ConaryClient:
         if not list:
             raise NoNewTrovesError
 
-        db.commitChangeSet(cs, replaceFiles = replaceFiles,
-                           tagScript = tagScript, keepExisting = keepExisting)
+        self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
+                                tagScript = tagScript, keepExisting = keepExisting)
  
 
     def applyChangeSet(self, pkg, replaceFiles = False, tagScript = None, keepExisting = False):
         """Applies a change set from a file to the system."""
-        db = database.Database(self.cfg.root, self.cfg.dbPath)
         self._prepareRoot()
         
         cs = changeset.ChangeSetFromFile(pkg)
             
         if cs.isAbsolute():
-            cs = db.rootChangeSet(cs)
+            cs = self.db.rootChangeSet(cs)
 
-        db.commitChangeSet(cs, replaceFiles = replaceFiles,
-                           tagScript = tagScript, keepExisting = keepExisting)
+        self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
+                                tagScript = tagScript, keepExisting = keepExisting)
  
     def _prepareRoot(self):
         """Prepares the installation root for trove updates and change set applications."""
