@@ -24,25 +24,26 @@ class BuildFile(files.File):
         self.realPath = realPath
 
 class _BuildDeviceFile(files.DeviceFile, BuildFile):
-    def __init__(self, devtype, major, minor, owner, group, perms):
+    def __init__(self, major, minor, owner, group, perms):
         BuildFile.__init__(self, None)
 
-	self.devt.major.set(major)
-	self.devt.minor.set(minor)
+	self.devt.setMajor(major)
+	self.devt.setMinor(minor)
 	self.inode.setOwner(owner)
 	self.inode.setGroup(group)
 	self.inode.setPerms(perms)
 	self.inode.setMtime(0)
+	self.flags.set(0)
 
 class BuildBlockDeviceFile(_BuildDeviceFile):
 
     lsTag = "b"
         
-class BuildCharacterBlockFile(_BuildDeviceFile):
+class BuildCharacterDeviceFile(_BuildDeviceFile):
 
     lsTag = "c"
 
-def BuildDeviceFile(self, devtype, major, minor, owner, group, perms):
+def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     if devtype == "b":
 	return BuildBlockDeviceFile(major, minor, owner, group, perms)
     elif devtype == "c":

@@ -557,7 +557,7 @@ class SymbolicLink(File):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         util.mkdirChain(os.path.dirname(target))
-	os.symlink(self.theLinkTarget, target)
+	os.symlink(self.target.value(), target)
 	File.restore(self, target, restoreContents, skipMtime = 1)
 
 class Socket(File):
@@ -619,7 +619,8 @@ class DeviceFile(File):
 	else:
 	    flags = stat.S_IFBLK
         util.mkdirChain(os.path.dirname(target))
-	os.mknod(target, flags, os.makedev(self.major, self.minor))
+	os.mknod(target, flags, os.makedev(self.devt.major(), 
+		 self.devt.minor()))
             
 	File.restore(self, target, restoreContents)
 
