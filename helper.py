@@ -172,7 +172,6 @@ def fullBranchName(nameSpace, defaultNick, version, versionStr):
 	    return version.fork(nick, sameVerRel = 0)
     elif version.isBranch():
 	return version
-	state.setTroveBranch(version)
     else:
 	return version.branch()
 
