@@ -307,7 +307,7 @@ class Recipe:
 
 class PackageRecipe(Recipe):
     buildRequires = []
-    Flags = use.Flag(showdefaults=True)
+    Flags = use.LocalFlags
     
     def mainDir(self, new = None):
 	if new:

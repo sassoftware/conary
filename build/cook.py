@@ -402,7 +402,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     recipeObj.populateLcache()
     
     builddir = cfg.buildPath + "/" + recipeObj.name
-    use.track(True, recipeObj.Flags)
+    use.track(True)
+    recipeObj.Flags._freeze()
 
     recipeObj.setup()
     bldInfo = buildinfo.BuildInfo(builddir)
@@ -438,7 +439,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	log.info('Processing %s', recipeClass.name)
 	recipeObj.doDestdirProcess() # includes policy
 	bldInfo.stop()
-	use.track(False, recipeObj.Flags)
+	use.track(False)
     finally:
 	os.chdir(cwd)
     
@@ -532,7 +533,6 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
     buildList = []
     changeSetFile = None
     targetLabel = None
-    use.applyCfg(cfg)
 
     if item.endswith('.recipe') and os.path.isfile(item):
 	if emerge:
@@ -543,6 +543,9 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 
 	if recipeFile[0] != '/':
 	    recipeFile = "%s/%s" % (os.getcwd(), recipeFile)
+
+	pkgname = recipeFile.split('/')[-1].split('.')[0]
+	use.overrideFlags(cfg, pkgname)
 
 	try:
 	    loader = recipe.RecipeLoader(recipeFile, cfg=cfg, repos=repos)
@@ -557,6 +560,8 @@ def cookItem(repos, cfg, item, prep=0, macros={}, buildBranch = None,
 	versionList = versionDict[srcName]
 	targetLabel = versions.CookBranch()
     else:
+	use.overrideFlags(cfg, item)
+
 	if resume:
 	    raise CookError('Cannot use --resume argument when cooking in repository')
         try:

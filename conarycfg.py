@@ -189,7 +189,7 @@ class ConaryConfiguration(ConfigFile):
 	return self.useflags.keys()
 
     def pkgKeys(self, pkg):
-	return self.pkgdefaults.get(pkg, {}).keys()
+	return self.pkgflags.get(pkg, {}).keys()
 
 class ConaryCfgError(Exception):
 
