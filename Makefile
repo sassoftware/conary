@@ -25,12 +25,10 @@ python_files = __init__.py	\
 	filecontents.py		\
 	files.py		\
 	fixedglob.py		\
-	group.py		\
 	importrpm.py		\
 	log.py			\
 	lookaside.py		\
 	package.py		\
-	packagename.py		\
 	packagepolicy.py	\
 	patch.py		\
 	policy.py		\
