@@ -109,7 +109,7 @@ class TroveStore:
 	cu.execute("""
 	    SELECT timeStamps FROM Nodes WHERE
 		itemId=(SELECT itemId FROM Items WHERE item=%s) AND
-		versionId=(SELECT versionId FROM Versions WHERE version=%s);
+		versionId=(SELECT versionId FROM Versions WHERE version=%s)
 	""", item, version.asString())
 
 	timeStamps = cu.fetchone()[0]
@@ -362,9 +362,8 @@ class TroveStore:
 		INSERT INTO NewFiles VALUES(%d, %s, %d, %d, %s, %s)
 	    """, (troveInstanceId, fileId, versionId, flavorId, stream, path))
 
-	cu.execute("""
-	    CREATE INDEX NewFilesIdx on NewFiles(fileId, versionId);
-
+	cu.execute("CREATE INDEX NewFilesIdx on NewFiles(fileId, versionId)")
+        cu.execute("""
 	    INSERT INTO FileStreams SELECT NULL,
 					   NewFiles.fileId,
 					   NewFiles.versionId,
@@ -373,18 +372,18 @@ class TroveStore:
 		FROM NewFiles LEFT OUTER JOIN FileStreams ON
 		    NewFiles.fileId = FileStreams.fileId AND
 		    NewFiles.versionId = FileStreams.versionId
-		WHERE FileStreams.streamId is NULL;
-
+		WHERE FileStreams.streamId is NULL
+                """)
+        cu.execute("""
 	    INSERT INTO TroveFiles SELECT NewFiles.instanceId,
 					  FileStreams.streamId,
 					  NewFiles.path
 		FROM NewFiles JOIN FileStreams ON
 		    NewFiles.fileId = FileStreams.fileId AND
-		    NewFiles.versionId = FileStreams.versionId;
-
-            DROP INDEX NewFilesIdx;
-	    DROP TABLE NewFiles;
-	""")
+		    NewFiles.versionId = FileStreams.versionId
+                    """)
+        cu.execute("DROP INDEX NewFilesIdx")
+        cu.execute("DROP TABLE NewFiles")
 
 	for (name, version, flavor) in trove.iterTroveList():
 	    versionId = self.getVersionId(version, versionCache)
@@ -550,7 +549,7 @@ class TroveStore:
     def iterFilesInTrove(self, troveName, troveVersion, troveFlavor,
                          sortByPath = False, withFiles = False):
 	if sortByPath:
-	    sort = " ORDER BY path";
+	    sort = " ORDER BY path"
 	else:
 	    sort =""
 	cu = self.db.cursor()
@@ -619,7 +618,7 @@ class TroveStore:
 		      JOIN Flavors ON Instances.flavorId = Flavors.flavorId
 	   WHERE Nodes.itemId=(SELECT itemId FROM Items WHERE item=%s)
 	     AND branchId=(SELECT branchId FROM Branches WHERE branch=%s)
-	   ORDER BY finalTimeStamp;
+	   ORDER BY finalTimeStamp
 	""", troveName, branch)
 
 	latest = {}	
