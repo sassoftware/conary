@@ -275,7 +275,13 @@ class ComponentSpec(_filterSpec):
     C{r.ComponentSpec(I{packagename:component}, I{filterexp}...)}
 
     This class includes the filter expressions that specify the default
-    assignment of files to components.
+    assignment of files to components.  The expressions are considered
+    in the order in which they are evaluated in the recipe, and the
+    first match wins.  After all the recipe-provided expressions are
+    evaluated, the default expressions are evaluated.  If no expression
+    matches, then the file is assigned to the catchall component, which
+    is C{runtime} by default but can be changed with the C{catchall=}
+    argument.
     """
     baseFilters = (
 	# automatic subpackage names and sets of regexps that define them
