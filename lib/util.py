@@ -228,6 +228,9 @@ def copyfile(sources, dest):
 	print '+ copying %s to %s' %(source, dest)
 	shutil.copy2(source, dest)
 
+def copyfileobj(source, dest):
+    shutil.copyfileobj(source, dest, 128 * 1024)
+
 def rename(sources, dest):
     for source in braceGlob(sources):
 	print '+ renaming %s to %s' %(source, dest)

@@ -9,6 +9,7 @@
 
 import gzip
 import os
+import util
 
 class DataStore:
 
@@ -82,7 +83,7 @@ class DataStore:
 	dest = self.newFile(hash)
 
 	if not dest: return		# it already exits
-	dest.write(file.read())
+        util.copyfileobj(file, dest)
 
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):

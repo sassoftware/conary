@@ -132,7 +132,7 @@ class RepositoryCache:
 	cachedname = createCacheName(cfg, name, location)
 	dest = open(cachedname, "w+")
 	src = self.repos.pullFileContentsObject(self.map[name])
-	dest.write(src.read())
+        util.copyfileobj(src, dest)
 	src.close()
 	dest.close()
 	return cachedname

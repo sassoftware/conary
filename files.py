@@ -501,7 +501,7 @@ class RegularFile(File):
 
 	    f = open(target, "w")
 	    src = fileContents.get()
-	    f.write(src.read())
+            util.copyfileobj(src, f)
 	    f.close()
 
 	File.restore(self, target, restoreContents)

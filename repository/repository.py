@@ -119,7 +119,7 @@ class LocalRepository(Repository):
 
 		# if targetFile is None the file is already in the store
 		if targetFile:
-		    targetFile.write(f.read())
+		    util.copyfileobj(f, targetFile)
 		    f.seek(0)
 		    targetFile.close()
 	    else:
