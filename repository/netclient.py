@@ -982,7 +982,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if affinityDatabase and affinityDatabase.hasPackage(name):
             affinityTroves = affinityDatabase.findTrove(name)
         else:
-            affinityTroves = None
+            affinityTroves = []
 
         if not versionStr:
             query = {}
@@ -992,8 +992,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     # XXX what if multiple troves are on this branch,
                     # but with different flavors?
 
+                    flavor = defaultFlavor.copy()
+                    flavor.union(trove.getFlavor(), 
+                                 mergeType = deps.DEP_MERGE_TYPE_PREFS)
                     query[name][trove.getVersion().branch()] = \
-                        [ defaultFlavor ]
+                        [ flavor ]
 
             if query:
                 flavorDict = self.getTroveLeavesByBranch(query, 
@@ -1036,8 +1039,28 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             flavorDict = { name : {} }
             for label in labelPath:
+                flavors = []
+                for trove in affinityTroves:
+                    if trove.getVersion().branch().label() == label:
+                        flavors.append(trove.getFlavor())
+
+                if not flavors:
+                    finalFlavor = defaultFlavor
+                else:
+                    # make sure the flavors are the same; otherwise
+                    # fall back to the default flavor
+                    flavor = flavors[0]
+                    for f in flavors:
+                        if f != flavor:
+                            flavor = defaultFlavor
+                            break
+
+                    finalFlavor = defaultFlavor.copy()
+                    finalFlavor.union(flavor, 
+                                      mergeType = deps.DEP_MERGE_TYPE_PREFS)
+            
                 d = self.getTroveLeavesByLabel([name], label, 
-                                               flavorFilter = defaultFlavor)
+                                               flavorFilter = finalFlavor)
                 if not d.get(name, None):
                     continue
                 elif not acrossRepositories:
@@ -1057,11 +1080,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if affinityTroves:
                 query[name] = {}
                 for trove in affinityTroves:
-                    # XXX what if multiple troves are on this branch,
+                    # XXX what if multiple troves are on this label,
                     # but with different flavors?
 
+                    flavor = defaultFlavor.copy()
+                    flavor.union(trove.getFlavor(), 
+                                 mergeType = deps.DEP_MERGE_TYPE_PREFS)
                     query[name][trove.getVersion().branch()] = \
-                        [ defaultFlavor ]
+                        [ flavor ]
 
             if query:
                 flavorDict = self.getTroveVersionsByBranch(query, 
@@ -1101,10 +1127,30 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             else:
                 fn = self.getTroveVersionFlavors
 
+            if affinityTroves:
+                flavors = [ x.getFlavor() for x in affinityTroves ]
+                flavor = flavors[0]
+                for f in flavors:
+                    if f != flavor:
+                        flavor = defaultFlavor
+                        break
+
+                finalFlavor = defaultFlavor.copy()
+                finalFlavor.union(flavor, 
+                                  mergeType = deps.DEP_MERGE_TYPE_PREFS)
+            else:
+                finalFlavor = defaultFlavor
+
             # we're not allowed to ask for the bestFlavor if the 
             # defaultFlavor is None
-            bestFlavor = defaultFlavor is not None
-            flavorDict = fn({ name : { version : [ defaultFlavor ] } },
+            if finalFlavor is None:
+                bestFlavor = False
+                flavor = None
+            else:
+                bestFlavor = True
+                flavor = finalFlavor
+
+            flavorDict = fn({ name : { version : [ flavor ] } },
                             bestFlavor = bestFlavor)
 
             if not flavorDict.has_key(name):

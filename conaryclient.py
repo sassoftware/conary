@@ -168,7 +168,9 @@ class ConaryClient:
                 try:
                     newList = self.repos.findTrove(None, troveName, 
                                                    self.cfg.flavor, versionStr,
-                                                   withFiles = False)
+                                                   withFiles = False,
+                                                   affinityDatabase = self.db)
+
                 except repository.TroveNotFound, e:
                     # we give an error for this later on
                     newList = []
