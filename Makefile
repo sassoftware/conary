@@ -35,6 +35,7 @@ python_files = __init__.py	\
 	conarycfg.py		\
 	conaryclient.py		\
 	constants.py		\
+	cvc.py			\
 	cscmd.py		\
 	datastore.py		\
 	display.py		\
@@ -43,14 +44,13 @@ python_files = __init__.py	\
 	queryrep.py		\
 	rollbacks.py		\
 	rpmhelper.py		\
-	srcctl.py		\
 	streams.py		\
 	trove.py		\
 	updatecmd.py		\
 	versions.py
 
 example_files = examples/tmpwatch.recipe
-bin_files = conary
+bin_files = conary cvc
 extra_files = conary-wrapper.in Makefile Make.rules conary.1 LICENSE constants.py.in
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 

@@ -38,7 +38,6 @@ import queryrep
 import repository
 import rollbacks
 import conarycfg
-import srcctl
 import updatecmd
 from lib import util
 import versions
@@ -57,14 +56,9 @@ except conarycfg.ConaryCfgError, e:
 sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
 
 def usage(rc = 1):
-    print "usage: conary branch <newbranch> <branchfrom> [<trove>]"
-    print "       conary changeset <pkg> [<oldver>] <newver> <outfile>"
-    print '       conary cook [--prep] [--debug-exceptions] [--macros file] '
-    print '                   [--use-flag  "<prefix>.<flag> <bool>"]+ '
-    print '                   [--use-macro "<macro> <value>"]+ '
-    print '                   <file.recipe|troveName>+'
-    print "       conary emerge       <troveName>+"
+    print "usage: conary changeset <pkg> [<oldver>] <newver> <outfile>"
     print "       conary commit       <changeset>"
+    print "       conary emerge       <troveName>+"
     print "       conary erase        <pkgname> [<version>]"
     print "       conary localcs      <pkg> <outfile>"
     print "       conary localcommit  <changeset>"
@@ -74,7 +68,6 @@ def usage(rc = 1):
     print "       conary rblist"
     print "       conary rollback     <rollback>"
     print "       conary showcs       <changeset>"
-    print "       conary source       [usage]"
     print "       conary update       <pkgname>[=<version>]*"
     print "              update       <changeset>+"
     print "       conary usage"
@@ -87,16 +80,6 @@ def usage(rc = 1):
     print '               --config "<item> <value>"'
     print '               --install-label <label>'
     print "               --root <root>"
-    print ""
-    print "cook flags:    --macros"
-    print "               --noclean"
-    print '               --use-flag  "<prefix>.<flag> <bool>"'
-    print '               --use-macro "<macro> <value>"'
-    print "               --prep"
-    print "               --resume [policy|<linenums>]"
-    print "               --debug-exceptions"
-    print "               --target-branch <branch>"
-    print '               --use-flag "<flag> <value>"'
     print ""
     print "query flags:   --full-versions"
     print "               --ids"
@@ -142,9 +125,6 @@ def realMain(argv=sys.argv):
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
     argDef["debug"] = NO_PARAM
-    argDef["debug-exceptions"] = NO_PARAM
-    argDef["use-flag"] = MULT_PARAM
-    argDef["use-macro"] = MULT_PARAM
     argDef["full-versions"] = NO_PARAM
     argDef["ids"] = NO_PARAM
     argDef["info"] = NO_PARAM
@@ -152,20 +132,13 @@ def realMain(argv=sys.argv):
     argDef["leaves"] = NO_PARAM
     argDef["path"] = ONE_PARAM
     argDef["ls"] = NO_PARAM
-    argDef["macros"] = ONE_PARAM
-    argDef["message"] = ONE_PARAM
-    argDef["noclean"] = NO_PARAM
-    argDef["prep"] = NO_PARAM
     argDef["profile"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
-    argDef["resume"] = OPT_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["tag-script"] = ONE_PARAM
     argDef["tags"] = NO_PARAM
     argDef["target-branch"] = ONE_PARAM
     argDef["version"] = NO_PARAM
-
-    argDef.update(srcctl.argDef)
 
     try:
         argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
@@ -194,13 +167,6 @@ def realMain(argv=sys.argv):
 
     if (len(otherArgs) < 2):
 	return usage()
-    elif (otherArgs[1] == "branch"):
-	if argSet: return usage()
-	if len(otherArgs) < 4 or len(otherArgs) > 5: return usage()
-	repos = openRepository(cfg.repositoryMap)
-
-	args = [repos, ] + otherArgs[2:]
-	branch.branch(*args)
     elif (otherArgs[1] == "changeset"):
 	# current usage is "package file oldversion newversion"
 	if len(otherArgs) != 5 and len(otherArgs) != 6:
@@ -232,53 +198,6 @@ def realMain(argv=sys.argv):
 	    return usage()
 	else:
 	    cfg.display()
-    elif (otherArgs[1] == "cook"):
-	log.setVerbosity(1)
-	macros = {}
-	prep = 0
-	resume = None
-	buildBranch = None
-	if argSet.has_key('use-flag'):
-	    for flag in argSet['use-flag']:
-		cfg.configLine(flag)
-	    del argSet['use-flag']
-
-	if argSet.has_key('use-macro'):
-	    for macro in argSet['use-macro']:
-		cfg.configLine('macros.' + macro)
-	    del argSet['use-macro']
-
-	if argSet.has_key('prep'):
-	    del argSet['prep']
-	    prep = 1
-
-	if argSet.has_key('noclean'):
-	    del argSet['noclean']
-	    cfg.noClean = True
-	else:
-	    cfg.noClean = False
-	if argSet.has_key('resume'):
-	    resume = argSet['resume']
-	    del argSet['resume']
-	if argSet.has_key('debug-exceptions'):
-	    del argSet['debug-exceptions']
-	    cfg.debugRecipeExceptions = True
-	if argSet.has_key('macros'):
-	    argSet['macros']
-	    f = open(argSet['macros'])
-	    # XXX sick hack
-	    macroSrc = "macros =" + f.read()
-	    exec macroSrc
-	    del f
-	    del argSet['macros']
-
-	if argSet.has_key('target-branch'):
-	    buildBranch = argSet['target-branch']
-	    del argSet['target-branch']
-
-	if argSet: return usage()
-
-	cook.cookCommand(cfg, otherArgs[2:], prep, macros, resume=resume)                
     elif (otherArgs[1] == "emerge"):
 	log.setVerbosity(1)
 
@@ -425,8 +344,6 @@ def realMain(argv=sys.argv):
 	for changeset in changesets:
 	    cs = repository.changeset.ChangeSetFromFile(changeset)
 	    cs.formatToFile(cfg, sys.stdout)
-    elif (otherArgs[1] == "source" or otherArgs[1] == "src"):
-	return srcctl.sourceCommand(cfg, otherArgs[2:], argSet)
     elif (otherArgs[1] == "update"):
 	kwargs = {}
 

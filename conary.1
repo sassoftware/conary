@@ -4,6 +4,8 @@
 conary \- repository-based software configuration manager
 .SH SYNOPSIS
 .B conary \fIcommand \fR[\fI<args>\fR]
+
+.B cvc \fIcommand \fR[\fI<args>\fR]
 .SH DESCRIPTION
 \fBConary\fR is a software configuration manager that uses distributed,
 network-based, versioned repositories rather than disparate package
@@ -15,19 +17,20 @@ Conary has several common command-line arguments, all of which modify
 configuration entries and are documented with other configuration
 entries.  The rest of its command-line arguments are specific to
 which conary \fBcommand\fP you are running, and are documented with
-the commands.
+the commands. The \fIC\fPonary \fIv\fPersion \fIc\fPontrol program, called \fBcvc\fP, handles
+build and source management.
 .SS "System Management"
 The following \fBcommands\fP are used to install, update, erase, and
 otherwise manage software installed on a local system.
 .TP 4
-.B query \fItrvname [version]\fP
+.B query \fItrovename [version]\fP
 Lists troves installed on the local system.
 .TP 4
 .B query \fI--path <file>\fP
 Lists the package that owns the specified file.  Must use absolute file name.
 .TP
-.B update [\fIargs\fP] <\fItrvname\fP[=\fIversion\fP]>* <\fIchangeset-file\fP>*
-Updates the trove \fItrvname\fR from the appropriate repository to 
+.B update [\fIargs\fP] <\fItrovename\fP[=\fIversion\fP]>* <\fIchangeset-file\fP>*
+Updates the trove \fItrovename\fR from the appropriate repository to 
 match the optional \fIversion\fP (otherwise the most recent version which 
 matches the \fBinstall-label\fP) and applies the changesets contained in any
 \fIchange-files\fP given.
@@ -41,8 +44,8 @@ matches the \fBinstall-label\fP) and applies the changesets contained in any
 .RE
 .TP
 .TP
-.B erase \fItrvname [version]\fP
-Erase all instances of \fItrvname\fP (or only a specified \fIversion\fP)
+.B erase \fItrovename [version]\fP
+Erase all instances of \fItrovename\fP (or only a specified \fIversion\fP)
 from the local system
 .TP
 .B remove \fIpath\fP
@@ -56,14 +59,14 @@ the component that now contains \fI/foo/blah\fP instead of
 \fI/foo/bar\fP, \fI/foo/blah\fP will not be created on your system
 as a new file.)
 .TP
-.B changeset \fItrvname [oldver] newver outfile\fP
-Creates an absolute changeset for \fItrvname newver\fP, or a relative
-changeset between \fItrvname oldver\fP and \fItrvname newver\fP, and stores
+.B changeset \fItrovename [oldver] newver outfile\fP
+Creates an absolute changeset for \fItrovename newver\fP, or a relative
+changeset between \fItrovename oldver\fP and \fItrovename newver\fP, and stores
 it in outfile.
 .TP
-.B localcs \fItrvname outfile\fP
+.B localcs \fItrovename outfile\fP
 Creates a local changeset, which represents the changes made on the
-local system to \fItrvname\fP, relative to the package as it is
+local system to \fItrovename\fP, relative to the package as it is
 represented in the repository.
 .TP
 .B localcommit
@@ -75,6 +78,17 @@ come from the repository, and the changes represented in the local
 changeset will be preserved as if they had been made by hand
 locally.
 .TP
+.B commit \fIchangeset\fP [--target-branch \fI<branch>\fP]
+Commits a changeset to the repository.  This is not a reversible
+operation, so take care.  The \fB--target-branch\fP option
+is only appropriate when you commit a \fBlocal changeset\fP
+to a repository.
+.TP
+.B emerge \fI<component>...\fP
+Builds the recipe for the given component (which it finds using the
+\fIbuildLabel\fP) onto the \fBlocalhost@local:EMERGE\fP branch
+and updates the local system to the new build.
+.TP
 .B rblist
 Lists available rollbacks.
 .TP
@@ -82,7 +96,7 @@ Lists available rollbacks.
 Applies rollback \fIrollback\fP.  (Syntax may change in future versions
 of Conary.)
 .TP
-.B repquery [\fIargs\fP \fItrvname [version]\fP
+.B repquery [\fIargs\fP \fItrovename [version]\fP
 Lists troves in the repository.
 Arguments include
 .RS 4
@@ -118,20 +132,44 @@ Lists the contents of the specified changesets.
 .\"
 .\"
 .SS "Building Components and Packages"
+The \fBcvc\fP command handles actions related to source components.
+.PP
+A source component is checked out into a \fBsource directory\fP
+with the \fBcheckout\fP command, or a source component and
+source directory are created with the \fBcvc newpkg\fP subcommand.
+Then the contents of the source directory are modified with other
+subcommands, and the changes to the source component are then
+committed to the repository with the \fBcvc commit\fP subcommand.
+Only the \fBcvc commit\fP command modifies the repository; the
+rest of the commands either query the repository for information
+about a source package or schedule a change to be applied to the
+repository by the next \fBcvc commit\fP command.
+.PP
+The default branch on which each of these commands operates
+is specified by the \fBbuildLabel\fP configuration entry
+(see below).
+.PP
+The following \fBcommands\fP to \fBcvc\fP are used to create,
+modify, and cook source components:
 .TP 4
-.B branch \fInewbranch branchfrom [trove]\fP
-Creates a new branch in the repository, relative to branch
-\fIbranchfrom\fP.  If \fItrove\fP is listed, create the
-branch only for that trove.
-.TP
-.B cook \fI[\fR--prep\fI] [\fR--macros file\fI] [\fR--target-branch \fI<branch>]\fR \e
+.B cook \fI[\fR--prep\fI] [\fR--macros file\fI] \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR--resume [<linenums>|policy]] [\fR--use-flag "<flag> True|False"] \fP \e
+.B \ \ \ \ \ [\fR--target-branch \fI<branch>\fP] \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR--use-macro <macro> <string>] \fI<file>\fP.recipe\fI|<component>...\fP
+.B \ \ \ \ \ [\fR--resume [<linenums>|policy]] \e
+.PD 0
+.TP
+.B \ \ \ \ \ [\fR--use-flag "<flag> True|False"] \e
+.PD 0
+.TP
+.B \ \ \ \ \ [\fR--use-macro <macro> <string>] \e
+.PD 0
+.TP
+.B \ \ \ \ \ \fI<file>\fP.recipe\fI|<component>...
 .PD
+
 Build a package.  If \fB--prep\fP is specified, the souce code is
 unpacked, but is not built. if \fB--macros\fP is specified, it
 names a file containing macro definitions to apply to the recipe
@@ -157,7 +195,7 @@ from the last build; this only works if the destdir still exists,
 either because of a policy error or because the \fB--noclean\fP option
 was provided.
 
-Example: conary cook --resume 5:10,15,35:
+Example: cvc cook --resume 5:10,15,35:
 
 Note that the \fB--resume\fP option may
 be used only with local recipe files, not source components grabbed
@@ -183,46 +221,15 @@ the package will be cooked from the repository.
 Conary will build a changeset that is relative to the current
 \fBbuildLabel\fP unless the \fB--target-branch\fP option is
 specified.
-.TP
-.B commit \fIchangeset\fP [--target-branch \fI<branch>\fP]
-Commits a changeset to the repository.  This is not a reversible
-operation, so take care.  The \fB--target-branch\fP option
-is only appropriate when you commit a \fBlocal changeset\fP
-to a repository.
-.TP
-.B emerge \fI<component>...\fP
-Builds the recipe for the given component (which it finds using the
-\fIbuildLabel\fP) onto the \fBlocalhost@local:EMERGE\fP branch
-and updates the local system to the new build.
-.TP
-.B conary source \fIsubcommand\fP
-Actions on source components, \fIexcept for \fBcook\fR, are
-subcommands on \fBconary source\fP, which can be abbreviated
-as \fBconary src\fP.  (The exception for \fBcook\fP is because
-conary can cook directly from the repository as well as from
-a checked-out source directory.)
-.IP
-A source component is checked out into a \fBsource directory\fP
-with the \fBcheckout\fP subcommand, or a source component and
-source directory are created with the \fBnewpkg\fP subcommand.
-Then the contents of the source directory are modified with other
-subcommands, and the changes to the source component are then
-committed to the repository with the \fBcommit\fP subcommand.
-Only the \fBcommit\fP subcommand modifies the repository; the
-rest of the commands either query the repository for information
-about a source package or schedule a change to be applied to the
-repository by the next \fBcommit\fP subcommand.
-.IP
-The default branch on which each of these commands operates
-is specified by the \fBbuildLabel\fP configuration entry
-(see below).
-.IP
-\fIsubcommands\fP include:
-.RS
 .TP 4
 .B add \fIfile...\fP
 Adds all the files listed on the command line to the source
 component.
+.TP
+.B branch \fInewbranch branchfrom [trove]\fP
+Creates a new branch in the repository, relative to branch
+\fIbranchfrom\fP.  If \fItrove\fP is listed, create the
+branch only for that trove.
 .TP
 .B checkout [--dir \fI<dir>\fP] \fI<trove>\fP [\fI<version>\fP]
 Check the \fI<trove>\fB:source\fR component out of the repository
@@ -231,7 +238,7 @@ and put it in directory \fI<dir>\fP if specified, and directory
 specified by \fBbuildLabel\fP unless \fI<version>\fP is specified.
 .TP
 .B commit [--message \fI<message>\fP]
-Different from \fBconary commit\fP, \fBconary source commit\fP
+Different from \fBconary commit\fP, \fBcvc commit\fP
 commits all the changes in the source directory to the repository. 
 It will ask for a changelog message unless one is passed on the
 command line with \fB--message\fP.
@@ -239,7 +246,7 @@ command line with \fB--message\fP.
 .B diff
 Show (in a slightly extended unified diff format) the changes that
 have been made in the current source directory since the last
-\fBconary source commit\fP
+\fBcvc commit\fP
 (or, if no commit, since the source component was checked out).
 .TP
 .B log [\fI<branch>\fP]
@@ -256,14 +263,14 @@ source directory.  It creates a diff between two versions of
 a source trove from the repository.
 .TP
 .B remove \fI<filename>...\fP
-Unlike \(lq\fBcvs remove\fP\(rq, \fBconary source remove\fP both removes
+Unlike \(lq\fBcvs remove\fP\(rq, \fBcvc remove\fP both removes
 the file from the filesystem and marks it to be removed from the next
-version checked into the repository at the next \fBconary source commit\fP.
+version checked into the repository at the next \fBcvc commit\fP.
 .TP
 .B rename \fI<oldname> <newname>\fP
 Renames the file \fI<oldname>\fP to \fI<newname>\fP on the filesystem,
 and marks it to be removed from the repository at the next
-\fBconary source commit\fP.
+\fBcvc commit\fP.
 .TP
 .B update [\fI<version>\fP]
 Updates the current source directory to the latest version, or to
