@@ -4,6 +4,8 @@ Changes in 0.50.6:
   * reworked troves being added to database to handle missing parts
     of packages and groups properly (and make things faster and more
     elegant)
+  * merged update and erase code paths in conaryclient
+  * update and erase now take +,- modifiers on trove names
 
 Changes in 0.50.5:
   * Streams return their value through __call__ instead of value()

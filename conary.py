@@ -83,9 +83,6 @@ def usage(rc = 1):
     print '                 --install-label <label>'
     print "                 --root <root>"
     print ""
-    print "erase flags:     --just-db"
-    print "                 --test"
-    print ""
     print "query flags:     --full-versions"
     print "                 --ids"
     print "                 --info"
@@ -110,7 +107,9 @@ def usage(rc = 1):
     print "                 --show-changes"
     print "                 --tags"
     print ""
-    print "update flags:    --exclude-troves <patterns>"
+    print "update/erase flags:"
+    print "                 --exclude-troves <patterns>"
+    print "                 --info"
     print "                 --just-db"
     print "                 --keep-existing"
     print "                 --no-deps"
@@ -261,31 +260,6 @@ def realMain(cfg, argv=sys.argv):
 	if argSet: return usage()
 
 	cook.cookCommand(cfg, otherArgs[2:], False, {}, emerge = True)
-    elif (otherArgs[1] == "erase"):
-        kwargs = {}
-
-	if argSet.has_key('tag-script'):
-	    kwargs['tagScript'] = argSet['tag-script']
-	    del argSet['tag-script']
-
-	if argSet.has_key('no-deps'):
-	    kwargs['depCheck'] = False
-	    del argSet['no-deps']
-
-	if argSet.has_key('just-db'):
-	    kwargs['justDatabase'] = True 
-	    del argSet['just-db']
-
-	if argSet.has_key('test'):
-	    kwargs['test'] = argSet['test']
-	    del argSet['test']
-
-	if argSet: return usage()
-
-	if len(otherArgs) >= 3:
-	    updatecmd.doErase(cfg, otherArgs[2:], **kwargs)
-	else:
-	    return usage()
     elif (otherArgs[1] == "import"):
 	if len(otherArgs) != 3 and len(otherArgs) != 3:
 	    return usage()
@@ -462,7 +436,7 @@ def realMain(cfg, argv=sys.argv):
                                         tags, fullVersions, showChanges, 
                                         ids=ids, sha1s=sha1s, all=all, 
                                         deps=showDeps)
-    elif (otherArgs[1] == "update"):
+    elif (otherArgs[1] == "update" or otherArgs[1] == "erase"):
 	kwargs = {}
 
 	if argSet.has_key('replace-files'):
@@ -493,6 +467,10 @@ def realMain(cfg, argv=sys.argv):
 	    kwargs['justDatabase'] = True
 	    del argSet['just-db']
 
+	if argSet.has_key('info'):
+	    kwargs['info'] = True
+	    del argSet['info']
+
 	keepExisting = argSet.has_key('keep-existing')
 	if keepExisting:
 	    kwargs['keepExisting'] = True
@@ -505,6 +483,8 @@ def realMain(cfg, argv=sys.argv):
 	if argSet.has_key('test'):
 	    kwargs['test'] = argSet['test']
 	    del argSet['test']
+
+        kwargs['updateByDefault'] = (otherArgs[1] == "update")
 
 	if argSet: return usage()
 	if len(otherArgs) >=3:

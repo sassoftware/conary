@@ -28,7 +28,8 @@ import sys
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
                                   depsRecurse = True, test = False,
-                                  justDatabase = False, recurse = True):
+                                  justDatabase = False, recurse = True,
+                                  info = False, updateByDefault = True):
     client = conaryclient.ConaryClient(cfg)
 
     applyList = []
@@ -55,7 +56,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             client.updateChangeSet(applyList, depsRecurse = depsRecurse,
                                    resolveDeps = depCheck,
                                    keepExisting = keepExisting,
-                                   test = test, recurse = recurse)
+                                   test = test, recurse = recurse,
+                                   updateByDefault = updateByDefault)
 
         if brokenByErase:
             print "Troves being removed create unresolved dependencies:"
@@ -90,6 +92,26 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             print "%s" % (" ".join(["%s(%s)" % 
                            (x[0], x[1].trailingRevision().asString())
                            for x in items]))
+            if info: return
+            
+        if info:
+            new = [ x.getName() for x in cs.iterNewPackageList() ]
+            old = [ x[0] for x in cs.getOldPackageList() ]
+            if not new and not old:
+                print "No troves are affected by this update."
+            
+            if new:
+                print "Versions of the following troves will be updated:"
+                print "\t", "\n\t".join(new)
+
+            if new and old:
+                print "\n"
+
+            if old:
+                print "Versions of the following troves will be removed:"
+                print "\t", "\n\t".join(old)
+
+            return
 
         client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,
                            test = test, justDatabase = justDatabase,
@@ -98,32 +120,6 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
         log.error(e)
     except repository.CommitError, e:
         log.error(e)
-
-def doErase(cfg, itemList, tagScript = None, depCheck = True, test = False,
-            justDatabase = False):
-    client = conaryclient.ConaryClient(cfg=cfg)
-
-    troveList = []
-    troveList = [ parseTroveSpec(item, None) for item in itemList ] 
-
-    # dedup
-    troveList = {}.fromkeys(troveList).keys()
-
-    brokenByErase = []
-    try:
-        brokenByErase = client.eraseTrove(troveList, tagScript = tagScript, 
-                                          depCheck = depCheck, test = test,
-                                          justDatabase = justDatabase,
-                                          localRollbacks = cfg.localRollbacks)
-    except repository.TroveNotFound, e:
-        log.error(str(e))
-
-    if brokenByErase:
-        print "Troves being removed create unresolved dependencies:"
-        for (troveName, depSet) in brokenByErase:
-            print "    %s:\n\t%s" %  \
-                    (troveName, "\n\t".join(str(depSet).split("\n")))
-        return 1
 
 def parseTroveSpec(specStr, defaultFlavor):
     if specStr.find('[') > 0 and specStr[-1] == ']':

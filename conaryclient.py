@@ -332,7 +332,8 @@ class ConaryClient:
 
         return csList
             
-    def _updateChangeSet(self, itemList, keepExisting = None, recurse = True):
+    def _updateChangeSet(self, itemList, keepExisting = None, recurse = True,
+                         updateMode = True):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -345,6 +346,7 @@ class ConaryClient:
         changeSetList = []
         newItems = []
         finalCs = UpdateChangeSet()
+
         for item in itemList:
             if isinstance(item, changeset.ChangeSetFromFile):
                 if item.isAbsolute():
@@ -362,6 +364,28 @@ class ConaryClient:
                 troveName = item[0]
                 versionStr = item[1]
                 flavor = item[2]
+
+            isInstall = updateMode
+            if troveName[0] == '-':
+                isInstall = False
+                troveName = troveName[1:]
+            elif troveName[0] == '+':
+                isInstall = True
+                troveName = troveName[1:]
+
+            if not isInstall:
+                troves = self.db.findTrove([], troveName, 
+                                           versionStr = versionStr, 
+                                           reqFlavor = flavor)
+                troves = self.db.getTroves(troves)
+                for outerTrove in troves:
+                    for trove in self.db.walkTroveSet(outerTrove, 
+                                                     ignoreMissing = True):
+                        changeSetList.append((trove.getName(), 
+                            (trove.getVersion(), trove.getFlavor()),
+                            (None, None), False))
+                # skip ahead to the next itemList
+                continue                    
 
             if isinstance(versionStr, versions.Version):
                 assert(isinstance(flavor, deps.DependencySet))
@@ -446,12 +470,14 @@ class ConaryClient:
         return finalCs
 
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
-                        depsRecurse = True, resolveDeps = True, test = False):
+                        depsRecurse = True, resolveDeps = True, test = False,
+                        updateByDefault = True):
         if not test:
             self._prepareRoot()
 
         finalCs = self._updateChangeSet(itemList, keepExisting = keepExisting,
-                                        recurse = recurse)
+                                        recurse = recurse,
+                                        updateMode = updateByDefault)
 
         if not resolveDeps:
             return (finalCs, [], {}, [])

@@ -26,10 +26,12 @@ otherwise manage software installed on a local system.
 Lists troves installed on the local system. Any number of trove names or
 absolute paths may be given.
 .TP
-.B update [\fIargs\fP] <\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]>* <\fIchangeset-file\fP>*
+.B update [\fIargs\fP] [+/-]<\fItrovename\fP[=\fIversion\fP][\fI<flavor>\fP]>* <\fIchangeset-file\fP>*
 Updates the trove \fItrovename\fR from the appropriate repository to 
 match the optional \fIversion\fP (otherwise the most recent version which 
 matches the \fBinstall-label\fP) and applies the changesets contained in any
+If the \fItrovename\fR is preceded by a minus, the trove is erased as part
+of the operation.
 \fIchange-files\fP given.
 .RS 4
 .TP
@@ -51,6 +53,8 @@ If two versions from the same branch are
 installed at the same time, this may confuse future update
 operations.
 .TP
+.B \-\-info
+Display a summary of what troves will be affected by the update.
 .B \-\-just-db
 The update is performed on the database, but the filesystem is not
 changed.
@@ -89,22 +93,11 @@ to provide the \-\-replace-files option.
 Perform all actions up to the point of writing to the filesystem.
 .RE
 .TP
-.B erase \fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
+.B erase [+/-]\fItrovename\fP[=\fRversion][\fI<flavor>\fP]\fP+
 Erase all instances of \fItrovename\fP (or only a specified \fIversion\fP)
-from the local system.
-.RS 4
-.TP 4
-.B \-\-no-deps
-Do not check dependencies before doing the erase.
-.TP 4
-.B \-\-just-db
-The troves are removed from the database, but their files are left in
-the filesystem.
-.TP 4
-.B \-\-test
-Perform all actions up to the point of writing to the filesystem.
-.RE
-.TP
+from the local system. It has the same syntax as \fBupdate\fR, but trove
+names which are not preceded by a plus or minus are removed instead of
+updated.
 .TP
 .B remove \fIpath\fP
 Remove the file named \fIpath\fP from the system, and record in the
