@@ -167,7 +167,7 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False):
     # Need to fetch a file that will be auto-added to the repository
     # on commit
     if (name.startswith("http://") or name.startswith("ftp://")) and f != -1:
-        return self.fetchURL(cfg, name, location)
+        return fetchURL(cfg, name, location)
 
     # could not find it anywhere
     return None
