@@ -912,6 +912,8 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
                       checking the sha1 of the file if the inode information 
                       matches exactly.
     @type forceSha1: bool
+    @param ignoreTransient: ignore transient files 
+    @type ignoreTransient: bool
     """
 
     noIds = ((flags & IGNOREUGIDS) != 0)
@@ -1096,6 +1098,9 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                       checking the sha1 of the file if the inode information 
                       matches exactly.
     @type forceSha1: bool
+    @param ignoreTransient: ignore transient files 
+    @type ignoreTransient: bool
+
     """
 
     changeSet = changeset.ChangeSet()
