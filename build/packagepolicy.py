@@ -113,7 +113,7 @@ class MakeDevices(policy.Policy):
     Make device nodes
     """
     def do(self):
-        for device in self.recipe.devices:
+        for device in self.recipe.getDevices():
             self.recipe.autopkg.addDevice(*device)
 
 class AddModes(policy.Policy):

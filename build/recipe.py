@@ -434,7 +434,10 @@ class Recipe:
             post.doProcess(self)
 
     def addDevice(self, target, devtype, major, minor, owner, group, perms=0400):
-        self.devices.append((target, devtype, major, minor, owner, group, perms))
+        self._devices.append((target, devtype, major, minor, owner, group, perms))
+
+    def getDevices(self):
+        return self._devices
 
     def setUid(self, path):
 	if path in self.fixmodes:
@@ -514,7 +517,7 @@ class Recipe:
 	#   source: (apply)
 	#     - apply is None or command to util.execute(apply)
 	self.signatures = {}
-        self.devices = []
+        self._devices = []
         self.fixmodes = {}
         self.cfg = cfg
 	self.laReposCache = laReposCache
