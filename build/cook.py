@@ -37,7 +37,7 @@ def _createPackage(repos, branch, bldPkg, ident):
     fileMap = {}
     p = package.Package(bldPkg.getName(), bldPkg.getVersion())
 
-    for (path, f) in bldPkg.items():
+    for (path, (realPath, f)) in bldPkg.iteritems():
 	(fileId, fileVersion) = ident(path)
 	f.id(fileId)
 
@@ -50,7 +50,7 @@ def _createPackage(repos, branch, bldPkg, ident):
 	    else:
 		p.addFile(f.id(), path, bldPkg.getVersion())
 
-        fileMap[f.id()] = (f, f.realPath, path)
+        fileMap[f.id()] = (f, realPath, path)
 
     return (p, fileMap)
 

@@ -44,9 +44,7 @@ class BuildPackage(dict):
         """
 	f = files.FileFromFilesystem(realPath, None)
 	f.inode.setPerms(f.inode.perms() & 01777)
-	# blech.
-	f.realPath = realPath
-	self[path] = f
+	self[path] = (realPath, f)
 
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
@@ -56,9 +54,13 @@ class BuildPackage(dict):
         @param path: the destination of the device node in the package
         """
         f = BuildDeviceFile(devtype, major, minor, owner, group, perms)
-	# blech.
-	f.realPath = None
-	self[path] = f
+	self[path] = (None, f)
+
+    def getFile(self, path):
+        return self[path][1]
+
+    def getRealPath(self, path):
+        return self[path][0]
 
     def getName(self):
         """
@@ -142,7 +144,7 @@ class AutoBuildPackage:
         """
         pkg = self.findPackage(path)
         pkg.addFile(path, realPath)
-	self.pathMap[path] = pkg[path]
+	self.pathMap[path] = pkg.getFile(path)
 	self.pkgMap[path] = pkg
 
     def addDevice(self, path, devtype, major, minor,
@@ -153,7 +155,7 @@ class AutoBuildPackage:
         """
         pkg = self.findPackage(path)
         pkg.addDevice(path, devtype, major, minor, owner, group, perms)
-	self.pathMap[path] = pkg[path]
+	self.pathMap[path] = pkg.getFile(path)
 	self.pkgMap[path] = pkg
 
     def getPackages(self):
