@@ -171,7 +171,7 @@ def checkout(repos, cfg, workDir, name, versionStr = None):
 	else:
 	    contents = None
 
-	fileObj.restore(contents, fullPath, 1)
+	fileObj.restore(contents, '/', fullPath, 1)
 
 	state.addFile(fileId, path, version)
 

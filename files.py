@@ -554,8 +554,8 @@ class File(object):
     def remove(self, target):
 	os.unlink(target)
 
-    def restore(self, target, restoreContents, skipMtime = 0):
-	self.setOwnerGroup(target)
+    def restore(self, root, target, restoreContents, skipMtime = 0):
+	self.setOwnerGroup(root, target)
 	self.chmod(target)
 
 	if not skipMtime:
@@ -567,21 +567,13 @@ class File(object):
     def chmod(self, target):
 	os.chmod(target, self.inode.perms())
 
-    def setOwnerGroup(self, target):
+    def setOwnerGroup(self, root, target):
 	if os.getuid(): return
 
-        try:
-            uid = pwd.getpwnam(self.inode.owner())[2]
-        except KeyError:
-            log.warning('user %s does not exist - using root', 
-			self.inode.owner())
-            uid = 0
-        try:
-            gid = grp.getgrnam(self.inode.group())[2]
-        except KeyError:
-            log.warning('group %s does not exist - using root', 
-			self.inode.group())
-            gid = 0
+	global userCache, groupCache
+
+	uid = userCache[self.inode.owner()]
+	gid = groupCache[self.inode.group()]
 
 	os.lchown(target, uid, gid)
 
@@ -690,53 +682,53 @@ class SymbolicLink(File):
 	# chmod() on a symlink follows the symlink
 	pass
 
-    def setOwnerGroup(self, target):
+    def setOwnerGroup(self, root, target):
 	# chmod() on a symlink follows the symlink
 	pass
 
-    def restore(self, fileContents, target, restoreContents):
+    def restore(self, fileContents, root, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         util.mkdirChain(os.path.dirname(target))
 	os.symlink(self.target.value(), target)
-	File.restore(self, target, restoreContents, skipMtime = 1)
+	File.restore(self, root, target, restoreContents, skipMtime = 1)
 
 class Socket(File):
 
     lsTag = "s"
     __slots__ = []
 
-    def restore(self, fileContents, target, restoreContents):
+    def restore(self, fileContents, root, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         util.mkdirChain(os.path.dirname(target))
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0);
         sock.bind(target)
         sock.close()
-	File.restore(self, target, restoreContents)
+	File.restore(self, root, target, restoreContents)
 
 class NamedPipe(File):
 
     lsTag = "p"
     __slots__ = []
 
-    def restore(self, fileContents, target, restoreContents):
+    def restore(self, fileContents, root, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
         util.mkdirChain(os.path.dirname(target))
 	os.mkfifo(target)
-	File.restore(self, target, restoreContents)
+	File.restore(self, root, target, restoreContents)
 
 class Directory(File):
 
     lsTag = "d"
     __slots__ = []
 
-    def restore(self, fileContents, target, restoreContents):
+    def restore(self, root, fileContents, target, restoreContents):
 	if not os.path.isdir(target):
 	    util.mkdirChain(target)
 
-	File.restore(self, target, restoreContents)
+	File.restore(self, root, target, restoreContents)
 
     def remove(self, target):
 	raise NotImplementedError
@@ -749,7 +741,7 @@ class DeviceFile(File):
     def sizeString(self):
 	return "%3d, %3d" % (self.devt.major(), self.devt.minor())
 
-    def restore(self, fileContents, target, restoreContents):
+    def restore(self, fileContents, root, target, restoreContents):
 	if os.path.exists(target) or os.path.islink(target):
 	    os.unlink(target)
 
@@ -763,7 +755,7 @@ class DeviceFile(File):
 	os.mknod(target, flags, os.makedev(self.devt.major(), 
 		 self.devt.minor()))
             
-	File.restore(self, target, restoreContents)
+	File.restore(self, root, target, restoreContents)
 
 class BlockDevice(DeviceFile):
 
@@ -789,7 +781,7 @@ class RegularFile(File):
     def sizeString(self):
 	return "%8d" % self.contents.size()
 
-    def restore(self, fileContents, target, restoreContents):
+    def restore(self, fileContents, root, target, restoreContents):
 	if restoreContents:
 	    # this is first to let us copy the contents of a file
 	    # onto itself; the unlink helps that to work
@@ -802,7 +794,7 @@ class RegularFile(File):
 
 	    tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
 	    try:
-		File.restore(self, tmpname, restoreContents)
+		File.restore(self, root, tmpname, restoreContents)
 		f = os.fdopen(tmpfd, 'w')
 		util.copyfileobj(src, f)
 		f.close()
@@ -813,7 +805,7 @@ class RegularFile(File):
 		raise
 
 	else:
-	    File.restore(self, target, restoreContents)
+	    File.restore(self, root, target, restoreContents)
 
     def __init__(self, *args, **kargs):
 	File.__init__(self, *args, **kargs)
@@ -991,3 +983,27 @@ def tupleChanged(cl, diff):
 	    rc.append(name)
 
     return rc
+
+class UserGroupIdCache:
+
+    def __getitem__(self, name):
+	theId = self.cache.get(name, None)
+	if theId is not None:
+	    return theId
+	
+	try:
+	    theId = self.lookupFn(name)[2]
+	except KeyError:
+	    log.warning('%s %s does not exist - using root', self.name, name)
+	    theId = 0
+
+	self.cache[name] = theId
+	return theId
+
+    def __init__(self, name, lookupFn):
+	self.lookupFn = lookupFn
+	self.name = name
+	self.cache = { 'root' : 0 }
+	
+userCache = UserGroupIdCache('user', pwd.getpwnam)
+groupCache = UserGroupIdCache('group', grp.getgrnam)

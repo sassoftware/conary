@@ -92,7 +92,7 @@ class FilesystemJob:
 		contents = override
 	    elif fileObj.hasContents:
 		contents = self.changeSet.getFileContents(fileId)[1]
-	    fileObj.restore(contents, target, contents != None)
+	    fileObj.restore(contents, self.root, target, contents != None)
 	    log.debug(msg)
 
 	paths = self.removes.keys()
