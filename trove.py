@@ -50,6 +50,9 @@ class Package:
 
 	return l
 
+    def getFile(self, fileId):
+	return self.idMap[fileId]
+
     def formatString(self):
 	str = ""
 	for (fileId, path, version) in self.files.values():
@@ -194,13 +197,13 @@ class PackageChangeSet:
 	f.write("%s\n" % self.newVersion.asString(cfg.defaultbranch))
 
 	for (fileId, path, version) in self.newFiles:
-	    f.write("\tadded %s\n" % path)
+	    f.write("\tadded %s (%s(.*)%s)\n" % (path, fileId[:6], fileId[-6:]))
 	for (fileId, path, version) in self.changedFiles:
 	    f.write("\tchanged %s\n" % path)
 	    change = changeSet.getFileChange(fileId)
 	    print "\t\t%s" % change
-	for path in self.oldFiles:
-	    f.write("\tremoved %s(.*)%s\n" % (path[:8], path[-8:]))
+	for fileId in self.oldFiles:
+	    f.write("\tremoved %s(.*)%s\n" % (fileId[:6], fileId[-6:]))
 
     def asString(self):
 	rc = ""
