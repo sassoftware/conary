@@ -395,6 +395,8 @@ def main():
 	print >> sys.stderr, \
 	    "An unknown exception occured on the repository server:"
 	print >> sys.stderr, "\t%s" % str(e)
+    except repository.repository.TroveMissing, e:
+	print >> sys.stderr, str(e)
 	    
 if __name__ == "__main__":
     sys.exit(main())

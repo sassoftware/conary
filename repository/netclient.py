@@ -18,6 +18,8 @@ import xmlrpclib
 import xmlshims
 from deps import deps
 
+shims = xmlshims.NetworkConvertors()
+
 class _Method(xmlrpclib._Method):
 
     def __call__(self, *args):
@@ -34,7 +36,7 @@ class _Method(xmlrpclib._Method):
 	    if not version:
 		version = None
 	    else:
-		version = self.FromVersion(version)
+		version = shims.toVersion(version)
 	    raise repository.TroveMissing(name, version)
 	elif exceptionName == "CommitError":
 	    raise repository.CommitError(exceptionArgs[0])
