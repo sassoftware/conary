@@ -85,7 +85,8 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	return newD
 
-    def hasPackage(self, pkgName):
+    def hasPackage(self, serverName, pkgName):
+	assert(serverName == self.name)
 	return self.troveStore.hasTrove(pkgName)
 
     def hasTrove(self, pkgName, version, flavor):
@@ -124,8 +125,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def createTroveBranch(self, pkgName, branch):
 	log.debug("creating branch %s for %s", branch.asString(), pkgName)
-	if not self.hasPackage(pkgName):
-	    raise PackageMissing, pkgName
         return self.troveStore.createTroveBranch(pkgName, branch)
 
     def iterFilesInTrove(self, troveName, version, flavor,
@@ -163,9 +162,6 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	self.close()
 
     def createBranch(self, newBranch, where, troveList = []):
-	if not troveList:
-	    troveList = self.iterAllTroveNames()
-
 	troveList = [ (x, where) for x in troveList ]
 
 	branchedTroves = {}
@@ -178,24 +174,33 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	    if branchedTroves.has_key(troveName): continue
 	    branchedTroves[troveName] = 1
-	    if not self.hasPackage(troveName):
-		log.warning("package %s does not exist" % troveName)
-		continue
 
 	    if isinstance(location, versions.Version):
 		verDict = { troveName : [ location ] }
+		serverName = location.branch().label().getHost()
 	    else:
-		verDict = self.getTroveLeavesByLabel([troveName], location)
+		serverName = location.getHost()
+
+		if serverName == self.name:
+		    verDict = self.getTroveLeavesByLabel([troveName], location)
+		else:
+		    verDict = self.reposSet.getTroveLeavesByLabel([troveName], location)
 
 	    # XXX this probably doesn't get flavors right
 
-	    d = self.getTroveVersionFlavors(verDict)
+	    if serverName == self.name:
+		d = self.getTroveVersionFlavors(verDict)
+	    else:
+		d = self.reposSet.getTroveVersionFlavors(verDict)
+
 	    fullList = []
 	    for (version, flavors) in d[troveName].iteritems():
-		for flavor in flavors:
-		    fullList.append((troveName, version, flavor))
+		fullList += [ (troveName, version, x) for x in flavors ]
 
-	    troves = self.getTroves(fullList)
+	    if serverName == self.name:
+		troves = self.getTroves(fullList)
+	    else:
+		troves = self.reposSet.getTroves(fullList)
 
 	    for trove in troves:
 		branchedVersion = trove.getVersion().fork(newBranch, 
@@ -234,6 +239,30 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             raise
         else:
             self.commit()
+
+    def _getLocalOrRemoteTrove(self, troveName, troveVersion, troveFlavor):
+	# the get trove netclient provides doesn't work with a FilesystemRepository
+	# (it needs to create a change set which gets passed)
+	if troveVersion.branch().label().getHost() == self.name:
+	    return self.getTrove(troveName, troveVersion, troveFlavor)
+	else:
+	    return self.reposSet.getTrove(troveName, troveVersion, troveFlavor)
+
+    def _getLocalOrRemoteFileVersion(self, fileId, fileVersion):
+	# the get trove netclient provides doesn't work with a FilesystemRepository
+	# (it needs to create a change set which gets passed)
+	if fileVersion.branch().label().getHost() == self.name:
+	    return self.getFileVersion(fileId, fileVersion)
+	else:
+	    return self.reposSet.getFileVersion(fileId, fileVersion)
+
+    def _getLocalOrRemoteFileContents(self, name, troveVersion, troveFlavor, path):
+	# the get trove netclient provides doesn't work with a FilesystemRepository
+	# (it needs to create a change set which gets passed)
+	if troveVersion.branch().label().getHost() == self.name:
+	    return self.getFileContents(name, troveVersion, troveFlavor, path)
+	else:
+	    return self.repos.getFileContents(name, troveVersion, troveFlavor, path)
 
     def createChangeSet(self, troveList, recurse = True, withFiles = True):
 	"""
@@ -299,10 +328,10 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    
 		continue
 		    
-	    new = self.getTrove(troveName, newVersion, flavor)
+	    new = self._getLocalOrRemoteTrove(troveName, newVersion, flavor)
 	 
 	    if oldVersion:
-		old = self.getTrove(troveName, oldVersion, flavor)
+		old = self._getLocalOrRemoteTrove(troveName, oldVersion, flavor)
 	    else:
 		old = None
 
@@ -315,25 +344,34 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	    cs.newPackage(pkgChgSet)
 
-	    for (fileId, oldVersion, newVersion, newPath) in filesNeeded:
-		if oldVersion:
-		    (oldFile, oldCont) = self.getFileVersion(fileId, 
-				oldVersion, withContents = 1)
-		else:
-		    oldFile = None
-		    oldCont = None
+	    for (fileId, oldFileVersion, newFileVersion, oldPath, newPath) in \
+									filesNeeded:
+		oldFile = None
+		if oldFileVersion:
+		    oldFile = self._getLocalOrRemoteFileVersion(fileId, oldFileVersion)
 
-		(newFile, newCont) = self.getFileVersion(fileId, newVersion,
-					    withContents = 1)
+		oldCont = None
+		newCont = None
 
-		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, 
-							 newFile)
+		newFile = self._getLocalOrRemoteFileVersion(fileId, newFileVersion)
 
-		cs.addFile(fileId, oldVersion, newVersion, filecs)
+		(filecs, hash) = changeset.fileChangeSet(fileId, oldFile, newFile)
+
+		cs.addFile(fileId, oldFileVersion, newFileVersion, filecs)
 
 		if hash and withFiles:
+		    if oldFileVersion :
+			f = self._getLocalOrRemoteFileContents(troveName, 
+						oldVersion, flavor, oldPath)
+			assert(f)
+			oldCont = filecontents.FromGzFile(f)
+
+		    f = self._getLocalOrRemoteFileContents(troveName, newVersion, 
+							   flavor, newPath)
+		    newCont = filecontents.FromGzFile(f)
 		    (contType, cont) = changeset.fileContentsDiff(oldFile, 
 						oldCont, newFile, newCont)
+
 		    cs.addFileContents(fileId, contType, cont, 
 				       newFile.flags.isConfig())
 
@@ -347,6 +385,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
     def __init__(self, name, path):
 	self.top = path
 	self.troveStore = None
+	self.name = name
 	self.reposSet = repository.netclient.NetworkRepositoryClient({ name : self })
 	
 	self.sqlDB = self.top + "/sqldb"
