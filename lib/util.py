@@ -141,6 +141,9 @@ class popen:
 	self.p = os.popen(*args)
         self.write = self.p.write
         self.read = self.p.read
+        self.readline = self.p.readline
+        self.readlines = self.p.readlines
+        self.writelines = self.p.writelines
 
     def close(self, *args):
 	rc = self.p.close(*args)
