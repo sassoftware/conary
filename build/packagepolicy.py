@@ -365,7 +365,7 @@ class SharedLibrary(policy.Policy):
     """
     Mark system shared libaries as such so that ldconfig will be run:
     C{r.SharedLibrary(subtree=I{path})} to mark a path;
-    C{r.SharedLibrary(I{filterexp}) to mark a file.
+    C{r.SharedLibrary(I{filterexp})} to mark a file.
     """
     # keep invariants in sync with ExecutableLibraries
     invariantsubtrees = [
@@ -603,7 +603,7 @@ class DanglingSymlinks(policy.Policy):
     """
     Disallow dangling symbolic links (symbolic links which point to
     files which do not exist):
-    C{DanglingSymlinks(exceptions=I{filterexp}) for intentionally
+    C{DanglingSymlinks(exceptions=I{filterexp})} for intentionally
     dangling symlinks.
     
     If you know that a dangling symbolic link created by your package
