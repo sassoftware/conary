@@ -201,11 +201,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         frozenList = []
         for trove in troveList:
-            branch = trove[1].freeze()
+            branch = self.fromBranch(trove[1])
             if len(trove) == 2:
                 version = ""
             else:
-                version = trove[2].freeze()
+                version = self.fromBranch(trove[2])
             item = (trove[0], branch, version)
             frozenList.append(item)
          

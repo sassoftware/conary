@@ -510,22 +510,30 @@ class TroveStore:
         itemId = self.items.get(troveName, None)
         if not itemId:
             return None
-        branchId = self.branchTable[branch]
-        
-        if not version:
-            latestVersion = self.metadataTable.getLatestVersion(itemId, branchId)
-        else:
-            latestVersion = version.asString()
-        cu = self.db.cursor()
-        cu.execute("SELECT versionId FROM Versions WHERE version=?", latestVersion)
 
-        versionId = cu.fetchone()
-        if versionId:
-            versionId = versionId[0]
-        else:
-            return None
-       
-        md = self.metadataTable.get(itemId, versionId, branchId, language)
+        # follow the branch tree up until we find metadata
+        md = None
+        while not md:
+            branchId = self.branchTable[branch]
+            
+            if not version:
+                latestVersion = self.metadataTable.getLatestVersion(itemId, branchId)
+            else:
+                latestVersion = version.asString()
+            cu = self.db.cursor()
+            cu.execute("SELECT versionId FROM Versions WHERE version=?", latestVersion)
+
+            versionId = cu.fetchone()
+            if versionId:
+                versionId = versionId[0]
+            else:
+                if branch.hasParent():
+                    branch = branch.parentNode().branch()
+                else:
+                    return None
+            
+            md = self.metadataTable.get(itemId, versionId, branchId, language)
+        
         md["version"] = versions.VersionFromString(latestVersion).asString()
         md["language"] = language
         return metadata.Metadata(md)
