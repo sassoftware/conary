@@ -12,8 +12,9 @@
 # full details.
 #
 import md5
-import sqlite3
 import re
+import sqlite3
+import sys
 
 from repository.netclient import UserAlreadyExists
 
@@ -255,14 +256,14 @@ class NetworkAuthorization:
     def deletePermission(self, userGroupId, labelId, itemId):
         cu = self.db.cursor()
         
-        cu.execute("""DELETE FROM Permissions
-                      WHERE userGroupId=? AND
-                            labelId=? AND
-                            itemId=?""",
-                   userGroupId, labelId, itemId)
+        stmt = """DELETE FROM Permissions
+                  WHERE userGroupId=? AND
+                        (labelId=? OR (labelId IS NULL AND ? IS NULL)) AND
+                        (itemId=? OR (itemId IS NULL AND ? IS NULL))"""
+
+        cu.execute(stmt, userGroupId, labelId, labelId, itemId, itemId)
         self.db.commit()
 
-    # XXX this is probably the wrong place for these functions...
     def iterItems(self):
         cu = self.db.cursor()
 
