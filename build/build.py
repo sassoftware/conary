@@ -512,7 +512,8 @@ class Desktopfile(BuildCommand, _FileAction):
 	    return
 	if 'desktop-file-utils:runtime' not in self.recipe.buildRequires:
 	    # Unfortunately, we really cannot do this automagically
-	    log.error("Must add 'desktop-file-utils:runtime' to buildRequires")
+            self.recipe.reportErrors(
+                "Must add 'desktop-file-utils:runtime' to buildRequires")
 	macros = self.recipe.macros.copy()
         if self.category:
 	    macros['category'] = '--add-category "%s"' %self.category
