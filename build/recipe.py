@@ -49,10 +49,13 @@ baseMacros = (
     ('docdir'		, '%(datadir)s/doc'),
     ('develdocdir'	, '%(datadir)s/develdoc'),
     # arguments/flags (empty ones are for documentation; non-existant = empty)
+    ('cc'		, 'gcc'),
     ('cflags'           , '-O2'),
     ('mflags'		, ''),
     ('parallelmflags'   , ''),
     ('sysroot'		, ''),
+    ('march'		, 'i386'), # "machine arch"
+    ('os'		, 'linux'),
 )
 
 crossMacros = (
