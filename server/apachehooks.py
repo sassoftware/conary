@@ -194,7 +194,6 @@ def get(isSecure, repos, httpHandler, req):
 
         if path.startswith(repos.tmpPath) and \
 		not(os.path.basename(path)[0:6].startswith('cache-')):
-	    print "removing", path
             os.unlink(path)
 
     return apache.OK
