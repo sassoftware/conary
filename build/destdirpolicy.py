@@ -117,23 +117,27 @@ class Strip(policy.Policy):
     XXX system policy on whether to create debuginfo packages
     """
     invariantinclusions = [
-	'%(bindir)s/',
-	'%(essentialbindir)s/',
-	'%(sbindir)s/',
-	'%(essentialsbindir)s/',
-	'%(libdir)s/',
-	'%(essentiallibdir)s/',
+	('%(bindir)s/', None, stat.S_IFDIR),
+	('%(essentialbindir)s/', None, stat.S_IFDIR),
+	('%(sbindir)s/', None, stat.S_IFDIR),
+	('%(essentialsbindir)s/', None, stat.S_IFDIR),
+	('%(libdir)s/', None, stat.S_IFDIR),
+	('%(essentiallibdir)s/', None, stat.S_IFDIR),
     ]
     def doFile(self, path):
 	if not os.path.islink(path):
-	    p = self.macros['destdir']+path
-	    # XXX do magic internally instead
-	    f = os.popen('file '+p, 'r')
-	    filetext = f.read()
-	    f.close()
-	    if (filetext.find('current ar archive') != -1) or \
-	       (filetext.find('ELF') != -1 and
-	        filetext.find('not stripped') != -1):
+	    d = self.macros['destdir']
+	    p = d+path
+	    m = magic.magic(path, d)
+	    if not m:
+		return
+	    # FIXME: should be:
+	    #if (m.name == "ELF" or m.name == "ar") and \
+	    #   not m.contents['stripped']):
+	    # but this has to wait until ewt writes stripped detection
+	    # for archives as well as elf files
+	    if (m.name == "ELF" and not m.contents['stripped']) or \
+	       (m.name == "ar"):
 		util.execute('%(strip)s -g ' %self.macros +p)
 
 
