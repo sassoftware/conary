@@ -106,7 +106,8 @@ class ConaryClient:
                 foundSuggestions = False
             else:
                 pathIdx += 1
-                foundSuggestions = True
+                if sugg:
+                    foundSuggestions = True
                 if pathIdx == len(self.cfg.installLabelPath):
                     if not foundSuggestions or not recurse:
                         return (cs, depList, suggMap)
