@@ -499,12 +499,12 @@ class RemoveFiles(BuildAction):
 	    else:
 		util.remove("%s/%s" %(macros['destdir'], filespec %macros))
 
-    def __init__(self, filespecs, **keywords):
+    def __init__(self, *args, **keywords):
         BuildAction.__init__(self, **keywords)
-	if type(filespecs) is str:
-	    self.filespecs = (filespecs,)
+	if type(args[0]) is tuple:
+	    self.filespecs = args[0]
 	else:
-	    self.filespecs = filespecs
+	    self.filespecs = args
 
 class InstallDocs(_FileAction):
     """
