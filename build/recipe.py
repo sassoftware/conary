@@ -258,7 +258,7 @@ class Recipe:
 
     def _addSignature(self, file, keyid):
 	# do not search unless a gpg keyid is specified
-	if not keyid:
+	if not keyid or not file:
 	    return
 	gpg = '%s.sig' %(file)
 	c = lookaside.searchAll(self.cfg, self.laReposCache, gpg, 
@@ -299,16 +299,20 @@ class Recipe:
 	extractDir = extractDir % self.macros
 	self.sources.append((file, 'tarball', extractDir, use, ()))
 
-    def addPatch(self, file, level='1', backup='', extractDir='', keyid=None, use=None, macros=False):
-	self._appendSource(file, keyid, 'patch', extractDir, use, (level, backup, macros))
+    def addPatch(self, file, level='1', backup='', extractDir='', keyid=None, use=None, macros=False, extraArgs=''):
+	self._appendSource(file, keyid, 'patch', extractDir, use, (level, backup, macros, extraArgs))
 
     def addSource(self, file, keyid=None, extractDir='', apply=None, use=None):
 	self._appendSource(file, keyid, 'source', extractDir, use, (apply))
 
+    def addAction(self, action, targetdir='', use=None):
+	self._appendSource('', '', 'action', targetdir, use, (action))
+
     def allSources(self):
         sources = []
         for (file, filetype, extractDir, use, args) in self.sources:
-            sources.append(file)
+	    if file: # no file for an action
+		sources.append(file)
 	for signaturelist in self.signatures.values():
             for (gpg, cached, keyid) in signaturelist:
                 sources.append(gpg)
@@ -384,7 +388,7 @@ class Recipe:
 	    util.mkdirChain(destDir)
 
 	    if filetype == 'patch':
-		(level, backup, macros) = args
+		(level, backup, macros, extraArgs) = args
 		f = lookaside.findAll(self.cfg, self.laReposCache, file, 
 			      self.name, self.srcdirs)
 		provides = "cat"
@@ -399,15 +403,15 @@ class Recipe:
 		if macros:
 		    print '+ applying macros to %s' %f
 		    pin = os.popen('%s %s' %(provides, f))
-		    print '+ patch -d %s -p%s %s' %(destDir, level, backup)
-		    pout = os.popen('patch -d %s -p%s %s'
-		                    %(destDir, level, backup), 'w')
+		    print '+ patch -d %s -p%s %s %s' %(destDir, level, backup, extraArgs)
+		    pout = os.popen('patch -d %s -p%s %s %s'
+		                    %(destDir, level, backup, extraArgs), 'w')
 		    pout.write(pin.read()%self.macros)
 		    pin.close()
 		    pout.close()
 		else:
-		    util.execute('%s %s | patch -d %s -p%s %s'
-				 %(provides, f, destDir, level, backup))
+		    util.execute('%s %s | patch -d %s -p%s %s %s'
+				 %(provides, f, destDir, level, backup, extraArgs))
 		continue
 
 	    if filetype == 'source':
@@ -418,6 +422,10 @@ class Recipe:
 		if apply:
 		    util.execute(apply, destDir)
 		continue
+
+	    if filetype == 'action':
+		(action) = args
+		util.execute(action, destDir)
 
     def doBuild(self, buildpath, root):
         builddir = buildpath + "/" + self.mainDir()
@@ -515,17 +523,20 @@ class Recipe:
 	# sources is list of (file, filetype, targetdir, use, (args)) tuples,
 	# where:
 	# - file is the name of the file
-	# - filetype is 'tarball', 'patch', 'source'
+	# - filetype is in ('tarball', 'patch', 'source', 'action')
 	# - targetdir is subdirectory to work in
 	# - use is a use flag or tuple of use flags; if it is a tuple,
 	#   they all have to be True in order to apply it
 	# - args is filetype-specific:
-	#   patch: (level, backup)
+	#   patch: (level, backup, macros, extraArgs)
 	#     - level is -p<level> (1)
 	#     - backup is .backupname suffix (none)
 	#     - macros is boolean: apply self.macros to patch? (False)
+	#     - extraArgs is string of additional patch args ('')
 	#   source: (apply)
 	#     - apply is None or command to util.execute(apply)
+	#   action: (action)
+	#     - action is the command to execute, in builddir
 	self.signatures = {}
         self._devices = []
         self.fixmodes = {}
