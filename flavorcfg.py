@@ -7,6 +7,7 @@ import deps.deps
 
 # XXX hack -- need a better way to add to list of config types
 FLAGSENSE = 2222
+BOOLDICT = 2223
 
 class SubArchConfig(ConfigFile):
     defaults = {
@@ -28,7 +29,7 @@ class ArchConfig(ConfigFile):
 	'buildName'	        : [ STRING, None ],
 	'shortDoc'	        : [ STRING, '' ],
 	'longDoc'	        : [ STRING, '' ],
-        'archProp'              : [ STRINGDICT, {} ],
+        'archProp'              : [ BOOLDICT, {} ],
     } 
 
 
@@ -41,6 +42,22 @@ class ArchConfig(ConfigFile):
             self.sections[self.section].configLine(line, file, lineno)
         else:
             ConfigFile.configLine(self, line, file, lineno)
+
+
+    def setValue(self, key, val, type=None, file="override"):
+	if type == None:
+	    type = self.types[key]
+        if type == BOOLDICT:
+	    (idx, val) = val.split(None, 1)
+	    if val.lower() in ('0', 'false'):
+		self.__dict__[key][idx] = False
+	    elif val.lower() in ('1', 'true'):
+		self.__dict__[key][idx] = True
+	    else:
+		raise ParseError, ("%s:%s: expected True or False for configuration value '%s'" % (file, self.lineno, key))
+        else:
+            ConfigFile.setValue(self, key, val, type, file)
+
 
     def setSection(self, sectionName):
         if sectionName not in self.sections:
