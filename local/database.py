@@ -343,12 +343,8 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	    if isinstance(cont, filecontents.WithFailedHunks):
 		log.warning("nonmerged changes to %s saved in %s.conflicts",
 			    path, path)
-		f = open(root + path + ".conflicts", "w")
-		f.write("--- current file\n")
-		f.write("+++ missing patches\n")
-		for hunk in cont.getHunks():
-		    hunk.write(f)
-		f.close()
+		cont.getHunks().write(root + path + ".conflicts", 
+			    "current", "missing")
 
 	# remove paths which are no longer valid
 	list = self.staleFileList()

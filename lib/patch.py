@@ -50,6 +50,15 @@ class Hunk:
 	self.lines = lines
 	self.contextCount = contextCount
 
+class FailedHunkList(list):
+
+    def write(filename, oldName, newName):
+	f = open(filename, "w")
+	f.write("--- %s\n" % oldName)
+	f.write("+++ %s\n" % newName)
+	for hunk in self:
+	    hunk.write(f)
+
 # this just applies hunks, not files... in other words, the --- and +++
 # lines should be omitted, and only a single file can be patched
 def patch(oldLines, unifiedDiff):
@@ -107,7 +116,7 @@ def patch(oldLines, unifiedDiff):
     i = 0
     last = len(unifiedDiff)
     result = []
-    failedHunks = []
+    failedHunks = FailedHunkList()
 
     fromLine = 0
     offset = 0
