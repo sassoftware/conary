@@ -171,7 +171,7 @@ class VersionedFile:
 	    next = None
 	    while curr and curr.isAfter(version):
 		next = curr
-		curr = self.getVersionInfo(curr)[1]
+		curr = self._getVersionInfo(curr)[1]
 	else:
 	    curr = None
 	    next = None
