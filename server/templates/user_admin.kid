@@ -18,9 +18,6 @@ from templates import library
             </tr>
         </thead>
         <tbody>
-        <?python #
-        rows = list(enumerate(rows))
-        ?>
             <tr py:for="i, row in rows"
                 class="{i % 2 and 'even' or 'odd'}">
                 <?python #
@@ -83,8 +80,12 @@ from templates import library
             <tbody>
                 <tr py:for="i, group in enumerate(netAuth.iterGroups())"
                     class="{i % 2 and 'even' or 'odd'}">
+                <?python #
+                rows = list(enumerate(netAuth.iterPermsByGroupId(group[0])))
+                ?>
                     <td><b>{group[1]}</b></td>
-                    <td py:content="permTable(group[0], netAuth.iterPermsByGroupId(group[0]))"/>
+                    <td py:if="rows" py:content="permTable(group[0], rows)"/>
+                    <td py:if="not rows" style="font-size: 80%;">Group has no permissions</td>
                 </tr>
             </tbody>
         </table>
