@@ -195,12 +195,13 @@ def commit(repos, cfg):
 
     # fetch all the sources
     recipeClass = loader.getRecipe()
-    lcache = lookaside.RepositoryCache(repos)
-    srcdirs = [ os.path.dirname(recipeClass.filename),
-		cfg.sourcepath % {'pkgname': recipeClass.name} ]
-    recipeObj = recipeClass(cfg, lcache, srcdirs)
-    recipeObj.setup()
-    files = recipeObj.fetchAllSources()
+    if issubclass(recipeClass, recipe.PackageRecipe):
+        lcache = lookaside.RepositoryCache(repos)
+        srcdirs = [ os.path.dirname(recipeClass.filename),
+                    cfg.sourcepath % {'pkgname': recipeClass.name} ]
+        recipeObj = recipeClass(cfg, lcache, srcdirs)
+        recipeObj.setup()
+        files = recipeObj.fetchAllSources()
     
     recipeVersionStr = recipeClass.version
 
