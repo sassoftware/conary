@@ -64,5 +64,7 @@ def loadTagDict(dirPath):
 	return {}
 
     for path in files:
-	c = TagFile(path)
-	d[c.name] = c
+	c = TagFile(os.path.join(dirPath, path))
+	d[c.tag] = c
+
+    return d
