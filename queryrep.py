@@ -41,14 +41,43 @@ def displayTroves(repos, cfg, all = False, ls = False, ids = False,
                           troveName)
                 continue
 
+	    # find the version strings to display for this trove; first
+	    # choice is just the version/release pair, if there are conflicts
+	    # try label/verrel, and if that doesn't work conflicts display 
+	    # everything
+	    versionStrs = {}
+	    short = {}
+	    for version in flavors[troveName]:
+		v = version.trailingVersion().asString()
+		versionStrs[version] = v
+		if short.has_key(v):
+		    versionStrs = {}
+		    break
+		short[v] = True
+
+	    if not versionStrs:
+		short = {}
+		for version in flavors[troveName]:
+		    v = version.branch().label().asString() + '/' + \
+			version.trailingVersion().asString()
+		    versionStrs[version] = v
+		    if short.has_key(v):
+			versionStrs = {}
+			break
+		    short[v] = True
+
+	    if not versionStrs:
+		for version in flavors[troveName]:
+		    versionStrs[version] = version.asString()
+
 	    for version in flavors[troveName]:
 		for flavor in flavors[troveName][version]:
 		    if all:
 			print "%-30s %-15s %s" % (troveName, flavor,
-					    version.asString(cfg.defaultbranch))
+						  versionStrs[version])
 		    elif not all and (flavor is None or cfg.flavor.satisfies(flavor)):
 			print _troveFormat % (troveName, 
-					    version.asString(cfg.defaultbranch))
+					      versionStrs[version])
 
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s):
     try:
@@ -85,12 +114,24 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s):
 		if file.hasContents:
 		    print "%s %s" % (file.contents.sha1(), path)
 	else:
-	    print _troveFormat % (troveName, version.asString(cfg.defaultbranch))
+	    if len(troveList) > 1:
+		print _troveFormat % (troveName, version.asString())
+	    else:
+		print _troveFormat % (troveName, 
+				      version.trailingVersion().asString())
 
 	    for (troveName, ver, flavor) in trove.iterTroveList():
-		print _grpFormat % (troveName, ver.asString(cfg.defaultbranch))
+		if ver.branch() == version.branch():
+		    print _grpFormat % (troveName, 
+					ver.trailingVersion().asString())
+		else:
+		    print _grpFormat % (troveName, ver.asString())
 
 	    fileL = [ (x[1], x[0], x[2]) for x in trove.iterFileList() ]
 	    fileL.sort()
-	    for (path, fileId, version) in fileL:
-		print _fileFormat % (path, version.asString(cfg.defaultbranch))
+	    for (path, fileId, ver) in fileL:
+		if ver.branch() == version.branch():
+		    print _fileFormat % (path, 
+					 ver.trailingVersion().asString())
+		else:
+		    print _fileFormat % (path, ver.asString())
