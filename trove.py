@@ -591,6 +591,9 @@ class Trove:
     def setBuildTime(self, nm):
         return self.troveInfo.buildTime.set(nm)
 
+    def setConaryVersion(self, ver):
+        return self.troveInfo.conaryVersion.set(ver)
+
     def __init__(self, name, version, flavor, changeLog, isRedirect = False):
         assert(flavor is not None)
 	self.idMap = {}
@@ -680,6 +683,7 @@ class OldFileStream(list, streams.InfoStream):
 _TROVEINFO_TAG_SIZE        = 0
 _TROVEINFO_TAG_SOURCENAME  = 1
 _TROVEINFO_TAG_BUILDTIME   = 2
+_TROVEINFO_TAG_CONARYVER   = 3
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
@@ -687,6 +691,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_SIZE       : ( streams.LongLongStream, 'size'       ),
         _TROVEINFO_TAG_SOURCENAME : ( streams.StringStream,   'sourceName' ),
         _TROVEINFO_TAG_BUILDTIME  : ( streams.LongLongStream, 'buildTime'  ),
+        _TROVEINFO_TAG_CONARYVER  : ( streams.StringStream,   'conaryVersion'),
     }
 
 class ReferencedFileList(list, streams.InfoStream):

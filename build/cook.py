@@ -17,6 +17,7 @@ Contains the functions which builds a recipe and commits the
 resulting packages to the repository.
 """
 
+import constants
 import deps.deps
 from repository import changeset
 from repository import filecontents
@@ -383,6 +384,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
     grp.setBuildTime(time.time())
     grp.setSourceName(fullName + ':recipe')
     grp.setSize(recipeObj.size)
+    grp.setConaryVersion(constants.version)
 
     grpDiff = grp.diff(None, absolute = 1)[0]
     changeSet = changeset.ChangeSet()
@@ -464,7 +466,8 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
     fileset.setBuildTime(time.time())
     fileset.setSourceName(fullName + ':recipe')
     fileset.setSize(size)
-
+    fileset.setConaryVersion(constants.version)
+    
     filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newPackage(filesetDiff)
 
@@ -612,6 +615,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
             grpMap[main].setSize(0)
             grpMap[main].setSourceName(recipeClass.name + ':source')
             grpMap[main].setBuildTime(buildTime)
+            grpMap[main].setConaryVersion(constants.version)
 
         searchBranch = buildBranch
         versionDict = []
@@ -646,6 +650,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	packageList.append((p, fileMap))
         p.setSourceName(recipeClass.name + ':source')
         p.setBuildTime(buildTime)
+        p.setConaryVersion(constants.version)
 	
 	# don't install :test component when you are installing
 	# the package
