@@ -108,11 +108,23 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    if not self.auth.check(authToken, write = False, trove = troveName):
 		raise InsufficientPermission
 
-	    d[troveName] = [ self.freezeVersion(x) for x in
+	rd = {}
+
+	if len(troveNameList) == 1:
+	  for troveName in troveNameList:
+	    rd[troveName] = [ self.freezeVersion(x) for x in
 			self.repos.troveStore.iterTroveLeafsByLabel(troveName,
 								   labelStr) ]
+	else:
+	    d = self.repos.troveStore.iterTroveLeafsByLabelBulk(troveNameList,
+								labelStr)
+	    for name in troveNameList:
+		if d.has_key(name):
+		    rd[name] = [ self.freezeVersion(x) for x in d[name] ]
+		else:
+		    rd[name] = []
 
-	return d
+	return rd
 
     def getTroveVersionsByLabel(self, authToken, troveNameList, labelStr):
 	d = {}

@@ -160,11 +160,51 @@ class TroveStore:
         except StopIteration:
             raise KeyError, (troveName, branch)
 
-    def iterTroveLeafsByLabel(self, troveName, labelStr):
+    def iterTroveLeafsByLabelBulk(self, troveNameList, labelStr):
 	cu = self.db.cursor()
+	cu.execute("CREATE TEMPORARY TABLE itlblb(troveName str)", 
+		   start_transaction = False)
+	for name in troveNameList:
+	    cu.execute("INSERT INTO itlblb VALUES (%s)", name)
+
+	cu.execute("""
+		SELECT Items.item, Versions.version, Nodes.timeStamps FROM
+		    (SELECT LabelMap.itemId as AitemId,
+				 LabelMap.branchId as AbranchId
+			    FROM Labels JOIN LabelMap 
+			      ON Labels.LabelId=LabelMap.LabelId 
+			    WHERE Labels.label=%s)
+		    JOIN Items 
+			ON Items.itemId=AitemId
+		    JOIN itlblb ON
+			itlblb.troveName = Items.item
+		    JOIN Latest ON 
+			AitemId=Latest.itemId AND AbranchId=Latest.branchId
+		    JOIN Nodes ON
+			AitemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
+		    JOIN Versions ON
+			Nodes.versionId = versions.versionId
+	""", labelStr)
+
+	d = {}
+	for (troveName, versionStr, timeStamps) in cu:
+	    v = versions.VersionFromString(versionStr, 
+		    timeStamps = [ float(x) for x in timeStamps.split(":") ] )
+	    if d.has_key(troveName):
+		d.append(v)
+	    else:
+		d[troveName] = [ v ]
+
+	cu.execute("DROP TABLE itlblb")
+
+	return d
+
+    def iterTroveLeafsByLabel(self, troveName, labelStr):
+	#cu = self.db.cursor()
 	# set up a table which lists the branchIds and the latest version
 	# id's for this search. the versionid will be NULL if it's an
 	# empty branch
+	cu = self.db.cursor()
 	cu.execute("""
 	    SELECT Versions.version, Nodes.timeStamps FROM 
 		(SELECT itemId AS AitemId, branchId as AbranchId FROM labelMap
@@ -172,7 +212,8 @@ class TroveStore:
 				WHERE item=%s)
 		    AND labelId=(SELECT labelId FROM Labels 
 				WHERE label=%s)
-		) JOIN Latest ON 
+		) 
+		JOIN Latest ON 
 		    AitemId=Latest.itemId AND AbranchId=Latest.branchId
 		JOIN Nodes ON
 		    AitemId=Nodes.itemId AND Latest.versionId=Nodes.versionId
