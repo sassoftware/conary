@@ -91,6 +91,7 @@ class RpmHeader:
         if OLDFILENAMES in self:
             for path in self[OLDFILENAMES]:
                 yield path
+            return
 
         paths = self[DIRNAMES]
         indexes = self[DIRINDEXES]
