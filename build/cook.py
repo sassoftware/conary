@@ -17,39 +17,6 @@ import time
 import types
 import util
 
-# type could be "src"
-def createPackage(repos, cfg, destdir, fileList, name, version, ident, 
-		  pkgtype = "auto"):
-    fileMap = {}
-    p = package.Package(name)
-
-    for filePath in fileList:
-	if pkgtype == "auto":
-	    realPath = destdir + filePath
-	    targetPath = filePath
-	else:
-	    realPath = filePath
-	    targetPath = os.path.basename(filePath)
-
-	file = files.FileFromFilesystem(realPath, ident(targetPath), 
-					type = pkgtype)
-
-	infoFile = repos.getFileDB(file.id())
-
-	duplicateVersion = \
-	    infoFile.checkBranchForDuplicate(cfg.defaultbranch, file)
-	if not duplicateVersion:
-	    p.addFile(file.id(), targetPath, version)
-	else:
-	    p.addFile(file.id(), targetPath, duplicateVersion)
-
-	if (pkgtype == "src"):
-	    fileMap[file.id()] = (file, realPath, targetPath)
-	else:
-	    fileMap[file.id()] = (file, realPath, targetPath)
-
-    return (p, fileMap)
-
 def cook(repos, cfg, recipeFile, prep=0, macros=()):
     repos.open("r")
 
@@ -61,30 +28,12 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
     for (className, recipeClass) in classList.items():
 	print "Building", className
-
-	# Find the files and ids which were owned by the last version of
-	# this package on the branch. We also construct an object which
-	# lets us look for source files this build needs inside of the
-	# repository
-	fileIdMap = {}
 	fullName = cfg.packagenamespace + "/" + recipeClass.name
-	lcache = lookaside.RepositoryCache(repos)
-	pkg = None
-	for pkgName in repos.getPackageList(fullName):
-	    pkgSet = repos.getPackageSet(pkgName)
-	    pkg = pkgSet.getLatestPackage(cfg.defaultbranch)
-	    for (fileId, path, version) in pkg.fileList():
-		fileIdMap[path] = fileId
-		if path[0] != "/":
-		    # we might need to retrieve this source file
-		    # to enable a build, so we need to find the
-		    # sha1 hash of it since that's how it's indexed
-		    # in the file store
-		    filedb = repos.getFileDB(fileId)
-		    file = filedb.getVersion(version)
-		    lcache.addFileHash(path, file.sha1())
 
-	ident = IdGen(fileIdMap)
+	lcache = lookaside.RepositoryCache(repos)
+
+	ident = files.IdGen()
+        ident.populate(cfg, repos, lcache, recipeClass.name)
 
         srcdirs = [ os.path.dirname(recipeClass.filename), cfg.sourcepath % {'pkgname': recipeClass.name} ]
 	recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
@@ -138,11 +87,12 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
 	for (name, buildPkg) in recipeObj.getPackageSet().packageSet():
 	    fullName = pkgname + "/" + name
-	    (p, fileMap) = createPackage(repos, cfg, destdir, buildPkg.keys(), 
-				         fullName, version, ident, "auto")
+	    p = package.createPackage(repos, cfg, destdir,
+                                      buildPkg.keys(), fullName,
+                                      version, ident, "auto")
 
             built.append(fullName)
-	    packageList.append((fullName, p, fileMap))
+	    packageList.append(p)
 
         recipes = [ recipeClass.filename ]
         # add any recipe that this recipeClass decends from to the sources
@@ -160,12 +110,12 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
             src = lookaside.findAll(cfg, lcache, file, recipeObj.name, srcdirs)
 	    srcList.append(src)
 	
-	(p, fileMap) = createPackage(repos, cfg, destdir, srcList, 
-				     pkgname + "/sources", version, ident, 
-				     "src")
-	packageList.append((pkgname + "/sources", p, fileMap))
+	p = package.createPackage(repos, cfg, destdir, srcList, 
+                          pkgname + "/sources", version, ident, 
+                          "src")
+	packageList.append(p)
 
-	changeSet = changeset.CreateFromFilesystem(packageList, version)
+	changeSet = changeset.CreateFromFilesystem(packageList)
 	repos.commitChangeSet(cfg.sourcepath, changeSet)
 
 	repos.open("r")
@@ -174,20 +124,3 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
     return built
 
-class IdGen:
-
-    def __call__(self, path):
-	if self.map.has_key(path):
-	    return self.map[path]
-
-	hash = sha1helper.hashString("%s %f %s" % (path, time.time(), 
-							self.noise))
-	self.map[path] = hash
-	return hash
-
-    def __init__(self, map):
-	# file ids need to be unique. we include the time and path when
-	# we generate them; any data put here is also used
-	uname = os.uname()
-	self.noise = "%s %s" % (uname[1], uname[2])
-	self.map = map

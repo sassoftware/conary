@@ -9,9 +9,24 @@ import types
 import util
 import versions
 import re
+import files
 
 # this is the repository's idea of a package
 class Package:
+    def getName(self):
+        return self.name
+    
+    def getVersion(self):
+        return self.version
+    
+    def setVersion(self, version):
+        self.version = version
+    
+    def getFileMap(self):
+        return self.fileMap
+    
+    def setFileMap(self, map):
+        self.fileMap = map
 
     def addFile(self, fileId, path, version):
 	self.files[path] = (fileId, path, version)
@@ -352,16 +367,16 @@ class PackageSpec:
 	return self.regexp.search(string)
 
 class PackageSpecInstance:
-    """An instance of a spec formed by the conjugation of a expspec and
+    """An instance of a spec formed by the conjugation of an explicitspec and
     an autospec"""
-    def __init__(self, instance, expspec, autospec):
+    def __init__(self, instance, explicitspec, autospec):
 	self.instance = instance
-	self.expspec  = expspec
+	self.explicitspec  = explicitspec
 	self.autospec = autospec
 
 class PackageSpecSet(dict):
     """An "ordered dictionary" containing PackageSpecInstances"""
-    def __init__(self, auto, exps):
+    def __init__(self, auto, explicit):
 	"""Storage area for (sub)package definitions; keeps
 	automatic subpackage definitions (like runtime, doc,
 	etc) and explicit subpackage definitions (higher-level
@@ -371,37 +386,37 @@ class PackageSpecSet(dict):
 	@param auto: automatic subpackage list
 	@type auto: tuple of (name, regex) or (name, (tuple, of
 	regex)) tuples
-	@param exps: explicit subpackage list
-	@type exps: tuple of (name, regex) or (name, (tuple, of
+	@param explicit: explicit subpackage list
+	@type explicit: tuple of (name, regex) or (name, (tuple, of
 	regex)) tuples
 	"""
 	self.auto = auto
-	if exps:
-	    self.exps = exps
+	if explicit:
+	    self.explicit = explicit
 	else:
-	    self.exps = (PackageSpec('', '.*'), )
+	    self.explicit = (PackageSpec('', '.*'), )
 	self.packageList = []
 	self.packageMap = {}
-	for expspec in self.exps:
+	for explicitspec in self.explicit:
 	    for autospec in self.auto:
-		name = self._getname(expspec.name, autospec.name)
-		self[name] = PackageSpecInstance(BuildPackage(name), expspec, autospec)
+		name = self._getname(explicitspec.name, autospec.name)
+		self[name] = PackageSpecInstance(BuildPackage(name),
+                                                 explicitspec, autospec)
 		self.packageList.append(name)
-		if not self.packageMap.has_key(expspec.name):
-		    self.packageMap[expspec.name] = {}
-		self.packageMap[expspec.name][autospec.name] = self[name]
+		if not self.packageMap.has_key(explicitspec.name):
+		    self.packageMap[explicitspec.name] = {}
+		self.packageMap[explicitspec.name][autospec.name] = self[name]
 
     def _getname(self, subname, autoname):
 	"""Cheap way of saying "if subname, then subname/autoname,
 	otherwise just autoname"."""
 	return string.lstrip(string.join((subname, autoname), '/'), '/')
     
-    def add(self, path, autospec, expspec):
-	self.packageMap[expspec.name][autospec.name].instance.addFile(path)
+    def add(self, path, autospec, explicitspec):
+	self.packageMap[explicitspec.name][autospec.name].instance.addFile(path)
 
 
 def Auto(name, root, specSet):
-
     os.path.walk(root, autoVisit,
                  (root, specSet))
 
@@ -421,13 +436,45 @@ def autoVisit(arg, dir, files):
         else:
             path = '/' + file
 	
-	for expspec in specSet.exps:
-	    if expspec.match(path):
+	for explicitspec in specSet.explicit:
+	    if explicitspec.match(path):
 		for autospec in specSet.auto:
 		    if autospec.match(path):
-			specSet.add(path, autospec, expspec)
+			specSet.add(path, autospec, explicitspec)
 			break
 		break
 
 def packageSetExists(db, pkg):
     return db.hasFile(pkg)
+
+# type could be "src"
+def createPackage(repos, cfg, destdir, fileList, name, version, ident, 
+		  pkgtype = "auto"):
+    fileMap = {}
+    p = Package(name)
+
+    for filePath in fileList:
+	if pkgtype == "auto":
+	    realPath = destdir + filePath
+	    targetPath = filePath
+	else:
+	    realPath = filePath
+	    targetPath = os.path.basename(filePath)
+
+	file = files.FileFromFilesystem(realPath, ident(targetPath), 
+					type = pkgtype)
+
+	fileDB = repos.getFileDB(file.id())
+
+        duplicateVersion = fileDB.checkBranchForDuplicate(cfg.defaultbranch,
+                                                          file)
+        if not duplicateVersion:
+	    p.addFile(file.id(), targetPath, version)
+	else:
+	    p.addFile(file.id(), targetPath, duplicateVersion)
+
+        fileMap[file.id()] = (file, realPath, targetPath)
+
+    p.setFileMap(fileMap)
+    p.setVersion(version)
+    return p
