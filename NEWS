@@ -1,6 +1,8 @@
 Changes in 0.11.3:
   * optimized a sqlite update statement to use indexed columns
   * added --test to update and erase
+  * dependency check didn't handle new components providing the same
+    items as old components (broken by 0.11.1 performance enhancements)
 
 Changes in 0.11.2:
   * standalone server was broken by --add-user changes in 0.11.1
@@ -14,6 +16,8 @@ Changes in 0.11.1:
   * erasing troves enforces dependencies -- this requires a database 
     conversion (run the conary-add-filedeps script which fixed the
     conversion to 0.11.0 after updating conary)
+  * reworked dependency queries to take advantage of indices for much
+    better performance
   * add --add-user to server.py for creating the authdb
 
 Changes in 0.11.0:

@@ -265,18 +265,31 @@ class DependencyTables:
 
         cu.execute("DROP TABLE suspectDeps")
 
-    def _resolveStmt(self, tableList):
-        """
-        tableList is a list of (requiresTable, providesTable, depTable)
-        tuples
-        """
-
+    def _resolveStmt(self, requiresTable, providesTableList, depTableList):
         subselect = ""
 
-        for (reqTable, provTable, depTable) in tableList:
-            substTable = { 'provides' : "%-15s" % provTable,
-                           'requires' : "%-15s" % reqTable,
+        depTableClause = ""
+        for depTable in depTableList:
+            substTable = { 'requires' : "%-15s" % requiresTable,
                            'deptable' : "%-15s" % depTable }
+
+            depTableClause += """\
+                         LEFT OUTER JOIN %(deptable)s ON
+                              %(requires)s.depId = %(deptable)s.depId\n""" % substTable
+
+        for provTable in providesTableList:
+            substTable = { 'provides' : "%-15s" % provTable,
+                           'requires' : "%-15s" % requiresTable,
+                           'depClause': depTableClause }
+
+            for name in ( 'class', 'name', 'flag' ):
+                if len(depTableList) > 1:
+                    s = "COALESCE(%s)" % ", ".join([ "%s.%s" % (x, name) 
+                                                    for x in depTableList])
+                else:
+                    s = "%s.%s" % (depTableList[0], name)
+
+                substTable[name] = s
 
             if subselect:
                 subselect += """\
@@ -287,14 +300,12 @@ class DependencyTables:
                               %(requires)s.instanceId AS reqInstId,
                               %(provides)s.depId      AS provDepId,
                               %(provides)s.instanceId AS provInstId,
-                              %(deptable)s.class      AS class,
-                              %(deptable)s.name       AS name,
-                              %(deptable)s.flag       AS flag
+                              %(class)s AS class,
+                              %(name)s AS name,
+                              %(flag)s AS flag
                          FROM %(requires)s JOIN %(provides)s ON
                               %(requires)s.depId = %(provides)s.depId
-                         JOIN %(deptable)s ON
-                              %(requires)s.depId = %(deptable)s.depId\n""" \
-                    % substTable
+%(depClause)s""" % substTable
             
 
         return """
@@ -481,7 +492,7 @@ class DependencyTables:
         # in the repository, but that something is being explicitly removed
         # and adding it back would be a bit rude!)
         cu.execute("""
-                SELECT depNum, provInstanceId, RemovedTroveIds.troveId FROM
+                SELECT depNum, RemovedTroveIds.troveId FROM
                     (%s) 
                     LEFT OUTER JOIN RemovedTroveIds ON
                         provInstanceId == RemovedTroveIds.troveId
@@ -489,9 +500,9 @@ class DependencyTables:
                         reqInstanceId == Removed.troveId
                     WHERE 
                         Removed.troveId IS NULL
-                """ % self._resolveStmt([ 
-                            ("TmpRequires", "Provides",    "Dependencies"),
-                            ("TmpRequires", "TmpProvides", "TmpDependencies") ])
+                """ % self._resolveStmt("TmpRequires",
+                                        ("Provides", "TmpProvides"),
+                                        ("Dependencies", "TmpDependencies"))
                 , start_transaction = False)
 
         # None in depList means the dependency got resolved; we track
@@ -503,13 +514,16 @@ class DependencyTables:
         #    depList); positive ones are for dependencies broken by an
         #    erase (and need to be looked up in the Requires table in the 
         #    database to get a nice description)
-        # resolvingInstanceId is an instanceId which resolved this dependency
-        #    since we only see resolved dependencies here, it must be set
         # removedInstanceId != None means that the dependency was resolved by 
-        #    something which is being removed
+        #    something which is being removed. If it is None, the dependency
+        #    was resolved by something which isn't disappearing. It could
+        #    occur multiple times for the same dependency with both None
+        #    and !None, in which case the None wins (as long as one item
+        #    resolves it, it's resolved)
         brokenByErase = {}
         unresolveable = [ None ] * (len(depList) + 1)
-        for (depNum, instanceId, removedInstanceId) in cu:
+        satisfied = []
+        for (depNum, removedInstanceId) in cu:
             if removedInstanceId is not None:
                 if depNum < 0:
                     # the dependency would have been resolved, but this
@@ -523,7 +537,20 @@ class DependencyTables:
             else:
                 # if we get here, the dependency is resolved; mark it as
                 # resolved by clearing it's entry in depList
-                depList[-depNum] = None
+                if depNum < 0:
+                    depList[-depNum] = None
+                else:
+                    # if depNum > 0, this was a dependency which was checked
+                    # because of something which is being removed, but it
+                    # remains satisfied
+                    satisfied.append(depNum)
+
+        # things which are listed in satisfied should be removed from
+        # brokenByErase; they are dependencies that were broken, but are
+        # resolved by something else
+        for depNum in satisfied:
+            if brokenByErase.has_key(depNum):
+                del brokenByErase[depNum]
 
         # sort things out of unresolveable which were resolved by something
         # else
@@ -604,8 +631,8 @@ class DependencyTables:
                         Instances.versionId == Nodes.versionId
                       ORDER BY
                         Nodes.finalTimestamp DESC
-                    """ % self._resolveStmt( [ 
-                          ("TmpRequires", "providesBranch", "Dependencies") ] ),
+                    """ % self._resolveStmt( "TmpRequires", 
+                                ("providesBranch",), ("Dependencies",) ),
                     start_transaction = False)
         result = {}
         handled = {}
