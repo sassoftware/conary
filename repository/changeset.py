@@ -589,9 +589,9 @@ class ChangeSetFromFile(ChangeSet):
             self.filesRead = True
 
             if self.lastCsf:
-                next = self.csf.getNextFile()
+                next = self.lastCsf.getNextFile()
                 if next:
-                    self.fileQueue.append(next + (self.csf,))
+                    self.fileQueue.append(next + (self.lastCsf,))
                 self.lastCsf = None
 
             while self.fileQueue:
@@ -738,10 +738,10 @@ class ChangeSetFromFile(ChangeSet):
 
     def __init__(self, file, skipValidate = 1):
 	f = open(file, "r")
-	self.csf = filecontainer.FileContainer(f)
+	csf = filecontainer.FileContainer(f)
 	f.close()
 
-	(name, tagInfo, control, size) = self.csf.getNextFile()
+	(name, tagInfo, control, size) = csf.getNextFile()
         assert(name == "CONARYCHANGESET")
 
 	start = control.read()
@@ -764,7 +764,7 @@ class ChangeSetFromFile(ChangeSet):
         self.fileQueue = []
 
         # load the diff cache
-        nextFile = self.csf.getNextFile()
+        nextFile = csf.getNextFile()
         while nextFile:
             name, tagInfo, f, size = nextFile
 
@@ -780,10 +780,10 @@ class ChangeSetFromFile(ChangeSet):
             self.configCache[name] = (tag, str)
             cont = filecontents.FromString(str)
 
-            nextFile = self.csf.getNextFile()
+            nextFile = csf.getNextFile()
 
         if nextFile:
-            self.fileQueue.append(nextFile + (self.csf,))
+            self.fileQueue.append(nextFile + (csf,))
 
 # old may be None
 def fileChangeSet(fileId, old, new):
