@@ -18,6 +18,43 @@ Classes from this module are not used directly; instead, they are used
 through eponymous interfaces in recipe.
 """
 
+# bail out as soon as possible if there's an unrecoverable error
+# so put error classes first
+
+class BinariesInBindirs(policy.Policy):
+    """
+    Directories that are specifically for binaries should only have
+    files that have some executable bit set.
+    """
+    invariantinclusions = [
+	'%(bindir)s/',
+	'%(essentialbindir)s/',
+	'%(sbindir)s/',
+	'%(essentialsbindir)s/',
+    ]
+
+    def doFile(self, file):
+	mode = os.lstat(self.macros['destdir'] + os.sep + file)[stat.ST_MODE]
+	if not mode & 0111:
+	    raise PackagePolicyError(
+		"%s has mode 0%o with no executable permission in bindir"
+		%(file, mode))
+
+
+class FilesInMandir(policy.Policy):
+    """
+    The C{%(mandir)s} directory should only have files in it, normally.
+    The main cause of files in C{%(mandir)s} is confusion in packages
+    about whether "mandir" means /usr/share/man or /usr/share/man/man<n>.
+    """
+    invariantinclusions = [ ('%(mandir)s/[^/][^/]*$', None, stat.S_IFDIR) ]
+
+    def doFile(self, file):
+	raise PackagePolicyError("%s is non-directory file in mandir" %file)
+
+
+# now the packaging classes
+
 class _filterSpec(policy.Policy):
     def __init__(self, *args, **keywords):
 	self.extraFilters = []
@@ -60,20 +97,15 @@ class ComponentSpec(_filterSpec):
 
     def doProcess(self, recipe):
 	compFilters = []
-	macros = recipe.macros
+	self.macros = recipe.macros
 
 	# the extras need to come first in order to override decisions
 	# in the base subfilters
 	for (filteritem) in self.extraFilters + list(self.baseFilters):
-	    filteritem = list(filteritem)
-	    while len(filteritem) < 4:
-		filteritem.append(None)
-	    name, patterns, setmode, unsetmode = filteritem
-	    name = name %macros
+	    name = filteritem[0] % self.macros
 	    assert(name != 'sources')
-	    compFilters.append(
-		filter.Filter(patterns, macros,
-			      setmode=setmode, unsetmode=unsetmode, name=name))
+	    filterargs = self.filterExpression(filteritem[1:], name=name)
+	    compFilters.append(filter.Filter(*filterargs))
 
 	# pass these down to PackageSpec for building the package
 	recipe.PackageSpec(compFilters=compFilters)
@@ -171,26 +203,6 @@ class Config(policy.Policy):
 		if configFilter.match(file):
 		    _markConfig(self.recipe, file)
 
-
-class BinariesInBindirs(policy.Policy):
-    """
-    Directories that are specifically for binaries should only have
-    files that have some executable bit set.
-    """
-    invariantinclusions = [
-	'%(bindir)s/',
-	'%(essentialbindir)s/',
-	'%(sbindir)s/',
-	'%(essentialsbindir)s/',
-    ]
-
-    def doFile(self, file):
-	mode = os.lstat(self.macros['destdir'] + os.sep + file)[stat.ST_MODE]
-	if not mode & 0111:
-	    raise PackagePolicyError(
-		"%s has mode 0%o with no executable permission in bindir"
-		%(file, mode))
-	
 
 class InitScript(policy.Policy):
     """
@@ -407,11 +419,12 @@ def DefaultPolicy():
     A recipe can then modify this list if necessary.
     """
     return [
+	BinariesInBindirs(),
+	FilesInMandir(),
 	ComponentSpec(),
 	PackageSpec(),
 	EtcConfig(),
 	Config(),
-	BinariesInBindirs(),
 	InitScript(),
 	SharedLibrary(),
 	ParseManifest(),
