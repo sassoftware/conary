@@ -150,15 +150,6 @@ class RemoveTimeStamps(Policy):
     def do(self):
 	pass
 
-class GenerateDependencies(Policy):
-    """
-    ignore stupid places like /usr/share/doc
-    allow packager to specify other places to ignore
-    do only first-level dependencies; stored transitive symbol dependencies go stale
-    """
-    def do(self):
-	pass
-
 
 def DefaultPolicy():
     """
@@ -172,5 +163,4 @@ def DefaultPolicy():
 	NormalizeManPages(),
 	NormalizeInfoPages(),
 	RemoveTimeStamps(),
-	GenerateDependencies(),
     ]
