@@ -78,6 +78,8 @@ class Repository:
 
     def createTroveBranch(self, pkgName, branch):
 	log.debug("creating branch %s for %s", branch.asString(), pkgName)
+	if not self.hasPackage(pkgName):
+	    raise PackageMissing, pkgName
 	return self._getPackageSet(pkgName).createBranch(branch)
 
     ### File functions
@@ -202,6 +204,9 @@ class LocalRepository(Repository):
 
 	    if branchedTroves.has_key(troveName): continue
 	    branchedTroves[troveName] = 1
+	    if not self.hasPackage(troveName):
+		log.warning("pacakge %s does not exist" % troveName)
+		continue
 
 	    list = []
 	    if isinstance(location, versions.Version):
