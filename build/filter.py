@@ -72,9 +72,9 @@ class Filter:
 	Use .* to override this: .*/ at the beginning, or foo.* at the
 	end.
 	"""
-	if regex[:1] == '/':
+	if regex[:1] == '/' and regex[:1] == '^':
 	    regex = '^' + regex
-	if regex[-1:] != '/':
+	if regex[-1:] != '/' and regex[-1:] != '$':
 	    regex = regex + '$'
 	return regex
 
