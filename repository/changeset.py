@@ -173,6 +173,9 @@ class ChangeSet(streams.LargeStreamSet):
 	assert(min(version.timeStamps()) > 0)
 	self.oldPackages.append((name, version, flavor))
 
+    def hasOldPackage(self, name, version, flavor):
+        return (name, version, flavor) in self.oldPackages
+
     def delOldPackage(self, name, version, flavor):
         self.oldPackages.remove((name, version, flavor))
 
@@ -784,7 +787,9 @@ class ReadOnlyChangeSet(ChangeSet):
         self.files.update(otherCs.files)
         self.primaryTroveList += otherCs.primaryTroveList
         self.newPackages.update(otherCs.newPackages)
-        self.oldPackages += otherCs.oldPackages
+        # keep the old package lists unique on merge
+        self.oldPackages = dict.fromkeys(self.oldPackages + 
+                                         otherCs.oldPackages).keys()
 
         if isinstance(otherCs, ReadOnlyChangeSet):
             assert(not self.lastCsf)

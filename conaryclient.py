@@ -177,7 +177,7 @@ class ConaryClient:
         # redirect to don't show up as primary troves (ever), which keeps
         # _mergeGroupChanges() from interacting with troves which are the
         # targets of redirections.
-        troveList = []
+        troveSet = {}
         delDict = {}
 
         for troveCs in cs.iterNewPackageList():
@@ -190,11 +190,9 @@ class ConaryClient:
             # don't install the redirection itself
             delDict[item] = True
 
-            followRedirect = True
-
             # but do remove the trove this redirection replaces. if it
             # isn't installed, we don't want this redirection or the
-            # items it points to
+            # item it points to
             if troveCs.getOldVersion():
                 oldItem = (troveCs.getName(), troveCs.getOldVersion(),
                            troveCs.getOldFlavor())
@@ -203,29 +201,41 @@ class ConaryClient:
                     cs.oldPackage(*oldItem)
                 else:
                     # erase the target(s) of the redirection
-                    followRedirect = False
                     for (name, changeList) in troveCs.iterChangedTroves():
                         for (changeType, version, flavor, byDef) in changeList:
                             delDict[(name, version, flavor)] = True
 
-            if followRedirect:
-                # now go through the targets of the redirection, remove them,
-                # and let them get readded later. this seems silly, but it
-                # lets the normal code which processes old versions be used
-                #
-                # the "remove them" bit is actually only needed for redirects
-                # built with the original cook code. modern redirects don't
-                # contain the extraneous bits to begin with.
-                for (name, changeList) in troveCs.iterChangedTroves():
-                    for (changeType, version, flavor, byDef) in changeList:
-                        if changeType == '-': continue
-                        delDict[(name, version, flavor)] = True
-                        troveList.append((name, version, flavor))
+            # look for troves being added by this redirect
+            for (name, changeList) in troveCs.iterChangedTroves():
+                for (changeType, version, flavor, byDef) in changeList:
+                    if changeType == '+': 
+                        troveSet[(name, version, flavor)] = True
 
         for item in delDict.iterkeys():
-            cs.delNewPackage(*item)
+            if cs.hasNewPackage(*item):
+                cs.delNewPackage(*item)
 
-        return troveList
+        # Troves in troveSet which are still in this changeset are ones
+        # we really do need to install. We don't know what versions they
+        # should be relative though; this removes them and depends on the
+        # caller to add them again, relative to the right things
+        addList = []
+        for item in troveSet.keys():
+            if not cs.hasNewPackage(*item): continue
+            cs.delNewPackage(*item)
+            addList.append(item)
+
+        outdated, eraseList = self.db.outdatedTroves(addList)
+        csList = []
+        for (name, newVersion, newFlavor), \
+              (oldName, oldVersion, oldFlavor) in outdated.iteritems():
+            csList.append((name, (oldVersion, oldFlavor),
+                                 (newVersion, newFlavor), False))
+            # don't let things be listed as old for two different reasons
+            if cs.hasOldPackage(name, oldVersion, oldFlavor):
+                cs.delOldPackage(name, oldVersion, oldFlavor)
+
+        return csList
 
     def _mergeGroupChanges(self, cs):
         # Updates a change set by removing troves which don't need
@@ -330,9 +340,6 @@ class ConaryClient:
                 #    
                 #    pass
 
-        # remove duplicates
-        newItems = dict.fromkeys(newItems).keys()
-
         if keepExisting:
             for (name, version, flavor) in newItems:
                 changeSetList.append((name, (None, None), (version, flavor), 0))
@@ -353,12 +360,14 @@ class ConaryClient:
             cs = self.repos.createChangeSet(changeSetList, withFiles = False)
             finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
 
-        redirectTroves = self._processRedirects(finalCs)
-        # this is done recursively (only because if fits the code a bit better),
-        if redirectTroves:
-            redirectCs = self._updateChangeSet(redirectTroves, 
-                                  keepExisting = keepExisting, test = test)
-            finalCs.merge(redirectCs)
+        # we need to iterate here to handle redirects to redirects to...
+        redirectCsList = self._processRedirects(finalCs) 
+        while redirectCsList:
+            cs = self.repos.createChangeSet(redirectCsList, withFiles = False,
+                                            primaryTroveList = [], 
+                                            recurse = False)
+            redirectCsList = self._processRedirects(cs)
+            finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
 
         self._mergeGroupChanges(finalCs)
 

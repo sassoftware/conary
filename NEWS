@@ -14,6 +14,7 @@ Changes in 0.50.1:
   * group, fileset, and redirect recipes have macros that contain the
     buildlabel and buildbranch.
   * fixed a bug with merging absolute change sets which contain config files
+  * redirections to troves w/ older versions already installed didn't work
 
 Changes in 0.50.0:
   * Redirections work
