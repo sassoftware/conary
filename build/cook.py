@@ -52,6 +52,14 @@ def _createComponent(repos, branch, bldPkg, newVersion, ident):
     p.setRequires(bldPkg.requires)
     p.setProvides(bldPkg.provides)
 
+    import pdb
+    pdb.set_trace()
+
+    linkGroups = {}
+    for pathList in bldPkg.linkGroups.itervalues():
+        linkGroupId = sha1helper.hashString("\n".join(pathList))
+        linkGroups.update({}.fromkeys(pathList, linkGroupId))
+
     for (path, (realPath, f)) in bldPkg.iteritems():
         if isinstance(f, files.RegularFile):
             flavor = f.flavor.deps
@@ -59,6 +67,10 @@ def _createComponent(repos, branch, bldPkg, newVersion, ident):
             flavor = None
         (fileId, fileVersion, oldFile) = ident(path, flavor)
 	f.id(fileId)
+        
+        linkGroupId = linkGroups.get(path, None)
+        if linkGroupId:
+            f.linkGroup.set(linkGroupId)
 
         if not fileVersion:
             # no existing versions for this path
