@@ -340,8 +340,6 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	    fileObj.restore(csWithContents, root + path, 
 			    newFile.restoreContents())
 
-	return 0
-
 	# remove paths which are no longer valid
 	for (path, file) in self.staleFileList():
 	    file.remove(root + path)
@@ -352,16 +350,15 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 		self.repos.removeFileContents(fileObj.sha1())
 
     # remove the specified file and it's local branch
-    def removeFile(self, fileId, version, path):
+    def removeFile(self, origJob, fileId, version, path):
 	# we need this object in case of an undo
 	fileObj = self.repos.getFileVersion(fileId, version)
 
-	branch = version.fork(versions.LocalBranch(), sameVerRel = 1)
-
 	self.oldFile(fileId, version, fileObj)
-	self.oldFile(fileId, branch, fileObj)
 
-	if not self.containsFilePath(path):
+	# if we're just going to create this again, don't bother
+	# removing it
+	if not origJob.containsFilePath(path):
 	    self.addStaleFile(path, fileObj)
 
     def __init__(self, repos, localCs, origJob):
@@ -370,18 +367,19 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	self.oldFiles = []
 	self.staleFiles = []
 
+	assert(not origJob.cs.isAbstract())
+
 	# Make sure every package in the original change set has a local
 	# branch with the right versions. The target of things in localCS
 	# needs to be the new local branch, and the source is the same
 	# as the target of the original CS (this is creating B->B.local
 	# from A->A.local when origJob is A->B; A, A.local, and B are all
 	# available)
-	for newPkg in origJob.newPackageList():
-	    name = newPkg.getName()
-	    Bver = newPkg.getVersion()
+	for Bpkg in origJob.newPackageList():
+	    name = Bpkg.getName()
+	    Bver = Bpkg.getVersion()
 	    Bloc = Bver.fork(versions.LocalBranch(), sameVerRel = 1)
 	    if not localCs.hasNewPackage(name):
-		Bpkg = repos.getPackageVersion(name, Bver)
 		BlocPkg = Bpkg.copy()
 		BlocPkg.changeVersion(Bloc)
 		BlocCs = BlocPkg.diff(Bpkg)[0]
@@ -396,11 +394,14 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	repository.ChangeSetJob.__init__(self, repos, localCs)
 
 	# walk through every package we're about to commit, and update
-	# the file list to reflect that the files are on the local branch
+	# the file list to reflect that the files are on the local branch,
+	# unless they are already on a local branch from migrating into
+	# this changeset from localCs
 	for branchPkg in self.newPackageList():
 	    for (fileId, path, version) in branchPkg.fileList():
-		ver = version.fork(versions.LocalBranch(), sameVerRel = 1)
-		branchPkg.updateFile(fileId, path, ver)
+		if not version.isLocal():
+		    ver = version.fork(versions.LocalBranch(), sameVerRel = 1)
+		    branchPkg.updateFile(fileId, path, ver)
 
 	# get the list of files which need to be created; files which
 	# are on the new jobs newFileList don't need to be created; they
@@ -415,25 +416,21 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	    if not skipPaths.has_key(f.path()):
 		self.paths[f.path()] = (f, origJob.cs)
 
-	return
-
-	#import sys
-	#import srscfg
-	#localCs.formatToFile(srscfg.SrsConfiguration(), sys.stdout)
-	#sys.exit(0)
+	# at this point, self is job which does all of the creation of
+	# new bits. we need self to perform the removal of the old bits
+	# as well
 
 	# remove old versions of the packages which are being added; make sure
 	# we get both the version being replaced and the local branch for that
 	# version
 	# 
 	# while we're here, package change sets may mark some files as removed;
-	# we need to remember to remove those files and their local branches.
-	# package change sets also know when file paths have changed, and the
-	# old paths are candidates for removal (and should be removed unless
-	# something else in this change set caused those paths to be owned
-	# again)
+	# we need to remember to remove those files, and make the paths for
+	# those files candidates for removal package change sets also know 
+	# when file paths have changed, and those old paths are also candidates
+	# for removal
 
-	for csPkg in cs.getNewPackageList():
+	for csPkg in origJob.cs.getNewPackageList():
 	    name = csPkg.getName()
 	    oldVersion = csPkg.getOldVersion()
 
@@ -456,7 +453,7 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 
 	    for fileId in csPkg.getOldFileList():
 		(oldPath, oldFileVersion) = pkg.getFile(fileId)
-		self.removeFile(fileId, oldFileVersion, oldPath)
+		self.removeFile(origJob, fileId, oldFileVersion, oldPath)
 
 	    for (fileId, newPath, newVersion) in csPkg.getChangedFileList():
 		if newPath:
@@ -468,39 +465,16 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 							    oldFileVersion)
 			self.addStaleFile(oldPath, fileObj)
 
-	# for each file we are going to create, create the file as
-	# well as the local branch; while we're at it erase the old
-	# version of that file, and the old branch
-	# 
-	# also build up a list of file paths so we can sort it to write
-	# files onto the filesystem in the right order later on
-	l = self.newFileList()[:]
-	self.pathList = []
-	for f in l:
-	    self.pathList.append((f.path(), f))
-
-	    newFile = f.copy()
-	    ver = newFile.version().fork(versions.LocalBranch(), sameVerRel = 1)
-	    newFile.changeVersion(ver)
-	    self.addFile(newFile)
-
-	    oldVersion = cs.getFileOldVersion(f.fileId())
+	# for each file which has changed, erase the old version of that
+	# file from the repository
+	for f in origJob.newFileList():
+	    oldVersion = origJob.cs.getFileOldVersion(f.fileId())
 	    if not oldVersion:
 		# this is a new file; there is no old version to erase
 		continue
 
-	    oldBranch = oldVersion.fork(versions.LocalBranch(), sameVerRel = 1)
-
 	    self.oldFile(f.fileId(), oldVersion, 
 			 repos.getFileVersion(f.fileId(), oldVersion))
-
-	    # this is removing the old local branch for the file; we need
-	    # to read that in from the filesystem to get the sha1 right
-	    self.oldFile(f.fileId(), oldBranch,
-			 repos.getFileVersion(f.fileId(), oldBranch,
-					      path = path))
-
-	self.pathList.sort()
 
 class DatabaseChangeSetUndo(repository.ChangeSetUndo):
 
