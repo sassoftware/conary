@@ -112,6 +112,9 @@ def loadTagDict(dirPath):
 	return {}
 
     for path in files:
+        # ignore hidden files
+        if path.startswith('.'):
+            continue
 	c = TagFile(os.path.join(dirPath, path))
 	d[c.tag] = c
 
