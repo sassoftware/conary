@@ -318,15 +318,15 @@ class Directory(File):
 class DeviceFile(File):
 
     def sizeString(self):
-	return "%3d, %3d" % (self.theMajor, self.theMinor)
+	return "%3d, %3d" % (self.major, self.minor)
 
     def infoLine(self):
 	return "%c %d %d %s" % (self.infoTag, self.major, self.minor,
 				  FileMode.infoLine(self))
 
     def same(self, other):
-	if (self.type == other.type and self.major == other.major and
-			self.minor == other.minor):
+	if (self.infoTag == other.infoTag and self.major == other.major and
+            self.minor == other.minor):
 	    return File.same(self, other)
 	
 	return 0
@@ -347,7 +347,7 @@ class DeviceFile(File):
 	if minor:
 	    self.minor = minor
 	
-	return (self.type, self.major, self.minor)
+	return (self.infoTag, self.major, self.minor)
 
     def applyChangeLine(self, line):
 	(ma, mi, line) = line.split(None, 2)
@@ -382,9 +382,9 @@ class BlockDevice(DeviceFile):
 class CharacterDevice(DeviceFile):
 
     lsTag = "c"
-
+    
     def __init__(self, fileId, info = None):
-	self.infoTag = "b"
+	self.infoTag = "c"
 	DeviceFile.__init__(self, fileId, info)
 
 class RegularFile(File):
@@ -492,8 +492,10 @@ def FileFromInfoLine(infoLine, fileId):
 	return Directory(fileId, infoLine)
     elif type == "p":
 	return NamedPipe(fileId, infoLine)
-    elif type == "v":
-	return DeviceFile(fileId, infoLine)
+    elif type == "c":
+	return CharacterDevice(fileId, infoLine)
+    elif type == "b":
+	return BlockDevice(fileId, infoLine)
     elif type == "s":
 	return Socket(fileId, infoLine)
     elif type == "src":

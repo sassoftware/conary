@@ -22,17 +22,48 @@ class BuildFile:
         self.realPath = realPath
         self.type = type
 
+class BuildDeviceFile(BuildFile):
+    def getRealPath(self):
+        return self.realPath
+
+    def getType(self):
+        return self.type
+
+    def infoLine(self):
+        # type major minor perms owner group size mtime
+        return "%c %d %d 0%o %s %s 0 0" % (self.devtype, self.major,
+                                           self.minor, self.perms,
+                                           self.owner, self.group)
+
+    def __init__(self, devtype, major, minor, owner, group, perms):
+        self.type = "auto"
+        self.realPath = None
+
+        self.devtype = devtype
+        self.major = major
+        self.minor = minor
+        self.owner = owner
+        self.group = group
+        self.perms = perms
+
 class BuildPackage(types.DictionaryType):
 
     def addFile(self, path, realPath, type="auto"):
         """add a file to the build package
-        @param path: the location of the file in the package
+        @param path: the destination of the file in the package
         @param realPath: the location of the actual file on the filesystem,
         used to obtain the contents of the file when creating a changeset
         to commit to the repository
         @param type: type of file.  Use "src" for source files.
         """
 	self[path] = BuildFile(realPath, type)
+
+    def addDevice(self, path, devtype, major, minor,
+                  user='root', group='root', perms=0660):
+        """add a device node to the build package
+        @param path: the destination of the device node in the package
+        """
+	self[path] = BuildDeviceFile(devtype, major, minor, user, group, perms)
 
     def getName(self):
 	return self.name
@@ -131,7 +162,7 @@ class BuildPackageFactory:
 			return self.packageMap[explicitspec][autospec]
         return None
     
-    def addFile(self, path, realPath=None):
+    def addFile(self, path, realPath):
         """Add a path to the correct BuildPackage instance by matching
         the file name against the the explicit and auto specs
 
@@ -141,6 +172,14 @@ class BuildPackageFactory:
         """
         pkg = self.findPackage(path)
         pkg.addFile(path, realPath)
+
+    def addDevice(self, path, devtype, major, minor,
+                  user='root', group='root', perms=0660):
+        """Add a device to the correct BuildPackage instance by matching
+        the file name against the the explicit and auto specs
+        """
+        pkg = self.findPackage(path)
+        pkg.addDevice(path, devtype, major, minor, user, group, perms)
 
     def packageSet(self):
         """Examine the BuildPackage instances created by the factory

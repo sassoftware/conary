@@ -37,13 +37,15 @@ def createPackage(repos, cfg, bldPkg, ident):
     fileMap = {}
     p = package.Package(bldPkg.getName(), bldPkg.getVersion())
 
-    for (path, file) in bldPkg.items():
-        realPath = file.getRealPath()
-        if realPath:
+    for (path, buildFile) in bldPkg.items():
+        realPath = buildFile.getRealPath()
+        if isinstance(buildFile, buildpackage.BuildDeviceFile):
+            file = files.FileFromInfoLine(buildFile.infoLine(), ident(path))
+        elif realPath:
             file = files.FileFromFilesystem(realPath, ident(path), 
-                                            type = file.getType())
+                                            type = buildFile.getType())
         else:
-            raise RuntimeError, "unable to find file on filesystem when building package"
+            raise RuntimeError, "unable to create file object for package"
 
 	duplicateVersion = checkBranchForDuplicate(repos, file.id(),
 						   cfg.defaultbranch, file)

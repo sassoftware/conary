@@ -405,6 +405,8 @@ class Recipe:
 	factory = buildpackage.BuildPackageFactory(
             namePrefix + ":" + self.name, version, self.autoSpecList, None)
         factory.walk(root)
+        #factory.addDevice('/dev/null', 'c', 1, 3, perms=0666)
+        #factory.addDevice('/dev/zero', 'c', 1, 5, perms=0666)
         self.packageSet = factory.packageSet()
 
     def getPackageSet(self):
