@@ -244,14 +244,12 @@ class SharedLibrary(policy.Policy):
 	'(%(essentiallibdir)s|%(libdir)s|%(prefix)s/X11R6/%(lib)s|'
 	'%(prefix)s/kerberos/%(lib)s|'
 	'%(prefix)s/local/%(lib)s|%(libdir)s/qt.*/lib|'
-	'%(libdir)s/(mysql|sane))/..*\.so\.'
+	'%(libdir)s/(mysql|sane))/..*\.so\..*'
     ]
 
     def _markSharedLibrary(self, filename):
-	map = self.recipe.autopkg.pathMap
-	if filename in map:
-	    log.debug('shared library: %s', filename)
-	    map[filename].flags.isShLib(True)
+	log.debug('shared library: %s', filename)
+	self.recipe.autopkg.pathMap[filename].flags.isShLib(True)
 
     def doFile(self, file):
 	fullpath = ('%(destdir)s/'+file) %self.macros
