@@ -798,27 +798,6 @@ class FilesError(Exception):
     def __str__(self):
 	return repr(self)
 
-def contentConflict(changeLine):
-    """
-    Tests a change line to see if only the file's contents conflict. It
-    assumes mtime conflicts have already been filtered. Size and sha1
-    mismatches are considered content conflicts.
-
-    @param changeLine: changeLine to check
-    @type changeLine: str
-    @rtype: boolean
-    """
-    conflictCount = changeLine.find(" ! ")
-    fields = changeLine.split()
-    if fields[0] != "f": return False
-
-    if conflictCount == 1:
-	return fields[1] == "!"
-    elif conflictCount == 2:
-	return fields[1] == "!" and fields[5] == "!"
-
-    return False
-
 def fieldsChanged(diff):
     sameType = struct.unpack("B", diff[0])
     if not sameType:
