@@ -43,7 +43,7 @@ class InstructionSets:
             frozen = " ".join((base, flags))
         else:
             frozen = base
-        return deps.deps.ThawDependency(frozen)        
+        return deps.deps.InstructionSetDependency.thawDependency(frozen)
     
     def addId(self, isd):
         cu = self.db.cursor()
