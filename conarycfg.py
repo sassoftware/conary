@@ -16,6 +16,8 @@ class SrsConfiguration:
 	    f.close()
 
     def configLine(self, line):
+	if line[0] == '#':
+	    return
 	(key, val) = line.split()
 	if not self.__dict__.has_key(key):
 	    raise KeyError, ("configuration value %s unknown" % key)
