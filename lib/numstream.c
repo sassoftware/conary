@@ -32,9 +32,9 @@
 #define VALUE(o, type) (((type##StreamObject *) (o))->val)
 
 #define NUMERICSTREAM_SET(o, val) \
-    if ((o)->ob_type == &allStreams[INT_STREAM])         \
+    if (STREAM_CHECK(o, INT_STREAM))            \
         SET(o, Int, val);                       \
-    else if ((o)->ob_type == &allStreams[SHORT_STREAM])  \
+    else if (STREAM_CHECK(o, SHORT_STREAM))     \
         SET(o, Short, val);                     \
     else                                        \
         assert(0);
@@ -84,10 +84,10 @@ static PyObject * NumericStream_Call(PyObject * self, PyObject * args,
         return Py_None;
     }
 
-    if (self->ob_type == &allStreams[INT_STREAM]) {
+    if (STREAM_CHECK(self, INT_STREAM)) {
         IntStreamObject * o = (void *) self;
         return PyInt_FromLong(o->val);
-    } else if (self->ob_type == &allStreams[SHORT_STREAM]) {
+    } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         ShortStreamObject * o = (void *) self;
         return PyInt_FromLong(o->val);
     }
@@ -104,14 +104,14 @@ static int NumericStream_Cmp(PyObject * self, PyObject * other) {
 
     if (ISNONE(self) && ISNONE(other)) {
         return 0;
-    } else if (self->ob_type == &allStreams[INT_STREAM]) {
+    } else if (STREAM_CHECK(self, INT_STREAM)) {
         if (VALUE(self, Int) == VALUE(other, Int))
             return 0;
         else if (VALUE(self, Int) < VALUE(other, Int))
             return -1;
 
         return 1;
-    } else if (self->ob_type == &allStreams[SHORT_STREAM]) {
+    } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         if (VALUE(self, Short) == VALUE(other, Short))
             return 0;
         else if (VALUE(self, Short) < VALUE(other, Short))
@@ -134,13 +134,13 @@ static PyObject * NumericStream_Diff(PyObject * self, PyObject * args) {
         return NULL;
     }
 
-    if (self->ob_type == &allStreams[INT_STREAM]) {
+    if (STREAM_CHECK(self, INT_STREAM)) {
         IntStreamObject * o1 = (void *) self;
         IntStreamObject * o2 = (void *) them;
 
         if ((o1->isNone != o2->isNone) || (o1->val != o2->val))
             return raw_IntStream_Freeze(o1);
-    } else if (self->ob_type == &allStreams[SHORT_STREAM]) {
+    } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         ShortStreamObject * o1 = (void *) self;
         ShortStreamObject * o2 = (void *) them;
 
@@ -220,9 +220,9 @@ static PyObject * NumericStream_Freeze(NumericStreamObject * self,
     if (self->isNone)
         return PyString_FromString("");
 
-    if (self->ob_type == &allStreams[INT_STREAM]) {
+    if (STREAM_CHECK(self, INT_STREAM)) {
         return raw_IntStream_Freeze((IntStreamObject *) self);
-    } else if (self->ob_type == &allStreams[SHORT_STREAM]) {
+    } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         return raw_ShortStream_Freeze((ShortStreamObject *) self);
     } else {
         PyErr_SetString(PyExc_TypeError, "invalid type");
@@ -273,10 +273,10 @@ static PyObject * NumericStream_Set(PyObject * self, PyObject * args) {
     if (!PyArg_ParseTuple(args, "i", &val))
         return NULL;
     
-    if (self->ob_type == &allStreams[INT_STREAM]) {
+    if (STREAM_CHECK(self, INT_STREAM)) {
         IntStreamObject * o = (void *) self;
         o->val = val;
-    } else if (self->ob_type == &allStreams[SHORT_STREAM]) {
+    } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         ShortStreamObject * o = (void *) self;
         o->val = val;
     } else {
@@ -292,7 +292,7 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
                                   int frozenLen) {
     self->isNone = 0;
 
-    if (self->ob_type == &allStreams[INT_STREAM]) {
+    if (STREAM_CHECK(self, INT_STREAM)) {
         IntStreamObject * o = (void *) self;
 
         if (frozenLen != 4) {
@@ -305,7 +305,7 @@ static int raw_NumericStream_Thaw(NumericStreamObject * self, char * frozen,
             o->isNone = 1;
         else
             o->val = ntohl(*((int *) frozen));
-    } else if (self->ob_type == &allStreams[SHORT_STREAM]) {
+    } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         ShortStreamObject * o = (void *) self;
 
         if (frozenLen != 2) {
@@ -355,7 +355,7 @@ static PyObject * NumericStream_Twm(PyObject * self, PyObject * args) {
         return NULL;
     }
 
-    if (self->ob_type == &allStreams[INT_STREAM]) {
+    if (STREAM_CHECK(self, INT_STREAM)) {
         IntStreamObject * o = (void *) self;
         IntStreamObject * base = (void *) other;
         int newVal = 0;
@@ -380,7 +380,7 @@ static PyObject * NumericStream_Twm(PyObject * self, PyObject * args) {
             retVal = Py_True;
         else
             retVal = Py_False;
-    } else if (self->ob_type == &allStreams[SHORT_STREAM]) {
+    } else if (STREAM_CHECK(self, SHORT_STREAM)) {
         ShortStreamObject * o = (void *) self;
         ShortStreamObject * base = (void *) other;
         int newVal = 0;
