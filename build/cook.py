@@ -406,9 +406,17 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     groupNames = recipeObj.getGroupNames()
     for groupName in groupNames:
         try:
-            recipeObj.findTroves(groupName = groupName)
+            failedDeps = recipeObj.findTroves(groupName = groupName)
         except recipe.RecipeFileError, msg:
             raise CookError(str(msg))
+
+        if failedDeps:
+            print "Group %s has unresolved dependencies:", groupName
+            for (name, depSet) in failedDeps:
+                print name
+                print "\t", "\n\t".join(str(depSet).split("\n"))
+
+            raise CookError("Dependency failure")
 
         for (name, versionFlavorList) in recipeObj.getTroveList(
                                             groupName = groupName).iteritems():

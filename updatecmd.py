@@ -98,21 +98,44 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             if info: return
             
         if info:
-            new = [ x.getName() for x in cs.iterNewPackageList() ]
-            old = [ x[0] for x in cs.getOldPackageList() ]
+            new = []
+            for x in cs.iterNewPackageList():
+                oldVersion = x.getOldVersion()
+                newVersion = x.getNewVersion()
+                if oldVersion:
+                    oldTVersion = oldVersion.trailingRevision()
+                newTVersion = newVersion.trailingRevision()
+
+                if oldVersion.branch() != newVersion.branch():
+                    kind = 'B'
+                elif oldTVersion.getVersion() != newTVersion.getVersion():
+                    kind = 'V'
+                elif oldTVersion.getSourceCount() != \
+                                            newTVersion.getSourceCount():
+                    kind = 'S'
+                else:
+                    kind = 'B'
+
+                new.append("%c %s (%s -> %s)" % 
+                                (kind, x.getName(),
+                                 oldTVersion.asString(),
+                                 newTVersion.asString()))
+
+            old = [ (x[0], x.getOldVersion().trailingVersion()) 
+                                for x in cs.getOldPackageList() ]
             if not new and not old:
                 print "No troves are affected by this update."
             
             if new:
                 print "Versions of the following troves will be updated:"
-                print "\t", "\n\t".join(new)
+                print "\t", "\n\t".join(sorted(new))
 
             if new and old:
-                print "\n"
+                print "\n",
 
             if old:
                 print "Versions of the following troves will be removed:"
-                print "\t", "\n\t".join(old)
+                print "\t", "\n\t".join(sorted(old))
 
             return
 

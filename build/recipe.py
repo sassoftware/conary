@@ -931,6 +931,7 @@ class SingleGroup:
 
         troves = repos.getTroves([ x[0] for x in troveList ], 
                                       withFiles = False)
+
         for (((name, v, f), byDefault), trove) in izip(troveList, troves):
             if trove.isRedirect():
                 raise RecipeFileError, \
@@ -952,8 +953,23 @@ class SingleGroup:
                     self.size += trove.getSize()
                 else:
                     validSize = False
+
         if not validSize:
             self.size = None
+
+        if self.depCheck:
+            troves = []
+            for name, l in self.troveVersionFlavors.iteritems():
+                troves += [ (name, (None, None),
+                              (x[0], x[1]), True ) for x in l ]
+            depCs = repos.createChangeSet(troves, recurse = True, 
+                                          withFiles = False)
+            db = database.Database(':memory:', ':memory:')
+            failedList = db.depCheck(depCs)[0]
+        else:
+            failedList = []
+
+        return failedList
 
     def getRequires(self):
         return self.requires
@@ -961,10 +977,11 @@ class SingleGroup:
     def getTroveList(self):
 	return self.troveVersionFlavors
 
-    def __init__(self):
+    def __init__(self, depCheck):
         self.addTroveList = []
         self.requires = deps.DependencySet()
 	self.troveVersionFlavors = {}
+        self.depCheck = depCheck
 
     def Requires(self, requirement):
         self.requires.addDep(deps.TroveDependencies, 
@@ -972,6 +989,7 @@ class SingleGroup:
 
 class GroupRecipe(Recipe):
     Flags = use.LocalFlags
+    depCheck = False
 
     def Requires(self, requirement, groupName = None):
         if requirement[0] == '/':
@@ -994,8 +1012,8 @@ class GroupRecipe(Recipe):
 
     def findTroves(self, groupName = None):
         if groupName is None: groupName = self.name
-        self.groups[groupName].findTroves(self.cfg, self.repos, 
-                                          self.labelPath)
+        return self.groups[groupName].findTroves(self.cfg, self.repos, 
+                                                 self.labelPath)
 
     def getRequires(self, groupName = None):
         if groupName is None: groupName = self.name
@@ -1012,12 +1030,12 @@ class GroupRecipe(Recipe):
     def setLabelPath(self, *path):
         self.labelPath = [ versions.Label(x) for x in path ]
 
-    def createGroup(self, groupName):
+    def createGroup(self, groupName, depCheck = False):
         if self.groups.has_key(groupName):
             raise RecipeFileError, 'group %s was already created' % groupName
         if not groupName.startswith('group-'):
             raise RecipeFileError, 'group names must start with "group-"'
-        self.groups[groupName] = SingleGroup()
+        self.groups[groupName] = SingleGroup(depCheck)
 
     def getGroupNames(self):
         return self.groups.keys()
@@ -1030,7 +1048,7 @@ class GroupRecipe(Recipe):
         self.macros = macros.Macros()
         self.macros.update(extraMacros)
         self.groups = {}
-        self.groups[self.name] = SingleGroup()
+        self.groups[self.name] = SingleGroup(self.depCheck)
 
 class RedirectRecipe(Recipe):
     Flags = use.LocalFlags

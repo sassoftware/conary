@@ -1,4 +1,6 @@
 Changes in 0.50.8:
+  * sort update --info alphabetically, display old versions, and display
+    a letter summarizing the type of change
   * NormalizeInterpreterPaths() policy now looks in the package currently
     being built, as well as on the installed system, to determine how to
     resolve #!/usr/bin/env scripts.
@@ -6,6 +8,7 @@ Changes in 0.50.8:
     well as a single group name.
   * --no-recurse works on the erase path
   * fix to walkTroveSet (which was horribly broken)
+  * enable (optional) dependency checking when building groups
 
 Changes in 0.50.7:
   * Added the XInetdService action to avoid having to include
