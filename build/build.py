@@ -425,8 +425,11 @@ class Desktopfile(BuildCommand, _FileAction):
 	if not Use.desktop or not self.use:
 	    return
 	macros = recipe.macros.copy()
+        # XXX why is the keyword "categories"?
         if self.categories:
 	    macros['category'] = '--add-category "%s"' %self.categories
+        else:
+            macros['category'] = ''
 	self.do(macros)
 	for file in self.arglist:
 	    self.setComponents('%(datadir)s/applications'+file)
