@@ -31,8 +31,22 @@ class BuildInfo(dict):
 	lines = self.__fd.readlines()
 	self.__fd.close()
 	for line in lines:
+	    if line == '\n':
+		continue
 	    (key, value) = line.split(None, 1)
-	    self.__dict__[key] = value[:-1] 
+	    #handle macros.foo 
+	    keys = key.split('.')
+	    if len(keys) > 1:
+		subdicts = keys[:-1]
+		key = keys[-1]
+		curdict = self.__dict__
+		for subdict in subdicts:
+		    if subdict not in curdict:
+			curdict[subdict] = {}
+		    curdict = curdict[subdict]
+		curdict[key] = value[:-1] 
+	    else:
+		self.__dict__[key] = value[:-1] 
 
     def begin(self):
 	self.__fd = open(self.__infofile, "w")

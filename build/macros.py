@@ -18,9 +18,12 @@ Module implementing the "macro" dictionary class
 
 class Macros(dict):
     def __init__(self, macros={}, shadow=False):
+	self.__tracked = {}
+	self.__track = False
 	if shadow:
 	    self.__macros = macros
 	else:
+	    self.__macros = {}
 	    self.update(macros)
 
     def update(self, other):
@@ -31,6 +34,8 @@ class Macros(dict):
 	if name[:7] == '_Macros':
 	    dict.__setitem__(self, name, value)
 	    return
+	if self.__track:
+	    self.__tracked[name] = 1 
         # only expand references to ourself
         d = {name: self.get(name)}
         # escape any macros in the new value
@@ -58,6 +63,12 @@ class Macros(dict):
     
     def __getattr__(self, name):
 	return self.__getitem__(name)
+
+    def trackChanges(self, flag=True):
+	self.__track = flag
+
+    def getTrackedChanges(self):
+	return self.__tracked.keys()
     
     def copy(self, shadow=True):
 	# shadow saves initial copying cost for a higher search cost
