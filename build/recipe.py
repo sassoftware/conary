@@ -463,6 +463,7 @@ class PackageRecipe(Recipe):
 	util.mkdirChain(builddir)
 
 	for (filename, filetype, targetdir, use, args) in self._sources:
+	    targetdir = targetdir %self.macros
 
 	    if use != None:
 		if type(use) is not tuple:
