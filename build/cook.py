@@ -208,6 +208,13 @@ def cookObject(repos, cfg, recipeClass, buildLabel, changeSetFile = None,
 	buildBranch = ver.branch()
 	del ver
 
+    if buildBranch:
+        macros['buildbranch'] = buildBranch.asString()
+        macros['buildlabel'] = buildBranch.asString().split('/')[-1]
+    else:
+        macros['buildbranch'] = buildLabel.asString()
+        macros['buildlabel'] = buildLabel.asString()
+
     if issubclass(recipeClass, recipe.PackageRecipe):
 	ret = cookPackageObject(repos, cfg, recipeClass, buildBranch,
                                 prep = prep, macros = macros,

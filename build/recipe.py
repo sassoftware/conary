@@ -83,6 +83,8 @@ baseMacros = {
     'os'		: 'linux',
     'target'		: 'i386-unknown-linux',
     'strip'		: 'strip',
+    'buildbranch'       : '',
+    'buildlabel'        : '',
 }
 
 crossMacros = {
