@@ -35,6 +35,8 @@ class Epdb(pdb.Pdb):
     # epdb will print to here instead of to sys.stdout,
     # and restore stdout when done
     __old_stdout = None
+    # used to track the number of times a set_trace has been seen
+    trace_counts = {}
 
     def __init__(self):
         self._exc_type = None
@@ -222,6 +224,68 @@ class Epdb(pdb.Pdb):
                 self.fncache[filename] = canonic
         return canonic
 
+    def reset_trace_count(klass, marker='default'):
+        tc = klass.trace_counts
+        try:
+            tc[marker][1] = 0
+        except KeyError:
+            pass
+    reset_trace_count = classmethod(reset_trace_count)
+
+    def set_trace_cond(klass, cond=None, marker='default'):
+        """ Sets a condition for set_trace statements that have the 
+            specified marker.  A condition can either callable, in
+            which case it should take one argument, which is the 
+            number of times set_trace(marker) has been called,
+            or it can be a number, in which case the break will
+            only be called.
+        """
+        tc = klass.trace_counts
+        try:
+            curVals = tc[marker]
+        except KeyError:
+            curVals = [ None, 0 ]
+        curVals[0] = cond
+        tc[marker] = curVals
+    set_trace_cond = classmethod(set_trace_cond)
+
+    def set_trace(self, marker='default', skip=0):
+        tc = Epdb.trace_counts
+        try:
+            (cond, curCount) = tc[marker]
+            curCount += 1
+        except KeyError:
+            (cond, curCount) = None, 1
+        if cond is None:
+            rv = True
+        else:
+            try:
+                rv = cond(curCount)
+            except TypeError:
+                # assume that if the condition 
+                # is not callable, it is an 
+                # integer above which we are 
+                # supposed to break
+                rv = curCount >= cond
+        if rv:
+            if marker != 'default':
+                self.prompt = '(Epdb [%s]) ' % marker
+            self._set_trace(skip=skip+1)
+        tc[marker] = [cond, curCount]
+
+    def _set_trace(self, skip=0):
+        """Start debugging from here."""
+        frame = sys._getframe().f_back
+        # go up the specified number of frames
+        for i in range(0,skip):
+            frame = frame.f_back
+        self.reset()
+        while frame:
+            frame.f_trace = self.trace_dispatch
+            self.botframe = frame
+            frame = frame.f_back
+        self.set_step()
+        sys.settrace(self.trace_dispatch)
 
     # bdb hooks
     def user_call(self, frame, argument_list):
@@ -248,7 +312,6 @@ class Epdb(pdb.Pdb):
         pdb.Pdb.user_exception(self, frame, exc_info)
 
 
-    
     def complete(self, text, state):
         if hasReadline:
             # from cmd.py, override completion to match on local variables
@@ -272,8 +335,29 @@ def beingTraced():
         frame = frame.f_back
     return False
 
-def set_trace():
-    Epdb().set_trace()
+def set_trace_cond(cond=None, marker='default'):
+    """ Sets a condition for set_trace statements that have the 
+        specified marker.  A condition can either callable, in
+        which case it should take one argument, which is the 
+        number of times set_trace(marker) has been called,
+        or it can be a number, in which case the break will
+        only be called.
+    """
+    Epdb.set_trace_cond(cond, marker)
+
+def reset_trace_count(marker='default'):
+    """ Resets the number a set_trace for a marker has been 
+        seen to 0. """
+    Epdb.reset_trace_count(marker)
+
+def set_trace(marker='default'):
+    """ Starts the debugger at the current location.  Takes an
+        optional argument 'marker' (default 'default'), that 
+        can be used with the set_trace_cond function to support 
+        turning on and off tracepoints based on conditionals
+    """
+
+    Epdb().set_trace(marker=marker, skip=1)
 
 def post_mortem(t, exc_type=None, exc_msg=None):
     p = Epdb()
