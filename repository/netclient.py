@@ -319,5 +319,5 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	r = c.getresponse()
 	assert(r.status == 200)
 
-    def __init__(self, repMap, server):
+    def __init__(self, repMap):
 	self.c = ServerCache(repMap)

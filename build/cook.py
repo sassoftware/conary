@@ -516,7 +516,7 @@ class CookError(Exception):
 
 def cookCommand(cfg, args, prep, macros, buildBranch = None):
     # this ensures the repository exists
-    repos = helper.openRepository(cfg.repositoryMap, cfg.repPath)
+    repos = helper.openRepository(cfg.repositoryMap)
 
     for item in args:
         # we want to fork here to isolate changes the recipe might make

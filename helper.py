@@ -11,8 +11,8 @@ import repository
 import repository.netclient
 import versions
 
-def openRepository(repMap, path):
-    repos = repository.netclient.NetworkRepositoryClient(repMap, path)
+def openRepository(repMap):
+    repos = repository.netclient.NetworkRepositoryClient(repMap)
 
     return repos
 
