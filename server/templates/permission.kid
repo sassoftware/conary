@@ -4,13 +4,13 @@ from templates import library
 ?>
 
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:py="http://naeblis.cx/ns/kid#">
-    <!-- creates a selection dropdown based on a dict, optionally adding an ALL
-         option at the top of the list. items = {value: "text"} -->
+    <!-- creates a selection dropdown based on a list, optionally adding an ALL
+         option at the top of the list. -->
     <select py:def="makeSelect(elementName, items, all = False)"
             name="{elementName}">
         <option py:if="all" value="">ALL</option>
-        <option py:for="value, text in sorted(items.items(), cmp=lambda x, y: cmp(x[1], y[1]))"
-                py:content="text" value="{value}"/>
+        <option py:for="value in sorted(items)"
+                py:content="value" value="{value}"/>
     </select>
 
     {library.html_header(pageTitle)}
@@ -29,7 +29,7 @@ from templates import library
                 </tr>
                 <tr>
                     <td id="header">Trove:</td>
-                    <td py:content="makeSelect('item', items, all = True)"/>
+                    <td py:content="makeSelect('trove', troves, all = True)"/>
                 </tr>
                 <tr>
                     <td id="header" rowspan="3">Options</td>

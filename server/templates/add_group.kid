@@ -10,7 +10,10 @@ from templates import library
 
         <form method="post" action="addGroup">
             <table class="add-form">
-                <tr><td id="header">Group Name:</td><td><input type="text" name="userGroupName"/></td></tr>
+                <tr>
+                    <td id="header">Group Name:</td>
+                    <td><input type="text" name="userGroupName"/></td>
+                </tr>
                 <tr>
                     <td id="header">Initial Users:</td>
                     <td>

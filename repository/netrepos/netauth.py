@@ -245,14 +245,6 @@ class NetworkAuthorization:
         for row in cu:
             yield row
 
-    def addPermission(self, userGroupId,
-                      labelId = None, itemId = None,
-                      write = False, capped = False, admin = False):
-        cu = self.db.cursor()
-        cu.execute("INSERT INTO Permissions VALUES(?, ?, ?, ?, ?, ?)",
-                   userGroupId, labelId, itemId, write, capped, admin)
-        self.db.commit()
-
     def addGroup(self, userGroupName):
         cu = self.db.cursor()
     

@@ -212,30 +212,29 @@ class HttpHandler:
         self.kid_write("user_admin", netAuth = self.repServer.auth)
 
     def addPermForm(self, authToken, fields):
-        groups = dict(self.repServer.auth.iterGroups())
-        labels = dict(self.repServer.auth.iterLabels())
-        items = dict(self.repServer.auth.iterItems())
+        groups = (x[1] for x in self.repServer.auth.iterGroups())
+        labels = (x[1] for x in self.repServer.auth.iterLabels())
+        troves = (x[1] for x in self.repServer.auth.iterItems())
     
-        self.kid_write("permission", groups=groups, labels=labels, items=items)
+        self.kid_write("permission", groups=groups, labels=labels, troves=troves)
 
     def addPerm(self, authToken, fields):
-        groupId = str(fields.getfirst("group", ""))
-        labelId = str(fields.getfirst("label", ""))
-        itemId = str(fields.getfirst("item", ""))
+        group = str(fields.getfirst("group", ""))
+        label = str(fields.getfirst("label", ""))
+        trove = str(fields.getfirst("trove", ""))
 
         write = bool(fields.getfirst("write", False))
         capped = bool(fields.getfirst("capped", False))
         admin = bool(fields.getfirst("admin", False))
 
-        self.repServer.auth.addPermission(groupId, labelId, itemId,
-                                          write, capped, admin)
+        self.repServer.auth.addAcl(group, trove, label,
+                                   write, capped, admin)
         self.kid_write("notice", message = "Permission successfully added.",
                                  link = "User Administration",
                                  url = "userlist")
    
     def addGroupForm(self, authToken, fields):
         users = dict(self.repServer.auth.iterUsers())
-    
         self.kid_write("add_group", users = users)
    
     def addGroup(self, authToken, fields):
@@ -243,7 +242,6 @@ class HttpHandler:
         initialUserIds = fields.getlist("initialUserIds")
 
         newGroupId = self.repServer.auth.addGroup(groupName)
-
         for userId in initialUserIds:
             self.repServer.auth.addGroupMember(newGroupId, userId)
 
