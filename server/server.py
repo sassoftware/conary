@@ -127,7 +127,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             return [ (x[0], x[1], self.fromVersion(x[2]), self.fromFile(x[3]))
                      for x in gen ]
         else:
-            return [ (x[0], x[1], self.toVersion(x[2])) for x in gen ]
+            return [ (x[0], x[1], self.fromVersion(x[2])) for x in gen ]
 
     def getAllTroveLeafs(self, troveNames):
 	d = {}
