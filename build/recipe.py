@@ -895,11 +895,13 @@ class SingleGroup:
         assert(flavor is None or isinstance(flavor, str))
 
         if flavor is not None:
-            flavor = deps.parseFlavor(flavor)
-            if flavor is None:
-                raise ValueError, 'invalid flavor'
+            flavorObj = deps.parseFlavor(flavor)
+            if flavorObj is None:
+                raise ValueError, 'invalid flavor: %s' % flavor
+        else:
+            flavorObj = None
 
-        self.addTroveList.append((name, versionStr, flavor, source, byDefault))
+        self.addTroveList.append((name, versionStr, flavorObj, source, byDefault))
 
     def findTroves(self, cfg, repos, labelPath):
         self.size = 0
