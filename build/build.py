@@ -5,35 +5,53 @@
 import os
 import shutil
 import util
+import string
 
-class ManualConfigure:
+class ShellCommand:
+    def __init__(self, *args, **keywords):
+        # initialize initialize our keywords to the defaults
+        self.__dict__.update(self.keywords)
+        # check to make sure that we don't get a keyword we don't expect
+        for key in keywords.keys():
+            if key not in self.keywords.keys():
+                raise TypeError, ("%s.__init__() got an unexpected keyword argument "
+                                  "'%s'" % (self.__class__.__name__, key))
+        # copy the keywords into our dict, overwriting the defaults
+        self.__dict__.update(keywords)
+        self.args = string.join(args)
+        # pre-fill in the preMake and arguments
+        self.command = self.template % self.__dict__
 
+    def execute(self, command):
+        print '+', command
+        os.system(command)
+
+class Configure(ShellCommand):
+    template = ('cd %%s; %(preConfigure)s ./configure --prefix=/usr '
+                '--sysconfdir=/etc %(extraFlags)s')
+    keywords = {'preConfigure': '',
+                'extraFlags': ''}
+    
     def doBuild(self, dir):
-	os.system("cd %s; ./configure %s" % (dir, self.extraflags))
+        self.execute(self.command % dir)
 
-    def __init__(self, extraflags=""):
-        self.extraflags = extraflags
+class ManualConfigure(Configure):
+    template = 'cd %%s; %(preConfigure)s ./configure %(extraFlags)s'
 
-class Configure:
-
+class Make(ShellCommand):
+    template = 'cd %%s; %(preMake)s make %(args)s'
+    keywords = {'preMake': ''}
+    
     def doBuild(self, dir):
-	os.system("cd %s; ./configure --prefix=/usr --sysconfdir=/etc %s" % (dir, self.extraflags))
+        self.execute(self.command % (dir))
 
-    def __init__(self, extraflags=""):
-        self.extraflags = extraflags
-
-class Make:
-
-    def doBuild(self, dir):
-	os.system("cd %s; make" % dir)
-
-class MakeInstall:
+class MakeInstall(ShellCommand):
+    template = "cd %%s; %(preMake)s make %(rootVar)s=%%s install %(args)s"
+    keywords = {'rootVar': 'DESTDIR',
+                'preMake': ''}
 
     def doInstall(self, dir, root):
-	os.system("cd %s; make %s=%s install" % (dir, self.rootVar, root))
-
-    def __init__(self, rootVar = "DESTDIR"):
-	self.rootVar = rootVar
+	self.execute(self.command % (dir, root))
 
 class InstallFile:
 
