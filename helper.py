@@ -150,6 +150,8 @@ def fullBranchName(defaultNick, version, versionStr):
 	    (versionStr.find("/") == -1) and versionStr.count("@")):
 	if not versionStr:
 	    nick = defaultNick
+	elif versionStr[0] == "@":
+	    nick = versions.BranchName(defaultNick.getHost() + versionStr)
 	else:
 	    nick = versions.BranchName(versionStr)
 
