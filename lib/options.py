@@ -11,7 +11,7 @@ import sys
 # 1 - arg may occur once, w/ parameter
 # 2 - arg may occur N times, w/ parameter
 
-def processArgs(argDef, cfgMap):
+def processArgs(argDef, cfgMap, cfg, usage):
     otherArgs = [ sys.argv[0] ]
     argSet = {}
 

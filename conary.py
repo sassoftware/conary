@@ -130,7 +130,7 @@ def realMain():
 
     argDef.update(srcctl.argDef)
 
-    argSet, otherArgs = options.processArgs(argDef, cfgMap)
+    argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage)
 
     profile = False
     if argSet.has_key('profile'):
