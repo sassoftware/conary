@@ -113,7 +113,9 @@ class Automake(BuildCommand):
     def do(self, macros):
 	macros = macros.copy()
         if self.m4Dir:
-	    macros.update({'m4DirArgs': '-I %s' %(self.m4Dir)})
+	    macros.m4DirArgs = '-I %s' %(self.m4Dir)
+	else:
+	    macros.m4DirArgs = ''
         util.execute(self.command %macros)
 
 
@@ -174,15 +176,15 @@ class Configure(BuildCommand):
 	macros = macros.copy()
         if self.objDir:
 	    objDir = self.objDir %macros
-            macros['mkObjdir'] = 'mkdir -p %s; cd %s;' %(objDir, objDir)
-	    macros['configure'] = '../%s' % self.configureName
+            macros.mkObjdir = 'mkdir -p %s; cd %s;' %(objDir, objDir)
+	    macros.configure = '../%s' % self.configureName
         else:
-            macros['mkObjdir'] = ''
-            macros['configure'] = './%s' % self.configureName
+            macros.mkObjdir = ''
+            macros.configure = './%s' % self.configureName
 	if self.subDir:
-	    macros['subDir'] = self.subDir
+	    macros.subDir = self.subDir
 	else:
-	    macros['subDir'] = ''
+	    macros.subDir = ''
         util.execute(self.command %macros)
 
 class ManualConfigure(Configure):
