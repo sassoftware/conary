@@ -391,9 +391,31 @@ class Epdb(pdb.Pdb):
         locals = self.curframe.f_locals
         globals = self.curframe.f_globals
         try:
+            docloc = None
             result = eval(arg + '\n', globals, locals) 
             if hasattr(result, '__doc__'):
-                print "\"\"\"%s\"\"\"" % result.__doc__
+                if result.__doc__ is not None:
+                    docstr = result.__doc__
+                elif inspect.ismethod(result):
+                    bases = inspect.getmro(result.im_class)
+                    found = False
+                    for base in bases:
+                        if hasattr(base, result.__name__):
+                            baseres = getattr(base, result.__name__)
+                            if (hasattr(baseres, '__doc__')
+                                and baseres.__doc__ is not None):
+                                docloc = baseres
+                                docstr = baseres.__doc__
+                                found = True
+                                break
+                    if not found:
+                        docstr = None
+                else:
+                    docstr = None
+                print "\"\"\"%s\"\"\"" % docstr
+                if docloc:
+                    print "(Found doc in %s)" % docloc
+                
             if inspect.isclass(result):
                 if hasattr(result, '__init__'):
                     self.do_define(arg + '.__init__')
