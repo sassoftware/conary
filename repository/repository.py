@@ -10,11 +10,12 @@ import package
 import files
 import datastore
 import os
+import versioned
 
 class Repository:
 
-    def getPackageSet(self, pkgName, mode = "r"):
-	return package.PackageSet(self.pkgDB, pkgName, mode)
+    def getPackageSet(self, pkgName, mode = 0):
+	return package.PackageSet(self.pkgDB, pkgName)
 
     def getFileDB(self, fileId):
 	return files.FileDB(self.fileDB, fileId)
@@ -36,26 +37,24 @@ class Repository:
 	return self.contentsStore.hasFile(fileId)
 
     def getPackageList(self, groupName = ""):
-	if not os.path.exists(self.pkgDB + groupName):
-	    return []
-	elif os.path.isfile(self.pkgDB + groupName):
+	if self.pkgDB.hasFile(groupName):
 	    return [ groupName ]
-	else:
-	    return self.recurPackageList(self.pkgDB, groupName)
 
-    def hasPackage(self, pkg):
-	return os.path.exists(self.pkgDB + pkg)
-	
-    def recurPackageList(self, root, path):
+	allPackages = self.pkgDB.fileList()
 	list = []
-	for file in os.listdir(root + path):
-	    if os.path.isdir(root + path + "/" + file):
-		list = list + self.recurPackageList(root, path + "/" + file)
-	    else:
-		list.append(path + "/" + file)
+	groupName = groupName + "/"
+
+	for pkgName in allPackages:
+	    if pkgName.startswith(groupName):
+		list.append(pkgName)
+
+	list.sort()
 
 	return list
 
+    def hasPackage(self, pkg):
+	return package.packageSetExists(self.pkgDB, pkg)
+	
     def storeFileFromChangeset(self, chgSet, file, pathToFile):
 	if isinstance(file, files.RegularFile):
 	    f = chgSet.getFileContents(file.sha1())
@@ -64,12 +63,13 @@ class Repository:
 
     def __init__(self, path):
 	self.top = path
-
-	self.pkgDB = self.top + "/pkgs"
-	self.fileDB = self.top + "/files"
+	
 	self.contentsDB = self.top + "/contents"
+	util.mkdirChain(self.contentsDB)
 
-	util.mkdirChain(self.pkgDB, self.fileDB, self.contentsDB)
+	# FIXME this needs some locking
+	self.pkgDB = versioned.FileIndexedDatabase(self.top + "/pkgs.db")
+	self.fileDB = versioned.Database(self.top + "/files.db")
 
 	self.contentsStore = datastore.DataStore(self.contentsDB)
 

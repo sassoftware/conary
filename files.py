@@ -377,22 +377,14 @@ class FileDB:
 	self.f.eraseVersion(version)
 
     def close(self):
-	if self.f:
-	    self.f.close()
-	    self.f = None
+	self.f = None
 
     def __del__(self):
 	self.close()
 
-    def __init__(self, dbpath, fileId):
+    def __init__(self, db, fileId):
+	self.f = db.openFile(fileId)
 	self.fileId = fileId
-	store = DataStore(dbpath)
-	if store.hasFile(fileId):
-	    f = store.openFile(fileId, "r+")
-	else:
-	    f = store.newFile(fileId)
-
-	self.f = versioned.open(f)
 
 def FileFromFilesystem(path, fileId, type = None):
     s = os.lstat(path)

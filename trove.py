@@ -286,21 +286,11 @@ class PackageSet:
 	self.f = None
 
     def __del__(self):
-	if self.f: self.close()
+	self.f = None
 
-    def __init__(self, dbpath, name, mode = "r"):
+    def __init__(self, db, name):
 	self.name = name
-	self.pkgPath = dbpath + self.name
-	self.packages = {}
-
-	util.mkdirChain(os.path.dirname(self.pkgPath))
-
-	if mode == "r":
-	    self.f = versioned.open(self.pkgPath, "r")
-	elif os.path.exists(self.pkgPath):
-	    self.f = versioned.open(self.pkgPath, "r+")
-	else:
-	    self.f = versioned.open(self.pkgPath, "w+")
+	self.f = db.openFile(name)
 
 #----------------------------------------------------------------------------
 
@@ -436,3 +426,6 @@ def autoVisit(arg, dir, files):
 			specSet.add(path, autospec, expspec)
 			break
 		break
+
+def packageSetExists(db, pkg):
+    return db.hasFile(pkg)
