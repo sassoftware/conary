@@ -144,6 +144,8 @@ class Flag(dict):
         if self._frozen:
             raise TypeError, 'flags are frozen'
         if name in self:
+            if name in self._overrides:
+                return
             self[name]._set(value)
         else:
             self[name] = Flag(value)
