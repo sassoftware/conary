@@ -242,7 +242,6 @@ class ConaryClient:
         cs = changeset.MergeableChangeSet()
         for (how, what) in theCs.contents:
             if how == self.repos.createChangeSet:
-                print "WHAT", what
                 newCs = self.repos.createChangeSet(what)
                 cs.merge(newCs)
             else:
