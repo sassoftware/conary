@@ -118,6 +118,10 @@ class RecipeLoader:
         if filename[0] != "/":
             raise IOError, "recipe file names must be absolute paths"
 
+        if component:
+            pkgname = component.split(':')[0]
+        else:
+            pkgname = filename.split('/')[-1].split('.')[0]
         basename = os.path.basename(filename)
         self.file = basename.replace('.', '-')
         self.module = imp.new_module(self.file)
@@ -144,12 +148,16 @@ class RecipeLoader:
             raise RecipeFileError(msg)
         # We need to track Use flags that might be mentioned only
         # outside of the setup() function.  
+        if cfg is not None:
+            use.overrideFlags(cfg, pkgname)
         use.resetUsed()
         use.LocalFlags._thaw()
         use.track(True)
         exec code in self.module.__dict__
         use.track(False)
         use.LocalFlags._freeze()
+        if cfg is not None:
+            use.clearOverrides(cfg, pkgname)
 
         # all recipes that could be loaded by loadRecipe are loaded;
         # get rid of our references to cfg and repos
@@ -202,6 +210,11 @@ class RecipeLoader:
                     raise RecipeFileError(
                         "Version string %s has illegal '-' character"
                         %obj.version)
+                if obj.name != pkgname:
+                    raise RecipeFileError(
+                        "Recipe object name '%s' does not match "
+                        "file/component name '%s'"
+                        % (obj.name, pkgname))
                 found = True
 
     def allRecipes(self):
@@ -284,7 +297,7 @@ def loadRecipe(file, sourcecomponent=None, label=None):
         recipepath = os.path.dirname(callerGlobals['filename'])
         localfile = recipepath + '/' + file
     try:
-        loader = RecipeLoader(localfile)
+        loader = RecipeLoader(localfile, cfg)
     except IOError, err:
         if err.errno == errno.ENOENT:
             loader = recipeLoaderFromSourceComponent(sourcecomponent, file, 

@@ -119,6 +119,9 @@ class Flag(dict):
                 track=self._track)
 	self._overrides[key] = bool(value)
 
+    def _clearOverrides(self):
+        self._overrides = {}
+
     def __delattr__(self, key):
         """ Remove a flag from this flag set """
         if self._frozen:
@@ -700,3 +703,12 @@ def overrideFlags(config, pkgname):
     prefix = 'Flags.%s.' % pkgname
     for key in config.pkgKeys(pkgname):
 	LocalFlags._override(key, config[prefix + key])
+
+def clearOverrides(config, pkgname):
+    Use._clearOverrides()
+    Arch._clearOverrides()
+    for majarch in Arch.keys():
+        Arch[majarch]._clearOverrides()
+    LocalFlags._clearOverrides()
+    for key in LocalFlags.keys():
+        LocalFlags[key]._clearOverrides()
