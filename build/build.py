@@ -288,15 +288,16 @@ class InstallSymlinks(BuildAction):
 	if type(self.fromFiles) is str:
 	    if self.toFile.endswith('/'):
 		dest = dest + os.path.basename(self.fromFiles)
-	    print '+ creating symlink from %s to %s' %(dest, self.fromFiles)
+            source = self.fromFiles %macros
+	    print '+ creating symlink %s -> %s' %(dest, source)
 	    if os.path.exists(dest) or os.path.islink(dest):
 		os.remove(dest)
-	    os.symlink(self.fromFiles %macros, dest)
+	    os.symlink(source, dest)
 	    return
 
 	for source in sources:
-	    print '+ creating symlink from %s to %s' %(dest, source)
-	    dest = dest+os.path.basename(source)
+	    dest = macros['destdir'] + (self.toFile + os.path.basename(source)) %macros 
+	    print '+ creating symlink %s -> %s' %(dest, source)
 	    if os.path.exists(dest) or os.path.islink(dest):
 		os.remove(dest)
 	    os.symlink(source, dest)
