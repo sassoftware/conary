@@ -985,10 +985,11 @@ class _userData(policy.Policy):
 
 class User(_userData):
     """
-    Provides information to use if Conary needs to create a user::
+    Provides information to use if Conary needs to create a user:
     C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}',
                groupid=I{preferred_gid}, homedir='I{/home/dir}',
                comment='I{comment}', shell='I{/path/to/shell}')}
+
     The defaults are::
       - C{group}: same name as the user
       - C{groupid}: same id as the user
