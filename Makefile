@@ -48,7 +48,7 @@ python_files = __init__.py	\
 	xmlshims.py
 
 example_files = examples/tmpwatch.recipe
-bin_files = conary conary-bootstrap
+bin_files = conary
 extra_files = conary-wrapper.in Makefile Make.rules
 dist_files = $(python_files) $(example_files) $(bin_files) $(extra_files)
 
@@ -89,26 +89,5 @@ dist: $(dist_files)
 clean: clean-subdirs default-clean
 	rm -f _sqlite.so
 	rm -rf sqlite
-
-bootstrap:
-	@if ! [ -d /opt/ -a -w /opt/ ]; then \
-		echo "/opt isn't writable, this won't work"; \
-		exit 1; \
-	fi
-	time $(PYTHON) ./conary-bootstrap --bootstrap group-bootstrap
-
-bootstrap-continue:
-	@if ! [ -d /opt/ -a -w /opt/ ]; then \
-		echo "/opt isn't writable, this won't work"; \
-		exit 1; \
-	fi
-	time $(PYTHON) ./conary-bootstrap --bootstrap --onlyunbuilt group-bootstrap
-
-
-deps.dot:
-	$(PYTHON) ./conary-bootstrap --dot `find ../recipes/ -name "cross*.recipe" -o -name "bootstrap*.recipe"` > deps.dot
-
-pychecker:
-	$(PYTHON) /usr/lib/python2.2/site-packages/pychecker/checker.py *.py
 
 include Make.rules
