@@ -858,9 +858,9 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         if self.getNewFlavor():
             depformat('New Flavor', self.getNewFlavor(), f)
 
-	for (pathId, path, version) in self.newFiles:
+	for (pathId, path, fileId, version) in self.newFiles:
 	    #f.write("\tadded (%s(.*)%s)\n" % (pathId[:6], pathId[-6:]))
-            change = changeSet.getFileChange(pathId)
+            change = changeSet.getFileChange(None, fileId)
             fileobj = files.ThawFile(change, pathId)
             
 	    if isinstance(fileobj, files.SymbolicLink):
