@@ -318,10 +318,8 @@ class FilesystemJob:
 	         not fsFile.partialEquality(headFile, ignoreOwnerGroup = noIds):
 		# something has changed for the file
 		if flags & MERGE:
-		    # XXX X for all we know, headChanges is empty!
 		    conflicts = fsFile.twm(headChanges, baseFile, 
 					   skip = "contents")
-		    # XXX X what if just the contents changed?
 		    if not conflicts:
 			attributesChanged = True
 		    else:
