@@ -179,11 +179,9 @@ def checkout(repos, cfg, dir, name, versionStr = None):
 def _buildChangeSet(repos, state, srcPkg):
     """
     Builds a change set against the sources in the current directory and
-    builds an in-core state object as if these changes were committed. If
-    no version is passed, the changeset is against the head of the
-    working branch. The return is a tuple with a boolean saying if
-    anything changes, the new state, the changeset, and the package which
-    was diff'd against.
+    builds an in-core package object reflecting those local changes.
+    The return is a tuple with a boolean saying if anything changes, the
+    new state, the changeset, and the new package object.
 
     @param repos: Repository this directory is against.
     @type repos: repository.Repository
@@ -268,7 +266,7 @@ def _buildChangeSet(repos, state, srcPkg):
     else:
 	foundDifference = 0
 
-    return (foundDifference, newState, changeSet, srcPkg)
+    return (foundDifference, newState, changeSet)
 
 def commit(repos):
     state = SourceStateFromFile("SRS")
@@ -295,7 +293,7 @@ def commit(repos):
     result = _buildChangeSet(repos, state, srcPkg)
     if not result: return
 
-    (isDifferent, newState, changeSet, oldPackage) = result
+    (isDifferent, newState, changeSet) = result
 
     if not isDifferent:
 	log.info("no changes have been made to commit")
@@ -315,14 +313,19 @@ def diff(repos, versionStr = None):
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return
 
-	srcPkg = pkgList[0]
+	oldPackage = pkgList[0]
     else:
-	srcPkg = repos.getLatestPackage(state.getName())
+	oldPackage = repos.getPackageVersion(state.getName(), 
+					     state.getVersion())
 
-    result = _buildChangeSet(repos, state, srcPkg)
+    # update the version to one w/ a timestamp
+    oldPackage.changeVersion(repos.pkgGetFullVersion(state.getName(), 
+			     oldPackage.getVersion()))
+
+    result = _buildChangeSet(repos, state, oldPackage)
     if not result: return
 
-    (changed, newState, changeSet, oldPackage) = result
+    (changed, newState, changeSet) = result
     if not changed: return
 
     packageChanges = changeSet.getNewPackageList()
