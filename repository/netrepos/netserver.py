@@ -23,17 +23,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     # 2. netserver.InsufficientPermission
 
     def callWrapper(self, method, authToken, args):
+	print method, args
 	try:
 	    r = self.__class__.__dict__[method](self, authToken, *args)
 	    return (False, r)
 	except repository.TroveMissing, e:
 	    if not e.troveName:
 		return (True, ("TroveMissing", "", ""))
-	    elif not e.troveVersion:
+	    elif not e.version:
 		return (True, ("TroveMissing", e.troveName, ""))
 	    else:
 		return (True, ("TroveMissing", e.troveName, 
-			self.fromVersion(e.troveVersion)))
+			self.fromVersion(e.version)))
 	except repository.CommitError, e:
 	    return (True, ("CommitError", str(e)))
 	except:
