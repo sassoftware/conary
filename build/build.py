@@ -374,7 +374,7 @@ class _PutFiles(_FileAction):
 	    sources = (self.source + fromFile) %macros
 	    sourcelist = util.braceGlob(sources)
 	    if not os.path.isdir(dest) and len(sourcelist) > 1:
-		raise TypeError, 'multiple files specified, but destination "%s" is not a directory'
+		raise TypeError, 'multiple files specified, but destination "%s" is not a directory' %dest
 	    for source in sourcelist:
 		thisdest = dest
                 if os.path.isdir(dest):
