@@ -22,6 +22,13 @@ class SrsConfiguration:
 
 	self.__dict__[key] = val
 
+	if key == "defaultbranch":
+	    self.defaultbranch = versions.VersionFromString(self.defaultbranch)
+
+	    if self.defaultbranch.isVersion():
+		sys.stderr.write("The configured default branch %s specifies " +
+		     "version, not a branch.\n" % self.defaultbranch.asString())
+
     def display(self):
 	keys = self.__dict__.keys()
 	keys.sort()
@@ -40,15 +47,7 @@ class SrsConfiguration:
 	self.defaultbranch = None
 	self.lookaside = "/var/cache/srs"
 	self.dbpath = "/var/lib/srsdb"
+	self.defaultbranch = versions.VersionFromString("/localhost@local")
 
 	self.read("/etc/srsrc")
 	self.read(os.environ["HOME"] + "/" + ".srsrc")
-
-	if self.defaultbranch:
-	    self.defaultbranch = versions.VersionFromString(self.defaultbranch)
-	else:
-	    self.defaultbranch = versions.VersionFromString("/localhost@local")
-
-	if self.defaultbranch.isVersion():
-	    sys.stderr.write("The configured default branch %s specifies " +
-		 "version, not a branch.\n" % self.defaultbranch.asString())
