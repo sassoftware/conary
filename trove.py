@@ -388,7 +388,7 @@ class Trove:
 
 		# first check for matches which are a superset of the old
 		# flavor, then for ones which are a subset of the old flavor
-		for oldFlavor in removed[name].keys():
+		for oldFlavor in removed.get(name, {}).keys():
 		    if not oldFlavor:
 			continue
 
