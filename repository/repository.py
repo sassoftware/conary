@@ -650,7 +650,7 @@ class ChangeSetJob:
 
 		# we already have the contents of this file... we can go
 		# ahead and restore it reusing those contents
-                # XXX this breaks filecontainer test
+       # XXX commenting this out breaks filesets
 #		if repos._hasFileContents(fileObj.contents.sha1()):
 		    # if we already have the file in the data store we can
 		    # get the contents from there
