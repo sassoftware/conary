@@ -225,8 +225,8 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 
 	    cl = trove.getChangeLog()
 	    if cl:
-		print "Change log: %s (%s)" % (cl.name, cl.contact)
-		lines = cl.message.split("\n")[:-1]
+		print "Change log: %s (%s)" % (cl.getName(), cl.getContact())
+		lines = cl.getMessage().split("\n")[:-1]
 		for l in lines:
 		    print "    %s" % l
 	else:
