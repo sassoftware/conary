@@ -57,6 +57,11 @@ while [ $# -gt 0 ] ; do
 	    version=$1
 	    shift
 	    ;;
+	--build-label)
+	    shift
+ 	    buildlabel="--build-label $1"
+	    shift
+	    ;;
 	*)
 	    if [ -z "$trove" ] ; then
 		trove=$1
@@ -74,7 +79,7 @@ TMP=$(mktemp /tmp/changemail.XXXXXX) || exit 1
 
 
 if [ $(echo -n $trove | tail -c7) == ":source" ]; then
-    $CVC rdiff $repMapArg "$repMap" $trove -1 $version > $TMP
+    $CVC rdiff $repMapArg "$repMap" $buildlabel $trove -1 $version > $TMP
 elif ! echo $trove | grep -s : > /dev/null; then
     echo "${trove} ($version) has been built into the repository" > $TMP
 fi
