@@ -10,7 +10,7 @@ import sys
 import traceback
 import pdb
 import exceptions
-import glob
+import fixedglob
 import shutil
 import string
 
@@ -210,7 +210,7 @@ def braceExpand(path):
 def braceGlob(paths):
     pathlist = []
     for path in braceExpand(paths):
-	pathlist.extend(glob.glob(path))
+	pathlist.extend(fixedglob.glob(path))
     return pathlist
 
 def rmtree(paths, ignore_errors=False, onerror=None):

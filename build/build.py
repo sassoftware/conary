@@ -15,7 +15,7 @@ the permissions on files in classes derived from _PutFile.
 import os
 import util
 import string
-import glob
+import fixedglob
 
 # make sure that the decimal value really is unreasonable before
 # adding a new translation to this file.
@@ -314,7 +314,7 @@ class InstallSymlinks(BuildAction):
                 expand = macros['destdir'] + source
             else:
                 expand = destdir + os.sep + source
-            sources = glob.glob(expand)
+            sources = fixedglob.glob(expand)
             if not sources and not self.allowDangling:
                 raise TypeError, 'symlink to "%s" would be dangling' %source
             for expanded in sources:
