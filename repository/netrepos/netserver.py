@@ -36,6 +36,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 			self.fromVersion(e.version)))
 	except repository.CommitError, e:
 	    return (True, ("CommitError", str(e)))
+	except ClientTooOld, e:
+	    return (True, ("ClientTooOld", str(e)))
 	except:
 	    raise
 
@@ -98,10 +100,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                                sortByPath, 
                                                withFiles) 
         if withFiles:
-            return [ (x[0], x[1], self.fromVersion(x[2]), self.fromFile(x[3]))
-                     for x in gen ]
+	    l = []
+	    for (fileId, filePath, fileVersion, fileObj) in gen:
+		if fileObj is None:
+		    fileObj = self.repos.getFileVersion(fileId, fileVersion)
+
+		l.append((fileId, filePath, self.fromVersion(fileVersion), 
+			  self.fromFile(fileObj)))
         else:
-            return [ (x[0], x[1], self.fromVersion(x[2])) for x in gen ]
+            l = [ (x[0], x[1], self.fromVersion(x[2])) for x in gen ]
+
+	return l
 
     def getFileContents(self, authToken, troveName, troveVersion, 
 			   troveFlavor, path, fileVersion):
@@ -313,7 +322,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    raise InsufficientPermission
 
         if clientVersion < 1:
-            raise RuntimeError, "client is too old"
+            raise ClientTooOld
         return 1
 
     def __init__(self, path, tmpPath, urlBase, authDbPath, name,
@@ -385,5 +394,12 @@ class NetworkAuthorization:
 	self.reCache = {}
 
 class InsufficientPermission(Exception):
+
+    pass
+
+class ClientTooOld(Exception):
+
+    def __str__(self):
+	return "download a new client from www.specifixinc.com"
 
     pass
