@@ -78,6 +78,7 @@ typedef struct
 	PyObject* expected_types;
 	PyObject* command_logfile;
 	PyThreadState *tstate;
+	int timeout;
 } pysqlc;
 
 /** a statement object. */
@@ -204,6 +205,33 @@ _con_dealloc(pysqlc* self)
 	}
 }
 
+static int busy_wait(int timeout,   /* Maximum amount of time to wait */
+		     int count      /* Number of times table has been busy */)
+{
+	static const char delays[] =
+		{ 1, 2, 5, 10, 15, 20, 25, 25,  25,  50,  50,  50, 100};
+	static const short int totals[] =
+		{ 0, 1, 3,  8, 18, 33, 53, 78, 103, 128, 178, 228, 287};
+# define NDELAY (sizeof(delays)/sizeof(delays[0]))
+	int delay, prior;
+	
+	if (count <= NDELAY){
+		delay = delays[count-1];
+		prior = totals[count-1];
+	}
+	else {
+		delay = delays[NDELAY-1];
+		prior = totals[NDELAY-1] + delay*(count-NDELAY-1);
+	}
+	if (prior + delay > timeout) {
+		delay = timeout - prior;
+		if (delay<=0) return 0;
+	}
+	usleep(delay * 1000);
+	return 1;
+}
+
+
 static const char *
 ctype_to_str(int ctype)
 {
@@ -274,7 +302,8 @@ pysqlite_connect(PyObject *self, PyObject *args, PyObject *kwargs)
 
 	/* Set the thread state to NULL */
 	obj->tstate = NULL;
-
+	obj->timeout = 0;
+	
 	Py_INCREF(Py_None);
 	obj->command_logfile = Py_None;
 
@@ -652,6 +681,7 @@ _con_sqlite_busy_timeout(pysqlc* self, PyObject *args, PyObject* kwargs)
 		return NULL;
 	}
 
+	self->timeout = timeout;
 	sqlite3_busy_timeout(self->p_db, timeout);
 
 	Py_INCREF(Py_None);
@@ -1091,17 +1121,21 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 	int result;
 	int i;
 	PyObject *row;
+	int busy_count = 0;
 
 	if(self->p_stmt == NULL) {
 		PyErr_SetString(_sqlite_ProgrammingError,
 				"Statement has already been finalized.");
 		return NULL;
 	}
-    
-	MY_BEGIN_ALLOW_THREADS(self->con->tstate);
-	result = sqlite3_step(self->p_stmt);
-	MY_END_ALLOW_THREADS(self->con->tstate);
 
+	do {
+		MY_BEGIN_ALLOW_THREADS(self->con->tstate);
+		result = sqlite3_step(self->p_stmt);
+		MY_END_ALLOW_THREADS(self->con->tstate);
+	} while (result == SQLITE_BUSY && busy_wait(self->con->timeout,
+						    busy_count++));
+					 
 	if (result == SQLITE_ROW) {
 		long long int lval;
 		double dval;
