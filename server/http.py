@@ -28,9 +28,6 @@ class ServerError(Exception):
 class InvalidServerCommand(ServerError):
     str = """Invalid command passed to server."""
 
-class InsufficientPermission(ServerError):
-    str = """Insufficient permission for requested operation."""
-
 class HttpHandler:
     def __init__(self, repServer):
         self.repServer = repServer
@@ -107,7 +104,7 @@ class HttpHandler:
         needWrite = self.commands[cmd][2][1]
         needAdmin = self.commands[cmd][2][2]
         if not self.repServer.auth.check(authToken, write=needWrite, admin=needAdmin):
-            raise InsufficientPermission
+            raise netserver.InsufficientPermission
 
         if cmd == "":
 	    home = None
@@ -300,7 +297,7 @@ class HttpHandler:
         
         if username != authToken[0]:
             if not admin:
-                raise InsufficientPermission
+                raise netserver.InsufficientPermission
         
         if fields.has_key("oldPassword"):
             oldPassword = fields["oldPassword"].value

@@ -58,7 +58,7 @@ def getAuth(req, repos):
 
     if authString.count(":") != 1:
         return apache.HTTP_BAD_REQUEST
-        
+      
     authToken = authString.split(":")
 
     return authToken
