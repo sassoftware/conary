@@ -15,6 +15,8 @@ from repository import changeset
 from repository import repository
 import filecontainer
 import log
+import os
+import tempfile
 import versions
 
 def doCommit(repos, changeSetFile, targetBranch):
@@ -28,23 +30,23 @@ def doCommit(repos, changeSetFile, targetBranch):
 	if cs.isAbsolute():
 	    # we can't do this -- where would we branch from?
 	    log.error("absolute change sets cannot be retargeted")
-	    return
+	    return 1
 	label = versions.BranchName(targetBranch)
 	cs.setTargetBranch(repos, label)
 
+        (fd, changeSetFile) = tempfile.mkstemp()
+        os.close(fd)
+        cs.writeToFile(changeSetFile)
+
     if cs.isLocal():
-	log.error("local change sets cannot be applied to a repository "
-		  "without a branch override")
+	log.error("commits of local change sets require branch overrides")
+        return 1
 
     try:
-        if targetBranch:
-            # XXX we currently cannot write out the retargeted changeset
-            repos.commitChangeSet(cs)
-        else:
-            # hopefully the file hasn't changed underneath us since we
-            # did the check at the top of doCommit().  We should probably
-            # add commitChangeSet method that takes a fd.
-            repos.commitChangeSetFile(changeSetFile)
+        # hopefully the file hasn't changed underneath us since we
+        # did the check at the top of doCommit().  We should probably
+        # add commitChangeSet method that takes a fd.
+        repos.commitChangeSetFile(changeSetFile)
     except repository.CommitError, e:
 	print e
 	

@@ -541,7 +541,7 @@ class ChangeSet(streams.LargeStreamSet):
 	    # try and reuse the version number we created; if
 	    # it's already in use we won't be able to though
 	    try:
-		repos.getTrove(name, newVer, pkgCs.getFlavor())
+		repos.getTrove(name, newVer, pkgCs.getNewFlavor())
 	    except repository.TroveMissing: 
 		pass
 	    else:
@@ -571,7 +571,7 @@ class ChangeSet(streams.LargeStreamSet):
 	    # O(n^2) (n is the number of packages changed in pkgCs), which is
 	    # just silly. if large groups are added like this the effect could
 	    # become noticeable
-	    for (name, list) in pkgCs.iterChangedPackages():
+	    for (name, list) in pkgCs.iterChangedTroves():
 		if not packageVersions.has_key(name): continue
 		for (change, version) in list:
 		    if change != '+': continue
