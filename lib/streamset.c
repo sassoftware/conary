@@ -84,6 +84,7 @@ static int StreamSetDef_Init(PyObject * self, PyObject * args,
     }
 
     /* simple bubble sort */
+#if 0
     for (i = 0; i < ssd->tagCount - 1; i++) {
 	for (j = 0; j < ssd->tagCount - i - 1; j++) {
 	    if (ssd->tags[j + 1].tag < ssd->tags[j].tag) {
@@ -94,6 +95,7 @@ static int StreamSetDef_Init(PyObject * self, PyObject * args,
 	    }
 	}
     }
+#endif
 
     return 0;
 }
