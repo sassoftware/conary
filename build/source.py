@@ -274,7 +274,7 @@ class Source(_Source):
     warning; a failed signature check is fatal.
     """
     def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None,
-                  use=None, apply='', macros=False, dest=None):
+                  use=None, apply='', contents=None, macros=False, dest=None):
 	"""
 	@param recipe: The recipe object currently being built.
 	@param sourcename: The name of the archive
@@ -291,6 +291,8 @@ class Source(_Source):
 	    unpacked or merely stored in the archive.
 	@param apply: A command line to run after storing the file.
 	    Macros will be interpolated into this command.
+	@param contents: If specified, provides the contents of the
+	    file.  The provided contents will be placed in C{sourcename}.
 	@param macros: If true, interpolate recipe macros in the body
 	    of the patch before applying it.  For example, you might
 	    have a patch that changes C{CFLAGS = -O2} to
@@ -304,14 +306,18 @@ class Source(_Source):
 	    a URL to a third-party web site, or copying a file out of an
 	    RPM package.
 	"""
-	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
 	self.apply = apply
 	self.applymacros = macros
+	self.contents = contents
 	if dest:
 	    # make sure that user did not pass subdirectory in
-	    self.dest = os.path.basename(dest %self.recipe.macros)
+	    self.dest = os.path.basename(dest %recipe.macros)
 	else:
-	    self.dest = os.path.basename(self.sourcename) # already expanded
+	    self.dest = os.path.basename(sourcename %recipe.macros)
+	if contents is not None:
+	    # Do not look for a file that does not exist...
+	    sourcename = ''
+	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
 
     def doUnpack(self):
 	destDir = os.sep.join((self.builddir, self.recipe.theMainDir))
@@ -321,22 +327,30 @@ class Source(_Source):
 	if self.dir:
 	    destDir = os.sep.join((destDir, self.dir))
 	    util.mkdirChain(destDir)
-	if self.applymacros:
-	    log.debug('applying macros to source %s' %f)
-	    pin = file(f)
+	if self.contents is not None:
 	    pout = file(os.sep.join((destDir, self.dest)), "w")
-	    pout.write(pin.read()%self.recipe.macros)
-	    pin.close()
+	    if self.applymacros:
+		pout.write(self.contents %self.recipe.macros)
+	    else:
+		pout.write(self.contents)
 	    pout.close()
 	else:
-	    util.copyfile(f, os.sep.join((destDir, self.dest)))
+	    if self.applymacros:
+		log.debug('applying macros to source %s' %f)
+		pin = file(f)
+		pout = file(os.sep.join((destDir, self.dest)), "w")
+		pout.write(pin.read()%self.recipe.macros)
+		pin.close()
+		pout.close()
+	    else:
+		util.copyfile(f, os.sep.join((destDir, self.dest)))
 	if self.apply:
 	    util.execute(self.apply %self.recipe.macros, destDir)
 
 
 class Action(_Source):
     """
-    Called as self.addSource from a recipe, this class copies a file
+    Called as self.addAction from a recipe, this class copies a file
     into the build directory %(builddir)s.
     """
     def __init__(self, recipe, action, dir='', use=None):
