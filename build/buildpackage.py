@@ -79,9 +79,15 @@ class BuildPackage(dict):
         used to obtain the contents of the file when creating a changeset
         to commit to the repository
         """
-	f = files.FileFromFilesystem(realPath, None, buildDeps = True)
+	(f, linkCount, inode) = files.FileFromFilesystem(realPath, None, 
+                                        buildDeps = True, inodeInfo = True)
 	f.inode.setPerms(f.inode.perms() & 01777)
 	self[path] = (realPath, f)
+
+        if linkCount and f.hasContents:
+            l = self.linkGroups.get(inode, [])
+            l.append(path)
+            self.linkGroups[inode] = l
 
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
@@ -113,6 +119,7 @@ class BuildPackage(dict):
         self.requires = deps.DependencySet()
         self.provides = deps.DependencySet()
         self.flavor = _getUseDependencySet(recipe)
+        self.linkGroups = {}
 	dict.__init__(self)
 
 
