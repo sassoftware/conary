@@ -12,7 +12,6 @@ the permissions on files in classes derived from _PutFile.
 """
 
 import os
-import shutil
 import util
 import string
 
@@ -28,7 +27,7 @@ _permmap = {
 }
 
 class ShellCommand:
-    """Base class for shell-based commands. ShellCommand is a virtual class
+    """Base class for shell-based commands. ShellCommand is an abstract class
     and can not be made into a working instance. Only derived classes which
     define the C{template} static class variable will work properly.
 
@@ -58,6 +57,7 @@ class ShellCommand:
         accepted by the class.
         @rtype: ShellCommand
         """
+        assert(self.__class__ is not ShellCommand)
         # initialize initialize our keywords to the defaults
         self.__dict__.update(self.keywords)
         # check to make sure that we don't get a keyword we don't expect
