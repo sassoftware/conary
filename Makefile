@@ -20,6 +20,7 @@ export DISTDIR = $(TOPDIR)/conary-$(VERSION)
 export prefix = /usr
 export conarydir = $(prefix)/share/conary
 export bindir = $(prefix)/bin
+export usrbindir = $(prefix)/usrbin
 export mandir = $(prefix)/share/man
 
 SUBDIRS=build local repository server lib pysqlite3 deps
@@ -86,6 +87,7 @@ install: all install-mkdirs install-subdirs pyfiles-install
 	$(PYTHON) -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
 	$(PYTHON) -OO -c "import compileall; compileall.compile_dir('$(DESTDIR)$(conarydir)', ddir='$(conarydir)', quiet=1)"
 	install -m 755 conary-wrapper $(DESTDIR)$(bindir)
+	install -m 755 rpm2cpio $(DESTDIR)$(usrbindir)
 	for f in $(bin_files); do \
 		ln -sf conary-wrapper $(DESTDIR)$(bindir)/$$f; \
 	done

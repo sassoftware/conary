@@ -14,19 +14,16 @@
 # full details.
 #
 
+import gzip
 import os
 import sys
-if os.path.dirname(sys.argv[0]) != ".":
-    if sys.argv[0][0] == "/":
-	fullPath = os.path.dirname(sys.argv[0])
-    else:
-	fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+
+binPath = os.path.dirname(sys.argv[0]) 
+if binPath and os.path.exists(binPath + "/../conary-wrapper"):
+    sys.path.append(os.path.realpath(binPath + "/.."))
 else:
-    fullPath = os.getcwd()
+    sys.path.append("/usr/share/conary")
 
-sys.path.append(os.path.dirname(fullPath))
-
-import gzip
 import rpmhelper
 
 def usage():

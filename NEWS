@@ -5,6 +5,7 @@ Changes in 0.12.5
   * source commands (r.addAction, etc.), if given absolute directories for 
     their dir keywords, will perform their actions in the destdir instead
     of the builddir
+  * include /usr/bin/rpm2cpio
 
 Changes in 0.12.4
   * set more arch flags for x86 and x86_64
