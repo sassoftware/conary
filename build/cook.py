@@ -12,6 +12,7 @@ import buildpackage
 import changeset
 import filecontents
 import files
+import fsrepos
 import helper
 import log
 import lookaside
@@ -38,10 +39,11 @@ def _createPackage(repos, branch, bldPkg, ident):
 
     for (path, buildFile) in bldPkg.items():
         realPath = buildFile.getRealPath()
+	(fileId, fileVersion) = ident(path)
         if isinstance(buildFile, buildpackage.BuildDeviceFile):
-            f = files.FileFromInfoLine(buildFile.infoLine(), ident(path))
+            f = files.FileFromInfoLine(buildFile.infoLine(), fileId)
         elif realPath:
-            f = files.FileFromFilesystem(realPath, ident(path), 
+            f = files.FileFromFilesystem(realPath, fileId,
                                          type = buildFile.getType(),
                                          requireSymbolicOwnership=True)
 	    # setuid or setgid must be set explicitly in buildFile
@@ -52,11 +54,14 @@ def _createPackage(repos, branch, bldPkg, ident):
         # set ownership, flags, etc
         f.merge(buildFile)
         
-	duplicateVersion = checkBranchForDuplicate(repos, branch, f)
-        if not duplicateVersion:
+        if not fileVersion:
 	    p.addFile(f.id(), path, bldPkg.getVersion())
 	else:
-	    p.addFile(f.id(), path, duplicateVersion)
+	    oldFile = repos.getFileVersion(f.id(), fileVersion)
+	    if oldFile.same(f):
+		p.addFile(f.id(), path, fileVersion)
+	    else:
+		p.addFile(f.id(), path, bldPkg.getVersion())
 
         fileMap[f.id()] = (f, realPath, path)
 
@@ -69,8 +74,8 @@ class _IdGen:
 
 	hash = sha1helper.hashString("%s %f %s" % (path, time.time(), 
 							self.noise))
-	self.map[path] = hash
-	return hash
+	self.map[path] = (hash, None)
+	return (hash, None)
 
     def __init__(self, map=None):
 	# file ids need to be unique. we include the time and path when
@@ -88,7 +93,7 @@ class _IdGen:
 	# lets us look for source files this build needs inside of the
 	# repository
 	for (fileId, path, version) in pkg.fileList():
-	    self.map[path] = fileId
+	    self.map[path] = (fileId, version)
 	    if path[0] != "/":
 		# we might need to retrieve this source file
 		# to enable a build, so we need to find the
@@ -431,7 +436,7 @@ class CookError(Exception):
 
 def cookCommand(cfg, args, prep, macros):
     # this ensures the repository exists
-    repos = repository.FilesystemRepository(cfg.reppath, "c")
+    repos = fsrepos.FilesystemRepository(cfg.reppath, "c")
     repos.close()
 
     for item in args:
@@ -443,7 +448,7 @@ def cookCommand(cfg, args, prep, macros):
             # child, set ourself to be the foreground process
             os.setpgrp()
             os.tcsetpgrp(0, os.getpgrp())
-	    repos = repository.FilesystemRepository(cfg.reppath, "r")
+	    repos = fsrepos.FilesystemRepository(cfg.reppath, "r")
             try:
                 built = cookItem(repos, cfg, item, prep=prep, macros=macros)
             except CookError, msg:
@@ -484,23 +489,7 @@ def cookCommand(cfg, args, prep, macros):
         # make sure that we are the foreground process again
         os.tcsetpgrp(0, os.getpgrp())
 
-#
-# see if the head of the specified branch is a duplicate
-# of the file object passed; it so return the version object
-# for that duplicate
-def checkBranchForDuplicate(repos, branch, file):
-    version = repos.fileLatestVersion(file.id(), branch)
-    if not version:
-	return None
-
-    lastFile = repos.getFileVersion(file.id(), version)
-
-    if file.same(lastFile):
-	return version
-
-    return None
-
 def makeFileId(*args):
     assert(args)
     str = "".join(args)
-    return _IdGen()(str)
+    return _IdGen()(str)[0]
