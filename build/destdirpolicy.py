@@ -34,6 +34,18 @@ class RemoveExtraLibs(policy.Policy):
     def doFile(self, path):
 	util.remove(self.macros['destdir']+path)
 
+class RemoveBackupFiles(policy.Policy):
+    """
+    Kill editor and patch backup files
+    """
+    invariantinclusions = [
+	'~$',
+	'\.orig$',
+    ]
+
+    def doFile(self, path):
+	util.remove(self.macros['destdir']+path)
+
 class Strip(policy.Policy):
     """
     strip executables
@@ -239,6 +251,7 @@ def DefaultPolicy():
     return [
 	SanitizeSonames(),
 	RemoveExtraLibs(),
+	RemoveBackupFiles(),
 	Strip(),
 	NormalizeGzip(),
 	NormalizeBzip(),
