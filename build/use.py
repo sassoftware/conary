@@ -36,12 +36,12 @@ class UseClass(dict):
 
 Use = UseClass({
     'pcre':		True,
-    'gcj':		False,
+    'gcj':		True,
     'gnat':		False,
     'selinux':		False,
     'pam':		True,
     'dietlibc':		False,
-    'bootstrap':	True,
+    'bootstrap':	False,
     'python':		True,	# XXX should this even be an option?
     # temporarily disabled until we build appropriate packages
     'perl':		False,
