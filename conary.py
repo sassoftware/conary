@@ -60,6 +60,7 @@ def usage(rc = 1):
     print "               --root <root>"
     print ""
     print "pkglist flags: --all"
+    print "               --sha1s"
     print "               --ids"
     print "               --ls"
     print ""
@@ -103,6 +104,7 @@ def main():
     argDef["prep"] = 0
     argDef["profile"] = 0
     argDef["replace-files"] = 0
+    argDef["sha1s"] = 0
     argDef["target-branch"] = 1
 
     argDef.update(srcctl.argDef)
@@ -256,6 +258,9 @@ def main():
 	ids = argSet.has_key('ids')
 	if ids: del argSet['ids']
 
+	sha1s = argSet.has_key('sha1s')
+	if sha1s: del argSet['sha1s']
+
 	if otherArgs[1] == "replist":
 	    queryRepos = openRepository(cfg.reppath, "r")
 	else:
@@ -264,7 +269,7 @@ def main():
 	if argSet: return usage()
 
 	if len(otherArgs) >= 2 and len(otherArgs) <= 4:
-	    args = [queryRepos, cfg, all, ls, ids] + otherArgs[2:]
+	    args = [queryRepos, cfg, all, ls, ids, sha1s] + otherArgs[2:]
 	    try:
 		display.displayPkgs(*args)
 	    except IOError, msg:
