@@ -127,7 +127,7 @@ def sourceCommand(cfg, args, argSet):
     elif (args[0] == "add"):
 	if len(args) < 2: return usage()
 	checkin.addFiles(args[1:])
-    elif (args[0] == "checkout"):
+    elif (args[0] == "checkout") or (args[0] == "co"):
 	if argSet.has_key("dir"):
 	    dir = argSet['dir']
 	    del argSet['dir']
