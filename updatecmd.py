@@ -86,6 +86,6 @@ def doErase(db, cfg, pkg, versionStr = None, tagScript = None):
 
     list = []
     for pkg in pkgList:
-	list.append((pkg.getName(), pkg.getFlavor(), pkg.getVersion()))
+	list.append((pkg.getName(), pkg.getVersion(), pkg.getFlavor()))
 
     db.eraseTroves(list, tagScript = tagScript)

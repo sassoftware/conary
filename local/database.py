@@ -9,6 +9,7 @@ import helper
 import log
 import localrep
 import os
+import package
 from repository import repository
 import sqldb
 import update
@@ -145,10 +146,15 @@ class SqlDbRepository(repository.DataStoreRepository,
 	# files get removed with their troves
 	pass
 
-    def eraseTroves(self, list, tagScript = None):
+    def eraseTroves(self, eraseList, tagScript = None):
 	cs = changeset.ChangeSet()
-	for (name, flavor, version) in list:
-	    cs.oldPackage(name, version, flavor)
+
+	for (name, version, flavor) in eraseList:
+	    outerTrove = self.getTrove(name, version, flavor)
+
+	    for trove in self.walkTroveSet(outerTrove, ignoreMissing = True):
+		cs.oldPackage(trove.getName(), trove.getVersion(), 
+			      trove.getFlavor())
 
 	self.commitChangeSet(cs, tagScript = tagScript)
 

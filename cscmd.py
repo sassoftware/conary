@@ -45,7 +45,7 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
 
     list = []
     for outerPackage in pkgList:
-	for pkg in package.walkPackageSet(db, outerPackage):
+	for pkg in db.walkTroveSet(outerPackage):
 	    ver = pkg.getVersion()
 	    origPkg = db.getTrove(pkg.getName(), ver, pkg.getFlavor(), 
 				  pristine = True)

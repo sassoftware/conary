@@ -789,40 +789,6 @@ class ThawTroveChangeSet(TroveChangeSet):
 	for line in lines:
 	    self.parse(line)
 
-def walkPackageSet(repos, trove):
-    """
-    Generator returns all of the packages included by pkg, including
-    pkg itself.
-    """
-    yield trove
-    seen = { trove.getName() : [ (trove.getVersion(),
-				  trove.getFlavor()) ] }
-
-    troveList = [x for x in trove.iterTroveList()]
-
-    while troveList:
-	(name, version, flavor) = troveList[0]
-	del troveList[0]
-
-	if seen.has_key(name):
-	    match = False
-	    for (ver, fla) in seen[name]:
-		if version == ver and fla == flavor:
-		    match = True
-		    break
-	    if match: continue
-
-	    seen[name].append((version, flavor))
-	else:
-	    seen[name] = [ (version, flavor) ]
-
-	trove = repos.getTrove(name, version, flavor)
-
-	yield trove
-
-	for (trove, version, flavor) in trove.iterTroveList():
-	    troveList += [ x for x in trove.iterTroveList() ]
-
 class TroveError(Exception):
 
     """
