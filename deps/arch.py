@@ -15,14 +15,13 @@
 import deps
 import os
 
-def x86flags(baseArch, baseFlagMap, ofInterest):
+def x86flags(archTag, baseArch, extraFlags, ofInterest):
     try:
         lines = open("/proc/cpuinfo").read().split("\n")
     except IOError:
         lines=[]
 
-    i = baseFlagMap.index(baseArch)
-    rc = [ (x, deps.FLAG_SENSE_PREFERRED) for x in baseFlagMap[i:] ]
+    rc = [ (x, deps.FLAG_SENSE_PREFERRED) for x in extraFlags ]
 
     for line in lines:
 	if not line.startswith("flags"): continue
@@ -33,15 +32,17 @@ def x86flags(baseArch, baseFlagMap, ofInterest):
 	    if ofInterest.has_key(flag): 
                 rc.append((flag, deps.FLAG_SENSE_PREFERRED))
 
-	return deps.Dependency('x86', rc)
+	return deps.Dependency(archTag, rc)
 
-    return deps.Dependency('x86')
+    return deps.Dependency(archTag)
 
 def flags_ix86(baseArch):
     baseFlagMap = [ 'i686', 'i586', 'i486' ]
+    i = baseFlagMap.index(baseArch)
+
     ofInterest = {}.fromkeys([ '3dnow', '3dnowext', 'mmx', 'mmxext', 'sse', 
                                'sse2', 'sse3', 'cmov', 'nx'])
-    return [ x86flags(baseArch, baseFlagMap, ofInterest) ]
+    return [ x86flags('x86', baseArch, baseFlagMap[i:], ofInterest) ]
 
 def flags_i686():
     return flags_ix86(baseArch = 'i686')
@@ -53,12 +54,10 @@ def flags_mips64():
     return deps.Dependency('mipseb', [ ('mips64', deps.FLAG_SENSE_REQUIRED) ])
 
 def flags_x86_64():
-    baseFlagMap = [ 'x86_64', 'i586', 'i486' ]
+    baseFlagMap = [ ]
     ofInterest = {}.fromkeys([ '3dnow', '3dnowext', 'nx', 'sse3' ])
 
-    x86 = flags_i686(baseArch)
-    x86_64 = x86flags(baseArch, baseFlagMap, ofInterest)
-    return x86 + x86_64
+    return [ (x86flags('x86_64', baseArch, baseFlagMap, ofInterest)) ]
 
 def current():
     return currentArch
