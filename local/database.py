@@ -159,6 +159,7 @@ class Database(repository.LocalRepository):
 		list.append((name, old, new, 0))
 
 	localChanges = self.createChangeSet(list)
+	localChanges.writeToFile("foo")
 
 	#if makeRollback:
 	#    # rollbacks have two pieces, B->A and A->A.local; applying
@@ -405,12 +406,27 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 	    # change set
 	    localCs.newPackage(BlocCs)
 
+	# look through each of the file changes specified by A->A.local
+	# and map those onto B->B.local.
+	for (fileId, (Aver, Aloc, csInfo)) in localCs.getFileList():
+	    # this file could have disappeared between A and B, which
+	    # means we don't need to map A->A.local onto it
+	    if not origJob.files.has_key(fileId): continue
+
+	    Bfile = origJob.files[fileId].file()
+	    Bver = origJob.files[fileId].version()
+
+	    # XXX this could have "conflict" written all over it! we're
+	    # just blindly using our local changes
+	    BlocFile = Bfile.copy()
+	    BlocFile.applyChange(csInfo)
+	    origJob.files[fileId].changeFile(BlocFile)
+
 	repository.ChangeSetJob.__init__(self, repos, localCs)
 
-	# walk through every package we're about to commit, and update
-	# the file list to reflect that the files are on the local branch,
-	# unless they are already on a local branch from migrating into
-	# this changeset from localCs
+	# whatever files in the final local package don't reference
+	# local files need to (the only ones that do reference local
+	# files are those which have had changes merged from A->A.local)
 	for branchPkg in self.newPackageList():
 	    for (fileId, path, version) in branchPkg.fileList():
 		if not version.isLocal():
