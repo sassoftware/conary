@@ -43,9 +43,9 @@ class DataStore:
 	    dest.close()
 
     # returns a python file object for the file requested
-    def openFile(self, hash):
+    def openFile(self, hash, mode = "r"):
 	path = self.hashToPath(hash)[1]
-	return open(path, "r+")
+	return open(path, mode)
 
     def removeFile(self, hash):
 	(dir, path) = self.hashToPath(hash)
