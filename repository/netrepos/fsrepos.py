@@ -305,7 +305,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		# to include in the local database
 		if (hash or (oldFile and newFile.flags.isConfig() 
                                       and not oldFile.flags.isConfig())):
-		    if oldFileVersion :
+		    if oldFileVersion and oldFile.hasContents:
 			oldCont = self.getFileContents(
                             [ (oldFileId, oldFileVersion, oldFile) ])[0]
 
