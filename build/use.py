@@ -400,6 +400,8 @@ class ArchCollection(Collection):
 	    except KeyError:
 		pass
 	self._archProps = archProps[:]
+	for archProp in self._archProps:
+            self._setAttr(archProp, False)
 
     def _setArchPropValues(self, majArch):
 	"""
