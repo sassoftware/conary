@@ -121,6 +121,9 @@ class ExpectedTypes(unittest.TestCase, testsupport.TestSupport):
         self.cur.execute("insert into test(a) values (5)")
         self.cur.execute("-- types int")
         self.cur.execute("select a from test")
+        res = self.cur.fetchone()
+        self.assert_(isinstance(res.a, types.IntType),
+                     "The built-in int converter didn't work.")
         self.cur.execute("select a from test")
         res = self.cur.fetchone()
         self.assert_(isinstance(res.a, types.StringType),
