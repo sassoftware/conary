@@ -17,7 +17,7 @@ import versions
 import files
 import base64
 
-class NetworkConvertors:
+class NetworkConvertors(object):
 
     def freezeVersion(self, v):
 	return v.freeze()
