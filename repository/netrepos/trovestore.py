@@ -46,6 +46,10 @@ class TroveStore:
 
     def __init__(self, path):
 	self.db = sqlite.connect(path, timeout = 30000)
+
+	cu = self.db.cursor()
+	cu.execute("PRAGMA temp_store = MEMORY", start_transaction = False)
+				 
         self.begin()
 	self.troveTroves = trovecontents.TroveTroves(self.db)
 	self.troveFiles = trovecontents.TroveFiles(self.db)
@@ -198,23 +202,51 @@ class TroveStore:
 	for (versionStr,) in cu:
 	    yield versionStr
 
-    def iterTroveFlavors(self, troveName, troveVersion):
+    def getTroveFlavors(self, troveDict):
 	cu = self.db.cursor()
+	vMap = {}
 	# I think we might be better of intersecting subqueries rather
 	# then using all of the and's in this join
 	cu.execute("""
-	    SELECT DISTINCT Flavors.flavor FROM Items JOIN Instances 
-	    JOIN Flavors JOIN versions ON 
-		items.itemId = instances.itemId AND 
-		versions.versionId = instances.versionId AND 
-		flavors.flavorId = instances.flavorId 
-	    WHERE item = %s AND version=%s""", 
-	    troveName, troveVersion.canon().asString())
-	for (flavorStr,) in cu:
-	    if flavorStr == 'none':
-		yield None
-	    else:
-		yield deps.deps.ThawDependencySet(flavorStr)
+	    CREATE TEMPORARY TABLE itf(item STRING, version STRING)
+	""", start_transaction = False)
+
+	for troveName in troveDict.keys():
+	    for version in troveDict[troveName]:
+		s = version.canon().asString()
+		vMap[s] = version
+		cu.execute("""
+		    INSERT INTO itf VALUES (%s, %s)
+		""", (troveName, s), start_transaction = False)
+
+	cu.execute("""
+	    SELECT aItem, aVersion, Flavors.flavor FROM
+		(SELECT Items.itemId AS aItemId, 
+			versions.versionId AS aVersionId,
+			Items.item AS aItem,
+			versions.version AS aVersion FROM
+		    itf JOIN Items ON itf.item = Items.item
+			JOIN versions ON itf.version = versions.version)
+		JOIN instances ON
+		    aItemId = instances.itemId AND
+		    aVersionId = instances.versionId
+		JOIN flavors ON
+		    instances.flavorId = flavors.flavorId
+		ORDER BY aItem, aVersion
+	""")
+
+	outD = {}
+	for (item, verString, flavor) in cu:
+	    if not outD.has_key(item):
+		outD[item] = {}
+	    ver = vMap[verString]
+	    if not outD[item].has_key(ver):
+		outD[item][ver] = []
+	    outD[item][ver].append(flavor)
+
+	cu.execute("DROP TABLE itf", start_transaction = False)
+
+	return outD
 
     def iterTroveNames(self):
 	return self.items.iterkeys()
@@ -435,14 +467,28 @@ class TroveStore:
 	return self.instances.isPresent((troveItemId, troveVersionId, 
 					 troveFlavorId))
 
-    def iterAllTroveLeafs(self, troveName):
+    def iterAllTroveLeafs(self, troveNameList):
 	cu = self.db.cursor()
+
 	cu.execute("""
-	    SELECT version FROM Items NATURAL JOIN Latest 
+	    SELECT item, version FROM Items NATURAL JOIN Latest 
 				      NATURAL JOIN Versions
-		WHERE item = %s""", troveName)
-	for (versionStr,) in cu:
-	    yield versionStr
+		WHERE item in (%s)""" % 
+	    ",".join(["'%s'" % x for x in troveNameList]))
+
+	lastName = None
+	leafList = []
+	for (name, version) in cu:
+	    if lastName != name and lastName:
+		yield (lastName, leafList)
+		leafList = []
+		lastName = name
+	    elif not lastName:
+		lastName = name
+
+	    leafList.append(version)
+		
+	yield (lastName, leafList)
 
     def branchesOfTroveLabel(self, troveName, label):
 	troveId = self.items[troveName]

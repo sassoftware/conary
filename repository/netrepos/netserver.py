@@ -90,13 +90,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return "%s/%s" % (self.urlBase, fileName[:-4])
 
     def getAllTroveLeafs(self, authToken, troveNames):
-	d = {}
 	for troveName in troveNames:
 	    if not self.auth.check(authToken, write = False, trove = troveName):
 		raise InsufficientPermission
 
-	    d[troveName] = [ x for x in
-			    self.repos.troveStore.iterAllTroveLeafs(troveName) ]
+	d = {}
+	for (name, leafList) in \
+			self.repos.troveStore.iterAllTroveLeafs(troveNames):
+	    d[name] = leafList
+	
 	return d
 
     def getTroveLeavesByLabel(self, authToken, troveNameList, labelStr):
@@ -112,19 +114,25 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	return d
 
     def getTroveVersionFlavors(self, authToken, troveDict):
-	newD = {}
+	inD = {}
+	vMap = {}
 	for (troveName, versionList) in troveDict.iteritems():
-	    if not self.auth.check(authToken, write = False, trove = troveName):
-		raise InsufficientPermission
-
-	    innerD = {}
+	    inD[troveName] = []
 	    for versionStr in versionList:
-		innerD[versionStr] = [ self.fromFlavor(x) for x in 
-		    self.repos.troveStore.iterTroveFlavors(troveName, 
-						 self.toVersion(versionStr)) ]
-	    newD[troveName] = innerD
+		v = self.toVersion(versionStr)
+		vMap[v] = versionStr
+		inD[troveName].append(v)
 
-	return newD
+	outD = self.repos.troveStore.getTroveFlavors(inD)
+
+	retD = {}
+	for troveName in outD.iterkeys():
+	    retD[troveName] = {}
+	    for troveVersion in outD[troveName]:
+		verStr = vMap[troveVersion]
+		retD[troveName][verStr] = outD[troveName][troveVersion]
+
+	return retD
 
     def getTroveLatestVersion(self, authToken, pkgName, branchStr):
 	branch = self.toBranch(branchStr)

@@ -35,13 +35,15 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	return None
 
     def iterAllTroveNames(self):
-	return self.troveStore.iterTroveNames()
+	a = self.troveStore.iterTroveNames()
+	return a
 
     def getAllTroveLeafs(self, troveNameList):
 	d = {}
-	for troveName in troveNameList:
+	for (troveName, troveLeafList) in \
+		self.troveStore.iterAllTroveLeafs(troveNameList):
 	    d[troveName] = [ versions.VersionFromString(x) for x in
-				self.troveStore.iterAllTroveLeafs(troveName) ]
+				troveLeafList ]
 	return d
 
     def getTroveVersionList(self, troveNameList):
@@ -70,13 +72,12 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 							    branch.asString()) ]
 	
     def getTroveVersionFlavors(self, troveDict):
-	newD = {}
-	for (troveName, versionList) in troveDict.iteritems():
-	    innerD = {}
-	    for version in versionList:
-		innerD[version] = [ x for x in 
-		    self.troveStore.iterTroveFlavors(troveName, version) ]
-	    newD[troveName] = innerD
+	newD = self.troveStore.getTroveFlavors(troveDict)
+
+	for troveName in newD.iterkeys():
+	    for version in newD[troveName].iterkeys():
+		newD[troveName][version] = \
+		    [ self.thawFlavor(x) for x in newD[troveName][version] ]
 
 	return newD
 
