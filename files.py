@@ -13,6 +13,8 @@ import types
 import time
 import lookaside
 
+_FILE_FLAG_CONFIG = 0x01
+
 class FileMode:
     def merge(self, mode):
         """merge another instance of a FileMode into this one"""
@@ -28,6 +30,8 @@ class FileMode:
             self.theMtime = mode.theMtime
         if self.theSize:
             self.theSize = mode.theSize
+        if self.theFlags:
+            self.theFlags = mode.theFlags
 
     def triplet(self, code, setbit = 0):
 	list = [ "-", "-", "-" ]
@@ -106,10 +110,23 @@ class FileMode:
 
 	return self.theMtime
 
+    def flags(self, new = None):
+	if (new != None and new != "-"):
+	    self.theFlags = new
+
+    def isConfig(self, set = None):
+	if set != None:
+	    if set:
+		self.theFlags |= _FILE_FLAG_CONFIG
+	    else:
+		self.theFlags &= ~(_FILE_FLAG_CONFIG)
+
+	return (self.theFlags and self.theFlags & _FILE_FLAG_)
+
     def infoLine(self):
-	return "0%o %s %s %s %s" % (self.thePerms, self.theOwner, 
+	return "0%o %s %s %s %s 0x%x" % (self.thePerms, self.theOwner, 
 				    self.theGroup, self.theSize,
-				    self.theMtime)
+				    self.theMtime, self.theFlags)
 
     def diff(self, them):
 	if not them:
@@ -134,23 +151,30 @@ class FileMode:
 	if self.thePerms == other.thePerms and \
 	   self.theOwner == other.theOwner and \
 	   self.theGroup == other.theGroup and \
+	   self.theFlags == other.theFlags and\
 	   self.theSize == other.theSize:
 	    return 1
 
 	return 0
 
     def applyChangeLine(self, line):
-	(p, o, g, s, m) = line.split()
+	(p, o, g, s, m, f) = line.split()
 	if p == "-": 
 	    p = None
 	else:
 	    p = int(p, 8)
+
+	if f == "-":
+	    f = None
+	else:
+	    f = int(f, 16)
 
 	self.perms(p)
 	self.owner(o)
 	self.group(g)
 	self.mtime(m)
 	self.size(s)
+	self.flags(f)
 
     def __init__(self, info = None):
 	if info:
@@ -161,6 +185,7 @@ class FileMode:
 	    self.theGroup = None
 	    self.theMtime = None
 	    self.theSize = None
+	    self.theFlags = None
 	
 class File(FileMode):
     def modeString(self):
@@ -479,6 +504,7 @@ def FileFromFilesystem(path, fileId, type = None):
     f.group(grp.getgrgid(s.st_gid)[0])
     f.mtime(s.st_mtime)
     f.size(s.st_size)
+    f.flags(0)
 
     return f
 
