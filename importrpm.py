@@ -65,13 +65,13 @@ def doImport(DBPATH, rpmFile):
 
 	infoFile = files.FileDB(DBPATH, file.path())
 
-	existingFile = infoFile.findVersion(file)
-	if not existingFile:
+	existing = infoFile.findVersion(file)
+	if not existing:
 	    file.version(version)
 	    infoFile.add(version, file)
 	    p.addFile(file.path(), file.version())
 	    infoFile.write()
 	else:
-	    p.addFile(file.path(), file.version())
+	    p.addFile(file.path(), existing[0])
 
     pkgSet.write()

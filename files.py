@@ -161,9 +161,9 @@ class FileDB:
 	f.close()
 
     def findVersion(self, file):
-	for f in self.versions.values():
+	for (v, f) in self.versions.items():
 	    if type(f) == type(file) and f.compare(file):
-		return f
+		return (v, f)
 
 	return None
 
