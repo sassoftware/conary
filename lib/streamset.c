@@ -139,22 +139,36 @@ static int StreamSet_Cmp(PyObject * self, PyObject * other) {
     return _StreamSet_doCmp(self, other, Py_None);
 }
 
+/* constants for includeEmpty argument */
+#define EXCLUDE_EMPTY 0
+#define INCLUDE_EMPTY 1
+
 static PyObject * StreamSet_concatStrings(StreamSetDefObject * ssd,
-					  PyObject ** vals, int len) {
+					  PyObject ** vals, int len,
+					  int includeEmpty) {
     char * final, * chptr;
-    int i;
+    int i, vallen;
 
     final = alloca(len);
     chptr = final;
     for (i = 0; i < ssd->tagCount; i++) {
 	if (vals[i] != Py_None)  {
-	    *chptr++ = ssd->tags[i].tag;
-	    *((short *) chptr) = htons(PyString_GET_SIZE(vals[i]));
-	    chptr += 2;
-
-	    memcpy(chptr, PyString_AS_STRING(vals[i]), 
-		   PyString_GET_SIZE(vals[i]));
-	    chptr += PyString_GET_SIZE(vals[i]);
+	    vallen = PyString_GET_SIZE(vals[i]);
+	    /* do not include zero length frozen data if requested */
+	    if (vallen > 0 || includeEmpty) {
+		/* either we have data or including empty data was
+		   requested */
+		*chptr++ = ssd->tags[i].tag;
+		*((short *) chptr) = htons(vallen);
+		chptr += 2;
+		
+		memcpy(chptr, PyString_AS_STRING(vals[i]), vallen);
+		chptr += vallen;
+	    } else {
+		/* otherwise we need to reduce the total size because
+		   we are excluding tags */
+		len -= 3;
+	    }
 	}
 
 	Py_DECREF(vals[i]);
@@ -206,7 +220,10 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args) {
 	Py_DECREF(attr);
     }
 
-    return StreamSet_concatStrings(ssd, vals, len);
+    /* note that, unlike freeze(), diff() includes diffs that
+       are zero length.  they have special meaning in some
+       stream types (usually that the stored value is None) */
+    return StreamSet_concatStrings(ssd, vals, len, INCLUDE_EMPTY);
 }
 
 static PyObject * StreamSet_Eq(PyObject * self, 
@@ -268,8 +285,8 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
 	    return NULL;
 	len += PyString_GET_SIZE(vals[i]) + 3;
     }
-
-    return StreamSet_concatStrings(ssd, vals, len);
+    /* do not include zero length frozen data */
+    return StreamSet_concatStrings(ssd, vals, len, EXCLUDE_EMPTY);
 }
 
 static int StreamSet_Init(PyObject * self, PyObject * args,
