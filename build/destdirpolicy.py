@@ -428,8 +428,11 @@ class FixupMultilibPaths(policy.Policy):
         if os.path.exists(fulltarget):
             tmode = os.lstat(fulltarget)[stat.ST_MODE]
             tm = self.recipe.magic[target]
-            if (stat.S_ISREG(mode) and stat.S_ISREG(tmode) and
-                'abi' in m.contents and 'abi' in tm.contents 
+            if (not stat.S_ISREG(mode) or not stat.S_ISREG(tmode)):
+                # one or both might be symlinks, in which case we do
+                # not want to touch this
+                return
+            if ('abi' in m.contents and 'abi' in tm.contents 
                 and m.contents['abi'] != tm.contents['abi']):
                 # path and target both exist and are of different abis.
                 # This means that this is actually a multilib package
