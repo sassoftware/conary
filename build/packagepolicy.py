@@ -12,10 +12,14 @@
 # full details.
 #
 """
-Module used by recipes to effect packaging policy; things like setting
-flags, tags, and dependencies.
+Module used after C{%(destdir)s} has been finalized to choose packages
+and components; set flags, tags, and dependencies; and enforce policy
+requirements on the contents of C{%(destdir)s}.
+
 Classes from this module are not used directly; instead, they are accessed
-through eponymous interfaces in recipe.
+through eponymous interfaces in recipe.  Most of these policies are rarely
+(if ever) invoked.  Examples are presented only for policies that are
+expected to be invoked in some recipes.
 """
 
 import util
@@ -31,7 +35,8 @@ import filter
 class NonBinariesInBindirs(policy.Policy):
     """
     Directories that are specifically for binaries should have only
-    files that have some executable bit set.
+    files that have some executable bit set:
+    C{r.NonBinariesInBindirs(exceptions=I{filterexp})}
     """
     invariantexceptions = [ ('.*', stat.S_IFDIR) ]
     invariantsubtrees = [
@@ -61,8 +66,8 @@ class NonBinariesInBindirs(policy.Policy):
 
 class FilesInMandir(policy.Policy):
     """
-    The C{%(mandir)s} directory should only have files in it, normally.
-    The main cause of files in C{%(mandir)s} is confusion in packages
+    The C{%(mandir)s} directory should normally have only files in it;
+    the main cause of files in C{%(mandir)s} is confusion in packages
     about whether "mandir" means /usr/share/man or /usr/share/man/man<n>.
     """
     invariantinclusions = [ ('%(mandir)s/[^/][^/]*$', None, stat.S_IFDIR) ]
@@ -73,7 +78,7 @@ class FilesInMandir(policy.Policy):
 
 class ImproperlyShared(policy.Policy):
     """
-    The %(datadir)s directory (normally /usr/share) is intended for
+    The C{%(datadir)s} directory (normally /usr/share) is intended for
     data that can be shared between architectures; therefore, no
     ELF files should be there.
     """
@@ -81,14 +86,18 @@ class ImproperlyShared(policy.Policy):
 
     def doFile(self, file):
         m = self.recipe.magic[file]
-	if m and m.name == "ELF":
-	    self.recipe.reportErrors(
-		"Architecture-specific file %s in shared data directory" %file)
+	if m
+	    if m.name == "ELF":
+		self.recipe.reportErrors(
+		    "Architecture-specific file %s in shared data directory" %file)
+	    if m.name == "ar":
+		self.recipe.reportErrors(
+		    "Possibly architecture-specific file %s in shared data directory" %file)
 
 
 class CheckSonames(policy.Policy):
     """
-    Make sure that .so -> SONAME -> fullname
+    Warns about various possible shared library packaging errors.
     """
     invariantinclusions = [ (r'..*\.so', None, stat.S_IFDIR), ]
     def doFile(self, path):
@@ -134,13 +143,14 @@ class CheckSonames(policy.Policy):
 			s, m.contents['soname'])
 	    except:
 		log.warning("%s implies %s, which does not exist --"
-			    " use Ldconfig('%s')?", path, s,
+			    " use r.Ldconfig('%s')?", path, s,
 			    os.path.dirname(path))
 
 class CheckDestDir(policy.Policy):
     """
-    Look for the destdir path in files and symlink contents; it should
-    not be there.
+    Look for the C{%(destdir)s} path in file paths and symlink contents;
+    it should not be there.  Does not check the contents of files, though
+    files also should not contain C{%(destdir)s}.
     """
     def doFile(self, file):
 	d = self.macros.destdir
@@ -158,6 +168,10 @@ class CheckDestDir(policy.Policy):
 # now the packaging classes
 
 class _filterSpec(policy.Policy):
+    """
+    Pure virtual base class from which C{ComponentSpec} and C{PackageSpec}
+    are derived.
+    """
     def __init__(self, *args, **keywords):
 	self.extraFilters = []
 	policy.Policy.__init__(self, *args, **keywords)
@@ -178,7 +192,11 @@ class _filterSpec(policy.Policy):
 
 class ComponentSpec(_filterSpec):
     """
-    Determines which component each file is in.
+    Determines which component each file is in:
+    C{r.ComponentSpec(I{componentname}, I{filterexp}...)}
+
+    This class includes the filter expressions that specify the default
+    assignment of files to components.
     """
     baseFilters = (
 	# automatic subpackage names and sets of regexps that define them
@@ -235,7 +253,10 @@ class ComponentSpec(_filterSpec):
 
 class PackageSpec(_filterSpec):
     """
-    Determines which package each file is in.
+    Determines which package (and optionally also component) each file is in:
+    C{r.ComponentSpec(I{packagename}, I{filterexp}...)}
+    or
+    C{r.ComponentSpec(I{packagename:component}, I{filterexp}...)}
     """
     keywords = { 'compFilters': None }
 
@@ -285,7 +306,8 @@ def _markConfig(recipe, filename, fullpath):
 
 class EtcConfig(policy.Policy):
     """
-    Mark all files below /etc as config files
+    Mark all files below /etc as config files:
+    C{r.EtcConfig(exceptions=I{filterexp}}
     """
     invariantsubtrees = [ '%(sysconfdir)s', '%(taghandlerdir)s']
 
@@ -306,7 +328,8 @@ class EtcConfig(policy.Policy):
 
 class Config(policy.Policy):
     """
-    Mark only explicit inclusions as config files
+    Mark only explicit inclusions as config files:
+    C{r.Config(I{filterexp}}
     """
 
     keywords = policy.Policy.keywords.copy()
@@ -320,9 +343,12 @@ class Config(policy.Policy):
 
 class Transient(policy.Policy):
     """
-    Mark files that have transient contents as such.  Transient contents
-    are contents that should be overwritten by a new version without
-    question at update time; almost the opposite of configuration files.
+    Mark files that have transient contents as such:
+    C{r.Transient(I{filterexp})}
+    
+    Transient contents are contents that should be overwritten by a new
+    version without question at update time; almost the opposite of
+    configuration files.
     """
     invariantinclusions = [
 	r'..*\.py(c|o)$',
@@ -337,7 +363,9 @@ class Transient(policy.Policy):
 
 class SharedLibrary(policy.Policy):
     """
-    Mark system shared libaries as such so that ldconfig will be run.
+    Mark system shared libaries as such so that ldconfig will be run:
+    C{r.SharedLibrary(subtree=I{path})} to mark a path;
+    C{r.SharedLibrary(I{filterexp}) to mark a file.
     """
     # keep invariants in sync with ExecutableLibraries
     invariantsubtrees = [
@@ -377,7 +405,10 @@ class TagDescription(policy.Policy):
 class TagSpec(policy.Policy):
     """
     Apply tags defined by tag descriptions in both the current system
-    and %(destdir)s to all the files in %(destdir)s.
+    and C{%(destdir)s} to all the files in C{%(destdir)s}; can also
+    be told to apply tags manually:
+    C{r.TagSpec(I{tagname}, I{filterexp})} to add manuall, or
+    C{r.TagSpec(I{tagname}, exceptions=I{filterexp})} to set an exception
     """
     keywords = {
 	'included': {},
@@ -468,16 +499,19 @@ class TagSpec(policy.Policy):
 
 class ParseManifest(policy.Policy):
     """
-    Parse a file containing a manifest intended for RPM, finding the
-    information that can't be represented by pure filesystem status
-    with a non-root built: device files (%dev), directory responsibility
-    (%dir), and ownership (%attr).  It translates these into the
-    related Conary construct for each.  There is no equivalent to
-    %defattr -- our default ownership is root:root, and permissions
-    (except for setuid and setgid files) are collected from the filesystem.
+    Parses a file containing a manifest intended for RPM:
+    C{r.ParseManifest(I{filename})}
+    
+    In the manifest, it finds the information that can't be represented by
+    pure filesystem status with a non-root built: device files (C{%dev})
+    and permissions (C{%attr}); it ignores directory ownership (C{%dir})
+    because Conary handled directories very differently from RPM,
+    and C{%defattr} because Conary's default ownership is root:root
+    and because permissions (except for setuid and setgid files) are
+    collected from the filesystem.  It translates each manifest line
+    which it handles into the related Conary construct.
 
-    XXX I think this parsing may not be sufficient for all manifests,
-    tested only with MAKEDEV output so far.
+    Warning: tested only with MAKEDEV output so far.
     """
 
     def __init__(self, *args, **keywords):
@@ -519,9 +553,9 @@ class ParseManifest(policy.Policy):
                 self.recipe.MakeDevices(target, devtype, int(major), int(minor),
                                         owner, group, int(perms, 0))
             elif fields[1].startswith('%dir '):
-                target = fields[1][5:]
-		# XXX not sure what we should do here...
-                dironly = 1
+		pass
+		# ignore -- Conary directory handling is too different
+		# to map
             else:
 		# XXX is this right?
                 target = fields[1].strip()
@@ -533,7 +567,12 @@ class ParseManifest(policy.Policy):
 
 class MakeDevices(policy.Policy):
     """
-    Make device nodes
+    Makes device nodes:
+    C{r.MakeDevices(I{path}, I{type}, I{major}, I{minor}, I{owner}, I{group}, I{perms}=0400)}, where C{I{type}} is C{b} or C{c},.
+
+    These nodes are only in the package, not in the filesystem, in order
+    to enable Conary's policy of non-root builds (only root can actually
+    create device nodes).
     """
     def __init__(self, *args, **keywords):
 	self.devices = []
@@ -558,15 +597,18 @@ class MakeDevices(policy.Policy):
 
 
 class DanglingSymlinks(policy.Policy):
-    # This policy must run after all modifications to the packging
-    # are complete becuase it counts on self.recipe.autopkg.pathMap
+    # This policy must run after all modifications to the packaging
+    # are complete because it counts on self.recipe.autopkg.pathMap
     # being final
     """
     Disallow dangling symbolic links (symbolic links which point to
-    files which do not exist).  If you know that a dangling symbolic
-    link created by your package is fulfilled by another package on
-    which your package depends, you may set up an exception for that
-    file for the C{DanglingSymlinks} policy.
+    files which do not exist):
+    C{DanglingSymlinks(exceptions=I{filterexp}) for intentionally
+    dangling symlinks.
+    
+    If you know that a dangling symbolic link created by your package
+    is fulfilled by another package on which your package depends,
+    you may set up an exception for that file.
     """
     invariantexceptions = (
 	'%(testdir)s/.*', )
@@ -618,8 +660,8 @@ class DanglingSymlinks(policy.Policy):
 
 class AddModes(policy.Policy):
     """
-    Apply suid/sgid modes -- use SetModes in recipes; this is just the
-    combined back end to SetModes and ParseManifest.
+    Do not call from recipes; this is used internally by C{r.SetModes}
+    and C{r.ParseManifest}
     """
     def __init__(self, *args, **keywords):
 	self.fixmodes = {}
@@ -645,8 +687,9 @@ class AddModes(policy.Policy):
 
 class WarnWriteable(policy.Policy):
     """
-    Unless a mode has been set explicitly (i.e. with SetModes), warn
-    about group- or other-writeable files.
+    Warns about unexpectedly group- or other-writeable files; rather
+    than set exceptions to this policy, use C{r.SetModes} so that the
+    open permissions are explicitly and expected.
     """
     # Needs to run after AddModes because AddModes sets exceptions
     def doFile(self, file):
@@ -688,8 +731,11 @@ class IgnoredSetuid(policy.Policy):
 
 class Ownership(policy.Policy):
     """
-    Set user and group ownership of files.  The default is
-    root:root
+    Sets user and group ownership of files when the default of
+    root:root is not appropriate:
+    C{r.Ownership(I{username}, I{groupname}, I{filterexp}...)}
+
+    No exceptions to this policy are permitted.
     """
     def __init__(self, *args, **keywords):
 	self.filespecs = []
@@ -736,24 +782,23 @@ class Ownership(policy.Policy):
 
 class ExcludeDirectories(policy.Policy):
     """
-    In Conary, there are only two reasons to package a directory: the
-    directory needs permissions other than 0755, or it must exist
-    even if it is empty.  Packages do not need to explicitly include
-    a directory just to ensure that there is a place to put a file;
-    Conary will appropriately create the directory, and delete it later
-    if the directory becomes empty.
-
-    The ExcludeDirectories policy causes directories to be excluded
-    from the package.  You can set exceptions to this policy with
-    C{ExcludeDirectories(exceptions=I{regexp})} and the directories
+    Causes directories to be excluded from the package by default; set
+    exceptions to this policy with
+    C{ExcludeDirectories(exceptions=I{filterexp})} and the directories
     matching the regular expression will be included in the package.
 
-    However, it should generally not be necessary to invoke this
-    policy directly, because the most common reason to include a
-    directory in a package is that it needs permissions other than
-    0755, so simply call C{SetMode(I{path(s)}, I{mode})} where
-    C{I{mode}} is not C{0755}, and the directory will automatically
-    included.
+    There are only two reasons to package a directory: the directory needs
+    permissions other than 0755, or it must exist even if it is empty.
+
+    It should generally not be necessary to invoke this policy directly,
+    because the most common reason to include a directory in a package
+    is that it needs permissions other than 0755, so simply call
+    C{r.SetMode(I{path(s)}, I{mode})} where C{I{mode}} is not C{0755},
+    and the directory will automatically included.
+
+    Packages do not need to explicitly include a directory just to ensure
+    that there is a place to put a file; Conary will appropriately create
+    the directory, and delete it later if the directory becomes empty.
     """
     invariantinclusions = [ ('.*', stat.S_IFDIR) ]
 
@@ -800,12 +845,11 @@ class Flavor(_requirements):
 class reportErrors(policy.Policy):
     """
     This class is used to pull together all package errors in the
-    sanity-checking rules that come above it.  Do not call it
-    directly; it is for internal use only!
-
-    It must come after all the other package classes that report
-    fatal errors, so might as well come last.
+    sanity-checking rules that come above it; do not call it
+    directly; it is for internal use only.
     """
+    # Must come after all the other package classes that report
+    # fatal errors, so might as well come last.
     def __init__(self, *args, **keywords):
 	self.warnings = []
 	policy.Policy.__init__(self, *args, **keywords)
@@ -825,7 +869,6 @@ class reportErrors(policy.Policy):
 def DefaultPolicy():
     """
     Return a list of actions that expresses the default policy.
-    A recipe can then modify this list if necessary.
     """
     return [
 	NonBinariesInBindirs(),
