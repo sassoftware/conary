@@ -1500,15 +1500,7 @@ class Flavor(policy.Policy):
 	f = pkg.getFile(path)
 	set = deps.DependencySet()
         isnset = pkg.isnsetMap[path]
-        if isnset == 'x86':
-            set.addDep(deps.InstructionSetDependency,
-                       deps.Dependency('x86', []))
-        elif isnset == 'x86_64':
-            set.addDep(deps.InstructionSetDependency,
-                       deps.Dependency('x86_64', []))
-        else:
-            set.addDep(deps.InstructionSetDependency,
-                       deps.Dependency(isnset, []))
+        set.addDep(deps.InstructionSetDependency, deps.Dependency(isnset, []))
         # get the Arch.* dependencies
         set.union(use.createFlavor(None, use.Arch._iterUsed()))
         f.flavor.set(set)
