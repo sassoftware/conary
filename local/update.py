@@ -46,11 +46,12 @@ class FilesystemJob:
     def _restore(self, fileObj, target, msg, contentsOverride = ""):
 	self.restores.append((fileObj.id(), fileObj, target, contentsOverride, 
 			      msg))
+
 	for tag in fileObj.tags:
-	    if self.tagActions.has_key(tag):
-		self.tagActions[tag].append(target)
+	    if self.tagUpdates.has_key(tag):
+		self.tagUpdates[tag].append(target)
 	    else:
-		self.tagActions[tag] = [ target ]
+		self.tagUpdates[tag] = [ target ]
 
     def _remove(self, fileObj, target, msg):
 	if isinstance(fileObj, files.Directory):
@@ -63,6 +64,12 @@ class FilesystemJob:
 		self.directorySet[dir] += 1
 	    else:
 		self.directorySet[dir] = 1
+
+	for tag in fileObj.tags:
+	    if self.tagRemoves.has_key(tag):
+		self.tagRemoves[tag].append(target)
+	    else:
+		self.tagRemoves[tag] = [ target ]
 
     def userRemoval(self, troveName, troveVersion, troveFlavor, fileId):
 	if not self.userRemovals.has_key((troveName, troveVersion, troveFlavor)):
@@ -78,7 +85,45 @@ class FilesystemJob:
     def _createFile(self, target, str, msg):
 	self.newFiles.append((target, str, msg))
 
-    def apply(self, tagSet, tagScript):
+    def apply(self, tagSet = {}, tagScript = None):
+	tagCommands = []
+	runLdconfig = False
+	rootLen = len(self.root)
+
+	if self.tagRemoves.has_key('tagdescription'):
+	    for path in self.tagRemoves['tagdescription']:
+		path = path[rootLen:]
+		tagInfo = None	
+		for ti in tagSet.iteritems:
+		    if ti.file == path: 
+			tagInfo = ti
+			break
+
+		if tagInfo:
+		    del tagSet[tagInfo.tag]
+		    if "self preremove" in tagInfo.implements:
+			tagCommands.append([ path[rootLen:], "self", 
+					     "preremove" ])
+
+	    del self.tagRemoves['tagdescription']
+
+	for tag, l in self.tagRemoves.iteritems():
+	    if not tagSet.has_key(tag): continue
+	    tagInfo = tagSet[tag]
+
+	    if "files preremove" in tagInfo.implements:
+		cmd = [ tagInfo.tag, "files", "preremove"] + \
+			    [ x[rootLen:] for x in l ]
+		tagCommands.append(cmd)
+	    
+	if tagCommands and tagScript:
+	    f = open(tagScript, "a")
+	    for cmd in tagCommands:
+		f.write("# %s\n" % " ".join(cmd))
+	    f.close()
+
+	tagCommands = []
+
 	for (oldPath, newPath, msg) in self.renames:
 	    os.rename(oldPath, newPath)
 	    log.debug(msg)
@@ -123,96 +168,15 @@ class FilesystemJob:
 	    f.close()
 	    log.warning(msg)
 
-	if self.tagActions.has_key('shlib'):
-	    p = "/sbin/ldconfig"
-	    if os.getuid():
-		log.warning("ldconfig skipped (insufficient permissions)")
-	    # write any needed entries in ld.so.conf before running ldconfig
-	    sysetc = util.joinPaths(self.root, '/etc')
-	    if not os.path.isdir(sysetc):
-		# normally happens only during testing, but why not be safe?
-		util.mkdirChain(sysetc)
-	    ldsopath = util.joinPaths(self.root, '/etc/ld.so.conf')
-	    try:
-		ldso = file(ldsopath, 'r+')
-		ldsolines = ldso.readlines()
-		ldso.close()
-	    except:
-		# bootstrap
-		ldsolines = []
-	    newlines = []
-	    rootlen = len(self.root)
-	    for path in self.tagActions['shlib']:
-		dirname = os.path.dirname(path)[rootlen:]
-		dirline = dirname+'\n'
-		if dirline not in ldsolines:
-		    ldsolines.append(dirline)
-		    newlines.append(dirname)
-	    if newlines:
-		log.debug("adding ld.so.conf entries: %s",
-			  " ".join(newlines))
-		ldsofd, ldsotmpname = tempfile.mkstemp(
-		    'ld.so.conf', '.ct', sysetc)
-		try:
-		    ldso = os.fdopen(ldsofd, 'w')
-		    os.chmod(ldsotmpname, 0644)
-		    ldso.writelines(ldsolines)
-		    ldso.close()
-		    os.rename(ldsotmpname, ldsopath)
-		except:
-		    os.unlink(ldsotmpname)
-		    raise
-	    if os.getuid():
-		log.warning("ldconfig skipped (insufficient permissions)")
-	    elif os.access(util.joinPaths(self.root, p), os.X_OK) != True:
-		log.error("/sbin/ldconfig is not available")
-	    else:
-		log.debug("running ldconfig")
-		pid = os.fork()
-		if not pid:
-		    os.chdir(self.root)
-		    os.chroot(self.root)
-                    try:
-                        # XXX add a test case for an invalid ldconfig binary
-                        os.execl(p, p)
-                    except:
-                        pass
-		    os._exit(1)
-		(id, status) = os.waitpid(pid, 0)
-		if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
-		    log.error("ldconfig failed")
+	if self.tagUpdates.has_key('shlib'):
+	    shlibAction(self.root, self.tagUpdates['shlib'])
+	    del self.tagUpdates['shlib']
+	elif runLdconfig:
+	    # override to force ldconfig to run on shlib removal
+	    shlibAction(self.root, [])
 
-	    del self.tagActions['shlib']
-
-	if self.tagActions.has_key('initscript'):
-	    p = "/sbin/chkconfig"
-	    if os.getuid():
-		log.warning("chkconfig skipped (insufficient permissions)")
-	    elif os.access(util.joinPaths(self.root, p), os.X_OK) != True:
-		log.error("/sbin/chkconfig is not available")
-	    else:
-		for path in self.tagActions['initscript']:
-		    name = os.path.basename(path)
-		    log.debug("running chkconfig --add %s", name)
-		    pid = os.fork()
-		    if not pid:
-			os.chdir(self.root)
-			os.chroot(self.root)
-                        # XXX add a test case for an invalid checkconfig binary
-                        try:
-                            os.execl(p, p, "--add", name)
-                        except:
-                            os._exit(1)
-		    (id, status) = os.waitpid(pid, 0)
-		    if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
-			log.error("chkconfig failed")
-
-	    del self.tagActions['initscript']
-
-	tagCommands = []
-
-	if self.tagActions.has_key('tagdescription'):
-	    for path in self.tagActions['tagdescription']:
+	if self.tagUpdates.has_key('tagdescription'):
+	    for path in self.tagUpdates['tagdescription']:
 		# these are new tag action files which we need to run for
 		# the first time. we run them against everything in the database
 		# which has this tag, which includes the files we've just
@@ -222,32 +186,41 @@ class FilesystemJob:
 		path = path[len(self.root):]
 		
 		# don't run these twice
-		if self.tagActions.has_key(tagInfo.tag):
-		    del self.tagActions[tagInfo.tag]
+		if self.tagUpdates.has_key(tagInfo.tag):
+		    del self.tagUpdates[tagInfo.tag]
 
-		cmd = [ path, "self", "update" ] + \
+		if "self update" in tagInfo.implements:
+		    cmd = [ path, "self", "update" ] + \
 			[x for x in self.repos.iterFilesWithTag(tagInfo.tag)]
-		tagCommands.append(cmd)
+		    tagCommands.append(cmd)
 
 		tagSet[tagInfo.tag] = tagInfo
 
-	    del self.tagActions['tagdescription']
+	    del self.tagUpdates['tagdescription']
 
-	rootLen = len(self.root)
-
-	for (tag, l) in self.tagActions.iteritems():
+	for (tag, l) in self.tagUpdates.iteritems():
 	    tagInfo = tagSet.get(tag, None)
 	    if tagInfo is None: continue
 
-	    cmd = [ tagInfo.file, "files", "update" ] + \
-		[ x[rootLen:] for x in l ]
+	    if "files update" in tagInfo.implements:
+		cmd = [ tagInfo.file, "files", "update" ] + \
+		    [ x[rootLen:] for x in l ]
+		tagCommands.append(cmd)
 
-	    tagCommands.append(cmd)
+	for tag, l in self.tagRemoves.iteritems():
+	    if not tagSet.has_key(tag): continue
+	    tagInfo = tagSet[tag]
 
+	    if "files remove" in tagInfo.implements:
+		cmd = [ tagInfo.tag, "files", "preremove"] + \
+			    [ x[rootLen:] for x in l ]
+		tagCommands.append(cmd)
+	    
 	if tagScript:
 	    f = open(tagScript, "a")
 	    f.write("\n".join([" ".join(x) for x in tagCommands]))
 	    f.write("\n")
+	    f.close()
 
     def getErrorList(self):
 	return self.errors
@@ -613,7 +586,8 @@ class FilesystemJob:
 	self.changeSet = changeSet
 	self.directorySet = {}
 	self.userRemovals = {}
-	self.tagActions = {}
+	self.tagUpdates = {}
+	self.tagRemoves = {}
 	self.repos = repos
 
 	for pkgCs in changeSet.iterNewPackageList():
@@ -823,3 +797,70 @@ def buildLocalChanges(repos, pkgList, root = "", flags = 0):
 	returnList.append(result)
 
     return (changeSet, returnList)
+
+def shlibAction(root, shlibList):
+    p = "/sbin/ldconfig"
+
+    if os.getuid():
+	log.warning("ldconfig skipped (insufficient permissions)")
+
+    # write any needed entries in ld.so.conf before running ldconfig
+    sysetc = util.joinPaths(root, '/etc')
+    if not os.path.isdir(sysetc):
+	# normally happens only during testing, but why not be safe?
+	util.mkdirChain(sysetc)
+    ldsopath = util.joinPaths(root, '/etc/ld.so.conf')
+
+    try:
+	ldso = file(ldsopath, 'r+')
+	ldsolines = ldso.readlines()
+	ldso.close()
+    except:
+	# bootstrap
+	ldsolines = []
+
+    newlines = []
+    rootlen = len(root)
+
+    for path in shlibList:
+	dirname = os.path.dirname(path)[rootlen:]
+	dirline = dirname+'\n'
+	if dirline not in ldsolines:
+	    ldsolines.append(dirline)
+	    newlines.append(dirname)
+
+    if newlines:
+	log.debug("adding ld.so.conf entries: %s",
+		  " ".join(newlines))
+	ldsofd, ldsotmpname = tempfile.mkstemp(
+	    'ld.so.conf', '.ct', sysetc)
+	try:
+	    ldso = os.fdopen(ldsofd, 'w')
+	    os.chmod(ldsotmpname, 0644)
+	    ldso.writelines(ldsolines)
+	    ldso.close()
+	    os.rename(ldsotmpname, ldsopath)
+	except:
+	    os.unlink(ldsotmpname)
+	    raise
+
+    if os.getuid():
+	log.warning("ldconfig skipped (insufficient permissions)")
+    elif os.access(util.joinPaths(root, p), os.X_OK) != True:
+	log.error("/sbin/ldconfig is not available")
+    else:
+	log.debug("running ldconfig")
+	pid = os.fork()
+	if not pid:
+	    os.chdir(root)
+	    os.chroot(root)
+	    try:
+		# XXX add a test case for an invalid ldconfig binary
+		os.execl(p, p)
+	    except:
+		pass
+	    os._exit(1)
+	(id, status) = os.waitpid(pid, 0)
+	if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
+	    log.error("ldconfig failed")
+

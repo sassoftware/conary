@@ -249,7 +249,7 @@ class Database(SqlDbRepository):
 	for pkg in cs.iterNewPackageList():
 	    if pkg.getName().endswith(":source"): raise SourcePackageInstall
 
-	tagSet = tags.loadTagDict("/etc/conary/tags")
+	tagSet = tags.loadTagDict(self.root + "/etc/conary/tags")
 
 	# Make sure this change set doesn't unintentionally restore troves
 	# which have been removed.  take a look at which packages were removed
