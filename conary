@@ -9,9 +9,8 @@ DBPATH=os.getcwd() + "/srsdb"
 
 scratch = DBPATH + "/scratch"
 fileDB = DBPATH + "/files"
-util.mkdirChain(DBPATH)
-util.mkdirChain(scratch)
-util.mkdirChain(fileDB)
+pkgDB = DBPATH + "/pkgs"
+util.mkdirChain(scratch, fileDB, pkgDB)
 
 def usage():
     print "usage: srs import <file.rpm>"

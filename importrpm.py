@@ -2,6 +2,7 @@ import rpm
 import os
 import files
 import util
+import package
 
 def doImport(DBPATH, rpmFile):
     scratch = DBPATH + "/scratch"
@@ -50,6 +51,8 @@ def doImport(DBPATH, rpmFile):
 
     version = "/specifix.com/" + pkgVersion + "-" + pkgRelease
 
+    p = package.Package(DBPATH, pkgName, version)
+
     for file in fileList:
 	dest = fileDB + "/" + file.dir() + "/" + file.name() + ".contents" 
 
@@ -58,5 +61,14 @@ def doImport(DBPATH, rpmFile):
 	os.rename(scratch + "/" + file.path(), dest)
 
 	infoFile = files.FileDB(DBPATH, file.path())
-	infoFile.add(version, file)
-	infoFile.write()
+
+	existingFile = infoFile.findVersion(file)
+	if not existingFile:
+	    file.version(version)
+	    infoFile.add(version, file)
+	    p.addFile(file)
+	    infoFile.write()
+	else:
+	    p.addFile(existingFile)
+
+    p.write()

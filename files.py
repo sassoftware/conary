@@ -68,6 +68,14 @@ class FileMode:
 	return "%o %s %s %s" % (self.thePerms, self.theOwner, self.theGroup,
 				self.theMtime)
 
+    def compare(self, other):
+	if self.thePerms == other.thePerms and \
+	   self.theOwner == other.theOwner and \
+	   self.theGroup == other.theGroup:
+	    return 1
+
+	return 0
+
     def __init__(self, info = None):
 	if info:
 	    (self.thePerms, self.theOwner, self.theGroup, self.theMtime) = \
@@ -100,11 +108,18 @@ class File(FileMode):
 
 	return self.theDir
 
+    def version(self, new = None):
+	if (new != None):
+	    self.theVersion = new
+
+	return self.theVersion
+
     def infoLine(self):
 	return FileMode.infoLine(self)
 
-    def __init__(self, path, info = None):
+    def __init__(self, path, newVersion = None, info = None):
 	self.path(path)
+	self.theVersion = newVersion
 	FileMode.__init__(self, info)
 
 class RegularFile(File):
@@ -118,13 +133,19 @@ class RegularFile(File):
     def infoLine(self):
 	return "f %s %s" % (self.themd5, File.infoLine(self))
 
-    def __init__(self, path, info = None):
+    def compare(self, other):
+	if self.themd5 == other.themd5:
+	    return File.compare(self, other)
+
+	return 0
+
+    def __init__(self, path, version = None, info = None):
 	if (info):
 	    (type, self.themd5, info) = string.split(info, None, 2)
 	else:
 	    self.themd5 = None
 
-	File.__init__(self, path, info)
+	File.__init__(self, path, version, info)
 
 class FileDB:
 
@@ -135,8 +156,15 @@ class FileDB:
 	f = open(self.dbfile, "r")
 	for line in f.readlines():
 	    (version, rest) = string.split(line, None, 1)
-	    self.versions[version] = RegularFile(self.path, rest)
+	    self.versions[version] = RegularFile(self.path, version, rest)
 	f.close()
+
+    def findVersion(self, file):
+	for f in self.versions.values():
+	    if type(f) == type(file) and f.compare(file):
+		return f
+
+	return None
 
     def add(self, version, file):
 	if self.versions.has_key(version):
