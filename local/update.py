@@ -493,7 +493,10 @@ class FilesystemJob:
 		    # those changes
 		    if headFileContType == changeset.ChangedFileTypes.diff:
 			sha1 = baseFile.contents.sha1()
-			baseLineF = repos.getFileContents([sha1])[sha1]
+			baseLineF = repos.getFileContents(pkgCs.getName(),
+					pkgCs.getOldVersion(), pkgCs.getFlavor(),
+					basePkg.getFile(fileId)[0])
+
 			baseLines = baseLineF.readlines()
 			del baseLineF
 			headFileContents = changeSet.getFileContents(fileId)[1]

@@ -265,55 +265,22 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self.toFile(self.c[version].getFileVersion(fileId,
                                                  self.fromVersion(version)))
 
-    def getFileContents(self, sha1List):
-	l = sha1List[:]
-	l.sort()
+    def getFileContents(self, name, version, flavor, path):
+	url = self.c[version].getFileContents(name, 
+		    self.fromVersion(version), self.fromFlavor(flavor),
+		    path)
 
-	sha1s = []
-	for item in sha1List:
-	    if type(item) == tuple:
-		sha1s.append(item[0])
-	    else:
-		sha1s.append(item)
-
-	url = self.s.getFileContents(sha1s)
-
-	# XXX we shouldn't need to copy this locally; doing so is silly
 	inF = urllib.urlopen(url)
 	(fd, path) = tempfile.mkstemp()
-	os.unlink(path)
+	#os.unlink(path)
 	outF = os.fdopen(fd, "r+")
 	util.copyfileobj(inF, outF)
-	inF.close()
+	del inF
 
 	outF.seek(0)
-	fc = filecontainer.FileContainer(outF)
-	del outF
+	gzfile = gzip.GzipFile(fileobj = outF)
 
-	d = {}
-	for item in sha1List:
-	    if type(item) == tuple:
-		(sha1, path) = item
-		f = open(path, "w")
-		returnFile = False
-	    else:
-		sha1 = item
-		(fd, path) = tempfile.mkstemp()
-		f = os.fdopen(fd, "w+")
-		returnFile = True
-
-	    inF = fileobj = fc.getFile(sha1)
-	    util.copyfileobj(inF, f)
-	    del inF
-
-	    if returnFile:
-		f.seek(0)
-		d[sha1] = f
-	    else:
-		del f
-		d[sha1] = path
-
-	return d
+	return gzfile
 
     def commitChangeSet(self, chgSet):
 	serverName = None
@@ -353,5 +320,4 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	assert(r.status == 200)
 
     def __init__(self, repMap, server):
-	self.s = xmlrpclib.Server(server)
 	self.c = ServerCache(repMap)

@@ -203,23 +203,15 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos,
     except repository.PackageMissing:
         raise RecipeFileError, 'cannot find source component %s' % component
 
-    srcFileInfo = None
-    for (fileId, path, version) in repos.iterFilesInTrove(
-					      sourceComponent.getName(),
-					      sourceComponent.getVersion(),
-					      sourceComponent.getFlavor()):
-        if path == filename:
-            srcFileInfo = (fileId, version)
-            break
-
-    if not srcFileInfo:
-        raise RecipeFileError, '%s does not contain %s' % (component, filename)
-
-    fileObj = repos.getFileVersion(fileId, version)
     (fd, recipeFile) = tempfile.mkstemp(".recipe", 'temp-%s-' %name)
-    os.close(fd)
-    sha1 = fileObj.contents.sha1()
-    repos.getFileContents([(sha1, recipeFile)])
+    outF = os.fdopen(fd, "w")
+    inF = repos.getFileContents(sourceComponent.getName(),
+				sourceComponent.getVersion(),
+				sourceComponent.getFlavor(), filename)
+    util.copyfileobj(inF, outF)
+
+    del inF
+    del outF
 
     try:
         loader = RecipeLoader(recipeFile, cfg, repos, component)

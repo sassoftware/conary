@@ -23,7 +23,6 @@ class ConaryConfiguration:
 	'instructionSet'	: deps.arch.current(),
 	'lookaside'		: '/var/cache/conary',
 	'name'			: None,
-	'repPath'		: '/var/lib/conary-rep',
 	'repositoryMap'	        : [ STRINGDICT, {} ],
 	'root'			: '/',
 	'sourcePath'		: '/usr/src/conary/sources',

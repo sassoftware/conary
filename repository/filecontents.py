@@ -18,21 +18,21 @@ class FileContents(object):
 	if self.__class__ == FileContents:
 	    raise NotImplementedError
 
-class FromRepository(FileContents):
+class FromDataStore(FileContents):
 
-    __slots__ = ( "repos", "theSize", "sha1" )
+    __slots__ = ( "store", "theSize", "sha1" )
 
     def copy(self):
         return self.__class__(self.repos, self.sha1, self.theSize)
 
     def get(self):
-	return self.repos.getFileContents((self.sha1,))[self.sha1]
+	return self.store.openFile(self.sha1)
 
     def size(self):
 	return self.theSize
 
-    def __init__(self, repos, sha1, size):
-	self.repos = repos
+    def __init__(self, store, sha1, size):
+	self.store = store
 	self.sha1 = sha1
 	self.theSize = size
 

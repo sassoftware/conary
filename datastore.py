@@ -182,6 +182,12 @@ class DataStore:
 	gzfile.fullSize = size
 	return gzfile
 
+    # returns a python file object for the file requested
+    def openRawFile(self, hash):
+	path = self.hashToPath(hash)
+	f = open(path, "r")
+	return f
+
     def removeFile(self, hash):
 	path = self.hashToPath(hash)
 	self.decrementCount(path)

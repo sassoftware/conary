@@ -185,24 +185,27 @@ class AbstractTroveDatabase:
 	"""
 	raise NotImplementedError
 
-    def getFileContents(self, sha1List):
+    def getFileContents(self, troveName, troveVersion, troveFlavor, path):
 	"""
-	Retrieves the files w/ the sha1s in the parameter list. If
-	an item in the list is a tuple, the first item in the tuple
-	should be the sha1 and the second the path the file should
-	be written to. If item in the tuple is a string, it should be
-	just a sha1 to retrieve.
+	Retrieves the files specified by the fileDict. The dictionary is
+	indexed by (troveName, troveVersion, troveFlavor) tuples, and each
+	element is a list.  If an item in the list is a tuple, the first item
+	in the tuple should be the path from the trove to retrieve and the
+	second the path the file should be written to. If item in the tuple is
+	a string, it should be just a path to retrieve.
 
-	A dict indexed by sha1's is returned. For sha1s which were given 
-	file names, the dict contains the file name the file was stored
-	in. For sha1s without file names, the dict contains an open file
-	object for the contents of the file (the file will have already
-	been unlinked, and has no file name in this case).
+	A dict indexed by (troveName, troveVersion, troveFlavor, trovePath) is
+	returned. For paths which were given file names, the dict contains the
+	file name the file was stored in. For paths without file names, the
+	dict contains an open file object for the contents of the file (the
+	file will have already been unlinked, and has no file name in this
+	case).
 
-	@param sha1List: files to retrieve
-	@type sha1List: list
-	@rtype: list
+	@param fileList: files to retrieve
+	@type fileList: list
+	@rtype: dict
 	"""
+	raise NotImplementedError
 
     def getTrove(self, troveName, version, flavor):
 	"""
@@ -498,22 +501,22 @@ class DataStoreRepository:
     def _removeFileContents(self, sha1):
 	self.contentsStore.removeFile(sha1)
 
-    def getFileContents(self, sha1List):
-	d = {}
-	for item in sha1List:
-	    if type(item) == str:
-		d[item] = self.contentsStore.openFile(item)
-	    else:
-		(sha1, path) = item
-		outF = open(path, "w+")
-		inF = self.contentsStore.openFile(sha1)
-		util.copyfileobj(inF, outF)
-		d[item] = path
-
-	return d
+    def _getFileObject(self, sha1):
+	return self.contentsStore.openFile(sha1)
 
     def _hasFileContents(self, fileId):
 	return self.contentsStore.hasFile(fileId)
+
+    def getFileContents(self, troveName, troveVersion, troveFlavor, path):
+	# this could be much more efficient; iterating over the files is
+	# just silly
+	for (fileId, tpath, tversion, fileObj) in \
+		self.iterFilesInTrove(troveName, troveVersion, 
+					    troveFlavor, withFiles = True):
+	    if tpath != path: continue
+
+	    inF = self.contentsStore.openFile(fileObj.contents.sha1())
+	    return inF
 
     def __init__(self, path):
 	fullPath = path + "/contents"
@@ -705,8 +708,9 @@ class ChangeSetJob:
 		if repos._hasFileContents(file.contents.sha1()):
 		    # if we already have the file in the data store we can
 		    # get the contents from there
-		    fileContents = filecontents.FromRepository(repos,
-				    file.contents.sha1(), file.contents.size())
+		    fileContents = filecontents.FromDataStore(
+				     repos.contentsStore, file.contents.sha1(), 
+				     file.contents.size())
 		    contType = changeset.ChangedFileTypes.file
 		else:
 		    oldFile = fileMap[fileId][3]
@@ -718,7 +722,7 @@ class ChangeSetJob:
 			assert(oldVer)
 			(contType, fileContents) = cs.getFileContents(fileId)
 			sha1 = oldfile.contents.sha1()
-			f = repos.getFileContents((sha1,))[sha1]
+			f = repos._getFileObject(sha1)
 			oldLines = f.readlines()
 			del f
 			diff = fileContents.get().readlines()
