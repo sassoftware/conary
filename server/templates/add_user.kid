@@ -1,6 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <?python #
-import kid; kid.enable_import()
 from templates import library
 ?>
 
