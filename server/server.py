@@ -132,6 +132,12 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	self.send_response(200, 'OK')
 
 if __name__ == '__main__':
+    profile = 0
+    if profile:
+        import hotshot
+        prof = hotshot.Profile('server.prof')
+        prof.start()
+
     netRepos = NetworkRepositoryServer(sys.argv[2], FILE_PATH, BASE_URL,
 				       sys.argv[3])
 
@@ -151,3 +157,11 @@ if __name__ == '__main__':
                 fds[fd].handle_request()
         except select.error:
             pass
+        except:
+            if profile:
+                prof.stop()
+                print "exception happened, exiting"
+                sys.exit(1)
+            else:
+                raise
+            
