@@ -286,11 +286,11 @@ def buildChangeSet(repos, state, srcVersion = None, needsHead = False):
 	if path.endswith(".recipe"):
 	    f.isConfig(set = True)
 
-	if not srcPkg.hasFile(fileId):
+	if not srcPkg or not srcPkg.hasFile(fileId):
 	    # if we're committing against head, this better be a new file.
 	    # if we're generating a diff against someplace else, it might not 
 	    # be.
-	    assert(not needsHead or not version)
+	    assert(needsHead and not version)
 	    # new file, so this is easy
 	    changeSet.addFile(fileId, None, newVersion, f.infoLine())
 	    state.addFile(fileId, path, newVersion)
