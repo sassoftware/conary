@@ -375,6 +375,9 @@ def realMain(cfg, argv=sys.argv):
         info = argSet.has_key('info')
 	if info: del argSet['info']
 
+        deps = argSet.has_key('deps')
+	if deps: del argSet['deps']
+
         showChanges = argSet.has_key('show-changes')
 	if showChanges: del argSet['show-changes']
 
@@ -394,8 +397,9 @@ def realMain(cfg, argv=sys.argv):
 	db = database.Database(cfg.root, cfg.dbPath)
 	repos = openRepository(cfg.repositoryMap)
         showchangeset.displayChangeSet(db, repos, cs, component, cfg, ls, 
-                                        tags, info, fullVersions, showChanges, 
-                                        ids=ids, sha1s=sha1s, all=all)
+                                        tags, fullVersions, showChanges, 
+                                        ids=ids, sha1s=sha1s, all=all, 
+                                        deps=deps)
     elif (otherArgs[1] == "update"):
 	kwargs = {}
 

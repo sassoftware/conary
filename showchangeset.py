@@ -26,11 +26,11 @@ from lib.sha1helper import sha1ToString
 
 
 def usage():
-    print "conary showcs   <changeset> [trove]"
+    print "conary showcs   <changeset> [trove[=version]]"
     print "showcs flags:   "
     print "                --full-versions   Print full version strings instead of "
     print "                                  attempting to shorten them" 
-    print "                --info            Print dependency information about the troves"
+    print "                --deps            Print dependency information about the troves"
     print "                --ls              (Recursive) list file contents"
     print "                --show-changes    For modifications, show the old "
     print "                                  file version next to new one"
@@ -44,11 +44,11 @@ def usage():
 
 
 def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,  
-                     info=False, fullVersions=False, showChanges=False,
+                     fullVersions=False, showChanges=False,
                     all=False, deps=False, sha1s=False, ids=False):
     (troves, hasVersions) = getTroves(cs, troveList) 
     if all:
-        ls = tags = fullVersions = info = deps = True
+        ls = tags = fullVersions = deps = True
     
     if not (ls or tags or sha1s or ids):
         if hasVersions:
@@ -59,11 +59,9 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
 	for (troveName, version, flavor), indent in troves:
             trove = cs.newPackages[(troveName, version, flavor)]
             displayTroveHeader(trove, indent, displayC, fullVersions)
-            if info:
-                if trove.getRequires():
-                    depformat('Requires', trove.getRequires())
-                if trove.getProvides():
-                    depformat('Provides', trove.getProvides())
+            if deps:
+                depformat('Requires', trove.getRequires())
+                depformat('Provides', trove.getProvides())
     else:
         troves = includeChildTroves(cs, troves)
         displayC = createDisplayCache(cs, troves, fullVersions)
@@ -128,11 +126,9 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
                 printedData = True
             if printedData:
                 print
-            if info:
-                if trove.getRequires():
-                    depformat('Requires', trove.getRequires())
-                if trove.getProvides():
-                    depformat('Provides', trove.getProvides())
+            if deps:
+                depformat('Requires', trove.getRequires())
+                depformat('Provides', trove.getProvides())
         for (troveName, version, flavor) in cs.oldPackages:
             print "remove %s %s" % (troveName, version.asString())
 
