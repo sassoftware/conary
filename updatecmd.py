@@ -32,7 +32,7 @@ def doUpdate(repos, db, cfg, pkg, versionStr = None):
                     cs = newcs
 
 	    list = []
-	    list = map(lambda x: list.append(x), cs.getPackageList())
+	    list = map(lambda x: list.append(x.getName()), cs.getPackageList())
 
     if not cs:
         # so far no changeset (either the path didn't exist or we could not
