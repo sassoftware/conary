@@ -400,6 +400,9 @@ class FlagsStream:
     def __init__(self, *args):
 	pass
 
+    def __eq__(self, other):
+	return self.__class__ == other.__class__
+
 class File:
 
     lsTag = None
@@ -483,7 +486,7 @@ class File:
 
 	return "".join(rc)
 
-    def twm(self, diff, base):
+    def twm(self, diff, base, skip = None):
 	sameType = struct.unpack("B", diff[0])
 	if not sameType: 
 	    # XXX file type changed -- we don't support this yet
@@ -496,7 +499,8 @@ class File:
 	for (name, streamType) in self.streamList:
 	    size = struct.unpack("!H", diff[i:i+2])[0]
 	    i += 2
-	    w = self.__dict__[name].twm(diff[i:i+size], base.__dict__[name])
+	    if name != skip:
+		w = self.__dict__[name].twm(diff[i:i+size], base.__dict__[name])
 	    i += size
 	    conflicts = conflicts or w
 
@@ -837,6 +841,10 @@ def fieldsChanged(diff):
 	    l = tupleChanged(InodeStream, diff[i:i+size])
 	    s = " ".join(l)
 	    rc.append("inode(%s)" % s)
+	elif name == "contents":
+	    l = tupleChanged(RegularFileStream, diff[i:i+size])
+	    s = " ".join(l)
+	    rc.append("contents(%s)" % s)
 	else:
 	    rc.append(name)
 
