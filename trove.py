@@ -41,6 +41,9 @@ class Trove:
     def changeVersion(self, version):
         self.version = version
 
+    def changeFlavor(self, flavor):
+        self.flavor = flavor
+
     def addFile(self, fileId, path, version):
 	self.idMap[fileId] = (path, version)
 
@@ -190,11 +193,12 @@ class Trove:
 	    self.removeFile(fileId)
 
 	self.mergeTroveListChanges(pkgCS.iterChangedTroves())
-	self.flavor = pkgCS.getFlavor()
+	self.flavor = pkgCS.getNewFlavor()
 	self.changeLog = pkgCS.getChangeLog()
 	self.setProvides(pkgCS.getProvides())
 	self.setRequires(pkgCS.getRequires())
 	self.changeVersion(pkgCS.getNewVersion())
+	self.changeFlavor(pkgCS.getNewFlavor())
 
 	return fileMap
 
@@ -807,9 +811,6 @@ class TroveChangeSet:
         return self.newFlavor
 
     def getNewFlavor(self):
-        return self.newFlavor
-
-    def getFlavor(self):
         return self.newFlavor
 
     def __init__(self, name, changeLog, oldVersion, newVersion, 

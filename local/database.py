@@ -333,7 +333,7 @@ class Database(SqlDbRepository):
 	for newPkg in cs.iterNewPackageList():
 	    name = newPkg.getName()
 	    old = newPkg.getOldVersion()
-	    flavor = newPkg.getFlavor()
+	    flavor = newPkg.getOldFlavor()
 	    if self.hasPackage(name) and old:
 		ver = old.fork(versions.LocalBranch(), sameVerRel = 1)
 		pkg = self.getTrove(name, old, flavor)

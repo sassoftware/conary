@@ -588,20 +588,20 @@ class ChangeSetJob:
 	    old = csPkg.getOldVersion()
 	    oldTroveVersion = old
 	    pkgName = csPkg.getName()
-	    troveFlavor = csPkg.getFlavor()
+	    troveFlavor = csPkg.getNewFlavor()
 
-	    if repos.hasTrove(pkgName, newVersion, csPkg.getFlavor()):
+	    if repos.hasTrove(pkgName, newVersion, troveFlavor):
 		raise CommitError, \
 		       "version %s of %s is already installed" % \
 			(newVersion.asString(), csPkg.getName())
 
 	    if old:
-		newPkg = repos.getTrove(pkgName, old, csPkg.getFlavor(),
+		newPkg = repos.getTrove(pkgName, old, csPkg.getOldFlavor(),
 					pristine = True)
 		newPkg.changeVersion(newVersion)
 	    else:
 		newPkg = trove.Trove(csPkg.getName(), newVersion,
-				     csPkg.getFlavor(), csPkg.getChangeLog())
+				     troveFlavor, csPkg.getChangeLog())
 
 	    newFileMap = newPkg.applyChangeSet(csPkg)
 

@@ -312,7 +312,7 @@ class FilesystemJob:
 	    fsPkg = fsPkg.copy()
 	else:
 	    fsPkg = trove.Trove(pkgCs.getName(), versions.NewVersion(),
-				    pkgCs.getFlavor(), pkgCs.getChangeLog())
+				pkgCs.getNewFlavor(), pkgCs.getChangeLog())
 
 	fsPkg.mergeTroveListChanges(pkgCs.iterChangedTroves(),
 				    redundantOkay = True)
@@ -395,7 +395,7 @@ class FilesystemJob:
 		# the file was removed from the local system; this change
 		# wins
 		self.userRemoval(pkgCs.getName(), pkgCs.getNewVersion(),
-                                 pkgCs.getFlavor(), fileId)
+                                 pkgCs.getNewFlavor(), fileId)
 		continue
 
 	    (fsPath, fsVersion) = fsPkg.getFile(fileId)
@@ -510,7 +510,8 @@ class FilesystemJob:
 		    if headFileContType == changeset.ChangedFileTypes.diff:
 			sha1 = baseFile.contents.sha1()
 			baseLineF = repos.getFileContents(pkgCs.getName(),
-					pkgCs.getOldVersion(), pkgCs.getFlavor(),
+					pkgCs.getOldVersion(), 
+					pkgCs.getOldFlavor(),
 					basePkg.getFile(fileId)[0],
 					basePkg.getFile(fileId)[1]).get()
 
@@ -638,7 +639,7 @@ class FilesystemJob:
 	    old = pkgCs.getOldVersion()
 	    if old:
 		localVer = old.fork(versions.LocalBranch(), sameVerRel = 1)
-		basePkg = repos.getTrove(name, old, pkgCs.getFlavor())
+		basePkg = repos.getTrove(name, old, pkgCs.getOldFlavor())
 		pkg = self._singlePackage(repos, pkgCs, changeSet, basePkg, 
 				      fsPkgDict[(name, localVer)], root, flags)
 		self.oldPackages.append((basePkg.getName(), 

@@ -97,9 +97,9 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 		# a new package. no need to erase any old stuff then!
 		continue
 
-	    assert(repos.hasTrove(name, oldVersion, csPkg.getFlavor()))
+	    assert(repos.hasTrove(name, oldVersion, csPkg.getOldFlavor()))
 
-	    oldPkg = repos.getTrove(name, oldVersion, csPkg.getFlavor())
+	    oldPkg = repos.getTrove(name, oldVersion, csPkg.getOldFlavor())
 	    self.oldPackage(oldPkg)
 
 	    for fileId in csPkg.getOldFileList():

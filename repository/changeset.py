@@ -118,7 +118,7 @@ class ChangeSet:
 	assert(min(new.timeStamps()) > 0)
 
 	self.newPackages[(csPkg.getName(), csPkg.getNewVersion(),
-		          csPkg.getFlavor())] = csPkg
+		          csPkg.getNewFlavor())] = csPkg
 
 	if csPkg.isAbsolute():
 	    self.absolute = 1
@@ -293,11 +293,11 @@ class ChangeSet:
 		# this was a new package, and the inverse of a new
 		# package is an old package
 		rollback.oldPackage(pkgCs.getName(), pkgCs.getNewVersion(), 
-				    pkgCs.getFlavor())
+				    pkgCs.getNewFlavor())
 		continue
 
 	    pkg = db.getTrove(pkgCs.getName(), pkgCs.getOldVersion(),
-			      pkgCs.getFlavor())
+			      pkgCs.getOldFlavor())
 
 	    # this is a modified package and needs to be inverted
 
