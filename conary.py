@@ -406,7 +406,7 @@ def realMain(cfg, argv=sys.argv):
 
 	if argSet: return usage()
 	if len(otherArgs) >=3:
-	    updatecmd.doUpdate(repos, cfg, otherArgs[2:], **kwargs)
+	    updatecmd.doUpdate(cfg, otherArgs[2:], **kwargs)
 	else:
 	    return usage()
     elif (otherArgs[1] == "return usage"):
