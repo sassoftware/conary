@@ -173,7 +173,7 @@ class RecipeLoader(types.DictionaryType):
                 if obj.__dict__.has_key('ignore'):
                     continue
                 if issubclass(obj, Recipe) and obj.__dict__.has_key('name'):
-                    obj.__dict__['filename'] = file
+                    obj.__dict__['filename'] = filename
                     self[name] = obj
 
     def __del__(self):
