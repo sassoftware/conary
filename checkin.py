@@ -127,12 +127,8 @@ def checkout(repos, cfg, dir, name, versionStr = None):
 
     for (fileId, (path, version)) in trv.iterFileList():
 	fullPath = dir + "/" + path
-	fileObj = repos.getFileVersion(fileId, version)
-
-	if fileObj.hasContents:
-	    contents = filecontents.FromRepository(repos, fileObj.sha1())
-	else:
-	    contents = None
+	(fileObj, contents) = repos.getFileVersion(fileId, version,
+						   withContents = True)
 
 	fileObj.restore(contents, fullPath, 1)
 
@@ -406,8 +402,9 @@ def update(repos, versionStr = None):
 				      state.getVersion())
 
     fullyUpdated = 1
+    cwd = os.getcwd()
 
-    for (fileId, headPath, headVersion) in pkgCs.getNewFileList():
+    for (fileId, headPath, headFileVersion) in pkgCs.getNewFileList():
 	# this gets broken links right
 	try:
 	    os.lstat(headPath)
@@ -419,14 +416,9 @@ def update(repos, versionStr = None):
 
 	log.info("creating %s" % headPath)
 	(headFile, headFileContents) = \
-		repos.getFileVersion(fileId, headVersion, withContents = 1)
-	src = repos.pullFileContentsObject(headFile.sha1())
-	dest = open(headPath, "w")
-	util.copyfileobj(src, dest)
-	#headFile.restore(headFileContents, headPath, 1)
-	state.addFile(fileId, headPath, headVersion)
-	del src
-	del dest
+		repos.getFileVersion(fileId, headFileVersion, withContents = 1)
+	headFile.restore(headFileContents, cwd + '/' + headPath, 1)
+	state.addFile(fileId, headPath, headFileVersion)
 
     for fileId in pkgCs.getOldFileList():
 	(path, version) = basePkg.getFile(fileId)
@@ -485,12 +477,12 @@ def update(repos, versionStr = None):
 	
 	# headFileVersion is None for renames
 	if headFileVersion:
-	    fsFile = files.FileFromFilesystem(realPath, fileId, type = "src")
+	    fsFile = files.FileFromFilesystem(realPath, fileId)
 	    (headFile, headFileContents) = \
 		    repos.getFileVersion(fileId, headFileVersion, 
 					 withContents = 1)
 
-	if headFileVersion and fsFile.sha1() != headFile.sha1():
+	if headFileVersion and not fsFile.same(headFile, ignoreOwner = True):
 	    # the contents have changed... let's see what to do
 	    if basePkg.hasFile(fileId):
 		baseFileVersion = basePkg.getFile(fileId)[1]
