@@ -108,7 +108,7 @@ class DependencyTables:
                     depList.append((troveNum, classId, dep))
 
     def _mergeTmpTable(self, cu, tmpName, depTable, reqTable, provTable,
-                       allDeps):
+                       allDeps, multiplier = 1):
         substDict = { 'tmpName'   : tmpName,
                       'depTable'  : depTable,
                       'reqTable'  : reqTable,
@@ -128,6 +128,10 @@ class DependencyTables:
                         WHERE
                             Dependencies.depId is NULL
                     """ % substDict, start_transaction = False)
+
+        if multiplier != 1:
+            cu.execute("UPDATE %s SET depId=depId * %d"  
+                           % (depTable, multiplier), start_transaction = False)
 
         cu.execute("""INSERT INTO %(reqTable)s 
                     SELECT %(tmpName)s.troveId, depId FROM
@@ -277,7 +281,7 @@ class DependencyTables:
             return (False, [])
 
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
-                            "TmpProvides", "AllDeps")
+                            "TmpProvides", "AllDeps", multiplier = -1)
         cu.execute(self._resolveStmt(depTable = "AllDeps",
                                      requiresTable = "TmpRequires",
                                      providesTable = "AllProvides"), 
@@ -356,7 +360,7 @@ class DependencyTables:
 
 
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
-                            None, "AllDeps")
+                            None, "AllDeps", multiplier = -1)
 
         cu.execute("""SELECT depNum, Items.item, Versions.version FROM 
                         (%s)
