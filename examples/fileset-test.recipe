@@ -1,0 +1,8 @@
+class groupTest(FilesetRecipe):
+    name = "fileset-test"
+    version = "1.0"
+
+    def setup(self):
+	self.addTrove("/usr/sbin/tmpwatch" "tmpwatch:runtime", "@linux")
+	self.addTrove("/usr/share/man/man8/tmpwatch.8.gz", "tmpwatch:doc", 
+		      "@linux")

@@ -1,0 +1,7 @@
+class groupTest(GroupRecipe):
+    name = "group-test"
+    version = "1.0"
+
+    def setup(self):
+	self.addTrove("tmpwatch:runtime", "srs.specifixinc.com@linux")
+	self.addTrove("tmpwatch:doc", "srs.specifixinc.com@linux")
