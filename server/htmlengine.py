@@ -214,7 +214,10 @@ Choose a branch: %s
                 permStr = "Read-Only"
             if admin:
                 permStr += " (admin)"
-            self.writeFn("<tr><td>%s</td><td>%s</td></tr>\n" % (user, permStr))
+            self.writeFn("""
+<tr><td>%s</td><td>%s</td><td><a href="chPassForm?username=%s">Change Password</a></td></tr>\n"""
+                % (user, permStr, user)
+            )
 
         self.writeFn("</table>")
         self.writeFn("""
@@ -244,16 +247,21 @@ Choose a branch: %s
 </form>
 """)
 
-    def htmlChPassForm(self, username):
+    def htmlChPassForm(self, username, askForOld):
         self.writeFn("""
 <form method="post" action="chPass">
 <table cellpadding="6">
 <tr><td>Changing password for:</td><td><b>%s</b></td></tr>
-<tr><td>Old password:</td><td><input type="password" name="oldPassword"></td></tr>
+""" % username)
+        if askForOld:
+            self.writeFn("""<tr><td>Old password:</td><td><input type="password" name="oldPassword"></td></tr>""")
+        self.writeFn("""
 <tr><td>New password:</td><td><input type="password" name="password1"></td></tr>
 <tr><td>Again:</td><td><input type="password" name="password2"></td></tr>
+
 </table>
 <p><input type="submit"></p>
+<input type="hidden" name="username" value="%s" />
 </form>
 """ % username)
 

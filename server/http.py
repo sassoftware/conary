@@ -207,20 +207,36 @@ class HttpHandler(HtmlEngine):
         
     def chPassFormCmd(self, authToken, fields):
         self.htmlPageTitle("Change Password")
-        self.htmlChPassForm(authToken[0])
+
+        if fields.has_key("username"):
+            username = fields["username"].value
+            askForOld = False
+        else:
+            username = authToken[0]
+            askForOld = True
+            
+        self.htmlChPassForm(username, askForOld)
         
     def chPassCmd(self, authToken, fields):
-        oldPassword = fields["oldPassword"].value
+        username = fields["username"].value
+        if username != authToken[0]:
+            if not self.repServer.auth.check(authToken, admin=True):
+                raise InsufficientPermission
+        
+        if fields.has_key("oldPassword"):
+            oldPassword = fields["oldPassword"].value
+        else:
+            oldPassword = None
         p1 = fields["password1"].value
         p2 = fields["password2"].value
 
         self.htmlPageTitle("Change Password")
-        if authToken[1] != oldPassword:
+        if oldPassword and authToken[1] != oldPassword:
             self.writeFn("""<div class="warning">Error: old password is incorrect</div>""")
         elif p1 != p2:
             self.writeFn("""<div class="warning">Error: passwords do not match</div>""")
         elif oldPassword == p1:
             self.writeFn("""<div class="warning">Error: old and new passwords identical, not changing.</div>""")
         else:
-            self.repServer.auth.changePassword(authToken[0], p1)
+            self.repServer.auth.changePassword(username, p1)
             self.writeFn("""<div>Password successfully changed.</div>""")
