@@ -51,6 +51,9 @@ class SqlDbRepository(repository.DataStoreRepository,
 
 	return l[0]
 
+    def getTroveVersionFlavors(self, troveDict):
+        return self.db.getTroveVersionFlavors(troveDict)
+
     def pkgVersionFlavors(self, pkgName, version):
 	l = [ x.getFlavor() for x in self.db.iterFindByName(pkgName)
 		     if version == x.getVersion() ]

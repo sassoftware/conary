@@ -444,6 +444,26 @@ class Database:
             ts = [float(x) for x in timeStamps.split(':')]
 	    yield versions.VersionFromString(match, timeStamps=ts)
 
+    def getTroveVersionFlavors(self, troveDict):
+        outD = {}
+        cu = self.db.cursor()
+        for name, versionList in troveDict.iteritems():
+            d = {}.fromkeys(versionList)
+            outD[name] = d
+            for key in d:
+                d[key] = []
+            cu.execute("""SELECT version, timeStamps, flavor FROM DBInstances
+                              NATURAL JOIN Versions
+                              JOIN DBFlavors
+                                  ON DBInstances.flavorid = DBFlavors.flavorid
+                          WHERE troveName=? AND isPresent=1""", name)
+            for (match, timeStamps, flavor) in cu:
+                ts = [float(x) for x in timeStamps.split(':')]
+                version = versions.VersionFromString(match, timeStamps=ts)
+                if outD[name].has_key(version):
+                    outD[name][version].append(deps.deps.ThawDependencySet(flavor))
+        return outD
+
     def hasByName(self, name):
 	return self.instances.hasName(name)
 
