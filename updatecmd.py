@@ -69,8 +69,11 @@ def doUpdate(repos, cfg, pkgList, replaceFiles = False, tagScript = None,
                 print "    %s -> %s" % (req, " ".join([x[0] for x in suggList]))
             return
         elif suggMap:
-            print "Including extra troves to resolve dependencies"
-            print "    %s" % " ".join(suggMap.itervalues())
+            print "Including extra troves to resolve dependencies:"
+            print "    ",
+            for suggList in suggMap.itervalues():
+                print "%s" % (" ".join([x[0] for x in suggList])),
+            print
 
         client.applyUpdate(cs, replaceFiles, tagScript, keepExisting)
     except conaryclient.UpdateError, e:
