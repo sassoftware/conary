@@ -7,12 +7,10 @@
 Simple functions used throughout srs.
 """
 
-import log
 import repository
 import repository.fsrepos
 import repository.netclient
 import versions
-import sys
 
 def openRepository(path):
     if path.startswith("http://"):
