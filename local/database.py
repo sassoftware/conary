@@ -453,24 +453,16 @@ class DatabaseChangeSetJob(repository.ChangeSetJob):
 		    ver = version.fork(versions.LocalBranch(), sameVerRel = 1)
 		    branchPkg.updateFile(fileId, path, ver)
 
-	# if we're applying a rollback, every file needs to be created.  if
-	# we're not, then get the list of files which need to be created; files
-	# which are on the new jobs newFileList don't need to be created; they
-	# are already in the filesystem (as members of A.local, and now they'll
-	# be members of B.local as well)
-	skipPaths = {}
+	# get a list of the files which need to be created as part of
+	# B->B.local
 	self.paths = {}
-
-	if retargetLocal:
-	    for f in self.newFileList():
-		skipPaths[f.path()] = 1
-	else:
-	    for f in self.newFileList():
-		self.paths[f.path()] = f
 
 	for f in origJob.newFileList():
 	    if not skipPaths.has_key(f.path()):
 		self.paths[f.path()] = f
+
+	for f in self.newFileList():
+	    self.paths[f.path()] = f
 
 	# at this point, self is job which does all of the creation of
 	# new bits. we need self to perform the removal of the old bits
