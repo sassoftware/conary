@@ -538,7 +538,12 @@ class File(object):
 	return "       0"
 
     def copy(self):
-	return copy.deepcopy(self)
+	new = copy.deepcopy(self)
+        for name, streamClass in self.streamList:
+            stream = self.__getattribute__(name).freeze()
+            newstream = streamClass(stream)
+            new.__setattr__(name, newstream)
+        return new
 
     def id(self, new = None):
 	if new:
