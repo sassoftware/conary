@@ -96,7 +96,7 @@ class FilesystemJob:
 	    p = "/sbin/ldconfig"
 	    if os.getuid():
 		log.warning("ldconfig skipped (insufficient permissions)")
-	    elif os.access(os.sep.join(self.root, p), os.X_OK) != True:
+	    elif os.access(util.joinPaths(self.root, p), os.X_OK) != True:
 		log.error("/sbin/ldconfig is not available")
 	    else:
 		log.debug("running ldconfig")
@@ -114,7 +114,7 @@ class FilesystemJob:
 	    p = "/sbin/chkconfig"
 	    if os.getuid():
 		log.warning("chkconfig skipped (insufficient permissions)")
-	    elif os.access(os.sep.join(self.root, p), os.X_OK) != True:
+	    elif os.access(util.joinPaths(self.root, p), os.X_OK) != True:
 		log.error("/sbin/chkconfig is not available")
 	    else:
 		for path in self.initScripts:
