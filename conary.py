@@ -91,7 +91,7 @@ def usage(rc = 1):
     print '               --use-flag  "<prefix>.<flag> <bool>"'
     print '               --use-macro "<macro> <value>"'
     print "               --prep"
-    print "               --resume [policy|<lineno>]"
+    print "               --resume [policy|<linenums>]"
     print "               --debug-exceptions"
     print "               --target-branch <branch>"
     print '               --use-flag "<flag> <value>"'

@@ -129,7 +129,7 @@ branch only for that trove.
 .B cook \fI[\fR--prep\fI] [\fR--macros file\fI] [\fR--target-branch \fI<branch>]\fR \e
 .PD 0
 .TP
-.B \ \ \ \ \ [\fR--resume [<linenum>|policy]] [\fR--use-flag "<flag> True|False"] \fP \e
+.B \ \ \ \ \ [\fR--resume [<linenums>|policy]] [\fR--use-flag "<flag> True|False"] \fP \e
 .PD 0
 .TP
 .B \ \ \ \ \ [\fR--use-macro <macro> <string>] \fI<file>\fP.recipe\fI|<component>...\fP
@@ -137,14 +137,28 @@ branch only for that trove.
 Build a package.  If \fB--prep\fP is specified, the souce code is
 unpacked, but is not built. if \fB--macros\fP is specified, it
 names a file containing macro definitions to apply to the recipe
-macro set.  If \fB--resume <linenum>\fP is specified, 
-conary will continue cooking the specified recipe from the line
-number given.  If \fB--resume\fP is specified with no parameter,
+macro set.  
+.IP
+If \fB--resume <linenums>\fP is specified, 
+conary will cooking the specified line numbers.  The format of
+linenums is any number of pairs of n or n:m 
+separated by commas, n and m are lines in the recipe.  
+If the initial linenum in a pair is left off, leaving :m, 
+conary will begin cooking from the beginning of the file.  
+If the final linenum is left off, leaving n: conary will cook until the end 
+of the file, run policy, and create a changeset.  A --resume n without
+a colon is equivalent to n:n, there are other ranges given to resume,
+or n: if it is the only argument given to --resume.  All resume line 
+ranges must be given in increasing order.
+
+If \fB--resume\fP is specified with no parameter,
 the recipe will be recooked from the line of last failure.  
 If \fB--resume policy\fP is specified, the policy will be rechecked 
 from the last build.  Note that the \fB--resume\fP option may
 only be used with local recipe files, not source components grabbed
 from a repository.
+
+Example: conary cook --resume 5:10,15,35:
 .IP 
 The --use-flag option can be used to override the default Use flags 
 and package-specific flags for this instantiaton.   The format for
