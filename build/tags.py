@@ -31,6 +31,11 @@ class TagFile(conarycfg.ConfigFile):
 	self.read(filename)
 
     def filterCB(self, type, key=None, val=None):
+	if not self.macros:
+	    # empty dictionary passed in from install side, do not
+	    # care about callbacks because this is only used on
+	    # build side
+	    return
 	if type == 'display':
 	    # I do not think we ever need to display, but if we do we
 	    # can fix this
