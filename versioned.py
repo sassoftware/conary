@@ -543,7 +543,7 @@ class FileIndexedDatabase(Database):
 		self.files[file] = 1
 		self._writeMap()
 	    else:
-		raise KeyError, "file %s is not in the database" % file
+		raise MissingFileError(file)
 	
 	return fileClass(self.db, file, self.createBranches, self)
 
@@ -608,3 +608,12 @@ class MissingBranchError(VersionedFileError):
 	self.branch = branch
 	self.name = name
 
+
+class MissingFileError(VersionedFileError):
+
+    def __str__(self):
+	return "file %s does not exist in the database" % self.name
+
+    def __init__(self, name):
+	VersionedFileError.__init__(self)
+	self.name = name

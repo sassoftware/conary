@@ -28,7 +28,10 @@ class Repository:
     createBranches = 1
 
     def _getPackageSet(self, name):
-	return _PackageSet(self.pkgDB, name)
+        try:
+            return _PackageSet(self.pkgDB, name)
+        except versioned.MissingFileError, e:
+            raise PackageMissing(e.name)
 
     def _getFileDB(self, fileId):
 	return _FileDB(self.fileDB, fileId)

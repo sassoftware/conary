@@ -6,6 +6,7 @@ import files
 import helper
 import log
 import package
+import repository
 
 _pkgFormat  = "%-39s %s"
 _fileFormat = "    %-35s %s"
@@ -29,7 +30,11 @@ def displayPkgs(repos, cfg, all = 0, ls = 0, pkg = "", versionStr = None):
 	    if all:
 		l = repos.getPackageVersionList(pkgName)
 	    else:
-		l = _versionList(repos, pkgName)
+                try:
+                    l = _versionList(repos, pkgName)
+                except repository.PackageMissing, e:
+                    log.error(str(e))
+                    return
 
 	    for version in l:
 		print _pkgFormat % (
