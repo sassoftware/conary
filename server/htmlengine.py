@@ -171,11 +171,11 @@ Choose a branch: %s
 <tr><td>URLs:</td><td>%s<br />%s</td></tr>
 <tr><td>Licenses:</td><td>%s<br />%s</td></tr>
 <tr><td>Categories:</td><td>%s<br />%s</td></tr>
+<tr><td>Source:</td><td>%s</td></tr>
 </table>
 <p><button id="submitButton" onclick="javascript:updateMetadata();">Save Changes</button></p>
 <input type="hidden" name="branch" value="%s" />
 <input type="hidden" name="troveName" value="%s" />
-<input type="hidden" name="source" value="%s" />
 </form>
 """     % (branchStr, versionStr,
            metadata["shortDesc"][0],
@@ -188,7 +188,8 @@ Choose a branch: %s
            self.makeSelectAppenderList("newLicense", "licenseList", licenses),
            self.makeSelect(metadata["category"], "categoryList", size=4, expand="53%", multiple=True),
            self.makeSelectAppenderList("newCategory", "categoryList", categories), 
-           branchFrz, troveName, metadata["source"][0])
+           self.makeSelect(['local', 'freshmeat'], "source", default=metadata["source"][0]),
+           branchFrz, troveName)
           )
 
         self.writeFn("""
