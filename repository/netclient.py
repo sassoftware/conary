@@ -521,7 +521,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                         else:
                             cs.merge(newCs)
                     except:
-                        if os.path.exists(tmpName):
+                        if target and os.path.exists(target):
+                            os.unlink(target)
+                        elif os.path.exists(tmpName):
                             os.unlink(tmpName)
                         raise
 
