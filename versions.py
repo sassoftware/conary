@@ -134,7 +134,7 @@ class Version:
     def copy(self):
         return copy.deepcopy(self)
 
-    def parseVersionString(self, ver):
+    def parseVersionString(self, ver, defaultBranch = None):
 	if ver[0] != "/":
             # XXX broken code, no defaultBranch in this scope
 	    if not defaultBranch:
@@ -177,6 +177,6 @@ class VersionFromString(Version):
 	if ver[0] != "/":
 	    ver = defaultBranch.asString() + "/" + ver
 
-	v = self.parseVersionString(ver)
+	v = self.parseVersionString(ver, defaultBranch)
 
 	Version.__init__(self, v, 0)
