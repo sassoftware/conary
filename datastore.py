@@ -150,22 +150,14 @@ class DataStore:
     def makeDir(self, path):
         d = os.path.dirname(path)
 	shortPath = d[:-3]
-        if not os.path.exists(shortPath):
+
+        for _dir in (shortPath, d):
             try:
-                os.mkdir(shortPath)
+                os.mkdir(_dir)
             except OSError, e:
-                # ignore create race
                 if e.errno != errno.EEXIST:
                     raise
-            
-	if not os.path.exists(d):
-            try:
-                os.mkdir(d)
-            except OSError, e:
-                # ignore create race
-                if e.errno != errno.EEXIST:
-                    raise
-                    
+
     # file should be a python file object seek'd to the beginning
     # this messes up the file pointer
     def addFile(self, f, hash):
