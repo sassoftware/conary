@@ -84,30 +84,41 @@ class HttpRequests(SimpleHTTPRequestHandler):
 
 	self.inFiles[path] = True
 
-class NetworkRepositoryServer(xmlshims.NetworkConvertors,
-			      fsrepos.FilesystemRepository):
+class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def allTroveNames(self):
 	return [ x for x in self.iterAllTroveNames() ]
 
+    def createBranch(self, newBranch, kind, frozenLocation, troveList):
+	newBranch = self.toLabel(newBranch)
+	if kind == 'v':
+	    location = self.toVersion(frozenLocation)
+	elif kind == 'l':
+	    location = self.toLabel(frozenLocation)
+	else:
+	    return 0
+
+	self.repos.createBranch(newBranch, location, troveList)
+	return 1
+
     def hasPackage(self, pkgName):
-	return self.troveStore.hasTrove(pkgName)
+	return self.repos.troveStore.hasTrove(pkgName)
 
     def hasTrove(self, pkgName, version, flavor):
-	return self.troveStore.hasTrove(pkgName, troveVersion = version,
+	return self.repos.troveStore.hasTrove(pkgName, troveVersion = version,
 					troveFlavor = flavor)
 
     def getTroveVersionList(self, troveNameList):
 	d = {}
 	for troveName in troveNameList:
 	    d[troveName] = [ x for x in
-				self.troveStore.iterTroveVersions(troveName) ]
+			    self.repos.troveStore.iterTroveVersions(troveName) ]
 
 	return d
 
     def getFilesInTrove(self, troveName, version, flavor,
                         sortByPath = False, withFiles = False):
-        gen = self.troveStore.iterFilesInTrove(troveName,
+        gen = self.repos.troveStore.iterFilesInTrove(troveName,
                                                self.toVersion(version),
                                                self.toFlavor(flavor),
                                                sortByPath, 
@@ -122,14 +133,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 	d = {}
 	for troveName in troveNames:
 	    d[troveName] = [ x for x in
-				self.troveStore.iterAllTroveLeafs(troveName) ]
+			    self.repos.troveStore.iterAllTroveLeafs(troveName) ]
 	return d
 
     def getTroveLeavesByLabel(self, troveNameList, labelStr):
 	d = {}
 	for troveName in troveNameList:
 	    d[troveName] = [ x for x in
-			     self.troveStore.iterTroveLeafsByLabel(troveName,
+			self.repos.troveStore.iterTroveLeafsByLabel(troveName,
 								   labelStr) ]
 
 	return d
@@ -140,14 +151,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 	    innerD = {}
 	    for versionStr in versionList:
 		innerD[versionStr] = [ self.fromFlavor(x) for x in 
-		    self.troveStore.iterTroveFlavors(troveName, 
+		    self.repos.troveStore.iterTroveFlavors(troveName, 
 						 self.toVersion(versionStr)) ]
 	    newD[troveName] = innerD
 
 	return newD
 
     def getTroveLatestVersion(self, pkgName, branchStr):
-	return self.fromVersion(self.troveStore.troveLatestVersion(pkgName, 
+	return self.fromVersion(self.repos.troveStore.troveLatestVersion(pkgName, 
 						  self.toBranch(branchStr)))
 
     def getChangeSet(self, chgSetList, recurse, withFiles):
@@ -160,13 +171,17 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 		l.append((name, self.toFlavor(flavor), self.toVersion(old),
 			 self.toVersion(new), absolute))
 
-	cs = self.createChangeSet(l, recurse = recurse, withFiles = withFiles)
+	cs = self.repos.createChangeSet(l, recurse = recurse, 
+					withFiles = withFiles)
 	(fd, path) = tempfile.mkstemp()
 	os.close(fd)
 	cs.writeToFile(path)
 	HttpRequests.outFiles[path] = True
 	fileName = os.path.basename(path)
 	return "http://localhost:8001/%s" % fileName
+
+    def iterAllTroveNames(self):
+	return self.repos.iterAllTroveNames()
 
     def prepareChangeSet(self):
 	(fd, path) = tempfile.mkstemp()
@@ -187,25 +202,21 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors,
 	    pass
 	    os.unlink(path)
 
-	fsrepos.FilesystemRepository.commitChangeSet(self, cs)
+	self.repos.commitChangeSet(cs)
 
 	return True
 
     def getFileVersion(self, fileId, version, withContents = 0):
-        # this is a sub-optimal test, we need to see if we've been
-        # called from xmlrpc or if we're being called internally
-        # to access data in the fsrepos
-        if type(version) is str:
-            # xml request
-            f = self.troveStore.getFile(fileId, self.toVersion(version))
-            return self.fromFile(f)
-        # internal fsrepos request
-        return fsrepos.FilesystemRepository.getFileVersion(self, fileId, version, withContents = withContents)
+	f = self.repos.troveStore.getFile(fileId, self.toVersion(version))
+	return self.fromFile(f)
 
     def checkVersion(self, clientVersion):
         if clientVersion < 0:
             raise RuntimeError, "client is too old"
         return 0
+
+    def __init__(self, path, mode):
+	self.repos = fsrepos.FilesystemRepository(path, mode)
 
 netRepos = NetworkRepositoryServer(sys.argv[2], "r")
 
