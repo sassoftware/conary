@@ -116,7 +116,7 @@ class ConaryClient:
         cs = changeset.ChangeSetFromFile(pkg)
             
         if cs.isAbsolute():
-            cs = self.db.rootChangeSet(cs)
+            cs = self.db.rootChangeSet(cs, keepExisting)
 
         self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
                                 tagScript = tagScript, keepExisting = keepExisting)

@@ -205,7 +205,7 @@ class Database(SqlDbRepository):
 
     # takes an absolute change set and creates a differential change set 
     # against a branch of the repository
-    def rootChangeSet(self, absSet):
+    def rootChangeSet(self, absSet, keepExisting):
 	assert(absSet.isAbsolute())
 
 	# this has an empty source path template, which is only used to
@@ -243,7 +243,11 @@ class Database(SqlDbRepository):
 			    pkgName, newVersion.asString())
 		continue
 
-	    (oldVersion, oldFlavor) = outdated[key][1:3]
+            if keepExisting:
+                oldVersion = None
+                oldFlavor = None
+            else:
+                (oldVersion, oldFlavor) = outdated[key][1:3]
 
 	    if not oldVersion:
 		# new package; the Package.diff() right after this never
