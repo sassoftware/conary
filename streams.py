@@ -65,14 +65,12 @@ class NumericStream(InfoStream):
 	if self.val != them.val:
 	    return struct.pack(self.format, self.val)
 
-	return ""
+	return None
 
     def thaw(self, frz):
 	self.val = struct.unpack(self.format, frz)[0]
 
     def twm(self, diff, base):
-	if not diff: return False
-
 	newVal = struct.unpack(self.format, diff)[0]
 	if self.val == base.val:
 	    self.val = newVal
@@ -143,14 +141,12 @@ class StringStream(InfoStream):
 	if self.s != them.s:
 	    return self.s
 
-	return ""
+	return None
 
     def thaw(self, frz):
 	self.s = frz
 
     def twm(self, diff, base):
-	if not diff: return False
-
 	if self.s == base.s:
 	    self.s = diff
 	    return False
@@ -247,7 +243,7 @@ class FrozenVersionStream(InfoStream):
 	if self.v != them.v:
 	    return self.v.freeze()
 
-	return ""
+	return None
 
     def thaw(self, frz):
 	if frz:
@@ -256,8 +252,6 @@ class FrozenVersionStream(InfoStream):
 	    self.v = None
 
     def twm(self, diff, base):
-	if not diff: return False
-
 	if self.v == base.v:
 	    self.v = diff
 	    return False
@@ -295,14 +289,12 @@ class DependenciesStream(InfoStream):
 	if self.deps != them.deps:
 	    return self.freeze()
 
-	return ''
+	return None
 
     def thaw(self, frz):
         self.deps = deps.ThawDependencySet(frz)
         
     def twm(self, diff, base):
-	if not diff: return False
-
         self.thaw(diff)
         return False
 
@@ -336,7 +328,7 @@ class StringsStream(list, InfoStream):
     def diff(self, them):
 	if self != them:
 	    return self.freeze()
-	return ''
+	return None
 
     def thaw(self, frz):
 	del self[:]
@@ -346,8 +338,6 @@ class StringsStream(list, InfoStream):
 		self.set(s)
 
     def twm(self, diff, base):
-	if not diff:
-	    return False
         self.thaw(diff)
         return False
 
@@ -395,7 +385,7 @@ class TupleStream(InfoStream):
 	rc = []
 	for (i, (name, itemType, size)) in enumerate(self.makeup):
 	    d = self.items[i].diff(them.items[i])
-	    if d:
+	    if d is not None:
 		if type(size) == int or (i + 1) == len(self.makeup):
 		    rc.append(d)
 		else:
@@ -506,7 +496,7 @@ class StreamSet(InfoStream):
 	rc = [ "\x01", self.lsTag ]
 	for streamId, (streamType, name) in self.streamDict.iteritems():
 	    d = self.__getattribute__(name).diff(other.__getattribute__(name))
-            if len(d):
+            if d is not None:
                 rc.append(struct.pack(self.headerFormat, streamId, len(d)) + d)
 
 	return "".join(rc)

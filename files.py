@@ -83,7 +83,7 @@ class LinkGroupStream(streams.Sha1Stream):
             else:
                 return self.s
 
-        return ""
+        return None
 
     def thaw(self, data):
         if not data:
@@ -100,7 +100,6 @@ class LinkGroupStream(streams.Sha1Stream):
         return streams.Sha1Stream.freeze(self)
 
     def twm(self, diff, base):
-	if not diff: return False
         # if the diff is the special value of "\0", that means that
         # the link group is no longer set.  Clear the link group value
         # on merge.
