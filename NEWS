@@ -8,6 +8,10 @@ Changes in 0.14.9:
   * Added forceSSL option to apache repository server configuration.
   * The network client code now supports accessing servers over https.
   * Proper salts are used for user passwords.
+  * The default value for macros.optflags is "-O2" again, instead of
+    an empty string.
+  * The http handler in the conary server now sends back proper error
+    codes in the case of an authentication error.
 
 Changes in 0.14.8:
   * Fixed bug where streams for commits on distributed branches didn't always
