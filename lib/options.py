@@ -112,8 +112,8 @@ def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
 
     if argSet.has_key('debug'):
 	del argSet['debug']
-	import pdb
-	pdb.set_trace()
+	import epdb
+	epdb.set_trace()
 
     if '-v' in otherArgs:
 	otherArgs.remove('-v')
