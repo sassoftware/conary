@@ -217,23 +217,14 @@ class FlagsStream(streams.IntStream):
 
 	return (self.val and self.val & flag)
 
-def streamDictToList(d):
-    vals = d.keys()
-    m = max(vals)
-    l = range(m + 1)
-    for v in vals:
-	l[v] = d[v]
-
-    return l
-
-class File(object):
+class File(streams.StreamSet):
 
     lsTag = None
     hasContents = 0
     streamDict = { streams._STREAM_INODE : (InodeStream, "inode"),
                    streams._STREAM_FLAGS : (FlagsStream, "flags"),
 		   streams._STREAM_TAGS :  (streams.StringsStream, "tags") }
-    streamList = streamDictToList(streamDict)
+    streamList = streams.streamSetDictToList(streamDict)
     __slots__ = [ "theId", "inode", "flags", "tags" ]
 
     def modeString(self):
@@ -245,13 +236,6 @@ class File(object):
 
     def sizeString(self):
 	return "       0"
-
-    def copy(self):
-	new = copy.deepcopy(self)
-        for streamClass, name in self.streamDict.itervalues():
-            stream = self.__getattribute__(name).copy()
-            new.__setattr__(name, stream)
-        return new
 
     def id(self, new = None):
 	if new:
@@ -285,36 +269,6 @@ class File(object):
 
 	os.lchown(target, uid, gid)
 
-    def initializeStreams(self, data):
-	for streamType, name in self.streamDict.itervalues():
-	    self.__setattr__(name, streamType())
-
-	if data: 
-	    # skip over the file type for now
-	    i = 1
-            dataLen = len(data)
-	    while i < dataLen:
-                assert(i < dataLen)
-		(streamId, size) = struct.unpack("!BH", data[i:i+3])
-		(streamType, name) = self.streamList[streamId]
-		i += 3
-		self.__setattr__(name, streamType(data[i:i + size]))
-		i += size
-
-	    assert(i == dataLen)
-
-    def diff(self, other):
-	if self.lsTag != other.lsTag:
-	    d = self.freeze()
-	    return struct.pack("!BH", 0, len(d)) + d
-
-	rc = [ "\x01", self.lsTag ]
-	for streamId, (streamType, name) in self.streamDict.iteritems():
-	    d = self.__getattribute__(name).diff(other.__getattribute__(name))
-	    rc.append(struct.pack("!BH", streamId, len(d)) + d)
-
-	return "".join(rc)
-
     def twm(self, diff, base, skip = None):
 	sameType = struct.unpack("B", diff[0])
 	if not sameType: 
@@ -322,36 +276,12 @@ class File(object):
 	    raise AssertionError
 	assert(self.lsTag == base.lsTag)
 	assert(self.lsTag == diff[1])
-	i = 2
-	conflicts = False
 	
-	while i < len(diff):
-	    streamId, size = struct.unpack("!BH", diff[i:i+3])
-
-	    streamType, name = self.streamDict[streamId]
-
-	    i += 3
-	    if name != skip:
-		w = self.__getattribute__(name).twm(diff[i:i+size], 
-					       base.__getattribute__(name))
-		conflicts = conflicts or w
-	    i += size
-
-	assert(i == len(diff))
-
-	return conflicts
+	return streams.StreamSet.twm(self, diff[2:], base, skip = skip)
 
     def __eq__(self, other):
 	if other.lsTag != self.lsTag: return False
-
-	for streamType, name in self.streamDict.itervalues():
-	    if not self.__getattribute__(name) == other.__getattribute__(name):
-		return False
-
-	return True
-
-    def __ne__(self, other):
-	return not self.__eq__(other)
+	return streams.StreamSet.__eq__(self, other)
 
     def metadataEqual(self, other, ignoreOwnerGroup):
 	if not ignoreOwnerGroup:
@@ -368,24 +298,22 @@ class File(object):
 	return True
 
     def freeze(self):
-	rc = [ self.lsTag ]
-	for streamId, (streamType, name) in self.streamDict.iteritems():
-	    s = self.__getattribute__(name).freeze()
-	    if len(s):
-		rc.append(struct.pack("!BH", streamId, len(s)) + s)
-	return "".join(rc)
+	return self.lsTag + streams.StreamSet.freeze(self)
 
     def __init__(self, fileId, streamData = None):
         assert(self.__class__ is not File)
 	self.theId = fileId
-	self.initializeStreams(streamData)
+	if streamData is not None:
+	    streams.StreamSet.__init__(self, streamData[1:])
+	else:
+	    streams.StreamSet.__init__(self, None)
 
 class SymbolicLink(File):
 
     lsTag = "l"
     streamDict = { streams._STREAM_TARGET : (streams.StringStream, "target") }
     streamDict.update(File.streamDict)
-    streamList = streamDictToList(streamDict)
+    streamList = streams.streamSetDictToList(streamDict)
     __slots__ = "target"
 
     def sizeString(self):
@@ -450,7 +378,7 @@ class DeviceFile(File):
 
     streamDict = { streams._STREAM_DEVICE : (DeviceStream, "devt") }
     streamDict.update(File.streamDict)
-    streamList = streamDictToList(streamDict)
+    streamList = streams.streamSetDictToList(streamDict)
     __slots__ = [ 'devt' ]
 
     def sizeString(self):
@@ -491,7 +419,7 @@ class RegularFile(File):
         streams._STREAM_FLAVOR   : (streams.DependenciesStream, 'flavor' ) }
 
     streamDict.update(File.streamDict)
-    streamList = streamDictToList(streamDict)
+    streamList = streams.streamSetDictToList(streamDict)
     __slots__ = ('contents', 'provides', 'requires', 'flavor')
 
     lsTag = "-"

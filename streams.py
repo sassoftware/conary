@@ -15,6 +15,7 @@
 Defines the datastreams stored in a changeset
 """
 
+import copy
 import struct
 
 from deps import filedeps, deps
@@ -184,6 +185,13 @@ class StringStream(InfoStream):
 
     def __init__(self, s = ''):
 	self.thaw(s)
+
+class Sha1Stream(StringStream):
+
+    # stores the sha1 as a binary, but can present it as a string
+
+    def __str__(self):
+	return "%x%x%x%x%x" % struct.unpack("!5I", self.s)
 
 class DependenciesStream(InfoStream):
     """
@@ -392,3 +400,87 @@ class TupleStream(InfoStream):
 		items.append(itemType(all[i]))
 	    self.items = items
 
+def streamSetDictToList(d):
+    vals = d.keys()
+    m = max(vals)
+    l = range(m + 1)
+    for v in vals:
+	l[v] = d[v]
+
+    return l
+
+class StreamSet(object):
+
+    def __init__(self, data = None):
+	for streamType, name in self.streamDict.itervalues():
+	    self.__setattr__(name, streamType())
+
+	if data: 
+	    i = 0
+            dataLen = len(data)
+	    while i < dataLen:
+                assert(i < dataLen)
+		(streamId, size) = struct.unpack("!BH", data[i:i+3])
+		(streamType, name) = self.streamList[streamId]
+		i += 3
+		self.__setattr__(name, streamType(data[i:i + size]))
+		i += size
+
+	    assert(i == dataLen)
+
+    def diff(self, other):
+	if self.lsTag != other.lsTag:
+	    d = self.freeze()
+	    return struct.pack("!BH", 0, len(d)) + d
+
+	rc = [ "\x01", self.lsTag ]
+	for streamId, (streamType, name) in self.streamDict.iteritems():
+	    d = self.__getattribute__(name).diff(other.__getattribute__(name))
+	    rc.append(struct.pack("!BH", streamId, len(d)) + d)
+
+	return "".join(rc)
+
+    def __eq__(self, other):
+	for streamType, name in self.streamDict.itervalues():
+	    if not self.__getattribute__(name) == other.__getattribute__(name):
+		return False
+
+	return True
+
+    def __ne__(self, other):
+	return not self.__eq__(other)
+
+    def freeze(self):
+	rc = []
+	for streamId, (streamType, name) in self.streamDict.iteritems():
+	    s = self.__getattribute__(name).freeze()
+	    if len(s):
+		rc.append(struct.pack("!BH", streamId, len(s)) + s)
+	return "".join(rc)
+
+    def copy(self):
+	new = copy.deepcopy(self)
+        for streamClass, name in self.streamDict.itervalues():
+            stream = self.__getattribute__(name).copy()
+            new.__setattr__(name, stream)
+        return new
+
+    def twm(self, diff, base, skip = None):
+	i = 0
+	conflicts = False
+	
+	while i < len(diff):
+	    streamId, size = struct.unpack("!BH", diff[i:i+3])
+
+	    streamType, name = self.streamDict[streamId]
+
+	    i += 3
+	    if name != skip:
+		w = self.__getattribute__(name).twm(diff[i:i+size], 
+					       base.__getattribute__(name))
+		conflicts = conflicts or w
+	    i += size
+
+	assert(i == len(diff))
+
+	return conflicts
