@@ -522,17 +522,17 @@ class TroveChangeSet:
 	    self.packages[name] = []
 	self.packages[name].append(('-', version, flavor))
 
-    def formatToFile(self, changeSet, cfg, f):
+    def formatToFile(self, changeSet, f):
 	f.write("%s " % self.name)
 
 	if self.isAbsolute():
 	    f.write("absolute ")
 	elif self.oldVersion:
-	    f.write("from %s to " % self.oldVersion.asString(cfg.defaultbranch))
+	    f.write("from %s to " % self.oldVersion.asString())
 	else:
 	    f.write("new ")
 
-	f.write("%s\n" % self.newVersion.asString(cfg.defaultbranch))
+	f.write("%s\n" % self.newVersion.asString())
 
         def depformat(name, dep, f):
             f.write('\t%s: %s\n' %(name,
@@ -567,7 +567,7 @@ class TroveChangeSet:
 	    f.write("\tremoved %s(.*)%s\n" % (fileId[:6], fileId[-6:]))
 
 	for name in self.packages.keys():
-	    list = [ x[0] + x[1].asString(cfg.defaultbranch) for x in self.packages[name] ]
+	    list = [ x[0] + x[1].asString() for x in self.packages[name] ]
 	    f.write("\t" + name + " " + " ".join(list) + "\n")
 
     def freeze(self):
