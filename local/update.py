@@ -23,6 +23,7 @@ import os
 import package
 import patch
 import stat
+import sys
 import util
 import versions
 
@@ -185,24 +186,24 @@ class FilesystemJob:
 	    elif os.access(util.joinPaths(self.root, p), os.X_OK) != True:
 		log.error("/usr/bin/gconftool-2 is not available")
 	    else:
-		# no real need to reset this environment variable after
-		# use; it's very specific and should cause no problems
 		try:
 		    gin = util.popen("gconftool-2 --get-default-source")
-		    os.environ['GCONF_CONFIG_SOURCE'] = gin.read()[:-1] #chop
+		    gconvEnv = gin.read()[:-1] #chop
 		    gin.close()
 		except:
 		    log.error("gconftool-2 --get-default-source failed")
 		    # XXX is it right to use this default in this case?
-		    os.environ['GCONF_CONFIG_SOURCE'] = 'xml::/etc/gconf/gconf.xml.defaults'
+		    gconvEnv = 'xml::/etc/gconf/gconf.xml.defaults'
 		for path in self.gconfSchema:
 		    log.debug("running gconftool-2 --makefile-install-rule %s", path)
 		    pid = os.fork()
 		    if not pid:
 			os.chdir(self.root)
 			os.chroot(self.root)
+			os.environ['GCONF_CONFIG_SOURCE'] = gconvEnv
                         try:
 			    # >/dev/null
+			    sys.stdout.flush()
 			    null = os.open('/dev/null', os.O_WRONLY)
 			    os.dup2(null, sys.stdout.fileno())
 			    os.close(null)
