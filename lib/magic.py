@@ -6,7 +6,6 @@
 import lib.elf
 import os
 import string
-import struct
 
 class Magic:
     def __init__(self, path, basedir):
@@ -20,6 +19,7 @@ class ELF(Magic):
     def __init__(self, path, basedir='', buffer=''):
 	Magic.__init__(self, path, basedir)
 	self.contents['stripped'] = lib.elf.stripped(basedir+path)
+	self.contents['hasDebug'] = lib.elf.hasDebug(basedir+path)
 
 
 class ar(Magic):
@@ -37,7 +37,7 @@ class gzip(Magic):
 	Magic.__init__(self, path, basedir)
 	if buffer[3] == '\x08':
 	    self.contents['name'] = _string(buffer[10:])
-	if buffer[8] == 4:
+	if buffer[8] == '\x02':
 	    self.contents['compression'] = '9'
 	else:
 	    self.contents['compression'] = '1'

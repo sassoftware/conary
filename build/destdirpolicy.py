@@ -133,10 +133,10 @@ class Strip(policy.Policy):
 	    return
 	# FIXME: should be:
 	#if (m.name == "ELF" or m.name == "ar") and \
-	#   not m.contents['stripped']):
-	# but this has to wait until ewt writes stripped detection
+	#   m.contents['hasDebug']):
+	# but this has to wait until ewt writes debug detection
 	# for archives as well as elf files
-	if (m.name == "ELF" and not m.contents['stripped']) or \
+	if (m.name == "ELF" and m.contents['hasDebug']) or \
 	   (m.name == "ar"):
 	    util.execute('%(strip)s -g ' %self.macros +d+path)
 
@@ -165,9 +165,9 @@ class NormalizeCompression(policy.Policy):
 	p = d+path
 	if m.name == 'gzip' and \
 	   (m.contents['compression'] != '9' or 'name' in m.contents):
-	    util.execute('gunzip %s; gzip -n -9 %s', p, p[:-3])
+	    util.execute('gunzip %s; gzip -n -9 %s' %(p, p[:-3]))
 	if m.name == 'bzip' and m.contents['compression'] != '9':
-	    util.execute('bunzip2 %s; bzip2 -9 %s', p, p[:-4])
+	    util.execute('bunzip2 %s; bzip2 -9 %s' %(p, p[:-4]))
 
 class NormalizeManPages(policy.Policy):
     """
@@ -177,9 +177,10 @@ class NormalizeManPages(policy.Policy):
        - '.so foo.n' becomes a symlink to foo.n
      - (re)compress all man pages with gzip -n -9
      - change all symlinks to point to .gz (if they don't already)
+     - make all man pages be mode 644
     Exceptions to this policy are ill-defined and thus are not
     currently honored.  Any suggestion that this policy should
-    honor inclusion/exception need to include statements of
+    honor inclusion/exception needs to include statements of
     precise semantics in that case...
     """
     def _uncompress(self, dirname, names):
@@ -187,28 +188,32 @@ class NormalizeManPages(policy.Policy):
 	    path = dirname + os.sep + name
 	    if name.endswith('.gz') and not os.path.islink(path):
 		util.execute('gunzip ' + dirname + os.sep + name)
-
-    def _compress(self, dirname, names):
-	for name in names:
-	    path = dirname + os.sep + name
-	    if not os.path.isdir(path) and not os.path.islink(path) \
-	       and not name.endswith('.gz'):
-		util.execute('gzip -n -9 ' + dirname + os.sep + name)
+	    if name.endswith('.bz2') and not os.path.islink(path):
+		util.execute('bunzip2 ' + dirname + os.sep + name)
 
     def _dedestdir(self, dirname, names):
+	"""
+	remove destdir, and fix up modes (this is the most convenient
+	place to fix up modes without adding an extra scan of the
+	directory tree)
+	"""
+	mode = os.lstat(dirname)[stat.ST_MODE]
+	if mode & 0777 != 0755:
+	    os.chmod(dirname, 0755)
 	for name in names:
 	    path = dirname + os.sep + name
-	    if not os.path.isdir(path) and not os.path.islink(path) \
-	       and not name.endswith('.gz'):
-		util.execute("sed -i 's,/?%s,,g' %s"
-			     %(self.macros['destdir'][1:], path))
+	    mode = os.lstat(path)[stat.ST_MODE]
+	    if mode & 0777 != 0644:
+		os.chmod(path, 0644)
+	    if not os.path.isdir(path) and not os.path.islink(path):
+		# no .gz files at this point
+		util.execute("sed -i 's,/*%s,,g' %s" %(self.destdir, path))
 
     def _sosymlink(self, dirname, names):
 	for name in names:
 	    path = dirname + os.sep + name
 	    if os.path.exists(path) and not os.path.isdir(path) \
-	       and not os.path.islink(path) \
-	       and not name.endswith('.gz'):
+	       and not os.path.islink(path):
 		# if only .so, change to symlink
 		f = file(path)
 		lines = f.readlines(512) # we really don't need the whole file
@@ -231,6 +236,12 @@ class NormalizeManPages(policy.Policy):
 			os.remove(path)
 			os.symlink(util.normpath('../'+match.group(1)), path)
 
+    def _compress(self, dirname, names):
+	for name in names:
+	    path = dirname + os.sep + name
+	    if not os.path.isdir(path) and not os.path.islink(path):
+		util.execute('gzip -n -9 ' + dirname + os.sep + name)
+
     def _gzsymlink(self, dirname, names):
 	for name in names:
 	    path = dirname + os.sep + name
@@ -251,9 +262,10 @@ class NormalizeManPages(policy.Policy):
 
     def do(self):
 	manpath = self.macros['destdir'] + self.macros['mandir']
+	self.destdir = self.macros['destdir'][1:] # we need without leading /
 	# uncompress all man pages
 	os.path.walk(manpath, NormalizeManPages._uncompress, self)
-	# remove '/?%(destdir)s'
+	# remove '/?%(destdir)s' and fix modes
 	os.path.walk(manpath, NormalizeManPages._dedestdir, self)
 	# .so foo.n becomes a symlink to foo.n
 	os.path.walk(manpath, NormalizeManPages._sosymlink, self)
