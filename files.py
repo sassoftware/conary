@@ -767,7 +767,7 @@ class Directory(File):
     lsTag = "d"
     __slots__ = []
 
-    def restore(self, root, fileContents, target, restoreContents):
+    def restore(self, fileContents, root, target, restoreContents):
 	if not os.path.isdir(target):
 	    util.mkdirChain(target)
 
