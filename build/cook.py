@@ -4,7 +4,6 @@
 #
 import buildpackage
 import changeset
-import copy
 import files
 import lookaside
 import os
@@ -38,7 +37,7 @@ def createPackage(repos, cfg, destdir, bldPkg, ident, pkgtype = "auto"):
     fileMap = {}
     p = package.Package(bldPkg.getName(), bldPkg.getVersion())
 
-    for filePath in bldPkg.keys():
+    for filePath in bldPkg.items():
 	if pkgtype == "auto":
 	    realPath = destdir + filePath
 	    targetPath = filePath
@@ -88,14 +87,14 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 	    # existing revision
 	    version = repos.pkgLatestVersion(nameList[0], cfg.defaultbranch)
 	    if version and recipeObj.version == version.trailingVersion():
-		version = copy.deepcopy(version)
+		version = version.copy()
 		version.incrementVersionRelease()
 	    else:
 		version = None
 
 	# this package/version doesn't exist yet
 	if not version:
-	    version = copy.deepcopy(cfg.defaultbranch)
+	    version = cfg.defaultbranch.copy()
 	    version.appendVersionRelease(recipeObj.version, 1)
 
 	builddir = cfg.buildpath + "/" + recipeObj.name

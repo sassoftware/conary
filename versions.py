@@ -6,6 +6,7 @@
 # classes for version structures and strings
 
 import string
+import copy
 
 class AbstractVersion:
 
@@ -119,6 +120,9 @@ class Version:
 
     def isVersion(self):
 	return isinstance(self.versions[-1], VersionRelease)
+
+    def copy(self):
+        return copy.deepcopy(self)
 
     def __init__(self, versionList):
 	self.versions = versionList
