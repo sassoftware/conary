@@ -637,6 +637,8 @@ class Symlink(_FileAction):
 	self.fromFiles = args[:split]
 	self.toFile = args[split]
 	# raise error while we can still tell what is wrong...
+	if not self.fromFiles:
+	    raise TypeError, 'not enough arguments'
 	if len(self.fromFiles) > 1:
 	    if not self.toFile.endswith('/') or os.path.isdir(self.toFile):
 		raise TypeError, 'too many targets for non-directory %s' %self.toFile
