@@ -198,8 +198,7 @@ class Config(policy.Policy):
 	    self.inclusions.extend(args)
 	inclusions = keywords.pop('inclusions', None)
 	if inclusions:
-            # XXX no local variable called "exceptions"
-	    self.inclusions.append(exceptions)
+	    self.inclusions.append(inclusions)
 	policy.Policy.updateArgs(self, [], **keywords)
 
     def doProcess(self, recipe):
