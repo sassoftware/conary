@@ -274,6 +274,7 @@ class PackageRecipe(Recipe):
     def mainDir(self, new = None):
 	if new:
 	    self.theMainDir = new % self.macros
+	    self.macros.maindir = self.theMainDir
 	return self.theMainDir
 
     def nameVer(self):
@@ -296,7 +297,6 @@ class PackageRecipe(Recipe):
 	return files
 
     def unpackSources(self, builddir):
-	self.macros.maindir = self.theMainDir
 	if os.path.exists(builddir):
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
@@ -395,13 +395,13 @@ class PackageRecipe(Recipe):
         self.cfg = cfg
 	self.laReposCache = laReposCache
 	self.srcdirs = srcdirs
-	self.theMainDir = self.nameVer()
 	self.macros = macros.Macros()
 	self.macros.update(baseMacros)
 	self.macros.name = self.name
 	self.macros.version = self.version
 	if extraMacros:
 	    self.macros.update(extraMacros)
+	self.mainDir(self.nameVer())
 
 class GroupRecipe(Recipe):
 
