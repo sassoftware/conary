@@ -26,6 +26,7 @@ use_files =	alternatives	\
 		kde		\
 		krb		\
 		ldap		\
+		nptl		\
 		pam		\
 		pcre		\
 		perl		\
@@ -34,8 +35,11 @@ use_files =	alternatives	\
 		qt		\
 		readline	\
 		sasl		\
+		selinux		\
 		ssl		\
 		tcl		\
+		tcpwrappers	\
+		tk		\
 		X		\
 		xfce
 
