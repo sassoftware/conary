@@ -227,9 +227,12 @@ def commit(repos, cfg, message):
         srcdirs = [ os.path.dirname(recipeClass.filename),
                     cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
         recipeObj = recipeClass(cfg, lcache, srcdirs)
+        recipeObj.populateLcache()
+	log.setVerbosity(1)
         recipeObj.setup()
         files = recipeObj.fetchAllSources()
-    
+	log.setVerbosity(0)
+        
     recipeVersionStr = recipeClass.version
 
     if isinstance(state.getVersion(), versions.NewVersion):

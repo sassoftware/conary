@@ -399,41 +399,8 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     srcdirs = [ os.path.dirname(recipeClass.filename),
 		cfg.sourceSearchDir % {'pkgname': recipeClass.name} ]
     recipeObj = recipeClass(cfg, lcache, srcdirs, macros)
-
-    # build a list containing this recipe class and any ancestor class
-    # from which it descends
-    classes = [ recipeClass ]
-    bases = list(recipeClass.__bases__)
-    while bases:
-        parent = bases.pop()
-        bases.extend(list(parent.__bases__))
-        if issubclass(parent, recipe.PackageRecipe):
-            classes.append(parent)
-
-    # reverse the class list, this way the files will be found in the
-    # youngest descendant first
-    classes.reverse()
+    recipeObj.populateLcache()
     
-    # populate the repository source lookaside cache from the :source
-    # components
-    for rclass in classes:
-        if not rclass._trove:
-            continue
-        srcName = rclass._trove.getName()
-        srcVersion = rclass._trove.getVersion()
-        for f in repos.iterFilesInTrove(srcName, srcVersion, None,
-                                        withFiles=True):
-            fileId, path, version, fileObj = f
-            assert(path[0] != "/")
-            # we might need to retrieve this source file
-            # to enable a build, so we need to find the
-            # sha1 hash of it since that's how it's indexed
-            # in the file store
-            if isinstance(fileObj, files.RegularFile):
-                # it only makes sense to fetch regular files, skip
-                # anything that isn't
-                lcache.addFileHash(srcName, srcVersion, None, path, version)
-
     builddir = cfg.buildPath + "/" + recipeObj.name
     use.track(True)
 
