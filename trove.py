@@ -118,7 +118,7 @@ class Package:
 
 	for id in addedIds:
 	    (selfPath, selfVersion) = self.idMap[id]
-	    filesNeeded.append((id, None, selfVersion))
+	    filesNeeded.append((id, None, selfVersion, selfPath))
 	    chgSet.newFile(id, selfPath, selfVersion)
 
 	for id in sameIds.keys():
@@ -133,7 +133,7 @@ class Package:
 
 	    if not selfVersion.equal(themVersion):
 		newVersion = selfVersion
-		filesNeeded.append((id, themVersion, selfVersion))
+		filesNeeded.append((id, themVersion, selfVersion, selfPath))
 
 	    if newPath or newVersion:
 		chgSet.changedFile(id, newPath, newVersion)
@@ -164,6 +164,12 @@ class PackageChangeSet:
 
     def getName(self):
 	return self.name
+
+    def changeOldVersion(self, version):
+	self.oldVersion = version
+
+    def changeNewVersion(self, version):
+	self.newVersion = version
 
     def getOldVersion(self):
 	return self.oldVersion
