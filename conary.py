@@ -27,7 +27,7 @@ import options
 import branch
 import commit
 import constants
-import cook
+from build import cook
 import cscmd
 from local import database
 import display

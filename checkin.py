@@ -22,7 +22,7 @@ from build import recipe, lookaside
 from local import update
 from repository import changeset
 import changelog
-import cook
+from build import cook
 import files
 import log
 import magic

@@ -17,8 +17,6 @@ Contains the functions which builds a recipe and commits the
 resulting packages to the repository.
 """
 
-from build import *
-
 import deps.deps
 from repository import changeset
 from repository import filecontents
@@ -26,7 +24,7 @@ from repository import repository
 from repository.netclient import NetworkRepositoryClient
 import files
 import log
-from build import buildinfo, lookaside, use
+import buildinfo, lookaside, use, recipe
 import os
 import resource
 import sha1helper
