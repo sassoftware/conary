@@ -30,11 +30,11 @@ from repository import filecontents
 import files
 import log
 import os
-import package
 import patch
 import stat
 import sys
 import tempfile
+import trove
 import util
 import versions
 
@@ -280,20 +280,20 @@ class FilesystemJob:
 	@param repos: the repository the files for basePkg are stored in
 	@type repos: repository.Repository
 	@param pkgCs: the package changeset to apply to the filesystem
-	@type pkgCs: package.PackageChangeSet
+	@type pkgCs: trove.PackageChangeSet
 	@param changeSet: the changeset pkgCs is part of
 	@type changeSet: changeset.ChangeSet
 	@param basePkg: the package the stuff in the filesystem came from
-	@type basePkg: package.Package
+	@type basePkg: trove.Package
 	@param fsPkg: the package representing what's in the filesystem now
-	@type fsPkg: package.Package
+	@type fsPkg: trove.Package
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
 	@param flags: flags which modify update behavior.  See L{update}
         module variable summary for flags definitions.
 	@type flags: int bitfield
-	@rtype: package.Package
+	@rtype: trove.Package
 	"""
 	if basePkg:
 	    assert(pkgCs.getOldVersion() == basePkg.getVersion())
@@ -308,7 +308,7 @@ class FilesystemJob:
 	if fsPkg:
 	    fsPkg = fsPkg.copy()
 	else:
-	    fsPkg = package.Trove(pkgCs.getName(), versions.NewVersion(),
+	    fsPkg = trove.Trove(pkgCs.getName(), versions.NewVersion(),
 				    pkgCs.getFlavor(), pkgCs.getChangeLog())
 
 	fsPkg.mergeTroveListChanges(pkgCs.iterChangedTroves(),
@@ -329,7 +329,7 @@ class FilesystemJob:
                 if (isinstance(headFile, files.Directory)
                     and stat.S_ISDIR(s.st_mode)):
 		    # if nobody else owns this directory, set the ownership
-		    # and permissions from this package. FIXME: if it is
+		    # and permissions from this trove. FIXME: if it is
 		    # already owned, we just assume those permissions are
 		    # right
 		    if repos.pathIsOwned(headPath):
@@ -607,7 +607,7 @@ class FilesystemJob:
 	@type changeSet: changeset.ChangeSet
 	@param fsPkgDict: dictionary mapping a package name to the package
 	object representing what's currently stored in the filesystem
-	@type fsPkgDict: dict of package.Package
+	@type fsPkgDict: dict of trove.Package
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
@@ -668,9 +668,9 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags):
     @param changeSet: Changeset to update with information for this package
     @type changeSet: changeset.ChangeSet
     @param curPkg: Package which is installed
-    @type curPkg: package.Package
+    @type curPkg: trove.Package
     @param srcPkg: Package to generate the change set against
-    @type srcPkg: package.Package
+    @type srcPkg: trove.Package
     @param newVersion: version to use for the newly created package
     @type newVersion: versions.NewVersion
     @param root: root directory the files are in (ignored for sources, which
@@ -817,7 +817,7 @@ def buildLocalChanges(repos, pkgList, root = ""):
     builds a package object which describes the files installed.  The
     return is a changeset and a list of tuples, each with a boolean
     saying if anything changed for a package reflecting what's in the
-    filesystem for that package.
+    filesystem for that trove.
 
     @param repos: Repository this directory is against.
     @type repos: repository.Repository

@@ -12,15 +12,15 @@
 # full details.
 #
 
-import trovetroves
-import versiontable
-import idtable
-import sqlite
-import package
-import files
 import deps.arch
 import deps.deps
+import files
+import idtable
+import sqlite
+import trove
+import trovetroves
 import versions
+import versiontable
 
 class Tags(idtable.CachedIdTable):
 
@@ -655,8 +655,7 @@ class Database:
 	if not troveVersion or min(troveVersion.timeStamps()) == 0:
 	    troveVersion = self.instances.getVersion(troveInstanceId)
 
-	trove = package.Trove(troveName, troveVersion, troveFlavor,
-			      None)
+	trv = trove.Trove(troveName, troveVersion, troveFlavor, None)
 
 	flavorCache = {}
 
@@ -684,7 +683,7 @@ class Database:
 		    flavor = deps.deps.ThawDependencySet(flavorStr)
 		    flavorCache[flavorId] = flavor
 
-	    trove.addTrove(name, version, flavor)
+	    trv.addTrove(name, version, flavor)
 
 	cu = self.db.cursor()
 	cu.execute("SELECT fileId, path, versionId, isPresent FROM "
@@ -697,9 +696,9 @@ class Database:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
-	    trove.addFile(fileId, path, version)
+	    trv.addFile(fileId, path, version)
 
-	return trove
+	return trv
 
     def eraseTrove(self, troveName, troveVersion, troveFlavor):
 	troveVersionId = self.versionTable[troveVersion]

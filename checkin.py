@@ -22,14 +22,14 @@ import helper
 import log
 import magic
 import os
-import package
 import repository
 import sys
 import time
+import trove
 import util
 import versions
 
-class SourceState(package.Trove):
+class SourceState(trove.Trove):
 
     def removeFilePath(self, file):
 	for (fileId, path, version) in self.iterFileList():
@@ -68,7 +68,7 @@ class SourceState(package.Trove):
 	return versionStr
 
     def __init__(self, name, version):
-	package.Trove.__init__(self, name, version, None, None)
+	trove.Trove.__init__(self, name, version, None, None)
 
 class SourceStateFromFile(SourceState):
 

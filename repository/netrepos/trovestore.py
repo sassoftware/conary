@@ -19,8 +19,8 @@ import instances
 import items
 import files
 import flavors
-import package
 import sqlite
+import trove
 import trovefiles
 import versionops
 import versions
@@ -585,7 +585,7 @@ class TroveStore:
 	else:
 	    changeLog = None
 
-	trove = package.Trove(troveName, troveVersion, troveFlavor,
+	trv = trove.Trove(troveName, troveVersion, troveFlavor,
 			      changeLog)
 	for instanceId in self.troveTroves[troveInstanceId]:
 	    (itemId, versionId, flavorId, isPresent) = \
@@ -594,7 +594,7 @@ class TroveStore:
 	    flavor = self.flavors.getId(flavorId)
 	    version = self.versionTable.getId(versionId, itemId)
 
-	    trove.addTrove(name, version, flavor)
+	    trv.addTrove(name, version, flavor)
 
 	versionCache = {}
 	cu.execute("SELECT fileId, path, versionId FROM "
@@ -606,9 +606,9 @@ class TroveStore:
 		version = self.versionTable.getBareId(versionId)
 		versionCache[versionId] = version
 
-	    trove.addFile(fileId, path, version)
+	    trv.addFile(fileId, path, version)
 
-	return trove
+	return trv
 
     def iterFilesInTrove(self, troveName, troveVersion, troveFlavor,
                          sortByPath = False, withFiles = False):

@@ -18,7 +18,6 @@ import helper
 import log
 import localrep
 import os
-import package
 from repository import repository
 import sqldb
 import update

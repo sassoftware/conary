@@ -18,9 +18,9 @@ import changeset
 import datastore
 import deps.deps
 import files
-import package
 import patch
 import tempfile
+import trove
 import util
 import versions
 
@@ -49,7 +49,7 @@ class AbstractTroveDatabase:
 	@type flavor: deps.DependencySet
 	@param versionStr: Trove version
 	@type versionStr: str
-	@rtype: list of package.Trove
+	@rtype: list of trove.Trove
 	"""
 	raise NotImplementedError
 
@@ -93,7 +93,7 @@ class AbstractTroveDatabase:
 	@type version: versions.Version
 	@param flavor: flavor
 	@type flavor: deps.deps.DependencySet
-	@rtype: package.Package
+	@rtype: trove.Package
 	"""
 	raise NotImplementedError
 
@@ -633,7 +633,7 @@ class ChangeSetJob:
 					pristine = True)
 		newPkg.changeVersion(newVersion)
 	    else:
-		newPkg = package.Trove(csPkg.getName(), newVersion,
+		newPkg = trove.Trove(csPkg.getName(), newVersion,
 				     csPkg.getFlavor(), csPkg.getChangeLog())
 
 	    newFileMap = newPkg.applyChangeSet(csPkg)

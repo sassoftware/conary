@@ -28,7 +28,6 @@ import helper
 import log
 from build import buildinfo, lookaside, use
 import os
-import package
 import resource
 import sha1helper
 import shutil
@@ -36,6 +35,7 @@ import signal
 import sys
 import tempfile
 import time
+import trove
 import types
 import updatecmd
 import util
@@ -48,7 +48,7 @@ import versions
 # returns a (pkg, fileMap) tuple
 def _createComponent(repos, branch, bldPkg, newVersion, ident):
     fileMap = {}
-    p = package.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
+    p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
     p.setRequires(bldPkg.requires)
     p.setProvides(bldPkg.provides)
 
@@ -263,7 +263,7 @@ def cookGroupObject(repos, cfg, recipeClass, buildBranch, macros={},
 	raise CookError(str(msg))
 
     grpFlavor = deps.deps.DependencySet()
-    grp = package.Trove(fullName, versions.NewVersion(), grpFlavor, None)
+    grp = trove.Trove(fullName, versions.NewVersion(), grpFlavor, None)
 
     d = {}
     for (name, versionList) in recipeObj.getTroveList().iteritems():
@@ -342,7 +342,7 @@ def cookFilesetObject(repos, cfg, recipeClass, buildBranch, macros={},
 					   recipeClass.version, flavor, 
 					   buildBranch, binary = True)
 
-    fileset = package.Trove(fullName, targetVersion, flavor, None)
+    fileset = trove.Trove(fullName, targetVersion, flavor, None)
     for (fileId, path, version) in l:
 	fileset.addFile(fileId, path, version)
 
@@ -477,9 +477,9 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
     while troveList:
         troves = repos.getTroves(troveList)
         troveList = []
-        for trove in troves:
-            ident.populate(repos, trove)
-            troveList += [ x for x in trove.iterTroveList() ]
+        for trv in troves:
+            ident.populate(repos, trv)
+            troveList += [ x for x in trv.iterTroveList() ]
 
     requires = deps.deps.DependencySet()
     provides = deps.deps.DependencySet()
@@ -494,7 +494,7 @@ def cookPackageObject(repos, cfg, recipeClass, buildBranch, prep=True,
 	targetVersion = helper.nextVersion(repos, grpName, recipeClass.version, 
 					   flavor, buildBranch, binary = True)
 
-    grp = package.Trove(grpName, targetVersion, flavor, None)
+    grp = trove.Trove(grpName, targetVersion, flavor, None)
 
     packageList = []
     for buildPkg in bldList:

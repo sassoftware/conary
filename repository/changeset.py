@@ -19,11 +19,11 @@ import filecontainer
 import filecontents
 import files
 import os
-import package
 import patch
 import repository
 import streams
 import struct
+import trove
 import versions
 
 from StringIO import StringIO
@@ -299,7 +299,7 @@ class ChangeSet:
 
 	    # this is a modified package and needs to be inverted
 
-	    invertedPkg = package.TroveChangeSet(pkgCs.getName(), 
+	    invertedPkg = trove.TroveChangeSet(pkgCs.getName(), 
 			       pkgCs.getFlavor(), pkg.getChangeLog(),
 			       pkgCs.getNewVersion(), pkgCs.getOldVersion())
 
@@ -613,7 +613,7 @@ class ChangeSetFromFile(ChangeSet):
 		size = int(header.split()[1])
 		buf = control.read(size)
 		lines = buf.split("\n")[:-1]
-		pkg = package.ThawTroveChangeSet(lines)
+		pkg = trove.ThawTroveChangeSet(lines)
 		self.newPackage(pkg)
 	    elif header.startswith("FILES "):
 		size = int(header.split()[1])

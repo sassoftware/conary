@@ -18,11 +18,11 @@ import gzip
 import httplib
 import log
 import os
-import package
 import repository
 import socket
 import tempfile
 import transport
+import trove
 import urllib
 import util
 import versions
@@ -255,7 +255,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 l.append(None)
                 continue
             
-            t = package.Trove(pkgCs.getName(), pkgCs.getOldVersion(),
+            t = trove.Trove(pkgCs.getName(), pkgCs.getOldVersion(),
                               pkgCs.getFlavor(), pkgCs.getChangeLog())
             t.applyChangeSet(pkgCs)
             l.append(t)

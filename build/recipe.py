@@ -28,13 +28,13 @@ import log
 import macros
 import magic
 import os
-import package
 import packagepolicy
 from repository import repository
 import shutil
 import source
 import sys
 import tempfile
+import trove
 import types
 import util
 
@@ -526,7 +526,7 @@ class FilesetRecipe(Recipe):
 	Adds files which match pattern from version versionStr of component.
 	Pattern is glob-style, with brace expansion. If recurse is set,
 	anything below a directory which matches pattern is also included,
-	and the directory itself does not have to be part of the package.
+	and the directory itself does not have to be part of the trove.
 	Remap is a list of (oldPath, newPath) tuples. The first oldPath
 	which matches the start of a matched pattern is rewritten as
 	newPath.
