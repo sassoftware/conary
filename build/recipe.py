@@ -153,10 +153,13 @@ def setupRecipeDict(d, filename):
 
 class RecipeLoader(types.DictionaryType):
     def __init__(self, filename, cfg=None, repos=None, component=None):
+        self.recipes = {}
+        
         if filename[0] != "/":
             raise IOError, "recipe file names must be absolute paths"
 
-        self.file = os.path.basename(filename).replace('.', '-')
+        basename = os.path.basename(filename)
+        self.file = basename.replace('.', '-')
         self.module = imp.new_module(self.file)
         sys.modules[self.file] = self.module
         f = open(filename)
@@ -173,8 +176,7 @@ class RecipeLoader(types.DictionaryType):
         try:
             code = compile(f.read(), filename, 'exec')
         except SyntaxError, err:
-            msg = ('Error in recipe file "%s": '
-                   '%s\n' %(os.path.basename(filename), err))
+            msg = ('Error in recipe file "%s": %s\n' %(basename, err))
             if err.offset is not None:
                 msg += '%s%s^\n' %(err.text, ' ' * (err.offset-1))
             else:
@@ -187,8 +189,9 @@ class RecipeLoader(types.DictionaryType):
         del self.module.__dict__['cfg']
         del self.module.__dict__['repos']
         del self.module.__dict__['component']
-        
-        for (name, obj) in  self.module.__dict__.items():
+
+        found = False
+        for (name, obj) in self.module.__dict__.items():
             if type(obj) is not types.ClassType:
                 continue
             # if a recipe has been marked to be ignored (for example, if
@@ -197,22 +200,32 @@ class RecipeLoader(types.DictionaryType):
             # class itself, not any parent class
             if 'ignore' in obj.__dict__:
                 continue
+            recipename = getattr(obj, 'name', '')
             # make sure the class is derived from Recipe
-            # and has a name
-            if issubclass(obj, PackageRecipe) and hasattr(obj, 'name'):
-                if obj.name.startswith('group-'):
+            if issubclass(obj, PackageRecipe):
+                if recipename.startswith('group-'):
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name cannot '
-                        'begin with "group-"' %os.path.basename(filename))
-                obj.filename = filename
-                self[name] = obj
-	    elif issubclass(obj, GroupRecipe) and hasattr(obj, 'name'):
-                if not obj.name.startswith('group-'):
+                        'begin with "group-"' %basename)
+	    elif issubclass(obj, GroupRecipe):
+                if recipename and not recipename.startswith('group-'):
                     raise RecipeFileError(
                         'Error in recipe file "%s": group name must '
-                        'begin with "group-"' %os.path.basename(filename))
-                obj.filename = filename
+                        'begin with "group-"' %basename)
+            else:
+                continue
+            self.recipes[name] = obj
+            obj.filename = filename
+            if hasattr(obj, 'name') and hasattr(obj, 'version'):
+                if found:
+                    raise RecipeFileError(
+                        'Error in recipe file "%s": multiple recipe classes '
+                        'with both name and version exist' %basename)
                 self[name] = obj
+                found = True
+
+    def allRecipes(self):
+        return self.recipes
 
     def __del__(self):
         try:
@@ -249,11 +262,11 @@ def recipeLoaderFromSourceComponent(component, filename, cfg, repos):
     os.close(fd)
 
     try:
-        classList = RecipeLoader(recipeFile, cfg, repos, component)
+        loader = RecipeLoader(recipeFile, cfg, repos, component)
     finally:
         os.unlink(recipeFile)
     
-    return classList
+    return loader
 
 def loadRecipe(file):
     callerGlobals = inspect.stack()[1][0].f_globals
@@ -263,20 +276,21 @@ def loadRecipe(file):
         recipepath = os.path.dirname(callerGlobals['filename'])
         localfile = recipepath + '/' + file
     try:
-        recipes = RecipeLoader(localfile)
+        loader = RecipeLoader(localfile)
     except IOError, err:
         if err.errno == errno.ENOENT:
-            recipes = recipeLoaderFromSourceComponent(callerGlobals['component'],
-                                                      file,
-                                                      cfg,
-                                                      repos)
-    for name, recipe in recipes.items():
-        # XXX hack to hide parent recipes
+            loader = recipeLoaderFromSourceComponent(callerGlobals['component'],
+                                                     file,
+                                                     cfg,
+                                                     repos)
+    for name, recipe in loader.allRecipes().items():
+        # hide all recipes from RecipeLoader - we don't want to return
+        # a recipe that has been loaded by loadRecipe
         recipe.ignore = 1
         callerGlobals[name] = recipe
-        # stash a reference to the module in the namespace
-        # of the recipe that loaded it, or else it will be destroyed
-        callerGlobals[os.path.basename(file).replace('.', '-')] = recipes
+    # stash a reference to the module in the namespace
+    # of the recipe that loaded it, or else it will be destroyed
+    callerGlobals[os.path.basename(file).replace('.', '-')] = loader
 
 class _recipeHelper:
     def __init__(self, list, theclass):
