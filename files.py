@@ -555,21 +555,13 @@ class RegularFile(File):
 
 	File.__init__(self, fileId, info, infoTag = self.infoTag)
 
-class SourceFile(RegularFile):
-
-    def __init__(self, fileId, info = None):
-	RegularFile.__init__(self, fileId, info, infoTag = "src")
-
-def FileFromFilesystem(path, fileId, type = None, possibleMatch = None,
+def FileFromFilesystem(path, fileId, possibleMatch = None,
                        requireSymbolicOwnership = False):
     s = os.lstat(path)
 
     needsSha1 = 0
 
-    if type == "src":
-	f = SourceFile(fileId)
-	needsSha1 = 1
-    elif (stat.S_ISREG(s.st_mode)):
+    if (stat.S_ISREG(s.st_mode)):
 	f = RegularFile(fileId)
 	needsSha1 = 1
     elif (stat.S_ISLNK(s.st_mode)):
@@ -639,8 +631,6 @@ def FileFromInfoLine(infoLine, fileId):
 	return BlockDevice(fileId, infoLine)
     elif type == "s":
 	return Socket(fileId, infoLine)
-    elif type == "src":
-	return SourceFile(fileId, infoLine)
     else:
 	raise FilesError("bad infoLine %s" % infoLine)
 

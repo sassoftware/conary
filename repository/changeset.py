@@ -277,15 +277,10 @@ class ChangeSet:
 		    rollback.addFileContents(fileId,
 					     ChangedFileTypes.file, cont, 1)
 		else:
-		    if isinstance(origFile, files.SourceFile):
-			type = "src"
-		    else:
-			type = None
-
 		    fullPath = db.root + path
 
 		    fsFile = files.FileFromFilesystem(fullPath, fileId,
-				type = type, possibleMatch = origFile)
+				possibleMatch = origFile)
 
 		    if fsFile.same(origFile):
 			cont = filecontents.FromFilesystem(fullPath)
@@ -340,14 +335,9 @@ class ChangeSet:
 						 newFile.isConfig())
 		elif origFile.sha1() != newFile.sha1():
 		    # this file changed, so we need the contents
-		    if isinstance(origFile, files.SourceFile):
-			type = "src"
-		    else:
-			type = None
-
 		    fullPath = db.root + curPath
 		    fsFile = files.FileFromFilesystem(fullPath, fileId,
-				type = type, possibleMatch = origFile)
+				possibleMatch = origFile)
 
 		    if fsFile.sha1() == origFile.sha1():
 			# the contents in the file system are right
