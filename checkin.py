@@ -8,7 +8,6 @@ import cook
 import errno
 import filecontents
 import files
-import helper
 import log
 import os
 import package
@@ -172,6 +171,7 @@ def checkout(repos, cfg, dir, name, versionStr = None):
     for (fileId, path, version) in trv.fileList():
 	fullPath = dir + "/" + path
 	fileObj = repos.getFileVersion(fileId, version)
+        # XXX src and dest are not used
 	src = repos.pullFileContentsObject(fileObj.sha1())
 	dest = open(fullPath, "w")
 	contents = filecontents.FromRepository(repos, fileObj.sha1())
@@ -643,7 +643,7 @@ def renameFile(oldName, newName):
 	return
 
     try:
-	lstat(newName)
+	os.lstat(newName)
     except:
 	pass
     else:
