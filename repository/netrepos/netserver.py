@@ -35,8 +35,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def callWrapper(self, method, authToken, args):
 	# reopens the sqlite db if it's changed
 	self.repos.reopen()
+
 	try:
-	    r = self.__class__.__dict__[method](self, authToken, *args)
+	    r = self.__getattribute__(method)(authToken, *args)
 	    return (False, r)
 	except repository.TroveMissing, e:
 	    if not e.troveName:

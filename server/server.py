@@ -148,7 +148,6 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
 	self.repos = fsrepos.FilesystemRepository(self.name, self.repPath,
 						  self.map)
 
-
 class ServerConfig(ConfigFile):
 
     defaults = {
