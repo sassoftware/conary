@@ -64,7 +64,7 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
 	lcache = lookaside.RepositoryCache(repos)
 
-	ident = buildpackage.IdGen()
+	ident = IdGen()
         ident.populate(cfg, repos, lcache, recipeClass.name)
 
         srcdirs = [ os.path.dirname(recipeClass.filename), cfg.sourcepath % {'pkgname': recipeClass.name} ]
@@ -152,3 +152,46 @@ def cook(repos, cfg, recipeFile, prep=0, macros=()):
 
     return built
 
+class IdGen:
+    def __call__(self, path):
+	if self.map.has_key(path):
+	    return self.map[path]
+
+	hash = sha1helper.hashString("%s %f %s" % (path, time.time(), 
+							self.noise))
+	self.map[path] = hash
+	return hash
+
+    def __init__(self, map=None):
+	# file ids need to be unique. we include the time and path when
+	# we generate them; any data put here is also used
+	uname = os.uname()
+	self.noise = "%s %s" % (uname[1], uname[2])
+        if map is None:
+            self.map = {}
+        else:
+            self.map = map
+
+    def populate(self, cfg, repos, lcache, name):
+	# Find the files and ids which were owned by the last version of
+	# this package on the branch. We also construct an object which
+	# lets us look for source files this build needs inside of the
+	# repository
+	fileIdMap = {}
+	fullName = cfg.packagenamespace + ":" + name
+	pkg = None
+	for pkgName in repos.getPackageList(fullName):
+	    pkgSet = repos.getPackageSet(pkgName)
+	    pkg = pkgSet.getLatestPackage(cfg.defaultbranch)
+	    for (fileId, path, version) in pkg.fileList():
+		fileIdMap[path] = fileId
+		if path[0] != "/":
+		    # we might need to retrieve this source file
+		    # to enable a build, so we need to find the
+		    # sha1 hash of it since that's how it's indexed
+		    # in the file store
+		    filedb = repos.getFileDB(fileId)
+		    file = filedb.getVersion(version)
+		    lcache.addFileHash(path, file.sha1())
+
+        self.map.update(fileIdMap)
