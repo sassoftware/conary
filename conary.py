@@ -205,6 +205,11 @@ def realMain(cfg, argv=sys.argv):
 
     # buildFlavor is installFlavor + overrides
     buildFlavor = cfg.flavor.copy()
+    if deps.deps.DEP_CLASS_IS in cfg.buildFlavor.getDepClasses():
+        # instruction set deps are overridden completely -- remove 
+        # any cfg.flavor instruction set info
+        del buildFlavor.members[deps.deps.DEP_CLASS_IS]
+
     buildFlavor.union(cfg.buildFlavor, 
                       mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
     cfg.buildFlavor = buildFlavor

@@ -138,6 +138,11 @@ def realMain(cfg, argv=sys.argv):
 
     # buildFlavor is installFlavor + overrides
     buildFlavor = cfg.flavor.copy()
+    if deps.deps.DEP_CLASS_IS in cfg.buildFlavor.getDepClasses():
+        # instruction set deps are overridden completely -- remove 
+        # any cfg.flavor instruction set info
+        del buildFlavor.members[deps.deps.DEP_CLASS_IS]
+
     buildFlavor.union(cfg.buildFlavor, 
                       mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
     cfg.buildFlavor = buildFlavor
@@ -247,6 +252,10 @@ def sourceCommand(cfg, args, argSet):
         buildBranch = None
         if argSet.has_key('use-flavor'):
             buildFlavor = deps.deps.parseFlavor(argSet['use-flavor'])
+            if deps.deps.DEP_CLASS_IS in buildFlavor.getDepClasses():
+                # instruction set deps are overridden completely -- remove 
+                # any cfg.flavor instruction set info
+                del cfg.buildFlavor.members[deps.deps.DEP_CLASS_IS]
             cfg.buildFlavor.union(buildFlavor, 
                           mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
             del argSet['use-flavor']
