@@ -118,12 +118,12 @@ class _PutFile:
 	    sources = (self.source + fromFile) %macros
 	    # XXX add {} expansion -- util.braceglob?
 	    sourcelist = glob.glob(sources)
-	    thisdest = dest
-	    if dest[-1:] == '/':
-		thisdest = dest + os.path.basename(sources)
-	    elif len(sourcelist) > 1:
+	    if dest[-1:] != '/' and len(sourcelist) > 1:
 		raise TypeError, 'singleton destination %s requires singleton source'
 	    for source in sourcelist:
+		thisdest = dest
+		if dest[-1:] == '/':
+		    thisdest = dest + os.path.basename(source)
 		shutil.copyfile(source, thisdest)
 		if self.mode >= 0:
 		    os.chmod(thisdest, self.mode)
