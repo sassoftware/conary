@@ -1151,28 +1151,32 @@ class Provides(policy.Policy):
 	    return
 	pkg = pkgMap[path]
 	f = pkg.getFile(path)
-        if not f.hasContents or not isinstance(f, files.RegularFile):
-            # only regular files can provide
-            return
 
-	fullpath = self.recipe.macros.destdir + path
-	mode = os.lstat(fullpath)[stat.ST_MODE]
-	m = self.recipe.magic[path]
-	if path in pkg.providesMap and m and m.name == 'ELF' and \
+        fullpath = self.recipe.macros.destdir + path
+        mode = os.lstat(fullpath)[stat.ST_MODE]
+        m = self.recipe.magic[path]
+        if path in pkg.providesMap and m and m.name == 'ELF' and \
            'soname' in m.contents and not mode & 0111:
             # libraries must be executable -- see other policy
-	    del pkg.providesMap[path]
+            del pkg.providesMap[path]
 
-	for (filter, provision) in self.fileFilters:
-	    if filter.match(path):
-		self._markProvides(path, provision, pkg, m, f)
+        for (filter, provision) in self.fileFilters:
+            if filter.match(path):
+                self._markProvides(path, provision, pkg, m, f)
 
-        if path not in pkg.providesMap:
-            return
-        f.provides.set(pkg.providesMap[path])
-        pkg.provides.union(f.provides.value())
+        if f.hasContents and isinstance(f, files.RegularFile):
+            # only regular files can provide
+            if path not in pkg.providesMap:
+                return
+            f.provides.set(pkg.providesMap[path])
+            pkg.provides.union(f.provides.value())
+
+        elif path in pkg.providesMap:
+            del pkg.providesMap[path]
+
         # Because paths can change, individual files do not provide their
         # paths.  However, within a trove, a file does provide its name.
+        # Furthermore, non-regular files can be path dependency targets 
         # Therefore, we have to handle this case a bit differently.
         if f.flags.isPathDependencyTarget():
             pkg.provides.addDep(deps.FileDependencies, deps.Dependency(path))
