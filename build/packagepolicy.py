@@ -138,7 +138,7 @@ class Config(policy.Policy):
 	    if not isinstance(self.inclusions, (tuple, list)):
 		self.inclusions = (self.inclusions,)
 	    for inclusion in self.inclusions:
-		self.configREs.append(re.compile(inclusion %self.macros))
+		self.configREs.append(re.compile(inclusion %recipe.macros))
 	policy.Policy.doProcess(self, recipe)
 
     def doFile(self, file):
