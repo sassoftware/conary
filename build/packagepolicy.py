@@ -330,7 +330,7 @@ class AddModes(policy.Policy):
 	    for package in packages.keys():
 		if path in packages[package]:
 		    log.debug('suid/sgid: %s', path)
-		    packages[package][path].perms(mode)
+		    packages[package][path].inode.setPerms(mode)
 
 
 class Ownership(policy.Policy):
