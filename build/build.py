@@ -28,6 +28,7 @@ import re
 import stat
 import sys
 import tempfile
+import textwrap
 
 #conary imports
 import action
@@ -1342,3 +1343,158 @@ class ConsoleHelper(BuildAction):
         recipe.Requires('/usr/bin/consolehelper', self.linkname)
 
 
+class XInetdService(_FileAction):
+    """
+    Easily create a file in /etc/xinetd.d/ to run an application:
+    C{r.XInetdService(I{name}, I{description},
+    [server=I{'/path/to/server'},] [server_args=I{'--args'},]
+    [protocol=I{'protocol'},] [port=I{'portnumber'},]
+    [default=I{bool(False)},] [type=I{'type'},] [id=I{'bool(False)'},]
+    [socket_type=I{'socket_type'},] [user=I{'user'},] [group=I{'group'},]
+    [wait=I{bool(False)},] [disable=I{bool(true)},]
+    [log_on_success=I{'VALUES'},] [log_on_failure=I{'VALUES'},]
+    [filename=I{'/etc/xinetd.d/something'},] [mode=I{0644},]
+    [otherlines=[I{'list', 'of', 'lines'}],])}
+
+    Specify only the arguments that you absolute need to specify.
+    The C{otherlines} argument should be a list of lines, and should
+    not include any leading tabs or trailing newlines.  The arguments
+    are generally as defined in the xinetd.conf man page, with the
+    exception that the arguments listed as C{I{bool(...)}} are translated
+    from Python boolean values to "yes" and "no".  C{default} is the
+    chkconfig default value and C{description} is the chkconfig
+    description; they are encoded as comments.  Do not include comment
+    characters in either, and do not wrap the description; it will be
+    nicely wrapped for you according to chkconfig's rules.
+    """
+    keywords = {
+        'serviceName':    None,
+        'description':    None,
+        'server':         None,
+        'server_args':    None,
+        'protocol':       None,
+        'port':           None,
+        'default':        False,
+        'type':           None,
+        'socket_type':    None,
+        'id':             False,
+        'wait':           False,
+        'disable':        True,
+        'user':           None,
+        'group':          None,
+        'log_on_success': None,
+        'log_on_failure': None,
+        'filename':       None,
+        'mode':           0644,
+        'otherlines':     None,
+    }
+
+    def do(self, macros):
+        c = [
+            "# default: %(default)s",
+            "%(description_text)s",
+            "",
+            "service %(serviceName)s",
+            "{",
+        ]
+
+        if self.protocol:
+            c.append("\tprotocol\t= %(protocol)s")
+
+        if self.port:
+            c.append("\tport\t\t= %(port)s")
+
+        if self.type:
+            c.append("\ttype\t\t= %(type)s")
+
+        if self.server:
+            c.append("\tserver\t\t= %(server)s")
+
+        if self.server_args:
+            c.append("\tserver_args\t= %(server_args)s")
+
+        if not self.socket_type:
+            c.append("\tsocket_type\t= %(socket_type)s")
+
+        if self.id:
+            c.append("\tid\t\t= %(serviceName)s-(socket_type)s")
+
+        if self.wait:
+            self.wait = 'yes'
+        else:
+            self.wait = 'no'
+        c.append("\twait\t\t= %(wait)s")
+
+        if self.disable:
+            self.disable = 'yes'
+        else:
+            self.disable = 'no'
+        c.append("\tdisable\t\t= %(disable)s")
+
+        if self.user:
+            c.append("user\t\t= %(user)s")
+
+        if self.group:
+            c.append("group\t\t= %(group)s")
+
+        if self.log_on_success:
+            c.append("log_on_success\t= %(log_on_success)s")
+
+        if self.log_on_failure:
+            c.append("log_on_failure\t= %(log_on_failure)s")
+
+        if self.otherlines:
+            c.extend(["\t%s"%x for x in self.otherlines])
+
+        c.append("}")
+
+        if not self.filename:
+            if self.id:
+                self.filename = '/'.join((
+                    macros.sysconfdir, 'xinetd.d',
+                    '-'.join((self.serviceName, self.socket_type))))
+            else:
+                self.filename = '/'.join((
+                    macros.sysconfdir, 'xinetd.d', self.serviceName))
+        
+        dest = macros.destdir+self.filename
+	util.mkdirChain(os.path.dirname(dest))
+        f = file(dest, 'w')
+        f.write('\n'.join(c) %self.__dict__ %macros)
+        f.write('\n')
+        self.chmod(macros.destdir, dest)
+
+
+    def __init__(self, recipe, *args, **keywords):
+        _FileAction.__init__(self, recipe, **keywords)
+        assert(len(args) == 2)
+        self.serviceName = args[0]
+        self.description = args[1]
+
+        if not self.type and not self.server:
+	    self.init_error(TypeError, 'at least one of type or server must be specified')
+
+        if self.server_args and not self.server:
+	    self.init_error(TypeError, 'server_args was specified, but server was not')
+
+        if not self.socket_type:
+            if self.protocol:
+                if self.protocol in ('tcp'):
+                    self.socket_type = 'stream'
+                elif self.protocol in ('udp'):
+                    self.socket_type = 'dgram'
+                else:
+                    self.init_error(TypeError, 'unknown socket_type for protocol %s'%self.protocol)
+            else:
+
+                    self.init_error(TypeError, 'socket_type or protocol must be specified')
+
+        if self.id and not self.socket_type:
+	    self.init_error(TypeError, 'id requires socket_type to be specified')
+
+        # chkconfig has somewhat odd formatting requirements
+        w = textwrap.TextWrapper(
+            initial_indent    = "# description: ",
+            subsequent_indent = "#              ",
+            break_long_words  = False)
+        self.description_text = ' \\\n'.join(w.wrap(self.description))

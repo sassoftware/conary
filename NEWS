@@ -1,3 +1,9 @@
+Changes in 0.50.7:
+  * Added the XInetdService action to avoid having to include
+    /etc/xinetd.d/ files separately, and to make xinetd.d files
+    be consistent, making recipe-provided changes less likely to
+    conflict with local configuration changes.
+
 Changes in 0.50.6:
   * conaryclient.updateChangeSet should have recursed by default
   * Metadata retrieval now works along distributed branches and shadows.
