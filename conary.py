@@ -28,7 +28,6 @@ import os
 import xmlrpclib
 
 #conary
-from build import cook
 import commit
 import conarycfg
 import constants
@@ -228,6 +227,10 @@ def realMain(cfg, argv=sys.argv):
 	else:
 	    cfg.display()
     elif (otherArgs[1] == "emerge"):
+        # import this late to reduce the dependency set for
+        # the main conary command in the common case.  This lets
+        # conary run even if, for example, libelf is missing
+        from build import cook
 	log.setVerbosity(log.DEBUG)
 
 	if argSet: return usage()
