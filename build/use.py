@@ -66,6 +66,10 @@ class Flag(dict):
         assert(isinstance(value, bool) or value is None)
         self._value = value
 
+    def _get(self):
+        # don't track this access to _value
+        return self._value
+
     def __repr__(self):
 	if self._value == None:
 	    # top-level flag, no point in printing out None...

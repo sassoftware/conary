@@ -208,9 +208,9 @@ class Configure(BuildCommand):
         else:
             macros.mkObjdir = ''
             macros.configure = './%s' % self.configureName
-        # __getitem__ method avoids adding bootstrap flag to tracked flags
+        # using the get method avoids adding bootstrap flag to tracked flags
         # (if the flag is really significant, it will be checked elsewhere)
-        if Use['bootstrap']:
+        if Use.bootstrap._get():
             macros.bootstrapFlags = self.bootstrapFlags
         else:
             macros.bootstrapFlags = ''
