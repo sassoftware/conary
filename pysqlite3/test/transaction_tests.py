@@ -57,6 +57,27 @@ class TransactionTests(unittest.TestCase, testsupport.TestSupport):
         except:
             self.fail("Immediate rollback raises exeption.")
 
+
+    def CheckRollbackAfterError(self):
+        import tempfile, os
+        fd, fn = tempfile.mkstemp()
+        os.close(fd)
+        db1 = sqlite.connect(fn)
+        db2 = sqlite.connect(fn)
+        cu1 = db1.cursor()
+        cu2 = db2.cursor()
+        cu1.execute('create table test(a)')
+        db1.commit()
+        cu1.execute('insert into test values(1)')
+        try:
+            cu2.execute('insert into test values(2)')
+        except sqlite.InternalError, e:
+            assert(str(e) == "database is locked")
+        db2.rollback()
+        db1.commit()
+        assert([ x for x in cu1.execute("select * from test")] == [(1,)])
+        os.unlink(fn)
+
 class AutocommitTests(unittest.TestCase, testsupport.TestSupport):
     def setUp(self):
         self.filename = self.getfilename()

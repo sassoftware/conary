@@ -108,7 +108,13 @@ class Cursor:
         self.description = None
         self.current_row = None
         if self.stmt is not None:
-            self.stmt.finalize()
+            try:
+                self.stmt.reset()
+            # XXX sqlite3_stmt_reset() returns a return code that
+            # reflects the last error for the vdbm.  We should ignore
+            # it since we're destroying this statement anyway
+            except _sqlite.DatabaseError:
+                pass
             self.stmt = None
         
     def _checkNotClosed(self, methodname=None):
