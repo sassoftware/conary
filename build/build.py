@@ -18,6 +18,7 @@ import fixedglob
 import log
 import re
 import stat
+import action
 from use import Use
 
 # make sure that the decimal value really is unreasonable before
@@ -33,12 +34,9 @@ _permmap = {
     640: 0640,
 }
 
-class BuildAction(util.Action):
-    keywords = {
-        'use': None
-    }
+class BuildAction(action.RecipeAction):
 
-    def __init__(self, *args, **keywords):
+    def __init__(self, recipe, *args, **keywords):
 	"""
 	@keyword use: Optional argument; Use flag(s) telling whether
 	to actually perform the action.
@@ -46,14 +44,12 @@ class BuildAction(util.Action):
 	"""
 	# enforce pure virtual status
         assert(self.__class__ is not BuildAction)
-	util.Action.__init__(self, *args, **keywords)
+	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	# change self.use to be a simple flag
-	self.use = util.checkUse(self.use)
 
-    def doBuild(self, recipe):
-	self.recipe = recipe
+    def doAction(self):
 	if self.use:
-	    self.do(recipe.macros)
+	    self.do(self.recipe.macros)
 
     def do(self, macros):
         """
@@ -65,16 +61,16 @@ class BuildAction(util.Action):
         self.error(AssertionError, "do method not implemented")
 
 
-class BuildCommand(BuildAction, util.ShellCommand):
+class BuildCommand(BuildAction, action.ShellCommand):
     """
     Pure virtual class which implements the do method,
     based on the shell command built from a template.
     """
-    def __init__(self, *args, **keywords):
+    def __init__(self, recipe, *args, **keywords):
 	# enforce pure virtual status
         assert(self.__class__ is not BuildCommand)
-	BuildAction.__init__(self, *args, **keywords)
-	util.ShellCommand.__init__(self, *args, **keywords)
+	BuildAction.__init__(self, recipe, *args, **keywords)
+	action.ShellCommand.__init__(self, recipe, *args, **keywords)
 
     def do(self, macros):
         """
@@ -121,7 +117,7 @@ class Automake(BuildCommand):
 
 class Configure(BuildCommand):
     """The Configure class runs an autoconf configure script with the
-    default paths as defined by the macro set passed into it when doBuild
+    default paths as defined by the macro set passed into it when doAction
     is invoked.  It provides many common arguments, set correctly to
     values provided by system macros.  If any of these arguments do
     not work for a program, then use the ManualConfigure class instead.
@@ -155,7 +151,7 @@ class Configure(BuildCommand):
                 'objDir': '',
 		'subDir': ''}
 
-    def __init__(self, *args, **keywords):
+    def __init__(self, recipe, *args, **keywords):
         """
         Create a new Configure instance used to run the autoconf configure
         command with default parameters
@@ -170,7 +166,7 @@ class Configure(BuildCommand):
 	@keyword configureName: the name of the configure command; normally
 	C{configure} but occasionally C{Configure} or something else.
         """
-        BuildCommand.__init__(self, *args, **keywords)
+        BuildCommand.__init__(self, recipe, *args, **keywords)
          
     def do(self, macros):
 	macros = macros.copy()
@@ -230,7 +226,7 @@ class Make(BuildCommand):
                 'subDir': '',
 		'forceFlags': False}
 
-    def __init__(self, *args, **keywords):
+    def __init__(self, recipe, *args, **keywords):
         """
         @keyword preMake: string to be inserted before the "make" command.
         Use preMake if you need to set an environment variable.  The
@@ -239,7 +235,7 @@ class Make(BuildCommand):
 	@keyword forceFlags: boolean; if set, unconditionally override
 	the Makefile definitions of *FLAGS (i.e. CFLAGS, CXXFLAGS, LDFLAGS)
         """
-	BuildCommand.__init__(self, *args, **keywords)
+	BuildCommand.__init__(self, recipe, *args, **keywords)
         if 'preMake' in keywords:
             if ';' in keywords['preMake']:
                 error(TypeError, 'preMake argument cannot contain ;')
@@ -420,37 +416,37 @@ class Desktopfile(BuildCommand, _FileAction):
 		' %(args)s')
     keywords = {'vendor': 'net',
 		'category': None}
+	
 
-    def doBuild(self, recipe):
-	if not Use.desktop or not self.use:
+    def do(self, macros):
+	if not Use.desktop:
 	    return
-	if 'desktop-file-utils:runtime' not in recipe.buildRequires:
+	if 'desktop-file-utils:runtime' not in self.recipe.buildRequires:
 	    # Unfortunately, we really cannot do this automagically
 	    log.error("Must add 'desktop-file-utils:runtime to buildRequires")
-	macros = recipe.macros.copy()
+	macros = self.recipe.macros.copy()
         if self.category:
 	    macros['category'] = '--add-category "%s"' %self.category
         else:
             macros['category'] = ''
-	self.do(macros)
 	for file in self.arglist:
 	    self.setComponents('%(datadir)s/applications'+file)
 
 
-class Environment(util.Action):
+class Environment(action.RecipeAction):
     """
     Set an environment variable after all macros are available.
 
     Call C{Environment('I{VARIABLE}', 'I{value}')} for each
     environment variable you need to set.
     """
-    def __init__(self, *args, **keywords):
+    def __init__(self, recipe, *args, **keywords):
 	assert(len(args)==2)
 	self.variable = args[0]
 	self.value = args[1]
-	util.Action.__init__(self, [], **keywords)
-    def doBuild(self, recipe):
-	os.environ[self.variable] = self.value % recipe.macros
+	action.RecipeAction.__init__(self, recipe, [], **keywords)
+    def do(self, macros):
+	os.environ[self.variable] = self.value % macros
 
 
 class SetModes(_FileAction):
@@ -468,8 +464,8 @@ class SetModes(_FileAction):
     Call C{SetModes(file[, file ...], mode)}
     """
     
-    def __init__(self, *args, **keywords):
-        _FileAction.__init__(self, *args, **keywords) 
+    def __init__(self, recipe, *args, **keywords):
+        _FileAction.__init__(self, recipe, *args, **keywords) 
 	split = len(args) - 1
 	self.paths = args[:split]
 	self.mode = args[split]
@@ -538,8 +534,8 @@ class _PutFiles(_FileAction):
 	self.chmod(macros['destdir'], dest[self.destlen:], mode=mode)
 	
 
-    def __init__(self, *args, **keywords):
-        _FileAction.__init__(self, *args, **keywords)
+    def __init__(self, recipe, *args, **keywords):
+        _FileAction.__init__(self, recipe, *args, **keywords)
 	split = len(args) - 1
 	self.fromFiles = args[:split]
 	self.toFile = args[split]
@@ -554,8 +550,8 @@ class Install(_PutFiles):
     """
     keywords = { 'mode': -2 }
 
-    def __init__(self, *args, **keywords):
-	_PutFiles.__init__(self, *args, **keywords)
+    def __init__(self, recipe, *args, **keywords):
+	_PutFiles.__init__(self, recipe, *args, **keywords)
 	self.source = ''
 	self.move = 0
 
@@ -563,8 +559,8 @@ class Copy(_PutFiles):
     """
     This class copies files within the destdir.
     """
-    def __init__(self, *args, **keywords):
-	_PutFiles.__init__(self, *args, **keywords)
+    def __init__(self, recipe, *args, **keywords):
+	_PutFiles.__init__(self, recipe, *args, **keywords)
 	self.source = '%(destdir)s'
 	self.move = 0
 
@@ -572,8 +568,8 @@ class Move(_PutFiles):
     """
     This class moves files within the destdir.
     """
-    def __init__(self, *args, **keywords):
-	_PutFiles.__init__(self, *args, **keywords)
+    def __init__(self, recipe, *args, **keywords):
+	_PutFiles.__init__(self, recipe, *args, **keywords)
 	self.source = '%(destdir)s'
 	self.move = 1
 
@@ -644,7 +640,7 @@ class Symlink(_FileAction):
 		log.warning('back-referenced symlink %s should probably be replaced by absolute symlink (start with "/" not "..")', source)
 	    os.symlink(util.normpath(source), to)
 
-    def __init__(self, *args, **keywords):
+    def __init__(self, recipe, *args, **keywords):
         """
         Create a new Symlink instance
 
@@ -657,7 +653,7 @@ class Symlink(_FileAction):
         creation of dangling symlinks
         @type allowDangling: bool
         """
-        _FileAction.__init__(self, *args, **keywords)
+        _FileAction.__init__(self, recipe, *args, **keywords)
 	split = len(args) - 1
 	self.fromFiles = args[:split]
 	self.toFile = args[split]
@@ -689,12 +685,12 @@ class Link(_FileAction):
 		os.remove(n)
 	    os.link(e, n)
 
-    def __init__(self, *args, **keywords):
+    def __init__(self, recipe, *args, **keywords):
         """
         Create a new Link instance::
 	    self.Link(newname, [newname, ...,] existingpath)
         """
-        _FileAction.__init__(self, *args, **keywords)
+        _FileAction.__init__(self, recipe, *args, **keywords)
 	split = len(args) - 1
 	self.newnames = args[:split]
 	self.existingpath = args[split]
@@ -718,8 +714,8 @@ class Remove(BuildAction):
 	    else:
 		util.remove("%s/%s" %(macros['destdir'], filespec %macros))
 
-    def __init__(self, *args, **keywords):
-        BuildAction.__init__(self, **keywords)
+    def __init__(self, recipe, *args, **keywords):
+        BuildAction.__init__(self, recipe, **keywords)
 	if type(args[0]) is tuple:
 	    self.filespecs = args[0]
 	else:
@@ -750,8 +746,8 @@ class Doc(_FileAction):
 					 dirmode=self.dirmode):
 		self.setComponents(newpath[destlen:])
 
-    def __init__(self, *args, **keywords):
-        _FileAction.__init__(self, *args, **keywords)
+    def __init__(self, recipe, *args, **keywords):
+        _FileAction.__init__(self, recipe, *args, **keywords)
 	if type(args[0]) is tuple:
 	    self.paths = args[0]
 	else:
@@ -784,13 +780,13 @@ class Create(_FileAction):
 		f.close()
 		self.setComponents(path)
 		self.chmod(macros['destdir'], path)
-    def __init__(self, *args, **keywords):
+    def __init__(self, recipe, *args, **keywords):
         """
         @keyword contents: The (optional) contents of the file
         @keyword macros: Whether or not to interpolate macros into the contents
         @keyword mode: The mode of the file (defaults to 0644)
         """
-        _FileAction.__init__(self, *args, **keywords)
+        _FileAction.__init__(self, recipe, *args, **keywords)
 	if type(args[0]) is tuple:
 	    self.paths = args[0]
 	else:
@@ -817,8 +813,8 @@ class MakeDirs(_FileAction):
                 util.mkdirChain(dest)
                 self.chmod(macros['destdir'], d)
 
-    def __init__(self, *args, **keywords):
-        _FileAction.__init__(self, *args, **keywords)
+    def __init__(self, recipe, *args, **keywords):
+        _FileAction.__init__(self, recipe, *args, **keywords)
 	if type(args[0]) is tuple:
 	    self.paths = args[0]
 	else:

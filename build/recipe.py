@@ -258,11 +258,12 @@ class _sourceHelper:
         self.recipe._sources.append(self.theclass(self.recipe, *args, **keywords))
 
 class _recipeHelper:
-    def __init__(self, list, theclass):
+    def __init__(self, list, recipe, theclass):
         self.list = list
         self.theclass = theclass
+	self.recipe = recipe
     def __call__(self, *args, **keywords):
-        self.list.append(self.theclass(*args, **keywords))
+        self.list.append(self.theclass(self.recipe, *args, **keywords))
 
 class _policyUpdater:
     def __init__(self, theobject):
@@ -307,8 +308,9 @@ class PackageRecipe(Recipe):
 	if os.path.exists(builddir):
 	    shutil.rmtree(builddir)
 	util.mkdirChain(builddir)
+	self.macros.builddir = builddir
 	for source in self._sources:
-	    source.unpack(builddir)
+	    source.doAction()
 
     def extraBuild(self, action):
         self._build.append(action)
@@ -319,7 +321,7 @@ class PackageRecipe(Recipe):
 			    'destdir': root})
 	self.magic = magic.magicCache(root)
 	for bld in self._build:
-	    bld.doBuild(self)
+	   bld.doAction()
 
     def doDestdirProcess(self):
 	for post in self.destdirPolicy:
@@ -352,7 +354,7 @@ class PackageRecipe(Recipe):
 	    if name.startswith('add'):
 		return _sourceHelper(source.__dict__[name[3:]], self)
 	    if name in build.__dict__:
-		return _recipeHelper(self._build, build.__dict__[name])
+		return _recipeHelper(self._build, self, build.__dict__[name])
 	    for (policy, list) in (
 		(destdirpolicy, self.destdirPolicy),
 		(packagepolicy, self.packagePolicy)):

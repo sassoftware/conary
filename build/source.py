@@ -15,19 +15,32 @@ import lookaside
 import os
 import rpmhelper
 import util
+import action
+import string
 
-class _Source:
-    def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None, use=None):
-	self.recipe = recipe
+class _Source(action.RecipeAction):
+    keywords = {'rpm': '',
+		'dir': '',
+		'keyid': None }
+
+	        
+    def __init__(self, recipe, *args, **keywords):
+	sourcename = args[0]
+	action.RecipeAction.__init__(self, recipe, *args, **keywords)
 	self.sourcename = sourcename % recipe.macros
-	self.rpm = rpm % recipe.macros
-	self.dir = dir # delay evaluation until unpacking
-	self.use = use
-	if keyid:
-	    self.keyid = keyid
+	self.rpm = self.rpm % recipe.macros
+	self.prep()
+	    
+    def prep(self):
+	if self.keyid:
 	    self._addSignature()
-	if rpm:
+	if self.rpm:
 	    self._extractFromRPM()
+
+    def doAction(self):
+	self.builddir = self.recipe.macros.builddir
+	self.dir = self.dir % self.recipe.macros
+	action.RecipeAction.doAction(self)
 
     def _addSignature(self):
         for suffix in ('sig', 'sign', 'asc'):
@@ -95,19 +108,7 @@ class _Source:
 	self._checkSignature(f)
 	return f
 
-    def unpack(self, builddir):
-	if self.use != None:
-	    if type(self.use) is not tuple:
-		self.use=(self.use,)
-	    for usevar in self.use:
-		if not usevar:
-		    # do not apply this
-		    return
-	self.builddir = builddir
-	self.dir = self.dir % self.recipe.macros
-	self.doUnpack()
-
-    def doUnpack(self):
+    def do(self):
 	raise NotImplementedError
 
 
@@ -124,7 +125,8 @@ class Archive(_Source):
 
     FIXME: must fix the rules for directories, then explain here.
     """
-    def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None, use=None):
+
+    def __init__(self, recipe, *args, **keywords):
 	"""
 	@param recipe: The recipe object currently being built.
 	@param sourcename: The name of the archive
@@ -139,9 +141,9 @@ class Archive(_Source):
 	    booleans, that determine whether the archive is actually
 	    unpacked or merely stored in the archive.
 	"""
-	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
+	_Source.__init__(self, recipe, *args, **keywords)
 
-    def doUnpack(self):
+    def do(self):
 	f = self._findSource()
 	self._checkSignature(f)
 
@@ -178,8 +180,13 @@ class Patch(_Source):
     signed with the appropriate GPG key.  A missing signature is a
     warning; a failed signature check is fatal.
     """
-    def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None,
-		 use=None, level='1', backup='', macros=False, extraArgs=''):
+    keywords = {'level': '1',
+		'backup': '',
+		'macros': False,
+		'extraArgs': ''}
+
+
+    def __init__(self, recipe, *args, **keywords):
 	"""
 	@param recipe: The recipe object currently being built.
 	@param sourcename: The name of the patch file
@@ -207,13 +214,10 @@ class Patch(_Source):
 	    Use only as a last resort -- and probably also file a bug
 	    report suggesting the possibility of direct support.
 	"""
-	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
-	self.level = level
-	self.backup = backup
-	self.applymacros = macros
-	self.extraArgs = extraArgs
+	_Source.__init__(self, recipe, *args, **keywords)
+	self.applymacros = self.macros
 
-    def doUnpack(self):
+    def do(self):
 	destDir = os.sep.join((self.builddir, self.recipe.theMainDir))
 	util.mkdirChain(destDir)
 
@@ -255,8 +259,16 @@ class Source(_Source):
     signed with the appropriate GPG key.  A missing signature is a
     warning; a failed signature check is fatal.
     """
-    def __init__(self, recipe, sourcename, rpm='', dir='', keyid=None,
-                  use=None, apply='', contents=None, macros=False, dest=None):
+
+    keywords = {'apply': '',
+		'contents': None,
+		'macros': False,
+		'dest': None}
+
+
+    def __init__(self, recipe, *args, **keywords):
+
+
 	"""
 	@param recipe: The recipe object currently being built.
 	@param sourcename: The name of the archive
@@ -288,20 +300,21 @@ class Source(_Source):
 	    a URL to a third-party web site, or copying a file out of an
 	    RPM package.
 	"""
-	self.apply = apply
-	self.applymacros = macros
-	self.contents = contents
-	if dest:
+	_Source.__init__(self, recipe, *args, **keywords)
+	if self.dest:
 	    # make sure that user did not pass subdirectory in
-	    self.dest = os.path.basename(dest %recipe.macros)
+	    self.dest = os.path.basename(self.dest %recipe.macros)
 	else:
-	    self.dest = os.path.basename(sourcename %recipe.macros)
-	if contents is not None:
+	    self.dest = os.path.basename(self.sourcename %recipe.macros)
+	if self.contents is not None:
 	    # Do not look for a file that does not exist...
-	    sourcename = ''
-	_Source.__init__(self, recipe, sourcename, rpm, dir, keyid, use)
+	    self.sourcename = ''
+	if self.macros:
+	    self.applymacros = True
+	else:
+	    self.applymacros = False
 
-    def doUnpack(self):
+    def do(self):
 	destDir = os.sep.join((self.builddir, self.recipe.theMainDir))
 	util.mkdirChain(destDir)
 
@@ -330,12 +343,15 @@ class Source(_Source):
 	    util.execute(self.apply %self.recipe.macros, destDir)
 
 
-class Action(_Source):
+class Action(action.RecipeAction):
     """
     Called as self.addAction from a recipe, this class copies a file
     into the build directory %(builddir)s.
     """
-    def __init__(self, recipe, action, dir='', use=None):
+
+    keywords = {'dir': '' }
+
+    def __init__(self, recipe, *args, **keywords):
 	"""
 	@param recipe: The recipe object currently being built.
 	@param action: A command line to run.
@@ -347,10 +363,12 @@ class Action(_Source):
 	    booleans, that determine whether the archive is actually
 	    unpacked or merely stored in the archive.
 	"""
-	_Source.__init__(self, recipe, '', '', dir, None, None)
-	self.action = action
+	action.RecipeAction.__init__(self, recipe, *args, **keywords)
+	self.action = args[0]
 
-    def doUnpack(self):
+    def do(self):
+	self.builddir = self.recipe.macros.builddir
+	self.dir = self.dir % self.recipe.macros
 	destDir = os.sep.join((self.builddir, self.recipe.theMainDir))
 	util.mkdirChain(destDir)
 	if self.dir:

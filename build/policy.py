@@ -6,13 +6,14 @@
 import util
 import filter
 import os
+import action
 
 """
 Base class used for destdirpolicy and packagepolicy
 """
 
 
-class Policy(util.Action):
+class Policy(action.RecipeAction):
     """
     Pure virtual superclass for all policy actions.  Policy actions
     that operate on the entire C{%(destdir)s} implement the C{do} method;
@@ -65,7 +66,7 @@ class Policy(util.Action):
 	"""
 	# enforce pure virtual status
 	assert(self.__class__ is not Policy)
-	util.Action.__init__(self, *args, **keywords)
+	action.RecipeAction.__init__(self, None, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
 	"""
@@ -130,7 +131,7 @@ class Policy(util.Action):
 		return
 
 	# change self.use to be a simple flag
-	self.use = util.checkUse(self.use)
+	self.use = action.checkUse(self.use)
 
 	# compile the inclusions
 	self.inclusionFilters = []
@@ -147,15 +148,17 @@ class Policy(util.Action):
 
 	# dispatch if/as appropriate
 	if self.use:
-	    if hasattr(self.__class__, 'do'):
-		self.do()
-	    elif hasattr(self.__class__, 'doFile'):
-		if not self.invariantsubtrees:
-		    self.invariantsubtrees.append('/')
-		for self.currentsubtree in self.invariantsubtrees:
-		    os.path.walk(
-			('%(destdir)s'+self.currentsubtree) %self.macros,
-			self.walkDir, None)
+	    self.do()
+
+    def do(self):
+	# calls doFile on all appropriate files -- can be overridden by
+	# subclasses
+	if not self.invariantsubtrees:
+	    self.invariantsubtrees.append('/')
+	for self.currentsubtree in self.invariantsubtrees:
+	    os.path.walk(
+		('%(destdir)s'+self.currentsubtree) %self.macros,
+		self.walkDir, None)
 
     def walkDir(self, ignore, dirname, names):
 	# chop off bit not useful for comparison
