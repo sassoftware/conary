@@ -15,6 +15,7 @@ Changes in 0.50.5:
     recipe, any loadRecipe lines contained in that recipe should still do 
     what you want. 
   * merge didn't handle files converging
+  * merge doesn't need to deal with autosource files
 
 Changes in 0.50.4:
   * Most rollback information is stored as a reference to a repository

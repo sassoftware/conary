@@ -920,7 +920,7 @@ def merge(repos):
     changeSet = repos.createChangeSet([(troveName, 
                             (parentRootVersion, deps.deps.DependencySet()), 
                             (parentHeadVersion, deps.deps.DependencySet()), 
-                            0)])
+                            0)], excludeAutoSource = True)
 
     # make sure there are changes to apply
     packageChanges = changeSet.iterNewPackageList()
