@@ -34,7 +34,7 @@ _STREAM_DEPS	    = 10
 
 def _makeTupleSlots(l):
     return [ "items", ] + [ x[0] for x in l ] + \
-		    [ "set" + x.capitalize() x in l ]
+		    [ "set" + x[0].capitalize() x in l ]
 
 def _makeFileSlots(l):
     return [ "theId" ] + [ x[0] for x in l ]
