@@ -477,9 +477,6 @@ class ConaryClient:
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         depsRecurse = True, resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback()):
-        if not test:
-            self._prepareRoot()
-
         callback.preparingChangeSet()
 
         finalCs = self._updateChangeSet(itemList, 
@@ -694,7 +691,7 @@ class ConaryClient:
 
 	return dupList
 
-    def _prepareRoot(self):
+    def checkWriteableRoot(self):
         """
         Prepares the installation root for trove updates and change 
         set applications.

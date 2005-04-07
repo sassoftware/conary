@@ -107,6 +107,9 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
     # dedup
     applyList = {}.fromkeys(applyList).keys()
 
+    if not info:
+	client.checkWriteableRoot()
+
     try:
         (cs, depFailures, suggMap, brokenByErase) = \
             client.updateChangeSet(applyList, depsRecurse = depsRecurse,

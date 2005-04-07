@@ -1,6 +1,7 @@
 Changes in 0.50.11:
   * Reworked file addition to local database a bit for better performance
   * Fixed sorting for --info
+  * Don't make --info installs require a writeable database
 
 Changes in 0.50.10:
   * Added callback for creating database transaction, so that it does 
