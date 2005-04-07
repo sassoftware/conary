@@ -1,3 +1,6 @@
+Changes in 0.50.11:
+  * Reworked file addition to local database a bit for better performance
+
 Changes in 0.50.10:
   * Added callback for creating database transaction, so that it does 
     not look like we spend an inordinate amount of time executing tag

@@ -33,6 +33,9 @@ class DBTroveFiles:
     """
     pathId, versionId, path, instanceId, stream
     """
+
+    addItemStmt = "INSERT INTO DBTroveFiles VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)"
+
     def __init__(self, db):
         self.db = db
 	self.tags = Tags(self.db)
@@ -104,14 +107,15 @@ class DBTroveFiles:
 	except StopIteration:
             raise KeyError, fileId
 
-    def addItem(self, pathId, versionId, path, fileId, instanceId, stream, 
-                tags):
+    def addItem(self, cu, pathId, versionId, path, fileId, instanceId, 
+                stream, tags, addItemStmt = None):
         assert(len(pathId) == 16)
-        cu = self.db.cursor()
-        cu.execute("""
-	    INSERT INTO DBTroveFiles VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)
-	""",
-	   (pathId, versionId, path, fileId, instanceId, 1, stream))
+
+        if not addItemStmt:
+            addItemStmt = cu.compile(self.addItemStmt)
+
+        cu.execstmt(addItemStmt, pathId, versionId, path, fileId, instanceId, 
+                    1, stream)
 
 	streamId = cu.lastrowid
 
@@ -631,16 +635,20 @@ class Database:
         self.depTables.add(cu, trove, troveInstanceId)
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
 
-	return (cu, troveInstanceId)
+        addFile = cu.compile(self.troveFiles.addItemStmt)
+
+	return (cu, troveInstanceId, addFile)
 
     def addFile(self, troveInfo, pathId, fileObj, path, fileId, fileVersion):
-	(cu, troveInstanceId) = troveInfo
+	(cu, troveInstanceId, addFileStmt) = troveInfo
 	versionId = self.getVersionId(fileVersion, self.addVersionCache)
 
 	if fileObj:
-	    self.troveFiles.addItem(fileObj.pathId(), versionId, path, 
+	    self.troveFiles.addItem(cu, fileObj.pathId(), 
+                                    versionId, path, 
                                     fileObj.fileId(), troveInstanceId, 
-                                    fileObj.freeze(), fileObj.tags)
+                                    fileObj.freeze(), fileObj.tags,
+                                    addItemStmt = addFileStmt)
 	else:
 	    cu.execute("""
 		UPDATE DBTroveFiles SET instanceId=? WHERE
