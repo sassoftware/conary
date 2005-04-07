@@ -160,12 +160,12 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,
                        urls, categories, licenses, source, language):
-        label = versions.VersionFromString(branch).label()
+        branch = self.toBranch(branch)
         if not self.auth.check(authToken, write = True,
-                               label = label):
+                               label = branch.label(),
+                               trove = troveName):
             raise InsufficientPermission
                                                                                             
-        branch = self.toBranch(branch)
         retval = self.troveStore.updateMetadata(troveName, branch, shortDesc, longDesc,
                                                 urls, categories, licenses, source, language)
         self.troveStore.commit()
@@ -173,13 +173,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getMetadata(self, authToken, clientVersion,
                     troveList, language):
-        if not self.auth.check(authToken):
-            raise InsufficientPermission
         metadata = {}
 
         # XXX optimize this to one SQL query downstream
         for troveName, branch, version in troveList:
             branch = self.toBranch(branch)
+            if not self.auth.check(authToken, write = False,
+                                   label = branch.label(),
+                                   trove = troveName):
+                raise InsufficientPermission
             if version:
                 version = self.toVersion(version)
             else:
