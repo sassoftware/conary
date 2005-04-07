@@ -23,6 +23,7 @@ from lib import sha1helper
 from lib import util
 import os
 import socket
+import sys
 import time
 import urllib2
 
@@ -45,11 +46,36 @@ def _createCacheEntry(cfg, name, location, infile):
     # contents in different packages do not collide
     cachedname = createCacheName(cfg, name, location)
     f = open(cachedname, "w+")
+   
+    BLOCKSIZE = 1024 * 4
+   
+    got = 0
+    last = 0
+    if infile.info().has_key('content-length'):
+        need = int(infile.info()['content-length'])
+    else:
+        need = 0
+    
     while 1:
-        buf = infile.read(1024 * 128)
+        buf = infile.read(BLOCKSIZE)
         if not buf:
             break
         f.write(buf)
+
+        if sys.stdout.isatty() and need != 0:
+            got += BLOCKSIZE
+            msg = "info: Downloading source (%d%% of %dk)..." \
+                  % ((got * 100) / need , need / 1024)
+            sys.stdout.write("\r")
+            sys.stdout.write(msg)
+            if len(msg) < last:
+                i = last - len(msg)
+                sys.stdout.write(" " * i + "\b" * i)
+            sys.stdout.flush()
+            last = len(msg)
+    
+    if sys.stdout.isatty():
+        sys.stdout.write("\n")
     f.close()
     infile.close()
 
