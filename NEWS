@@ -2,6 +2,8 @@ Changes in 0.50.10:
   * Added callback for creating database transaction, so that it does 
     not look like we spend an inordinate amount of time executing tag
     pre scripts.
+  * Added findtrove.py to the Makefile so that it is included in
+    the distributed version of conary.
 
 Changes in 0.50.9:
   * reimplemented StreamSet in C
