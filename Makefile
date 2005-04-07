@@ -107,9 +107,16 @@ dist: $(dist_files)
 	for f in $(dist_files); do \
 		mkdir -p $(DISTDIR)/`dirname $$f`; \
 		cp -a $$f $(DISTDIR)/$$f; \
-	done
+	done; \
 	tar cjf $(DISTDIR).tar.bz2 `basename $(DISTDIR)`
+	@echo "=== sanity building/testing conary ==="; \
+	cd $(DISTDIR); \
+	make > /dev/null; \
+	./conary > /dev/null || echo "CONARY DOES NOT WORK"; \
+	cd -; \
 	rm -rf $(DISTDIR)
+
+distcheck: dist
 
 clean: clean-subdirs default-clean
 	rm -f _sqlite.so _sqlite3.so
@@ -120,8 +127,5 @@ tag:
 
 force-tag:
 	cvs tag -F conary-`echo $(VERSION) | sed 's/\./_/g'`
-
-distcheck: dist
-	(tar tjf $(DISTDIR).tar.bz2 | grep '\.py$$' | sed s/conary-$(VERSION)/\./g; find -name "*.py") | sort | uniq -u
 
 include Make.rules
