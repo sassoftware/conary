@@ -193,14 +193,14 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             
             if new:
                 print "Versions of the following troves will be updated:"
-                print "\t", "\n\t".join(sorted(new))
+                print "\t", "\n\t".join(new)
 
             if new and old:
                 print "\n",
 
             if old:
                 print "Versions of the following troves will be removed:"
-                print "\t", "\n\t".join(sorted(old))
+                print "\t", "\n\t".join(old)
 
             return
 
