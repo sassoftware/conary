@@ -18,6 +18,7 @@ python_files = __init__.py	\
 		changeset.py	\
 		filecontainer.py\
 		filecontents.py	\
+                findtrove.py    \
 		netclient.py 	\
 		repository.py	\
 		transport.py	\
