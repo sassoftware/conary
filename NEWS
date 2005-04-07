@@ -6,7 +6,6 @@ Changes in 0.50.10:
     the distributed version of conary.
   * Added distcheck rule to Makefile to try and avoid missing files in the
     future
-  * Implemented progress indicator on source downloads
 
 Changes in 0.50.9:
   * reimplemented StreamSet in C
