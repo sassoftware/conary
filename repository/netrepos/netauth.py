@@ -207,6 +207,16 @@ class NetworkAuthorization:
                    password, salt, user)
         self.db.commit()
 
+    def getUserGroups(self, user):
+        cu = self.db.cursor()
+        cu.execute("""SELECT UserGroups.userGroup
+                      FROM UserGroups, Users, UserGroupMembers 
+                      WHERE UserGroups.userGroupId = UserGroupMembers.userGroupId AND
+                            UserGroupMembers.userId = Users.userId AND
+                            Users.user = ?""", user)
+        
+        return [row[0] for row in cu]
+
     def iterUsers(self):
         cu = self.db.cursor()
         cu.execute("SELECT userId, user FROM Users")

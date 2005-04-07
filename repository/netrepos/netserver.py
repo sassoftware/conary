@@ -153,6 +153,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return True
 
+    def getUserGroups(self, authToken, clientVersion):
+        r = self.auth.getUserGroups(authToken[0])
+        return r 
+
     def updateMetadata(self, authToken, clientVersion,
                        troveName, branch, shortDesc, longDesc,
                        urls, categories, licenses, source, language):
