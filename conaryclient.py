@@ -272,7 +272,8 @@ class ConaryClient:
             oldItem = (troveCs.getName(), troveCs.getOldVersion(), 
                        troveCs.getOldFlavor())
             if self.db.hasTrove(*item):
-                # this trove is already installed
+                # this trove is already installed. if it's on the same
+		# branch, remove the old one
                 cs.delNewPackage(*item)
             elif not oldItem[1]:
                 # it's a new trove
@@ -293,11 +294,15 @@ class ConaryClient:
                                    and not outdated.has_key(oldItem):
                         # we have a different version of the trove already
                         # installed. we need to change this to be relative to
-                        # the version already installed (unless that version
-                        # is being removed by something else in the change
-                        # set
-                        cs.delNewPackage(*item)
-                        addList.append(item)
+                        # the version already installed which is on the same
+			# branch (unless that version # is being removed by 
+			# something else in the change # set) 
+			versionList = self.db.getTroveVersionList(oldItem[0])
+			for version in versionList:
+			    if version.branch() == item[1].branch():
+				cs.delNewPackage(*item)
+				addList.append(item)
+				break
             elif not self.db.hasTrove(*oldItem):
                 # the old version isn't present, so we don't want this
                 # one either

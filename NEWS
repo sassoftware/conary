@@ -2,6 +2,8 @@ Changes in 0.50.11:
   * Reworked file addition to local database a bit for better performance
   * Fixed sorting for --info
   * Don't make --info installs require a writeable database
+  * Added an exception to group updating, restricting removal of existing 
+    troves to match the group's contents to troves on the same branch
 
 Changes in 0.50.10:
   * Added callback for creating database transaction, so that it does 
