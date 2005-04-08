@@ -107,7 +107,10 @@ class ConfigFile:
 	    except:
 		raise ParseError, ("%s:%s: expected integer for configuration value '%s'" % (file, self.lineno, key))
 	elif type == STRINGDICT:
-	    (idx, val) = val.split(None, 1)
+            try:
+                (idx, val) = val.split(None, 1)
+            except ValueError:
+		raise ParseError, ("%s:%s: expected '<key> <value>' pair for '%s'" % (file, self.lineno, key))
 	    self.__dict__[key][idx] = val
 	elif type == STRINGLIST:
 	    self.__dict__[key].append(val)
