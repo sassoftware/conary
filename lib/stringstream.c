@@ -81,8 +81,10 @@ static int StringStream_Cmp(PyObject * self, PyObject * other) {
 }
 
 static void StringStream_Dealloc(PyObject * self) {
-    Py_DECREF(((StringStreamObject *) self)->s);
-    self->ob_type->tp_free(self);;
+    if (((StringStreamObject *) self)->s) {
+	Py_DECREF(((StringStreamObject *) self)->s);
+    }
+    self->ob_type->tp_free(self);
 }
 
 static PyObject * StringStream_Diff(StringStreamObject * self, 
