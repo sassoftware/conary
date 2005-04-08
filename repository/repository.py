@@ -364,7 +364,7 @@ class ChangeSetJob:
 	# file to multiple locations.
 	self.repos._storeFileFromContents(fileContents, sha1, restoreContents)
 
-    def __init__(self, repos, cs, fileHostFilter = []):
+    def __init__(self, repos, cs, fileHostFilter = [], callback = None):
 	self.repos = repos
 	self.cs = cs
 
@@ -375,7 +375,11 @@ class ChangeSetJob:
 	# file objects which map up with them are created later, but
 	# we do need a map from pathId to the path and version of the
 	# file we need, so build up a dictionary with that information
-	for csPkg in cs.iterNewPackageList():
+	newList = [ x for x in cs.iterNewPackageList() ]
+	for i, csPkg in enumerate(newList):
+	    if callback:
+		callback.creatingDatabaseTransaction(i + 1, len(newList))
+
 	    newVersion = csPkg.getNewVersion()
 	    old = csPkg.getOldVersion()
 	    oldTroveVersion = old

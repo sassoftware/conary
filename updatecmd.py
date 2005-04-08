@@ -46,8 +46,9 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
     def creatingRollback(self):
         self._message("Creating rollback...")
 
-    def preparingUpdate(self):
-        self._message("Preparing update...")
+    def preparingUpdate(self, troveNum, troveCount):
+        self._message("Preparing update (%d of %d)..." % 
+		      (troveNum, troveCount))
 
     def restoreFiles(self, size, totalSize):
         if totalSize != 0:
@@ -61,8 +62,9 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
             self._message("Removing %d of %d (%d%%)..."
                         % (fileNum , total, (fileNum * 100) / total))
 
-    def creatingDatabaseTransaction(self):
-        self._message("Creating database transaction...")
+    def creatingDatabaseTransaction(self, troveNum, troveCount):
+        self._message("Creating database transaction (%d of %d)..." %
+		      (troveNum, troveCount))
 
     def runningPreTagHandlers(self):
         self._message("Running tag pre-scripts...")

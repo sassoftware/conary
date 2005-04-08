@@ -332,8 +332,8 @@ class File(streams.StreamSet):
         else:
             if os.getuid() == 0:
                 global userCache, groupCache
-                uid = userCache.lookup(root, self.inode.owner())
-                gid = groupCache.lookup(root, self.inode.group())
+                uid = userCache.lookupName(root, self.inode.owner())
+                gid = groupCache.lookupName(root, self.inode.group())
                 os.lchown(target, uid, gid)
         # do the chmod after the chown because some versions of Linux
         # remove setuid/gid flags when changing ownership to root 
@@ -541,14 +541,16 @@ class RegularFile(File):
 def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False):
     s = os.lstat(path)
 
+    global userCache, groupCache
+
     try:
-        owner = pwd.getpwuid(s.st_uid)[0]
+	owner = userCache.lookupId('/', s.st_uid)
     except KeyError, msg:
 	raise FilesError(
 	    "Error mapping uid %d to user name for file %s: %s" %(s.st_uid, path, msg))
 
     try:
-        group = grp.getgrgid(s.st_gid)[0]
+	group = groupCache.lookupId('/', s.st_gid)
     except KeyError, msg:
 	raise FilesError(
 	    "Error mapping gid %d to group name for file %s: %s" %(s.st_gid, path, msg))
@@ -717,8 +719,8 @@ def tupleChanged(cl, diff):
 
 class UserGroupIdCache:
 
-    def lookup(self, root, name):
-	theId = self.cache.get(name, None)
+    def lookupName(self, root, name):
+	theId = self.nameCache.get(name, None)
 	if theId is not None:
 	    return theId
 
@@ -728,7 +730,7 @@ class UserGroupIdCache:
 	    os.chroot(root)
 	
 	try:
-	    theId = self.lookupFn(name)[2]
+	    theId = self.nameLookupFn(name)[2]
 	except KeyError:
 	    log.warning('%s %s does not exist - using root', self.name, name)
 	    theId = 0
@@ -737,13 +739,35 @@ class UserGroupIdCache:
 	    os.chroot(".")
 	    os.fchdir(curDir)
 
-	self.cache[name] = theId
+	self.nameCache[name] = theId
+	self.idCache[theId] = name
 	return theId
 
-    def __init__(self, name, lookupFn):
-	self.lookupFn = lookupFn
-	self.name = name
-	self.cache = { 'root' : 0 }
+    def lookupId(self, root, theId):
+	theName = self.idCache.get(theId, None)
+	if theName is not None:
+	    return theName
+
+	if root and root != '/':
+	    curDir = os.open(".", os.O_RDONLY)
+	    os.chdir("/")
+	    os.chroot(root)
 	
-userCache = UserGroupIdCache('user', pwd.getpwnam)
-groupCache = UserGroupIdCache('group', grp.getgrnam)
+	name = self.idLookupFn(theId)[0]
+	if root and root != '/':
+	    os.chroot(".")
+	    os.fchdir(curDir)
+
+	self.nameCache[name] = theId
+	self.idCache[theId] = name
+	return name
+
+    def __init__(self, name, nameLookupFn, idLookupFn):
+	self.nameLookupFn = nameLookupFn
+	self.idLookupFn = idLookupFn
+	self.name = name
+	self.nameCache = { 'root' : 0 }
+	self.idCache = { 0 : 'root' }
+	
+userCache = UserGroupIdCache('user', pwd.getpwnam, pwd.getpwuid)
+groupCache = UserGroupIdCache('group', grp.getgrnam, grp.getgrgid)

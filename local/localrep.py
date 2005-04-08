@@ -73,7 +73,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     # origJob is A->B, so localCs needs to be changed to be B->B.local.
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
-    def __init__(self, repos, cs, keepExisting):
+    def __init__(self, repos, cs, keepExisting, callback):
 	assert(not cs.isAbsolute())
 
 	self.cs = cs
@@ -115,7 +115,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 		(oldPath, oldFileId, oldFileVersion) = oldPkg.getFile(pathId)
 		self.removeFile(pathId, oldFileId)
 
-	repository.ChangeSetJob.__init__(self, repos, cs)
+	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback)
 
 	if not keepExisting:
 	    for pkg in self.oldPackageList():

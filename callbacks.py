@@ -22,10 +22,10 @@ class UpdateCallback(ChangesetCallback):
     def creatingRollback(self):
         pass
 
-    def preparingUpdate(self):
+    def preparingUpdate(self, troveNum, troveCount):
         pass
 
-    def creatingDatabaseTransaction(self):
+    def creatingDatabaseTransaction(self, troveNum, troveCount):
         pass
 
     def restoreFiles(self, size, totalSize):

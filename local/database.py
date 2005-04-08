@@ -333,10 +333,8 @@ class Database(SqlDbRepository):
 	if keepExisting:
 	    flags |= update.KEEPEXISTING
 
-        callback.preparingUpdate()
-
 	fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root, 
-				     flags = flags)
+				     flags = flags, callback = callback)
 
 	# look through the directories which have had files removed and
 	# see if we can remove the directories as well
@@ -391,13 +389,13 @@ class Database(SqlDbRepository):
                 callback.runningPreTagHandlers()
                 fsJob.preapply(tagSet, tagScript)
 
-        callback.creatingDatabaseTransaction()
         # Build A->B
         if toStash:
             # this updates the database from the changeset; the change
             # isn't committed until the self.commit below
             # an object for historical reasons
-            localrep.LocalRepositoryChangeSetJob(self, cs, keepExisting)
+            localrep.LocalRepositoryChangeSetJob(self, cs, keepExisting,
+						 callback)
 
         errList = fsJob.getErrorList()
         if errList:

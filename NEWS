@@ -11,6 +11,9 @@ Changes in 0.50.11:
     that are referenced but not within the changeset
   * conary changeset now support trove=<version>-- to create a changeset that
     erases the trove
+  * Cache user id to name mapping
+  * Improved the progress indicators for preparingUpdate and
+    creatingDatabaseTransaction
 
 Changes in 0.50.10:
   * Added callback for creating database transaction, so that it does 

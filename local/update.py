@@ -868,7 +868,8 @@ class FilesystemJob:
 
 	return fsPkg
 
-    def __init__(self, repos, changeSet, fsPkgDict, root, flags = MERGE):
+    def __init__(self, repos, changeSet, fsPkgDict, root, callback = None, 
+		 flags = MERGE):
 	"""
 	Constructs the job for applying a change set to the filesystem.
 
@@ -937,7 +938,10 @@ class FilesystemJob:
             self._setupRemoves(repos, pkgCs, changeSet, basePkg,
                                newFsPkg, root, flags)
 
-	for (pkgCs, newFsPkg) in pkgList:
+	for i, (pkgCs, newFsPkg) in enumerate(pkgList):
+	    if callback:
+		callback.preparingUpdate(i + 1, len(pkgList))
+
 	    old = pkgCs.getOldVersion()
 
 	    if old:
