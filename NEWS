@@ -6,6 +6,11 @@ Changes in 0.50.11:
     troves to match the group's contents to troves on the same branch
   * Groups which had the same trove added (via a referenced trove) and
     removed (from the primary trove) got confused
+  * conary showcs now takes trove version
+  * conary showcs will display erased troves in changesets, and erased troves
+    that are referenced but not within the changeset
+  * conary changeset now support trove=<version>-- to create a changeset that
+    erases the trove
 
 Changes in 0.50.10:
   * Added callback for creating database transaction, so that it does 
