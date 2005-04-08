@@ -272,8 +272,7 @@ class ConaryClient:
             oldItem = (troveCs.getName(), troveCs.getOldVersion(), 
                        troveCs.getOldFlavor())
             if self.db.hasTrove(*item):
-                # this trove is already installed. if it's on the same
-		# branch, remove the old one
+                # this trove is already installed. don't install it again
                 cs.delNewPackage(*item)
             elif not oldItem[1]:
                 # it's a new trove
@@ -308,11 +307,16 @@ class ConaryClient:
                 # one either
                 cs.delNewPackage(*item)
 
-        # remove troves from the old package which aren't currently
-        # installed
+        # remove troves from the old package list which aren't currently
+        # installed. also remove ones which are supposed to have been
+	# installed by this change set
+	delList = []
         for item in cs.getOldPackageList():
-            if not self.db.hasTrove(*item):
-                cs.delOldPackage(*item)
+            if not self.db.hasTrove(*item) or inclusions.has_key(item):
+		delList.append(item)
+
+	for item in delList:
+	    cs.delOldPackage(*item)
 
         removeSet = dict.fromkeys(
             [ (x.getName(), x.getOldVersion(), x.getOldFlavor() )

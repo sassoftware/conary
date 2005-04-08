@@ -4,6 +4,8 @@ Changes in 0.50.11:
   * Don't make --info installs require a writeable database
   * Added an exception to group updating, restricting removal of existing 
     troves to match the group's contents to troves on the same branch
+  * Groups which had the same trove added (via a referenced trove) and
+    removed (from the primary trove) got confused
 
 Changes in 0.50.10:
   * Added callback for creating database transaction, so that it does 
