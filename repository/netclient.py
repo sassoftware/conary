@@ -244,9 +244,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
                                   capped, admin)
 
-    def getUserGroups(self, label):
-        return self.c[label].getUserGroups()
-
     def troveNames(self, label):
 	return self.c[label].troveNames(self.fromLabel(label))
 
@@ -574,7 +571,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         cs = None
         scheduledSet = {}
         internalCs = None
-        urlsFetched = 0
         filesNeeded = []
 
         if target:
@@ -604,8 +600,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 chgSetList += _cvtTroveList(extraTroveList)
                 filesNeeded += _cvtFileList(extraFileList)
-
-                urlsFetched += len(sizes)
 
                 inF = urllib.urlopen(url)
 
@@ -799,11 +793,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             cs.addPrimaryTrove(name, trove.getNewVersion(), flavor)
 
         if target and cs:
-            if urlsFetched > 1 or internalCs:
+            if cs.oldPackages or cs.newPackages:
                 os.unlink(target)
                 cs.writeToFile(target)
 
             cs = None
+        elif target:
+            os.unlink(target)
 
 	return cs
 
