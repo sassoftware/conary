@@ -244,6 +244,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
                                   capped, admin)
 
+    def getUserGroups(self, label):
+        return self.c[label].getUserGroups()
+
     def troveNames(self, label):
 	return self.c[label].troveNames(self.fromLabel(label))
 
