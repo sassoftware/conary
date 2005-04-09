@@ -4,15 +4,11 @@
       py:extends="'library.kid'">
     ${html_header(pageTitle)}
     <body>
-        <h1>Conary Repositry</h1>
-        <ul class="menu"><li class="highlighted">${pageTitle}</li></ul>
-        <ul class="menu submenu"> </ul>
+        <h2>${pageTitle}</h2>
 
-        <div id="content">
-            <p>${message}</p>
-            <p>Return to <a href="${url}">${link}</a></p>
+        <p>${message}</p>
+        <p>Return to <a href="${url}">${link}</a></p>
 
-            ${html_footer()}
-        </div>
+        ${html_footer()}
     </body>
 </html>
