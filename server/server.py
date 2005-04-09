@@ -384,6 +384,7 @@ if __name__ == '__main__':
     netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH, 
 			baseUrl, otherArgs[2], cfg.repositoryMap,
                         logFile = cfg.logFile)
+    netRepos.cfg = cfg
     httpHandler = HttpHandler(netRepos)
 
     port = int(cfg.port)

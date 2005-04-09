@@ -52,55 +52,59 @@
 
     ${html_header(pageTitle)}
     <body>
-        <h2>${pageTitle}</h2>
+        <h1>${pageTitle}</h1>
+        <ul class="menu"><li class="highlighted">Edit Metadata</li></ul>
+        <ul class="menu submenu"> </ul>
+        <div id="content">
+            <h4>Trove: ${troveName}</h4>
+            <h4>Branch: ${branch.asString().split("/")[-1]}</h4>
+            <h4>Metadata revision: ${versionStr}</h4>
 
-        <h4>Branch: ${branch.asString().split("/")[-1]}</h4>
-        <h4>Metadata revision: ${versionStr}</h4>
+            <form method="post" action="updateMetadata">
+                <table style="width: 60%;" cellpadding="8">
+                    <tr>
+                        <td style="width: 25%;" >Short Description:</td>
+                        <td><input style="width: 100%;" type="text" name="shortDesc" value="${metadata.getShortDesc()}" /></td>
+                    </tr>
+                    <tr>
+                        <td>Long Description:</td>
+                        <td><textarea style="width: 100%;" name="longDesc" rows="4" cols="60">${metadata.getLongDesc()} </textarea></td>
+                    </tr>
+                    <tr>
+                        <td>URLs:</td>
+                        <td py:content="selectionEditor('Url', metadata.getUrls())"/>
+                    </tr>
+                    <tr>
+                        <td>Licenses:</td>
+                        <td py:content="selectionEditor('License', metadata.getLicenses(), licenses)"/>
+                    </tr>
+                    <tr>
+                        <td>Categories:</td>
+                        <td py:content="selectionEditor('Category', metadata.getCategories(), categories)"/>
+                    </tr>
+                    <tr><td>Source:</td><td>${sourceSelect(source)}</td></tr>
+                </table>
+                <p><button id="submitButton" onclick="javascript:updateMetadata();">Save Changes</button></p>
+                <input type="hidden" name="branch" value="${branch.freeze()}" />
+                <input type="hidden" name="troveName" value="${troveName}" />
+            </form>
 
-        <form method="post" action="updateMetadata">
-            <table style="width: 60%;" cellpadding="8">
-                <tr>
-                    <td style="width: 25%;" >Short Description:</td>
-                    <td><input style="width: 100%;" type="text" name="shortDesc" value="${metadata.getShortDesc()}" /></td>
-                </tr>
-                <tr>
-                    <td>Long Description:</td>
-                    <td><textarea style="width: 100%;" name="longDesc" rows="4" cols="60">${metadata.getLongDesc()} </textarea></td>
-                </tr>
-                <tr>
-                    <td>URLs:</td>
-                    <td py:content="selectionEditor('Url', metadata.getUrls())"/>
-                </tr>
-                <tr>
-                    <td>Licenses:</td>
-                    <td py:content="selectionEditor('License', metadata.getLicenses(), licenses)"/>
-                </tr>
-                <tr>
-                    <td>Categories:</td>
-                    <td py:content="selectionEditor('Category', metadata.getCategories(), categories)"/>
-                </tr>
-                <tr><td>Source:</td><td>${sourceSelect(source)}</td></tr>
-            </table>
-            <p><button id="submitButton" onclick="javascript:updateMetadata();">Save Changes</button></p>
-            <input type="hidden" name="branch" value="${branch.freeze()}" />
-            <input type="hidden" name="troveName" value="${troveName}" />
-        </form>
+            <!-- fetch from freshmeat -->
+            <form method="post" action="getMetadata">
+                <input type="hidden" name="branch" value="${branch.freeze()}" />
+                <input type="hidden" name="troveName" value="${troveName}" />
+                <input type="hidden" name="source" value="freshmeat" />
+                <input type="submit" value="Fetch from Freshmeat" />
+                <p>Freshmeat project name: <input type="text" name="freshmeatName" value="${troveName[:-7]}" /></p>
+            </form>
 
-        <!-- fetch from freshmeat -->
-        <form method="post" action="getMetadata">
-            <input type="hidden" name="branch" value="${branch.freeze()}" />
-            <input type="hidden" name="troveName" value="${troveName}" />
-            <input type="hidden" name="source" value="freshmeat" />
-            <input type="submit" value="Fetch from Freshmeat" />
-            <p>Freshmeat project name: <input type="text" name="freshmeatName" value="${troveName[:-7]}" /></p>
-        </form>
+            <!-- cancel -->
+            <form method="post" action="metadata">
+                <input type="hidden" name="troveName" value="%s" />
+                <input type="submit" value="Cancel" />
+            </form>
 
-        <!-- cancel -->
-        <form method="post" action="metadata">
-            <input type="hidden" name="troveName" value="%s" />
-            <input type="submit" value="Cancel" />
-        </form>
-
-        ${html_footer()}
+            ${html_footer()}
+        </div>
     </body>
 </html>

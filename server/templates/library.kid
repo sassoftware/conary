@@ -10,8 +10,7 @@
     </head>
 
     <!-- define the HTML footer -->
-    <div py:def="html_footer">
-        <hr />
-        <span class="copyright"><b>Conary Repository Server</b> Copyright &#169; 2005 <a href="http://www.specifix.com/">Specifix, Inc.</a></span>
+    <div py:def="html_footer" class="footer">
+        Conary Repository Server | Copyright &#169; 2005 <a href="http://www.specifix.com/">Specifix, Inc.</a>
     </div>
 </html>

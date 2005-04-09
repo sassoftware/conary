@@ -62,20 +62,20 @@ def _createCacheEntry(cfg, name, location, infile):
             break
         f.write(buf)
 
-        if sys.stdout.isatty() and need != 0:
+        if sys.stderr.isatty() and need != 0:
             got += BLOCKSIZE
             msg = "info: Downloading source (%d%% of %dk)..." \
                   % ((got * 100) / need , need / 1024)
-            sys.stdout.write("\r")
-            sys.stdout.write(msg)
+            log.info("\r")
+            log.info(msg)
             if len(msg) < last:
                 i = last - len(msg)
-                sys.stdout.write(" " * i + "\b" * i)
-            sys.stdout.flush()
+                log.info(" " * i + "\b" * i)
+            sys.stderr.flush()
             last = len(msg)
     
-    if sys.stdout.isatty():
-        sys.stdout.write("\n")
+    if sys.stderr.isatty():
+        log.info("\n")
     f.close()
     infile.close()
 

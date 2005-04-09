@@ -29,11 +29,12 @@ class InvalidServerCommand(ServerError):
     str = """Invalid command passed to server."""
 
 class HttpHandler:
-    def __init__(self, repServer):
-        self.repServer = repServer
-        self.troveStore = repServer.troveStore
+    def __init__(self, repos):
+        self.repos = repos
+        self.troveStore = repos.troveStore
         self.templatePath = os.path.dirname(sys.modules['templates'].__file__) + os.path.sep
-        
+        self.cfg = self.repos.cfg
+       
         # "command name": (command handler, page title, 
         #       (requires auth, requires write access, requires admin))
         self.commands = {
@@ -103,13 +104,13 @@ class HttpHandler:
 
         needWrite = self.commands[cmd][2][1]
         needAdmin = self.commands[cmd][2][2]
-        if not self.repServer.auth.check(authToken, write=needWrite, admin=needAdmin):
+        if not self.repos.auth.check(authToken, write=needWrite, admin=needAdmin):
             raise netserver.InsufficientPermission
 
         if cmd == "":
 	    home = None
         else:
-	    home = self.repServer.urlBase
+	    home = self.repos.urlBase
 
         self.pageTitle = pageTitle
         handler(authToken, fields)
@@ -117,13 +118,13 @@ class HttpHandler:
     def kid_write(self, templateName, **values):
         path = os.path.join(self.templatePath, templateName + ".kid")
         t = kid.load_template(path)
-        self.writeFn(t.serialize(encoding="utf-8", pageTitle=self.pageTitle, **values))
+        self.writeFn(t.serialize(encoding="utf-8", pageTitle=self.pageTitle, cfg = self.cfg, **values))
 
     def main(self, authToken, fields):
         self.kid_write("main_page", fields=fields)
 
     def metadata(self, authToken, fields, troveName=None):
-        troveList = [x for x in self.repServer.troveStore.iterTroveNames() if x.endswith(':source')]
+        troveList = list(self.repos.troveStore.iterTroveNames())
         troveList.sort()
 
         # pick the next trove in the list
@@ -146,12 +147,12 @@ class HttpHandler:
         
         source = str(fields.getfirst('source', '')).lower()
         
-        versions = self.repServer.getTroveVersionList(authToken,
+        versions = self.repos.getTroveVersionList(authToken,
             netserver.SERVER_VERSIONS[-1], { troveName : None })
         
         branches = {}
         for version in versions[troveName]:
-            version = self.repServer.thawVersion(version)
+            version = self.repos.thawVersion(version)
             branches[version.branch()] = True
 
         branches = branches.keys()
@@ -170,7 +171,7 @@ class HttpHandler:
         self._getMetadata(fields, troveName, branch)
 
     def _getMetadata(self, fields, troveName, branch):
-        branch = self.repServer.thawVersion(branch)
+        branch = self.repos.thawVersion(branch)
 
         if "source" in fields and fields["source"].value.lower() == "freshmeat":
             if "freshmeatName" in fields:
@@ -192,7 +193,7 @@ class HttpHandler:
                                    troveName = troveName)
 
     def updateMetadata(self, authToken, fields):
-        branch = self.repServer.thawVersion(fields["branch"].value)
+        branch = self.repos.thawVersion(fields["branch"].value)
         troveName = fields["troveName"].value
         
         self.troveStore.updateMetadata(troveName, branch,
@@ -208,12 +209,12 @@ class HttpHandler:
         self.metadata(authToken, fields, troveName)
         
     def userlist(self, authToken, fields):
-        self.kid_write("user_admin", netAuth = self.repServer.auth)
+        self.kid_write("user_admin", netAuth = self.repos.auth)
 
     def addPermForm(self, authToken, fields):
-        groups = (x[1] for x in self.repServer.auth.iterGroups())
-        labels = (x[1] for x in self.repServer.auth.iterLabels())
-        troves = (x[1] for x in self.repServer.auth.iterItems())
+        groups = (x[1] for x in self.repos.auth.iterGroups())
+        labels = (x[1] for x in self.repos.auth.iterLabels())
+        troves = (x[1] for x in self.repos.auth.iterItems())
     
         self.kid_write("permission", groups=groups, labels=labels, troves=troves)
 
@@ -226,23 +227,23 @@ class HttpHandler:
         capped = bool(fields.getfirst("capped", False))
         admin = bool(fields.getfirst("admin", False))
 
-        self.repServer.auth.addAcl(group, trove, label,
+        self.repos.auth.addAcl(group, trove, label,
                                    write, capped, admin)
         self.kid_write("notice", message = "Permission successfully added.",
                                  link = "User Administration",
                                  url = "userlist")
    
     def addGroupForm(self, authToken, fields):
-        users = dict(self.repServer.auth.iterUsers())
+        users = dict(self.repos.auth.iterUsers())
         self.kid_write("add_group", users = users)
    
     def addGroup(self, authToken, fields):
         groupName = fields["userGroupName"].value
         initialUserIds = fields.getlist("initialUserIds")
 
-        newGroupId = self.repServer.auth.addGroup(groupName)
+        newGroupId = self.repos.auth.addGroup(groupName)
         for userId in initialUserIds:
-            self.repServer.auth.addGroupMember(newGroupId, userId)
+            self.repos.auth.addGroupMember(newGroupId, userId)
 
         self.kid_write("notice", message = "Group successfully created.",
                                  link = "User Administration",
@@ -253,7 +254,7 @@ class HttpHandler:
         labelId = fields.getfirst("labelId", None)
         itemId = fields.getfirst("itemId", None)
 
-        self.repServer.auth.deletePermission(groupId, labelId, itemId)
+        self.repos.auth.deletePermission(groupId, labelId, itemId)
         self.kid_write("notice", message = "Permission deleted.",
                                  link = "User Administration",
                                  url = "userlist")
@@ -274,8 +275,8 @@ class HttpHandler:
             admin = True
         else:
             admin = False
-        self.repServer.addUser(authToken, 0, user, password)
-        self.repServer.addAcl(authToken, 0, user, "", "", write, True, admin)
+        self.repos.addUser(authToken, 0, user, password)
+        self.repos.addAcl(authToken, 0, user, "", "", write, True, admin)
 
         self.kid_write("notice", message = "User successfully added.",
                                  link = "User Administration",
@@ -293,7 +294,7 @@ class HttpHandler:
         
     def chPass(self, authToken, fields):
         username = fields["username"].value
-        admin = self.repServer.auth.check(authToken, admin=True)
+        admin = self.repos.auth.check(authToken, admin=True)
         
         if username != authToken[0]:
             if not admin:
@@ -313,7 +314,7 @@ class HttpHandler:
         elif oldPassword == p1:
             self.kid_write("error", error = "Error: old and new passwords identical, not changing")
         else:
-            self.repServer.auth.changePassword(username, p1)
+            self.repos.auth.changePassword(username, p1)
             if admin:
                 returnLink = ("User Administration", "userlist")
             else:

@@ -41,6 +41,7 @@ class ServerConfig(conarycfg.ConfigFile):
         'serverName'        :  None,
         'tmpDir'            :  "/var/tmp",
         'cacheChangeSets'   :  [ conarycfg.BOOLEAN, False ],
+        'staticUrl'         : '/static/'
     }
 
 def getAuth(req, repos):
@@ -127,7 +128,7 @@ def post(port, isSecure, repos, httpHandler, req):
         except netserver.InsufficientPermission:
             return apache.HTTP_FORBIDDEN
         except:
-            writeTraceback(req)
+            writeTraceback(req, repos.cfg)
 
     return apache.OK
 
@@ -160,7 +161,7 @@ def get(isSecure, repos, httpHandler, req):
         except netserver.InsufficientPermission:
             return apache.HTTP_FORBIDDEN
         except:
-            writeTraceback(req)
+            writeTraceback(req, repos.cfg)
         return apache.OK
 
     localName = repos.tmpPath + "/" + req.args + "-out"
@@ -217,8 +218,8 @@ def putFile(port, isSecure, repos, req):
 
     return apache.OK
 
-def writeTraceback(wfile):
-    kid_error.write(wfile, pageTitle = "Error",
+def writeTraceback(wfile, cfg):
+    kid_error.write(wfile, pageTitle = "Error", cfg = cfg,
                            error = traceback.format_exc())
 
 def handler(req):
@@ -261,6 +262,7 @@ def handler(req):
                                 logFile = cfg.logFile)
 
 	repositories[repName].forceSecure = cfg.forceSSL
+        repositories[repName].cfg = cfg
 
     port = req.server.port
     if not port:

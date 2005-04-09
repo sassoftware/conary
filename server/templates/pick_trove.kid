@@ -4,21 +4,25 @@
       py:extends="'library.kid'">
     ${html_header(pageTitle)}
     <body>
-        <h2>${pageTitle}</h2>
+        <h1>Conary Repository</h1>
+        <ul class="menu"><li class="highlighted">${pageTitle}</li></ul>
+        <ul class="menu submenu"> </ul>
 
-        <form action="chooseBranch" method="post">
-            <p>
-                <div class="formHeader">Pick a trove:</div>
-                <select name="troveNameList" size="12" multiple="multiple" style="width: 50%;">
-                    <option py:for="trove in troveList"
-                            value="${trove}" py:content="trove"/>
-                </select>
-            </p>
-            <p><div class="formHeader">Or enter a trove name:</div><input type="text" name="troveName"/></p>
-            <p><input type="submit" /></p>
-            <p><input type="submit" value="Freshmeat" name="source" /></p>
-        </form>
+        <div id="content">
+            <form action="chooseBranch" method="post">
+                <p>
+                    <div class="formHeader">Pick a trove:</div>
+                    <select name="troveNameList" size="12" style="width: 50%;">
+                        <option py:for="trove in troveList"
+                                value="${trove}" py:content="trove"/>
+                    </select>
+                </p>
+                <p><div class="formHeader">Or enter a trove name:</div><input type="text" name="troveName"/></p>
+                <p><input type="submit" /></p>
+                <p><input type="submit" value="Freshmeat" name="source" /></p>
+            </form>
 
-        ${html_footer()}
+            ${html_footer()}
+        </div>
     </body>
 </html>

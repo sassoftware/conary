@@ -4,11 +4,16 @@
       py:extends="'library.kid'">
     ${html_header(pageTitle)}
     <body>
-        <h2>${pageTitle}</h2>
-        
-        <pre class="error">${error}</pre>
-        <p>Please go back and try again.</p>
+        <h1>Conary Repository</h1>
 
-        ${html_footer()}
+        <ul class="menu"><li class="highlighted">Error</li></ul>
+        <ul class="menu submenu"> </ul>
+        
+        <div id="content">
+            <pre class="error">${error}</pre>
+            <p>Please go back and try again.</p>
+
+            ${html_footer()}
+        </div>
     </body>
 </html>

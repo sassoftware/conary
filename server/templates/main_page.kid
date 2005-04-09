@@ -4,15 +4,19 @@
       py:extends="'library.kid'">
     ${html_header(pageTitle)}
     <body>
-        <h2>${pageTitle}</h2>
+        <h1>${pageTitle}</h1>
 
-        <p>Welcome to the Conary Repository.</p>
-        <ul>
-        <li><a href="metadata">Metadata Management</a></li>
-        <li><a href="userlist">User Administration</a></li>
-        <li><a href="chPassForm">Change Password</a></li>
-        </ul>
+        <ul class="menu"><li class="highlighted">Main Menu</li></ul>
+        <ul class="menu submenu"> </ul>
+        <div id="content">
+            <p>Welcome to the Conary Repository.</p>
+            <ul>
+                <li><a href="metadata">Metadata Management</a></li>
+                <li><a href="userlist">User Administration</a></li>
+                <li><a href="chPassForm">Change Password</a></li>
+            </ul>
 
-        ${html_footer()}
+            ${html_footer()}
+        </div>
     </body>
 </html>
