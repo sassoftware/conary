@@ -2,6 +2,10 @@ Changes in 0.50.12:
   * Implemented --quiet for conary update changeset commands, and cvc cook.
     Also implemented the 'quiet' configuration value. This option suppresses
     progress indicators.
+  * Split loadRecipe into loadInstalled and loadSuperClass, depending on the 
+    purpose of the recipe loading.  loadInstalled will examine the local
+    system to look for a matching installed trove, and load that version, 
+    while loadSuperClass will not.
 
 Changes in 0.50.11:
   * Reworked file addition to local database a bit for better performance

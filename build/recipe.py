@@ -153,7 +153,10 @@ def setupRecipeDict(d, filename):
     localImport(d, 'build', ('build', 'action'))
     localImport(d, 'build.recipe', ('PackageRecipe', 'GroupRecipe',
                                     'RedirectRecipe', 'FilesetRecipe',
-                                    'loadRecipe'))
+                                    'loadSuperClass', 'loadInstalled',
+                                    # XXX when all recipes have been migrated
+                                    # we can get rid of loadRecipe
+                                    ('loadSuperClass', 'loadRecipe')))
     localImport(d, 'lib', ('util',))
     for x in ('os', 're', 'sys', 'stat'):
         localImport(d, x)
@@ -351,11 +354,34 @@ def recipeLoaderFromSourceComponent(name, cfg, repos,
     return (loader, sourceComponent.getVersion())
 
 
-
-
-def loadRecipe(troveSpec, label=None):
+def loadSuperClass(troveSpec, label=None):
     """
-    Load a recipe so that its class/data can be used in another recipe.
+    Load a recipe so that its class/data can be used as a super class for
+    this recipe.
+
+    If the package is not installed anywhere on the system, the C{labelPath}
+    will be searched without reference to the installed system.  
+
+    @param troveSpec: C{name}I{[}C{=I{version}}I{][}C{[I{flavor}]}I{]}
+    specification of the trove to load.  The flavor given will be used
+    to find the given recipe and also to set the flavor of the loaded recipe.
+    @param label: label string to search for the given recipe in place of 
+    using the default C{labelPath}.  
+    If not specified, the labels listed in the version in the including 
+    recipe will be used as the c{labelPath} to search.
+    For example, if called from recipe with version
+    C{/conary.specifix.com@spx:devel//shadow/1.0-1-1},
+    the default C{labelPath} that would be constructed would be:
+    C{[conary.specifix.com@spx:shadow, conary.specifix.com@spx:devel]}
+    """
+    callerGlobals = inspect.stack()[1][0].f_globals
+    ignoreInstalled = True
+    _loadRecipe(troveSpec, label, callerGlobals, False)
+
+def loadInstalled(troveSpec, label=None):
+    """
+    Load a recipe so that its data about the installed system can be used 
+    in this recipe.
 
     If a complete version is not specified in the trovespec, the version of 
     the recipe to load will be based on what is installed on the system.  
@@ -380,6 +406,13 @@ def loadRecipe(troveSpec, label=None):
     C{[conary.specifix.com@spx:shadow, conary.specifix.com@spx:devel]}
     """
 
+    callerGlobals = inspect.stack()[1][0].f_globals
+    _loadRecipe(troveSpec, label, callerGlobals, True)
+
+
+def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
+    """ See docs for loadInstalledPackage and loadSuperClass.  """
+
     def _findInstalledVersion(db, labelPath, name, versionStr, flavor):
         """ Specialized search of the installed system along a labelPath, 
             defaulting to searching the whole system if the trove is not
@@ -393,7 +426,7 @@ def loadRecipe(troveSpec, label=None):
             troves = db.findTrove(labelPath, name, flavor, versionStr)
             if len(troves) > 1:
                 raise RuntimeError, (
-                                'Multiple troves could match loadRecipe' 
+                                'Multiple troves could match loadInstalled' 
                                 ' request %s' % troveSpec)
             if troves:
                 return troves[0][1].getSourceVersion(), troves[0][2]
@@ -413,12 +446,15 @@ def loadRecipe(troveSpec, label=None):
             pass
         return None
 
-    callerGlobals = inspect.stack()[1][0].f_globals
+
     cfg = callerGlobals['cfg']
     repos = callerGlobals['repos']
     branch = callerGlobals['branch']
-    ignoreInstalled = callerGlobals['ignoreInstalled']
     parentPackageName = callerGlobals['name']
+    if 'ignoreInstalled' in callerGlobals:
+        alwaysIgnoreInstalled = callerGlobals['ignoreInstalled']
+    else:
+        alwaysIgnoreInstalled = False
 
     oldUsed = use.getUsed()
     name, versionStr, flavor = updatecmd.parseTroveSpec(troveSpec, None)
@@ -429,14 +465,13 @@ def loadRecipe(troveSpec, label=None):
     else:
         file = name + '.recipe'
 
-
     #first check to see if a filename was specified, and if that 
     #recipe actually exists.   
     loader = None
     if not (label or versionStr or flavor):
         if name[0] != '/':
-            recipepath = os.path.dirname(callerGlobals['filename'])
-            localfile = recipepath + '/' + file
+            parentFilePath = callerGlobals['filename']
+            localfile = os.path.dirname(parentFilePath) + '/' + file
         else:
             localfile = name + '.recipe'
 
@@ -446,7 +481,7 @@ def loadRecipe(troveSpec, label=None):
                 cfg.buildFlavor = deps.overrideFlavor(oldBuildFlavor, flavor)
                 use.setBuildFlagsFromFlavor(name, cfg.buildFlavor)
             loader = RecipeLoader(localfile, cfg, 
-                                  ignoreInstalled=ignoreInstalled)
+                                  ignoreInstalled=alwaysIgnoreInstalled)
 
     if not loader:
         if label:
@@ -460,7 +495,7 @@ def loadRecipe(troveSpec, label=None):
                 labelPath.append(branch.label())
         else:
             labelPath = None
-        if not ignoreInstalled:
+        if findInstalled and not alwaysIgnoreInstalled:
             # look on the local system to find a trove that is installed that
             # matches this loadrecipe request.  Use that trove's version
             # and flavor information to grab the source out of the repository
@@ -480,7 +515,7 @@ def loadRecipe(troveSpec, label=None):
         loader = recipeLoaderFromSourceComponent(name, cfg, repos, 
                                                  labelPath=labelPath, 
                                                  versionStr=versionStr,
-                                             ignoreInstalled=ignoreInstalled)[0]
+                                     ignoreInstalled=alwaysIgnoreInstalled)[0]
     if flavor:
         cfg.buildFlavor = oldBuildFlavor
         use.setBuildFlagsFromFlavor(parentPackageName, cfg.buildFlavor)
