@@ -705,7 +705,8 @@ class Version(VersionSequence):
             # too short
             return False
 
-        if self.versions[-1].buildCount is None:
+        trailing = self.versions[-1]
+        if trailing.buildCount is None:
             return True
 
         # find the previous Revision object. If the shadow counts are
@@ -718,11 +719,18 @@ class Version(VersionSequence):
             while not isinstance(item, AbstractRevision):
                 item = iter.next()
         except StopIteration:
+            if (not trailing.sourceCount.shadowCount() 
+                and not trailing.buildCount.shadowCount()):
+                # this is a direct shadow of a binary trove -- it hasn't
+                # been touched on the shadow
+                return True
+            # the source or binary has been touched on this shadow
             return False
+
 
         if item.buildCount and \
             item.buildCount.shadowCount() == \
-                self.versions[-1].buildCount.shadowCount():
+                trailing.buildCount.shadowCount():
             return True
 
         return False
