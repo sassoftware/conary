@@ -80,6 +80,7 @@ baseMacros = {
     'thistestdir'	: '%(testdir)s/%(name)s-%(version)s',
     'debuglibdir'       : '/usr/lib/debug', # no %(prefix)s or %(lib)s!
     'debugsrcdir'       : '/usr/src/debug', # no %(prefix)s!
+    'buildlogpath'      : '%(debugsrcdir)s/buildlogs/%(name)s-%(version)s-log.bz2',
     # special component prefixes that the whole system needs to share
     'krbprefix'		: '%(exec_prefix)s/kerberos',
     'x11prefix'		: '%(exec_prefix)s/X11R6',

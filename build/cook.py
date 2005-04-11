@@ -17,29 +17,32 @@ Contains the functions which builds a recipe and commits the
 resulting packages to the repository.
 """
 
-import constants
-import deps.deps
-from repository import changeset
-from repository import filecontents
-from repository import repository
-from repository.netclient import NetworkRepositoryClient
-import files
-from lib import log
-import buildinfo, buildpackage, lookaside, use, recipe
 import os
 import resource
-from lib import sha1helper
 import shutil
 import signal
 import sys
 import tempfile
 import time
-import trove
+import traceback
 import types
+
+import buildinfo, buildpackage, lookaside, use, recipe
 import conaryclient
+import constants
+import deps.deps
+import files
+from lib import log
+from lib import logger
+from lib import sha1helper
 from lib import util
-import versions
+from repository import changeset
+from repository import filecontents
+from repository import repository
+from repository.netclient import NetworkRepositoryClient
+import trove
 from updatecmd import parseTroveSpec
+import versions
 
 # -------------------- private below this line -------------------------
 def _createComponent(repos, bldPkg, newVersion, ident):
@@ -158,7 +161,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
                changeSetFile = None, prep=True, macros={}, 
                targetLabel = None, resume = None, alwaysBumpCount = False, 
                allowUnknownFlags = False, allowMissingSource = False,
-               ignoreDeps = False):
+               ignoreDeps = False, logBuild = False):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -197,6 +200,11 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     even if their flavors would differentiate them.  
     @type alwaysBumpCount: bool
     @param allowMissingSource: if True, do not complain if the sourceVersion
+    specified does not point to an existing source trove.  Warning -- this
+    can lead to strange trove setups in the repository
+    @type logBuild: bool
+    @param logBuild: if True, log the build to a file that will be included
+    in the changeset
     specified does not point to an existing source trove.  Warning -- this
     can lead to strange trove seupts
     @type allowMissingSource: bool
@@ -246,7 +254,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 				targetLabel = targetLabel,
 				resume = resume, 
                                 alwaysBumpCount = alwaysBumpCount, 
-                                ignoreDeps = ignoreDeps)
+                                ignoreDeps = ignoreDeps, logBuild = logBuild)
     elif issubclass(recipeClass, recipe.RedirectRecipe):
 	ret = cookRedirectObject(repos, cfg, recipeClass,  sourceVersion,
 			      macros = macros, targetLabel = targetLabel,
@@ -528,7 +536,7 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
 def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True, 
 		      macros={}, targetLabel = None, 
                       resume = None, alwaysBumpCount=False, 
-                      ignoreDeps=False):
+                      ignoreDeps=False, logBuild=False):
     """
     Turns a package recipe object into a change set. Returns the absolute
     changeset created, a list of the names of the packages built, and
@@ -597,49 +605,82 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         destdir = builddir + '/_ROOT_'
     util.mkdirChain(destdir)
 
-    bldInfo.begin()
-    bldInfo.destdir = destdir
-    if resume is True:
-        resume = bldInfo.lastline
-    recipeObj.unpackSources(builddir, destdir, resume)
-
-    # if we're only extracting, continue to the next recipe class.
-    if prep:
-	return
-
-    cwd = os.getcwd()
+    if logBuild:
+        # turn on logging of this trove.  Log is packaged as part
+        # of :debug component
+        logPath = destdir + recipeObj.macros.buildlogpath
+        # during the build, keep the log file in the same dir as buildinfo.
+        # that will make it more accessible for debugging.  At the end of 
+        # the build, copy to the correct location
+        tmpLogPath = builddir + '/' + os.path.basename(logPath)
+        util.mkdirChain(os.path.dirname(logPath))
+        # touch the logPath file so that the build process expects
+        # a file there for packaging
+        open(logPath, 'w')
+        logFile = logger.startLog(tmpLogPath)
     try:
-	os.chdir(builddir + '/' + recipeObj.mainDir())
-	recipeObj.doBuild(builddir, resume=resume)
-        
-	if resume and resume != "policy" and \
-                      recipeObj.resumeList[-1][1] != False:
-	    log.info('Finished Building %s Lines %s, Not Running Policy', 
-                                                   recipeClass.name, resume)
-	    return
-	log.info('Processing %s', recipeClass.name)
-	recipeObj.doDestdirProcess() # includes policy
-	bldInfo.stop()
-	use.track(False)
-    finally:
-	os.chdir(cwd)
+        bldInfo.begin()
+        bldInfo.destdir = destdir
+        if resume is True:
+            resume = bldInfo.lastline
+        recipeObj.unpackSources(builddir, destdir, resume)
+
+        # if we're only extracting, continue to the next recipe class.
+        if prep:
+            return
+
+        cwd = os.getcwd()
+        try:
+            os.chdir(builddir + '/' + recipeObj.mainDir())
+            recipeObj.doBuild(builddir, resume=resume)
+            
+            if resume and resume != "policy" and \
+                          recipeObj.resumeList[-1][1] != False:
+                log.info('Finished Building %s Lines %s, Not Running Policy', 
+                                                       recipeClass.name, resume)
+                return
+            log.info('Processing %s', recipeClass.name)
+            recipeObj.doDestdirProcess() # includes policy
+            bldInfo.stop()
+            use.track(False)
+        finally:
+            os.chdir(cwd)
     
-    grpName = recipeClass.name
+        grpName = recipeClass.name
 
-    bldList = recipeObj.getPackages()
-    if not bldList:
-	# no components in packages
-	log.warning('Cowardlily refusing to create empty package %s'
-		    %recipeClass.name)
-	return
+        bldList = recipeObj.getPackages()
+        if not bldList:
+            # no components in packages
+            log.warning('Cowardlily refusing to create empty package %s'
+                        %recipeClass.name)
+            return
 
-    # Every component has the same flavor (enforced by policy), just use 
-    # the first one
-    flavor = deps.deps.DependencySet()
-    flavor.union(bldList[0].flavor)
-    componentNames = [ x.name for x in bldList ]
-    targetVersion = nextVersion(repos, componentNames, sourceVersion, flavor, 
-                                targetLabel, alwaysBumpCount=alwaysBumpCount)
+        # Every component has the same flavor (enforced by policy), just use 
+        # the first one
+        flavor = deps.deps.DependencySet()
+        flavor.union(bldList[0].flavor)
+        componentNames = [ x.name for x in bldList ]
+        targetVersion = nextVersion(repos, componentNames, sourceVersion, 
+                                    flavor, targetLabel, 
+                                    alwaysBumpCount=alwaysBumpCount)
+    except Exception, msg:
+        if logBuild:
+            logFile.write('%s\n' % msg)
+            logFile.write(''.join(traceback.format_exception(*sys.exc_info())))
+            logFile.write('\n')
+            logFile.close()
+        raise
+    else:
+        if logBuild:
+            logFile.close()
+            os.unlink(logPath)
+            if cfg.noClean:
+                # leave the easily accessible copy in place in 
+                # builddir
+                shutil.copy2(tmpLogPath, logPath)
+            else:
+                os.rename(tmpLogPath, logPath)
+
     buildTime = time.time()
 
     # create all of the package troves we need
@@ -867,7 +908,7 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
 
 def cookItem(repos, cfg, item, prep=0, macros={}, 
 	     emerge = False, resume = None, allowUnknownFlags = False,
-             ignoreDeps = False):
+             ignoreDeps = False, logBuild = False):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -968,7 +1009,8 @@ def cookItem(repos, cfg, item, prep=0, macros={},
                             sourceVersion = sourceVersion,
 			    resume = resume, 
                             allowUnknownFlags = allowUnknownFlags,
-                            allowMissingSource=False, ignoreDeps=ignoreDeps)
+                            allowMissingSource=False, ignoreDeps=ignoreDeps,
+                            logBuild=logBuild)
         if troves:
             built = (tuple(troves), changeSetFile)
     except repository.RepositoryError, e:
@@ -1004,7 +1046,7 @@ class CookError(Exception):
 
 def cookCommand(cfg, args, prep, macros, emerge = False, 
                 resume = None, allowUnknownFlags = False,
-                ignoreDeps = False, profile = False):
+                ignoreDeps = False, profile = False, logBuild = True):
     # this ensures the repository exists
     repos = NetworkRepositoryClient(cfg.repositoryMap)
 
@@ -1044,7 +1086,7 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 built = cookItem(repos, cfg, item, prep=prep, macros=macros,
 				 emerge = emerge, resume = resume, 
                                  allowUnknownFlags = allowUnknownFlags, 
-                                 ignoreDeps = ignoreDeps)
+                                 ignoreDeps = ignoreDeps, logBuild = logBuild)
             except CookError, msg:
 		log.error(str(msg))
                 sys.exit(1)
