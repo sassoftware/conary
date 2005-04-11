@@ -23,7 +23,7 @@ export libdir = $(prefix)/lib
 export mandir = $(prefix)/share/man
 export conarydir = $(libdir)/python$(PYVERSION)/site-packages/conary
 
-SUBDIRS=build local repository server lib pysqlite3 deps scripts config
+SUBDIRS=build local repository server lib pysqlite3 deps scripts config web
 
 python_files = __init__.py	\
 	branch.py		\
