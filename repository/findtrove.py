@@ -337,13 +337,13 @@ class QueryRevisionByBranch(Query):
                 finalMap[self.map[name]] = pkgList
                 break
             if not found:
-                self.addMissing(name)
+                self.addMissing(missing, name)
 
     def missingMsg(self, name):
         branch = self.query[name].keys()[0]
         versionStr = self.map[name][1]
         return "revision %s of %s was found on branch %s" \
-                                    % (versionStr, name, branch)
+                                    % (versionStr, name, branch.asString())
 
 
 class QueryRevisionByLabel(Query):
