@@ -530,7 +530,7 @@ class FilesystemJob:
             twmSkipList = { "contents" : True, "inode" : True }
 	else:
 	    noIds = False
-            twmSkipList = {  "inode" : True }
+            twmSkipList = {  "contents" : True }
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.

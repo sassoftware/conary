@@ -15,6 +15,7 @@ Changes in 0.50.11:
   * Improved the progress indicators for preparingUpdate and
     creatingDatabaseTransaction
   * Implemented progress indicator on source downloads
+  * Fixed bug in update process which caused files to be incorrectly skipped
 
 Changes in 0.50.10:
   * Added callback for creating database transaction, so that it does 
