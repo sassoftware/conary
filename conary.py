@@ -28,6 +28,7 @@ import os
 import xmlrpclib
 
 #conary
+import callbacks
 import commit
 import conarycfg
 import constants
@@ -72,6 +73,7 @@ def usage(rc = 1):
     print ""
     print "changeset flags: --exclude-troves <patterns>"
     print "                 --no-recurse"
+    print "                 --quiet"
     print ""
     print "commit flags:    --target-branch <branch>"
     print ""
@@ -118,6 +120,7 @@ def usage(rc = 1):
     print "                 --no-deps-recurse"
     print "                 --no-recurse"
     print "                 --no-resolve"
+    print "                 --quiet"
     print "                 --replace-files"
     print "                 --resolve"
     print "                 --test"
@@ -164,6 +167,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["path"] = MULT_PARAM
     argDef["ls"] = NO_PARAM
     argDef["profile"] = NO_PARAM
+    argDef["quiet"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
     argDef["sha1s"] = NO_PARAM
     argDef["show-changes"] = NO_PARAM
@@ -215,8 +219,16 @@ def realMain(cfg, argv=sys.argv):
 	return usage()
     elif (otherArgs[1] == "changeset"):
         kwargs = {}
+        
+        callback = updatecmd.UpdateCallback()
+        if cfg.quiet:
+            callback = callbacks.UpdateCallback()
+        if argSet.has_key('quiet'):
+            callback = callbacks.UpdateCallback()
+            del argSet['quiet']
+        kwargs['callback'] = callback
+
         kwargs['recurse'] = not(argSet.has_key('no-recurse'))
-        kwargs['callback'] = updatecmd.UpdateCallback()
         if not kwargs['recurse']:
             del argSet['no-recurse']
             
@@ -445,7 +457,14 @@ def realMain(cfg, argv=sys.argv):
                                         deps=showDeps)
     elif (otherArgs[1] == "update" or otherArgs[1] == "erase"):
 	kwargs = {}
-        kwargs['callback'] = updatecmd.UpdateCallback()
+
+        callback = updatecmd.UpdateCallback()
+        if cfg.quiet:
+            callback = callbacks.UpdateCallback()
+        if argSet.has_key('quiet'):
+            callback = callbacks.UpdateCallback()
+            del argSet['quiet']
+        kwargs['callback'] = callback
 
 	if argSet.has_key('replace-files'):
 	    kwargs['replaceFiles'] = True

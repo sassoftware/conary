@@ -77,6 +77,7 @@ def usage(rc = 1):
     print "               --prep"
     print "               --resume [policy|<linenums>]"
     print "               --debug-exceptions"
+    print "               --quiet"
     print ""
     print "commit flags:  --message <msg>"
     print ""
@@ -105,6 +106,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["no-deps"] = NO_PARAM
     argDef["prep"] = NO_PARAM
     argDef["profile"] = NO_PARAM
+    argDef["quiet"] = NO_PARAM
     argDef["replace-files"] = NO_PARAM
     argDef["resume"] = OPT_PARAM
     argDef["sha1s"] = NO_PARAM
@@ -277,6 +279,10 @@ def sourceCommand(cfg, args, argSet, profile=False):
             ignoreDeps = True
         else:
             ignoreDeps = False
+
+        if argSet.has_key('quiet'):
+            cfg.quiet = True
+            del argSet['quiet']
 
         if argSet.has_key('no-clean'):
             del argSet['no-clean']

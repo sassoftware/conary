@@ -278,6 +278,7 @@ class ConaryConfiguration(ConfigFile):
         'archDirs'               : [ STRINGPATH, ('/etc/conary/arch', 
                                                   '/etc/conary/distro/arch',
                                                   '~/.conary/arch')],
+        'quiet'                 : [ BOOL, False ],
     }
 
     def __init__(self, readConfigFiles=True):
