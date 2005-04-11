@@ -1,3 +1,8 @@
+Changes in 0.50.12:
+  * Implemented --quiet for conary update changeset commands, and cvc cook.
+    Also implemented the 'quiet' configuration value. This option suppresses
+    progress indicators.
+
 Changes in 0.50.11:
   * Reworked file addition to local database a bit for better performance
   * Fixed sorting for --info
