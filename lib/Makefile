@@ -17,6 +17,7 @@ python_files=	    __init__.py		\
 		    epdb.py		\
 		    erlcompleter.py	\
 		    log.py		\
+		    logger.py		\
 		    magic.py		\
 		    options.py		\
 		    patch.py		\
