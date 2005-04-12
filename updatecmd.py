@@ -96,6 +96,9 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             try:
                 cs = changeset.ChangeSetFromFile(pkgStr)
             except BadContainer, msg:
+                # ensure that it is obvious that a file is being referenced
+                if pkgStr[0] not in './':
+                    pkgStr = './' + pkgStr
                 log.error("'%s' is not a valid conary changset: %s" % 
                           (pkgStr, msg))
                 sys.exit(1)
