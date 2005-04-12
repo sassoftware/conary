@@ -211,12 +211,6 @@ static PyObject * NumericStream_Freeze(NumericStreamObject * self,
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &skipSet))
         return NULL;
 
-    if (skipSet && skipSet != Py_None) {
-        PyErr_SetString(PyExc_ValueError, 
-                "cstreams.NumericStream.freeze() does not support skipSet");
-        return NULL;
-    }
-
     if (self->isNone)
         return PyString_FromString("");
 
