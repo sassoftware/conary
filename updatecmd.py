@@ -99,7 +99,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                 # ensure that it is obvious that a file is being referenced
                 if pkgStr[0] not in './':
                     pkgStr = './' + pkgStr
-                log.error("'%s' is not a valid conary changset: %s" % 
+                log.error("'%s' is not a valid conary changeset: %s" % 
                           (pkgStr, msg))
                 sys.exit(1)
             applyList.append(cs)
