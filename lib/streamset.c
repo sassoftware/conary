@@ -19,6 +19,8 @@
 
 #include "cstreams.h"
 
+#include <stdio.h>
+
 /* debugging aid */
 #if defined(__i386__) || defined(__x86_64__)
 # define breakpoint do {__asm__ __volatile__ ("int $03");} while (0)
@@ -45,6 +47,9 @@ typedef struct {
     PyObject_HEAD
 } StreamSetObject;
 
+static int StreamSet_Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
+			      char * data, int dataLen, int offset);
+
 /* ------------------------------------- */
 /* StreamSetDef Implementation           */
 
@@ -54,7 +59,7 @@ static int StreamSetDef_Init(PyObject * self, PyObject * args,
     StreamSetDefObject * ssd = (void *) self;
     PyObject * spec;
     PyListObject * items;
-    int i, j;
+    int i;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist,
 				     &PyDict_Type, &spec)) {
@@ -246,10 +251,14 @@ static PyObject * StreamSet_Eq(PyObject * self,
     PyObject * skipSet = Py_None;
     int rc;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|O!", kwlist,
-				     self->ob_type, &other, &PyDict_Type, 
-				     &skipSet))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|O", kwlist,
+				     self->ob_type, &other, &skipSet))
         return NULL;
+
+    if (skipSet != Py_None && skipSet->ob_type != &PyDict_Type) {
+        PyErr_SetString(PyExc_TypeError, "skipSet must be None or a dict");
+	return NULL;
+    }
 
     rc = _StreamSet_doCmp(self, other, skipSet);
     if (rc < 0 && PyErr_Occurred())
@@ -286,8 +295,11 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
     vals = alloca(sizeof(PyObject *) * ssd->tagCount);
 
     for (i = 0; i < ssd->tagCount; i++) {
-	if (skipSet != Py_None && PyDict_Contains(skipSet, ssd->tags[i].name))
+	if (skipSet != Py_None && PyDict_Contains(skipSet, ssd->tags[i].name)) {
+            Py_INCREF(Py_None);
+            vals[i] = Py_None;
 	    continue;
+        }
 
 	attr = self->ob_type->tp_getattro((PyObject *) self, 
 					  ssd->tags[i].name);
@@ -315,13 +327,9 @@ static int StreamSet_Init(PyObject * self, PyObject * args,
     static char * kwlist[] = { "data", "offset", NULL };
     StreamSetDefObject * ssd;
     int i;
+    int offset = 0;
     char * data = NULL;
     int dataLen;
-    char * end, * chptr, * streamData;
-    int streamId, size;
-    int ignoreUnknown = -1;
-    PyObject * attr, * ro;
-    int offset = 0;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|z#i", kwlist, &data, 
 				     &dataLen, &offset)) {
@@ -354,6 +362,37 @@ static int StreamSet_Init(PyObject * self, PyObject * args,
 
     if (!data)
 	return 0;
+
+    if (StreamSet_Thaw_raw(self, ssd, data, dataLen, offset))
+	return -1;
+
+    return 0;
+}
+
+static PyObject * StreamSet_Thaw(PyObject * self, PyObject * args) {
+    char * data = NULL;
+    int dataLen;
+    StreamSetDefObject * ssd;
+
+    if (!PyArg_ParseTuple(args, "s#", &data, &dataLen))
+        return NULL;
+
+    ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
+
+    if (StreamSet_Thaw_raw(self, ssd, data, dataLen, 0))
+	return NULL;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static int StreamSet_Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
+			      char * data, int dataLen, int offset) {
+    char * streamData, * chptr, * end;
+    int size, i;
+    PyObject * attr, * ro;
+    int ignoreUnknown = -1;
+    int streamId;
 
     end = data + dataLen;
     chptr = data + offset;
@@ -392,11 +431,18 @@ static int StreamSet_Init(PyObject * self, PyObject * args,
 	ro = PyObject_CallMethod(attr, "thaw", "s#", streamData, size);
 	Py_DECREF(attr);
 	if (!ro) {
+            breakpoint;
 	    return -1;
 	}
 	Py_DECREF(ro);
     }
 
+    if (chptr != end) {
+	printf("HERE\n");
+	fflush(stdout);
+	i = 1;
+	while (i) ;
+    }
     assert(chptr == end);
 
     return 0;
@@ -520,10 +566,11 @@ static PyTypeObject StreamSetDefType = {
 };
 
 static PyMethodDef StreamSetMethods[] = {
-    { "__deepcopy__", (PyCFunction) StreamSet_DeepCopy, METH_VARARGS },
-    { "diff",   (PyCFunction) StreamSet_Diff,   METH_VARARGS },
+    { "__deepcopy__", (PyCFunction) StreamSet_DeepCopy, METH_VARARGS         },
+    { "diff",   (PyCFunction) StreamSet_Diff,   METH_VARARGS                 },
     { "__eq__", (PyCFunction) StreamSet_Eq,     METH_VARARGS | METH_KEYWORDS },
     { "freeze", (PyCFunction) StreamSet_Freeze, METH_VARARGS | METH_KEYWORDS },
+    { "thaw",   (PyCFunction) StreamSet_Thaw,   METH_VARARGS                 },
     { "twm",    (PyCFunction) StreamSet_Twm,    METH_VARARGS | METH_KEYWORDS },
     {NULL}  /* Sentinel */
 };
