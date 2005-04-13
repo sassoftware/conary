@@ -28,7 +28,7 @@ class WebHandler(object):
     def _checkAuth(self, authToken):
         raise NotImplementedError
 
-    def _getHandler(self, cmd):
+    def _getHandler(self, cmd, auth):
         """Overrideable method to return a handler method in an application-specific way
            Needs to raise AttributeError if that method does not exist."""
         raise NotImplementedError
@@ -78,7 +78,7 @@ class WebHandler(object):
         if cmd.startswith("_"):
             return apache.HTTP_NOT_FOUND 
         try:
-            method = self._getHandler(cmd)
+            method = self._getHandler(cmd, auth)
         except AttributeError:
             return apache.HTTP_NOT_FOUND
         self.fields = FieldStorage(self.req)
