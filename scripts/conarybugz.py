@@ -20,9 +20,10 @@ a script that contains local information; something like the following:
 
 #!/usr/bin/python
 
+import os
 import re
 import sys
-sys.path.append("/usr/share/conary")
+import conary
 import conarybugz
 
 def getPerson(name, labelText):
@@ -63,12 +64,8 @@ import re
 import sys
 import MySQLdb
 import textwrap
-binPath = os.path.dirname(sys.argv[0]) 
-if binPath and os.path.exists(binPath + "/../conary-wrapper"):
-    sys.path.append(os.path.realpath(binPath + "/.."))
-else:
-    sys.path.append("/usr/share/conary")
 
+import conary
 import conarycfg
 from deps import deps
 from local import database

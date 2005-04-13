@@ -6,11 +6,12 @@ Changes in 0.50.12:
     purpose of the recipe loading.  loadInstalled will examine the local
     system to look for a matching installed trove, and load that version, 
     while loadSuperClass will not.
-  * logs of builds are now stored in cooked changesets in the :debuginfo 
+  * Logs of builds are now stored in cooked changesets in the :debuginfo 
     component -- generally in 
     /usr/src/debug/buildlogs/<name>-<version>-log.bz2, controlled by 
     macros.buildlogpath
-  * add lib/logger.py
+  * Added lib/logger.py
+  * Fixed conarybugz.py to work with Conary's new site-packages location
 
 Changes in 0.50.11:
   * Reworked file addition to local database a bit for better performance
