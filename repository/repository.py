@@ -20,6 +20,7 @@ import deps.deps
 import files
 from lib import patch
 from lib import sha1helper
+import sha
 import tempfile
 import trove
 from lib import util
@@ -522,8 +523,6 @@ class ChangeSetJob:
 						"".join(newLines))
 
 		assert(not failedHunks)
-		sha = sha1helper.sha1String("".join(newLines))
-		assert(sha == fileObj.contents.sha1())
             else:
                 fileContents = filecontents.FromChangeSet(cs, pathId)
 

@@ -28,6 +28,7 @@ import os
 from lib import util
 from lib import sha1helper
 from repository import filecontents
+import sha
 
 class DataStore:
 
@@ -82,7 +83,7 @@ class DataStore:
 
 	os.close(countFile)
 
-    def incrementCount(self, path, fileObj = None):
+    def incrementCount(self, path, fileObj = None, digest = None):
 	"""
 	Increments the count by one.  it becomes one, the contents
 	of fileObj are stored into that path. Return the new count.
@@ -108,7 +109,7 @@ class DataStore:
 	    os.ftruncate(countFile, 0)
 	    os.write(countFile, "%d\n" % val)
 	    os.close(countFile)
-            return val
+            return (val, None)
 	else:
 	    # new file, try to be the one who creates it
 	    newPath = path + ".new"
@@ -129,13 +130,14 @@ class DataStore:
 
 	    fObj = os.fdopen(fd, "r+")
 	    dest = gzip.GzipFile(mode = "w", fileobj = fObj)
-	    util.copyfileobj(fileObj, dest)
+            contentSha1 = sha.new()
+	    util.copyfileobj(fileObj, dest, digest = contentSha1)
 	    os.rename(newPath, path)
 
 	    dest.close()
 	    # this closes fd for us
 	    fObj.close()
-            return 1
+            return (1, contentSha1.hexdigest())
 
     # add one to the reference count for a file which already exists
     # in the archive
@@ -159,7 +161,8 @@ class DataStore:
     def addFile(self, f, hash):
 	path = self.hashToPath(hash)
         self.makeDir(path)
-	newCount = self.incrementCount(path, fileObj = f)
+	newCount, sha1 = self.incrementCount(path, fileObj = f)
+        assert(not sha1 or sha1 == hash)
         if newCount == 1 and self.logFile:
             open(self.logFile, "a").write(path + "\n")
 
