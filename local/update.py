@@ -33,6 +33,7 @@ from lib import log
 import os
 from lib import patch
 from lib import sha1helper
+import sha
 import stat
 import sys
 import tempfile
@@ -173,6 +174,19 @@ class FilesystemJob:
 
     def apply(self, tagSet = {}, tagScript = None, journal = None,
               callback = UpdateCallback()):
+
+	def restoreFile(fileObj, contents, root, target, journal):
+	    if fileObj.hasContents and contents and not \
+				       fileObj.flags.isConfig():
+		# config file sha1's are verified when they get inserted
+		# into the config file cache
+		d = sha.new()
+		fileObj.restore(contents, root, target, journal=journal,
+				digest = d)
+		assert(d.digest() == fileObj.contents.sha1())
+	    else:
+		fileObj.restore(contents, root, target, journal=journal)
+
 	# this is run after the changes are in the database (but before
 	# they are committed
 	tagCommands = []
@@ -237,7 +251,7 @@ class FilesystemJob:
                 
                 contType, contents = self.changeSet.getFileContents(pathId)
                 assert(contType == changeset.ChangedFileTypes.file)
-                fileObj.restore(contents, self.root, target, journal=journal)
+		restoreFile(fileObj, contents, self.root, target, journal)
                 del delayedRestores[match[0]]
 
                 if fileObj.hasContents and fileObj.linkGroup():
@@ -284,7 +298,7 @@ class FilesystemJob:
 
                         continue
 
-	    fileObj.restore(contents, self.root, target, journal=journal)
+	    restoreFile(fileObj, contents, self.root, target, journal)
             if ptrTargets.has_key(pathId):
                 ptrTargets[pathId] = target
 	    log.debug(msg, target)
@@ -310,8 +324,8 @@ class FilesystemJob:
                     linkGroup = fileObj.linkGroup()
                     self.linkGroups[linkGroup] = target
 
-            fileObj.restore(filecontents.FromFilesystem(ptrTargets[ptrId]),
-                            self.root, target, journal=journal)
+	    restoreFile(fileObj, filecontents.FromFilesystem(ptrTargets[ptrId]),
+			self.root, target, journal=journal)
             log.debug(msg, target)
 
         del delayedRestores

@@ -505,7 +505,7 @@ class RegularFile(File):
     def sizeString(self):
 	return "%8d" % self.contents.size()
 
-    def restore(self, fileContents, root, target, journal=None):
+    def restore(self, fileContents, root, target, journal=None, digest = None):
 	if fileContents != None:
 	    # this is first to let us copy the contents of a file
 	    # onto itself; the unlink helps that to work
@@ -519,7 +519,7 @@ class RegularFile(File):
 	    tmpfd, tmpname = tempfile.mkstemp(name, '.ct', path)
 	    try:
 		f = os.fdopen(tmpfd, 'w')
-		util.copyfileobj(src, f)
+		util.copyfileobj(src, f, digest = digest)
 		f.close()
 
                 if os.path.isdir(target):

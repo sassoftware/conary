@@ -521,9 +521,9 @@ class ChangeSetJob:
 		fileContents = filecontents.FromString(
 						"".join(newLines))
 
-		if failedHunks:
-		    fileContents = filecontents.WithFailedHunks(
-					fileContents, failedHunks)
+		assert(not failedHunks)
+		sha = sha1helper.sha1String("".join(newLines))
+		assert(sha == fileObj.contents.sha1())
             else:
                 fileContents = filecontents.FromChangeSet(cs, pathId)
 
