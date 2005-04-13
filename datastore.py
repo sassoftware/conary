@@ -162,7 +162,9 @@ class DataStore:
 	path = self.hashToPath(hash)
         self.makeDir(path)
 	newCount, sha1 = self.incrementCount(path, fileObj = f)
-        assert(not sha1 or sha1 == hash)
+        if sha1 and sha1 != hash:
+            raise IntegrityError
+
         if newCount == 1 and self.logFile:
             open(self.logFile, "a").write(path + "\n")
 
@@ -253,3 +255,6 @@ class DataStoreRepository:
     def __init__(self, path, logFile = None, dataStore = None):
 	self.contentsStore = dataStore
 
+class IntegrityError(Exception):
+
+    pass

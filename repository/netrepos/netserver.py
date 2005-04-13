@@ -35,6 +35,7 @@ from local import versiontable
 from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExists
 import trovestore
 import versions
+from datastore import IntegrityError
 
 # a list of the protocols we understand
 SERVER_VERSIONS = [ 29, 30, 31 ]
@@ -109,6 +110,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	except UserAlreadyExists, e:
             condRollback()
 	    return (True, ("UserAlreadyExists", str(e)))
+	except IntegrityError, e:
+            condRollback()
+	    return (True, ("IntegrityError", str(e)))
 	#except Exception, e:
         #    condRollback()
 	#    return (True, ("Unknown Exception", str(e)))

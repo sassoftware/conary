@@ -76,6 +76,9 @@ class _Method(xmlrpclib._Method):
 	    raise repository.DuplicateBranch(exceptionArgs[0])
         elif exceptionName == "MethodNotSupported":
 	    raise repository.MethodNotSupported(exceptionArgs[0])
+        elif exceptionName == "IntegrityError":
+            from datastore import IntegrityError
+            raise IntegrityError
         elif exceptionName in "InvalidClientVersion":
             from netrepos import netserver
 	    raise netserver.InvalidClientVersion, exceptionArgs[0]

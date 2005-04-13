@@ -13,8 +13,10 @@
 #
 
 import database
+import datastore
 from repository import repository
 from StringIO import StringIO
+import sha
 import zlib
 
 class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
@@ -169,7 +171,13 @@ class SqlDataStore:
             cu.execute("UPDATE DataStore SET count=count+1 WHERE hash=?",
                        hash)
         else:
-            data = zlib.compress(fileObj.read())
+            rawData = fileObj.read()
+            data = zlib.compress(rawData)
+            digest = sha.new()
+            digest.update(rawData)
+            if digest.hexdigest() != hash:
+                raise datastore.IntegrityError
+
             cu.execute("INSERT INTO DataStore VALUES(?, 1, ?)",
                        hash, data)
 
