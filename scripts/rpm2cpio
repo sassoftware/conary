@@ -18,12 +18,7 @@ import gzip
 import os
 import sys
 
-binPath = os.path.dirname(sys.argv[0]) 
-if binPath and os.path.exists(binPath + "/../conary-wrapper"):
-    sys.path.append(os.path.realpath(binPath + "/.."))
-else:
-    sys.path.append("/usr/share/conary")
-
+import conary
 import rpmhelper
 
 def usage():

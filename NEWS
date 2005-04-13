@@ -12,6 +12,8 @@ Changes in 0.50.12:
     macros.buildlogpath
   * Added lib/logger.py
   * Fixed conarybugz.py to work with Conary's new site-packages location
+  * Cleaned up yuck, rpm2cpio, and rpm2ccs scripts to use new "import conary"
+    mechanism for finding conary.
 
 Changes in 0.50.11:
   * Reworked file addition to local database a bit for better performance
