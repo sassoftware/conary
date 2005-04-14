@@ -37,6 +37,7 @@ class Logger:
         """
         masterFd, slaveFd = pty.openpty()
         directRd, directWr = os.pipe()
+        signal.signal(signal.SIGTTOU, signal.SIG_IGN)
         pid = os.fork()
         if pid:
             # make parent process slave -- this allows us to 
@@ -168,13 +169,13 @@ class _ChildLogger:
                     raise
                 read = []
             if ptyFd in read:
-                # read output from psedu terminal stdout/stderr, and pass to 
+                # read output from pseudo terminal stdout/stderr, and pass to 
                 # terminal and log
                 try:
                     output = os.read(ptyFd, BUFFER)
                 except OSError, msg:
                     if msg.errno == errno.EIO: 
-                        # input/output error - ptty closed 
+                        # input/output error - pty closed 
                         # shut down logger
                         break
                     elif msg.errno != errno.EINTR:
@@ -185,7 +186,7 @@ class _ChildLogger:
                     os.write(stdout, output)
                     logFile.write(output)
             if directRd in read:
-                # read output from psedu terminal stdout/stderr, and pass to 
+                # read output from pseudo terminal stdout/stderr, and pass to 
                 # terminal and log
                 try:
                     output = os.read(directRd, BUFFER)
