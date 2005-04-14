@@ -60,7 +60,7 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
             displayTroveHeader(cs, troveName, newVer, newFla, oldVer, oldFla, 
                                indent, displayC, fullVersions)
             if newVer and deps:
-                trove = cs.getNewPackageVersion(troveName, newVer, vewFla)
+                trove = cs.getNewPackageVersion(troveName, newVer, newFla)
                 depformat('Requires', trove.getRequires())
                 depformat('Provides', trove.getProvides())
     else:
