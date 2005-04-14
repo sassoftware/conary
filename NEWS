@@ -15,6 +15,7 @@ Changes in 0.50.12:
   * Cleaned up yuck, rpm2cpio, and rpm2ccs scripts to use new "import conary"
     mechanism for finding conary.
   * Check sha1s for all files written into the repository or file system
+  * conary scs --deps works again
 
 Changes in 0.50.11:
   * Reworked file addition to local database a bit for better performance
