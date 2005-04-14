@@ -680,6 +680,10 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                 shutil.copy2(tmpLogPath, logPath)
             else:
                 os.rename(tmpLogPath, logPath)
+            # readd this file to the bldList to update its size info
+            # XXX should make this more elegant
+            recipeObj.autopkg.addFile(recipeObj.macros.buildlogpath, logPath)
+            bldList = recipeObj.autopkg.getPackages()
 
     buildTime = time.time()
 
