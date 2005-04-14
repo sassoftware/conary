@@ -21,6 +21,7 @@ and create changesets from the files created during the build process
 import files
 import lib.elf
 from lib import log
+from lib import sha1helper
 import os
 import string
 import time
@@ -242,6 +243,17 @@ class AutoBuildPackage:
 			return self.packageMap[main][comp]
         return None
     
+    def updateFileContents(self, path, realPath):
+        """
+        Update contents information, including sha1 and contents
+        """
+        f = self.pathMap[path]
+        assert(f.hasContents and isinstance(f, files.RegularFile))
+        sha1 = sha1helper.sha1FileBin(realPath)
+        size = os.lstat(realPath).st_size
+        f.contents.setSize(size)
+        f.contents.setSha1(sha1)
+
     def addFile(self, path, realPath):
         """
         Add a path to the correct BuildPackage instance by matching
