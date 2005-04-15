@@ -382,6 +382,16 @@ class DependencyTables:
                 """ % subselect
 
     def check(self, changeSet):
+	"""
+	Check the database for closure against the operations in
+	the passed changeSet.
+
+	@param changeSet: The changeSet which defined the operations
+	@type changeSet: repository.ChangeSet
+	@rtype: tuple of dependency failures for new packages and
+		dependency failures caused by removal of existing
+		packages
+	"""
         def _depItemsToSet(depInfoList):
             failedSets = [ (x, None, None) for x in troveNames]
 
@@ -473,6 +483,11 @@ class DependencyTables:
                                      class, name, flag)
                              VALUES(?, ?, ?, ?, ?, ?, ?)""")
 
+	# This sets up negative depNum entries for the requirements we're
+	# checking (multiplier = -1 makse them negative), with (-1 * depNum) 
+	# indexing depList. depList is a list of (troveNum, depClass, dep) 
+	# tuples. Like for depNum, negative troveNum values mean the
+	# dependency was part of a new trove.
         for i, trvCs in enumerate(changeSet.iterNewPackageList()):
             troveNum = -i - 1
             troveNames.append((trvCs.getName()))
@@ -488,7 +503,7 @@ class DependencyTables:
                                   trvCs.getOldFlavor()))
 
             # using depNum 0 is a hack, but it's just on a provides so
-            # it shouldn't matter
+            # it doesn't matter
             cu.execstmt(stmt,
                         troveNum,                   # troveNum
                         0,                          # depNum,
@@ -501,7 +516,7 @@ class DependencyTables:
         # create the index for DepCheck
         self._createTmpTable(cu, "DepCheck", makeTable = False)
 
-        # merge everything into TmpDependencies
+        # merge everything into TmpDependencies, TmpRequires, and tmpProvides
         self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
                             "TmpProvides", 
                             ("Dependencies", "TmpDependencies"), 
@@ -543,8 +558,10 @@ class DependencyTables:
             # no need to remove RemovedTroves -- this is all in a transaction
             # which gets rolled back
 
-        # check the dependencies for anything which depends on things which
-        # we've removed
+        # Check the dependencies for anything which depends on things which
+        # we've removed. We insert those dependencies into our temporary
+	# tables (which define everything which needs to be checked) with
+	# a positive depNum which mathes the depNum from the Requires table.
         cu.execute("""
                 INSERT INTO TmpRequires SELECT 
                     DISTINCT Requires.instanceId, Requires.depId, 
@@ -562,7 +579,9 @@ class DependencyTables:
                     Requires.instanceId, Requires.depNum,
                     Requires.DepCount, 0, Dependencies.class,
                     Dependencies.name, Dependencies.flag
-                FROM RemovedTroveIds INNER JOIN Provides ON
+                FROM 
+		    RemovedTroveIds 
+		INNER JOIN Provides ON
                     RemovedTroveIds.troveId == Provides.instanceId
                 INNER JOIN Requires ON
                     Provides.depId = Requires.depId
@@ -576,8 +595,9 @@ class DependencyTables:
         # in the repository, but that something is being explicitly removed
         # and adding it back would be a bit rude!)
         cu.execute("""
-                SELECT depNum, RemovedTroveIds.troveId FROM
-                    (%s) 
+                SELECT depNum, RemovedTroveIds.troveId 
+		    FROM
+			(%s) 
                     LEFT OUTER JOIN RemovedTroveIds ON
                         provInstanceId == RemovedTroveIds.troveId
                     LEFT OUTER JOIN RemovedTroveIds AS Removed ON
