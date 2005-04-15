@@ -107,7 +107,7 @@ class DependencyTables:
 	    cu.execute("CREATE INDEX %sIdx ON %s(troveId, class, name, flag)"
 			    % (name, name), start_transaction = False)
 
-    def _populateTmpTable(self, cu, stmt, name, depList, troveNum, requires, 
+    def _populateTmpTable(self, cu, stmt, depList, troveNum, requires, 
                           provides, multiplier = 1):
         allDeps = []
         if requires:
@@ -258,7 +258,7 @@ class DependencyTables:
         prov = trove.getProvides()
 
 	stmt = cu.compile("INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)")
-        self._populateTmpTable(cu, stmt, "NeededDeps", [], troveId, 
+        self._populateTmpTable(cu, stmt, [], troveId, 
                                trove.getRequires(), prov)
 
         cu.execute("INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)",
@@ -468,12 +468,19 @@ class DependencyTables:
         oldTroves = []
         troveNames = []
 
-	stmt = cu.compile("INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)")
+	stmt = cu.compile("""INSERT INTO DepCheck 
+                                    (troveId, depNum, flagCount, isProvides,
+                                     class, name, flag)
+                             VALUES(?, ?, ?, ?, ?, ?, ?)""")
 
         for i, trvCs in enumerate(changeSet.iterNewPackageList()):
+            troveNum = -i - 1
             troveNames.append((trvCs.getName()))
-            self._populateTmpTable(cu, stmt, "DepCheck", depList, -i - 1, 
-                                   trvCs.getRequires(), trvCs.getProvides(),
+            self._populateTmpTable(cu, stmt, 
+                                   depList = depList, 
+                                   troveNum = troveNum,
+                                   requires = trvCs.getRequires(), 
+                                   provides = trvCs.getProvides(),
                                    multiplier = -1)
 
             if trvCs.getOldVersion():
@@ -483,15 +490,26 @@ class DependencyTables:
             # using depNum 0 is a hack, but it's just on a provides so
             # it shouldn't matter
             cu.execstmt(stmt,
-                        -i - 1, 0, 1, True, deps.DEP_CLASS_TROVES, 
-                        trvCs.getName(), NO_FLAG_MAGIC)
+                        troveNum,                   # troveNum
+                        0,                          # depNum,
+                        1,                          # flagCount
+                        True,                       # isProviedes
+                        deps.DEP_CLASS_TROVES,      # class
+                        trvCs.getName(),            # name
+                        NO_FLAG_MAGIC)              # flag
 
+        # create the index for DepCheck
         self._createTmpTable(cu, "DepCheck", makeTable = False)
+
+        # merge everything into TmpDependencies
+        self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
+                            "TmpProvides", 
+                            ("Dependencies", "TmpDependencies"), 
+                            multiplier = -1)
 
         # now build a table of all the troves which are being erased
         cu.execute("""CREATE TEMPORARY TABLE RemovedTroveIds 
-                        (troveId INTEGER PRIMARY KEY)""", 
-                    start_transaction = False)
+                        (troveId INTEGER PRIMARY KEY)""")
 
         oldTroves += changeSet.getOldPackageList()
 
@@ -506,12 +524,12 @@ class DependencyTables:
                     flavor = None
 
                 cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?)",
-                           (name, version.asString(), flavor), 
-                           start_transaction = False)
+                           (name, version.asString(), flavor))
 
             cu.execute("""INSERT INTO RemovedTroveIds 
-                            SELECT instanceId FROM
-                                RemovedTroves INNER JOIN Versions ON
+                            SELECT instanceId FROM 
+                                RemovedTroves 
+                            INNER JOIN Versions ON
                                 RemovedTroves.version = Versions.version
                             INNER JOIN DBFlavors ON
                                 RemovedTroves.flavor = DBFlavors.flavor OR
@@ -520,14 +538,10 @@ class DependencyTables:
                             INNER JOIN DBInstances ON
                                 DBInstances.troveName = RemovedTroves.name AND
                                 DBInstances.versionId = Versions.versionId AND
-                                DBInstances.flavorId  = DBFlavors.flavorId""",
-                        start_transaction = False)
-            cu.execute("DROP TABLE RemovedTroves", start_transaction = False)
+                                DBInstances.flavorId  = DBFlavors.flavorId""")
 
-        self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
-                            "TmpProvides", 
-                            ("Dependencies", "TmpDependencies"), 
-                            multiplier = -1)
+            # no need to remove RemovedTroves -- this is all in a transaction
+            # which gets rolled back
 
         # check the dependencies for anything which depends on things which
         # we've removed
@@ -535,7 +549,9 @@ class DependencyTables:
                 INSERT INTO TmpRequires SELECT 
                     DISTINCT Requires.instanceId, Requires.depId, 
                              Requires.depNum, Requires.depCount
-                FROM RemovedTroveIds INNER JOIN Provides ON
+                FROM 
+                    RemovedTroveIds 
+                INNER JOIN Provides ON
                     RemovedTroveIds.troveId == Provides.instanceId
                 INNER JOIN Requires ON
                     Provides.depId = Requires.depId
@@ -636,7 +652,7 @@ class DependencyTables:
         unresolveableList = _depItemsToSet(unresolveable)
         unresolveableList += _brokenItemsToSet(cu, brokenByErase.keys())
 
-        # no need to drop the DepCheck table since we're rolling this whole
+        # no need to drop our temporary tables since we're rolling this whole
         # transaction back anyway
 	self.db.rollback()
 
@@ -652,7 +668,7 @@ class DependencyTables:
         depList = [ None ]
 	stmt = cu.compile("INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)")
         for i, depSet in enumerate(depSetList):
-            self._populateTmpTable(cu, stmt, "DepCheck", depList, -i - 1, 
+            self._populateTmpTable(cu, stmt, depList, -i - 1, 
                                    depSet, None, multiplier = -1)
 
 
