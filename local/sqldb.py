@@ -325,7 +325,7 @@ class DBInstanceTable:
 class DBFlavors(idtable.IdTable):
 
     def addId(self, flavor):
-	idtable.IdTable.addId(self, flavor.freeze())
+	return idtable.IdTable.addId(self, flavor.freeze())
 
     def __getitem__(self, flavor):
         if not flavor:
