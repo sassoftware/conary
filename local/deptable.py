@@ -362,7 +362,8 @@ class DependencyTables:
 """ % providesLabel
 
         return """
-                SELECT depCheck.depNum as depNum,
+                SELECT Matched.reqDepId as depId,
+                       depCheck.depNum as depNum,
                        Matched.reqInstId as reqInstanceId,
                        Matched.provInstId as provInstanceId
                     FROM (
@@ -456,6 +457,146 @@ class DependencyTables:
 
             return failedSets.items()
 
+        def _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges):
+            # these edges cancel each other out -- for example, if Foo
+            # requires both the old and new versions of Bar the order between
+            # Foo and Bar is irrelevant
+            for edge in oldOldEdges.keys():
+                if oldNewEdges.has_key(edge):
+                    del oldOldEdges[edge]
+                    del oldNewEdges[edge]
+
+            for edge in newOldEdges.keys():
+                if newNewEdges.has_key(edge):
+                    del newOldEdges[edge]
+                    del newNewEdges[edge]
+
+        def _buildGraph(nodes, oldOldEdges, newNewEdges):
+            for (reqNodeId, provNodeId, depId) in oldOldEdges.iterkeys():
+                # remove the provider after removing the requirer
+                nodes[provNodeId][2].append(reqNodeId)
+                nodes[reqNodeId][3].append(provNodeId)
+
+            # the edges left in oldNewEdges represent dependencies which troves
+            # slated for removal have on troves being installed. either those
+            # dependencies will already be guaranteed by edges in oldOldEdges,
+            # or they were broken to begin with. either way, we don't have to
+            # care about them
+
+            # newOldEdges are dependencies which troves being installed have on
+            # troves being removed. since those dependencies will be broken
+            # after this operation, we don't need to order on them (it's likely
+            # they are filled by some other trove being added, and the edge
+            # in newNewEdges will make that work out
+            for (reqNodeId, provNodeId, depId) in newNewEdges.iterkeys():
+                nodes[reqNodeId][2].append(provNodeId)
+                nodes[provNodeId][2].append(reqNodeId)
+
+        def _treeDFS(nodes, nodeIdx, seen, finishes, timeCount):
+            seen[nodeIdx] = True
+            
+            for nodeId in nodes[nodeIdx][2]:
+                if not seen[nodeId]:
+                    timeCount = _treeDFS(nodes, nodeId, seen, finishes,
+                                         timeCount)
+
+            finishes[nodeIdx] = timeCount
+            timeCount += 1
+            return timeCount
+
+        def _connectDFS(nodes, compList, nodeIdx, seen, finishes):
+            seen[nodeIdx] = True
+            edges = [ (finishes[x], x) for x in nodes[nodeIdx][3] ]
+            edges.sort()
+            edges.reverse()
+
+            compList.append(nodeIdx)
+            
+            for finishTime, nodeId in edges:
+                if not seen[nodeId]:
+                    _connectDFS(nodes, compList, nodeId, seen, finishes)
+
+        def _stronglyConnect(nodes):
+            # Converts the graph to a graph of strongly connected components.
+            # We return a list of lists, where each sublist represents a
+            # single components. All of the edges for that component are
+            # in the nodes list, and are from or two the first node in the
+            # sublist for that component
+
+            # Now for a nice, simple strongly connected componenet algorithm.
+            # If you don't understand this, try _Introductions_To_Algorithms_
+            # by Cormen, Leiserson and Rivest. If you google for "strongly
+            # connected components" (as of 4/2005) you'll find lots of snippets
+            # from it
+            finishes = [ -1 ] * len(nodes)
+            seen = [ False ] * len(nodes)
+            nextStart = 1
+            timeCount = 0
+            while nextStart != len(nodes):
+                if not seen[nextStart]:
+                    timeCount = _treeDFS(nodes, nextStart, seen, finishes, 
+                                         timeCount)
+                
+                nextStart += 1
+
+            nodeOrders = [ (f, i) for i, f in enumerate(finishes) ]
+            nodeOrders.sort()
+            nodeOrders.reverse()
+            # get rid of the placekeeper "None" node
+            del nodeOrders[-1]
+
+            nextStart = 0
+            seen = [ False ] * len(nodes)
+            allSets = []
+            while nextStart != len(nodeOrders):
+                nodeId = nodeOrders[nextStart][1]
+                if not seen[nodeId]:
+                    compSet = []
+                    _connectDFS(nodes, compSet, nodeId, seen, finishes)
+                    allSets.append(compSet)
+
+                nextStart += 1
+
+            # map node indexes to nodes in the component graph
+            componentMap = {}
+            for i, nodeSet in enumerate(allSets):
+                componentMap.update(dict.fromkeys(nodeSet, i))
+                
+            componentGraph = []
+            for i, nodeSet in enumerate(allSets):
+                edges = {}
+                componentNodes = []
+                for nodeId in nodeSet:
+                    componentNodes.append((nodes[nodeId][0], nodes[nodeId][1]))
+                    edges.update(dict.fromkeys(
+                            [ componentMap[targetId] 
+                                        for targetId in nodes[nodeId][2] ]
+                                ))
+                componentGraph.append((componentNodes, edges))
+
+            return componentGraph
+
+        def _orderDFS(compGraph, nodeIdx, seen, order):
+            order.append(nodeIdx)
+            seen[nodeIdx] = True
+            for otherNode in compGraph[nodeIdx][1]:
+                if not seen[otherNode]:
+                    _orderDFS(compGraph, otherNode, seen, order)
+
+        def _orderComponents(compGraph):
+            # returns a topological sort of compGraph
+            order = []
+            seen = [ False ] * len(compGraph)
+            nextIndex = 0
+            while (nextIndex < len(compGraph)):
+                if not seen[nextIndex]:
+                    _orderDFS(compGraph, nextIndex, seen, order)
+
+                nextIndex += 1
+
+            order.reverse()
+            return [ compGraph[x][0] for x in order ]
+
         # this works against a database, not a repository
         cu = self.db.cursor()
 
@@ -483,6 +624,25 @@ class DependencyTables:
                                      class, name, flag)
                              VALUES(?, ?, ?, ?, ?, ?, ?)""")
 
+        # We build up a graph to let us split the changeset into pieces.
+        # Each node in the graph represents a remove/add pair. Note that
+        # for (troveNum < 0) nodes[abs(troveNum)] is the node for that
+        # addition. The initial None makes that work out. For removed nodes,
+        # the index is built into the sql tables. Each node stores the
+        # old trove info, new trode info, list of nodes whose operations
+        # need to occur before this nodes, and a list of nodes whose
+        # operations should occur after this nodes (the two lists form
+        # the ordering graph and it's transpose)
+        nodes = [ None ]
+        # there are four kinds of edges -- old needs old, old needs new,
+        # new needs new, and new needs old. Each edge carries a depId
+        # to aid in cancelling them out. Our initial edge representation
+        # is a simple dict of edges.
+        oldNewEdges = {}
+        oldOldEdges = {}
+        newNewEdges = {}
+        newOldEdges = {}
+
 	# This sets up negative depNum entries for the requirements we're
 	# checking (multiplier = -1 makse them negative), with (-1 * depNum) 
 	# indexing depList. depList is a list of (troveNum, depClass, dep) 
@@ -498,9 +658,17 @@ class DependencyTables:
                                    provides = trvCs.getProvides(),
                                    multiplier = -1)
 
+	    newInfo = (trvCs.getName(), trvCs.getNewVersion(),
+		       trvCs.getNewFlavor())
+
             if trvCs.getOldVersion():
-                oldTroves.append((trvCs.getName(), trvCs.getOldVersion(),
-                                  trvCs.getOldFlavor()))
+		oldInfo = (trvCs.getName(), trvCs.getOldVersion(),
+			   trvCs.getOldFlavor())
+                oldTroves.append((oldInfo, len(nodes)))
+	    else:
+		oldInfo = None
+
+            nodes.append((oldInfo, newInfo, [], []))
 
             # using depNum 0 is a hack, but it's just on a provides so
             # it doesn't matter
@@ -524,25 +692,30 @@ class DependencyTables:
 
         # now build a table of all the troves which are being erased
         cu.execute("""CREATE TEMPORARY TABLE RemovedTroveIds 
-                        (troveId INTEGER PRIMARY KEY)""")
+                        (troveId INTEGER KEY, nodeId INTEGER)""")
 
-        oldTroves += changeSet.getOldPackageList()
+        for oldInfo in changeSet.getOldPackageList():
+            oldTroves.append((oldInfo, len(nodes)))
+            nodes.append((oldInfo, None, [], []))
 
         if oldTroves:
+            # this sets up nodesByRemovedId because the temporary RemovedTroves
+            # table exactly parallels the RemovedTroveIds we set up
             cu.execute("""CREATE TEMPORARY TABLE RemovedTroves 
-                            (name STRING, version STRING, flavor STRING)""",
+                            (name STRING, version STRING, flavor STRING,
+                             nodeId INTEGER)""",
                        start_transaction = False)
-            for (name, version, flavor) in oldTroves:
+            for (name, version, flavor), nodeIdx in oldTroves:
                 if flavor:
                     flavor = flavor.freeze()
                 else:
                     flavor = None
 
-                cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?)",
-                           (name, version.asString(), flavor))
+                cu.execute("INSERT INTO RemovedTroves VALUES(?, ?, ?, ?)",
+                           (name, version.asString(), flavor, nodeIdx))
 
             cu.execute("""INSERT INTO RemovedTroveIds 
-                            SELECT instanceId FROM 
+                            SELECT instanceId, nodeId FROM 
                                 RemovedTroves 
                             INNER JOIN Versions ON
                                 RemovedTroves.version = Versions.version
@@ -595,7 +768,8 @@ class DependencyTables:
         # in the repository, but that something is being explicitly removed
         # and adding it back would be a bit rude!)
         cu.execute("""
-                SELECT depNum, RemovedTroveIds.troveId 
+                SELECT depId, depNum, RemovedTroveIds.troveId, RemovedTroveIds.nodeId,
+                       provInstanceId
 		    FROM
 			(%s) 
                     LEFT OUTER JOIN RemovedTroveIds ON
@@ -607,6 +781,69 @@ class DependencyTables:
                 """ % self._resolveStmt("TmpRequires",
                                         ("Provides", "TmpProvides"),
                                         ("Dependencies", "TmpDependencies")))
+
+	# XXX there's no real need to instantiate this; we're just doing
+	# it for convienence while this code gets reworked
+	result = [ x for x in cu ]
+        cu2 = self.db.cursor()
+        for (depId, depNum, removedInstanceId, removedNodeIdx, provInstId) \
+                        in result:
+	    if depNum < 0:
+                assert(depList[-depNum][0] < 0)
+                fromNodeId = -depList[-depNum][0]
+
+		if removedInstanceId is not None:
+		    # new trove depends on something old
+                    toNodeId = removedNodeIdx
+                    newOldEdges[(fromNodeId, toNodeId, depId)] = True
+		elif provInstId > 0:
+		    # new trove depends on something already installed
+		    # which is not being removed. not interesting.
+		    pass
+		else:
+		    # new trove depends on something new
+                    toNodeId = -provInstId
+                    newNewEdges[(fromNodeId, toNodeId, depId)] = True
+	    else:
+                # XXX this should probably get batched 
+                # Turn the depNum into a list of things being erased which
+                # require that item
+                cu2.execute("SELECT DISTINCT instanceId FROM Requires WHERE "
+                            "Requires.depNum = ?", depNum)
+                fromNodeIds = [ x[0] for x in cu2 ]
+
+                edgeSet = None
+		if removedInstanceId is not None:
+		    # old trove depends on something old
+                    toNodeId = removedNodeIdx
+                    edgeSet = oldOldEdges
+		elif provInstId > 0:
+		    # old trove depends on something already installed
+		    # which is not being removed. not interesting.
+		    pass
+		else:
+		    # old trove depends on something new
+                    toNodeId = -(provInstId + 1)
+                    edgeSet = oldNewEdges
+
+                if edgeSet:
+                    for fromNodeId in fromNodeIds:
+                        edgeSet[(fromNodeId, toNodeId, depId)] = True
+
+        # Remove nodes which cancel each other
+        _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
+
+        # Now build up a unified node list. The different kinds of edges and
+        # the particular depId no longer matter. The direction here is a bit
+        # different, and defines the ordering for the operation, not the
+        # order of the dependency
+        _buildGraph(nodes, oldOldEdges, newNewEdges)
+        del oldOldEdges
+        del oldNewEdges
+        del newOldEdges
+        del newNewEdges
+        componentGraph = _stronglyConnect(nodes)
+        ordering = _orderComponents(componentGraph)
 
         # None in depList means the dependency got resolved; we track
         # would have been resolved by something which has been removed as
@@ -626,7 +863,8 @@ class DependencyTables:
         brokenByErase = {}
         unresolveable = [ None ] * (len(depList) + 1)
         satisfied = []
-        for (depNum, removedInstanceId) in cu:
+        for (depId, depNum, removedInstanceId, removedNodeIdx, provInstId) \
+                        in result:
             if removedInstanceId is not None:
                 if depNum < 0:
                     # the dependency would have been resolved, but this
@@ -634,8 +872,8 @@ class DependencyTables:
                     unresolveable[-depNum] = True
                 else:
                     # this change set removes something which is needed
-                    # by something else on the system w/o providing a
-                    # replacement
+                    # by something else on the system (if might provide
+		    # a replacement; we handle that later)
                     brokenByErase[depNum] = True
             else:
                 # if we get here, the dependency is resolved; mark it as
