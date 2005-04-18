@@ -139,11 +139,21 @@ class _ChildLogger:
         s = struct.pack('HHHH', 0, 0, 0, 0)
         result = fcntl.ioctl(sys.stdin.fileno(), termios.TIOCGWINSZ, s)
         rows, cols = struct.unpack('HHHH', result)[0:2]
-        s = struct.pack('HHHH', rows, columns, 0, 0)
+        s = struct.pack('HHHH', rows, cols, 0, 0)
+        fcntl.ioctl(self.ptyFd, termios.TIOCSWINSZ, s)
+
+    def _setTerminalSize(self, rows, cols):
+        s = struct.pack('HHHH', rows, cols, 0, 0)
         fcntl.ioctl(self.ptyFd, termios.TIOCSWINSZ, s)
 
     def log(self):
         self._controlTerminal()
+    
+        # standardize terminal size at 24, 80 for those programs that 
+        # access it.  This should ensure that programs that look at 
+        # terminal size for displaying log info will look similar across
+        # runs.
+        self._setTerminalSize(24, 80)
 
         # set some local variables that are reused often within the loop
         ptyFd = self.ptyFd
@@ -158,7 +168,8 @@ class _ChildLogger:
         sigwinch = []
         def sigwinch_handler(s, f):
             sigwinch.append(True)
-        signal.signal(signal.SIGWINCH, sigwinch_handler)
+        # disable to ensure window size is standardized
+        #signal.signal(signal.SIGWINCH, sigwinch_handler)
 
         while True:
             try:
@@ -219,6 +230,7 @@ class _ChildLogger:
                     os.write(ptyFd, input)
                     logFile.write(input)
             if sigwinch:
-                self._resizeTerminal()
+            #   disable sigwinch to ensure the window width expected in logs is standardized
+            #   self._resizeTerminal()
                 sigwinch = []
 
