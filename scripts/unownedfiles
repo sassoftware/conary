@@ -1,0 +1,88 @@
+#!/usr/bin/python2.4
+# -*- mode: python -*-
+#
+# Copyright (c) 2004-2005 Specifix, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+""" Finds file(s) matching the given regexp that are unowned """
+
+import os
+import re
+import sys
+
+import conary
+import conarycfg
+from deps import deps
+from local import database
+from lib import util
+from repository import netclient
+from repository import repository
+import versions
+import updatecmd
+
+def usage():
+    print """\
+Usage: unowned [-r] <file>+
+         """                      
+    return 1
+
+sys.excepthook = util.genExcepthook()
+
+
+def main(argv):
+    if argv < 2:
+        return usage()
+    if len(argv) > 1 and argv[1] == '-r':
+        recursive = True
+        pathList = argv[2:]
+    else:
+        recursive = False
+        pathList = argv[1:]
+
+    if not pathList:
+        return usage()
+        
+
+    expandedPathList = []
+    for path in pathList:
+        expandedPathList.extend(util.braceGlob(os.path.abspath(util.normpath(path)))) 
+
+    cfg = conarycfg.ConaryConfiguration()
+    db = database.Database(cfg.root, cfg.dbPath)
+    for path in pathList:
+        if not os.path.isdir(path) or not recursive:
+            found = False
+            for trove in db.iterTrovesByPath(path):
+                found = True
+                break
+            if not found:
+                unownedFile(path)
+        else:
+            for (root, dirnames, fileNames) in os.walk(path):
+                dirnames.sort()
+                found = False
+                for fileName in sorted(fileNames):
+                    filePath = root + '/' + fileName
+                    for trove in db.iterTrovesByPath(filePath):
+                        found = True
+                        break
+                    if not found:
+                        unownedFile(filePath)
+            
+    return 0
+
+def unownedFile(path):
+    print path
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
