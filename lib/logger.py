@@ -219,6 +219,6 @@ class _ChildLogger:
                     os.write(ptyFd, input)
                     logFile.write(input)
             if sigwinch:
-                self._signalTerminalResized()
+                self._resizeTerminal()
                 sigwinch = []
 
