@@ -40,7 +40,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 
     if troveList:
         (troves, hasVersions, hasFlavors) = \
-                    display.parseTroveStrings(troveList, cfg.flavor)
+                    display.parseTroveStrings(troveList)
     else:
 	# this returns a sorted list
         troves = []
@@ -85,7 +85,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
             flavors = {}
             for label in cfg.installLabelPath:
                 d = dict.fromkeys([ x[0] for x in troves ],
-                                  { label : [ cfg.flavor ] } )
+                                  { label : cfg.flavor } )
                 d = repos.getTroveLeavesByLabel(d, bestFlavor = True)
                 repos.queryMerge(flavors, d)
 
@@ -117,7 +117,15 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 			print _troveFormatWithFlavor %(
                             troveName, displayc[troveName, version],
                             display._formatFlavor(flavor))
-		    elif not all and (flavor is None or cfg.flavor.satisfies(flavor)):
+		    else:
+                        if flavor is not None:
+                            found = False
+                            for installFlavor in cfg.flavor:
+                                if installFlavor.satisfies(flavor):
+                                    found = True
+                                    break
+                            if not found:
+                                continue
 			print _troveFormat % (troveName, 
 					      displayc[troveName, version])
             displayc.clearCache(troveName)
@@ -128,14 +136,12 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		      info, tags, showDeps, fullVersions, flavor):
     withFiles = ids
 
-    if flavor is None:
-        flavor = cfg.flavor
-
     try:
 	troveList = repos.findTrove(cfg.installLabelPath, 
                                     (troveName, versionStr, flavor),
                                     cfg.flavor, 
-                                    acrossRepositories = True)
+                                    acrossRepositories = True,
+                                    acrossFlavors = True)
     except repository.TroveNotFound, e:
 	log.error(str(e))
 	return

@@ -10,6 +10,8 @@ Changes in 0.50.13:
     modified with the ComponentRequires policy.
   * The build/buildpackage.py file has variable and function names changed
     to better match our terminology for packages and components.
+  * Change flavor specified in the conaryrc to a flavor path -- accept the 
+    flavor config parameter multiple times to create a flavor path
 
 Changes in 0.50.12:
   * Implemented --quiet for conary update changeset commands, and cvc cook.

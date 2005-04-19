@@ -133,7 +133,7 @@ def realMain(cfg, argv=sys.argv):
     cfg.initializeFlavors()
     # set the build flavor here, just to set architecture information 
     # which is used when initializing a recipe class
-    use.setBuildFlagsFromFlavor(None, cfg.flavor, error=False)
+    use.setBuildFlagsFromFlavor(None, cfg.buildFlavor, error=False)
     if 'profile' in argSet:
 	del argSet['profile']
 	import hotshot

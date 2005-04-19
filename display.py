@@ -140,12 +140,12 @@ def printFile(fileObj, path, prefix='', verbose=True, tags=False, sha1s=False,
     else:
         print "%s%s%s%s" % (id, sha1,path, taglist)
 
-def parseTroveStrings(troveNameList, defaultFlavor):
+def parseTroveStrings(troveNameList):
     troveNames = []
     hasVersions = False
     hasFlavors = False
     for item in troveNameList:
-        (name, version, flavor) = updatecmd.parseTroveSpec(item, defaultFlavor)
+        (name, version, flavor) = updatecmd.parseTroveSpec(item)
 
         if version is not None:
             hasVersions = True
@@ -178,9 +178,9 @@ def _printOneTroveName(db, troveName, troveDict, fullVersions, info):
 
 def displayTroves(db, troveNameList = [], pathList = [], ls = False, 
                   ids = False, sha1s = False, fullVersions = False, 
-                  tags = False, defaultFlavor = None, info=False):
+                  tags = False, info=False):
     (troveNames, hasVersions, hasFlavors) = \
-        parseTroveStrings(troveNameList, None)
+        parseTroveStrings(troveNameList)
 
     pathList = [os.path.abspath(util.normpath(x)) for x in pathList]
     

@@ -125,19 +125,22 @@ class ConaryClient:
                             # (much) smarter here
                             scoredList = []
                             for choice in choiceList:
-                                try:
-                                    affinityTroves = self.db.findTrove(None, 
+                                affinityTroves = None
+                                if not keepExisting:
+                                    try:
+                                        affinityTroves = self.db.findTrove(
+                                                                    None, 
                                                                     choice[0])
-                                except repository.TroveNotFound:
-                                    affinityTroves = None
+                                    except repository.TroveNotFound:
+                                        pass 
+                                    
+                                for flavor in self.cfg.flavor:
+                                    f = flavor.copy()
 
-                                f = self.cfg.flavor.copy()
-
-                                if affinityTroves:
-                                    f.union(affinityTroves[0][2],
-                                        mergeType = deps.DEP_MERGE_TYPE_PREFS)
-                                scoredList.append((f.score(choice[2]), choice))
-                                
+                                    if affinityTroves:
+                                        f.union(affinityTroves[0][2],
+                                            mergeType = deps.DEP_MERGE_TYPE_PREFS)
+                                    scoredList.append((f.score(choice[2]), choice))
                             scoredList.sort(_scoreSort)
                             if scoredList[-1][0] is not False:
                                 choice = scoredList[-1][1]

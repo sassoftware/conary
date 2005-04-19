@@ -951,7 +951,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return result
 
     def findTroves(self, labelPath, troves, defaultFlavor = None, 
-                  acrossRepositories = False, 
+                  acrossRepositories = False, acrossFlavors = False,
                   affinityDatabase = None, allowMissing=False):
         """ 
         Searches for the given troveSpec requests in the context of a labelPath,
@@ -985,6 +985,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for each trove, return the best result for the first host that 
         matches.
         @type boolean
+        @param acrossFlavors: if True, for each trove, return the best 
+        result for each flavor listed in the flavorPath used.  If False, 
+        for each trove, return the best result for the first flavor that 
+        matches.
+        @type boolean
         @type affinityDatabase: database to search for affinity troves.  
         Affinity troves for a trove spec match the trove name exactly, and
         match the branch/label requested if explicitly requested in the 
@@ -1003,14 +1008,15 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         """
         troveFinder = findtrove.TroveFinder(labelPath, defaultFlavor, 
                                             acrossRepositories,
+                                            acrossFlavors,
                                             affinityDatabase)
         return troveFinder.findTroves(self, troves, allowMissing)
 
     def findTrove(self, labelPath, (name, versionStr, flavor), 
                   defaultFlavor=None, acrossRepositories = False, 
-                  affinityDatabase = None):
+                  acrossFlavors = False, affinityDatabase = None):
         res = self.findTroves(labelPath, ((name, versionStr, flavor),),
-                              defaultFlavor, acrossRepositories, 
+                              defaultFlavor, acrossRepositories, acrossFlavors,
                               affinityDatabase)
         return res[(name, versionStr, flavor)]
 	    

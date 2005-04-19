@@ -938,7 +938,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
     use.track(True)
 
-    (name, versionStr, flavor) = parseTroveSpec(item, None)
+    (name, versionStr, flavor) = parseTroveSpec(item)
     if flavor:
         cfg.buildFlavor = deps.deps.overrideFlavor(cfg.buildFlavor, flavor)
     if name.endswith('.recipe') and os.path.isfile(name):

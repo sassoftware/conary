@@ -235,8 +235,17 @@ class FlavorConfig:
         useFlags.addDep(deps.deps.UseDependency, 
                         deps.deps.Dependency("use", flags))
         if override:
-            useFlags.union(override,
-                           mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
+            if isinstance(override, list):
+                newUseFlags = []
+                for flavor in override:
+                    useFlagsCopy = useFlags.copy()
+                    useFlagsCopy.union(flavor,
+                                 mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
+                    newUseFlags.append(useFlagsCopy)
+                return newUseFlags
+            else:
+                useFlags.union(override,
+                               mergeType = deps.deps.DEP_MERGE_TYPE_OVERRIDE)
         return useFlags
 
     def populateBuildFlags(self):

@@ -33,16 +33,14 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True,
             log.error("one = expected in '%s' argument to changeset", item)
             return
         if l[0]:
-            (troveName, oldVersionStr, oldFlavor) = parseTroveSpec(l[0],
-                                                        cfg.flavor)
+            (troveName, oldVersionStr, oldFlavor) = parseTroveSpec(l[0])
         else:
             oldVersionStr = None
             oldFlavor = None
         if l[1]:
             if l[0]:
                 l[1] = troveName + "=" + l[1]
-            (troveName, newVersionStr, newFlavor) = parseTroveSpec(l[1],
-                                                        cfg.flavor)
+            (troveName, newVersionStr, newFlavor) = parseTroveSpec(l[1])
         else:
             newVersionStr = None
             newFlavor = None

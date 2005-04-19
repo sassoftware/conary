@@ -35,7 +35,7 @@ def usage():
 
 def verify(troveNameList, db, cfg, all=False):
     (troveNames, hasVersions, hasFlavors) = \
-                    display.parseTroveStrings(troveNameList, cfg.flavor)
+                    display.parseTroveStrings(troveNameList)
     if not troveNames and not all:
         usage()
         log.error("must specify either a trove or --all")

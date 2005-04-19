@@ -458,7 +458,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         alwaysIgnoreInstalled = False
 
     oldUsed = use.getUsed()
-    name, versionStr, flavor = updatecmd.parseTroveSpec(troveSpec, None)
+    name, versionStr, flavor = updatecmd.parseTroveSpec(troveSpec)
 
     if name.endswith('.recipe'):
         file = name
@@ -637,8 +637,7 @@ class PackageRecipe(Recipe):
         reqMap = {}
         missingReqs = []
         for buildReq in self.buildRequires:
-            (name, versionStr, flavor) = updatecmd.parseTroveSpec(buildReq, 
-                                                                     None)
+            (name, versionStr, flavor) = updatecmd.parseTroveSpec(buildReq)
             # XXX move this to use more of db.findTrove's features, instead
             # of hand parsing
             try:
@@ -1246,7 +1245,8 @@ class FilesetRecipe(Recipe):
 
 	try:
 	    pkgList = self.repos.findTrove(self.label, 
-                                           (component, versionStr, self.flavor))
+                                           (component, versionStr, None),
+                                           self.flavor)
 	except repository.TroveNotFound, e:
 	    raise RecipeFileError, str(e)
 

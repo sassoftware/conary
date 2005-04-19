@@ -39,8 +39,9 @@ import versions
     STRINGPATH, 
     FLAVOR,
     INT,
-    REGEXPLIST
-) = range(12)
+    REGEXPLIST,
+    FLAVORLIST, 
+) = range(13)
 
 BOOLEAN=BOOL
 
@@ -149,6 +150,8 @@ class ConfigFile:
 		raise ParseError, ("%s:%s: expected True or False for configuration value '%s'" % (file, self.lineno, key))
         elif type == FLAVOR:
             self.__dict__[key] = deps.deps.parseFlavor(val)
+        elif type == FLAVORLIST:
+            self.__dict__[key].append(deps.deps.parseFlavor(val))
 
     def displayKey(self, key, value, type, out):
         if type == STRING:
@@ -186,6 +189,9 @@ class ConfigFile:
                 out.write("%-25s %s\n" % (hdr, str))
             else:
                 out.write('%-25s %s\n' % (key, flavorStr))
+        elif type == FLAVORLIST:
+            for flavor in value:
+                self.displayKey(key, flavor, FLAVOR, out)
         elif type == BOOL:
             out.write("%-25s %s\n" % (key, bool(value)))
         else:
@@ -236,17 +242,22 @@ class ConfigFile:
         import flavorcfg
         self.flavorConfig = flavorcfg.FlavorConfig(self.useDirs, 
                                                    self.archDirs)
+        if self.flavor == []:
+            self.flavor = [deps.deps.DependencySet()]
 
         self.flavor = self.flavorConfig.toDependency(override=self.flavor)
 
-        if not deps.deps.DEP_CLASS_IS in self.flavor.getDepClasses():
-            insSet = deps.deps.DependencySet()
-            for dep in deps.arch.currentArch:
-                insSet.addDep(deps.deps.InstructionSetDependency, dep)
-            self.flavor.union(insSet)
+        newFlavors = []
+        for flavor in self.flavor:
+            if not deps.deps.DEP_CLASS_IS in flavor.getDepClasses():
+                insSet = deps.deps.DependencySet()
+                for dep in deps.arch.currentArch:
+                    insSet.addDep(deps.deps.InstructionSetDependency, dep)
+                flavor.union(insSet)
+            newFlavors.append(flavor)
 
         # buildFlavor is installFlavor + overrides
-        self.buildFlavor = deps.deps.overrideFlavor(self.flavor, 
+        self.buildFlavor = deps.deps.overrideFlavor(self.flavor[0], 
                                                     self.buildFlavor)
 	self.flavorConfig.populateBuildFlags()
 
@@ -263,7 +274,7 @@ class ConaryConfiguration(ConfigFile):
 	'debugRecipeExceptions' : [ BOOL, False ], 
 	'dumpStackOnError'      : [ BOOL, True ], 
         'excludeTroves'         : [ REGEXPLIST, [] ],
-        'flavor'                : [ FLAVOR, deps.deps.DependencySet() ],
+        'flavor'                : [ FLAVORLIST, [] ],
 	'installLabelPath'	: [ LABELLIST, [] ],
         'localRollbacks'        : [ BOOL, False ],
 	'lookaside'		: '/var/cache/conary',

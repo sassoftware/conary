@@ -104,10 +104,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                 sys.exit(1)
             applyList.append(cs)
         else:
-            if updateByDefault or pkgStr[0] == '+':
-                applyList.append(parseTroveSpec(pkgStr, cfg.flavor))
-            else:
-                applyList.append(parseTroveSpec(pkgStr, None))
+            applyList.append(parseTroveSpec(pkgStr))
 
     # dedup
     applyList = {}.fromkeys(applyList).keys()
@@ -221,14 +218,14 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
     except repository.CommitError, e:
         log.error(e)
 
-def parseTroveSpec(specStr, defaultFlavor):
+def parseTroveSpec(specStr):
     if specStr.find('[') > 0 and specStr[-1] == ']':
         specStr = specStr[:-1]
         l = specStr.split('[')
         if len(l) != 2:
             raise TroveSpecError, "bad trove spec %s]" % specStr
         specStr, flavorSpec = l
-        flavor = deps.parseFlavor(flavorSpec, mergeBase = defaultFlavor)
+        flavor = deps.parseFlavor(flavorSpec)
         if flavor is None:
             raise TroveSpecError, "bad flavor [%s]" % flavorSpec
     else:

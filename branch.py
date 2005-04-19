@@ -25,10 +25,7 @@ def branch(repos, cfg, newLabel, troveSpec, makeShadow = False,
            sourceTroves = False):
     client = conaryclient.ConaryClient(cfg)
 
-    (troveName, versionSpec, flavor) = updatecmd.parseTroveSpec(troveSpec,
-                                                                cfg.flavor)
-    if not flavor:
-        flavor = cfg.flavor
+    (troveName, versionSpec, flavor) = updatecmd.parseTroveSpec(troveSpec)
 
     troveList = repos.findTrove(cfg.buildLabel, 
                                 (troveName, versionSpec, flavor), 
