@@ -113,7 +113,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
             
 	    for version in reversed(versionList):
 		for flavor in flavors[troveName][version]:
-		    if all:
+		    if all or len(flavors[troveName][version]) > 1:
 			print _troveFormatWithFlavor %(
                             troveName, displayc[troveName, version],
                             display._formatFlavor(flavor))
