@@ -287,7 +287,7 @@ class AutoBuildPackage:
         Add a device to the correct BuildComponent instance by matching
         the file name against the package and component filters
         """
-        pkg = self._findPackage(path)
+        pkg = self.findComponent(path)
         pkg.addDevice(path, devtype, major, minor, owner, group, perms)
 	self.pathMap[path] = pkg.getFile(path)
 	self.componentMap[path] = pkg
