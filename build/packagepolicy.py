@@ -1362,8 +1362,9 @@ class ComponentRequires(policy.Policy):
     """
     depMap = {
         # component: components that depend thereon if they both exist
-        'lib': frozenset(('devel', 'devellib', 'runtime')),
         'data': frozenset(('lib', 'runtime')),
+        'devellib': frozenset(('devel',)),
+        'lib': frozenset(('devel', 'devellib', 'runtime')),
     }
     overridesMap = {}
 
