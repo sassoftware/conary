@@ -439,6 +439,14 @@ class DependencySet:
         c = self.members.setdefault(tag, depClass())
         c.addDep(dep)
 
+    def addEmptyDepClass(self, depClass):
+        """ adds an empty dependency class, which for flavors has 
+            different semantics when merging than not having a dependency 
+            class.  See mergeFlavors """
+	tag = depClass.tag
+        assert(tag not in self.members)
+        self.members[tag] = depClass()
+
     def copy(self):
         return copy.deepcopy(self)
 
@@ -451,7 +459,10 @@ class DependencySet:
     def score(self,other):
         score = 0
 	for tag in other.members:
-	    if not self.members.has_key(tag): 
+            # ignore empty dep classes when scoring
+            if not other.members[tag].members:
+                continue
+	    if tag not in self.members: 
 		return False
 
 	    thisScore = self.members[tag].score(other.members[tag])
@@ -567,6 +578,39 @@ def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
     flavor.union(newFlavor, mergeType=mergeType)
     return flavor
 
+def mergeFlavor(flavor, mergeBase):
+    """ 
+    Merges the given flavor with the mergeBase - if flavor 
+    doesn't contain use flags, then include the mergeBase's 
+    use flags.  If flavor doesn't contain an instruction set, then 
+    include the mergeBase's instruction set(s)
+    """
+    if flavor is None:
+        return mergeBase
+    if not mergeBase:
+        return flavor
+    flavorInsSet = flavor.getDepClasses().get(DEP_CLASS_IS, None)
+    flavorUseSet = flavor.getDepClasses().get(DEP_CLASS_USE, None)
+    # Note that flavorInsSet might be empty but nonzero
+    needsIns = (flavorInsSet is None)
+    needsUse = (flavorUseSet is None)
+    if not (needsIns or needsUse):
+        return flavor
+
+    mergedFlavor = flavor.copy()
+    if needsIns:
+        insSet = mergeBase.getDepClasses().get(DEP_CLASS_IS, None)
+        if insSet is not None:
+            for insSet in insSet.getDeps():
+                mergedFlavor.addDep(InstructionSetDependency, insSet)
+
+    if needsUse:
+        useSet = mergeBase.getDepClasses().get(DEP_CLASS_USE, None)
+        if useSet is not None:
+            useSet = useSet.getDeps().next()
+            mergedFlavor.addDep(UseDependency, useSet)
+    return mergedFlavor
+
 def formatFlavor(flavor):
     """
     Formats a flavor and returns a string which parseFlavor can 
@@ -632,9 +676,6 @@ def parseFlavor(s, mergeBase = None):
 
     s = s.strip()
 
-    needsInsSet = True
-    needsUse = True
-
     match = flavorRegexp.match(s)
     if not match:
         return None
@@ -646,7 +687,6 @@ def parseFlavor(s, mergeBase = None):
     if groups[3]:
         # groups[3] is base instruction set, groups[4] is the flags, and
         # groups[5] is the next instruction set
-        needsInsSet = False
 
         # set up the loop for the next pass
         insGroups = groups[3:]
@@ -674,29 +714,22 @@ def parseFlavor(s, mergeBase = None):
             insGroups = match.groups()
 
     elif groups[2]:
-        needsInsSet = False
+        # mark that the user specified "is:" without any instruction set
+        # by adding a placeholder instruction set dep class here. 
+        set.addEmptyDepClass(InstructionSetDependency)
 
     if groups[1]:
-        needsUse = False
         useFlags = groups[1].split(",")
         for i, flag in enumerate(useFlags):
             useFlags[i] = _fixup(flag)
 
         set.addDep(UseDependency, Dependency("use", useFlags))
     elif groups[0]:
-        needsUse = False
+        # mark that the user specified "use:" without any instruction set
+        # by adding a placeholder instruction set dep class here. 
+        set.addEmptyDepClass(UseDependency)
 
-    if needsInsSet and mergeBase:
-        insSet = mergeBase.getDepClasses().get(DEP_CLASS_IS, None)
-        if insSet is not None:
-            insSet = insSet.getDeps().next()
-            set.addDep(InstructionSetDependency, insSet)
-
-    if needsUse and mergeBase:
-        useSet = mergeBase.getDepClasses().get(DEP_CLASS_USE, None)
-        if useSet is not None:
-            useSet = useSet.getDeps().next()
-            set.addDep(UseDependency, useSet)
+    return mergeFlavor(set, mergeBase)
 
     return set
 
