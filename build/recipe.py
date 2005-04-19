@@ -793,7 +793,7 @@ class PackageRecipe(Recipe):
 	# policies look at the recipe instance for all information
 	for policy in self.packagePolicy:
 	    policy.doProcess(self)
-        return self.autopkg.getPackages()
+        return self.autopkg.getComponents()
 
     def getUnpackagedComponentNames(self):
         # someday, this will probably be per-branch policy

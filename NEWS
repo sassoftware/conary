@@ -1,3 +1,16 @@
+Changes in 0.50.13:
+  * Added automatic :data component for /usr/share, to which you should
+    add any platform-independent files that are needed by :lib components
+    but not in a libdir-derived path.  These might include configuration
+    files and supporting data files needed by both library and runtime
+    programs.
+  * Added automatic intra-package inter-component dependencies; now within
+    a single package, the :devel component will automatically require the
+    :lib component if both components exist.  These dependency sets can be
+    modified with the ComponentRequires policy.
+  * The build/buildpackage.py file has variable and function names changed
+    to better match our terminology for packages and components.
+
 Changes in 0.50.12:
   * Implemented --quiet for conary update changeset commands, and cvc cook.
     Also implemented the 'quiet' configuration value. This option suppresses

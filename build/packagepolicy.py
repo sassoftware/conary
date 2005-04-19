@@ -388,7 +388,10 @@ class ComponentSpec(_filterSpec):
 	('doc',       ('%(datadir)s/(gtk-doc|doc|man|info)/')),
 	('locale',    ('%(datadir)s/locale/',
 		       '%(datadir)s/gnome/help/.*/')),
-	('emacs',     ('%(datadir)s/emacs/site-lisp/.*',)),
+	('emacs',     ('%(datadir)s/emacs/site-lisp/',)),
+        # Anything else in /usr/share should be architecture-independent
+        # data files (thus the "datadir" name)
+        ('data',      ('%(datadir)s/',)),
     )
     keywords = { 'catchall': 'runtime' }
 
@@ -885,14 +888,14 @@ class DanglingSymlinks(policy.Policy):
 		return
 	    abscontents = util.joinPaths(os.path.dirname(path), contents)
 	    if abscontents in recipe.autopkg.pathMap:
-		pkgMap = recipe.autopkg.pkgMap
-		if pkgMap[abscontents] != pkgMap[path] and \
+		componentMap = recipe.autopkg.componentMap
+		if componentMap[abscontents] != componentMap[path] and \
 		   not path.endswith('.so') and \
-		   not pkgMap[path].getName().endswith(':test'):
+		   not componentMap[path].getName().endswith(':test'):
 		    # warn about suspicious cross-component symlink
 		    log.warning('symlink %s points from package %s to %s',
-				path, pkgMap[path].getName(),
-				pkgMap[abscontents].getName())
+				path, componentMap[path].getName(),
+				componentMap[abscontents].getName())
 	    else:
 		for targetFilter, requirement in self.targetFilters:
 		    if targetFilter.match(abscontents):
@@ -1333,14 +1336,76 @@ class LinkCount(policy.Policy):
     Only regular, non-config files may have hardlinks; no exceptions.
     """
     def do(self):
-        for package in self.recipe.autopkg.packages.values():
-            for path in package.hardlinks:
+        for component in self.recipe.autopkg.getComponents():
+            for path in component.hardlinks:
                 if self.recipe.autopkg.pathMap[path].flags.isConfig():
                     self.recipe.reportErrors(
                         "Config file %s has illegal hard links" %path)
-            for path in package.badhardlinks:
+            for path in component.badhardlinks:
                 self.recipe.reportErrors(
                     "Special file %s has illegal hard links" %path)
+
+
+class ComponentRequires(policy.Policy):
+    """
+    Creates automatic intra-package inter-component dependencies, such
+    as C{:lib} components depending on their corresponding C{:data}
+    components.  Changes are passed in with dictionaries; general changes with:
+    C{r.ComponentRequires({I{componentname}: I{requiringComponentSet}})}
+    and top-level package-specific changes with:
+    C{r.ComponentRequires({I{packagename}: {I{componentname}: I{requiringComponentSet}}})}
+    (i.e.  C{r.ComponentRequires({'data', set(('lib',))})} means that in
+    all top-level packages (normally just one), only C{:lib} requires
+    C{:data}, whereas by default both C{:lib} and C{:runtime} require C{:lib};
+    and C{r.ComponentRequires({'foo', {'data', set(('lib',))}})} makes that
+    same change, but only for the C{foo} package).
+    """
+    depMap = {
+        # component: components that depend thereon if they both exist
+        'lib': frozenset(('devel', 'devellib', 'runtime')),
+        'data': frozenset(('lib', 'runtime')),
+    }
+    overridesMap = {}
+
+    def updateArgs(self, *args, **keywords):
+        d = args[0]
+        if isinstance(d[d.keys()[0]], dict): # dict of dicts
+            for packageName in d:
+                if packageName not in self.overridesMap:
+                    # start with defaults, then override them individually
+                    o = {}
+                    o.update(self.depMap)
+                    self.overridesMap[packageName] = o
+                self.overridesMap[packageName].update(d[packageName])
+        else: # dict of sets
+            self.depMap.update(d)
+
+    def do(self):
+        components = self.recipe.autopkg.components
+        for packageName in [x.name for x in self.recipe.autopkg.packageMap]:
+            if packageName in self.overridesMap:
+                d = self.overridesMap[packageName]
+            else:
+                d = self.depMap
+            for requiredComponent in d:
+                for requiringComponent in d[requiredComponent]:
+                    reqName = ':'.join((packageName, requiredComponent))
+                    wantName = ':'.join((packageName, requiringComponent))
+                    if (reqName in components and wantName in components and
+                        components[reqName] and components[wantName]):
+                        # Note: this does not add dependencies to files;
+                        # we could iterate over all the files in the
+                        # requiring trove and make them require the
+                        # required trove, but that seems slow and useless.
+                        # These dependencies really shouldn't be useful
+                        # for fileset creation anyway.  And we do have
+                        # other places where we attach information to troves
+                        # without it bubbling up from files.
+                        ds = deps.DependencySet()
+                        depClass = deps.TroveDependencies
+                        ds.addDep(depClass, deps.Dependency(reqName))
+                        p = components[wantName]
+                        p.requires.union(ds)
 
 
 class Requires(_addInfo):
@@ -1357,10 +1422,10 @@ class Requires(_addInfo):
 	'%(docdir)s/',
     )
     def runInfo(self, path):
-	pkgMap = self.recipe.autopkg.pkgMap
-	if path not in pkgMap:
+	componentMap = self.recipe.autopkg.componentMap
+	if path not in componentMap:
 	    return
-	pkg = pkgMap[path]
+	pkg = componentMap[path]
 	f = pkg.getFile(path)
         if not (f.hasContents and isinstance(f, files.RegularFile)) and \
            not isinstance(f, files.SymbolicLink):
@@ -1474,10 +1539,10 @@ class Provides(policy.Policy):
 	policy.Policy.doProcess(self, recipe)
 
     def doFile(self, path):
-	pkgMap = self.recipe.autopkg.pkgMap
-	if path not in pkgMap:
+	componentMap = self.recipe.autopkg.componentMap
+	if path not in componentMap:
 	    return
-	pkg = pkgMap[path]
+	pkg = componentMap[path]
 	f = pkg.getFile(path)
 
         fullpath = self.recipe.macros.destdir + path
@@ -1570,10 +1635,10 @@ class Flavor(policy.Policy):
         return self.libRe.match(path)
 
     def doFile(self, path):
-	pkgMap = self.recipe.autopkg.pkgMap
-	if path not in pkgMap:
+	componentMap = self.recipe.autopkg.componentMap
+	if path not in componentMap:
 	    return
-	pkg = pkgMap[path]
+	pkg = componentMap[path]
 	f = pkg.getFile(path)
         if path in pkg.isnsetMap:
             isnset = pkg.isnsetMap[path]
@@ -1588,7 +1653,7 @@ class Flavor(policy.Policy):
                 if self.troveMarked:
                     return
                 set = use.Arch.getCurrentArch()._toDependency()
-                for pkg in pkgMap.values():
+                for pkg in componentMap.values():
                     pkg.flavor.union(set)
                 self.troveMarked = True
                 return
@@ -1602,7 +1667,7 @@ class Flavor(policy.Policy):
         f.flavor.set(set)
         # all troves need to share the same flavor so that we can
         # distinguish them later
-        for pkg in pkgMap.values():
+        for pkg in componentMap.values():
             pkg.flavor.union(f.flavor())
 
 
@@ -1671,6 +1736,7 @@ def DefaultPolicy(recipe):
         UtilizeGroup(recipe),
 	ExcludeDirectories(recipe),
 	LinkCount(recipe),
+	ComponentRequires(recipe),
 	Requires(recipe),
 	Provides(recipe),
 	Flavor(recipe),

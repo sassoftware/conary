@@ -14,7 +14,7 @@
 
 """
 Contains classes used during the build process to collect files
-into BuildPackages.  These BuildPackages are used to create Packages
+into BuildComponents.  These BuildComponents are used to create Packages
 and create changesets from the files created during the build process
 """
 
@@ -56,13 +56,13 @@ def _getUseDependencySet(recipe):
                                          recipe.Flags._iterUsed(), 
                                          use.Arch._iterUsed())
     
-class BuildPackage(dict):
+class BuildComponent(dict):
 
     def addFile(self, path, realPath):
         """
-        Add a file to the build package
+        Add a file to the build component
 
-        @param path: the destination of the file in the package
+        @param path: the destination of the file in the component
         @param realPath: the location of the actual file on the filesystem,
         used to obtain the contents of the file when creating a changeset
         to commit to the repository
@@ -132,9 +132,9 @@ class BuildPackage(dict):
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
         """
-        Add a device node to the build package
+        Add a device node to the build component
 
-        @param path: the destination of the device node in the package
+        @param path: the destination of the device node in the component
         """
         f = BuildDeviceFile(devtype, major, minor, owner, group, perms)
 	self[path] = (None, f)
@@ -147,9 +147,9 @@ class BuildPackage(dict):
 
     def getName(self):
         """
-        Return the name of the BuildPackage
+        Return the name of the BuildComponent
 
-        @returns: name of the BuildPackage
+        @returns: name of the BuildComponent
         @rtype: str
         """
 	return self.name
@@ -197,7 +197,7 @@ class BuildPackage(dict):
 
 class AutoBuildPackage:
     """
-    AutoBuildPackage creates a set of BuildPackage instances and
+    AutoBuildPackage creates a set of BuildComponent instances and
     provides facilities for automatically populating them with files
     according to Filters.
     """
@@ -210,37 +210,39 @@ class AutoBuildPackage:
 	"""
 	self.pkgFilters = pkgFilters
         self.compFilters = compFilters
-        # dictionary of all the build packages
-        self.packages = {}
+        # dictionary of all the components
+        self.components = {}
         # reverse map from the package:component combination to
         # the correct build package
 	self.packageMap = {}
 	for main in self.pkgFilters:
 	    for comp in self.compFilters:
 		name = self._getname(main.name, comp.name)
-		if name not in self.packages:
-		    self.packages[name] = BuildPackage(name, recipe)
+		if name not in self.components:
+		    self.components[name] = BuildComponent(name, recipe)
 		if main not in self.packageMap:
 		    self.packageMap[main] = {}
-		self.packageMap[main][comp] = self.packages[name]
+		self.packageMap[main][comp] = self.components[name]
 	# dictionary from pathnames to fileobjects
 	self.pathMap = {}
 	# dictionary from pathnames to packages
-	self.pkgMap = {}
+	self.componentMap = {}
 
     def _getname(self, pkgname, compname):
-        return string.join((pkgname, compname), ':')
+        return ':'.join((pkgname, compname))
 
-    def _findPackage(self, path):
+    def findComponent(self, path):
         """
-	Return the BuildPackage that matches the path.
-	Should be called only once per path to add an entry to self.pkgMap
+	Return the BuildComponent that matches the path.
 	"""
+        if path in self.componentMap:
+            return self.componentMap[path]
 	for main in self.pkgFilters:
 	    if main.match(path):
 		for comp in self.compFilters:
 		    if comp.match(path):
-			return self.packageMap[main][comp]
+			self.componentMap[path] = self.packageMap[main][comp]
+                        return self.componentMap[path]
         return None
     
     def updateFileContents(self, path, realPath):
@@ -256,59 +258,58 @@ class AutoBuildPackage:
 
     def addFile(self, path, realPath):
         """
-        Add a path to the correct BuildPackage instance by matching
+        Add a path to the correct BuildComponent instance by matching
         the file name against the package and component filters
 
-        @param path: path to add to the BuildPackage
+        @param path: path to add to the BuildComponent
         @type path: str
         @rtype: None
         """
-        pkg = self._findPackage(path)
+        pkg = self.findComponent(path)
         pkg.addFile(path, realPath)
 	self.pathMap[path] = pkg.getFile(path)
-	self.pkgMap[path] = pkg
 
     def delFile(self, path):
         """
 	Remove a file from the package and from the caches.
 
-        @param path: path to remove from the BuildPackage
+        @param path: path to remove from the BuildComponent
         @type path: str
         @rtype: None
         """
-	del self.pkgMap[path][path]
-	del self.pkgMap[path]
+	del self.componentMap[path][path]
+	del self.componentMap[path]
 	del self.pathMap[path]
 
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
         """
-        Add a device to the correct BuildPackage instance by matching
+        Add a device to the correct BuildComponent instance by matching
         the file name against the package and component filters
         """
         pkg = self._findPackage(path)
         pkg.addDevice(path, devtype, major, minor, owner, group, perms)
 	self.pathMap[path] = pkg.getFile(path)
-	self.pkgMap[path] = pkg
+	self.componentMap[path] = pkg
 
-    def getPackages(self):
+    def getComponents(self):
         """
-        Examine the BuildPackage instances that have been created and
+        Examine the BuildComponent instances that have been created and
         return a list that includes only those which have files
         
-        @return: list of BuildPackages instances
+        @return: list of BuildComponent instances
         @rtype: list
         """
         l = []
-        for name in self.packages.keys():
-            if self.packages[name].keys():
-                l.append(self.packages[name])
+        for componentName in self.components.keys():
+            if self.components[componentName].keys(): # if has files
+                l.append(self.components[componentName])
         return l
             
     def walk(self, root):
         """
         Traverse the directory tree specified by @C{root}, adding file
-        entries to the BuildPackages
+        entries to the BuildComponent
 
         @param root: root of path to walk
         @type root: str
