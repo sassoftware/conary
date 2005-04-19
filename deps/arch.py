@@ -42,7 +42,7 @@ def flags_ix86(baseArch):
 
     ofInterest = {}.fromkeys([ '3dnow', '3dnowext', 'mmx', 'mmxext', 'sse', 
                                'sse2', 'sse3', 'cmov', 'nx'])
-    return [ x86flags('x86', baseArch, baseFlagMap[i:], ofInterest) ]
+    return [ [ x86flags('x86', baseArch, baseFlagMap[i:], ofInterest) ] ]
 
 def flags_i686():
     return flags_ix86(baseArch = 'i686')
@@ -51,13 +51,14 @@ def flags_i586():
     return flags_ix86(baseArch = 'i586')
 
 def flags_mips64():
-    return deps.Dependency('mipseb', [ ('mips64', deps.FLAG_SENSE_REQUIRED) ])
+    return [[ deps.Dependency('mipseb', [ ('mips64', deps.FLAG_SENSE_REQUIRED) ]) ]]
 
 def flags_x86_64():
     baseFlagMap = [ ]
     ofInterest = {}.fromkeys([ '3dnow', '3dnowext', 'nx', 'sse3' ])
 
-    return [ (x86flags('x86_64', baseArch, baseFlagMap, ofInterest)) ]
+    return [[ (x86flags('x86_64', baseArch, baseFlagMap, ofInterest)) ]] \
+            + flags_i686()
 
 def current():
     return currentArch

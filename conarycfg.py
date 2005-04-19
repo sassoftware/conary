@@ -248,13 +248,25 @@ class ConfigFile:
         self.flavor = self.flavorConfig.toDependency(override=self.flavor)
 
         newFlavors = []
+        hasIns = False
+        
+        # if any flavor has an instruction set, don't merge
         for flavor in self.flavor:
-            if not deps.deps.DEP_CLASS_IS in flavor.getDepClasses():
-                insSet = deps.deps.DependencySet()
-                for dep in deps.arch.currentArch:
-                    insSet.addDep(deps.deps.InstructionSetDependency, dep)
-                flavor.union(insSet)
-            newFlavors.append(flavor)
+            if deps.deps.DEP_CLASS_IS in flavor.getDepClasses():
+                hasIns = True
+                break
+
+        if not hasIns:
+            # use all the flavors for the main arch first
+            for depList in deps.arch.currentArch:
+                for flavor in self.flavor:
+                    insSet = deps.deps.DependencySet()
+                    for dep in depList:
+                        insSet.addDep(deps.deps.InstructionSetDependency, dep)
+                    newFlavor = flavor.copy()
+                    newFlavor.union(insSet)
+                    newFlavors.append(newFlavor)
+            self.flavor = newFlavors
 
         # buildFlavor is installFlavor + overrides
         self.buildFlavor = deps.deps.overrideFlavor(self.flavor[0], 
