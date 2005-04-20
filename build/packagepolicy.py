@@ -1361,7 +1361,7 @@ class ComponentRequires(policy.Policy):
     same change, but only for the C{foo} package).
     """
     depMap = {
-        # component: components that depend thereon if they both exist
+        # component: components that require it if they both exist
         'data': frozenset(('lib', 'runtime')),
         'devellib': frozenset(('devel',)),
         'lib': frozenset(('devel', 'devellib', 'runtime')),
