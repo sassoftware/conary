@@ -133,10 +133,15 @@ class Run(BuildCommand):
     def do(self, macros):
 	macros = macros.copy()
         if self.filewrap:
+            basedir = '/'.join(sys.modules[__name__].__file__.split('/')[:-2])
+            localcopy = '/'.join((basedir, 'lib', 'filename_wrapper.so'))
+            if os.path.exists(localcopy):
+                macros.fnw = localcopy
+            else:
+                macros.fnw = '%(libdir)s/conary/filename_wrapper.so'
             macros.envcmd = (
                 'export DESTDIR=%(destdir)s;'
-                'export LD_PRELOAD=%(libdir)s/conary/filename_wrapper.so;'
-                %macros
+                'export LD_PRELOAD=%(fnw)s;'
             )
         else:
 	    macros.envcmd = ''
