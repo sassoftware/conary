@@ -26,6 +26,8 @@
 #define GET_REAL(name) if (!real_##name) real_##name = dlsym(RTLD_NEXT, #name);
 #define GET_PATH() p = prepend_destdir(pathname)
 #define PUT_PATH() free((void *)p)
+#define PRINTF(...)
+/* #define PRINTF(...) printf(__VA_ARGS__) */
 
 
 static const char *prepend_destdir(const char *pathname) {
@@ -59,25 +61,43 @@ static const char *prepend_destdir(const char *pathname) {
  * opendir() C library call.
  */
 
-int open(const char *pathname, int flags) {
-    static int (*real_open)(const char *pathname, int flags);
+int open(const char *pathname, int flags, mode_t mode) {
+    static int (*real_open)(const char *pathname, int flags, mode_t mode);
     const char *p;
     int ret;
 
+    PRINTF("open\n");
     GET_REAL(open);
     GET_PATH();
-    if (p) ret = real_open(p, flags);
+    if (p) ret = real_open(p, flags, mode);
     PUT_PATH();
     if (ret != -1 || errno != ENOENT) return ret;
 
-    return real_open(pathname, flags);
+    return real_open(pathname, flags, mode);
 }
+
+int open64(const char *pathname, int flags, mode_t mode) {
+    static int (*real_open64)(const char *pathname, int flags, mode_t mode);
+    const char *p;
+    int ret;
+
+    PRINTF("open64\n");
+    GET_REAL(open64);
+    GET_PATH();
+    if (p) ret = real_open64(p, flags, mode);
+    PUT_PATH();
+    if (ret != -1 || errno != ENOENT) return ret;
+
+    return real_open64(pathname, flags, mode);
+}
+
 
 int stat(const char *pathname, struct stat *buf) {
     static int (*real_stat)(const char *pathname, struct stat *buf);
     const char *p;
     int ret;
 
+    PRINTF("stat\n");
     GET_REAL(stat);
     GET_PATH();
     if (p) ret = real_stat(p, buf);
@@ -87,11 +107,27 @@ int stat(const char *pathname, struct stat *buf) {
     return real_stat(pathname, buf);
 }
 
+int stat64(const char *pathname, struct stat64 *buf) {
+    static int (*real_stat64)(const char *pathname, struct stat64 *buf);
+    const char *p;
+    int ret;
+
+    PRINTF("stat64\n");
+    GET_REAL(stat64);
+    GET_PATH();
+    if (p) ret = real_stat64(p, buf);
+    PUT_PATH();
+    if (ret != -1 || errno != ENOENT) return ret;
+
+    return real_stat64(pathname, buf);
+}
+
 int lstat(const char *pathname, struct stat *buf) {
     static int (*real_lstat)(const char *pathname, struct stat *buf);
     const char *p;
     int ret;
 
+    PRINTF("lstat\n");
     GET_REAL(lstat);
     GET_PATH();
     if (p) ret = real_lstat(p, buf);
@@ -101,11 +137,27 @@ int lstat(const char *pathname, struct stat *buf) {
     return real_lstat(pathname, buf);
 }
 
+int lstat64(const char *pathname, struct stat64 *buf) {
+    static int (*real_lstat64)(const char *pathname, struct stat64 *buf);
+    const char *p;
+    int ret;
+
+    PRINTF("lstat64\n");
+    GET_REAL(lstat64);
+    GET_PATH();
+    if (p) ret = real_lstat64(p, buf);
+    PUT_PATH();
+    if (ret != -1 || errno != ENOENT) return ret;
+
+    return real_lstat64(pathname, buf);
+}
+
 int chmod(const char *pathname, mode_t mode) {
     static int (*real_chmod)(const char *pathname, mode_t mode);
     const char *p;
     int ret;
 
+    PRINTF("chmod\n");
     GET_REAL(chmod);
     GET_PATH();
     if (p) ret = real_chmod(p, mode);
@@ -120,6 +172,7 @@ int unlink(const char *pathname) {
     const char *p;
     int ret;
 
+    PRINTF("unlink\n");
     GET_REAL(unlink);
     GET_PATH();
     if (p) ret = real_unlink(p);
@@ -137,6 +190,7 @@ int opendir(const char *pathname) {
     const char *p;
     int ret;
 
+    PRINTF("opendir\n");
     GET_REAL(opendir);
     GET_PATH();
     if (p) ret = real_opendir(p);
@@ -151,6 +205,7 @@ void *dlopen(const char *pathname, int flags) {
     const char *p;
     void *ret;
 
+    PRINTF("dlopen\n");
     GET_REAL(dlopen);
     GET_PATH();
     if (p) ret = real_dlopen(p, flags);
@@ -165,6 +220,7 @@ FILE *fopen(const char *pathname, const char *mode) {
     const char *p;
     FILE *ret;
 
+    PRINTF("fopen\n");
     GET_REAL(fopen);
     GET_PATH();
     if (p) ret = real_fopen(p, mode);
@@ -179,6 +235,7 @@ FILE *freopen(const char *pathname, const char *mode, FILE *stream) {
     const char *p;
     FILE *ret;
 
+    PRINTF("freopen\n");
     GET_REAL(freopen);
     GET_PATH();
     if (p) ret = real_freopen(p, mode, stream);
