@@ -83,10 +83,6 @@ class WebHandler(object):
             return apache.HTTP_NOT_FOUND
         self.fields = FieldStorage(self.req)
 
-        import sys
-        print >>sys.stderr, method
-        sys.stderr.flush()
-
         d = dict(self.fields)
         d['auth'] = self.auth
         return method(**d)
