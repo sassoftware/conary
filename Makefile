@@ -22,6 +22,7 @@ export bindir = $(prefix)/bin
 export libdir = $(prefix)/lib
 export mandir = $(prefix)/share/man
 export conarydir = $(libdir)/python$(PYVERSION)/site-packages/conary
+export conarylibdir = $(libdir)/conary
 
 SUBDIRS=build local repository server lib pysqlite3 deps scripts config web
 

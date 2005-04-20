@@ -26,15 +26,16 @@ python_files=	    __init__.py		\
 		    util.py
 
 python_modules=elfmodule.so miscmodule.so cstreamsmodule.so
+wrapper_libs=filename_wrapper.so
 elfmodule_objs=elf.o
 miscmodule_objs=misc.o
 cstreamsmodule_objs=cstreams.o numstream.o streamset.o stringstream.o
 generated_files=$(elfmodule_objs) $(miscmodule_objs) $(cstreamsmodule_objs) $(python_modules)
 dist_files = $(python_files) elf.c misc.c cstreams.c numstream.c streamset.c \
-             stringstream.c cstreams.h Makefile
+             stringstream.c cstreams.h filename_wrapper.c Makefile
 
 
-all: $(python_modules)
+all: $(python_modules) $(wrapper_libs)
 
 elfmodule.so: $(elfmodule_objs)
 	$(CC) -shared -o $@ $< -lelf
@@ -47,9 +48,14 @@ $(cstreamsmodule_objs): cstreams.h
 cstreamsmodule.so: $(cstreamsmodule_objs)
 	$(CC) -shared -o $@ $^ -lelf
 
+filename_wrapper.so: filename_wrapper.c
+	$(CC) -fPIC -rdynamic -c filename_wrapper.c
+	$(CC) -shared -o filename_wrapper.so filename_wrapper.o -lc -ldl
+
 install: pyfiles-install
 	mkdir -p $(DESTDIR)$(conarydir)/$(DIR)
 	install -m 755 $(python_modules) $(DESTDIR)$(conarydir)/$(DIR)
+	install -m 755 $(wrapper_libs) $(DESTDIR)$(conarylibdir)/
 
 clean: default-clean
 

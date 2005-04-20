@@ -120,12 +120,26 @@ class Run(BuildCommand):
     @keyword dir: directory in which to run the command.  Relative dirs
                   are relative to the build dir, absolute dirs are relative
                   to the destdir.
+    @keyword filewrap: Defaults to False; if True, causes a
+                  C{LD_PRELOAD} wrapper that looks in %(destdir)s for
+                  some common file operations.  Occasionally useful
+                  to avoid the need to modify programs that need to
+                  be run after the build and assume that they are not
+                  run until after installation.
     """
-    keywords = {'dir': ''}
-    template = "%%(cdcmd)s%(args)s"
+    keywords = {'dir': '', 'filewrap': False}
+    template = "%%(envcmd)s%%(cdcmd)s%(args)s"
 
     def do(self, macros):
 	macros = macros.copy()
+        if self.filewrap:
+            macros.envcmd = (
+                'export DESTDIR=%(destdir)s;'
+                'export LD_PRELOAD=%(libdir)s/conary/filename_wrapper.so;'
+                %macros
+            )
+        else:
+	    macros.envcmd = ''
         if self.dir:
             macros.cdcmd = 'cd %s; ' % (action._expandOnePath(self.dir, macros))
 	else:

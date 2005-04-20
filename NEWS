@@ -12,6 +12,10 @@ Changes in 0.50.13:
     to better match our terminology for packages and components.
   * Change flavor specified in the conaryrc to a flavor path -- accept the 
     flavor config parameter multiple times to create a flavor path
+  * Added a "filewrap" argument to r.Run() that inserts an LD_PRELOAD
+    wrapper that overrides some library funtions to look in %(destdir)s
+    first before looking in the filesystem.  This is subject to change
+    as we experiment with it!
 
 Changes in 0.50.12:
   * Implemented --quiet for conary update changeset commands, and cvc cook.
