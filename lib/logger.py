@@ -21,11 +21,12 @@ def startLog(path):
 class Logger:
     def __init__(self, path):
         self.path = path
-        self.startLog()
+        self.logging = False
         self.closed = False
+        self.startLog()
 
     def __del__(self):
-        if not self.closed:
+        if self.logging and not self.closed:
             self.close()
 
     def startLog(self):
@@ -80,6 +81,7 @@ class Logger:
         os.dup2(slaveFd, 1)
         os.dup2(slaveFd, 2)
         os.close(slaveFd)
+        self.logging = True
         return
 
     def close(self):
