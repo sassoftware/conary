@@ -30,6 +30,9 @@ class FileContents(object):
     def copy(self):
         raise NotImplementedError
 
+    def get(self):
+        raise NotImplementedError
+
     def getWithSize(self):
 	return (self.get(), self.size())
 
