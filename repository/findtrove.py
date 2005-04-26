@@ -104,17 +104,8 @@ class Query:
         missing[troveTup] = self.missingMsg(name)
             
     def missingMsg(self, name):
-        versionStr = self.map[name][1]
-        if not versionStr:
-            return ("%s was not on found on path %s" \
-                    % (name, ', '.join(x.asString() for x in self.labelPath)))
-        elif self.labelPath:
-            return ("version %s of %s was not on found on path %s" \
-                    % (versionStr, name, 
-                       ', '.join(x.asString() for x in labelPath)))
-        else:
-            return "version %s of %s was not on found" % (versionStr, name)
-
+        raise NotImplementedError
+    
 class QueryByVersion(Query):
 
     def __init__(self, defaultFlavor, labelPath, acrossRepositories, 
@@ -187,7 +178,7 @@ class QueryByVersion(Query):
 
     def missingMsg(self, name):
         versionStr = self.map[name][1]
-        return "version %s of %s was not on found" % (versionStr, name)
+        return "version %s of %s was not found" % (versionStr, name)
 
 class QueryByLabelPath(Query):
 
@@ -473,7 +464,7 @@ class QueryRevisionByBranch(QueryByBranch):
         versionStr = self.map[name][1]
         try:
             verRel = versions.Revision(versionStr)
-        except versions.ParseError, e:
+        except versions.ParseError:
             verRel = None
 
         for version in reversed(sorted(versionFlavorDict.iterkeys())):
@@ -511,7 +502,7 @@ class QueryRevisionByLabel(QueryByLabelPath):
         versionStr = self.map[name][1]
         try:
             verRel = versions.Revision(versionStr)
-        except versions.ParseError, e:
+        except versions.ParseError:
             verRel = None
         for version in reversed(sorted(versionFlavorDict.iterkeys())):
             if verRel:
@@ -655,7 +646,8 @@ class TroveFinder:
                                                 % (name, versionStr))
             if '-' in versionStr:
                 try:
-                    verRel = versions.Revision(versionStr)
+                    # attempt to parse the versionStr
+                    versions.Revision(versionStr)
                     return VERSION_STR_REVISION
                 except ParseError, msg:
                     raise repository.TroveNotFound, str(msg)
@@ -694,7 +686,7 @@ class TroveFinder:
     def sortFullVersion(self, troveTup, affinityTroves):
         name, versionStr, flavor = troveTup
         if self.query[QUERY_BY_VERSION].hasName(name):
-            self.remaining.append(tup)
+            self.remaining.append(troveTup)
             return
         version = versions.VersionFromString(versionStr)
         if flavor is None and affinityTroves:
@@ -711,7 +703,7 @@ class TroveFinder:
             newLabelPath = [ label ]
         except versions.ParseError:
             raise repository.TroveNotFound, \
-                                "invalid version %s" % versionStr
+                                "invalid version %s" % troveTup[1]
         return self._sortLabel(newLabelPath, troveTup, affinityTroves)
 
     def sortBranchName(self, troveTup, affinityTroves):
