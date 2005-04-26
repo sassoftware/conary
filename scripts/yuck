@@ -32,8 +32,7 @@ import versions
 import updatecmd
 
 def usage():
-    print """\
-Usage: yuck [--missing] [--update] [--except <exception,...>]"
+    print """Usage: yuck [--missing] [--update] [--except <exception,...>]
             [--display|--display-only <displayparam>,<displayparam>]
 
         display parameters: [no]change,name,local,version,repo,flavor
