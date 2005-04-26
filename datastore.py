@@ -83,7 +83,7 @@ class DataStore:
 
 	os.close(countFile)
 
-    def incrementCount(self, path, fileObj = None, digest = None):
+    def incrementCount(self, path, fileObj = None):
 	"""
 	Increments the count by one.  it becomes one, the contents
 	of fileObj are stored into that path. Return the new count.
@@ -239,6 +239,8 @@ class DataStoreRepository:
             if len(item) == 3:
                 fileObj = item[2]
             else:
+                # XXX this is broken code, we have no findFileVersion()
+                # method
                 fileObj = self.findFileVersion(fileId)
             
             if fileObj:
