@@ -131,7 +131,7 @@ def main(argv):
             for v, f in branchPkgs[branch][pkg]:
                 # XXX this fails when multiple versions are installed from the 
                 # same branch -- only one new version is returned 
-                queryflavor = cfg.flavor.copy()
+                queryflavor = cfg.flavor[0].copy()
                 queryflavor.union(f, mergeType=deps.DEP_MERGE_TYPE_OVERRIDE)
                 query[host][pkg][branch] = [queryflavor]
     dbpkgs.sort()
