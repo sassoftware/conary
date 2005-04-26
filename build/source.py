@@ -188,7 +188,9 @@ class Archive(_Source):
 	    _extractFilesFromRPM(f, directory=destDir)
 	    return
 
-	if f.endswith(".bz2") or f.endswith(".tbz2"):
+	if f.endswith(".tar"):
+	    tarflags = "-xf"
+	elif f.endswith(".bz2") or f.endswith(".tbz2"):
 	    tarflags = "-jxf"
 	elif f.endswith(".gz") or f.endswith(".tgz") or f.endswith(".Z"):
 	    tarflags = "-zxf"
