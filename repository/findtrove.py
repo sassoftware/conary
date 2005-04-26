@@ -649,7 +649,7 @@ class TroveFinder:
                     # attempt to parse the versionStr
                     versions.Revision(versionStr)
                     return VERSION_STR_REVISION
-                except ParseError, msg:
+                except versions.ParseError, msg:
                     raise repository.TroveNotFound, str(msg)
             return VERSION_STR_TROVE_VER
 
