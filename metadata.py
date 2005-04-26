@@ -11,7 +11,6 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-import metadata
 import textwrap
 import time
 import urlparse
@@ -304,4 +303,3 @@ def showDetails(repos, cfg, troveName, branch, sourceTrove):
         print "Description: \n%s" % (wrappedDesc)
     else:
         log.info("no details found for %s", troveName)
-

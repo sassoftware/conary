@@ -43,7 +43,7 @@ def internalOnly(func):
 def externalOnly(func):
     def wrapper(self, **kwargs):
         if self.cfg.externalAccess:
-            raise PermissionDenied
-        else:
             return func(self, **kwargs)
+        else:
+            raise PermissionDenied
     return wrapper

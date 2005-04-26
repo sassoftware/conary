@@ -40,7 +40,6 @@ from lib import log
 from lib import options
 from lib import util
 from local import database
-import metadata
 import queryrep
 import repository
 from repository import netclient
