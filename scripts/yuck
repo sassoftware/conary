@@ -97,6 +97,8 @@ def main(argv):
             displayOrder.remove(param)
     
     cfg = conarycfg.ConaryConfiguration()
+    cfg.initializeFlavors()
+    
     repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
     db = database.Database(cfg.root, cfg.dbPath)
     dbTroves = dict.fromkeys(db.iterAllTroveNames())
