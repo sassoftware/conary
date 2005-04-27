@@ -79,6 +79,7 @@ class ConaryClient:
     def __init__(self, cfg = None):
         if cfg == None:
             cfg = conarycfg.ConaryConfiguration()
+            cfg.initializeFlavors()
         
         cfg.installLabel = cfg.installLabelPath[0]
         self.cfg = cfg
