@@ -480,7 +480,7 @@ class QueryRevisionByBranch(QueryByBranch):
     def missingMsg(self, name):
         branch = self.query[0][name].keys()[0]
         versionStr = self.map[name][1]
-        return "revision %s of %s was found on branch %s" \
+        return "revision %s of %s was not found on branch %s" \
                                     % (versionStr, name, branch.asString())
 
 class QueryRevisionByLabel(QueryByLabelPath):
