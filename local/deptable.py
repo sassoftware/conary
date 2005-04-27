@@ -382,7 +382,7 @@ class DependencyTables:
                         COUNT(DepCheck.troveId) == DepCheck.flagCount
                 """ % subselect
 
-    def check(self, changeSet):
+    def check(self, changeSet, findOrdering = False):
 	"""
 	Check the database for closure against the operations in
 	the passed changeSet.
@@ -474,8 +474,8 @@ class DependencyTables:
         def _buildGraph(nodes, oldOldEdges, newNewEdges):
             for (reqNodeId, provNodeId, depId) in oldOldEdges.iterkeys():
                 # remove the provider after removing the requirer
-                nodes[provNodeId][2].append(reqNodeId)
-                nodes[reqNodeId][3].append(provNodeId)
+                nodes[provNodeId][1].append(reqNodeId)
+                nodes[reqNodeId][2].append(provNodeId)
 
             # the edges left in oldNewEdges represent dependencies which troves
             # slated for removal have on troves being installed. either those
@@ -489,13 +489,13 @@ class DependencyTables:
             # they are filled by some other trove being added, and the edge
             # in newNewEdges will make that work out
             for (reqNodeId, provNodeId, depId) in newNewEdges.iterkeys():
-                nodes[reqNodeId][2].append(provNodeId)
+                nodes[reqNodeId][1].append(provNodeId)
                 nodes[provNodeId][2].append(reqNodeId)
 
         def _treeDFS(nodes, nodeIdx, seen, finishes, timeCount):
             seen[nodeIdx] = True
             
-            for nodeId in nodes[nodeIdx][2]:
+            for nodeId in nodes[nodeIdx][1]:
                 if not seen[nodeId]:
                     timeCount = _treeDFS(nodes, nodeId, seen, finishes,
                                          timeCount)
@@ -506,7 +506,7 @@ class DependencyTables:
 
         def _connectDFS(nodes, compList, nodeIdx, seen, finishes):
             seen[nodeIdx] = True
-            edges = [ (finishes[x], x) for x in nodes[nodeIdx][3] ]
+            edges = [ (finishes[x], x) for x in nodes[nodeIdx][2] ]
             edges.sort()
             edges.reverse()
 
@@ -567,10 +567,10 @@ class DependencyTables:
                 edges = {}
                 componentNodes = []
                 for nodeId in nodeSet:
-                    componentNodes.append((nodes[nodeId][0], nodes[nodeId][1]))
+                    componentNodes.append(nodes[nodeId][0])
                     edges.update(dict.fromkeys(
                             [ componentMap[targetId] 
-                                        for targetId in nodes[nodeId][2] ]
+                                        for targetId in nodes[nodeId][1] ]
                                 ))
                 componentGraph.append((componentNodes, edges))
 
@@ -668,7 +668,7 @@ class DependencyTables:
 	    else:
 		oldInfo = None
 
-            nodes.append((oldInfo, newInfo, [], []))
+            nodes.append((trvCs, [], []))
 
             # using depNum 0 is a hack, but it's just on a provides so
             # it doesn't matter
@@ -696,7 +696,7 @@ class DependencyTables:
 
         for oldInfo in changeSet.getOldPackageList():
             oldTroves.append((oldInfo, len(nodes)))
-            nodes.append((oldInfo, None, [], []))
+            nodes.append((oldInfo, [], []))
 
         if oldTroves:
             # this sets up nodesByRemovedId because the temporary RemovedTroves
@@ -830,20 +830,43 @@ class DependencyTables:
                     for fromNodeId in fromNodeIds:
                         edgeSet[(fromNodeId, toNodeId, depId)] = True
 
-        # Remove nodes which cancel each other
-        _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
+        changeSetList = []
+        if findOrdering:
+            # Remove nodes which cancel each other
+            _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
 
-        # Now build up a unified node list. The different kinds of edges and
-        # the particular depId no longer matter. The direction here is a bit
-        # different, and defines the ordering for the operation, not the
-        # order of the dependency
-        _buildGraph(nodes, oldOldEdges, newNewEdges)
-        del oldOldEdges
-        del oldNewEdges
-        del newOldEdges
-        del newNewEdges
-        componentGraph = _stronglyConnect(nodes)
-        ordering = _orderComponents(componentGraph)
+            # Now build up a unified node list. The different kinds of edges
+            # and the particular depId no longer matter. The direction here is
+            # a bit different, and defines the ordering for the operation, not
+            # the order of the dependency
+            _buildGraph(nodes, oldOldEdges, newNewEdges)
+            del oldOldEdges
+            del oldNewEdges
+            del newOldEdges
+            del newNewEdges
+            componentGraph = _stronglyConnect(nodes)
+            del nodes
+            ordering = _orderComponents(componentGraph)
+            for component in ordering:
+                oneList = []
+                for item in component:
+                    if isinstance(item, tuple):
+                        oneList.append((item[0], (item[1], item[2]),
+                                                 (None, None), False))
+                    else:
+                        oneList.append((item.getName(),
+                                        (item.getOldVersion(),
+                                         item.getNewVersion()),
+                                        (item.getOldFlavor(),
+                                         item.getNewFlavor()),
+                                        item.isAbsolute()) )
+                changeSetList.append(oneList)
+        else:
+            del nodes
+            del oldOldEdges
+            del oldNewEdges
+            del newOldEdges
+            del newNewEdges
 
         # None in depList means the dependency got resolved; we track
         # would have been resolved by something which has been removed as
@@ -914,7 +937,7 @@ class DependencyTables:
         # transaction back anyway
 	self.db.rollback()
 
-        return (failedList, unresolveableList)
+        return (failedList, unresolveableList, changeSetList)
 
     def resolve(self, label, depSetList):
         cu = self.db.cursor()

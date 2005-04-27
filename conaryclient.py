@@ -106,7 +106,7 @@ class ConaryClient:
     def _resolveDependencies(self, cs, keepExisting = None, depsRecurse = True):
         pathIdx = 0
         foundSuggestions = False
-        (depList, cannotResolve) = self.db.depCheck(cs)
+        (depList, cannotResolve) = self.db.depCheck(cs)[0:2]
         suggMap = {}
 
         while depList:
@@ -158,7 +158,7 @@ class ConaryClient:
                                                   keepExisting = keepExisting)
                     cs.merge(newCs)
 
-                    (depList, cannotResolve) = self.db.depCheck(cs)
+                    (depList, cannotResolve) = self.db.depCheck(cs)[0:2]
 
             if troves and depsRecurse:
                 pathIdx = 0
