@@ -914,6 +914,8 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
                 if (not version.isBranchedBinary()
                     and version.getSourceVersion() == sourceVersion):
                     relVersions.append((version, d[troveName][version]))
+    del troveName
+
     if relVersions:
         # all these versions only differ by build count.
         # but we can't rely on the timestamp sort, because the build counts
@@ -928,8 +930,7 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
             # version, and we always want to bump the build count
             latest.incrementBuildCount()
         else:
-            relFlavors = d[troveName][latest]
-            if troveFlavor in relFlavors:
+            if troveFlavor in flavors:
                 # case 2.  There is a binary trove with this source
                 # version, and our flavor matches one already existing
                 # with this build count, so bump the build count
