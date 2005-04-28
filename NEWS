@@ -3,6 +3,8 @@ Changes in 0.50.14:
     used yet)
   * Allow groups to include other groups defined in the same recipe (but
     explicitly disallow cycles in groups)
+  * Fixed bug in building multiple groups with a single recipe when some
+    of the groups already exist, but others don't
 
 Changes in 0.50.13:
   * Added automatic :data component for /usr/share, to which you should
