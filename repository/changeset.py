@@ -20,6 +20,7 @@ import errno
 import filecontainer
 import filecontents
 import files
+import gzip
 import os
 from lib import patch
 import repository
@@ -279,20 +280,26 @@ class ChangeSet(streams.LargeStreamSet):
 	return self.oldPackages
 
     def configFileIsDiff(self, pathId):
-        (tag, cont) = self.configCache.get(pathId, (None, None))
+        (tag, cont) = self.configCache.get(pathId, (None, None, None))
         return tag == ChangedFileTypes.diff
 
-    def addFileContents(self, pathId, contType, contents, cfgFile):
+    def addFileContents(self, pathId, contType, contents, cfgFile,
+                        compressed = False):
 	if cfgFile:
-	    self.configCache[pathId] = (contType, contents)
+            assert(not compressed)
+	    self.configCache[pathId] = (contType, contents, compressed)
 	else:
-	    self.fileContents[pathId] = (contType, contents)
+	    self.fileContents[pathId] = (contType, contents, compressed)
 
     def getFileContents(self, pathId, withSize = False):
 	if self.fileContents.has_key(pathId):
 	    cont = self.fileContents[pathId]
 	else:
 	    cont = self.configCache[pathId]
+
+        # this shouldn't be done on precompressed contents
+        assert(not cont[2])
+        cont = cont[:2]
 
 	if not withSize:
 	    return cont
@@ -341,14 +348,16 @@ class ChangeSet(streams.LargeStreamSet):
         # diffs come first, followed by plain files
 
 	for hash in idList:
-	    (contType, f) = contents[hash]
+	    (contType, f, compressed) = contents[hash]
             if contType == ChangedFileTypes.diff:
-                csf.addFile(hash, f, tag + contType[4:])
+                csf.addFile(hash, f, tag + contType[4:],
+                            precompressed = compressed)
 
 	for hash in idList:
-	    (contType, f) = contents[hash]
+	    (contType, f, compressed) = contents[hash]
             if contType != ChangedFileTypes.diff:
-                csf.addFile(hash, f, tag + contType[4:])
+                csf.addFile(hash, f, tag + contType[4:],
+                            precompressed = compressed)
 
     def writeAllContents(self, csf):
 	self.writeContents(csf, self.configCache, True)
@@ -698,12 +707,13 @@ class ReadOnlyChangeSet(ChangeSet):
     fileQueueCmp = staticmethod(fileQueueCmp)
 
     def configFileIsDiff(self, pathId):
-        (tag, str) = self.configCache.get(pathId, (None, None))
+        (tag, str, compressed) = self.configCache.get(pathId, 
+                                                      (None, None, None))
         return tag == ChangedFileTypes.diff
 
-    def _nextFile(self):
+    def _nextFile(self, compressed = False):
         if self.lastCsf:
-            next = self.lastCsf.getNextFile()
+            next = self.lastCsf.getNextFile(compressed = compressed)
             if next:
                 util.tupleListBsearchInsert(self.fileQueue, 
                                             next + (self.lastCsf,),
@@ -722,7 +732,7 @@ class ReadOnlyChangeSet(ChangeSet):
         name = None
 	if self.configCache.has_key(pathId):
             name = pathId
-	    (tag, contents) = self.configCache[pathId]
+	    (tag, contents, compressed) = self.configCache[pathId]
 
             if type(contents) == str:
                 cont = filecontents.FromString(contents)
@@ -840,7 +850,8 @@ class ReadOnlyChangeSet(ChangeSet):
                                                             fileObj, cont)
 
                     if contType == ChangedFileTypes.diff:
-                        self.configCache[pathId] = (contType, cont.get().read())
+                        self.configCache[pathId] = (contType, cont.get().read(),
+                                                    False)
 
 	self.files = {}
 	for tup in newFiles:
@@ -861,14 +872,15 @@ class ReadOnlyChangeSet(ChangeSet):
         idList.sort()
 
 	for hash in idList:
-	    (tag, str) = self.configCache[hash]
+	    (tag, str, compressed) = self.configCache[hash]
             csf.addFile(hash, filecontents.FromString(str), "1 " + tag[4:])
 
-        next = self._nextFile()
+        next = self._nextFile(compressed = True)
         while next:
             name, tagInfo, f, size, otherCsf = next
-            csf.addFile(name, filecontents.FromFile(f, size = size), tagInfo)
-            next = self._nextFile()
+            csf.addFile(name, filecontents.FromFile(f, size = size), tagInfo,
+                        precompressed = True)
+            next = self._nextFile(compressed = True)
 
     def merge(self, otherCs):
         self.files.update(otherCs.files)
@@ -897,12 +909,13 @@ class ReadOnlyChangeSet(ChangeSet):
             # make a copy. the configCache should only store diffs
             configs = {}
 
-            for (pathId, (contType, contents)) in \
+            for (pathId, (contType, contents, compressed)) in \
                                     otherCs.configCache.iteritems():
+                assert(not compressed)
                 if contType == ChangedFileTypes.diff:
-                    self.configCache[pathId] = (contType, contents)
+                    self.configCache[pathId] = (contType, contents, compressed)
                 else:
-                    configs[pathId] = (contType, contents)
+                    configs[pathId] = (contType, contents, compressed)
                     
             wrapper = dictAsCsf(otherCs.fileContents)
             wrapper.addConfigs(configs)
@@ -972,7 +985,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
             cont = filecontents.FromFile(f)
             s = cont.get().read()
             size = len(s)
-            self.configCache[name] = (tag, s)
+            self.configCache[name] = (tag, s, False)
             cont = filecontents.FromString(s)
 
             nextFile = csf.getNextFile()
@@ -1054,13 +1067,26 @@ def CreateFromFilesystem(pkgList):
 
 class dictAsCsf:
 
-    def getNextFile(self):
+    def getNextFile(self, compressed = False):
         if not self.items:
             return None
 
         (name, contType, contObj) = self.items[0]
         del self.items[0]
-        return (name, contType, contObj.get(), contObj.size())
+
+        if compressed:
+            # XXX there must be a better way, but I can't think of it
+            f = contObj.get()
+            (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
+                                          suffix = '.cf-out')
+            os.unlink(path)
+            gzf = gzip.GzipFile(path, "wb")
+            util.copyfileobj(f, gzf)
+            del f
+            f = os.fdopen(fd, "r")
+            return (name, contType, f, contObj.size())
+        else:
+            return (name, contType, contObj.get(), contObj.size())
 
     def addConfigs(self, contents):
         # this is like __init__, but it knows things are config files so

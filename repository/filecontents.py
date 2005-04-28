@@ -58,6 +58,27 @@ class FromDataStore(FileContents):
 	self.sha1 = sha1
 	self.theSize = size
 
+class CompressedFromDataStore(FileContents):
+
+    __slots__ = ( "store", "theSize", "sha1" )
+
+    def getSha1(self):
+        return self.sha1
+
+    def copy(self):
+        return self.__class__(self.store, self.sha1, self.theSize)
+
+    def get(self):
+	return self.store.openRawFile(sha1helper.sha1ToString(self.sha1))
+
+    def size(self):
+	return self.theSize
+
+    def __init__(self, store, sha1, size):
+	self.store = store
+	self.sha1 = sha1
+	self.theSize = size
+
 class FromFilesystem(FileContents):
 
     __slots__ = ( "path" )

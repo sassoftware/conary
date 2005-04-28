@@ -27,33 +27,29 @@ to allow operations to be reverted.
 The file format is::
   - magic
   - file format version
-  - total # of bytes in file tables
   - file table entry 1
-  - file table entry 2
-  -                  .
-  -                  .
-  -                  .
-  - file table entry N
   - file 1
+  - file table entry 2
   - file 2
   .
   .
   .
+  - file table entry N
   - file N
 
-Everything after the file format version is gzipped (so gzip magic
-appears right after the file version).
+The header and table entries are uncompressed.  The contents of the file 
+table are compressed, and each file is individually compressed. When files 
+are retrieved from the container, the returned file object automatically 
+uncompresses the file.
 
 Each file table entry looks like::
 
-  lengt
-  of entry (4 bytes), not including these 4 bytes
+  SUBFILE_MAGIC (2 bytes)
+  length of entry (4 bytes), not including these 4 bytes
   length of file name (4 bytes)
-  file name 
-  file offset (4 bytes) (in the gzipped data)
-  file size (4 bytes)
+  length of compressed file data(4 bytes)
   length of arbitrary data (4 bytes)
-  entries in file table (4 bytes)
+  file name 
   arbitrary file table data
 """
 
@@ -64,8 +60,9 @@ import struct
 from lib import util
 
 FILE_CONTAINER_MAGIC = "\xEA\x3F\x81\xBB"
-FILE_CONTAINER_VERSION = 2005012901
-READABLE_VERSIONS = [ FILE_CONTAINER_VERSION, 2005011901 ]
+SUBFILE_MAGIC = 0x3FBB
+FILE_CONTAINER_VERSION = 2005033001
+READABLE_VERSIONS = [ FILE_CONTAINER_VERSION ]
 SEEK_SET = 0
 SEEK_CUR = 1
 SEEK_END = 2
@@ -74,7 +71,7 @@ class FileContainer:
 
     bufSize = 128 * 1024
 
-    def readTable(self):
+    def readHeader(self):
 	magic = self.file.read(4)
 	if len(magic) != 4 or magic != FILE_CONTAINER_MAGIC:
 	    raise BadContainer, "bad magic"
@@ -87,57 +84,65 @@ class FileContainer:
 	    raise BadContainer, "unsupported file container version %d" % \
 			version
 
-	self.gzfile = gzip.GzipFile(None, "rb", None, self.file)
-
-	self.contentsStart = self.gzfile.tell()
+	self.contentsStart = self.file.tell()
 	self.next = self.contentsStart
 
     def close(self):
-	if self.mutable:
-	    self.rest.close()
 	self.file = None
     
-    def addFile(self, fileName, contents, tableData):
+    def addFile(self, fileName, contents, tableData, precompressed = False):
 	assert(isinstance(contents, filecontents.FileContents))
 	assert(self.mutable)
 
 	(fileObj, size) = contents.getWithSize()
-	self.rest.write(struct.pack("!HIH", len(fileName), size, 
-			len(tableData)))
-	self.rest.write(fileName)
-	self.rest.write(tableData)
-	util.copyfileobj(fileObj, self.rest)
+        self.file.write(struct.pack("!HH", SUBFILE_MAGIC, len(fileName)))
+        sizeLoc = self.file.tell()
+	self.file.write(struct.pack("!IH", 0, len(tableData)))
+	self.file.write(fileName)
+	self.file.write(tableData)
 
-    def getNextFile(self):
+        if precompressed:
+            size = util.copyfileobj(fileObj, self.file)
+        else:
+            start = self.file.tell()
+            gzFile = gzip.GzipFile(None, "wb", 6, self.file)
+            util.copyfileobj(fileObj, gzFile)
+            gzFile.close()
+            size = self.file.tell() - start
+
+        self.file.seek(sizeLoc, SEEK_SET)
+        self.file.write(struct.pack("!I", size))
+        self.file.seek(0, SEEK_END)
+
+    def getNextFile(self, compressed = False):
 	assert(not self.mutable)
 
-	eatCount = self.next - self.gzfile.tell()
-
-	# in case the file wasn't completely read in (it may have
-	# already been in the repository, for example)
-	while eatCount > self.bufSize:
-	    self.gzfile.read(self.bufSize)
-	    eatCount -= self.bufSize
-	self.gzfile.read(eatCount)
-
+        self.file.seek(self.next, SEEK_SET)
 	name, tag, size = self.nextFile()
 
 	if name is None:
 	    return None
 
-	fcf = util.NestedFile(self.gzfile, size)
-	self.next = self.gzfile.tell() + size
+	fcf = util.SeekableNestedFile(self.file, size)
 
-	return (name, tag, fcf, size)
+        if compressed:
+            finalFile = fcf
+        else:
+            finalFile = gzip.GzipFile(None, "r", fileobj = fcf)
+
+	self.next = self.file.tell() + size
+
+	return (name, tag, finalFile, size)
 
     def nextFile(self):
-	nameLen = self.gzfile.read(8)
+	nameLen = self.file.read(10)
 	if not len(nameLen):
 	    return (None, None, None)
 
-	nameLen, size, tagLen = struct.unpack("!HIH", nameLen)
-	name = self.gzfile.read(nameLen)
-	tag = self.gzfile.read(tagLen)
+	subMagic, nameLen, size, tagLen = struct.unpack("!HHIH", nameLen)
+        assert(subMagic == SUBFILE_MAGIC)
+	name = self.file.read(nameLen)
+	tag = self.file.read(tagLen)
 	return (name, tag, size)
 	
     def __del__(self):
@@ -165,11 +170,10 @@ class FileContainer:
 	    self.file.write(struct.pack("!I", FILE_CONTAINER_VERSION))
 
 	    self.mutable = True
-	    self.rest = gzip.GzipFile(None, "wb", 6, self.file)
 	else:
 	    self.file.seek(0, SEEK_SET)
 	    try:
-		self.readTable()
+		self.readHeader()
 	    except:
 		self.file.close()
 		self.file = None

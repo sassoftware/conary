@@ -330,8 +330,25 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                         else:
                             ptrTable[contentsHash] = pathId
 
+                    if not newFile.flags.isConfig() and \
+                                contType == changeset.ChangedFileTypes.file:
+                        cont = filecontents.CompressedFromDataStore(
+                                              self.contentsStore, 
+                                              newFile.contents.sha1(), 
+                                              newFile.contents.size())
+                        compressed = True
+                    else:
+                        compressed = False
+
+                    # ptr entries are not compressed, whether or not they
+                    # are config files. override the compressed rule from
+                    # above
+                    if contType == changeset.ChangedFileTypes.ptr:
+                        compressed = False
+
 		    cs.addFileContents(pathId, contType, cont, 
-				       newFile.flags.isConfig())
+				       newFile.flags.isConfig(),
+                                       compressed = compressed)
 
 	return (cs, externalTroveList, externalFileList)
 
