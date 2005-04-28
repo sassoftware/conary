@@ -1,7 +1,8 @@
 Changes in 0.50.14:
   * Dependency checking now returns reordering information (which isn't
     used yet)
-  * Allow groups to include other groups defined in the same recipe
+  * Allow groups to include other groups defined in the same recipe (but
+    explicitly disallow cycles in groups)
 
 Changes in 0.50.13:
   * Added automatic :data component for /usr/share, to which you should

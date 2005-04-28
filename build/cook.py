@@ -395,6 +395,30 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     normal trove.
     """
 
+    def _findCycle(graph):
+	"""
+	Looks for a cycle in the graph (which is a dictionary indexed
+	by nodes, each entry in which is a list of edges. Returns a 
+	list of the nodes in the first cycle found.
+	"""
+
+	def _handleOne(node, path):
+	    seen[node] = True
+
+	    for target in graph[node]:
+		if target in path:
+		    return path + [ target ]
+
+		cycle = _handleOne(target, path + [ target ])
+		if cycle:
+		    return cycle
+
+	seen = {}
+	for node in graph:
+	    if seen.has_key(node): continue
+	    cycle = _handleOne(node, [])
+	    if cycle: return cycle
+
     fullName = recipeClass.name
     changeSet = changeset.ChangeSet()
 
@@ -437,6 +461,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     buildTime = time.time()
 
     groups = {}
+    newGroupGraph = {}
     for groupName in groupNames:
         grp = trove.Trove(groupName, targetVersion, grpFlavor, None,
                           isRedirect = False)
@@ -447,9 +472,13 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
             for (version, flavor, byDefault) in versionFlavorList:
                 grp.addTrove(name, version, flavor, byDefault = byDefault)
 
-	# add groups which were newly created by this group
+	# add groups which were newly created by this group. also build
+	# the graph we need for cycle detection
 	for name, byDefault in recipeObj.getNewGroupList(groupName = groupName):
 	    grp.addTrove(name, targetVersion, grpFlavor, byDefault = byDefault)
+
+	newGroupGraph[groupName] = [ x[0] for x in 
+			    recipeObj.getNewGroupList(groupName = groupName) ]
 
         grp.setBuildTime(buildTime)
         grp.setSourceName(fullName + ':source')
@@ -458,6 +487,10 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
 
         grpDiff = grp.diff(None, absolute = 1)[0]
         changeSet.newPackage(grpDiff)
+
+    cycle = _findCycle(newGroupGraph)
+    if cycle:
+	raise CookError("cycle in groups: %s" % cycle)
 
     built = [ (grp.getName(), grp.getVersion().asString(), grp.getFlavor()) 
               for grp in groups.itervalues()]
