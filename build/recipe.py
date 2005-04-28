@@ -941,7 +941,11 @@ class SingleGroup:
         else:
             flavorObj = None
 
-        self.addTroveList.append((name, versionStr, flavorObj, source, byDefault))
+        self.addTroveList.append((name, versionStr, flavorObj, source, 
+				  byDefault))
+
+    def addNewGroup(self, name, byDefault):
+	self.newGroupList.append([ name, byDefault ])
 
     def findTroves(self, cfg, repos, labelPath):
         self.size = 0
@@ -1015,8 +1019,12 @@ class SingleGroup:
     def getTroveList(self):
 	return self.troveVersionFlavors
 
+    def getNewGroupList(self):
+	return self.newGroupList
+
     def __init__(self, depCheck):
         self.addTroveList = []
+        self.newGroupList = []
         self.requires = deps.DependencySet()
 	self.troveVersionFlavors = {}
         self.depCheck = depCheck
@@ -1040,13 +1048,23 @@ class GroupRecipe(Recipe):
                  byDefault = True, groupName = None):
         if groupName is None:
             groupName = [self.name]
-        if not isinstance(groupName, (list, tuple)):
+        elif not isinstance(groupName, (list, tuple)):
             groupName = [groupName]
+
         for thisGroupName in groupName:
             self.groups[thisGroupName].addTrove(name, versionStr = versionStr,
                                                 flavor = flavor,
                                                 source = source,
                                                 byDefault = byDefault)
+
+    def addNewGroup(self, name, groupName = None, byDefault = True):
+	if groupName is None:
+	    groupName = self.name
+
+	if not self.groups.has_key(name):
+	    raise RecipeFileError, 'group %s has not been created' % name
+
+	self.groups[groupName].addNewGroup(name, byDefault)
 
     def findTroves(self, groupName = None):
         if groupName is None: groupName = self.name
@@ -1060,6 +1078,10 @@ class GroupRecipe(Recipe):
     def getTroveList(self, groupName = None):
         if groupName is None: groupName = self.name
 	return self.groups[groupName].getTroveList()
+
+    def getNewGroupList(self, groupName = None):
+        if groupName is None: groupName = self.name
+	return self.groups[groupName].getNewGroupList()
 
     def getSize(self, groupName = None):
         if groupName is None: groupName = self.name

@@ -437,7 +437,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     buildTime = time.time()
 
     groups = {}
-    for groupName in recipeObj.getGroupNames():
+    for groupName in groupNames:
         grp = trove.Trove(groupName, targetVersion, grpFlavor, None,
                           isRedirect = False)
         grp.setRequires(recipeObj.getRequires(groupName = groupName))
@@ -446,6 +446,10 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
         for (name, versionFlavorList) in recipeObj.getTroveList(groupName = groupName).iteritems():
             for (version, flavor, byDefault) in versionFlavorList:
                 grp.addTrove(name, version, flavor, byDefault = byDefault)
+
+	# add groups which were newly created by this group
+	for name, byDefault in recipeObj.getNewGroupList(groupName = groupName):
+	    grp.addTrove(name, targetVersion, grpFlavor, byDefault = byDefault)
 
         grp.setBuildTime(buildTime)
         grp.setSourceName(fullName + ':source')
