@@ -443,7 +443,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
             raise CookError(str(msg))
 
         if failedDeps:
-            print "Group %s has unresolved dependencies:", groupName
+            print "Group %s has unresolved dependencies:" % groupName
             for (name, depSet) in failedDeps:
                 print name
                 print "\t", "\n\t".join(str(depSet).split("\n"))
