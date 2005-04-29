@@ -20,38 +20,37 @@ import streams
 import string
 import tempfile
 
-class AbstractChangeLog(streams.TupleStream):
+_CHANGELOG_NAME    = 1
+_CHANGELOG_CONTACT = 2
+_CHANGELOG_MESSAGE = 3
 
-    __slots__ = [ 'items' ]
-    makeup = ( ("name",    streams.StringStream, "B"), 
-	       ("contact", streams.StringStream, "B"),
-	       ("message", streams.StringStream, "!H") )
+class ChangeLog(streams.StreamSet):
+
+    streamDict = { _CHANGELOG_NAME    : (streams.StringStream, "name"    ),
+                   _CHANGELOG_CONTACT : (streams.StringStream, "contact" ),
+                   _CHANGELOG_MESSAGE : (streams.StringStream, "message" ) }
+
+    _streamDict = streams.StreamSetDef(streamDict)
+    __slots__ = [ 'name', 'contact', 'message' ]
 
     def getName(self):
-	return self.items[0]()
+        return self.name()
 
     def setName(self, value):
-	return self.items[0].set(value)
+        self.name.set(value)
 
     def getContact(self):
-	return self.items[1]()
+        return self.contact()
 
     def setContact(self, value):
-	return self.items[1].set(value)
+        self.contact.set(value)
 
     def getMessage(self):
-	return self.items[2]()
+        return self.message()
 
     def setMessage(self, value):
 	assert(not value or value[-1] == '\n')
-	return self.items[2].set(value)
-
-    def freeze(self, skipSet = None):
-	if self.items[0]() or self.items[1]() or \
-	   self.items[2]():
-	    return streams.TupleStream.freeze(self)
-	else:
-	    return ""
+        self.message.set(value)
 
     def getMessageFromUser(self):
 	editor = os.environ.get("EDITOR", "/bin/vi")
@@ -76,34 +75,14 @@ class AbstractChangeLog(streams.TupleStream):
 	self.setMessage(newMsg)
 	return True
 
-    def __eq__(self, other, skipSet = None):
-	if not isinstance(other, AbstractChangeLog):
-	    return False
-
-	return self.items == other.items
-
-    def __init__(self, data = None):
-	if data == "": data = None
-	streams.TupleStream.__init__(self, data)
-
-class ChangeLog(AbstractChangeLog):
-
-    __slots__ = [ 'items' ]
-
-    def __init__(self, name, contact = None, message = None):
+    def __init__(self, name = None, contact = None, message = None):
         if contact is None:
-            AbstractChangeLog.__init__(self, data = name)
+            streams.StreamSet.__init__(self, data = name)
         else:
             assert(not message or message[-1] == '\n')
 
-            AbstractChangeLog.__init__(self)
+            streams.StreamSet.__init__(self)
 
             self.setName(name)
             self.setContact(contact)
             self.setMessage(message)
-
-class ThawChangeLog(AbstractChangeLog):
-
-    __slots__ = [ 'items' ]
-
-    pass

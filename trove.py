@@ -23,7 +23,7 @@ import streams
 import struct
 import versions
 from deps import deps
-from changelog import AbstractChangeLog
+from changelog import ChangeLog
 from streams import FrozenVersionStream
 from streams import DependenciesStream
 from streams import ByteStream
@@ -822,7 +822,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         _STREAM_TCS_NEW_VERSION : (FrozenVersionStream,  "newVersion"    ),
         _STREAM_TCS_REQUIRES    : (DependenciesStream,   "requires"      ),
         _STREAM_TCS_PROVIDES    : (DependenciesStream,   "provides"      ),
-        _STREAM_TCS_CHANGE_LOG  : (AbstractChangeLog,    "changeLog"     ),
+        _STREAM_TCS_CHANGE_LOG  : (ChangeLog,            "changeLog"     ),
         _STREAM_TCS_OLD_FILES   : (OldFileStream,	 "oldFiles"      ),
         _STREAM_TCS_TYPE        : (streams.IntStream,    "tcsType"       ),
         _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,   "packages"      ),
