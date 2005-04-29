@@ -292,7 +292,8 @@ class ChangeSet(streams.LargeStreamSet):
 	else:
 	    self.fileContents[pathId] = (contType, contents, compressed)
 
-    def getFileContents(self, pathId, withSize = False):
+    def getFileContents(self, pathId, withSize = False, compressed = False):
+        assert(not compressed)
 	if self.fileContents.has_key(pathId):
 	    cont = self.fileContents[pathId]
 	else:
@@ -712,7 +713,7 @@ class ReadOnlyChangeSet(ChangeSet):
                                                       (None, None, None))
         return tag == ChangedFileTypes.diff
 
-    def _nextFile(self, compressed = False):
+    def _nextFile(self):
         if self.lastCsf:
             next = self.lastCsf.getNextFile()
             if next:
@@ -728,12 +729,9 @@ class ReadOnlyChangeSet(ChangeSet):
         self.lastCsf = rc[4]
         del self.fileQueue[0]
 
-        if compressed:
-            return rc
+        return rc
 
-        return rc[0:2] + (gzip.GzipFile(None, "r", fileobj = rc[2]),) + rc[3:5]
-
-    def getFileContents(self, pathId, withSize = False):
+    def getFileContents(self, pathId, withSize = False, compressed = False):
         name = None
 	if self.configCache.has_key(pathId):
             name = pathId
@@ -751,6 +749,8 @@ class ReadOnlyChangeSet(ChangeSet):
             rc = self._nextFile()
             while rc:
                 name, tagInfo, f, size, csf = rc
+                if not compressed:
+                    f = gzip.GzipFile(None, "r", fileobj = f)
                 
                 # if we found the pathId we're looking for, or the pathId
                 # we got is a config file, cache or break out of the loop
@@ -880,12 +880,12 @@ class ReadOnlyChangeSet(ChangeSet):
 	    (tag, str, compressed) = self.configCache[hash]
             csf.addFile(hash, filecontents.FromString(str), "1 " + tag[4:])
 
-        next = self._nextFile(compressed = True)
+        next = self._nextFile()
         while next:
             name, tagInfo, f, size, otherCsf = next
             csf.addFile(name, filecontents.FromFile(f, size = size), tagInfo,
                         precompressed = True)
-            next = self._nextFile(compressed = True)
+            next = self._nextFile()
 
     def merge(self, otherCs):
         self.files.update(otherCs.files)
