@@ -41,29 +41,26 @@ _STREAM_CS_PKGS     = 2
 _STREAM_CS_OLD_PKGS = 3
 _STREAM_CS_FILES    = 4
 
-class FileInfo(streams.TupleStream):
+_FILEINFO_OLDFILEID = 1
+_FILEINFO_NEWFILEID = 2
+_FILEINFO_CSINFO    = 3
 
-    __slots__ = []
+class FileInfo(streams.StreamSet):
 
-    # pathId, oldVersion, newVersion, csInfo
-    makeup = (("oldFileId", streams.StringStream, "B"),
-	      ("newFileId", streams.StringStream, 20),
-	      ("csInfo", streams.StringStream, "B"))
+    streamDict = { _FILEINFO_OLDFILEID : (streams.StringStream, "oldFileId"),
+                   _FILEINFO_NEWFILEID : (streams.StringStream, "newFileId"),
+                   _FILEINFO_CSINFO    : (streams.StringStream, "csInfo"   ) }
+    _streamDict = streams.StreamSetDef(streamDict)
+    __slots__ = [ "oldFileId", "newFileId", "csInfo" ]
 
-    def oldFileId(self):
-        return self.items[0]()
-
-    def newFileId(self):
-        return self.items[1]()
-
-    def csInfo(self):
-        return self.items[2]()
-
-    def __init__(self, first, newFileId = None, chg = None):
+    def __init__(self, first, newFileId = None, csInfo = None):
 	if newFileId is None:
-	    streams.TupleStream.__init__(self, first)
+	    streams.StreamSet.__init__(self, first)
 	else:
-	    streams.TupleStream.__init__(self, first, newFileId, chg)
+            streams.StreamSet.__init__(self)
+            self.oldFileId.set(first)
+            self.newFileId.set(newFileId)
+            self.csInfo.set(csInfo)
 
 class RollbackRecordNewPackges(dict, streams.InfoStream):
 
