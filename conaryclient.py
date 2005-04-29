@@ -11,16 +11,18 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import itertools
 import os
-from lib import util
 import pickle
 
+#conary imports
 from callbacks import UpdateCallback
 import conarycfg
 import deps
 import versions
 import metadata
 from deps import deps
+from lib import util
 from local import database
 from repository import repository
 from repository import changeset
@@ -125,30 +127,50 @@ class ConaryClient:
                             # but with different flavors? we could be
                             # (much) smarter here
                             scoredList = []
-                            for choice in choiceList:
-                                affinityTroves = None
-                                if not keepExisting:
+
+                            # set up a list of affinity troves for each choice
+                            if keepExisting:
+                                affTroveList = [] * len(choiceList)
+                            else:
+                                affTroveList = []
+                                for choice in choiceList:
                                     try:
                                         affinityTroves = self.db.findTrove(
-                                                                    None, 
+                                                                        None, 
                                                                     choice[0])
+                                        affTroveList.append(affinityTroves)
                                     except repository.TroveNotFound:
-                                        pass 
-                                    
-                                for flavor in self.cfg.flavor:
-                                    f = flavor.copy()
+                                        affTroveList.append([])
 
+                            found = False
+                            # iterate over flavorpath -- use suggestions 
+                            # from first flavor on flavorpath that gets a match 
+                            for flavor in self.cfg.flavor:
+
+                                for choice, affinityTroves in itertools.izip(
+                                                                 choiceList, 
+                                                                 affTroveList):
+                                    f = flavor.copy()
                                     if affinityTroves:
                                         f.union(affinityTroves[0][2],
-                                            mergeType = deps.DEP_MERGE_TYPE_PREFS)
-                                    scoredList.append((f.score(choice[2]), choice))
-                            scoredList.sort(_scoreSort)
-                            if scoredList[-1][0] is not False:
-                                choice = scoredList[-1][1]
-                                suggList.append(choice)
+                                        mergeType=deps.DEP_MERGE_TYPE_PREFS)
+                                    scoredList.append((f.score(choice[2]), 
+                                                       choice))
+                                scoredList.sort(_scoreSort)
+                                if scoredList[-1][0] is not False:
+                                    choice = scoredList[-1][1]
+                                    suggList.append(choice)
 
-                                l = suggMap.setdefault(troveName, [])
-                                l.append(choice)
+                                    l = suggMap.setdefault(troveName, [])
+                                    l.append(choice)
+                                    found = True
+                                    break
+
+                                if found:
+                                    # break out of searching flavor path
+                                    # move on to the next dep that needs
+                                    # to be filled
+                                    break
 
 			troves.update(dict.fromkeys(suggList))
 
