@@ -638,7 +638,7 @@ class ChangeSet(streams.LargeStreamSet):
 			    self.addFile(pathId, oldVer, newVer, csInfo)
 
 	for pkgCs in self.iterNewPackageList():
-	    # the implemented of updateChangedPackage makes this whole thing
+	    # the implementation of updateChangedPackage makes this whole thing
 	    # O(n^2) (n is the number of packages changed in pkgCs), which is
 	    # just silly. if large groups are added like this the effect could
 	    # become noticeable
