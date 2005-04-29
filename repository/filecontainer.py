@@ -127,7 +127,7 @@ class FileContainer:
 
 	self.next = self.file.tell() + size
 
-	return (name, tag, fcf, size)
+	return (name, tag, fcf)
 
     def nextFile(self):
 	nameLen = self.file.read(10)

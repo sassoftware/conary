@@ -720,10 +720,10 @@ class ReadOnlyChangeSet(ChangeSet):
             return None
 
         rc = self.fileQueue[0]
-        self.lastCsf = rc[4]
+        self.lastCsf = rc[3]
         del self.fileQueue[0]
 
-        return rc[0:3] + rc[4:5]
+        return rc
 
     def getFileContents(self, pathId, compressed = False):
         name = None
@@ -733,10 +733,8 @@ class ReadOnlyChangeSet(ChangeSet):
 
             if type(contents) == str:
                 cont = filecontents.FromString(contents)
-                size = len(contents)
             else:
                 cont = contents
-                size = contents.size()
 	else:
             self.filesRead = True
 
@@ -940,7 +938,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
         else:
             csf = filecontainer.FileContainer(fileName)
 
-	(name, tagInfo, control, size) = csf.getNextFile()
+	(name, tagInfo, control) = csf.getNextFile()
         assert(name == "CONARYCHANGESET")
 
 	start = gzip.GzipFile(None, "r", fileobj = control).read()
@@ -966,7 +964,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
         # load the diff cache
         nextFile = csf.getNextFile()
         while nextFile:
-            name, tagInfo, f, size = nextFile
+            name, tagInfo, f = nextFile
 
             (isConfig, tag) = tagInfo.split()
             tag = 'cft-' + tag
@@ -1080,7 +1078,7 @@ class dictAsCsf:
         del gzf
         os.lseek(fd, 0, 0)
         f = os.fdopen(fd, "r")
-        return (name, contType, f, contObj.size())
+        return (name, contType, f)
 
     def addConfigs(self, contents):
         # this is like __init__, but it knows things are config files so
