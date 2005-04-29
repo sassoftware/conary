@@ -57,8 +57,10 @@ def flags_x86_64():
     baseFlagMap = [ ]
     ofInterest = {}.fromkeys([ '3dnow', '3dnowext', 'nx', 'sse3' ])
 
-    return [[ (x86flags('x86_64', baseArch, baseFlagMap, ofInterest)) ]] \
-            + flags_i686()
+    x86_64 = x86flags('x86_64', baseArch, baseFlagMap, ofInterest)
+    multiarch = flags_i686()
+    multiarch[0].append(x86_64)
+    return [[ x86_64 ]] + multiarch 
 
 def current():
     return currentArch
