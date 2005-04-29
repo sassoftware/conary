@@ -27,6 +27,7 @@ import repository
 from lib import sha1helper
 import streams
 import struct
+import tempfile
 import trove
 from lib import util
 import versions
@@ -713,7 +714,7 @@ class ReadOnlyChangeSet(ChangeSet):
 
     def _nextFile(self, compressed = False):
         if self.lastCsf:
-            next = self.lastCsf.getNextFile(compressed = compressed)
+            next = self.lastCsf.getNextFile()
             if next:
                 util.tupleListBsearchInsert(self.fileQueue, 
                                             next + (self.lastCsf,),
@@ -726,7 +727,11 @@ class ReadOnlyChangeSet(ChangeSet):
         rc = self.fileQueue[0]
         self.lastCsf = rc[4]
         del self.fileQueue[0]
-        return rc
+
+        if compressed:
+            return rc
+
+        return rc[0:2] + (gzip.GzipFile(None, "r", fileobj = rc[2]),) + rc[3:5]
 
     def getFileContents(self, pathId, withSize = False):
         name = None
@@ -946,7 +951,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 	(name, tagInfo, control, size) = csf.getNextFile()
         assert(name == "CONARYCHANGESET")
 
-	start = control.read()
+	start = gzip.GzipFile(None, "r", fileobj = control).read()
 	ReadOnlyChangeSet.__init__(self, data = start)
 
 	self.absolute = True
@@ -982,7 +987,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
             if tag != ChangedFileTypes.diff and not(self.absolute and isConfig):
                 break
 
-            cont = filecontents.FromFile(f)
+            cont = filecontents.FromFile(gzip.GzipFile(None, "r", fileobj = f))
             s = cont.get().read()
             size = len(s)
             self.configCache[name] = (tag, s, False)
@@ -1067,26 +1072,24 @@ def CreateFromFilesystem(pkgList):
 
 class dictAsCsf:
 
-    def getNextFile(self, compressed = False):
+    def getNextFile(self):
         if not self.items:
             return None
 
         (name, contType, contObj) = self.items[0]
         del self.items[0]
 
-        if compressed:
-            # XXX there must be a better way, but I can't think of it
-            f = contObj.get()
-            (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
-                                          suffix = '.cf-out')
-            os.unlink(path)
-            gzf = gzip.GzipFile(path, "wb")
-            util.copyfileobj(f, gzf)
-            del f
-            f = os.fdopen(fd, "r")
-            return (name, contType, f, contObj.size())
-        else:
-            return (name, contType, contObj.get(), contObj.size())
+        # XXX there must be a better way, but I can't think of it
+        f = contObj.get()
+        (fd, path) = tempfile.mkstemp(suffix = '.cf-out')
+        #os.unlink(path)
+        gzf = gzip.GzipFile(path, "wb", fileobj = os.fdopen(os.dup(fd), "w"))
+        util.copyfileobj(f, gzf)
+        del f
+        del gzf
+        os.lseek(fd, 0, 0)
+        f = os.fdopen(fd, "r")
+        return (name, contType, f, contObj.size())
 
     def addConfigs(self, contents):
         # this is like __init__, but it knows things are config files so

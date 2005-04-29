@@ -114,7 +114,7 @@ class FileContainer:
         self.file.write(struct.pack("!I", size))
         self.file.seek(0, SEEK_END)
 
-    def getNextFile(self, compressed = False):
+    def getNextFile(self):
 	assert(not self.mutable)
 
         self.file.seek(self.next, SEEK_SET)
@@ -125,14 +125,9 @@ class FileContainer:
 
 	fcf = util.SeekableNestedFile(self.file, size)
 
-        if compressed:
-            finalFile = fcf
-        else:
-            finalFile = gzip.GzipFile(None, "r", fileobj = fcf)
-
 	self.next = self.file.tell() + size
 
-	return (name, tag, finalFile, size)
+	return (name, tag, fcf, size)
 
     def nextFile(self):
 	nameLen = self.file.read(10)

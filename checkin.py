@@ -235,7 +235,7 @@ def _getRecipeLoader(cfg, repos, recipeFile):
 
 def checkout(repos, cfg, workDir, name):
     # We have to be careful with labels
-    parts =  name.split('=', 1) 
+    parts = name.split('=', 1) 
     if len(parts) == 1:
         versionStr = None
     else:
