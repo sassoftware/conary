@@ -355,7 +355,6 @@ class Trove:
 	# now handle the packages we include
 	added = {}
 	removed = {}
-        changed = {}
 
 	for key in self.packages.iterkeys():
 	    if them and them.packages.has_key(key): 
@@ -922,11 +921,13 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	@param new: version to add to the changed list
 	@type new: versions.VersionString
 	"""
-	for (theName, list) in self.packages.iteritems():
+        # XXX this method is broken.  it is not flavor aware.
+        raise AssertionError
+	for (theName, l) in self.packages.iteritems():
 	    if theName != name: continue
-	    for (i, (change, ver)) in enumerate(list):
+	    for (i, (change, ver)) in enumerate(l):
 		if ver == old:
-		    list[i] = (change, new)
+		    l[i] = (change, new)
 		    return
 
     def oldTroveVersion(self, name, version, flavor):
