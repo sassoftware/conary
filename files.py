@@ -52,23 +52,26 @@ FILE_STREAM_TAGS	    = 8
 FILE_STREAM_TARGET	    = 9
 FILE_STREAM_LINKGROUP	    = 10
 
-class DeviceStream(streams.TupleStream):
+DEVICE_STREAM_MAJOR = 1
+DEVICE_STREAM_MINOR = 2
 
-    __slots__ = []
+INODE_STREAM_PERMS = 1
+INODE_STREAM_MTIME = 2
+INODE_STREAM_OWNER = 3
+INODE_STREAM_GROUP = 4
 
-    makeup = (("major", streams.IntStream, 4), ("minor", streams.IntStream, 4))
+class DeviceStream(streams.StreamSet):
 
-    def major(self):
-        return self.items[0]()
+    streamDict = { DEVICE_STREAM_MAJOR : (streams.IntStream,  "major"),
+                   DEVICE_STREAM_MINOR : (streams.IntStream,  "minor") }
+    _streamDict = streams.StreamSetDef(streamDict)
+    __slots__ = [ "major", "minor" ]
 
     def setMajor(self, value):
-        return self.items[0].set(value)
-
-    def minor(self):
-        return self.items[1]()
+        self.major.set(value)
 
     def setMinor(self, value):
-        return self.items[1].set(value)
+        self.minor.set(value)
 
 class LinkGroupStream(streams.StringStream):
 
@@ -114,61 +117,46 @@ class LinkGroupStream(streams.StringStream):
     def __init__(self, data = None):
 	streams.StringStream.__init__(self, data)
 
-class RegularFileStream(streams.TupleStream):
+REGULAR_FILE_SIZE = 1
+REGULAR_FILE_SHA1 = 2
 
-    __slots__ = []
-    makeup = (("size", streams.LongLongStream, 8), 
-	      ("sha1", streams.Sha1Stream, 20))
+class RegularFileStream(streams.StreamSet):
 
-    def size(self):
-        return self.items[0]()
+    streamDict = { REGULAR_FILE_SIZE : (streams.LongLongStream, "size"),
+                   REGULAR_FILE_SHA1 : (streams.Sha1Stream,     "sha1") }
+    _streamDict = streams.StreamSetDef(streamDict)
+    __slots__ = [ "size", "sha1" ]
 
     def setSize(self, value):
-        return self.items[0].set(value)
-
-    def sha1(self):
-        return self.items[1]()
+        self.size.set(value)
 
     def setSha1(self, value):
-        return self.items[1].set(value)
+        self.sha1.set(value)
 
-class InodeStream(streams.TupleStream):
-
-    __slots__ = []
+class InodeStream(streams.StreamSet):
 
     """
     Stores basic inode information on a file: perms, owner, group.
     """
 
-    # this is permissions, mtime, owner, group
-    makeup = (("perms", streams.ShortStream, 2), 
-	      ("mtime", streams.MtimeStream, 4), 
-              ("owner", streams.StringStream, "B"), 
-	      ("group", streams.StringStream, "B"))
-
-    def perms(self):
-        return self.items[0]()
+    streamDict = { INODE_STREAM_PERMS : (streams.ShortStream,  "perms"),
+                   INODE_STREAM_MTIME : (streams.MtimeStream,  "mtime"),
+                   INODE_STREAM_OWNER : (streams.StringStream, "owner"),
+                   INODE_STREAM_GROUP : (streams.StringStream, "group") }
+    _streamDict = streams.StreamSetDef(streamDict)
+    __slots__ = [ "perms", "mtime", "owner", "group" ]
 
     def setPerms(self, value):
-        return self.items[0].set(value)
-
-    def mtime(self):
-        return self.items[1]()
+        self.perms.set(value)
 
     def setMtime(self, value):
-        return self.items[1].set(value)
-
-    def owner(self):
-        return self.items[2]()
+        self.mtime.set(value)
 
     def setOwner(self, value):
-        return self.items[2].set(value)
-
-    def group(self):
-        return self.items[3]()
+        self.owner.set(value)
 
     def setGroup(self, value):
-        self.items[3].set(value)
+        self.group.set(value)
         
     def triplet(self, code, setbit = 0):
 	l = [ "-", "-", "-" ]
@@ -228,7 +216,18 @@ class InodeStream(streams.TupleStream):
 	    return time.strftime("%b %e  %Y", timeSet)
 
     def __eq__(self, other, skipSet = { 'mtime' : True }):
-        return streams.TupleStream.eq(self, other, skipSet = skipSet)
+        return streams.StreamSet.__eq__(self, other, skipSet = skipSet)
+
+    def __init__(self, perms = None, mtime = None, owner = None, group = None):
+        if perms and not mtime:
+            streams.StreamSet.__init__(self, perms)
+        else:
+            streams.StreamSet.__init__(self)
+            if perms:
+                self.perms.set(perms)
+                self.mtime.set(mtime)
+                self.owner.set(owner)
+                self.group.set(group)
 
     eq = __eq__
 
@@ -488,7 +487,7 @@ class CharacterDevice(DeviceFile):
 class RegularFile(File):
 
     streamDict = { 
-	FILE_STREAM_CONTENTS : (RegularFileStream ,         'contents'  ),
+	FILE_STREAM_CONTENTS : (RegularFileStream,          'contents'  ),
         FILE_STREAM_PROVIDES : (streams.DependenciesStream, 'provides'  ),
         FILE_STREAM_REQUIRES : (streams.DependenciesStream, 'requires'  ),
         FILE_STREAM_FLAVOR   : (streams.DependenciesStream, 'flavor'    ),
@@ -708,12 +707,15 @@ def fieldsChanged(diff):
     return rc
 
 def tupleChanged(cl, diff):
-    what = struct.unpack("B", diff[0])[0]
-
+    i = 0
     rc = []
-    for (i, (name, itemType, size)) in enumerate(cl.makeup):
-	if what & (1 << i):
-	    rc.append(name)
+    while i < len(diff):
+        streamId, size = struct.unpack("!BH", diff[i:i+3])
+        name = cl.streamDict[streamId][1]
+        rc.append(name)
+        i += size + 3
+
+    assert(i == len(diff))
 
     return rc
 

@@ -2,6 +2,9 @@ Changes in 0.60.0:
   * changed changesets to compress individual files instead of the combined
     stream
   * cleaned up file content objects to no longer track file sizes
+  * switched away from TupleStream to StreamSet for both better performance
+    and improved flexibility in the format (at the price of larger
+    frozen streams)
 
 Changes in 0.50.14:
   * Dependency checking now returns reordering information (which isn't
