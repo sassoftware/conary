@@ -134,8 +134,7 @@ class SqlDbRepository(datastore.DataStoreRepository,
 	if withContents:
 	    if fileObj.hasContents:
 		cont = filecontents.FromDataStore(self.contentsStore,
-					          fileObj.contents.sha1(), 
-					          fileObj.contents.size())
+					          fileObj.contents.sha1())
 	    else:
 		cont = None
 

@@ -910,7 +910,6 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 start += size
 
                 gzfile = gzip.GzipFile(fileobj = nestedF)
-                gzfile.fullSize = util.gzipFileSize(nestedF)
 
                 contents[i] = filecontents.FromGzFile(gzfile)
 

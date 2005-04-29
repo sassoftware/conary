@@ -476,8 +476,7 @@ class ChangeSetJob:
 		    # get the contents from there
    		    fileContents = filecontents.FromDataStore(
  				     repos.contentsStore, 
- 				     fileObj.contents.sha1(), 
- 				     fileObj.contents.size())
+ 				     fileObj.contents.sha1())
  		    contType = changeset.ChangedFileTypes.file
  		    self.addFileContents(fileObj.contents.sha1(), newVersion, 
  					 fileContents, restoreContents, 

@@ -292,7 +292,7 @@ class ChangeSet(streams.LargeStreamSet):
 	else:
 	    self.fileContents[pathId] = (contType, contents, compressed)
 
-    def getFileContents(self, pathId, withSize = False, compressed = False):
+    def getFileContents(self, pathId, compressed = False):
         assert(not compressed)
 	if self.fileContents.has_key(pathId):
 	    cont = self.fileContents[pathId]
@@ -303,10 +303,7 @@ class ChangeSet(streams.LargeStreamSet):
         assert(not cont[2])
         cont = cont[:2]
 
-	if not withSize:
-	    return cont
-
-	return cont + (cont.size(), )
+	return cont
 
     def addFile(self, oldFileId, newFileId, csInfo):
         self.files[(oldFileId, newFileId)] = csInfo
@@ -441,9 +438,7 @@ class ChangeSet(streams.LargeStreamSet):
 		# saved as part of that change set.
 		if origFile.flags.isConfig():
 		    cont = filecontents.FromDataStore(db.contentsStore, 
-						       origFile.contents.sha1(),
-
-						       origFile.contents.size())
+						      origFile.contents.sha1())
 		    rollback.addFileContents(pathId,
 					     ChangedFileTypes.file, cont, 1)
 		else:
@@ -523,8 +518,7 @@ class ChangeSet(streams.LargeStreamSet):
 						 ChangedFileTypes.diff, cont, 1)
 		    else:
 			cont = filecontents.FromDataStore(db.contentsStore, 
-				    origFile.contents.sha1(),
-                                    origFile.contents.size())
+				    origFile.contents.sha1())
 			rollback.addFileContents(pathId,
 						 ChangedFileTypes.file, cont,
 						 newFile.flags.isConfig())
@@ -729,9 +723,9 @@ class ReadOnlyChangeSet(ChangeSet):
         self.lastCsf = rc[4]
         del self.fileQueue[0]
 
-        return rc
+        return rc[0:3] + rc[4:5]
 
-    def getFileContents(self, pathId, withSize = False, compressed = False):
+    def getFileContents(self, pathId, compressed = False):
         name = None
 	if self.configCache.has_key(pathId):
             name = pathId
@@ -748,7 +742,7 @@ class ReadOnlyChangeSet(ChangeSet):
 
             rc = self._nextFile()
             while rc:
-                name, tagInfo, f, size, csf = rc
+                name, tagInfo, f, csf = rc
                 if not compressed:
                     f = gzip.GzipFile(None, "r", fileobj = f)
                 
@@ -769,8 +763,6 @@ class ReadOnlyChangeSet(ChangeSet):
         if name != pathId:
             raise KeyError, 'pathId %s is not in the changeset' % \
                             sha1helper.md5ToString(pathId)
-        elif withSize:
-            return (tag, cont, size)
         else:
             return (tag, cont)
 
@@ -882,8 +874,8 @@ class ReadOnlyChangeSet(ChangeSet):
 
         next = self._nextFile()
         while next:
-            name, tagInfo, f, size, otherCsf = next
-            csf.addFile(name, filecontents.FromFile(f, size = size), tagInfo,
+            name, tagInfo, f, otherCsf = next
+            csf.addFile(name, filecontents.FromFile(f), tagInfo,
                         precompressed = True)
             next = self._nextFile()
 
@@ -989,7 +981,6 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 
             cont = filecontents.FromFile(gzip.GzipFile(None, "r", fileobj = f))
             s = cont.get().read()
-            size = len(s)
             self.configCache[name] = (tag, s, False)
             cont = filecontents.FromString(s)
 

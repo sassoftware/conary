@@ -75,8 +75,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	if withContents:
 	    if file.hasContents:
 		cont = filecontents.FromDataStore(self.contentsStore, 
-						    file.contents.sha1(), 
-						    file.contents.size())
+						    file.contents.sha1())
 	    else:
 		cont = None
 
@@ -130,8 +129,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
             if fileVersion.branch().label().getHost() == self.name:
                 fileObj = item[2]
                 cont = filecontents.FromDataStore(self.contentsStore, 
-                                                  fileObj.contents.sha1(), 
-                                                  fileObj.contents.size())
+                                                  fileObj.contents.sha1())
             else:
                 # a bit of sleight of hand here... we look for this file in
                 # the trove it was first built in
@@ -334,8 +332,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                                 contType == changeset.ChangedFileTypes.file:
                         cont = filecontents.CompressedFromDataStore(
                                               self.contentsStore, 
-                                              newFile.contents.sha1(), 
-                                              newFile.contents.size())
+                                              newFile.contents.sha1())
                         compressed = True
                     else:
                         compressed = False

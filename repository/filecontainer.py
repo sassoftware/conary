@@ -94,7 +94,7 @@ class FileContainer:
 	assert(isinstance(contents, filecontents.FileContents))
 	assert(self.mutable)
 
-	(fileObj, size) = contents.getWithSize()
+	fileObj = contents.get()
         self.file.write(struct.pack("!HH", SUBFILE_MAGIC, len(fileName)))
         sizeLoc = self.file.tell()
 	self.file.write(struct.pack("!IH", 0, len(tableData)))

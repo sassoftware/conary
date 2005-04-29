@@ -24,17 +24,11 @@ class FileContents(object):
 
     __slots__ = ()
 
-    def size(self):
-	raise NotImplementedError
-
     def copy(self):
         raise NotImplementedError
 
     def get(self):
         raise NotImplementedError
-
-    def getWithSize(self):
-	return (self.get(), self.size())
 
     def __init__(self):
 	if self.__class__ == FileContents:
@@ -50,13 +44,9 @@ class FromDataStore(FileContents):
     def get(self):
 	return self.store.openFile(sha1helper.sha1ToString(self.sha1))
 
-    def size(self):
-	return self.theSize
-
-    def __init__(self, store, sha1, size):
+    def __init__(self, store, sha1):
 	self.store = store
 	self.sha1 = sha1
-	self.theSize = size
 
 class CompressedFromDataStore(FileContents):
 
@@ -71,13 +61,9 @@ class CompressedFromDataStore(FileContents):
     def get(self):
 	return self.store.openRawFile(sha1helper.sha1ToString(self.sha1))
 
-    def size(self):
-	return self.theSize
-
-    def __init__(self, store, sha1, size):
+    def __init__(self, store, sha1):
 	self.store = store
 	self.sha1 = sha1
-	self.theSize = size
 
 class FromFilesystem(FileContents):
 
@@ -85,9 +71,6 @@ class FromFilesystem(FileContents):
 
     def get(self):
 	return open(self.path, "r")
-
-    def size(self):
-	return os.stat(self.path).st_size
 
     def __init__(self, path):
 	self.path = path
@@ -102,14 +85,6 @@ class FromChangeSet(FileContents):
     def get(self):
 	return self.cs.getFileContents(self.pathId)[1].get()
 
-    def getWithSize(self):
-	f, size = self.cs.getFileContents(self.pathId, withSize = True)[1:]
-	f = f.get()
-	return (f, size)
-
-    def size(self):
-	assert(0)
-
     def __init__(self, cs, pathId):
 	self.cs = cs
 	self.pathId = pathId
@@ -123,9 +98,6 @@ class FromString(FileContents):
 
     def get(self):
 	return StringIO(self.str)
-
-    def size(self):
-	return len(self.str)
 
     def __eq__(self, other):
         if type(other) is str:
@@ -145,21 +117,11 @@ class FromFile(FileContents):
         # XXX dup the file?
         return self.__class__(self.f)
 
-    def size(self):
-	if self.theSize is None:
-	    pos = self.f.tell()
-	    size = self.f.seek(0, SEEK_END)
-	    self.f.seek(pos, SEEK_SET)
-	    self.theSize = size
-
-	return self.theSize
-
     def get(self):
 	return self.f
 
-    def __init__(self, f, size = None):
+    def __init__(self, f):
 	self.f = f
-	self.theSize = size
 
 class FromGzFile(FileContents):
 
@@ -167,9 +129,6 @@ class FromGzFile(FileContents):
 
     def copy(self):
         return self.__class__(self.f)
-
-    def size(self):
-	return self.f.fullSize
 
     def get(self):
 	return self.f
@@ -189,9 +148,6 @@ class WithFailedHunks(FileContents):
 
     def getHunks(self):
 	return self.hunks
-
-    def size(self):
-	return self.fc.size()
 
     def __init__(self, fc, hunks):
 	self.fc = fc

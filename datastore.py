@@ -174,7 +174,6 @@ class DataStore:
 	f = open(path, "r")
 
 	gzfile = gzip.GzipFile(path, mode)
-	gzfile.fullSize = util.gzipFileSize(f)
 	return gzfile
 
     # returns a python file object for the file requested
@@ -245,8 +244,7 @@ class DataStoreRepository:
             
             if fileObj:
                 cont = filecontents.FromDataStore(self.contentsStore,
-                                                  fileObj.contents.sha1(),
-                                                  fileObj.contents.size())
+                                                  fileObj.contents.sha1())
             else:
                 cont = ""
 
