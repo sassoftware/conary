@@ -950,4 +950,7 @@ class Database:
 
 class OldDatabaseSchema(Exception):
 
+    def __str__(self):
+	return "Repository needs conversion for this version of conary."
+
     pass

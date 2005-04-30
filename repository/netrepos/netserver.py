@@ -43,6 +43,8 @@ CACHE_SCHEMA_VERSION = 12
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
+    schemaVersion = 1
+
     # lets the following exceptions pass:
     #
     # 1. Internal server error (unknown exception)
@@ -1058,11 +1060,36 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def cacheChangeSets(self):
         return isinstance(self.cache, CacheSet)
 
+    def versionCheck(self):
+        cu = self.db.cursor()
+        count = cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
+                           "name='DatabaseVersion'").next()[0]
+        if count == 0:
+            # if DatabaseVersion does not exist, but any other tables do exist,
+            # then the database version is old
+            count = cu.execute("SELECT count(*) FROM sqlite_master").next()[0]
+            if count:
+                return False
+
+            cu.execute("CREATE TABLE DatabaseVersion (version INTEGER)",
+		       start_transaction = False)
+            cu.execute("INSERT INTO DatabaseVersion VALUES (?)", 
+                       self.schemaVersion, start_transaction = False)
+        else:
+            version = cu.execute("SELECT * FROM DatabaseVersion").next()[0]
+            if version != self.schemaVersion:
+                return False
+
+        return True
+
     def open(self):
 	if self.troveStore is not None:
 	    self.close()
 
         self.db = sqlite3.connect(self.sqlDbPath, timeout=30000)
+	if not self.versionCheck():
+	    raise SchemaVersion
+
 	self.troveStore = trovestore.TroveStore(self.db)
 	sb = os.stat(self.sqlDbPath)
 	self.sqlDeviceInode = (sb.st_dev, sb.st_ino)
@@ -1083,6 +1110,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             del self.db
 
             self.db = sqlite3.connect(self.sqlDbPath, timeout=30000)
+	    if not self.versionCheck():
+		raise SchemaVersion
 	    self.troveStore = trovestore.TroveStore(self.db)
 
 	    sb = os.stat(self.sqlDbPath)
@@ -1290,4 +1319,7 @@ class CacheSet:
         self.db.commit()
 
 class InvalidClientVersion(Exception):
+    pass
+
+class SchemaVersion(Exception):
     pass
