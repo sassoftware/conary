@@ -1409,6 +1409,41 @@ class ComponentRequires(policy.Policy):
                         p.requires.union(ds)
 
 
+class ComponentProvides(policy.Policy):
+    """
+    Causes each trove to provide itself explicitly; optionally with
+    capability flags provided by
+    C{r.ComponentProvides(I{flags})} or
+    C{r.ComponentProvides('I{pkgname}', I{flags})}
+    where C{I{flags}} may be a single string, or a list, tuple, or set
+    of strings.
+    At this time, all packages and components have the union of all
+    capability flags built from this recipe.  The second form may in
+    the future be changed to apply capability flags only to the named
+    package.  It is impossible to provide a capability flag for one
+    component but not another within a single package.
+    """
+    flags = set()
+
+    def updateArgs(self, *args, **keywords):
+        if len(args) == 2:
+            #pkgname = args[0]
+            flags = args[1]
+        else:
+            flags = args[0]
+        if not isinstance(flags, (list, tuple, set)):
+            flags=(flags,)
+        self.flags |= set(flags)
+
+    def do(self):
+        if not self.flags:
+            return
+        flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in self.flags ]
+        for component in self.recipe.autopkg.components.values():
+            component.provides.addDep(deps.TroveDependencies,
+                deps.Dependency(component.name, flags))
+
+
 class Requires(_addInfo):
     """
     Drives requirement mechanism: to avoid adding requirements for a file,
@@ -1738,6 +1773,7 @@ def DefaultPolicy(recipe):
 	ExcludeDirectories(recipe),
 	LinkCount(recipe),
 	ComponentRequires(recipe),
+        ComponentProvides(recipe),
 	Requires(recipe),
 	Provides(recipe),
 	Flavor(recipe),
