@@ -221,14 +221,9 @@ class DependencyTables:
     def get(self, cu, trv, troveId):
         for (tblName, setFn) in (('Requires', trv.setRequires),
                                  ('Provides', trv.setProvides)):
-            if tblName == 'Provides':
-                classClause = "AND class != %d" % deps.DEP_CLASS_TROVES
-            else:
-                classClause = ""
-
             cu.execute("SELECT class, name, flag FROM %s NATURAL JOIN "
-                       "Dependencies WHERE instanceId=? %s ORDER BY class, name"
-                    % (tblName, classClause), troveId)
+                       "Dependencies WHERE instanceId=? ORDER BY class, name"
+                    % tblName, troveId)
 
             last = None
             flags = []
@@ -260,12 +255,6 @@ class DependencyTables:
 	stmt = cu.compile("INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)")
         self._populateTmpTable(cu, stmt, [], troveId, 
                                trove.getRequires(), prov)
-
-        cu.execute("INSERT INTO NeededDeps VALUES(?, ?, ?, ?, ?, ?, ?)",
-                       (troveId, 1, 1, 
-                        1, deps.DEP_CLASS_TROVES, 
-                        trove.getName(), NO_FLAG_MAGIC), 
-                        start_transaction = False)
         self._mergeTmpTable(cu, "NeededDeps", "Dependencies", "Requires", 
                             "Provides", ("Dependencies",))
 
@@ -669,17 +658,6 @@ class DependencyTables:
 		oldInfo = None
 
             nodes.append((trvCs, [], []))
-
-            # using depNum 0 is a hack, but it's just on a provides so
-            # it doesn't matter
-            cu.execstmt(stmt,
-                        troveNum,                   # troveNum
-                        0,                          # depNum,
-                        1,                          # flagCount
-                        True,                       # isProviedes
-                        deps.DEP_CLASS_TROVES,      # class
-                        trvCs.getName(),            # name
-                        NO_FLAG_MAGIC)              # flag
 
         # create the index for DepCheck
         self._createTmpTable(cu, "DepCheck", makeTable = False)

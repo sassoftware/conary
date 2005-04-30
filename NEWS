@@ -5,6 +5,7 @@ Changes in 0.60.0:
   * switched away from TupleStream to StreamSet for both better performance
     and improved flexibility in the format (at the price of larger
     frozen streams)
+  * troves explicitly provide their own names
 
 Changes in 0.50.14:
   * Dependency checking now returns reordering information (which isn't

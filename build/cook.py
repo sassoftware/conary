@@ -30,7 +30,7 @@ import types
 import buildinfo, buildpackage, lookaside, use, recipe
 import conaryclient
 import constants
-import deps.deps
+from deps import deps
 import files
 from lib import log
 from lib import logger
@@ -50,6 +50,7 @@ def _createComponent(repos, bldPkg, newVersion, ident):
     fileMap = {}
     p = trove.Trove(bldPkg.getName(), newVersion, bldPkg.flavor, None)
     p.setRequires(bldPkg.requires)
+    provides = bldPkg.provides
     p.setProvides(bldPkg.provides)
 
     linkGroups = {}
@@ -236,7 +237,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
 
     try: 
         trove = repos.getTrove(srcName, sourceVersion, 
-                               deps.deps.DependencySet(), withFiles = False)
+                               deps.DependencySet(), withFiles = False)
         sourceVersion = trove.getVersion()
     except repository.TroveMissing:
         if not allowMissingSource and targetLabel != versions.CookLabel():
@@ -328,12 +329,11 @@ def cookRedirectObject(repos, cfg, recipeClass, sourceVersion, macros={},
 	raise CookError(str(msg))
 
     redirects = recipeObj.getRedirections()
-    redirectFlavor = deps.deps.DependencySet()
+    redirectFlavor = deps.DependencySet()
 
     for (topName, troveList) in redirects.iteritems():
         for (name, version, flavor) in troveList:
-            redirectFlavor.union(flavor, 
-                                 mergeType=deps.deps.DEP_MERGE_TYPE_NORMAL)
+            redirectFlavor.union(flavor, mergeType=deps.DEP_MERGE_TYPE_NORMAL)
 
     targetVersion = nextVersion(repos, fullName, sourceVersion, redirectFlavor,
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
@@ -432,7 +432,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
     except recipe.RecipeFileError, msg:
 	raise CookError(str(msg))
 
-    grpFlavor = deps.deps.DependencySet()
+    grpFlavor = deps.DependencySet()
     grpFlavor.union(buildpackage._getUseDependencySet(recipeObj)) 
 
     groupNames = recipeObj.getGroupNames()
@@ -454,7 +454,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
                                             groupName = groupName).iteritems():
             for (version, flavor, byDefault) in versionFlavorList:
                 grpFlavor.union(flavor,
-                            mergeType=deps.deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
+                            mergeType=deps.DEP_MERGE_TYPE_DROP_CONFLICTS)
 
     targetVersion = nextVersion(repos, groupNames, sourceVersion, grpFlavor,
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
@@ -466,6 +466,11 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
         grp = trove.Trove(groupName, targetVersion, grpFlavor, None,
                           isRedirect = False)
         grp.setRequires(recipeObj.getRequires(groupName = groupName))
+
+	provides = deps.DependencySet()
+	provides.addDep(deps.TroveDependencies, deps.Dependency(groupName))
+	grp.setProvides(provides)
+
         groups[groupName] = grp
 
         for (name, versionFlavorList) in recipeObj.getTroveList(groupName = groupName).iteritems():
@@ -532,7 +537,7 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
     changeSet = changeset.ChangeSet()
 
     l = []
-    flavor = deps.deps.DependencySet()
+    flavor = deps.DependencySet()
     size = 0
     for (pathId, path, fileId, version) in recipeObj.iterFileList():
 	fileObj = repos.getFileVersion(pathId, fileId, version)
@@ -554,6 +559,9 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
                                 targetLabel, alwaysBumpCount=alwaysBumpCount)
 
     fileset = trove.Trove(fullName, targetVersion, flavor, None)
+    provides = deps.DependencySet()
+    provides.addDep(deps.TroveDependencies, deps.Dependency(fullName))
+    fileset.setProvides(provides)
 
     for (pathId, path, version, fileId) in l:
 	fileset.addFile(pathId, path, version, fileId)
@@ -695,7 +703,7 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
         # Every component has the same flavor (enforced by policy), just use 
         # the first one
-        flavor = deps.deps.DependencySet()
+        flavor = deps.DependencySet()
         flavor.union(bldList[0].flavor)
         componentNames = [ x.name for x in bldList ]
         targetVersion = nextVersion(repos, componentNames, sourceVersion, 
@@ -724,7 +732,8 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
     buildTime = time.time()
 
-    # create all of the package troves we need
+    # create all of the package troves we need, and let each package provide
+    # itself
     grpMap = {}
     for buildPkg in bldList:
         compName = buildPkg.getName()
@@ -735,6 +744,9 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             grpMap[main].setSourceName(recipeClass.name + ':source')
             grpMap[main].setBuildTime(buildTime)
             grpMap[main].setConaryVersion(constants.version)
+	    provides = deps.DependencySet()
+	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
+	    grpMap[main].setProvides(provides)
 
     # look up the pathids used by our immediate predecessor troves.
     ident = _IdGen()
@@ -888,7 +900,7 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
     @param sourceVersion: the source version that we are incrementing
     @type sourceVersion: Version
     @param troveFlavor: flavor of the trove being built
-    @type troveFlavor: deps.deps.DependencySet
+    @type troveFlavor: deps.DependencySet
     @param alwaysBumpCount: if True, then do not return a version that 
     matches an existing trove, even if their flavors would differentiate 
     them, instead, increase the appropriate count.  
@@ -979,7 +991,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 
     (name, versionStr, flavor) = parseTroveSpec(item)
     if flavor:
-        cfg.buildFlavor = deps.deps.overrideFlavor(cfg.buildFlavor, flavor)
+        cfg.buildFlavor = deps.overrideFlavor(cfg.buildFlavor, flavor)
     if name.endswith('.recipe') and os.path.isfile(name):
         if versionStr:
             raise Cookerror, \

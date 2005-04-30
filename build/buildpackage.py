@@ -184,6 +184,7 @@ class BuildComponent(dict):
 	self.name = name
         self.requires = deps.DependencySet()
         self.provides = deps.DependencySet()
+	self.provides.addDep(deps.TroveDependencies, deps.Dependency(name))
         self.flavor = _getUseDependencySet(recipe)
         self.linkGroups = {}
         self.requiresMap = {}
