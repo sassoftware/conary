@@ -1441,9 +1441,11 @@ class ComponentProvides(policy.Policy):
         self.flags = frozenset(flags) | self.flags
 
     def do(self):
-        if not self.flags:
-            return
-        flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in self.flags ]
+        if self.flags:
+            flags = [ (x % self.macros, deps.FLAG_SENSE_REQUIRED)
+                      for x in self.flags ]
+        else:
+            flags = []
         for component in self.recipe.autopkg.components.values():
             component.provides.addDep(deps.TroveDependencies,
                 deps.Dependency(component.name, flags))
