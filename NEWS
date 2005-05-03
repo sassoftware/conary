@@ -1,11 +1,18 @@
 Changes in 0.60.0:
-  * changed changesets to compress individual files instead of the combined
-    stream
-  * cleaned up file content objects to no longer track file sizes
-  * switched away from TupleStream to StreamSet for both better performance
-    and improved flexibility in the format (at the price of larger
-    frozen streams)
-  * troves explicitly provide their own names
+  * Changed changesets to compress individual files instead of the combined
+    stream.
+  * Cleaned up file content objects to no longer track file sizes.
+  * Switched away from TupleStream to StreamSet both for better performance
+    and for improved flexibility in the format (at the price of larger
+    frozen streams).
+  * Troves explicitly provide their own names.
+  * Troves can now provide "capability flags", and trove requirements
+    can now include references to the capability flags.
+    r.ComponentProvides(('ASDF', 'FDSA')) will cause all components built
+    from the current recipe to provide the 'ASDF' and 'FDSA' capability
+    flags, and r.Requires('/path/to/file', 'foo:runtime(ASDF FDSA)')
+    will make /path/to/file require the foo:runtime component built
+    with the ASDF and FDSA capability flags.
 
 Changes in 0.50.14:
   * Dependency checking now returns reordering information (which isn't
