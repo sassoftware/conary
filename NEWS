@@ -13,7 +13,7 @@ Changes in 0.60.0:
     flags, and r.Requires('/path/to/file', 'foo:runtime(ASDF FDSA)')
     will make /path/to/file require the foo:runtime component built
     with the ASDF and FDSA capability flags.
-  * Frozen form of dependencies doesn't depend on colon as separator
+  * Dependency components can contain : characters now.
 
 Changes in 0.50.14:
   * Dependency checking now returns reordering information (which isn't

@@ -109,12 +109,12 @@ class Dependency(BaseDependency):
 
     def freeze(self):
 	if self.flags:
-	    flags = self.flags.items()
+	    flags = [ (x.replace(':', '::'), y) for x, y in self.flags.items() ]
 	    flags.sort()
-	    return "%s\0%s" % (self.name, 
-                "\0".join([ "%s%s" % (senseMap[x[1]], x[0]) for x in flags]))
+	    return "%s:%s" % (self.name.replace(':', '::'), 
+                ":".join([ "%s%s" % (senseMap[x[1]], x[0]) for x in flags]))
 	else:
-	    return self.name
+	    return self.name.replace(':', '::')
 
     def score(self, required):
         """
@@ -237,8 +237,6 @@ class Dependency(BaseDependency):
     def __init__(self, name, flags = []):
 	self.name = name
 	if type(flags) == dict:
-            # flags aren't allowed to have colons in them
-            assert(sum([ flag.count(':') for flag in flags ]) == 0)
 	    self.flags = flags
 	else:
 	    self.flags = {}
@@ -321,8 +319,12 @@ class DependencyClass:
             yield dep
 
     def thawDependency(frozen):
-        l = frozen.split("\0", 1)
-        flags = []
+        frozen = frozen.replace(':', '\0')
+        frozen = frozen.replace('\0\0', ':')
+        l = frozen.split('\0')
+        # that version is a third faster than:
+        # frozen = frozen.replace('::', '\0')
+        # l = [ x.replace('\0', ':') for x in frozen.split(':') ]
         flags = l[1:]
 
         for i, flag in enumerate(flags):
