@@ -237,6 +237,8 @@ class Dependency(BaseDependency):
     def __init__(self, name, flags = []):
 	self.name = name
 	if type(flags) == dict:
+            # flags aren't allowed to have colons in them
+            assert(sum([ flag.count(':') for flag in flags ]) == 0)
 	    self.flags = flags
 	else:
 	    self.flags = {}
