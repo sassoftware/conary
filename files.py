@@ -67,12 +67,6 @@ class DeviceStream(streams.StreamSet):
     _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ "major", "minor" ]
 
-    def setMajor(self, value):
-        self.major.set(value)
-
-    def setMinor(self, value):
-        self.minor.set(value)
-
 class LinkGroupStream(streams.StringStream):
 
     def diff(self, other):
@@ -127,12 +121,6 @@ class RegularFileStream(streams.StreamSet):
     _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ "size", "sha1" ]
 
-    def setSize(self, value):
-        self.size.set(value)
-
-    def setSha1(self, value):
-        self.sha1.set(value)
-
 class InodeStream(streams.StreamSet):
 
     """
@@ -146,18 +134,6 @@ class InodeStream(streams.StreamSet):
     _streamDict = streams.StreamSetDef(streamDict)
     __slots__ = [ "perms", "mtime", "owner", "group" ]
 
-    def setPerms(self, value):
-        self.perms.set(value)
-
-    def setMtime(self, value):
-        self.mtime.set(value)
-
-    def setOwner(self, value):
-        self.owner.set(value)
-
-    def setGroup(self, value):
-        self.group.set(value)
-        
     def triplet(self, code, setbit = 0):
 	l = [ "-", "-", "-" ]
 	if code & 4:
@@ -571,12 +547,12 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False):
 	f = NamedPipe(pathId)
     elif (stat.S_ISBLK(s.st_mode)):
 	f = BlockDevice(pathId)
-	f.devt.setMajor(s.st_rdev >> 8)
-	f.devt.setMinor(s.st_rdev & 0xff)
+	f.devt.major.set(s.st_rdev >> 8)
+	f.devt.minor.set(s.st_rdev & 0xff)
     elif (stat.S_ISCHR(s.st_mode)):
 	f = CharacterDevice(pathId)
-	f.devt.setMajor(s.st_rdev >> 8)
-	f.devt.setMinor(s.st_rdev & 0xff)
+	f.devt.major.set(s.st_rdev >> 8)
+	f.devt.minor.set(s.st_rdev & 0xff)
     else:
         raise FilesError("unsupported file type for %s" % path)
 
@@ -596,8 +572,8 @@ def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False):
     if needsSha1:
 	sha1 = sha1helper.sha1FileBin(path)
 	f.contents = RegularFileStream()
-	f.contents.setSize(s.st_size)
-	f.contents.setSha1(sha1)
+	f.contents.size.set(s.st_size)
+	f.contents.sha1.set(sha1)
 
     if inodeInfo:
         return (f, s.st_nlink, (s.st_rdev, s.st_ino))

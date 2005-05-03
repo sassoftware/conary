@@ -30,6 +30,8 @@ import versions
 from build import tags
 from deps import deps
 
+OldDatabaseSchema = sqldb.OldDatabaseSchema
+
 class SqlDbRepository(datastore.DataStoreRepository,
 		      repository.AbstractRepository):
 

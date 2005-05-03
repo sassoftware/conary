@@ -35,7 +35,7 @@ c = FileContainer(f)
 if len(sys.argv) == 2:
     rc = c.getNextFile()
     while rc:
-	(name, tag, f, size) = rc
+	(name, tag, f) = rc
 	if len(name) == 16:
 	    name = md5ToString(name)
 
@@ -48,7 +48,7 @@ elif len(sys.argv) == 3:
 
     nf = c.getNextFile()
     while nf:
-        (fname, tag, f, size) = nf
+        (fname, tag, f) = nf
         if fname == name:
             break
         nf = c.getNextFile()

@@ -37,12 +37,12 @@ def BuildDeviceFile(devtype, major, minor, owner, group, perms):
     else:
 	raise AssertionError
 
-    f.devt.setMajor(major)
-    f.devt.setMinor(minor)
-    f.inode.setOwner(owner)
-    f.inode.setGroup(group)
-    f.inode.setPerms(perms)
-    f.inode.setMtime(time.time())
+    f.devt.major.set(major)
+    f.devt.minor.set(minor)
+    f.inode.owner.set(owner)
+    f.inode.group.set(group)
+    f.inode.perms.set(perms)
+    f.inode.mtime.set(time.time())
     f.flags.set(0)
 
     return f
@@ -69,7 +69,7 @@ class BuildComponent(dict):
         """
 	(f, linkCount, inode) = files.FileFromFilesystem(realPath, None, 
                                         inodeInfo = True)
-	f.inode.setPerms(f.inode.perms() & 01777)
+	f.inode.perms.set(f.inode.perms() & 01777)
 	self[path] = (realPath, f)
 
         if f.hasContents and isinstance(f, files.RegularFile):
@@ -254,8 +254,8 @@ class AutoBuildPackage:
         assert(f.hasContents and isinstance(f, files.RegularFile))
         sha1 = sha1helper.sha1FileBin(realPath)
         size = os.lstat(realPath).st_size
-        f.contents.setSize(size)
-        f.contents.setSha1(sha1)
+        f.contents.size.set(size)
+        f.contents.sha1.set(sha1)
 
     def addFile(self, path, realPath):
         """

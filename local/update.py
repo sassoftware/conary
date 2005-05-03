@@ -743,8 +743,8 @@ class FilesystemJob:
 			# this case (something other than owner/group
 			# changed, such as size).  simply take the
 			# head values
-			baseFile.inode.setOwner(headFile.inode.owner())
-			baseFile.inode.setGroup(headFile.inode.group())
+			baseFile.inode.owner.set(headFile.inode.owner())
+			baseFile.inode.group.set(headFile.inode.group())
 
 		    conflicts = fsFile.twm(headChanges, baseFile, 
 					   skip = twmSkipList)
@@ -795,8 +795,8 @@ class FilesystemJob:
                         # now set the sha1 and size of the fsFile's
                         # contents to match what will be on the system
                         # once this is applied
-                        fsFile.contents.setSha1(sha1helper.sha1String(newContents))
-                        fsFile.contents.setSize(len(newContents))
+                        fsFile.contents.sha1.set(sha1helper.sha1String(newContents))
+                        fsFile.contents.size.set(len(newContents))
 			self._restore(fsFile, realPath, 
 				      "replacing %s with contents "
 				      "from repository",
@@ -804,8 +804,8 @@ class FilesystemJob:
 		    else:
                         # switch the fsFile to the sha1 for the new file
                         if fsFile.hasContents:
-                            fsFile.contents.setSha1(headFile.contents.sha1())
-                            fsFile.contents.setSize(headFile.contents.size())
+                            fsFile.contents.sha1.set(headFile.contents.sha1())
+                            fsFile.contents.size.set(headFile.contents.size())
 			self._restore(fsFile, realPath, 
 				      "replacing %s with contents "
 				      "from repository")

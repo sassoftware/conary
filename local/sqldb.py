@@ -368,7 +368,7 @@ class DBFlavorMap(idtable.IdMapping):
 
 class Database:
 
-    schemaVersion = 1
+    schemaVersion = 2
 
     def __init__(self, path):
 	self.db = sqlite3.connect(path, timeout=30000)
@@ -384,10 +384,10 @@ class Database:
 
         if not self.versionCheck():
             raise OldDatabaseSchema, \
-                "The Conary database on this system is too old.\n" \
-                "For information on how to convert this database," \
-                " please visit:\n"                                 \
-                "http://wiki.specifix.com/ConaryConversion"
+                "The Conary database on this system is too old. "    \
+                "For information on how\nto convert this database, " \
+                "please visit:\n"                                    \
+                "\thttp://wiki.rpath.com/ConaryConversion"
 
 	self.troveTroves = trovetroves.TroveTroves(self.db)
 	self.troveFiles = DBTroveFiles(self.db)

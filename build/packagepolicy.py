@@ -937,7 +937,7 @@ class AddModes(policy.Policy):
 	    # set explicitly, do not warn
 	    self.recipe.WarnWriteable(exceptions=path.replace('%', '%%'))
 	    log.debug('suid/sgid: %s mode 0%o', path, mode & 07777)
-	    self.recipe.autopkg.pathMap[path].inode.setPerms(mode)
+	    self.recipe.autopkg.pathMap[path].inode.perms.set(mode)
 
 
 class WarnWriteable(policy.Policy):
@@ -1206,7 +1206,7 @@ class Ownership(policy.Policy):
     def _markOwnership(self, filename, owner, group):
 	pkgfile = self.recipe.autopkg.pathMap[filename]
 	if owner:
-	    pkgfile.inode.setOwner(owner)
+	    pkgfile.inode.owner.set(owner)
             if owner in self.recipe.usermap:
                 # XXX fill this in when there is something to do with it
                 log.warning('User "%s" definition ignored for file %s, not yet implemented',
@@ -1219,7 +1219,7 @@ class Ownership(policy.Policy):
                 log.warning('SupplementalGroup "%s" definition ignored for file %s, not yet implemented',
                     self.recipe.suppmap[owner][0], filename)
 	if group:
-	    pkgfile.inode.setGroup(group)
+	    pkgfile.inode.group.set(group)
             if group in self.recipe.grpmap:
                 # XXX fill this in when there is something to do with it
                 log.warning('Group "%s" definition ignored for file %s, not yet implemented',
