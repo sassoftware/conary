@@ -1358,7 +1358,9 @@ class ComponentRequires(policy.Policy):
     all top-level packages (normally just one), only C{:lib} requires
     C{:data}, whereas by default both C{:lib} and C{:runtime} require C{:lib};
     and C{r.ComponentRequires({'foo', {'data', set(('lib',))}})} makes that
-    same change, but only for the C{foo} package).
+    same change, but only for the C{foo} package).  C{ComponentRequires} cannot
+    require capability flags; use C{Requires} if you need to specify a
+    requirement including a capability flag.
     """
     def __init__(self, *args, **keywords):
         self.depMap = {
@@ -1454,8 +1456,8 @@ class Requires(_addInfo):
     C{r.Requires(exceptions=I{filterexp})}
     and to add a requirement manually,
     C{r.Requires('I{foo}', I{filterexp})} where C{'I{foo}'} can be
-    C{'I{/path/to/file}'} or C{'I{packagename}:I{component}'} (components
-    are the only troves that can be required).
+    C{'I{/path/to/file}'} or C{'I{packagename}:I{component[}(I{FLAGS})I{]}'}
+    (components are the only troves that can be required).
     """
     invariantexceptions = (
 	'%(docdir)s/',
@@ -1538,7 +1540,13 @@ class Requires(_addInfo):
             # BuildPackage only fills in requiresMap for ELF files; we may
             # need to create a few more DependencySets.
             pkg.requiresMap[path] = deps.DependencySet()
-        pkg.requiresMap[path].addDep(depClass, deps.Dependency(info))
+        flags = []
+        if '(' in info:
+            flagindex = info.index('(')
+            flags = set(info[flagindex+1:-1].split())
+            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
+            info = info.split('(')[0]
+        pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, flags))
 
 
 class Provides(policy.Policy):
@@ -1551,7 +1559,8 @@ class Provides(policy.Policy):
     A C{I{provision}} may be a file, soname or an ABI; a C{I{provision}} that
     starts with 'file' is a file, one that starts with 'soname:' is a
     soname, and one that starts with 'abi:' is an ABI.  Other prefixes are
-    reserved.
+    reserved.  Note: use C{ComponentProvides} to add capability flags to
+    components.
     """
     invariantexceptions = (
 	'%(docdir)s/',
