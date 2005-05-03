@@ -417,7 +417,11 @@ class TroveDependencies(DependencyClass):
     depClass = Dependency
 
     def thawDependency(frozen):
-        d = DependencyClass.thawDependency(frozen)
+        # the : character is special in TroveDependencies
+        if frozen.count(':') > 1:
+            d = DependencyClass.thawDependency(frozen)
+        else:
+            d = Dependency(frozen, [])
         cached = dependencyCache.setdefault(d, d)
         return cached
 
