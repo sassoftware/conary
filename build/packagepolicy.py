@@ -1360,13 +1360,15 @@ class ComponentRequires(policy.Policy):
     and C{r.ComponentRequires({'foo', {'data', set(('lib',))}})} makes that
     same change, but only for the C{foo} package).
     """
-    depMap = {
-        # component: components that require it if they both exist
-        'data': frozenset(('lib', 'runtime')),
-        'devellib': frozenset(('devel',)),
-        'lib': frozenset(('devel', 'devellib', 'runtime')),
-    }
-    overridesMap = {}
+    def __init__(self, *args, **keywords):
+        self.depMap = {
+            # component: components that require it if they both exist
+            'data': frozenset(('lib', 'runtime')),
+            'devellib': frozenset(('devel',)),
+            'lib': frozenset(('devel', 'devellib', 'runtime')),
+        }
+        self.overridesMap = {}
+	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
         d = args[0]
