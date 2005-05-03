@@ -319,7 +319,7 @@ class DependencyClass:
             yield dep
 
     def thawDependency(frozen):
-        l = frozen.split(":")
+        l = frozen.rsplit(":", 1)
         flags = []
         if len(l) > 1:
             flags = l[1].split(',')
@@ -415,9 +415,10 @@ class TroveDependencies(DependencyClass):
     depClass = Dependency
 
     def thawDependency(frozen):
-        d = Dependency(frozen, [])
+        d = DependencyClass.thawDependency(frozen)
         cached = dependencyCache.setdefault(d, d)
         return cached
+
     thawDependency = staticmethod(thawDependency)
 
 _registerDepClass(TroveDependencies)
