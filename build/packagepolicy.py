@@ -1423,7 +1423,8 @@ class ComponentProvides(policy.Policy):
     package.  It is impossible to provide a capability flag for one
     component but not another within a single package.
     """
-    flags = set()
+    # frozenset to make sure we do not modify class data
+    flags = frozenset()
 
     def updateArgs(self, *args, **keywords):
         if len(args) == 2:
@@ -1433,7 +1434,7 @@ class ComponentProvides(policy.Policy):
             flags = args[0]
         if not isinstance(flags, (list, tuple, set)):
             flags=(flags,)
-        self.flags |= set(flags)
+        self.flags = frozenset(flags) | self.flags
 
     def do(self):
         if not self.flags:
