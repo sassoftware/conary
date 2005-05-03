@@ -111,8 +111,8 @@ class Dependency(BaseDependency):
 	if self.flags:
 	    flags = self.flags.items()
 	    flags.sort()
-	    return "%s:%s" % (self.name, 
-                    ",".join([ "%s%s" % (senseMap[x[1]], x[0]) for x in flags]))
+	    return "%s\0%s" % (self.name, 
+                "\0".join([ "%s%s" % (senseMap[x[1]], x[0]) for x in flags]))
 	else:
 	    return self.name
 
@@ -321,10 +321,9 @@ class DependencyClass:
             yield dep
 
     def thawDependency(frozen):
-        l = frozen.rsplit(":", 1)
+        l = frozen.split("\0", 1)
         flags = []
-        if len(l) > 1:
-            flags = l[1].split(',')
+        flags = l[1:]
 
         for i, flag in enumerate(flags):
             kind = flag[0:2]
@@ -417,11 +416,7 @@ class TroveDependencies(DependencyClass):
     depClass = Dependency
 
     def thawDependency(frozen):
-        # the : character is special in TroveDependencies
-        if frozen.count(':') > 1:
-            d = DependencyClass.thawDependency(frozen)
-        else:
-            d = Dependency(frozen, [])
+        d = DependencyClass.thawDependency(frozen)
         cached = dependencyCache.setdefault(d, d)
         return cached
 
