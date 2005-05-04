@@ -383,11 +383,7 @@ class Database:
                 raise
 
         if not self.versionCheck():
-            raise OldDatabaseSchema, \
-                "The Conary database on this system is too old. "    \
-                "For information on how\nto convert this database, " \
-                "please visit:\n"                                    \
-                "\thttp://wiki.rpath.com/ConaryConversion"
+            raise OldDatabaseSchema
 
 	self.troveTroves = trovetroves.TroveTroves(self.db)
 	self.troveFiles = DBTroveFiles(self.db)
@@ -951,6 +947,8 @@ class Database:
 class OldDatabaseSchema(Exception):
 
     def __str__(self):
-	return "Repository needs conversion for this version of conary."
+        return "The Conary database on this system is too old. "    \
+               "For information on how to\nconvert this database, " \
+               "please visit http://wiki.rpath.com/ConaryConversion."
 
     pass
