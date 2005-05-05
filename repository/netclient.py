@@ -40,7 +40,7 @@ import xmlshims
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 30, 31 ]
+CLIENT_VERSIONS = [ 32 ]
 
 class _Method(xmlrpclib._Method):
 

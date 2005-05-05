@@ -38,8 +38,8 @@ import versions
 from datastore import IntegrityError
 
 # a list of the protocols we understand
-SERVER_VERSIONS = [ 29, 30, 31 ]
-CACHE_SCHEMA_VERSION = 12
+SERVER_VERSIONS = [ 32 ]
+CACHE_SCHEMA_VERSION = 13
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 

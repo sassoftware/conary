@@ -429,7 +429,6 @@ static int StreamSet_Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
 	ro = PyObject_CallMethod(attr, "thaw", "s#", streamData, size);
 	Py_DECREF(attr);
 	if (!ro) {
-            breakpoint;
 	    return -1;
 	}
 	Py_DECREF(ro);
