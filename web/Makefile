@@ -14,7 +14,8 @@
 
 SUBDIRS=
 
-python_files = webauth.py\
+python_files = __init__.py\
+	       webauth.py\
                webhandler.py\
                fields.py
 
