@@ -34,7 +34,7 @@ def requiresAuth(func):
 
 def internalOnly(func):
     def wrapper(self, **kwargs):
-        if not kwards['auth'].isInternal:
+        if not kwargs['auth'].isInternal:
             raise PermissionDenied
         else:
             return func(self, **kwargs)
