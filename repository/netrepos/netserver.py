@@ -618,27 +618,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return self._getTroveList(authToken, clientVersion, troveFilter,
                                   withVersions = True, withFlavors = True)
 
-    def oldgetTroveVersionsByLabel(self, authToken, clientVersion, 
-                                   troveNameList, labelStr, flavorFilter):
-        if not labelStr:
-            return {}
-        elif troveNameList:
-            troveFilter = {}.fromkeys(troveNameList, 
-                                      { labelStr: [ flavorFilter ] })
-        else:
-            troveFilter = { None : { labelStr : [ flavorFilter ] } }
-
-        if flavorFilter:
-            flavorType = self._GET_TROVE_BEST_FLAVOR
-        else:
-            flavorType = self._GET_TROVE_ALL_FLAVORS
-
-        return self._getTroveList(authToken, clientVersion, troveFilter,
-                                  withVersions = True, 
-                                  versionType = self._GTL_VERSION_TYPE_LABEL,
-                                  flavorFilter = flavorType,
-                                  withFlavors = True)
-
     def getTroveVersionFlavors(self, authToken, clientVersion, troveSpecs,
                                bestFlavor):
         return self._getTroveVerInfoByVer(authToken, clientVersion, troveSpecs, 
@@ -662,30 +641,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                   withVersions = True, 
                                   latestFilter = self._GET_TROVE_VERY_LATEST,
                                   withFlavors = True)
-
-    def oldgetTroveLeavesByLabel(self, authToken, clientVersion, troveNameList, 
-                                 labelStr, flavorFilter):
-        if not labelStr:
-            return {}
-        elif troveNameList:
-            troveFilter = {}.fromkeys(troveNameList,
-                                      { labelStr : [ flavorFilter ] })
-            if troveFilter.has_key(None):
-                return
-        else:
-            troveFilter = { None : { labelStr : [ flavorFilter ] } }
-
-        if flavorFilter == 0:
-            flavorSelection = self._GET_TROVE_ALL_FLAVORS
-        else:
-            flavorSelection = self._GET_TROVE_BEST_FLAVOR
-
-        return self._getTroveList(authToken, clientVersion, troveFilter,
-                                  withVersions = True, 
-                                  versionType = self._GTL_VERSION_TYPE_LABEL,
-                                  latestFilter = self._GET_TROVE_VERY_LATEST,
-                                  withFlavors = True, 
-                                  flavorFilter = flavorSelection)
 
     def _getTroveVerInfoByVer(self, authToken, clientVersion, troveSpecs, 
                               bestFlavor, versionType, latestFilter):
@@ -732,11 +687,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveLeavesByLabel(self, authToken, clientVersion, troveNameList, 
                               labelStr, flavorFilter = None):
-        if clientVersion <= 30:
-            return self.oldgetTroveLeavesByLabel(authToken, clientVersion,
-                                                 troveNameList, labelStr, 
-                                                 flavorFilter)
-
         troveSpecs = troveNameList
         bestFlavor = labelStr
         return self._getTroveVerInfoByVer(authToken, clientVersion,
@@ -746,11 +696,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveVersionsByLabel(self, authToken, clientVersion, troveNameList, 
                               labelStr, flavorFilter = None):
-        if clientVersion <= 30:
-            return self.oldgetTroveLeavesByLabel(authToken, clientVersion,
-                                                 troveNameList, labelStr, 
-                                                 flavorFilter)
-
         troveSpecs = troveNameList
         bestFlavor = labelStr
         return self._getTroveVerInfoByVer(authToken, clientVersion,
@@ -1047,13 +992,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
-        if clientVersion < 29:
+        if clientVersion < 32:
             raise InvalidClientVersion, \
                ("Invalid client version %s.  Server accepts client versions %s"
                 " - read http://wiki.conary.com/ConaryConversion" % \
                 (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
-        elif clientVersion == 29:
-            return SERVER_VERSIONS[-1]
         
         return SERVER_VERSIONS
 
