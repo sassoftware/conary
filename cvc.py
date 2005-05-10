@@ -35,9 +35,6 @@ import repository
 import versions
 import xmlrpclib
 
-argDef = {}
-argDef['dir'] = 1
-
 sys.excepthook = util.genExcepthook()
 def usage(rc = 1):
     print "usage: cvc add <file> [<file2> <file3> ...]"
@@ -116,7 +113,6 @@ def realMain(cfg, argv=sys.argv):
     argDef["unknown-flags"] = NO_PARAM
     argDef["version"] = NO_PARAM
 
-    argDef.update(argDef)
     try:
         argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
                                                 argv=argv)
