@@ -5,7 +5,12 @@ Changes in 0.60.1:
     protocol less than 32
   * updated the URL provided in a server-side client version mismatch
     exception
+  * Server-side dependency suggestions return more choices, leaving it
+    to the client to sort it all out
+  * Client uses timestamps to determine which troves to install when their
+    flavors score equally
 
+>>>>>>> 1.303
 Changes in 0.60.0:
   * Changed changesets to compress individual files instead of the combined
     stream.

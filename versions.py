@@ -179,9 +179,18 @@ class Revision(AbstractRevision):
     def freeze(self):
 	return self.asString(frozen = True)
 
+    def getTimestamp(self):
+        """
+        Returns the timestamp for this revision.
+
+        @rtype: float
+        """
+	assert(self.timeStamp)
+        return self.timeStamp
+
     def freezeTimestamp(self):
 	"""
-	Returns a binary representation of the files timestamp, which can
+	Returns a binary representation of the revision's timestamp, which can
 	be later used to restore the timestamp to the string'ified version
 	of a version object.
 

@@ -70,12 +70,19 @@ class UpdateChangeSet(changeset.ReadOnlyChangeSet):
 # l.sort()
 # l == [ -1, False, 1 ]
 # note that also False == 0 sometimes
+#
+# secondary scoring is done on the final timestamp (so ties get broken
+# by an explicit rule)
 def _scoreSort(x, y):
     if x[0] is False:
         return -1
     if y[0] is False:
         return 1
-    return cmp(x[0], y[0])
+    rc = cmp(x[0], y[0])
+    if rc:
+        return rc
+
+    return cmp(x[1], y[1])
 
 class ConaryClient:
     def __init__(self, cfg = None):
@@ -145,6 +152,8 @@ class ConaryClient:
                             found = False
                             # iterate over flavorpath -- use suggestions 
                             # from first flavor on flavorpath that gets a match 
+                            import lib
+                            lib.epdb.st()
                             for flavor in self.cfg.flavor:
 
                                 for choice, affinityTroves in itertools.izip(
@@ -155,10 +164,11 @@ class ConaryClient:
                                         f.union(affinityTroves[0][2],
                                         mergeType=deps.DEP_MERGE_TYPE_PREFS)
                                     scoredList.append((f.score(choice[2]), 
-                                                       choice))
+                                       choice[1].trailingRevision().getTimestamp(),
+                                       choice))
                                 scoredList.sort(_scoreSort)
                                 if scoredList[-1][0] is not False:
-                                    choice = scoredList[-1][1]
+                                    choice = scoredList[-1][-1]
                                     suggList.append(choice)
 
                                     l = suggMap.setdefault(troveName, [])
