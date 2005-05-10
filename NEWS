@@ -1,9 +1,9 @@
 Changes in 0.60.1:
-  * support for legacy clients (protocol version 29) has been removed from
+  * Support for legacy clients (protocol version 29) has been removed from
     the server
-  * the server raises an server-side exception if any client with
+  * The server raises an server-side exception if any client with
     protocol less than 32
-  * updated the URL provided in a server-side client version mismatch
+  * Updated the URL provided in a server-side client version mismatch
     exception
   * Server-side dependency suggestions return more choices, leaving it
     to the client to sort it all out
