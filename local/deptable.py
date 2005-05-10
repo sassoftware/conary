@@ -920,6 +920,8 @@ class DependencyTables:
     def resolve(self, label, depSetList):
         cu = self.db.cursor()
 
+	cu.execute("BEGIN")
+
         self._createTmpTable(cu, "DepCheck")
         createDepTable(cu, 'TmpDependencies', isTemp = True)
         createRequiresTable(cu, 'TmpRequires', isTemp = True)
@@ -959,60 +961,27 @@ class DependencyTables:
 
         # this depends intimately on things being sorted newest to oldest
 
-        depSolutions = [ {} ] * len(depList)
-        troveNameSolutions = {}
-        solutionCount = {}
+        depSolutions = [ {} for x in xrange(len(depList)) ]
 
-        saw = {}
         for (depId, troveName, versionStr, timeStamps, flavorStr) in cu:
             depId = -depId
 
-            # only remember the first (newest) version of each trove for
-            # a particular flavor
-            sawVersion = saw.setdefault((troveName, flavorStr), versionStr)
-            if sawVersion != versionStr:
-                continue
-
-            d = depSolutions[depId].setdefault(troveName, {}) 
-            d[versionStr, flavorStr] = timeStamps
-
-            if not troveNameSolutions.has_key((troveName, depId)):
-                troveNameSolutions[(troveName, depId)] = True
-                solutionCount.setdefault(troveName, 0)
-                solutionCount[troveName] += 1
+            # remember the first version for each troveName/flavorStr pair
+            depSolutions[depId].setdefault((troveName, flavorStr),
+                                           (versionStr, timeStamps))
 
         result = {}
 
-        for depId, troveNames in enumerate(depSolutions):
-            if depId == 0: continue
-            if not troveNames: 
-                # no solutions for this depId
-                continue
-
-            countList = []
-            for troveName in troveNames:
-                countList.append((solutionCount[troveName], troveName))
-            countList.sort()
-
-            # pick the trove which helped the most
-            troveName = countList[-1][1]
-            choices = [ (troveName, 
-                         versions.strToFrozen(x[0][0], x[1].split(":")),
-                         x[0][1]) 
-                            for x in troveNames[troveName].items() ]
-
+        for depId, troveSet in enumerate(depSolutions):
+            if not troveSet: continue
             depNum = depList[depId][0]
             depSet = depSetList[depNum]
-            l = result.setdefault(depSet, [])
+            result[depSet] = \
+                [ [ (x[0][0], 
+                     versions.strToFrozen(x[1][0], x[1][1].split(":")),
+                     x[0][1]) for x in troveSet.items() ] ]
 
-            if choices not in l:
-                l.append(choices)
-
-        cu.execute("DROP TABLE TmpDependencies", start_transaction= False)
-        cu.execute("DROP TABLE TmpRequires", start_transaction= False)
-        cu.execute("DROP TABLE DepCheck", start_transaction = False)
-
-        assert(not self.db.inTransaction)
+        self.db.rollback()
 
         return result
 
