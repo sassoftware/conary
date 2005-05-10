@@ -10,7 +10,6 @@ Changes in 0.60.1:
   * Client uses timestamps to determine which troves to install when their
     flavors score equally
 
->>>>>>> 1.303
 Changes in 0.60.0:
   * Changed changesets to compress individual files instead of the combined
     stream.
