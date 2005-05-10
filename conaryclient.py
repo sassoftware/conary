@@ -130,7 +130,7 @@ class ConaryClient:
 
                             # set up a list of affinity troves for each choice
                             if keepExisting:
-                                affTroveList = [] * len(choiceList)
+                                affTroveList = [[]] * len(choiceList)
                             else:
                                 affTroveList = []
                                 for choice in choiceList:
