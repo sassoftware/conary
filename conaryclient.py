@@ -152,8 +152,6 @@ class ConaryClient:
                             found = False
                             # iterate over flavorpath -- use suggestions 
                             # from first flavor on flavorpath that gets a match 
-                            import lib
-                            lib.epdb.st()
                             for flavor in self.cfg.flavor:
 
                                 for choice, affinityTroves in itertools.izip(
