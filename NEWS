@@ -1,3 +1,11 @@
+Changes in 0.60.1:
+  * support for legacy clients (protocol version 29) has been removed from
+    the server
+  * the server raises an server-side exception if any client with
+    protocol less than 32
+  * updated the URL provided in a server-side client version mismatch
+    exception
+
 Changes in 0.60.0:
   * Changed changesets to compress individual files instead of the combined
     stream.
