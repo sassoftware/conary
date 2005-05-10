@@ -843,11 +843,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
             pathList.append(path)
 
-        if clientVersion < 30:
-            urls = [ os.path.join(self.urlBase(), "changeset?%s" % 
-                            os.path.basename(x)[:-4]) for x in pathList ]
-            return urls, newChgSetList, allFilesNeeded
-        elif len(pathList) == 1:
+        if len(pathList) == 1:
             url = os.path.join(self.urlBase(), 
                        "changeset?%s" % os.path.basename(pathList[0])[:-4])
             size = os.stat(os.path.join(self.tmpPath, pathList[0])).st_size
