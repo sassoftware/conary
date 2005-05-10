@@ -1050,7 +1050,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if clientVersion < 29:
             raise InvalidClientVersion, \
                ("Invalid client version %s.  Server accepts client versions %s"
-                " - download a valid client from www.specifix.com" % \
+                " - read http://wiki.conary.com/ConaryConversion" % \
                 (clientVersion, ', '.join(str(x) for x in SERVER_VERSIONS)))
         elif clientVersion == 29:
             return SERVER_VERSIONS[-1]
