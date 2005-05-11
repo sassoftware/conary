@@ -996,11 +996,22 @@ def removeFile(file):
     state.write("CONARY")
 
 def newPackage(repos, cfg, name):
+    parts = name.split('=', 1) 
+    if len(parts) == 1:
+        label = cfg.buildLabel
+    else:
+        versionStr = parts[1]
+        name = parts[0]
+        try:
+            label = versions.Label(versionStr)
+        except versions.ParseError:
+            log.error("%s is not a valid label" % versionStr)
+            return
     name += ":source"
 
     # XXX this should really allow a --build-branch or something; we can't
     # create new packages on branches this way
-    branch = versions.Branch([cfg.buildLabel])
+    branch = versions.Branch([label])
     state = SourceState(name, versions.NewVersion(), branch)
 
     # see if this package exists on our build branch
