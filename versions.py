@@ -95,6 +95,9 @@ class SerialNumber(object):
     def __str__(self):
         return ".".join((str(x) for x in self.numList))
 
+    def __repr__(self):
+        return "versions.SerialNumber('%s')" % str(self)
+
     def __hash__(self):
         hashVal = 0
         for item in self.numList:
@@ -175,6 +178,9 @@ class Revision(AbstractRevision):
 	    rc = self.freezeTimestamp() + ":" + rc
 
 	return rc
+
+    def __repr__(self):
+        return "versions.Revision('%s')" % self.asString()
 
     def freeze(self):
 	return self.asString(frozen = True)
@@ -409,6 +415,9 @@ class Label(AbstractLabel):
 	i = hash(self.host) ^ hash(self.namespace) ^ hash(self.branch)
 	return i
 
+    def __repr__(self):
+        return "versions.Label('%s')" % self.asString()
+
     def __init__(self, value, template = None):
 	"""
 	Parses a label string into a Label object. A ParseError is
@@ -582,6 +591,9 @@ class VersionSequence(AbstractVersion):
                 
 	return "/".join(strL)
 
+    def __repr__(self):
+        return "versions.VersionFromString('%s')" % self.asString()
+
     def freeze(self):
 	"""
 	Returns a complete string representation of the version, including
@@ -656,6 +668,9 @@ class NewVersion(AbstractVersion):
 
     def branch(self):
 	return None
+
+    def __repr__(self):
+        return 'versions.NewVersion()'
 
     def __init__(self):
         pass
