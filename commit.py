@@ -19,27 +19,28 @@ import os
 import tempfile
 import versions
 
-def doCommit(repos, changeSetFile, targetBranch):
+def doCommit(repos, changeSetFile, targetLabel):
     try:
 	cs = changeset.ChangeSetFromFile(changeSetFile)
     except filecontainer.BadContainer:
 	log.error("invalid changeset %s", changeSetFile)
 	return 1
 
-    if targetBranch:
-	if cs.isAbsolute():
-	    # we can't do this -- where would we branch from?
-	    log.error("absolute change sets cannot be retargeted")
-	    return 1
-	label = versions.Label(targetBranch)
-	cs.setTargetBranch(repos, label)
+    if not cs.isLocal() or cs.isAbsolute():
+        log.error("commit only works on local changesets")
+        return 1
 
-        (fd, changeSetFile) = tempfile.mkstemp()
-        os.close(fd)
-        cs.writeToFile(changeSetFile)
+    label = versions.Label(targetLabel)
+    cs.setTargetBranch(repos, label)
+    commitCs = cs.makeAbsolute(repos)
+
+    (fd, changeSetFile) = tempfile.mkstemp()
+
+    print changeSetFile
+    os.close(fd)
+    commitCs.writeToFile(changeSetFile)
 
     if cs.isLocal():
-	log.error("commits of local change sets require branch overrides")
         return 1
 
     try:
@@ -51,7 +52,7 @@ def doCommit(repos, changeSetFile, targetBranch):
         except repository.CommitError, e:
             print e
     finally:
-        if targetBranch:
+        if targetLabel:
             os.unlink(changeSetFile)
 	
 def doLocalCommit(db, changeSetFile):

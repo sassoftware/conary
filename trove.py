@@ -921,14 +921,14 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	@param new: version to add to the changed list
 	@type new: versions.VersionString
 	"""
-        # XXX this method is broken.  it is not flavor aware.
-        raise AssertionError
 	for (theName, l) in self.packages.iteritems():
 	    if theName != name: continue
-	    for (i, (change, ver)) in enumerate(l):
+	    for (i, (change, ver, flavor, byDefault)) in enumerate(l):
 		if ver == old:
-		    l[i] = (change, new)
+		    l[i] = (change, new, flavor, byDefault)
 		    return
+
+        raise TroveError, "trove not found to update"
 
     def oldTroveVersion(self, name, version, flavor):
 	"""

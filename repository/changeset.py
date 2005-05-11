@@ -21,6 +21,7 @@ import filecontainer
 import filecontents
 import files
 import gzip
+import itertools
 import os
 from lib import patch
 import repository
@@ -582,7 +583,9 @@ class ChangeSet(streams.LargeStreamSet):
     def setTargetBranch(self, repos, targetBranchLabel):
 	"""
 	Retargets this changeset to create packages and files on
-	branch targetLabel off of the source node.
+	branch targetLabel off of the parent of the source node. Version
+        calculations aren't quite right for source troves 
+        (s/incrementBuildCount).
 
 	@param repos: repository which will be committed to
 	@type repos: repository.Repository
@@ -590,26 +593,19 @@ class ChangeSet(streams.LargeStreamSet):
 	@type targetBranchLabel: versions.Label
 	"""
 	assert(not targetBranchLabel == versions.LocalLabel())
+        # if it's local, Versoin.parentVersion() has to work everywhere
         assert(self.isLocal())
+        assert(not self.isAbsolute())
 
 	packageVersions = {}
 
-        # We need to find the old fileid's for files. Unfortuantely, those
-        # aren't explicitly stored anywhere. We assume that the the file map
-        # in the changeset gives us good enough hints. The keys for self.files
-        # are (oldFileId, newFileId), which is the opposite of what we need
-        # to initialize the dict
-        oldFileIdMap = dict([ (x[1], x[0]) for x in self.files.iterkeys() ])
-
 	for pkgCs in self.iterNewPackageList():
 	    name = pkgCs.getName()
-	    oldVer = pkgCs.getOldVersion()
-	    ver = pkgCs.getNewVersion()
-	    # what to do about versions for new packages?
-	    assert(oldVer)
+            origVer = pkgCs.getNewVersion()
 
+	    oldVer = pkgCs.getOldVersion()
 	    newBr = oldVer.createBranch(targetBranchLabel, withVerRel = 0)
-	    newVer = newBr.createVersion(ver.trailingRevision())
+	    newVer = newBr.createVersion(oldVer.trailingRevision())
             del newBr
 
 	    # try and reuse the version number we created; if
@@ -621,13 +617,12 @@ class ChangeSet(streams.LargeStreamSet):
 	    else:
 		branch = oldVer.createBranch(targetBranchLabel, withVerRel = 0)
 		newVer = repos.getTroveLatestVersion(name, branch)
+                newVer.incrementBuildCount()
 
 	    pkgCs.changeNewVersion(newVer)
             assert(not packageVersions.has_key(name))
-	    packageVersions[name] = [ (ver, newVer) ]
-
-            # FILEID
-            # this is just hosed. needs attention.
+	    packageVersions[(name, pkgCs.getNewFlavor())] = \
+                                [ (origVer, newVer) ]
 
             for (listMethod, addMethod) in [
                     (pkgCs.getChangedFileList, pkgCs.changedFile),
@@ -635,10 +630,6 @@ class ChangeSet(streams.LargeStreamSet):
                 for (pathId, path, fileId, fileVersion) in listMethod():
                     if fileVersion != "-" and fileVersion.isLocal():
                         addMethod(pathId, path, fileId, newVer)
-                        oldFileId = oldFileIdMap[fileId]
-                        csInfo = self.getFileChange(oldFileId, fileId)
-                        # this replaces the existing file 
-                        self.addFile(oldFileId, fileId, csInfo)
 
 	for pkgCs in self.iterNewPackageList():
 	    # the implementation of updateChangedPackage makes this whole thing
@@ -646,13 +637,15 @@ class ChangeSet(streams.LargeStreamSet):
 	    # just silly. if large groups are added like this the effect could
 	    # become noticeable
 	    for (name, list) in pkgCs.iterChangedTroves():
-		if not packageVersions.has_key(name): continue
-                for (change, version) in list:
+                for (change, version, flavor, absolute) in list:
 		    if change != '+': continue
 
-		    for (oldVer, newVer) in packageVersions[name]:
+                    if not packageVersions.has_key((name, flavor)): continue
+
+		    for (oldVer, newVer) in packageVersions[(name, flavor)]:
 			if oldVer == version:
-			    pkgCs.updateChangedPackage(name, oldVer, newVer)
+			    pkgCs.updateChangedPackage(name, flavor, oldVer, 
+                                                       newVer)
 
 	# this has to be true, I think...
 	self.local = 0
@@ -764,9 +757,90 @@ class ReadOnlyChangeSet(ChangeSet):
         else:
             return (tag, cont)
 
+    def makeAbsolute(self, repos):
+	"""
+	Converts this (relative) change set to an abstract change set.
+	File contents are ommitted unless the file changed. This is fine
+	for changesets being committed, not so hot for changesets which
+	are being applied directly to a system. The absolute changeset
+        is returned as a new changeset; self is left unchanged.
+	"""
+	assert(not self.absolute)
+
+        absCs = ChangeSet()
+        absCs.setPrimaryTroveList(self.getPrimaryTroveList())
+        neededFiles = []
+
+        oldTroveList = [ (x.getName(), x.getOldVersion(),
+                          x.getOldFlavor()) for x in self.newPackages.values() ]
+        oldTroves = repos.getTroves(oldTroveList)
+
+	# for each file find the old fileId for it so we can assemble the
+	# proper stream and contents
+	for trv, troveCs in itertools.izip(oldTroves,
+                                           self.newPackages.itervalues()):
+	    troveName = troveCs.getName()
+	    newVersion = troveCs.getNewVersion()
+	    newFlavor = troveCs.getNewFlavor()
+	    assert(troveCs.getOldVersion() == trv.getVersion())
+            assert(trv.getName() == troveName)
+
+	    for (pathId, path, fileId, version) in troveCs.getNewFileList():
+		filecs = self.files[(None, fileId)]
+		newFiles.append((None, fileId, filecs))
+
+	    for (pathId, path, fileId, version) in troveCs.getChangedFileList():
+		(oldPath, oldFileId, oldVersion) = trv.getFile(pathId)
+		filecs = self.files[(oldFileId, fileId)]
+		neededFiles.append((pathId, oldFileId, fileId, oldVersion,
+                                    version, filecs))
+		
+	    trv.applyChangeSet(troveCs)
+	    newCs = trv.diff(None, absolute = True)[0]
+	    absCs.newPackage(newCs)
+
+	fileList = [ (x[0], x[1], x[3]) for x in neededFiles ]
+	fileObjs = repos.getFileVersions(fileList)
+
+        # XXX this would be markedly more efficient if we batched up getting
+        # file contents
+	for ((pathId, oldFileId, newFileId, oldVersion, newVersion, filecs), 
+                        fileObj) in itertools.izip(neededFiles, fileObjs):
+	    fileObj.twm(filecs, fileObj)
+	    (filecs, hash) = fileChangeSet(pathId, None, fileObj)
+	    absCs.addFile(None, newFileId, filecs)
+
+            if newVersion != oldVersion and fileObj.hasContents:
+		# we need the contents as well
+                if files.contentsChanged(filecs):
+                    (contType, cont) = self.getFileContents(pathId, 
+                                                            compressed = True)
+                    if contType == ChangedFileTyes.diff:
+                        origCont = repos.getFileContents([(oldFileId, 
+                                                           oldVersion)])[0]
+                        diff = cont.get().readlines()
+                        oldLines = origCont.get().readlines()
+                        (newLines, failures) = patch.patch(oldLines, diff)
+                        assert(not failures)
+                        fileContents = filecontents.FromString(
+                                                        "".join(newLines))
+                        absCs.addFileContents(pathId, ChangedFileTypes.file, 
+                                              fileContents,
+                                              fileObj.flags.isConfig())
+                    else:
+                        absCs.addFileContents(pathId, ChangedFileTypes.file,
+                                              fileObj.flags.isConfig(), cont,
+                                              compressed = True)
+                else:
+                    cont = repos.getFileContents([(oldFileId, oldVersion)])[0]
+                    absCs.addFileContents(pathId, ChangedFileTypes.file, cont,
+                                          fileObj.flags.isConfig())
+
+        return absCs
+
     def rootChangeSet(self, db, troveMap):
 	"""
-	Converts this (absolute) change set to a realative change
+	Converts this (absolute) change set to a relative change
 	set. The second parameter, troveMap, specifies the old trove
 	for each trove listed in this change set. It is a dictionary
 	mapping (troveName, newVersion, newFlavor) tuples to 

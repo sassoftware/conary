@@ -1191,15 +1191,16 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 
     if (csPkg.getOldFileList() or csPkg.getChangedFileList()
         or csPkg.getNewFileList()):
-	foundDifference = 1
+	foundDifference = True
     else:
-	foundDifference = 0
+	foundDifference = False
 
     return (foundDifference, newPkg)
 
 def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                                   forceSha1 = False, ignoreTransient=False,
-                                  ignoreAutoSource = False):
+                                  ignoreAutoSource = False,
+                                  updateContainers = False):
     """
     Builds a change set against a set of files currently installed and
     builds a package object which describes the files installed.  The
@@ -1223,11 +1224,15 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
     @type ignoreTransient: bool
     @param ignoreAutoSource: ignore automatically added source files 
     @type ignoreAutoSource: bool
+    @param updateContainers: Container troves are updated to point to the 
+                             new versions of troves which have had files 
+                             changed.
     """
 
     changeSet = changeset.ChangeSet()
+    changedTroves = {}
     returnList = []
-    for (curPkg, srcPkg, newVersion, flags) in pkgList:
+    for (curPkg, srcPkg, newVersion, flags) in pkgList: # this always skips container troves
 	result = _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, 
 			       root, flags, 
                                withFileContents = withFileContents,
@@ -1237,8 +1242,41 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
         if result is None:
             # an error occurred
             return None
+
+        if result[0]:
+            # something changed
+            changedTroves[(curPkg.getName(), curPkg.getVersion(),
+                                             curPkg.getFlavor())
+                         ] = (curPkg.getName(), newVersion, curPkg.getFlavor())
+
 	returnList.append(result)
 
+    if not updateContainers:
+        return (changeSet, returnList)
+
+    for i, (curTrove, srcPkg, newVersion, flags) in enumerate(pkgList):
+        inclusions = [ x for x in curTrove.iterTroveList() ]
+        if not inclusions: continue
+        assert(curTrove == srcPkg)
+
+        newTrove = curTrove.copy()
+        changed = False
+
+        for tuple in inclusions:
+            # these are only different if files have been manually removd;
+            # they should be the same for containers
+            if tuple in changedTroves:
+                newTrove.addTrove(*(changedTroves[tuple] + 
+                                    (newTrove.includeTroveByDefault(*tuple),)))
+                newTrove.delTrove(*(tuple + (False,)))
+                changed = True
+                
+        if changed:
+            newTrove.changeVersion(newVersion)
+            trvCs = newTrove.diff(curTrove)[0]
+            returnList[i] = (True, trvCs)
+            changeSet.newPackage(trvCs)
+            
     return (changeSet, returnList)
 
 def shlibAction(root, shlibList, tagScript = None):

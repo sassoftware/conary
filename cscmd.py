@@ -164,7 +164,8 @@ def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
 	    ver = ver.createBranch(versions.LocalLabel(), withVerRel = 1)
 	    list.append((pkg, origPkg, ver, 0))
 	    
-    result = update.buildLocalChanges(db, list, root = cfg.root)
+    result = update.buildLocalChanges(db, list, root = cfg.root,
+                                      updateContainers = True)
     if not result: return
     cs = result[0]
 
