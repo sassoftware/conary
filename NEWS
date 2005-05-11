@@ -11,6 +11,7 @@ Changes in 0.60.1:
     flavors score equally
   * Fixed build-side bug handling meta characters ([,*,etc) in file names 
   * "cvc newpkg" now accepts pkgname=label syntax
+  * files.contentsChanged() function updated to work with StreamSets
 
 Changes in 0.60.0:
   * Changed changesets to compress individual files instead of the combined

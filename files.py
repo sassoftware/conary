@@ -615,20 +615,17 @@ def contentsChanged(diff):
 
     type = diff[1]
     if type != "-": return False
-    i = 2
 
+    i = 2
     while i < len(diff):
 	streamId, size = struct.unpack("!BH", diff[i:i+3])
 	i += 3
-
-	if streamId == FILE_STREAM_CONTENTS:
-	    changedCode = struct.unpack("B", diff[i])[0]
-	    return changedCode != 0
-
+	
+	if RegularFile.streamDict[streamId][1] == "contents":
+            if tupleChanged(RegularFileStream, diff[i:i+size]):
+                return True
 	i += size
-
-    assert(i == len(diff))
-
+        
     return False
 
 def fieldsChanged(diff):
