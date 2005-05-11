@@ -595,7 +595,7 @@ class ChangeSet(streams.LargeStreamSet):
 	packageVersions = {}
 
         # We need to find the old fileid's for files. Unfortuantely, those
-        # are explicitly stored anywhere. We assume that the the file map
+        # aren't explicitly stored anywhere. We assume that the the file map
         # in the changeset gives us good enough hints. The keys for self.files
         # are (oldFileId, newFileId), which is the opposite of what we need
         # to initialize the dict
