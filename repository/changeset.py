@@ -590,8 +590,16 @@ class ChangeSet(streams.LargeStreamSet):
 	@type targetBranchLabel: versions.Label
 	"""
 	assert(not targetBranchLabel == versions.LocalLabel())
+        assert(self.isLocal())
 
 	packageVersions = {}
+
+        # We need to find the old fileid's for files. Unfortuantely, those
+        # are explicitly stored anywhere. We assume that the the file map
+        # in the changeset gives us good enough hints. The keys for self.files
+        # are (oldFileId, newFileId), which is the opposite of what we need
+        # to initialize the dict
+        oldFileIdMap = dict([ (x[1], x[0]) for x in self.files.iterkeys() ])
 
 	for pkgCs in self.iterNewPackageList():
 	    name = pkgCs.getName()
@@ -615,27 +623,22 @@ class ChangeSet(streams.LargeStreamSet):
 		newVer = repos.getTroveLatestVersion(name, branch)
 
 	    pkgCs.changeNewVersion(newVer)
-	    if not packageVersions.has_key(name):
-		packageVersions[name] = []
-	    packageVersions[name].append((ver, newVer))
+            assert(not packageVersions.has_key(name))
+	    packageVersions[name] = [ (ver, newVer) ]
 
             # FILEID
             # this is just hosed. needs attention.
 
-	    # files on the local branch get remapped; others don't
-	    if self.isLocal(): 
-		for (listMethod, addMethod) in [
-			(pkgCs.getChangedFileList, pkgCs.changedFile),
-			(pkgCs.getNewFileList, pkgCs.newFile) ]:
-		    for (pathId, path, fileId, fileVersion) in listMethod():
-			if fileVersion != "-" and fileVersion.isLocal():
-			    addMethod(pathId, path, newVer)
-			    oldVer = self.getFileOldVersion(pathId)
-			    csInfo = self.getFileChange(pathId)
-                            (otherPathId, oldVer, otherNewVer, csInfo) = \
-                                self.getFile()
-			    # this replaces the existing file 
-			    self.addFile(pathId, oldVer, newVer, csInfo)
+            for (listMethod, addMethod) in [
+                    (pkgCs.getChangedFileList, pkgCs.changedFile),
+                    (pkgCs.getNewFileList, pkgCs.newFile) ]:
+                for (pathId, path, fileId, fileVersion) in listMethod():
+                    if fileVersion != "-" and fileVersion.isLocal():
+                        addMethod(pathId, path, fileId, newVer)
+                        oldFileId = oldFileIdMap[fileId]
+                        csInfo = self.getFileChange(oldFileId, fileId)
+                        # this replaces the existing file 
+                        self.addFile(oldFileId, fileId, csInfo)
 
 	for pkgCs in self.iterNewPackageList():
 	    # the implementation of updateChangedPackage makes this whole thing
