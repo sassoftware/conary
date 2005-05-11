@@ -9,6 +9,7 @@ Changes in 0.60.1:
     to the client to sort it all out
   * Client uses timestamps to determine which troves to install when their
     flavors score equally
+  * Fixed build-side bug handling meta characters ([,*,etc) in file names 
 
 Changes in 0.60.0:
   * Changed changesets to compress individual files instead of the combined
