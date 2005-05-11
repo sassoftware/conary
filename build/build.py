@@ -25,6 +25,7 @@ the permissions on files in classes derived from _PutFile.
 
 import os
 import re
+import shutil
 import stat
 import sys
 import tempfile
@@ -619,9 +620,9 @@ class _PutFiles(_FileAction):
         if not os.path.isdir(dest) and len(fromFiles) > 1:
             raise TypeError, 'multiple files specified, but destination "%s" is not a directory' %dest
         for source in fromFiles:
-            self._do_one(source, dest, macros)
+            self._do_one(source, dest, macros.destdir)
 
-    def _do_one(self, source, dest, macros):
+    def _do_one(self, source, dest, destdir):
 	if os.path.isdir(source) and not self.move:
 	    # deep copy of target dir
 	    # foo/bar/a -> /blah should give /blah/a rather than /blah/foo/bar/a
@@ -629,7 +630,7 @@ class _PutFiles(_FileAction):
 	    util.mkdirChain(dest)
 	    for sourcefile in os.listdir(source):
 		thissrc = util.joinPaths(source, sourcefile)
-		self._do_one(thissrc, dest, macros)
+		self._do_one(thissrc, dest, destdir)
 	    return
 
 	if os.path.isdir(dest):
@@ -645,11 +646,13 @@ class _PutFiles(_FileAction):
 		mode = 0644
 
 	if self.move:
-	    util.rename(source, dest)
+            log.debug('renaming %s to %s', source, dest)
+            os.rename(source, dest)
 	else:
-	    util.copyfile(source, dest)
-	self.setComponents(macros.destdir, dest)
-	self.chmod(macros.destdir, dest, mode=mode)
+            log.debug('copying %s to %s', source, dest)
+            shutil.copy2(source, dest)
+	self.setComponents(destdir, dest)
+	self.chmod(destdir, dest, mode=mode)
 	
 
     def __init__(self, recipe, *args, **keywords):
