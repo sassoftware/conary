@@ -36,7 +36,6 @@ def doCommit(repos, changeSetFile, targetLabel):
 
     (fd, changeSetFile) = tempfile.mkstemp()
 
-    print changeSetFile
     os.close(fd)
     commitCs.writeToFile(changeSetFile)
 

@@ -849,6 +849,9 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
     def getNewFileList(self):
 	return self.newFiles
 
+    def resetNewFileList(self):
+        self.newFiles = []
+
     def oldFile(self, pathId):
 	self.oldFiles.append(pathId)
 
@@ -882,6 +885,9 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
     # path and/or version can be None
     def changedFile(self, pathId, path, fileId, version):
 	self.changedFiles.append((pathId, path, fileId, version))
+
+    def resetChangedFileList(self):
+        self.changedFiles = []
 
     def getChangedFileList(self):
 	return self.changedFiles

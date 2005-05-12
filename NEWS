@@ -13,6 +13,7 @@ Changes in 0.60.1:
   * "cvc newpkg" now accepts pkgname=label syntax
   * files.contentsChanged() function updated to work with StreamSets
   * Basic local changeset creation, retargeting, and commits work
+  * Permissions weren't merged for operations run as non-root users
   * The structure of the repository web interface has been redesigned
     and some authentication UI bugs have been fixed.
   * The repository web interface now requires the conary-web-common package

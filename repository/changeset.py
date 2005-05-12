@@ -624,10 +624,14 @@ class ChangeSet(streams.LargeStreamSet):
 	    packageVersions[(name, pkgCs.getNewFlavor())] = \
                                 [ (origVer, newVer) ]
 
-            for (listMethod, addMethod) in [
-                    (pkgCs.getChangedFileList, pkgCs.changedFile),
-                    (pkgCs.getNewFileList, pkgCs.newFile) ]:
-                for (pathId, path, fileId, fileVersion) in listMethod():
+            for (listMethod, addMethod, resetMethod) in [
+                    (pkgCs.getChangedFileList, pkgCs.changedFile,
+                     pkgCs.resetChangedFileList),
+                    (pkgCs.getNewFileList, pkgCs.newFile,
+                     pkgCs.resetNewFileList) ]:
+                fileList = [ x for x in listMethod() ]
+                resetMethod()
+                for (pathId, path, fileId, fileVersion) in fileList:
                     if fileVersion != "-" and fileVersion.isLocal():
                         addMethod(pathId, path, fileId, newVer)
 
@@ -759,11 +763,11 @@ class ReadOnlyChangeSet(ChangeSet):
 
     def makeAbsolute(self, repos):
 	"""
-	Converts this (relative) change set to an abstract change set.
-	File contents are ommitted unless the file changed. This is fine
-	for changesets being committed, not so hot for changesets which
-	are being applied directly to a system. The absolute changeset
-        is returned as a new changeset; self is left unchanged.
+        Converts this (relative) change set to an abstract change set.  File
+        streams and contents are omitted unless the file changed. This is fine
+        for changesets being committed, not so hot for changesets which are
+        being applied directly to a system. The absolute changeset is returned
+        as a new changeset; self is left unchanged.
 	"""
 	assert(not self.absolute)
 
@@ -807,15 +811,15 @@ class ReadOnlyChangeSet(ChangeSet):
 	for ((pathId, oldFileId, newFileId, oldVersion, newVersion, filecs), 
                         fileObj) in itertools.izip(neededFiles, fileObjs):
 	    fileObj.twm(filecs, fileObj)
-	    (filecs, hash) = fileChangeSet(pathId, None, fileObj)
-	    absCs.addFile(None, newFileId, filecs)
+	    (absFileCs, hash) = fileChangeSet(pathId, None, fileObj)
+	    absCs.addFile(None, newFileId, absFileCs)
 
             if newVersion != oldVersion and fileObj.hasContents:
 		# we need the contents as well
                 if files.contentsChanged(filecs):
                     (contType, cont) = self.getFileContents(pathId, 
                                                             compressed = True)
-                    if contType == ChangedFileTyes.diff:
+                    if contType == ChangedFileTypes.diff:
                         origCont = repos.getFileContents([(oldFileId, 
                                                            oldVersion)])[0]
                         diff = cont.get().readlines()
@@ -829,9 +833,11 @@ class ReadOnlyChangeSet(ChangeSet):
                                               fileObj.flags.isConfig())
                     else:
                         absCs.addFileContents(pathId, ChangedFileTypes.file,
-                                              fileObj.flags.isConfig(), cont,
+                                              cont, fileObj.flags.isConfig(), 
                                               compressed = True)
                 else:
+                    # include the old contents; we might need them for
+                    # a distributed branch
                     cont = repos.getFileContents([(oldFileId, oldVersion)])[0]
                     absCs.addFileContents(pathId, ChangedFileTypes.file, cont,
                                           fileObj.flags.isConfig())

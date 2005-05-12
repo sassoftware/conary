@@ -539,9 +539,8 @@ class FilesystemJob:
 
 	if (flags & IGNOREUGIDS) or os.getuid():
 	    noIds = True
-            # XXX this keeps attributes from being properly merged. we
-            # need a better fix (twm needs to be made much more flexible)
-            twmSkipList = { "contents" : True, "inode" : True }
+            twmSkipList = { "contents" : True, "owner" : True,
+                            "group" : True}
 	else:
 	    noIds = False
             twmSkipList = {  "contents" : True }
