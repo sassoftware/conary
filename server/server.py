@@ -45,7 +45,7 @@ from conarycfg import ConfigFile
 from conarycfg import STRINGDICT
 from lib import options
 from lib import util
-from http import HttpHandler
+#from http import HttpHandler
 
 import kid
 kid.enable_import()
@@ -91,26 +91,7 @@ class HttpRequests(SimpleHTTPRequestHandler):
         else:
             queryString = ""
         
-        if base != 'changeset':
-            if httpHandler.requiresAuth(base):
-                authToken = self.checkAuth()
-                if not authToken:
-                    return
-            else:
-                authToken = (None, None)
-
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-
-            fields = cgi.FieldStorage(environ = { 'QUERY_STRING' : queryString })
-            try:
-                httpHandler.handleCmd(self.wfile.write, base, authToken, fields)
-            except netserver.InsufficientPermission:
-                self.send_error(403)
-            except:
-                self.writeTraceback()
-        else:
+        if base == 'changeset':
             urlPath = posixpath.normpath(urllib.unquote(self.path))
             localName = FILE_PATH + "/" + urlPath.split('?', 1)[1] + "-out"
 
@@ -147,7 +128,9 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 del f
                 if path.startswith(FILE_PATH):
                     os.unlink(path)
-
+        else:
+            self.send_error(501, "Not Implemented")
+ 
     def do_POST(self):
         if self.headers.get('Content-Type', '') == 'text/xml':
             authToken = self.getAuth()
@@ -155,26 +138,8 @@ class HttpRequests(SimpleHTTPRequestHandler):
                 return
             
             return self.handleXml(authToken)
-
-        cmd = os.path.basename(self.path)
-        if httpHandler.requiresAuth(cmd):
-            authToken = self.checkAuth()
-            if not authToken:
-                return
         else:
-            authToken = (None, None)
-
-        try: 
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-            c = cgi.FieldStorage(fp = self.rfile, headers = self.headers, 
-                                 environ = { 'REQUEST_METHOD' : 'POST' })
-            httpHandler.handleCmd(self.wfile.write, cmd, authToken, c)
-        except netserver.InsufficientPermission:
-            self.send_error(403)
-        except:
-            self.writeTraceback()
+            self.send_error(501, "Not Implemented")
 
     def getAuth(self):
         info = self.headers.get('Authorization', None)
@@ -384,7 +349,7 @@ if __name__ == '__main__':
     netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH, 
 			baseUrl, otherArgs[2], cfg.repositoryMap,
                         logFile = cfg.logFile)
-    httpHandler = HttpHandler(netRepos)
+#    httpHandler = HttpHandler(netRepos)
 
     port = int(cfg.port)
     httpServer = HTTPServer(("", port), HttpRequests)

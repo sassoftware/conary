@@ -1,16 +1,14 @@
 #
-# Copyright (c) 2005 Specifix, Inc.
+# Copyright (c) 2005 rpath, Inc.
+# All rights reserved.
 #
-# This program is distributed under the terms of the Common Public License,
-# version 1.0. A copy of this license should have been distributed with this
-# source file in a file called LICENSE. If it is not present, the license
-# is always available at http://www.opensource.org/licenses/cpl.php.
-#
-# This program is distributed in the hope that it will be useful, but
-# without any waranty; without even the implied warranty of merchantability
-# or fitness for a particular purpose. See the Common Public License for
-# full details.
-#
+
+class MissingParameterError(Exception):
+    def __init__(self, param):
+        self.param = param
+        
+    def __str__(self):
+        return "Missing Parameter: %s" % self.param
 
 def strFields(**params):
     """Decorator for cgi fields.  Use like @strFields(foo=None, bar='foo') 
@@ -23,7 +21,7 @@ def strFields(**params):
                 if name in kw:
                     value = str(kw[name])
                 elif default is None:
-                    raise RuntimeError, 'Required Parameter %s missing' % name
+                    raise MissingParameterError(str(name)) 
                 else:
                     value = default
                 kw[name] = value
@@ -43,7 +41,7 @@ def intFields(**params):
                 if name in kw:
                     value = int(kw[name])
                 elif default is None:
-                    raise RuntimeError, 'Required Parameter %s missing' % name
+                    raise MissingParameterError(str(name))
                 else:
                     value = default
                 kw[name] = value
@@ -51,20 +49,55 @@ def intFields(**params):
         return wrapper
     return deco
 
-def listFields(**params):
+def listFields(memberType, **params):
     def deco(func):
         def wrapper(self, **kw):
             for name, default in params.iteritems():
                 if name in kw:
                     if not isinstance(kw[name], list):
-                        value = [kw[name]]
+                        value = [memberType(kw[name])]
                     else:
-                        value = kw[name]
+                        value = [ memberType(x) for x in kw[name] ]
                 elif default is None:
-                    raise RuntimeError, 'Required Parameter %s missing' % name
+                    raise MissingParameterError(name)
                 else:
-                    value = []
-            kw[name] = value
+                    value = default
+                kw[name] = value
             return func(self, **kw)
         return wrapper
     return deco
+
+def boolFields(**params):
+    def deco(func):
+        def wrapper(self, **kw):
+            for name, default in params.iteritems():
+                if name in kw:
+                    value = bool(int(kw[name]))
+                elif default is None:
+                    raise MissingParameterError(name)
+                else:
+                    value = default
+                kw[name] = value
+            return func(self, **kw)
+        return wrapper
+    return deco
+
+def dictFields(**params):
+    def deco(func):
+        def wrapper(self, **kw):
+            for key in kw.keys():
+                parts = key.split('.')
+                if len(parts) > 1 and parts[0] in params:
+                    d = kw
+                    d.setdefault(parts[0], {}) 
+                    while len(parts) > 1:
+                        d.setdefault(parts[0], {}) 
+                        d = d[parts[0]]
+                        parts = parts[1:]
+                    value = kw[key]
+                    d[parts[0]] = str(value)
+                    del kw[key]
+            return func(self, **kw)
+        return wrapper
+    return deco
+

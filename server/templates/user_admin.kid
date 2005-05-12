@@ -41,57 +41,61 @@
         </tbody>
     </table>
 
-    ${html_header(pageTitle)}
+    ${html_header("User List")}
     <body>
-        <h2>${pageTitle}</h2>
+        <h1>Conary Repository</h1>
 
-        <h3>Users</h3>
+        <ul class="menu"><li class="highlighted">User List</li></ul>
+        <ul class="menu submenu"> </ul>
 
-        <table class="user-admin" id="users">
-            <thead>
-                <tr>
-                    <td style="width: 25%;">Username</td>
-                    <td>Member Of</td>
-                    <td style="text-align: right;">Options</td>
-                </tr>
-            </thead>
-            <tbody>
-                <tr py:for="i, user in enumerate(netAuth.iterUsers())"
-                    class="${i % 2 and 'even' or 'odd'}">
-                    <td>${user[1]}</td>
-                    <td><div py:for="group in netAuth.iterGroupsByUserId(user[0])"
-                             py:content="group[1]" />
-                    </td>
-                    <td style="text-align: right;">
-                        <a href="chPassForm?username=${user[1]}">Change Password</a> | 
-                        <u>Groups</u> | 
-                        <u>Delete</u>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-        <p><a href="addUserForm">Add User</a></p>
+        <div id="content">
+            <h2>Users</h2>
+            <table class="user-admin" id="users">
+                <thead>
+                    <tr>
+                        <td style="width: 25%;">Username</td>
+                        <td>Member Of</td>
+                        <td style="text-align: right;">Options</td>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr py:for="i, user in enumerate(netAuth.iterUsers())"
+                        class="${i % 2 and 'even' or 'odd'}">
+                        <td>${user[1]}</td>
+                        <td><div py:for="group in netAuth.iterGroupsByUserId(user[0])"
+                                 py:content="group[1]" />
+                        </td>
+                        <td style="text-align: right;">
+                            <a href="chPassForm?username=${user[1]}">Change Password</a> | 
+                            <u>Groups</u> | 
+                            <u>Delete</u>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><a href="addUserForm">Add User</a></p>
 
-        <h3>Groups</h3>
-        <table class="user-admin" id="groups">
-            <thead><tr><td style="width: 25%;">Group Name</td><td>Permissions</td></tr></thead>
-            <tbody>
-                <tr py:for="i, group in enumerate(netAuth.iterGroups())"
-                    class="${i % 2 and 'even' or 'odd'}">
-                <?python #
-                rows = list(enumerate(netAuth.iterPermsByGroupId(group[0])))
-                ?>
-                    <td><b>${group[1]}</b></td>
-                    <td py:if="rows" py:content="permTable(group[0], rows)"/>
-                    <td py:if="not rows" style="font-size: 80%;">Group has no permissions</td>
-                </tr>
-            </tbody>
-        </table>
-        <p>
-            <a href="addPermForm">Add Permission</a><br />
-            <a href="addGroupForm">Add Group</a>
-        </p>
+            <h2>Groups</h2>
+            <table class="user-admin" id="groups">
+                <thead><tr><td style="width: 25%;">Group Name</td><td>Permissions</td></tr></thead>
+                <tbody>
+                    <tr py:for="i, group in enumerate(netAuth.iterGroups())"
+                        class="${i % 2 and 'even' or 'odd'}">
+                    <?python #
+                    rows = list(enumerate(netAuth.iterPermsByGroupId(group[0])))
+                    ?>
+                        <td><b>${group[1]}</b></td>
+                        <td py:if="rows" py:content="permTable(group[0], rows)"/>
+                        <td py:if="not rows" style="font-size: 80%;">Group has no permissions</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>
+                <a href="addPermForm">Add Permission</a><br />
+                <a href="addGroupForm">Add Group</a>
+            </p>
 
-        ${html_footer()}
+            ${html_footer()}
+        </div>
     </body>
 </html>

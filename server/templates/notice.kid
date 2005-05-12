@@ -2,13 +2,17 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
-    ${html_header(pageTitle)}
+    ${html_header("Notice")}
     <body>
-        <h2>${pageTitle}</h2>
+        <h1>Conary Repository</h1>
 
-        <p>${message}</p>
-        <p>Return to <a href="${url}">${link}</a></p>
+        <div id="content">
+            <h2>Notice</h2>
 
-        ${html_footer()}
+            <p>${message}</p>
+            <p>Return to <a href="${url}">${link}</a></p>
+
+            ${html_footer()}
+        </div>
     </body>
 </html>

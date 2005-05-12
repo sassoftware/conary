@@ -14,7 +14,6 @@
 
 from mod_python import apache
 from mod_python import util
-import base64
 import os
 import traceback
 import xmlrpclib
@@ -27,6 +26,7 @@ import conarycfg
 import kid
 kid.enable_import()
 from templates import error as kid_error
+from web.webauth import getAuth
 
 BUFFER=1024 * 256
 
@@ -41,33 +41,14 @@ class ServerConfig(conarycfg.ConfigFile):
         'serverName'        :  None,
         'tmpDir'            :  "/var/tmp",
         'cacheChangeSets'   :  [ conarycfg.BOOLEAN, False ],
+        'staticPath'        :  "/conary-static",
     }
-
-def getAuth(req, repos):
-    if not 'Authorization' in req.headers_in:
-        return ('anonymous', 'anonymous')
-
-    info = req.headers_in['Authorization'].split()
-    if len(info) != 2 or info[0] != "Basic":
-        return apache.HTTP_BAD_REQUEST
-
-    try:
-        authString = base64.decodestring(info[1])
-    except:
-        return apache.HTTP_BAD_REQUEST
-
-    if authString.count(":") != 1:
-        return apache.HTTP_BAD_REQUEST
-      
-    authToken = authString.split(":")
-
-    return authToken
 
 def checkAuth(req, repos):
     if not req.headers_in.has_key('Authorization'):
         return None
     else:
-        authToken = getAuth(req, repos)
+        authToken = getAuth(req)
         if type(authToken) != tuple:
             return authToken
 
@@ -77,14 +58,14 @@ def checkAuth(req, repos):
     return authToken
 
 def post(port, isSecure, repos, httpHandler, req):
+    authToken = getAuth(req)
+    if type(authToken) is int:
+        return authToken
+
+    if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
+        return apache.HTTP_FORBIDDEN
+
     if req.headers_in['Content-Type'] == "text/xml":
-        authToken = getAuth(req, repos)
-        if type(authToken) is int:
-            return authToken
-
-        if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
-            return apache.HTTP_FORBIDDEN
-
         (params, method) = xmlrpclib.loads(req.read())
 
         if isSecure:
@@ -104,32 +85,16 @@ def post(port, isSecure, repos, httpHandler, req):
         if len(resp) > 200 and 'zlib' in encoding:
             req.headers_out['Content-encoding'] = 'zlib'
             resp = zlib.compress(resp, 5)
-        req.write(resp) 
+        req.write(resp)
+        return apache.OK
     else:
-        cmd = os.path.basename(req.uri)
-        if httpHandler.requiresAuth(cmd):
-            authToken = checkAuth(req, repos)
-            if type(authToken) is int or authToken is None or authToken[0] is None:
-                req.err_headers_out['WWW-Authenticate'] = \
-                                    'Basic realm="Conary Repository"'
-                return apache.HTTP_UNAUTHORIZED
-        else:
-            authToken = (None, None)
-
-        if authToken[0] is not None and authToken[0] != "anonymous" and \
-                    not isSecure and repos.forceSecure:
-            return apache.HTTP_FORBIDDEN
-    
-        req.content_type = "text/html"
         try:
-            httpHandler.handleCmd(req.write, cmd, authToken,
-                                  util.FieldStorage(req))
+            return httpHandler._methodHandler()
         except netserver.InsufficientPermission:
             return apache.HTTP_FORBIDDEN
         except:
-            writeTraceback(req)
-
-    return apache.OK
+            writeTraceback(req, repos.cfg)
+            return apache.OK
 
 def get(isSecure, repos, httpHandler, req):
     uri = req.uri
@@ -138,65 +103,53 @@ def get(isSecure, repos, httpHandler, req):
     cmd = os.path.basename(uri)
     fields = util.FieldStorage(req)
 
-    authToken = getAuth(req, repos)
+    authToken = getAuth(req)
     if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
         return apache.HTTP_FORBIDDEN
    
-    if cmd != "changeset":
-	# we need to redo this with a trailing / for the root menu to work
-	cmd = os.path.basename(req.uri)
+    if cmd == "changeset":
+        localName = repos.tmpPath + "/" + req.args + "-out"
+        size = os.stat(localName).st_size
 
-        if httpHandler.requiresAuth(cmd):
-            authToken = checkAuth(req, repos)
-            if not authToken:
-                req.err_headers_out['WWW-Authenticate'] = 'Basic realm="Conary Repository"'
-                return apache.HTTP_UNAUTHORIZED
+        if localName.endswith(".cf-out"):
+            try:
+                f = open(localName, "r")
+            except IOError:
+                self.send_error(404, "File not found")
+                return None
+
+            os.unlink(localName)
+
+            items = []
+            totalSize = 0
+            for l in f.readlines():
+                (path, size) = l.split()
+                size = int(size)
+                totalSize += size
+                items.append((path, size))
+            del f
         else:
-            authToken = (None, None)
+            size = os.stat(localName).st_size;
+            items = [ (localName, size) ]
+            totalSize = size
 
-        req.content_type = "text/html"
+        req.content_type = "application/x-conary-change-set"
+        for (path, size) in items:
+            req.sendfile(path)
+
+            if path.startswith(repos.tmpPath) and \
+                    not(os.path.basename(path)[0:6].startswith('cache-')):
+                os.unlink(path)
+
+        return apache.OK
+    else:
         try:
-            httpHandler.handleCmd(req.write, cmd, authToken, fields)
+            return httpHandler._methodHandler()
         except netserver.InsufficientPermission:
             return apache.HTTP_FORBIDDEN
         except:
-            writeTraceback(req)
-        return apache.OK
-
-    localName = repos.tmpPath + "/" + req.args + "-out"
-    size = os.stat(localName).st_size
-
-    if localName.endswith(".cf-out"):
-        try:
-            f = open(localName, "r")
-        except IOError:
-            self.send_error(404, "File not found")
-            return None
-
-        os.unlink(localName)
-
-        items = []
-        totalSize = 0
-        for l in f.readlines():
-            (path, size) = l.split()
-            size = int(size)
-            totalSize += size
-            items.append((path, size))
-        del f
-    else:
-        size = os.stat(localName).st_size;
-        items = [ (localName, size) ]
-        totalSize = size
-
-    req.content_type = "application/x-conary-change-set"
-    for (path, size) in items:
-        req.sendfile(path)
-
-        if path.startswith(repos.tmpPath) and \
-		not(os.path.basename(path)[0:6].startswith('cache-')):
-            os.unlink(path)
-
-    return apache.OK
+            writeTraceback(req, repos.cfg)
+            return apache.OK
 
 def putFile(port, isSecure, repos, req):
     if not isSecure and repos.forceSecure:
@@ -217,8 +170,8 @@ def putFile(port, isSecure, repos, req):
 
     return apache.OK
 
-def writeTraceback(wfile):
-    kid_error.write(wfile, pageTitle = "Error",
+def writeTraceback(wfile, cfg):
+    kid_error.write(wfile, cfg = cfg, pageTitle = "Error",
                            error = traceback.format_exc())
 
 def handler(req):
@@ -261,7 +214,7 @@ def handler(req):
                                 logFile = cfg.logFile)
 
 	repositories[repName].forceSecure = cfg.forceSSL
-
+        repositories[repName].cfg = cfg
     port = req.server.port
     if not port:
         port = req.parsed_uri[apache.URI_PORT]
@@ -270,7 +223,7 @@ def handler(req):
     secure = (port == 443)
     
     repos = repositories[repName]
-    httpHandler = HttpHandler(repos)
+    httpHandler = HttpHandler(req, repos.cfg, repos)
     
     method = req.method.upper()
 

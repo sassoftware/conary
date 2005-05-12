@@ -11,39 +11,48 @@
                 py:content="value" value="${value}"/>
     </select>
 
-    ${html_header(pageTitle)}
+    ${html_header("Add Permission")}
     <body>
-        <h2>${pageTitle}</h2>
+        <h1>Conary Repository</h1>
 
-        <form method="post" action="addPerm">
-            <table class="add-form">
-                <tr>
-                    <td id="header">Group:</td>
-                    <td py:content="makeSelect('group', groups)"/>
-                </tr>
-                <tr>
-                    <td id="header">Label:</td>
-                    <td py:content="makeSelect('label', labels, all = True)"/>
-                </tr>
-                <tr>
-                    <td id="header">Trove:</td>
-                    <td py:content="makeSelect('trove', troves, all = True)"/>
-                </tr>
-                <tr>
-                    <td id="header" rowspan="3">Options</td>
-                    <td><input type="checkbox" name="write" /> Write access</td>
-                </tr>
-                <tr>
-                    <td><input type="checkbox" name="capped" /> Capped</td>
-                </tr>
-                <tr>
-                    <td><input type="checkbox" name="admin" /> Admin access</td>
-                </tr>
+        <ul class="menu">
+            <li><a href="userlist">User List</a></li>
+            <li class="highlighted">Add Permission</li>
+        </ul>
+        <ul class="menu submenu"> </ul>
 
-            </table>
-            <p><input type="submit" value="Add"/></p>
-        </form>
+        <div id="content">
+            <h2>Add Permission</h2>
+            <form method="post" action="addPerm">
+                <table class="add-form">
+                    <tr>
+                        <td id="header">Group:</td>
+                        <td py:content="makeSelect('group', groups)"/>
+                    </tr>
+                    <tr>
+                        <td id="header">Label:</td>
+                        <td py:content="makeSelect('label', labels, all = True)"/>
+                    </tr>
+                    <tr>
+                        <td id="header">Trove:</td>
+                        <td py:content="makeSelect('trove', troves, all = True)"/>
+                    </tr>
+                    <tr>
+                        <td id="header" rowspan="3">Options</td>
+                        <td><input type="checkbox" name="write" /> Write access</td>
+                    </tr>
+                    <tr style="display: none;">
+                        <td><input type="checkbox" name="capped" /> Capped</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" name="admin" /> Admin access</td>
+                    </tr>
 
-        ${html_footer()}
+                </table>
+                <p><input type="submit" value="Add"/></p>
+            </form>
+
+            ${html_footer()}
+        </div>
     </body>
 </html>

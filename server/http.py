@@ -20,133 +20,121 @@ import templates
 
 from metadata import MDClass
 from repository.netrepos import netserver
+from web.webhandler import WebHandler
+from web.fields import strFields, intFields, listFields, boolFields
+from web.webauth import getAuth
+
+from mod_python import apache
+from mod_python.util import FieldStorage
 
 class ServerError(Exception):
     def __str__(self):
         return self.str
         
-class InvalidServerCommand(ServerError):
-    str = """Invalid command passed to server."""
+class InvalidPassword(ServerError):
+    str = """Incorrect password."""
 
-class HttpHandler:
-    def __init__(self, repServer):
+def checkAuth(write = False, admin = False):
+    def deco(func):
+        def wrapper(self, **kwargs):
+            # XXX two xmlrpc calls here could possibly be condensed to one
+            # first check the password only
+            if not self.repServer.auth.check(kwargs['auth']):
+                raise InvalidPassword
+            # now check for proper permissions
+            if not self.repServer.auth.check(kwargs['auth'], write=write, admin=admin):
+                raise netserver.InsufficientPermission
+            else:
+                return func(self, **kwargs)
+        return wrapper
+    return deco
+
+class HttpHandler(WebHandler):
+    def __init__(self, req, cfg, repServer):
+        WebHandler.__init__(self, req, cfg)
+
         self.repServer = repServer
         self.troveStore = repServer.troveStore
         self.templatePath = os.path.dirname(sys.modules['templates'].__file__) + os.path.sep
-        
-        # "command name": (command handler, page title, 
-        #       (requires auth, requires write access, requires admin))
-        self.commands = {
-             # metadata commands
-             "":               (self.main, "Conary Repository",
-                               (True, True, False)),
-             "main":           (self.main, "Conary Repository",
-                               (True, True, False)),
-             "metadata":       (self.metadata, "View Metadata",          
-                               (True, True, False)),
-             "chooseBranch":   (self.chooseBranch, "View Metadata",
-                               (True, True, False)),
-             "getMetadata":    (self.getMetadata, "View Metadata",       
-                               (True, True, False)),
-             "updateMetadata": (self.updateMetadata, "Metadata Updated", 
-                               (True, True, False)),
-             
-             # user administration commands
-             "userlist":       (self.userlist, "User Administration",    
-                               (True, False, True)),
-             "addPermForm":    (self.addPermForm, "Add Permission",
-                               (True, False, True)),
-             "addPerm":        (self.addPerm, "Add Permission",
-                               (True, False, True)),
-             "deletePerm":     (self.deletePerm, "Delete Permission",
-                               (True, False, True)),
-             "addUserForm":    (self.addUserForm, "Add User",            
-                               (True, False, True)),
-             "addUser":        (self.addUser, "Add User",                
-                               (True, False, True)),
-             "addGroupForm":   (self.addGroupForm, "Add Group",
-                               (True, False, True)),
-             "addGroup":       (self.addGroup, "Add Group",
-                               (True, False, True)),
-             # change password commands
-             "chPassForm":     (self.chPassForm, "Change Password",
-                               (True, False, False)),
-             "chPass":         (self.chPass, "Change Password",
-                               (True, False, False)),
-        }
+       
+    def _getHandler(self, cmd):
+        try:
+            method = self.__getattribute__(cmd)
+        except AttributeError:
+            method = self.main
+        return method
 
-    def requiresAuth(self, cmd):
-        if cmd in self.commands:
-            return self.commands[cmd][2][0]
-        else:
-            return True
-
-    def handleCmd(self, writeFn, cmd, authToken=None, fields=None):
+    def _methodHandler(self):
         """Handle either an HTTP POST or GET command."""
-        self.writeFn = writeFn
-        if cmd.endswith('/'):
-            cmd = cmd[:-1]
+        self.writeFn = self.req.write
+        cmd = os.path.basename(self.req.path_info)
 
-        # handle the odd case of style sheet and javascript libraries
-        # XXX these items are served with the wrong content-type
-        if cmd in ["style.css", "library.js"]:
-            f = open(os.path.join(self.templatePath, cmd))
-            self.writeFn(f.read())
-            f.close()
-            return 
-    
-        if cmd in self.commands:
-            handler = self.commands[cmd][0]
-            pageTitle = self.commands[cmd][1]
-        else:
-            raise InvalidServerCommand
+        # return a possible error code from getAuth (malformed auth header, etc)
+        auth = getAuth(self.req)
+        if type(auth) is int:
+            return auth
 
-        needWrite = self.commands[cmd][2][1]
-        needAdmin = self.commands[cmd][2][2]
-        if not self.repServer.auth.check(authToken, write=needWrite, admin=needAdmin):
-            raise netserver.InsufficientPermission
+        if cmd.startswith('_'):
+            return apache.HTTP_NOT_FOUND
 
-        if cmd == "":
-	    home = None
-        else:
-	    home = self.repServer.urlBase
+        self.req.content_type = "application/xhtml+xml"
 
-        self.pageTitle = pageTitle
-        handler(authToken, fields)
+        try:
+            method = self._getHandler(cmd)
+        except AttributeError:
+            return apache.HTTP_NOT_FOUND
+        self.fields = FieldStorage(self.req)
 
-    def kid_write(self, templateName, **values):
+        d = dict(self.fields)
+        d['auth'] = auth
+
+        try:
+            return method(**d)
+        except netserver.InsufficientPermission:
+            # no permission, don't ask for a new password 
+            return apache.HTTP_FORBIDDEN
+        except InvalidPassword:
+            # if password is invalid, request a new one
+            self.req.err_headers_out['WWW-Authenticate'] = \
+                'Basic realm="Conary Repository"'
+            return apache.HTTP_UNAUTHORIZED
+
+    def _write(self, templateName, **values):
         path = os.path.join(self.templatePath, templateName + ".kid")
         t = kid.load_template(path)
-        self.writeFn(t.serialize(encoding="utf-8", pageTitle=self.pageTitle, **values))
+        self.writeFn(t.serialize(encoding="utf-8", cfg = self.cfg, **values))
 
-    def main(self, authToken, fields):
-        self.kid_write("main_page", fields=fields)
+    @checkAuth(write=True)
+    def main(self, auth):
+        self._write("main_page")
+        return apache.OK
 
-    def metadata(self, authToken, fields, troveName=None):
+    @checkAuth(write = True)
+    @strFields(troveName = "")
+    def metadata(self, auth, troveName):
         troveList = [x for x in self.repServer.troveStore.iterTroveNames() if x.endswith(':source')]
         troveList.sort()
 
         # pick the next trove in the list
         # or stay on the previous trove if canceled
-        if "troveName" in fields:
-            troveName = fields["troveName"].value
-        elif troveName in troveList:
+        if troveName in troveList:
             loc = troveList.index(troveName)
-            if loc < len(troveList):
+            if loc < (len(troveList)-1):
                 troveName = troveList[loc+1]
 
-        self.kid_write("pick_trove", troveList = troveList,
-                                     troveName = troveName)
+        self._write("pick_trove", troveList = troveList,
+                                  troveName = troveName)
+        return apache.OK
 
-    def chooseBranch(self, authToken, fields):
-        if fields.has_key('troveName'):
-            troveName = fields['troveName'].value
-        else:
-            troveName = fields['troveNameList'].value
+    @checkAuth(write = True)
+    @strFields(troveName = "", troveNameList = "", source = "")
+    def chooseBranch(self, auth, troveName, troveNameList, source):
+        if not troveName:
+            troveName = troveNameList
+       
+        source = source.lower()
         
-        source = str(fields.getfirst('source', '')).lower()
-        
-        versions = self.repServer.getTroveVersionList(authToken,
+        versions = self.repServer.getTroveVersionList(auth,
             netserver.SERVER_VERSIONS[-1], { troveName : None })
         
         branches = {}
@@ -156,31 +144,29 @@ class HttpHandler:
 
         branches = branches.keys()
         if len(branches) == 1:
-            self._getMetadata(fields, troveName, branches[0].freeze())
+            return self._redirect("getMetadata?troveName=%s;branch=%s" %\
+                (troveName, branches[0].freeze()))
         else:
-            self.kid_write("choose_branch",
+            self._write("choose_branch",
                            branches = branches,
                            troveName = troveName,
                            source = source)
+        return apache.OK
 
-    def getMetadata(self, authToken, fields):
-        troveName = fields['troveName'].value
-
-        branch = fields['branch'].value
-        self._getMetadata(fields, troveName, branch)
-
-    def _getMetadata(self, fields, troveName, branch):
+    @checkAuth(write = True)
+    @strFields(troveName = None, branch = None, source = "", freshmeatName = "")
+    def getMetadata(self, auth, troveName, branch, source, freshmeatName):
         branch = self.repServer.thawVersion(branch)
 
-        if "source" in fields and fields["source"].value.lower() == "freshmeat":
-            if "freshmeatName" in fields:
-                fmName = fields["freshmeatName"].value
+        if source.lower() == "freshmeat":
+            if freshmeatName:
+                fmName = freshmeatName
             else:
                 fmName = troveName[:-7]
             try:
                 md = metadata.fetchFreshmeat(fmName)
             except metadata.NoFreshmeatRecord:
-                self.kid_write("error", error = "No Freshmeat record found.")
+                self._write("error", error = "No Freshmeat record found.")
                 return
         else:
             md = self.troveStore.getMetadata(troveName, branch)
@@ -188,136 +174,144 @@ class HttpHandler:
         if not md: # fill a stub
             md = metadata.Metadata(None)
 
-        self.kid_write("metadata", metadata = md, branch = branch,
-                                   troveName = troveName)
+        self._write("metadata", metadata = md, branch = branch,
+                                troveName = troveName)
+        return apache.OK
 
-    def updateMetadata(self, authToken, fields):
-        branch = self.repServer.thawVersion(fields["branch"].value)
-        troveName = fields["troveName"].value
+    @checkAuth(write = True)
+    @listFields(str, selUrl = [], selLicense = [], selCategory = [])
+    @strFields(troveName = None, branch = None, shortDesc = "",
+               longDesc = "", source = None)
+    def updateMetadata(self, auth, troveName, branch, shortDesc,
+                       longDesc, source, selUrl, selLicense,
+                       selCategory):
+        branch = self.repServer.thawVersion(branch)
         
         self.troveStore.updateMetadata(troveName, branch,
-            fields["shortDesc"].value,
-            fields["longDesc"].value,
-            fields.getlist("selUrl"),
-            fields.getlist("selLicense"),
-            fields.getlist("selCategory"),
-            fields["source"].value,
-            "C"
-        )
+                                       shortDesc, longDesc,
+                                       selUrl, selLicense,
+                                       selCategory, source, "C")
+        return self._redirect("metadata?troveName=%s" % troveName)
+    
+    @checkAuth(write = True, admin = True)
+    def userlist(self, auth):
+        self._write("user_admin", netAuth = self.repServer.auth)
+        return apache.OK
 
-        self.metadata(authToken, fields, troveName)
-        
-    def userlist(self, authToken, fields):
-        self.kid_write("user_admin", netAuth = self.repServer.auth)
-
-    def addPermForm(self, authToken, fields):
+    @checkAuth(write = True, admin = True)
+    def addPermForm(self, auth):
         groups = (x[1] for x in self.repServer.auth.iterGroups())
         labels = (x[1] for x in self.repServer.auth.iterLabels())
         troves = (x[1] for x in self.repServer.auth.iterItems())
     
-        self.kid_write("permission", groups=groups, labels=labels, troves=troves)
+        self._write("permission", groups=groups, labels=labels, troves=troves)
+        return apache.OK
 
-    def addPerm(self, authToken, fields):
-        group = str(fields.getfirst("group", ""))
-        label = str(fields.getfirst("label", ""))
-        trove = str(fields.getfirst("trove", ""))
-
-        write = bool(fields.getfirst("write", False))
-        capped = bool(fields.getfirst("capped", False))
-        admin = bool(fields.getfirst("admin", False))
-
-        self.repServer.auth.addAcl(group, trove, label,
-                                   write, capped, admin)
-        self.kid_write("notice", message = "Permission successfully added.",
-                                 link = "User Administration",
-                                 url = "userlist")
-   
-    def addGroupForm(self, authToken, fields):
-        users = dict(self.repServer.auth.iterUsers())
-        self.kid_write("add_group", users = users)
-   
-    def addGroup(self, authToken, fields):
-        groupName = fields["userGroupName"].value
-        initialUserIds = fields.getlist("initialUserIds")
-
-        newGroupId = self.repServer.auth.addGroup(groupName)
-        for userId in initialUserIds:
-            self.repServer.auth.addGroupMember(newGroupId, userId)
-
-        self.kid_write("notice", message = "Group successfully created.",
-                                 link = "User Administration",
-                                 url = "userlist")
-   
-    def deletePerm(self, authToken, fields):
-        groupId = str(fields.getfirst("groupId", ""))
-        labelId = fields.getfirst("labelId", None)
-        itemId = fields.getfirst("itemId", None)
-
-        self.repServer.auth.deletePermission(groupId, labelId, itemId)
-        self.kid_write("notice", message = "Permission deleted.",
-                                 link = "User Administration",
-                                 url = "userlist")
-   
-    def addUserForm(self, authToken, fields):
-        self.kid_write("add_user")
-
-    def addUser(self, authToken, fields):
-        user = fields["user"].value
-        password = fields["password"].value
-       
-        if fields.has_key("write"):
+    @checkAuth(write = True, admin = True)
+    @strFields(group = None, label = "", trove = "",
+               write = "off", capped = "off", admin = "off")
+    def addPerm(self, auth, group, label, trove,
+                write, capped, admin):
+        # silly gyrations
+        if write == "on":
             write = True
         else:
             write = False
-
-        if fields.has_key("admin"):
+        if capped == "on":
+            capped = True
+        else:
+            capped = False
+        if admin == "on":
             admin = True
         else:
             admin = False
-        self.repServer.addUser(authToken, 0, user, password)
-        self.repServer.addAcl(authToken, 0, user, "", "", write, True, admin)
-
-        self.kid_write("notice", message = "User successfully added.",
+        
+        self.repServer.auth.addAcl(group, trove, label,
+                                   write, capped, admin)
+        self._write("notice", message = "Permission successfully added.",
                                  link = "User Administration",
                                  url = "userlist")
-       
-    def chPassForm(self, authToken, fields):
-        if fields.has_key("username"):
-            username = fields["username"].value
+        return apache.OK
+  
+    @checkAuth(write = True, admin = True)
+    def addGroupForm(self, auth):
+        users = dict(self.repServer.auth.iterUsers())
+        self._write("add_group", users = users)
+        return apache.OK
+   
+    @checkAuth(write = True, admin = True)
+    @strFields(userGroupName = None)
+    @listFields(int, initialUserIds = [])
+    def addGroup(self, auth, userGroupName, initialUserIds):
+        newGroupId = self.repServer.auth.addGroup(userGroupName)
+        for userId in initialUserIds:
+            self.repServer.auth.addGroupMember(newGroupId, userId)
+
+        return self._redirect("userlist")
+ 
+    @checkAuth(write = True, admin = True)
+    @strFields(groupId = None, labelId = "", itemId = "")
+    def deletePerm(self, auth, groupId, labelId, itemId):
+        # labelId and itemId are optional parameters so we can't
+        # default them to None: the fields decorators treat that as
+        # required, so we need to reset them to None here:
+        if not labelId:
+            labelId = None
+        if not itemId:
+            itemId = None
+        self.repServer.auth.deletePermission(groupId, labelId, itemId)
+        return self._redirect("userlist")
+
+    @checkAuth(write = True, admin = True)
+    def addUserForm(self, auth):
+        self._write("add_user")
+        return apache.OK
+
+    @checkAuth(write = True, admin = True)
+    @strFields(user = None, password = None)
+    @boolFields(write = False, admin = False)
+    def addUser(self, auth, user, password, write, admin):
+        self.repServer.addUser(auth, 0, user, password)
+        self.repServer.addAcl(auth, 0, user, "", "", write, True, admin)
+
+        return self._redirect("userlist")
+
+    @checkAuth()
+    @strFields(username = "")
+    def chPassForm(self, auth, username):
+        if username:
             askForOld = False
         else:
-            username = authToken[0]
+            username = auth[0]
             askForOld = True
         
-        self.kid_write("change_password", username = username, askForOld = askForOld)
+        self._write("change_password", username = username, askForOld = askForOld)
+        return apache.OK
+   
+    @checkAuth()
+    @strFields(username = None, oldPassword = "",
+               password1 = None, password2 = None)
+    def chPass(self, auth, username, oldPassword,
+               password1, password2):
+        admin = self.repServer.auth.check(auth, admin=True)
         
-    def chPass(self, authToken, fields):
-        username = fields["username"].value
-        admin = self.repServer.auth.check(authToken, admin=True)
-        
-        if username != authToken[0]:
+        if username != auth[0]:
             if not admin:
                 raise netserver.InsufficientPermission
         
-        if fields.has_key("oldPassword"):
-            oldPassword = fields["oldPassword"].value
+        if auth[1] != oldPassword and auth[0] == username and not admin:
+            self._write("error", error = "Error: old password is incorrect")
+        elif password1 != password2:
+            self._write("error", error = "Error: passwords do not match")
+        elif oldPassword == password1:
+            self._write("error", error = "Error: old and new passwords identical, not changing")
         else:
-            oldPassword = None
-        p1 = fields["password1"].value
-        p2 = fields["password2"].value
-
-        if authToken[1] != oldPassword and authToken[0] == username and not admin:
-            self.kid_write("error", error = "Error: old password is incorrect")
-        elif p1 != p2:
-            self.kid_write("error", error = "Error: passwords do not match")
-        elif oldPassword == p1:
-            self.kid_write("error", error = "Error: old and new passwords identical, not changing")
-        else:
-            self.repServer.auth.changePassword(username, p1)
+            self.repServer.auth.changePassword(username, password1)
             if admin:
                 returnLink = ("User Administration", "userlist")
             else:
                 returnLink = ("Main Menu", "main")
 
-            self.kid_write("notice", message = "Password successfully changed",
-                                     link = returnLink[0], url = returnLink[1])                             
+            self._write("notice", message = "Password successfully changed",
+                        link = returnLink[0], url = returnLink[1])
+        return apache.OK

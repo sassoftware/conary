@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import base64
 
 # kid imports
 import kid
@@ -22,7 +23,6 @@ from mod_python.util import FieldStorage
 
 import webauth
 
-HMACsalt = "salt"
 
 class WebHandler(object):
     def _checkAuth(self, authToken):
@@ -39,7 +39,7 @@ class WebHandler(object):
 
     def _redirect(self, location):
         self.req.headers_out['Location'] = location
-        return apache.HTTP_MOVED_TEMPORARILY
+        return apache.HTTP_MOVED_PERMANENTLY
 
     def _handle(self):
         # both GET and POST events are treated the same way
@@ -50,11 +50,10 @@ class WebHandler(object):
             return apache.HTTP_METHOD_NOT_ALLOWED
 
     def _method_handler(self):
-        cookies = Cookie.get_cookies(self.req, 
-                                     Cookie.MarshalCookie, 
-                                     secret = HMACsalt)
+        cookies = Cookie.get_cookies(self.req, Cookie.Cookie) 
         if 'authToken' in cookies:
-            self.authToken = cookies['authToken'].value
+            auth = base64.decodestring(cookies['authToken'].value)
+            self.authToken = auth.split(":")
 
             try:
                 auth = self._checkAuth(self.authToken)
@@ -86,12 +85,6 @@ class WebHandler(object):
         d = dict(self.fields)
         d['auth'] = self.auth
         return method(**d)
-
-    def _getTemplate(self, name):
-        cfg = self.cfg
-        templatePath = cfg.fsRoot + cfg.webDir + '/' +  name + '.kid'
-        t = kid.load_template(templatePath)
-        return t
 
     def _write(self, template, **values):
         template.write(self.req, encoding="utf-8", cfg = self.cfg, 
