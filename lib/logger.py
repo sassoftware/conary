@@ -73,7 +73,11 @@ class Logger:
         """
         self.directWr = directWr
         self.loggerPid = loggerPid
-        self.oldTermios = termios.tcgetattr(sys.stdin.fileno())
+
+        if sys.stdin.isatty():
+            self.oldTermios = termios.tcgetattr(sys.stdin.fileno())
+        else:
+            self.oldTermios = None
         self.oldStderr = os.dup(sys.stderr.fileno())
         self.oldStdout = os.dup(sys.stdout.fileno())
         self.oldStdin = os.dup(sys.stdin.fileno())
@@ -95,7 +99,8 @@ class Logger:
         os.dup2(self.oldStdin, 0)
         os.dup2(self.oldStdout, 1)
         os.dup2(self.oldStderr, 2)
-        termios.tcsetattr(0, termios.TCSADRAIN, self.oldTermios)
+        if self.oldTermios is not None:
+            termios.tcsetattr(0, termios.TCSADRAIN, self.oldTermios)
         os.close(self.oldStdin)
         os.close(self.oldStdout)
         os.close(self.oldStderr)
@@ -162,9 +167,12 @@ class _ChildLogger:
         logFile = self.logFile
         directRd = self.directRd
         stdin = sys.stdin.fileno()
+
         stdout = sys.stdout.fileno()
 
-        fdList = [stdin, directRd, ptyFd]
+        fdList = [directRd, ptyFd]
+        if os.isatty(stdin):
+            fdList.append(stdin)
         
         # sigwinch is called when the window size is changed
         sigwinch = []
