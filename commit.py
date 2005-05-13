@@ -26,21 +26,17 @@ def doCommit(repos, changeSetFile, targetLabel):
 	log.error("invalid changeset %s", changeSetFile)
 	return 1
 
-    if not cs.isLocal() or cs.isAbsolute():
-        log.error("commit only works on local changesets")
-        return 1
-
-    label = versions.Label(targetLabel)
-    cs.setTargetBranch(repos, label)
-    commitCs = cs.makeAbsolute(repos)
-
-    (fd, changeSetFile) = tempfile.mkstemp()
-
-    os.close(fd)
-    commitCs.writeToFile(changeSetFile)
-
     if cs.isLocal():
-        return 1
+        if not targetLabel:
+            log.error("committing local changesets requires a targetLabel")
+        label = versions.Label(targetLabel)
+        cs.setTargetBranch(repos, label)
+        commitCs = cs.makeAbsolute(repos)
+
+        (fd, changeSetFile) = tempfile.mkstemp()
+
+        os.close(fd)
+        commitCs.writeToFile(changeSetFile)
 
     try:
         # hopefully the file hasn't changed underneath us since we
