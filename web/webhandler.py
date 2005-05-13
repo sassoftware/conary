@@ -50,13 +50,14 @@ class WebHandler(object):
             return apache.HTTP_METHOD_NOT_ALLOWED
 
     def _method_handler(self):
-        cookies = Cookie.get_cookies(self.req, Cookie.Cookie) 
+        cookies = Cookie.get_cookies(self.req, Cookie.Cookie)
+        
         if 'authToken' in cookies:
             auth = base64.decodestring(cookies['authToken'].value)
-            self.authToken = auth.split(":")
+            authToken = auth.split(":")
 
             try:
-                auth = self._checkAuth(self.authToken)
+                auth = self._checkAuth(authToken)
             except NotImplementedError:
                 auth = webauth.Authorization()
 
@@ -66,12 +67,11 @@ class WebHandler(object):
                 Cookie.add_cookie(self.req, cookie)
                 return self._redirect("login")
         else:
+            authToken = ('anonymous', 'anonymous')
+            self._checkAuth(authToken)
             auth = webauth.Authorization()
-            # XXX this is kind of ugly
-            # need to call this method to do any initialization
-            # in the subclass. kind of a chicken/egg problem.
-            self._checkAuth(('anonymous', 'anonymous'))
 
+        self.authToken = authToken
         self.auth = auth
 
         cmd = self.req.path_info
