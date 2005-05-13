@@ -67,6 +67,11 @@ class WebHandler(object):
                 return self._redirect("login")
         else:
             auth = webauth.Authorization()
+            # XXX this is kind of ugly
+            # need to call this method to do any initialization
+            # in the subclass. kind of a chicken/egg problem.
+            self._checkAuth(('anonymous', 'anonymous'))
+
         self.auth = auth
 
         cmd = self.req.path_info
