@@ -32,10 +32,13 @@ import sys
 import tempfile
 import traceback
 
+from pdb import _saferepr
+
 class Epdb(pdb.Pdb):
     # epdb will print to here instead of to sys.stdout,
     # and restore stdout when done
     __old_stdout = None
+    _displayList = {}
     # used to track the number of times a set_trace has been seen
     trace_counts = {'default' : [ True, 0 ]}
 
@@ -194,11 +197,7 @@ class Epdb(pdb.Pdb):
                 rv = (type(cond) == bool) or bool(cond(1))
                 self.set_trace_cond(marker, cond)
             except:
-                t, v = sys.exc_info()[:2]
-                if type(t) == type(''):
-                    exc_type_name = t
-                else: exc_type_name = t.__name__
-                print '***', exc_type_name + ':', v
+                print self._reprExc()
     do_tc = do_trace_cond
 
     def _set_path(self, paths):
@@ -287,11 +286,7 @@ class Epdb(pdb.Pdb):
             code = compile('\n'.join(full_input) + '\n', '<stdin>', 'exec')
             exec code in globals, locals
         except:
-            t, v = sys.exc_info()[:2]
-            if type(t) == type(''):
-                exc_type_name = t
-            else: exc_type_name = t.__name__
-            print '***', exc_type_name + ':', v
+            print self._reprExc()
 
     def handle_directive(self, line):
         cmd = line.split('?', 1)
@@ -356,6 +351,29 @@ class Epdb(pdb.Pdb):
         else:
             return 'd'
 
+    def _eval(self, arg, fn=None, printExc=True):
+        locals = self.curframe.f_locals
+        globals = self.curframe.f_globals
+        try:
+            result = eval(arg + '\n', globals, locals) 
+            if fn is None:
+                return True, result
+            return True, fn(result)
+        except:
+            if printExc:
+                exc = self._reprExc()
+                print exc
+                return False, exc
+            else:
+                return False, self._reprExc()
+
+    def _reprExc(self):
+        t, v = sys.exc_info()[:2]
+        if type(t) == type(''):
+            exc_type_name = t
+        else: exc_type_name = t.__name__
+        return ' '.join(('***', exc_type_name + ':', _saferepr(str(v))))
+
     def _getMembersOfType(self, obj, objType):
         names = dir(obj)
         members = []
@@ -366,44 +384,87 @@ class Epdb(pdb.Pdb):
         return members
     
     def do_showmethods(self, arg):
-        locals = self.curframe.f_locals
-        globals = self.curframe.f_globals
-        try:
-            result = eval(arg + '\n', globals, locals) 
-            self._showmethods(result)
-        except:
-            t, v = sys.exc_info()[:2]
-            if type(t) == type(''):
-                exc_type_name = t
-            else: exc_type_name = t.__name__
-            print '***', exc_type_name + ':', v
+        self._eval(arg, self._showmethods)
 
     def do_showclasses(self, arg):
-        locals = self.curframe.f_locals
-        globals = self.curframe.f_globals
-        try:
-            result = eval(arg + '\n', globals, locals) 
-            self._showclasses(result)
-        except:
-            t, v = sys.exc_info()[:2]
-            if type(t) == type(''):
-                exc_type_name = t
-            else: exc_type_name = t.__name__
-            print '***', exc_type_name + ':', v
+        self._eval(arg, self._showclasses)
 
+    def do_display(self, arg):
+        if not arg:
+            self._displayItems()
+        else:
+            params = arg.split()
+            if params[0] == 'list' and not params[1:]:
+                self._listDisplayItems()
+            elif params[0] in ('enable','disable','delete'):
+                try:
+                    nums = [int(x) for x in params[1:]]
+                except ValueError, msg:
+                    print '***', ValueError, msg
+                    return
+                missing = []
+                _nums = []
+
+                for num in nums:
+                    if num in self._displayList:
+                        _nums.append(num)
+                    else:
+                        missing.append(str(num))
+                if params[0] == 'enable':
+                    for num in _nums:
+                        self._displayList[num][0] = True
+                if params[0] == 'disable':
+                    for num in _nums:
+                        self._displayList[num][0] = False
+                if params[0] == 'delete':
+                    for num in nums:
+                        del self._displayList[num]
+                self._listDisplayItems()
+                if missing:
+                    print "Warning: could not find display num(s) %s" \
+                                                        % ','.join(missing)
+            else:
+                if self._displayList:
+                    displayNum = max(self._displayList) + 1
+                else:
+                    displayNum = 0
+                self._displayList[displayNum] = [True, arg]
+                self._listDisplayItems()
+
+    def _listDisplayItems(self):
+        displayedItem = False
+        for num in sorted(self._displayList.iterkeys()):
+            if not displayedItem:
+                displayedItem = True
+                print
+                print "Cmds to display:"
+            enabled, item = self._displayList[num]
+            if not enabled:
+                print "%d: %s (disabled)" % (num, item)
+            else:
+                print "%d: %s" % (num, item)
+        if displayedItem:
+            print
+        else:
+            print "*** No items set to display at each cmd"
+
+
+    def _displayItems(self):
+        displayedItem = False
+        for num in sorted(self._displayList.iterkeys()):
+            enabled, item = self._displayList[num]
+            if not enabled:
+                continue
+            if not displayedItem:
+                displayedItem = True
+                print
+            passed, result = self._eval(item, printExc = False)
+            print "%d: %s = %s" % (num, item, _saferepr(result))
+        if displayedItem:
+            print
 
     def do_showdata(self, arg):
-        locals = self.curframe.f_locals
-        globals = self.curframe.f_globals
-        try:
-            result = eval(arg + '\n', globals, locals) 
-            self._showdata(result)
-        except:
-            t, v = sys.exc_info()[:2]
-            if type(t) == type(''):
-                exc_type_name = t
-            else: exc_type_name = t.__name__
-            print '***', exc_type_name + ':', v
+        result = self._eval(item, self._showdata)
 
     def _define(self, obj):
         if inspect.isclass(obj):
@@ -446,63 +507,96 @@ class Epdb(pdb.Pdb):
 
 
     def do_define(self, arg):
-        locals = self.curframe.f_locals
-        globals = self.curframe.f_globals
-        try:
-            result = eval(arg + '\n', globals, locals) 
-            self._define(result)
-        except:
-            t, v = sys.exc_info()[:2]
-            if type(t) == type(''):
-                exc_type_name = t
-            else: exc_type_name = t.__name__
-            print '***', exc_type_name + ':', v
+        self._eval(arg, self._define)
+
+    def do_showdata(self, arg):
+        result = self._eval(item, self._showdata)
+
+    def _define(self, obj):
+        if inspect.isclass(obj):
+            bases = inspect.getmro(obj)
+            bases = [ x.__name__ for x in bases[1:] ]
+            if bases:
+                bases = ' -- Bases (' + ', '.join(bases) + ')'
+            else:
+                bases = '' 
+            if hasattr(obj, '__init__') and inspect.isroutine(obj.__init__):
+                try:
+                    initfn = obj.__init__.im_func
+                    argspec = inspect.getargspec(initfn)
+                    # get rid of self from arg list...
+                    fnargs = argspec[0][1:] 
+                    newArgSpec = (fnargs, argspec[1], argspec[2], argspec[3])
+                    argspec = inspect.formatargspec(*newArgSpec)
+                except TypeError:
+                    argspec = '(?)'
+            else:
+                argspec = ''
+            print "Class " + obj.__name__ + argspec + bases
+        elif inspect.ismethod(obj) or type(obj).__name__ == 'method-wrapper':
+            m_class = obj.im_class
+            m_self = obj.im_self
+            m_func = obj.im_func
+            name = m_class.__name__ + '.' +  m_func.__name__
+            #if m_self:
+            #    name = "<Bound>"  + name
+            argspec = inspect.formatargspec(*inspect.getargspec(m_func))
+            print "%s%s" % (name, argspec)
+        elif type(obj).__name__ == 'builtin_function_or_method':
+            print obj
+        elif inspect.isfunction(obj):
+            name = obj.__name__
+            argspec = inspect.formatargspec(*inspect.getargspec(obj))
+            print "%s%s" % (name, argspec)
+        else:
+            print type(obj)
+
+
+    def do_define(self, arg):
+        self._eval(arg, self._define)
 
     def do_doc(self, arg):
-        locals = self.curframe.f_locals
-        globals = self.curframe.f_globals
-        try:
-            docloc = None
-            result = eval(arg + '\n', globals, locals) 
-            if hasattr(result, '__doc__'):
-                if result.__doc__ is not None:
-                    docstr = result.__doc__
-                elif inspect.ismethod(result):
-                    bases = inspect.getmro(result.im_class)
-                    found = False
-                    for base in bases:
-                        if hasattr(base, result.__name__):
-                            baseres = getattr(base, result.__name__)
-                            if (hasattr(baseres, '__doc__')
-                                and baseres.__doc__ is not None):
-                                docloc = baseres
-                                docstr = baseres.__doc__
-                                found = True
-                                break
-                    if not found:
-                        docstr = None
-                else:
+        self._eval(arg, self._doc)
+
+    def _doc(self, result):
+        docloc = None
+        if hasattr(result, '__doc__'):
+            if result.__doc__ is not None:
+                docstr = result.__doc__
+            elif inspect.ismethod(result):
+                bases = inspect.getmro(result.im_class)
+                found = False
+                for base in bases:
+                    if hasattr(base, result.__name__):
+                        baseres = getattr(base, result.__name__)
+                        if (hasattr(baseres, '__doc__')
+                            and baseres.__doc__ is not None):
+                            docloc = baseres
+                            docstr = baseres.__doc__
+                            found = True
+                            break
+                if not found:
                     docstr = None
-                print "\"\"\"%s\"\"\"" % docstr
-                if docloc:
-                    print "(Found doc in %s)" % docloc
-                
-            if inspect.isclass(result):
-                if hasattr(result, '__init__'):
-                    self.do_define(arg + '.__init__')
-                    if hasattr(result.__init__, '__doc__'):
-                        print "\"\"\"%s\"\"\"" % result.__init__.__doc__
-                else:
-                    print "No init function"
-        except:
-            t, v = sys.exc_info()[:2]
-            if type(t) == type(''):
-                exc_type_name = t
-            else: exc_type_name = t.__name__
-            print '***', exc_type_name + ':', v
+            else:
+                docstr = None
+            print "\"\"\"%s\"\"\"" % docstr
+            if docloc:
+                print "(Found doc in %s)" % docloc
+            
+        if inspect.isclass(result):
+            if hasattr(result, '__init__'):
+                self.do_define(arg + '.__init__')
+                if hasattr(result.__init__, '__doc__'):
+                    print "\"\"\"%s\"\"\"" % result.__init__.__doc__
+            else:
+                print "No init function"
 
     def interaction(self, frame, traceback):
-        pdb.Pdb.interaction(self, frame, traceback)
+        self.setup(frame, traceback)
+        self._displayItems()
+        self.print_stack_entry(self.stack[self.curindex])
+        self.cmdloop()
+        self.forget()
         if not self.__old_stdout is None:
             sys.stdout.flush()
             # now we reset stdout to be the whatever it was before
