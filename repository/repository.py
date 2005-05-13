@@ -358,12 +358,13 @@ class ChangeSetJob:
 	pass
 
     def addFileContents(self, sha1, fileVersion, fileContents, 
-		restoreContents, isConfig):
+                        restoreContents, isConfig, precompressed = False):
 	# Note that the order doesn't matter, we're just copying
 	# files into the repository. Restore the file pointer to
 	# the beginning of the file as we may want to commit this
 	# file to multiple locations.
-	self.repos._storeFileFromContents(fileContents, sha1, restoreContents)
+	self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
+                                          precompressed = precompressed)
 
     def __init__(self, repos, cs, fileHostFilter = [], callback = None):
 	self.repos = repos
@@ -523,6 +524,8 @@ class ChangeSetJob:
 
 		assert(not failedHunks)
             else:
+                # config files are not always available compressed (due
+                # to the config file cache)
                 fileContents = filecontents.FromChangeSet(cs, pathId)
 
 	    self.addFileContents(fileObj.contents.sha1(), newVersion, 
@@ -532,14 +535,15 @@ class ChangeSetJob:
 	normalRestoreList.sort()
         ptrRestores = []
 	for (pathId, sha1, version, restoreContents) in normalRestoreList:
-	    (contType, fileContents) = cs.getFileContents(pathId)
+	    (contType, fileContents) = cs.getFileContents(pathId,
+                                                          compressed = True)
             if contType == changeset.ChangedFileTypes.ptr:
                 ptrRestores.append(sha1)
                 continue
 
 	    assert(contType == changeset.ChangedFileTypes.file)
 	    self.addFileContents(sha1, version, fileContents, restoreContents,
-				 0)
+				 0, precompressed = True)
 
         for sha1 in ptrRestores:
 	    self.addFileContents(sha1, None, None, False, 0)

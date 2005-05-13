@@ -18,6 +18,8 @@ Changes in 0.60.1:
     and some authentication UI bugs have been fixed.
   * The repository web interface now requires the conary-web-common package
     to be installed.
+  * Committing troves to the repository no longer recompresses non-config
+    files
 
 Changes in 0.60.0:
   * Changed changesets to compress individual files instead of the combined

@@ -83,7 +83,7 @@ class DataStore:
 
 	os.close(countFile)
 
-    def incrementCount(self, path, fileObj = None):
+    def incrementCount(self, path, fileObj = None, precompressed = False):
 	"""
 	Increments the count by one.  it becomes one, the contents
 	of fileObj are stored into that path. Return the new count.
@@ -126,15 +126,30 @@ class DataStore:
 	    
 	    if not os.path.exists(newPath):
 		os.close(fd)
-		return self.incrementCount(path, fileObj = fileObj)
+		return self.incrementCount(path, fileObj = fileObj,
+                                           precompressed = precompressed)
 
-	    fObj = os.fdopen(fd, "r+")
-	    dest = gzip.GzipFile(mode = "w", fileobj = fObj)
-            contentSha1 = sha.new()
-	    util.copyfileobj(fileObj, dest, digest = contentSha1)
-	    os.rename(newPath, path)
+            fObj = os.fdopen(fd, "r+")
+            if precompressed:
+                # this requires fileObj to be seekable. it's just easier
+                # that way
+                contentSha1 = sha.new()
+                uncompObj = gzip.GzipFile(mode = "r", fileobj = fileObj)
+                s = uncompObj.read(128 * 1024)
+                while s:
+                    contentSha1.update(s)
+                    s = uncompObj.read(128 * 1024)
+                fileObj.seek(0)
+                
+                util.copyfileobj(fileObj, fObj)
+                uncompObj.close()
+            else:
+                dest = gzip.GzipFile(mode = "w", fileobj = fObj)
+                contentSha1 = sha.new()
+                util.copyfileobj(fileObj, dest, digest = contentSha1)
+                dest.close()
 
-	    dest.close()
+            os.rename(newPath, path)
 	    # this closes fd for us
 	    fObj.close()
             return (1, contentSha1.hexdigest())
@@ -158,10 +173,11 @@ class DataStore:
 
     # file should be a python file object seek'd to the beginning
     # this messes up the file pointer
-    def addFile(self, f, hash):
+    def addFile(self, f, hash, precompressed = False):
 	path = self.hashToPath(hash)
         self.makeDir(path)
-	newCount, sha1 = self.incrementCount(path, fileObj = f)
+	newCount, sha1 = self.incrementCount(path, fileObj = f,
+                                             precompressed = precompressed)
         if sha1 and sha1 != hash:
             raise IntegrityError
 
@@ -209,10 +225,12 @@ class DataStoreRepository:
     network repositories.
     """
 
-    def _storeFileFromContents(self, contents, sha1, restoreContents):
+    def _storeFileFromContents(self, contents, sha1, restoreContents,
+                               precompressed = False):
 	if restoreContents:
 	    self.contentsStore.addFile(contents.get(), 
-				       sha1helper.sha1ToString(sha1))
+				       sha1helper.sha1ToString(sha1),
+                                       precompressed = precompressed)
 	else:
 	    # the file doesn't have any contents, so it must exist
 	    # in the data store already; we still need to increment

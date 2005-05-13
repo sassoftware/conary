@@ -14,6 +14,7 @@
 
 import database
 import datastore
+import gzip
 from repository import repository
 from StringIO import StringIO
 import sha
@@ -58,10 +59,11 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
             self.removeFile(pathId, oldFileId)
 
     def addFileContents(self, sha1, newVer, fileContents, restoreContents,
-			isConfig):
+			isConfig, precompressed = False):
 	if isConfig:
 	    repository.ChangeSetJob.addFileContents(self, sha1, newVer, 
-			     fileContents, restoreContents, isConfig)
+			     fileContents, restoreContents, isConfig, 
+                             precompressed = precompressed)
 
     # remove the specified file 
     def removeFile(self, pathId, fileId):
@@ -158,7 +160,7 @@ class SqlDataStore:
             cu.execute("UPDATE DataStore SET count=? WHERE hash=?", 
                        count, hash)
 
-    def incrementCount(self, hash, fileObj = None):
+    def incrementCount(self, hash, fileObj = None, precompressed = True):
 	"""
 	Increments the count by one.  If it becomes one (the file is
         new), the contents of fileObj are stored into that path.
@@ -171,7 +173,15 @@ class SqlDataStore:
             cu.execute("UPDATE DataStore SET count=count+1 WHERE hash=?",
                        hash)
         else:
-            rawData = fileObj.read()
+            if precompressed:
+                # it's precompressed as a gzip stream, and we need a
+                # zlib stream. just decompress it.
+                gzObj = gzip.GzipFile(mode = "r", fileobj = fileObj)
+                rawData = gzObj.read()
+                del gzObj
+            else:
+                rawData = fileObj.read()
+
             data = zlib.compress(rawData)
             digest = sha.new()
             digest.update(rawData)
@@ -188,8 +198,8 @@ class SqlDataStore:
 
     # file should be a python file object seek'd to the beginning
     # this messes up the file pointer
-    def addFile(self, f, hash):
-	self.incrementCount(hash, fileObj = f)
+    def addFile(self, f, hash, precompressed = True):
+	self.incrementCount(hash, fileObj = f, precompressed = precompressed)
 
     # returns a python file object for the file requested
     def openFile(self, hash, mode = "r"):

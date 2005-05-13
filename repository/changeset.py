@@ -725,6 +725,7 @@ class ReadOnlyChangeSet(ChangeSet):
     def getFileContents(self, pathId, compressed = False):
         name = None
 	if self.configCache.has_key(pathId):
+            assert(not compressed)
             name = pathId
 	    (tag, contents, compressed) = self.configCache[pathId]
 
@@ -817,24 +818,30 @@ class ReadOnlyChangeSet(ChangeSet):
             if newVersion != oldVersion and fileObj.hasContents:
 		# we need the contents as well
                 if files.contentsChanged(filecs):
-                    (contType, cont) = self.getFileContents(pathId, 
-                                                            compressed = True)
-                    if contType == ChangedFileTypes.diff:
-                        origCont = repos.getFileContents([(oldFileId, 
-                                                           oldVersion)])[0]
-                        diff = cont.get().readlines()
-                        oldLines = origCont.get().readlines()
-                        (newLines, failures) = patch.patch(oldLines, diff)
-                        assert(not failures)
-                        fileContents = filecontents.FromString(
-                                                        "".join(newLines))
-                        absCs.addFileContents(pathId, ChangedFileTypes.file, 
-                                              fileContents,
-                                              fileObj.flags.isConfig())
+                    if fileObj.flags.isConfig():
+                        # config files aren't available compressed
+                        (contType, cont) = self.getFileContents(pathId)
+                        if contType == ChangedFileTypes.diff:
+                            origCont = repos.getFileContents([(oldFileId, 
+                                                               oldVersion)])[0]
+                            diff = cont.get().readlines()
+                            oldLines = origCont.get().readlines()
+                            (newLines, failures) = patch.patch(oldLines, diff)
+                            assert(not failures)
+                            fileContents = filecontents.FromString(
+                                                            "".join(newLines))
+                            absCs.addFileContents(pathId, 
+                                                  ChangedFileTypes.file, 
+                                                  fileContents, True)
+                        else:
+                            absCs.addFileContents(pathId, ChangedFileTypes.file,
+                                                  cont, True)
                     else:
+                        (contType, cont) = self.getFileContents(pathId,
+                                                        compressed = True)
+                        assert(contType == ChangedFileTypes.file)
                         absCs.addFileContents(pathId, ChangedFileTypes.file,
-                                              cont, fileObj.flags.isConfig(), 
-                                              compressed = True)
+                                              cont, False, compressed = True)
                 else:
                     # include the old contents; we might need them for
                     # a distributed branch
