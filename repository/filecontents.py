@@ -92,8 +92,6 @@ class FromChangeSet(FileContents):
 class CompressedFromChangeSet(FromChangeSet):
 
     def get(self):
-        import lib
-        lib.epdb.st()
 	return self.cs.getFileContents(self.pathId, compressed = True)[1].get()
 
 class FromString(FileContents):
