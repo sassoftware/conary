@@ -107,7 +107,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
         try:
             # a little odd that creating a class instance has the side
             # effect of modifying the repository...
-            ChangeSetJob(self, cs, [ serverName ])
+            ChangeSetJob(self, cs, [ serverName ], resetTimestamps = True)
         except:
             print >> sys.stderr, "exception occurred while committing change set"
             stackutil.printTraceBack()

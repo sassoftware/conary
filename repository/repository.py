@@ -366,18 +366,38 @@ class ChangeSetJob:
 	self.repos._storeFileFromContents(fileContents, sha1, restoreContents,
                                           precompressed = precompressed)
 
-    def __init__(self, repos, cs, fileHostFilter = [], callback = None):
+    def __init__(self, repos, cs, fileHostFilter = [], callback = None,
+                 resetTimestamps = False):
 	self.repos = repos
 	self.cs = cs
 
 	configRestoreList = []
 	normalRestoreList = []
 
+	newList = [ x for x in cs.iterNewPackageList() ]
+
+        if resetTimestamps:
+            # This depends intimiately on the versions cache. We don't
+            # change the timestamps on each version, because the cache
+            # ensures they are all a single underlying object. Slick,
+            # but brittle?
+            updated = {}
+
+            for csPkg in newList:
+                ver = csPkg.getNewVersion()
+                if ver in updated:
+                    pass
+                else:
+                    oldVer = ver.copy()
+                    ver.trailingRevision().resetTimeStamp()
+                    updated[oldVer] = ver
+
+            del updated
+
 	# create the package objects which need to be installed; the
 	# file objects which map up with them are created later, but
 	# we do need a map from pathId to the path and version of the
 	# file we need, so build up a dictionary with that information
-	newList = [ x for x in cs.iterNewPackageList() ]
 	for i, csPkg in enumerate(newList):
 	    if callback:
 		callback.creatingDatabaseTransaction(i + 1, len(newList))
