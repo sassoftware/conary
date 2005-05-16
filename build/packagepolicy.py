@@ -563,11 +563,17 @@ class Transient(policy.Policy):
         r'..*\.elc$',
     ]
 
-    def doFile(self, file):
-	fullpath = self.macros.destdir + file
+    def doFile(self, filename):
+	fullpath = self.macros.destdir + filename
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    log.debug('transient: %s', file)
-	    self.recipe.autopkg.pathMap[file].flags.isTransient(True)
+            recipe = self.recipe
+            f = recipe.autopkg.pathMap[filename]
+	    log.debug('transient: %s', filename)
+	    f.flags.isTransient(True)
+            if f.flags.isConfig() or f.flags.isInitialContents():
+                recipe.reportErrors(
+                    '%s is marked as both a transient file and'
+                    ' a configuration or intial contents file' %filename)
 
 
 class SharedLibrary(policy.Policy):
