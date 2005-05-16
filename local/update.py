@@ -583,6 +583,12 @@ class FilesystemJob:
                     self.errors.append("non-empty directory %s is in "
                                        "the way of a newly created "
                                        "file" % headRealPath)
+                elif (headFile.flags.isInitialContents()  and 
+                      not self.removes.has_key(headRealPath)):
+                    # don't replace InitialContents files if they already
+                    # have contents on disk
+                    fullyUpdated = False
+                    continue
                 elif (not flags & REPLACEFILES and
                       not self.removes.has_key(headRealPath)):
                     self.errors.append("%s is in the way of a newly " 
@@ -768,7 +774,10 @@ class FilesystemJob:
                    headFile.contents.sha1() != baseFile.contents.sha1()
                 ):
 
-		if forceUpdate or (flags & REPLACEFILES) or \
+                if not forceUpdate and headFile.flags.isInitialContents():
+		    log.debug("skipping new contents of InitialContents file"
+                              "%s" % finalPath)
+		elif forceUpdate or (flags & REPLACEFILES) or \
                         (not flags & MERGE) or \
 			headFile.flags.isTransient() or \
 			fsFile.contents == baseFile.contents:

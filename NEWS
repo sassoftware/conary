@@ -1,3 +1,6 @@
+Changes in 0.60.2:
+  * Added InitialContent flag 
+
 Changes in 0.60.1:
   * Support for legacy clients (protocol version 29) has been removed from
     the server
