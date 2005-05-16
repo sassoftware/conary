@@ -27,6 +27,7 @@ Changes in 0.60.1:
     good)
   * Reworked troves to be representable as streams and implement *basic*
     signature capability
+  * Local cook versions are now more sensible.
 
 Changes in 0.60.0:
   * Changed changesets to compress individual files instead of the combined

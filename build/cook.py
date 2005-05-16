@@ -938,6 +938,10 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
                                           b[0].trailingRevision().buildCount))
         latest, flavors = relVersions[-1]
         latest = latest.copy()
+
+        if targetLabel:
+            latest = latest.createBranch(targetLabel, withVerRel = True)
+
         if alwaysBumpCount:
             # case 1.  There is a binary trove with this source
             # version, and we always want to bump the build count
@@ -954,10 +958,13 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
     if not latest:
         # case 4.  There is no binary trove derived from this source 
         # version.  
-        latest = sourceVersion.getBinaryVersion()
-        latest.incrementBuildCount()
-    if targetLabel:
-        latest = latest.createBranch(targetLabel, withVerRel = True)
+        latest = sourceVersion.copy()
+
+        if targetLabel:
+            latest = latest.createBranch(targetLabel, withVerRel = True)
+        else:
+            latest = sourceVersion
+        latest = latest.getBinaryVersion()
         latest.incrementBuildCount()
     return latest
 
@@ -1030,6 +1037,8 @@ def cookItem(repos, cfg, item, prep=0, macros={},
             sourceVersion = versions.VersionFromString('/%s/%s-1' % (
                                                    cfg.buildLabel.asString(),
                                                    recipeClass.version))
+            # the source version must have a time stamp
+            sourceVersion.trailingRevision().resetTimeStamp()
         targetLabel = versions.CookLabel()
     else:
 	if resume:
