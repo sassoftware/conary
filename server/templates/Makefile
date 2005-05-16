@@ -25,14 +25,11 @@ kid_files =	add_group.kid		\
 		pick_trove.kid		\
 		user_admin.kid
 
-extra_inst = library.js \
-             style.css
-
 extra_dist = Makefile
 
 python_files = __init__.py
 
-dist_files = $(python_files) $(extra_inst) $(extra_dist) $(kid_files)
+dist_files = $(python_files) $(extra_dist) $(kid_files)
 
 all: default-all
 
