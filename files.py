@@ -30,9 +30,11 @@ from deps import deps
 
 _FILE_FLAG_CONFIG = 1 << 0
 _FILE_FLAG_PATH_DEPENDENCY_TARGET = 1 << 1
-# the following two are a legacy from before tag handlers; all repositories
+# initialContents files are created if the file does not already exist
+# in the filesystem; it's skipped otherwise
+_FILE_FLAG_INITIAL_CONTENTS = 1 << 2
+# the following is a legacy from before tag handlers; all repositories
 # and databases have been purged of them, so it can be used at will
-_FILE_FLAG_UNUSED1 = 1 << 2
 _FILE_FLAG_UNUSED2 = 1 << 3
 # transient contents that may have modified contents overwritten
 _FILE_FLAG_TRANSIENT = 1 << 4
@@ -217,6 +219,9 @@ class FlagsStream(streams.NumericStream):
 
     def isPathDependencyTarget(self, set = None):
 	return self._isFlag(_FILE_FLAG_PATH_DEPENDENCY_TARGET, set)
+
+    def isInitialContents(self):
+	return self._isFlag(_FILE_FLAG_INITIAL_CONTENTS, set)
 
     def isSource(self, set = None):
 	return self._isFlag(_FILE_FLAG_SOURCEFILE, set)
