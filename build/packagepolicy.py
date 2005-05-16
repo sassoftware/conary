@@ -518,10 +518,35 @@ class Config(policy.Policy):
     keywords = policy.Policy.keywords.copy()
     keywords['inclusions'] = []
 
-    def doFile(self, file):
-	fullpath = self.macros.destdir + file
+    def doFile(self, filename):
+	fullpath = self.macros.destdir + filename
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    _markConfig(self.recipe, file, fullpath)
+	    _markConfig(self.recipe, filename, fullpath)
+
+
+class InitialContents(policy.Policy):
+    """
+    Mark only explicit inclusions as initial contents files, which
+    provide their contents only if the file does not yet exist:
+    C{r.InitialContents(I{filterexp})}
+    """
+
+    # change inclusions to default to none, instead of all files
+    keywords = policy.Policy.keywords.copy()
+    keywords['inclusions'] = []
+
+    def doFile(self, filename):
+	fullpath = self.macros.destdir + filename
+        recipe = self.recipe
+	if os.path.isfile(fullpath) and util.isregular(fullpath):
+            log.debug('initial contents: %s', filename)
+            f = recipe.autopkg.pathMap[filename]
+            f.flags.isInitialContents(True)
+            if f.flags.isConfig():
+                recipe.reportErrors(
+                    '%s is marked as both a configuration file and'
+                    ' an initial contents file' %filename)
+
 
 
 class Transient(policy.Policy):
@@ -1764,6 +1789,7 @@ def DefaultPolicy(recipe):
 	PackageSpec(recipe),
 	EtcConfig(recipe),
 	Config(recipe),
+	InitialContents(recipe),
 	Transient(recipe),
 	SharedLibrary(recipe),
 	TagDescription(recipe),
