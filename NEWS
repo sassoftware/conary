@@ -25,6 +25,8 @@ Changes in 0.60.1:
     a bad idea of time; servers should be consistent, even if they're
     wrong, and as long as time doesn't go backwards on that server all is
     good)
+  * Reworked troves to be representable as streams and implement *basic*
+    signature capability
 
 Changes in 0.60.0:
   * Changed changesets to compress individual files instead of the combined

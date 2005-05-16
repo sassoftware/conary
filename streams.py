@@ -240,6 +240,7 @@ class DependenciesStream(InfoStream):
 	return self.deps
 
     def set(self, val):
+        assert(val is not None)
 	self.deps = val
 
     def freeze(self, skipSet = None):
@@ -265,7 +266,6 @@ class DependenciesStream(InfoStream):
 
     def __init__(self, dep = ''):
         assert(type(dep) is str)
-        self.deps = None
         self.thaw(dep)
 
 class StringsStream(list, InfoStream):
@@ -312,6 +312,8 @@ class LargeStreamSet(InfoStream):
     headerSize = 6
 
     ignoreUnknown = False
+
+    __slots__ = []
 
     def __init__(self, data = None):
 	for streamType, name in self.streamDict.itervalues():

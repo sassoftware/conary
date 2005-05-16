@@ -639,6 +639,9 @@ class NewVersion(AbstractVersion):
 
     __slots__ = ( )
 
+    def copy(self):
+        return self.__class__()
+
     def asString(self, frozen = False):
 	return "@NEW@"
 

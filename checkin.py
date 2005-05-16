@@ -18,6 +18,7 @@ and diffs; creating new packages; adding, removing, and renaming files;
 and committing changes back to the repository.
 """
 
+import copy
 import difflib
 from build import recipe, lookaside
 from local import update
@@ -41,6 +42,8 @@ import versions
 makeFileId = lambda: os.urandom(16)
 
 class SourceState(trove.Trove):
+
+    __slots__ = [ "branch", "pathMap", "lastMerged" ]
 
     def setPathMap(self, map):
         self.pathMap = map
@@ -69,7 +72,7 @@ class SourceState(trove.Trove):
 	.
 	PATHIDn PATHn FILEIDn VERSIONn
 	"""
-        assert(len(self.packages) == 0)
+        assert(len(self.troves) == 0)
 
 	f = open(filename, "w")
 	f.write("name %s\n" % self.getName())
@@ -118,7 +121,20 @@ class SourceState(trove.Trove):
 
 	return versionStr
 
-    def __init__(self, name, version, branch, lastmerged = None):
+    def copy(self, classOverride = None):
+        new = trove.Trove.copy(self, classOverride = classOverride)
+        new.branch = self.branch.copy()
+        new.pathMap = copy.copy(self.pathMap)
+        if self.lastMerged:
+            new.lastMerged = self.lastMerged.copy()
+        else:
+            new.lastMerged = None
+        return new
+
+    def __init__(self, name, version, branch, changeLog = None, 
+                 lastmerged = None, isRedirect = False):
+        assert(not isRedirect)
+        assert(not changeLog)
 	trove.Trove.__init__(self, name, version, 
                              deps.deps.DependencySet(), None)
         self.branch = branch
@@ -190,6 +206,9 @@ class SourceStateFromFile(SourceState):
 	    raise CONARYFileMissing
 
 	self.parseFile(file)
+
+    def copy(self):
+        return SourceState.copy(self, classOverride = SourceState)
 
 def _verifyAtHead(repos, headPkg, state):
     # get the latest version on our branch
@@ -495,6 +514,17 @@ def commit(repos, cfg, message):
     pkgCs.changeChangeLog(cl)
 
     repos.commitChangeSet(changeSet)
+
+    # committing to the repository changes the version timestamp; get the
+    # right timestamp to put in the CONARY file
+    matches = repos.getTroveVersionsByBranch({ newState.getName() : 
+                                { newState.getVersion().branch() : None } })
+    for ver in matches[newState.getName()]:
+        if ver == newState.getVersion():
+            break
+    assert(ver == newState.getVersion())
+    newState.changeVersion(ver)
+
     newState.setLastMerged(None)
     newState.write("CONARY")
 

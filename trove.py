@@ -28,36 +28,217 @@ from streams import FrozenVersionStream
 from streams import DependenciesStream
 from streams import ByteStream
 
-class Trove:
+_TROVEINFO_TAG_SIZE        = 0
+_TROVEINFO_TAG_SOURCENAME  = 1
+_TROVEINFO_TAG_BUILDTIME   = 2
+_TROVEINFO_TAG_CONARYVER   = 3
+
+class TroveInfo(streams.StreamSet):
+    ignoreUnknown = True
+    streamDict = {
+        _TROVEINFO_TAG_SIZE       : ( streams.LongLongStream,'size'       ),
+        _TROVEINFO_TAG_SOURCENAME : ( streams.StringStream,  'sourceName' ),
+        _TROVEINFO_TAG_BUILDTIME  : ( streams.LongLongStream,'buildTime'  ),
+        _TROVEINFO_TAG_CONARYVER  : ( streams.StringStream,  'conaryVersion'),
+    }
+    _streamDict = streams.StreamSetDef(streamDict)
+
+_TROVESIG_SHA1 = 0
+
+class TroveSignatures(streams.StreamSet):
+    ignoreUnknown = True
+    streamDict = {
+        _TROVESIG_SHA1            : ( streams.Sha1Stream,    'sha1'       ),
+    }
+    _streamDict = streams.StreamSetDef(streamDict)
+
+class TroveRefsTrovesStream(dict, streams.InfoStream):
+
     """
-    Packages are groups of files and other packages, which are included by
-    reference. By convention, "package" often refers to a package with
-    files but no other packages, while a "group" means a package with other
-    packages but no files. While this object allows any mix of file and
-    package inclusion, in practice conary doesn't allow it.
+    Defines a dict which represents the troves referenced by a trove. Each
+    entry maps a (troveName, version, flavor) tuple to a byDefault (boolean) 
+    value.
+
+    It can be frozen (to allow signatures to be calculated), but the other
+    stream methods are not provided. The frozen form is intended to be
+    easily extended if that becomes necessary at some later point.
     """
+
+    def freeze(self, skipSet = None):
+        """
+        Frozen form is a sequence of:
+            total entry size, excluding these two bytes (2 bytes)
+            troveName length (2 bytes)
+            troveName
+            version string length (2 bytes)
+            version string
+            flavor string length (2 bytes)
+            flavor string
+            byDefault value (1 byte, 0 or 1)
+
+        This whole thing is sorted by the string value of each entry. Sorting
+        this way is a bit odd, but it's simple and well-defined.
+        """
+        l = []
+        for ((name, version, flavor), byDefault) in self.iteritems():
+            v = version.asString()
+            f = flavor.freeze()
+            s = (struct.pack("!H", len(name)) + name +
+                 struct.pack("!H", len(v)) + v +
+                 struct.pack("!H", len(f)) + f +
+                 struct.pack("B", byDefault))
+            l.append(struct.pack("!H", len(s)) + s)
+
+        l.sort()
+
+        return "".join(l)
+
     def copy(self):
-	return copy.deepcopy(self)
+        new = TroveRefsTrovesStream()
+        for key, val in self.iteritems():
+            new[key] = val
+
+        return new
+
+class TroveRefsFilesStream(dict, streams.InfoStream):
+
+    """
+    Defines a dict which represents the files referenced by a trove. Each
+    entry maps a pathId to a (path, fileId, version) tuple.
+
+    It can be frozen (to allow signatures to be calculated), but the other
+    stream methods are not provided. The frozen form is slightly more 
+    complicated then probably seems necessary, but it's designed to allow more
+    information to be added to each entry if it becomes necessary without
+    affecting old troves (so the signatures of old troves will still be
+    easily computable).
+    """
+
+    def freeze(self, skipSet = None):
+        """
+        Frozen form is a sequence of:
+            total entry size, excluding these two bytes (2 bytes)
+            pathId (16 bytes)
+            fileId (20 bytes)
+            pathLen (2 bytes)
+            path
+            versionLen (2 bytes)
+            version string
+
+        This whole thing is sorted by the string value of each entry. Sorting
+        this way is a bit odd, but it's simple and well-defined.
+        """
+        l = []
+        for (pathId, (path, fileId, version)) in self.iteritems():
+            v = version.asString()
+            s = (pathId + fileId +
+                     struct.pack("!H", len(path)) + path +
+                     struct.pack("!H", len(v)) + v)
+            l.append(struct.pack("!H", len(s)) + s)
+
+        l.sort()
+
+        return ''.join(l)
+
+    def copy(self):
+        new = TroveRefsFilesStream()
+        for key, val in self.iteritems():
+            new[key] = val
+
+        return new
+
+_STREAM_TRV_NAME      = 0
+_STREAM_TRV_VERSION   = 1
+_STREAM_TRV_FLAVOR    = 2
+_STREAM_TRV_CHANGELOG = 3
+_STREAM_TRV_TROVEINFO = 4
+_STREAM_TRV_PROVIDES  = 5
+_STREAM_TRV_REQUIRES  = 6
+_STREAM_TRV_TROVES    = 7
+_STREAM_TRV_FILES     = 8
+_STREAM_TRV_REDIRECT  = 9
+_STREAM_TRV_SIGS      = 10
+
+class Trove(streams.LargeStreamSet):
+    """
+    Troves are groups of files and other troves, which are included by
+    reference. By convention, "component" often refers to a trove with
+    files but no other trove, while a "packages" means a trove with other
+    troves but no files. While this object allows any mix of file and
+    package inclusion, in practice conary doesn't allow it.
+
+    Trove is a stream primarily to allow it to be frozen and have a signature 
+    computed. It does provide a nice level of consistency as well. If it were 
+    a true stream, diff() would return a string instead of an object (a 
+    TroveChangeSet), but that string would be difficult to handle (and
+    Conary often directly manipulates TroveChangeSet objects))
+    """
+    streamDict = { 
+        _STREAM_TRV_NAME      : (streams.StringStream,        "name"      ),
+        _STREAM_TRV_VERSION   : (streams.FrozenVersionStream, "version"   ), 
+        _STREAM_TRV_FLAVOR    : (streams.DependenciesStream,  "flavor"    ), 
+        _STREAM_TRV_PROVIDES  : (streams.DependenciesStream,  "provides"  ), 
+        _STREAM_TRV_REQUIRES  : (streams.DependenciesStream,  "requires"  ), 
+        _STREAM_TRV_CHANGELOG : (changelog.ChangeLog,         "changeLog" ), 
+        _STREAM_TRV_TROVEINFO : (TroveInfo,                   "troveInfo" ), 
+        _STREAM_TRV_TROVES    : (TroveRefsTrovesStream,       "troves"    ), 
+        _STREAM_TRV_FILES     : (TroveRefsFilesStream,        "idMap"     ), 
+        _STREAM_TRV_REDIRECT  : (ByteStream,                  "redirect"  ),
+        _STREAM_TRV_SIGS      : (TroveSignatures,             "sigs"      ),
+    }
+    ignoreUnknown = False
+
+    # the memory savings from slots isn't all that interesting here, but it
+    # makes sure we don't add data to troves and forget to make it part
+    # of the stream
+    __slots__ = [ "name", "version", "flavor", "provides", "requires",
+                  "changeLog", "troveInfo", "troves", "idMap", "redirect",
+                  "sigs" ]
+
+    def freeze(self, skipSet = { _STREAM_TRV_SIGS : True }):
+        return streams.LargeStreamSet.freeze(self, skipSet)
+
+    def computeSignatures(self):
+        s = self.freeze()
+        sha1 = sha1helper.sha1String(s)
+        self.sigs.sha1.set(sha1)
+
+    def copy(self, classOverride = None):
+        if not classOverride:
+            classOverride = self.__class__
+
+        new = classOverride(self.name(),
+                            self.version().copy(),
+                            self.flavor().copy(),
+                            None,
+                            isRedirect = self.isRedirect())
+        new.idMap = self.idMap.copy()
+        new.troves = self.troves.copy()
+        new.provides.thaw(self.provides.freeze())
+        new.requires.thaw(self.requires.freeze())
+        new.changeLog = changelog.ChangeLog(self.changeLog.freeze())
+        new.troveInfo.thaw(self.troveInfo.freeze())
+        return new
 
     def getName(self):
-        return self.name
+        return self.name()
     
     def getVersion(self):
-        return self.version
+        return self.version()
     
     def changeVersion(self, version):
-        self.version = version
+        self.version.set(version)
 
     def changeFlavor(self, flavor):
-        self.flavor = flavor
+        self.flavor.set(flavor)
 
     def isRedirect(self):
-        return self.redirect
+        return self.redirect()
 
     def addFile(self, pathId, path, version, fileId):
 	assert(len(pathId) == 16)
 	assert(fileId is None or len(fileId) == 20)
-        assert(not self.redirect)
+        assert(not self.redirect())
 	self.idMap[pathId] = (path, fileId, version)
 
     # pathId is the only thing that must be here; the other fields could
@@ -108,9 +289,9 @@ class Trove:
 	@param presentOkay: replace if this is a duplicate, don't complain
 	@type presentOkay: boolean
 	"""
-	if not presentOkay and self.packages.has_key((name, version, flavor)):
-	    raise TroveError, "duplicate trove included in %s" % self.name
-	self.packages[(name, version, flavor)] = byDefault
+	if not presentOkay and self.troves.has_key((name, version, flavor)):
+	    raise TroveError, "duplicate trove included in %s" % self.name()
+	self.troves[(name, version, flavor)] = byDefault
 
     def delTrove(self, name, version, flavor, missingOkay):
 	"""
@@ -126,8 +307,8 @@ class Trove:
 	part of this trove?
 	@type missingOkay: boolean
 	"""
-	if self.packages.has_key((name, version, flavor)):
-	    del self.packages[(name, version, flavor)]
+	if self.troves.has_key((name, version, flavor)):
+	    del self.troves[(name, version, flavor)]
 	elif missingOkay:
 	    pass
 	else:
@@ -141,13 +322,13 @@ class Trove:
 
 	@rtype: list
 	"""
-	return self.packages.iterkeys()
+	return self.troves.iterkeys()
 
     def includeTroveByDefault(self, name, version, flavor):
-        return self.packages[(name, version, flavor)]
+        return self.troves[(name, version, flavor)]
 
     def hasTrove(self, name, version, flavor):
-	return self.packages.has_key((name, version, flavor))
+	return self.troves.has_key((name, version, flavor))
 
     # returns a dictionary mapping a pathId to a (path, version, pkgName) tuple
     def applyChangeSet(self, pkgCS):
@@ -161,8 +342,8 @@ class Trove:
 	@rtype: dict
 	"""
 
-	self.redirect = pkgCS.getIsRedirect()
-        if self.redirect:
+	self.redirect.set(pkgCS.getIsRedirect())
+        if self.redirect():
             # we don't explicitly remove files for redirects
             self.idMap = {}
 
@@ -170,20 +351,22 @@ class Trove:
 
 	for (pathId, path, fileId, fileVersion) in pkgCS.getNewFileList():
 	    self.addFile(pathId, path, fileVersion, fileId)
-	    fileMap[pathId] = self.idMap[pathId] + (self.name, None, None, None)
+	    fileMap[pathId] = self.idMap[pathId] + \
+                                (self.name(), None, None, None)
 
 	for (pathId, path, fileId, fileVersion) in pkgCS.getChangedFileList():
 	    (oldPath, oldFileId, oldVersion) = self.idMap[pathId]
 	    self.updateFile(pathId, path, fileVersion, fileId)
 	    # look up the path/version in self.idMap as the ones here
 	    # could be None
-	    fileMap[pathId] = self.idMap[pathId] + (self.name, oldPath, oldFileId, oldVersion)
+	    fileMap[pathId] = self.idMap[pathId] + \
+                                (self.name(), oldPath, oldFileId, oldVersion)
 
 	for pathId in pkgCS.getOldFileList():
 	    self.removeFile(pathId)
 
 	self.mergeTroveListChanges(pkgCS.iterChangedTroves())
-	self.flavor = pkgCS.getNewFlavor()
+	self.flavor.set(pkgCS.getNewFlavor())
 	self.changeLog = pkgCS.getChangeLog()
 	self.setProvides(pkgCS.getProvides())
 	self.setRequires(pkgCS.getRequires())
@@ -221,7 +404,7 @@ class Trove:
 		    self.delTrove(name, version, flavor,
 					   missingOkay = redundantOkay)
 		elif oper == "~":
-                    self.packages[(name, version, flavor)] = byDefault
+                    self.troves[(name, version, flavor)] = byDefault
                 else:
                     assert(0)
     
@@ -275,7 +458,7 @@ class Trove:
 	@rtype: (TroveChangeSet, fileChangeList, troveChangeList)
 	"""
 
-	assert(not them or self.name == them.name)
+	assert(not them or self.name() == them.name())
 
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
@@ -285,34 +468,34 @@ class Trove:
                 troveInfoDiff = ""
 
 	    themMap = them.idMap
-	    chgSet = TroveChangeSet(self.name, self.changeLog,
+	    chgSet = TroveChangeSet(self.name(), self.changeLog,
 				      them.getVersion(),	
 				      self.getVersion(),
 				      them.getFlavor(), self.getFlavor(),
 				      absolute = False,
-                                      isRedirect = self.redirect,
+                                      isRedirect = self.redirect(),
                                       troveInfoDiff = troveInfoDiff)
 	else:
 	    themMap = {}
-	    chgSet = TroveChangeSet(self.name, self.changeLog,
+	    chgSet = TroveChangeSet(self.name(), self.changeLog,
 				      None, self.getVersion(),
 				      None, self.getFlavor(),
 				      absolute = absolute,
-                                      isRedirect = self.redirect,
+                                      isRedirect = self.redirect(),
                                       troveInfoDiff = self.troveInfo.freeze())
 
 	# dependency and flavor information is always included in total;
-	# this lets us do dependency checking w/o having to load packages
+	# this lets us do dependency checking w/o having to load troves
 	# on the client
-	chgSet.setRequires(self.requires)
-	chgSet.setProvides(self.provides)
+        chgSet.setRequires(self.requires())
+        chgSet.setProvides(self.provides())
 
 	removedIds = []
 	addedIds = []
 	sameIds = {}
 	filesNeeded = []
 
-        if not self.redirect:
+        if not self.redirect():
             # we just ignore file information for redirects
             allIds = self.idMap.keys() + themMap.keys()
             for pathId in allIds:
@@ -352,27 +535,27 @@ class Trove:
                 if newPath or newVersion:
                     chgSet.changedFile(pathId, newPath, selfFileId, newVersion)
 
-	# now handle the packages we include
+	# now handle the troves we include
 	added = {}
 	removed = {}
 
-	for key in self.packages.iterkeys():
-	    if them and them.packages.has_key(key): 
-                if self.packages[key] != them.packages[key]:
+	for key in self.troves.iterkeys():
+	    if them and them.troves.has_key(key): 
+                if self.troves[key] != them.troves[key]:
                     chgSet.changedTrove(key[0], key[1], key[2],
-                                        self.packages[key])
+                                        self.troves[key])
                 continue
 
 	    (name, version, flavor) = key
-	    chgSet.newTroveVersion(name, version, flavor, self.packages[key])
+	    chgSet.newTroveVersion(name, version, flavor, self.troves[key])
 
             d = added.setdefault(name, {})
             l = d.setdefault(flavor, [])
             l.append(version)
 
 	if them:
-	    for key in them.packages.iterkeys():
-		if self.packages.has_key(key): continue
+	    for key in them.troves.iterkeys():
+		if self.troves.has_key(key): continue
 
 		(name, version, flavor) = key
 		chgSet.oldTroveVersion(name, version, flavor)
@@ -567,19 +750,19 @@ class Trove:
 	return (chgSet, filesNeeded, pkgList)
 
     def setProvides(self, provides):
-        self.provides = provides
+        self.provides.set(provides)
 
     def setRequires(self, requires):
-        self.requires = requires
+        self.requires.set(requires)
 
     def getProvides(self):
-        return self.provides
+        return self.provides()
 
     def getRequires(self):
-        return self.requires
+        return self.requires()
 
     def getFlavor(self):
-        return self.flavor
+        return self.flavor()
 
     def getChangeLog(self):
         return self.changeLog
@@ -612,17 +795,17 @@ class Trove:
         return self.troveInfo.conaryVersion.set(ver)
 
     def __init__(self, name, version, flavor, changeLog, isRedirect = False):
+        streams.LargeStreamSet.__init__(self)
+        if flavor is None:
+            import lib
+            lib.epdb.st()
         assert(flavor is not None)
-	self.idMap = {}
-	self.name = name
-	self.version = version
-	self.flavor = flavor
-	self.packages = {}
-        self.provides = None
-        self.requires = None
-	self.changeLog = changeLog
-        self.redirect = isRedirect
-        self.troveInfo = TroveInfo()
+	self.name.set(name)
+	self.version.set(version)
+	self.flavor.set(flavor)
+        if changeLog:
+            self.changeLog.thaw(changeLog.freeze())
+        self.redirect.set(isRedirect)
 
 class ReferencedTroveSet(dict, streams.InfoStream):
 
@@ -707,21 +890,6 @@ class OldFileStream(list, streams.InfoStream):
 	list.__init__(self)
 	if data is not None:
 	    self.thaw(data)
-
-_TROVEINFO_TAG_SIZE        = 0
-_TROVEINFO_TAG_SOURCENAME  = 1
-_TROVEINFO_TAG_BUILDTIME   = 2
-_TROVEINFO_TAG_CONARYVER   = 3
-
-class TroveInfo(streams.StreamSet):
-    ignoreUnknown = True
-    streamDict = {
-        _TROVEINFO_TAG_SIZE       : ( streams.LongLongStream,'size'       ),
-        _TROVEINFO_TAG_SOURCENAME : ( streams.StringStream,  'sourceName' ),
-        _TROVEINFO_TAG_BUILDTIME  : ( streams.LongLongStream,'buildTime'  ),
-        _TROVEINFO_TAG_CONARYVER  : ( streams.StringStream,  'conaryVersion'),
-    }
-    _streamDict = streams.StreamSetDef(streamDict)
 
 class ReferencedFileList(list, streams.InfoStream):
 
@@ -874,7 +1042,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	self.newVersion.set(version)
 
     def changeChangeLog(self, cl):
-	self.changeLog = cl
+	self.changeLog.thaw(cl.freeze())
 
     def getOldVersion(self):
 	return self.oldVersion()
@@ -1043,19 +1211,13 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         return self.isRedirect()
 
     def getProvides(self):
-        p = self.provides()
-        if not p:
-            return None
-        return p
+        return self.provides()
 
     def setRequires(self, requires):
 	self.requires.set(requires)
 
     def getRequires(self):
-        r = self.requires()
-        if not r:
-            return None
-        return r
+        return self.requires()
 
     def getOldFlavor(self):
         return self.oldFlavor()
@@ -1081,9 +1243,8 @@ class TroveChangeSet(AbstractTroveChangeSet):
 	    self.tcsType.set(_TCS_TYPE_ABSOLUTE)
 	else:
 	    self.tcsType.set(_TCS_TYPE_RELATIVE)
-        self.provides.set(None)
-        self.requires.set(None)
-	self.oldFlavor.set(oldFlavor)
+        if oldVersion is not None:
+            self.oldFlavor.set(oldFlavor)
 	self.newFlavor.set(newFlavor)
         self.isRedirect.set(isRedirect)
         assert(troveInfoDiff is not None)
@@ -1094,12 +1255,6 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
     def __init__(self, buf):
 	AbstractTroveChangeSet.__init__(self, buf)
 
-	# we can't represent the different between an empty flavor and
-        # no flavor; the oldFlavor is the only place this matters, and
-        # we can infer the answer from oldVersion
-        if self.oldVersion() is None:
-	    self.oldFlavor.set(None)
-	
 class TroveError(Exception):
 
     """
