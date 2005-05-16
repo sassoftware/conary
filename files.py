@@ -220,7 +220,7 @@ class FlagsStream(streams.NumericStream):
     def isPathDependencyTarget(self, set = None):
 	return self._isFlag(_FILE_FLAG_PATH_DEPENDENCY_TARGET, set)
 
-    def isInitialContents(self):
+    def isInitialContents(self, set = None):
 	return self._isFlag(_FILE_FLAG_INITIAL_CONTENTS, set)
 
     def isSource(self, set = None):
