@@ -510,7 +510,7 @@ class Epdb(pdb.Pdb):
         self._eval(arg, self._define)
 
     def do_showdata(self, arg):
-        result = self._eval(item, self._showdata)
+        result = self._eval(arg, self._showdata)
 
     def _define(self, obj):
         if inspect.isclass(obj):
