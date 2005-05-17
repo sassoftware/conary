@@ -31,9 +31,6 @@ class OptionError(Exception):
     
     val = 1
 
-
-print >> sys.stderr, dir(sys)
-sys.stderr.flush()
 def processArgs(argDef, cfgMap, cfg, usage, argv=sys.argv):
     otherArgs = [ argv[0] ]
     argSet = {}
