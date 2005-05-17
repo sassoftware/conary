@@ -1046,6 +1046,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	    del self.troveStore
             del self.auth
             del self.repos
+	    # self.db doesn't seem to be getting gc'd (and closed) properly
+	    # here, so close it explicitly
+	    self.db.close()
             del self.db
 
             self.db = sqlite3.connect(self.sqlDbPath, timeout=30000)
