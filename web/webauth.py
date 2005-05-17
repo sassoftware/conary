@@ -11,8 +11,9 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from mod_python import apache
 import base64
+
+HTTP_BAD_REQUEST = 400
 
 class PermissionDenied(Exception):
     def __str__(self):
@@ -24,25 +25,19 @@ def getAuth(req):
 
     info = req.headers_in['Authorization'].split()
     if len(info) != 2 or info[0] != "Basic":
-        return apache.HTTP_BAD_REQUEST
+        return HTTP_BAD_REQUEST
 
     try:
         authString = base64.decodestring(info[1])
     except:
-        return apache.HTTP_BAD_REQUEST
+        return HTTP_BAD_REQUEST
 
     if authString.count(":") != 1:
-        return apache.HTTP_BAD_REQUEST
+        return HTTP_BAD_REQUEST
 
     authToken = authString.split(":")
 
     return authToken
-
-class Authorization:
-    def __init__(self, passwordOK=False, isInternal=False, userId=-1):
-        self.passwordOK = passwordOK
-        self.isInternal = isInternal
-        self.userId = userId
 
 # various decorators for authenticated methods
 # XXX granularize the errors raised
