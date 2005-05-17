@@ -216,8 +216,8 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                     for l in lines:
                         print "    " + l
         elif showDeps:
-            for name, dep in (('Provides', trove.provides),
-                              ('Requires', trove.requires)):
+            for name, dep in (('Provides', trove.provides.deps),
+                              ('Requires', trove.requires.deps)):
                 print '%s:' %name
                 if not dep:
                     print '     None'

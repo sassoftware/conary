@@ -2,6 +2,7 @@ Changes in 0.60.2:
   * Added InitialContent flag 
   * Fixed bug which caused servers to leak file descriptors when the sqldb
     was replaced
+  * "repquery --deps" output fixed (broken in 0.60.1)
 
 Changes in 0.60.1:
   * Support for legacy clients (protocol version 29) has been removed from
