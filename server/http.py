@@ -14,6 +14,7 @@
 import metadata
 import os
 import sys
+import traceback
 
 import kid
 import templates 
@@ -90,13 +91,16 @@ class HttpHandler(WebHandler):
         try:
             return method(**d)
         except netserver.InsufficientPermission:
-            # no permission, don't ask for a new password 
+            # no permission, don't ask for a new password
             return apache.HTTP_FORBIDDEN
         except InvalidPassword:
             # if password is invalid, request a new one
             self.req.err_headers_out['WWW-Authenticate'] = \
                 'Basic realm="Conary Repository"'
             return apache.HTTP_UNAUTHORIZED
+        except:
+            self._write("error", error = traceback.format_exc())
+            return apache.OK
 
     def _write(self, templateName, **values):
         path = os.path.join(self.templatePath, templateName + ".kid")
@@ -129,6 +133,9 @@ class HttpHandler(WebHandler):
     @strFields(troveName = "", troveNameList = "", source = "")
     def chooseBranch(self, auth, troveName, troveNameList, source):
         if not troveName:
+            if not troveNameList:
+                self._write("error", error = "You must provide a trove name.")
+                return apache.OK
             troveName = troveNameList
        
         source = source.lower()

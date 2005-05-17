@@ -88,13 +88,7 @@ def post(port, isSecure, repos, httpHandler, req):
         req.write(resp)
         return apache.OK
     else:
-        try:
-            return httpHandler._methodHandler()
-        except netserver.InsufficientPermission:
-            return apache.HTTP_FORBIDDEN
-        except:
-            writeTraceback(req, repos.cfg)
-            return apache.OK
+        return httpHandler._methodHandler()
 
 def get(isSecure, repos, httpHandler, req):
     uri = req.uri
@@ -143,13 +137,7 @@ def get(isSecure, repos, httpHandler, req):
 
         return apache.OK
     else:
-        try:
-            return httpHandler._methodHandler()
-        except netserver.InsufficientPermission:
-            return apache.HTTP_FORBIDDEN
-        except:
-            writeTraceback(req, repos.cfg)
-            return apache.OK
+        return httpHandler._methodHandler()
 
 def putFile(port, isSecure, repos, req):
     if not isSecure and repos.forceSecure:

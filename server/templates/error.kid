@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
-    ${html_header("Error"
+    ${html_header("Error")}
     <body>
         <h1>Conary Repository</h1>
 
