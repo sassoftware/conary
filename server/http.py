@@ -18,7 +18,6 @@ import sys
 import kid
 import templates 
 
-from metadata import MDClass
 from repository.netrepos import netserver
 from web.webhandler import WebHandler
 from web.fields import strFields, intFields, listFields, boolFields
