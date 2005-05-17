@@ -90,13 +90,3 @@ class WebHandler(object):
         d = dict(self.fields)
         d['auth'] = self.auth
         return method(**d)
-
-    def _write(self, template, **values):
-        path = os.path.join(self.cfg.templatePath, template + ".kid")
-        t = kid.load_template(path)
-
-        content = t.serialize(encoding="utf-8", cfg = self.cfg,
-                                                isInternal = self.auth.isInternal,
-                                                **values)
-        self.req.write(content)
- 

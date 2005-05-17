@@ -47,10 +47,6 @@ from lib import options
 from lib import util
 #from http import HttpHandler
 
-import kid
-kid.enable_import()
-from templates import error as kid_error
-
 DEFAULT_FILE_PATH="/tmp/conary-server"
 
 class HttpRequests(SimpleHTTPRequestHandler):
@@ -183,10 +179,6 @@ class HttpRequests(SimpleHTTPRequestHandler):
         self.end_headers()
         return None
       
-    def writeTraceback(self):
-        kid_error.write(self.wfile, pageTitle = "Error",
-                        error = traceback.format_exc())
-        
     def handleXml(self, authToken):
 	contentLength = int(self.headers['Content-Length'])
 	(params, method) = xmlrpclib.loads(self.rfile.read(contentLength))
