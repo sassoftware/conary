@@ -396,6 +396,22 @@ def tupleListBsearchInsert(haystack, newItem, cmpFn):
         elif rc > 0:
             haystack.insert(start, newItem)
 
+_tempdir = tempfile.gettempdir()
+def settempdir(tempdir):
+    # XXX add locking if we ever go multi-threadded
+    global _tempdir
+    _tempdir = tempdir
+
+def mkstemp(suffix="", prefix=tempfile.template, dir=None, text=False):
+    """
+    a wrapper for tempfile.mkstemp that uses a common prefix which
+    is set through settempdir()
+    """
+    if dir is None:
+        global _tempdir
+        dir = _tempdir
+    return tempfile.mkstemp(suffix=suffix, prefix=prefix, dir=dir, text=text)
+
 class NestedFile:
 
     def close(self):

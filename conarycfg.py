@@ -313,6 +313,7 @@ class ConaryConfiguration(ConfigFile):
 	self.macroflags = {}
 	if readConfigFiles:
 	    self.readFiles()
+        util.settempdir(self.tmpDir)
 
     def readFiles(self):
 	self.read("/etc/conaryrc")

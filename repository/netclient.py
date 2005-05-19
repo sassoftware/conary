@@ -582,7 +582,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         if target:
             outFile = open(target, "w+")
         else:
-            (outFd, tmpName) = tempfile.mkstemp()
+            (outFd, tmpName) = util.mkstemp()
             outFile = os.fdopen(outFd, "w+")
             os.unlink(tmpName)
 
@@ -895,7 +895,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 start = tmpFile.tell()
                 outF = tmpFile
             else:
-                (fd, path) = tempfile.mkstemp()
+                (fd, path) = util.mkstemp()
                 os.unlink(path)
                 outF = os.fdopen(fd, "r+")
                 start = 0
@@ -938,7 +938,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         return self._commit(cs, fName)
 
     def commitChangeSet(self, chgSet):
-	(outFd, path) = tempfile.mkstemp()
+	(outFd, path) = util.mkstemp()
 	os.close(outFd)
 	chgSet.writeToFile(path)
 
