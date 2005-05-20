@@ -196,10 +196,17 @@ class FrozenVersionStream(InfoStream):
 	self.v = val
 
     def freeze(self, skipSet = None):
-	if self.v:
-	    return self.v.freeze()
-	else:
+        # If versionStrings is in skipSet, freeze the string w/o the timestamp.
+        # This is a bit of a hack to allow trove signatures to exclude
+        # the timestamps. Since those timestamps are reset on the server
+        # at commit time, including them would make signing the to-be-committed
+        # changeset impossible.
+	if not self.v:
 	    return ""
+        elif 'versionStrings' in skipSet:
+	    return self.v.asString()
+	else:
+	    return self.v.freeze()
 
     def diff(self, them):
 	if self.v != them.v:
@@ -361,13 +368,13 @@ class LargeStreamSet(InfoStream):
     def __ne__(self, other):
 	return not self.__eq__(other)
 
-    def freeze(self, skipSet = None):
+    def freeze(self, skipSet = {}):
 	rc = []
 
 	for streamId, (streamType, name) in self.streamDict.iteritems():
-            if skipSet and streamId in skipSet: continue
+            if name in skipSet: continue
 
-	    s = self.__getattribute__(name).freeze(skipSet = skipSet)
+            s = self.__getattribute__(name).freeze(skipSet = skipSet)
 	    if len(s):
 		rc.append(struct.pack(self.headerFormat, streamId, len(s)) + s)
 	return "".join(rc)
