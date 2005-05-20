@@ -38,8 +38,8 @@ import trove
 from lib import util
 import versions
 
-# makeFileId() returns 16 random bytes, for use as a fileId
-makeFileId = lambda: os.urandom(16)
+# makePathId() returns 16 random bytes, for use as a pathId
+makePathId = lambda: os.urandom(16)
 
 class SourceState(trove.Trove):
 
@@ -401,7 +401,7 @@ def commit(repos, cfg, message):
                               'cvc add' % base)
                     return
 
-                pathId = makeFileId()
+                pathId = makePathId()
                 state.addFile(pathId, base, versions.NewVersion(), "0" * 20)
 
             if os.path.dirname(fullPath) != cwd:
@@ -489,7 +489,12 @@ def commit(repos, cfg, message):
 	log.error("no change log message was given")
 	return
 
-    pkgCs = changeSet.iterNewPackageList().next()
+    newState.changeChangeLog(cl)
+
+    if not srcPkg:
+        pkgCs = newState.diff(None, absolute = True)[0]
+    else:
+        pkgCs = newState.diff(srcPkg)[0]
 
     if pkgCs.getOldVersion() is not None and \
             pkgCs.getOldVersion().branch().label().getHost() != \
@@ -511,8 +516,9 @@ def commit(repos, cfg, message):
         changeSet = changeset.CreateFromFilesystem([ (newState, fileMap) ])
         pkgCs = changeSet.iterNewPackageList().next()
 
-    pkgCs.changeChangeLog(cl)
-
+    # this replaces the TroveChangeSet update.buildLocalChanges put in
+    # the changeset
+    changeSet.newPackage(pkgCs)
     repos.commitChangeSet(changeSet)
 
     # committing to the repository changes the version timestamp; get the
@@ -1009,7 +1015,7 @@ def addFiles(fileList, ignoreExisting=False):
 	    log.error("refusing to add CONARY to the list of managed sources")
 	    continue
 
-	pathId = makeFileId()
+	pathId = makePathId()
 
 	state.addFile(pathId, file, versions.NewVersion(), "0" * 20)
 
