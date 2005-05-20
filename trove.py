@@ -403,8 +403,7 @@ class Trove(streams.LargeStreamSet):
             self.troveInfo.twm(pkgCS.getTroveInfoDiff(), self.troveInfo)
 
         if not skipIntegrityChecks:
-            pass
-            #assert(self.getSigs() == pkgCS.getNewSigs())
+            assert(self.getSigs() == pkgCS.getNewSigs())
 
 	return fileMap
 
