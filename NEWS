@@ -3,6 +3,10 @@ Changes in 0.60.2:
   * Fixed bug which caused servers to leak file descriptors when the sqldb
     was replaced
   * "repquery --deps" output fixed (broken in 0.60.1)
+  * Added AutoDoc policy which finds common documentation files and puts
+    them in %(thisdocdir)s automatically.  AutoDoc is disabled by calling
+    Doc without calling AutoDoc, which means that existing recipes that
+    call Doc will not show changes.
 
 Changes in 0.60.1:
   * Support for legacy clients (protocol version 29) has been removed from

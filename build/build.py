@@ -1022,6 +1022,7 @@ class Doc(_FileAction):
 
     def __init__(self, recipe, *args, **keywords):
         _FileAction.__init__(self, recipe, *args, **keywords)
+        self.recipe.AutoDoc(docCalled=True)
 	if type(args[0]) is tuple:
 	    self.paths = args[0]
 	else:

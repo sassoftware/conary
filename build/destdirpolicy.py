@@ -379,6 +379,53 @@ class FixDirModes(policy.Policy):
 	self.recipe.AddModes(mode, path)
 	os.chmod(fullpath, mode | 0700)
 
+
+class AutoDoc(policy.Policy):
+    """
+    Automatically adds likely documentation not otherwise installed;
+    disabled by default if C{r.Doc()} invoked unless C{r.AutoDoc()}
+    invoked; exceptions passed in via
+    C{r.AutoDoc(exceptions=I{filterexpression})}
+    are evaluated relative to the C{%(builddir)s}, not the
+    C{%(destdir)s}.
+    """
+
+    rootdir = '%(builddir)s'
+    invariantinclusions = [
+        '.*/NEWS$',
+        r'.*/(LICENSE|COPYING)(\.lib|)$',
+        '.*/HACKING$',
+        '.*/INSTALL$',
+        '.*/README.*',
+    ]
+    calledExplicitly = False
+    docCalled = False
+
+    def updateArgs(self, *args, **keywords):
+        docCalledNow = keywords.pop('docCalled', False)
+        if not docCalledNow:
+            self.calledExplicitly = True
+        self.docCalled |= docCalledNow
+        policy.Policy.updateArgs(self, *args, **keywords)
+
+    def preProcess(self):
+        self.builddir = self.recipe.macros.builddir
+        self.destdir = util.joinPaths(
+            self.recipe.macros.destdir,
+            self.recipe.macros.thisdocdir)
+
+    def test(self):
+        if self.docCalled and not self.calledExplicitly:
+            return False
+        return True
+
+    def doFile(self, filename):
+        source = util.joinPaths(self.builddir, filename)
+        dest = util.joinPaths(self.destdir, filename)
+        util.mkdirChain(os.path.dirname(dest))
+        shutil.copy2(source, dest)
+
+
 class RemoveNonPackageFiles(policy.Policy):
     """
     Remove classes of files that normally should not be packaged;
@@ -1063,6 +1110,7 @@ def DefaultPolicy(recipe):
 	TestSuiteLinks(recipe),
 	TestSuiteFiles(recipe),
 	FixDirModes(recipe),
+        AutoDoc(recipe),
 	RemoveNonPackageFiles(recipe),
 	FixupMultilibPaths(recipe),
 	ExecutableLibraries(recipe),
