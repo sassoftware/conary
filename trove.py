@@ -52,6 +52,12 @@ class TroveSignatures(streams.StreamSet):
     }
     _streamDict = streams.StreamSetDef(streamDict)
 
+    def freeze(self, skipSet = {}):
+        if not self.sha1():
+            return ""
+
+        return streams.StreamSet.freeze(self, skipSet = skipSet)
+
 class TroveRefsTrovesStream(dict, streams.InfoStream):
 
     """
@@ -195,13 +201,20 @@ class Trove(streams.LargeStreamSet):
                   "changeLog", "troveInfo", "troves", "idMap", "redirect",
                   "sigs" ]
 
-    def freeze(self, skipSet = { _STREAM_TRV_SIGS : True }):
-        return streams.LargeStreamSet.freeze(self, skipSet)
+    def _sigString(self):
+        return streams.LargeStreamSet.freeze(self, 
+                                             skipSet = { 'sigs' : True,
+                                                      'versionStrings' : True })
 
     def computeSignatures(self):
-        s = self.freeze()
+        s = self._sigString()
         sha1 = sha1helper.sha1String(s)
         self.sigs.sha1.set(sha1)
+
+    def verifySignatures(self):
+        s = self.freeze()
+        sha1 = sha1helper.sha1String(s)
+        return sha1 == self.sigs.sha1()
 
     def copy(self, classOverride = None):
         if not classOverride:
@@ -229,8 +242,15 @@ class Trove(streams.LargeStreamSet):
     def changeVersion(self, version):
         self.version.set(version)
 
+    def changeChangeLog(self, cl):
+	self.changeLog.thaw(cl.freeze())
+
     def changeFlavor(self, flavor):
         self.flavor.set(flavor)
+
+    def getSigs(self):
+        self.computeSignatures()
+        return self.sigs
 
     def isRedirect(self):
         return self.redirect()
@@ -331,7 +351,7 @@ class Trove(streams.LargeStreamSet):
 	return self.troves.has_key((name, version, flavor))
 
     # returns a dictionary mapping a pathId to a (path, version, pkgName) tuple
-    def applyChangeSet(self, pkgCS):
+    def applyChangeSet(self, pkgCS, skipIntegrityChecks = False):
 	"""
 	Updates the package from the changes specified in a change set.
 	Returns a dictionary, indexed by pathId, which gives the
@@ -339,13 +359,17 @@ class Trove(streams.LargeStreamSet):
 
 	@param pkgCS: change set
 	@type pkgCS: TroveChangeSet
+        @param skipIntegrityChecks: Normally sha1 signatures are confirmed
+        after a merge. In some cases (notably where version numbers are
+        being changed), this check needs to be skipped.
+        @type skipIntegrityChecks: boolean
 	@rtype: dict
 	"""
 
 	self.redirect.set(pkgCS.getIsRedirect())
         if self.redirect():
             # we don't explicitly remove files for redirects
-            self.idMap = {}
+            self.idMap = TroveRefsFilesStream()
 
 	fileMap = {}
 
@@ -355,6 +379,9 @@ class Trove(streams.LargeStreamSet):
                                 (self.name(), None, None, None)
 
 	for (pathId, path, fileId, fileVersion) in pkgCS.getChangedFileList():
+            if pathId not in self.idMap:
+                import lib
+                lib.epdb.st()
 	    (oldPath, oldFileId, oldVersion) = self.idMap[pathId]
 	    self.updateFile(pathId, path, fileVersion, fileId)
 	    # look up the path/version in self.idMap as the ones here
@@ -377,6 +404,12 @@ class Trove(streams.LargeStreamSet):
             self.troveInfo = TroveInfo(pkgCS.getTroveInfoDiff())
         else:
             self.troveInfo.twm(pkgCS.getTroveInfoDiff(), self.troveInfo)
+
+        if not skipIntegrityChecks:
+            if (self.getSigs() != pkgCS.getNewSigs()):
+                import lib
+                lib.epdb.st()
+            assert(self.getSigs() == pkgCS.getNewSigs())
 
 	return fileMap
 
@@ -472,6 +505,7 @@ class Trove(streams.LargeStreamSet):
 				      them.getVersion(),	
 				      self.getVersion(),
 				      them.getFlavor(), self.getFlavor(),
+                                      them.getSigs(), self.getSigs(),
 				      absolute = False,
                                       isRedirect = self.redirect(),
                                       troveInfoDiff = troveInfoDiff)
@@ -480,6 +514,7 @@ class Trove(streams.LargeStreamSet):
 	    chgSet = TroveChangeSet(self.name(), self.changeLog,
 				      None, self.getVersion(),
 				      None, self.getFlavor(),
+                                      None, self.getSigs(),
 				      absolute = absolute,
                                       isRedirect = self.redirect(),
                                       troveInfoDiff = self.troveInfo.freeze())
@@ -977,6 +1012,8 @@ _STREAM_TCS_OLD_FLAVOR      = 11
 _STREAM_TCS_NEW_FLAVOR      = 12
 _STREAM_TCS_IS_REDIRECT     = 13
 _STREAM_TCS_TROVEINFO       = 14
+_STREAM_TCS_OLD_SIGS        = 15
+_STREAM_TCS_NEW_SIGS        = 16
 
 _TCS_TYPE_ABSOLUTE = 1
 _TCS_TYPE_RELATIVE = 2
@@ -999,6 +1036,8 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         _STREAM_TCS_NEW_FLAVOR  : (DependenciesStream,   "newFlavor"     ),
         _STREAM_TCS_IS_REDIRECT : (ByteStream,           "isRedirect"    ),
         _STREAM_TCS_TROVEINFO   : (streams.StringStream, "troveInfoDiff" ),
+        _STREAM_TCS_OLD_SIGS    : (TroveSignatures,      "oldSigs"       ),
+        _STREAM_TCS_NEW_SIGS    : (TroveSignatures,      "newSigs"       ),
     }
 
     ignoreUnknown = True
@@ -1042,6 +1081,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	self.newVersion.set(version)
 
     def changeChangeLog(self, cl):
+        assert(0)
 	self.changeLog.thaw(cl.freeze())
 
     def getOldVersion(self):
@@ -1049,6 +1089,12 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 
     def getNewVersion(self):
 	return self.newVersion()
+
+    def getOldSigs(self):
+        return self.oldSigs
+
+    def getNewSigs(self):
+        return self.newSigs
 
     # path and/or version can be None
     def changedFile(self, pathId, path, fileId, version):
@@ -1228,7 +1274,8 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 class TroveChangeSet(AbstractTroveChangeSet):
 
     def __init__(self, name, changeLog, oldVersion, newVersion, 
-		 oldFlavor, newFlavor, absolute = 0, isRedirect = False,
+		 oldFlavor, newFlavor, oldSigs, newSigs,
+                 absolute = 0, isRedirect = False,
                  troveInfoDiff = None):
 	AbstractTroveChangeSet.__init__(self)
 	assert(isinstance(newVersion, versions.AbstractVersion))
@@ -1249,6 +1296,9 @@ class TroveChangeSet(AbstractTroveChangeSet):
         self.isRedirect.set(isRedirect)
         assert(troveInfoDiff is not None)
         self.troveInfoDiff.set(troveInfoDiff)
+        if oldSigs:
+            self.oldSigs.thaw(oldSigs.freeze())
+        self.newSigs.thaw(newSigs.freeze())
 
 class ThawTroveChangeSet(AbstractTroveChangeSet):
 
