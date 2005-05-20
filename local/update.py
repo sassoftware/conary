@@ -1282,7 +1282,7 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
         if changed:
             newTrove.changeVersion(newVersion)
             trvCs = newTrove.diff(curTrove)[0]
-            returnList[i] = (True, trvCs)
+            returnList[i] = (True, newTrove)
             changeSet.newPackage(trvCs)
             
     return (changeSet, returnList)
