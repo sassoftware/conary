@@ -438,7 +438,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             
             t = trove.Trove(pkgCs.getName(), pkgCs.getOldVersion(),
                             pkgCs.getNewFlavor(), pkgCs.getChangeLog())
-            t.applyChangeSet(pkgCs)
+            # trove integrity checks don't work when file information is
+            # excluded
+            t.applyChangeSet(pkgCs, skipIntegrityChecks = not withFiles)
             l.append(t)
 
 	return l
