@@ -401,7 +401,11 @@ class ChangeSet(streams.LargeStreamSet):
 			       pkg.getChangeLog(),
 			       pkgCs.getNewVersion(), pkgCs.getOldVersion(),
 			       pkgCs.getNewFlavor(), pkgCs.getOldFlavor(),
+                               pkgCs.getNewSigs(), pkgCs.getOldSigs(),
                                troveInfoDiff = newTroveInfoDiff)
+
+            invertedPkg.setRequires(pkg.getRequires())
+            invertedPkg.setProvides(pkg.getProvides())
 
 	    for (name, list) in pkgCs.iterChangedTroves():
 		for (oper, version, flavor, byDef) in list:
@@ -800,7 +804,7 @@ class ReadOnlyChangeSet(ChangeSet):
 		neededFiles.append((pathId, oldFileId, fileId, oldVersion,
                                     version, filecs))
 		
-	    trv.applyChangeSet(troveCs)
+	    trv.applyChangeSet(troveCs, skipIntegrityChecks = True)
 	    newCs = trv.diff(None, absolute = True)[0]
 	    absCs.newPackage(newCs)
 
