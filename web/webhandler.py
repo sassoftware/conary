@@ -81,10 +81,8 @@ class WebHandler(object):
         self.req.content_type = "text/html"
         if cmd.startswith("_"):
             return apache.HTTP_NOT_FOUND 
-        try:
-            method = self._getHandler(cmd, auth)
-        except AttributeError:
-            return apache.HTTP_NOT_FOUND
+        
+        method = self._getHandler(cmd, auth)
         self.fields = FieldStorage(self.req)
 
         d = dict(self.fields)
