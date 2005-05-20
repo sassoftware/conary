@@ -379,9 +379,6 @@ class Trove(streams.LargeStreamSet):
                                 (self.name(), None, None, None)
 
 	for (pathId, path, fileId, fileVersion) in pkgCS.getChangedFileList():
-            if pathId not in self.idMap:
-                import lib
-                lib.epdb.st()
 	    (oldPath, oldFileId, oldVersion) = self.idMap[pathId]
 	    self.updateFile(pathId, path, fileVersion, fileId)
 	    # look up the path/version in self.idMap as the ones here
