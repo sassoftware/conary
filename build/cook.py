@@ -797,7 +797,7 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         p.setConaryVersion(constants.version)
 	
 	byDefault = comp not in recipeObj.getUnpackagedComponentNames()
-        grp.addTrove(compName, p.getVersion(), p.getFlavor() or None,
+        grp.addTrove(compName, p.getVersion(), p.getFlavor(),
                      byDefault = byDefault)
         if byDefault:
             grp.setSize(grp.getSize() + p.getSize())
