@@ -40,7 +40,7 @@ import xmlshims
 
 shims = xmlshims.NetworkConvertors()
 
-CLIENT_VERSIONS = [ 32 ]
+CLIENT_VERSIONS = [ 32, 33 ]
 
 class _Method(xmlrpclib._Method):
 
@@ -932,9 +932,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         """
         ids = self.c[branch].getPackageBranchPathIds(sourceName, 
                                                      self.fromVersion(branch))
-        return dict((self.toPath(x[0]), self.toPathId(x[1]))
-                    for x in ids.iteritems())
-
+        if self.c[branch].serverVersion >= 33:
+            return dict((self.toPath(x[0]), (self.toPathId(x[1][0]),
+                                             self.toVersion(x[1][1]),
+                                             self.toFileId(x[1][2])))
+                        for x in ids.iteritems())
+        else:
+            return dict((self.toPath(x[0]), (self.toPathId(x[1]), None, None))
+                        for x in ids.iteritems())
+            
+                    
     def commitChangeSetFile(self, fName):
         cs = changeset.ChangeSetFromFile(fName)
         return self._commit(cs, fName)

@@ -38,7 +38,7 @@ import versions
 from datastore import IntegrityError
 
 # a list of the protocols we understand
-SERVER_VERSIONS = [ 32 ]
+SERVER_VERSIONS = [ 32, 33 ]
 CACHE_SCHEMA_VERSION = 13
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
@@ -949,13 +949,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                     self.toFileId(fileId))
 	return self.fromFile(f)
 
-    def getPackageBranchPathIds(self, authToken, clientVersion, sourceName, 
-                                branch):
-	if not self.auth.check(authToken, write = False, 
-                               trove = sourceName,
-			       label = self.toBranch(branch).label()):
-	    raise InsufficientPermission
-
+    def _getPackageBranchPathIdsV32(self, sourceName, branch):
         cu = self.db.cursor()
 
         cu.execute("""
@@ -984,10 +978,55 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return ids
 
+    def getPackageBranchPathIds(self, authToken, clientVersion, sourceName, 
+                                branch):
+	if not self.auth.check(authToken, write = False, 
+                               trove = sourceName,
+			       label = self.toBranch(branch).label()):
+	    raise InsufficientPermission
+
+        if clientVersion < 33:
+            return self._getPackageBranchPathIdsV32(sourceName, branch)
+
+        cu = self.db.cursor()
+
+        cu.execute("""
+            SELECT DISTINCT pathId, path, version, fileId FROM
+                TroveInfo JOIN Instances ON
+                    TroveInfo.instanceId == Instances.instanceId
+                INNER JOIN Nodes ON
+                    Instances.itemId == Nodes.itemId AND
+                    Instances.versionId == Nodes.versionId
+                INNER JOIN Branches ON
+                    Nodes.branchId = Branches.branchId
+                INNER JOIN TroveFiles ON
+                    Instances.instanceId = TroveFiles.instanceId
+                INNER JOIN Versions ON
+                    TroveFiles.versionId = Versions.versionId
+                INNER JOIN FileStreams ON
+                    TroveFiles.streamId = FileStreams.streamId
+                WHERE
+                    TroveInfo.infoType = ? AND
+                    TroveInfo.data = ? AND
+                    Branches.branch = ?
+                ORDER BY 
+                    Nodes.finalTimestamp DESC
+        """, trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch)
+
+        ids = {}
+        for (pathId, path, version, fileId) in cu:
+            if not ids.has_key(path):
+                ids[self.fromPath(path)] = (self.fromPathId(pathId),
+                                            version,
+                                            self.fromFileId(fileId))
+
+        return ids
+
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
 
+        # cut off older clients entirely, no negotiation
         if clientVersion < 32:
             raise InvalidClientVersion, \
                ("Invalid client version %s.  Server accepts client versions %s"

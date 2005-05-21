@@ -65,25 +65,26 @@ def _createComponent(repos, bldPkg, newVersion, ident):
             flavor = f.flavor.deps
         else:
             flavor = None
-        (pathId, fileVersion, oldFile) = ident(path, newVersion, flavor)
+        (pathId, fileVersion, oldFileId) = ident(path, newVersion, flavor)
 	f.pathId(pathId)
         
         linkGroupId = linkGroups.get(path, None)
         if linkGroupId:
             f.linkGroup.set(linkGroupId)
 
+        fileId = f.fileId()
         if not fileVersion:
             # no existing versions for this path
-	    p.addFile(f.pathId(), path, newVersion, f.fileId())
+	    p.addFile(f.pathId(), path, newVersion, fileId)
 	else:
             # check to see if the file we have now is the same as the
             # file in the previous version of the file (modes, contents, etc)
-	    if oldFile == f:
+	    if oldFileId == fileId:
                 # if it's the same, use old version
-		p.addFile(f.pathId(), path, fileVersion, f.fileId())
+		p.addFile(f.pathId(), path, fileVersion, fileId)
 	    else:
                 # otherwise use the new version
-		p.addFile(f.pathId(), path, newVersion, f.fileId())
+		p.addFile(f.pathId(), path, newVersion, fileId)
 
         fileMap[f.pathId()] = (f, realPath, path)
 
@@ -100,7 +101,7 @@ class _IdGen:
 	    return self.map[path]
 
 	pathid = sha1helper.md5String("%s %s" % (path, version.asString()))
-	self.map[(path, flavor)] = (pathid, None, None)
+	self.map[path] = (pathid, None, None)
 	return (pathid, None, None)
 
     def __init__(self, map=None):
@@ -113,24 +114,20 @@ class _IdGen:
         for pathId, path, fileId, version in t.iterFileList():
             fileStream = files.ThawFile(cs.getFileChange(None, fileId),
                                         pathId)
-            if isinstance(fileStream, files.RegularFile):
-                flavor = fileStream.flavor.deps
-            else:
-                flavor = None
             if self.map.has_key(path):
                 assert(self.map[path][0] == pathId)
-            self.map[path] = (pathId, version, fileStream)
+            self.map[path] = (pathId, version, fileStream.fileId())
 
     def merge(self, idDict):
         # merges the ids contained in idDict into this object; existing
         # id's are preferred
-        newD = dict( (x[0], (x[1], None, None)) for x in idDict.iteritems() )
-        newD.update(self.map)
-        self.map = newD
+        idDict.update(self.map)
+        self.map = idDict
 
     def populate(self, repos, troveList):
 	# Find the files and ids which were owned by the last version of
-	# this package on the branch.
+	# this package on the branch. Only used when talking to servers
+        # older than protocol 33
         if not troveList:
             return
         csList = []
@@ -765,14 +762,9 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         versionDict = dict( [ (x, { searchBranch : None } ) for x in grpMap ] )
         versionDict = repos.getTroveLeavesByBranch(versionDict)
 
-    troveList = []
-    for main in versionDict:
-        for (ver, flavors) in versionDict[main].iteritems():
-            troveList += [ (main, ver, x) for x in flavors ]
-
-    ident.populate(repos, troveList)
-
-    # this adds any other pathids we might need
+    log.debug('looking up pathids from repository history')
+    # look up the pathids for every file that has been built by
+    # this source component, following our brach ancestry
     while True:
         d = repos.getPackageBranchPathIds(recipeClass.name + ':source',
                                           searchBranch)
@@ -781,6 +773,29 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         if not searchBranch.hasParentBranch():
             break
         searchBranch = searchBranch.parentBranch()
+
+    # older versions (protocol version 32 and earlier) did not return
+    # version/fileid information from getPackageBranchPathIds().  If
+    # any entry is missing that information, fall back to the older
+    # method using ident.populate() on a trove list
+    missingInfo = False
+    for pathid, version, fileid in ident.map.values():
+        if version is None or fileid is None:
+            missingInfo = True
+            break
+
+    if missingInfo:
+        # we're missing version or fileid, try to find them
+        log.debug('version/fileId information missing from pathId '
+                  'lookups, probably using an old server.  Falling '
+                  'back to old method')
+        troveList = []
+        for main in versionDict:
+            for (ver, flavors) in versionDict[main].iteritems():
+                troveList += [ (main, ver, x) for x in flavors ]
+
+        ident.populate(repos, troveList)
+    log.debug('pathId lookup complete')
 
     packageList = []
     for buildPkg in bldList:
