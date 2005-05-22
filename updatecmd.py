@@ -218,6 +218,13 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
     except repository.CommitError, e:
         log.error(e)
 
+def updateAll(cfg, info = False, depCheck = True):
+    client = conaryclient.ConaryClient(cfg)
+    cu = client.db.db.db.cursor()    
+    cu.execute('select trovename from dbinstances left outer join trovetroves on dbinstances.instanceid=trovetroves.includedid join versions on dbinstances.versionid = versions.versionid where includedid is null and version not like "%local%";')
+    names = [ x[0] for x in cu ]
+    return doUpdate(cfg, names, info = info, depCheck = depCheck)
+
 def parseTroveSpec(specStr):
     if specStr.find('[') > 0 and specStr[-1] == ']':
         specStr = specStr[:-1]

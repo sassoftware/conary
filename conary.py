@@ -516,6 +516,23 @@ def realMain(cfg, argv=sys.argv):
 	    updatecmd.doUpdate(cfg, otherArgs[2:], **kwargs)
 	else:
 	    return usage()
+    elif (otherArgs[1] == "updateall"):
+	kwargs = {}
+
+	if argSet.has_key('info'):
+	    kwargs['info'] = True
+	    del argSet['info']
+
+	if argSet.has_key('no-deps'):
+	    kwargs['depCheck'] = False
+	    del argSet['no-deps']
+
+	if argSet: return usage()
+
+	if len(otherArgs) == 2:
+	    updatecmd.updateAll(cfg, **kwargs)
+	else:
+	    return usage()
     elif (otherArgs[1] == "return usage"):
 	return usage(rc = 0)
     else:
