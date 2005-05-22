@@ -862,8 +862,8 @@ class Database:
 	self.addVersionCache = {}
 	self.flavorsNeeded = {}
 
-    def depCheck(self, changeSet):
-        return self.depTables.check(changeSet)
+    def depCheck(self, changeSet, findOrdering = False):
+        return self.depTables.check(changeSet, findOrdering = findOrdering)
 	
     def pathIsOwned(self, path):
 	for instanceId in self.troveFiles.iterPath(path):

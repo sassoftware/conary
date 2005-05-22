@@ -267,8 +267,8 @@ class Database(SqlDbRepository):
 
         return resultDict, eraseList
 
-    def depCheck(self, cs):
-        return self.db.depCheck(cs)
+    def depCheck(self, cs, findOrdering = False):
+        return self.db.depCheck(cs, findOrdering = findOrdering)
 
     # local changes includes the A->A.local portion of a rollback; if it
     # doesn't exist we need to compute that and save a rollback for this
