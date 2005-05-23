@@ -395,8 +395,16 @@ class QueryByBranch(Query):
         return repos.getTroveLeavesByBranch(query, bestFlavor=True)
 
     def _findAllFlavor(self, repos, missing, finalMap):
+        # list of names not yet found
         namesToFind = set(self.query[0])
+
+        # name, branch tuples that have been found -- if a trove
+        # is being sought on multiple branches, we still only want to 
+        # return one name per branch 
         foundBranches = set()
+
+        # names that have been found -- as long as a name has been found
+        # with one branch/flavor, do not give a missing message
         foundNames = set()
 
         for query in self.query:
@@ -441,7 +449,7 @@ class QueryByBranch(Query):
 
     def missingMsg(self, name):
         flavor = self.map[name][2]
-        if flavor is None:
+        if name in self.queryNoFlavor:
             branches = self.queryNoFlavor[name].keys()
         else:
             branches = self.query[0][name].keys()
