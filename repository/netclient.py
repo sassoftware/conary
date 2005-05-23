@@ -137,7 +137,7 @@ class ServerCache:
                 else:
                     errmsg = str(e)
                 if url.find('@') != -1:
-                    url = protocol + '://<user>:<pwd>@' + url.split('@')[1]
+                    url = protocol + '://<user>:<pwd>@' + url.rsplit('@', 1)[1]
 		raise repository.OpenError('Error occured opening repository '
 			    '%s: %s' % (url, errmsg))
 
