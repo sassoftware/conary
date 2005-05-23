@@ -15,6 +15,8 @@ Changes in 0.60.2:
     refactored. isLocal() is now onLocalLabel(), isEmerge() is now
     onEmergeLabel(), etc. isOnLocalHost() has been added as a method
     to easily determine if a version only exists in the database
+  * Moved logic for explicitly creating a changeset from cscmd.py to the
+    ConaryClient object
 
 Changes in 0.60.1:
   * Support for legacy clients (protocol version 29) has been removed from

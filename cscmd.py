@@ -12,6 +12,7 @@
 # full details.
 #
 
+import conaryclient
 from lib import log
 from local import update
 from repository import repository
@@ -21,8 +22,9 @@ import versions
 
 def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True,
                      callback = None):
+    client = conaryclient.ConaryClient(cfg)
+
     primaryCsList = []
-    primaryList = []
 
     for item in troveList:
         l = item.split("--")
@@ -80,72 +82,10 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True,
         primaryCsList.append((troveName, (oldVersion, oldFlavor), 
                                          (newVersion, newFlavor),
                               not oldVersion))
-        if newVersion:
-            primaryList.append((troveName, newVersion, newFlavor))
-        else:
-            primaryList.append((troveName, oldVersion, oldFlavor))
-
-
-    cs = repos.createChangeSet(primaryCsList, recurse = recurse, 
-                               withFiles = False)
-
-    # filter out non-defaults
-    for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), abstract) \
-                                                            in primaryCsList:
-        if not newVersion:
-            # cannot have a non-default erase
-            continue
-
-        primaryTroveCs = cs.getNewPackageVersion(name, newVersion, newFlavor)
-
-        for (name, changeList) in primaryTroveCs.iterChangedTroves():
-            for (changeType, version, flavor, byDef) in changeList:
-                if changeType == '+' and not byDef and \
-                   (name, version, flavor) not in primaryList:
-                    # it won't be here if recurse is False
-                    if cs.hasNewPackage(name, version, flavor):
-                        cs.delNewPackage(name, version, flavor)
         
-    # now filter the excludeTroves list
-    fullCsList = []
-    for troveCs in cs.iterNewPackageList():
-        name = troveCs.getName()
-        newVersion = troveCs.getNewVersion()
-        newFlavor = troveCs.getNewFlavor()
-
-        skip = False
-
-        # troves explicitly listed should never be excluded
-        if (name, newVersion, newFlavor) not in primaryList:
-            for reStr, regExp in cfg.excludeTroves:
-                if regExp.match(name):
-                    skip = True
-        
-    
-        if not skip:
-            fullCsList.append((name, 
-                       (troveCs.getOldVersion(), troveCs.getOldFlavor()),
-                       (newVersion,              newFlavor),
-                   not troveCs.getOldVersion()))
-
-    # exclude packages that are being erased as well
-    for (name, oldVersion, oldFlavor) in cs.getOldPackageList():
-        skip = False
-        if (name, oldVersion, oldFlavor) not in primaryList:
-            for reStr, regExp in cfg.excludeTroves:
-                if regExp.match(name):
-                    skip = True
-        if not skip:
-            fullCsList.append((name, 
-                       (oldVersion, oldFlavor),
-                       (None, None), True))
-
-    # recreate primaryList without erase-only troves for the primary trove list
-    primaryList = [ (x[0], x[2][0], x[2][1]) for x in primaryCsList \
-                                                if x[2][0] is not None ]
-    repos.createChangeSetFile(fullCsList, outFileName, recurse = False,
-                              primaryTroveList = primaryList,
-                              callback = callback)
+    client.createChangeSetFile(outFileName, primaryCsList, recurse = recurse, 
+                               callback = callback, 
+                               excludeList = cfg.excludeTroves)
 
 def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
     try:

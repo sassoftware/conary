@@ -734,6 +734,100 @@ class ConaryClient:
 
 	return dupList
 
+    def createChangeSetFile(self, path, csList, recurse = True, 
+                            skipNotByDefault = False, excludeList = [],
+                            callback = None):
+        """
+        Creates <path> as a change set file.
+
+        @param path: path to write the change set to
+        @type path: string
+        @param csList: list of (troveName, (oldVersion, oldFlavor),
+                                (newVersion, newFlavor), isAbsolute)
+        @param recurse: If true, conatiner troves are recursed through
+        @type recurse: boolean
+        @param skipNotByDefault: If True, troves which are included in
+        a container with byDefault as False are not included (this flag
+        doesn't do anything if recurse is False)
+        @type recurse: boolean
+        @param excludeList: List of regular expressions which are matched
+        against recursively included trove names. Troves which match any 
+        of the expressions are left out of the change set (this list
+        is meaningless if recurse is False).
+        @param callback: Callback object
+        @type callback: callbacks.UpdateCallback
+        """
+        primaryList = []
+        for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), abstract) \
+                                                            in csList:
+            if newVersion:
+                primaryList.append((name, newVersion, newFlavor))
+            else:
+                primaryList.append((name, oldVersion, oldFlavor))
+
+        cs = self.repos.createChangeSet(csList, recurse = recurse, 
+                                        withFiles = False)
+
+        # filter out non-defaults
+        for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), abstract) \
+                                                            in csList:
+            if not newVersion:
+                # cannot have a non-default erase
+                continue
+
+            primaryTroveCs = cs.getNewPackageVersion(name, newVersion, 
+                                                     newFlavor)
+
+            for (name, changeList) in primaryTroveCs.iterChangedTroves():
+                for (changeType, version, flavor, byDef) in changeList:
+                    if changeType == '+' and not byDef and \
+                       (name, version, flavor) not in primaryList:
+                        # it won't be here if recurse is False
+                        if cs.hasNewPackage(name, version, flavor):
+                            cs.delNewPackage(name, version, flavor)
+            
+        # now filter excludeList
+        fullCsList = []
+        for troveCs in cs.iterNewPackageList():
+            name = troveCs.getName()
+            newVersion = troveCs.getNewVersion()
+            newFlavor = troveCs.getNewFlavor()
+
+            skip = False
+
+            # troves explicitly listed should never be excluded
+            if (name, newVersion, newFlavor) not in primaryList:
+                for reStr, regExp in excludeList:
+                    if regExp.match(name):
+                        skip = True
+            
+        
+            if not skip:
+                fullCsList.append((name, 
+                           (troveCs.getOldVersion(), troveCs.getOldFlavor()),
+                           (newVersion,              newFlavor),
+                       not troveCs.getOldVersion()))
+
+        # exclude packages that are being erased as well
+        for (name, oldVersion, oldFlavor) in cs.getOldPackageList():
+            skip = False
+            if (name, oldVersion, oldFlavor) not in primaryList:
+                for reStr, regExp in cfg.excludeTroves:
+                    if regExp.match(name):
+                        skip = True
+            if not skip:
+                fullCsList.append((name, 
+                           (oldVersion, oldFlavor),
+                           (None, None), True))
+
+        # recreate primaryList without erase-only troves for the primary trove 
+        # list
+        primaryList = [ (x[0], x[2][0], x[2][1]) for x in csList 
+                                                    if x[2][0] is not None ]
+        self.repos.createChangeSetFile(fullCsList, path, recurse = False,
+                                       primaryTroveList = primaryList,
+                                       callback = callback)
+
     def checkWriteableRoot(self):
         """
         Prepares the installation root for trove updates and change 
