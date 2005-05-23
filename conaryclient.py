@@ -734,29 +734,8 @@ class ConaryClient:
 
 	return dupList
 
-    def createChangeSetFile(self, path, csList, recurse = True, 
-                            skipNotByDefault = False, excludeList = [],
-                            callback = None):
-        """
-        Creates <path> as a change set file.
-
-        @param path: path to write the change set to
-        @type path: string
-        @param csList: list of (troveName, (oldVersion, oldFlavor),
-                                (newVersion, newFlavor), isAbsolute)
-        @param recurse: If true, conatiner troves are recursed through
-        @type recurse: boolean
-        @param skipNotByDefault: If True, troves which are included in
-        a container with byDefault as False are not included (this flag
-        doesn't do anything if recurse is False)
-        @type recurse: boolean
-        @param excludeList: List of regular expressions which are matched
-        against recursively included trove names. Troves which match any 
-        of the expressions are left out of the change set (this list
-        is meaningless if recurse is False).
-        @param callback: Callback object
-        @type callback: callbacks.UpdateCallback
-        """
+    def _createChangeSetList(self, path, csList, recurse = True, 
+                             skipNotByDefault = False, excludeList = []):
         primaryList = []
         for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), abstract) \
                                                             in csList:
@@ -824,6 +803,56 @@ class ConaryClient:
         # list
         primaryList = [ (x[0], x[2][0], x[2][1]) for x in csList 
                                                     if x[2][0] is not None ]
+
+        return (fullCsList, primaryList)
+
+    def createChangeSetFile(self, path, csList, recurse = True, 
+                            skipNotByDefault = False, excludeList = [],
+                            callback = None, withFiles = False,
+                            withFileContents = False):
+        """
+        Like self.createChangeSetFile(), but returns a change set object.
+        withFiles and withFileContents are the same as for the underlying
+        repository call.
+        """
+        (fullCsList, primaryList) = self._createChangeSetList(path, csList, 
+                recurse = recurse, skipNotByDefault = skipNotByDefault, 
+                excludeList = excludeList)
+
+        return self.repos.createChangeSet(fullCsList, recurse = False,
+                                       primaryTroveList = primaryList,
+                                       callback = callback, 
+                                       withFiles = withFiles,
+                                       withFileContents = withFileContents)
+
+    def createChangeSetFile(self, path, csList, recurse = True, 
+                            skipNotByDefault = False, excludeList = [],
+                            callback = None):
+        """
+        Creates <path> as a change set file.
+
+        @param path: path to write the change set to
+        @type path: string
+        @param csList: list of (troveName, (oldVersion, oldFlavor),
+                                (newVersion, newFlavor), isAbsolute)
+        @param recurse: If true, conatiner troves are recursed through
+        @type recurse: boolean
+        @param skipNotByDefault: If True, troves which are included in
+        a container with byDefault as False are not included (this flag
+        doesn't do anything if recurse is False)
+        @type recurse: boolean
+        @param excludeList: List of regular expressions which are matched
+        against recursively included trove names. Troves which match any 
+        of the expressions are left out of the change set (this list
+        is meaningless if recurse is False).
+        @param callback: Callback object
+        @type callback: callbacks.UpdateCallback
+        """
+
+        (fullCsList, primaryList) = self._createChangeSetList(path, csList, 
+                recurse = recurse, skipNotByDefault = skipNotByDefault, 
+                excludeList = excludeList)
+
         self.repos.createChangeSetFile(fullCsList, path, recurse = False,
                                        primaryTroveList = primaryList,
                                        callback = callback)
