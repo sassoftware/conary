@@ -20,12 +20,8 @@ import xmlrpclib
 import zlib
 
 from repository.netrepos import netserver
-from http import HttpHandler
 import conarycfg
 
-import kid
-kid.enable_import()
-from templates import error as kid_error
 from web.webauth import getAuth
 
 BUFFER=1024 * 256
@@ -57,7 +53,7 @@ def checkAuth(req, repos):
             
     return authToken
 
-def post(port, isSecure, repos, httpHandler, req):
+def post(port, isSecure, repos, req):
     authToken = getAuth(req)
     if type(authToken) is int:
         return authToken
@@ -88,9 +84,11 @@ def post(port, isSecure, repos, httpHandler, req):
         req.write(resp)
         return apache.OK
     else:
+        from http import HttpHandler
+        httpHandler = HttpHandler(req, repos.cfg, repos)
         return httpHandler._methodHandler()
 
-def get(isSecure, repos, httpHandler, req):
+def get(isSecure, repos, req):
     uri = req.uri
     if uri.endswith('/'):
         uri = uri[:-1]
@@ -137,6 +135,8 @@ def get(isSecure, repos, httpHandler, req):
 
         return apache.OK
     else:
+        from http import HttpHandler
+        httpHandler = HttpHandler(req, repos.cfg, repos)
         return httpHandler._methodHandler()
 
 def putFile(port, isSecure, repos, req):
@@ -211,14 +211,12 @@ def handler(req):
     secure = (port == 443)
     
     repos = repositories[repName]
-    httpHandler = HttpHandler(req, repos.cfg, repos)
-    
     method = req.method.upper()
 
     if method == "POST":
-	return post(port, secure, repos, httpHandler, req)
+	return post(port, secure, repos, req)
     elif method == "GET":
-	return get(secure, repos, httpHandler, req)
+	return get(secure, repos, req)
     elif method == "PUT":
 	return putFile(port, secure, repos, req)
     else:

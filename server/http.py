@@ -17,7 +17,7 @@ import sys
 import traceback
 
 import kid
-import templates 
+import templates
 
 from repository.netrepos import netserver
 from web.webhandler import WebHandler
@@ -55,7 +55,12 @@ class HttpHandler(WebHandler):
 
         self.repServer = repServer
         self.troveStore = repServer.troveStore
-        self.templatePath = os.path.dirname(sys.modules['templates'].__file__) + os.path.sep
+
+        if 'server.templates' in sys.modules:
+            self.templatePath = os.path.dirname(sys.modules['server.templates'].__file__) + os.path.sep
+        else:
+            self.templatePath = os.path.dirname(sys.modules['templates'].__file__) + os.path.sep
+                        
        
     def _getHandler(self, cmd):
         try:
