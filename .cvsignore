@@ -7,3 +7,5 @@ conary.recipe
 sqlite
 sqlite3
 constants.py
+conary.pickle
+conary.prof
