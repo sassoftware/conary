@@ -18,7 +18,7 @@ from repository import changeset
 
 def listRollbacks(db, cfg):
     def verStr(cfg, version):
-	if version.isLocal():
+	if version.onLocalLabel():
 	    return "local"
 
 	if version.branch().label() == cfg.installLabel:

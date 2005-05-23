@@ -248,7 +248,7 @@ class ChangeSet(streams.LargeStreamSet):
 
 	if csPkg.isAbsolute():
 	    self.absolute = True
-	if (old and old.isLocal()) or new.isLocal():
+	if (old and old.onLocalLabel()) or new.onLocalLabel():
 	    self.local = 1
 
     def delNewPackage(self, name, version, flavor):
@@ -636,7 +636,7 @@ class ChangeSet(streams.LargeStreamSet):
                 fileList = [ x for x in listMethod() ]
                 resetMethod()
                 for (pathId, path, fileId, fileVersion) in fileList:
-                    if fileVersion != "-" and fileVersion.isLocal():
+                    if fileVersion != "-" and fileVersion.onLocalLabel():
                         addMethod(pathId, path, fileId, newVer)
 
 	for pkgCs in self.iterNewPackageList():
@@ -1046,7 +1046,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 	    old = trvCs.getOldVersion()
 	    new = trvCs.getNewVersion()
 
-	    if (old and old.isLocal()) or new.isLocal():
+	    if (old and old.onLocalLabel()) or new.onLocalLabel():
 		self.local = 1
 
 	if empty:

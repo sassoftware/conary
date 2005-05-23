@@ -648,13 +648,16 @@ class NewVersion(AbstractVersion):
     def freeze(self):
 	return "@NEW@"
 
-    def isLocal(self):
+    def isOnLocalHost(self):
 	return False
 
-    def isEmerge(self):
+    def onLocalLabel(self):
 	return False
 
-    def isLocalCook(self):
+    def onEmergeLabel(self):
+	return False
+
+    def onLocalCookLabel(self):
 	return False
 
     def __hash__(self):
@@ -829,7 +832,7 @@ class Version(VersionSequence):
 	"""
 	return self.versions[-1]
 
-    def isLocal(self):
+    def onLocalLabel(self):
     	"""
 	Tests whether this is the local branch, or is a version on
 	the local branch
@@ -838,7 +841,7 @@ class Version(VersionSequence):
 	"""
 	return isinstance(self.versions[-2], LocalLabel)
 
-    def isEmerge(self):
+    def onEmergeLabel(self):
     	"""
 	Tests whether this is the emerge branch, or is a version on
 	the emerge branch
@@ -847,7 +850,7 @@ class Version(VersionSequence):
 	"""
 	return isinstance(self.versions[-2], EmergeLabel)
 
-    def isLocalCook(self):
+    def onLocalCookLabel(self):
     	"""
 	Tests whether this is the local cook branch, or is a version on
 	the local cook branch
@@ -855,6 +858,17 @@ class Version(VersionSequence):
 	@rtype: boolean
 	"""
 	return isinstance(self.versions[-2], CookLabel)
+
+    def isOnLocalHost(self):
+    	"""
+        Returns True if the label for this version has "local" as the
+        server (signifying that this is a local version, not from a
+        networked repository)
+
+	@rtype: boolean
+	"""
+	return (self.onLocalCookLabel() or self.onEmergeLabel()
+                or self.onLocalLabel())
 
     def branch(self):
 	"""
