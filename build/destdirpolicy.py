@@ -398,6 +398,8 @@ class AutoDoc(policy.Policy):
         '.*/INSTALL$',
         '.*/README.*',
     ]
+    invariantexceptions = [ ('.*', stat.S_IFDIR) ]
+
     calledExplicitly = False
     docCalled = False
 
