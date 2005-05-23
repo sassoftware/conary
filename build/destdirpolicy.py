@@ -424,6 +424,8 @@ class AutoDoc(policy.Policy):
     def doFile(self, filename):
         source = util.joinPaths(self.builddir, filename)
         dest = util.joinPaths(self.destdir, filename)
+        if os.path.exists(dest):
+            return
         util.mkdirChain(os.path.dirname(dest))
         shutil.copy2(source, dest)
 
