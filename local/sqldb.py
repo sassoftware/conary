@@ -422,6 +422,20 @@ class Database:
                        self.schemaVersion)
         else:
             version = cu.execute("SELECT * FROM DatabaseVersion").next()[0]
+            if version == 2:
+                # convert from version 2 to version 3
+                try:
+                    cu.execute("ALTER TABLE DBInstances ADD COLUMN locked "
+                               "BOOLEAN")
+                    cu.execute("UPDATE DatabaseVersion SET version=3")
+                except:
+                    raise OldDatabaseSchema(
+                      "The Conary database on this system is too old. "      \
+                      "It will be automatically\nconverted as soon as you "  \
+                      "run Conary with write permissions for the database\n" \
+                      "(which normally means as root).")
+                version = 3
+
             if version != self.schemaVersion:
                 return False
 
@@ -995,8 +1009,12 @@ class Database:
 class OldDatabaseSchema(Exception):
 
     def __str__(self):
-        return "The Conary database on this system is too old. "    \
-               "For information on how to\nconvert this database, " \
-               "please visit http://wiki.rpath.com/ConaryConversion."
+        return self.msg
 
-    pass
+    def __init__(self, msg = None):
+        if msg:
+            self.msg = msg
+        else:
+            msg = "The Conary database on this system is too old. "    \
+                  "For information on how to\nconvert this database, " \
+                  "please visit http://wiki.rpath.com/ConaryConversion."
