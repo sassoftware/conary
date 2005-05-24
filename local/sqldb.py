@@ -185,7 +185,8 @@ class DBInstanceTable:
 				versionId INT, 
 				flavorId INT,
 				timeStamps STR,
-				isPresent INT)""")
+				isPresent INT,
+                                locked BOOLEAN)""")
 	    cu.execute("CREATE INDEX InstancesNameIdx ON "
 		       "DBInstances(troveName)")
 	    cu.execute("CREATE UNIQUE INDEX InstancesIdx ON "
@@ -222,9 +223,10 @@ class DBInstanceTable:
 
         cu = self.db.cursor()
         cu.execute("INSERT INTO DBInstances VALUES (NULL, ?, ?, ?, "
-						   "?, ?)",
+						   "?, ?, ?)",
                    (troveName, versionId, flavorId, 
-		    ":".join([ "%.3f" % x for x in timeStamps]), isPresent))
+		    ":".join([ "%.3f" % x for x in timeStamps]), isPresent,
+                    False))
 	return cu.lastrowid
 
     def delId(self, theId):
@@ -368,7 +370,7 @@ class DBFlavorMap(idtable.IdMapping):
 
 class Database:
 
-    schemaVersion = 2
+    schemaVersion = 3
 
     def __init__(self, path):
 	self.db = sqlite3.connect(path, timeout=30000)
@@ -490,6 +492,52 @@ class Database:
                     outD[name][version].append(deps.deps.ThawDependencySet(flavor))
         return outD
 
+    def lockTrove(self, name, version, flavor, lock = True):
+        if flavor.freeze() == "":
+            flavorClause = "IS NULL"
+        else:
+            flavorClause = "= '%s'" % flavor.freeze()
+
+        cu = self.db.cursor()
+        cu.execute("""
+            UPDATE DBInstances set locked=? WHERE
+                instanceId = (SELECT instanceId FROM DBInstances 
+                    JOIN DBFlavors ON
+                        DBInstances.flavorId = DBFlavors.flavorId
+                    JOIN Versions ON
+                        DBInstances.versionID = Versions.versionId
+                    WHERE
+                        troveName=? AND
+                        version = ? AND
+                        flavor %s)
+        """ % flavorClause, lock, name, version.asString())
+
+    def trovesAreLocked(self, troveList):
+        cu = self.db.cursor()
+        cu.execute("CREATE TEMPORARY TABLE tlList (name STRING, "
+                                "version STRING, flavor STRING)")
+        for (name, version, flavor) in troveList:
+            cu.execute("INSERT INTO tlList VALUES(?, ?, ?)", name, 
+                       version.asString(), flavor.freeze())
+        cu.execute("""SELECT locked FROM tlList
+                            JOIN DBInstances ON
+                                DBInstances.troveName = tlList.name
+                            JOIN Versions ON
+                                Versions.version = tlList.version AND
+                                DBInstances.versionId = Versions.versionId
+                            JOIN DBFlavors ON
+                                (DBFlavors.flavor = tlList.flavor 
+                                    OR
+                                 DBFlavors.flavor is NULL and
+                                 tlList.flavor = '') AND
+                                DBInstances.flavorId = DBFlavors.flavorId
+                    """)
+        results = [ x[0] for x in cu ]
+        assert(len(results) == len(troveList))
+        cu.execute("DROP TABLE tlList")
+
+        return results
+
     def hasByName(self, name):
 	return self.instances.hasName(name)
 
@@ -608,7 +656,7 @@ class Database:
             INSERT INTO DBInstances SELECT NULL, IncludedTroves.troveName, 
                                            IncludedTroves.versionId, 
                                            IncludedTroves.flavorId,
-                                           IncludedTroves.timeStamps, 0
+                                           IncludedTroves.timeStamps, 0, 0
                 FROM IncludedTroves LEFT OUTER JOIN DBInstances ON
                     IncludedTroves.troveName == DBInstances.troveName AND
                     IncludedTroves.versionId == DBInstances.versionId AND

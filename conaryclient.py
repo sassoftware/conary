@@ -885,3 +885,6 @@ class ConaryClient:
             raise UpdateError, \
                 "Write permission denied on conary database %s" % self.db.dbpath
 
+    def lockTroves(self, troveList, lock = True):
+        self.db.lockTroves(troveList, lock = lock)
+

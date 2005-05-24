@@ -19,6 +19,7 @@ import files
 import os
 from lib import util
 from lib import log
+import time
 
 from deps import deps
 from lib.sha1helper import sha1ToString, md5ToString
@@ -260,22 +261,46 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags, info):
             file = db.getFileVersion(pathId, fileId, version)
             if file.hasContents:
                 print "%s %s" % (sha1ToString(file.contents.sha1()), path)
+    elif info:
+        troveVersion = trove.getVersion()
+        if trove.getBuildTime():
+            buildTime = time.strftime("%c",
+                                time.localtime(trove.getBuildTime()))
+        else:
+            buildTime = "(unknown)"
+
+        if trove.getSize():
+            size = "%s" % trove.getSize()
+        else:
+            size = "(unknown)"
+
+        print "%-30s %s" % \
+            (("Name      : %s" % trove.getName(),
+             ("Build time: %s" % buildTime)))
+
+        if fullVersions:
+            print "Version   :", troveVersion.asString()
+            print "Label     : %s" % \
+                        troveVersion.branch().label().asString()
+
+        else:
+            print "%-30s %s" % \
+                (("Version   : %s" % 
+                            troveVersion.trailingRevision().asString()),
+                 ("Label     : %s" % 
+                            troveVersion.branch().label().asString()))
+
+        print "%-30s %s" % \
+            (("Size      : %d" % trove.getSize(),
+             ("Locked    : %s" % db.trovesAreLocked([ (trove.getName(), 
+                              trove.getVersion(), trove.getFlavor()) ])[0])))
+        print "Flavor    : %s" % deps.formatFlavor(trove.getFlavor())
     else:
         if fullVersions:
-            if info:
-                print _troveFormatWithFlavor % (trove.getName(), 
-                                                version.asString(), 
-                                                _formatFlavor(flavor))
-            else:
-                print _troveFormat % (trove.getName(), version.asString())
+            print _troveFormat % (trove.getName(), version.asString())
         else:
-            if info:
-                print _troveFormatWithFlavor % (trove.getName(), 
-                                        version.trailingRevision().asString(), 
-                                        _formatFlavor(flavor))
-            else:
-                print _troveFormat % (trove.getName(), 
-                                      version.trailingRevision().asString())
+            print _troveFormat % (trove.getName(), 
+                                  version.trailingRevision().asString())
 
         for (troveName, ver, fla) in trove.iterTroveList():
             if fullVersions:

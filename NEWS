@@ -11,12 +11,14 @@ Changes in 0.60.2:
     so that the IdGen class can determine if an older version number
     should be assigned to files.  getPackageBranchPathIds() is now the
     primary mechanism for populating the pathId dictionary.
-  * the local label methods of the version object have been
+  * The local label methods of the version object have been
     refactored. isLocal() is now onLocalLabel(), isEmerge() is now
     onEmergeLabel(), etc. isOnLocalHost() has been added as a method
     to easily determine if a version only exists in the database
   * Moved logic for explicitly creating a changeset from cscmd.py to the
     ConaryClient object
+  * Added the (unused) ability to lock and unlock troves
+  * "query --info" behaves much more like "repquery --info" now
 
 Changes in 0.60.1:
   * Support for legacy clients (protocol version 29) has been removed from

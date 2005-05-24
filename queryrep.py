@@ -130,8 +130,6 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 					      displayc[troveName, version])
             displayc.clearCache(troveName)
 
-                
-
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
 		      info, tags, showDeps, fullVersions, flavor):
     withFiles = ids

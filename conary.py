@@ -59,12 +59,14 @@ def usage(rc = 1):
     print "       conary erase        <pkgname>[=<version>][[flavor]]+"
     print "       conary localcs      <pkg> <outfile>"
     print "       conary localcommit  <changeset>"
+    print "       conary lock         <pkgname>[=<version>][[flavor]]*"
     print "       conary query        <pkgname>[=<version>][[flavor]]*"
     print "       conary remove       <path>"
     print "       conary repquery     <pkgname>[=<version>][[flavor]]*"
     print "       conary rblist"
     print "       conary rollback     <rollback>"
     print "       conary showcs       <changeset> <trove>[=<version>]*"
+    print "       conary unlock       <pkgname>[=<version>][[flavor]]*"
     print "       conary update       <pkgname>[=<version>][[flavor]]* <changeset>*"
     print "       conary usage"
     print "       conary verify       <pkgname>[=<version>][[flavor]]*"
@@ -274,12 +276,6 @@ def realMain(cfg, argv=sys.argv):
 	if argSet: return usage()
 
 	cook.cookCommand(cfg, otherArgs[2:], False, {}, emerge = True)
-    elif (otherArgs[1] == "import"):
-	if len(otherArgs) != 3 and len(otherArgs) != 3:
-	    return usage()
-
-	repos = openRepository(cfg.repositoryMap)
-	importrpm.doImport(repos, cfg, otherArgs[2])
     elif (otherArgs[1] == "localcs"):
 	if len(otherArgs) != 4 and len(otherArgs) != 4:
 	    return usage()
@@ -294,6 +290,10 @@ def realMain(cfg, argv=sys.argv):
 	db = database.Database(cfg.root, cfg.dbPath)
 	for changeSet in otherArgs[2:]:
 	    commit.doLocalCommit(db, changeSet)
+    elif (otherArgs[1] == "lock" or otherArgs[1] == "unlock"):
+	if argSet: return usage()
+
+        updatecmd.changeLocks(cfg, otherArgs[2:], lock = otherArgs[1] == "lock")
     elif (otherArgs[1] == "query") or (otherArgs[1] == "q"):
 	if argSet.has_key('path'):
 	    paths = argSet['path']

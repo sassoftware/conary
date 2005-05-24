@@ -225,6 +225,17 @@ def updateAll(cfg, info = False, depCheck = True):
     names = [ x[0] for x in cu ]
     return doUpdate(cfg, names, info = info, depCheck = depCheck)
 
+def changeLocks(cfg, troveStrList, lock = True):
+    client = conaryclient.ConaryClient(cfg)
+    troveList = [] 
+    for item in troveStrList:
+        name, ver, flv = parseTroveSpec(item)
+        troves = client.db.findTrove([], name, versionStr = ver,
+                                     reqFlavor = flv)
+        troveList += troves
+
+    client.lockTroves(troveList, lock = lock)
+
 def parseTroveSpec(specStr):
     if specStr.find('[') > 0 and specStr[-1] == ']':
         specStr = specStr[:-1]

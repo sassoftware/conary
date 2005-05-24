@@ -170,6 +170,20 @@ class SqlDbRepository(datastore.DataStoreRepository,
     def addTroveDone(self, troveInfo):
 	pass
 
+    def lockTroves(self, troveList, lock):
+        troves = self.getTroves(troveList)
+
+        for trove in troves:
+            for subTrove in self.walkTroveSet(trove):
+                self.db.lockTrove(subTrove.getName(),
+                                  subTrove.getVersion(),
+                                  subTrove.getFlavor(), lock = lock)
+
+        self.db.commit()
+
+    def trovesAreLocked(self, troveList):
+        return self.db.trovesAreLocked(troveList)
+
     def commit(self):
 	self.db.commit()
 
