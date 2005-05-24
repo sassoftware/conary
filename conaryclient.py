@@ -748,22 +748,39 @@ class ConaryClient:
                                         withFiles = False)
 
         # filter out non-defaults
-        for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), abstract) \
-                                                            in csList:
-            if not newVersion:
-                # cannot have a non-default erase
-                continue
+        if skipNotByDefault:
+            # Find out if troves were included w/ byDefault set (one
+            # byDefault beats any number of not byDefault)
+            inclusions = {}
+            for troveCs in cs.iterNewPackageList():
+                for (name, changeList) in troveCs.iterChangedTroves():
+                    for (changeType, version, flavor, byDef) in changeList:
+                        if changeType == '+':
+                            if byDef:
+                                inclusions[(name, version, flavor)] = True
+                            else:
+                                inclusions.setdefault((name, version, flavor), 
+                                                      False)
 
-            primaryTroveCs = cs.getNewPackageVersion(name, newVersion, 
-                                                     newFlavor)
+            for troveCs in [ x for x in cs.iterNewPackageList() ]:
+                if not troveCs.getNewVersion():
+                    # erases get to stay since they don't have a byDefault flag
+                    continue
 
-            for (name, changeList) in primaryTroveCs.iterChangedTroves():
-                for (changeType, version, flavor, byDef) in changeList:
-                    if changeType == '+' and not byDef and \
-                       (name, version, flavor) not in primaryList:
-                        # it won't be here if recurse is False
-                        if cs.hasNewPackage(name, version, flavor):
-                            cs.delNewPackage(name, version, flavor)
+                item = (troveCs.getName(), troveCs.getNewVersion(),
+                        troveCs.getNewFlavor())
+                if item in primaryList: 
+                    # the item was explicitly asked for
+                    continue
+                elif inclusions[item]:
+                    # the item was included w/ byDefault set (or we might
+                    # have already erased it from the changeset)
+                    continue
+
+                # don't look at this trove again; we already decided to
+                # erase it
+                inclusions[item] = True
+                cs.delNewPackage(*item)
             
         # now filter excludeList
         fullCsList = []
@@ -807,7 +824,7 @@ class ConaryClient:
         return (fullCsList, primaryList)
 
     def createChangeSet(self, csList, recurse = True, 
-                        skipNotByDefault = False, excludeList = [],
+                        skipNotByDefault = True, excludeList = [],
                         callback = None, withFiles = False,
                         withFileContents = False):
         """
@@ -826,7 +843,7 @@ class ConaryClient:
                                        withFileContents = withFileContents)
 
     def createChangeSetFile(self, path, csList, recurse = True, 
-                            skipNotByDefault = False, excludeList = [],
+                            skipNotByDefault = True, excludeList = [],
                             callback = None):
         """
         Creates <path> as a change set file.
