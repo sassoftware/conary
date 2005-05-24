@@ -17,7 +17,7 @@ Changes in 0.60.2:
     to easily determine if a version only exists in the database
   * Moved logic for explicitly creating a changeset from cscmd.py to the
     ConaryClient object
-  * Added the (unused) ability to lock and unlock troves
+  * Added the (unused) ability to lock and unlock troves. Ignore this for now.
   * "query --info" behaves much more like "repquery --info" now
   * isSourceVersion() method has been to the Version object
   * most of the remaining erroneous references to "Package" have been
