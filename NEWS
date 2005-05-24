@@ -19,6 +19,7 @@ Changes in 0.60.2:
     ConaryClient object
   * Added the (unused) ability to lock and unlock troves
   * "query --info" behaves much more like "repquery --info" now
+  * add isSourceVersion() method to Version
 
 Changes in 0.60.1:
   * Support for legacy clients (protocol version 29) has been removed from

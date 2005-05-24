@@ -832,6 +832,14 @@ class Version(VersionSequence):
 	"""
 	return self.versions[-1]
 
+    def isSourceVersion(self):
+    	"""
+	Tests whether this version is a source or binary version.
+
+	@rtype: boolean
+	"""
+	return self.canonicalVersion().versions[-1].buildCount is None
+
     def onLocalLabel(self):
     	"""
 	Tests whether this is the local branch, or is a version on
