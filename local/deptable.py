@@ -566,11 +566,12 @@ class DependencyTables:
             return componentGraph
 
         def _orderDFS(compGraph, nodeIdx, seen, order):
-            order.append(nodeIdx)
             seen[nodeIdx] = True
             for otherNode in compGraph[nodeIdx][1]:
                 if not seen[otherNode]:
                     _orderDFS(compGraph, otherNode, seen, order)
+
+            order.append(nodeIdx)
 
         def _orderComponents(compGraph):
             # returns a topological sort of compGraph
@@ -583,7 +584,6 @@ class DependencyTables:
 
                 nextIndex += 1
 
-            order.reverse()
             return [ compGraph[x][0] for x in order ]
 
         # this works against a database, not a repository
@@ -810,8 +810,6 @@ class DependencyTables:
 
         changeSetList = []
         if findOrdering:
-            import lib
-            lib.epdb.st()
             # Remove nodes which cancel each other
             _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
 
