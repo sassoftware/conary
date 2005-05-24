@@ -82,6 +82,12 @@ class SqlDbRepository(datastore.DataStoreRepository,
     def hasTroveByName(self, name):
 	return self.db.hasByName(name)
 
+    def hasPackage(self, name):
+        import warnings
+        warnings.warn("hasPackage is deprecated, use hasTroveByName",
+                      DeprecationWarning)
+        return self.db.hasByName(name)
+
     def hasTrove(self, troveName, version, flavor):
         cu = self.db.db.cursor()
 
