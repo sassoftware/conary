@@ -158,7 +158,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             
         if info:
             new = []
-            for x in cs.iterNewPackageList():
+            for x in cs.iterNewTroveList():
                 oldVersion = x.getOldVersion()
                 newVersion = x.getNewVersion()
                 if oldVersion:
@@ -191,7 +191,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
 	    new = [ "%s %s" % (x[1], x[0]) for x in new ]
 
             old = [ "%s (%s)" % (x[0], x[1].trailingRevision().asString()) 
-                                for x in cs.getOldPackageList() ]
+                                for x in cs.getOldTroveList() ]
 	    old.sort()
             if not new and not old:
                 print "No troves are affected by this update."

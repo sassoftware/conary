@@ -60,7 +60,7 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
             displayTroveHeader(cs, troveName, newVer, newFla, oldVer, oldFla, 
                                indent, displayC, fullVersions)
             if newVer and deps:
-                trove = cs.getNewPackageVersion(troveName, newVer, newFla)
+                trove = cs.getNewTroveVersion(troveName, newVer, newFla)
                 depformat('Requires', trove.getRequires())
                 depformat('Provides', trove.getProvides())
     else:
@@ -68,11 +68,11 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
         displayC = createDisplayCache(cs, troves, fullVersions)
         first = True
         for (troveName, newVer, newFla, oldVer, oldFla), indent in troves:
-            if not newVer or not cs.hasNewPackage(troveName, newVer, newFla):
+            if not newVer or not cs.hasNewTrove(troveName, newVer, newFla):
                 displayTroveHeader(cs, troveName, newVer, newFla, oldVer, 
                                    oldFla, indent, displayC, fullVersions)
                 continue
-            trove = cs.getNewPackageVersion(troveName, newVer, newFla)
+            trove = cs.getNewTroveVersion(troveName, newVer, newFla)
             # only print the header if we are going to print some more
             # information or it is a primary trove in the changeset
             if (((troveName, newVer, newFla) in cs.primaryTroveList) 
@@ -181,7 +181,7 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
             if deps:
                 depformat('Requires', trove.getRequires())
                 depformat('Provides', trove.getProvides())
-        for (troveName, version, flavor) in cs.oldPackages:
+        for (troveName, version, flavor) in cs.oldTroves:
             print "remove %s %s" % (troveName, version.asString())
 
 def printChangedFile(indent, f, path, oldF, oldPath, tags=False, sha1s=False, pathIds=False, pathId=None ):
@@ -240,7 +240,7 @@ def displayTroveHeader(cs, troveName, newVer, newFla, oldVer, oldFla,
     """ Displays very basic information about the trove """
     if newVer:
         try:
-            trove = cs.getNewPackageVersion(troveName, newVer, newFla)
+            trove = cs.getNewTroveVersion(troveName, newVer, newFla)
         except KeyError:
             trove = None
     else:
@@ -292,8 +292,8 @@ def includeChildTroves(cs, troves):
     for pkg, indent in troves:
         newList.append((pkg, indent))
         troveName, nv, nf, ov, of = pkg
-        if cs.hasNewPackage(troveName, nv, nf):
-            trove = cs.getNewPackageVersion(troveName, nv, nf)
+        if cs.hasNewTrove(troveName, nv, nf):
+            trove = cs.getNewTroveVersion(troveName, nv, nf)
             for subTroveName, changes in sorted(trove.iterChangedTroves()):
                 if len(changes) == 2 and changes[0][0] != changes[1][0]:
                     if changes[0][0] == '+':
@@ -331,14 +331,14 @@ def getTroves(cs, troveList):
         allTroves[n, ov, of] = (n,None,None,ov,of)
 
     if not troveList:
-        # create a list of all troves in this changeset, but only 
-        # display those that are either primary packages, or are not
-        # contained by any primary packages 
-        # (other packages will be picked up if we are asked to recurse)
+        # create a list of all troves in this changeset, but only
+        # display those that are either primary troves, or are not
+        # contained by any primary troves (other troves will be picked
+        # up if we are asked to recurse)
         allTroves = {}
-        for trove in cs.iterNewPackageList():
+        for trove in cs.iterNewTroveList():
             addTrove(allTroves, trove)
-        for troveTup in cs.getOldPackageList():
+        for troveTup in cs.getOldTroveList():
             n, ov, of = troveTup
             addOldTrove(allTroves, n, ov, of)
         
@@ -355,7 +355,7 @@ def getTroves(cs, troveList):
                     del allTroves[name, version, flavor]
                 except KeyError:
                     pass
-                trove = cs.getNewPackageVersion(name, version, flavor)
+                trove = cs.getNewTroveVersion(name, version, flavor)
                 for subTroveName, changes in  trove.iterChangedTroves():
                     (type, version, flavor, byDefault) = changes[0]
                     try:
@@ -384,7 +384,7 @@ def getTroves(cs, troveList):
 
     troves = {}
     for reqName, reqVersion in troveDefs:
-        for trove in cs.iterNewPackageList():
+        for trove in cs.iterNewTroveList():
             troveName = trove.getName()
             troveVersion = trove.getNewVersion()
             if (troveName == reqName or
@@ -398,7 +398,7 @@ def getTroves(cs, troveList):
                 elif troveVersion.trailingRevision().getVersion() == reqVersion:
                     addTrove(troves, trove)
                     break
-        for (troveName, troveVersion, troveFlavor) in cs.getOldPackageList():
+        for (troveName, troveVersion, troveFlavor) in cs.getOldTroveList():
             if (troveName == reqName or
                  (reqName[0] == ':' and troveName.endswith(reqName))):
                 if not reqVersion:

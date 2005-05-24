@@ -87,35 +87,35 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True,
                                callback = callback, 
                                excludeList = cfg.excludeTroves)
 
-def LocalChangeSetCommand(db, cfg, pkgName, outFileName):
+def LocalChangeSetCommand(db, cfg, troveName, outFileName):
     try:
-	pkgList = db.findTrove(None, pkgName, None)
-        pkgList = db.getTroves(pkgList)
+	troveList = db.findTrove(None, troveName, None)
+        troveList = db.getTroves(troveList)
     except repository.TroveNotFound, e:
 	log.error(e)
 	return
 
     list = []
-    for outerPackage in pkgList:
-	for pkg in db.walkTroveSet(outerPackage):
-	    ver = pkg.getVersion()
-	    origPkg = db.getTrove(pkg.getName(), ver, pkg.getFlavor(), 
-				  pristine = True)
+    for outerTrove in troveList:
+	for trove in db.walkTroveSet(outerTrove):
+	    ver = trove.getVersion()
+	    origTrove = db.getTrove(trove.getName(), ver, trove.getFlavor(), 
+                                    pristine = True)
 	    ver = ver.createBranch(versions.LocalLabel(), withVerRel = 1)
-	    list.append((pkg, origPkg, ver, 0))
+	    list.append((trove, origTrove, ver, 0))
 	    
     result = update.buildLocalChanges(db, list, root = cfg.root,
                                       updateContainers = True)
     if not result: return
     cs = result[0]
 
-    for outerPackage in pkgList:
-	cs.addPrimaryTrove(outerPackage.getName(), 
-	    outerPackage.getVersion().createBranch(
-		versions.LocalLabel(), withVerRel = 1),
-	   outerPackage.getFlavor())
+    for outerTrove in troveList:
+	cs.addPrimaryTrove(outerTrove.getName(), 
+                           outerTrove.getVersion().createBranch(
+            versions.LocalLabel(), withVerRel = 1),
+                           outerTrove.getFlavor())
 
-    for (changed, fsPkg) in result[1]:
+    for (changed, fsTrove) in result[1]:
 	if changed:
 	    break
 

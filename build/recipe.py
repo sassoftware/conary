@@ -1161,20 +1161,20 @@ class RedirectRecipe(Recipe):
 
             d = self.redirections.setdefault(fromName, {})
 
-            # this redirects from oldPackage -> newPackage
+            # this redirects from oldTrove -> newTrove
             d[(topName, topVersion, topFlavor)] = True
 
             for (name, version, flavor) in topLevelTrove.iterTroveList():
-                # redirect from oldPackage -> referencedPackage
+                # redirect from oldTrove -> referencedPackage
                 d[(name, version, flavor)] = True
 
                 if name.find(":") != -1:
                     compName = fromName + ":" + name.split(":")[1]
-                    # redirect from oldPackage -> oldPackage:component. we
+                    # redirect from oldTrove -> oldTrove:component. we
                     # leave version/flavor alone; they get filled in later
                     d[(compName, None, None)] = True
 
-                    # redirect from oldPackage:component -> newPackage:component
+                    # redirect from oldTrove:component -> newTrove:component
                     d2 = self.redirections.setdefault(compName, {})
                     d2[(name, version, flavor)] = True
 

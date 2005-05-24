@@ -88,13 +88,13 @@ class AbstractTroveDatabase:
 	Returns the trove which matches (troveName, version, flavor). If
 	the trove does not exist, TroveMissing is raised.
 
-	@param troveName: package name
+	@param troveName: trove name
 	@type troveName: str
 	@param version: version
 	@type version: versions.Version
 	@param flavor: flavor
 	@type flavor: deps.deps.DependencySet
-	@rtype: trove.Package
+	@rtype: trove.Trove
 	"""
 	raise NotImplementedError
 
@@ -165,11 +165,11 @@ class AbstractTroveDatabase:
 		seen[name] = [ (version, flavor) ]
 
 	    try:
-		trove = self.getTrove(name, version, flavor)
+		trv = self.getTrove(name, version, flavor)
 
-		yield trove
+		yield trv
 
-		troveList += [ x for x in trove.iterTroveList() ]
+		troveList += [ x for x in trv.iterTroveList() ]
 	    except TroveMissing:
 		if not ignoreMissing:
 		    raise
@@ -306,9 +306,9 @@ class IdealRepository(AbstractTroveDatabase):
                         target[name][version] += flavorList
 
 class AbstractRepository(IdealRepository):
-    ### Package access functions
+    ### Trove access functions
 
-    def hasPackage(self, troveName):
+    def hasTroveByName(self, troveName):
 	"""
 	Tests to see if the repository contains any version of the named
 	trove.
@@ -345,13 +345,13 @@ class ChangeSetJob:
 
     storeOnlyConfigFiles = False
 
-    def addTrove(self, pkg):
-	return self.repos.addTrove(pkg)
+    def addTrove(self, trove):
+	return self.repos.addTrove(trove)
 
-    def addTroveDone(self, pkgId):
-	self.repos.addTroveDone(pkgId)
+    def addTroveDone(self, troveId):
+	self.repos.addTroveDone(troveId)
 
-    def oldPackage(self, pkg):
+    def oldTrove(self, trove):
 	pass
 
     def oldFile(self, pathId, fileVersion, fileObj):
@@ -374,7 +374,7 @@ class ChangeSetJob:
 	configRestoreList = []
 	normalRestoreList = []
 
-	newList = [ x for x in cs.iterNewPackageList() ]
+	newList = [ x for x in cs.iterNewTroveList() ]
 
         if resetTimestamps:
             # This depends intimiately on the versions cache. We don't
@@ -383,8 +383,8 @@ class ChangeSetJob:
             # but brittle?
             updated = {}
 
-            for csPkg in newList:
-                ver = csPkg.getNewVersion()
+            for csTrove in newList:
+                ver = csTrove.getNewVersion()
                 if ver in updated:
                     pass
                 else:
@@ -394,38 +394,38 @@ class ChangeSetJob:
 
             del updated
 
-	# create the package objects which need to be installed; the
+	# create the trove objects which need to be installed; the
 	# file objects which map up with them are created later, but
 	# we do need a map from pathId to the path and version of the
 	# file we need, so build up a dictionary with that information
-	for i, csPkg in enumerate(newList):
+	for i, csTrove in enumerate(newList):
 	    if callback:
 		callback.creatingDatabaseTransaction(i + 1, len(newList))
 
-	    newVersion = csPkg.getNewVersion()
-	    old = csPkg.getOldVersion()
+	    newVersion = csTrove.getNewVersion()
+	    old = csTrove.getOldVersion()
 	    oldTroveVersion = old
-	    pkgName = csPkg.getName()
-	    troveFlavor = csPkg.getNewFlavor()
+	    troveName = csTrove.getName()
+	    troveFlavor = csTrove.getNewFlavor()
 
-	    if repos.hasTrove(pkgName, newVersion, troveFlavor):
+	    if repos.hasTrove(troveName, newVersion, troveFlavor):
 		raise CommitError, \
 		       "version %s of %s is already installed" % \
-			(newVersion.asString(), csPkg.getName())
+			(newVersion.asString(), csTrove.getName())
 
 	    if old:
-		newPkg = repos.getTrove(pkgName, old, csPkg.getOldFlavor(),
+		newTrove = repos.getTrove(troveName, old, csTrove.getOldFlavor(),
 					pristine = True)
-		newPkg.changeVersion(newVersion)
+		newTrove.changeVersion(newVersion)
 	    else:
-		newPkg = trove.Trove(csPkg.getName(), newVersion,
-				     troveFlavor, csPkg.getChangeLog())
+		newTrove = trove.Trove(csTrove.getName(), newVersion,
+                                        troveFlavor, csTrove.getChangeLog())
 
-	    newFileMap = newPkg.applyChangeSet(csPkg)
+	    newFileMap = newTrove.applyChangeSet(csTrove)
 
-	    troveInfo = self.addTrove(newPkg)
+	    troveInfo = self.addTrove(newTrove)
 
-	    for (pathId, path, fileId, newVersion) in newPkg.iterFileList():
+	    for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
 		tuple = newFileMap.get(pathId, None)
 		if tuple is not None:
 		    (oldPath, oldFileId, oldVersion) = tuple[-3:]
@@ -503,7 +503,7 @@ class ChangeSetJob:
  					 fileContents, restoreContents, 
  					 fileObj.flags.isConfig())
 		elif fileObj.flags.isConfig():
-		    tup = (pathId, fileObj, oldPath, oldfile, pkgName,
+		    tup = (pathId, fileObj, oldPath, oldfile, troveName,
 			   oldTroveVersion, troveFlavor, newVersion, 
                            fileId, oldVersion, oldFileId, restoreContents)
 		    configRestoreList.append(tup)
@@ -518,7 +518,7 @@ class ChangeSetJob:
 	configRestoreList.sort()
 	normalRestoreList.sort()
 
-	for (pathId, fileObj, oldPath, oldfile, pkgName, oldTroveVersion,
+	for (pathId, fileObj, oldPath, oldfile, troveName, oldTroveVersion,
 	     troveFlavor, newVersion, newFileId, oldVersion, 
              oldFileId, restoreContents) in configRestoreList:
             if cs.configFileIsDiff(pathId):
@@ -571,11 +571,11 @@ class ChangeSetJob:
 	del configRestoreList
 	del normalRestoreList
 
-	for (pkgName, version, flavor) in cs.getOldPackageList():
-	    pkg = self.repos.getTrove(pkgName, version, flavor)
-	    self.oldPackage(pkg)
+	for (troveName, version, flavor) in cs.getOldTroveList():
+	    trv = self.repos.getTrove(troveName, version, flavor)
+	    self.oldTrove(trv)
 
-	    for (pathId, path, fileId, version) in pkg.iterFileList():
+	    for (pathId, path, fileId, version) in trv.iterFileList():
 		file = self.repos.getFileVersion(pathId, fileId, version)
 		self.oldFile(pathId, version, file)
 

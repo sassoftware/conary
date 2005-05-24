@@ -238,7 +238,7 @@ def sourceCommand(cfg, args, argSet, profile=False):
 	except repository.repository.OpenError:
 	    repos = None
 
-	checkin.newPackage(repos, cfg, args[1])
+	checkin.newTrove(repos, cfg, args[1])
     elif (args[0] == "merge"):
 	if argSet or not args or len(args) > 1: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)

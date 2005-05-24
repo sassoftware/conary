@@ -298,13 +298,13 @@ class Trove(streams.LargeStreamSet):
     def addTrove(self, name, version, flavor, presentOkay = False,
                  byDefault = True):
 	"""
-	Adds a single version of a package.
+	Adds a single version of a trove.
 
-	@param name: name of the package
+	@param name: name of the trove
 	@type name: str
-	@param version: version of the package
+	@param version: version of the trove
 	@type version: versions.Version
-	@param flavor: flavor of the package to include
+	@param flavor: flavor of the trove to include
 	@type flavor: deps.deps.DependencySet
 	@param presentOkay: replace if this is a duplicate, don't complain
 	@type presentOkay: boolean
@@ -315,13 +315,13 @@ class Trove(streams.LargeStreamSet):
 
     def delTrove(self, name, version, flavor, missingOkay):
 	"""
-	Removes a single version of a package.
+	Removes a single version of a trove.
 
-	@param name: name of the package
+	@param name: name of the trove
 	@type name: str
-	@param version: version of the package
+	@param version: version of the trove
 	@type version: versions.Version
-	@param flavor: flavor of the package to include
+	@param flavor: flavor of the trove to include
 	@type flavor: deps.deps.DependencySet
 	@param missingOkay: should we raise an error if the version isn't
 	part of this trove?
@@ -337,8 +337,8 @@ class Trove(streams.LargeStreamSet):
 
     def iterTroveList(self):
 	"""
-	Returns a generator for (packageName, version, flavor) ordered pairs, 
-	listing all of the package in the group, along with their versions. 
+	Returns a generator for (name, version, flavor) ordered pairs, 
+	listing all of the trove in the group, along with their versions. 
 
 	@rtype: list
 	"""
@@ -353,9 +353,9 @@ class Trove(streams.LargeStreamSet):
     # returns a dictionary mapping a pathId to a (path, version, pkgName) tuple
     def applyChangeSet(self, pkgCS, skipIntegrityChecks = False):
 	"""
-	Updates the package from the changes specified in a change set.
+	Updates the trove from the changes specified in a change set.
 	Returns a dictionary, indexed by pathId, which gives the
-	(path, version, packageName) for that file.
+	(path, version, troveName) for that file.
 
 	@param pkgCS: change set
 	@type pkgCS: TroveChangeSet
@@ -410,11 +410,11 @@ class Trove(streams.LargeStreamSet):
 
     def mergeTroveListChanges(self, changeList, redundantOkay = False):
 	"""
-	Merges a set of changes to the included package list into this
-	package.
+	Merges a set of changes to the included trove list into this
+	trove.
 
 	@param changeList: A list or generator specifying a set of
-	package changes; this is the same as returned by
+	trove changes; this is the same as returned by
 	TroveChangeSet.iterChangedTroves()
 	@type changeList: (name, list) tuple
 	@param redundantOkay: Redundant changes are normally considered errors
@@ -466,17 +466,18 @@ class Trove(streams.LargeStreamSet):
 
     def diff(self, them, absolute = 0):
 	"""
-	Generates a change set between them (considered the old version) and
-	this instance. We return the change set, a list of other package diffs
-	which should be included for this change set to be complete, and a list
-	of file change sets which need to be included.  The list of package
-	changes is of the form (pkgName, oldVersion, newVersion, oldFlavor,
-	newFlavor).  If absolute is True, oldVersion is always None and
-	absolute diffs can be used.  Otherwise, absolute versions are not
-	necessary, and oldVersion of None means the package is new. The list of
-	file changes is a list of (pathId, oldVersion, newVersion, oldPath,
-	newPath) tuples, where newPath is 
-	the path to the file in this package.
+	Generates a change set between them (considered the old
+	version) and this instance. We return the change set, a list
+	of other trove diffs which should be included for this change
+	set to be complete, and a list of file change sets which need
+	to be included.  The list of trove changes is of the form
+	(pkgName, oldVersion, newVersion, oldFlavor, newFlavor).  If
+	absolute is True, oldVersion is always None and absolute diffs
+	can be used.  Otherwise, absolute versions are not necessary,
+	and oldVersion of None means the trove is new. The list of
+	file changes is a list of (pathId, oldVersion, newVersion,
+	oldPath, newPath) tuples, where newPath is the path to the
+	file in this trove.
 
 	@param them: object to generate a change set from (may be None)
 	@type them: Group
@@ -602,7 +603,7 @@ class Trove(streams.LargeStreamSet):
 			pkgList.append((name, None, version, None, flavor))
 	    return (chgSet, filesNeeded, pkgList)
 
-	# use added and removed to assemble a list of package diffs which need
+	# use added and removed to assemble a list of trove diffs which need
 	# to go along with this change set
 
 	for name in added.keys(): 
@@ -711,12 +712,12 @@ class Trove(streams.LargeStreamSet):
 					  None, newFlavor))
                 continue
 
-	    # for each new version of a package, try and generate the diff
-	    # between that package and the version of the package which was
+	    # for each new version of a trove, try and generate the diff
+	    # between that trove and the version of the trove which was
 	    # removed which was on the same branch. if that's not possible,
-	    # see if the parent of the package was removed, and use that as
+	    # see if the parent of the trove was removed, and use that as
 	    # the diff. if we can't do that and only one version of this
-	    # package is being obsoleted, use that for the diff. if we
+	    # trove is being obsoleted, use that for the diff. if we
 	    # can't do that either, throw up our hands in a fit of pique
 
 	    for version in newVersionList:
@@ -1024,7 +1025,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         _STREAM_TCS_CHANGE_LOG  : (ChangeLog,            "changeLog"     ),
         _STREAM_TCS_OLD_FILES   : (OldFileStream,	 "oldFiles"      ),
         _STREAM_TCS_TYPE        : (streams.IntStream,    "tcsType"       ),
-        _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,   "packages"      ),
+        _STREAM_TCS_TROVE_CHANGES:(ReferencedTroveSet,   "troves"        ),
         _STREAM_TCS_NEW_FILES   : (ReferencedFileList,   "newFiles"      ),
         _STREAM_TCS_CHG_FILES   : (ReferencedFileList,   "changedFiles"  ),
         _STREAM_TCS_OLD_FLAVOR  : (DependenciesStream,   "oldFlavor"     ),
@@ -1038,7 +1039,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
     ignoreUnknown = True
 
     """
-    Represents the changes between two packages and forms part of a
+    Represents the changes between two troves and forms part of a
     ChangeSet. 
     """
 
@@ -1102,13 +1103,13 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	return self.changedFiles
 
     def iterChangedTroves(self):
-	return self.packages.iteritems()
+	return self.troves.iteritems()
 
     def newTroveVersion(self, name, version, flavor, byDefault):
 	"""
-	Adds a version of a package which appeared in newVersion.
+	Adds a version of a troves which appeared in newVersion.
 
-	@param name: name of the package
+	@param name: name of the trove
 	@type name: str
 	@param version: new version
 	@type version: versions.Version
@@ -1118,25 +1119,25 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         @type byDefault: boolean
 	"""
 
-        l = self.packages.setdefault(name, [])
+        l = self.troves.setdefault(name, [])
 	l.append(('+', version, flavor, byDefault))
 
-    def updateChangedPackage(self, name, flavor, old, new):
+    def updateChangedTrove(self, name, flavor, old, new):
 	"""
-	Removes package (name, flavor, old version) from the changed list and
-	adds package (name, flavor, version) new to the list (with the same 
+	Removes trove (name, flavor, old version) from the changed list and
+	adds trove (name, flavor, version) new to the list (with the same 
 	change type).
 
-	@param name: name of the package
+	@param name: name of the trove
 	@type name: str
-	@param flavor: flavor of the package
+	@param flavor: flavor of the trove
 	@type flavor: deps.deps.DependencySet
 	@param old: version to remove from the changed list
 	@type old: versions.VersionString
 	@param new: version to add to the changed list
 	@type new: versions.VersionString
 	"""
-	for (theName, l) in self.packages.iteritems():
+	for (theName, l) in self.troves.iteritems():
 	    if theName != name: continue
 	    for (i, (change, ver, flavor, byDefault)) in enumerate(l):
 		if ver == old:
@@ -1147,16 +1148,16 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 
     def oldTroveVersion(self, name, version, flavor):
 	"""
-	Adds a version of a package which appeared in oldVersion.
+	Adds a version of a trove which appeared in oldVersion.
 
-	@param name: name of the package
+	@param name: name of the trove
 	@type name: str
 	@param version: old version
 	@type version: versions.Version
 	@param flavor: old flavor
 	@type flavor: deps.deps.DependencySet
 	"""
-        l = self.packages.setdefault(name, [])
+        l = self.troves.setdefault(name, [])
         l.append(('-', version, flavor, None))
 
     def changedTrove(self, name, version, flavor, byDefault):
@@ -1172,7 +1173,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         @param byDefault: New value of byDefault
         @type byDefault: boolean
 	"""
-        l = self.packages.setdefault(name, [])
+        l = self.troves.setdefault(name, [])
         l.append(('~', version, flavor, byDefault))
 
     def formatToFile(self, changeSet, f):
@@ -1229,9 +1230,9 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 	    pathIdStr = sha1helper.md5ToString(pathId)
 	    f.write("\tremoved %s(.*)%s\n" % (pathIdStr[:6], pathIdStr[-6:]))
 
-	for name in self.packages.keys():
+	for name in self.troves.keys():
             l = []
-            for x in self.packages[name]:
+            for x in self.troves[name]:
                 l.append(x[0] + x[1].asString())
                 if x[3] is None:
                     l[-1] += ' (None)'
@@ -1303,7 +1304,7 @@ class ThawTroveChangeSet(AbstractTroveChangeSet):
 class TroveError(Exception):
 
     """
-    Ancestor for all exceptions raised by the package module.
+    Ancestor for all exceptions raised by the trove module.
     """
 
     pass

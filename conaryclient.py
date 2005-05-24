@@ -99,7 +99,7 @@ class ConaryClient:
     def _rootChangeSet(self, cs, keepExisting = False):
 	troveList = [ (x.getName(), x.getNewVersion(), 
 		       x.getNewFlavor()) 
-			    for x in cs.iterNewPackageList() ]
+			    for x in cs.iterNewTroveList() ]
 
 	if keepExisting:
 	    outdated = None
@@ -215,7 +215,7 @@ class ConaryClient:
         troveSet = {}
         delDict = {}
 
-        for troveCs in cs.iterNewPackageList():
+        for troveCs in cs.iterNewTroveList():
             if not troveCs.getIsRedirect():
                 continue
 
@@ -233,7 +233,7 @@ class ConaryClient:
                            troveCs.getOldFlavor())
 
                 if self.db.hasTrove(*oldItem):
-                    cs.oldPackage(*oldItem)
+                    cs.oldTrove(*oldItem)
                 else:
                     # erase the target(s) of the redirection
                     for (name, changeList) in troveCs.iterChangedTroves():
@@ -247,8 +247,8 @@ class ConaryClient:
                         troveSet[(name, version, flavor)] = True
 
         for item in delDict.iterkeys():
-            if cs.hasNewPackage(*item):
-                cs.delNewPackage(*item)
+            if cs.hasNewTrove(*item):
+                cs.delNewTrove(*item)
 
         # Troves in troveSet which are still in this changeset are ones
         # we really do need to install. We don't know what versions they
@@ -256,8 +256,8 @@ class ConaryClient:
         # caller to add them again, relative to the right things
         addList = []
         for item in troveSet.keys():
-            if not cs.hasNewPackage(*item): continue
-            cs.delNewPackage(*item)
+            if not cs.hasNewTrove(*item): continue
+            cs.delNewTrove(*item)
             addList.append(item)
 
         outdated, eraseList = self.db.outdatedTroves(addList)
@@ -267,8 +267,8 @@ class ConaryClient:
             csList.append((name, (oldVersion, oldFlavor),
                                  (newVersion, newFlavor), False))
             # don't let things be listed as old for two different reasons
-            if cs.hasOldPackage(name, oldVersion, oldFlavor):
-                cs.delOldPackage(name, oldVersion, oldFlavor)
+            if cs.hasOldTrove(name, oldVersion, oldFlavor):
+                cs.delOldTrove(name, oldVersion, oldFlavor)
 
         return csList
 
@@ -287,7 +287,7 @@ class ConaryClient:
         # find the troves which include other troves; they give useful
         # hints as to which ones should be excluded due to byDefault
         # flags
-        for troveCs in cs.iterNewPackageList():
+        for troveCs in cs.iterNewTroveList():
             for (name, changeList) in troveCs.iterChangedTroves():
                 for (changeType, version, flavor, byDef) in changeList:
                     if changeType == '+':
@@ -297,7 +297,7 @@ class ConaryClient:
                             inclusions.setdefault((name, version, flavor), 
                                                   False)
 
-        for troveCs in [ x for x in cs.iterNewPackageList() ]:
+        for troveCs in [ x for x in cs.iterNewTroveList() ]:
             item = (troveCs.getName(), troveCs.getNewVersion(),
                     troveCs.getNewFlavor())
             if item in primaries:
@@ -307,22 +307,22 @@ class ConaryClient:
                        troveCs.getOldFlavor())
             if self.db.hasTrove(*item):
                 # this trove is already installed. don't install it again
-                cs.delNewPackage(*item)
+                cs.delNewTrove(*item)
             elif not oldItem[1]:
                 # it's a new trove
                 if not inclusions.get(item, True):
                     # it was included by something else, but not by default
-                    cs.delNewPackage(*item)
+                    cs.delNewTrove(*item)
                 else:
                     # check the exclude list
                     skipped = False
                     for reStr, regExp in self.cfg.excludeTroves:
                         if regExp.match(item[0]):
-                            cs.delNewPackage(*item)
+                            cs.delNewTrove(*item)
                             skipped = True
                             break
 
-                    if not skipped and self.db.hasPackage(oldItem[0]) \
+                    if not skipped and self.db.hasTroveByName(oldItem[0]) \
                                    and not keepExisting \
                                    and not outdated.has_key(oldItem):
                         # we have a different version of the trove already
@@ -333,28 +333,28 @@ class ConaryClient:
 			versionList = self.db.getTroveVersionList(oldItem[0])
 			for version in versionList:
 			    if version.branch() == item[1].branch():
-				cs.delNewPackage(*item)
+				cs.delNewTrove(*item)
 				addList.append(item)
 				break
             elif not self.db.hasTrove(*oldItem):
                 # the old version isn't present, so we don't want this
                 # one either
-                cs.delNewPackage(*item)
+                cs.delNewTrove(*item)
 
         # remove troves from the old package list which aren't currently
         # installed. also remove ones which are supposed to have been
 	# installed by this change set
 	delList = []
-        for item in cs.getOldPackageList():
+        for item in cs.getOldTroveList():
             if not self.db.hasTrove(*item) or inclusions.has_key(item):
 		delList.append(item)
 
 	for item in delList:
-	    cs.delOldPackage(*item)
+	    cs.delOldTrove(*item)
 
         removeSet = dict.fromkeys(
             [ (x.getName(), x.getOldVersion(), x.getOldFlavor() )
-                            for x in cs.iterNewPackageList() ])
+                            for x in cs.iterNewTroveList() ])
 
         outdated, eraseList = self.db.outdatedTroves(addList)
         csList = []
@@ -366,8 +366,8 @@ class ConaryClient:
                                      (newVersion, newFlavor), False))
                 continue
 
-            if cs.hasOldPackage(name, oldVersion, oldFlavor):
-                cs.delOldPackage(name, oldVersion, oldFlavor)
+            if cs.hasOldTrove(name, oldVersion, oldFlavor):
+                cs.delOldTrove(name, oldVersion, oldFlavor)
 
             removeSet[(name, oldVersion, oldFlavor)] = True
             csList.append((name, (oldVersion, oldFlavor),
@@ -545,9 +545,9 @@ class ConaryClient:
         changedTroves = [ (x.getName(), 
                            (x.getOldVersion(), x.getOldFlavor()),
                            (x.getNewVersion(), x.getNewFlavor()), False)
-                               for x in theCs.iterNewPackageList() ]
+                               for x in theCs.iterNewTroveList() ]
         changedTroves += [ (x[0], (x[1], x[2]), (None, None), False) 
-                               for x in theCs.getOldPackageList() ]
+                               for x in theCs.getOldTroveList() ]
         changedTroves = dict.fromkeys(changedTroves)
 
         for (how, what) in theCs.contents:
@@ -557,15 +557,15 @@ class ConaryClient:
                 troves = [ (x.getName(), 
                                (x.getOldVersion(), x.getOldFlavor()),
                                (x.getNewVersion(), x.getNewFlavor()), False)
-                                    for x in newCs.iterNewPackageList() ]
+                                    for x in newCs.iterNewTroveList() ]
                 troves += [ (x[0], (x[1], x[2]), (None, None), False) 
-                                    for x in newCs.getOldPackageList() ]
+                                    for x in newCs.getOldTroveList() ]
 
                 for item in troves:
                     if changedTroves.has_key(item):
                         del changedTroves[item]
                     else:
-                        newCs.delNewPackage(item[0], item[2][0], item[2][1])
+                        newCs.delNewTrove(item[0], item[2][0], item[2][1])
                 cs.merge(newCs)
 
         newCs = self.repos.createChangeSet(changedTroves.keys(), 
@@ -725,7 +725,7 @@ class ConaryClient:
                     dupList.append((trove.getName(), 
                                     trove.getVersion().branch()))
                 else:
-                    cs.newPackage(troveCs)
+                    cs.newTrove(troveCs)
                     cs.addPrimaryTrove(name, version, flavor)
                     needsCommit = True
 
@@ -752,7 +752,7 @@ class ConaryClient:
             # Find out if troves were included w/ byDefault set (one
             # byDefault beats any number of not byDefault)
             inclusions = {}
-            for troveCs in cs.iterNewPackageList():
+            for troveCs in cs.iterNewTroveList():
                 for (name, changeList) in troveCs.iterChangedTroves():
                     for (changeType, version, flavor, byDef) in changeList:
                         if changeType == '+':
@@ -762,7 +762,7 @@ class ConaryClient:
                                 inclusions.setdefault((name, version, flavor), 
                                                       False)
 
-            for troveCs in [ x for x in cs.iterNewPackageList() ]:
+            for troveCs in [ x for x in cs.iterNewTroveList() ]:
                 if not troveCs.getNewVersion():
                     # erases get to stay since they don't have a byDefault flag
                     continue
@@ -780,11 +780,11 @@ class ConaryClient:
                 # don't look at this trove again; we already decided to
                 # erase it
                 inclusions[item] = True
-                cs.delNewPackage(*item)
+                cs.delNewTrove(*item)
             
         # now filter excludeList
         fullCsList = []
-        for troveCs in cs.iterNewPackageList():
+        for troveCs in cs.iterNewTroveList():
             name = troveCs.getName()
             newVersion = troveCs.getNewVersion()
             newFlavor = troveCs.getNewFlavor()
@@ -805,7 +805,7 @@ class ConaryClient:
                        not troveCs.getOldVersion()))
 
         # exclude packages that are being erased as well
-        for (name, oldVersion, oldFlavor) in cs.getOldPackageList():
+        for (name, oldVersion, oldFlavor) in cs.getOldTroveList():
             skip = False
             if (name, oldVersion, oldFlavor) not in primaryList:
                 for reStr, regExp in cfg.excludeTroves:

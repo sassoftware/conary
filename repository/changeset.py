@@ -38,8 +38,8 @@ from StringIO import StringIO
 ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff", "ptr")
 
 _STREAM_CS_PRIMARY  = 1
-_STREAM_CS_PKGS     = 2
-_STREAM_CS_OLD_PKGS = 3
+_STREAM_CS_TROVES     = 2
+_STREAM_CS_OLD_TROVES = 3
 _STREAM_CS_FILES    = 4
 
 _FILEINFO_OLDFILEID = 1
@@ -63,7 +63,7 @@ class FileInfo(streams.StreamSet):
             self.newFileId.set(newFileId)
             self.csInfo.set(csInfo)
 
-class RollbackRecordNewPackges(dict, streams.InfoStream):
+class RollbackRecordNewTroves(dict, streams.InfoStream):
 
     def freeze(self, skipSet = None):
 	l = []
@@ -105,8 +105,8 @@ class RollbackRecordNewPackges(dict, streams.InfoStream):
 class RollbackRecord(streams.LargeStreamSet):
 
     streamDict = { 
-        _STREAM_CS_PKGS:    (RollbackRecordNewPackges,    "newPackages"      ),
-        _STREAM_CS_OLD_PKGS:(streams.ReferencedTroveList, "oldPackages"      ),
+        _STREAM_CS_TROVES:    (RollbackRecordNewTroves,    "newTroves"      ),
+        _STREAM_CS_OLD_TROVES:(streams.ReferencedTroveList, "oldTroves"      ),
     }
 
     """
@@ -127,20 +127,20 @@ class RollbackRecord(streams.LargeStreamSet):
 
         if changeSet:
             streams.LargeStreamSet.__init__(self)
-            for pkgCs in changeSet.iterNewPackageList():
-                newInfo = (pkgCs.getName(), pkgCs.getNewVersion(),
-                           pkgCs.getNewFlavor())
+            for troveCs in changeSet.iterNewTroveList():
+                newInfo = (troveCs.getName(), troveCs.getNewVersion(),
+                           troveCs.getNewFlavor())
 
-                if pkgCs.getOldVersion():
-                    oldInfo = (pkgCs.getName(), pkgCs.getOldVersion(),
-                               pkgCs.getOldFlavor())
+                if troveCs.getOldVersion():
+                    oldInfo = (troveCs.getName(), troveCs.getOldVersion(),
+                               troveCs.getOldFlavor())
 
-                    self.newPackages[oldInfo] = newInfo
+                    self.newTroves[oldInfo] = newInfo
                 else:
-                    self.oldPackages.append(newInfo)
+                    self.oldTroves.append(newInfo)
 
-            for (name, version, flavor) in changeSet.getOldPackageList():
-                self.newPackages[(name, version, flavor)] = (None, None, None)
+            for (name, version, flavor) in changeSet.getOldTroveList():
+                self.newTroves[(name, version, flavor)] = (None, None, None)
         else:
             f = open(fileName, "r")
             magic = f.read(len(self.ROLLBACK_RECORD_MAGIC))
@@ -150,12 +150,12 @@ class RollbackRecord(streams.LargeStreamSet):
             data = f.read()
             streams.LargeStreamSet.__init__(self, data)
 
-class ChangeSetNewPackageList(dict, streams.InfoStream):
+class ChangeSetNewTroveList(dict, streams.InfoStream):
 
     def freeze(self, skipSet = None):
 	l = []
-	for pkg in self.itervalues():
-	    s = pkg.freeze()
+	for trv in self.itervalues():
+	    s = trv.freeze()
 	    l.append(struct.pack("!I", len(s)))
 	    l.append(s)
 	
@@ -212,10 +212,10 @@ class ChangeSetFileDict(dict, streams.InfoStream):
 class ChangeSet(streams.LargeStreamSet):
 
     streamDict = { 
-        _STREAM_CS_PRIMARY :(streams.ReferencedTroveList, "primaryTroveList" ),
-        _STREAM_CS_PKGS    :(ChangeSetNewPackageList,     "newPackages"      ),
-        _STREAM_CS_OLD_PKGS:(streams.ReferencedTroveList, "oldPackages"      ),
-        _STREAM_CS_FILES   :(ChangeSetFileDict,		  "files"            ),
+     _STREAM_CS_PRIMARY   :(streams.ReferencedTroveList, "primaryTroveList"),
+     _STREAM_CS_TROVES    :(ChangeSetNewTroveList,       "newTroves"       ),
+     _STREAM_CS_OLD_TROVES:(streams.ReferencedTroveList, "oldTroves"       ),
+     _STREAM_CS_FILES     :(ChangeSetFileDict,		 "files"           ),
     }
 
     ignoreUnknown = True
@@ -237,46 +237,63 @@ class ChangeSet(streams.LargeStreamSet):
     def getPrimaryTroveList(self):
 	return self.primaryTroveList
 
-    def newPackage(self, csPkg):
-	old = csPkg.getOldVersion()
-	new = csPkg.getNewVersion()
+    def getPrimaryPackageList(self):
+        import warnings
+        warnings.warn("getPrimaryPackage is deprecated, use "
+                      "getPrimaryTroveList", DeprecationWarning)
+        return self.primaryTroveList
+
+    def newTrove(self, csTrove):
+	old = csTrove.getOldVersion()
+	new = csTrove.getNewVersion()
 	assert(not old or min(old.timeStamps()) > 0)
 	assert(min(new.timeStamps()) > 0)
 
-	self.newPackages[(csPkg.getName(), csPkg.getNewVersion(),
-		          csPkg.getNewFlavor())] = csPkg
+	self.newTroves[(csTrove.getName(), new,
+                        csTrove.getNewFlavor())] = csTrove
 
-	if csPkg.isAbsolute():
+	if csTrove.isAbsolute():
 	    self.absolute = True
 	if (old and old.onLocalLabel()) or new.onLocalLabel():
 	    self.local = 1
 
-    def delNewPackage(self, name, version, flavor):
-	del self.newPackages[(name, version, flavor)]
+    def newPackage(self, csTrove):
+        import warnings
+        warnings.warn("newPackage is deprecated, use newTrove",
+                      DeprecationWarning)
+        return self.newTrove(csTrove)
+
+    def delNewTrove(self, name, version, flavor):
+	del self.newTroves[(name, version, flavor)]
         if (name, version, flavor) in self.primaryTroveList:
             self.primaryTroveList.remove((name, version, flavor))
 
-    def oldPackage(self, name, version, flavor):
+    def oldTrove(self, name, version, flavor):
 	assert(min(version.timeStamps()) > 0)
-	self.oldPackages.append((name, version, flavor))
+	self.oldTroves.append((name, version, flavor))
 
-    def hasOldPackage(self, name, version, flavor):
-        return (name, version, flavor) in self.oldPackages
+    def hasOldTrove(self, name, version, flavor):
+        return (name, version, flavor) in self.oldTroves
 
-    def delOldPackage(self, name, version, flavor):
-        self.oldPackages.remove((name, version, flavor))
+    def delOldTrove(self, name, version, flavor):
+        self.oldTroves.remove((name, version, flavor))
+
+    def iterNewTroveList(self):
+	return self.newTroves.itervalues()
 
     def iterNewPackageList(self):
-	return self.newPackages.itervalues()
+        import warnings
+        warnings.warn("iterNewPackageList is deprecated", DeprecationWarning)
+        return self.newTroves.itervalues()
 
-    def getNewPackageVersion(self, name, version, flavor):
-	return self.newPackages[(name, version, flavor)]
+    def getNewTroveVersion(self, name, version, flavor):
+	return self.newTroves[(name, version, flavor)]
 
-    def hasNewPackage(self, name, version, flavor):
-	return self.newPackages.has_key((name, version, flavor))
+    def hasNewTrove(self, name, version, flavor):
+	return self.newTroves.has_key((name, version, flavor))
 
-    def getOldPackageList(self):
-	return self.oldPackages
+    def getOldTroveList(self):
+	return self.oldTroves
 
     def configFileIsDiff(self, pathId):
         (tag, cont) = self.configCache.get(pathId, (None, None, None))
@@ -307,20 +324,19 @@ class ChangeSet(streams.LargeStreamSet):
         self.files[(oldFileId, newFileId)] = csInfo
 
     def formatToFile(self, cfg, f):
-	f.write("primary packages:\n")
-	for (pkgName, version, flavor) in self.primaryTroveList:
+	f.write("primary troves:\n")
+	for (troveName, version, flavor) in self.primaryTroveList:
 	    if flavor:
-		f.write("\t%s %s %s\n" % (pkgName, version.asString(), 
+		f.write("\t%s %s %s\n" % (troveName, version.asString(), 
 					  flavor.freeze()))
 	    else:
-		f.write("\t%s %s\n" % (pkgName, version.asString()))
+		f.write("\t%s %s\n" % (troveName, version.asString()))
 	f.write("\n")
 
-	for pkg in self.newPackages.itervalues():
-	    pkg.formatToFile(self, f)
-	for (pkgName, version, flavor) in self.oldPackages:
-	    f.write("remove %s %s\n" %
-		    (pkgName, version.asString()))
+	for trv in self.newTroves.itervalues():
+	    trv.formatToFile(self, f)
+	for (troveName, version, flavor) in self.oldTroves:
+	    f.write("remove %s %s\n" % (troveName, version.asString()))
 
     def getFileChange(self, oldFileId, newFileId):
 	return self.files.get((oldFileId, newFileId), None)
@@ -380,51 +396,54 @@ class ChangeSet(streams.LargeStreamSet):
 
 	rollback = ChangeSetFromRepository(db)
 
-	for pkgCs in self.iterNewPackageList():
-	    if not pkgCs.getOldVersion():
-		# this was a new package, and the inverse of a new
-		# package is an old package
-		rollback.oldPackage(pkgCs.getName(), pkgCs.getNewVersion(), 
-				    pkgCs.getNewFlavor())
+	for troveCs in self.iterNewTroveList():
+	    if not troveCs.getOldVersion():
+		# this was a new trove, and the inverse of a new
+		# trove is an old trove
+		rollback.oldTrove(troveCs.getName(), troveCs.getNewVersion(), 
+				    troveCs.getNewFlavor())
 		continue
 
-	    pkg = db.getTrove(pkgCs.getName(), pkgCs.getOldVersion(),
-			      pkgCs.getOldFlavor())
+	    trv = db.getTrove(troveCs.getName(), troveCs.getOldVersion(),
+                                troveCs.getOldFlavor())
 
-            newTroveInfo = trove.TroveInfo(pkg.getTroveInfo().freeze())
-            newTroveInfo.twm(pkgCs.getTroveInfoDiff(), newTroveInfo)
-            newTroveInfoDiff = pkg.getTroveInfo().diff(newTroveInfo)
+            newTroveInfo = trove.TroveInfo(trv.getTroveInfo().freeze())
+            newTroveInfo.twm(troveCs.getTroveInfoDiff(), newTroveInfo)
+            newTroveInfoDiff = trv.getTroveInfo().diff(newTroveInfo)
 
-	    # this is a modified package and needs to be inverted
+	    # this is a modified trove and needs to be inverted
 
-	    invertedPkg = trove.TroveChangeSet(pkgCs.getName(), 
-			       pkg.getChangeLog(),
-			       pkgCs.getNewVersion(), pkgCs.getOldVersion(),
-			       pkgCs.getNewFlavor(), pkgCs.getOldFlavor(),
-                               pkgCs.getNewSigs(), pkgCs.getOldSigs(),
-                               troveInfoDiff = newTroveInfoDiff)
+	    invertedTrove = trove.TroveChangeSet(troveCs.getName(), 
+                                                 trv.getChangeLog(),
+                                                 troveCs.getNewVersion(),
+                                                 troveCs.getOldVersion(),
+                                                 troveCs.getNewFlavor(),
+                                                 troveCs.getOldFlavor(),
+                                                 troveCs.getNewSigs(),
+                                                 troveCs.getOldSigs(),
+                                                 troveInfoDiff = newTroveInfoDiff)
 
-            invertedPkg.setRequires(pkg.getRequires())
-            invertedPkg.setProvides(pkg.getProvides())
+            invertedTrove.setRequires(trv.getRequires())
+            invertedTrove.setProvides(trv.getProvides())
 
-	    for (name, list) in pkgCs.iterChangedTroves():
+	    for (name, list) in troveCs.iterChangedTroves():
 		for (oper, version, flavor, byDef) in list:
 		    if oper == '+':
-			invertedPkg.oldTroveVersion(name, version, flavor)
+			invertedTrove.oldTroveVersion(name, version, flavor)
 		    elif oper == "-":
-			invertedPkg.newTroveVersion(name, version, flavor, True)
+			invertedTrove.newTroveVersion(name, version, flavor, True)
 
-	    for (pathId, path, fileId, version) in pkgCs.getNewFileList():
-		invertedPkg.oldFile(pathId)
+	    for (pathId, path, fileId, version) in troveCs.getNewFileList():
+		invertedTrove.oldFile(pathId)
 
-	    for pathId in pkgCs.getOldFileList():
-                if not pkg.hasFile(pathId):
+	    for pathId in troveCs.getOldFileList():
+                if not trv.hasFile(pathId):
                     # this file was removed using 'conary remove /path'
                     # so it does not go in the rollback
                     continue
                 
-		(path, fileId, version) = pkg.getFile(pathId)
-		invertedPkg.newFile(pathId, path, fileId, version)
+		(path, fileId, version) = trv.getFile(pathId)
+		invertedTrove.newFile(pathId, path, fileId, version)
 
 		origFile = db.getFileVersion(pathId, fileId, version)
 		rollback.addFile(None, fileId, origFile.freeze())
@@ -465,17 +484,17 @@ class ChangeSet(streams.LargeStreamSet):
 		    rollback.addFileContents(pathId, ChangedFileTypes.file, 
 					     cont, 0)
 
-	    for (pathId, newPath, newFileId, newVersion) in pkgCs.getChangedFileList():
-		if not pkg.hasFile(pathId):
+	    for (pathId, newPath, newFileId, newVersion) in troveCs.getChangedFileList():
+		if not trv.hasFile(pathId):
 		    # the file has been removed from the local system; we
 		    # don't need to restore it on a rollback
 		    continue
-		(curPath, curFileId, curVersion) = pkg.getFile(pathId)
+		(curPath, curFileId, curVersion) = trv.getFile(pathId)
 
 		if newPath:
-		    invertedPkg.changedFile(pathId, curPath, curFileId, curVersion)
+		    invertedTrove.changedFile(pathId, curPath, curFileId, curVersion)
 		else:
-		    invertedPkg.changedFile(pathId, None, curFileId, curVersion)
+		    invertedTrove.changedFile(pathId, None, curFileId, curVersion)
 
                 try:
                     csInfo = self.files[(curFileId, newFileId)]
@@ -546,17 +565,17 @@ class ChangeSet(streams.LargeStreamSet):
 					     origFile.flags.isConfig() or
 					     newFile.flags.isConfig())
 
-	    rollback.newPackage(invertedPkg)
+	    rollback.newTrove(invertedTrove)
 
-	for (name, version, flavor) in self.getOldPackageList():
-	    pkg = db.getTrove(name, version, flavor)
-	    pkgDiff = pkg.diff(None)[0]
-	    rollback.newPackage(pkgDiff)
+	for (name, version, flavor) in self.getOldTroveList():
+	    trv = db.getTrove(name, version, flavor)
+	    troveDiff = trv.diff(None)[0]
+	    rollback.newTrove(troveDiff)
 
             # everything in the rollback is considered primary
             rollback.addPrimaryTrove(name, version, flavor)
 
-	    for (pathId, path, fileId, fileVersion) in pkg.iterFileList():
+	    for (pathId, path, fileId, fileVersion) in trv.iterFileList():
 		fileObj = db.getFileVersion(pathId, fileId, fileVersion)
 		rollback.addFile(None, fileId, fileObj.freeze())
 		if fileObj.hasContents:
@@ -586,7 +605,7 @@ class ChangeSet(streams.LargeStreamSet):
 
     def setTargetBranch(self, repos, targetBranchLabel):
 	"""
-	Retargets this changeset to create packages and files on
+	Retargets this changeset to create troves and files on
 	branch targetLabel off of the parent of the source node. Version
         calculations aren't quite right for source troves 
         (s/incrementBuildCount).
@@ -601,13 +620,13 @@ class ChangeSet(streams.LargeStreamSet):
         assert(self.isLocal())
         assert(not self.isAbsolute())
 
-	packageVersions = {}
+	troveVersions = {}
 
-	for pkgCs in self.iterNewPackageList():
-	    name = pkgCs.getName()
-            origVer = pkgCs.getNewVersion()
+	for troveCs in self.iterNewTroveList():
+	    name = troveCs.getName()
+            origVer = troveCs.getNewVersion()
 
-	    oldVer = pkgCs.getOldVersion()
+	    oldVer = troveCs.getOldVersion()
 	    newBr = oldVer.createBranch(targetBranchLabel, withVerRel = 0)
 	    newVer = newBr.createVersion(oldVer.trailingRevision())
             del newBr
@@ -615,7 +634,7 @@ class ChangeSet(streams.LargeStreamSet):
 	    # try and reuse the version number we created; if
 	    # it's already in use we won't be able to though
 	    try:
-		repos.getTrove(name, newVer, pkgCs.getNewFlavor())
+		repos.getTrove(name, newVer, troveCs.getNewFlavor())
 	    except repository.TroveMissing: 
 		pass
 	    else:
@@ -623,37 +642,37 @@ class ChangeSet(streams.LargeStreamSet):
 		newVer = repos.getTroveLatestVersion(name, branch)
                 newVer.incrementBuildCount()
 
-	    pkgCs.changeNewVersion(newVer)
-            assert(not packageVersions.has_key(name))
-	    packageVersions[(name, pkgCs.getNewFlavor())] = \
+	    troveCs.changeNewVersion(newVer)
+            assert(not troveVersions.has_key(name))
+	    troveVersions[(name, troveCs.getNewFlavor())] = \
                                 [ (origVer, newVer) ]
 
             for (listMethod, addMethod, resetMethod) in [
-                    (pkgCs.getChangedFileList, pkgCs.changedFile,
-                     pkgCs.resetChangedFileList),
-                    (pkgCs.getNewFileList, pkgCs.newFile,
-                     pkgCs.resetNewFileList) ]:
+                    (troveCs.getChangedFileList, troveCs.changedFile,
+                     troveCs.resetChangedFileList),
+                    (troveCs.getNewFileList, troveCs.newFile,
+                     troveCs.resetNewFileList) ]:
                 fileList = [ x for x in listMethod() ]
                 resetMethod()
                 for (pathId, path, fileId, fileVersion) in fileList:
                     if fileVersion != "-" and fileVersion.onLocalLabel():
                         addMethod(pathId, path, fileId, newVer)
 
-	for pkgCs in self.iterNewPackageList():
-	    # the implementation of updateChangedPackage makes this whole thing
-	    # O(n^2) (n is the number of packages changed in pkgCs), which is
+	for troveCs in self.iterNewTroveList():
+	    # the implementation of updateChangedTrove makes this whole thing
+	    # O(n^2) (n is the number of troves changed in troveCs), which is
 	    # just silly. if large groups are added like this the effect could
 	    # become noticeable
-	    for (name, list) in pkgCs.iterChangedTroves():
+	    for (name, list) in troveCs.iterChangedTroves():
                 for (change, version, flavor, absolute) in list:
 		    if change != '+': continue
 
-                    if not packageVersions.has_key((name, flavor)): continue
+                    if not troveVersions.has_key((name, flavor)): continue
 
-		    for (oldVer, newVer) in packageVersions[(name, flavor)]:
+		    for (oldVer, newVer) in troveVersions[(name, flavor)]:
 			if oldVer == version:
-			    pkgCs.updateChangedPackage(name, flavor, oldVer, 
-                                                       newVer)
+			    troveCs.updateChangedTrove(name, flavor, oldVer, 
+                                                     newVer)
 
 	# this has to be true, I think...
 	self.local = 0
@@ -667,12 +686,12 @@ class ChangeSet(streams.LargeStreamSet):
 
 class ChangeSetFromRepository(ChangeSet):
 
-    def newPackage(self, pkg):
-	# add the time stamps to the package version numbers
-	if pkg.getOldVersion():
-	    assert(min(pkg.getOldVersion().timeStamps()) > 0)
-	assert(min(pkg.getNewVersion().timeStamps()) > 0)
-	ChangeSet.newPackage(self, pkg)
+    def newTrove(self, trv):
+	# add the time stamps to the trove version numbers
+	if trv.getOldVersion():
+	    assert(min(trv.getOldVersion().timeStamps()) > 0)
+	assert(min(trv.getNewVersion().timeStamps()) > 0)
+	ChangeSet.newTrove(self, trv)
 
     def __init__(self, repos):
 	self.repos = repos
@@ -781,13 +800,13 @@ class ReadOnlyChangeSet(ChangeSet):
         neededFiles = []
 
         oldTroveList = [ (x.getName(), x.getOldVersion(),
-                          x.getOldFlavor()) for x in self.newPackages.values() ]
+                          x.getOldFlavor()) for x in self.newTroves.values() ]
         oldTroves = repos.getTroves(oldTroveList)
 
 	# for each file find the old fileId for it so we can assemble the
 	# proper stream and contents
 	for trv, troveCs in itertools.izip(oldTroves,
-                                           self.newPackages.itervalues()):
+                                           self.newTroves.itervalues()):
 	    troveName = troveCs.getName()
 	    newVersion = troveCs.getNewVersion()
 	    newFlavor = troveCs.getNewFlavor()
@@ -806,7 +825,7 @@ class ReadOnlyChangeSet(ChangeSet):
 		
 	    trv.applyChangeSet(troveCs, skipIntegrityChecks = True)
 	    newCs = trv.diff(None, absolute = True)[0]
-	    absCs.newPackage(newCs)
+	    absCs.newTrove(newCs)
 
 	fileList = [ (x[0], x[1], x[3]) for x in neededFiles ]
 	fileObjs = repos.getFileVersions(fileList)
@@ -876,18 +895,18 @@ class ReadOnlyChangeSet(ChangeSet):
 	#assert(not eraseFiles)
 
 	newFiles = []
-	newPackages = []
+	newTroves = []
 
-	for (key, troveCs) in self.newPackages.items():
+	for (key, troveCs) in self.newTroves.items():
 	    troveName = troveCs.getName()
 	    newVersion = troveCs.getNewVersion()
 	    newFlavor = troveCs.getNewFlavor()
 	    assert(not troveCs.getOldVersion())
 
 	    if troveMap is not None and not troveMap.has_key(key):
-		log.warning("package %s %s is already installed -- skipping",
+		log.warning("trove %s %s is already installed -- skipping",
 			    troveName, newVersion.asString())
-                del self.newPackages[key]
+                del self.newTroves[key]
                 if key in self.primaryTroveList:
                     self.primaryTroveList.remove(key)
 		continue
@@ -899,22 +918,23 @@ class ReadOnlyChangeSet(ChangeSet):
                 (oldVersion, oldFlavor) = troveMap[key]
 
 	    if not oldVersion:
-		# new package; the Package.diff() right after this never
+		# new trove; the Trove.diff() right after this never
 		# sets the absolute flag, so the right thing happens
 		old = None
 	    else:
 		old = db.getTrove(troveName, oldVersion, oldFlavor,
 					     pristine = True)
-	    newPkg = trove.Trove(troveName, None, deps.DependencySet(), None)
-	    newPkg.applyChangeSet(troveCs)
+	    newTrove = trove.Trove(troveName, None, deps.DependencySet(), None)
+	    newTrove.applyChangeSet(troveCs)
 
-	    # we ignore pkgsNeeded; it doesn't mean much in this case
-	    (pkgChgSet, filesNeeded, pkgsNeeded) = newPkg.diff(old, 
-                                                               absolute = 0)
-	    newPackages.append(pkgChgSet)
+	    # we ignore trovesNeeded; it doesn't mean much in this case
+	    (troveChgSet, filesNeeded, trovesNeeded) = \
+                          newTrove.diff(old, absolute = 0)
+	    newTroves.append(troveChgSet)
             filesNeeded.sort()
 
-	    for (pathId, oldFileId, oldVersion, newFileId, newVersion) in filesNeeded:
+	    for x in filesNeeded:
+                (pathId, oldFileId, oldVersion, newFileId, newVersion) = x
                 filecs = self.getFileChange(None, newFileId)
 		fileObj = files.ThawFile(filecs, pathId)
 		
@@ -927,8 +947,8 @@ class ReadOnlyChangeSet(ChangeSet):
 
 		newFiles.append((oldFileId, newFileId, filecs))
 
-		if hash and oldVersion and \
-                        oldFile.flags.isConfig() and fileObj.flags.isConfig():
+		if (hash and oldVersion and oldFile.flags.isConfig()
+                    and fileObj.flags.isConfig()):
 		    contType = ChangedFileTypes.file
 		    cont = filecontents.FromChangeSet(self, pathId)
 		    if oldVersion:
@@ -936,16 +956,15 @@ class ReadOnlyChangeSet(ChangeSet):
                                                             fileObj, cont)
 
                     if contType == ChangedFileTypes.diff:
-                        self.configCache[pathId] = (contType, cont.get().read(),
-                                                    False)
+                        self.configCache[pathId] = (contType,
+                                                    cont.get().read(), False)
 
 	self.files = {}
 	for tup in newFiles:
 	    self.addFile(*tup)
 
-	self.packages = []
-	for pkgCs in newPackages:
-	    self.newPackage(pkgCs)
+	for troveCs in newTroves:
+	    self.newTrove(troveCs)
 
         self.absolute = False
 
@@ -971,14 +990,14 @@ class ReadOnlyChangeSet(ChangeSet):
     def merge(self, otherCs):
         self.files.update(otherCs.files)
         self.primaryTroveList += otherCs.primaryTroveList
-        self.newPackages.update(otherCs.newPackages)
-        # keep the old package lists unique on merge.  we erase all the
-        # entries and extend the existing oldPackages object because it
+        self.newTroves.update(otherCs.newTroves)
+        # keep the old trove lists unique on merge.  we erase all the
+        # entries and extend the existing oldTroves object because it
         # is a streams.ReferencedTroveList, not a regular list
-        if otherCs.oldPackages:
-            l = dict.fromkeys(self.oldPackages + otherCs.oldPackages).keys()
-            del self.oldPackages[:]
-            self.oldPackages.extend(l)
+        if otherCs.oldTroves:
+            l = dict.fromkeys(self.oldTroves + otherCs.oldTroves).keys()
+            del self.oldTroves[:]
+            self.oldTroves.extend(l)
 
         if isinstance(otherCs, ReadOnlyChangeSet):
             assert(not self.lastCsf)
@@ -1038,7 +1057,7 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 	self.absolute = True
 	empty = True
 
-	for trvCs in self.newPackages.itervalues():
+	for trvCs in self.newTroves.itervalues():
 	    if not trvCs.isAbsolute():
 		self.absolute = False
 	    empty = False
@@ -1129,14 +1148,14 @@ def fileContentsDiff(oldFile, oldCont, newFile, newCont):
 
 # this creates an absolute changeset
 #
-# expects a list of (pkg, fileMap) tuples
+# expects a list of (trove, fileMap) tuples
 #
-def CreateFromFilesystem(pkgList):
+def CreateFromFilesystem(troveList):
     cs = ChangeSet()
 
-    for (pkg, fileMap) in pkgList:
-	(pkgChgSet, filesNeeded, pkgsNeeded) = pkg.diff(None, absolute = 1)
-	cs.newPackage(pkgChgSet)
+    for (trv, fileMap) in troveList:
+	(troveChgSet, filesNeeded, trovesNeeded) = trv.diff(None, absolute = 1)
+	cs.newTrove(troveChgSet)
 
 	for (pathId, oldFileId, oldVersion, newFileId, newVersion) in filesNeeded:
 	    (file, realPath, filePath) = fileMap[pathId]

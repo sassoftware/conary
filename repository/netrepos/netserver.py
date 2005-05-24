@@ -906,11 +906,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	# walk through all of the branches this change set commits to
 	# and make sure the user has enough permissions for the operation
 	items = {}
-	for pkgCs in cs.iterNewPackageList():
-	    items[(pkgCs.getName(), pkgCs.getNewVersion())] = True
+	for troveCs in cs.iterNewTroveList():
+	    items[(troveCs.getName(), troveCs.getNewVersion())] = True
 	    if not self.auth.check(authToken, write = True, 
-			       label = pkgCs.getNewVersion().branch().label(),
-			       trove = pkgCs.getName()):
+		       label = troveCs.getNewVersion().branch().label(),
+		       trove = troveCs.getName()):
 		raise InsufficientPermission
 
 	self.repos.commitChangeSet(cs, self.name)
@@ -918,11 +918,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.commitAction:
 	    return True
 
-	for pkgCs in cs.iterNewPackageList():
+	for troveCs in cs.iterNewTroveList():
 	    d = { 'reppath' : self.urlBase(),
-	    	  'trove' : pkgCs.getName(),
-                  'flavor' : deps.formatFlavor(pkgCs.getNewFlavor()),
-		  'version' : pkgCs.getNewVersion().asString() }
+	    	  'trove' : troveCs.getName(),
+                  'flavor' : deps.formatFlavor(troveCs.getNewFlavor()),
+		  'version' : troveCs.getNewVersion().asString() }
 	    cmd = self.commitAction % d
 	    os.system(cmd)
 

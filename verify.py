@@ -67,33 +67,34 @@ def verify(troveNameList, db, cfg, all=False):
                 log.error("trove %s is not installed", troveName)
 
 def verifyTrove(trove, db, cfg):
-    list = []
-    for pkg in db.walkTroveSet(trove):
-        ver = pkg.getVersion()
-        origPkg = db.getTrove(pkg.getName(), ver, pkg.getFlavor(), 
+    l = []
+    for trove in db.walkTroveSet(trove):
+        ver = trove.getVersion()
+        origTrove = db.getTrove(trove.getName(), ver, trove.getFlavor(), 
                               pristine = True)
         ver = ver.createBranch(versions.LocalLabel(), withVerRel = 1)
-        list.append((pkg, origPkg, ver, 0))
+        l.append((trove, origTrove, ver, 0))
 	    
     try:
-        result = update.buildLocalChanges(db, list, root = cfg.root, 
-                                      withFileContents=False, forceSha1=True,
-                                      ignoreTransient=True)
+        result = update.buildLocalChanges(db, l, root = cfg.root, 
+                                          withFileContents=False,
+                                          forceSha1=True,
+                                          ignoreTransient=True)
         if not result: return
         cs = result[0]
 
         cs.addPrimaryTrove(trove.getName(), 
-                trove.getVersion().createBranch(
-                    versions.LocalLabel(), withVerRel = 1),
-                trove.getFlavor())
+                           trove.getVersion().createBranch(versions.LocalLabel(),
+                                    withVerRel = 1),
+                           trove.getFlavor())
 
-        for (changed, fsPkg) in result[1]:
+        for (changed, fsTrove) in result[1]:
             if changed:
                 break
         if not changed:
             return
         showchangeset.displayChangeSet(db, None, cs, [], cfg, ls=True, 
-                                                              showChanges=True)
+                                       showChanges=True)
     except OSError, err:
         if err.errno == 13:
             log.warning("Permission denied creating local changeset for"

@@ -73,16 +73,16 @@ class SqlDbRepository(datastore.DataStoreRepository,
     def getAllTroveFlavors(self, troveDict):
         return self.db.getAllTroveFlavors(troveDict)
 
-    def pkgVersionFlavors(self, pkgName, version):
-	l = [ x.getFlavor() for x in self.db.iterFindByName(pkgName)
+    def troveVersionFlavors(self, troveName, version):
+	l = [ x.getFlavor() for x in self.db.iterFindByName(troveName)
 		     if version == x.getVersion() ]
 
 	return l
 
-    def hasPackage(self, name):
+    def hasTroveByName(self, name):
 	return self.db.hasByName(name)
 
-    def hasTrove(self, pkgName, version, flavor):
+    def hasTrove(self, troveName, version, flavor):
         cu = self.db.db.cursor()
 
         if flavor:
@@ -100,7 +100,7 @@ class SqlDbRepository(datastore.DataStoreRepository,
                             DBInstances.isPresent != 0 AND
                             Versions.version == ? AND
                             DBFlavors.flavor %s
-                   """ % flavorTest, pkgName, version.asString())
+                   """ % flavorTest, troveName, version.asString())
 
         result = cu.next()[0] != 0
 
@@ -164,8 +164,8 @@ class SqlDbRepository(datastore.DataStoreRepository,
     def addFileVersion(self, troveId, pathId, fileObj, path, fileId, version):
 	self.db.addFile(troveId, pathId, fileObj, path, fileId, version)
 
-    def addTrove(self, pkg):
-	return self.db.addTrove(pkg)
+    def addTrove(self, trove):
+	return self.db.addTrove(trove)
 
     def addTroveDone(self, troveInfo):
 	pass
@@ -190,8 +190,8 @@ class SqlDbRepository(datastore.DataStoreRepository,
     def close(self):
 	self.db.close()
 
-    def eraseTrove(self, pkgName, version, flavor):
-	self.db.eraseTrove(pkgName, version, flavor)
+    def eraseTrove(self, troveName, version, flavor):
+	self.db.eraseTrove(troveName, version, flavor)
 
     def pathIsOwned(self, path):
 	return self.db.pathIsOwned(path)
@@ -218,7 +218,7 @@ class SqlDbRepository(datastore.DataStoreRepository,
 class Database(SqlDbRepository):
 
     # XXX some of these interfaces are horribly inefficient as we have
-    # to instantiate a full package object to do anything... 
+    # to instantiate a full trove object to do anything... 
     # FilesystemRepository has the same problem
 
     def iterFilesInTrove(self, troveName, version, flavor,
@@ -300,44 +300,45 @@ class Database(SqlDbRepository):
         if isRollback:
             flags |= update.MISSINGFILESOKAY
 
-	for pkg in cs.iterNewPackageList():
-	    if pkg.getName().endswith(":source"): raise SourcePackageInstall
+	for trove in cs.iterNewTroveList():
+	    if trove.getName().endswith(":source"):
+                raise SourceComponentInstall
 
 	tagSet = tags.loadTagDict(self.root + "/etc/conary/tags")
 
 	# create the change set from A->A.local
-	pkgList = []
-	for newPkg in cs.iterNewPackageList():
-	    name = newPkg.getName()
-	    old = newPkg.getOldVersion()
-	    flavor = newPkg.getOldFlavor()
-	    if self.hasPackage(name) and old:
+	troveList = []
+	for newTrove in cs.iterNewTroveList():
+	    name = newTrove.getName()
+	    old = newTrove.getOldVersion()
+	    flavor = newTrove.getOldFlavor()
+	    if self.hasTroveByName(name) and old:
 		ver = old.createBranch(versions.LocalLabel(), withVerRel = 1)
-		pkg = self.getTrove(name, old, flavor)
-		origPkg = self.getTrove(name, old, flavor, pristine = 1)
-		assert(pkg)
-		pkgList.append((pkg, origPkg, ver, 
-                                flags & update.MISSINGFILESOKAY))
+		trove = self.getTrove(name, old, flavor)
+		origTrove = self.getTrove(name, old, flavor, pristine = 1)
+		assert(trove)
+		troveList.append((trove, origTrove, ver, 
+                                  flags & update.MISSINGFILESOKAY))
 
 	if not keepExisting:
-	    for (name, version, flavor) in cs.getOldPackageList():
+	    for (name, version, flavor) in cs.getOldTroveList():
 		localVersion = version.createBranch(versions.LocalLabel(), 
 					            withVerRel = 1)
-		pkg = self.getTrove(name, version, flavor)
-		origPkg = self.getTrove(name, version, flavor, pristine = 1)
-		assert(pkg)
-		pkgList.append((pkg, origPkg, localVersion, 
-				update.MISSINGFILESOKAY))
+	        trove = self.getTrove(name, version, flavor)
+		origTrove = self.getTrove(name, version, flavor, pristine = 1)
+		assert(trove)
+		troveList.append((trove, origTrove, localVersion, 
+                                  update.MISSINGFILESOKAY))
 
         callback.creatingRollback()
 
-	result = update.buildLocalChanges(self, pkgList, root = self.root)
+	result = update.buildLocalChanges(self, troveList, root = self.root)
 	if not result: return
 
 	(localChanges, retList) = result
-	fsPkgDict = {}
-	for (changed, fsPkg) in retList:
-	    fsPkgDict[(fsPkg.getName(), fsPkg.getVersion())] = fsPkg
+	fsTroveDict = {}
+	for (changed, fsTrove) in retList:
+	    fsTroveDict[(fsTrove.getName(), fsTrove.getVersion())] = fsTrove
 
 	if not isRollback:
             if localRollbacks:
@@ -348,7 +349,7 @@ class Database(SqlDbRepository):
 	if keepExisting:
 	    flags |= update.KEEPEXISTING
 
-	fsJob = update.FilesystemJob(self, cs, fsPkgDict, self.root, 
+	fsJob = update.FilesystemJob(self, cs, fsTroveDict, self.root, 
 				     flags = flags, callback = callback)
 
 	# look through the directories which have had files removed and
@@ -426,7 +427,7 @@ class Database(SqlDbRepository):
             self.db.removeFilesFromTrove(troveName, troveVersion, 
                                          troveFlavor, pathIdList)
 
-	for (name, version, flavor) in fsJob.getOldPackageList():
+	for (name, version, flavor) in fsJob.getOldTroveList():
 	    if toStash:
 		# if to stash if false, we're restoring the local
 		# branch of a rollback
@@ -559,9 +560,9 @@ class Database(SqlDbRepository):
             if isinstance(reposCs, changeset.RollbackRecord):
                 jobList = [ (x[0][0], (x[1][1], x[1][2]),
                                       (x[0][1], x[0][2]), False)
-                                for x in reposCs.newPackages.iteritems() ]
+                                for x in reposCs.newTroves.iteritems() ]
                 jobList += [ (x[0], (x[1], x[2]), (None, None), False)
-                                for x in reposCs.oldPackages ]
+                                for x in reposCs.oldTroves ]
                 reposCs = repos.createChangeSet(jobList, recurse = False)
 
             try:
@@ -663,17 +664,17 @@ class Database(SqlDbRepository):
             raise repository.TroveNotFound, \
                     "version %s of %s was not on found" % (versionStr, 
                                                            troveName)
-        pkgList = []
+        troveList = []
         if reqFlavor is None:
             for version in versionList:
-                for flavor in self.pkgVersionFlavors(troveName, version):
-                    pkgList.append((troveName, version, flavor))
+                for flavor in self.troveVersionFlavors(troveName, version):
+                    troveList.append((troveName, version, flavor))
         else:
             for version in versionList:
-                for flavor in self.pkgVersionFlavors(troveName, version):
+                for flavor in self.troveVersionFlavors(troveName, version):
                     if flavor.stronglySatisfies(reqFlavor):
-                        pkgList.append((troveName, version, flavor))
-        return pkgList
+                        troveList.append((troveName, version, flavor))
+        return troveList
 
     def __init__(self, root, path):
 	self.root = root
@@ -748,10 +749,10 @@ class RollbackDoesNotExist(RollbackError):
 	which does not exist"""
         RollbackError.__init__(self, rollbackName)
 
-class SourcePackageInstall(DatabaseError):
+class SourceComponentInstall(DatabaseError):
 
     def __str__(self):
-	return "cannot install a source package onto the local system"
+	return "cannot install a source component onto the local system"
 
 class OpenError(DatabaseError):
 

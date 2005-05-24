@@ -290,12 +290,12 @@ def checkout(repos, cfg, workDir, name):
                                 (trvInfo[1], trvInfo[2]),
 			        True)], excludeAutoSource = True)
 
-    pkgCs = cs.iterNewPackageList().next()
+    troveCs = cs.iterNewTroveList().next()
 
     earlyRestore = []
     lateRestore = []
 
-    for (pathId, path, fileId, version) in pkgCs.getNewFileList():
+    for (pathId, path, fileId, version) in troveCs.getNewFileList():
 	fullPath = workDir + "/" + path
 
 	state.addFile(pathId, path, version, fileId)
@@ -492,13 +492,13 @@ def commit(repos, cfg, message):
     newState.changeChangeLog(cl)
 
     if not srcPkg:
-        pkgCs = newState.diff(None, absolute = True)[0]
+        troveCs = newState.diff(None, absolute = True)[0]
     else:
-        pkgCs = newState.diff(srcPkg)[0]
+        troveCs = newState.diff(srcPkg)[0]
 
-    if pkgCs.getOldVersion() is not None and \
-            pkgCs.getOldVersion().branch().label().getHost() != \
-            pkgCs.getNewVersion().branch().label().getHost():
+    if troveCs.getOldVersion() is not None and \
+            troveCs.getOldVersion().branch().label().getHost() != \
+            troveCs.getNewVersion().branch().label().getHost():
         # we can't commit across hosts, so just make an absolute change
         # set instead (yeah, a bit of a hack). this can happen on shadows
         fileMap = {}
@@ -514,11 +514,11 @@ def commit(repos, cfg, message):
             fileMap[pathId] = (fileObj, fullPath, path)
             
         changeSet = changeset.CreateFromFilesystem([ (newState, fileMap) ])
-        pkgCs = changeSet.iterNewPackageList().next()
+        troveCs = changeSet.iterNewTroveList().next()
 
     # this replaces the TroveChangeSet update.buildLocalChanges put in
     # the changeset
-    changeSet.newPackage(pkgCs)
+    changeSet.newTrove(troveCs)
     repos.commitChangeSet(changeSet)
 
     # committing to the repository changes the version timestamp; get the
@@ -792,31 +792,31 @@ def diff(repos, versionStr = None):
 	    log.error("%s specifies multiple versions" % versionStr)
 	    return
 
-	oldPackage = repos.getTrove(*pkgList[0])
+	oldTrove = repos.getTrove(*pkgList[0])
     else:
-	oldPackage = repos.getTrove(state.getName(), 
+	oldTrove = repos.getTrove(state.getName(), 
                                     state.getVersion().canonicalVersion(), 
                                     deps.deps.DependencySet())
 
     result = update.buildLocalChanges(repos, 
-	    [(state, oldPackage, versions.NewVersion(), update.IGNOREUGIDS)],
+	    [(state, oldTrove, versions.NewVersion(), update.IGNOREUGIDS)],
             forceSha1=True, ignoreAutoSource = True)
     if not result: return
 
     (changeSet, ((isDifferent, newState),)) = result
     if not isDifferent: return
-    _showChangeSet(repos, changeSet, oldPackage, state)
+    _showChangeSet(repos, changeSet, oldTrove, state)
 
-def _showChangeSet(repos, changeSet, oldPackage, newPackage):
-    packageChanges = changeSet.iterNewPackageList()
-    pkgCs = packageChanges.next()
-    assert(util.assertIteratorAtEnd(packageChanges))
+def _showChangeSet(repos, changeSet, oldTrove, newTrove):
+    troveChanges = changeSet.iterNewTroveList()
+    troveCs = troveChanges.next()
+    assert(util.assertIteratorAtEnd(troveChanges))
 
-    showOneLog(pkgCs.getNewVersion(), pkgCs.getChangeLog())
+    showOneLog(troveCs.getNewVersion(), troveCs.getChangeLog())
 
-    fileList = [ (x[0], x[1], True, x[2], x[3]) for x in pkgCs.getNewFileList() ]
+    fileList = [ (x[0], x[1], True, x[2], x[3]) for x in troveCs.getNewFileList() ]
     fileList += [ (x[0], x[1], False, x[2], x[3]) for x in 
-			    pkgCs.getChangedFileList() ]
+			    troveCs.getChangedFileList() ]
 
     # sort by pathId to match the changeset order
     fileList.sort()
@@ -834,14 +834,14 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	# changed file
 	if path:
 	    dispStr = path
-	    if oldPackage:
-		oldPath = oldPackage.getFile(pathId)[0]
+	    if oldTrove:
+		oldPath = oldTrove.getFile(pathId)[0]
 		dispStr += " (aka %s)" % oldPath
 	else:
-	    path = oldPackage.getFile(pathId)[0]
+	    path = oldTrove.getFile(pathId)[0]
 	    dispStr = path
 
-        oldFileId = oldPackage.getFile(pathId)[1]
+        oldFileId = oldTrove.getFile(pathId)[1]
 	
 	if not newVersion:
 	    sys.stdout.write(dispStr + '\n')
@@ -861,7 +861,7 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 	    (contType, contents) = changeSet.getFileContents(pathId)
 	    if contType == changeset.ChangedFileTypes.diff:
                 sys.stdout.write('--- %s %s\n+++ %s %s\n'
-                                 %(path, oldPackage.getVersion().asString(),
+                                 %(path, oldTrove.getVersion().asString(),
                                    path, newVersion.asString()))
 
 		lines = contents.get().readlines()
@@ -869,8 +869,8 @@ def _showChangeSet(repos, changeSet, oldPackage, newPackage):
 		print str
 		print
 
-    for pathId in pkgCs.getOldFileList():
-	path = oldPackage.getFile(pathId)[0]
+    for pathId in troveCs.getOldFileList():
+	path = oldTrove.getFile(pathId)[0]
 	print "%s: removed" % path
 	
 def updateSrc(repos, versionStr = None):
@@ -910,9 +910,9 @@ def updateSrc(repos, versionStr = None):
                                 0)],
                                       excludeAutoSource = True)
 
-    packageChanges = changeSet.iterNewPackageList()
-    pkgCs = packageChanges.next()
-    assert(util.assertIteratorAtEnd(packageChanges))
+    troveChanges = changeSet.iterNewTroveList()
+    troveCs = troveChanges.next()
+    assert(util.assertIteratorAtEnd(troveChanges))
 
     localVer = state.getVersion().createBranch(versions.LocalLabel(), 
                                                withVerRel = 1)
@@ -923,11 +923,11 @@ def updateSrc(repos, versionStr = None):
     if errList:
 	for err in errList: log.error(err)
     fsJob.apply()
-    newPkgs = fsJob.iterNewPackageList()
+    newPkgs = fsJob.iterNewTroveList()
     newState = newPkgs.next()
     assert(util.assertIteratorAtEnd(newPkgs))
 
-    if newState.getVersion() == pkgCs.getNewVersion() and newBranch:
+    if newState.getVersion() == troveCs.getNewVersion() and newBranch:
 	newState.changeBranch(newBranch)
 
     newState.write("CONARY")
@@ -959,9 +959,9 @@ def merge(repos):
                             0)], excludeAutoSource = True)
 
     # make sure there are changes to apply
-    packageChanges = changeSet.iterNewPackageList()
-    pkgCs = packageChanges.next()
-    assert(util.assertIteratorAtEnd(packageChanges))
+    troveChanges = changeSet.iterNewTroveList()
+    troveCs = troveChanges.next()
+    assert(util.assertIteratorAtEnd(troveChanges))
 
     localVer = parentRootVersion.createBranch(versions.LocalLabel(), 
                                                withVerRel = 1)
@@ -973,12 +973,12 @@ def merge(repos):
 	for err in errList: log.error(err)
     fsJob.apply()
 
-    newPkgs = fsJob.iterNewPackageList()
+    newPkgs = fsJob.iterNewTroveList()
     newState = newPkgs.next()
     assert(util.assertIteratorAtEnd(newPkgs))
 
     # this check succeeds if the merge was successful
-    if newState.getVersion() == pkgCs.getNewVersion():
+    if newState.getVersion() == troveCs.getNewVersion():
         newState.setLastMerged(parentHeadVersion)
         newState.changeVersion(shadowHeadVersion)
 
@@ -1031,7 +1031,7 @@ def removeFile(file):
 
     state.write("CONARY")
 
-def newPackage(repos, cfg, name):
+def newTrove(repos, cfg, name):
     parts = name.split('=', 1) 
     if len(parts) == 1:
         label = cfg.buildLabel

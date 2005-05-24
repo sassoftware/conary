@@ -443,31 +443,31 @@ class FilesystemJob:
     def getErrorList(self):
 	return self.errors
 
-    def iterNewPackageList(self):
-	return iter(self.newPackages)
+    def iterNewTroveList(self):
+	return iter(self.newTroves)
 
-    def getOldPackageList(self):
-	return self.oldPackages
+    def getOldTroveList(self):
+	return self.oldTroves
 
     def getDirectoryCountSet(self):
 	return self.directorySet
 
-    def _setupRemoves(self, repos, pkgCs, changeSet, basePkg, fsPkg,
+    def _setupRemoves(self, repos, troveCs, changeSet, baseTrove, fsTrove,
                       root, flags):
         # Remove old files. if the files have already been removed, just
         # mention that fact and continue. Don't erase files which
         # have changed contents.
 	cwd = os.getcwd()
 
-	for pathId in pkgCs.getOldFileList():
-            if not basePkg.hasFile(pathId):
+	for pathId in troveCs.getOldFileList():
+            if not baseTrove.hasFile(pathId):
                 # this file was removed with 'conary remove /path', so
                 # nothing more has to be done
 		continue
                 
-	    (path, fileId, version) = basePkg.getFile(pathId)
+	    (path, fileId, version) = baseTrove.getFile(pathId)
 
-	    if not fsPkg.hasFile(pathId):
+	    if not fsTrove.hasFile(pathId):
 		log.debug("%s has already been removed" % path)
 		continue
 
@@ -486,7 +486,7 @@ class FilesystemJob:
 		except OSError, exc:
 		    # it's okay if the file is missing, it means we all agree
 		    if exc.errno == errno.ENOENT:
-			fsPkg.removeFile(pathId)
+			fsTrove.removeFile(pathId)
 			continue
 		    else:
 			raise
@@ -501,26 +501,26 @@ class FilesystemJob:
 				   "on head", path)
 
 	    self._remove(oldFile, realPath, "removing %s")
-	    fsPkg.removeFile(pathId)
+	    fsTrove.removeFile(pathId)
 
-    def _singleTrove(self, repos, pkgCs, changeSet, basePkg, fsPkg, root,
-		       flags):
+    def _singleTrove(self, repos, troveCs, changeSet, baseTrove, fsTrove, root,
+                     flags):
 	"""
-	Build up the todo list for applying a single package to the
+	Build up the todo list for applying a single trove to the
 	filesystem. 
 
-	@param repos: the repository the files for basePkg are stored in
+	@param repos: the repository the files for baseTrove are stored in
 	@type repos: repository.Repository
-	@param pkgCs: the package changeset to apply to the filesystem
-	@type pkgCs: trove.PackageChangeSet
-	@param changeSet: the changeset pkgCs is part of
+	@param troveCs: the trove changeset to apply to the filesystem
+	@type troveCs: trove.TroveChangeSet
+	@param changeSet: the changeset troveCs is part of
 	@type changeSet: changeset.ChangeSet
-	@param basePkg: the package the stuff in the filesystem came from
-	@type basePkg: trove.Package
-	@param fsPkg: the package representing what's in the filesystem now.
+	@param baseTrove: the trove the stuff in the filesystem came from
+	@type baseTrove: trove.Trove
+	@param fsTrove: the trove representing what's in the filesystem now.
         it is updated to represent what will be in the filesystem for this
         trove if apply() is used.
-	@type fsPkg: trove.Package
+	@type fsTrove: trove.Trove
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
@@ -528,12 +528,12 @@ class FilesystemJob:
         module variable summary for flags definitions.
 	@type flags: int bitfield
 	"""
-	if basePkg:
-	    assert(pkgCs.getOldVersion() == basePkg.getVersion())
+	if baseTrove:
+	    assert(troveCs.getOldVersion() == baseTrove.getVersion())
 	cwd = os.getcwd()
 
         # fully updated tracks whether any errors have occured; if no
-        # errors occur, fsPkg gets updated to the new version of the trove
+        # errors occur, fsTrove gets updated to the new version of the trove
         # this doesn't matter for binary stuff, just source management
 	fullyUpdated = True
 
@@ -547,7 +547,7 @@ class FilesystemJob:
 
         # Create new files. If the files we are about to create already
         # exist, it's an error.
-	for (pathId, headPath, headFileId, headFileVersion) in pkgCs.getNewFileList():
+	for (pathId, headPath, headFileId, headFileVersion) in troveCs.getNewFileList():
 	    if headPath[0] == '/':
 		headRealPath = root + headPath
 	    else:
@@ -557,10 +557,10 @@ class FilesystemJob:
 
             # these files are placed directly into the lookaside at build
             # time; we don't worry about them.  We still need to put them
-            # in the fsPkg, though, since we update the CONARY state
+            # in the fsTrove, though, since we update the CONARY state
             # from that and want to note these new files.
             if headFile.flags.isAutoSource():
-                fsPkg.addFile(pathId, headPath, headFileVersion, headFileId)
+                fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
                 continue
 
             try:
@@ -600,19 +600,19 @@ class FilesystemJob:
                 pass
 
 	    self._restore(headFile, headRealPath, "creating %s")
-	    fsPkg.addFile(pathId, headPath, headFileVersion, headFileId)
+	    fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
 
         # Handle files which have changed betweeen versions. This is by
         # far the most complicated case.
-	for (pathId, headPath, headFileId, headFileVersion) in pkgCs.getChangedFileList():
-	    if not fsPkg.hasFile(pathId):
+	for (pathId, headPath, headFileId, headFileVersion) in troveCs.getChangedFileList():
+	    if not fsTrove.hasFile(pathId):
 		# the file was removed from the local system; this change
 		# wins
-		self.userRemoval(pkgCs.getName(), pkgCs.getNewVersion(),
-                                 pkgCs.getNewFlavor(), pathId)
+		self.userRemoval(troveCs.getName(), troveCs.getNewVersion(),
+                                 troveCs.getNewFlavor(), pathId)
 		continue
 
-	    (fsPath, fsFileId, fsVersion) = fsPkg.getFile(pathId)
+	    (fsPath, fsFileId, fsVersion) = fsTrove.getFile(pathId)
 	    if fsPath[0] == "/":
 		rootFixup = root
 	    else:
@@ -625,10 +625,10 @@ class FilesystemJob:
 	    # if headPath is none, the name hasn't changed in the repository
 	    if headPath and headPath != fsPath:
 		# the paths are different; if one of them matches the one
-		# from the old package, take the other one as it is the one
+		# from the old trove, take the other one as it is the one
 		# which changed
-		if basePkg.hasFile(pathId):
-		    basePath = basePkg.getFile(pathId)[0]
+		if baseTrove.hasFile(pathId):
+		    basePath = baseTrove.getFile(pathId)[0]
 		else:
 		    basePath = None
 
@@ -639,7 +639,7 @@ class FilesystemJob:
 
                     # XXX is this correct?  all the other addFiles use
                     # the headFileId, not the fsFileId
-		    fsPkg.addFile(pathId, headPath, fsVersion, fsFileId)
+		    fsTrove.addFile(pathId, headPath, fsVersion, fsFileId)
 		    finalPath = headPath
 		else:
 		    pathOkay = False
@@ -663,11 +663,11 @@ class FilesystemJob:
             # FIXME we should be able to inspect headChanges directly
             # to see if we need to go into the if statement which follows
             # this rather then having to look up the file from the old
-            # package for every file which has changed
+            # trove for every file which has changed
             fsFile = files.FileFromFilesystem(realPath, pathId)
             
             # get the baseFile which was originally installed
-            (baseFilePath, baseFileId, baseFileVersion) = basePkg.getFile(pathId)
+            (baseFilePath, baseFileId, baseFileVersion) = baseTrove.getFile(pathId)
             baseFile = repos.getFileVersion(pathId, baseFileId, baseFileVersion)
             assert(baseFile.fileId() == baseFileId)
             
@@ -790,7 +790,7 @@ class FilesystemJob:
 			 headFileContents) = changeSet.getFileContents(pathId)
 
 			baseLineF = repos.getFileContents([ (baseFileId,
-					basePkg.getFile(pathId)[2]) ])[0].get()
+					baseTrove.getFile(pathId)[2]) ])[0].get()
 
 			baseLines = baseLineF.readlines()
 			del baseLineF
@@ -881,28 +881,28 @@ class FilesystemJob:
 		# XXX this doesn't even attempt to merge file permissions
 		# and such; the good part of that is differing owners don't
 		# break things
-		fsPkg.addFile(pathId, finalPath, headFileVersion, headFileId)
+		fsTrove.addFile(pathId, finalPath, headFileVersion, headFileId)
 	    else:
 		fullyUpdated = False
 
 	if fullyUpdated:
-	    fsPkg.changeVersion(pkgCs.getNewVersion())
+	    fsTrove.changeVersion(troveCs.getNewVersion())
 
-	return fsPkg
+	return fsTrove
 
-    def __init__(self, repos, changeSet, fsPkgDict, root, callback = None, 
+    def __init__(self, repos, changeSet, fsTroveDict, root, callback = None, 
 		 flags = MERGE):
 	"""
 	Constructs the job for applying a change set to the filesystem.
 
-	@param repos: the repository the current package and file information 
+	@param repos: the repository the current trove and file information 
 	is in
 	@type repos: repository.Repository
 	@param changeSet: the changeset to apply to the filesystem
 	@type changeSet: changeset.ChangeSet
-	@param fsPkgDict: dictionary mapping a package name to the package
+	@param fsTroveDict: dictionary mapping a trove name to the trove
 	object representing what's currently stored in the filesystem
-	@type fsPkgDict: dict of trove.Package
+	@type fsTroveDict: dict of trove.Trove
 	@param root: root directory to apply changes to (this is ignored for
 	source management, which uses the cwd)
 	@type root: str
@@ -914,7 +914,7 @@ class FilesystemJob:
 	self.restores = []
         self.restoreSize = 0
 	self.removes = {}
-	self.oldPackages = []
+	self.oldTroves = []
 	self.errors = []
 	self.newFiles = []
 	self.root = root
@@ -927,82 +927,82 @@ class FilesystemJob:
 	self.repos = repos
 
 	if not(flags & KEEPEXISTING):
-            for (name, oldVersion, oldFlavor) in changeSet.getOldPackageList():
-                self.oldPackages.append((name, oldVersion, oldFlavor))
-                oldPkg = repos.getTrove(name, oldVersion, oldFlavor)
-                for (pathId, path, fileId, version) in oldPkg.iterFileList():
+            for (name, oldVersion, oldFlavor) in changeSet.getOldTroveList():
+                self.oldTroves.append((name, oldVersion, oldFlavor))
+                oldTrove = repos.getTrove(name, oldVersion, oldFlavor)
+                for (pathId, path, fileId, version) in oldTrove.iterFileList():
                     fileObj = repos.getFileVersion(pathId, fileId, version)
                     self._remove(fileObj, root + path, "removing %s")
 
         pkgList = []
 
-	for pkgCs in changeSet.iterNewPackageList():
-            old = pkgCs.getOldVersion()
+	for troveCs in changeSet.iterNewTroveList():
+            old = troveCs.getOldVersion()
 	    if old:
 		localVer = old.createBranch(versions.LocalLabel(), 
                                             withVerRel = 1)
-                newFsPkg = fsPkgDict[(pkgCs.getName(), localVer)].copy()
+                newFsTrove = fsTroveDict[(troveCs.getName(), localVer)].copy()
             else:
-                newFsPkg = trove.Trove(pkgCs.getName(), versions.NewVersion(),
-                                    pkgCs.getNewFlavor(), pkgCs.getChangeLog())
+                newFsTrove = trove.Trove(troveCs.getName(), versions.NewVersion(),
+                                    troveCs.getNewFlavor(), troveCs.getChangeLog())
 
-            pkgList.append((pkgCs, newFsPkg))
+            pkgList.append((troveCs, newFsTrove))
 
-	for (pkgCs, newFsPkg) in pkgList:
-	    old = pkgCs.getOldVersion()
+	for (troveCs, newFsTrove) in pkgList:
+	    old = troveCs.getOldVersion()
 
 	    if old:
-		basePkg = repos.getTrove(pkgCs.getName(), old, 
-                                         pkgCs.getOldFlavor())
+		baseTrove = repos.getTrove(troveCs.getName(), old, 
+                                         troveCs.getOldFlavor())
 	    else:
-                basePkg = None
+                baseTrove = None
 
-            self._setupRemoves(repos, pkgCs, changeSet, basePkg,
-                               newFsPkg, root, flags)
+            self._setupRemoves(repos, troveCs, changeSet, baseTrove,
+                               newFsTrove, root, flags)
 
-	for i, (pkgCs, newFsPkg) in enumerate(pkgList):
+	for i, (troveCs, newFsTrove) in enumerate(pkgList):
 	    if callback:
 		callback.preparingUpdate(i + 1, len(pkgList))
 
-	    old = pkgCs.getOldVersion()
+	    old = troveCs.getOldVersion()
 
 	    if old:
-		basePkg = repos.getTrove(pkgCs.getName(), old, 
-                                         pkgCs.getOldFlavor())
-		self.oldPackages.append((basePkg.getName(), 
-					 basePkg.getVersion(),
-					 basePkg.getFlavor()))
+		baseTrove = repos.getTrove(troveCs.getName(), old, 
+                                         troveCs.getOldFlavor())
+		self.oldTroves.append((baseTrove.getName(), 
+					 baseTrove.getVersion(),
+					 baseTrove.getFlavor()))
 	    else:
-                basePkg = None
+                baseTrove = None
 
-            self._singleTrove(repos, pkgCs, changeSet, basePkg,
-                                      newFsPkg, root, flags)
+            self._singleTrove(repos, troveCs, changeSet, baseTrove,
+                                      newFsTrove, root, flags)
 
-            newFsPkg.mergeTroveListChanges(pkgCs.iterChangedTroves(),
+            newFsTrove.mergeTroveListChanges(troveCs.iterChangedTroves(),
                                            redundantOkay = True)
 
         pkgList = [ x[1] for x in pkgList ]
-        self.newPackages = pkgList
+        self.newTroves = pkgList
 
-def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
+def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
                   withFileContents=True, forceSha1=False, 
                   ignoreTransient=False, ignoreAutoSource = False):
     """
     Populates a change set against the files in the filesystem and builds
-    a package object which describes the files installed.  The return
-    is a tuple with a boolean saying if anything changed and a package
+    a trove object which describes the files installed.  The return
+    is a tuple with a boolean saying if anything changed and a trove
     reflecting what's in the filesystem; the changeSet is updated as a
     side effect.
 
     @param repos: Repository this directory is against.
     @type repos: repository.Repository
-    @param changeSet: Changeset to update with information for this package
+    @param changeSet: Changeset to update with information for this trove
     @type changeSet: changeset.ChangeSet
-    @param curPkg: Package which is installed
-    @type curPkg: trove.Package
-    @param srcPkg: Package to generate the change set against
-    @type srcPkg: trove.Package
-    @param newVersion: version to use for the newly created package
+    @param curTrove: Trove which is installed
+    @type curTrove: trove.Trove
+    @param srcTrove: Trove to generate the change set against
+    @type srcTrove: trove.Trove
+    @param newVersion: version to use for the newly created trove
     @type newVersion: versions.NewVersion
     @param root: root directory the files are in (ignored for sources, which
     are assumed to be in the current directory)
@@ -1021,20 +1021,20 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 
     noIds = ((flags & IGNOREUGIDS) != 0)
 
-    newPkg = curPkg.copy()
-    newPkg.changeVersion(newVersion)
+    newTrove = curTrove.copy()
+    newTrove.changeVersion(newVersion)
 
     pathIds = {}
-    for (pathId, path, fileId, version) in newPkg.iterFileList():
+    for (pathId, path, fileId, version) in newTrove.iterFileList():
 	pathIds[pathId] = True
 
-    # Iterating over the files in newPkg would be much more natural
-    # then iterating over the ones in the old package, and then going
-    # through newPkg to find what we missed. However, doing it the
+    # Iterating over the files in newTrove would be much more natural
+    # then iterating over the ones in the old trove, and then going
+    # through newTrove to find what we missed. However, doing it the
     # hard way lets us iterate right over the changeset we get from
     # the repository.
-    if srcPkg:
-	fileList = [ x for x in srcPkg.iterFileList() ]
+    if srcTrove:
+	fileList = [ x for x in srcTrove.iterFileList() ]
 	# need to walk changesets in order of fileid
 	fileList.sort()
     else:
@@ -1044,10 +1044,10 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
     # would be nice to have a better list...
     nonCfgExt = ('ps', 'eps', 'gif', 'png', 'tiff', 'jpeg', 'jpg',
 	'ico', 'rpm', 'ccs', 'gz', 'bz2', 'tgz', 'tbz', 'tbz2', 'zip')
-    isSrcPkg = curPkg.getName().endswith(':source')
+    isSrcTrove = curTrove.getName().endswith(':source')
 
     for (pathId, srcPath, srcFileId, srcFileVersion) in fileList:
-	# files which disappear don't need to make it into newPkg
+	# files which disappear don't need to make it into newTrove
 	if not pathIds.has_key(pathId): continue
 	del pathIds[pathId]
 
@@ -1059,11 +1059,11 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
         elif ignoreAutoSource and srcFile.flags.isAutoSource():
             continue
 
-	(path, fileId, version) = newPkg.getFile(pathId)
+	(path, fileId, version) = newTrove.getFile(pathId)
 
-        if isSrcPkg:
-            if path in curPkg.pathMap:
-                realPath = curPkg.pathMap[path]
+        if isSrcTrove:
+            if path in curTrove.pathMap:
+                realPath = curTrove.pathMap[path]
                 isAutoSource = True
             else:
                 realPath = os.getcwd() + "/" + path
@@ -1074,7 +1074,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 	try:
 	    os.lstat(realPath)
 	except OSError:
-            if isSrcPkg:
+            if isSrcTrove:
 		log.error("%s is missing (use remove if this is intentional)" 
 		    % path)
                 return None
@@ -1083,7 +1083,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 		log.warning("%s is missing (use remove if this is intentional)" 
 		    % path)
 
-            newPkg.removeFile(pathId)
+            newTrove.removeFile(pathId)
             continue
 
         if forceSha1:
@@ -1094,7 +1094,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 	f = files.FileFromFilesystem(realPath, pathId,
 				     possibleMatch = possibleMatch)
 
-	if isSrcPkg:
+	if isSrcTrove:
 	    f.flags.isSource(set = True)
             f.flags.isAutoSource(set = isAutoSource)
             assert(srcFile.flags.isAutoSource() == f.flags.isAutoSource())
@@ -1114,7 +1114,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
         f.tags = srcFile.tags.copy()
 
 	extension = path.split(".")[-1]
-	if isSrcPkg and extension not in nonCfgExt:
+	if isSrcTrove and extension not in nonCfgExt:
 	    f.flags.isConfig(set = True)
 	    sb = os.stat(realPath)
 	    if sb.st_size > 0 and stat.S_ISREG(sb.st_mode):
@@ -1128,7 +1128,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 		os.close(fd)
 
 	if not f.eq(srcFile, ignoreOwnerGroup = noIds):
-	    newPkg.addFile(pathId, path, newVersion, f.fileId())
+	    newTrove.addFile(pathId, path, newVersion, f.fileId())
 
 	    (filecs, hash) = changeset.fileChangeSet(pathId, srcFile, f)
 	    changeSet.addFile(srcFileId, f.fileId(), filecs)
@@ -1147,11 +1147,11 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 
     # anything left in pathIds has been newly added
     for pathId in pathIds.iterkeys():
-	(path, fileId, version) = newPkg.getFile(pathId)
+	(path, fileId, version) = newTrove.getFile(pathId)
 
-        if isSrcPkg:
-            if path in curPkg.pathMap:
-                realPath = curPkg.pathMap[path]
+        if isSrcTrove:
+            if path in curTrove.pathMap:
+                realPath = curTrove.pathMap[path]
                 isAutoSource = True
             else:
                 realPath = os.getcwd() + "/" + path
@@ -1164,7 +1164,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
                     # probably by a merge (if it was added on the command
                     # line, it's version would be NewVersion)
                     changeSet.addFile(None, srcFile.fileId(), srcFile.freeze())
-                    newPkg.addFile(pathId, path, version, srcFile.fileId())
+                    newTrove.addFile(pathId, path, version, srcFile.fileId())
                     continue
         else:
 	    realPath = root + path
@@ -1172,12 +1172,12 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 	# if we're committing against head, this better be a new file.
 	# if we're generating a diff against someplace else, it might not 
 	# be.
-	assert(srcPkg or isinstance(version, versions.NewVersion))
+	assert(srcTrove or isinstance(version, versions.NewVersion))
 
 	f = files.FileFromFilesystem(realPath, pathId)
 
 	extension = path.split(".")[-1]
-	if isSrcPkg:
+	if isSrcTrove:
             f.flags.isSource(set = True)
             f.flags.isAutoSource(set = isAutoSource)
             if extension not in nonCfgExt:
@@ -1185,7 +1185,7 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 
 	# new file, so this part is easy
 	changeSet.addFile(None, f.fileId(), f.freeze())
-	newPkg.addFile(pathId, path, newVersion, f.fileId())
+	newTrove.addFile(pathId, path, newVersion, f.fileId())
 
 	if f.hasContents and withFileContents:
 	    newCont = filecontents.FromFilesystem(realPath)
@@ -1193,33 +1193,33 @@ def _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, root, flags,
 				      changeset.ChangedFileTypes.file,
 				      newCont, f.flags.isConfig())
 
-    (csPkg, filesNeeded, pkgsNeeded) = newPkg.diff(srcPkg)
+    (csTrove, filesNeeded, pkgsNeeded) = newTrove.diff(srcTrove)
     assert(not pkgsNeeded)
-    changeSet.newPackage(csPkg)
+    changeSet.newTrove(csTrove)
 
-    if (csPkg.getOldFileList() or csPkg.getChangedFileList()
-        or csPkg.getNewFileList()):
+    if (csTrove.getOldFileList() or csTrove.getChangedFileList()
+        or csTrove.getNewFileList()):
 	foundDifference = True
     else:
 	foundDifference = False
 
-    return (foundDifference, newPkg)
+    return (foundDifference, newTrove)
 
 def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
-                                  forceSha1 = False, ignoreTransient=False,
-                                  ignoreAutoSource = False,
-                                  updateContainers = False):
+                      forceSha1 = False, ignoreTransient=False,
+                      ignoreAutoSource = False,
+                      updateContainers = False):
     """
     Builds a change set against a set of files currently installed and
-    builds a package object which describes the files installed.  The
+    builds a trove object which describes the files installed.  The
     return is a changeset and a list of tuples, each with a boolean
-    saying if anything changed for a package reflecting what's in the
+    saying if anything changed for a trove reflecting what's in the
     filesystem for that trove.
 
     @param repos: Repository this directory is against.
     @type repos: repository.Repository
     @param pkgList: Specifies which pacakage to work on, and is a list
-    of (curPkg, srcPkg, newVersion, flags) tuples as defined in the parameter
+    of (curTrove, srcTrove, newVersion, flags) tuples as defined in the parameter
     list for _localChanges()
     @param root: root directory the files are in (ignored for sources, which
     are assumed to be in the current directory)
@@ -1240,8 +1240,8 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
     changeSet = changeset.ChangeSet()
     changedTroves = {}
     returnList = []
-    for (curPkg, srcPkg, newVersion, flags) in pkgList: # this always skips container troves
-	result = _localChanges(repos, changeSet, curPkg, srcPkg, newVersion, 
+    for (curTrove, srcTrove, newVersion, flags) in pkgList: # this always skips container troves
+	result = _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, 
 			       root, flags, 
                                withFileContents = withFileContents,
                                forceSha1 = forceSha1, 
@@ -1253,19 +1253,19 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
 
         if result[0]:
             # something changed
-            changedTroves[(curPkg.getName(), curPkg.getVersion(),
-                                             curPkg.getFlavor())
-                         ] = (curPkg.getName(), newVersion, curPkg.getFlavor())
+            changedTroves[(curTrove.getName(), curTrove.getVersion(),
+                                             curTrove.getFlavor())
+                         ] = (curTrove.getName(), newVersion, curTrove.getFlavor())
 
 	returnList.append(result)
 
     if not updateContainers:
         return (changeSet, returnList)
 
-    for i, (curTrove, srcPkg, newVersion, flags) in enumerate(pkgList):
+    for i, (curTrove, srcTrove, newVersion, flags) in enumerate(pkgList):
         inclusions = [ x for x in curTrove.iterTroveList() ]
         if not inclusions: continue
-        assert(curTrove == srcPkg)
+        assert(curTrove == srcTrove)
 
         newTrove = curTrove.copy()
         changed = False
@@ -1283,7 +1283,7 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
             newTrove.changeVersion(newVersion)
             trvCs = newTrove.diff(curTrove)[0]
             returnList[i] = (True, newTrove)
-            changeSet.newPackage(trvCs)
+            changeSet.newTrove(trvCs)
             
     return (changeSet, returnList)
 

@@ -637,7 +637,7 @@ class DependencyTables:
 	# indexing depList. depList is a list of (troveNum, depClass, dep) 
 	# tuples. Like for depNum, negative troveNum values mean the
 	# dependency was part of a new trove.
-        for i, trvCs in enumerate(changeSet.iterNewPackageList()):
+        for i, trvCs in enumerate(changeSet.iterNewTroveList()):
             troveNum = -i - 1
             troveNames.append((trvCs.getName()))
             self._populateTmpTable(cu, stmt, 
@@ -672,7 +672,7 @@ class DependencyTables:
         cu.execute("""CREATE TEMPORARY TABLE RemovedTroveIds 
                         (troveId INTEGER KEY, nodeId INTEGER)""")
 
-        for oldInfo in changeSet.getOldPackageList():
+        for oldInfo in changeSet.getOldTroveList():
             oldTroves.append((oldInfo, len(nodes)))
             nodes.append((oldInfo, [], []))
 

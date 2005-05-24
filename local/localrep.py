@@ -30,19 +30,19 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     to the old version of things.
     """
 
-    def addPackage(self, pkg):
-	pkgCs = self.cs.getNewPackageVersion(pkg.getName(), pkg.getVersion(),
-					     pkg.getFlavor())
-	return self.repos.addPackage(pkg)
+    def addTrove(self, trove):
+	troveCs = self.cs.getNewTroveVersion(trove.getName(), trove.getVersion(),
+					     trove.getFlavor())
+	return self.repos.addTrove(trove)
 
-    def addPackageDone(self, troveId):
+    def addTroveDone(self, troveId):
 	pass
 
-    def oldPackage(self, pkg):
-	self.oldPackages.append(pkg)
+    def oldTrove(self, trove):
+	self.oldTroves.append(trove)
 
-    def oldPackageList(self):
-	return self.oldPackages
+    def oldTroveList(self):
+	return self.oldTroves
 
     def oldFile(self, pathId, fileId, fileObj):
 	self.oldFiles.append((pathId, fileId, fileObj))
@@ -82,7 +82,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
 	self.cs = cs
 	self.repos = repos
-	self.oldPackages = []
+	self.oldTroves = []
 	self.oldFiles = []
 
 	# remove old versions of the packages which are being added. this has
@@ -94,9 +94,9 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 	# those files candidates for removal. package change sets also know 
 	# when file paths have changed, and those old paths are also candidates
 	# for removal
-	for csPkg in cs.iterNewPackageList():
-	    name = csPkg.getName()
-	    oldVersion = csPkg.getOldVersion()
+	for csTrove in cs.iterNewTroveList():
+	    name = csTrove.getName()
+	    oldVersion = csTrove.getOldVersion()
 
 	    if not oldVersion:
 		# we know this isn't an absolute change set (since this
@@ -105,26 +105,26 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 		# a new package. no need to erase any old stuff then!
 		continue
 
-	    assert(repos.hasTrove(name, oldVersion, csPkg.getOldFlavor()))
+	    assert(repos.hasTrove(name, oldVersion, csTrove.getOldFlavor()))
 
-	    oldPkg = repos.getTrove(name, oldVersion, csPkg.getOldFlavor())
-	    self.oldPackage(oldPkg)
+	    oldTrove = repos.getTrove(name, oldVersion, csTrove.getOldFlavor())
+	    self.oldTrove(oldTrove)
 
-	    for pathId in csPkg.getOldFileList():
-                if not oldPkg.hasFile(pathId):
+	    for pathId in csTrove.getOldFileList():
+                if not oldTrove.hasFile(pathId):
                     # the file has already been removed from the non-pristine
                     # version of this trove in the database, so there is
                     # nothing to do
                     continue
-		(oldPath, oldFileId, oldFileVersion) = oldPkg.getFile(pathId)
+		(oldPath, oldFileId, oldFileVersion) = oldTrove.getFile(pathId)
 		self.removeFile(pathId, oldFileId)
 
 	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback)
 
 	if not keepExisting:
-	    for pkg in self.oldPackageList():
-		self.repos.eraseTrove(pkg.getName(), pkg.getVersion(),
-				      pkg.getFlavor())
+	    for trove in self.oldTroveList():
+		self.repos.eraseTrove(trove.getName(), trove.getVersion(),
+				      trove.getFlavor())
 
 	for (pathId, fileVersion, fileObj) in self.oldFileList():
 	    self.repos.eraseFileVersion(pathId, fileVersion)

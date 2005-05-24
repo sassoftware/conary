@@ -261,7 +261,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         cs = self._getChangeSet(l, recurse = False, withFiles = True,
                                 withFileContents = False)
         try:
-            trvCs = cs.getNewPackageVersion(troveName, version, flavor)
+            trvCs = cs.getNewTroveVersion(troveName, version, flavor)
         except KeyError:
             raise StopIteration
         
@@ -431,16 +431,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # walk the list so we can return the troves in the same order
         for (name, version, flavor) in troves:
             try:
-                pkgCs = cs.getNewPackageVersion(name, version, flavor)
+                troveCs = cs.getNewTroveVersion(name, version, flavor)
             except KeyError:
                 l.append(None)
                 continue
             
-            t = trove.Trove(pkgCs.getName(), pkgCs.getOldVersion(),
-                            pkgCs.getNewFlavor(), pkgCs.getChangeLog())
+            t = trove.Trove(troveCs.getName(), troveCs.getOldVersion(),
+                            troveCs.getNewFlavor(), troveCs.getChangeLog())
             # trove integrity checks don't work when file information is
             # excluded
-            t.applyChangeSet(pkgCs, skipIntegrityChecks = not withFiles)
+            t.applyChangeSet(troveCs, skipIntegrityChecks = not withFiles)
             l.append(t)
 
 	return l
@@ -655,7 +655,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             for i, (troveName, (oldVersion, oldFlavor),
                   (newVersion, newFlavor), absolute) in enumerate(ourJobList):
                 if not newVersion:
-                    internalCs.oldPackage(troveName, oldVersion, oldFlavor)
+                    internalCs.oldTrove(troveName, oldVersion, oldFlavor)
                     delList.append(i)
 
             for i in reversed(delList):
@@ -693,7 +693,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 new = troves[i + 1]
                 i += 2
 
-                (pkgChgSet, newFilesNeeded, pkgsNeeded) = \
+                (troveChgSet, newFilesNeeded, pkgsNeeded) = \
                                 new.diff(old, absolute = absolute) 
                 # newFilesNeeded = [ (pathId, oldFileVersion, newFileVersion) ]
                 filesNeeded += [ (x[0], troveName, 
@@ -708,7 +708,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                                            (otherNewVersion, otherNewFlavor),
                                            absolute))
 
-                internalCs.newPackage(pkgChgSet)
+                internalCs.newTrove(troveChgSet)
 
         if withFiles and filesNeeded:
             need = []
@@ -797,11 +797,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # convert the versions in here to ones w/ timestamps
         cs.setPrimaryTroveList([])
         for (name, version, flavor) in primaryTroveList:
-            trove = cs.getNewPackageVersion(name, version, flavor)
+            trove = cs.getNewTroveVersion(name, version, flavor)
             cs.addPrimaryTrove(name, trove.getNewVersion(), flavor)
 
         if target and cs:
-            if cs.oldPackages or cs.newPackages:
+            if cs.oldTroves or cs.newTroves:
                 os.unlink(target)
                 cs.writeToFile(target)
 
@@ -1030,14 +1030,14 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	    
     def _commit(self, chgSet, fName):
 	serverName = None
-	for pkg in chgSet.iterNewPackageList():
-	    v = pkg.getOldVersion()
+	for trove in chgSet.iterNewTroveList():
+	    v = trove.getOldVersion()
 	    if v:
 		if serverName is None:
 		    serverName = v.branch().label().getHost()
 		assert(serverName == v.branch().label().getHost())
 
-	    v = pkg.getNewVersion()
+	    v = trove.getNewVersion()
 	    if serverName is None:
 		serverName = v.branch().label().getHost()
 	    assert(serverName == v.branch().label().getHost())

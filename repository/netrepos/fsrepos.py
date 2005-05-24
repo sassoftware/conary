@@ -92,7 +92,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
     def commitChangeSet(self, cs, serverName):
 	# let's make sure commiting this change set is a sane thing to attempt
-	for pkg in cs.iterNewPackageList():
+	for pkg in cs.iterNewTroveList():
 	    v = pkg.getNewVersion()
 	    label = v.branch().label()
 	    if isinstance(label, versions.EmergeLabel):
@@ -208,7 +208,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
                 else:
                     # remove this trove and any trove contained in it
                     old = self.getTrove(troveName, oldVersion, oldFlavor)
-                    cs.oldPackage(troveName, oldVersion, oldFlavor)
+                    cs.oldTrove(troveName, oldVersion, oldFlavor)
                     for (name, version, flavor) in old.iterTroveList():
                         troveList.append((name, (version, flavor),
                                                 (None, None), absolute))
@@ -232,7 +232,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 	    else:
 		old = None
 
-	    (pkgChgSet, filesNeeded, pkgsNeeded) = \
+	    (troveChgSet, filesNeeded, pkgsNeeded) = \
 				new.diff(old, absolute = absolute)
 
 	    if recurse:
@@ -240,7 +240,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 		    troveList.append((pkgName, (old, oldFlavor),
 					       (new, newFlavor), absolute))
 
-	    cs.newPackage(pkgChgSet)
+	    cs.newTrove(troveChgSet)
 
 	    # sort the set of files we need into bins based on the server
 	    # name

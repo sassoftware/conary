@@ -139,13 +139,13 @@ class _IdGen:
 	l = []
         for (name, version, flavor) in troveList:
             try:
-                pkgCs = cs.getNewPackageVersion(name, version, flavor)
+                troveCs = cs.getNewTroveVersion(name, version, flavor)
             except KeyError:
                 l.append(None)
                 continue
-            t = trove.Trove(pkgCs.getName(), pkgCs.getOldVersion(),
-                            pkgCs.getNewFlavor(), pkgCs.getChangeLog())
-            t.applyChangeSet(pkgCs)
+            t = trove.Trove(troveCs.getName(), troveCs.getOldVersion(),
+                            troveCs.getNewFlavor(), troveCs.getChangeLog())
+            t.applyChangeSet(troveCs)
             l.append(t)
             # recurse over troves contained in the current trove
             troveList += [ x for x in t.iterTroveList() ]
@@ -358,7 +358,7 @@ def cookRedirectObject(repos, cfg, recipeClass, sourceVersion, macros={},
         trv.setConaryVersion(constants.version)
 
         trvDiff = trv.diff(None, absolute = 1)[0]
-        changeSet.newPackage(trvDiff)
+        changeSet.newTrove(trvDiff)
         built.append((trv.getName(), trv.getVersion().asString(), 
                       trv.getFlavor()) )
 
@@ -488,7 +488,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
         grp.setConaryVersion(constants.version)
 
         grpDiff = grp.diff(None, absolute = 1)[0]
-        changeSet.newPackage(grpDiff)
+        changeSet.newTrove(grpDiff)
 
     cycle = _findCycle(newGroupGraph)
     if cycle:
@@ -569,7 +569,7 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
     fileset.setConaryVersion(constants.version)
     
     filesetDiff = fileset.diff(None, absolute = 1)[0]
-    changeSet.newPackage(filesetDiff)
+    changeSet.newTrove(filesetDiff)
 
     built = [ (fileset.getName(), fileset.getVersion().asString(), 
                                                 fileset.getFlavor()) ]
@@ -823,7 +823,7 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
     for grp in grpMap.values():
         grpDiff = grp.diff(None, absolute = 1)[0]
-        changeSet.newPackage(grpDiff)
+        changeSet.newTrove(grpDiff)
 
     return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
 
