@@ -734,7 +734,7 @@ class ConaryClient:
 
 	return dupList
 
-    def _createChangeSetList(self, path, csList, recurse = True, 
+    def _createChangeSetList(self, csList, recurse = True, 
                              skipNotByDefault = False, excludeList = []):
         primaryList = []
         for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), abstract) \
@@ -806,16 +806,16 @@ class ConaryClient:
 
         return (fullCsList, primaryList)
 
-    def createChangeSetFile(self, path, csList, recurse = True, 
-                            skipNotByDefault = False, excludeList = [],
-                            callback = None, withFiles = False,
-                            withFileContents = False):
+    def createChangeSet(self, csList, recurse = True, 
+                        skipNotByDefault = False, excludeList = [],
+                        callback = None, withFiles = False,
+                        withFileContents = False):
         """
         Like self.createChangeSetFile(), but returns a change set object.
         withFiles and withFileContents are the same as for the underlying
         repository call.
         """
-        (fullCsList, primaryList) = self._createChangeSetList(path, csList, 
+        (fullCsList, primaryList) = self._createChangeSetList(csList, 
                 recurse = recurse, skipNotByDefault = skipNotByDefault, 
                 excludeList = excludeList)
 
@@ -849,7 +849,7 @@ class ConaryClient:
         @type callback: callbacks.UpdateCallback
         """
 
-        (fullCsList, primaryList) = self._createChangeSetList(path, csList, 
+        (fullCsList, primaryList) = self._createChangeSetList(csList, 
                 recurse = recurse, skipNotByDefault = skipNotByDefault, 
                 excludeList = excludeList)
 

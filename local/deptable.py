@@ -810,6 +810,8 @@ class DependencyTables:
 
         changeSetList = []
         if findOrdering:
+            import lib
+            lib.epdb.st()
             # Remove nodes which cancel each other
             _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
 
