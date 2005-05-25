@@ -152,6 +152,11 @@ static PyObject * StringStream_Freeze(StringStreamObject * self,
     return self->s;
 }
 
+static long StringStream_Hash(PyObject * self) {
+    StringStreamObject * o = (void *) self;
+    return o->s->ob_type->tp_hash(o->s);
+}
+
 static int StringStream_Init(PyObject * self, PyObject * args,
                              PyObject * kwargs) {
     StringStreamObject * o = (void *) self;
@@ -278,7 +283,7 @@ PyTypeObject StringStreamType = {
     0,                              /*tp_as_number*/
     0,                              /*tp_as_sequence*/
     0,                              /*tp_as_mapping*/
-    0,                              /*tp_hash */
+    StringStream_Hash,              /*tp_hash */
     StringStream_Call,		    /*tp_call*/
     0,                              /*tp_str*/
     0,                              /*tp_getattro*/

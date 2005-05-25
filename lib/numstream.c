@@ -180,6 +180,16 @@ static PyObject * NumericStream_Eq(PyObject * self, PyObject * args,
     return Py_False;
 }
 
+static long IntStream_Hash(PyObject * self) {
+    IntStreamObject * o = (void *) self;
+    return o->val;
+}
+
+static long ShortStream_Hash(PyObject * self) {
+    ShortStreamObject * o = (void *) self;
+    return o->val;
+}
+
 static inline PyObject * raw_IntStream_Freeze(IntStreamObject * o) {
     int ordered = htonl(o->val);
     char buffer[20];
@@ -477,12 +487,12 @@ PyTypeObject IntStreamType = {
     0,                              /*tp_print*/
     0,                              /*tp_getattr*/
     0,                              /*tp_setattr*/
-    0,                              /*tp_compare*/
+    NumericStream_Cmp,              /*tp_compare*/
     0,                              /*tp_repr*/
     0,                              /*tp_as_number*/
     0,                              /*tp_as_sequence*/
     0,                              /*tp_as_mapping*/
-    0,                              /*tp_hash */
+    IntStream_Hash,                 /*tp_hash */
     0,                              /*tp_call*/
     0,                              /*tp_str*/
     0,                              /*tp_getattro*/
@@ -512,12 +522,12 @@ PyTypeObject ShortStreamType = {
     0,                              /*tp_print*/
     0,                              /*tp_getattr*/
     0,                              /*tp_setattr*/
-    0,                              /*tp_compare*/
+    NumericStream_Cmp,              /*tp_compare*/
     0,                              /*tp_repr*/
     0,                              /*tp_as_number*/
     0,                              /*tp_as_sequence*/
     0,                              /*tp_as_mapping*/
-    0,                              /*tp_hash */
+    ShortStream_Hash,               /*tp_hash */
     0,                              /*tp_call*/
     0,                              /*tp_str*/
     0,                              /*tp_getattro*/
