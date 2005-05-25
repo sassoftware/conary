@@ -49,6 +49,8 @@ typedef struct {
 
 static int StreamSet_Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
 			      char * data, int dataLen, int offset);
+static int LStreamSet_Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
+			       char * data, int dataLen, int offset);
 
 /* ------------------------------------- */
 /* StreamSetDef Implementation           */
@@ -166,7 +168,7 @@ static PyObject * StreamSet_concatStrings(StreamSetDefObject * ssd,
 		   requested */
 		*chptr++ = ssd->tags[i].tag;
 		*((short *) chptr) = htons(valLen);
-		chptr += 2;
+		chptr += sizeof(short);
 		
 		memcpy(chptr, PyString_AS_STRING(vals[i]), valLen);
 		chptr += valLen;
@@ -516,6 +518,219 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
 }
 
 /* ------------------------------------- */
+/* LargeStreamSet Implementation         */
+
+static PyObject * LStreamSet_concatStrings(StreamSetDefObject * ssd,
+					   PyObject ** vals, int len,
+					   int includeEmpty) {
+    char * final, * chptr;
+    int i, valLen;
+    PyObject * result;
+
+    final = malloc(len);
+    chptr = final;
+    for (i = 0; i < ssd->tagCount; i++) {
+	if (vals[i] != Py_None)  {
+	    valLen = PyString_GET_SIZE(vals[i]);
+	    /* do not include zero length frozen data if requested */
+	    if (valLen > 0 || includeEmpty) {
+		/* either we have data or including empty data was
+		   requested */
+		*((short *) chptr) = htons(ssd->tags[i].tag);
+		chptr += sizeof(short);
+		*((int *) chptr) = htonl(valLen);
+		chptr += sizeof(int);
+		
+		memcpy(chptr, PyString_AS_STRING(vals[i]), valLen);
+		chptr += valLen;
+	    } else {
+		/* otherwise we need to reduce the total size because
+		   we are excluding tags */
+		len -= 6;
+	    }
+	}
+
+	Py_DECREF(vals[i]);
+    }
+
+    result = PyString_FromStringAndSize(final, len);
+    free(final);
+    return result;
+}
+static PyObject * LStreamSet_Freeze(StreamSetObject * self, 
+                                    PyObject * args,
+                                    PyObject * kwargs) {
+    static char * kwlist[] = { "skipSet", NULL };
+    PyObject ** vals;
+    StreamSetDefObject * ssd;
+    int i;
+    PyObject * attr, * skipSet = Py_None;
+    int len = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &skipSet))
+        return NULL;
+
+    if (skipSet != Py_None && skipSet->ob_type != &PyDict_Type) {
+        PyErr_SetString(PyExc_TypeError, "skipSet must be None or a dict");
+	return NULL;
+    }
+
+    ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
+    vals = alloca(sizeof(PyObject *) * ssd->tagCount);
+
+    for (i = 0; i < ssd->tagCount; i++) {
+	if (skipSet != Py_None && PyDict_Contains(skipSet, ssd->tags[i].name)) {
+            Py_INCREF(Py_None);
+            vals[i] = Py_None;
+	    continue;
+        }
+
+	attr = self->ob_type->tp_getattro((PyObject *) self, 
+					  ssd->tags[i].name);
+	vals[i] = PyObject_CallMethod(attr, "freeze", "O", skipSet);
+	Py_DECREF(attr);
+
+	if (!vals[i]) {
+	    int j;
+
+	    for (j = 0; j < i; j++) 
+		Py_DECREF(vals[j]);
+
+	    return NULL;
+	}
+
+        if (vals[i] != Py_None)
+            len += PyString_GET_SIZE(vals[i]) + 6;
+    }
+    /* do not include zero length frozen data */
+    return LStreamSet_concatStrings(ssd, vals, len, EXCLUDE_EMPTY);
+}
+
+static int LStreamSet_Init(PyObject * self, PyObject * args,
+			   PyObject * kwargs) {
+    static char * kwlist[] = { "data", "offset", NULL };
+    StreamSetDefObject * ssd;
+    int i;
+    int offset = 0;
+    char * data = NULL;
+    int dataLen;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|z#i", kwlist, &data, 
+				     &dataLen, &offset)) {
+        return -1;
+    }
+
+    ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
+    if (!ssd) {
+        PyErr_SetString(PyExc_ValueError, 
+		"LargeStreamSets must have _streamDict class attribute");
+	return -1;
+    } else if (ssd->ob_type != &StreamSetDefType) {
+        PyErr_SetString(PyExc_TypeError, 
+		"streamDict attribute must be a cstreams.StreamSetDef");
+	return -1;
+    }
+
+    for (i = 0; i < ssd->tagCount; i++) {
+	PyObject * obj;
+
+        if (!(obj = PyObject_CallFunction(ssd->tags[i].type, NULL)))
+	    return -1;
+	
+	if (self->ob_type->tp_setattro(self, ssd->tags[i].name, 
+				       obj))
+	    return -1;
+	/* we keep our reference in our dict */
+	Py_DECREF(obj);
+    }
+
+    if (!data)
+	return 0;
+
+    if (LStreamSet_Thaw_raw(self, ssd, data, dataLen, offset))
+	return -1;
+
+    return 0;
+}
+
+static PyObject * LStreamSet_Thaw(PyObject * self, PyObject * args) {
+    char * data = NULL;
+    int dataLen;
+    StreamSetDefObject * ssd;
+
+    if (!PyArg_ParseTuple(args, "s#", &data, &dataLen))
+        return NULL;
+
+    ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
+
+    if (LStreamSet_Thaw_raw(self, ssd, data, dataLen, 0))
+	return NULL;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+static int LStreamSet_Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
+			      char * data, int dataLen, int offset) {
+    char * streamData, * chptr, * end;
+    int size, i;
+    PyObject * attr, * ro;
+    int ignoreUnknown = -1;
+    int streamId;
+
+    end = data + dataLen;
+    chptr = data + offset;
+    while (chptr < end) {
+	streamId = ntohs(*((short *) chptr));
+	chptr += sizeof(short);
+	size = ntohl(*((int *) chptr));
+	chptr += sizeof(int);
+	streamData = chptr;
+	chptr += size;
+
+	for (i = 0; i < ssd->tagCount; i++)
+	    if (ssd->tags[i].tag == streamId) break;
+	if (i == ssd->tagCount) {
+	    PyObject * obj;
+
+	    if (ignoreUnknown == 1)
+		continue;
+	    if (ignoreUnknown == -1) {
+		obj = PyDict_GetItemString(self->ob_type->tp_dict, 
+					   "ignoreUnknown");
+		if (obj) {
+		    ignoreUnknown = PyInt_AsLong(obj);
+		    Py_DECREF(obj);
+		}
+
+		if (ignoreUnknown == 1)
+		    continue;
+
+		PyErr_SetString(PyExc_ValueError, "unknown tag in stream set");
+		return -1;
+	    }
+	}
+
+	attr = self->ob_type->tp_getattro(self, ssd->tags[i].name);
+	ro = PyObject_CallMethod(attr, "thaw", "s#", streamData, size);
+	Py_DECREF(attr);
+	if (!ro) {
+	    return -1;
+	}
+	Py_DECREF(ro);
+    }
+
+    if (chptr != end) {
+	printf("HERE\n");
+	fflush(stdout);
+	i = 1;
+	while (i) ;
+    }
+    assert(chptr == end);
+
+    return 0;
+}
+
+/* ------------------------------------- */
 /* Type and method definition            */
 
 static PyMethodDef StreamSetDefMethods[] = {
@@ -612,6 +827,52 @@ PyTypeObject StreamSetType = {
     StreamSet_Init,                 /* tp_init */
 };
 
+static PyMethodDef LargeStreamSetMethods[] = {
+    { "freeze", (PyCFunction) LStreamSet_Freeze, METH_VARARGS | METH_KEYWORDS },
+    { "thaw",   (PyCFunction) LStreamSet_Thaw,   METH_VARARGS                 },
+    {NULL}  /* Sentinel */
+};
+
+PyTypeObject LargeStreamSetType = {
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,                              /*ob_size*/
+    "cstreams.LargeStreamSet",      /*tp_name*/
+    sizeof(StreamSetObject),        /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    0,                              /*tp_dealloc*/
+    0,                              /*tp_print*/
+    0,                              /*tp_getattr*/
+    0,                              /*tp_setattr*/
+    0,				    /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,				    /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,             /*tp_flags*/
+    NULL,                           /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    LargeStreamSetMethods,          /* tp_methods */
+    0,                              /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    LStreamSet_Init,                /* tp_init */
+};
+
 #define REGISTER_TYPE(name) \
     if (PyType_Ready(&name ## Type) < 0) \
         return; \
@@ -621,5 +882,6 @@ PyTypeObject StreamSetType = {
 void streamsetinit(PyObject * m) {
     StreamSetDefType.tp_new = PyType_GenericNew;
     REGISTER_TYPE(StreamSetDef);
-    allStreams[STREAM_SET].pyType  = StreamSetType;
+    allStreams[STREAM_SET].pyType = StreamSetType;
+    allStreams[LARGE_STREAM_SET].pyType = LargeStreamSetType;
 }

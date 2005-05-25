@@ -70,7 +70,7 @@ class TroveRefsTrovesStream(dict, streams.InfoStream):
     easily extended if that becomes necessary at some later point.
     """
 
-    def freeze(self, skipSet = None):
+    def freeze(self, skipSet = {}):
         """
         Frozen form is a sequence of:
             total entry size, excluding these two bytes (2 bytes)
@@ -120,7 +120,7 @@ class TroveRefsFilesStream(dict, streams.InfoStream):
     easily computable).
     """
 
-    def freeze(self, skipSet = None):
+    def freeze(self, skipSet = {}):
         """
         Frozen form is a sequence of:
             total entry size, excluding these two bytes (2 bytes)
@@ -192,6 +192,7 @@ class Trove(streams.LargeStreamSet):
         _STREAM_TRV_REDIRECT  : (ByteStream,                  "redirect"  ),
         _STREAM_TRV_SIGS      : (TroveSignatures,             "sigs"      ),
     }
+    _streamDict = streams.StreamSetDef(streamDict)
     ignoreUnknown = False
 
     # the memory savings from slots isn't all that interesting here, but it
@@ -199,7 +200,7 @@ class Trove(streams.LargeStreamSet):
     # of the stream
     __slots__ = [ "name", "version", "flavor", "provides", "requires",
                   "changeLog", "troveInfo", "troves", "idMap", "redirect",
-                  "sigs" ]
+                  "sigs", "immutable" ]
 
     def _sigString(self):
         return streams.LargeStreamSet.freeze(self, 
@@ -231,6 +232,7 @@ class Trove(streams.LargeStreamSet):
         new.requires.thaw(self.requires.freeze())
         new.changeLog = changelog.ChangeLog(self.changeLog.freeze())
         new.troveInfo.thaw(self.troveInfo.freeze())
+        new.sigs.thaw(self.sigs.freeze())
         return new
 
     def getName(self):
@@ -251,6 +253,13 @@ class Trove(streams.LargeStreamSet):
     def getSigs(self):
         self.computeSignatures()
         return self.sigs
+
+    def setSigs(self, sigs):
+        # make sure the signature block being applied to this trove is
+        # correct for this trove
+        self.computeSignatures()
+        assert(self.sigs.sha1() == sigs.sha1())
+        self.sigs = sigs
 
     def isRedirect(self):
         return self.redirect()
@@ -365,6 +374,8 @@ class Trove(streams.LargeStreamSet):
         @type skipIntegrityChecks: boolean
 	@rtype: dict
 	"""
+
+        assert(not self.immutable)
 
 	self.redirect.set(pkgCS.getIsRedirect())
         if self.redirect():
@@ -837,10 +848,11 @@ class Trove(streams.LargeStreamSet):
         if changeLog:
             self.changeLog.thaw(changeLog.freeze())
         self.redirect.set(isRedirect)
+        self.immutable = False
 
 class ReferencedTroveSet(dict, streams.InfoStream):
 
-    def freeze(self, skipSet = None):
+    def freeze(self, skipSet = {}):
 	l = []
 	for name, troveList in self.iteritems():
 	    subL = []
@@ -906,7 +918,7 @@ class ReferencedTroveSet(dict, streams.InfoStream):
 
 class OldFileStream(list, streams.InfoStream):
 
-    def freeze(self, skipSet = None):
+    def freeze(self, skipSet = {}):
 	return "".join(self)
 
     def thaw(self, data):
@@ -924,7 +936,7 @@ class OldFileStream(list, streams.InfoStream):
 
 class ReferencedFileList(list, streams.InfoStream):
 
-    def freeze(self, skipSet = None):
+    def freeze(self, skipSet = {}):
 	l = []
 
 	for (pathId, path, fileId, version) in self:
@@ -1035,6 +1047,7 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
         _STREAM_TCS_OLD_SIGS    : (TroveSignatures,      "oldSigs"       ),
         _STREAM_TCS_NEW_SIGS    : (TroveSignatures,      "newSigs"       ),
     }
+    _streamDict = streams.StreamSetDef(streamDict)
 
     ignoreUnknown = True
 
@@ -1269,6 +1282,8 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 
 class TroveChangeSet(AbstractTroveChangeSet):
 
+    _streamDict = AbstractTroveChangeSet._streamDict
+
     def __init__(self, name, changeLog, oldVersion, newVersion, 
 		 oldFlavor, newFlavor, oldSigs, newSigs,
                  absolute = 0, isRedirect = False,
@@ -1297,6 +1312,8 @@ class TroveChangeSet(AbstractTroveChangeSet):
         self.newSigs.thaw(newSigs.freeze())
 
 class ThawTroveChangeSet(AbstractTroveChangeSet):
+
+    _streamDict = AbstractTroveChangeSet._streamDict
 
     def __init__(self, buf):
 	AbstractTroveChangeSet.__init__(self, buf)

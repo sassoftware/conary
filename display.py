@@ -295,6 +295,7 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags, info):
              ("Locked    : %s" % db.trovesAreLocked([ (trove.getName(), 
                               trove.getVersion(), trove.getFlavor()) ])[0])))
         print "Flavor    : %s" % deps.formatFlavor(trove.getFlavor())
+        print "Requires  : %s" % trove.getRequires()
     else:
         if fullVersions:
             print _troveFormat % (trove.getName(), version.asString())

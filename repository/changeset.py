@@ -108,6 +108,7 @@ class RollbackRecord(streams.LargeStreamSet):
         _STREAM_CS_TROVES:    (RollbackRecordNewTroves,    "newTroves"      ),
         _STREAM_CS_OLD_TROVES:(streams.ReferencedTroveList, "oldTroves"      ),
     }
+    _streamDict = streams.StreamSetDef(streamDict)
 
     """
     Subsitutes for a changeset when full rollback information is
@@ -217,6 +218,7 @@ class ChangeSet(streams.LargeStreamSet):
      _STREAM_CS_OLD_TROVES:(streams.ReferencedTroveList, "oldTroves"       ),
      _STREAM_CS_FILES     :(ChangeSetFileDict,		 "files"           ),
     }
+    _streamDict = streams.StreamSetDef(streamDict)
 
     ignoreUnknown = True
 
@@ -686,6 +688,8 @@ class ChangeSet(streams.LargeStreamSet):
 
 class ChangeSetFromRepository(ChangeSet):
 
+    _streamDict = ChangeSet._streamDict
+
     def newTrove(self, trv):
 	# add the time stamps to the trove version numbers
 	if trv.getOldVersion():
@@ -699,6 +703,8 @@ class ChangeSetFromRepository(ChangeSet):
 
 class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 
+    _streamDict = ChangeSet._streamDict
+
     def __init__(self, absCS):
 	self.absCS = absCS
 	ChangeSet.__init__(self)
@@ -706,6 +712,8 @@ class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 class PathIdsConflictError(Exception): pass
 
 class ReadOnlyChangeSet(ChangeSet):
+
+    _streamDict = ChangeSet._streamDict
 
     def fileQueueCmp(a, b):
         if a[1][0] == "1" and b[1][0] == "0":
@@ -1040,6 +1048,8 @@ class ReadOnlyChangeSet(ChangeSet):
         self.fileQueue = []
 
 class ChangeSetFromFile(ReadOnlyChangeSet):
+
+    _streamDict = ReadOnlyChangeSet._streamDict
 
     def __init__(self, fileName, skipValidate = 1):
         if type(fileName) is str:

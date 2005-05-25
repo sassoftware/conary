@@ -32,7 +32,7 @@ static PyMethodDef CStreamsMethods[] = {
     {NULL}  /* Sentinel */
 };
 
-struct singleStream allStreams[5];
+struct singleStream allStreams[];
 
 PyMODINIT_FUNC
 initcstreams(void) 

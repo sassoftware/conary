@@ -43,6 +43,8 @@ makePathId = lambda: os.urandom(16)
 
 class SourceState(trove.Trove):
 
+    _streamDict = trove.Trove._streamDict
+
     __slots__ = [ "branch", "pathMap", "lastMerged" ]
 
     def setPathMap(self, map):
@@ -150,6 +152,8 @@ class CONARYFileMissing(Exception):
         return 'CONARY state file does not exist.'
 
 class SourceStateFromFile(SourceState):
+
+    _streamDict = SourceState._streamDict
 
     # name : (isVersion, required)
     fields = { 'name'       : (False, True ),

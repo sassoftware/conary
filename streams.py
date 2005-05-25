@@ -26,6 +26,7 @@ IntStream = cstreams.IntStream
 ShortStream = cstreams.ShortStream
 StringStream = cstreams.StringStream
 StreamSet = cstreams.StreamSet
+LargeStreamSet = cstreams.LargeStreamSet
 StreamSetDef = cstreams.StreamSetDef
 
 class InfoStream(object):
@@ -195,7 +196,7 @@ class FrozenVersionStream(InfoStream):
 	assert(not val or min(val.timeStamps()) > 0)
 	self.v = val
 
-    def freeze(self, skipSet = None):
+    def freeze(self, skipSet = {}):
         # If versionStrings is in skipSet, freeze the string w/o the timestamp.
         # This is a bit of a hack to allow trove signatures to exclude
         # the timestamps. Since those timestamps are reset on the server
@@ -203,7 +204,7 @@ class FrozenVersionStream(InfoStream):
         # changeset impossible.
 	if not self.v:
 	    return ""
-        elif 'versionStrings' in skipSet:
+        elif skipSet and 'versionStrings' in skipSet:
 	    return self.v.asString()
 	else:
 	    return self.v.freeze()
@@ -312,56 +313,6 @@ class StringsStream(list, InfoStream):
 
     def __init__(self, frz = ''):
 	self.thaw(frz)
-
-class LargeStreamSet(InfoStream):
-
-    headerFormat = "!HI"
-    headerSize = 6
-
-    ignoreUnknown = False
-
-    __slots__ = []
-
-    def __init__(self, data = None):
-	for streamType, name in self.streamDict.itervalues():
-	    self.__setattr__(name, streamType())
-
-	if data: 
-	    i = 0
-            dataLen = len(data)
-	    while i < dataLen:
-                assert(i < dataLen)
-		(streamId, size) = struct.unpack(self.headerFormat, 
-						 data[i:i + self.headerSize])
-                tup = self.streamDict.get(streamId, None)
-                i += self.headerSize
-                streamData = data[i:i + size]
-                i += size
-
-                if tup:
-                    (streamType, name) = tup
-                    self.__setattr__(name, streamType(streamData))
-                elif not self.ignoreUnknown:
-                    raise UnknownStream
-
-	    assert(i == dataLen)
-
-    def __eq__(self, other, skipSet = None):
-        assert(0)
-
-    def __ne__(self, other):
-        assert(0)
-
-    def freeze(self, skipSet = {}):
-	rc = []
-
-	for streamId, (streamType, name) in self.streamDict.iteritems():
-            if name in skipSet: continue
-
-            s = self.__getattribute__(name).freeze(skipSet = skipSet)
-	    if len(s):
-		rc.append(struct.pack(self.headerFormat, streamId, len(s)) + s)
-	return "".join(rc)
 
 class ReferencedTroveList(list, InfoStream):
 

@@ -1,3 +1,6 @@
+Changes in 0.60.3:
+  * Reimplemented LargeStreamSet in C
+
 Changes in 0.60.2:
   * Added InitialContent flag 
   * Fixed bug which caused servers to leak file descriptors when the sqldb
