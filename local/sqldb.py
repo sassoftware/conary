@@ -442,7 +442,8 @@ class Database:
                     cu.execute("DROP INDEX foo;")
 
                     cu.execute("UPDATE DatabaseVersion SET version=3")
-                except:
+		    self.db.commit()
+                except sqlite3.ProgrammingError:
                     raise OldDatabaseSchema(
                       "The Conary database on this system is too old. "      \
                       "It will be automatically\nconverted as soon as you "  \
