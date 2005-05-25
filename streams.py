@@ -353,6 +353,64 @@ class ReferencedTroveList(list, InfoStream):
 	if data is not None:
 	    self.thaw(data)
 
+class StreamCollection(InfoStream):
+
+    """
+    streamDict needs to be defined as an index of small ints to
+    Stream class types.
+    """
+
+    def __eq__(self, other):
+        assert(self.__class__ == other.__class__)
+        return self.items == other.items
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def freeze(self):
+        l = []
+        for typeId, itemDict in self.items.iteritems():
+            for item in itemDict:
+                s = item.freeze()
+                l.append(struct.pack("!BH", typeId, len(s)))
+                l.append(s)
+
+        return "".join(l)
+
+    def thaw(self, data):
+        i = 0
+        self.items = dict([ (x, {}) for x in self.streamDict ])
+        while (i < len(data)):
+            typeId, length = struct.unpack("!BH", data[i:i+3])
+            i += 3
+            s = data[i:i+length]
+            item = self.streamDict[typeId](s)
+            self.items[typeId][item] = True
+            i += length
+        
+        assert(i == len(data))
+
+    def addStream(self, typeId, item):
+        assert(item.__class__ == self.streamDict[typeId])
+        self.items[typeId][item] = True
+
+    def delStream(self, typeId, item):
+        del self.items[typeId][item]
+
+    def getStreams(self, typeId):
+        return self.items[typeId]
+
+    def iterAll(self):
+        for typeId, itemDict in self.items.iteritems():
+            for item in itemDict:
+                yield item
+
+    def __init__(self, data = None):
+	if data is not None:
+	    self.thaw(data)
+        else:
+            self.items = dict([ (x, {}) for x in self.streamDict ])
+
 class UnknownStream(Exception):
 
     pass
