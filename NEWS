@@ -24,6 +24,8 @@ Changes in 0.60.2:
     changed to "Trove" throughout the code.  This includes method
     names such as getPrimaryPackageList() -> getPrimaryTroveList().  Some
     more commonly used methods were left as deprecated thunking methods
+  * dependency resolution couldn't resolve a requirement w/o flags against
+    a provides w/ flags
 
 Changes in 0.60.1:
   * Support for legacy clients (protocol version 29) has been removed from

@@ -427,6 +427,20 @@ class Database:
                 try:
                     cu.execute("ALTER TABLE DBInstances ADD COLUMN locked "
                                "BOOLEAN")
+                    cu.execute("CREATE TEMPORARY TABLE tmp (class INTEGER, "
+                               "name STRING, depId INTEGER);")
+                    cu.execute("CREATE INDEX foo ON dependencies(name);")
+                    cu.execute("INSERT INTO tmp SELECT DISTINCT dependencies.class, name, dependencies.depId FROM dependencies WHERE dependencies.flag != '-*none*-';")
+
+                    cu.execute("INSERT INTO dependencies SELECT DISTINCT NULL, class, name, '-*none*-' FROM tmp;")
+                    cu.execute("UPDATE REQUIRES SET depCount=depCount + 1 WHERE depId IN (SELECT DISTINCT depNum FROM tmp JOIN requires ON tmp.depId = requires.depId);")
+
+                    cu.execute("INSERT INTO requires SELECT DISTINCT instanceId, dependencies.depId, depNum, depCount FROM tmp JOIN requires ON tmp.depId = requires.depId JOIN dependencies ON tmp.name = dependencies.name AND dependencies.flag = '-*none*-';")
+
+                    cu.execute("INSERT INTO provides SELECT DISTINCT instanceId, dependencies.depId FROM tmp JOIN provides ON tmp.depId = provides.depId JOIN dependencies ON tmp.name = dependencies.name AND dependencies.flag = '-*none*-';")
+
+                    cu.execute("DROP INDEX foo;")
+
                     cu.execute("UPDATE DatabaseVersion SET version=3")
                 except:
                     raise OldDatabaseSchema(
