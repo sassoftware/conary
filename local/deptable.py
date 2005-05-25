@@ -120,6 +120,10 @@ class DependencyTables:
         for (isProvides, (classId, depClass)) in allDeps:
             for dep in depClass.getDeps():
                 for (depName, flags) in zip(dep.getName(), dep.getFlags()):
+                    cu.execstmt(stmt,
+                                   troveNum, multiplier * len(depList), 
+                                    1 + len(flags), isProvides, classId, 
+                                    depName, NO_FLAG_MAGIC)
                     if flags:
                         for (flag, sense) in flags:
                             # conary 0.12.0 had mangled flags; this check
@@ -128,13 +132,8 @@ class DependencyTables:
                             assert(sense == deps.FLAG_SENSE_REQUIRED)
                             cu.execstmt(stmt,
                                         troveNum, multiplier * len(depList), 
-                                        len(flags), isProvides, classId, 
+                                        1 + len(flags), isProvides, classId, 
                                         depName, flag)
-                    else:
-			cu.execstmt(stmt,
-                                       troveNum, multiplier * len(depList), 
-                                        1, isProvides, classId, 
-                                        depName, NO_FLAG_MAGIC)
 
                 if not isProvides:
                     depList.append((troveNum, classId, dep))
@@ -230,7 +229,8 @@ class DependencyTables:
             depSet = deps.DependencySet()
             for (classId, name, flag) in cu:
                 if (classId, name) == last:
-                    flags.append((flag, deps.FLAG_SENSE_REQUIRED))
+                    if flag != NO_FLAG_MAGIC:
+                        flags.append((flag, deps.FLAG_SENSE_REQUIRED))
                 else:
                     if last:
                         depSet.addDep(deps.dependencyClasses[last[0]],
