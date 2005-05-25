@@ -16,7 +16,8 @@ def suite():
 
 def main():
     runner = unittest.TextTestRunner()
-    runner.run(suite())
+    results = runner.run(suite())
+    return len(results.errors) + len(results.failures)
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
