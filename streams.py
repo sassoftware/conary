@@ -346,27 +346,11 @@ class LargeStreamSet(InfoStream):
 
 	    assert(i == dataLen)
 
-    def diff(self, other):
-        rc = []
-
-	for streamId, (streamType, name) in self.streamDict.iteritems():
-	    d = self.__getattribute__(name).diff(other.__getattribute__(name))
-            if d is not None:
-                rc.append(struct.pack(self.headerFormat, streamId, len(d)) + d)
-
-	return "".join(rc)
-
     def __eq__(self, other, skipSet = None):
-	for streamType, name in self.streamDict.itervalues():
-	    if (not skipSet or not name in skipSet) and \
-               not self.__getattribute__(name).__eq__(
-                            other.__getattribute__(name), skipSet = skipSet):
-		return False
-
-	return True
+        assert(0)
 
     def __ne__(self, other):
-	return not self.__eq__(other)
+        assert(0)
 
     def freeze(self, skipSet = {}):
 	rc = []
@@ -378,27 +362,6 @@ class LargeStreamSet(InfoStream):
 	    if len(s):
 		rc.append(struct.pack(self.headerFormat, streamId, len(s)) + s)
 	return "".join(rc)
-
-    def twm(self, diff, base, skip = []):
-	i = 0
-	conflicts = False
-	
-	while i < len(diff):
-	    streamId, size = struct.unpack(self.headerFormat, 
-					   diff[i:i + self.headerSize])
-
-	    streamType, name = self.streamDict[streamId]
-
-	    i += self.headerSize
-	    if name not in skip:
-		w = self.__getattribute__(name).twm(diff[i:i+size], 
-					       base.__getattribute__(name))
-		conflicts = conflicts or w
-	    i += size
-
-	assert(i == len(diff))
-
-	return conflicts
 
 class ReferencedTroveList(list, InfoStream):
 
