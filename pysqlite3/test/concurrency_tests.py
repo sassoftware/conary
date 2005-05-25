@@ -41,7 +41,7 @@ class ConcurrencyTests(unittest.TestCase):
             assert(str(e) == "database is locked")
         t2 = time.time()
         # make sure we slept 2 seconds
-        assert(t2 - t1 >= 2)
+        assert(t2 - t1 >= 2 and t2 - t1 <= 3)
         db2.commit()
         cu1.stmt.step()
         assert [ x for x in cu1.execute('select * from foo') ] == [(1,), (2,)] 
@@ -65,7 +65,7 @@ class ConcurrencyTests(unittest.TestCase):
             assert(str(e) == "database is locked")
         t2 = time.time()
         # make sure we slept 2 seconds
-        assert(t2 - t1 >= 2)
+        assert(t2 - t1 >= 2 and t2 - t1 <= 3)
         # unlock the database
         db2.rollback()
         # make sure that re-trying the BEGIN works

@@ -567,6 +567,7 @@ sqlite_busy_handler_callback(void* void_data, int num_busy)
 	MY_END_ALLOW_THREADS(con->tstate);
 
 	args = PyTuple_New(2);
+	Py_INCREF(userdata);
 	PyTuple_SetItem(args, 0, userdata);
 	PyTuple_SetItem(args, 1, PyInt_FromLong((long)num_busy));
 
@@ -1095,37 +1096,6 @@ sqlite_version_info(PyObject* self)
 **----------------------------------------------------------------------------
 */
 
-static int busy_wait(pysqlc *con,
-		     int count      /* Number of times table has been busy */)
-{
-	static const char delays[] =
-		{ 1, 2, 5, 10, 15, 20, 25, 25,  25,  50,  50,  50, 100};
-	static const short int totals[] =
-		{ 0, 1, 3,  8, 18, 33, 53, 78, 103, 128, 178, 228, 287};
-# define NDELAY (sizeof(delays)/sizeof(delays[0]))
-	int delay, prior;
-
-	/* if there is a busy callback function, use it */
-	if (con->busy_data != NULL) {
-		return sqlite_busy_handler_callback(con->busy_data, count);
-	}
-	
-	if (count <= NDELAY){
-		delay = delays[count-1];
-		prior = totals[count-1];
-	}
-	else {
-		delay = delays[NDELAY-1];
-		prior = totals[NDELAY-1] + delay*(count-NDELAY-1);
-	}
-	if (prior + delay > con->timeout) {
-		delay = con->timeout - prior;
-		if (delay<=0) return 0;
-	}
-	usleep(delay * 1000);
-	return 1;
-}
-
 static char _stmt_step_doc [] =
 "step()\n\
 Fetch the next row from a the statement.";
@@ -1136,7 +1106,6 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 	int result;
 	int i;
 	PyObject *row;
-	int busy_count = 0;
 
 	if(self->p_stmt == NULL) {
 		PyErr_SetString(_sqlite_ProgrammingError,
@@ -1145,10 +1114,7 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 	}
 
 	MY_BEGIN_ALLOW_THREADS(self->con->tstate);
-	do {
-		result = sqlite3_step(self->p_stmt);
-	} while (result == SQLITE_BUSY && busy_wait(self->con,
-						    busy_count++));
+	result = sqlite3_step(self->p_stmt);
 	MY_END_ALLOW_THREADS(self->con->tstate);
 					 
 	if (result == SQLITE_ROW) {

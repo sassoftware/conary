@@ -4,10 +4,10 @@ import _sqlite3 as _sqlite
 import copy, new, sys, weakref
 from types import *
 
-if _sqlite.sqlite_version_info() >= (3,0,8):
-    _BEGIN = "BEGIN IMMEDIATE"
-else:
-    _BEGIN = "BEGIN"
+if _sqlite.sqlite_version_info() < (3,2,1):
+    raise RuntimeError, "sqlite too old"
+
+_BEGIN = "BEGIN IMMEDIATE"
 
 if sys.version_info[:2] >= (2,2):
     MyStopIteration = StopIteration
