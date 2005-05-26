@@ -71,24 +71,16 @@ class HttpHandler(WebHandler):
 
     def _methodHandler(self):
         """Handle either an HTTP POST or GET command."""
-        self.writeFn = self.req.write
-        cmd = os.path.basename(self.req.path_info)
 
         # return a possible error code from getAuth (malformed auth header, etc)
         auth = getAuth(self.req)
         if type(auth) is int:
             return auth
 
-        if cmd.startswith('_'):
-            return apache.HTTP_NOT_FOUND
-
-        self.req.content_type = "application/xhtml+xml"
-
         try:
-            method = self._getHandler(cmd)
+            method = self._getHandler(self.cmd)
         except AttributeError:
             return apache.HTTP_NOT_FOUND
-        self.fields = FieldStorage(self.req)
 
         d = dict(self.fields)
         d['auth'] = auth

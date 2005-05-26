@@ -12,6 +12,7 @@
 # full details.
 #
 import base64
+import os
 
 # kid imports
 import kid
@@ -25,6 +26,8 @@ import webauth
 
 # helper class for web handlers
 class WebHandler(object):
+    content_type = "application/xhtml+xml"
+
     def _checkAuth(self, authToken):
         raise NotImplementedError
 
@@ -39,6 +42,17 @@ class WebHandler(object):
     def __init__(self, req, cfg):
         self.req = req
         self.cfg = cfg
+
+        self.fields = FieldStorage(self.req)
+        self.cookies = Cookie.get_cookies(self.req, Cookie.Cookie)
+        self.writeFn = self.req.write
+        
+        self.req.content_type = self.content_type
+                
+        self.cmd = os.path.basename(self.req.path_info)
+        
+        if self.cmd.startswith('_'):
+            raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
 
     def _redirect(self, location):
         self.req.headers_out['Location'] = location
