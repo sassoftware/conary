@@ -105,6 +105,11 @@ class ServerCache:
 		serverName = item.label().getHost()
 	    else:
 		serverName = item.branch().label().getHost()
+        if serverName == 'local':
+            raise repository.OpenError(
+             '\nError: Tried to access repository on reserved host name'
+             ' "local" -- this host is reserved for troves compiled/created'
+             ' locally, and cannot be queried.')
 
 	server = self.cache.get(serverName, None)
 	if server is None:
