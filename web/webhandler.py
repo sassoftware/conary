@@ -33,6 +33,9 @@ class WebHandler(object):
            Needs to raise AttributeError if that method does not exist."""
         raise NotImplementedError
 
+    def _methodHandler(self):
+        raise NotImplementedError
+
     def __init__(self, req, cfg):
         self.req = req
         self.cfg = cfg
@@ -45,6 +48,6 @@ class WebHandler(object):
         # both GET and POST events are treated the same way
         method = self.req.method.upper()
         if method in ("GET", "POST"):
-            return self._method_handler()
+            return self._methodHandler()
         else:
             return apache.HTTP_METHOD_NOT_ALLOWED
