@@ -33,7 +33,8 @@ import updatecmd
 
 def usage():
     print """Usage: yuck [--missing] [--update] [--except <exception,...>]
-            [--display|--display-only <displayparam>,<displayparam>]
+            [--display|--display-only <displayparam>,<displayparam>] 
+            [--root <root>]
 
         display parameters: [no]change,name,local,version,repo,flavor
          """                      
@@ -53,6 +54,8 @@ def main(argv):
     display['flavor'] = False
     args = argv[1:]
     lastArg = ''
+    cfg = conarycfg.ConaryConfiguration()
+
     while args:
         arg = args[0]
         args = args[1:]
@@ -85,6 +88,9 @@ def main(argv):
                 display[param] = value
         elif arg == '--update':
             doUpdate = True
+        elif arg == '--root':
+            cfg.configLine('root %s' % args[0])
+            args = args[1:]
         else:
             usage()
             print "Error: unknown option", arg
@@ -95,7 +101,6 @@ def main(argv):
         if not display[param]:
             displayOrder.remove(param)
     
-    cfg = conarycfg.ConaryConfiguration()
     cfg.initializeFlavors()
     
     repos = netclient.NetworkRepositoryClient(cfg.repositoryMap)
@@ -162,8 +167,9 @@ def main(argv):
                     else:
                         repoVersions.sort()
                         v = repoVersions[-1]
-                        f = deps.formatFlavor(versionList[pkg][v][0])
-                        if v.isAfter(lv) and v not in dbVersions:
+                        f = versionList[pkg][v][0]
+                        if v.isAfter(lv) and (v, f) not in dbVersions:
+                            f = deps.formatFlavor(f)
                             updates.append((branch.asString(), pkg, lv, v, f))
     maxL = 0
     maxF = 0
