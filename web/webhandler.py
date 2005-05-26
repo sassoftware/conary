@@ -23,7 +23,7 @@ from mod_python.util import FieldStorage
 
 import webauth
 
-
+# helper class for web handlers
 class WebHandler(object):
     def _checkAuth(self, authToken):
         raise NotImplementedError
@@ -48,43 +48,3 @@ class WebHandler(object):
             return self._method_handler()
         else:
             return apache.HTTP_METHOD_NOT_ALLOWED
-
-    def _method_handler(self):
-        cookies = Cookie.get_cookies(self.req, Cookie.Cookie)
-        
-        if 'authToken' in cookies:
-            auth = base64.decodestring(cookies['authToken'].value)
-            authToken = auth.split(":")
-
-            try:
-                auth = self._checkAuth(authToken)
-            except NotImplementedError:
-                auth = webauth.Authorization()
-
-            if not auth.passwordOK:
-                cookie = Cookie.Cookie('authToken', '')
-                cookie.expires = time.time() - 300
-                Cookie.add_cookie(self.req, cookie)
-                return self._redirect("login")
-        else:
-            authToken = ('anonymous', 'anonymous')
-            self._checkAuth(authToken)
-            auth = webauth.Authorization()
-
-        self.authToken = authToken
-        self.auth = auth
-
-        cmd = self.req.path_info
-        if cmd.startswith("/"):
-            cmd = cmd[1:]
-
-        self.req.content_type = "text/html"
-        if cmd.startswith("_"):
-            return apache.HTTP_NOT_FOUND 
-        
-        method = self._getHandler(cmd, auth)
-        self.fields = FieldStorage(self.req)
-
-        d = dict(self.fields)
-        d['auth'] = self.auth
-        return method(**d)
