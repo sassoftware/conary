@@ -226,20 +226,10 @@ class HttpHandler(WebHandler):
                write = "off", capped = "off", admin = "off")
     def addPerm(self, auth, group, label, trove,
                 write, capped, admin):
-        # silly gyrations
-        if write == "on":
-            write = True
-        else:
-            write = False
-        if capped == "on":
-            capped = True
-        else:
-            capped = False
-        if admin == "on":
-            admin = True
-        else:
-            admin = False
-        
+        write = (write == "on")
+        capped = (capped == "on")
+        admin = (admin == "on")
+       
         self.repServer.auth.addAcl(group, trove, label,
                                    write, capped, admin)
         self._write("notice", message = "Permission successfully added.",
