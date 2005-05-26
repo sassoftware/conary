@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 Specifix, Inc.
+# Copyright (c) 2004-2005 rpath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -22,10 +22,9 @@ through eponymous interfaces in recipe.  Most of these policies are rarely
 expected to be invoked in some recipes.
 """
 
-from lib import util
+from lib import util, log
 import os
 import policy
-from lib import log
 from deps import deps
 import re
 import stat
@@ -64,13 +63,12 @@ class NonBinariesInBindirs(policy.Policy):
 	d = self.macros['destdir']
 	mode = os.lstat(util.joinPaths(d, file))[stat.ST_MODE]
 	if not mode & 0111:
-	    self.recipe.reportErrors(
-		"%s has mode 0%o with no executable permission in bindir"
-		%(file, mode))
+            self.error(
+                "%s has mode 0%o with no executable permission in bindir",
+                file, mode)
 	m = self.recipe.magic[file]
 	if m and m.name == 'ltwrapper':
-	    self.recipe.reportErrors(
-		"%s is a build-only libtool wrapper script" %file)
+            self.error("%s is a build-only libtool wrapper script", file)
 
 
 class FilesInMandir(policy.Policy):
@@ -90,7 +88,7 @@ class FilesInMandir(policy.Policy):
     recursive = False
 
     def doFile(self, file):
-	self.recipe.reportErrors("%s is non-directory file in mandir" %file)
+        self.error("%s is non-directory file in mandir", file)
 
 
 class BadInterpreterPaths(policy.Policy):
@@ -110,13 +108,13 @@ class BadInterpreterPaths(policy.Policy):
 	if m and m.name == 'script':
             interp = m.contents['interpreter']
             if not interp:
-                self.recipe.reportErrors(
-                    'missing interpreter in "%s", missing buildRequires?'
-                    %path)
+                self.error(
+                    'missing interpreter in "%s", missing buildRequires?',
+                    path)
             elif interp[0] != '/':
-                self.recipe.reportErrors(
-                    "illegal relative interpreter path %s in %s (%s)"
-                    %(interp, path, m.contents['line']))
+                self.error(
+                    "illegal relative interpreter path %s in %s (%s)",
+                    interp, path, m.contents['line'])
 
 
 class NonMultilibComponent(policy.Policy):
@@ -165,10 +163,10 @@ class NonMultilibComponent(policy.Policy):
         else:
             self.foundlib[p] = path
         if self.foundlib64[p] and self.foundlib[p] and not self.reported[p]:
-            self.recipe.reportErrors(
+            self.error(
                 '%s packages may install in /usr/lib or /usr/lib64,'
-                ' but not both: at least %s and %s both exist' %(
-                p, self.foundlib[p], self.foundlib64[p]))
+                ' but not both: at least %s and %s both exist',
+                p, self.foundlib[p], self.foundlib64[p])
             self.reported[p] = True
 
 
@@ -186,7 +184,8 @@ class NonMultilibDirectories(policy.Policy):
         return True
 
     def doFile(self, path):
-        self.recipe.reportErrors('path %s has illegal lib64 component on 32-bit platform' %path)
+        self.error('path %s has illegal lib64 component on 32-bit platform',
+                   path)
 
 
 
@@ -202,11 +201,11 @@ class ImproperlyShared(policy.Policy):
         m = self.recipe.magic[file]
 	if m:
 	    if m.name == "ELF":
-		self.recipe.reportErrors(
-		    "Architecture-specific file %s in shared data directory" %file)
+                self.error(
+                    "Architecture-specific file %s in shared data directory",
+                    file)
 	    if m.name == "ar":
-		self.recipe.reportErrors(
-		    "Possibly architecture-specific file %s in shared data directory" %file)
+                self.error("Possibly architecture-specific file %s in shared data directory", file)
 
 
 class CheckSonames(policy.Policy):
@@ -232,9 +231,9 @@ class CheckSonames(policy.Policy):
 		    target = m.contents['soname']+'.something'
 		else:
 		    target = m.contents['soname']
-		log.warning(
-		    '%s is not a symlink but probably should be a link to %s',
-		    path, target)
+                self.warn(
+                    '%s is not a symlink but probably should be a link to %s',
+                    path, target)
 	    return
 
 	# store initial contents
@@ -251,21 +250,21 @@ class CheckSonames(policy.Policy):
 
 	if m and m.name == 'ELF' and 'soname' in m.contents:
 	    if so == linkpath:
-		log.debug('%s is final path, soname is %s;'
-		    ' soname usually is symlink to specific implementation',
-		    linkpath, m.contents['soname'])
+                self.dbg('%s is final path, soname is %s;'
+                    ' soname usually is symlink to specific implementation',
+                    linkpath, m.contents['soname'])
 	    soname = util.normpath(util.joinPaths(
 			os.path.dirname(sopath), m.contents['soname']))
 	    s = soname[destlen:]
 	    try:
 		os.stat(soname)
 		if not os.path.islink(soname):
-		    log.warning('%s has soname %s; therefore should be a symlink',
-			s, m.contents['soname'])
+                    self.warn('%s has soname %s; therefore should be a symlink',
+                              s, m.contents['soname'])
 	    except:
-		log.warning("%s implies %s, which does not exist --"
-			    " use r.Ldconfig('%s')?", path, s,
-			    os.path.dirname(path))
+                self.warn("%s implies %s, which does not exist --"
+                          " use r.Ldconfig('%s')?",
+                          path, s, os.path.dirname(path))
 
 
 class RequireChkconfig(policy.Policy):
@@ -292,8 +291,7 @@ class RequireChkconfig(policy.Policy):
                 foundChkconfig = True
                 break
         if not foundChkconfig:
-	    self.recipe.reportErrors(
-		"initscript %s must contain chkconfig information before any uncommented lines"  %path)
+            self.error("initscript %s must contain chkconfig information before any uncommented lines", path)
 
 
 class CheckDestDir(policy.Policy):
@@ -305,14 +303,13 @@ class CheckDestDir(policy.Policy):
     def doFile(self, file):
 	d = self.macros.destdir
 	if file.find(d) != -1:
-	    self.recipe.reportErrors('Path %s contains destdir %s' %(file, d))
+            self.error('Path %s contains destdir %s', file, d)
 	fullpath = d+file
 	if os.path.islink(fullpath):
 	    contents = os.readlink(fullpath)
 	    if contents.find(d) != -1:
-		self.recipe.reportErrors(
-		    'Symlink %s contains destdir %s in contents %s'
-		    %(file, d, contents))
+                self.error('Symlink %s contains destdir %s in contents %s',
+                           file, d, contents)
 
 
 # now the packaging classes
@@ -472,8 +469,8 @@ class PackageSpec(_filterSpec):
         recipe.autopkg.walk(self.macros['destdir'])
 
 
-def _markConfig(recipe, filename, fullpath):
-    log.debug('config: %s', filename)
+def _markConfig(policy, filename, fullpath):
+    policy.dbg('config: %s', filename)
     f = file(fullpath)
     f.seek(0, 2)
     if f.tell():
@@ -482,9 +479,9 @@ def _markConfig(recipe, filename, fullpath):
 	lastchar = f.read(1)
 	f.close()
 	if lastchar != '\n':
-	    recipe.reportErrors("config file %s missing trailing newline" %filename)
+	    policy.error("config file %s missing trailing newline" %filename)
     f.close()
-    recipe.autopkg.pathMap[filename].flags.isConfig(True)
+    policy.recipe.autopkg.pathMap[filename].flags.isConfig(True)
 
 class EtcConfig(policy.Policy):
     """
@@ -501,11 +498,11 @@ class EtcConfig(policy.Policy):
 	    # can be ELF or shell scripts; we just want tag handlers
 	    # to be config files if they are shell scripts.
 	    # Just in case it was not intentional, warn...
-	    log.debug('ELF file %s found in config directory', file)
+            self.dbg('ELF file %s found in config directory', file)
 	    return
 	fullpath = ('%(destdir)s/'+file) %self.macros
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    _markConfig(self.recipe, file, fullpath)
+	    _markConfig(self, file, fullpath)
 
 
 class Config(policy.Policy):
@@ -521,7 +518,7 @@ class Config(policy.Policy):
     def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    _markConfig(self.recipe, filename, fullpath)
+	    _markConfig(self, filename, fullpath)
 
 
 class InitialContents(policy.Policy):
@@ -539,13 +536,13 @@ class InitialContents(policy.Policy):
 	fullpath = self.macros.destdir + filename
         recipe = self.recipe
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-            log.debug('initial contents: %s', filename)
+            self.dbg('initial contents: %s', filename)
             f = recipe.autopkg.pathMap[filename]
             f.flags.isInitialContents(True)
             if f.flags.isConfig():
-                recipe.reportErrors(
+                self.error(
                     '%s is marked as both a configuration file and'
-                    ' an initial contents file' %filename)
+                    ' an initial contents file', filename)
 
 
 
@@ -568,12 +565,12 @@ class Transient(policy.Policy):
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
             recipe = self.recipe
             f = recipe.autopkg.pathMap[filename]
-	    log.debug('transient: %s', filename)
+            self.dbg('transient: %s', filename)
 	    f.flags.isTransient(True)
             if f.flags.isConfig() or f.flags.isInitialContents():
-                recipe.reportErrors(
+                self.error(
                     '%s is marked as both a transient file and'
-                    ' a configuration or intial contents file' %filename)
+                    ' a configuration or initial contents file', filename)
 
 
 class SharedLibrary(policy.Policy):
@@ -603,7 +600,7 @@ class SharedLibrary(policy.Policy):
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
 	    m = self.recipe.magic[file]
 	    if m and m.name == 'ELF' and 'soname' in m.contents:
-		log.debug('shared library: %s', file)
+                self.dbg('shared library: %s', file)
 		self.recipe.autopkg.pathMap[file].tags.set("shlib")
 
 
@@ -619,7 +616,7 @@ class TagDescription(policy.Policy):
     def doFile(self, file):
 	fullpath = self.macros.destdir + file
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    log.debug('conary tag file: %s', file)
+            self.dbg('conary tag file: %s', file)
 	    self.recipe.autopkg.pathMap[file].tags.set("tagdescription")
 
 
@@ -635,7 +632,7 @@ class TagHandler(policy.Policy):
     def doFile(self, file):
 	fullpath = self.macros.destdir + file
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    log.debug('conary tag handler: %s', file)
+            self.dbg('conary tag handler: %s', file)
 	    self.recipe.autopkg.pathMap[file].tags.set("taghandler")
 
 
@@ -739,7 +736,7 @@ class TagSpec(_addInfo):
         # and therefore markTag will be called twice.
         tags = self.recipe.autopkg.pathMap[path].tags
         if tag not in tags:
-            log.debug('%s: %s', name, path)
+            self.dbg('%s: %s', name, path)
             tags.set(tag)
 
     def runInfo(self, path):
@@ -750,8 +747,8 @@ class TagSpec(_addInfo):
                     if tag in self.excluded:
 		        for filt in self.excluded[tag]:
                             if filt.match(path):
-			        log.debug('ignoring tag match for %s: %s',
-				      tag, path)
+                                self.dbg('ignoring tag match for %s: %s',
+                                         tag, path)
                                 isExcluded = True
                                 break
                     if not isExcluded:
@@ -768,8 +765,8 @@ class TagSpec(_addInfo):
 		    for filt in self.excluded[tag.tag]:
 			# exception handling is per-tag, so handled specially
 			if filt.match(path):
-			    log.debug('ignoring tag match for %s: %s',
-				      name, path)
+                            self.dbg('ignoring tag match for %s: %s',
+                                     name, path)
                             isExcluded = True
 			    break
                 if not isExcluded:
@@ -915,7 +912,8 @@ class DanglingSymlinks(policy.Policy):
 	if os.path.islink(f):
 	    contents = os.readlink(f)
 	    if contents[0] == '/':
-		log.warning('Absolute symlink %s points to %s, should probably be relative', path, contents)
+                self.warn('Absolute symlink %s points to %s,'
+                          ' should probably be relative', path, contents)
 		return
 	    abscontents = util.joinPaths(os.path.dirname(path), contents)
 	    if abscontents in recipe.autopkg.pathMap:
@@ -924,22 +922,22 @@ class DanglingSymlinks(policy.Policy):
 		   not path.endswith('.so') and \
 		   not componentMap[path].getName().endswith(':test'):
 		    # warn about suspicious cross-component symlink
-		    log.warning('symlink %s points from package %s to %s',
-				path, componentMap[path].getName(),
-				componentMap[abscontents].getName())
+                    self.warn('symlink %s points from package %s to %s',
+                              path, componentMap[path].getName(),
+                              componentMap[abscontents].getName())
 	    else:
 		for targetFilter, requirement in self.targetFilters:
 		    if targetFilter.match(abscontents):
 			# contents are an exception
-			log.debug('allowing special dangling symlink %s -> %s',
-				  path, contents)
+                        self.dbg('allowing special dangling symlink %s -> %s',
+                                 path, contents)
                         if requirement:
-                            log.debug('automatically adding requirement'
-                                      ' %s for symlink %s', requirement, path)
+                            self.dbg('automatically adding requirement'
+                                     ' %s for symlink %s', requirement, path)
                             recipe.Requires(requirement,
                                             util.literalRegex(path))
 			return
-		recipe.reportErrors(
+		self.error(
 		    "Dangling symlink: %s points to non-existant %s (%s)"
 		    %(path, contents, abscontents))
 
@@ -967,7 +965,7 @@ class AddModes(policy.Policy):
 	    mode = self.fixmodes[path]
 	    # set explicitly, do not warn
 	    self.recipe.WarnWriteable(exceptions=path.replace('%', '%%'))
-	    log.debug('suid/sgid: %s mode 0%o', path, mode & 07777)
+            self.dbg('suid/sgid: %s mode 0%o', path, mode & 07777)
 	    self.recipe.autopkg.pathMap[path].inode.perms.set(mode)
 
 
@@ -991,8 +989,8 @@ class WarnWriteable(policy.Policy):
 		type = "directory"
 	    else:
 		type = "file"
-	    log.warning('Possibly inappropriately writeable permission'
-			' 0%o for %s %s', mode & 0777, type, file)
+            self.warn('Possibly inappropriately writeable permission'
+                      ' 0%o for %s %s', mode & 0777, type, file)
 
 
 class WorldWriteableExecutables(policy.Policy):
@@ -1009,9 +1007,9 @@ class WorldWriteableExecutables(policy.Policy):
 	d = self.macros['destdir']
 	mode = os.lstat(util.joinPaths(d, file))[stat.ST_MODE]
         if mode & 0111 and mode & 02 and not stat.S_ISLNK(mode):
-	    self.recipe.reportErrors(
-		"%s has mode 0%o with world-writeable permission in bindir"
-		%(file, mode))
+            self.error(
+                "%s has mode 0%o with world-writeable permission in bindir",
+                file, mode)
 
 
 
@@ -1066,8 +1064,8 @@ class FilesForDirectories(policy.Policy):
                     # XXX only report error if directory is included in
                     # the package; if it is merely in the filesystem
                     # only log a warning.  Needs to follow ExcludeDirectories...
-		    self.recipe.reportErrors(
-			'File %s should be a directory; bad r.Install()?' %path)
+                    self.error(
+                        'File %s should be a directory; bad r.Install()?', path)
 
 
 class ObsoletePaths(policy.Policy):
@@ -1088,9 +1086,8 @@ class ObsoletePaths(policy.Policy):
                 # XXX only report error if directory is included in
                 # the package; if it is merely in the filesystem
                 # only log a warning.  Needs to follow ExcludeDirectories...
-		self.recipe.reportErrors(
-		    'Path %s should not exist, use %s instead'
-                    %(path, self.candidates[path]))
+                self.error('Path %s should not exist, use %s instead',
+                           path, self.candidates[path])
 
 
 class IgnoredSetuid(policy.Policy):
@@ -1109,8 +1106,8 @@ class IgnoredSetuid(policy.Policy):
 		type = "directory"
 	    else:
 		type = "file"
-	    log.warning('%s %s has unpackaged set{u,g}id mode 0%o in filesystem'
-			%(type, file, mode&06777))
+            self.warn('%s %s has unpackaged set{u,g}id mode 0%o in filesystem',
+                      type, file, mode&06777)
 
 
 
@@ -1240,28 +1237,28 @@ class Ownership(policy.Policy):
 	    pkgfile.inode.owner.set(owner)
             if owner in self.recipe.usermap:
                 # XXX fill this in when there is something to do with it
-                log.warning('User "%s" definition ignored for file %s, not yet implemented',
-                    owner, filename)
+                self.warn('User "%s" definition ignored for file %s, not yet implemented',
+                          owner, filename)
             elif owner not in self.systemusers:
-                log.warning('User "%s" missing definition for file %s',
-                    owner, filename)
+                self.warn('User "%s" missing definition for file %s',
+                          owner, filename)
             if owner in self.recipe.suppmap:
                 # XXX fill this in when there is something to do with it
-                log.warning('SupplementalGroup "%s" definition ignored for file %s, not yet implemented',
-                    self.recipe.suppmap[owner][0], filename)
+                self.warn('SupplementalGroup "%s" definition ignored for file %s, not yet implemented',
+                          self.recipe.suppmap[owner][0], filename)
 	if group:
 	    pkgfile.inode.group.set(group)
             if group in self.recipe.grpmap:
                 # XXX fill this in when there is something to do with it
-                log.warning('Group "%s" definition ignored for file %s, not yet implemented',
-                    group, filename)
+                self.warn('Group "%s" definition ignored for file %s, not yet implemented',
+                          group, filename)
             elif group in self.recipe.usergrpmap:
                 # maingroup for user
-                log.warning('Group "%s" definition ignored for file %s, not yet implemented',
-                    group, filename)
+                self.warn('Group "%s" definition ignored for file %s, not yet implemented',
+                          group, filename)
             elif group not in self.systemgroups:
-                log.warning('Group "%s" missing definition for file %s',
-                    group, filename)
+                self.warn('Group "%s" missing definition for file %s',
+                          group, filename)
 
 
 class _Utilize(policy.Policy):
@@ -1356,9 +1353,9 @@ class ExcludeDirectories(policy.Policy):
 	s = os.lstat(fullpath)
 	mode = s[stat.ST_MODE]
 	if mode & 0777 != 0755:
-	    log.debug('excluding directory %s with mode %o', path, mode&0777)
+            self.dbg('excluding directory %s with mode %o', path, mode&0777)
 	elif not os.listdir(fullpath):
-	    log.debug('excluding empty directory %s', path)
+            self.dbg('excluding empty directory %s', path)
 	self.recipe.autopkg.delFile(path)
 
 
@@ -1370,11 +1367,9 @@ class LinkCount(policy.Policy):
         for component in self.recipe.autopkg.getComponents():
             for path in component.hardlinks:
                 if self.recipe.autopkg.pathMap[path].flags.isConfig():
-                    self.recipe.reportErrors(
-                        "Config file %s has illegal hard links" %path)
+                    self.error("Config file %s has illegal hard links", path)
             for path in component.badhardlinks:
-                self.recipe.reportErrors(
-                    "Special file %s has illegal hard links" %path)
+                self.error("Special file %s has illegal hard links", path)
 
 
 class ComponentRequires(policy.Policy):
@@ -1522,8 +1517,7 @@ class Requires(_addInfo):
                             os.path.exists(self.recipe.macros.destdir+interp)):
                         # this interpreter not on system, warn
                         # cannot be an error to prevent buildReq loops
-                        log.warning(
-                            'interpreter "%s" (referenced in %s) missing',
+                        self.warn('interpreter "%s" (referenced in %s) missing',
                             interp, path)
                         # N.B. no special handling for /{,usr/}bin/env here;
                         # if there has been an exception to
@@ -1543,16 +1537,13 @@ class Requires(_addInfo):
                 depClass = deps.FileDependencies
             else: # by process of elimination, must be a trove
                 if info.startswith('group-'):
-                    self.recipe.reportErrors(
-                        'group dependency %s not allowed' %info)
+                    self.error('group dependency %s not allowed', info)
                     return
                 if info.startswith('fileset-'):
-                    self.recipe.reportErrors(
-                        'fileset dependency %s not allowed' %info)
+                    self.error('fileset dependency %s not allowed', info)
                     return
                 if ':' not in info:
-                    self.recipe.reportErrors(
-                        'package dependency %s not allowed' %info)
+                    self.error('package dependency %s not allowed', info)
                     return
                 depClass = deps.TroveDependencies
             self._addRequirement(path, info, pkg, depClass)
@@ -1563,8 +1554,8 @@ class Requires(_addInfo):
                 # exception handling is per-requirement,
                 # so handled specially
                 if filt.match(path):
-                    log.debug('ignoring requirement match for %s: %s',
-                              path, info)
+                    self.dbg('ignoring requirement match for %s: %s',
+                             path, info)
                     return False
         return True
 
@@ -1768,7 +1759,7 @@ class reportErrors(policy.Policy):
 	"""
 	Called once, with printf-style arguments, for each warning.
 	"""
-	self.warnings.append(args[0] %args[1:])
+	self.warnings.append(args[0] %tuple(args[1:]))
     def do(self):
 	if self.warnings:
 	    for warning in self.warnings:

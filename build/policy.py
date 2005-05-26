@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 Specifix, Inc.
+# Copyright (c) 2004-2005 rpath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -15,7 +15,7 @@
 Base classes used for destdirpolicy and packagepolicy.
 """
 
-from lib import util
+from lib import util, log
 import filter
 import os
 import action
@@ -24,7 +24,7 @@ import action
 
 class Policy(action.RecipeAction):
     """
-    Pure virtual superclass for all policy actions.  Policy actions
+    Abstract superclass for all policy actions.  Policy actions
     that operate on the entire C{%(destdir)s} implement the C{do} method;
     Policy actions that operate on a per-file basis implement the
     C{doFile} method.  The C{doFile} function is never called for files
@@ -256,6 +256,31 @@ class Policy(action.RecipeAction):
 	    if f.match(filespec):
 		return True
 	return False
+
+    # warning and error reporting
+
+    def _addClassName(self, args):
+        args = list(args)
+        classname = str(self.__class__).split('.')[-1]
+        args[0] = ': '.join((classname, args[0]))
+        return args
+
+    def dbg(self, *args, **kwargs):
+        args = self._addClassName(args)
+        log.debug(*args, **kwargs)
+
+    def info(self, *args, **kwargs):
+        args = self._addClassName(args)
+        log.info(*args, **kwargs)
+
+    def warn(self, *args, **kwargs):
+        args = self._addClassName(args)
+        log.warning(*args, **kwargs)
+
+    def error(self, *args, **kwargs):
+        args = self._addClassName(args)
+        log.error(*args, **kwargs)
+        self.recipe.reportErrors(*args, **kwargs)
 
 
 class PolicyError(Exception):

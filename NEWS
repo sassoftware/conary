@@ -1,6 +1,9 @@
 Changes in 0.60.3:
   * Reimplemented LargeStreamSet in C
   * Added StreamCollection
+  * Policies now announce their names in their information, warning,
+    debug, and error messages, making it easier to determine how to
+    resolve problems.
 
 Changes in 0.60.2:
   * Added InitialContent flag 

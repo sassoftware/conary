@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 Specifix, Inc.
+# Copyright (c) 2004-2005 rpath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -35,7 +35,6 @@ import shutil
 import stat
 
 #conary imports
-from lib import log
 from lib import magic
 from lib import util
 import macros
@@ -262,7 +261,7 @@ class TestSuiteLinks(policy.Policy):
 	# I give up: don't make the link because it's probably wrong
 	# XXX other, missing tests: magic, close filenames, close sizes
 	# destdirlen = len(self.macros.destdir)
-	# log.warning('Could not determine which builddir file %s corresponds to for creating test component' % fullpath[destdirlen:])
+        # self.warn('Could not determine which builddir file %s corresponds to for creating test component', fullpath[destdirlen:])
 	return None
 
 
@@ -483,7 +482,7 @@ class FixupMultilibPaths(policy.Policy):
 	m = self.recipe.magic[path]
 	if stat.S_ISREG(mode) and (
             not m or (m.name != "ELF" and m.name != "ar")):
-	    log.warning("non-object file with library name %s", path)
+            self.warn("non-object file with library name %s", path)
 	    return
 	basename = os.path.basename(path)
         currentsubtree = self.currentsubtree % self.macros
@@ -511,8 +510,8 @@ class FixupMultilibPaths(policy.Policy):
 	    raise DestdirPolicyError(
 		"Conflicting library files %s and %s installed" %(
 		    path, target))
-	log.warning('Multilib error: file %s found in wrong directory,'
-		    ' attempting to fix...' %path)
+        self.warn('file %s found in wrong directory, attempting to fix...',
+                  path)
         util.mkdirChain(destdir + targetdir)
         if stat.S_ISREG(mode):
             util.rename(destdir + path, fulltarget)
@@ -585,7 +584,7 @@ class ExecutableLibraries(policy.Policy):
 	if mode & 0111:
 	    # has some executable bit set
 	    return
-	log.warning('non-executable library %s, changing to mode 0755' %path)
+        self.warn('non-executable library %s, changing to mode 0755', path)
 	os.chmod(fullpath, 0755)
 
 class UTF8Filenames(policy.Policy):
@@ -598,7 +597,7 @@ class UTF8Filenames(policy.Policy):
             path.decode('utf-8')
         except UnicodeDecodeError:
             #self.recipe.reportErrors('path "%s" is not valid UTF-8' %path)
-            log.warning('path "%s" is not valid UTF-8' %path)
+            self.warn('path "%s" is not valid UTF-8', path)
 
 class ReadableDocs(policy.Policy):
     """
@@ -618,8 +617,8 @@ class ReadableDocs(policy.Policy):
             isExec = mode & 0111
             if isExec:
                 mode |= 0011
-            log.warning('non group and world documentation file %s, changing'
-                        ' to mode 0%o' %(path, mode & 07777))
+            self.warn('non group and world documentation file %s, changing'
+                      ' to mode 0%o', path, mode & 07777)
             os.chmod(fullpath, mode)
 
 class Strip(policy.Policy):
@@ -846,9 +845,9 @@ class NormalizeManPages(policy.Policy):
 			    # directory:
 			    targetpath = os.sep.join((dirname, matchlist[l-1]))
 			    if os.path.exists(targetpath):
-				log.debug('replacing %s (%s) with symlink %s',
-					  name, match.group(0),
-					  os.path.basename(match.group(1)))
+                                self.dbg('replacing %s (%s) with symlink %s',
+                                         name, match.group(0),
+                                         os.path.basename(match.group(1)))
 				os.remove(path)
 				os.symlink(os.path.basename(match.group(1)),
 					   path)
@@ -861,8 +860,8 @@ class NormalizeManPages(policy.Policy):
 						  matchlist[l-1])
 			    targetpath = os.sep.join((dirname, target))
 			    if os.path.exists(targetpath):
-				log.debug('replacing %s (%s) with symlink %s',
-					  name, match.group(0), target)
+                                self.dbg('replacing %s (%s) with symlink %s',
+                                          name, match.group(0), target)
 				os.remove(path)
 				os.symlink(target, path)
 
@@ -987,8 +986,8 @@ class NormalizeAppDefaults(policy.Policy):
             return
 
         x = '%(destdir)s/%(x11prefix)s/lib/X11/app-defaults' % self.macros
-        log.warning('app-default files misplaced in'
-                    ' %(sysconfdir)s/X11/app-defaults' % self.macros)
+        self.warn('app-default files misplaced in'
+                  ' %(sysconfdir)s/X11/app-defaults' % self.macros)
         if os.path.islink(x):
             util.remove(x)
         util.mkdirChain(x)
@@ -1046,8 +1045,8 @@ class NormalizeInterpreterPaths(policy.Policy):
                 f.close()
                 # revert any change to mode
                 os.chmod(d, mode)
-                log.info('changing %s to %s in %s'
-                         %(line, " ".join(wordlist), path))
+                self.info('changing %s to %s in %s',
+                          line, " ".join(wordlist), path)
                 del self.recipe.magic[path]
 
 
@@ -1101,7 +1100,7 @@ class RelativeSymlinks(policy.Policy):
                 # prefer writing relative symlinks, since we want them to
                 # create absolute symlinks and let us make minimal relative
                 # symlink from them, so let's not make noise about this.
-                #log.debug('Changing absolute symlink %s -> %s to relative symlink -> %s',
+                #self.dbg('Changing absolute symlink %s -> %s to relative symlink -> %s',
                 #          path, contents, normpath)
 		os.symlink(normpath, fullpath)
 
