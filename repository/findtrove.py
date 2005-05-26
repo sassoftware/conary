@@ -61,11 +61,9 @@ class Query:
         self.acrossFlavors = acrossFlavors
 
     def reset(self):
-        if self.defaultFlavorPath is None:
-            self.query = [{}]
-        else:
-            self.query = [{} for x in self.defaultFlavorPath]
-        self.map = {}
+        for dct in self.query:
+            dct.clear()
+        self.map.clear()
 
     def hasName(self, name):
         return name in self.map
@@ -345,15 +343,21 @@ class QueryByBranch(Query):
                                                        acrossFlavors)
         self.queryNoFlavor = {}
         self.affinityFlavors = {}
+        # localTroves are troves that, through affinity, are assigned to
+        # a local branch.  Since there's no repository associated with 
+        # local branches, there's no chance of an update available.  
+        # We merely return an empty set of troves, showing that there were
+        # no updates found for that trove.
+        self.localTroves = set()
 
     def reset(self):
         Query.reset(self)
-        self.queryNoFlavor = {}
-        self.affinityFlavors = {}
+        self.queryNoFlavor.clear()
+        self.affinityFlavors.clear()
+        self.localTroves.clear()
 
     def addQuery(self, troveTup, branch, flavorList):
         name = troveTup[0]
-
         if flavorList is None:
             self.queryNoFlavor[name] = { branch : None }
         else:
@@ -383,13 +387,22 @@ class QueryByBranch(Query):
             self.addQuery(troveTup, branch, flavorList)
         else:
             for dummy, afVersion, afFlavor in affinityTroves:
+                if afVersion.isOnLocalHost():
+                    self._addLocalTrove(troveTup)
+                    continue
+
                 flavorList = self.overrideFlavors(afFlavor)
                 self.addQuery(troveTup, afVersion.branch(), flavorList)
 
+    def _addLocalTrove(self, troveTup):
+        name = troveTup[0]
+        self.map[name] = troveTup
+        self.localTroves.add(name)
 
     def findAll(self, repos, missing, finalMap):
         self._findAllNoFlavor(repos, missing, finalMap)
         self._findAllFlavor(repos, missing, finalMap)
+        self._findLocalTroves(finalMap)
 
     def callQueryFunction(self, repos, query):
         return repos.getTroveLeavesByBranch(query, bestFlavor=True)
@@ -446,6 +459,10 @@ class QueryByBranch(Query):
             for version, flavorList in res[name].iteritems():
                 pkgList.extend((name, version, f) for f in flavorList)
             finalMap[self.map[name]] = pkgList
+
+    def _findLocalTroves(self, finalMap):
+        for name in self.localTroves:
+            finalMap.setdefault(self.map[name], [])
 
     def missingMsg(self, name):
         flavor = self.map[name][2]
@@ -575,8 +592,9 @@ class TroveFinder:
             missing = {}
 
             for query in self.query.values():
-                query.findAll(repos, missing, finalMap)
-                query.reset()
+                if query.hasTroves():
+                    query.findAll(repos, missing, finalMap)
+                    query.reset()
 
             if missing and not allowMissing:
                 if len(missing) > 1:
