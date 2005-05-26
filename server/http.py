@@ -96,16 +96,19 @@ class HttpHandler(WebHandler):
         try:
             return method(**d)
         except netserver.InsufficientPermission:
-            # no permission, don't ask for a new password
+            # good password but no permission, don't ask for a new password
             return apache.HTTP_FORBIDDEN
         except InvalidPassword:
             # if password is invalid, request a new one
-            self.req.err_headers_out['WWW-Authenticate'] = \
-                'Basic realm="Conary Repository"'
-            return apache.HTTP_UNAUTHORIZED
+            return self._requestAuth()
         except:
             self._write("error", error = traceback.format_exc())
             return apache.OK
+
+    def _requestAuth(self):
+        self.req.err_headers_out['WWW-Authenticate'] = \
+            'Basic realm="Conary Repository"'
+        return apache.HTTP_UNAUTHORIZED
 
     def _write(self, templateName, **values):
         path = os.path.join(self.templatePath, templateName + ".kid")
