@@ -69,8 +69,12 @@ static int StringStream_Cmp(PyObject * self, PyObject * other) {
     cmpLen = len_s < len_o ? len_s : len_o;
 
     rc = memcmp(PyString_AS_STRING(s->s), PyString_AS_STRING(o->s), cmpLen);
-    if (rc)
-	return rc;
+    /* clamp the value returned from memcmp to -1 or 1 as memcmp() can
+       return any value */
+    if (rc > 0)
+	return 1;
+    else if (rc < 0)
+	return -1;
 
     if (len_s < len_o)
 	return -1;
