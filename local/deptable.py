@@ -29,7 +29,7 @@ def createDepTable(cu, name, isTemp):
                                   flag str
                                  )""" % (tmp, name),
                start_transaction = (not isTemp))
-    cu.execute("CREATE INDEX %sIdx ON %s(class, name, flag)" % 
+    cu.execute("CREATE UNIQUE INDEX %sIdx ON %s(class, name, flag)" % 
                (name, name), start_transaction = (not tmp))
 
 def createRequiresTable(cu, name, isTemp):

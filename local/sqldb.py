@@ -463,6 +463,8 @@ class Database:
                     cu.execute("update requires set depId=? where depId=?", goodId, badId)
                     cu.execute("delete from dependencies where depId=?", badId)
                 cu.execute("UPDATE DatabaseVersion SET version=4")
+                cu.execute("DROP INDEX DependenciesIdx")
+                cu.execute("CREATE UNIQUE INDEX DependenciesIdx ON Dependencies(class, name, flag)")
                 self.db.commit()
                 version = 4
 
