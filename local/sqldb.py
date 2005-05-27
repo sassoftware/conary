@@ -370,7 +370,7 @@ class DBFlavorMap(idtable.IdMapping):
 
 class Database:
 
-    schemaVersion = 4
+    schemaVersion = 5
 
     def __init__(self, path):
 	self.db = sqlite3.connect(path, timeout=30000)
@@ -422,51 +422,55 @@ class Database:
                        self.schemaVersion)
         else:
             version = cu.execute("SELECT * FROM DatabaseVersion").next()[0]
-            if version == 2:
-                # convert from version 2 to version 3
+            if version == 2 or version == 3 or version == 4:
+                import deptable, itertools, sys
+                class FakeTrove:
+                    def setRequires(self, req):
+                        self.r = req
+                    def setProvides(self, prov):
+                        self.p = prov
+                    def getRequires(self):
+                        return self.r
+                    def getProvides(self):
+                        return self.p
+                    def __init__(self):
+                        self.r = deps.deps.DependencySet()
+                        self.p = deps.deps.DependencySet()
+
                 try:
-                    cu.execute("ALTER TABLE DBInstances ADD COLUMN locked "
-                               "BOOLEAN")
-                    cu.execute("CREATE TEMPORARY TABLE tmp (class INTEGER, "
-                               "name STRING, depId INTEGER);")
-                    cu.execute("CREATE INDEX foo ON dependencies(name);")
-                    cu.execute("INSERT INTO tmp SELECT DISTINCT dependencies.class, name, dependencies.depId FROM dependencies WHERE dependencies.flag != '-*none*-';")
-
-                    cu.execute("INSERT INTO dependencies SELECT DISTINCT NULL, class, name, '-*none*-' FROM tmp;")
-                    cu.execute("UPDATE REQUIRES SET depCount=depCount + 1 WHERE depId IN (SELECT DISTINCT depNum FROM tmp JOIN requires ON tmp.depId = requires.depId);")
-
-                    cu.execute("INSERT INTO requires SELECT DISTINCT instanceId, dependencies.depId, depNum, depCount FROM tmp JOIN requires ON tmp.depId = requires.depId JOIN dependencies ON tmp.name = dependencies.name AND dependencies.flag = '-*none*-';")
-
-                    cu.execute("INSERT INTO provides SELECT DISTINCT instanceId, dependencies.depId FROM tmp JOIN provides ON tmp.depId = provides.depId JOIN dependencies ON tmp.name = dependencies.name AND dependencies.flag = '-*none*-';")
-
-                    cu.execute("DROP INDEX foo;")
-
-                    cu.execute("UPDATE DatabaseVersion SET version=3")
-		    self.db.commit()
+                    cu.execute("UPDATE DatabaseVersion SET version=5")
                 except sqlite3.ProgrammingError:
                     raise OldDatabaseSchema(
                       "The Conary database on this system is too old. "      \
                       "It will be automatically\nconverted as soon as you "  \
                       "run Conary with write permissions for the database\n" \
                       "(which normally means as root).")
-                version = 3
 
-            if version == 3:
-                # the conversion to version 3 created duplicate entries in 
-                # the dependency table; we need to clean those out, because 
-                # duplicates there play havoc with dependency resolution
-                # (flag counts don't add up correctly)
-                cu.execute("select a.depId, b.depId from dependencies as a join dependencies as b where a.class = b.class and a.name = b.name and a.flag = b.flag and a.depId < b.depId;")
-                duplicateDeps = [ x for x in cu ]
-                for (goodId, badId) in duplicateDeps:
-                    cu.execute("update provides set depId=? where depId=?", goodId, badId)
-                    cu.execute("update requires set depId=? where depId=?", goodId, badId)
-                    cu.execute("delete from dependencies where depId=?", badId)
-                cu.execute("UPDATE DatabaseVersion SET version=4")
-                cu.execute("DROP INDEX DependenciesIdx")
-                cu.execute("CREATE UNIQUE INDEX DependenciesIdx ON Dependencies(class, name, flag)")
+                print "Converting database...",
+                sys.stdout.flush()
+
+                instances = [ x[0] for x in 
+                              cu.execute("select instanceId from DBInstances") ]
+                dtbl = deptable.DependencyTables(self.db)
+                troves = []
+
+                for instanceId in instances:
+                    trv = FakeTrove()
+                    dtbl.get(cu, trv, instanceId)
+                    troves.append(trv)
+
+                cu.execute("delete from dependencies")
+                cu.execute("delete from requires")
+                cu.execute("delete from provides")
+
+                version = 5
+                for instanceId, trv in itertools.izip(instances, troves):
+                    dtbl.add(cu, trv, instanceId)
+
                 self.db.commit()
-                version = 4
+
+                print "                      \r",
+                sys.stdout.flush()
 
             if version != self.schemaVersion:
                 return False
