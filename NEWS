@@ -1,3 +1,7 @@
+Changes in 0.60.4:
+  * An error in the automatic database conversion of 0.60.2 systems
+    has been corrected.
+
 Changes in 0.60.3:
   * Reimplemented LargeStreamSet in C
   * Added StreamCollection
