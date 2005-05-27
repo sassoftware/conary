@@ -653,7 +653,7 @@ class ConaryClient:
                               sourceTroves):
         cs = changeset.ChangeSet()
 
-        seen = {}
+        seen = set(troveList)
         dupList = []
         needsCommit = False
 
@@ -663,17 +663,15 @@ class ConaryClient:
             leavesByLabelOps = {}
 
             troves = self.repos.getTroves(troveList)
-            troveList = []
+            troveList = set()
             branchedTroves = {}
 
 	    for trove in troves:
-                key = (trove.getName(), trove.getVersion(), trove.getFlavor())
-                if seen.has_key(key):
-                    continue
-                seen[key] = True
 
                 # add contained troves to the todo-list
-                troveList += [ x for x in trove.iterTroveList() ]
+                newTroves = [ x for x in trove.iterTroveList() if x not in seen]
+                troveList.update(newTroves)
+                seen.update(newTroves)
 
                 if sourceTroves and not trove.getName().endswith(':source'):
                     # XXX this can go away once we don't care about
@@ -681,10 +679,12 @@ class ConaryClient:
                     if not trove.getSourceName():
                         log.warning('%s has no source information' % 
                                     trove.getName())
-
-                    troveList.append((trove.getSourceName(),
-                                      trove.getVersion().getSourceVersion(),
-                                      deps.DependencySet()))
+                    key  = (trove.getSourceName(),
+                            trove.getVersion().getSourceVersion(),
+                            deps.DependencySet())
+                    if key not in seen:
+                        troveList.add(key)
+                        seen.add(key)
                     continue
                     
                 if shadow:
