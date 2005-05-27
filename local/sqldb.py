@@ -449,8 +449,9 @@ class Database:
                 print "Converting database...",
                 sys.stdout.flush()
 
-                cu.execute("ALTER TABLE DBInstances ADD COLUMN locked "
-                           "BOOLEAN")
+                if version == 2:
+                    cu.execute("ALTER TABLE DBInstances ADD COLUMN locked "
+                               "BOOLEAN")
 
                 instances = [ x[0] for x in 
                               cu.execute("select instanceId from DBInstances") ]
