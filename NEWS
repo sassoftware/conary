@@ -4,6 +4,9 @@ Changes in 0.60.3:
   * Policies now announce their names in their information, warning,
     debug, and error messages, making it easier to determine how to
     resolve problems.
+  * The database conversion for to 0.60.2 could leave duplicate entries
+    in dependency tables, which causes dependency resolution to fail
+    badly (an infinite loop could result)
 
 Changes in 0.60.2:
   * Added InitialContent flag 

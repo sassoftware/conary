@@ -370,7 +370,7 @@ class DBFlavorMap(idtable.IdMapping):
 
 class Database:
 
-    schemaVersion = 3
+    schemaVersion = 4
 
     def __init__(self, path):
 	self.db = sqlite3.connect(path, timeout=30000)
@@ -450,6 +450,22 @@ class Database:
                       "run Conary with write permissions for the database\n" \
                       "(which normally means as root).")
                 version = 3
+
+            if version == 3:
+                # the conversion to version 3 created duplicate entries in 
+                # the dependency table; we need to clean those out, because 
+                # duplicates there play havoc with dependency resolution
+                # (flag counts don't add up correctly)
+                cu.execute("select a.depId, b.depId from dependencies as a join dependencies as b where a.class = b.class and a.name = b.name and a.flag = b.flag and a.depId < b.depId;")
+                duplicateDeps = [ x for x in cu ]
+                for (goodId, badId) in duplicateDeps:
+                    print "HERE", badId
+                    cu.execute("update provides set depId=? where depId=?", goodId, badId)
+                    cu.execute("update requires set depId=? where depId=?", goodId, badId)
+                    cu.execute("delete from dependencies where depId=?", badId)
+                cu.execute("UPDATE DatabaseVersion SET version=4")
+                self.db.commit()
+                version = 4
 
             if version != self.schemaVersion:
                 return False
