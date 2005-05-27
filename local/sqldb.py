@@ -459,7 +459,6 @@ class Database:
                 cu.execute("select a.depId, b.depId from dependencies as a join dependencies as b where a.class = b.class and a.name = b.name and a.flag = b.flag and a.depId < b.depId;")
                 duplicateDeps = [ x for x in cu ]
                 for (goodId, badId) in duplicateDeps:
-                    print "HERE", badId
                     cu.execute("update provides set depId=? where depId=?", goodId, badId)
                     cu.execute("update requires set depId=? where depId=?", goodId, badId)
                     cu.execute("delete from dependencies where depId=?", badId)
