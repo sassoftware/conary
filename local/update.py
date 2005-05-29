@@ -211,7 +211,7 @@ class FilesystemJob:
 	paths.reverse()
 	for fileNum, target in enumerate(paths):
 	    (fileObj, msg) = self.removes[target]
-            callback.removeFiles(fileNum, len(paths))
+            callback.removeFiles(fileNum + 1, len(paths))
 
 	    # don't worry about files which don't exist
 	    try:
