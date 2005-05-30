@@ -624,7 +624,8 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
     recipeObj.setup()
     try:
-        recipeObj.checkBuildRequirements(cfg, sourceVersion, ignoreDeps=ignoreDeps)
+        recipeObj.checkBuildRequirements(cfg, sourceVersion, 
+                                         ignoreDeps=ignoreDeps)
     except CookError:
         return
     bldInfo = buildinfo.BuildInfo(builddir)
@@ -741,6 +742,9 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             grpMap[main].setSourceName(recipeClass.name + ':source')
             grpMap[main].setBuildTime(buildTime)
             grpMap[main].setConaryVersion(constants.version)
+            grpMap[main].setBuildRequirements(
+                    [ (x.getName(), x.getVersion(), x.getFlavor())
+                            for x in recipeObj.buildReqMap.itervalues() ] )
 	    provides = deps.DependencySet()
 	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
 	    grpMap[main].setProvides(provides)

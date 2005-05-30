@@ -28,10 +28,37 @@ from streams import FrozenVersionStream
 from streams import DependenciesStream
 from streams import ByteStream
 
+class SingleBuildDependency(streams.StreamSet):
+    _SINGLE_BUILD_DEP_NAME    = 0
+    _SINGLE_BUILD_DEP_VERSION = 1
+    _SINGLE_BUILD_DEP_FLAVOR  = 2
+
+    ignoreUnknown = True
+    streamDict = {
+        _SINGLE_BUILD_DEP_NAME    : (streams.StringStream,        'name'    ),
+        _SINGLE_BUILD_DEP_VERSION : (streams.StringVersionStream, 'version' ),
+        _SINGLE_BUILD_DEP_FLAVOR  : (streams.DependenciesStream,  'flavor'  )
+    }
+    _streamDict = streams.StreamSetDef(streamDict)
+
+class BuildDependencies(streams.StreamCollection):
+    streamDict = { 1 : SingleBuildDependency }
+
+    def add(self, name, version, flavor):
+        dep = SingleBuildDependency()
+        dep.name.set(name)
+        dep.version.set(version)
+        dep.flavor.set(flavor)
+        self.addStream(1, dep)
+
+    def iter(self):
+        return self.iterAll()
+
 _TROVEINFO_TAG_SIZE        = 0
 _TROVEINFO_TAG_SOURCENAME  = 1
 _TROVEINFO_TAG_BUILDTIME   = 2
 _TROVEINFO_TAG_CONARYVER   = 3
+_TROVEINFO_TAG_BUILDDEPS   = 4
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
@@ -40,6 +67,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_SOURCENAME : ( streams.StringStream,  'sourceName' ),
         _TROVEINFO_TAG_BUILDTIME  : ( streams.LongLongStream,'buildTime'  ),
         _TROVEINFO_TAG_CONARYVER  : ( streams.StringStream,  'conaryVersion'),
+        _TROVEINFO_TAG_BUILDDEPS  : ( BuildDependencies,     'buildReqs'  ),
     }
     _streamDict = streams.StreamSetDef(streamDict)
 
@@ -836,11 +864,16 @@ class Trove(streams.LargeStreamSet):
     def setConaryVersion(self, ver):
         return self.troveInfo.conaryVersion.set(ver)
 
+    def setBuildRequirements(self, itemList):
+        for (name, ver, release) in itemList:
+            self.troveInfo.buildReqs.add(name, ver, release)
+
+    def getBuildRequirements(self):
+        return [ (x[1].name(), x[1].version(), x[1].flavor()) 
+                        for x in self.troveInfo.buildReqs.iterAll() ]
+
     def __init__(self, name, version, flavor, changeLog, isRedirect = False):
         streams.LargeStreamSet.__init__(self)
-        if flavor is None:
-            import lib
-            lib.epdb.st()
         assert(flavor is not None)
 	self.name.set(name)
 	self.version.set(version)
