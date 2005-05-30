@@ -16,6 +16,7 @@ Defines the datastreams stored in a changeset
 """
 
 import copy
+import itertools
 import struct
 import versions
 
@@ -237,6 +238,22 @@ class FrozenVersionStream(InfoStream):
     def __init__(self, v = None):
 	self.thaw(v)
 
+class StringVersionStream(FrozenVersionStream):
+    __slots__ = []
+
+    def thaw(self, frz):
+	if frz:
+	    self.v = versions.VersionFromString(frz)
+	else:
+	    self.v = None
+
+    def freeze(self, skipSet = {}):
+	if not self.v:
+	    return ""
+	else:
+	    return self.v.asString()
+
+
 class DependenciesStream(InfoStream):
     """
     Stores list of strings; used for requires/provides lists
@@ -360,14 +377,14 @@ class StreamCollection(InfoStream):
     Stream class types.
     """
 
-    def __eq__(self, other):
+    def __eq__(self, other, skipSet = {}):
         assert(self.__class__ == other.__class__)
         return self.items == other.items
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def freeze(self):
+    def freeze(self, skipSet = {}):
         l = []
         for typeId, itemDict in self.items.iteritems():
             for item in itemDict:
@@ -403,7 +420,40 @@ class StreamCollection(InfoStream):
     def iterAll(self):
         for typeId, itemDict in self.items.iteritems():
             for item in itemDict:
-                yield item
+                yield (typeId, item)
+
+    def diff(self, other):
+        assert(self.__class__ == other.__class__)
+        us = set(self.iterAll()) 
+        them = set(other.iterAll())
+        added = us - them
+        removed = them - us
+
+        l = []
+        l.append(struct.pack("!HH", len(removed), len(added)))
+
+        for typeId, item in itertools.chain(removed, added):
+            s = item.freeze()
+            l.append(struct.pack("!BH", typeId, len(s)))
+            l.append(s)
+        
+        return "".join(l)
+
+    def twm(self, diff, base):
+        assert(self == base)
+        numRemoved, numAdded = struct.unpack("!HH", diff[0:4])
+        i = 4
+
+        for x in xrange(numRemoved + numAdded):
+            typeId, length = struct.unpack("!BH", diff[i : i + 3])
+            i += 3
+            item = self.streamDict[typeId](diff[i:i + length])
+            i += length
+
+            if x < numRemoved:
+                del self.items[typeId][item]
+            else:
+                self.items[typeId][item] = True
 
     def __init__(self, data = None):
 	if data is not None:
