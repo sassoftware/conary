@@ -1,5 +1,6 @@
 Changes in 0.60.6:
   * Packages now track which troves were used to resolve BuildReqs
+  * 'conary emerge' works again
 
 Changes in 0.60.4:
   * An error in the automatic database conversion of 0.60.2 systems
