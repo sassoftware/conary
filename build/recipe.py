@@ -872,7 +872,9 @@ class PackageRecipe(Recipe):
 			if isinstance(policyObj, policyClass):
 			    return _policyUpdater(policyObj)
 		    return _recipeHelper(list, self, policyClass)
-        return self.__dict__[name]
+        if name in self.__dict__:
+            return self.__dict__[name]
+        raise AttributeError, name
 
     def __delattr__(self, name):
 	"""
