@@ -725,8 +725,10 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             else:
                 os.rename(tmpLogPath, logPath)
             # update contents on the buildlog, since they changed
+            buildlogpath = recipeObj.macros.buildlogpath
             recipeObj.autopkg.updateFileContents(
                 recipeObj.macros.buildlogpath, logPath)
+            recipeObj.autopkg.pathMap[buildlogpath].tags.set("buildlog")
 
     buildTime = time.time()
 
