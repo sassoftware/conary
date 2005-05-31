@@ -1138,6 +1138,14 @@ class User(_userData):
     def updateArgs(self, *args, **keywords):
         assert(len(args) == 2)
         name, uid = args
+
+        name = name % self.recipe.macros
+
+        # interpolate macros into the keywords...
+        for key in ('group', 'homedir', 'comment', 'shell'):
+            if key in keywords:
+                keywords[key] = keywords[key] % self.recipe.macros
+
         group = keywords.get('group', name)
         groupid = keywords.get('groupid', uid)
         homedir = keywords.get('homedir', None)
@@ -1160,6 +1168,9 @@ class SupplementalGroup(_userData):
     def updateArgs(self, *args, **keywords):
         assert(len(args) == 3)
         user, group, groupid = args
+        user = user % self.recipe.macros
+        group = group % self.recipe.macros
+
         self.recipe.suppmap[user] = (group, groupid)
     def _create(self):
         self.recipe.suppmap={}
@@ -1177,6 +1188,7 @@ class Group(_userData):
     def updateArgs(self, *args, **keywords):
         assert(len(args) == 2)
         group, groupid = args
+        group = group % self.recipe.macros
         self.recipe.grpmap[group] = groupid
     def _create(self):
         self.recipe.grpmap={}
