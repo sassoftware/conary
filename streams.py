@@ -429,6 +429,9 @@ class StreamCollection(InfoStream):
         added = us - them
         removed = them - us
 
+        if not added and not removed:
+            return ""
+
         l = []
         l.append(struct.pack("!HH", len(removed), len(added)))
 
@@ -443,9 +446,6 @@ class StreamCollection(InfoStream):
         assert(self == base)
         numRemoved, numAdded = struct.unpack("!HH", diff[0:4])
         i = 4
-
-        if not numRemoved and not numAdded:
-            return ""
 
         for x in xrange(numRemoved + numAdded):
             typeId, length = struct.unpack("!BH", diff[i : i + 3])
