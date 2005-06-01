@@ -744,9 +744,9 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             grpMap[main].setSourceName(recipeClass.name + ':source')
             grpMap[main].setBuildTime(buildTime)
             grpMap[main].setConaryVersion(constants.version)
-            grpMap[main].setBuildRequirements(
-                    [ (x.getName(), x.getVersion(), x.getFlavor())
-                            for x in recipeObj.buildReqMap.itervalues() ] )
+##             grpMap[main].setBuildRequirements(
+##                     [ (x.getName(), x.getVersion(), x.getFlavor())
+##                             for x in recipeObj.buildReqMap.itervalues() ] )
 	    provides = deps.DependencySet()
 	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
 	    grpMap[main].setProvides(provides)
