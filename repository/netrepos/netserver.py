@@ -761,8 +761,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     oldV = 0
                     oldF = 0
 
-                newV = self.fromVersion(newV)
-                newF = self.fromFlavor(newF)
+                if newV:
+                    newV = self.fromVersion(newV)
+                    newF = self.fromFlavor(newF)
+                else:
+                    # this happens when a distributed group has a trove
+                    # on a remote repository disappear
+                    newV = 0
+                    newF = 0
 
                 new.append((name, (oldV, oldF), (newV, newF), absolute))
 

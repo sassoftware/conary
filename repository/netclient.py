@@ -498,6 +498,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             for (troveName, (old, oldFlavor), (new, newFlavor), absolute) in \
                     jobList:
                 if not new:
+                    # XXX does doing this on the client get recursion right?
                     ourJobList.append((troveName, (old, oldFlavor),
                                        (new, newFlavor), absolute))
                     continue
@@ -536,8 +537,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     oldV = self.toVersion(oldV)
                     oldF = self.toFlavor(oldF)
 
-                newV = self.toVersion(newV)
-                newF = self.toFlavor(newF)
+                if newV == 0:
+                    newV = None
+                    newF = None
+                else:
+                    newV = self.toVersion(newV)
+                    newF = self.toFlavor(newF)
 
                 new.append((name, (oldV, oldF), (newV, newF), absolute))
 
@@ -660,10 +665,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             for i, (troveName, (oldVersion, oldFlavor),
                   (newVersion, newFlavor), absolute) in enumerate(ourJobList):
                 if not newVersion:
-                    internalCs.oldTrove(troveName, oldVersion, oldFlavor)
-                    delList.append(i)
+                    delList.append(((troveName, oldVersion, oldFlavor), i))
 
-            for i in reversed(delList):
+            # this lets us remove from ourJobList from back to front, keeping
+            # our indices valid
+            delList.reverse()
+
+            # XXX this is an expensive way to get a version w/ timestamps, but
+            # it's easier than other approaches :-(
+            trvs = self.getTroves([ x[0] for x in delList ], withFiles = False)
+            for (trvInfo, i), trv in itertools.izip(delList, trvs):
+                internalCs.oldTrove(trv.getName(), trv.getVersion(),
+                                    trv.getFlavor())
                 del ourJobList[i]
             del delList
 
