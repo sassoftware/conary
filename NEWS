@@ -3,6 +3,7 @@ Changes in 0.60.5:
   * 'conary emerge' works again
   * Distributed group changesets failed when remote troves disappeared
     from the group
+  * build logs are now tagged with 'buildlog' tag
 
 Changes in 0.60.4:
   * An error in the automatic database conversion of 0.60.2 systems
