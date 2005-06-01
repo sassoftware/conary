@@ -154,6 +154,9 @@ def setupRecipeDict(d, filename):
     localImport(d, 'build', ('build', 'action'))
     localImport(d, 'build.recipe', ('PackageRecipe', 'GroupRecipe',
                                     'RedirectRecipe', 'FilesetRecipe',
+                                    'DistroPackageRecipe',
+                                    'BuildPackageRecipe',
+                                    'CPackageRecipe',
                                     'loadSuperClass', 'loadInstalled',
                                     # XXX when all recipes have been migrated
                                     # we can get rid of loadRecipe
@@ -929,6 +932,69 @@ class PackageRecipe(Recipe):
 	self.mainDir(self.nameVer())
         self.sourcePathMap = {}
         self.pathConflicts = {}
+
+# XXX the next three classes will probably migrate to the repository
+# somehow, but not until we have figured out how to do this without
+# requiring that every recipe have a loadSuperClass line in it.
+
+class DistroPackageRecipe(PackageRecipe):
+    # :lib in here is only for runtime, not to link against.
+    # Any package that needs to link should still specify the :devellib
+    buildRequires = [
+        'filesystem:runtime',
+        'setup:runtime',
+        'python:runtime',
+        'python:lib',
+        'conary:runtime',
+        'conary:lib',
+        'conary:python',
+        'sqlite:lib',
+        'bzip2:runtime',
+        'gzip:runtime',
+        'tar:runtime',
+        'cpio:runtime',
+        'patch:runtime',
+    ]
+    Flags = use.LocalFlags
+    # abstract base class
+    ignore = 1
+
+class BuildPackageRecipe(DistroPackageRecipe):
+    # Again, no :devellib here
+    buildRequires = [
+        'coreutils:runtime',
+        'make:runtime',
+        'mktemp:runtime',
+        # all the rest of these are for configure
+        'findutils:runtime',
+        'gawk:runtime',
+        'grep:runtime',
+        'sed:runtime',
+        'diffutils:runtime',
+    ]
+    buildRequires.extend(DistroPackageRecipe.buildRequires)
+    Flags = use.LocalFlags
+    # abstract base class
+    ignore = 1
+
+
+class CPackageRecipe(BuildPackageRecipe):
+    buildRequires = [
+        'binutils:runtime',
+        'binutils:lib',
+        'binutils:devellib',
+        'gcc:runtime',
+        'gcc:lib',
+        'gcc:devellib',
+        'glibc:runtime',
+        'glibc:lib',
+        'glibc:devellib',
+        'debugedit:runtime',
+    ]
+    buildRequires.extend(BuildPackageRecipe.buildRequires)
+    Flags = use.LocalFlags
+    # abstract base class
+    ignore = 1
 
 class SingleGroup:
 
