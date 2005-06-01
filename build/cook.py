@@ -660,7 +660,17 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         # touch the logPath file so that the build process expects
         # a file there for packaging
         open(logPath, 'w')
-        logFile = logger.startLog(tmpLogPath)
+        try:
+            logFile = logger.startLog(tmpLogPath)
+        except OSError, err:
+            if err.args[0] == 'out of pty devices':
+                log.warning('*** No ptys found -- not logging build ***')
+                logBuild = False
+                # don't worry about cleaning up the touched log file --
+                # it's in the build dir and will be erased when the build 
+                # is finished
+            else:
+                raise
     try:
         bldInfo.begin()
         bldInfo.destdir = destdir
