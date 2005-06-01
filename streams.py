@@ -444,6 +444,9 @@ class StreamCollection(InfoStream):
         numRemoved, numAdded = struct.unpack("!HH", diff[0:4])
         i = 4
 
+        if not numRemoved and not numAdded:
+            return ""
+
         for x in xrange(numRemoved + numAdded):
             typeId, length = struct.unpack("!BH", diff[i : i + 3])
             i += 3
