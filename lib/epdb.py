@@ -802,6 +802,7 @@ def post_mortem(t, exc_type=None, exc_msg=None):
     p.reset()
     while t.tb_next is not None:
         t = t.tb_next
+    p.switch_stdout()
     p.interaction(t.tb_frame, t)
 
 def matchFileOnDirPath(curpath, pathdir):
