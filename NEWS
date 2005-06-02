@@ -1,3 +1,6 @@
+Changes in 0.60.6:
+  * Erasing emerged troves didn't work properly
+
 Changes in 0.60.5:
   * Packages now track which troves were used to resolve BuildReqs
   * 'conary emerge' works again

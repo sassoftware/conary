@@ -106,6 +106,8 @@ class ServerCache:
 	    else:
 		serverName = item.branch().label().getHost()
         if serverName == 'local':
+            import lib
+            lib.epdb.st()
             raise repository.OpenError(
              '\nError: Tried to access repository on reserved host name'
              ' "local" -- this host is reserved for troves compiled/created'
@@ -660,23 +662,31 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             if (ourJobList or filesNeeded) and not internalCs:
                 internalCs = changeset.ChangeSet()
 
-            # handle everything in ourJobList which is just a deletion
+            # Handle everything in ourJobList which is just a deletion. We
+            # need timestamped versions for this; only go the repository
+            # to get those if the ones we have are not versioned.
             delList = []
+            timesNeeded = [ ]
             for i, (troveName, (oldVersion, oldFlavor),
                   (newVersion, newFlavor), absolute) in enumerate(ourJobList):
                 if not newVersion:
                     delList.append(((troveName, oldVersion, oldFlavor), i))
+                    if not sum(oldVersion.timeStamps()):
+                        timesNeeded.append(delList[-1])
+
+            # XXX this is an expensive way to get a version w/ timestamps, but
+            # it's easier than other approaches :-(
+            trvs = self.getTroves([ x[0] for x in timesNeeded ], 
+                                  withFiles = False)
+            timeDict = dict(zip(timesNeeded, trvs))
 
             # this lets us remove from ourJobList from back to front, keeping
             # our indices valid
             delList.reverse()
 
-            # XXX this is an expensive way to get a version w/ timestamps, but
-            # it's easier than other approaches :-(
-            trvs = self.getTroves([ x[0] for x in delList ], withFiles = False)
-            for (trvInfo, i), trv in itertools.izip(delList, trvs):
-                internalCs.oldTrove(trv.getName(), trv.getVersion(),
-                                    trv.getFlavor())
+            for trvInfo, i in delList:
+                ver = timeDict.get(trvInfo, trvInfo[1])
+                internalCs.oldTrove(trvInfo[0], ver, trvInfo[2])
                 del ourJobList[i]
             del delList
 
