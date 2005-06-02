@@ -82,9 +82,17 @@ class Policy(action.RecipeAction):
 	@keyword use: Optional argument; Use flag(s) telling whether
 	to actually perform the action.
 	@type use: None, Use flag, or tuple/list of Use flags
-	XXX: document inclusions and subtrees
+        @keyword subtree: Subtree to which to limit the policy, or it
+        it already is limited (invariantsubtrees), then additional
+        subtrees to consider.
+        @type subtree: string or sequence of strings
+        @keyword inclusions: C{FileFilter}s to which to limit the policy,
+        or if it already is limited (invariantinclusion) then additional
+        C{FileFilter}s to include within the general limitation.
+        @type inclusions: C{FileFilter} strings, C{FileFilter} tuples,
+        or list (not tuple) of C{FileFilter} strings or C{FileFilter} tuples.
 	"""
-	# enforce pure virtual status
+	# enforce abstract base class status
 	assert(self.__class__ is not Policy)
 
 	action.RecipeAction.__init__(self, None, [], **keywords)
@@ -121,13 +129,16 @@ class Policy(action.RecipeAction):
 	        self.subtrees.append(subtrees)
 
 	inclusions = keywords.pop('inclusions', [])
-	if args or inclusions:
-	    if not self.inclusions:
-		self.inclusions = []
-            if type(inclusions) in (list, tuple):
-	        self.inclusions.extend(inclusions)
+	if (args or inclusions) and not self.inclusions:
+            self.inclusions = []
+
+        if inclusions:
+            if type(inclusions) == list:
+                self.inclusions.extend(inclusions)
             else:
-	        self.inclusions.append(inclusions)
+                self.inclusions.append(inclusions)
+
+        if args:
 	    self.inclusions.extend(args)
 
 	self.addArgs(**keywords)
