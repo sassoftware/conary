@@ -4,6 +4,9 @@ Changes in 0.60.5:
   * Distributed group changesets failed when remote troves disappeared
     from the group
   * build logs are now tagged with 'buildlog' tag
+  * Conary now handles cases when a directory becomes a symlink when
+    applying a changeset.  An error message is displayed which tells the
+    user how to apply the update.
 
 Changes in 0.60.4:
   * An error in the automatic database conversion of 0.60.2 systems

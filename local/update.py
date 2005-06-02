@@ -714,8 +714,34 @@ class FilesystemJob:
             # of an exception
             fileTypeError = False
             if baseFile.lsTag != headFile.lsTag:
-                # the file type changed between versions. 
-                if flags & REPLACEFILES or baseFile.lsTag == fsFile.lsTag:
+                if isinstance(baseFile, files.Directory):
+                    # a directory changed to some other type of file
+                    if isinstance(fsFile, files.Directory):
+                        # if the local filesystem still has a directory
+                        # there, bail
+                        if isinstance(headFile, files.SymbolicLink):
+                            newLocation = os.path.abspath(os.path.join(
+                                os.path.dirname(finalPath), headFile.target()))
+                            self.errors.append(
+                                '%s changed from a directory to '
+                                'a symbolic link.  To apply this changeset, '
+                                'first manually move %s to %s, then run '
+                                '"ln -s %s %s".' %(finalPath, finalPath,
+                                                   newLocation,
+                                                   headFile.target(),
+                                                   finalPath))
+                        else:
+                            self.errors.append("%s changed from a directory to "
+                                               "a non-directory" %finalPath)
+                        continue
+                    else:
+                        # someone changed the filesystem so we're replacing
+                        # something else instead of a directory
+                        forceUpdate = True
+                        attributesChanged = True
+                elif flags & REPLACEFILES or baseFile.lsTag == fsFile.lsTag:
+                    # the file type changed between versions. Force an
+                    # update because changes cannot be be merged
                     attributesChanged = True
                     fsFile = headFile
                     forceUpdate = True
