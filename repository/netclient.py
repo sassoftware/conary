@@ -106,8 +106,6 @@ class ServerCache:
 	    else:
 		serverName = item.branch().label().getHost()
         if serverName == 'local':
-            import lib
-            lib.epdb.st()
             raise repository.OpenError(
              '\nError: Tried to access repository on reserved host name'
              ' "local" -- this host is reserved for troves compiled/created'
