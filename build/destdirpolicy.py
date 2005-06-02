@@ -396,6 +396,8 @@ class AutoDoc(policy.Policy):
         '.*/HACKING$',
         '.*/INSTALL$',
         '.*/README.*',
+        '.*/CHANGES$',
+        '.*/TODO$',
         '.*/ChangeLog.*',
     ]
     invariantexceptions = [ ('.*', stat.S_IFDIR) ]
