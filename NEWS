@@ -1,8 +1,9 @@
 Changes in 0.60.6:
+  * Packages now track which troves were used to resolve BuildReqs
   * Erasing emerged troves didn't work properly
+  * Calling Doc() no longer disables the AutoDoc() policy.
 
 Changes in 0.60.5:
-  * Packages now track which troves were used to resolve BuildReqs
   * 'conary emerge' works again
   * Distributed group changesets failed when remote troves disappeared
     from the group
@@ -30,7 +31,8 @@ Changes in 0.60.2:
     was replaced
   * "repquery --deps" output fixed (broken in 0.60.1)
   * Added AutoDoc policy which finds common documentation files and puts
-    them in %(thisdocdir)s automatically.  AutoDoc is disabled by calling
+    them in %(thisdocdir)s automatically.
+    AutoDoc is disabled by calling
     Doc without calling AutoDoc, which means that existing recipes that
     call Doc will not show changes.
   * getPackageBranchPathIds() now returns version and fileId as well,

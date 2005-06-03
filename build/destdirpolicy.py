@@ -382,9 +382,7 @@ class FixDirModes(policy.Policy):
 class AutoDoc(policy.Policy):
     """
     Automatically adds likely documentation not otherwise installed;
-    disabled by default if C{r.Doc()} invoked unless C{r.AutoDoc()}
-    invoked; exceptions passed in via
-    C{r.AutoDoc(exceptions=I{filterexpression})}
+    exceptions passed in via C{r.AutoDoc(exceptions=I{filterexpression})}
     are evaluated relative to the C{%(builddir)s}, not the
     C{%(destdir)s}.
     """
@@ -403,26 +401,11 @@ class AutoDoc(policy.Policy):
     ]
     invariantexceptions = [ ('.*', stat.S_IFDIR) ]
 
-    calledExplicitly = False
-    docCalled = False
-
-    def updateArgs(self, *args, **keywords):
-        docCalledNow = keywords.pop('docCalled', False)
-        if not docCalledNow:
-            self.calledExplicitly = True
-        self.docCalled |= docCalledNow
-        policy.Policy.updateArgs(self, *args, **keywords)
-
     def preProcess(self):
         self.builddir = self.recipe.macros.builddir
         self.destdir = util.joinPaths(
             self.recipe.macros.destdir,
             self.recipe.macros.thisdocdir)
-
-    def test(self):
-        if self.docCalled and not self.calledExplicitly:
-            return False
-        return True
 
     def doFile(self, filename):
         source = util.joinPaths(self.builddir, filename)
