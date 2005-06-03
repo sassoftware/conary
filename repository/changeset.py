@@ -821,6 +821,9 @@ class ReadOnlyChangeSet(ChangeSet):
 	    assert(troveCs.getOldVersion() == trv.getVersion())
             assert(trv.getName() == troveName)
 
+            # XXX this is broken.  makeAbsolute() is only used for
+            # committing local changesets, and they can't have new
+            # files, so we're OK at the moment.
 	    for (pathId, path, fileId, version) in troveCs.getNewFileList():
 		filecs = self.files[(None, fileId)]
 		newFiles.append((None, fileId, filecs))
