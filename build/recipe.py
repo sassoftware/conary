@@ -99,8 +99,8 @@ baseMacros = {
     'os'		: 'linux',
     'target'		: '%(targetarch)s-unknown-linux',
     'debugedit'         : 'debugedit',
-    'strip'             : 'eu-strip', # eu-strip for debuginfo
-    'strip-archive'     : 'strip', # eu-strip segfaults on ar
+    'strip'             : 'eu-strip', # eu-strip for debuginfo, "strip -g" else
+    'strip-archive'     : 'strip -g', # eu-strip segfaults on ar
     'buildbranch'       : '',
     'buildlabel'        : '',
 }

@@ -715,7 +715,7 @@ class Strip(policy.Policy):
                     ' -l /dev/stdout '%self.dm
                     +fullpath).read().split('\x00')[:-1])
                 util.mkdirChain(debuglibdir)
-                util.execute('%s -g -f %s %s' %(
+                util.execute('%s -f %s %s' %(
                     self.dm.strip, debuglibpath, fullpath))
 
             else:
@@ -723,9 +723,9 @@ class Strip(policy.Policy):
                     # just in case strip is eu-strip, which segfaults
                     # whenever it touches an ar archive, and seems to 
                     # break some .o files
-                    util.execute('%(strip-archive)s -g ' %self.dm +fullpath)
+                    util.execute('%(strip-archive)s ' %self.dm +fullpath)
                 else:
-                    util.execute('%(strip)s -g ' %self.dm +fullpath)
+                    util.execute('%(strip)s ' %self.dm +fullpath)
 
             del self.recipe.magic[path]
             if oldmode is not None:
