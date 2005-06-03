@@ -203,12 +203,9 @@ def handler(req):
 
 	repositories[repName].forceSecure = cfg.forceSSL
         repositories[repName].cfg = cfg
-    port = req.server.port
-    if not port:
-        port = req.parsed_uri[apache.URI_PORT]
-        if not port:
-            port = 80
-    secure = (port == 443)
+
+    port = req.connection.local_addr[1]
+    secure =  (port == 443)
     
     repos = repositories[repName]
     method = req.method.upper()

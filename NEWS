@@ -2,6 +2,7 @@ Changes in 0.60.6:
   * Packages now track which troves were used to resolve BuildReqs
   * Erasing emerged troves didn't work properly
   * Calling Doc() no longer disables the AutoDoc() policy.
+  * Find the port for apache accurately
 
 Changes in 0.60.5:
   * 'conary emerge' works again
