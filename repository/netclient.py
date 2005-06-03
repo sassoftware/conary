@@ -676,7 +676,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # it's easier than other approaches :-(
             trvs = self.getTroves([ x[0] for x in timesNeeded ], 
                                   withFiles = False)
-            timeDict = dict(zip(timesNeeded, trvs))
+            timeDict = dict(zip([ x[0] for x in timesNeeded ], 
+                                [ x.getVersion() for x in trvs ]))
 
             # this lets us remove from ourJobList from back to front, keeping
             # our indices valid
