@@ -741,7 +741,7 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
                                 { troveName : { newV.branch() : None } } )
 	vers = vers[troveName].keys()
         vers.sort()
-	# erase everything later then us
+	# erase everything later than us
 	i = vers.index(newV)
 	del vers[i:]
 

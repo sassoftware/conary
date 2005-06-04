@@ -924,13 +924,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.commitAction:
 	    return True
 
+        d = { 'reppath' : self.urlBase(), }
+        cmd = self.commitAction % d
+        p = util.popen(cmd, "w")
 	for troveCs in cs.iterNewTroveList():
-	    d = { 'reppath' : self.urlBase(),
-	    	  'trove' : troveCs.getName(),
-                  'flavor' : deps.formatFlavor(troveCs.getNewFlavor()),
-		  'version' : troveCs.getNewVersion().asString() }
-	    cmd = self.commitAction % d
-	    os.system(cmd)
+            p.write("%s\n%s\n%s\n" %(troveCs.getName(),
+                                     deps.formatFlavor(troveCs.getNewFlavor()),
+		                     troveCs.getNewVersion().asString()))
+        p.close()
 
 	return True
 

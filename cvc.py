@@ -221,7 +221,6 @@ def sourceCommand(cfg, args, argSet, profile=False):
 	if argSet or len(args) != 4: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
-	args[0] = repos
 	checkin.rdiff(repos, cfg.buildLabel,  *args[1:])
     elif (args[0] == "remove"):
 	if len(args) < 2: return usage()

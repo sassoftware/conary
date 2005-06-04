@@ -14,7 +14,7 @@
 
 python_files = conarybugz.py
 
-extra_dist = Makefile rpm2cpio yuck yuck.1 convertcontents
+extra_dist = Makefile rpm2cpio yuck yuck.1 convertcontents changemail
 
 dist_files = $(python_files) $(extra_dist)
 

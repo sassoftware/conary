@@ -1,3 +1,11 @@
+Changes in 0.60.7:
+  * The changemail script is now distributed with conary, and is called
+    with a different calling convention; instead of being called once
+    per trove with trove-specific command line options, it is called
+    once per commit (of however many troves) and creates more readable
+    summary email messages.  Remove --trove, --version, and --flavor
+    arguments from your changemail invocations.
+
 Changes in 0.60.6:
   * Erasing emerged troves works properly
   * Calling Doc() no longer disables the AutoDoc() policy.
