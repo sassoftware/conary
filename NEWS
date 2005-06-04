@@ -1,7 +1,4 @@
 Changes in 0.60.6:
-  * Additional troveinfo has been added to track which troves were
-    used to resolve BuildReqs.  The code which actually adds the
-    information has not been enabled yet.
   * Erasing emerged troves works properly
   * Calling Doc() no longer disables the AutoDoc() policy.
   * A more reliable method is used for finding the port of an
