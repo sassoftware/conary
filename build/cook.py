@@ -754,6 +754,8 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             grpMap[main].setSourceName(recipeClass.name + ':source')
             grpMap[main].setBuildTime(buildTime)
             grpMap[main].setConaryVersion(constants.version)
+            # do not turn this on yet, it will make changesets unreadable
+            # by older clients
 ##             grpMap[main].setBuildRequirements(
 ##                     [ (x.getName(), x.getVersion(), x.getFlavor())
 ##                             for x in recipeObj.buildReqMap.itervalues() ] )
