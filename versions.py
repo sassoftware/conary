@@ -840,6 +840,24 @@ class Version(VersionSequence):
 	"""
 	return self.canonicalVersion().versions[-1].buildCount is None
 
+
+    def isShadow(self):
+        """ Returns True if this version is a shadow of another trove """
+        return self.branch().isShadow() 
+
+    def isModifiedShadow(self):
+        """ Returns True if this version is a shadow that has been modified
+        """
+        if self.isShadow():
+            tr = self.trailingRevision()
+
+            if tr.sourceCount.shadowCount():
+                return True
+            if tr.buildCount and tr.buildCount.shadowCount():
+                return True
+
+        return False
+
     def onLocalLabel(self):
     	"""
 	Tests whether this is the local branch, or is a version on
@@ -1029,6 +1047,10 @@ class Branch(VersionSequence):
 
     def hasParentBranch(self):
         return len(self.versions) >= 2
+
+    def isShadow(self):
+        """ Returns True if this branch is a shadow of another branch """
+        return self.hasParentBranch() and isinstance(self.versions[-2], Label)
 
     def createVersion(self, verRel):
 	"""
