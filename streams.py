@@ -44,6 +44,10 @@ class InfoStream(object):
 	raise NotImplementedError
     
     def diff(self, them):
+        """
+        Return the diff twm needs to convert them into self. Return None
+        if the two items are identical.
+        """
 	raise NotImplementedError
 
     def twm(self, diff, base):
@@ -430,7 +434,7 @@ class StreamCollection(InfoStream):
         removed = them - us
 
         if not added and not removed:
-            return ""
+            return None
 
         l = []
         l.append(struct.pack("!HH", len(removed), len(added)))
