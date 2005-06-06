@@ -67,7 +67,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_SOURCENAME : ( streams.StringStream,  'sourceName' ),
         _TROVEINFO_TAG_BUILDTIME  : ( streams.LongLongStream,'buildTime'  ),
         _TROVEINFO_TAG_CONARYVER  : ( streams.StringStream,  'conaryVersion'),
-##         _TROVEINFO_TAG_BUILDDEPS  : ( BuildDependencies,     'buildReqs'  ),
+        _TROVEINFO_TAG_BUILDDEPS  : ( BuildDependencies,     'buildReqs'  ),
     }
     _streamDict = streams.StreamSetDef(streamDict)
 
@@ -864,13 +864,13 @@ class Trove(streams.LargeStreamSet):
     def setConaryVersion(self, ver):
         return self.troveInfo.conaryVersion.set(ver)
 
-##     def setBuildRequirements(self, itemList):
-##         for (name, ver, release) in itemList:
-##             self.troveInfo.buildReqs.add(name, ver, release)
+    def setBuildRequirements(self, itemList):
+        for (name, ver, release) in itemList:
+            self.troveInfo.buildReqs.add(name, ver, release)
 
-##     def getBuildRequirements(self):
-##         return [ (x[1].name(), x[1].version(), x[1].flavor()) 
-##                         for x in self.troveInfo.buildReqs.iterAll() ]
+    def getBuildRequirements(self):
+        return [ (x[1].name(), x[1].version(), x[1].flavor()) 
+                         for x in self.troveInfo.buildReqs.iterAll() ]
 
     def __init__(self, name, version, flavor, changeLog, isRedirect = False):
         streams.LargeStreamSet.__init__(self)
