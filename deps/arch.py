@@ -71,11 +71,14 @@ def any():
 def canInstall(other):
     return other == "any" or other == currentArch
 
-baseArch = os.uname()[4]
-localNamespace = locals()
-if localNamespace.has_key("flags_" + baseArch):
-    currentArch = localNamespace["flags_" + baseArch]()
-else:
-    currentArch = [ deps.Dependency(baseArch) ]
+def initializeArch():
+    global currentArch
+    localNamespace = globals()
+    if localNamespace.has_key("flags_" + baseArch):
+        currentArch = localNamespace["flags_" + baseArch]()
 
-del localNamespace
+    del localNamespace
+
+baseArch = os.uname()[4]
+currentArch = [ deps.Dependency(baseArch) ]
+initializeArch()
