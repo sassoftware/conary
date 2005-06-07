@@ -109,6 +109,7 @@ def main(argv):
             for ver, shortver in srcMap[sourceName]:
                 print '================================'
                 print '%s=%s' %(sourceName, shortver)
+                print 'cvc rdiff %s -1 %s' %(sourceName[:-7], ver)
                 print '================================'
                 checkin.rdiff(repos, cfg.buildLabel, sourceName, '-1', ver)
                 print
