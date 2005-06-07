@@ -294,7 +294,7 @@ class QueryByLabelPath(Query):
                     # we are trying to find one match per label
                     # if we've already found a match for a label, 
                     # remove it
-                    for label in req:
+                    for label in req.keys():
                         if (name, label) in foundNameLabels:
                             req.pop(label)
                 elif name in foundNames:
