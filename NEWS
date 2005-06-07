@@ -5,6 +5,9 @@ Changes in 0.60.7:
     once per commit (of however many troves) and creates more readable
     summary email messages.  Remove --trove, --version, and --flavor
     arguments from your changemail invocations.
+  * The cvc rdiff command now recognizes creating a shadow as such.
+  * Build requirement tracking is now half-enabled; conary is now able
+    to read "buildReqs" tags, but will not yet generate them.
 
 Changes in 0.60.6:
   * Erasing emerged troves works properly

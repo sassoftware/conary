@@ -724,6 +724,9 @@ def annotate(repos, filename):
         line[0] = line[0].replace('\t', ' ' * 8)
         print "%-*s %s %s" % (maxV, version.asString(defaultBranch=branch), info, line[0]),
 
+def _printShadow(oldVersion,  newVersion):
+    print "New shadow:\n  %s\n  of\n  %s" %(newVersion, oldVersion)
+
 def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     if not troveName.endswith(":source"):
 	troveName += ":source"
@@ -737,6 +740,10 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 
     try:
 	count = -int(oldVersion)
+        if count == 1 and newV.isShadow() and not newV.isModifiedShadow():
+            # This is a newly-created shadow
+            _printShadow(newV.parentVersion().asString(), newVersion)
+            return
 	vers = repos.getTroveVersionsByBranch( 
                                 { troveName : { newV.branch() : None } } )
 	vers = vers[troveName].keys()
@@ -757,6 +764,12 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
 	    oldV = branchList[-count]
 	    old = (troveName, oldV, deps.deps.DependencySet())
     except ValueError:
+
+        if newV.isShadow() and not newV.isModifiedShadow() and \
+           newV.parentVersion().asString() == oldVersion:
+            _printShadow(oldVersion, newVersion)
+            return
+
 	old = repos.findTrove(buildLabel, (troveName, oldVersion, None)) 
 	if len(old) > 1:
 	    log.error("%s matches multiple versions" % oldVersion)
