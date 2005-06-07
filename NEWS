@@ -8,6 +8,9 @@ Changes in 0.60.7:
   * The cvc rdiff command now recognizes creating a shadow as such.
   * Build requirement tracking is now half-enabled; conary is now able
     to read "buildReqs" tags, but will not yet generate them.
+  * Files in /tmp and /var/tmp, and all cvs temporary files, will no
+    longer be packaged by default,
+    
 
 Changes in 0.60.6:
   * Erasing emerged troves works properly

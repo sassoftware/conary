@@ -432,6 +432,8 @@ class RemoveNonPackageFiles(policy.Policy):
 	r'\.orig$',
         r'%(sysconfdir)s.*/rc[0-6].d/[KS].*$',
 	'~$',
+        r'.*/\.#.*',
+        '(/var)?/tmp/',
     ]
 
     def doFile(self, path):
