@@ -393,11 +393,11 @@ class AutoDoc(policy.Policy):
         r'.*/(LICENSE|COPYING)(\.lib|)$',
         '.*/HACKING$',
         '.*/INSTALL$',
-        '.*/README.*',
+        '.*README.*',
         '.*/CHANGES$',
         '.*/TODO$',
         '.*/FAQ$',
-        '.*/ChangeLog.*',
+        '.*/Change[lL]og.*',
     ]
     invariantexceptions = [ ('.*', stat.S_IFDIR) ]
 
