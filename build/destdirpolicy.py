@@ -390,7 +390,7 @@ class AutoDoc(policy.Policy):
     rootdir = '%(builddir)s'
     invariantinclusions = [
         '.*/NEWS$',
-        r'.*/(LICENSE|COPYING)(\.lib|)$',
+        r'.*/(LICENSE|COPY(ING|RIGHT))(\.lib|)$',
         '.*/HACKING$',
         '.*/INSTALL$',
         '.*README.*',
