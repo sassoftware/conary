@@ -158,6 +158,7 @@ def main(argv):
 
         sendMail(tmpfile, subject, argSet['email'])
 
+    return 0
 
 def sendMail(tmpfile, subject, addresses):
     # stdout is the tmpfile, so make sure it has been flushed!
