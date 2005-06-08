@@ -153,6 +153,10 @@ def fetchURL(cfg, name, location):
             if msg.code == 404:
                 _createNegativeCacheEntry(cfg, name, location)
                 return None
+            else:
+                log.error('error downloading %s: %s',
+                          name, str(msg))
+                return None
         except urllib2.URLError:
             _createNegativeCacheEntry(cfg, name, location)
             return None
