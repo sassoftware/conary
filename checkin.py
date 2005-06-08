@@ -724,8 +724,33 @@ def annotate(repos, filename):
         line[0] = line[0].replace('\t', ' ' * 8)
         print "%-*s %s %s" % (maxV, version.asString(defaultBranch=branch), info, line[0]),
 
-def _printShadow(oldVersion,  newVersion):
-    print "New shadow:\n  %s\n  of\n  %s" %(newVersion, oldVersion)
+def _describeShadow(oldVersion, newVersion):
+    return "New shadow:\n  %s\n  of\n  %s" %(newVersion, oldVersion)
+
+# findRelativeVersion might move to another module?
+def findRelativeVersion(repos, troveName, count, newV):
+    vers = repos.getTroveVersionsByBranch( 
+                            { troveName : { newV.branch() : None } } )
+    vers = vers[troveName].keys()
+    vers.sort()
+    # erase everything later than us
+    i = vers.index(newV)
+    del vers[i:]
+
+    branchList = []
+    for v in vers:
+        if v.branch() == newV.branch():
+	    branchList.append(v)
+
+    if len(branchList) < count:
+        oldV = None
+        old = None
+    else:
+        oldV = branchList[-count]
+        old = (troveName, oldV, deps.deps.DependencySet())
+
+    return old, oldV
+
 
 def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     if not troveName.endswith(":source"):
@@ -739,35 +764,16 @@ def rdiff(repos, buildLabel, troveName, oldVersion, newVersion):
     newV = new[1]
 
     try:
-	count = -int(oldVersion)
+        count = -int(oldVersion)
         if count == 1 and newV.isShadow() and not newV.isModifiedShadow():
-            # This is a newly-created shadow
-            _printShadow(newV.parentVersion().asString(), newVersion)
+            print _describeShadow(newV.parentVersion().asString(), newVersion)
             return
-	vers = repos.getTroveVersionsByBranch( 
-                                { troveName : { newV.branch() : None } } )
-	vers = vers[troveName].keys()
-        vers.sort()
-	# erase everything later than us
-	i = vers.index(newV)
-	del vers[i:]
+        old, oldV = findRelativeVersion(repos, troveName, count, newV)
 
-	branchList = []
-	for v in vers:
-	    if v.branch() == newV.branch():
-		branchList.append(v)
-
-	if len(branchList) < count:
-	    oldV = None
-	    old = None
-	else:
-	    oldV = branchList[-count]
-	    old = (troveName, oldV, deps.deps.DependencySet())
     except ValueError:
-
         if newV.isShadow() and not newV.isModifiedShadow() and \
            newV.parentVersion().asString() == oldVersion:
-            _printShadow(oldVersion, newVersion)
+            print _describeShadow(oldVersion, newVersion)
             return
 
 	old = repos.findTrove(buildLabel, (troveName, oldVersion, None)) 
