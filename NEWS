@@ -11,6 +11,8 @@ Changes in 0.60.7:
     to read "buildReqs" tags, but will not yet generate them.
   * Files in /tmp and /var/tmp, and all cvs temporary files, will no
     longer be packaged by default,
+  * The addArchive(), addSource(), and addPatch() actions can now fetch
+    via HTTPS as well as HTTP and FTP.
     
 
 Changes in 0.60.6:
