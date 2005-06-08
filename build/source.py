@@ -75,7 +75,7 @@ class _Source(action.RecipeAction):
 		raise SourceError, "GPG signature %s failed" %(self.localgpgfile)
 
     def _checkKeyID(self, filepath, keyid):
-	p = util.popen("gpg --no-options --logger-fd 1 --no-secmem-warning --verify %s %s"
+	p = util.popen("LANG=C gpg --no-options --logger-fd 1 --no-secmem-warning --verify %s %s"
 		      %(self.localgpgfile, filepath))
 	result = p.read()
 	found = result.find("key ID %s" % keyid)
