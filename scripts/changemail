@@ -41,12 +41,13 @@ def main(argv):
     if not len(argv):
         usage()
 
-    # XXX uncomment this after we have a version installed on the system
-    #sys.excepthook = util.genExcepthook(prefix='changemail-stack-')
+    sys.excepthook = util.genExcepthook(prefix='changemail-stack-')
 
     argDef = {
         'email': options.MULT_PARAM,
         'user': options.ONE_PARAM,
+        'sourceuser': options.ONE_PARAM,
+        'binaryuser': options.ONE_PARAM,
     }
 
     cfgMap = {
@@ -92,9 +93,16 @@ def main(argv):
             d = d.setdefault(version, {})
             l = d.setdefault(flavor, None)
 
-    user = None
-    if 'user' in argSet:
-        user = argSet['user']
+    sourceuser = None
+    binaryuser = None
+    if 'sourceuser' in argSet:
+        sourceuser = argSet['sourceuser']
+    if 'binaryuser' in argSet:
+        binaryuser = argSet['binaryuser']
+    if not sourceuser and 'user' in argSet:
+        sourceuser = argSet['user']
+    if not binaryuser and 'user' in argSet:
+        binaryuser = argSet['user']
 
     tmpfd, tmppath = tempfile.mkstemp('', 'changemail-')
     os.unlink(tmppath)
@@ -115,14 +123,22 @@ def main(argv):
 
         for sourceName in sources:
             for ver, shortver in srcMap[sourceName]:
+                new = repos.findTrove(cfg.buildLabel, (sourceName, ver, None))
+                newV = new[0][1]
+                old, oldV = checkin.findRelativeVersion(repos, sourceName,
+                                                        1, newV)
+                if old:
+                    old = ' (previous: %s)'%oldV.asString().split('/')[-1]
+                else:
+                    old = ''
                 print '================================'
-                print '%s=%s' %(sourceName, shortver)
+                print '%s=%s%s' %(sourceName, shortver, old)
                 print 'cvc rdiff %s -1 %s' %(sourceName[:-7], ver)
                 print '================================'
                 checkin.rdiff(repos, cfg.buildLabel, sourceName, '-1', ver)
                 print
-        if user:
-            print 'Committed by: %s' %user
+        if sourceuser:
+            print 'Committed by: %s' %sourceuser
 
         sendMail(tmpfile, subject, argSet['email'])
 
@@ -143,8 +159,8 @@ def main(argv):
 
         if binaries:
             print "Binary package commits:"
-            if user:
-                print 'Committed by: %s' %user
+            if binaryuser:
+                print 'Committed by: %s' %binaryuser
         for package in binaries:
             for version in sorted(pkgMap[package].keys()):
                 print '================================'
