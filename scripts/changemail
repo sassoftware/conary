@@ -68,6 +68,9 @@ def main(argv):
 
     data = [x[:-1] for x in sys.stdin.readlines()]
 
+    # XXX uncomment this after we have a version installed on the system
+    #sys.excepthook = util.genExcepthook(prefix='changemail-stack-')
+
     srcMap = {}
     pkgMap = {}
     grpMap = {}
