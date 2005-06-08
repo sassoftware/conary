@@ -929,8 +929,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         p = util.popen(cmd, "w")
 	for troveCs in cs.iterNewTroveList():
             p.write("%s\n%s\n%s\n" %(troveCs.getName(),
-                                     deps.formatFlavor(troveCs.getNewFlavor()),
-		                     troveCs.getNewVersion().asString()))
+		                     troveCs.getNewVersion().asString(),
+                                     deps.formatFlavor(troveCs.getNewFlavor())))
         p.close()
 
 	return True
