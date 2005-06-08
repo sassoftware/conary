@@ -40,9 +40,13 @@ def usage(exitcode=1):
 def main(argv):
     if not len(argv):
         usage()
-    
+
+    # XXX uncomment this after we have a version installed on the system
+    #sys.excepthook = util.genExcepthook(prefix='changemail-stack-')
+
     argDef = {
         'email': options.MULT_PARAM,
+        'user': options.ONE_PARAM,
     }
 
     cfgMap = {
@@ -68,9 +72,6 @@ def main(argv):
 
     data = [x[:-1] for x in sys.stdin.readlines()]
 
-    # XXX uncomment this after we have a version installed on the system
-    #sys.excepthook = util.genExcepthook(prefix='changemail-stack-')
-
     srcMap = {}
     pkgMap = {}
     grpMap = {}
@@ -90,6 +91,10 @@ def main(argv):
             d = grpMap.setdefault(name, {})
             d = d.setdefault(version, {})
             l = d.setdefault(flavor, None)
+
+    user = None
+    if 'user' in argSet:
+        user = argSet['user']
 
     tmpfd, tmppath = tempfile.mkstemp('', 'changemail-')
     os.unlink(tmppath)
@@ -116,6 +121,8 @@ def main(argv):
                 print '================================'
                 checkin.rdiff(repos, cfg.buildLabel, sourceName, '-1', ver)
                 print
+        if user:
+            print 'Committed by: %s' %user
 
         sendMail(tmpfile, subject, argSet['email'])
 
@@ -136,6 +143,8 @@ def main(argv):
 
         if binaries:
             print "Binary package commits:"
+            if user:
+                print 'Committed by: %s' %user
         for package in binaries:
             for version in sorted(pkgMap[package].keys()):
                 print '================================'

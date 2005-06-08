@@ -924,7 +924,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	if not self.commitAction:
 	    return True
 
-        d = { 'reppath' : self.urlBase(), }
+        d = { 'reppath' : self.urlBase(),
+              'user' : authToken[0],
+        }
         cmd = self.commitAction % d
         p = util.popen(cmd, "w")
 	for troveCs in cs.iterNewTroveList():
