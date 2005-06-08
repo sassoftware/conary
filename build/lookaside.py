@@ -28,10 +28,12 @@ import time
 import urllib2
 
 # location is normally the package name
+networkPrefixes = ('http://', 'https://', 'ftp://')
 
 def _truncateName(name):
-    if name.startswith("http://") or name.startswith("ftp://"):
-        return name[5:]
+    for prefix in networkPrefixes:
+        if name.startswith(prefix):
+            return name[len(prefix)-2:]
     return name
 
 def createCacheName(cfg, name, location, negative=''):
@@ -100,26 +102,31 @@ def _createNegativeCacheEntry(cfg, name, location):
 def _searchCache(cfg, name, location):
     basename = os.path.basename(name)
 
-    if name.startswith("http://") or name.startswith("ftp://"):
+    networkSource = False
+    for prefix in networkPrefixes:
+        if name.startswith(prefix):
+            networkSource = True
+            break
 
-	# check for negative cache entries to avoid spamming servers
+    if networkSource:
+        # check for negative cache entries to avoid spamming servers
         negativeName = _createNegativeCacheName(cfg, name, location)
-	if os.path.exists(negativeName):
-	    if time.time() > 60*60 + os.path.getmtime(negativeName):
-		os.remove(negativeName)
+        if os.path.exists(negativeName):
+            if time.time() > 60*60 + os.path.getmtime(negativeName):
+                os.remove(negativeName)
             else:
                 log.warning('found %s, therefore not fetching %s',
                     negativeName, name)
                 return -1
 
-	# exact match first, then look for cached responses from other servers
-	positiveName = createCacheName(cfg, name, location)
-	if os.path.exists(positiveName):
-	    return positiveName
-	return util.searchPath(basename, os.sep.join((cfg.lookaside,
+        # exact match first, then look for cached responses from other servers
+        positiveName = createCacheName(cfg, name, location)
+        if os.path.exists(positiveName):
+            return positiveName
+        return util.searchPath(basename, os.sep.join((cfg.lookaside,
                                                       location, basename)))
     else:
-	return util.searchFile(basename,
+        return util.searchFile(basename,
                                [os.sep.join((cfg.lookaside, location))])
 
 
@@ -199,10 +206,15 @@ def searchAll(cfg, repCache, name, location, srcdirs, autoSource=False):
     f = _searchCache(cfg, name, location)
     if f and f != -1: return f
 
+    # negative cache entry
+    if f == -1:
+        return None
+
     # Need to fetch a file that will be auto-added to the repository
     # on commit
-    if (name.startswith("http://") or name.startswith("ftp://")) and f != -1:
-        return fetchURL(cfg, name, location)
+    for prefix in networkPrefixes:
+        if name.startswith(prefix):
+            return fetchURL(cfg, name, location)
 
     # could not find it anywhere
     return None
