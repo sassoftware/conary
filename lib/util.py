@@ -89,7 +89,7 @@ def searchFile(file, searchdirs, error=None):
 def findFile(file, searchdirs):
     return searchFile(file, searchdirs, error=1)
 
-def genExcepthook(dumpStack=True, debugCtrlC=False):
+def genExcepthook(dumpStack=True, debugCtrlC=False, prefix='conary-stack-'):
     def excepthook(type, value, tb):
         if type is bdb.BdbQuit:
             sys.exit(1)
@@ -99,7 +99,7 @@ def genExcepthook(dumpStack=True, debugCtrlC=False):
         lines = traceback.format_exception(type, value, tb)
         if dumpStack:
             try:
-                (tbfd,path) = tempfile.mkstemp('', 'conary-stack-')
+                (tbfd,path) = tempfile.mkstemp('', prefix)
                 output = os.fdopen(tbfd, 'w')
                 stackutil.printTraceBack(tb, output, type, value)
                 output.close()
