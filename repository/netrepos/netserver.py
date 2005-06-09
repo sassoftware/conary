@@ -778,7 +778,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             new = []
             for (pathId, troveName, (oldTroveV, oldTroveF, oldFileId, oldFileV), 
                                     (newTroveV, newTroveF, newFileId, newFileV)) in l:
-                if oldTroveV:
+                if oldFileV:
                     oldTroveV = self.fromVersion(oldTroveV)
                     oldFileV = self.fromVersion(oldFileV)
                     oldFileId = self.fromFileId(oldFileId)
