@@ -15,7 +15,9 @@ Changes in 0.60.7:
     longer be packaged by default,
   * The addArchive(), addSource(), and addPatch() actions can now fetch
     via HTTPS as well as HTTP and FTP.
-    
+  * The repository now handles creating a changeset between two troves
+    that both contain a version of a file that is stored on a different
+    repository
 
 Changes in 0.60.6:
   * Erasing emerged troves works properly
