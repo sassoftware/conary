@@ -28,6 +28,7 @@ install:
 	install -m 644 yuck.1 $(DESTDIR)$(mandir)/man1
 	install -m 755 convertcontents $(DESTDIR)$(conarydir)
 	install -m 755 conarybugz.py $(DESTDIR)$(conarydir)
+	install -m 755 changemail $(DESTDIR)$(conarydir)
 
 dist: default-dist
 

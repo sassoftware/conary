@@ -1,3 +1,7 @@
+Changes in 0.60.8:
+  * The changemail script is now actually packaged, in
+    /usr/lib{,64}/python2.4/site-packages/conary/changemail
+
 Changes in 0.60.7:
   * The changemail script is now distributed with conary, and is called
     with a different calling convention; instead of being called once
