@@ -623,6 +623,15 @@ class VersionSequence(AbstractVersion):
             if isinstance(item, AbstractRevision):
                 item.timeStamp = timeStamps[i]
                 i += 1
+
+    def iterLabels(self):
+        """
+        Iterates through the labels that are used in this version 
+        in order, from earliest to last.
+        """
+        for item in self.versions:
+            if isinstance(item, Label):
+                yield item
             
     def __init__(self, versionList):
         """
