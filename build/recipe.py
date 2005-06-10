@@ -635,6 +635,49 @@ class PackageRecipe(Recipe):
         """ Checks to see if the build requirements for the recipe 
             are installed
         """
+
+        def _filterBuildReqsByVersionStr(versionStr, troves):
+            if not versionStr:
+                return troves
+
+            versionMatches = []
+            if versionStr.find('@') == -1:
+                if versionStr.find(':') == -1:
+                    log.warning('Deprecated buildreq format.  Use '
+                                ' foo=:tag, not foo=tag')
+                    versionStr = ':' + versionStr
+
+            # we don't allow full version strings or just releases
+            if versionStr[0] not in ':@':
+                raise RecipeFileError("Unsupported buildReq format")
+
+
+            for trove in troves:
+                labels = trove.getVersion().iterLabels()
+                if versionStr[0] == ':':
+                    branchTag = versionStr[1:]
+                    branchTags = [ x.getLabel() for x in labels ] 
+                    if branchTag in branchTags:
+                        versionMatches.append(trove)
+                else:
+                    # versionStr must begin with an @
+                    branchNames = []
+                    for label in labels:
+                        branchNames.append('@%s:%s' % (label.getNamespace(),
+                                                       label.getLabel()))
+                    if versionStr in branchNames:
+                        versionMatches.append(trove)
+            return versionMatches
+
+        def _filterBuildReqsByFlavor(flavor, troves):
+            troves.sort(lambda a, b: a.getVersion().__cmp__(b.getVersion()))
+            if not flavor:
+                return troves[-1]
+            for trove in reversed(versionMatches):
+                troveFlavor = trove.getFlavor()
+                if troveFlavor.stronglySatisfies(flavor):
+                    return trove
+
 	db = database.Database(cfg.root, cfg.dbPath)
         time = sourceVersion.timeStamps()[-1]
         reqMap = {}
@@ -650,49 +693,25 @@ class PackageRecipe(Recipe):
                 missingReqs.append(buildReq)
                 continue
                 break
-            versionMatches = []
-            if versionStr and versionStr.find('@') == -1:
-                if versionStr.find(':') == -1:
-                    log.warning('Deprecated buildreq format.  Use '
-                                ' foo=:tag, not foo=tag')
-            for trove in troves:
-                if versionStr is None:
-                    versionMatches.append(trove) 
-                    continue
-                if versionStr.find('@') == -1:
-                    label = trove.getVersion().branch().label()
-                    if versionStr[0] == ':' or versionStr.find(':') == -1:
-                        if versionStr[0] == ':':
-                            versionStr = versionStr[1:]
-                        if label.getLabel() == versionStr:
-                            versionMatches.append(trove)
-                        continue
-                    if ("%s:%s" % (label.getNamespace(), label.getLabel())\
-                                                              == versionStr):
-                        versionMatches.append(trove)
-                        break
-                    continue
-                else:
-                    raise RecipeFileError("Unsupported buildReq format")
+
+            versionMatches =  _filterBuildReqsByVersionStr(versionStr, troves)
+                
             if not versionMatches:
                 missingReqs.append(buildReq)
                 continue
-            versionMatches.sort(lambda a, b: a.getVersion().__cmp__(b.getVersion()))
-            if not flavor:
-                reqMap[buildReq] = versionMatches[-1]
-                continue
-            for trove in reversed(versionMatches):
-                troveFlavor = trove.getFlavor()
-                if troveFlavor.stronglySatisfies(flavor):
-                    reqMap[buildReq] = trove
-                    break
-            if buildReq not in reqMap:
+            match = _filterBuildReqsByFlavor(flavor, versionMatches)
+            if match:
+                reqMap[buildReq] = match
+            else:
                 missingReqs.append(buildReq)
+            
+            
+        
         if missingReqs:
             if not ignoreDeps:
                 log.error("Could not find the following troves "
                           "needed to cook this recipe:\n"  
-                          "%s" % '\n'.join(missingReqs))
+                          "%s" % '\n'.join(sorted(missingReqs)))
                 raise cook.CookError, 'unresolved build dependencies'
         self.buildReqMap = reqMap
 
