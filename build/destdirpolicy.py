@@ -391,6 +391,7 @@ class AutoDoc(policy.Policy):
     invariantinclusions = [
         '.*/NEWS$',
         r'.*/(LICENSE|COPY(ING|RIGHT))(\.lib|)$',
+        '.*/RELEASE-NOTES$',
         '.*/HACKING$',
         '.*/INSTALL$',
         '.*README.*',
