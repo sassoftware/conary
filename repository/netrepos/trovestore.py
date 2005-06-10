@@ -706,60 +706,6 @@ class TroveStore:
     def resolveRequirements(self, label, depSetList):
         return self.depTables.resolve(label, depSetList)
 
-    def _getPackageBranchPathIdsV32(self, sourceName, branch):
-        cu = self.db.cursor()
-
-        cu.execute("""
-            SELECT DISTINCT pathId, path FROM
-                TroveInfo JOIN Instances ON
-                    TroveInfo.instanceId == Instances.instanceId
-                INNER JOIN Nodes ON
-                    Instances.itemId == Nodes.itemId AND
-                    Instances.versionId == Nodes.versionId
-                INNER JOIN Branches ON
-                    Nodes.branchId = Branches.branchId
-                INNER JOIN TroveFiles ON
-                    Instances.instanceId = TroveFiles.instanceId
-                WHERE
-                    TroveInfo.infoType = ? AND
-                    TroveInfo.data = ? AND
-                    Branches.branch = ?
-                ORDER BY 
-                    Nodes.finalTimestamp DESC
-        """, trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch)
-
-        for pathId, path in cu:
-            yield path, pathId
-
-    def getPackageBranchPathIds(self, sourceName, branch):
-        cu = self.db.cursor()
-
-        cu.execute("""
-            SELECT DISTINCT pathId, path, version, fileId FROM
-                TroveInfo JOIN Instances ON
-                    TroveInfo.instanceId == Instances.instanceId
-                INNER JOIN Nodes ON
-                    Instances.itemId == Nodes.itemId AND
-                    Instances.versionId == Nodes.versionId
-                INNER JOIN Branches ON
-                    Nodes.branchId = Branches.branchId
-                INNER JOIN TroveFiles ON
-                    Instances.instanceId = TroveFiles.instanceId
-                INNER JOIN Versions ON
-                    TroveFiles.versionId = Versions.versionId
-                INNER JOIN FileStreams ON
-                    TroveFiles.streamId = FileStreams.streamId
-                WHERE
-                    TroveInfo.infoType = ? AND
-                    TroveInfo.data = ? AND
-                    Branches.branch = ?
-                ORDER BY 
-                    Nodes.finalTimestamp DESC
-        """, trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch)
-
-        for (pathId, path, version, fileId) in cu:
-            yield (path, (pathId, version, fileId))
-
     def begin(self):
 	"""
 	Force the database to begin a transaction; this locks the database
