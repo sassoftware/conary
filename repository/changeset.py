@@ -298,7 +298,7 @@ class ChangeSet(streams.LargeStreamSet):
 	return self.oldTroves
 
     def configFileIsDiff(self, pathId):
-        (tag, cont) = self.configCache.get(pathId, (None, None, None))
+        (tag, cont, compressed) = self.configCache.get(pathId, (None, None, None))
         return tag == ChangedFileTypes.diff
 
     def addFileContents(self, pathId, contType, contents, cfgFile,

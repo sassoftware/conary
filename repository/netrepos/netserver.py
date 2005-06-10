@@ -304,7 +304,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             getList.append('gtvlTbl.flavorId')
         else:
             getList.append('0')
-        argList = [ authToken[0] ]
 
         if withVersions:
             getList += [ 'Versions.version', 'timeStamps', 'Nodes.branchId',
@@ -428,12 +427,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             getList.append("NULL")
             flavorScoreCheck = ""
 
+        getList = ", ".join(getList)
+        
         fullQuery = """
                 SELECT 
-                      %s
+                      %(getList)s
                     FROM
-                    %s
-                    %s
+                    %(troveNameClause)s
+                    %(instanceClause)s
                     INNER JOIN Nodes ON
                         Nodes.itemId = Instances.itemId AND
                         Nodes.versionId = Instances.versionId
@@ -444,20 +445,18 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         UserPermissions.permittedLabelId = NodeLabelMap.labelId 
                       OR
                         UserPermissions.permittedLabelId is NULL
-                    %s
-                    %s
-                    %s
-                    %s
+                    %(versionClause)s
+                    %(labelClause)s
+                    %(flavorClause)s
+                    %(flavorScoringClause)s
                     WHERE
                         user = ?
-                    %s
-                    %s
-        """ % (", ".join(getList), troveNameClause, instanceClause, 
-               versionClause, labelClause, flavorClause, flavorScoringClause,
-               grouping, flavorScoreCheck)
+                    %(grouping)s
+                    %(flavorScoreCheck)s
+        """ %locals()
         # this is a lot like the query for troveNames()... there is probably
         # a way to unify this through some views
-        cu.execute(fullQuery, argList)
+        cu.execute(fullQuery, (authToken[0],))
 
         pwChecked = False
         # this prevents dups that could otherwise arise from multiple
@@ -958,35 +957,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                     self.toFileId(fileId))
 	return self.fromFile(f)
 
-    def _getPackageBranchPathIdsV32(self, sourceName, branch):
-        cu = self.db.cursor()
-
-        cu.execute("""
-            SELECT DISTINCT pathId, path FROM
-                TroveInfo JOIN Instances ON
-                    TroveInfo.instanceId == Instances.instanceId
-                INNER JOIN Nodes ON
-                    Instances.itemId == Nodes.itemId AND
-                    Instances.versionId == Nodes.versionId
-                INNER JOIN Branches ON
-                    Nodes.branchId = Branches.branchId
-                INNER JOIN TroveFiles ON
-                    Instances.instanceId = TroveFiles.instanceId
-                WHERE
-                    TroveInfo.infoType = ? AND
-                    TroveInfo.data = ? AND
-                    Branches.branch = ?
-                ORDER BY 
-                    Nodes.finalTimestamp DESC
-        """, trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch)
-
-        ids = {}
-        for (pathId, path) in cu:
-            if not ids.has_key(path):
-                ids[self.fromPath(path)] = self.fromPathId(pathId)
-
-        return ids
-
     def getPackageBranchPathIds(self, authToken, clientVersion, sourceName, 
                                 branch):
 	if not self.auth.check(authToken, write = False, 
@@ -994,42 +964,24 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 			       label = self.toBranch(branch).label()):
 	    raise InsufficientPermission
 
+        d = {}
         if clientVersion < 33:
-            return self._getPackageBranchPathIdsV32(sourceName, branch)
+            ids = self.troveStore._getPackageBranchPathIdsV32(sourceName,
+                                                              branch)
+            for path, pathId in ids:
+                if not d.has_key(path):
+                    d[self.fromPath(path)] = (self.fromPathId(pathId),
+                                              None, None)
+        else:
+            ids = self.troveStore.getPackageBranchPathIds(sourceName,
+                                                          branch)
+            for path, (pathId, version, fileId) in ids:
+                if not d.has_key(path):
+                    d[self.fromPath(path)] = (self.fromPathId(pathId),
+                                              version,
+                                              self.fromFileId(fileId))
 
-        cu = self.db.cursor()
-
-        cu.execute("""
-            SELECT DISTINCT pathId, path, version, fileId FROM
-                TroveInfo JOIN Instances ON
-                    TroveInfo.instanceId == Instances.instanceId
-                INNER JOIN Nodes ON
-                    Instances.itemId == Nodes.itemId AND
-                    Instances.versionId == Nodes.versionId
-                INNER JOIN Branches ON
-                    Nodes.branchId = Branches.branchId
-                INNER JOIN TroveFiles ON
-                    Instances.instanceId = TroveFiles.instanceId
-                INNER JOIN Versions ON
-                    TroveFiles.versionId = Versions.versionId
-                INNER JOIN FileStreams ON
-                    TroveFiles.streamId = FileStreams.streamId
-                WHERE
-                    TroveInfo.infoType = ? AND
-                    TroveInfo.data = ? AND
-                    Branches.branch = ?
-                ORDER BY 
-                    Nodes.finalTimestamp DESC
-        """, trove._TROVEINFO_TAG_SOURCENAME, sourceName, branch)
-
-        ids = {}
-        for (pathId, path, version, fileId) in cu:
-            if not ids.has_key(path):
-                ids[self.fromPath(path)] = (self.fromPathId(pathId),
-                                            version,
-                                            self.fromFileId(fileId))
-
-        return ids
+        return d
 
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
