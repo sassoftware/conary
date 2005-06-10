@@ -907,11 +907,24 @@ class PackageRecipe(Recipe):
 			del list[index]
 			return
 	del self.__dict__[name]
+
+    def _includeSuperClassBuildReqs(self):
+        """ Include build requirements from super classes by searching
+            up the class hierarchy for buildRequires.  You can only
+            override this currenly by calling 
+            <superclass>.buildRequires.remove()
+        """
+        buildReqs = set()
+        for base in inspect.getmro(self.__class__):
+            buildReqs.update(getattr(base, 'buildRequires', []))
+        self.buildRequires = list(buildReqs)
     
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}):
         assert(self.__class__ is not Recipe)
 	self._sources = []
 	self._build = []
+
+        self._includeSuperClassBuildReqs()
         self.destdirPolicy = destdirpolicy.DefaultPolicy(self)
         self.packagePolicy = packagepolicy.DefaultPolicy(self)
         self.cfg = cfg
