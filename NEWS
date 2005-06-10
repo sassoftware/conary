@@ -3,6 +3,8 @@ Changes in 0.60.8:
     /usr/lib{,64}/python2.4/site-packages/conary/changemail
   * build requirements for superclasses are automatically added to 
     subclasses
+  * build requirements now look at all labels in a version to see if they
+    satisfy a build req
 
 Changes in 0.60.7:
   * The changemail script is now distributed with conary, and is called
