@@ -782,11 +782,9 @@ class NormalizeManPages(policy.Policy):
 	    if name.endswith('.bz2') and util.isregular(path):
 		util.execute('bunzip2 ' + dirname + os.sep + name)
 
-    def _dedestdir(self, dirname, names):
+    def _touchup(self, dirname, names):
 	"""
-	remove destdir, and fix up modes (this is the most convenient
-	place to fix up modes without adding an extra scan of the
-	directory tree)
+	remove destdir, fix up modes, ensure that it is legal UTF-8
 	"""
 	mode = os.lstat(dirname)[stat.ST_MODE]
 	if mode & 0777 != 0755:
@@ -799,7 +797,29 @@ class NormalizeManPages(policy.Policy):
                 continue
 	    if mode & 0777 != 0644:
 		os.chmod(path, 0644)
-	    util.execute("sed -i 's,/*%s,,g' %s" %(self.destdir, path))
+            f = file(path, 'r+')
+            data = f.read()
+            write = False
+            try:
+                data.decode('utf-8')
+            except:
+                try:
+                    data = data.decode('iso-8859-1').encode('utf-8')
+                    write = True
+                except:
+                    self.error('unable to decode %s as utf-8 or iso-8859-1',
+                               path)
+            if data.find(self.destdir) != -1:
+                write = True
+                # I think this is cheaper than using a regexp
+                data = data.replace('/'+self.destdir, '')
+                data = data.replace(self.destdir, '')
+
+            if write:
+                f.seek(0)
+                f.truncate(0)
+                f.write(data)
+
 
     def _sosymlink(self, dirname, names):
 	section = os.path.basename(dirname)
@@ -890,7 +910,7 @@ class NormalizeManPages(policy.Policy):
 	    # uncompress all man pages
 	    os.path.walk(manpath, NormalizeManPages._uncompress, self)
 	    # remove '/?%(destdir)s' and fix modes
-	    os.path.walk(manpath, NormalizeManPages._dedestdir, self)
+	    os.path.walk(manpath, NormalizeManPages._touchup, self)
 	    # .so foo.n becomes a symlink to foo.n
 	    os.path.walk(manpath, NormalizeManPages._sosymlink, self)
 	    # recompress all man pages

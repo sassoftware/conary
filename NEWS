@@ -1,10 +1,13 @@
 Changes in 0.60.8:
   * The changemail script is now actually packaged, in
     /usr/lib{,64}/python2.4/site-packages/conary/changemail
-  * build requirements for superclasses are automatically added to 
-    subclasses
-  * build requirements now look at all labels in a version to see if they
-    satisfy a build req
+  * Build requirements for superclasses are automatically added to 
+    subclasses.
+  * Build requirements now look at all labels in a version to see if they
+    satisfy a build requirement.
+  * The NormalizeManPages policy now automatically converts man pages
+    encoded in iso-8859-1 to man pages encoded in utf-8.  Additionally,
+    it runs faster and no longer calls sed.
 
 Changes in 0.60.7:
   * The changemail script is now distributed with conary, and is called
