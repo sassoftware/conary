@@ -90,8 +90,8 @@ def main(argv):
             l.append(component)
         elif name.startswith('group-'):
             d = grpMap.setdefault(name, {})
-            d = d.setdefault(version, {})
-            l = d.setdefault(flavor, None)
+            s = d.setdefault(version, set())
+            s.add(flavor)
 
     sourceuser = None
     binaryuser = None
@@ -178,8 +178,8 @@ def main(argv):
             for version in sorted(grpMap[group].keys()):
                 print '================================'
                 print '%s=%s' %(group, version)
-                flavorDict = grpMap[group][version]
-                for flavor in sorted(flavorDict.keys()):
+                flavorSet = grpMap[group][version]
+                for flavor in sorted(flavorSet):
                     print wrap.fill('[%s]' %
                         ', '.join(flavor.split(',')))
                 print
