@@ -14,7 +14,7 @@
 
 python_files = conarybugz.py
 
-extra_dist = Makefile rpm2cpio yuck yuck.1 convertcontents changemail
+extra_dist = Makefile rpm2cpio yuck yuck.1 convertcontents changemail changemail.py commitaction
 
 dist_files = $(python_files) $(extra_dist)
 
@@ -28,7 +28,9 @@ install:
 	install -m 644 yuck.1 $(DESTDIR)$(mandir)/man1
 	install -m 755 convertcontents $(DESTDIR)$(conarydir)
 	install -m 755 conarybugz.py $(DESTDIR)$(conarydir)
+	install -m 755 commitaction $(DESTDIR)$(conarydir)
 	install -m 755 changemail $(DESTDIR)$(conarydir)
+	install -m 755 changemail.py $(DESTDIR)$(conarydir)
 
 dist: default-dist
 

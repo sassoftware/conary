@@ -1,3 +1,14 @@
+Changes in 0.60.9:
+  * The changemail script is replaced by a generic commitaction script
+    that loads modules, and a changemail.py module is supplied.  There is
+    a backward-compatible changemail script which calls commitaction
+    with the changemail.py module.  --email and --*user options now are
+    changemail module options, so the commitAction should be specified
+    something like this:
+    commitAction /.../conary/commitaction --repmap ... --module "/.../conary/changemail --user %(user)s --email foo@example.com --email bar@example.com"
+    You can add your own modules and run them all from the same commitaction
+    using multiple --module arguments to the commitaction script.
+
 Changes in 0.60.8:
   * The changemail script is now actually packaged, in
     /usr/lib{,64}/python2.4/site-packages/conary/changemail

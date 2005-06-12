@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/bin/bash
 #
 # Copyright (c) 2005 rpath, Inc.
 #
@@ -13,189 +13,38 @@
 # full details.
 #
 
-# get the path
-import conary
+# This is a temporary compatibility wrapper around the new commitaction
+# script and its changemail module.
 
-import checkin
-import conarycfg
-import deps
-from lib import options, util
-import os
-from repository.netclient import NetworkRepositoryClient
-import sys
-import tempfile
-import textwrap
-import versions
+DN=$(dirname $0)
+ADDRS=""
+ARGS=""
+COMMITARGS=""
 
-def usage(exitcode=1):
-    sys.stderr.write("\n".join((
-     "Usage: changemail --repmap <repmap> --build-label <buildLabel>",
-     "                  [--email] <email> [[--email] <email>...]",
-     r"Takes triplets of name\nversion\nflavor\n on standard input",
-     ""
-    )))
-    sys.exit(exitcode)
+while [ $# -gt 0 ] ; do
+    case $1 in
+        --email)
+            shift
+            ADDRS="$ADDRS $1"
+            shift
+            ;;
+        --*user)
+            ARGS="$ARGS $1 $2"
+            shift; shift
+            ;;
+        --*)
+            COMMITARGS="$COMMITARGS $1 $2"
+            shift; shift
+            ;;
+        *)
+            ADDRS="$ADDRS $1"
+            shift
+            ;;
+    esac
+done
 
+# Uncomment this after a few releases
+# In July or so change this from warning to err
+#logger -p daemon.warning -t changemail "Deprecated changemail script; use commitaction --module \"$DN/changemail ARGS\" instead"
 
-def main(argv):
-    if not len(argv):
-        usage()
-
-    sys.excepthook = util.genExcepthook(prefix='changemail-stack-')
-
-    argDef = {
-        'email': options.MULT_PARAM,
-        'user': options.ONE_PARAM,
-        'sourceuser': options.ONE_PARAM,
-        'binaryuser': options.ONE_PARAM,
-    }
-
-    cfgMap = {
-        'build-label': 'buildLabel',
-        'repmap': 'repositoryMap'
-    }
-
-    cfg = conarycfg.ConaryConfiguration()
-    argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
-                                            argv=argv)
-    # remove argv[0]
-    otherArgs = otherArgs[1:]
-
-    if 'email' in argSet:
-        argSet['email'].extend(otherArgs)
-    else:
-        if otherArgs:
-            argSet['email'] = otherArgs
-        else:
-            usage()
-
-    repos = NetworkRepositoryClient(cfg.repositoryMap)
-
-    data = [x[:-1] for x in sys.stdin.readlines()]
-
-    srcMap = {}
-    pkgMap = {}
-    grpMap = {}
-
-    for name, version, flavor in zip(data, data[1:], data[2:])[::3]:
-        if name[-7:] == ':source':
-            # sources are not flavored
-            l = srcMap.setdefault(name, [])
-            l.append((version, version.split('/')[-1]))
-        elif ':' in name:
-            package, component = name.split(':')
-            d = pkgMap.setdefault(package, {})
-            d = d.setdefault(version, {})
-            l = d.setdefault(flavor, [])
-            l.append(component)
-        elif name.startswith('group-'):
-            d = grpMap.setdefault(name, {})
-            s = d.setdefault(version, set())
-            s.add(flavor)
-
-    sourceuser = None
-    binaryuser = None
-    if 'sourceuser' in argSet:
-        sourceuser = argSet['sourceuser']
-    if 'binaryuser' in argSet:
-        binaryuser = argSet['binaryuser']
-    if not sourceuser and 'user' in argSet:
-        sourceuser = argSet['user']
-    if not binaryuser and 'user' in argSet:
-        binaryuser = argSet['user']
-
-    tmpfd, tmppath = tempfile.mkstemp('', 'changemail-')
-    os.unlink(tmppath)
-    tmpfile = os.fdopen(tmpfd)
-    sys.stdout.flush()
-    oldStdOut = os.dup(sys.stdout.fileno())
-    os.dup2(tmpfd, 1)
-
-    if srcMap:
-        sources = sorted(srcMap.keys())
-        names = [ x.split(':')[0] for x in sources ]
-        subjectList = []
-        for sourceName in sources:
-            for ver, shortver in srcMap[sourceName]:
-                subjectList.append('%s=%s' %(
-                    sourceName.split(':')[0], shortver))
-        subject = 'Source: %s' %" ".join(subjectList)
-
-        for sourceName in sources:
-            for ver, shortver in srcMap[sourceName]:
-                new = repos.findTrove(cfg.buildLabel, (sourceName, ver, None))
-                newV = new[0][1]
-                old, oldV = checkin.findRelativeVersion(repos, sourceName,
-                                                        1, newV)
-                if old:
-                    old = ' (previous: %s)'%oldV.asString().split('/')[-1]
-                else:
-                    old = ''
-                print '================================'
-                print '%s=%s%s' %(sourceName, shortver, old)
-                print 'cvc rdiff %s -1 %s' %(sourceName[:-7], ver)
-                print '================================'
-                checkin.rdiff(repos, cfg.buildLabel, sourceName, '-1', ver)
-                print
-        if sourceuser:
-            print 'Committed by: %s' %sourceuser
-
-        sendMail(tmpfile, subject, argSet['email'])
-
-    if pkgMap or grpMap:
-        # stdout is the tmpfile
-        sys.stdout.flush()
-        sys.stdout.seek(0)
-        sys.stdout.truncate()
-
-        binaries = sorted(pkgMap.keys())
-        groups = sorted(grpMap.keys())
-        subject = 'Binary: %s' %" ".join(binaries+groups)
-
-        wrap = textwrap.TextWrapper(
-            initial_indent='    ',
-            subsequent_indent='        ',
-        )
-
-        if binaries:
-            print "Binary package commits:"
-            if binaryuser:
-                print 'Committed by: %s' %binaryuser
-        for package in binaries:
-            for version in sorted(pkgMap[package].keys()):
-                print '================================'
-                print '%s=%s' %(package, version)
-                flavorDict = pkgMap[package][version]
-                for flavor in sorted(flavorDict.keys()):
-                    print wrap.fill('%s:%s [%s]' %(package,
-                        ' :'.join(flavorDict[flavor]),
-                        ', '.join(flavor.split(','))))
-                print
-
-        if groups:
-            print "Group commits:"
-        for group in groups:
-            for version in sorted(grpMap[group].keys()):
-                print '================================'
-                print '%s=%s' %(group, version)
-                flavorSet = grpMap[group][version]
-                for flavor in sorted(flavorSet):
-                    print wrap.fill('[%s]' %
-                        ', '.join(flavor.split(',')))
-                print
-
-        sendMail(tmpfile, subject, argSet['email'])
-
-    return 0
-
-def sendMail(tmpfile, subject, addresses):
-    # stdout is the tmpfile, so make sure it has been flushed!
-    sys.stdout.flush()
-    for address in addresses:
-        tmpfile.seek(0)
-        mail = util.popen("""mail -s '%s' %s""" %(subject, address), "w")
-        mail.writelines(tmpfile.readlines())
-        mail.close()
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+exec $DN/commitaction $COMMITARGS --module "$DN/changemail $ARGS" $ADDRS

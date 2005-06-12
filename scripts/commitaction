@@ -1,0 +1,115 @@
+#!/usr/bin/python
+#
+# Copyright (c) 2005 rpath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+# get the path
+import conary
+
+import conarycfg
+from lib import options, util
+from repository.netclient import NetworkRepositoryClient
+import os
+import sys
+import imp
+
+def usage(exitcode=1):
+    sys.stderr.write("\n".join((
+     "Usage: changeaction --repmap <repmap> --build-label <buildLabel>",
+     "                    --module '/path/to/module module options'",
+     r"Takes triplets of name\nversion\nflavor\n on standard input",
+     ""
+    )))
+    sys.exit(exitcode)
+
+
+def main(argv):
+    if not len(argv):
+        usage()
+
+    sys.excepthook = util.genExcepthook(prefix='commitaction-stack-')
+
+    argDef = {
+        'module': options.MULT_PARAM,
+    }
+
+    cfgMap = {
+        'build-label': 'buildLabel',
+        'repmap': 'repositoryMap'
+    }
+
+    cfg = conarycfg.ConaryConfiguration()
+    argSet, otherArgs = options.processArgs(argDef, cfgMap, cfg, usage,
+                                            argv=argv)
+    # remove argv[0]
+    otherArgs = otherArgs[1:]
+
+    if 'module' not in argSet:
+        usage()
+
+    repos = NetworkRepositoryClient(cfg.repositoryMap)
+
+    data = [x[:-1] for x in sys.stdin.readlines()]
+
+    # { 'pkg:source': [(version, shortversion), ...] }
+    srcMap = {}
+    # { 'pkg' { version: { flavor: [ component, ...] } } }
+    pkgMap = {}
+    # { 'group-foo' { version: set(flavor, ...) } }
+    grpMap = {}
+
+    # [1,2,3,4,5,6,...] -> [(1,2,3), (4,5,6), ...]
+    commitList = zip(data, data[1:], data[2:])[::3]
+
+    for name, version, flavor in commitList:
+        if name[-7:] == ':source':
+            # sources are not flavored
+            l = srcMap.setdefault(name, [])
+            l.append((version, version.split('/')[-1]))
+        elif ':' in name:
+            package, component = name.split(':')
+            d = pkgMap.setdefault(package, {})
+            d = d.setdefault(version, {})
+            l = d.setdefault(flavor, [])
+            l.append(component)
+        elif name.startswith('group-'):
+            d = grpMap.setdefault(name, {})
+            s = d.setdefault(version, set())
+            s.add(flavor)
+
+    ret = 0
+    for module in argSet['module']:
+        argv = module.split()
+        path = argv[0]
+        name = os.path.basename(path)
+        if name.endswith('.py'):
+            name = name[:-3]
+        try:
+            f, pathName, description = imp.find_module(
+                name, [os.path.dirname(path)])
+        except:
+            break
+        try:
+            mod = imp.load_module(name, f, path, description)
+            # pass repos, cfg, and all otherArgs to all modules
+            if 'process' in mod.__dict__:
+                ret |= mod.process(repos, cfg, commitList,
+                                   srcMap, pkgMap, grpMap,
+                                   argv[1:], otherArgs)
+        finally:
+            f.close()
+
+    return ret
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
