@@ -1129,7 +1129,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	try:
 	    util.mkdirChain(self.repPath)
 	except OSError, e:
-	    raise repository.repository.OpenError(str(e))
+	    raise repository.OpenError(str(e))
 
         if cacheChangeSets:
             self.cache = CacheSet(path + "/cache.sql", tmpPath, 
