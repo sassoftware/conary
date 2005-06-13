@@ -173,9 +173,9 @@ def fetchURL(cfg, name, location):
                 return None
         except IOError, msg:
             # only retry for server busy.
-            if 'ftp error] 421' in msg:
+            if msg.args[1].args[0].startswith('421'):
                 log.info('FTP server busy when retrieving %s.'
-                         '  Retrying in 10 seconds.', name, msg)
+                         '  Retrying in 10 seconds.', name)
                 time.sleep(10)
                 retries += 1
             else:
