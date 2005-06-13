@@ -252,6 +252,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
                                   capped, admin)
 
+    def changePassword(self, label, user, newPassword):
+        self.c[label].changePassword(user, newPassword)
+
     def getUserGroups(self, label):
         return self.c[label].getUserGroups()
 

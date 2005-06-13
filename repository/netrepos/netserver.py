@@ -158,6 +158,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                          admin)
 
         return True
+    
+    def changePassword(self, authToken, clientVersion, user, newPassword):
+        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]) and\
+            user != authToken[0]:
+            raise InsufficientPermissions
+
+        self.auth.changePassword(user, newPassword)
+        
+        return True
 
     def getUserGroups(self, authToken, clientVersion):
         r = self.auth.getUserGroups(authToken[0])
