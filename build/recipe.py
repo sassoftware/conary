@@ -157,6 +157,7 @@ def setupRecipeDict(d, filename):
                                     'DistroPackageRecipe',
                                     'BuildPackageRecipe',
                                     'CPackageRecipe',
+                                    'AutoPackageRecipe',
                                     'loadSuperClass', 'loadInstalled',
                                     # XXX when all recipes have been migrated
                                     # we can get rid of loadRecipe
@@ -965,11 +966,18 @@ class PackageRecipe(Recipe):
         self.sourcePathMap = {}
         self.pathConflicts = {}
 
-# XXX the next three classes will probably migrate to the repository
+
+# XXX the next four classes will probably migrate to the repository
 # somehow, but not until we have figured out how to do this without
 # requiring that every recipe have a loadSuperClass line in it.
 
 class DistroPackageRecipe(PackageRecipe):
+    """
+    Most packages in the distribution should descend from this class,
+    directly or indirectly, except for direct build requirements of
+    this class.  This package differs from the C{PackageRecipe}
+    class only by providing explicit build requirements.
+    """
     # :lib in here is only for runtime, not to link against.
     # Any package that needs to link should still specify the :devellib
     buildRequires = [
@@ -992,6 +1000,13 @@ class DistroPackageRecipe(PackageRecipe):
     ignore = 1
 
 class BuildPackageRecipe(DistroPackageRecipe):
+    """
+    Packages that need to be built with the make utility and basic standard
+    shell tools should descend from this recipe in order to automatically
+    have a reasonable set of build requirements.  This package differs
+    from the C{PackageRecipe} class only by providing explicit build
+    requirements.
+    """
     # Again, no :devellib here
     buildRequires = [
         'coreutils:runtime',
@@ -1009,8 +1024,13 @@ class BuildPackageRecipe(DistroPackageRecipe):
     # abstract base class
     ignore = 1
 
-
 class CPackageRecipe(BuildPackageRecipe):
+    """
+    Most packages should descend from this recipe in order to automatically
+    have a reasonable set of build requirements for a package that builds
+    C source code to binaries.  This package differs from the
+    C{PackageRecipe} class only by providing explicit build requirements.
+    """
     buildRequires = [
         'binutils:runtime',
         'binutils:lib',
@@ -1027,6 +1047,40 @@ class CPackageRecipe(BuildPackageRecipe):
     Flags = use.LocalFlags
     # abstract base class
     ignore = 1
+
+class AutoPackageRecipe(CPackageRecipe):
+    """
+    Recipe class for simple packages built with auto* tools.  Child
+    classes should provide the C{unpack()} method for populating the
+    source list.  To call policy, implement the C{policy()} method and
+    put any necessary policy invocations there.  Next mostly likely is
+    to provide a C{makeinstall()} method if C{MakeInstall()} is
+    insufficient for the package.  Least likely to need overriding
+    are C{configure()} if C{Configure()} is insufficient, and
+    C{make()} if C{Make()} is insufficient.
+    """
+    Flags = use.LocalFlags
+    # abstract base class
+    ignore = 1
+
+    def setup(r):
+        r.unpack()
+        r.configure()
+        r.make()
+        r.makeinstall()
+        r.policy()
+
+    def unpack(r):
+        pass
+    def configure(r):
+        r.Configure()
+    def make(r):
+        r.Make()
+    def makeinstall(r):
+        r.MakeInstall()
+    def policy(r):
+        pass
+
 
 class SingleGroup:
 
