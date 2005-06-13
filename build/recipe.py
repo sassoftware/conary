@@ -575,11 +575,13 @@ class Recipe:
 class PackageRecipe(Recipe):
     buildRequires = []
     Flags = use.LocalFlags
+    explicitMainDir = False
     
-    def mainDir(self, new = None):
+    def mainDir(self, new=None, explicit=True):
 	if new:
 	    self.theMainDir = new % self.macros
 	    self.macros.maindir = self.theMainDir
+            self.explicitMainDir |= explicit
 	return self.theMainDir
 
     def nameVer(self):
@@ -962,7 +964,7 @@ class PackageRecipe(Recipe):
         self.packages = { self.name : True }
 	if extraMacros:
 	    self.macros.update(extraMacros)
-	self.mainDir(self.nameVer())
+	self.mainDir(self.nameVer(), explicit=False)
         self.sourcePathMap = {}
         self.pathConflicts = {}
 

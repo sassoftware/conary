@@ -171,32 +171,45 @@ class Archive(_Source):
     def do(self):
 	f = self._findSource()
 	self._checkSignature(f)
-        if dir == '':
-            # default for no dir specified is different from when a 
-            # relative dir is specified, 
-            destDir = os.sep.join((self.buildDir, self.recipe.macros.mainDir))
-        else:
-            destDir = action._expandOnePath(self.dir, self.recipe.macros, 
-                                                      defaultDir=self.builddir)
+        destDir = action._expandOnePath(self.dir, self.recipe.macros, 
+                                        defaultDir=self.builddir)
         util.mkdirChain(destDir)
+
+        guessMainDir = (not self.recipe.explicitMainDir and
+                        not self.dir.startswith('/'))
+
+        if guessMainDir:
+            before = set(os.listdir(destDir))
 
 	if f.endswith(".zip"):
 	    util.execute("unzip -q -o -d %s %s" % (destDir, f))
-	    return
 
-	if f.endswith(".rpm"):
+	elif f.endswith(".rpm"):
 	    _extractFilesFromRPM(f, directory=destDir)
-	    return
 
-	if f.endswith(".tar"):
-	    tarflags = "-xf"
-	elif f.endswith(".bz2") or f.endswith(".tbz2"):
-	    tarflags = "-jxf"
-	elif f.endswith(".gz") or f.endswith(".tgz") or f.endswith(".Z"):
-	    tarflags = "-zxf"
 	else:
-	    raise SourceError, "unknown archive compression"
-	util.execute("tar -C %s %s %s" % (destDir, tarflags, f))
+            if f.endswith(".tar"):
+                tarflags = "-xf"
+            elif f.endswith(".bz2") or f.endswith(".tbz2"):
+                tarflags = "-jxf"
+            elif f.endswith(".gz") or f.endswith(".tgz") or f.endswith(".Z"):
+                tarflags = "-zxf"
+            else:
+                raise SourceError, "unknown archive compression"
+            util.execute("tar -C %s %s %s" % (destDir, tarflags, f))
+
+        if guessMainDir:
+            after = set(os.listdir(destDir))
+            difference = after - before
+            oldMainDir = self.recipe.mainDir()
+            if len(difference) == 1:
+                candidate = difference.pop()
+                if os.path.isdir('%s/%s' %(destDir, candidate)):
+                    self.recipe.mainDir(candidate)
+                else:
+                    self.recipe.mainDir(oldMainDir)
+            else:
+                self.recipe.mainDir(oldMainDir)
 
 
 class Patch(_Source):
