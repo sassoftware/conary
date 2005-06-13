@@ -186,8 +186,9 @@ class HttpRequests(SimpleHTTPRequestHandler):
 	try:
 	    result = netRepos.callWrapper(None, None, method, authToken, params)
 	except netserver.InsufficientPermission:
+
 	    self.send_error(403)
-	    return
+	    return None
 
 	resp = xmlrpclib.dumps((result,), methodresponse=1)
 
