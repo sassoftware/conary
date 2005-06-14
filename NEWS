@@ -6,6 +6,11 @@ Changes in 0.60.10:
     raises an error instead of printing a warning.
   * Conary now enforces the rule that tag names must have no whitespace
     and must be all alphanumeric characters, -, or _.
+  * Conary can now run a single instance of a single tag handler to
+    process multiple tags.  The tag description files for each tag
+    must point to the same tag handler, and must each specify the
+    multitag datasource.  The data is passed to the tag handler on
+    standard input using the protocol "tag list for file1\nfile1\n..."
 
 Changes in 0.60.9:
   * The changemail script is replaced by a generic commitaction script

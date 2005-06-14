@@ -32,7 +32,7 @@ class TagFile(conarycfg.ConfigFile):
 		       'description':  ('update', 'preremove'),
                       }
     # ...and "datasource"
-    datasourceCheck = ['args', 'stdin']
+    datasourceCheck = ['args', 'stdin', 'multitag']
 
     def __init__(self, filename, macros = {}, warn=False):
 	self.defaults = {
@@ -74,7 +74,7 @@ class TagFile(conarycfg.ConfigFile):
 	if 'datasource' in self.__dict__:
 	    if self.__dict__['datasource'] not in self.datasourceCheck:
 		raise conarycfg.ParseError, \
-		    'unknown datasource option %s: "datasource args|stdin"' \
+		    'unknown datasource option %s: "datasource args|stdin|multitag"' \
 		    %self.__dict__['datasource']
 
 

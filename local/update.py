@@ -102,32 +102,31 @@ class FilesystemJob:
     def preapply(self, tagSet = {}, tagScript = None):
 	# this is run before the change make it to the database
 	rootLen = len(self.root)
-	tagCommands = []
+	tagCommands = tagCommand()
 
         for path in self.tagRemoves.get('taghandler', []):
             path = path[rootLen:]
-            tagInfo = None
+            tagInfo = []
             for ti in tagSet.itervalues():
                 if ti.file == path:
-                    tagInfo = ti
-                    break
+                    tagInfo.append(ti)
 
             if not tagInfo:
                 continue
 
-            # this prevents us from trying to run "files add" for this tag
-            del tagSet[tagInfo.tag]
+            for ti in tagInfo:
+                # this prevents us from trying to run "files add" for this tag
+                del tagSet[ti.tag]
 
-            # we're running "handler preremove"; we don't need to run
-            # "files preremove" as well, and we won't be able to run "files
-            # remove" (since the taghandler would have disappeared)
-            if self.tagRemoves.has_key(tagInfo.tag):
-                del self.tagRemoves[tagInfo.tag]
+                # we're running "handler preremove"; we don't need to run
+                # "files preremove" as well, and we won't be able to run "files
+                # remove" (since the taghandler would have disappeared)
+                if self.tagRemoves.has_key(ti.tag):
+                    del self.tagRemoves[ti.tag]
 
-            if "handler preremove" in tagInfo.implements:
-                tagCommands.append([ tagInfo, ("handler", "preremove"), 
-                   [x for x in 
-                        self.repos.iterFilesWithTag(tagInfo.tag) ] ] )
+                if "handler preremove" in ti.implements:
+                    tagCommands.addCommand(ti, 'handler', 'preremove',
+                        [x for x in self.repos.iterFilesWithTag(ti.tag)])
 
 	for tag, l in self.tagRemoves.iteritems():
 	    if tag == 'tagdescription':
@@ -136,13 +135,10 @@ class FilesystemJob:
 	    tagInfo = tagSet[tag]
 
 	    if "files preremove" in tagInfo.implements:
-		l.sort()
-		cmd = [ tagInfo, ("files", "preremove"),
-			    [ x[rootLen:] for x in l ] ]
-		tagCommands.append(cmd)
+                tagCommands.addCommand(tagInfo, 'files', 'preremove',
+                    [x[rootLen:] for x in l ])
 	    
-	if tagCommands:
-	    runTagCommands(tagScript, self.root, tagCommands, preScript = True)
+        tagCommands.run(tagScript, self.root, preScript=True)
 
     def _createLink(self, linkGroup, target):
         # this is part of a hard link group, attempt making a
@@ -189,7 +185,7 @@ class FilesystemJob:
 
 	# this is run after the changes are in the database (but before
 	# they are committed
-	tagCommands = []
+	tagCommands = tagCommand()
 	runLdconfig = False
 	rootLen = len(self.root)
 
@@ -397,9 +393,8 @@ class FilesystemJob:
                 del self.tagUpdates[tagInfo.tag]
 
             if "handler update" in tagInfo.implements:
-                cmd = [ tagInfo, ("handler", "update"),
-                    [x for x in self.repos.iterFilesWithTag(tagInfo.tag)] ]
-                tagCommands.append(cmd)
+                tagCommands.addCommand(tagInfo, 'handler', 'update',
+                    [x for x in self.repos.iterFilesWithTag(tagInfo.tag)])
             elif "files update" in tagInfo.implements:
                 # if "handler update" isn't implemented, see if "files
                 # update" is implemented. if so, we need to call this
@@ -408,8 +403,7 @@ class FilesystemJob:
                 fileList = [x for x in 
                             self.repos.iterFilesWithTag(tagInfo.tag) ] 
                 if fileList:
-                    cmd = [ tagInfo, ("files", "update"), fileList ]
-                    tagCommands.append(cmd)
+                    tagCommands.addCommand(tagInfo, 'files', 'update', fileList)
 
             tagSet[tagInfo.tag] = tagInfo
 
@@ -421,24 +415,20 @@ class FilesystemJob:
 	    if tagInfo is None: continue
 
 	    if "files update" in tagInfo.implements:
-		l.sort()
-		cmd = [ tagInfo, ("files", "update"), 
-		    [ x[rootLen:] for x in l ] ]
-		tagCommands.append(cmd)
+                tagCommands.addCommand(tagInfo, 'files', 'update',
+		    [x[rootLen:] for x in l])
 
 	for tag, l in self.tagRemoves.iteritems():
 	    if not tagSet.has_key(tag): continue
 	    tagInfo = tagSet[tag]
 
 	    if "files remove" in tagInfo.implements:
-		l.sort()
-		cmd = [ tagInfo, ("files", "remove"),
-			    [ x[rootLen:] for x in l ] ]
-		tagCommands.append(cmd)
+                tagCommands.addCommand(tagInfo, 'files', 'remove',
+                    [x[rootLen:] for x in l])
 	    
 	if tagCommands:
             callback.runningPostTagHandlers()
-	    runTagCommands(tagScript, self.root, tagCommands)
+	    tagCommands.run(tagScript, self.root)
 
     def getErrorList(self):
 	return self.errors
@@ -1382,67 +1372,165 @@ def shlibAction(root, shlibList, tagScript = None):
 	if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
 	    log.error("ldconfig failed")
 
-def runTagCommands(tagScript, root, cmdList, preScript = False):
-    if tagScript:
-	if preScript:
-	    pre = "# "
-	else:
-	    pre = ""
 
-	f = open(tagScript, "a")
-	for (tagInfo, cmd, args) in cmdList:
-	    if tagInfo.datasource == 'args':
-		f.write("%s%s %s %s\n" % (pre, tagInfo.file, " ".join(cmd), 
-					" ".join(args)))
-	    else:
-		f.write("%s%s %s <<EOF\n" % (pre, tagInfo.file, " ".join(cmd)))
-		for arg in args:
-		    f.write("%s%s\n" % (pre, arg))
-		f.write("%sEOF\n" % pre)
-		
-	f.close()
-	return
+class handlerInfo:
+    def __init__(self):
+        self.tagToFile = {} # {tagInfo: fileList}
+        self.fileToTag = {} # {fileName: tagInfoList}
+    def update(self, tagInfo, fileList):
+        l = self.tagToFile.setdefault(tagInfo, [])
+        l.extend(fileList)
+        for file in fileList:
+            l = self.fileToTag.setdefault(file, [])
+            l.append(tagInfo)
 
-    uid = os.getuid()
+class tagCommand:
+    def __init__(self):
+        self.commandOrder = (
+            ('handler', 'preremove'),
+            ('files',   'preremove'),
+            ('handler', 'update'),
+            ('files',   'update'),
+            ('files',   'remove'),
+        )
+        self.commands = {
+            'handler': {
+                'update':    {}, # {handler: handlerInfo}
+                'preremove': {},
+            },
+            'files': {
+                'update':    {},
+                'preremove': {},
+                'remove':    {},
+            },
+        }
 
-    for (tagInfo, cmd, args) in cmdList:
-	log.debug("running %s %s", tagInfo.file, " ".join(cmd))
-	if root != '/' and uid:
-	    continue
+    def addCommand(self, tagInfo, updateType, updateClass, fileList):
+        h = self.commands[updateType][updateClass].setdefault(
+            tagInfo.file, handlerInfo())
+        h.update(tagInfo, fileList)
 
-	fullCmd = [ tagInfo.file ] + list(cmd)
-	if tagInfo.datasource == 'args':
-	    fullCmd += args
+    def _badMultiTag(self, tagInfoList):
+        if len([x for x in tagInfoList if x.datasource != 'multitag']):
+            # multiple description without multitag protocol
+            log.error('tag handler %s used by multiple tags'
+                      ' without multitag protocol' % handler)
+            return True
+        return False
 
-	p = os.pipe()
-	pid = os.fork()
-	if not pid:
-	    os.close(p[1])
-            os.dup2(p[0], 0)
-            os.close(p[0])
-	    os.environ['PATH'] = "/sbin:/bin:/usr/sbin:/usr/bin"
-	    if root != '/':
-		os.chdir(root)
-		os.chroot(root)
+    def run(self, tagScript, root, preScript=False):
+        if tagScript:
+            if preScript:
+                pre = "# "
+            else:
+                pre = ""
 
-	    try:
-		os.execv(fullCmd[0], fullCmd)
-	    except Exception, e:
-		sys.stderr.write('%s\n' %e)
-	    os._exit(1)
+            f = open(tagScript, "a")
+            for (updateType, updateClass) in self.commandOrder:
+                for handler in sorted(self.commands[updateType][updateClass]):
+                    # stable sort order to be able to reproduce bugs,
+                    # whether in conary or in the packaged software
+                    hi = self.commands[updateType][updateClass][handler]
+                    tagInfoList = hi.tagToFile.keys()
+                    if (len(tagInfoList) > 1):
+                        # multiple tags for one tag handler
+                        if self._badMultiTag(tagInfoList):
+                            break
+                        f.write("%s%s %s %s <<EOF\n" % (
+                            pre, handler, updateType, updateClass))
+                        for fileName in hi.fileToTag:
+                            f.write("%s%s\n" % (pre, " ".join(
+                                sorted([x.tag for x in
+                                        hi.fileToTag[fileName]]))))
+                            f.write("%s%s\n" % (pre, fileName))
+                        f.write("%sEOF\n" % pre)
+                    else:
+                        tagInfo = tagInfoList.pop()
+                        if tagInfo.datasource == 'args':
+                            f.write("%s%s %s %s %s\n" % (pre, handler,
+                                updateType, updateClass,
+                                " ".join(hi.tagToFile[tagInfo])))
+                        elif tagInfo.datasource == 'stdin':
+                            f.write("%s%s %s %s <<EOF\n" % (pre, handler,
+                                updateType, updateClass))
+                            for filename in hi.tagToFile[tagInfo]:
+                                f.write("%s%s\n" % (pre, filename))
+                            f.write("%sEOF\n" % pre)
+                        else:
+                            log.error('unknown datasource %s' %tagInfo.datasource)
+                    
+            f.close()
+            return
 
-	os.close(p[0])
-	if tagInfo.datasource == 'stdin':
-	    for arg in args:
-                try:
-                    os.write(p[1], arg + "\n")
-                except OSError, e:
-                    if e.errno != errno.EPIPE:
-                        raise
-                    log.error(str(e))
-                    break
-        os.close(p[1])
+        uid = os.getuid()
 
-	(id, status) = os.waitpid(pid, 0)
-	if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
-	    log.error("%s failed", cmd[0])
+        for (updateType, updateClass) in self.commandOrder:
+            for handler in sorted(self.commands[updateType][updateClass]):
+                # stable sort order
+                hi = self.commands[updateType][updateClass][handler]
+                tagInfoList = hi.tagToFile.keys()
+                if (len(tagInfoList) > 1):
+                    # multiple tags for one tag handler
+                    if self._badMultiTag(tagInfoList):
+                        break
+                    datasource = 'multitag'
+                    command = (handler, updateType, updateClass)
+                else:
+                    tagInfo = tagInfoList.pop()
+                    datasource = tagInfo.datasource
+                    if tagInfo.datasource == 'args':
+                        command = [handler, updateType, updateClass]
+                        command.extend(hi.tagToFile[tagInfo])
+                    elif tagInfo.datasource == 'stdin':
+                        command = (handler, updateType, updateClass)
+                    else:
+                        log.error('unknown datasource %s' %tagInfo.datasource)
+
+                log.debug("running %s", " ".join(command))
+                if root != '/' and uid:
+                    continue
+
+                p = os.pipe()
+                pid = os.fork()
+                if not pid:
+                    os.close(p[1])
+                    os.dup2(p[0], 0)
+                    os.close(p[0])
+                    os.environ['PATH'] = "/sbin:/bin:/usr/sbin:/usr/bin"
+                    if root != '/':
+                        os.chdir(root)
+                        os.chroot(root)
+
+                    try:
+                        os.execv(command[0], command)
+                    except Exception, e:
+                        sys.stderr.write('%s\n' %e)
+                    os._exit(1)
+
+                os.close(p[0])
+                if datasource == 'stdin':
+                    for filename in hi.tagToFile[tagInfo]:
+                        try:
+                            os.write(p[1], filename + "\n")
+                        except OSError, e:
+                            if e.errno != errno.EPIPE:
+                                raise
+                            log.error(str(e))
+                            break
+                elif datasource == 'multitag':
+                    for fileName in hi.fileToTag:
+                        try:
+                            os.write(p[1], "%s\n%s\n" %(" ".join(
+                                sorted([x.tag for x in
+                                        hi.fileToTag[fileName]])),
+                                filename))
+                        except OSError, e:
+                            if e.errno != errno.EPIPE:
+                                raise
+                            log.error(str(e))
+                            break
+                os.close(p[1])
+
+                (id, status) = os.waitpid(pid, 0)
+                if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
+                    log.error("%s failed", cmd[0])
