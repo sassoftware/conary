@@ -761,6 +761,12 @@ class TagSpec(_addInfo):
         # commonly, a tagdescription will nominate a file to be
         # tagged, but it will also be set explicitly in the recipe,
         # and therefore markTag will be called twice.
+        if (len(tag.split()) > 1 or
+            not tag.replace('-', '').replace('_', '').isalnum()):
+            # handlers for multiple tags require strict tag names:
+            # no whitespace, only alphanumeric plus - and _ characters
+            self.error('illegal tag name %s for file %s' %(tag, path))
+            return
         tags = self.recipe.autopkg.pathMap[path].tags
         if tag not in tags:
             self.dbg('%s: %s', name, path)

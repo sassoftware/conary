@@ -4,6 +4,8 @@ Changes in 0.60.10:
     later be forbidden by this policy.
   * UTF8Filenames moved to packagepolicy, where it belongs, and it now
     raises an error instead of printing a warning.
+  * Conary now enforces the rule that tag names must have no whitespace
+    and must be all alphanumeric characters, -, or _.
 
 Changes in 0.60.9:
   * The changemail script is replaced by a generic commitaction script
