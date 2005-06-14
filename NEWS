@@ -1,3 +1,10 @@
+Changes in 0.60.10:
+  * BadFilenames policy absolutely prohibits filenames with newlines
+    in them, no exceptions allowed.  Other similarly bad filenames may
+    later be forbidden by this policy.
+  * UTF8Filenames moved to packagepolicy, where it belongs, and it now
+    raises an error instead of printing a warning.
+
 Changes in 0.60.9:
   * The changemail script is replaced by a generic commitaction script
     that loads modules, and a changemail.py module is supplied.  There is

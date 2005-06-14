@@ -117,6 +117,32 @@ class BadInterpreterPaths(policy.Policy):
                     interp, path, m.contents['line'])
 
 
+class BadFilenames(policy.Policy):
+    """
+    Filenames must not contain newlines because filenames are separated
+    by newlines in several conary protocols.  No exceptions are allowed.
+    """
+    def test(self):
+        assert(not self.exceptions)
+        return True
+    def doFile(self, path):
+        if path.find('\n') != -1:
+            self.error("path %s has illegal newline character", path)
+
+
+class NonUTF8Filenames(policy.Policy):
+    """
+    Filenames should be UTF-8 encoded because that is the standard system
+    encoding.
+    """
+    def doFile(self, path):
+        try:
+            path.decode('utf-8')
+        except UnicodeDecodeError:
+            self.error('path "%s" is not valid UTF-8', path)
+
+
+
 class NonMultilibComponent(policy.Policy):
     """
     Python and Perl components should generally be under /usr/lib, unless
@@ -1789,6 +1815,8 @@ def DefaultPolicy(recipe):
 	NonBinariesInBindirs(recipe),
 	FilesInMandir(recipe),
         BadInterpreterPaths(recipe),
+        BadFilenames(recipe),
+        NonUTF8Filenames(recipe),
         NonMultilibComponent(recipe),
         NonMultilibDirectories(recipe),
 	ImproperlyShared(recipe),
