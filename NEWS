@@ -11,6 +11,7 @@ Changes in 0.60.10:
     must point to the same tag handler, and must each specify the
     multitag datasource.  The data is passed to the tag handler on
     standard input using the protocol "tag list for file1\nfile1\n..."
+  * Fixed ftp server busy detection when fetching files via URL.
 
 Changes in 0.60.9:
   * The changemail script is replaced by a generic commitaction script
