@@ -48,8 +48,9 @@ class WebHandler(object):
         self.writeFn = self.req.write
         
         self.req.content_type = self.content_type
-                
         self.cmd = os.path.basename(self.req.path_info)
+        if self.cmd.endswith("/"):
+            self.cmd = self.cmd[:-1]
         
         if self.cmd.startswith('_'):
             raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
