@@ -43,6 +43,7 @@ from local import database
 import queryrep
 import repository
 from repository import netclient
+import conaryclient
 import rollbacks
 import showchangeset
 import updatecmd
@@ -587,6 +588,8 @@ def main(argv=sys.argv):
 	print >> sys.stderr, str(e)
     except database.OldDatabaseSchema, e:
 	print >> sys.stderr, str(e)
-	    
+    except conaryclient.UpdateError, e:
+        print >> sys.stderr, str(e)
+
 if __name__ == "__main__":
     sys.exit(main())
