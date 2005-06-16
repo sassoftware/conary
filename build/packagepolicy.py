@@ -592,7 +592,7 @@ class Transient(policy.Policy):
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
             recipe = self.recipe
             f = recipe.autopkg.pathMap[filename]
-            self.dbg('transient: %s', filename)
+            self.dbg(filename)
 	    f.flags.isTransient(True)
             if f.flags.isConfig() or f.flags.isInitialContents():
                 self.error(
