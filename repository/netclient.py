@@ -1097,7 +1097,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             c = httplib.HTTPSConnection(host)
 
 	f = open(path)
-        size = os.stat(path).st_size
+        size = os.fstat(f.fileno()).st_size
         sent = 0
         BUFSIZE = 8192
 
