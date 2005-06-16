@@ -179,7 +179,7 @@ class Archive(_Source):
                         not self.dir.startswith('/'))
 
         if guessMainDir:
-            before = set(os.listdir(destDir))
+            before = set(os.listdir(self.builddir))
 
 	if f.endswith(".zip"):
 	    util.execute("unzip -q -o -d %s %s" % (destDir, f))
@@ -199,7 +199,7 @@ class Archive(_Source):
             util.execute("tar -C %s %s %s" % (destDir, tarflags, f))
 
         if guessMainDir:
-            after = set(os.listdir(destDir))
+            after = set(os.listdir(self.builddir))
             difference = after - before
             oldMainDir = self.recipe.mainDir()
             if len(difference) == 1:
