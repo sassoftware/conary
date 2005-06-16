@@ -179,6 +179,9 @@ class Archive(_Source):
 
         if guessMainDir:
             before = set(os.listdir(self.builddir))
+            if self.recipe.mainDir() in before:
+                mainDirPath = '/'.join((self.builddir, self.recipe.mainDir()))
+                mainDirBefore = set(os.listdir(mainDirPath))
 
         util.mkdirChain(destDir)
 
@@ -201,9 +204,16 @@ class Archive(_Source):
 
         if guessMainDir:
             after = set(os.listdir(self.builddir))
+            if self.recipe.mainDir() in before:
+                mainDirAfter = set(os.listdir(mainDirPath))
+                mainDirDifference = mainDirAfter - mainDirBefore
+            else:
+                mainDirDifference = set()
             difference = after - before
             oldMainDir = self.recipe.mainDir()
-            if len(difference) == 1:
+            if len(difference) == 1 and not len(mainDirDifference):
+                # Archive produced something outside of mainDir
+                # and did not put any contents into mainDir
                 candidate = difference.pop()
                 if os.path.isdir('%s/%s' %(self.builddir, candidate)):
                     self.recipe.mainDir(candidate)
