@@ -187,7 +187,7 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
 			       int includeEmpty,
 			       int size) {
     char *final, *chptr;
-    int i, valLen;
+    int i, valLen, useAlloca = 0;
     PyObject * result;
     void (*addTag)(char**,int,int);
 
@@ -199,7 +199,12 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
     else
 	addTag = addLargeTag;
 
-    final = malloc(len);
+    if (len < 2096) {
+	useAlloca = 1;
+	final = alloca(len);
+    } else
+	final = malloc(len);
+    
     if (final == NULL)
 	return PyErr_NoMemory();
     
@@ -225,8 +230,9 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
     }
 
     result = PyString_FromStringAndSize(final, len);
-    
-    free(final);
+
+    if (!useAlloca)
+	free(final);
     return result;
 }
 
