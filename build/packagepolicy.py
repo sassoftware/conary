@@ -563,7 +563,7 @@ class InitialContents(policy.Policy):
 	fullpath = self.macros.destdir + filename
         recipe = self.recipe
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-            self.dbg('initial contents: %s', filename)
+            self.dbg(filename)
             f = recipe.autopkg.pathMap[filename]
             f.flags.isInitialContents(True)
             if f.flags.isConfig():
@@ -622,13 +622,13 @@ class SharedLibrary(policy.Policy):
 	self.recipe.ExecutableLibraries(*args, **keywords)
 	self.recipe.CheckSonames(*args, **keywords)
 
-    def doFile(self, file):
-	fullpath = self.macros.destdir + file
+    def doFile(self, filename):
+	fullpath = self.macros.destdir + filename
 	if os.path.isfile(fullpath) and util.isregular(fullpath):
-	    m = self.recipe.magic[file]
+	    m = self.recipe.magic[filename]
 	    if m and m.name == 'ELF' and 'soname' in m.contents:
-                self.dbg('shared library: %s', file)
-		self.recipe.autopkg.pathMap[file].tags.set("shlib")
+                self.dbg(filename)
+		self.recipe.autopkg.pathMap[filename].tags.set("shlib")
 
 
 class TagDescription(policy.Policy):
