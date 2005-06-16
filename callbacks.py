@@ -26,6 +26,11 @@ class ChangesetCallback:
     def requestingChangeSet(self):
         pass
 
+class CookCallback:
+
+    def sendingChangeset(self, sent, total):
+        pass
+
 class UpdateCallback(ChangesetCallback):
 
     def preparingChangeSet(self):

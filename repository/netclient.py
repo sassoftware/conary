@@ -976,13 +976,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         cs = changeset.ChangeSetFromFile(fName)
         return self._commit(cs, fName)
 
-    def commitChangeSet(self, chgSet):
+    def commitChangeSet(self, chgSet, callback = None):
 	(outFd, path) = util.mkstemp()
 	os.close(outFd)
 	chgSet.writeToFile(path)
 
 	try:
-            result = self._commit(chgSet, path)
+            result = self._commit(chgSet, path, callback = callback)
         finally:
             os.unlink(path)
 
@@ -1058,7 +1058,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                               affinityDatabase)
         return res[(name, versionStr, flavor)]
 	    
-    def _commit(self, chgSet, fName):
+    def _commit(self, chgSet, fName, callback = None):
 	serverName = None
 	for trove in chgSet.iterNewTroveList():
 	    v = trove.getOldVersion()
@@ -1074,11 +1074,20 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 	    
 	url = self.c[serverName].prepareChangeSet()
 
-        self._putFile(url, fName)
+        if callback:
+            callbackFn = callback.sendingChangeset
+        else:
+            callbackFn = None
+
+        self._putFile(url, fName, callbackFn = callbackFn)
 
 	self.c[serverName].commitChangeSet(url)
 
-    def _putFile(self, url, path):
+    def _putFile(self, url, path, callbackFn=None):
+        """ send a file to a url.  Takes a callbackFn
+            which is called with two parameters - bytes sent
+            and total bytes
+        """
         protocol, uri = urllib.splittype(url)
         assert(protocol in ('http', 'https'))
 	(host, putPath) = url.split("/", 3)[2:4]
@@ -1087,8 +1096,27 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             c = httplib.HTTPSConnection(host)
 	f = open(path)
+        # determin number of bytes should I just do a stat instead?
+        f.seek(0, 2)
+        size = f.tell()
+        f.seek(0)
+        sent = 0
+        BUFSIZE = 8192
+
 	c.connect()
-	c.request("PUT", url, f.read())
+        c.putrequest("PUT", url)
+        c.putheader('Content-length', str(size))
+        c.endheaders()
+
+        while True:
+            content = f.read(BUFSIZE)
+            if content:
+                c.send(content)
+                sent = min(sent + BUFSIZE, size)
+                if callbackFn:
+                    callbackFn(sent, size)
+            else:
+                break
 	r = c.getresponse()
 	assert(r.status == 200)
 

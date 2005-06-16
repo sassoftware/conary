@@ -28,6 +28,7 @@ import traceback
 import types
 
 import buildinfo, buildpackage, lookaside, use, recipe
+import callbacks
 import conaryclient
 import constants
 from deps import deps
@@ -155,11 +156,18 @@ class _IdGen:
 
 # -------------------- public below this line -------------------------
 
+class CookCallback(callbacks.LineOutput, callbacks.CookCallback):
+
+    def sendingChangeset(self, got, need):
+        if need != 0:
+            self._message("Committing changeset (%d%% of %dk)..." 
+                          % ((got * 100) / need, need / 1024))
+
 def cookObject(repos, cfg, recipeClass, sourceVersion,
                changeSetFile = None, prep=True, macros={}, 
                targetLabel = None, resume = None, alwaysBumpCount = False, 
                allowUnknownFlags = False, allowMissingSource = False,
-               ignoreDeps = False, logBuild = False):
+               ignoreDeps = False, logBuild = False, callback = None):
     """
     Turns a recipe object into a change set, and sometimes commits the
     result.
@@ -208,6 +216,9 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     @type allowMissingSource: bool
     @rtype: list of strings
     """
+
+    if not callback:
+        callback = callbacks.CookCallback()
 
     if not (hasattr(recipeClass, 'name') and hasattr(recipeClass, 'version')):
         raise CookError('recipe class must have name and version defined')
@@ -276,7 +287,7 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     if changeSetFile:
 	cs.writeToFile(changeSetFile)
     else:
-	repos.commitChangeSet(cs)
+	repos.commitChangeSet(cs, callback = callback)
 
     if cleanup:
 	(fn, args) = cleanup
@@ -1003,7 +1014,7 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
 
 def cookItem(repos, cfg, item, prep=0, macros={}, 
 	     emerge = False, resume = None, allowUnknownFlags = False,
-             ignoreDeps = False, logBuild = False):
+             ignoreDeps = False, logBuild = False, callback = None):
     """
     Cooks an item specified on the command line. If the item is a file
     which can be loaded as a recipe, it's cooked and a change set with
@@ -1107,7 +1118,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
 			    resume = resume, 
                             allowUnknownFlags = allowUnknownFlags,
                             allowMissingSource=False, ignoreDeps=ignoreDeps,
-                            logBuild=logBuild)
+                            logBuild=logBuild, callback=callback)
         if troves:
             built = (tuple(troves), changeSetFile)
     except repository.RepositoryError, e:
@@ -1183,7 +1194,8 @@ def cookCommand(cfg, args, prep, macros, emerge = False,
                 built = cookItem(repos, cfg, item, prep=prep, macros=macros,
 				 emerge = emerge, resume = resume, 
                                  allowUnknownFlags = allowUnknownFlags, 
-                                 ignoreDeps = ignoreDeps, logBuild = logBuild)
+                                 ignoreDeps = ignoreDeps, logBuild = logBuild,
+                                 callback = CookCallback())
             except CookError, msg:
 		log.error(str(msg))
                 sys.exit(1)
