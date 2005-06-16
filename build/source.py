@@ -173,13 +173,14 @@ class Archive(_Source):
 	self._checkSignature(f)
         destDir = action._expandOnePath(self.dir, self.recipe.macros, 
                                         defaultDir=self.builddir)
-        util.mkdirChain(destDir)
 
         guessMainDir = (not self.recipe.explicitMainDir and
                         not self.dir.startswith('/'))
 
         if guessMainDir:
             before = set(os.listdir(self.builddir))
+
+        util.mkdirChain(destDir)
 
 	if f.endswith(".zip"):
 	    util.execute("unzip -q -o -d %s %s" % (destDir, f))
@@ -204,7 +205,7 @@ class Archive(_Source):
             oldMainDir = self.recipe.mainDir()
             if len(difference) == 1:
                 candidate = difference.pop()
-                if os.path.isdir('%s/%s' %(destDir, candidate)):
+                if os.path.isdir('%s/%s' %(self.builddir, candidate)):
                     self.recipe.mainDir(candidate)
                 else:
                     self.recipe.mainDir(oldMainDir)
