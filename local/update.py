@@ -1425,6 +1425,9 @@ class tagCommand:
             else:
                 pre = ""
 
+            # N.B. All changes in the logic for writing scripts need to
+            # be paralleled by changes below in the non-tagScript branch,
+            # where we're running programs instead.
             f = open(tagScript, "a")
             for (updateType, updateClass) in self.commandOrder:
                 for handler in sorted(self.commands[updateType][updateClass]):
@@ -1464,6 +1467,9 @@ class tagCommand:
 
         uid = os.getuid()
 
+        # N.B. All changes in the logic for writing scripts need to
+        # be paralleled by changes above in the tagScript branch,
+        # where we're writing scripts instead.
         for (updateType, updateClass) in self.commandOrder:
             for handler in sorted(self.commands[updateType][updateClass]):
                 # stable sort order
