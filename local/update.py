@@ -1449,7 +1449,7 @@ class tagCommand:
                         if tagInfo.datasource == 'args':
                             f.write("%s%s %s %s %s\n" % (pre, handler,
                                 updateType, updateClass,
-                                " ".join(hi.tagToFile[tagInfo])))
+                                " ".join(sorted(hi.tagToFile[tagInfo]))))
                         elif tagInfo.datasource == 'stdin':
                             f.write("%s%s %s %s <<EOF\n" % (pre, handler,
                                 updateType, updateClass))
@@ -1480,7 +1480,7 @@ class tagCommand:
                     datasource = tagInfo.datasource
                     if tagInfo.datasource == 'args':
                         command = [handler, updateType, updateClass]
-                        command.extend(hi.tagToFile[tagInfo])
+                        command.extend(sorted(hi.tagToFile[tagInfo]))
                     elif tagInfo.datasource == 'stdin':
                         command = (handler, updateType, updateClass)
                     else:
