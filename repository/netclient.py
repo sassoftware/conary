@@ -1095,11 +1095,9 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             c = httplib.HTTPConnection(host)
         else:
             c = httplib.HTTPSConnection(host)
+
 	f = open(path)
-        # determin number of bytes should I just do a stat instead?
-        f.seek(0, 2)
-        size = f.tell()
-        f.seek(0)
+        size = os.stat(path).st_size
         sent = 0
         BUFSIZE = 8192
 
