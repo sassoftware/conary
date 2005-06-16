@@ -1,3 +1,7 @@
+Changes in 0.60.11:
+  * The '-f' flag was added to the arguments to gzip when
+    recompressing compressed files
+
 Changes in 0.60.10:
   * BadFilenames policy absolutely prohibits filenames with newlines
     in them, no exceptions allowed.  Other similarly bad filenames may

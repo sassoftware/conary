@@ -745,7 +745,7 @@ class NormalizeCompression(policy.Policy):
 	# XXX if foo and foo.gz both occur, this is bad -- fix it!
 	if m.name == 'gzip' and \
 	   (m.contents['compression'] != '9' or 'name' in m.contents):
-	    util.execute('gunzip %s; gzip -n -9 %s' %(p, p[:-3]))
+	    util.execute('gunzip %s; gzip -f -n -9 %s' %(p, p[:-3]))
             del self.recipe.magic[path]
 	if m.name == 'bzip' and m.contents['compression'] != '9':
 	    util.execute('bunzip2 %s; bzip2 -9 %s' %(p, p[:-4]))
@@ -758,7 +758,7 @@ class NormalizeManPages(policy.Policy):
      - Fix all man pages' contents:
        - remove instances of C{/?%(destdir)s} from all man pages
        - C{.so foo.n} becomes a symlink to foo.n
-     - (re)compress all man pages with gzip -n -9
+     - (re)compress all man pages with gzip -f -n -9
      - change all symlinks to point to .gz (if they don't already)
      - make all man pages be mode 644
     """
@@ -867,7 +867,7 @@ class NormalizeManPages(policy.Policy):
 	for name in names:
 	    path = dirname + os.sep + name
 	    if util.isregular(path):
-		util.execute('gzip -n -9 ' + dirname + os.sep + name)
+		util.execute('gzip -f -n -9 ' + dirname + os.sep + name)
 
     def _gzsymlink(self, dirname, names):
 	for name in names:
@@ -927,17 +927,17 @@ class NormalizeInfoPages(policy.Policy):
 		    m = self.recipe.magic[path]
 		    if not m:
 			# not compressed
-			util.execute('gzip -n -9 %s' %syspath)
+			util.execute('gzip -f -n -9 %s' %syspath)
                         del self.recipe.magic[path]
 		    elif m.name == 'gzip' and \
 		       (m.contents['compression'] != '9' or \
 		        'name' in m.contents):
-			util.execute('gunzip %s; gzip -n -9 %s'
+			util.execute('gunzip %s; gzip -f -n -9 %s'
                                      %(syspath, syspath[:-3]))
                         del self.recipe.magic[path]
 		    elif m.name == 'bzip':
 			# should use gzip instead
-			util.execute('bunzip2 %s; gzip -n -9 %s'
+			util.execute('bunzip2 %s; gzip -f -n -9 %s'
                                      %(syspath, syspath[:-4]))
                         del self.recipe.magic[path]
 
