@@ -387,6 +387,8 @@ class ComponentSpec(_filterSpec):
 		       '%(debuglibdir)s/')),
     )
     baseFilters = (
+        # development docs go in :devel
+        ('devel',     ('%(mandir)s/man(2|3)/')),
 	# note that gtk-doc is not well-named; it is a shared system, like info,
 	# and is used by unassociated tools (devhelp).  This line needs to
         # come first because "lib" in these paths should not mean :lib
@@ -405,7 +407,6 @@ class ComponentSpec(_filterSpec):
         # devel is architecture-generic -- no %(lib)s/%(libdir)s
         ('devel',     (r'.*/include/.*\.h',
 		       '%(includedir)s/',
-		       '%(mandir)s/man(2|3)/',
 		       '%(datadir)s/aclocal/',
 		       '%(bindir)s/..*-config')),
         # Anything in {,/usr}/lib{,64} is architecture-specific
