@@ -107,7 +107,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             applyList.append(parseTroveSpec(pkgStr))
 
     # dedup
-    applyList = {}.fromkeys(applyList).keys()
+    applyList = set(applyList)
 
     if not info:
 	client.checkWriteableRoot()
@@ -121,12 +121,6 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                    updateByDefault = updateByDefault,
                                    callback = callback)
 
-        if brokenByErase:
-            print "Troves being removed create unresolved dependencies:"
-            for (troveName, depSet) in brokenByErase:
-                print "    %s:\n\t%s" %  \
-                        (troveName, "\n\t".join(str(depSet).split("\n")))
-            return
 
         if depFailures:
             print "The following dependencies could not be resolved:"
@@ -134,7 +128,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                 print "    %s:\n\t%s" %  \
                         (troveName, "\n\t".join(str(depSet).split("\n")))
             return
-        elif (not cfg.autoResolve or brokenByErase) and suggMap:
+        elif (not cfg.autoResolve) and suggMap:
             print "Additional troves are needed:"
             for (req, suggList) in suggMap.iteritems():
                 print "    %s -> %s" % \
@@ -155,7 +149,14 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                            (x[0], x[1].trailingRevision().asString())
                            for x in items]))
             if info: return
-            
+
+        if brokenByErase:
+            print "Troves being removed create unresolved dependencies:"
+            for (troveName, depSet) in brokenByErase:
+                print "    %s:\n\t%s" %  \
+                        (troveName, "\n\t".join(str(depSet).split("\n")))
+            return
+
         if info:
             new = []
             for x in cs.iterNewTroveList():

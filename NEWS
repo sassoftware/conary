@@ -1,3 +1,12 @@
+Changes in 0.60.12:
+  * Previously, if you ran "conary update foo", and foo requires a new
+    version of bar, but updating to the new version of bar would break
+    existing dependencies of other troves on the system, a very
+    unuseful "Troves being removed create unresolved dependencies"
+    message.  Conary now says that "Additional troves are needed" instead.
+    If --resolve is used, it will report the troves that have been added
+    before displaying the dependency failures caused by erase.
+
 Changes in 0.60.11:
   * The '-f' flag was added to the arguments to gzip when
     recompressing compressed files
