@@ -1439,6 +1439,22 @@ class tagCommand:
                         # multiple tags for one tag handler
                         if self._badMultiTag(tagInfoList):
                             break
+                        datasource = 'multitag'
+                    else:
+                        tagInfo = tagInfoList.pop()
+                        datasource = tagInfo.datasource
+
+                    if datasource == 'args':
+                        f.write("%s%s %s %s %s\n" % (pre, handler,
+                            updateType, updateClass,
+                            " ".join(sorted(hi.tagToFile[tagInfo]))))
+                    elif datasource == 'stdin':
+                        f.write("%s%s %s %s <<EOF\n" % (pre, handler,
+                            updateType, updateClass))
+                        for filename in hi.tagToFile[tagInfo]:
+                            f.write("%s%s\n" % (pre, filename))
+                        f.write("%sEOF\n" % pre)
+                    elif datasource == 'multitag':
                         f.write("%s%s %s %s <<EOF\n" % (
                             pre, handler, updateType, updateClass))
                         for fileName in hi.fileToTag:
@@ -1448,25 +1464,12 @@ class tagCommand:
                             f.write("%s%s\n" % (pre, fileName))
                         f.write("%sEOF\n" % pre)
                     else:
-                        tagInfo = tagInfoList.pop()
-                        if tagInfo.datasource == 'args':
-                            f.write("%s%s %s %s %s\n" % (pre, handler,
-                                updateType, updateClass,
-                                " ".join(sorted(hi.tagToFile[tagInfo]))))
-                        elif tagInfo.datasource == 'stdin':
-                            f.write("%s%s %s %s <<EOF\n" % (pre, handler,
-                                updateType, updateClass))
-                            for filename in hi.tagToFile[tagInfo]:
-                                f.write("%s%s\n" % (pre, filename))
-                            f.write("%sEOF\n" % pre)
-                        else:
-                            log.error('unknown datasource %s' %tagInfo.datasource)
-                    
+                        log.error('unknown datasource %s' %datasource)
+
             f.close()
             return
 
         uid = os.getuid()
-
         # N.B. All changes in the logic for writing scripts need to
         # be paralleled by changes above in the tagScript branch,
         # where we're writing scripts instead.
@@ -1475,22 +1478,28 @@ class tagCommand:
                 # stable sort order
                 hi = self.commands[updateType][updateClass][handler]
                 tagInfoList = hi.tagToFile.keys()
+
+                # start building the command line -- all the tag
+                # handler protocols begin the same way
+                command = [handler, updateType, updateClass]
                 if (len(tagInfoList) > 1):
                     # multiple tags for one tag handler
                     if self._badMultiTag(tagInfoList):
                         break
                     datasource = 'multitag'
-                    command = (handler, updateType, updateClass)
                 else:
                     tagInfo = tagInfoList.pop()
                     datasource = tagInfo.datasource
-                    if tagInfo.datasource == 'args':
-                        command = [handler, updateType, updateClass]
-                        command.extend(sorted(hi.tagToFile[tagInfo]))
-                    elif tagInfo.datasource == 'stdin':
-                        command = (handler, updateType, updateClass)
-                    else:
-                        log.error('unknown datasource %s' %tagInfo.datasource)
+
+                # if the handler uses the command line argument
+                # protocol, add all the filenames to the command line
+                if datasource == 'args':
+                    command.extend(sorted(hi.tagToFile[tagInfo]))
+
+                # double check that we're using a known protocol
+                if datasource not in ('multitag', 'args', 'stdin'):
+                    log.error('unknown datasource %s' %datasource)
+                    break
 
                 log.debug("running %s", " ".join(command))
                 if root != '/' and uid:
@@ -1529,7 +1538,7 @@ class tagCommand:
                             os.write(p[1], "%s\n%s\n" %(" ".join(
                                 sorted([x.tag for x in
                                         hi.fileToTag[fileName]])),
-                                filename))
+                                fileName))
                         except OSError, e:
                             if e.errno != errno.EPIPE:
                                 raise
@@ -1539,4 +1548,4 @@ class tagCommand:
 
                 (id, status) = os.waitpid(pid, 0)
                 if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
-                    log.error("%s failed", cmd[0])
+                    log.error("%s failed", command[0])
