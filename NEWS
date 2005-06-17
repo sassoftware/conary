@@ -7,6 +7,7 @@ Changes in 0.60.12:
     are needed" instead.  If --resolve is used, it will report the
     troves that have been added before displaying the dependency
     failures caused by erase.
+  * Symlinks no longer confuse AutoDoc policy.
 
 Changes in 0.60.11:
   * The '-f' flag was added to the arguments to gzip when

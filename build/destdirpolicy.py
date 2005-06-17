@@ -413,6 +413,9 @@ class AutoDoc(policy.Policy):
         dest = util.joinPaths(self.destdir, filename)
         if os.path.exists(dest):
             return
+        if not util.isregular(source):
+            # will not be a directory, but might be a symlink or something
+            return
         util.mkdirChain(os.path.dirname(dest))
         shutil.copy2(source, dest)
 
