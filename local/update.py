@@ -1451,13 +1451,13 @@ class tagCommand:
                     elif datasource == 'stdin':
                         f.write("%s%s %s %s <<EOF\n" % (pre, handler,
                             updateType, updateClass))
-                        for filename in hi.tagToFile[tagInfo]:
+                        for filename in sorted(hi.tagToFile[tagInfo]):
                             f.write("%s%s\n" % (pre, filename))
                         f.write("%sEOF\n" % pre)
                     elif datasource == 'multitag':
                         f.write("%s%s %s %s <<EOF\n" % (
                             pre, handler, updateType, updateClass))
-                        for fileName in hi.fileToTag:
+                        for fileName in sorted(hi.fileToTag):
                             f.write("%s%s\n" % (pre, " ".join(
                                 sorted([x.tag for x in
                                         hi.fileToTag[fileName]]))))
