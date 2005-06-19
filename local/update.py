@@ -1524,7 +1524,7 @@ class tagCommand:
 
                 os.close(p[0])
                 if datasource == 'stdin':
-                    for filename in hi.tagToFile[tagInfo]:
+                    for filename in sorted(hi.tagToFile[tagInfo]):
                         try:
                             os.write(p[1], filename + "\n")
                         except OSError, e:
@@ -1533,7 +1533,7 @@ class tagCommand:
                             log.error(str(e))
                             break
                 elif datasource == 'multitag':
-                    for fileName in hi.fileToTag:
+                    for fileName in sorted(hi.fileToTag):
                         try:
                             os.write(p[1], "%s\n%s\n" %(" ".join(
                                 sorted([x.tag for x in
