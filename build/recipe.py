@@ -1123,10 +1123,6 @@ class SingleGroup:
         for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
             desFlavor = flavorMap[flavor]
             pkgList = results[name, versionStr, desFlavor]
-            if len(pkgList) != 1:
-                raise RecipeFileError, \
-                    "trove specified in group recipe more than once: %s" \
-                    % name
             troveList.append((pkgList[0], byDefault))
             assert(desFlavor.score(pkgList[0][2]) is not False)
 
