@@ -8,6 +8,7 @@ Changes in 0.60.12:
     troves that have been added before displaying the dependency
     failures caused by erase.
   * Symlinks no longer confuse AutoDoc policy.
+  * Autosource files which have changed confused cvc update
 
 Changes in 0.60.11:
   * The '-f' flag was added to the arguments to gzip when
