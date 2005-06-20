@@ -227,7 +227,7 @@ class Epdb(pdb.Pdb):
             else:
                 reldist = int(arg)
             if self.lineno is None:
-                lineno = 0
+                lineno = self.curframe.f_lineno
             else:
                 lineno = self.lineno
             lineno += reldist - 5
