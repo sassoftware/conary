@@ -650,21 +650,10 @@ class FilesystemJob:
             # (we just checked headFileVersion, and if there isn't an
             # old version then this file would be new, not changed
 
-            # FIXME we should be able to inspect headChanges directly
-            # to see if we need to go into the if statement which follows
-            # this rather then having to look up the file from the old
-            # trove for every file which has changed
-            fsFile = files.FileFromFilesystem(realPath, pathId)
-            
             # get the baseFile which was originally installed
             (baseFilePath, baseFileId, baseFileVersion) = baseTrove.getFile(pathId)
             baseFile = repos.getFileVersion(pathId, baseFileId, baseFileVersion)
             assert(baseFile.fileId() == baseFileId)
-            
-            # link groups come from the database; they aren't inferred from
-            # the filesystem
-            if fsFile.hasContents and baseFile.hasContents:
-                fsFile.linkGroup.set(baseFile.linkGroup())
 
             # now assemble what the file is supposed to look like on head
             headChanges = changeSet.getFileChange(baseFileId, headFileId)
@@ -689,6 +678,21 @@ class FilesystemJob:
                 # type changed between versions
                 headFile = files.ThawFile(headChanges, pathId)
                 
+            if baseFile.flags.isAutoSource():
+                fsTrove.addFile(pathId, headPath, headFileVersion, headFileId)
+                continue
+            
+            # FIXME we should be able to inspect headChanges directly
+            # to see if we need to go into the if statement which follows
+            # this rather then having to look up the file from the old
+            # trove for every file which has changed
+            fsFile = files.FileFromFilesystem(realPath, pathId)
+            
+            # link groups come from the database; they aren't inferred from
+            # the filesystem
+            if fsFile.hasContents and baseFile.hasContents:
+                fsFile.linkGroup.set(baseFile.linkGroup())
+
             fsFile.flags.isConfig(headFile.flags.isConfig())
             fsFile.flags.isSource(headFile.flags.isSource())
             fsFile.tags.thaw(headFile.tags.freeze())
