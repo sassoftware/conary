@@ -53,8 +53,22 @@ class ConfigFile:
 	if os.path.exists(path):
 	    f = open(path, "r")
 	    lineno = 1
-	    for line in f:
-		self.configLine(line, path, lineno)
+            # create an explicit iterator for the file
+            # so that we can grab an extra line mid-loop for 
+            # line continuations (a \ at the end of the line)
+            lines = iter(f)
+	    for line in lines:
+                fullLine = []
+                while line and line[-2:] == '\\\n':
+                    # line ends in \, join all such lines together
+                    fullLine.append(line[:-2])
+                    try:
+                        line = lines.next()
+                    except StopIteration:
+                        break
+                fullLine.append(line)
+
+		self.configLine(''.join(fullLine), path, lineno)
 		lineno = lineno + 1
 	    f.close()
 	elif exception:
