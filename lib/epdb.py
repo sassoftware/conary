@@ -283,7 +283,7 @@ class Epdb(pdb.Pdb):
         globals = self.curframe.f_globals
         print ''
         try:
-            code = compile('\n'.join(full_input) + '\n', '<stdin>', 'exec')
+            code = compile('\n'.join(full_input) + '\n', '<stdin>', 'single')
             exec code in globals, locals
         except:
             print self._reprExc()
