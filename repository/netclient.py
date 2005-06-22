@@ -17,11 +17,11 @@ import exceptions
 import gzip
 import httplib
 import itertools
-import xml
 import os
 import socket
 import tempfile
 import urllib
+import xml
 import xmlrpclib
 
 #conary
