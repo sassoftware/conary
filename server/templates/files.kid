@@ -15,6 +15,20 @@
  or fitness for a particular purpose. See the Common Public License for
  full details.
 -->
+
+    <div id="fileList" py:def="fileList(files)">
+        <table style="width: 100%;">
+            <tr py:for="pathId, path, fileId, version, fObj in files">
+                <td>${fObj.modeString()}</td>
+                <td>${fObj.inode.owner()}</td>
+                <td>${fObj.inode.group()}</td>
+                <td>${fObj.sizeString()}</td>
+                <td>${fObj.timeString()}</td>
+                <td>${path}</td>
+            </tr>
+        </table>
+    </div>
+
     ${html_header("Main Menu")}
     <body>
         <h1>Conary Repository</h1>
@@ -22,16 +36,10 @@
         <ul class="menu submenu"> </ul>
 
         <div id="content">
-            <h2>Main Menu</h2>
+            <h2>Files in <a href="troveInfo?t=${troveName}">${troveName}</a></h2>
 
-            <p>Welcome to the Conary Repository.</p>
-            <ul>
-            <li><a href="browse">Browse Repository</a></li>
-            <li><a href="metadata">Metadata Management</a></li>
-            <li><a href="userlist">User Administration</a></li>
-            <li><a href="chPassForm">Change Password</a></li>
-            </ul>
-
+            ${fileList(fileIters)}
+        
             ${html_footer()}
         </div>
     </body>

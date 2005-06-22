@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 Specifix, Inc.
+# Copyright (c) 2004-2005 rpath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -11,6 +11,7 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
+import itertools
 import metadata
 import os
 import sys
@@ -23,6 +24,9 @@ from repository.netrepos import netserver
 from web.webhandler import WebHandler
 from web.fields import strFields, intFields, listFields, boolFields
 from web.webauth import getAuth
+from repository import shimclient
+import versions
+from deps import deps
 
 from mod_python import apache
 from mod_python.util import FieldStorage
@@ -50,33 +54,42 @@ def checkAuth(write = False, admin = False):
     return deco
 
 class HttpHandler(WebHandler):
-    def __init__(self, req, cfg, repServer):
+    def __init__(self, req, cfg, repServer, protocol, port):
         WebHandler.__init__(self, req, cfg)
 
         self.repServer = repServer
         self.troveStore = repServer.troveStore
+
+        self._protocol = protocol
+        self._port = port
 
         if 'server.templates' in sys.modules:
             self.templatePath = os.path.dirname(sys.modules['server.templates'].__file__) + os.path.sep
         else:
             self.templatePath = os.path.dirname(sys.modules['templates'].__file__) + os.path.sep
                         
-       
     def _getHandler(self, cmd):
         try:
             method = self.__getattribute__(cmd)
         except AttributeError:
-            method = self.main
+            method = self._404
         return method
+
+    def _getAuth(self):
+        return getAuth(self.req)
 
     def _methodHandler(self):
         """Handle either an HTTP POST or GET command."""
 
-        # return a possible error code from getAuth (malformed auth header, etc)
-        auth = getAuth(self.req)
+        auth = self._getAuth()
+        
         if type(auth) is int:
             return auth
 
+        self.client = shimclient.ShimNetClient(
+            self.repServer, self._protocol, self._port, auth, self.repServer.map)
+        self.serverName = self.repServer.name
+            
         try:
             method = self._getHandler(self.cmd)
         except AttributeError:
@@ -110,6 +123,65 @@ class HttpHandler(WebHandler):
     @checkAuth(write=True)
     def main(self, auth):
         self._write("main_page")
+        return apache.OK
+
+    def browse(self, auth):
+        troves = self.client.getAllTroveLeaves(self.serverName, {None: [None]})
+        packages = []
+        components = {}
+        for trove in troves:
+            if ":" not in trove:
+                packages.append(trove)
+            else:
+                package, component = trove.split(":")
+                l = components.setdefault(package, [])
+                l.append(component)
+
+        # add back leftover component-only troves to packages list
+        noPackages = set(components.keys()) - set(packages)
+        for x in noPackages:
+            for component in components[x]:
+                packages.append(x + ":" + component)
+
+        self._write("browse", packages = sorted(packages), components = components)
+        return apache.OK
+
+    @strFields(t = None, v = "")
+    def troveInfo(self, auth, t, v):
+        leaves = self.client.getTroveVersionList(self.serverName, {t: [None]}) 
+        versionList = sorted(leaves[t].keys(), reverse = True)
+
+        if not v:
+            reqVer = versionList[0]
+        else:
+            reqVer = versions.ThawVersion(v)
+            
+        query = [(t, reqVer, x) for x in leaves[t][reqVer]]
+        troves = self.client.getTroves(query, withFiles = False)
+        self._write("trove_info", troveName = t, troves = troves,
+            versionList = versionList, reqVer = reqVer)
+           
+        return apache.OK
+
+    @strFields(t = None, v = None, f = "")
+    def files(self, auth, t, v, f):
+        v = versions.ThawVersion(v)
+        f = deps.ThawDependencySet(f)
+       
+        parentTrove = self.client.getTrove(t, v, f, withFiles = False)
+        fileIters = []
+        for trove in self.client.walkTroveSet(parentTrove):
+            files = self.client.iterFilesInTrove(
+                trove.getName(),
+                trove.getVersion(),
+                trove.getFlavor(),
+                withFiles = True,
+                sortByPath = True)
+            fileIters.append(files)
+            
+        self._write("files", 
+            troveName = t,
+            fileIters = itertools.chain(*fileIters))
         return apache.OK
 
     @checkAuth(write = True)

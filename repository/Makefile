@@ -20,6 +20,7 @@ python_files = __init__.py	\
 		filecontents.py	\
                 findtrove.py    \
 		netclient.py 	\
+		shimclient.py	\
 		repository.py	\
 		transport.py	\
 		xmlshims.py

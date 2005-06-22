@@ -14,15 +14,18 @@
 
 kid_files =	add_group.kid		\
 		add_user.kid 		\
+		browse.kid		\
 		change_password.kid	\
 		choose_branch.kid	\
 		error.kid		\
+		files.kid		\
 		library.kid		\
 		main_page.kid		\
 		metadata.kid		\
 		notice.kid		\
 		permission.kid		\
 		pick_trove.kid		\
+		trove_info.kid		\
 		user_admin.kid
 
 extra_dist = Makefile

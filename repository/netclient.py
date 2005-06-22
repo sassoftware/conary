@@ -58,7 +58,10 @@ class _Method(xmlrpclib._Method):
         isException, result = self.__send(self.__name, newArgs)
 	if not isException:
 	    return result
+        else:
+            self.handleError(result)
 
+    def handleError(self, result):
 	exceptionName = result[0]
 	exceptionArgs = result[1:]
 

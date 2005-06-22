@@ -17,21 +17,23 @@
 -->
     ${html_header("Main Menu")}
     <body>
-        <h1>Conary Repository</h1>
+        <h1>Repository Browser</h1>
         <ul class="menu"><li class="highlighted">Main Menu</li></ul>
         <ul class="menu submenu"> </ul>
 
         <div id="content">
-            <h2>Main Menu</h2>
+            <h2>Repository Browser</h2>
 
-            <p>Welcome to the Conary Repository.</p>
             <ul>
-            <li><a href="browse">Browse Repository</a></li>
-            <li><a href="metadata">Metadata Management</a></li>
-            <li><a href="userlist">User Administration</a></li>
-            <li><a href="chPassForm">Change Password</a></li>
+                <li py:for="package in packages">
+                    <a href="troveInfo?t=${package}">${package}</a> <span py:if="package in components">[+]</span>
+                    <ul id="components" py:if="package in components">
+                        <li py:for="component in components[package]">
+                            <a href="troveInfo?t=${package}:${component}">${component}</a>
+                        </li>
+                    </ul>
+                </li>
             </ul>
-
             ${html_footer()}
         </div>
     </body>

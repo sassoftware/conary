@@ -60,14 +60,14 @@ def post(port, isSecure, repos, req):
 
     if authToken[0] != "anonymous" and not isSecure and repos.forceSecure:
         return apache.HTTP_FORBIDDEN
+    
+    if isSecure:
+        protocol = "https"
+    else:
+        protocol = "http"
 
     if req.headers_in['Content-Type'] == "text/xml":
         (params, method) = xmlrpclib.loads(req.read())
-
-        if isSecure:
-            protocol = "https"
-        else:
-            protocol = "http"
 
         try:
             result = repos.callWrapper(protocol, port, method, authToken, 
@@ -85,10 +85,10 @@ def post(port, isSecure, repos, req):
         return apache.OK
     else:
         from http import HttpHandler
-        httpHandler = HttpHandler(req, repos.cfg, repos)
+        httpHandler = HttpHandler(req, repos.cfg, repos, protocol, port) 
         return httpHandler._methodHandler()
 
-def get(isSecure, repos, req):
+def get(port, isSecure, repos, req):
     uri = req.uri
     if uri.endswith('/'):
         uri = uri[:-1]
@@ -136,7 +136,13 @@ def get(isSecure, repos, req):
         return apache.OK
     else:
         from http import HttpHandler
-        httpHandler = HttpHandler(req, repos.cfg, repos)
+
+        if isSecure:
+            protocol = "https"
+        else:
+            protocol = "http"
+
+        httpHandler = HttpHandler(req, repos.cfg, repos, protocol, port)
         return httpHandler._methodHandler()
 
 def putFile(port, isSecure, repos, req):
@@ -213,7 +219,7 @@ def handler(req):
     if method == "POST":
 	return post(port, secure, repos, req)
     elif method == "GET":
-	return get(secure, repos, req)
+	return get(port, secure, repos, req)
     elif method == "PUT":
 	return putFile(port, secure, repos, req)
     else:
