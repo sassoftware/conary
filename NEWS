@@ -10,6 +10,7 @@ Changes in 0.60.12:
   * Symlinks no longer confuse AutoDoc policy.
   * Autosource files which have changed confused cvc update
   * allow a \ at the end of a line in config files to do line continuations
+  * several bugs in the multitag handler have been fixed
 
 Changes in 0.60.11:
   * The '-f' flag was added to the arguments to gzip when
