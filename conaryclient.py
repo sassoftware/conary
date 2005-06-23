@@ -528,8 +528,19 @@ class ConaryClient:
                 keepList.append(origJob[-1])
 
         newJobList = []
+        deferredList = []
 
-        while keepList:
+        while True:
+            if not keepList and deferredList:
+                newCs = self.repos.createChangeSet(deferredList, 
+                                                   withFiles = False)
+                cs.merge(newCs)
+                origJob += deferredList
+                keepList = deferredList
+                deferredList = []
+            if not keepList:
+                break
+
             job = keepList.pop()
             newJobList.append(job)
             (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), abs) \
@@ -544,6 +555,16 @@ class ConaryClient:
             # collections should be in the changeset already. after all, it's
             # supposed to be recursive
             trvCs = cs.getNewTroveVersion(trvName, newVersion, newFlavor)
+
+            if oldFlavor is None:
+                oldFlavorSet = deps.DependencySet()
+            else:
+                oldFlavorSet = oldFlavor
+
+            if trvCs.getOldVersion() != oldVersion or \
+                    trvCs.oldFlavor() != oldFlavorSet:
+                deferredList.append(job)
+                continue
 
             if oldVersion is None:
                 # Read the comments at the top of _newBase if you hope
