@@ -11,8 +11,8 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 #
-from repository import netclient
-from repository import netrepos
+import netclient
+import netrepos
 
 class ShimNetClient(netclient.NetworkRepositoryClient):
     """
