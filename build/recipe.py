@@ -197,6 +197,7 @@ class RecipeLoader:
         self.module.__dict__['branch'] = branch
         self.module.__dict__['name'] = pkgname
         self.module.__dict__['ignoreInstalled'] = ignoreInstalled
+        self.module.__dict__['loadedTroves'] = []
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -283,14 +284,14 @@ class RecipeLoader:
                 raise RecipeFileError(
                     "Recipe in file/component '%s' did not contain both a name"
                     " and a version attribute." % pkgname)
-        # inherit any tracked flags that we found while loading parent
-        # classes
         if found:
+            # inherit any tracked flags that we found while loading parent
+            # classes.  Also inherit the list of recipes classes needed to load
+            # this recipe.
+            self.recipe._loadedTroves = self.module.__dict__['loadedTroves']
+
             if self.recipe._trackedFlags is not None:
                 use.setUsed(self.recipe._trackedFlags)
-            
-            # add in the tracked flags that we found while loading this
-            # class
             self.recipe._trackedFlags = use.getUsed()
         else:
             # we'll get this if the recipe file is empty 
@@ -531,6 +532,19 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
         # a recipe that has been loaded by loadRecipe
         recipe.ignore = 1
         callerGlobals[name] = recipe
+        if recipe._trove:
+            # create a tuple with the version and flavor information needed to 
+            # load this trove again.   You might be able to rely on the
+            # flavor that the trove was built with, but when you load a
+            # recipe that is not a superclass of the current recipe, 
+            # its flavor is not assumed to be relevant to the resulting 
+            # package (otherwise you might have completely irrelevant flavors
+            # showing up for any package that loads the python recipe, e.g.)
+            usedFlavor = use.createFlavor(name, recipe._trackedFlags)
+            troveTuple = (recipe._trove.getName(), recipe._trove.getVersion(),
+                          usedFlavor)
+            callerGlobals['loadedTroves'].extend(recipe._loadedTroves)
+            callerGlobals['loadedTroves'].append(troveTuple)
     # stash a reference to the module in the namespace
     # of the recipe that loaded it, or else it will be destroyed
     callerGlobals[os.path.basename(file).replace('.', '-')] = loader
@@ -565,9 +579,13 @@ class Recipe:
     """Virtual base class for all Recipes"""
     _trove = None
     _trackedFlags = None
+    _loadedTroves = []
 
     def __init__(self):
         assert(self.__class__ is not Recipe)
+
+    def getLoadedTroves(self):
+        return self._loadedTroves
 
     def __repr__(self):
         return "<%s Object>" % self.__class__
@@ -942,7 +960,7 @@ class PackageRecipe(Recipe):
         self.buildRequires = list(buildReqs)
     
     def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}):
-        assert(self.__class__ is not Recipe)
+        Recipe.__init__(self)
 	self._sources = []
 	self._build = []
 
