@@ -12,7 +12,6 @@
 # full details.
 #
 import netclient
-import netrepos
 
 class ShimNetClient(netclient.NetworkRepositoryClient):
     """
