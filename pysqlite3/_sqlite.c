@@ -13,8 +13,10 @@
 **                  Michael Owens <mike@mikesclutter.com>
 **                     Gerhard Häring <gh@ghaering.de>
 **
-**                    Copyright (c) 2004  Specifix, Inc.
-**                                        Matt Wilson <msw@specifix.com>
+**          Portions Copyright (c) 2004-2005 Specifix, Inc.
+**                                           Matt Wilson <msw@specifix.com>
+**              Portions Copyright (c) 2005  rpath, Inc.
+**                                           Matt Wilson <msw@rpath.com>
 **
 ** All Rights Reserved
 **
@@ -62,6 +64,20 @@
 #  define MY_BEGIN_ALLOW_THREADS(st)
 #  define MY_END_ALLOW_THREADS(st)      { st = NULL; }
 #endif
+
+enum {
+	INTEGER,
+	FLOAT,
+	TIMESTAMP,
+	TIME,
+	DATE,
+	INTERVAL,
+	STRING,
+	UNICODESTRING,
+	BINARY,
+	BOOLEAN,
+	NULLVALUE
+} row_types;
 
 /*----------------------------------------------------------------------------
 ** Object Declarations
@@ -126,6 +142,8 @@ static PyObject* tc_INTERVAL;
 static PyObject* tc_STRING;
 static PyObject* tc_UNICODESTRING;
 static PyObject* tc_BINARY;
+static PyObject* tc_BOOLEAN;
+static PyObject* tc_NULL;
 
 /*----------------------------------------------------------------------------
 ** Function Prototypes
@@ -201,9 +219,9 @@ _con_dealloc(pysqlc* self)
 		}
 
 		Py_XDECREF(self->busy_data);
-		
+
 		Py_DECREF(self->command_logfile);
-	
+
 		PyObject_Del(self);
 	}
 }
@@ -280,8 +298,7 @@ pysqlite_connect(PyObject *self, PyObject *args, PyObject *kwargs)
 	obj->tstate = NULL;
 	obj->timeout = 0;
 	obj->busy_data = NULL;
-	
-	
+
 	Py_INCREF(Py_None);
 	obj->command_logfile = Py_None;
 
@@ -340,7 +357,7 @@ set_result(sqlite3_context* context, PyObject *obj)
 	else if (PyString_Check(obj)) {
 		char *buf;
 		int len;
-	
+
 		PyString_AsStringAndSize(obj, &buf, &len);
 		if (memchr(buf, '\0', len))
 			sqlite3_result_blob(context, buf, len,
@@ -356,10 +373,10 @@ set_result(sqlite3_context* context, PyObject *obj)
 		sqlite3_result_text16(context, buf, len, SQLITE_TRANSIENT);
 	}
 	else if (PyFloat_Check(obj)) {
-		sqlite3_result_double(context, PyFloat_AsDouble(obj));	
+		sqlite3_result_double(context, PyFloat_AsDouble(obj));
 	}
 	else if (obj == Py_None) {
-		sqlite3_result_null(context);	
+		sqlite3_result_null(context);
 	}
 	else {
 		PyObject *o = NULL;
@@ -367,7 +384,7 @@ set_result(sqlite3_context* context, PyObject *obj)
 			o = PyObject_GetAttrString(obj, "__quote__");
 		else if (PyObject_HasAttrString(obj, "_quote"))
 			o = PyObject_GetAttrString(obj, "_quote");
-	
+
 		if (o != NULL && PyCallable_Check(o)) {
 			char *buf;
 			int len;
@@ -497,7 +514,7 @@ aggregate_step(sqlite3_context *context, int argc, sqlite3_value **argv)
 	else {
 		Py_DECREF(function_result);
 	}
-	
+
 	MY_BEGIN_ALLOW_THREADS(con->tstate);
 }
 
@@ -517,7 +534,7 @@ aggregate_finalize(sqlite3_context *context)
 	con = (pysqlc*)PyTuple_GetItem(userdata, 1);
 	MY_END_ALLOW_THREADS(con->tstate);
 
-	aggregate_instance = 
+	aggregate_instance =
 		(PyObject**)sqlite3_aggregate_context(context,
 						      sizeof(PyObject*));
 
@@ -627,7 +644,7 @@ _con_sqlite_busy_handler(pysqlc* self, PyObject *args, PyObject* kwargs)
 	if (self->busy_data != NULL) {
 		Py_DECREF(self->busy_data);
 	}
-	
+
 	if ((userdata = PyTuple_New(3)) == NULL)
 		return NULL;
 
@@ -642,7 +659,7 @@ _con_sqlite_busy_handler(pysqlc* self, PyObject *args, PyObject* kwargs)
 			     userdata);
 
 	self->busy_data = userdata;
-	
+
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -748,7 +765,7 @@ _con_create_aggregate(pysqlc* self, PyObject *args, PyObject* kwargs)
 
 	if (!(userdata = PyTuple_New(2)))
 		return NULL;
-    
+
 	Py_INCREF(aggregate_class);
 	PyTuple_SetItem(userdata, 0, aggregate_class);
 	Py_INCREF(self);
@@ -786,27 +803,25 @@ _con_set_command_logfile(pysqlc* self, PyObject *args,
 					 kwlist, &logfile))
 		return NULL;
 
-	if (logfile == Py_None) {
-		Py_DECREF(logfile);
-		Py_INCREF(Py_None);
-		return Py_None;
-	}
+	/* if it's None, we can skip the .write() method checks */
+	if (logfile != Py_None) {
+		o = PyObject_GetAttrString(logfile, "write");
+		if (!o) {
+			PyErr_SetString(PyExc_ValueError,
+				  "logfile must have a 'write' attribute!");
+			return NULL;
+		}
 
-	o = PyObject_GetAttrString(logfile, "write");
-	if (!o) {
-		PyErr_SetString(PyExc_ValueError,
-				"logfile must have a 'write' attribute!");
-		return NULL;
-	}
-
-	if (!PyCallable_Check(o)) {
-		PyErr_SetString(PyExc_ValueError,
-				"logfile must have a callable 'write' attribute!");
+		if (!PyCallable_Check(o)) {
+			PyErr_SetString(PyExc_ValueError,
+			    "logfile must have a callable 'write' attribute!");
+			Py_DECREF(o);
+			return NULL;
+		}
 		Py_DECREF(o);
-		return NULL;
 	}
 
-	Py_DECREF(o);
+	/* looks good, use it for the logfile */
 	Py_INCREF(logfile);
 	self->command_logfile = logfile;
 
@@ -963,7 +978,7 @@ _con_execute(pysqlc* self, PyObject *args)
 	if(!PyArg_ParseTuple(args,"s:execute", &sql)) {
 		return NULL;
 	}
-    
+
 	ret = sqlite3_exec(self->p_db, sql, NULL, NULL, &errmsg);
 
 	if (ret != SQLITE_OK) {
@@ -1059,10 +1074,10 @@ _con_prepare(pysqlc* self, PyObject *args)
 	Py_INCREF(self);
 	pystmt->con = self;
 	pystmt->p_stmt = stmt;
-	pystmt->description = _stmt_get_description(pystmt);
+	pystmt->description = NULL;
 	pystmt->num_fields = sqlite3_column_count(stmt);
 	pystmt->reset = 1;
-    
+
 	return (PyObject*)pystmt;
 }
 
@@ -1096,6 +1111,10 @@ sqlite_version_info(PyObject* self)
 **----------------------------------------------------------------------------
 */
 
+#if defined(__i386__) || defined(__x86_64__)
+# define breakpoint do {__asm__ __volatile__ ("int $03");} while (0)
+#endif
+
 static char _stmt_step_doc [] =
 "step()\n\
 Fetch the next row from a the statement.";
@@ -1116,43 +1135,40 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 	MY_BEGIN_ALLOW_THREADS(self->con->tstate);
 	result = sqlite3_step(self->p_stmt);
 	MY_END_ALLOW_THREADS(self->con->tstate);
-					 
+
+	if (self->description == NULL)
+		self->description = _stmt_get_description(self);
+
 	if (result == SQLITE_ROW) {
 		long long int lval;
 		double dval;
 		int len;
 		const void *blob;
 		const char *text;
-	
+
 		if (self->reset) {
 			self->reset = 0;
 		}
 		row = PyTuple_New(self->num_fields);
 		for(i=0; i < self->num_fields; i++) {
-			char *ctype, *p;
-			const char *decltype =
-				sqlite3_column_decltype(self->p_stmt, i);
-			
-			if (decltype == NULL)
-				decltype = ctype_to_str(
-					sqlite3_column_type(self->p_stmt, i));
-			if (decltype == NULL)
-				decltype = "NULL";
-	    
-			ctype = strdup(decltype);
-			/* convert to upper case */
-			p = ctype;
-			while (*p) {
-				*p = toupper(*p);
-				p++;
-			}
+			PyObject *type_code, *row_descr;
+			int row_type;
+
+			/* handle the NULL case early */
 			text = sqlite3_column_text(self->p_stmt, i);
 			if (text == NULL) {
 				Py_INCREF(Py_None);
 				PyTuple_SetItem(row, i, Py_None);
+				continue;
 			}
-			else if (!strcmp(ctype, "INTEGER") ||
-				 !strcmp(ctype, "INT")) {
+
+			/* look up the type code */
+			row_descr = PyTuple_GetItem(self->description, i);
+			type_code = PyTuple_GetItem(row_descr, 1);
+
+			row_type = PyInt_AsLong(type_code);
+			switch(row_type) {
+			case INTEGER:
 				lval = sqlite3_column_int64(self->p_stmt, i);
 				if (lval > INT_MAX)
 					PyTuple_SetItem(row, i,
@@ -1160,41 +1176,40 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 				else
 					PyTuple_SetItem(row, i,
 							PyInt_FromLong(lval));
-			}
-			else if (!strncmp(ctype, "BOOL", 4)) {
+				break;
+			case BOOLEAN:
 				len = sqlite3_column_int(self->p_stmt, i);
 				PyTuple_SetItem(row, i,
 						PyBool_FromLong(len));
-			}
-			else if (!strcmp(ctype, "FLOAT")) {
+				break;
+			case FLOAT:
 				dval = sqlite3_column_double(self->p_stmt, i);
 				PyTuple_SetItem(row, i,
 						PyFloat_FromDouble(dval));
-			}
-			else if (!strcmp(ctype, "BINARY") ||
-				 !strcmp(ctype, "BLOB")) { 
+				break;
+			case BINARY:
 				len = sqlite3_column_bytes(self->p_stmt, i);
 				blob = sqlite3_column_blob(self->p_stmt, i);
 				PyTuple_SetItem(row, i,
 					PyString_FromStringAndSize(blob, len));
-			}
-			else if (!strcmp(ctype, "UNICODE")) {
+				break;
+			case UNICODESTRING:
 				blob = sqlite3_column_text16(self->p_stmt, i);
 				len = sqlite3_column_bytes16(self->p_stmt, i) / 4;
 				PyTuple_SetItem(row, i,
 					PyUnicode_FromUnicode(blob, len));
-			}
-			else if (!strcmp(ctype, "NULL")) {
+				break;
+			case NULLVALUE:
 				Py_INCREF(Py_None);
 				PyTuple_SetItem(row, i, Py_None);
-			}
-			else {
+				break;
+			default:
 				/* handle everything else as a string */
 				len = sqlite3_column_bytes(self->p_stmt, i);
 				PyTuple_SetItem(row, i,
 					PyString_FromStringAndSize(text, len));
+				break;
 			}
-			free(ctype);
 		}
 		return row;
 	}
@@ -1213,7 +1228,7 @@ _stmt_step(pysqlstmt *self, PyObject *args)
 	}
 	else {
 		/* this statement is bad, better not touch it anymore,
-		 just reutn what we have */
+		 just return what we have */
 		PyErr_SetString(_sqlite_InternalError,
 				sqlite3_errmsg(self->con->p_db));
 		return NULL;
@@ -1248,7 +1263,7 @@ _stmt_reset(pysqlstmt *self)
 			return NULL;
 		}
 	}
-    
+
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -1277,7 +1292,7 @@ _stmt_finalize(pysqlstmt *self)
 		}
 		self->p_stmt = NULL;
 	}
-    
+
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -1334,7 +1349,7 @@ _stmt_bind(pysqlstmt *self, PyObject *args)
 					 PyFloat_AsDouble(obj));
 	}
 	else if (obj == Py_None) {
-		rc = sqlite3_bind_null(self->p_stmt, idx);	
+		rc = sqlite3_bind_null(self->p_stmt, idx);
 	}
 	else {
 		PyObject *o = NULL;
@@ -1342,7 +1357,7 @@ _stmt_bind(pysqlstmt *self, PyObject *args)
 			o = PyObject_GetAttrString(obj, "__quote__");
 		else if (PyObject_HasAttrString(obj, "_quote"))
 			o = PyObject_GetAttrString(obj, "_quote");
-	
+
 		if (o != NULL && PyCallable_Check(o)) {
 			char *buf;
 			int len;
@@ -1354,7 +1369,7 @@ _stmt_bind(pysqlstmt *self, PyObject *args)
 			Py_DECREF(str);
 		}
 	}
-    
+
 	if (rc != SQLITE_OK) {
 		if (rc == -1)
 			PyErr_SetString(_sqlite_ProgrammingError,
@@ -1364,7 +1379,7 @@ _stmt_bind(pysqlstmt *self, PyObject *args)
 					sqlite3_errmsg(self->con->p_db));
 		return NULL;
 	}
-    
+
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -1376,12 +1391,13 @@ static PyObject*
 _stmt_get_description(pysqlstmt* self)
 {
 	int num_fields, i, l, j;
-	const char **p_col_names;
 	PyObject *obj, *col, *type_code;
 	char type_name[255];
 
 	num_fields = sqlite3_column_count(self->p_stmt);
-	p_col_names = malloc(2*num_fields*sizeof(const char *));
+	if ((obj = PyTuple_New(num_fields)) == NULL) {
+		return NULL;
+	}
 
 	for(i=0; i < num_fields; i++){
 		const char *name = sqlite3_column_name(self->p_stmt, i);
@@ -1389,30 +1405,21 @@ _stmt_get_description(pysqlstmt* self)
 		if (ctype == NULL)
 			ctype = ctype_to_str(sqlite3_column_type(self->p_stmt,
 								 i));
-		p_col_names[i] = name;
-		p_col_names[num_fields + i] = ctype;
-	}
+		if (ctype == NULL)
+			ctype = "NULL";
 
-	if ((obj = PyTuple_New(num_fields)) == NULL) {
-		free(p_col_names);
-		return NULL;
-	}
-
-	for (i=0; i < num_fields; i++) {
 		col = PyTuple_New(7);
 
 		/* 1. Column Name */
-		PyTuple_SetItem(col, 0,
-				Py_BuildValue("s", p_col_names[i]));
+		PyTuple_SetItem(col, 0, Py_BuildValue("s", name));
 
 		/* 2. Type code */
 		/* Make a copy of column type. */
-		if (p_col_names[num_fields + i] == NULL) {
+		if (ctype == NULL) {
 			strcpy(type_name, "TEXT");
 		}
 		else {
-			strncpy(type_name, p_col_names[num_fields + i],
-				sizeof(type_name) - 1);
+			strncpy(type_name, ctype, sizeof(type_name) - 1);
 		}
 
 		/* Get its length. */
@@ -1425,18 +1432,20 @@ _stmt_get_description(pysqlstmt* self)
 
 		/* Init/unset value */
 		type_code = NULL;
-
 		/* Try to determine column type. */
 		if (strstr(type_name, "INTERVAL"))
 			type_code = tc_INTERVAL;
 		else if (strstr(type_name, "INT"))
 			type_code = tc_INTEGER;
+		else if (strstr(type_name, "BOOL"))
+			type_code = tc_BOOLEAN;
 		else if (strstr(type_name, "CHAR") ||
-			 strstr(type_name, "TEXT"))
+			 strstr(type_name, "TEXT") ||
+			 strstr(type_name, "STR"))
 			type_code = tc_STRING;
 		else if (strstr(type_name, "UNICODE"))
 			type_code = tc_UNICODESTRING;
-		else if (strstr(type_name, "BINARY") ||
+		else if (strstr(type_name, "BIN") ||
 			 strstr(type_name, "BLOB"))
 			type_code = tc_BINARY;
 		else if (strstr(type_name, "FLOAT") ||
@@ -1453,7 +1462,7 @@ _stmt_get_description(pysqlstmt* self)
 		else if (strstr(type_name, "TIME"))
 			type_code = tc_TIME;
 		else if (type_code == NULL)
-			type_code = Py_None;
+			type_code = tc_NULL;
 
 		/* Assign type. */
 		Py_INCREF(type_code);
@@ -1482,7 +1491,6 @@ _stmt_get_description(pysqlstmt* self)
 		PyTuple_SetItem(obj, i, col);
 	}
 
-	free(p_col_names);
 	return obj;
 }
 
@@ -1510,16 +1518,16 @@ _stmt_dealloc(pysqlstmt* self)
 		Py_DECREF(self->description);
 		self->description = 0;
 	}
-    
+
 	if (self->p_stmt != NULL) {
 		result = sqlite3_finalize(self->p_stmt);
 		if (result == SQLITE_MISUSE) {
 			PyObject *err_type, *err_value, *err_traceback;
 			int have_error = PyErr_Occurred() ? 1 : 0;
-	    
+
 			if (have_error)
 				PyErr_Fetch(&err_type, &err_value,
-					    &err_traceback);    
+					    &err_traceback);
 			PyErr_SetString(_sqlite_DatabaseError,
 					sqlite3_errmsg(self->con->p_db));
 			PyErr_WriteUnraisable(
@@ -1603,7 +1611,6 @@ static PyMethodDef _con_methods[] = {
 PySQLite_MODINIT_FUNC(init_sqlite3)
 {
 	PyObject *module, *dict;
-	long tc = 0L;
 
 	module = Py_InitModule("_sqlite3", pysqlite_functions);
 
@@ -1612,15 +1619,17 @@ PySQLite_MODINIT_FUNC(init_sqlite3)
 	}
 
 	/*** Initialize type codes */
-	tc_INTEGER = PyInt_FromLong(tc++);
-	tc_FLOAT = PyInt_FromLong(tc++);
-	tc_TIMESTAMP = PyInt_FromLong(tc++);
-	tc_DATE = PyInt_FromLong(tc++);
-	tc_TIME = PyInt_FromLong(tc++);
-	tc_INTERVAL = PyInt_FromLong(tc++);
-	tc_STRING = PyInt_FromLong(tc++);
-	tc_UNICODESTRING = PyInt_FromLong(tc++);
-	tc_BINARY = PyInt_FromLong(tc++);
+	tc_INTEGER = PyInt_FromLong(INTEGER);
+	tc_FLOAT = PyInt_FromLong(FLOAT);
+	tc_TIMESTAMP = PyInt_FromLong(TIMESTAMP);
+	tc_DATE = PyInt_FromLong(DATE);
+	tc_TIME = PyInt_FromLong(TIME);
+	tc_INTERVAL = PyInt_FromLong(INTERVAL);
+	tc_STRING = PyInt_FromLong(STRING);
+	tc_UNICODESTRING = PyInt_FromLong(UNICODESTRING);
+	tc_BINARY = PyInt_FromLong(BINARY);
+	tc_BOOLEAN = PyInt_FromLong(BOOLEAN);
+	tc_NULL = PyInt_FromLong(NULLVALUE);
 
 	PyDict_SetItemString(dict, "INTEGER", tc_INTEGER);
 	PyDict_SetItemString(dict, "FLOAT", tc_FLOAT);
@@ -1631,6 +1640,8 @@ PySQLite_MODINIT_FUNC(init_sqlite3)
 	PyDict_SetItemString(dict, "STRING", tc_STRING);
 	PyDict_SetItemString(dict, "UNICODESTRING", tc_UNICODESTRING);
 	PyDict_SetItemString(dict, "BINARY", tc_BINARY);
+	PyDict_SetItemString(dict, "BOOLEAN", tc_BOOLEAN);
+	PyDict_SetItemString(dict, "NULL", tc_NULL);
 
 	/*** Create DB-API Exception hierarchy */
 	_sqlite_Error = PyErr_NewException("_sqlite.Error",
