@@ -224,6 +224,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
     for (troveName, versionStr, flavor) in troveNames:
         try:
             for trove in db.findTrove(None, troveName, flavor, versionStr):
+                # db.getTrove returns the pristine trove by default
                 trove = db.getTrove(*trove)
                 _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, 
                                   tags, info)
@@ -291,7 +292,7 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags, info):
                             troveVersion.branch().label().asString()))
 
         print "%-30s %s" % \
-            (("Size      : %d" % trove.getSize(),
+            (("Size      : %s" % size,
              ("Locked    : %s" % db.trovesAreLocked([ (trove.getName(), 
                               trove.getVersion(), trove.getFlavor()) ])[0])))
         print "Flavor    : %s" % deps.formatFlavor(trove.getFlavor())

@@ -28,6 +28,15 @@ import sys
 
 class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
+    def done(self):
+        self._message('')
+
+    def _message(self, text):
+        if text and self.hunkInfo[1] > 1:
+            text = "Job %d of %d: %s%s" % (self.hunkInfo[0], self.hunkInfo[1],
+                                            text[0].lower(), text[1:])
+        callbacks.LineOutput._message(self, text)
+
     def preparingChangeSet(self):
         self._message("Preparing changeset...")
 
@@ -72,9 +81,14 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
     def runningPostTagHandlers(self):
         self._message("Running tag post-scripts...")
 
+    def setHunk(self, num, total):
+        self.restored = 0
+        self.hunkInfo = (num, total)
+
     def __init__(self):
         callbacks.LineOutput.__init__(self)
         self.restored = 0
+        self.hunkInfo = (0, 0)
 
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
@@ -113,22 +127,23 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
 	client.checkWriteableRoot()
 
     try:
-        (cs, depFailures, suggMap, brokenByErase) = \
+        (updJob, depFailures, suggMap, brokenByErase) = \
             client.updateChangeSet(applyList, depsRecurse = depsRecurse,
                                    resolveDeps = depCheck,
                                    keepExisting = keepExisting,
                                    test = test, recurse = recurse,
                                    updateByDefault = updateByDefault,
-                                   callback = callback)
-
+                                   callback = callback, split = True)
 
         if depFailures:
+            callback.done()
             print "The following dependencies could not be resolved:"
             for (troveName, depSet) in depFailures:
                 print "    %s:\n\t%s" %  \
                         (troveName, "\n\t".join(str(depSet).split("\n")))
             return
-        elif (not cfg.autoResolve) and suggMap:
+        elif (not cfg.autoResolve or brokenByErase) and suggMap:
+            callback.done()
             print "Additional troves are needed:"
             for (req, suggList) in suggMap.iteritems():
                 print "    %s -> %s" % \
@@ -136,6 +151,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                   (x[0], x[1].trailingRevision().asString()) for x in suggList]))
             return
         elif suggMap:
+            callback.done()
             print "Including extra troves to resolve dependencies:"
             print "   ",
             items = {}
@@ -158,41 +174,45 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
             return
 
         if info:
+            callback.done()
             new = []
-            for x in cs.iterNewTroveList():
-                oldVersion = x.getOldVersion()
-                newVersion = x.getNewVersion()
-                if oldVersion:
-                    oldTVersion = oldVersion.trailingRevision()
-                else:
-                    # if there is no oldVersion, this is a new trove
-                    new.append(("%s (%s)" % 
-                                (x.getName(), 
-                                 newVersion.trailingRevision().asString()),
-				'N'))
-                    continue
-                    
-                newTVersion = newVersion.trailingRevision()
+            for cs in updJob.getChangeSets():
+                for x in cs.iterNewTroveList():
+                    oldVersion = x.getOldVersion()
+                    newVersion = x.getNewVersion()
+                    if oldVersion:
+                        oldTVersion = oldVersion.trailingRevision()
+                    else:
+                        # if there is no oldVersion, this is a new trove
+                        new.append(("%s (%s)" % 
+                                    (x.getName(), 
+                                     newVersion.trailingRevision().asString()),
+                                    'N'))
+                        continue
+                        
+                    newTVersion = newVersion.trailingRevision()
 
-                if oldVersion.branch() != newVersion.branch():
-                    kind = 'B'
-                elif oldTVersion.getVersion() != newTVersion.getVersion():
-                    kind = 'V'
-                elif oldTVersion.getSourceCount() != \
-                                            newTVersion.getSourceCount():
-                    kind = 'S'
-                else:
-                    kind = 'B'
+                    if oldVersion.branch() != newVersion.branch():
+                        kind = 'B'
+                    elif oldTVersion.getVersion() != newTVersion.getVersion():
+                        kind = 'V'
+                    elif oldTVersion.getSourceCount() != \
+                                                newTVersion.getSourceCount():
+                        kind = 'S'
+                    else:
+                        kind = 'B'
 
-                new.append(("%s (%s -> %s)" % 
-                                (x.getName(), oldTVersion.asString(),
-                                 newTVersion.asString()), kind))
+                    new.append(("%s (%s -> %s)" % 
+                                    (x.getName(), oldTVersion.asString(),
+                                     newTVersion.asString()), kind))
 
 	    new.sort()
 	    new = [ "%s %s" % (x[1], x[0]) for x in new ]
 
-            old = [ "%s (%s)" % (x[0], x[1].trailingRevision().asString()) 
-                                for x in cs.getOldTroveList() ]
+            old = []
+            for cs in updJob.getChangeSets():
+                old += [ "%s (%s)" % (x[0], x[1].trailingRevision().asString()) 
+                                    for x in cs.getOldTroveList() ]
 	    old.sort()
             if not new and not old:
                 print "No troves are affected by this update."
@@ -210,8 +230,9 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
 
             return
 
-        client.applyUpdate(cs, replaceFiles, tagScript, keepExisting,
-                           test = test, justDatabase = justDatabase,
+        keepExisting = False
+        client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
+                           justDatabase = justDatabase,
                            localRollbacks = cfg.localRollbacks,
                            callback = callback)
     except conaryclient.UpdateError, e:

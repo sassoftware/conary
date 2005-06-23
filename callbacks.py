@@ -60,6 +60,11 @@ class UpdateCallback(ChangesetCallback):
     def runningPostTagHandlers(self):
         pass
 
+    def setHunk(self, hunk, hunkCount):
+        pass
+
+    def done(self):
+        pass
 
 class LineOutput:
 
@@ -76,6 +81,7 @@ class LineOutput:
         if self.last:
             self._message("")
             print "\r",
+            self.out.flush()
 
     def __init__(self, f = sys.stdout):
         self.last = 0

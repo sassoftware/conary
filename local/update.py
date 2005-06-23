@@ -47,7 +47,6 @@ MERGE = 1 << 0
 REPLACEFILES = 1 << 1
 IGNOREUGIDS = 1 << 2
 MISSINGFILESOKAY = 1 << 3
-KEEPEXISTING = 1 << 4
         
 class FilesystemJob:
     """
@@ -126,7 +125,7 @@ class FilesystemJob:
 
                 if "handler preremove" in ti.implements:
                     tagCommands.addCommand(ti, 'handler', 'preremove',
-                        [x for x in self.repos.iterFilesWithTag(ti.tag)])
+                        [x for x in self.db.iterFilesWithTag(ti.tag)])
 
 	for tag, l in self.tagRemoves.iteritems():
 	    if tag == 'tagdescription':
@@ -270,7 +269,7 @@ class FilesystemJob:
 	    elif fileObj.hasContents:
                 if fileObj.flags.isConfig() and not fileObj.flags.isSource():
                     # take the config file from the local database
-                    contents = self.repos.getFileContents(
+                    contents = self.db.getFileContents(
                                     [ (None, None, fileObj) ])[0]
                 elif fileObj.linkGroup() and \
                         self.linkGroups.has_key(fileObj.linkGroup()):
@@ -394,14 +393,14 @@ class FilesystemJob:
 
             if "handler update" in tagInfo.implements:
                 tagCommands.addCommand(tagInfo, 'handler', 'update',
-                    [x for x in self.repos.iterFilesWithTag(tagInfo.tag)])
+                    [x for x in self.db.iterFilesWithTag(tagInfo.tag)])
             elif "files update" in tagInfo.implements:
                 # if "handler update" isn't implemented, see if "files
                 # update" is implemented. if so, we need to call this
                 # for all of those items files (otherwise the handler will
                 # never be called for files which are already installed)
                 fileList = [x for x in 
-                            self.repos.iterFilesWithTag(tagInfo.tag) ] 
+                            self.db.iterFilesWithTag(tagInfo.tag) ] 
                 if fileList:
                     tagCommands.addCommand(tagInfo, 'files', 'update', fileList)
 
@@ -910,14 +909,14 @@ class FilesystemJob:
 
 	return fsTrove
 
-    def __init__(self, repos, changeSet, fsTroveDict, root, callback = None, 
+    def __init__(self, db, changeSet, fsTroveDict, root, callback = None, 
 		 flags = MERGE):
 	"""
 	Constructs the job for applying a change set to the filesystem.
 
-	@param repos: the repository the current trove and file information 
+	@param db: the db the current trove and file information 
 	is in
-	@type repos: repository.Repository
+	@type db: local.database.Database
 	@param changeSet: the changeset to apply to the filesystem
 	@type changeSet: changeset.ChangeSet
 	@param fsTroveDict: dictionary mapping a trove name to the trove
@@ -944,15 +943,14 @@ class FilesystemJob:
 	self.tagUpdates = {}
 	self.tagRemoves = {}
         self.linkGroups = {}
-	self.repos = repos
+	self.db = db
 
-	if not(flags & KEEPEXISTING):
-            for (name, oldVersion, oldFlavor) in changeSet.getOldTroveList():
-                self.oldTroves.append((name, oldVersion, oldFlavor))
-                oldTrove = repos.getTrove(name, oldVersion, oldFlavor)
-                for (pathId, path, fileId, version) in oldTrove.iterFileList():
-                    fileObj = repos.getFileVersion(pathId, fileId, version)
-                    self._remove(fileObj, root + path, "removing %s")
+        for (name, oldVersion, oldFlavor) in changeSet.getOldTroveList():
+            self.oldTroves.append((name, oldVersion, oldFlavor))
+            oldTrove = db.getTrove(name, oldVersion, oldFlavor)
+            for (pathId, path, fileId, version) in oldTrove.iterFileList():
+                fileObj = db.getFileVersion(pathId, fileId, version)
+                self._remove(fileObj, root + path, "removing %s")
 
         pkgList = []
 
@@ -972,12 +970,12 @@ class FilesystemJob:
 	    old = troveCs.getOldVersion()
 
 	    if old:
-		baseTrove = repos.getTrove(troveCs.getName(), old, 
+		baseTrove = db.getTrove(troveCs.getName(), old, 
                                          troveCs.getOldFlavor())
 	    else:
                 baseTrove = None
 
-            self._setupRemoves(repos, troveCs, changeSet, baseTrove,
+            self._setupRemoves(db, troveCs, changeSet, baseTrove,
                                newFsTrove, root, flags)
 
 	for i, (troveCs, newFsTrove) in enumerate(pkgList):
@@ -987,7 +985,7 @@ class FilesystemJob:
 	    old = troveCs.getOldVersion()
 
 	    if old:
-		baseTrove = repos.getTrove(troveCs.getName(), old, 
+		baseTrove = db.getTrove(troveCs.getName(), old, 
                                          troveCs.getOldFlavor())
 		self.oldTroves.append((baseTrove.getName(), 
 					 baseTrove.getVersion(),
@@ -995,7 +993,7 @@ class FilesystemJob:
 	    else:
                 baseTrove = None
 
-            self._singleTrove(repos, troveCs, changeSet, baseTrove,
+            self._singleTrove(db, troveCs, changeSet, baseTrove,
                                       newFsTrove, root, flags)
 
             newFsTrove.mergeTroveListChanges(troveCs.iterChangedTroves(),
@@ -1214,11 +1212,11 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 				      newCont, f.flags.isConfig())
 
     (csTrove, filesNeeded, pkgsNeeded) = newTrove.diff(srcTrove)
-    assert(not pkgsNeeded)
     changeSet.newTrove(csTrove)
 
     if (csTrove.getOldFileList() or csTrove.getChangedFileList()
-        or csTrove.getNewFileList()):
+        or csTrove.getNewFileList()
+        or [ x for x in csTrove.iterChangedTroves()]):
 	foundDifference = True
     else:
 	foundDifference = False
@@ -1227,8 +1225,7 @@ def _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, root, flags,
 
 def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
                       forceSha1 = False, ignoreTransient=False,
-                      ignoreAutoSource = False,
-                      updateContainers = False):
+                      ignoreAutoSource = False, updateContainers = False):
     """
     Builds a change set against a set of files currently installed and
     builds a trove object which describes the files installed.  The
@@ -1260,7 +1257,7 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
     changeSet = changeset.ChangeSet()
     changedTroves = {}
     returnList = []
-    for (curTrove, srcTrove, newVersion, flags) in pkgList: # this always skips container troves
+    for (curTrove, srcTrove, newVersion, flags) in pkgList: 
 	result = _localChanges(repos, changeSet, curTrove, srcTrove, newVersion, 
 			       root, flags, 
                                withFileContents = withFileContents,
@@ -1286,6 +1283,7 @@ def buildLocalChanges(repos, pkgList, root = "", withFileContents=True,
         inclusions = [ x for x in curTrove.iterTroveList() ]
         if not inclusions: continue
         assert(curTrove == srcTrove)
+        assert(srcTrove.emptyFileList() and curTrove.emptyFileList())
 
         newTrove = curTrove.copy()
         changed = False

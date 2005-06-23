@@ -29,7 +29,6 @@ import versionops
 import versions
 
 from local import troveinfo
-from local import trovetroves
 from local import versiontable
 
 class LocalRepVersionTable(versiontable.VersionTable):
@@ -62,6 +61,20 @@ class LocalRepVersionTable(versiontable.VersionTable):
 
 class TroveStore:
 
+    def _createSchema(self, cu):
+        cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
+                   "name='TroveTroves'")
+        if cu.next()[0] == 0:
+            cu.execute("""CREATE TABLE TroveTroves(instanceId INTEGER, 
+					           includedId INTEGER,
+                                                   byDefault BOOLEAN)""")
+	    cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON "
+			    "TroveTroves(instanceId)")
+	    # this index is so we can quickly tell what troves are needed
+	    # by another trove
+	    cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON "
+			    "TroveTroves(includedId)")
+
     def __init__(self, db):
 	self.db = db
 
@@ -69,7 +82,7 @@ class TroveStore:
 	#cu.execute("PRAGMA temp_store = MEMORY", start_transaction = False)
 				 
         self.begin()
-	self.troveTroves = trovetroves.TroveTroves(self.db)
+	self._createSchema(cu)
 	trovefiles.TroveFiles(self.db)
 	instances.FileStreams(self.db)
 	self.items = items.Items(self.db)
@@ -329,7 +342,8 @@ class TroveStore:
 					     troveFlavorId, 
                                              trove.isRedirect(),
                                              isPresent = True)
-	assert(not self.troveTroves.has_key(troveInstanceId))
+        assert(cu.execute("SELECT COUNT(*) from TroveTroves WHERE "
+                          "instanceId=?", troveInstanceId).next()[0] == 0)
 
         if updateLatest:
             # this name/version already exists, so this must be a new
@@ -418,8 +432,9 @@ class TroveStore:
 	    instanceId = self.getInstanceId(itemId, versionId, flavorId,
                                             trove.isRedirect(),
 					    isPresent = False)
-	    self.troveTroves.addItem(troveInstanceId, instanceId,
-                        trove.includeTroveByDefault(name, version, flavor))
+            cu.execute("INSERT INTO TroveTroves VALUES(?, ?, ?)",
+	               troveInstanceId, instanceId,
+                       trove.includeTroveByDefault(name, version, flavor))
 
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
 
@@ -568,7 +583,9 @@ class TroveStore:
 
 	trv = trove.Trove(troveName, troveVersion, troveFlavor,
 			      changeLog, isRedirect = isRedirect)
-	for instanceId, byDefault in self.troveTroves[troveInstanceId]:
+        cu.execute("SELECT includedId, byDefault from TroveTroves WHERE "
+                   "instanceId=?", troveInstanceId)
+        for (instanceId, byDefault) in cu:
 	    (itemId, versionId, flavorId, isPresent) = \
 		    self.instances.getId(instanceId)
 	    name = self.items.getId(itemId)

@@ -47,8 +47,6 @@ def ChangeSetCommand(repos, cfg, troveList, outFileName, recurse = True,
             newVersionStr = None
             newFlavor = None
 
-
-
         if l[0]:
             troveList = repos.findTrove(cfg.installLabelPath, 
                                         (troveName, oldVersionStr, oldFlavor),

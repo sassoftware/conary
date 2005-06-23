@@ -450,36 +450,28 @@ class DependencyTables:
             # these edges cancel each other out -- for example, if Foo
             # requires both the old and new versions of Bar the order between
             # Foo and Bar is irrelevant
-            for edge in oldOldEdges.keys():
-                if oldNewEdges.has_key(edge):
-                    del oldOldEdges[edge]
-                    del oldNewEdges[edge]
+            #for edge in oldOldEdges.keys():
+            #    if oldNewEdges.has_key(edge):
+            #        del oldOldEdges[edge]
+            #        del oldNewEdges[edge]
 
-            for edge in newOldEdges.keys():
-                if newNewEdges.has_key(edge):
-                    del newOldEdges[edge]
-                    del newNewEdges[edge]
+            #for edge in newOldEdges.keys():
+            #    if newNewEdges.has_key(edge):
+            #        del newOldEdges[edge]
+            #        del newNewEdges[edge]
+
+            oldOldEdges.difference_update(oldNewEdges)
+            newNewEdges.difference_update(newOldEdges)
 
         def _buildGraph(nodes, oldOldEdges, newNewEdges):
-            for (reqNodeId, provNodeId, depId) in oldOldEdges.iterkeys():
+            for (reqNodeId, provNodeId, depId) in oldOldEdges:
                 # remove the provider after removing the requirer
-                nodes[provNodeId][1].append(reqNodeId)
-                nodes[reqNodeId][2].append(provNodeId)
+                nodes[provNodeId][1].add(reqNodeId)
+                nodes[reqNodeId][2].add(provNodeId)
 
-            # the edges left in oldNewEdges represent dependencies which troves
-            # slated for removal have on troves being installed. either those
-            # dependencies will already be guaranteed by edges in oldOldEdges,
-            # or they were broken to begin with. either way, we don't have to
-            # care about them
-
-            # newOldEdges are dependencies which troves being installed have on
-            # troves being removed. since those dependencies will be broken
-            # after this operation, we don't need to order on them (it's likely
-            # they are filled by some other trove being added, and the edge
-            # in newNewEdges will make that work out
-            for (reqNodeId, provNodeId, depId) in newNewEdges.iterkeys():
-                nodes[reqNodeId][1].append(provNodeId)
-                nodes[provNodeId][2].append(reqNodeId)
+            for (reqNodeId, provNodeId, depId) in newNewEdges:
+                nodes[reqNodeId][1].add(provNodeId)
+                nodes[provNodeId][2].add(reqNodeId)
 
         def _treeDFS(nodes, nodeIdx, seen, finishes, timeCount):
             seen[nodeIdx] = True
@@ -627,10 +619,11 @@ class DependencyTables:
         # new needs new, and new needs old. Each edge carries a depId
         # to aid in cancelling them out. Our initial edge representation
         # is a simple dict of edges.
-        oldNewEdges = {}
-        oldOldEdges = {}
-        newNewEdges = {}
-        newOldEdges = {}
+        oldNewEdges = set()
+        oldOldEdges = set()
+        newNewEdges = set()
+        newOldEdges = set()
+        troveInfo = {}
 
 	# This sets up negative depNum entries for the requirements we're
 	# checking (multiplier = -1 makse them negative), with (-1 * depNum) 
@@ -650,6 +643,8 @@ class DependencyTables:
 	    newInfo = (trvCs.getName(), trvCs.getNewVersion(),
 		       trvCs.getNewFlavor())
 
+            troveInfo[newInfo] = i + 1
+
             if trvCs.getOldVersion():
 		oldInfo = (trvCs.getName(), trvCs.getOldVersion(),
 			   trvCs.getOldFlavor())
@@ -657,7 +652,19 @@ class DependencyTables:
 	    else:
 		oldInfo = None
 
-            nodes.append((trvCs, [], []))
+            nodes.append((trvCs, set(), set()))
+
+        # Create dependencies from collections to the things they include.
+        # This forces collections to be installed after all of their
+        # elements
+        for i, trvCs in enumerate(changeSet.iterNewTroveList()):
+            for (name, changeList) in trvCs.iterChangedTroves():
+                for (changeType, version, flavor, byDef) in changeList:
+                    if changeType == '+':
+                        targetTrove = troveInfo.get((name, version, flavor), -1)
+                        if targetTrove >= 0:
+                            newNewEdges.add((i + 1, targetTrove, None))
+        del troveInfo
 
         # create the index for DepCheck
         self._createTmpTable(cu, "DepCheck", makeTable = False)
@@ -674,7 +681,7 @@ class DependencyTables:
 
         for oldInfo in changeSet.getOldTroveList():
             oldTroves.append((oldInfo, len(nodes)))
-            nodes.append((oldInfo, [], []))
+            nodes.append((oldInfo, set(), set()))
 
         if oldTroves:
             # this sets up nodesByRemovedId because the temporary RemovedTroves
@@ -773,7 +780,7 @@ class DependencyTables:
 		if removedInstanceId is not None:
 		    # new trove depends on something old
                     toNodeId = removedNodeIdx
-                    newOldEdges[(fromNodeId, toNodeId, depId)] = True
+                    newOldEdges.add((fromNodeId, toNodeId, depId))
 		elif provInstId > 0:
 		    # new trove depends on something already installed
 		    # which is not being removed. not interesting.
@@ -781,7 +788,7 @@ class DependencyTables:
 		else:
 		    # new trove depends on something new
                     toNodeId = -provInstId
-                    newNewEdges[(fromNodeId, toNodeId, depId)] = True
+                    newNewEdges.add((fromNodeId, toNodeId, depId))
 	    else:
                 # XXX this should probably get batched 
                 # Turn the depNum into a list of things being erased which
@@ -806,12 +813,25 @@ class DependencyTables:
 
                 if edgeSet:
                     for fromNodeId in fromNodeIds:
-                        edgeSet[(fromNodeId, toNodeId, depId)] = True
+                        edgeSet.add((fromNodeId, toNodeId, depId))
 
         changeSetList = []
         if findOrdering:
             # Remove nodes which cancel each other
             _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
+
+            # the edges left in oldNewEdges represent dependencies which troves
+            # slated for removal have on troves being installed. either those
+            # dependencies will already be guaranteed by edges in oldOldEdges,
+            # or they were broken to begin with. either way, we don't have to
+            # care about them
+            del oldNewEdges
+            # newOldEdges are dependencies which troves being installed have on
+            # troves being removed. since those dependencies will be broken
+            # after this operation, we don't need to order on them (it's likely
+            # they are filled by some other trove being added, and the edge
+            # in newNewEdges will make that work out
+            del newOldEdges
 
             # Now build up a unified node list. The different kinds of edges
             # and the particular depId no longer matter. The direction here is
@@ -819,9 +839,8 @@ class DependencyTables:
             # the order of the dependency
             _buildGraph(nodes, oldOldEdges, newNewEdges)
             del oldOldEdges
-            del oldNewEdges
-            del newOldEdges
             del newNewEdges
+
             componentGraph = _stronglyConnect(nodes)
             del nodes
             ordering = _orderComponents(componentGraph)
@@ -834,8 +853,8 @@ class DependencyTables:
                     else:
                         oneList.append((item.getName(),
                                         (item.getOldVersion(),
-                                         item.getNewVersion()),
-                                        (item.getOldFlavor(),
+                                         item.getOldFlavor()),
+                                        (item.getNewVersion(),
                                          item.getNewFlavor()),
                                         item.isAbsolute()) )
                 changeSetList.append(oneList)

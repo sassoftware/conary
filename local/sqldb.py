@@ -20,7 +20,6 @@ import idtable
 import sqlite3
 import trove
 import troveinfo
-import trovetroves
 import versions
 import versiontable
 
@@ -370,7 +369,22 @@ class DBFlavorMap(idtable.IdMapping):
 
 class Database:
 
-    schemaVersion = 5
+    schemaVersion = 6
+
+    def _createSchema(self, cu):
+        cu.execute("SELECT COUNT(*) FROM sqlite_master WHERE "
+                   "name='TroveTroves'")
+        if cu.next()[0] == 0:
+            cu.execute("""CREATE TABLE TroveTroves(instanceId INTEGER, 
+					           includedId INTEGER,
+                                                   byDefault BOOLEAN,
+                                                   inPristine BOOLEAN)""")
+	    cu.execute("CREATE INDEX TroveTrovesInstanceIdx ON "
+			    "TroveTroves(instanceId)")
+	    # this index is so we can quickly tell what troves are needed
+	    # by another trove
+	    cu.execute("CREATE INDEX TroveTrovesIncludedIdx ON "
+			    "TroveTroves(includedId)")
 
     def __init__(self, path):
 	self.db = sqlite3.connect(path, timeout=30000)
@@ -386,8 +400,7 @@ class Database:
 
         if not self.versionCheck():
             raise OldDatabaseSchema
-
-	self.troveTroves = trovetroves.TroveTroves(self.db)
+        self._createSchema(self.db.cursor())
 	self.troveFiles = DBTroveFiles(self.db)
 	self.instances = DBInstanceTable(self.db)
 	self.versionTable = versiontable.VersionTable(self.db)
@@ -438,7 +451,7 @@ class Database:
                         self.p = deps.deps.DependencySet()
 
                 try:
-                    cu.execute("UPDATE DatabaseVersion SET version=5")
+                    cu.execute("UPDATE DatabaseVersion SET version=6")
                 except sqlite3.ProgrammingError:
                     raise OldDatabaseSchema(
                       "The Conary database on this system is too old. "      \
@@ -446,7 +459,8 @@ class Database:
                       "run Conary with write permissions for the database\n" \
                       "(which normally means as root).")
 
-                print "Converting database...",
+                msg = "Converting database..."
+                print msg,
                 sys.stdout.flush()
 
                 if version == 2:
@@ -473,7 +487,35 @@ class Database:
 
                 self.db.commit()
 
-                print "                      \r",
+                print "\r%s\r" %(' '*len(msg)),
+                sys.stdout.flush()
+
+            if version == 5:
+                import sys
+                cu.execute("ALTER TABLE TroveTroves ADD COLUMN inPristine "
+                           "INTEGER")
+                cu.execute("UPDATE TroveTroves SET inPristine=?", True)
+
+                # erase unused versions
+                msg = "Removing unused version strings...\r"
+                print msg,
+                sys.stdout.flush()
+                cu.execute("""
+                        DELETE FROM Versions WHERE versionId IN 
+                            (SELECT versions.versionid FROM versions 
+                                LEFT OUTER JOIN 
+                                    (SELECT versionid AS usedversions FROM 
+                                     dbinstances UNION 
+                                     SELECT versionid AS
+                                     usedversions FROM dbtrovefiles) 
+                                ON usedversions = versions.versionid 
+                             WHERE 
+                                usedversions IS NULL)
+                """)
+
+                cu.execute("UPDATE DatabaseVersion SET version=6")
+                version = 6
+                print "\r%s\r" %(' ' * len(msg)),
                 sys.stdout.flush()
 
             if version != self.schemaVersion:
@@ -569,10 +611,12 @@ class Database:
     def trovesAreLocked(self, troveList):
         cu = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE tlList (name STRING, "
-                                "version STRING, flavor STRING)")
+                                "version STRING, flavor STRING)",
+                   start_transaction = False)
         for (name, version, flavor) in troveList:
             cu.execute("INSERT INTO tlList VALUES(?, ?, ?)", name, 
-                       version.asString(), flavor.freeze())
+                       version.asString(), flavor.freeze(),
+                       start_transaction = False)
         cu.execute("""SELECT locked FROM tlList
                             JOIN DBInstances ON
                                 DBInstances.troveName = tlList.name
@@ -588,12 +632,39 @@ class Database:
                     """)
         results = [ x[0] for x in cu ]
         assert(len(results) == len(troveList))
-        cu.execute("DROP TABLE tlList")
+        cu.execute("DROP TABLE tlList", start_transaction = False)
 
         return results
 
     def hasByName(self, name):
 	return self.instances.hasName(name)
+
+    def trovesByName(self, names):
+        cu = self.db.cursor()
+
+        cu.execute("CREATE TEMPORARY TABLE tbn (idx INTEGER, name STRING)",
+                   start_transaction = False)
+
+        result = [ None ] * len(names)
+        for i, name in enumerate(names):
+            cu.execute("INSERT INTO tbn VALUES(?, ?)", i, name)
+            result[i] = list()
+
+        cu.execute("""SELECT idx, name, version, flavor FROM 
+                        tbn JOIN DBInstances ON
+                            tbn.name = DBInstances.name
+                        JOIN Versions ON
+                            Versions.version = DBInstnances.versionId
+                        JOIN Flavors ON
+                            Flavors.flavorId = DBInstances.flavorId""")
+        
+        for (i, name, versionStr, flavorStr) in cu:
+            result[i].append((name, versions.VersionFromString(versionStr),
+                              deps.deps.ThawDependencySet(flavorStr)))
+
+        cu.execute("DROP TABLE tbn")
+
+        return result
 
     def getVersionId(self, version, cache):
 	theId = cache.get(version, None)
@@ -618,7 +689,7 @@ class Database:
 
 	return theId
 
-    def addTrove(self, trove):
+    def addTrove(self, oldTroveSpec, trove):
 	cu = self.db.cursor()
 
 	troveName = trove.getName()
@@ -684,7 +755,8 @@ class Database:
 	    troveInstanceId = self.instances.addId(troveName, troveVersionId, 
 				       troveFlavorId, troveVersion.timeStamps())
 	
-	assert(not self.troveTroves.has_key(troveInstanceId))
+        assert(cu.execute("SELECT COUNT(*) FROM TroveTroves WHERE "
+                          "instanceId=?", troveInstanceId).next()[0] == 0)
 
         cu.execute("""CREATE TEMPORARY TABLE IncludedTroves(
                                 troveName STRING,
@@ -721,17 +793,47 @@ class Database:
 
         # now include the troves in this one
         cu.execute("""
-            INSERT INTO TroveTroves SELECT ?, instanceId, byDefault
+            INSERT INTO TroveTroves SELECT ?, instanceId, byDefault, ?
                 FROM IncludedTroves JOIN DBInstances ON
                     IncludedTroves.troveName == DBInstances.troveName AND
                     IncludedTroves.versionId == DBInstances.versionId AND
                     IncludedTroves.flavorId == DBInstances.flavorId 
-            """, troveInstanceId)
+            """, troveInstanceId, True)
 
         cu.execute("DROP TABLE IncludedTroves")
 
         self.depTables.add(cu, trove, troveInstanceId)
         self.troveInfoTable.addInfo(cu, trove, troveInstanceId)
+        
+        # add this trove to any groups the old trove was part of (which could
+        # already be in the list, if we're reverting to something the group
+        # already references)
+        if oldTroveSpec[1] is not None:
+            flavorStr = oldTroveSpec[2].freeze()
+            if flavorStr:
+                flavorStr = "= '%s'" % flavorStr
+            else:
+                flavorStr = "IS NULL"
+
+            cu.execute("""
+                INSERT INTO TroveTroves SELECT 
+                        TroveTroves.instanceId, ?, TroveTroves.byDefault, ?
+                    FROM DBInstances JOIN Versions ON 
+                        DBInstances.versionId = Versions.versionId
+                    JOIN DBFlavors ON
+                        DBInstances.flavorId = DBFlavors.flavorId
+                    JOIN TroveTroves ON
+                        DBInstances.instanceId = TroveTroves.includedId
+                    LEFT OUTER JOIN TroveTroves AS present ON
+                        present.instanceId = TroveTroves.instanceId AND
+                        present.includedId = ?
+                    WHERE
+                        present.instanceId is NULL AND
+                        troveName = ? AND
+                        version = ? AND
+                        flavor %s
+                """ % flavorStr, troveInstanceId, False, troveInstanceId,
+                     oldTroveSpec[0], oldTroveSpec[1].asString())
 
         addFile = cu.compile(self.troveFiles.addItemStmt)
 
@@ -799,7 +901,27 @@ class Database:
 
         return l2
 
+    def hasTroves(self, troveList):
+        instances = self._lookupTroves(troveList)
+        result = [ False ] * len(troveList)
+        for i, instanceId in enumerate(instances):
+            if instanceId is not None:
+                result[i] = True
+
+        return result
+
     def getTroves(self, troveList, pristine):
+        # returns a list parallel to troveList, with nonexistant troves
+        # filled in w/ None
+        instances = self._lookupTroves(troveList)
+        for i, instanceId in enumerate(instances):
+            if instanceId is not None:
+                instances[i] = self._getTrove(pristine, 
+                                              troveInstanceId = instanceId)
+
+        return instances
+
+    def _lookupTroves(self, troveList):
         # returns a list parallel to troveList, with nonexistant troves
         # filled in w/ None
         cu = self.db.cursor()
@@ -826,18 +948,19 @@ class Database:
                         INNER JOIN DBInstances ON
                             getTrovesTbl.troveName == DBInstances.troveName AND
                             getTrovesTbl.flavorId == DBInstances.flavorId AND
-                            DBInstances.versionId == Versions.versionId
+                            DBInstances.versionId == Versions.versionId AND
+                            DBInstances.isPresent == 1
                     """)
 
         r = [ None ] * len(troveList)
         for (idx, instanceId) in cu:
-            r[idx] = self._getTrove(pristine, troveInstanceId = instanceId)
+            r[idx] = instanceId
 
         cu.execute("DROP TABLE getTrovesTbl", start_transaction = False)
 
         return r
 
-    def getTrove(self, troveName, troveVersion, troveFlavor, pristine = False):
+    def getTrove(self, troveName, troveVersion, troveFlavor, pristine = True):
 	return self._getTrove(troveName = troveName, 
 			      troveVersion = troveVersion, 
 			      troveFlavor = troveFlavor,
@@ -882,14 +1005,20 @@ class Database:
 	# add all of the troves which are references from this trove; the
 	# flavor cache is already complete
 	cu = self.db.cursor()
+        if pristine:
+            pristineClause = "TroveTroves.inPristine = 1"
+        else:
+            pristineClause = "DBInstances.isPresent = 1"
+
 	cu.execute("""
 	    SELECT troveName, versionId, byDefault, timeStamps, 
                    DBFlavors.flavorId, flavor FROM 
 		TroveTroves INNER JOIN DBInstances INNER JOIN DBFlavors ON 
 		    TroveTroves.includedId = DBInstances.instanceId AND
 		    DBFlavors.flavorId = DBInstances.flavorId 
-		WHERE TroveTroves.instanceId = ?
-	""", troveInstanceId)
+		WHERE TroveTroves.instanceId = ? AND
+                      %s
+	""" % pristineClause, troveInstanceId)
 
 	versionCache = {}
 	for (name, versionId, byDefault, timeStamps, flavorId, flavorStr) in cu:
@@ -906,8 +1035,8 @@ class Database:
 
 	    trv.addTrove(name, version, flavor, byDefault = byDefault)
 
-	cu.execute("SELECT pathId, path, versionId, fileId, isPresent FROM "
-		   "DBTroveFiles WHERE instanceId = ?", troveInstanceId)
+        cu.execute("SELECT pathId, path, versionId, fileId, isPresent FROM "
+                   "DBTroveFiles WHERE instanceId = ?", troveInstanceId)
 	for (pathId, path, versionId, fileId, isPresent) in cu:
 	    if not pristine and not isPresent:
 		continue
@@ -924,6 +1053,13 @@ class Database:
 	return trv
 
     def eraseTrove(self, troveName, troveVersion, troveFlavor):
+        cu = self.db.cursor()
+
+        if not self.needsCleanup:
+            self.needsCleanup = True
+            cu.execute("CREATE TEMPORARY TABLE RemovedVersions "
+                       "(rmvdVer INTEGER PRIMARY KEY)")
+
 	troveVersionId = self.versionTable[troveVersion]
 	if troveFlavor is None:
 	    troveFlavorId = 0
@@ -932,13 +1068,30 @@ class Database:
 	troveInstanceId = self.instances[(troveName, troveVersionId, 
 					  troveFlavorId)]
 
+        cu.execute("INSERT OR IGNORE INTO RemovedVersions "
+                   "VALUES (?)", troveVersionId)
+        cu.execute("""
+                INSERT OR IGNORE INTO RemovedVersions 
+                    SELECT DISTINCT DBTroveFiles.versionId FROM DBTroveFiles
+                        WHERE 
+                            DBTroveFiles.instanceId = ?""")
+        cu.execute("""
+                INSERT OR IGNORE INTO RemovedVersions 
+                    SELECT DISTINCT DBInstances.versionId FROM
+                        TroveTroves JOIN DBInstances ON
+                            TroveTroves.instanceId = DBInstances.instanceId
+                        WHERE 
+                            TroveTroves.instanceId = ?""")
+
 	self.troveFiles.delInstance(troveInstanceId)
-	del self.troveTroves[troveInstanceId]
+        cu.execute("DELETE FROM TroveTroves WHERE instanceId=?",
+                   troveInstanceId)
+        cu.execute("DELETE FROM TroveTroves WHERE includedId=? AND inPristine=0",
+                   troveInstanceId)
         self.depTables.delete(self.db.cursor(), troveInstanceId)
 
 	# mark this trove as not present
 	self.instances.setPresent(troveInstanceId, 0)
-	self.needsCleanup = True
 
     def commit(self):
 	if self.needsCleanup:
@@ -954,11 +1107,21 @@ class Database:
 		DELETE FROM DBInstances WHERE instanceId IN 
 		    (SELECT DBInstances.instanceId FROM 
 			DBInstances LEFT OUTER JOIN TroveTroves 
-			ON DBInstances.instanceId = troveTroves.includedId 
-			WHERE isPresent = 0 AND troveTroves.includedId is NULL
+			ON DBInstances.instanceId = TroveTroves.includedId 
+			WHERE isPresent = 0 AND TroveTroves.includedId is NULL
 		    );
 		""")
-	    self.needCleanup = False
+            cu.execute("""DELETE FROM Versions WHERE Versions.versionId IN 
+                            (SELECT rmvdVer FROM RemovedVersions
+                                LEFT OUTER JOIN DBInstances ON
+                                    rmvdVer == DBInstances.versionId
+                                LEFT OUTER JOIN DBTroveFiles ON
+                                    rmvdVer == DBTroveFiles.versionId
+                                WHERE
+                                    DBInstances.versionId is NULL AND
+                                    DBTroveFiles.versionId is NULL)""")
+            cu.execute("DROP TABLE RemovedVersions")
+	    self.needsCleanup = False
 
 	self.db.commit()
 	self.addVersionCache = {}
@@ -1040,6 +1203,106 @@ class Database:
 	    else:
 		yield (pathId, path, fileId, version)
 
+    def mapLockedTroves(self, mapList):
+        if not mapList:
+            return
+
+        cu = self.db.cursor()
+        cu.execute("""CREATE TEMPORARY TABLE mlt(
+                            name STRING,
+                            lockedVersion STRING,
+                            lockedFlavor STRING,
+                            mappedVersion STRING,
+                            mappedTimestamps STRING,
+                            mappedFlavor STRING)""")
+        
+        for (name, lockedInfo, mapInfo) in mapList:
+            assert(sum(mapInfo[0].timeStamps()) > 0)
+            if not lockedInfo[1]:
+                lockedFlavor = None
+            else:
+                lockedFlavor = lockedInfo[1].freeze()
+
+            if not mapInfo[1]:
+                mapFlavor = None
+            else:
+                mapFlavor = mapInfo[1].freeze()
+
+            cu.execute("INSERT INTO mlt VALUES(?, ?, ?, ?, ?, ?)", 
+                       name, lockedInfo[0].asString(), lockedFlavor,
+                       mapInfo[0].asString(), 
+                        ":".join([ "%.3f" % x for x in 
+                                    mapInfo[0].timeStamps()]),
+                       mapFlavor)
+
+        # now add link collections to these troves
+        cu.execute("""INSERT INTO TroveTroves 
+                        SELECT TroveTroves.instanceId, lockedInst.instanceId,
+                               TroveTroves.byDefault, 0 FROM
+                            mlt JOIN DBFlavors AS lockFlv ON
+                                lockedFlavor == lockFlv.flavor OR
+                                lockedFlavor IS NULL and lockFlv.flavor IS NULL
+                            JOIN Versions AS lockVers ON
+                                lockedVersion == lockVers.version
+                            JOIN DBInstances as lockedInst ON
+                                lockedInst.troveName == mlt.name AND
+                                lockedInst.flavorId == lockFlv.flavorId AND
+                                lockedInst.versionId == lockVers.versionId
+                            JOIN DBFlavors AS mapFlv ON
+                                mappedFlavor == mapFlv.flavor OR
+                                mappedFlavor IS NULL and mapFlv.flavor IS NULL
+                            JOIN Versions AS mapVers ON
+                                mappedVersion == mapVers.version
+                            JOIN DBInstances as mapInst ON
+                                mapInst.troveName == mlt.name AND
+                                mapInst.flavorId == mapFlv.flavorId AND
+                                mapInst.versionId == mapVers.versionId
+                            JOIN TroveTroves ON
+                                TroveTroves.includedId == mapInst.instanceId
+                    """)
+
+        cu.execute("DROP TABLE mlt")
+
+    def findTroveContainers(self, l):
+        cu = self.db.cursor()
+        cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER, name STRING, "
+                                              "version STRING, "
+                                              "flavor STRING)", 
+                                              start_transaction = False)
+        for idx, info in enumerate(l):
+            cu.execute("INSERT INTO ftc VALUES(?, ?, ?, ?)", idx, info[0],
+                       info[1].asString(), info[2].freeze(), 
+                       start_transaction = False)
+
+        cu.execute("""SELECT idx, DBInstances.troveName, Versions.version,
+                             DBFlavors.flavor
+                        FROM ftc JOIN Versions AS IncVersion ON
+                            ftc.version = IncVersion.version
+                        JOIN DBFlavors AS IncFlavor ON
+                            ftc.flavor = IncFlavor.flavor OR
+                            (ftc.flavor = "" AND IncFlavor.flavor IS NULL)
+                        JOIN DBInstances AS IncInst ON
+                            ftc.name = IncInst.troveName AND
+                            IncVersion.versionId = IncInst.versionId AND
+                            IncFlavor.flavorId = IncInst.flavorId
+                        JOIN TroveTroves ON
+                            IncInst.instanceId = TroveTroves.includedId
+                        JOIN DBInstances ON
+                            TroveTroves.instanceId = DBInstances.instanceId
+                        JOIN DBFlavors ON
+                            DBInstances.flavorId = DBFlavors.flavorId
+                        JOIN Versions ON
+                            DBInstances.versionId = Versions.versionId
+                """)
+        result = [ [] for x in l ]
+        for (idx, name, version, flavor) in cu:
+            result[idx].append((name, versions.VersionFromString(version),
+                                deps.deps.ThawDependencySet(flavor)))
+
+        cu.execute("DROP TABLE ftc", start_transaction = False)
+
+        return result
+
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)
 
@@ -1055,6 +1318,6 @@ class OldDatabaseSchema(Exception):
         if msg:
             self.msg = msg
         else:
-            msg = "The Conary database on this system is too old. "    \
-                  "For information on how to\nconvert this database, " \
-                  "please visit http://wiki.rpath.com/ConaryConversion."
+            self.msg = "The Conary database on this system is too old. "    \
+                       "For information on how to\nconvert this database, " \
+                       "please visit http://wiki.rpath.com/ConaryConversion."

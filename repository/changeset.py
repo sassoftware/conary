@@ -63,94 +63,6 @@ class FileInfo(streams.StreamSet):
             self.newFileId.set(newFileId)
             self.csInfo.set(csInfo)
 
-class RollbackRecordNewTroves(dict, streams.InfoStream):
-
-    def freeze(self, skipSet = None):
-	l = []
-	for newInfo, oldInfo in self.iteritems():
-            if oldInfo[0] is None:
-                l.append('')
-            else:
-                l.append(oldInfo[0])
-                l.append(oldInfo[1].asString())
-                l.append(oldInfo[2].freeze())
-
-            l.append(newInfo[0])
-            l.append(newInfo[1].asString())
-            l.append(newInfo[2].freeze())
-	
-	return "\0".join(l)
-
-    def thaw(self, data):
-        l = data.split('\0')
-	i = 0
-	while i < len(l):
-            if l[i]:
-                oldInfo = (l[i], versions.VersionFromString(l[i + 1]),
-                           deps.ThawDependencySet(l[i + 2]))
-                i += 3
-            else:
-                oldInfo = (None, None, None)
-                i += 1
-
-            newInfo = (l[i], versions.VersionFromString(l[i + 1]),
-                       deps.ThawDependencySet(l[i + 2]))
-            i += 3
-            self[newInfo] = oldInfo
-
-    def __init__(self, data = None):
-	if data:
-	    self.thaw(data)
-
-class RollbackRecord(streams.LargeStreamSet):
-
-    streamDict = { 
-        _STREAM_CS_TROVES:    (RollbackRecordNewTroves,    "newTroves"      ),
-        _STREAM_CS_OLD_TROVES:(streams.ReferencedTroveList, "oldTroves"      ),
-    }
-    _streamDict = streams.StreamSetDef(streamDict)
-
-    """
-    Subsitutes for a changeset when full rollback information is
-    retrieved from a repository instead of being stored locally in
-    a changeset.
-    """
-
-    ROLLBACK_RECORD_MAGIC = "\xEA\x3F\x81\xBC"
-
-    def writeToFile(self, outFileName):
-        f = open(outFileName, 'w')
-        f.write(self.ROLLBACK_RECORD_MAGIC)
-        f.write(self.freeze())
-
-    def __init__(self, changeSet = None, fileName = None):
-        assert(not(changeSet and fileName))
-
-        if changeSet:
-            streams.LargeStreamSet.__init__(self)
-            for troveCs in changeSet.iterNewTroveList():
-                newInfo = (troveCs.getName(), troveCs.getNewVersion(),
-                           troveCs.getNewFlavor())
-
-                if troveCs.getOldVersion():
-                    oldInfo = (troveCs.getName(), troveCs.getOldVersion(),
-                               troveCs.getOldFlavor())
-
-                    self.newTroves[oldInfo] = newInfo
-                else:
-                    self.oldTroves.append(newInfo)
-
-            for (name, version, flavor) in changeSet.getOldTroveList():
-                self.newTroves[(name, version, flavor)] = (None, None, None)
-        else:
-            f = open(fileName, "r")
-            magic = f.read(len(self.ROLLBACK_RECORD_MAGIC))
-            if magic != self.ROLLBACK_RECORD_MAGIC:
-                raise filecontainer.BadContainer
-
-            data = f.read()
-            streams.LargeStreamSet.__init__(self, data)
-
 class ChangeSetNewTroveList(dict, streams.InfoStream):
 
     def freeze(self, skipSet = None):
@@ -391,12 +303,35 @@ class ChangeSet(streams.LargeStreamSet):
 	    os.unlink(outFileName)
 	    raise
 
+    def rollbackRecord(self):
+        rollback = ChangeSet()
+        for troveCs in self.iterNewTroveList():
+            if troveCs.getOldVersion():
+                newTrove = trove.Trove(troveCs.getName(), 
+                                       troveCs.getNewVersion(),
+                                       troveCs.getNewFlavor(), None)
+                oldTrove = trove.Trove(troveCs.getName(), 
+                                       troveCs.getOldVersion(),
+                                       troveCs.getOldFlavor(), None,
+                                       isRedirect = True)
+                rollback.newTrove(oldTrove.diff(newTrove)[0])
+            else:
+                rollback.oldTrove(troveCs.getName(), troveCs.getNewVersion(),
+                                  troveCs.getNewFlavor())
+
+        for (name, version, flavor) in self.getOldTroveList():
+            oldTrove = trove.Trove(name, version, flavor, None, 
+                                   isRedirect = True)
+            rollback.newTrove(oldTrove.diff(None)[0])
+
+        return rollback
+
     # if availableFiles is set, this includes the contents that it can
     # find, but doesn't worry about files which it can't find
     def makeRollback(self, db, configFiles = 0):
 	assert(not self.absolute)
 
-	rollback = ChangeSetFromRepository(db)
+        rollback = ChangeSet()
 
 	for troveCs in self.iterNewTroveList():
 	    if not troveCs.getOldVersion():
@@ -685,21 +620,6 @@ class ChangeSet(streams.LargeStreamSet):
 	self.fileContents = {}
 	self.absolute = False
 	self.local = 0
-
-class ChangeSetFromRepository(ChangeSet):
-
-    _streamDict = ChangeSet._streamDict
-
-    def newTrove(self, trv):
-	# add the time stamps to the trove version numbers
-	if trv.getOldVersion():
-	    assert(min(trv.getOldVersion().timeStamps()) > 0)
-	assert(min(trv.getNewVersion().timeStamps()) > 0)
-	ChangeSet.newTrove(self, trv)
-
-    def __init__(self, repos):
-	self.repos = repos
-	ChangeSet.__init__(self)
 
 class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 

@@ -592,6 +592,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             # no need to work hard to find this out
             return changeset.ReadOnlyChangeSet()
 
+        # make sure the absolute flag isn't set for any differential change
+        # sets
+        assert(not [ x for x in chgSetList if (x[1][0] and x[-1]) ])
+
         cs = None
         scheduledSet = {}
         internalCs = None
@@ -829,9 +833,13 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
         # convert the versions in here to ones w/ timestamps
         cs.setPrimaryTroveList([])
+        oldTroveSet = dict([ (x,x) for x in cs.getOldTroveList() ] )
         for (name, version, flavor) in primaryTroveList:
-            trove = cs.getNewTroveVersion(name, version, flavor)
-            cs.addPrimaryTrove(name, trove.getNewVersion(), flavor)
+            if cs.hasNewTrove(name, version, flavor):
+                trove = cs.getNewTroveVersion(name, version, flavor)
+                cs.addPrimaryTrove(name, trove.getNewVersion(), flavor)
+            else:
+                cs.addPrimaryTrove(*oldTroveSet[(name, version,flavor)])
 
         if target and cs:
             if cs.oldTroves or cs.newTroves:

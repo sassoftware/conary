@@ -3,6 +3,17 @@ Changes in 0.60.13:
     contents browser, accessible either from the main page (if you are
     logged into the web interface), or from the /browse url. Example:
         http://conary.example.com/conary/browse
+  * "Large" updates are split into multiple pieces which are downloaded
+     and installed independently of one another
+  * Trove updates are tracked through collections
+  * Group handling completely rewritten to function as a three way merge
+    instead of a set of heuristics
+  * Trove removal handles references troves which are referenced by multiple
+    collections
+  * Rollback format unified for local and nonlocal rollbacks
+  * Dependency ordering forces collections to be installed after all of their
+    referenced troves (allowing simple restarts)
+  * Database migration removes stale versions
 
 Changes in 0.60.12:
   * Previously, if you ran "conary update foo", and foo requires a new

@@ -29,17 +29,12 @@ def listRollbacks(db, cfg):
 	print "%s:" % rollbackName
 
 	rb = db.getRollback(rollbackName)
-	for cs in rb:
-            if isinstance(cs, changeset.RollbackRecord):
-                newList = [ (x[0][0], x[1][1], x[0][1])
-                                        for x in cs.newTroves.iteritems() ]
-                oldList = [ x[0:2] for x in cs.oldTroves ]
-            else:
-                newList = []
-                for pkg in cs.iterNewTroveList():
-                    newList.append((pkg.getName(), pkg.getOldVersion(),
-                                    pkg.getNewVersion()))
-                oldList = [ x[0:2] for x in cs.getOldTroveList() ]
+	for cs in rb.iterChangeSets():
+            newList = []
+            for pkg in cs.iterNewTroveList():
+                newList.append((pkg.getName(), pkg.getOldVersion(),
+                                pkg.getNewVersion()))
+            oldList = [ x[0:2] for x in cs.getOldTroveList() ]
 
 	    newList.sort()
 	    oldList.sort()

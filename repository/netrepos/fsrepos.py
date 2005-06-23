@@ -154,7 +154,7 @@ class FilesystemRepository(DataStoreRepository, AbstractRepository):
 
 	if newVersion == None then the trove is being removed
 	"""
-	cs = changeset.ChangeSetFromRepository(self)
+	cs = changeset.ChangeSet()
 
         externalTroveList = []
         externalFileList = []

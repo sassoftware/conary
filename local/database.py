@@ -22,6 +22,7 @@ from lib import log
 import localrep
 import os
 from repository import repository
+import shutil
 import sqldb
 import trove
 import update
@@ -32,13 +33,59 @@ from deps import deps
 
 OldDatabaseSchema = sqldb.OldDatabaseSchema
 
+class Rollback:
+
+    reposName = "%s/repos.%d"
+    localName = "%s/local.%d"
+
+    def addRollback(self, repos, local):
+        repos.writeToFile(self.reposName % (self.dir, self.count))
+        local.writeToFile(self.localName % (self.dir, self.count))
+        self.count += 1
+        open("%s/count" % self.dir, "w").write("%d\n" % self.count)
+
+    def _getChangeSets(self, item):
+        repos = changeset.ChangeSetFromFile(self.reposName % (self.dir, item))
+        local = changeset.ChangeSetFromFile(self.localName % (self.dir, item))
+        return (repos, local)
+
+    def getLast(self):
+        if not self.count:
+            return (None, None)
+        return self._getChangeSets(self.count - 1)
+
+    def removeLast(self):
+        os.unlink(self.reposName % (self.dir, self.count - 1))
+        os.unlink(self.localName % (self.dir, self.count - 1))
+        self.count -= 1
+        open("%s/count" % self.dir, "w").write("%d\n" % self.count)
+
+    def iterChangeSets(self):
+        for i in range(self.count):
+            csList = self._getChangeSets(i)
+            yield csList[0]
+            yield csList[1]
+
+    def __init__(self, dir, load = False):
+        self.dir = dir
+
+        if load:
+            self.stored = True
+            self.count = int(open("%s/count" % self.dir).readline()[:-1])
+        else:
+            self.stored = False
+            self.count = 0
+
 class SqlDbRepository(datastore.DataStoreRepository,
 		      repository.AbstractRepository):
 
     def iterAllTroveNames(self):
 	return self.db.iterAllTroveNames()
 
-    def getTrove(self, name, version, flavor, pristine = False):
+    def findTroveContainers(self, l):
+        return self.db.findTroveContainers(l)
+
+    def getTrove(self, name, version, flavor, pristine = True):
 	l = [ x for x in self.db.iterFindByName(name, pristine = pristine)
 		 if version == x.getVersion() and flavor == x.getFlavor()]
 	if not l:
@@ -46,7 +93,7 @@ class SqlDbRepository(datastore.DataStoreRepository,
 	assert(len(l) == 1)
 	return l[0]
 
-    def getTroves(self, troveList, pristine = False):
+    def getTroves(self, troveList, pristine = True):
         return self.db.getTroves(troveList, pristine)
 
     def getTroveLatestVersion(self, name, branch):
@@ -82,11 +129,11 @@ class SqlDbRepository(datastore.DataStoreRepository,
     def hasTroveByName(self, name):
 	return self.db.hasByName(name)
 
-    def hasPackage(self, name):
-        import warnings
-        warnings.warn("hasPackage is deprecated, use hasTroveByName",
-                      DeprecationWarning)
-        return self.db.hasByName(name)
+    def hasTroves(self, troves):
+        return self.db.hasTroves(troves)
+
+    def trovesByName(self, names):
+        return self.db.trovesByName(names)
 
     def hasTrove(self, troveName, version, flavor):
         cu = self.db.db.cursor()
@@ -170,8 +217,8 @@ class SqlDbRepository(datastore.DataStoreRepository,
     def addFileVersion(self, troveId, pathId, fileObj, path, fileId, version):
 	self.db.addFile(troveId, pathId, fileObj, path, fileId, version)
 
-    def addTrove(self, trove):
-	return self.db.addTrove(trove)
+    def addTrove(self, oldTroveSpec, trove):
+	return self.db.addTrove(oldTroveSpec, trove)
 
     def addTroveDone(self, troveInfo):
 	pass
@@ -293,12 +340,12 @@ class Database(SqlDbRepository):
     # local changes includes the A->A.local portion of a rollback; if it
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
-    def commitChangeSet(self, cs, isRollback = False, toStash = True,
+    def commitChangeSet(self, cs, lockMap,
+                        isRollback = False, toStash = True,
                         replaceFiles = False, tagScript = None,
-			keepExisting = False, test = False,
-                        justDatabase = False, journal = None,
-                        localRollbacks = False, 
-                        callback = UpdateCallback()):
+			test = False, justDatabase = False, journal = None,
+                        localRollbacks = False, callback = UpdateCallback(),
+                        rollback = None):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -320,40 +367,39 @@ class Database(SqlDbRepository):
 	    flavor = newTrove.getOldFlavor()
 	    if self.hasTroveByName(name) and old:
 		ver = old.createBranch(versions.LocalLabel(), withVerRel = 1)
-		trove = self.getTrove(name, old, flavor)
-		origTrove = self.getTrove(name, old, flavor, pristine = 1)
+		trove = self.getTrove(name, old, flavor, pristine = False)
+		origTrove = self.getTrove(name, old, flavor, pristine = True)
 		assert(trove)
 		troveList.append((trove, origTrove, ver, 
                                   flags & update.MISSINGFILESOKAY))
 
-	if not keepExisting:
-	    for (name, version, flavor) in cs.getOldTroveList():
-		localVersion = version.createBranch(versions.LocalLabel(), 
-					            withVerRel = 1)
-	        trove = self.getTrove(name, version, flavor)
-		origTrove = self.getTrove(name, version, flavor, pristine = 1)
-		assert(trove)
-		troveList.append((trove, origTrove, localVersion, 
-                                  update.MISSINGFILESOKAY))
+        for (name, version, flavor) in cs.getOldTroveList():
+            localVersion = version.createBranch(versions.LocalLabel(), 
+                                                withVerRel = 1)
+            trove = self.getTrove(name, version, flavor, pristine = False)
+            origTrove = self.getTrove(name, version, flavor, 
+                                      pristine = True)
+            assert(trove)
+            troveList.append((trove, origTrove, localVersion, 
+                              update.MISSINGFILESOKAY))
 
         callback.creatingRollback()
 
 	result = update.buildLocalChanges(self, troveList, root = self.root)
 	if not result: return
 
-	(localChanges, retList) = result
+	localRollback, retList = result
+
 	fsTroveDict = {}
 	for (changed, fsTrove) in retList:
 	    fsTroveDict[(fsTrove.getName(), fsTrove.getVersion())] = fsTrove
 
 	if not isRollback:
             if localRollbacks:
-                inverse = cs.makeRollback(self, configFiles = 1)
+                reposRollback = cs.makeRollback(self, configFiles = 1)
             else:
-                inverse = changeset.RollbackRecord(changeSet = cs)
+                reposRollback = cs.rollbackRecord()
             flags |= update.MERGE
-	if keepExisting:
-	    flags |= update.KEEPEXISTING
 
 	fsJob = update.FilesystemJob(self, cs, fsTroveDict, self.root, 
 				     flags = flags, callback = callback)
@@ -399,9 +445,8 @@ class Database(SqlDbRepository):
 	# which is a bit unfortunate since this rollback isn't actually
 	# valid until a bit later
 	if not isRollback and not test:
-	    self.addRollback(inverse, localChanges)
-	    del inverse
-	    del localChanges
+            rollback.addRollback(reposRollback, localRollback)
+	    del rollback
 
         if not justDatabase:
             # run preremove scripts before updating the database, otherwise
@@ -416,8 +461,8 @@ class Database(SqlDbRepository):
             # this updates the database from the changeset; the change
             # isn't committed until the self.commit below
             # an object for historical reasons
-            localrep.LocalRepositoryChangeSetJob(self, cs, keepExisting,
-						 callback)
+            localrep.LocalRepositoryChangeSetJob(self, cs, callback)
+            self.db.mapLockedTroves(lockMap)
 
         errList = fsJob.getErrorList()
         if errList:
@@ -482,21 +527,19 @@ class Database(SqlDbRepository):
 
 	self.db.commit()
 
-    def addRollback(self, reposChangeset, localChangeset):
-	rpFn = self.rollbackCache + ("/rb.r.%d" % (self.lastRollback + 1))
-	reposChangeset.writeToFile(rpFn)
-
-	localFn = self.rollbackCache + ("/rb.l.%d" % (self.lastRollback + 1))
-	localChangeset.writeToFile(localFn)
-
+    def createRollback(self):
+	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))
+        if os.path.exists(rbDir):
+            shutil.rmtree(rbDir)
+        os.mkdir(rbDir)
 	self.lastRollback += 1
 	self.writeRollbackStatus()
+        return Rollback(rbDir)
 
     # name looks like "r.%d"
     def removeRollback(self, name):
 	rollback = int(name[2:])
-	os.unlink(self.rollbackCache + "/rb.r.%d" % rollback)
-	os.unlink(self.rollbackCache + "/rb.l.%d" % rollback)
+	shutil.rmtree(self.rollbackCache + "/%d" % rollback)
 	if rollback == self.lastRollback:
 	    self.lastRollback -= 1
 	    self.writeRollbackStatus()
@@ -539,16 +582,8 @@ class Database(SqlDbRepository):
 	if not self.hasRollback(name): return None
 
 	num = int(name[2:])
-
-	rc = []
-	for ch in [ "r", "l" ]:
-	    name = self.rollbackCache + "/" + "rb.%c.%d" % (ch, num)
-            try:
-                rc.append(changeset.ChangeSetFromFile(name))
-            except filecontainer.BadContainer:
-                rc.append(changeset.RollbackRecord(fileName = name))
-
-	return rc
+        dir = self.rollbackCache + "/" + "%d" % num
+        return Rollback(dir, load = True)
 
     def applyRollbackList(self, repos, names, replaceFiles=False):
 	last = self.lastRollback
@@ -562,24 +597,39 @@ class Database(SqlDbRepository):
 	    last -= 1
 
 	for name in names:
-	    (reposCs, localCs) = self.getRollback(name)
-            if isinstance(reposCs, changeset.RollbackRecord):
-                jobList = [ (x[0][0], (x[1][1], x[1][2]),
-                                      (x[0][1], x[0][2]), False)
-                                for x in reposCs.newTroves.iteritems() ]
-                jobList += [ (x[0], (x[1], x[2]), (None, None), False)
-                                for x in reposCs.oldTroves ]
-                reposCs = repos.createChangeSet(jobList, recurse = False)
+	    rb = self.getRollback(name)
 
-            try:
-                self.commitChangeSet(reposCs, isRollback = True,
-                                     replaceFiles = replaceFiles)
-                self.commitChangeSet(localCs, isRollback = True,
-                                     toStash = False,
-                                     replaceFiles = replaceFiles)
-                self.removeRollback(name)
-            except CommitError:
-                raise RollbackError(name)
+            (reposCs, localCs) = rb.getLast() 
+            while reposCs:
+                # redirects in rollbacks mean we need to go get the real
+                # changeset from a repository
+                jobList = []
+                for trvCs in reposCs.iterNewTroveList():
+                    if not trvCs.isRedirect(): continue
+                    jobList.append((trvCs.getName(),
+                                (trvCs.getOldVersion(), trvCs.getOldFlavor()),
+                                (trvCs.getNewVersion(), trvCs.getNewFlavor()),
+                                False))
+
+                newCs = repos.createChangeSet(jobList, recurse = False)
+                # this overwrites old with new
+                reposCs.merge(newCs)
+
+                try:
+                    self.commitChangeSet(reposCs, set(),
+                                         isRollback = True,
+                                         replaceFiles = replaceFiles)
+                    self.commitChangeSet(localCs, set(),
+                                         isRollback = True,
+                                         toStash = False,
+                                         replaceFiles = replaceFiles)
+                    rb.removeLast()
+                except CommitError:
+                    raise RollbackError(name)
+
+                (reposCs, localCs) = rb.getLast()
+
+            self.removeRollback(name)
     
     def findTrove(self, labelPath, troveName, reqFlavor=None, 
                                               versionStr = None):

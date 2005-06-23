@@ -38,6 +38,8 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
     hasVersions = False
     hasFlavors = False
 
+    emptyList = (not troveList)
+
     if troveList:
         (troves, hasVersions, hasFlavors) = \
                     display.parseTroveStrings(troveList)

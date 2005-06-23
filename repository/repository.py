@@ -345,7 +345,7 @@ class ChangeSetJob:
 
     storeOnlyConfigFiles = False
 
-    def addTrove(self, trove):
+    def addTrove(self, oldTroveSpec, trove):
 	return self.repos.addTrove(trove)
 
     def addTroveDone(self, troveId):
@@ -403,8 +403,8 @@ class ChangeSetJob:
 		callback.creatingDatabaseTransaction(i + 1, len(newList))
 
 	    newVersion = csTrove.getNewVersion()
-	    old = csTrove.getOldVersion()
-	    oldTroveVersion = old
+	    oldTroveVersion = csTrove.getOldVersion()
+            oldTroveFlavor = csTrove.getOldFlavor()
 	    troveName = csTrove.getName()
 	    troveFlavor = csTrove.getNewFlavor()
 
@@ -413,9 +413,10 @@ class ChangeSetJob:
 		       "version %s of %s is already installed" % \
 			(newVersion.asString(), csTrove.getName())
 
-	    if old:
-		newTrove = repos.getTrove(troveName, old, csTrove.getOldFlavor(),
-					pristine = True)
+	    if oldTroveVersion:
+		newTrove = repos.getTrove(troveName, oldTroveVersion, 
+                                          csTrove.getOldFlavor(), 
+                                          pristine = True)
 		newTrove.changeVersion(newVersion)
 	    else:
 		newTrove = trove.Trove(csTrove.getName(), newVersion,
@@ -423,7 +424,8 @@ class ChangeSetJob:
 
 	    newFileMap = newTrove.applyChangeSet(csTrove)
 
-	    troveInfo = self.addTrove(newTrove)
+	    troveInfo = self.addTrove(
+                    (troveName, oldTroveVersion, oldTroveFlavor), newTrove)
 
 	    for (pathId, path, fileId, newVersion) in newTrove.iterFileList():
 		tuple = newFileMap.get(pathId, None)

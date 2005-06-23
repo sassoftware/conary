@@ -20,6 +20,7 @@ from callbacks import UpdateCallback
 import conarycfg
 import deps
 import versions
+import trove
 import metadata
 from deps import deps
 from lib import util
@@ -49,6 +50,24 @@ class VersionSuppliedError(UpdateError):
 class NoNewTrovesError(UpdateError):
     def __str__(self):
         return "no new troves were found"
+
+class UpdateJob:
+
+    def addChangeSet(self, cs):
+        self.csList.append(cs)
+
+    def getChangeSets(self):
+        return self.csList
+
+    def addLockMapping(self, name, lockedVersion, neededVersion):
+        self.lockMapping.add((name, lockedVersion, neededVersion))
+    
+    def getLockMaps(self):
+        return self.lockMapping
+
+    def __init__(self):
+        self.csList = []
+        self.lockMapping = set()
 
 class UpdateChangeSet(changeset.ReadOnlyChangeSet):
 
@@ -115,16 +134,29 @@ class ConaryClient:
 
 	cs.rootChangeSet(self.db, outdated)
 
-    def _resolveDependencies(self, cs, keepExisting = None, depsRecurse = True):
+    def _resolveDependencies(self, cs, uJob, keepExisting = None, 
+                             depsRecurse = True, split = False,
+                             resolve = True):
         pathIdx = 0
         foundSuggestions = False
-        (depList, cannotResolve) = self.db.depCheck(cs)[0:2]
+        (depList, cannotResolve, changeSetList) = \
+                        self.db.depCheck(cs, findOrdering = split)
         suggMap = {}
+        lastCheck = []
+
+        if not resolve:
+            depList = []
+            cannotResolve = []
 
         while depList:
-            sugg = self.repos.resolveDependencies(
-                            self.cfg.installLabelPath[pathIdx], 
-                            [ x[1] for x in depList ])
+            nextCheck = [ x[1] for x in depList ]
+            if nextCheck == lastCheck:
+                sugg = {}
+            else:
+                sugg = self.repos.resolveDependencies(
+                                self.cfg.installLabelPath[pathIdx], 
+                                nextCheck)
+                lastCheck = nextCheck
 
             troves = {}
             if sugg:
@@ -187,11 +219,12 @@ class ConaryClient:
                 troves = troves.keys()
                 # if we've found good suggestions, merge in those troves
                 if troves:
-                    newCs = self._updateChangeSet(troves, 
-                                                  keepExisting = keepExisting)
+                    newCs = self._updateChangeSet(troves, uJob,
+                                          keepExisting = keepExisting)[0]
                     cs.merge(newCs)
 
-                    (depList, cannotResolve) = self.db.depCheck(cs)[0:2]
+                    (depList, cannotResolve, changeSetList) = \
+                                    self.db.depCheck(cs, findOrdering = split)
 
             if troves and depsRecurse:
                 pathIdx = 0
@@ -202,24 +235,27 @@ class ConaryClient:
                     foundSuggestions = True
                 if pathIdx == len(self.cfg.installLabelPath):
                     if not foundSuggestions or not depsRecurse:
-                        return (cs, depList, suggMap, cannotResolve)
+                        return (cs, depList, suggMap, cannotResolve,
+                                changeSetList)
                     pathIdx = 0
                     foundSuggestions = False
 
-        return (cs, depList, suggMap, cannotResolve)
+        return (cs, depList, suggMap, cannotResolve, changeSetList)
 
-    def _processRedirects(self, cs):
+    def _processRedirects(self, cs, recurse):
         # Looks for redirects in the change set, and returns a list of
-        # troves which need to be included in the update. Troves we
-        # redirect to don't show up as primary troves (ever), which keeps
-        # _mergeGroupChanges() from interacting with troves which are the
-        # targets of redirections.
+        # troves which need to be included in the update. 
         troveSet = {}
         delDict = {}
+        redirectHack = {}
+        primaries = dict.fromkeys(cs.getPrimaryTroveList())
 
         for troveCs in cs.iterNewTroveList():
             if not troveCs.getIsRedirect():
                 continue
+
+            if not recurse:
+                raise UpdateError,  "Redirect found with --no-recurse set"
 
             item = (troveCs.getName(), troveCs.getNewVersion(),
                     troveCs.getNewFlavor())
@@ -236,149 +272,399 @@ class ConaryClient:
 
                 if self.db.hasTrove(*oldItem):
                     cs.oldTrove(*oldItem)
+                    # make all removals due to redirects be primary
+                    cs.addPrimaryTrove(*oldItem)
                 else:
                     # erase the target(s) of the redirection
                     for (name, changeList) in troveCs.iterChangedTroves():
                         for (changeType, version, flavor, byDef) in changeList:
                             delDict[(name, version, flavor)] = True
 
-            # look for troves being added by this redirect
+            targets = []
             for (name, changeList) in troveCs.iterChangedTroves():
                 for (changeType, version, flavor, byDef) in changeList:
-                    if changeType == '+': 
-                        troveSet[(name, version, flavor)] = True
+                    if changeType == '-': continue
+                    if (":" not in name and ":" not in item[0]) or \
+                       (":"     in name and ":"     in item[0]):
+                        l = redirectHack.setdefault((name, version, flavor), [])
+                        l.append(item)
+                        targets.append((name, version, flavor))
+
+            if item in primaries:
+                for target in targets:
+                    cs.addPrimaryTrove(*target)
 
         for item in delDict.iterkeys():
             if cs.hasNewTrove(*item):
                 cs.delNewTrove(*item)
 
-        # Troves in troveSet which are still in this changeset are ones
-        # we really do need to install. We don't know what versions they
-        # should be relative though; this removes them and depends on the
-        # caller to add them again, relative to the right things
-        addList = []
-        for item in troveSet.keys():
-            if not cs.hasNewTrove(*item): continue
-            cs.delNewTrove(*item)
-            addList.append(item)
+        for l in redirectHack.itervalues():
+	    outdated, eraseList = self.db.outdatedTroves(l)
+            del l[:]
+            for (name, newVersion, newFlavor), \
+                  (oldName, oldVersion, oldFlavor) in outdated.iteritems():
+                if oldVersion is not None:
+                    l.append((oldName, oldVersion, oldFlavor))
 
-        outdated, eraseList = self.db.outdatedTroves(addList)
-        csList = []
-        for (name, newVersion, newFlavor), \
-              (oldName, oldVersion, oldFlavor) in outdated.iteritems():
-            csList.append((name, (oldVersion, oldFlavor),
-                                 (newVersion, newFlavor), False))
-            # don't let things be listed as old for two different reasons
-            if cs.hasOldTrove(name, oldVersion, oldFlavor):
-                cs.delOldTrove(name, oldVersion, oldFlavor)
+        return redirectHack
 
-        return csList
+    def _mergeGroupChanges(self, cs, uJob, redirectHack, keepExisting, recurse):
 
-    def _mergeGroupChanges(self, cs, keepExisting):
+        def _newBase(newTrv):
+            """
+            This creates three different troves. Read carefully or it's
+            really confusing:
+
+                1. The local idea of what version of this trove is
+                   already installed.
+                2. A pristine version of the old local version. The diff
+                   between pristine and local modifies the changeset
+                   to the new version. This lets us prevent some troves
+                   from being installed.
+                3. The old version of the local trove. The diff between
+                   this and local is used to create the job. This allows
+                   us to update other troves currently installed on the
+                   system.
+            """
+
+            localTrv = newTrv.copy()
+            pristineTrv = newTrv.copy()
+            oldTrv = trove.Trove(localTrv.getName(), localTrv.getVersion(),
+                                 localTrv.getFlavor(), None)
+                                        
+            delList = []
+            for info in localTrv.iterTroveList():
+                # off by default
+                if not localTrv.includeTroveByDefault(*info):
+                    delList.append(info)
+                    continue
+
+                # in excludeTroves
+                for reStr, regExp in self.cfg.excludeTroves:
+                    match = False
+                    if regExp.match(info[0]):
+                        delList.append(info)
+                        match = True
+                        break
+
+                    if match: continue
+
+                # if this is the target of a redirection, make sure we have
+                # the source of that redirection installed
+                if redirectHack.has_key(info):
+                    l = redirectHack[info]
+                    present = self.db.hasTroves(l)
+                    if sum(present) == 0:
+                        # sum of booleans -- tee-hee
+                        delList.append(info)
+                        break
+
+            for info in delList:
+                localTrv.delTrove(*(info + (False,)))
+
+            # now look for other versions of these troves (which are the
+            # versions we'd like to replace; keep-existing is handled
+            # elsewhere)
+            outdated, toErase = self.db.outdatedTroves([ x for x in 
+                                                localTrv.iterTroveList() ])
+
+            for info in localTrv.iterTroveList():
+                # we don't worry about duplicates here; _alreadyInstalled
+                # will handle that for us a bit later
+                (odName, odVersion, odFlavor) = outdated.get(info, 
+                                                         (None, None, None))
+                if odVersion is None: continue
+                assert(odName == info[0])
+                oldTrv.addTrove(odName, odVersion, odFlavor)
+
+            return (oldTrv, pristineTrv, localTrv)
+
+        def _alreadyInstalled(trv):
+            troveInfo = [ x for x in newTrv.iterTroveList() ]
+            present = self.db.hasTroves(troveInfo)
+            r = [ info for info,present in itertools.izip(troveInfo, present)
+                     if present ]
+
+            return dict.fromkeys(r)
+
+        def _lockedList(neededList):
+            l = [ (x[0], x[1], x[3]) for x in neededList if x[1] is not None ]
+            l.reverse()
+            lockList = self.db.trovesAreLocked(l)
+            r = []
+            for item in neededList:
+                if item[1] is not None:
+                    r.append(lockList.pop())
+                else:
+                    r.append(False)
+
+            return r
+
+	def _findErasures(cs, primaryErases, recurse):
+	    nodeList = []
+	    nodeIdx = {}
+	    ERASE = 1
+	    KEEP = 2
+	    UNKNOWN = 3
+
+            for trvCs in cs.iterNewTroveList():
+                if trvCs.getOldVersion() is None: continue
+                info = (trvCs.getName(), trvCs.getOldVersion(),
+                        trvCs.getOldFlavor())
+                nodeIdx[info] = len(nodeList)
+                nodeList.append([ info, ERASE, [], True ])
+
+	    # this will traceback for primaries which aren't installed, and
+	    # (rightfully) ignores locking for priamry troves
+	    trvs = self.db.getTroves(primaryErases, pristine = False)
+	    troveList = [ (info, trv, None) for info, trv in 
+				itertools.izip(primaryErases, trvs) ]
+	    while troveList:
+		info, trv, fromTrove = troveList.pop()
+
+		if info not in nodeIdx:
+		    nodeId = len(nodeList)
+		    nodeIdx[info] = nodeId
+		    nodeList.append([info, UNKNOWN, [], False])
+
+		if fromTrove is None:
+		    nodeList[nodeId][1] = ERASE
+		else:
+		    nodeList[fromTrove][2].append(nodeId)
+		
+		if not trv or not recurse:
+		    continue
+
+		refTroveInfo = [ x for x in trv.iterTroveList() ]
+		present = self.db.hasTroves(refTroveInfo)
+		locked = self.db.trovesAreLocked(refTroveInfo)
+		areContainers = [ not(x[0].startswith('fileset-') or 
+				    x[0].find(":") != -1)
+				    for x in refTroveInfo ]
+
+		contList = []
+		for (info, isPresent, isLocked, isContainer) in \
+			itertools.izip(refTroveInfo, present, locked, 
+				       areContainers):
+		    if not isPresent or isLocked: continue
+		    if not isContainer:
+			troveList.append((info, None, nodeId))
+		    else:   
+			contList.append(info)
+
+		trvs = self.db.getTroves(contList, pristine = False)
+		troveList += [ (info, trv, nodeId) for info, trv in
+				    itertools.izip(contList, trvs) ]
+
+	    needParents = [ (nodeId, info) for nodeId, (info, state, edges,
+                                                        alreadyHandled)
+				in enumerate(nodeList) if state == UNKNOWN ]
+            keepNodes = []
+	    while needParents:
+		containers = self.db.findTroveContainers([ x[1] for x
+							    in needParents ])
+                newNeedParents = []
+		for (nodeId, nodeInfo), containerList in \
+				itertools.izip(needParents, containers):
+		    for containerInfo in containerList:
+			if containerInfo in nodeIdx:
+                            containerId = nodeIdx[containerInfo]
+			    nodeList[containerId][2].append(nodeId)
+			else:
+			    containerId = len(nodeList)
+			    nodeIdx[containerInfo] = containerId
+			    nodeList.append([ containerInfo, KEEP, [ nodeId ],
+                                              False])
+			    newNeedParents.append((containerId, containerInfo))
+                            keepNodes.append(containerId)
+                needParents = newNeedParents
+		    
+	    seen = [ False ] * len(nodeList)
+            # DFS to mark troves as KEEP
+            while keepNodes:
+                nodeId = keepNodes.pop()
+                if seen[nodeId]: continue
+                seen[nodeId] = True
+                nodeList[nodeId][1] = KEEP
+                keepNodes += nodeList[nodeId][2] 
+                
+            # anything which isn't to KEEP is to erase, but skip those which
+            # are already being removed by a trvCs
+            eraseList = [ (x[0][0], (x[0][1], x[0][2]), (None, None), False)
+                                for x in nodeList if x[1] != KEEP and
+                                                     not x[3] ]
+            
+            return eraseList
+
         # Updates a change set by removing troves which don't need
-        # to be updated do to local state. It also removes troves which
-        # don't need to be installed because they're new, but aren't to
-        # be installed by default.
+        # to be updated due to local state. It also removes new troves which
+        # don't need to be installed because their byDefault is False
         assert(not cs.isAbsolute())
 
         primaries = cs.getPrimaryTroveList()
-        inclusions = {}
-        outdated = {}
-        addList = []
+        keepList = []
+        origJob = []
 
-        # find the troves which include other troves; they give useful
-        # hints as to which ones should be excluded due to byDefault
-        # flags
-        for troveCs in cs.iterNewTroveList():
-            for (name, changeList) in troveCs.iterChangedTroves():
-                for (changeType, version, flavor, byDef) in changeList:
-                    if changeType == '+':
-                        if byDef:
-                            inclusions[(name, version, flavor)] = True
-                        else:
-                            inclusions.setdefault((name, version, flavor), 
-                                                  False)
+        # XXX it's crazy that we have to use the name of the trove to
+        # figure out if it's a collection or not, but these changesets
+        # are sans files (for performance), so that's what we're left
+        # with
 
-        for troveCs in [ x for x in cs.iterNewTroveList() ]:
-            item = (troveCs.getName(), troveCs.getNewVersion(),
-                    troveCs.getNewFlavor())
+        for trvCs in cs.iterNewTroveList():
+            if trvCs.getOldVersion():
+                origJob.append((trvCs.getName(), 
+                                (trvCs.getOldVersion(), trvCs.getOldFlavor()),
+                                (trvCs.getNewVersion(), trvCs.getNewFlavor()),
+                                False))
+            else:
+                origJob.append((trvCs.getName(), (None, None),
+                                (trvCs.getNewVersion(), trvCs.getNewFlavor()),
+                                False))
+
+            item = (trvCs.getName(), trvCs.getNewVersion(),
+                    trvCs.getNewFlavor())
+
             if item in primaries:
-                continue 
+                keepList.append(origJob[-1])
 
-            oldItem = (troveCs.getName(), troveCs.getOldVersion(), 
-                       troveCs.getOldFlavor())
-            if self.db.hasTrove(*item):
-                # this trove is already installed. don't install it again
-                cs.delNewTrove(*item)
-            elif not oldItem[1]:
-                # it's a new trove
-                if not inclusions.get(item, True):
-                    # it was included by something else, but not by default
-                    cs.delNewTrove(*item)
-                else:
-                    # check the exclude list
-                    skipped = False
-                    for reStr, regExp in self.cfg.excludeTroves:
-                        if regExp.match(item[0]):
-                            cs.delNewTrove(*item)
-                            skipped = True
-                            break
+        newJobList = []
 
-                    if not skipped and self.db.hasTroveByName(oldItem[0]) \
-                                   and not keepExisting \
-                                   and not outdated.has_key(oldItem):
-                        # we have a different version of the trove already
-                        # installed. we need to change this to be relative to
-                        # the version already installed which is on the same
-			# branch (unless that version # is being removed by 
-			# something else in the change # set) 
-			versionList = self.db.getTroveVersionList(oldItem[0])
-			for version in versionList:
-			    if version.branch() == item[1].branch():
-				cs.delNewTrove(*item)
-				addList.append(item)
-				break
-            elif not self.db.hasTrove(*oldItem):
-                # the old version isn't present, so we don't want this
-                # one either
-                cs.delNewTrove(*item)
+        while keepList:
+            job = keepList.pop()
+            newJobList.append(job)
+            (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), abs) \
+                                = job
 
-        # remove troves from the old package list which aren't currently
-        # installed. also remove ones which are supposed to have been
-	# installed by this change set
-	delList = []
-        for item in cs.getOldTroveList():
-            if not self.db.hasTrove(*item) or inclusions.has_key(item):
-		delList.append(item)
-
-	for item in delList:
-	    cs.delOldTrove(*item)
-
-        removeSet = dict.fromkeys(
-            [ (x.getName(), x.getOldVersion(), x.getOldFlavor() )
-                            for x in cs.iterNewTroveList() ])
-
-        outdated, eraseList = self.db.outdatedTroves(addList)
-        csList = []
-        for (name, newVersion, newFlavor), \
-              (oldName, oldVersion, oldFlavor) in outdated.iteritems():
-            # don't let multiple items remove the same old item
-            if removeSet.has_key((name, oldVersion, oldFlavor)):
-                csList.append((name, (None, None),
-                                     (newVersion, newFlavor), False))
+            if not recurse:
                 continue
 
-            if cs.hasOldTrove(name, oldVersion, oldFlavor):
+            if trvName.startswith('fileset-') or trvName.find(":") != -1:
+                continue
+
+            # collections should be in the changeset already. after all, it's
+            # supposed to be recursive
+            trvCs = cs.getNewTroveVersion(trvName, newVersion, newFlavor)
+
+            if oldVersion is None:
+                # Read the comments at the top of _newBase if you hope
+                # to understand any of this.
+                newPristine = trove.Trove(trvName, newVersion, newFlavor, None)
+                newPristine.applyChangeSet(trvCs)
+                (oldTrv, pristineTrv, localTrv) = _newBase(newPristine)
+                newTrv = pristineTrv.copy()
+                newTrv.mergeCollections(localTrv, newPristine)
+                finalCs, fileList, neededTroveList = newTrv.diff(oldTrv)
+            else:
+                oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
+                                       pristine = True)
+                localTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
+                                            pristine = False)
+                assert(not oldTrv.hasFiles())
+                assert(not localTrv.hasFiles())
+
+                newPristine = oldTrv.copy()
+                newPristine.applyChangeSet(trvCs)
+                newTrv = oldTrv.copy()
+
+                newTrv.mergeCollections(localTrv, newPristine)
+                finalCs, fileList, neededTroveList = newTrv.diff(localTrv)
+                del oldTrv
+                assert(not fileList)
+                alreadyInstalled = []
+
+            alreadyInstalled = _alreadyInstalled(newTrv)
+            locked = _lockedList(neededTroveList)
+            for (name, oldVersion, newVersion, oldFlavor, newFlavor), \
+                    oldIsLocked in itertools.izip(neededTroveList, locked):
+                if (name, newVersion, newFlavor) not in alreadyInstalled:
+                    if oldIsLocked:
+                        if newVersion is not None:
+                            uJob.addLockMapping(name, 
+                                                (oldVersion, oldFlavor),
+                                                (newVersion, newFlavor))
+                    else:
+                        keepList.append((name, (oldVersion, oldFlavor),
+                                               (newVersion, newFlavor), False))
+
+        erasePrimaryList = []
+        for (name, version, flavor) in cs.getOldTroveList():
+            origJob.append((name, (version, flavor), (None, None), False))
+
+            if (name, version, flavor) in primaries:
+		erasePrimaryList.append((name, version, flavor))
+
+	newJobList +=_findErasures(cs, erasePrimaryList, recurse)
+
+        origJob = set(origJob)
+        newJob = set(newJobList)
+
+        obsoleteJob = origJob - newJob
+        removedTroves = {}
+        for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) \
+                                                in obsoleteJob:
+            if newVersion:
+                if not oldVersion:
+                    # we may need to put this back later (and going over the
+                    # network for something we already have is 1. dumb and
+                    # 2. inappropriate for changeset files being installed)
+                    removedTroves[(name, newVersion, newFlavor)] = \
+                        cs.getNewTroveVersion(name, newVersion, newFlavor)
+                cs.delNewTrove(name, newVersion, newFlavor)
+            else:
                 cs.delOldTrove(name, oldVersion, oldFlavor)
 
-            removeSet[(name, oldVersion, oldFlavor)] = True
-            csList.append((name, (oldVersion, oldFlavor),
-                                 (newVersion, newFlavor), False))
+        neededJob = newJob - origJob
 
-        return csList
+        if keepExisting:
+            # convert everything relative to new installs
+            jobList = []
+            for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), 
+                 absolute) in neededJob:
+                if (name, newVersion, newFlavor) in removedTroves:
+                    cs.newTrove(removedTroves[(name, newVersion, newFlavor)])
+                else:
+                    jobList.append((name, (None, None),
+                                          (newVersion, newFlavor), absolute))
+
+            for trvCs in cs.iterNewTroveList():
+                if trvCs.getOldVersion() is not None:
+                    jobList.append((name, (None, None),
+                                          (trvCs.getNewVersion(), 
+                                           trvCs.getNewFlavor()), absolute))
+                    cs.delNewTrove(name, trvCs.getNewVersion(),
+                                   trvCs.getNewFlavor())
+
+            neededJob = jobList
+        else:
+            # Make sure a single trove doesn't get removed multiple times.
+            # This can happen if (for example) a single trove is updated
+            # to two new versions of that trove simultaneously. This assumes
+            # that the cs passed in to us doesn't have this problem; we only
+            # check neededJob for it
+            removed = {}
+            for trvCs in cs.iterNewTroveList():
+                if trvCs.getOldVersion() is not None:
+                    removed[(trvCs.getName(), trvCs.getOldVersion(),
+                             trvCs.getOldFlavor())] = None
+
+            jobList = []
+            for job in neededJob:
+                if job[1][0] is None:
+                    jobList.append(job)
+                    continue
+
+                if removed.has_key((job[0], job[1][0], job[1][1])):
+                    jobList.append((job[0], (None, None), job[2], job[3]))
+                else:
+                    jobList.append(job)
+                    removed[(job[0], job[1][0], job[1][1])] = True
+
+            neededJob = jobList
+
+        return neededJob
             
-    def _updateChangeSet(self, itemList, keepExisting = None, recurse = True,
-                         updateMode = True):
+    def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
+                         recurse = True, updateMode = True):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -391,9 +677,11 @@ class ConaryClient:
         changeSetList = []
         newItems = []
         finalCs = UpdateChangeSet()
+        splittable = True
 
         for item in itemList:
             if isinstance(item, changeset.ChangeSetFromFile):
+                splittable = False
                 if item.isAbsolute():
 		    self._rootChangeSet(item, keepExisting = keepExisting)
 
@@ -424,16 +712,9 @@ class ConaryClient:
                                            reqFlavor = flavor)
                 troves = self.db.getTroves(troves)
                 for outerTrove in troves:
-		    if recurse:
-			 for trove in self.db.walkTroveSet(outerTrove, 
-							  ignoreMissing = True):
-			     changeSetList.append((trove.getName(), 
-				 (trove.getVersion(), trove.getFlavor()),
-				 (None, None), False))
-		    else:
-			changeSetList.append((outerTrove.getName(), 
-			    (outerTrove.getVersion(), outerTrove.getFlavor()),
-			    (None, None), False))
+                    changeSetList.append((outerTrove.getName(), 
+                        (outerTrove.getVersion(), outerTrove.getFlavor()),
+                        (None, None), False))
                 # skip ahead to the next itemList
                 continue                    
 
@@ -496,94 +777,163 @@ class ConaryClient:
             raise NoNewTrovesError
 
         if changeSetList:
+            primaries = ([ (x[0], x[2][0], x[2][1]) for x in changeSetList
+                                if x[2][0] is not None ] +
+                         [ (x[0], x[1][0], x[1][1]) for x in changeSetList
+                                if x[2][0] is     None ])
             cs = self.repos.createChangeSet(changeSetList, withFiles = False,
-                                            recurse = recurse)
+                                            recurse = recurse,
+                                            primaryTroveList = primaries)
             finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
 
-        # we need to iterate here to handle redirects to redirects to...
-        redirectCsList = self._processRedirects(finalCs) 
-        while redirectCsList:
-            cs = self.repos.createChangeSet(redirectCsList, withFiles = False,
-                                            primaryTroveList = [], 
-                                            recurse = False)
-            newRedirectCsList = self._processRedirects(cs)
-            finalCs.merge(cs, (self.repos.createChangeSet, redirectCsList))
-            redirectCsList = newRedirectCsList
+        redirectHack = self._processRedirects(finalCs, recurse) 
 
-        mergeItemList = self._mergeGroupChanges(finalCs, keepExisting)
+        mergeItemList = self._mergeGroupChanges(finalCs, uJob, redirectHack, 
+                                                keepExisting, recurse)
         if mergeItemList:
             cs = self.repos.createChangeSet(mergeItemList, withFiles = False,
                                             primaryTroveList = [], 
                                             recurse = False)
             finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
 
-        return finalCs
+        return finalCs, splittable
 
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         depsRecurse = True, resolveDeps = True, test = False,
-                        updateByDefault = True, callback = UpdateCallback()):
+                        updateByDefault = True, callback = UpdateCallback(),
+                        split = False):
         callback.preparingChangeSet()
 
-        finalCs = self._updateChangeSet(itemList, 
+        uJob = UpdateJob()
+
+        finalCs, splittable = self._updateChangeSet(itemList, uJob,
                                         keepExisting = keepExisting,
                                         recurse = recurse,
                                         updateMode = updateByDefault)
 
-        if not resolveDeps:
-            return (finalCs, [], {}, [])
+        split = split and splittable
+
+        # When keep existing is provided none of the changesets should
+        # be relative (since relative change sets, by definition, cause
+        # something on the system to get replaced).
+        if keepExisting:
+            for troveCs in finalCs.iterNewTroveList():
+                if troveCs.getOldVersion() is not None:
+                    raise UpdateError, 'keepExisting specified for a ' \
+                                       'relative change set'
 
         callback.resolvingDependencies()
 
-        return self._resolveDependencies(finalCs, keepExisting = keepExisting, 
-                                         depsRecurse = depsRecurse)
+        (cs, depList, suggMap, cannotResolve, splitJob) = \
+            self._resolveDependencies(finalCs, uJob, 
+                                      resolve = resolveDeps,
+                                      keepExisting = keepExisting, 
+                                      depsRecurse = depsRecurse,
+                                      split = split)
 
-    def applyUpdate(self, theCs, replaceFiles = False, tagScript = None, 
-                    keepExisting = None, test = False, justDatabase = False,
-                    journal = None, localRollbacks = False, 
-                    callback = UpdateCallback()):
-        assert(isinstance(theCs, changeset.ReadOnlyChangeSet))
-        cs = changeset.ReadOnlyChangeSet()
+        if split:
+            startNew = True
+            for job in splitJob:
+                if startNew:
+                    newCs = changeset.ChangeSet()
+                    startNew = False
 
-        changedTroves = [ (x.getName(), 
-                           (x.getOldVersion(), x.getOldFlavor()),
-                           (x.getNewVersion(), x.getNewFlavor()), False)
-                               for x in theCs.iterNewTroveList() ]
-        changedTroves += [ (x[0], (x[1], x[2]), (None, None), False) 
-                               for x in theCs.getOldTroveList() ]
-        changedTroves = dict.fromkeys(changedTroves)
+                foundCollection = False
 
-        for (how, what) in theCs.contents:
-            if how == changeset.ChangeSetFromFile:
-                newCs = what
+                for (name, (oldVersion, oldFlavor),
+                           (newVersion, newFlavor), absolute) in job:
+                    if ':' not in name:
+                        foundCollection = True
 
-                troves = [ (x.getName(), 
+                    if not newVersion:
+                        newCs.oldTrove(name, oldVersion, oldFlavor)
+                    else:
+                        trvCs = cs.getNewTroveVersion(name, newVersion,
+                                                      newFlavor)
+                        assert(trvCs.getOldVersion() == oldVersion)
+                        assert(trvCs.getOldFlavor() == oldFlavor)
+                        newCs.newTrove(trvCs)
+
+                if foundCollection:
+                    uJob.addChangeSet(newCs)
+                    startNew = True
+
+            if not startNew:
+                uJob.addChangeSet(newCs)
+        else:
+            uJob.addChangeSet(cs)
+
+        return (uJob, depList, suggMap, cannotResolve)
+
+    def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
+                    test = False, justDatabase = False, journal = None, 
+                    localRollbacks = False, callback = UpdateCallback()):
+
+        def _handleSingleChangeSet(theCs, uJob, rollback, standalone = False):
+            assert(not standalone or 
+                   isinstance(theCs, changeset.ReadOnlyChangeSet))
+            cs = changeset.ReadOnlyChangeSet()
+
+            changedTroves = [ (x.getName(), 
                                (x.getOldVersion(), x.getOldFlavor()),
                                (x.getNewVersion(), x.getNewFlavor()), False)
-                                    for x in newCs.iterNewTroveList() ]
-                troves += [ (x[0], (x[1], x[2]), (None, None), False) 
-                                    for x in newCs.getOldTroveList() ]
+                                   for x in theCs.iterNewTroveList() ]
+            changedTroves += [ (x[0], (x[1], x[2]), (None, None), False) 
+                                   for x in theCs.getOldTroveList() ]
+            changedTroves = dict.fromkeys(changedTroves)
 
-                for item in troves:
-                    if changedTroves.has_key(item):
-                        del changedTroves[item]
-                    else:
-                        newCs.delNewTrove(item[0], item[2][0], item[2][1])
-                cs.merge(newCs)
+            if standalone:
+                for (how, what) in theCs.contents:
+                    if how == changeset.ChangeSetFromFile:
+                        newCs = what
 
-        newCs = self.repos.createChangeSet(changedTroves.keys(), 
-                                           recurse = False,
-                                           callback = callback)
-        cs.merge(newCs)
+                        troves = [ (x.getName(), 
+                                   (x.getOldVersion(), x.getOldFlavor()),
+                                   (x.getNewVersion(), x.getNewFlavor()), False)
+                                        for x in newCs.iterNewTroveList() ]
+                        troves += [ (x[0], (x[1], x[2]), (None, None), False) 
+                                            for x in newCs.getOldTroveList() ]
 
-        try:
-            self.db.commitChangeSet(cs, replaceFiles = replaceFiles,
-                                    tagScript = tagScript, 
-                                    keepExisting = keepExisting,
-                                    test = test, justDatabase = justDatabase,
+                        for item in troves:
+                            if changedTroves.has_key(item):
+                                del changedTroves[item]
+                            elif item[2][0]:
+                                newCs.delNewTrove(item[0], item[2][0], 
+                                                  item[2][1])
+                            else:
+                                newCs.delOldTrove(item[0], item[1][0],
+                                                  item[1][1])
+                        cs.merge(newCs)
+
+            newCs = self.repos.createChangeSet(changedTroves.keys(), 
+                                               recurse = False,
+                                               callback = callback)
+            cs.merge(newCs)
+
+            try:
+                rb = self.db.commitChangeSet(cs, uJob.getLockMaps(),
+                                    replaceFiles = replaceFiles,
+                                    tagScript = tagScript, test = test, 
+                                    justDatabase = justDatabase,
                                     journal = journal, callback = callback,
-                                    localRollbacks = localRollbacks)
-        except database.CommitError, e:
-            raise UpdateError, "changeset cannot be applied"
+                                    localRollbacks = localRollbacks,
+                                    rollback = rollback)
+            except database.CommitError, e:
+                raise UpdateError, "changeset cannot be applied"
+
+            return rb
+
+        rollback = self.db.createRollback()
+        csSet = uJob.getChangeSets()
+        if isinstance(csSet[0], changeset.ReadOnlyChangeSet):
+            # this handles change sets which include change set files
+            assert(len(csSet) == 1)
+            callback.setHunk(0, 0)
+            _handleSingleChangeSet(csSet[0], uJob, rollback, standalone = True)
+        else:
+            for i, theCs in enumerate(csSet):
+                callback.setHunk(i + 1, len(csSet))
+                _handleSingleChangeSet(theCs, uJob, rollback)
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):
@@ -814,9 +1164,8 @@ class ConaryClient:
                     if regExp.match(name):
                         skip = True
             if not skip:
-                fullCsList.append((name, 
-                           (oldVersion, oldFlavor),
-                           (None, None), True))
+                fullCsList.append((name, (oldVersion, oldFlavor),
+                                   (None, None), False))
 
         # recreate primaryList without erase-only troves for the primary trove 
         # list

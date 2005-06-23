@@ -30,10 +30,8 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     to the old version of things.
     """
 
-    def addTrove(self, trove):
-	troveCs = self.cs.getNewTroveVersion(trove.getName(), trove.getVersion(),
-					     trove.getFlavor())
-	return self.repos.addTrove(trove)
+    def addTrove(self, oldTroveSpec, trove):
+	return self.repos.addTrove(oldTroveSpec, trove)
 
     def addTroveDone(self, troveId):
 	pass
@@ -77,7 +75,7 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
     # origJob is A->B, so localCs needs to be changed to be B->B.local.
     # Otherwise, we're applying a rollback and origJob is B->A and
     # localCs is A->A.local, so it doesn't need retargeting.
-    def __init__(self, repos, cs, keepExisting, callback):
+    def __init__(self, repos, cs, callback):
 	assert(not cs.isAbsolute())
 
 	self.cs = cs
@@ -121,10 +119,9 @@ class LocalRepositoryChangeSetJob(repository.ChangeSetJob):
 
 	repository.ChangeSetJob.__init__(self, repos, cs, callback = callback)
 
-	if not keepExisting:
-	    for trove in self.oldTroveList():
-		self.repos.eraseTrove(trove.getName(), trove.getVersion(),
-				      trove.getFlavor())
+        for trove in self.oldTroveList():
+            self.repos.eraseTrove(trove.getName(), trove.getVersion(),
+                                  trove.getFlavor())
 
 	for (pathId, fileVersion, fileObj) in self.oldFileList():
 	    self.repos.eraseFileVersion(pathId, fileVersion)

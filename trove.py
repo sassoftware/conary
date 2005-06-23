@@ -230,6 +230,9 @@ class Trove(streams.LargeStreamSet):
                   "changeLog", "troveInfo", "troves", "idMap", "redirect",
                   "sigs", "immutable" ]
 
+    def __repr__(self):
+        return "trove.Trove('%s', %s)" % (self.name(), repr(self.version()))
+
     def _sigString(self):
         return streams.LargeStreamSet.freeze(self, 
                                              skipSet = { 'sigs' : True,
@@ -325,12 +328,18 @@ class Trove(streams.LargeStreamSet):
 	for (theId, (path, fileId, version)) in self.idMap.iteritems():
 	    yield (theId, path, fileId, version)
 
+    def emptyFileList(self):
+        return len(self.idMap) == 0
+
     def getFile(self, pathId):
         x = self.idMap[pathId]
 	return (x[0], x[1], x[2])
 
     def hasFile(self, pathId):
 	return self.idMap.has_key(pathId)
+
+    def hasFiles(self):
+        return len(self.idMap) != 0
 
     def addTrove(self, name, version, flavor, presentOkay = False,
                  byDefault = True):
@@ -387,15 +396,120 @@ class Trove(streams.LargeStreamSet):
     def hasTrove(self, name, version, flavor):
 	return self.troves.has_key((name, version, flavor))
 
-    # returns a dictionary mapping a pathId to a (path, version, pkgName) tuple
-    def applyChangeSet(self, pkgCS, skipIntegrityChecks = False):
+    def mergeCollections(self, primaryDeriv, secondaryDeriv):
+        def diffJob(derivativeTrove):
+            trvCs, files, troves = derivativeTrove.diff(self)
+            assert(not files)
+
+            job = []
+            replaces = {}
+            replaced = {}
+
+            for (name, oldVersion, newVersion, oldFlavor, newFlavor) in troves:
+                if newVersion:
+                    byDef = derivativeTrove.includeTroveByDefault(
+                                                name, newVersion, newFlavor)
+                else:
+                    # for erase byDef is meaningless
+                    byDef = False
+
+                job.append((name, (oldVersion, oldFlavor),
+                                  (newVersion, newFlavor), byDef))
+
+            for (name, changeList) in trvCs.iterChangedTroves():
+                for (changeType, version, flavor, byDef) in changeList:
+                    # XXX we need to do something smarter here
+                    assert(changeType != '~')
+
+            return set(job)
+
+        def applyJob(jobSet, skipNotByDefault = False):
+            for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), 
+                 byDef) in jobSet:
+                if oldVersion is not None:
+                    self.delTrove(name, oldVersion, oldFlavor, byDef)
+                if newVersion is not None and \
+                        (oldVersion or not skipNotByDefault or byDef):
+                    self.addTrove(name, newVersion, newFlavor, 
+                                  byDefault = byDef)
+
+        # Trove changesets suck. They don't store the A->B for a trove
+        # inclusion, they store -A and +B. The A->B relationship can
+        # be inferred, but having to do so is dumb. This operation really
+        # ought to work on two trove changesets. It works on the two other
+        # troves (and calculates the rest) becaues of this flaw.
+        primaryJob = diffJob(primaryDeriv)
+        secondaryJob = diffJob(secondaryDeriv)
+
+        # things that we have in common are easy
+        common = primaryJob & secondaryJob
+        primaryJob = primaryJob - common
+        secondaryJob = secondaryJob - common
+
+        applyJob(common)
+         
+        # build an index to the secondary job set
+        secondaryIndex = {}
+        for job in secondaryJob:
+            (name, oldInfo, newInfo, byDefault) = job
+            assert((name, oldInfo[0], oldInfo[1]) not in secondaryIndex)
+            assert((name, newInfo[0], newInfo[1]) not in secondaryIndex)
+            if oldInfo[0]:
+                secondaryIndex[(name, oldInfo)] = job
+            if newInfo[0]:
+                secondaryIndex[(name, newInfo)] = job
+
+        primaryRemoveList = []
+        for job in primaryJob:
+            (name, oldInfo, newInfo, byDefault) = job
+
+            oldOverlap = secondaryIndex.get((name, oldInfo), None)
+            newOverlap = secondaryIndex.get((name, newInfo), None)
+
+            if oldOverlap is None and newOverlap is None:
+                # it doesn't overlap with the secondary job set
+                continue
+
+            assert(oldOverlap != newOverlap)
+            # This assumes any other overlap is bad. It's not entirely
+            # clear that it's true, but I don't see any obvious
+            # exceptions
+            if oldOverlap is not None:
+                # We keep the new trove from the secondaryJob when they
+                # both diverge from the same place (though a primary erase
+                # beats a secondary change). This lets:
+                #   conary update foo=1
+                #   conary update foo:runtime=2
+                #   conary update foo=3
+                # have foo:runtime=3 installed.
+                if job[2] == (None, None):
+                    del secondaryIndex[(oldOverlap[0], oldOverlap[1])]
+                    del secondaryIndex[(oldOverlap[0], oldOverlap[2])]
+                    secondaryJob.remove(oldOverlap)
+                else:
+                    primaryRemoveList.append(job)
+            else:
+                assert(newOverlap is not None)
+                del secondaryIndex[(newOverlap[0], newOverlap[1])]
+                del secondaryIndex[(newOverlap[0], newOverlap[2])]
+                secondaryJob.remove(newOverlap)
+
+        for job in primaryRemoveList:
+            primaryJob.remove(job)
+
+        applyJob(primaryJob)
+        applyJob(secondaryJob, skipNotByDefault = True)
+
+    # returns a dictionary mapping a pathId to a (path, version, trvName) tuple
+    def applyChangeSet(self, trvCs, skipIntegrityChecks = False):
 	"""
 	Updates the trove from the changes specified in a change set.
 	Returns a dictionary, indexed by pathId, which gives the
-	(path, version, troveName) for that file.
+	(path, version, troveName) for that file. This method assumes
+        there are no conflicts.
 
-	@param pkgCS: change set
-	@type pkgCS: TroveChangeSet
+	@param trvCs: change set
+	@type trvCs: TroveChangeSet
         @param skipIntegrityChecks: Normally sha1 signatures are confirmed
         after a merge. In some cases (notably where version numbers are
         being changed), this check needs to be skipped.
@@ -405,19 +519,19 @@ class Trove(streams.LargeStreamSet):
 
         assert(not self.immutable)
 
-	self.redirect.set(pkgCS.getIsRedirect())
+	self.redirect.set(trvCs.getIsRedirect())
         if self.redirect():
             # we don't explicitly remove files for redirects
             self.idMap = TroveRefsFilesStream()
 
 	fileMap = {}
 
-	for (pathId, path, fileId, fileVersion) in pkgCS.getNewFileList():
+	for (pathId, path, fileId, fileVersion) in trvCs.getNewFileList():
 	    self.addFile(pathId, path, fileVersion, fileId)
 	    fileMap[pathId] = self.idMap[pathId] + \
                                 (self.name(), None, None, None)
 
-	for (pathId, path, fileId, fileVersion) in pkgCS.getChangedFileList():
+	for (pathId, path, fileId, fileVersion) in trvCs.getChangedFileList():
 	    (oldPath, oldFileId, oldVersion) = self.idMap[pathId]
 	    self.updateFile(pathId, path, fileVersion, fileId)
 	    # look up the path/version in self.idMap as the ones here
@@ -425,52 +539,55 @@ class Trove(streams.LargeStreamSet):
 	    fileMap[pathId] = self.idMap[pathId] + \
                                 (self.name(), oldPath, oldFileId, oldVersion)
 
-	for pathId in pkgCS.getOldFileList():
+	for pathId in trvCs.getOldFileList():
 	    self.removeFile(pathId)
 
-	self.mergeTroveListChanges(pkgCS.iterChangedTroves())
-	self.flavor.set(pkgCS.getNewFlavor())
-	self.changeLog = pkgCS.getChangeLog()
-	self.setProvides(pkgCS.getProvides())
-	self.setRequires(pkgCS.getRequires())
-	self.changeVersion(pkgCS.getNewVersion())
-	self.changeFlavor(pkgCS.getNewFlavor())
+	self.mergeTroveListChanges(trvCs.iterChangedTroves())
+	self.flavor.set(trvCs.getNewFlavor())
+	self.changeLog = trvCs.getChangeLog()
+	self.setProvides(trvCs.getProvides())
+	self.setRequires(trvCs.getRequires())
+	self.changeVersion(trvCs.getNewVersion())
+	self.changeFlavor(trvCs.getNewFlavor())
 
-        if not pkgCS.getOldVersion():
-            self.troveInfo = TroveInfo(pkgCS.getTroveInfoDiff())
+        if not trvCs.getOldVersion():
+            self.troveInfo = TroveInfo(trvCs.getTroveInfoDiff())
         else:
-            self.troveInfo.twm(pkgCS.getTroveInfoDiff(), self.troveInfo)
+            self.troveInfo.twm(trvCs.getTroveInfoDiff(), self.troveInfo)
 
         if not skipIntegrityChecks:
             pass
-            #assert(self.getSigs() == pkgCS.getNewSigs())
+            #assert(self.getSigs() == trvCs.getNewSigs())
+
+        assert((not self.idMap) or (not self.troves))
 
 	return fileMap
 
     def mergeTroveListChanges(self, changeList, redundantOkay = False):
-	"""
-	Merges a set of changes to the included trove list into this
-	trove.
+        """
+        Merges a set of changes to the included trove list into this
+        trove.
 
-	@param changeList: A list or generator specifying a set of
-	trove changes; this is the same as returned by
-	TroveChangeSet.iterChangedTroves()
-	@type changeList: (name, list) tuple
-	@param redundantOkay: Redundant changes are normally considered errors
-	@type redundantOkay: boolean
-	"""
+        @param changeList: A list or generator specifying a set of
+        trove changes; this is the same as returned by
+        TroveChangeSet.iterChangedTroves()
+        @type changeList: (name, list) tuple
+        @param redundantOkay: Redundant changes are normally considered 
+        errors
+        @type redundantOkay: boolean
+        """
 
-	for (name, list) in changeList:
-	    for (oper, version, flavor, byDefault) in list:
-		if oper == '+':
-		    self.addTrove(name, version, flavor,
-					   presentOkay = redundantOkay,
+        for (name, list) in changeList:
+            for (oper, version, flavor, byDefault) in list:
+                if oper == '+':
+                    self.addTrove(name, version, flavor,
+                                           presentOkay = redundantOkay,
                                            byDefault = byDefault)
 
-		elif oper == "-":
-		    self.delTrove(name, version, flavor,
-					   missingOkay = redundantOkay)
-		elif oper == "~":
+                elif oper == "-":
+                    self.delTrove(name, version, flavor,
+                                           missingOkay = redundantOkay)
+                elif oper == "~":
                     self.troves[(name, version, flavor)] = byDefault
                 else:
                     assert(0)
@@ -510,7 +627,7 @@ class Trove(streams.LargeStreamSet):
 	of other trove diffs which should be included for this change
 	set to be complete, and a list of file change sets which need
 	to be included.  The list of trove changes is of the form
-	(pkgName, oldVersion, newVersion, oldFlavor, newFlavor).  If
+	(trvName, oldVersion, newVersion, oldFlavor, newFlavor).  If
 	absolute is True, oldVersion is always None and absolute diffs
 	can be used.  Otherwise, absolute versions are not necessary,
 	and oldVersion of None means the trove is new. The list of
@@ -527,6 +644,8 @@ class Trove(streams.LargeStreamSet):
 	"""
 
 	assert(not them or self.name() == them.name())
+        assert((not self.idMap) or (not self.troves))
+        assert((not them) or (not them.idMap) or (not them.troves))
 
 	# find all of the file ids which have been added, removed, and
 	# stayed the same
@@ -633,14 +752,14 @@ class Trove(streams.LargeStreamSet):
                 l = d.setdefault(flavor, [])
                 l.append(version)
 
-	pkgList = []
+	trvList = []
 
 	if absolute:
 	    for name in added.keys():
 		for flavor in added[name]:
 		    for version in added[name][flavor]:
-			pkgList.append((name, None, version, None, flavor))
-	    return (chgSet, filesNeeded, pkgList)
+			trvList.append((name, None, version, None, flavor))
+	    return (chgSet, filesNeeded, trvList)
 
 	# use added and removed to assemble a list of trove diffs which need
 	# to go along with this change set
@@ -651,7 +770,7 @@ class Trove(streams.LargeStreamSet):
 		# name; this must be a new addition
 		for newFlavor in added[name]:
 		    for version in added[name][newFlavor]:
-			pkgList.append((name, None, version, None, newFlavor))
+			trvList.append((name, None, version, None, newFlavor))
 
 		del added[name]
 
@@ -747,7 +866,7 @@ class Trove(streams.LargeStreamSet):
 
 	    if not oldVersionList:
 		for newVersion in newVersionList:
-		    pkgList.append((name, None, newVersion, 
+		    trvList.append((name, None, newVersion, 
 					  None, newFlavor))
                 continue
 
@@ -768,9 +887,9 @@ class Trove(streams.LargeStreamSet):
 
 		if not oldVersionList:
 		    # no nice match, that's too bad
-		    pkgList.append((name, None, version, None, newFlavor))
+		    trvList.append((name, None, version, None, newFlavor))
 		elif len(oldVersionList) == 1:
-		    pkgList.append((name, oldVersionList[0], version, 
+		    trvList.append((name, oldVersionList[0], version, 
 				    oldFlavor, newFlavor))
 		    del oldVersionList[0]
 		else:
@@ -801,7 +920,7 @@ class Trove(streams.LargeStreamSet):
 
 		    if match is not None:
 			oldVersionList.remove(match)
-			pkgList.append((name, match, version, 
+			trvList.append((name, match, version, 
 					oldFlavor, newFlavor))
 		    else:
 			# Here's the fit of pique. This shouldn't happen
@@ -810,14 +929,14 @@ class Trove(streams.LargeStreamSet):
 
 	    # remove old versions which didn't get matches
 	    for oldVersion in oldVersionList:
-		pkgList.append((name, oldVersion, None, oldFlavor, None))
+		trvList.append((name, oldVersion, None, oldFlavor, None))
 
         for name, flavorList in removed.iteritems():
             for flavor, versionList in flavorList.iteritems():
                 for version in versionList:
-                    pkgList.append((name, version, None, flavor, None))
+                    trvList.append((name, version, None, flavor, None))
 
-	return (chgSet, filesNeeded, pkgList)
+	return (chgSet, filesNeeded, trvList)
 
     def setProvides(self, provides):
         self.provides.set(provides)
@@ -1147,6 +1266,10 @@ class AbstractTroveChangeSet(streams.LargeStreamSet):
 
     def getChangedFileList(self):
 	return self.changedFiles
+
+    def hasChangedFiles(self):
+        return (len(self.newFiles) + len(self.changedFiles) + 
+                len(self.oldFiles)) != 0
 
     def iterChangedTroves(self):
 	return self.troves.iteritems()
