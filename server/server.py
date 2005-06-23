@@ -45,7 +45,6 @@ from conarycfg import ConfigFile
 from conarycfg import STRINGDICT
 from lib import options
 from lib import util
-#from http import HttpHandler
 
 DEFAULT_FILE_PATH="/tmp/conary-server"
 
@@ -342,7 +341,6 @@ if __name__ == '__main__':
     netRepos = ResetableNetworkRepositoryServer(otherArgs[1], FILE_PATH, 
 			baseUrl, otherArgs[2], cfg.repositoryMap,
                         logFile = cfg.logFile)
-#    httpHandler = HttpHandler(netRepos)
 
     port = int(cfg.port)
     httpServer = HTTPServer(("", port), HttpRequests)
