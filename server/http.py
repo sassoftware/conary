@@ -158,8 +158,14 @@ class HttpHandler(WebHandler):
             
         query = [(t, reqVer, x) for x in leaves[t][reqVer]]
         troves = self.client.getTroves(query, withFiles = False)
+        metadata = self.client.getMetadata([t, reqVer.branch()], reqVer.branch().label())
+        if t in metadata:
+            metadata = metadata[t]
+            
         self._write("trove_info", troveName = t, troves = troves,
-            versionList = versionList, reqVer = reqVer)
+                                  versionList = versionList,
+                                  reqVer = reqVer,
+                                  metadata = metadata)
            
         return apache.OK
 
@@ -245,7 +251,7 @@ class HttpHandler(WebHandler):
                 md = metadata.fetchFreshmeat(fmName)
             except metadata.NoFreshmeatRecord:
                 self._write("error", error = "No Freshmeat record found.")
-                return
+                return apache.OK
         else:
             md = self.troveStore.getMetadata(troveName, branch)
 

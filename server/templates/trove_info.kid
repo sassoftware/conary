@@ -70,11 +70,31 @@ import time
 
         <div id="content">
             <h3>Trove Information:</h3>
-            
-            <div py:omit="True" py:if="trove.getName().endswith(':source')"
-                 py:for="trove in troves">
-                ${sourceTroveInfo(trove)}
-                <p><a href="files?t=${troveName};v=${quote(trove.getVersion().freeze())};f=${quote(trove.getFlavor().freeze())}">Show Files</a></p>
+
+            <table py:if="metadata">
+                <tr class="even"><td>Summary:</td><td>${metadata.getShortDesc()}</td></tr>
+                <tr class="odd"><td>Description:</td><td>${metadata.getLongDesc()}</td></tr>
+                <tr class="even">
+                    <td>Categories:</td>
+                    <td><div py:for="category in metadata.getCategories()" py:content="category"/></td>
+                </tr>
+                 <tr class="odd">
+                    <td>Licenses:</td>
+                    <td><div py:for="lic in metadata.getLicenses()" py:content="lic"/></td>
+                </tr>
+                <tr class="even">
+                    <td>Urls:</td>
+                    <td><div py:for="url in metadata.getUrls()"><a href="${url}">${url}</a></div></td>
+                </tr>
+            </table>
+
+            <hr />
+
+            <div py:omit="True" py:if="troves[0].getName().endswith(':source')">
+                ${sourceTroveInfo(troves[0])}
+                <p><a href="files?t=${troveName};
+                            v=${quote(troves[0].getVersion().freeze())};
+                            f=${quote(troves[0].getFlavor().freeze())}">Show Files</a></p>
             </div>
             <div py:omit="True" py:if="not trove.getName().endswith(':source')"
                  py:for="trove in troves">
