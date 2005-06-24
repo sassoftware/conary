@@ -26,6 +26,7 @@ Changes in 0.60.13:
     the components are installable side-by-side.
   * Troves store information about troves loaded when building a recipe
   * Build Requirements are stored with the trove 
+  * Add isCollection() to TroveInfo
 
 Changes in 0.60.12:
   * Previously, if you ran "conary update foo", and foo requires a new

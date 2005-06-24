@@ -367,6 +367,7 @@ def cookRedirectObject(repos, cfg, recipeClass, sourceVersion, macros={},
         trv.setBuildTime(time.time())
         trv.setSourceName(fullName + ':source')
         trv.setConaryVersion(constants.version)
+        trv.setIsCollection(False)
 
         trvDiff = trv.diff(None, absolute = 1)[0]
         changeSet.newTrove(trvDiff)
@@ -497,6 +498,7 @@ def cookGroupObject(repos, cfg, recipeClass, sourceVersion, macros={},
         grp.setSourceName(fullName + ':source')
         grp.setSize(recipeObj.getSize(groupName = groupName))
         grp.setConaryVersion(constants.version)
+        grp.setIsCollection(True)
 
         grpDiff = grp.diff(None, absolute = 1)[0]
         changeSet.newTrove(grpDiff)
@@ -578,6 +580,7 @@ def cookFilesetObject(repos, cfg, recipeClass, sourceVersion, macros={},
     fileset.setSourceName(fullName + ':source')
     fileset.setSize(size)
     fileset.setConaryVersion(constants.version)
+    fileset.setIsCollection(False)
     
     filesetDiff = fileset.diff(None, absolute = 1)[0]
     changeSet.newTrove(filesetDiff)
@@ -805,6 +808,7 @@ def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
 	    provides = deps.DependencySet()
 	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
 	    grpMap[main].setProvides(provides)
+            grpMap[main].setIsCollection(True)
 
     # look up the pathids used by our immediate predecessor troves.
     ident = _IdGen()
@@ -860,8 +864,10 @@ def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
     built = []
     packageList = []
     for buildPkg in bldList:
+        # bldList only contains components
         compName = buildPkg.getName()
         main, comp = compName.split(':')
+        assert(comp)
         grp = grpMap[main]
 
 	(p, fileMap) = _createComponent(repos, buildPkg, targetVersion, ident)
@@ -872,6 +878,7 @@ def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
         p.setBuildTime(buildTime)
         p.setConaryVersion(constants.version)
         p.setInstallBin(buildPkg.getInstallBin())
+        p.setIsCollection(False)
 	
 	byDefault = comp not in recipeObj.getUnpackagedComponentNames()
         grp.addTrove(compName, p.getVersion(), p.getFlavor(),

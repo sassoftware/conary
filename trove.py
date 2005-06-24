@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2004-2005 Specifix, Inc.
+# Copyright (c) 2004-2005 rpath, Inc.
 #
 # This program is distributed under the terms of the Common Public License,
 # version 1.0. A copy of this license should have been distributed with this
@@ -92,6 +92,7 @@ _TROVEINFO_TAG_CONARYVER      = 3
 _TROVEINFO_TAG_BUILDDEPS      = 4
 _TROVEINFO_TAG_LOADEDTROVES   = 5
 _TROVEINFO_TAG_INSTALLBINS    = 6
+_TROVEINFO_TAG_ISCOLLECTION   = 7
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
@@ -103,6 +104,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_BUILDDEPS    : ( BuildDependencies,     'buildReqs'    ),
         _TROVEINFO_TAG_LOADEDTROVES : ( LoadedTroves,          'loadedTroves' ),
         _TROVEINFO_TAG_INSTALLBINS  : ( InstallBin,            'installBin'   ),
+        _TROVEINFO_TAG_ISCOLLECTION : ( streams.ShortStream,   'isCollection' ),
     }
     _streamDict = streams.StreamSetDef(streamDict)
 
@@ -1017,6 +1019,15 @@ class Trove(streams.LargeStreamSet):
 
     def setConaryVersion(self, ver):
         return self.troveInfo.conaryVersion.set(ver)
+
+    def setIsCollection(self, b):
+        if b:
+            return self.troveInfo.isCollection.set(1)
+        else:
+            return self.troveInfo.isCollection.set(0)
+
+    def isCollection(self):
+        return self.troveInfo.isCollection()
 
     def setBuildRequirements(self, itemList):
         for (name, ver, release) in itemList:
