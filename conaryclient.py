@@ -427,7 +427,7 @@ class ConaryClient:
                 if not newVersion:
                     cs.delOldTrove(name, oldVersion, oldFlavor)
 
-	def _findErasures(cs, primaryErases, recurse):
+	def _findErasures(cs, primaryErases, referencedTroves, recurse):
 	    nodeList = []
 	    nodeIdx = {}
 	    ERASE = 1
@@ -483,14 +483,14 @@ class ConaryClient:
 				    for x in refTroveInfo ]
 
 		contList = []
-		for (info, isPresent, isLocked, isContainer) in \
+		for (subInfo, isPresent, isLocked, isContainer) in \
 			itertools.izip(refTroveInfo, present, locked, 
 				       areContainers):
 		    if not isPresent or isLocked: continue
 		    if not isContainer:
-			troveList.append((info, None, nodeId))
+			troveList.append((subInfo, None, nodeId))
 		    else:   
-			contList.append(info)
+			contList.append(subInfo)
 
 		trvs = self.db.getTroves(contList, pristine = False)
 		troveList += [ (info, trv, nodeId) for info, trv in
@@ -499,7 +499,6 @@ class ConaryClient:
 	    needParents = [ (nodeId, info) for nodeId, (info, state, edges,
                                                         alreadyHandled)
 				in enumerate(nodeList) if state == UNKNOWN ]
-            keepNodes = []
 	    while needParents:
 		containers = self.db.getTroveContainers([ x[1] for x
 							    in needParents ])
@@ -516,11 +515,20 @@ class ConaryClient:
 			    nodeList.append([ containerInfo, KEEP, [ nodeId ],
                                               False])
 			    newNeedParents.append((containerId, containerInfo))
-                            keepNodes.append(containerId)
                 needParents = newNeedParents
+
+            # don't erase nodes which are referenced by troves we're about
+            # to install unless there is a really good reason
+            for info in referencedTroves:
+                if info in nodeIdx:
+                    node = nodeList[nodeIdx[info]]
+                    if node[1] == UNKNOWN:
+                        node[1] = KEEP
 		    
 	    seen = [ False ] * len(nodeList)
             # DFS to mark troves as KEEP
+            keepNodes = [ nodeId for nodeId, node in enumerate(nodeList)
+                                if node[1] == KEEP ]
             while keepNodes:
                 nodeId = keepNodes.pop()
                 if seen[nodeId]: continue
@@ -569,6 +577,7 @@ class ConaryClient:
 
         newJob = set()
         deferredList = []
+        referencedTroves = []
 
         while True:
             if not keepList and deferredList:
@@ -633,6 +642,8 @@ class ConaryClient:
                 assert(not fileList)
                 alreadyInstalled = []
 
+            referencedTroves += [ x for x in newTrv.iterTroveList() ]
+
             alreadyInstalled = _alreadyInstalled(newTrv)
             locked = _lockedList(neededTroveList)
             for (name, oldVersion, newVersion, oldFlavor, newFlavor), \
@@ -663,7 +674,8 @@ class ConaryClient:
         # _findErasures from stubbing it's toe on trvCs entries which don't
         # matter
         removedTroves = _removeObsoleteUpdates(cs, origJob - newJob)
-        newJob.update(_findErasures(cs, erasePrimaryList, recurse))
+        newJob.update(_findErasures(cs, erasePrimaryList, 
+                                    referencedTroves, recurse))
         # now get rid of obsolete erases
         _removeObsoleteErasures(cs, origJob - newJob)
         neededJob = newJob - origJob
