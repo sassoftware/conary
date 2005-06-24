@@ -142,7 +142,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                 print "    %s:\n\t%s" %  \
                         (troveName, "\n\t".join(str(depSet).split("\n")))
             return
-        elif (not cfg.autoResolve or brokenByErase) and suggMap:
+        elif (not info and resolve) and (not cfg.autoResolve or brokenByErase) and suggMap:
             callback.done()
             print "Additional troves are needed:"
             for (req, suggList) in suggMap.iteritems():
