@@ -530,7 +530,7 @@ class ConaryClient:
                                 for x in nodeList if x[1] != KEEP and
                                                      not x[3] ]
             
-            return eraseList
+            return set(eraseList)
 
         # Updates a change set by removing troves which don't need
         # to be updated due to local state. It also removes new troves which
@@ -563,7 +563,7 @@ class ConaryClient:
             if item in primaries:
                 keepList.append(origJob[-1])
 
-        newJobList = []
+        newJob = set()
         deferredList = []
 
         while True:
@@ -578,7 +578,7 @@ class ConaryClient:
                 break
 
             job = keepList.pop()
-            newJobList.append(job)
+            newJob.add(job)
             (trvName, (oldVersion, oldFlavor), (newVersion, newFlavor), abs) \
                                 = job
 
@@ -655,8 +655,7 @@ class ConaryClient:
 
         origJob = set(origJob)
 
-	newJobList += _findErasures(cs, erasePrimaryList, recurse)
-        newJob = set(newJobList)
+        newJob.update(_findErasures(cs, erasePrimaryList, recurse))
 
         removedTroves = _removeObsoletes(cs, origJob - newJob)
         neededJob = newJob - origJob
