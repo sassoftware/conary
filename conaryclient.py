@@ -501,7 +501,7 @@ class ConaryClient:
 				in enumerate(nodeList) if state == UNKNOWN ]
             keepNodes = []
 	    while needParents:
-		containers = self.db.findTroveContainers([ x[1] for x
+		containers = self.db.getTroveContainers([ x[1] for x
 							    in needParents ])
                 newNeedParents = []
 		for (nodeId, nodeInfo), containerList in \

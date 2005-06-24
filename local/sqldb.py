@@ -1280,7 +1280,7 @@ class Database:
 
         cu.execute("DROP TABLE mlt")
 
-    def findTroveContainers(self, l):
+    def getTroveContainers(self, l):
         cu = self.db.cursor()
         cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER, name STRING, "
                                               "version STRING, "
