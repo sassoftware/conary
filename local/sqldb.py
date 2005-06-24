@@ -1146,11 +1146,28 @@ class Database:
 				 pristine = pristine)
 	    yield trv
     
-    def iterTroveNameVersionByPath(self, path):
-	for instanceId in self.troveFiles.iterPath(path):
-	    troveId = self.instances.getId(instanceId)
-	    yield troveId
+    def iterFindPathReferences(self, path):
+        cu = self.db.cursor()
+        cu.execute("""SELECT troveName, version, flavor, pathId 
+                            FROM DBTroveFiles JOIN DBInstances ON
+                                DBTroveFiles.instanceId = DBInstances.instanceId
+                            JOIN Versions ON
+                                DBInstances.versionId = Versions.versionId
+                            JOIN DBFlavors ON
+                                DBFlavors.flavorId = DBInstances.flavorId
+                            WHERE
+                                path = ?
+                    """, path)
 
+        for (name, version, flavor, pathId) in cu:
+            version = versions.VersionFromString(version)
+            if flavor is None:
+                flavor = deps.deps.DependencySet()
+            else:
+                flavor = deps.deps.ThawDependencySet(flavor)
+
+            yield (name, version, flavor, pathId)
+            
     def removeFileFromTrove(self, trove, path):
 	versionId = self.versionTable[trove.getVersion()]
         flavorId = self.flavors[trove.getFlavor()]

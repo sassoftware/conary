@@ -493,7 +493,7 @@ class FilesystemJob:
 	    fsTrove.removeFile(pathId)
 
     def _singleTrove(self, repos, troveCs, changeSet, baseTrove, fsTrove, root,
-                     flags):
+                     removalHints, flags):
 	"""
 	Build up the todo list for applying a single trove to the
 	filesystem. 
@@ -578,12 +578,15 @@ class FilesystemJob:
                     # have contents on disk
                     fullyUpdated = False
                     continue
-                elif (not flags & REPLACEFILES and
-                      not self.removes.has_key(headRealPath)):
-                    self.errors.append("%s is in the way of a newly " 
-                                       "created file" % headRealPath)
-                    fullyUpdated = False
-                    continue
+                elif not self.removes.has_key(headRealPath):
+                    for info in self.db.iterFindPathReferences(headPath):
+                        if (flags & REPLACEFILES) or info[0:3] in removalHints:
+                            self.userRemoval(*info)
+                        else:
+                            self.errors.append("%s is in the way of a newly " 
+                                               "created file" % headRealPath)
+                            fullyUpdated = False
+                            continue
             except OSError:
                 # the path doesn't exist, carry on with the restore
                 pass
@@ -910,7 +913,7 @@ class FilesystemJob:
 	return fsTrove
 
     def __init__(self, db, changeSet, fsTroveDict, root, callback = None, 
-		 flags = MERGE):
+		 flags = MERGE, removeHints = {}):
 	"""
 	Constructs the job for applying a change set to the filesystem.
 
@@ -947,7 +950,8 @@ class FilesystemJob:
 
         for (name, oldVersion, oldFlavor) in changeSet.getOldTroveList():
             self.oldTroves.append((name, oldVersion, oldFlavor))
-            oldTrove = db.getTrove(name, oldVersion, oldFlavor)
+            oldTrove = db.getTrove(name, oldVersion, oldFlavor, 
+                                   pristine = False)
             for (pathId, path, fileId, version) in oldTrove.iterFileList():
                 fileObj = db.getFileVersion(pathId, fileId, version)
                 self._remove(fileObj, root + path, "removing %s")
@@ -994,7 +998,7 @@ class FilesystemJob:
                 baseTrove = None
 
             self._singleTrove(db, troveCs, changeSet, baseTrove,
-                                      newFsTrove, root, flags)
+                                      newFsTrove, root, removeHints, flags)
 
             newFsTrove.mergeTroveListChanges(troveCs.iterChangedTroves(),
                                            redundantOkay = True)

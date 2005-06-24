@@ -14,6 +14,8 @@ Changes in 0.60.13:
   * Dependency ordering forces collections to be installed after all of their
     referenced troves (allowing simple restarts)
   * Database migration removes stale versions
+  * --replace-files marks the replaced versions of the files as no longer
+    present
 
 Changes in 0.60.12:
   * Previously, if you ran "conary update foo", and foo requires a new

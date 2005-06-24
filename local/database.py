@@ -345,7 +345,7 @@ class Database(SqlDbRepository):
                         replaceFiles = False, tagScript = None,
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
-                        rollback = None):
+                        rollback = None, removeHints = {}):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -402,7 +402,8 @@ class Database(SqlDbRepository):
             flags |= update.MERGE
 
 	fsJob = update.FilesystemJob(self, cs, fsTroveDict, self.root, 
-				     flags = flags, callback = callback)
+				     flags = flags, callback = callback,
+                                     removeHints = removeHints)
 
 	# look through the directories which have had files removed and
 	# see if we can remove the directories as well
@@ -525,7 +526,7 @@ class Database(SqlDbRepository):
 	for trv in self.db.iterFindByPath(path):
 	    self.db.removeFileFromTrove(trv, path)
 
-	self.db.commit()
+        self.db.commit()
 
     def createRollback(self):
 	rbDir = self.rollbackCache + ("/%d" % (self.lastRollback + 1))
@@ -630,6 +631,9 @@ class Database(SqlDbRepository):
                 (reposCs, localCs) = rb.getLast()
 
             self.removeRollback(name)
+
+    def iterFindPathReferences(self, path):
+        return self.db.iterFindPathReferences(path)
     
     def findTrove(self, labelPath, troveName, reqFlavor=None, 
                                               versionStr = None):

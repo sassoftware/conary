@@ -897,7 +897,8 @@ class ConaryClient:
                     test = False, justDatabase = False, journal = None, 
                     localRollbacks = False, callback = UpdateCallback()):
 
-        def _handleSingleChangeSet(theCs, uJob, rollback, standalone = False):
+        def _handleSingleChangeSet(theCs, uJob, rollback, removeHints = {}, 
+                                   standalone = False):
             assert(not standalone or 
                    isinstance(theCs, changeset.ReadOnlyChangeSet))
             cs = changeset.ReadOnlyChangeSet()
@@ -945,7 +946,8 @@ class ConaryClient:
                                     justDatabase = justDatabase,
                                     journal = journal, callback = callback,
                                     localRollbacks = localRollbacks,
-                                    rollback = rollback)
+                                    rollback = rollback,
+                                    removeHints = removeHints)
             except database.CommitError, e:
                 raise UpdateError, "changeset cannot be applied"
 
@@ -959,9 +961,21 @@ class ConaryClient:
             callback.setHunk(0, 0)
             _handleSingleChangeSet(csSet[0], uJob, rollback, standalone = True)
         else:
+            # build a set of everything which is being removed
+            removeHints = set()
+            for theCs in csSet:
+                for trvCs in theCs.iterNewTroveList():
+                    if trvCs.getOldVersion() is not None:
+                        removeHints.add((trvCs.getName(), trvCs.getOldVersion(),
+                                         trvCs.getOldFlavor()))
+
+                for info in theCs.getOldTroveList():
+                    removeHints.add(info)
+
             for i, theCs in enumerate(csSet):
                 callback.setHunk(i + 1, len(csSet))
-                _handleSingleChangeSet(theCs, uJob, rollback)
+                _handleSingleChangeSet(theCs, uJob, rollback, 
+                                       removeHints = removeHints)
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):
