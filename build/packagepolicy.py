@@ -21,19 +21,20 @@ through eponymous interfaces in recipe.  Most of these policies are rarely
 (if ever) invoked.  Examples are presented only for policies that are
 expected to be invoked in some recipes.
 """
-
-from lib import util, log
+import itertools
 import os
-import policy
-from deps import deps
 import re
 import stat
-import tags
+
 import buildpackage
+from deps import deps
+import destdirpolicy
 import files
 import filter
-import destdirpolicy
+from lib import util, log
+import policy
 import use
+import tags
 
 
 class NonBinariesInBindirs(policy.Policy):
@@ -435,7 +436,9 @@ class ComponentSpec(_filterSpec):
         # The extras need to come before base in order to override decisions
         # in the base subfilters; invariants come first for those very few
         # specs that absolutely should not be overridden in recipes.
-        for filteritem in list(self.invariantFilters) + self.extraFilters + list(self.baseFilters):
+        for filteritem in itertools.chain(self.invariantFilters,
+                                          self.extraFilters,
+                                          self.baseFilters):
             main = ''
 	    name = filteritem[0] % self.macros
             if ':' in name:
@@ -495,6 +498,54 @@ class PackageSpec(_filterSpec):
 	# now walk the tree -- all policy classes after this require
 	# that the initial tree is built
         recipe.autopkg.walk(self.macros['destdir'])
+
+class InstallKey(policy.Policy):
+    """
+        Set key/value pairs that determine whether conary assumes that two 
+        versions of a component can be installed side-by-side:
+        C{r.InstallKey('foo:runtime', key1='value1', key2='value2')}
+
+        If two versions of a component share the same install keys, but
+        differ on a value for some key, the two troves are assumed to be
+        installable side by side.
+    """
+
+    defaultCompKeys = { 'test' : {'version': '%(version)s'}}
+
+    def __init__(self, *args, **keywords):
+        policy.Policy.__init__(self, *args, **keywords)
+        self.installKeySpecs = {}
+
+    def updateArgs(self, *args, **keywords):
+        # keep a list of packages filtered for in PackageSpec in the recipe
+        if args:
+            if len(args) > 1:
+                raise RuntimeError, ('Cannot specify multiple components'
+                                     ' for InstallKey, got '
+                                     ' %s' % ', '.join(args) )
+            name = args[0]
+            if ':' not in name:
+                raise RuntimeError, ('Packages can not have an installKey -'
+                                     ' they must be component specific')
+            self.installKeySpecs[args[0]] = keywords
+
+
+    def do(self):
+        def _expandBinKeys(binKeys):
+            return dict((x[0], x[1] % self.recipe.macros) \
+                                            for x in binKeys.iteritems())
+
+        installKeys = {}
+        # install the default keys for components
+        for compName, binKeys in self.defaultCompKeys.iteritems():
+            for component in self.recipe.autopkg.getComponents():
+                if component.name.split(':')[1] == compName:
+                    component.setInstallBin(_expandBinKeys(binKeys))
+
+        # override or fill in binKeys from user specified bin keys
+        for component in self.recipe.autopkg.getComponents():
+            binKeys = self.installKeySpecs.get(component.name, {})
+            component.setInstallBin(_expandBinKeys(binKeys))
 
 
 def _markConfig(policy, filename, fullpath):
@@ -1832,6 +1883,7 @@ def DefaultPolicy(recipe):
 	CheckDestDir(recipe),
 	ComponentSpec(recipe),
 	PackageSpec(recipe),
+        InstallKey(recipe),
 	EtcConfig(recipe),
 	Config(recipe),
 	InitialContents(recipe),

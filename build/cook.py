@@ -617,8 +617,32 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     @type alwaysBumpCount: bool
     @rtype: tuple
     """
+    # 1. create the desired files in destdir and package info
+    result  = _cookPackageObject(repos, cfg, recipeClass, 
+                                 sourceVersion, prep=prep,
+                                 macros=macros, resume=resume,
+                                 ignoreDeps=ignoreDeps, 
+                                 logBuild=logBuild)
+    if not result:
+        return
 
-    built = []
+    (bldList, recipeObj, builddir, destdir) = result
+    
+    # 2. convert the package into a changeset ready for committal
+    changeSet, built = _createPackageChangeSet(repos, bldList, recipeObj,
+                                               sourceVersion, 
+                                               targetLabel=targetLabel, 
+                                               alwaysBumpCount=alwaysBumpCount)
+                                               
+
+    return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
+
+def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True, 
+		       macros={}, resume = None, ignoreDeps=False, 
+                       logBuild=False):
+    """Builds the package for cookPackageObject.  Parameter meanings are 
+       described there.
+    """
     fullName = recipeClass.name
 
     lcache = lookaside.RepositoryCache(repos)
@@ -720,14 +744,6 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
                         %recipeClass.name)
             return
 
-        # Every component has the same flavor (enforced by policy), just use 
-        # the first one
-        flavor = deps.DependencySet()
-        flavor.union(bldList[0].flavor)
-        componentNames = [ x.name for x in bldList ]
-        targetVersion = nextVersion(repos, componentNames, sourceVersion, 
-                                    flavor, targetLabel, 
-                                    alwaysBumpCount=alwaysBumpCount)
     except Exception, msg:
         if logBuild:
             logFile.write('%s\n' % msg)
@@ -735,23 +751,40 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
             logFile.write('\n')
             logFile.close()
         raise
-    else:
-        if logBuild:
-            logFile.close()
-            os.unlink(logPath)
-            if cfg.noClean:
-                # leave the easily accessible copy in place in 
-                # builddir
-                shutil.copy2(tmpLogPath, logPath)
-            else:
-                os.rename(tmpLogPath, logPath)
-            # update contents on the buildlog, since they changed
-            buildlogpath = recipeObj.macros.buildlogpath
-            recipeObj.autopkg.updateFileContents(
-                recipeObj.macros.buildlogpath, logPath)
-            recipeObj.autopkg.pathMap[buildlogpath].tags.set("buildlog")
+
+    if logBuild:
+        logFile.close()
+        os.unlink(logPath)
+        if cfg.noClean:
+            # leave the easily accessible copy in place in 
+            # builddir
+            shutil.copy2(tmpLogPath, logPath)
+        else:
+            os.rename(tmpLogPath, logPath)
+        # update contents on the buildlog, since they changed
+        buildlogpath = recipeObj.macros.buildlogpath
+        recipeObj.autopkg.updateFileContents(
+            recipeObj.macros.buildlogpath, logPath)
+        recipeObj.autopkg.pathMap[buildlogpath].tags.set("buildlog")
+    return bldList, recipeObj, builddir, destdir
+
+def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
+                            targetLabel=None, alwaysBumpCount=False):
+    """ Helper function for cookPackage object.  See there for most
+        parameter definitions. BldList is the list of
+        components created by cooking a package recipe.  RecipeObj is
+        the instantiation of the package recipe.
+    """
+    # determine final version and flavor  - flavor is shared among
+    # all components, so just grab the first one.
+    flavor = bldList[0].flavor.copy()
+    componentNames = [ x.name for x in bldList ]
+    targetVersion = nextVersion(repos, componentNames, sourceVersion, 
+                                flavor, targetLabel, 
+                                alwaysBumpCount=alwaysBumpCount)
 
     buildTime = time.time()
+    sourceName = recipeObj.__class__.name + ':source'
 
     # create all of the package troves we need, and let each package provide
     # itself
@@ -762,7 +795,7 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         if main not in grpMap:
             grpMap[main] = trove.Trove(main, targetVersion, flavor, None)
             grpMap[main].setSize(0)
-            grpMap[main].setSourceName(recipeClass.name + ':source')
+            grpMap[main].setSourceName(sourceName)
             grpMap[main].setBuildTime(buildTime)
             grpMap[main].setConaryVersion(constants.version)
             # do not turn this on yet, it will make changesets unreadable
@@ -795,8 +828,7 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
     # look up the pathids for every file that has been built by
     # this source component, following our brach ancestry
     while True:
-        d = repos.getPackageBranchPathIds(recipeClass.name + ':source',
-                                          searchBranch)
+        d = repos.getPackageBranchPathIds(sourceName, searchBranch)
         ident.merge(d)
 
         if not searchBranch.hasParentBranch():
@@ -826,6 +858,7 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         ident.populate(repos, troveList)
     log.debug('pathId lookup complete')
 
+    built = []
     packageList = []
     for buildPkg in bldList:
         compName = buildPkg.getName()
@@ -836,7 +869,7 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
 
 	built.append((compName, p.getVersion().asString(), p.getFlavor()))
 	packageList.append((p, fileMap))
-        p.setSourceName(recipeClass.name + ':source')
+        p.setSourceName(sourceName)
         p.setBuildTime(buildTime)
         p.setConaryVersion(constants.version)
 	
@@ -854,7 +887,8 @@ def cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         grpDiff = grp.diff(None, absolute = 1)[0]
         changeSet.newTrove(grpDiff)
 
-    return (changeSet, built, (recipeObj.cleanup, (builddir, destdir)))
+    return changeSet, built
+
 
 def guessSourceVersion(repos, name, versionStr, buildLabel, 
                                                 searchBuiltTroves=False):
