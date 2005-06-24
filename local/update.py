@@ -579,14 +579,17 @@ class FilesystemJob:
                     fullyUpdated = False
                     continue
                 elif not self.removes.has_key(headRealPath):
+                    inWay = (flags & REPLACEFILES) == 0
                     for info in self.db.iterFindPathReferences(headPath):
                         if (flags & REPLACEFILES) or info[0:3] in removalHints:
                             self.userRemoval(*info)
-                        else:
-                            self.errors.append("%s is in the way of a newly " 
-                                               "created file" % headRealPath)
-                            fullyUpdated = False
-                            continue
+                            inWay = False
+
+                    if inWay:
+                        self.errors.append("%s is in the way of a newly " 
+                                           "created file" % headRealPath)
+                        fullyUpdated = False
+                        continue
             except OSError:
                 # the path doesn't exist, carry on with the restore
                 pass
