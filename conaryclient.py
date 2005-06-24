@@ -1202,7 +1202,7 @@ class ConaryClient:
         for (name, oldVersion, oldFlavor) in cs.getOldTroveList():
             skip = False
             if (name, oldVersion, oldFlavor) not in primaryList:
-                for reStr, regExp in cfg.excludeTroves:
+                for reStr, regExp in self.cfg.excludeTroves:
                     if regExp.match(name):
                         skip = True
             if not skip:

@@ -580,6 +580,8 @@ class FilesystemJob:
                     continue
                 elif not self.removes.has_key(headRealPath):
                     inWay = (flags & REPLACEFILES) == 0
+                    from lib import epdb
+                    epdb.st()
                     for info in self.db.iterFindPathReferences(headPath):
                         if (flags & REPLACEFILES) or info[0:3] in removalHints:
                             self.userRemoval(*info)
