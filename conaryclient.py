@@ -404,7 +404,7 @@ class ConaryClient:
 
             return r
 
-        def _removeObsoletes(cs, obsoletes):
+        def _removeObsoleteUpdates(cs, obsoletes):
             rmvd = {}
 
             for (name, (oldVersion, oldFlavor), 
@@ -418,10 +418,14 @@ class ConaryClient:
                         rmvd[(name, newVersion, newFlavor)] = \
                             cs.getNewTroveVersion(name, newVersion, newFlavor)
                     cs.delNewTrove(name, newVersion, newFlavor)
-                else:
-                    cs.delOldTrove(name, oldVersion, oldFlavor)
 
             return rmvd
+
+        def _removeObsoleteErasures(cs, obsoletes):
+            for (name, (oldVersion, oldFlavor), 
+                       (newVersion, newFlavor), absolute) in obsoletes:
+                if not newVersion:
+                    cs.delOldTrove(name, oldVersion, oldFlavor)
 
 	def _findErasures(cs, primaryErases, recurse):
 	    nodeList = []
@@ -655,9 +659,13 @@ class ConaryClient:
 
         origJob = set(origJob)
 
+        # remove the trvCs entries we don't need any more. this keeps
+        # _findErasures from stubbing it's toe on trvCs entries which don't
+        # matter
+        removedTroves = _removeObsoleteUpdates(cs, origJob - newJob)
         newJob.update(_findErasures(cs, erasePrimaryList, recurse))
-
-        removedTroves = _removeObsoletes(cs, origJob - newJob)
+        # now get rid of obsolete erases
+        _removeObsoleteErasures(cs, origJob - newJob)
         neededJob = newJob - origJob
 
         if keepExisting:
