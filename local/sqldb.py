@@ -1320,6 +1320,39 @@ class Database:
 
         return result
 
+    def findTroveContainers(self, names):
+        # XXX this fn could be factored out w/ getTroveContainers above 
+        cu = self.db.cursor()
+        cu.execute("CREATE TEMPORARY TABLE ftc(idx INTEGER, name STRING)",
+                                              start_transaction = False)
+        for idx, name in enumerate(names):
+            cu.execute("INSERT INTO ftc VALUES(?, ?)", idx, name,
+                       start_transaction = False)
+
+        cu.execute("""SELECT idx, DBInstances.troveName, Versions.version,
+                             DBFlavors.flavor
+                        FROM ftc
+                        JOIN DBInstances AS IncInst ON
+                            ftc.name = IncInst.troveName 
+                        JOIN TroveTroves ON
+                            IncInst.instanceId = TroveTroves.includedId
+                        JOIN DBInstances ON
+                            TroveTroves.instanceId = DBInstances.instanceId
+                        JOIN DBFlavors ON
+                            DBInstances.flavorId = DBFlavors.flavorId
+                        JOIN Versions ON
+                            DBInstances.versionId = Versions.versionId
+                """)
+        result = [ [] for x in names ]
+        for (idx, name, version, flavor) in cu:
+            result[idx].append((name, versions.VersionFromString(version),
+                                deps.deps.ThawDependencySet(flavor)))
+
+        cu.execute("DROP TABLE ftc", start_transaction = False)
+
+        return result
+
+
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)
 

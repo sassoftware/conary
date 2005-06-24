@@ -85,6 +85,9 @@ class SqlDbRepository(datastore.DataStoreRepository,
     def getTroveContainers(self, l):
         return self.db.getTroveContainers(l)
 
+    def findTroveContainers(self, names):
+        return self.db.findTroveContainers(names)
+
     def getTrove(self, name, version, flavor, pristine = True):
 	l = [ x for x in self.db.iterFindByName(name, pristine = pristine)
 		 if version == x.getVersion() and flavor == x.getFlavor()]
