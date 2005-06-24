@@ -411,6 +411,10 @@ class ConaryClient:
 	    KEEP = 2
 	    UNKNOWN = 3
 
+	    troveList = []
+
+	    # locks for updated troves are handled when the update trvCs
+	    # is checked; no need to check it again here
             for trvCs in cs.iterNewTroveList():
                 if trvCs.getOldVersion() is None: continue
                 info = (trvCs.getName(), trvCs.getOldVersion(),
@@ -418,10 +422,17 @@ class ConaryClient:
                 nodeIdx[info] = len(nodeList)
                 nodeList.append([ info, ERASE, [], True ])
 
+		if info[0].startswith('fileset-') or info[0].find(":") != -1:
+		    trv = None
+		else:
+		    trv = self.db.getTrove(info[0], info[1], info[2], 
+					   pristine = False)
+		troveList.append((info, trv, None))
+
 	    # this will traceback for primaries which aren't installed, and
-	    # (rightfully) ignores locking for priamry troves
+	    # (rightfully) ignores locking for primary troves
 	    trvs = self.db.getTroves(primaryErases, pristine = False)
-	    troveList = [ (info, trv, None) for info, trv in 
+	    troveList += [ (info, trv, None) for info, trv in 
 				itertools.izip(primaryErases, trvs) ]
 	    while troveList:
 		info, trv, fromTrove = troveList.pop()
@@ -430,6 +441,8 @@ class ConaryClient:
 		    nodeId = len(nodeList)
 		    nodeIdx[info] = nodeId
 		    nodeList.append([info, UNKNOWN, [], False])
+		else:
+		    nodeId = nodeIdx[info]
 
 		if fromTrove is None:
 		    nodeList[nodeId][1] = ERASE
