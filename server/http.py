@@ -89,7 +89,10 @@ class HttpHandler(WebHandler):
         self.client = shimclient.ShimNetClient(
             self.repServer, self._protocol, self._port, auth, self.repServer.map)
         self.serverName = self.repServer.name
-            
+
+        if not self.cmd:
+            self.cmd = "main"
+
         try:
             method = self._getHandler(self.cmd)
         except AttributeError:
@@ -101,8 +104,13 @@ class HttpHandler(WebHandler):
         try:
             return method(**d)
         except netserver.InsufficientPermission:
-            # good password but no permission, don't ask for a new password
-            return apache.HTTP_FORBIDDEN
+            if auth[0] == "anonymous":
+                # if an anonymous user raises InsufficientPermission,
+                # ask for a real login.
+                return self._requestAuth()
+            else:
+                # if a real user raises InsufficientPermission, forbid access.
+                return apache.HTTP_FORBIDDEN
         except InvalidPassword:
             # if password is invalid, request a new one
             return self._requestAuth()
@@ -127,6 +135,7 @@ class HttpHandler(WebHandler):
 
     def browse(self, auth):
         troves = self.client.getAllTroveLeaves(self.serverName, {None: [None]})
+        
         packages = []
         components = {}
         for trove in troves:
@@ -137,7 +146,8 @@ class HttpHandler(WebHandler):
                 l = components.setdefault(package, [])
                 l.append(component)
 
-        # add back leftover component-only troves to packages list
+        # add back troves that do not have a parent package container
+        # to the package list
         noPackages = set(components.keys()) - set(packages)
         for x in noPackages:
             for component in components[x]:
