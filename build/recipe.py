@@ -522,9 +522,6 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                                                  labelPath=labelPath, 
                                                  versionStr=versionStr,
                                      ignoreInstalled=alwaysIgnoreInstalled)[0]
-    if flavor:
-        cfg.buildFlavor = oldBuildFlavor
-        use.setBuildFlagsFromFlavor(parentPackageName, cfg.buildFlavor)
 
 
     for name, recipe in loader.allRecipes().items():
@@ -545,6 +542,12 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                           usedFlavor)
             callerGlobals['loadedTroves'].extend(recipe._loadedTroves)
             callerGlobals['loadedTroves'].append(troveTuple)
+
+    if flavor:
+        cfg.buildFlavor = oldBuildFlavor
+        # must set this flavor back after the above use.createFlavor()
+        use.setBuildFlagsFromFlavor(parentPackageName, cfg.buildFlavor)
+
     # stash a reference to the module in the namespace
     # of the recipe that loaded it, or else it will be destroyed
     callerGlobals[os.path.basename(file).replace('.', '-')] = loader
