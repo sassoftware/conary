@@ -163,17 +163,20 @@ class NetworkAuthorization:
         self.db.commit()
                             
     def addUser(self, user, password):
-        cu = self.db.cursor()
         salt = os.urandom(4)
         
         m = md5.new()
         m.update(salt)
         m.update(password)
+        return self.addUserByMD5(user, salt, m.hexdigest())
+
+    def addUserByMD5(self, user, salt, password):
 
         # insert into userGroups first; since every entry in users is
         # also in userGroups, the uniqueness constraint on the 
         # userGroups table ensures uniqueness in both, and lets us use
         # the userGroupId as the userId as well
+        cu = self.db.cursor()
 
         try:
             cu.execute("INSERT INTO UserGroups VALUES (NULL, ?)", user)
@@ -185,7 +188,7 @@ class NetworkAuthorization:
         userGroupId = cu.lastrowid
 
         cu.execute("INSERT INTO Users VALUES (?, ?, ?, ?)",
-                   (userGroupId, user, salt, m.hexdigest()))
+                   (userGroupId, user, salt, password))
         userId = cu.lastrowid
         cu.execute("INSERT INTO UserGroupMembers VALUES (?, ?)", 
                    userGroupId, userGroupId)

@@ -143,6 +143,16 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return True
 
+    def addUserByMD5(self, authToken, clientVersion, user, salt, newPassword):
+        # adds a new user, with no acls. for now it requires full admin
+        # rights
+        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+            raise InsufficientPermissions
+
+        #Base64 decode salt
+        self.auth.addUserByMD5(user, base64.decodestring(salt), newPassword)
+        return True
+
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
                label, write, capped, admin):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):

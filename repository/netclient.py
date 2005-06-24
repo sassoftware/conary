@@ -242,6 +242,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         # the label just identifies the repository to create the user in
         self.c[label].addUser(user, newPassword)
 
+    def addUserByMD5(self, label, user, salt, password):
+        #Base64 encode salt
+        self.c[label].addUserByMD5(user, base64.encodestring(salt), password)
+
     def addAcl(self, reposLabel, userGroup, trovePattern, label, write,
                capped, admin):
         if not label:
