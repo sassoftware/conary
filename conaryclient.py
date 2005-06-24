@@ -151,6 +151,9 @@ class ConaryClient:
         while depList:
             nextCheck = [ x[1] for x in depList ]
             if nextCheck == lastCheck:
+                # if we didn't resolve anything last time, so we're
+                # checking the exact same set of dependencies  --
+                # just give up
                 sugg = {}
             else:
                 sugg = self.repos.resolveDependencies(
@@ -231,6 +234,7 @@ class ConaryClient:
                 foundSuggestions = False
             else:
                 pathIdx += 1
+                lastCheck = []
                 if troves:
                     foundSuggestions = True
                 if pathIdx == len(self.cfg.installLabelPath):
