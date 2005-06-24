@@ -682,6 +682,9 @@ class ConaryClient:
             # to two new versions of that trove simultaneously. This assumes
             # that the cs passed in to us doesn't have this problem; we only
             # check neededJob for it
+
+	    # XXX it seems like findErasures should actually be the one
+	    # responsible for this
             removed = {}
             for trvCs in cs.iterNewTroveList():
                 if trvCs.getOldVersion() is not None:
