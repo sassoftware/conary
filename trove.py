@@ -28,24 +28,25 @@ from streams import FrozenVersionStream
 from streams import DependenciesStream
 from streams import ByteStream
 
-class SingleBuildDependency(streams.StreamSet):
-    _SINGLE_BUILD_DEP_NAME    = 0
-    _SINGLE_BUILD_DEP_VERSION = 1
-    _SINGLE_BUILD_DEP_FLAVOR  = 2
+class TroveTuple(streams.StreamSet):
+    _SINGLE_TROVE_TUP_NAME    = 0
+    _SINGLE_TROVE_TUP_VERSION = 1
+    _SINGLE_TROVE_TUP_FLAVOR  = 2
 
     ignoreUnknown = True
     streamDict = {
-        _SINGLE_BUILD_DEP_NAME    : (streams.StringStream,        'name'    ),
-        _SINGLE_BUILD_DEP_VERSION : (streams.StringVersionStream, 'version' ),
-        _SINGLE_BUILD_DEP_FLAVOR  : (streams.DependenciesStream,  'flavor'  )
+        _SINGLE_TROVE_TUP_NAME    : (streams.StringStream,        'name'    ),
+        _SINGLE_TROVE_TUP_VERSION : (streams.StringVersionStream, 'version' ),
+        _SINGLE_TROVE_TUP_FLAVOR  : (streams.DependenciesStream,  'flavor'  )
     }
     _streamDict = streams.StreamSetDef(streamDict)
 
-class BuildDependencies(streams.StreamCollection):
-    streamDict = { 1 : SingleBuildDependency }
+
+class TroveTupleList(streams.StreamCollection):
+    streamDict = { 1 : TroveTuple }
 
     def add(self, name, version, flavor):
-        dep = SingleBuildDependency()
+        dep = TroveTuple()
         dep.name.set(name)
         dep.version.set(version)
         dep.flavor.set(flavor)
@@ -54,20 +55,54 @@ class BuildDependencies(streams.StreamCollection):
     def iter(self):
         return self.iterAll()
 
-_TROVEINFO_TAG_SIZE        = 0
-_TROVEINFO_TAG_SOURCENAME  = 1
-_TROVEINFO_TAG_BUILDTIME   = 2
-_TROVEINFO_TAG_CONARYVER   = 3
-_TROVEINFO_TAG_BUILDDEPS   = 4
+class BuildDependencies(TroveTupleList):
+    pass
+
+class LoadedTroves(TroveTupleList):
+    pass
+
+class InstallBinItem(streams.StreamSet):
+    _INSTALL_BIN_KEY  = 0
+    _INSTALL_BIN_VALUE = 1
+
+    ignoreUnknown = True
+    streamDict = {
+        _INSTALL_BIN_KEY    : (streams.StringStream,        'key'    ),
+        _INSTALL_BIN_VALUE  : (streams.StringStream,        'value'  ),
+    }
+    _streamDict = streams.StreamSetDef(streamDict)
+
+
+class InstallBin(streams.StreamCollection):
+    streamDict = { 1 : InstallBinItem }
+
+    def add(self, key, value):
+        item = InstallBinItem()
+        item.key.set(key)
+        item.value.set(value)
+        self.addStream(1, item)
+
+    def iter(self):
+        return self.iterAll()
+
+_TROVEINFO_TAG_SIZE           = 0
+_TROVEINFO_TAG_SOURCENAME     = 1
+_TROVEINFO_TAG_BUILDTIME      = 2
+_TROVEINFO_TAG_CONARYVER      = 3
+_TROVEINFO_TAG_BUILDDEPS      = 4
+_TROVEINFO_TAG_LOADEDTROVES   = 5
+_TROVEINFO_TAG_INSTALLBINS    = 6
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
     streamDict = {
-        _TROVEINFO_TAG_SIZE       : ( streams.LongLongStream,'size'       ),
-        _TROVEINFO_TAG_SOURCENAME : ( streams.StringStream,  'sourceName' ),
-        _TROVEINFO_TAG_BUILDTIME  : ( streams.LongLongStream,'buildTime'  ),
-        _TROVEINFO_TAG_CONARYVER  : ( streams.StringStream,  'conaryVersion'),
-        _TROVEINFO_TAG_BUILDDEPS  : ( BuildDependencies,     'buildReqs'  ),
+        _TROVEINFO_TAG_SIZE         : ( streams.LongLongStream,'size'         ),
+        _TROVEINFO_TAG_SOURCENAME   : ( streams.StringStream,  'sourceName'   ),
+        _TROVEINFO_TAG_BUILDTIME    : ( streams.LongLongStream,'buildTime'    ),
+        _TROVEINFO_TAG_CONARYVER    : ( streams.StringStream,  'conaryVersion'),
+        _TROVEINFO_TAG_BUILDDEPS    : ( BuildDependencies,     'buildReqs'    ),
+        _TROVEINFO_TAG_LOADEDTROVES : ( LoadedTroves,          'loadedTroves' ),
+        _TROVEINFO_TAG_INSTALLBINS  : ( InstallBin,            'installBin'   ),
     }
     _streamDict = streams.StreamSetDef(streamDict)
 
@@ -990,6 +1025,23 @@ class Trove(streams.LargeStreamSet):
     def getBuildRequirements(self):
         return [ (x[1].name(), x[1].version(), x[1].flavor()) 
                          for x in self.troveInfo.buildReqs.iterAll() ]
+
+    def setLoadedTroves(self, itemList):
+        for (name, ver, release) in itemList:
+            self.troveInfo.loadedTroves.add(name, ver, release)
+
+    def getLoadedTroves(self):
+        return [ (x[1].name(), x[1].version(), x[1].flavor()) 
+                 for x in self.troveInfo.loadedTroves.iterAll() ]
+
+    def setInstallBin(self, installBin):
+        for (key, value) in sorted(installBin.iteritems()):
+            self.troveInfo.installBin.add(key, value)
+
+    def getInstallBin(self):
+        return dict( (x[1].key(), x[1].value()) 
+                     for x in self.troveInfo.installBin.iterAll())
+
 
     def __init__(self, name, version, flavor, changeLog, isRedirect = False):
         streams.LargeStreamSet.__init__(self)

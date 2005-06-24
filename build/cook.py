@@ -798,11 +798,10 @@ def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
             grpMap[main].setSourceName(sourceName)
             grpMap[main].setBuildTime(buildTime)
             grpMap[main].setConaryVersion(constants.version)
-            # do not turn this on yet, it will make changesets unreadable
-            # by older clients
-##             grpMap[main].setBuildRequirements(
-##                     [ (x.getName(), x.getVersion(), x.getFlavor())
-##                             for x in recipeObj.buildReqMap.itervalues() ] )
+            grpMap[main].setLoadedTroves(recipeObj.getLoadedTroves())
+            grpMap[main].setBuildRequirements(
+                     set((x.getName(), x.getVersion(), x.getFlavor())
+                             for x in recipeObj.buildReqMap.itervalues()) )
 	    provides = deps.DependencySet()
 	    provides.addDep(deps.TroveDependencies, deps.Dependency(main))
 	    grpMap[main].setProvides(provides)
@@ -872,6 +871,7 @@ def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
         p.setSourceName(sourceName)
         p.setBuildTime(buildTime)
         p.setConaryVersion(constants.version)
+        p.setInstallBin(buildPkg.getInstallBin())
 	
 	byDefault = comp not in recipeObj.getUnpackagedComponentNames()
         grp.addTrove(compName, p.getVersion(), p.getFlavor(),
