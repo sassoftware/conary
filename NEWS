@@ -3,6 +3,8 @@ Changes in 0.60.13:
     contents browser, accessible either from the main page (if you are
     logged into the web interface), or from the /browse url. Example:
         http://conary.example.com/conary/browse
+  * A bug preventing all access to the web interface if an anonymous
+    user existed has been fixed.
   * "Large" updates are split into multiple pieces which are downloaded
      and installed independently of one another
   * Trove updates are tracked through collections
