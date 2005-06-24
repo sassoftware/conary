@@ -175,14 +175,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
 
         if info:
             callback.done()
-            totalJobs = len(updJob.getChangeSets())
-            for num, cs in enumerate(updJob.getChangeSets()):
-                if totalJobs > 1:
-                    print 'Job %d of %d:' %(num + 1, totalJobs)
-                    indent = '    '
-                else:
-                    indent = '    '
-                new = []
+            new = []
+            for cs in updJob.getChangeSets():
                 for x in cs.iterNewTroveList():
                     oldVersion = x.getOldVersion()
                     newVersion = x.getNewVersion()
@@ -190,12 +184,12 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                         oldTVersion = oldVersion.trailingRevision()
                     else:
                         # if there is no oldVersion, this is a new trove
-                        new.append(("%s (%s)" %
-                                    (x.getName(),
+                        new.append(("%s (%s)" % 
+                                    (x.getName(), 
                                      newVersion.trailingRevision().asString()),
                                     'N'))
                         continue
-
+                        
                     newTVersion = newVersion.trailingRevision()
 
                     if oldVersion.branch() != newVersion.branch():
@@ -212,22 +206,27 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                     (x.getName(), oldTVersion.asString(),
                                      newTVersion.asString()), kind))
 
-                new.sort()
-                new = [ "%s %s" % (x[1], x[0]) for x in new ]
+	    new.sort()
+	    new = [ "%s %s" % (x[1], x[0]) for x in new ]
 
-                old = []
-                old += [ "D %s (%s deleted)" % (x[0], x[1].trailingRevision().asString()) 
-                         for x in cs.getOldTroveList() ]
-                old.sort()
+            old = []
+            for cs in updJob.getChangeSets():
+                old += [ "%s (%s)" % (x[0], x[1].trailingRevision().asString()) 
+                                    for x in cs.getOldTroveList() ]
+	    old.sort()
+            if not new and not old:
+                print "No troves are affected by this update."
+            
+            if new:
+                print "Versions of the following troves will be updated:"
+                print "\t", "\n\t".join(new)
 
-                if not new and not old:
-                    print indent + "Nothing is affected by this update."
+            if new and old:
+                print "\n",
 
-                if new:
-                    print indent + ("\n%s" %indent).join(new)
-
-                if old:
-                    print indent + ("\n%s" %indent).join(old)
+            if old:
+                print "Versions of the following troves will be removed:"
+                print "\t", "\n\t".join(old)
 
             return
 
