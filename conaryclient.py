@@ -607,6 +607,9 @@ class ConaryClient:
                             uJob.addLockMapping(name, 
                                                 (oldVersion, oldFlavor),
                                                 (newVersion, newFlavor))
+                    elif newVersion is None:
+                        assert((name, oldVersion, oldFlavor) in
+                                    cs.getOldTroveList())
                     else:
                         keepList.append((name, (oldVersion, oldFlavor),
                                                (newVersion, newFlavor), False))
@@ -867,7 +870,7 @@ class ConaryClient:
 
                 for (name, (oldVersion, oldFlavor),
                            (newVersion, newFlavor), absolute) in job:
-                    if ':' not in name:
+                    if newVersion is not None and ':' not in name:
                         foundCollection = True
 
                     if not newVersion:
