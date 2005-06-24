@@ -535,7 +535,6 @@ class InstallBin(policy.Policy):
             return dict((x[0], x[1] % self.recipe.macros) \
                                             for x in binKeys.iteritems())
 
-        installKeys = {}
         # install the default keys for components
         for compName, binKeys in self.defaultCompKeys.iteritems():
             for component in self.recipe.autopkg.getComponents():
