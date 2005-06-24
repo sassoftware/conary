@@ -404,6 +404,25 @@ class ConaryClient:
 
             return r
 
+        def _removeObsoletes(cs, obsoletes):
+            rmvd = {}
+
+            for (name, (oldVersion, oldFlavor), 
+                       (newVersion, newFlavor), absolute) in obsoletes:
+                if newVersion:
+                    if not oldVersion:
+                        # we may need to put this back later (and going over
+                        # the network for something we already have is 1. dumb
+                        # and 2. inappropriate for changeset files being
+                        # installed)
+                        rmvd[(name, newVersion, newFlavor)] = \
+                            cs.getNewTroveVersion(name, newVersion, newFlavor)
+                    cs.delNewTrove(name, newVersion, newFlavor)
+                else:
+                    cs.delOldTrove(name, oldVersion, oldFlavor)
+
+            return rmvd
+
 	def _findErasures(cs, primaryErases, recurse):
 	    nodeList = []
 	    nodeIdx = {}
@@ -634,26 +653,12 @@ class ConaryClient:
             if (name, version, flavor) in primaries:
 		erasePrimaryList.append((name, version, flavor))
 
-	newJobList +=_findErasures(cs, erasePrimaryList, recurse)
-
         origJob = set(origJob)
+
+	newJobList += _findErasures(cs, erasePrimaryList, recurse)
         newJob = set(newJobList)
 
-        obsoleteJob = origJob - newJob
-        removedTroves = {}
-        for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), absolute) \
-                                                in obsoleteJob:
-            if newVersion:
-                if not oldVersion:
-                    # we may need to put this back later (and going over the
-                    # network for something we already have is 1. dumb and
-                    # 2. inappropriate for changeset files being installed)
-                    removedTroves[(name, newVersion, newFlavor)] = \
-                        cs.getNewTroveVersion(name, newVersion, newFlavor)
-                cs.delNewTrove(name, newVersion, newFlavor)
-            else:
-                cs.delOldTrove(name, oldVersion, oldFlavor)
-
+        removedTroves = _removeObsoletes(cs, origJob - newJob)
         neededJob = newJob - origJob
 
         if keepExisting:
