@@ -16,6 +16,12 @@ Changes in 0.60.13:
   * Database migration removes stale versions
   * --replace-files marks the replaced versions of the files as no longer
     present
+  * Skeleton code in policy for Install Bins - does not do anything yet.
+    By specifying a component's install bin, which is a set of key-value 
+    pairs, you can describe whether two versions of a component are 
+    installable side-by-side.  If two versions of the component share the
+    same keys for their install bins, but at least one different value, then
+    the components are installable side-by-side.
 
 Changes in 0.60.12:
   * Previously, if you ran "conary update foo", and foo requires a new

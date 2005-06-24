@@ -499,11 +499,11 @@ class PackageSpec(_filterSpec):
 	# that the initial tree is built
         recipe.autopkg.walk(self.macros['destdir'])
 
-class InstallKey(policy.Policy):
+class InstallBin(policy.Policy):
     """
         Set key/value pairs that determine whether conary assumes that two 
         versions of a component can be installed side-by-side:
-        C{r.InstallKey('foo:runtime', key1='value1', key2='value2')}
+        C{r.InstallBin('foo:runtime', key1='value1', key2='value2')}
 
         If two versions of a component share the same install keys, but
         differ on a value for some key, the two troves are assumed to be
@@ -514,20 +514,20 @@ class InstallKey(policy.Policy):
 
     def __init__(self, *args, **keywords):
         policy.Policy.__init__(self, *args, **keywords)
-        self.installKeySpecs = {}
+        self.installBinSpecs = {}
 
     def updateArgs(self, *args, **keywords):
         # keep a list of packages filtered for in PackageSpec in the recipe
         if args:
             if len(args) > 1:
                 raise RuntimeError, ('Cannot specify multiple components'
-                                     ' for InstallKey, got '
+                                     ' for InstallBin, got '
                                      ' %s' % ', '.join(args) )
             name = args[0]
             if ':' not in name:
-                raise RuntimeError, ('Packages can not have an installKey -'
+                raise RuntimeError, ('Packages can not have an install bin -'
                                      ' they must be component specific')
-            self.installKeySpecs[args[0]] = keywords
+            self.installBinSpecs[args[0]] = keywords
 
 
     def do(self):
@@ -544,7 +544,7 @@ class InstallKey(policy.Policy):
 
         # override or fill in binKeys from user specified bin keys
         for component in self.recipe.autopkg.getComponents():
-            binKeys = self.installKeySpecs.get(component.name, {})
+            binKeys = self.installBinSpecs.get(component.name, {})
             component.setInstallBin(_expandBinKeys(binKeys))
 
 
@@ -1883,7 +1883,7 @@ def DefaultPolicy(recipe):
 	CheckDestDir(recipe),
 	ComponentSpec(recipe),
 	PackageSpec(recipe),
-        InstallKey(recipe),
+        InstallBin(recipe),
 	EtcConfig(recipe),
 	Config(recipe),
 	InitialContents(recipe),
