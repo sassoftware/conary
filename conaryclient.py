@@ -710,7 +710,8 @@ class ConaryClient:
                     continue
 
                 if removed.has_key((job[0], job[1][0], job[1][1])):
-                    jobList.append((job[0], (None, None), job[2], job[3]))
+                    if job[2][1] is not None:
+                        jobList.append((job[0], (None, None), job[2], job[3]))
                 else:
                     jobList.append(job)
                     removed[(job[0], job[1][0], job[1][1])] = True
