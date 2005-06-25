@@ -427,7 +427,8 @@ class ConaryClient:
                 if not newVersion:
                     cs.delOldTrove(name, oldVersion, oldFlavor)
 
-	def _findErasures(cs, primaryErases, referencedTroves, recurse):
+	def _findErasures(primaryErases, newJob, referencedTroves, 
+                          recurse):
 	    nodeList = []
 	    nodeIdx = {}
 	    ERASE = 1
@@ -436,14 +437,28 @@ class ConaryClient:
 
 	    troveList = []
 
-	    # locks for updated troves are handled when the update trvCs
+            # Make sure troves which the changeset thinks should be removed
+            # get considered for removal. Ones which need to be removed
+            # for a new trove to be installed are guaranteed to be removed.
+            #
+	    # Locks for updated troves are handled when the update trvCs
 	    # is checked; no need to check it again here
-            for trvCs in cs.iterNewTroveList():
-                if trvCs.getOldVersion() is None: continue
-                info = (trvCs.getName(), trvCs.getOldVersion(),
-                        trvCs.getOldFlavor())
+            oldTroves = [ ((job[0], job[1][0], job[1][1]), True, ERASE) for
+                                job in newJob
+                                if job[1][0] is not None and 
+                                   job[2][0] is not None ]
+            eraseList = [ (job[0], job[1][0], job[1][1]) for
+                                job in newJob
+                                if job[1][0] is not None and 
+                                   job[2][0] is None ]
+            present = self.db.hasTroves(eraseList)
+            oldTroves += [ (info, False, UNKNOWN) for info, isPresent in
+                                itertools.izip(eraseList, present)
+                                if isPresent ]
+
+            for info, fromUpdate, state in oldTroves:
                 nodeIdx[info] = len(nodeList)
-                nodeList.append([ info, ERASE, [], True ])
+                nodeList.append([ info, state, [], fromUpdate ])
 
 		if info[0].startswith('fileset-') or info[0].find(":") != -1:
 		    trv = None
@@ -452,11 +467,13 @@ class ConaryClient:
 					   pristine = False)
 		troveList.append((info, trv, None))
 
-	    # this will traceback for primaries which aren't installed, and
-	    # (rightfully) ignores locking for primary troves
-	    trvs = self.db.getTroves(primaryErases, pristine = False)
-	    troveList += [ (info, trv, None) for info, trv in 
-				itertools.izip(primaryErases, trvs) ]
+            del oldTroves, present, eraseList
+
+            # primary troves need to be set to force erase (which may
+            # not be done by the above logic!)
+            for info in primaryErases:
+                nodeList[nodeIdx[info]][1] = ERASE
+
 	    while troveList:
 		info, trv, fromTrove = troveList.pop()
 
@@ -467,11 +484,6 @@ class ConaryClient:
 		else:
 		    nodeId = nodeIdx[info]
 
-		if fromTrove is None:
-		    nodeList[nodeId][1] = ERASE
-		else:
-		    nodeList[fromTrove][2].append(nodeId)
-		
 		if not trv or not recurse:
 		    continue
 
@@ -655,18 +667,20 @@ class ConaryClient:
                                                 (oldVersion, oldFlavor),
                                                 (newVersion, newFlavor))
                     elif newVersion is None:
-                        assert((name, oldVersion, oldFlavor) in
-                                    cs.getOldTroveList())
+                        newJob.add((name, (oldVersion, oldFlavor),
+                                          (None, None), False))
                     else:
                         keepList.append((name, (oldVersion, oldFlavor),
                                                (newVersion, newFlavor), False))
 
         erasePrimaryList = []
         for (name, version, flavor) in cs.getOldTroveList():
-            origJob.append((name, (version, flavor), (None, None), False))
+            job = (name, (version, flavor), (None, None), False)
+            origJob.append(job)
 
             if (name, version, flavor) in primaries:
 		erasePrimaryList.append((name, version, flavor))
+                newJob.add(job)
 
         origJob = set(origJob)
 
@@ -674,7 +688,7 @@ class ConaryClient:
         # _findErasures from stubbing it's toe on trvCs entries which don't
         # matter
         removedTroves = _removeObsoleteUpdates(cs, origJob - newJob)
-        newJob.update(_findErasures(cs, erasePrimaryList, 
+        newJob.update(_findErasures(erasePrimaryList, newJob,
                                     referencedTroves, recurse))
         # now get rid of obsolete erases
         _removeObsoleteErasures(cs, origJob - newJob)
