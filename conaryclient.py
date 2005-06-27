@@ -606,7 +606,6 @@ class ConaryClient:
                 newCs = self.repos.createChangeSet(deferredList, 
                                                    withFiles = False)
                 cs.merge(newCs)
-                origJob += deferredList
                 keepList = deferredList
                 deferredList = []
             if not keepList:
