@@ -21,6 +21,7 @@ import fsrepos
 from lib import log
 import files
 import os
+import sys
 import re
 from lib import sha1helper
 import sqlite3
@@ -152,6 +153,30 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         #Base64 decode salt
         self.auth.addUserByMD5(user, base64.decodestring(salt), newPassword)
         return True
+
+    def deleteUserByName(self, authToken, clientVersion, user):
+        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+            raise InsufficientPermissions
+
+        error = self.auth.deleteUserByName(user)
+        if error:
+            print >>sys.stderr, error
+            sys.stderr.flush()
+            return False
+        else:
+            return True
+
+    def deleteUserById(self, authToken, clientVersion, userId):
+        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+            raise InsufficientPermissions
+
+        error = self.auth.deleteUserById(userId)
+        if error:
+            print >>sys.stderr, error
+            sys.stderr.flush()
+            return False
+        else:
+            return True
 
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
                label, write, capped, admin):

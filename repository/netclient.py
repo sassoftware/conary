@@ -246,6 +246,12 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         #Base64 encode salt
         self.c[label].addUserByMD5(user, base64.encodestring(salt), password)
 
+    def deleteUserByName(self, label, user):
+        self.c[label].deleteUserByName(user)
+
+    def deleteUserById(self, label, userId):
+        self.c[label].deleteUserById(userId)
+
     def addAcl(self, reposLabel, userGroup, trovePattern, label, write,
                capped, admin):
         if not label:

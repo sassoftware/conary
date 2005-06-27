@@ -196,6 +196,69 @@ class NetworkAuthorization:
         self.db.commit()
         return userId
 
+    def deleteUserByName(self, user, commit = True):
+        cu = self.db.cursor()
+
+        error = None
+        sql = "SELECT userId FROM Users WHERE user=?"
+        cu.execute(sql, user)
+        try:
+            userId = cu.next()[0]
+        except StopIteration:
+            #Don't delete if there's nothing there
+            error = "User '%s' does not exist in the repository" % user
+        if not error:
+            return self.deleteUser(userId, user, commit)
+        else:
+            return error
+
+    def deleteUserById(self, userId, commit = True):
+        cu = self.db.cursor()
+
+        error = None
+        sql = "SELECT user FROM Users WHERE userId=?"
+        cu.execute(sql, userId)
+        try:
+            user = cu.next()[0]
+        except StopIteration:
+            #Don't delete if there's nothing there
+            error = "UserId '%d' does not exist in the repository" % userId
+        if not error:
+            return self.deleteUser(userId, user, commit)
+        else:
+            return error
+
+
+    def deleteUser(self, userId, user, commit = True):
+        # Need to do a lot of stuff:
+        # UserGroups, Users, and all ACLs
+
+        cu = self.db.cursor()
+
+        error = None
+        try:
+            #First delete the user from all the groups
+            sql = "DELETE from UserGroupMembers WHERE userId=?"
+            cu.execute(sql, userId)
+
+                
+            #Then delete the UserGroup created with the name of that user
+            self.deleteGroup(user, False)
+
+            #Now delete the user-self
+            sql = "DELETE from Users WHERE userId=?"
+            cu.execute(sql, userId)
+
+            if commit: 
+                self.db.commit()
+        except Exception, e:
+            if commit:
+                self.db.rollback()
+                error = str(e)
+            else:
+                raise e
+        return error
+
     def changePassword(self, user, newPassword):
         cu = self.db.cursor()
 
@@ -244,6 +307,15 @@ class NetworkAuthorization:
         for row in cu:
             yield row
 
+    def iterGroupMembers(self, userGroupId):
+        cu = self.db.cursor()
+        cu.execute("""SELECT Users.user FROM UserGroupMembers, Users
+                      WHERE Users.userId = UserGroupMembers.userId AND
+                      UserGroupMembers.userGroupId=?""", userGroupId)
+
+        for row in cu:
+            yield row[0]
+
     def iterPermsByGroupId(self, userGroupId):
         cu = self.db.cursor()
         cu.execute("""SELECT Permissions.labelId, Labels.label,
@@ -259,6 +331,14 @@ class NetworkAuthorization:
         for row in cu:
             yield row
 
+    def getGroupIdByName(self, userGroupName):
+        cu = self.db.cursor()
+
+        cu.execute("SELECT userGroupId FROM UserGroups WHERE userGroup=?",
+            userGroupName)
+
+        return cu.next()[0]
+
     def addGroup(self, userGroupName):
         cu = self.db.cursor()
     
@@ -272,7 +352,17 @@ class NetworkAuthorization:
         cu.execute("INSERT INTO UserGroupMembers VALUES(?, ?)",
                    userGroupId, userId)
         self.db.commit()
-    
+
+    def deleteGroup(self, userGroupName, commit = True):
+        return self.deleteGroupById(self.getGroupIdByName(userGroupName), commit)
+    def deleteGroupById(self, userGroupId, commit = True):
+        cu = self.db.cursor()
+        cu.execute("DELETE FROM Permissions WHERE userGroupId=?", userGroupId)
+        cu.execute("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
+        cu.execute("DELETE FROM UserGroups WHERE userGroupId=?", userGroupId)
+        if commit:
+            self.db.commit()
+
     def deletePermission(self, userGroupId, labelId, itemId):
         cu = self.db.cursor()
         
