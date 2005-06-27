@@ -904,8 +904,9 @@ class ConaryClient:
                          False, troves without a prefix will be erased, but
                          troves prefixed by a '+' will be updated.
         @type itemList: [(troveName, version, flavor), ...]
-        @param keepExisting: If True, troves updated will updated without erasing older
-                             versions of the same trove.
+        @param keepExisting: If True, troves updated not erase older
+                             versions of the same trove, as long as there
+                             are no conflicting files in either trove.
         @type keepExisting: bool
         @param recurse: Apply updates/erases to container troves. [FIXME: accurate?]
         @type recurse: bool
