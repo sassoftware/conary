@@ -106,7 +106,17 @@ def _scoreSort(x, y):
     return cmp(x[1], y[1])
 
 class ConaryClient:
+    """
+    ConaryClient is a high-level class to some useful Conary operations,
+    including trove updates and erases.
+    """
     def __init__(self, cfg = None):
+        """
+        @param cfg: a custom L{conarycfg.ConaryConfiguration object}.
+                    If None, the standard Conary configuration is loaded
+                    from /etc/conaryrc, ~/.conaryrc, and ./conaryrc.
+        @type cfg: L{conarycfg.ConaryConfiguration}
+        """
         if cfg == None:
             cfg = conarycfg.ConaryConfiguration()
             cfg.initializeFlavors()
@@ -885,6 +895,35 @@ class ConaryClient:
                         depsRecurse = True, resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
                         split = False):
+        """
+        Creates a changeset to update the system based on a set of trove update
+        and erase operations.
+        @param itemList: A list of 3-length tuples: (troveName, version, flavor).
+                         If updateByDefault is True, trove names in itemList
+                         prefixed by a '-' will be erased. If updateByDefault is
+                         False, troves without a prefix will be erased, but
+                         troves prefixed by a '+' will be updated.
+        @type itemList: [(troveName, version, flavor), ...]
+        @param keepExisting: If True, troves updated will updated without erasing older
+                             versions of the same trove.
+        @type keepExisting: bool
+        @param recurse: Apply updates/erases to container troves. [FIXME: accurate?]
+        @type recurse: bool
+        @param depsRecurse: Resolve dependencies recursively. [FIXME: accurate?]
+        @type depsRecurse: bool
+        @param resolveDeps: Resolve dependencies. [FIXME: describe this and the previous better]
+        @type resolveDeps: bool
+        @param test: If True, the operations will be attempted but the filesystem and database
+                     will not be updated.
+        @type test: bool
+        @param updateByDefault: If True, troves passed to L{itemList} without a '-' or '+' prefix will
+                                be updated. If False, troves without a prefix will be erased.
+        @type updateByDefault: bool
+        @param callback: L{callbacks.UpdateCallback} object.
+        @type L{callbacks.UpdateCallback}
+        @param split: Split large update operations into separate jobs. [FIXME: accurate?]
+        @type split: bool
+        """
         callback.preparingChangeSet()
 
         uJob = UpdateJob()
