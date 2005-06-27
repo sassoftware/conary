@@ -33,7 +33,7 @@ from repository import repository
 from local import idtable
 from local import sqldb
 from local import versiontable
-from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExists
+from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExists, UserNotFound
 import trovestore
 import versions
 from datastore import IntegrityError
@@ -113,6 +113,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	except UserAlreadyExists, e:
             condRollback()
 	    return (True, ("UserAlreadyExists", str(e)))
+        except UserNotFound, e:
+            condRollback()
+            return (True, ("UserNotFound", str(e)))
 	except IntegrityError, e:
             condRollback()
 	    return (True, ("IntegrityError", str(e)))
@@ -158,13 +161,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
             raise InsufficientPermissions
 
-        error = self.auth.deleteUserByName(user)
-        if error:
-            print >>sys.stderr, error
-            sys.stderr.flush()
-            return False
-        else:
-            return True
+        self.auth.deleteUserByName(user)
+        return True
 
     def deleteUserById(self, authToken, clientVersion, userId):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):

@@ -88,6 +88,8 @@ class _Method(xmlrpclib._Method):
         elif exceptionName == "UserAlreadyExists":
             import netrepos
 	    raise UserAlreadyExists(exceptionArgs[0])
+        elif exceptionName == "UserNotFound":
+            raise UserNotFound(exceptionArgs[0])
 	else:
 	    raise UnknownException(exceptionName, exceptionArgs)
 
@@ -1157,6 +1159,13 @@ class UnknownException(repository.RepositoryError):
 
 class UserAlreadyExists(Exception):
     pass
+
+class UserNotFound(Exception):
+    def __init__(self, user = "user"):
+        self.user = user
+
+    def __str__(self):
+        return "UserNotFound: %s" % self.user
 
 class InvalidServerVersion(Exception):
     pass

@@ -17,7 +17,7 @@ import re
 import sqlite3
 import sys
 
-from repository.netclient import UserAlreadyExists
+from repository.netclient import UserAlreadyExists, UserNotFound
 
 class NetworkAuthorization:
     def check(self, authToken, write = False, admin = False, label = None, trove = None):
@@ -199,35 +199,26 @@ class NetworkAuthorization:
     def deleteUserByName(self, user, commit = True):
         cu = self.db.cursor()
 
-        error = None
         sql = "SELECT userId FROM Users WHERE user=?"
         cu.execute(sql, user)
         try:
             userId = cu.next()[0]
         except StopIteration:
-            #Don't delete if there's nothing there
-            error = "User '%s' does not exist in the repository" % user
-        if not error:
-            return self.deleteUser(userId, user, commit)
-        else:
-            return error
+            raise UserNotFound(user)
+        
+        return self.deleteUser(userId, user, commit)
 
     def deleteUserById(self, userId, commit = True):
         cu = self.db.cursor()
 
-        error = None
         sql = "SELECT user FROM Users WHERE userId=?"
         cu.execute(sql, userId)
         try:
             user = cu.next()[0]
         except StopIteration:
-            #Don't delete if there's nothing there
-            error = "UserId '%d' does not exist in the repository" % userId
-        if not error:
-            return self.deleteUser(userId, user, commit)
-        else:
-            return error
-
+            raise UserNotFound(user)
+        
+        return self.deleteUser(userId, user, commit)
 
     def deleteUser(self, userId, user, commit = True):
         # Need to do a lot of stuff:
@@ -235,7 +226,6 @@ class NetworkAuthorization:
 
         cu = self.db.cursor()
 
-        error = None
         try:
             #First delete the user from all the groups
             sql = "DELETE from UserGroupMembers WHERE userId=?"
@@ -254,10 +244,9 @@ class NetworkAuthorization:
         except Exception, e:
             if commit:
                 self.db.rollback()
-                error = str(e)
-            else:
-                raise e
-        return error
+            
+            raise e
+        return True
 
     def changePassword(self, user, newPassword):
         cu = self.db.cursor()
