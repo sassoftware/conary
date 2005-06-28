@@ -26,6 +26,8 @@
 # define breakpoint do {__asm__ __volatile__ ("int $03");} while (0)
 #endif
 
+#define ALLOCA_CUTOFF 2048
+
 staticforward PyTypeObject StreamSetDefType;
 
 /* ------------------------------------- */
@@ -130,10 +132,8 @@ static int _StreamSet_doCmp(PyObject * self, PyObject * other,
 	if (skipSet != Py_None && PyDict_Contains(skipSet, ssd->tags[i].name)) 
 	    continue;
 
-	attr = self->ob_type->tp_getattro((PyObject *) self, 
-					  ssd->tags[i].name);
-	otherAttr = other->ob_type->tp_getattro((PyObject *) other, 
-						ssd->tags[i].name);
+	attr = PyObject_GetAttr((PyObject *) self, ssd->tags[i].name);
+	otherAttr = PyObject_GetAttr((PyObject *) other, ssd->tags[i].name);
 	rc = PyObject_CallMethod(attr, "__eq__", "OO", otherAttr, skipSet);
 	Py_DECREF(attr);
 	Py_DECREF(otherAttr);
@@ -199,7 +199,7 @@ static PyObject *concatStrings(StreamSetDefObject *ssd,
     else
 	addTag = addLargeTag;
 
-    if (len < 2096) {
+    if (len < ALLOCA_CUTOFF) {
 	useAlloca = 1;
 	final = alloca(len);
     } else
@@ -256,22 +256,25 @@ static PyObject * StreamSet_DeepCopy(PyObject * self, PyObject * args) {
 static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args) {
     PyObject ** vals;
     StreamSetDefObject * ssd;
-    int i, len;
-    PyObject * attr, * otherAttr;
+    int i, len, useAlloca = 0;
+    PyObject * attr, * otherAttr, *rc;
     StreamSetObject * other;
 
     if (!PyArg_ParseTuple(args, "O!", self->ob_type, &other))
         return NULL;
 
     ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
-    vals = alloca(sizeof(PyObject *) * ssd->tagCount);
+    len = sizeof(PyObject *) * ssd->tagCount;
+    if (len < ALLOCA_CUTOFF) {
+	useAlloca = 1;
+	vals = alloca(len);
+    } else
+	vals = malloc(len);
     len = 0;
 
     for (i = 0; i < ssd->tagCount; i++) {
-	attr = self->ob_type->tp_getattro((PyObject *) self, 
-					  ssd->tags[i].name);
-	otherAttr = other->ob_type->tp_getattro((PyObject *) other, 
-						ssd->tags[i].name);
+	attr = PyObject_GetAttr((PyObject *) self, ssd->tags[i].name);
+	otherAttr = PyObject_GetAttr((PyObject *) other, ssd->tags[i].name);
 
 	vals[i] = PyObject_CallMethod(attr, "diff", "O", otherAttr);
 
@@ -283,6 +286,8 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args) {
 	    for (j = 0; j < i; j++)
 		Py_DECREF(vals[j]);
 
+	    if (!useAlloca)
+		free(vals);
 	    return NULL;
 	} else if (vals[i] != Py_None)
 	    len += ssd->size + PyString_GET_SIZE(vals[i]);
@@ -291,7 +296,11 @@ static PyObject * StreamSet_Diff(StreamSetObject * self, PyObject * args) {
     /* note that, unlike freeze(), diff() includes diffs that
        are zero length.  they have special meaning in some
        stream types (usually that the stored value is None) */
-    return concatStrings(ssd, vals, len, INCLUDE_EMPTY, ssd->size);
+    rc = concatStrings(ssd, vals, len, INCLUDE_EMPTY, ssd->size);
+
+    if (!useAlloca)
+	free(vals);
+    return rc;
 }
 
 static PyObject * StreamSet_Eq(PyObject * self, 
@@ -330,20 +339,25 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
     static char * kwlist[] = { "skipSet", NULL };
     PyObject ** vals;
     StreamSetDefObject * ssd;
-    int i;
-    PyObject * attr, * skipSet = Py_None;
-    int len = 0;
+    int i, len, useAlloca = 0;
+    PyObject * attr, *rc, * skipSet = Py_None;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &skipSet))
         return NULL;
 
-    if (skipSet != Py_None && skipSet->ob_type != &PyDict_Type) {
+    if (skipSet != Py_None && !PyDict_Check(skipSet)) {
         PyErr_SetString(PyExc_TypeError, "skipSet must be None or a dict");
 	return NULL;
     }
 
     ssd = (void *) PyDict_GetItemString(self->ob_type->tp_dict, "_streamDict");
-    vals = alloca(sizeof(PyObject *) * ssd->tagCount);
+    len = sizeof(PyObject *) * ssd->tagCount;
+    if (len < ALLOCA_CUTOFF) {
+	useAlloca = 1;
+	vals = alloca(len);
+    } else
+	vals = malloc(len);
+    len = 0;
 
     for (i = 0; i < ssd->tagCount; i++) {
 	if (skipSet != Py_None && PyDict_Contains(skipSet, ssd->tags[i].name)) {
@@ -352,8 +366,7 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
 	    continue;
         }
 
-	attr = self->ob_type->tp_getattro((PyObject *) self, 
-					  ssd->tags[i].name);
+	attr = PyObject_GetAttr((PyObject *) self, ssd->tags[i].name);
 	vals[i] = PyObject_CallMethod(attr, "freeze", "O", skipSet);
 	Py_DECREF(attr);
 
@@ -362,6 +375,8 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
 
 	    for (j = 0; j < i; j++) 
 		Py_DECREF(vals[j]);
+	    if (!useAlloca)
+		free(vals);
 
 	    return NULL;
 	}
@@ -370,7 +385,10 @@ static PyObject * StreamSet_Freeze(StreamSetObject * self,
             len += PyString_GET_SIZE(vals[i]) + ssd->size;
     }
     /* do not include zero length frozen data */
-    return concatStrings(ssd, vals, len, EXCLUDE_EMPTY, ssd->size);
+    rc = concatStrings(ssd, vals, len, EXCLUDE_EMPTY, ssd->size);
+    if (!useAlloca)
+	free(vals);
+    return rc;
 }
 
 static int StreamSet_Init_Common(PyObject * o, PyObject * args,
@@ -408,15 +426,17 @@ static int StreamSet_Init_Common(PyObject * o, PyObject * args,
     }
 
     ssd->size = size;
-    
+
     for (i = 0; i < ssd->tagCount; i++) {
 	PyObject * obj;
 
         if (!(obj = PyObject_CallFunction(ssd->tags[i].type, NULL)))
 	    return -1;
-	
-	if (self->ob_type->tp_setattro(o, ssd->tags[i].name, obj))
+
+	if (PyObject_SetAttr(o, ssd->tags[i].name, obj)) {
+	    Py_DECREF(obj);
 	    return -1;
+	}
 	/* we keep our reference in our dict */
 	Py_DECREF(obj);
     }
@@ -506,9 +526,8 @@ static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
 	    if (ignoreUnknown == -1) {
 		obj = PyDict_GetItemString(self->ob_type->tp_dict, 
 					   "ignoreUnknown");
-		if (obj) {
+		if (obj != NULL) {
 		    ignoreUnknown = PyInt_AsLong(obj);
-		    Py_DECREF(obj);
 		}
 
 		if (ignoreUnknown == 1)
@@ -519,7 +538,7 @@ static int Thaw_raw(PyObject * self, StreamSetDefObject * ssd,
 	    }
 	}
 
-	attr = self->ob_type->tp_getattro(self, ssd->tags[i].name);
+	attr = PyObject_GetAttr((PyObject *) self, ssd->tags[i].name);
 	ro = PyObject_CallMethod(attr, "thaw", "s#", streamData, size);
 	Py_DECREF(attr);
 	if (!ro) {
@@ -557,7 +576,7 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
 				     &base, &skipSet))
         return NULL;
 
-    if (skipSet != Py_None && skipSet->ob_type != &PyDict_Type) {
+    if (skipSet != Py_None && !PyDict_Check(skipSet)) {
         PyErr_SetString(PyExc_TypeError, "skipSet must be None or a dict");
 	return NULL;
     }
@@ -588,11 +607,9 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
 	if (skipSet != Py_None && PyDict_Contains(skipSet, ssd->tags[i].name))
 	    continue;
 
-	attr = self->ob_type->tp_getattro((PyObject *) self, 
-					  ssd->tags[i].name);
-	baseAttr = base->ob_type->tp_getattro((PyObject *) base, 
-					       ssd->tags[i].name);
-
+	attr = PyObject_GetAttr((PyObject *) self, ssd->tags[i].name);
+	baseAttr = PyObject_GetAttr((PyObject *) base,
+				    ssd->tags[i].name);
 	ro = PyObject_CallMethod(attr, "twm", "s#O", streamData, size, 
 				 baseAttr);
 	Py_DECREF(attr);
@@ -644,7 +661,7 @@ static PyTypeObject StreamSetDefType = {
     0,                              /*tp_str*/
     0,                              /*tp_getattro*/
     0,                              /*tp_setattro*/
-    0,                              /*tp_as_buffer*/
+    0,                              /*tp_as_buffer*/     
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,             /*tp_flags*/
     NULL,                           /* tp_doc */
     0,                              /* tp_traverse */
