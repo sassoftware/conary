@@ -637,8 +637,6 @@ class PathIdsConflictError(Exception):
         self.file1 = file1
         self.trove2 = trove2
         self.file2 = file2
-        from lib import epdb
-        epdb.set_trace()
 
     def getPathId(self):
         return self.pathId
