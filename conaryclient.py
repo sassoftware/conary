@@ -1048,8 +1048,7 @@ class ConaryClient:
                     test = False, justDatabase = False, journal = None, 
                     localRollbacks = False, callback = UpdateCallback()):
 
-        def _handleSingleChangeSet(theCs, uJob, rollback, removeHints = {}, 
-                                   standalone = False):
+        def _createCs(theCs, uJob, standalone = False):
             assert(not standalone or 
                    isinstance(theCs, changeset.ReadOnlyChangeSet))
             cs = changeset.ReadOnlyChangeSet()
@@ -1090,6 +1089,10 @@ class ConaryClient:
                                                callback = callback)
             cs.merge(newCs)
 
+            return newCs
+
+
+        def _applyCs(cs, uJob, rollback, removeHints = {}):
             try:
                 rb = self.db.commitChangeSet(cs, uJob.getLockMaps(),
                                     replaceFiles = replaceFiles,
@@ -1110,7 +1113,8 @@ class ConaryClient:
             # this handles change sets which include change set files
             assert(len(csSet) == 1)
             callback.setHunk(0, 0)
-            _handleSingleChangeSet(csSet[0], uJob, rollback, standalone = True)
+            newCs = _createCs(csSet[0], uJob, standalone = True)
+            _applyCs(newCs, uJob, rollback)
         else:
             # build a set of everything which is being removed
             removeHints = set()
@@ -1125,8 +1129,8 @@ class ConaryClient:
 
             for i, theCs in enumerate(csSet):
                 callback.setHunk(i + 1, len(csSet))
-                _handleSingleChangeSet(theCs, uJob, rollback, 
-                                       removeHints = removeHints)
+                newCs = _createCs(theCs, uJob)
+                _applyCs(newCs, uJob, rollback, removeHints = removeHints)
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):
