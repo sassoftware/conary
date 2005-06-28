@@ -27,7 +27,7 @@ extra_dist = Makefile
 
 dist_files = $(python_files) $(extra_dist)
 
-all: default-install
+all: default-all
 
 install: pyfiles-install
 
