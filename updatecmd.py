@@ -177,17 +177,13 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
     # dedup
     applyList = set(applyList)
     try:
-        updJob = _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
-                              tagScript = tagScript, 
-                              keepExisting = keepExisting, depCheck = depCheck,
-                              depsRecurse = depsRecurse, test = test,
-                              justDatabase = justDatabase, recurse = recurse,
-                              info = info, updateByDefault = updateByDefault,
-                              callback = callback)
-        if info:
-            callback.done()
-            displayUpdateInfo(updJob)
-            return
+        _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
+                      tagScript = tagScript, 
+                      keepExisting = keepExisting, depCheck = depCheck,
+                      depsRecurse = depsRecurse, test = test,
+                      justDatabase = justDatabase, recurse = recurse,
+                      info = info, updateByDefault = updateByDefault,
+                      callback = callback)
     except conaryclient.DependencyFailure, e:
         # XXX print dependency errors because the testsuite 
         # prefers it
@@ -210,6 +206,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
     if not info:
 	client.checkWriteableRoot()
 
+
     (updJob, suggMap) = \
     client.updateChangeSet(applyList, depsRecurse = depsRecurse,
                            resolveDeps = depCheck,
@@ -217,6 +214,11 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                            test = test, recurse = recurse,
                            updateByDefault = updateByDefault,
                            callback = callback, split = True)
+
+    if info:
+        callback.done()
+        displayUpdateInfo(updJob)
+        return
 
     if suggMap:
         callback.done()
