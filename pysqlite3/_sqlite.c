@@ -173,27 +173,83 @@ staticforward PyMethodDef _con_methods[];
 staticforward struct memberlist _con_memberlist[];
 
 PyTypeObject pysqlc_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,
-	"Connection",
-	sizeof(pysqlc),
-	0,
-	(destructor) _con_dealloc,
-	0,
-	(getattrfunc) _con_get_attr,
-	(setattrfunc) NULL,
-}; 
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,                              /*ob_size*/
+    "Connection",                   /*tp_name*/
+    sizeof(pysqlc),                 /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    (destructor) _con_dealloc,      /*tp_dealloc*/
+    0,                              /*tp_print*/
+    (getattrfunc) _con_get_attr,    /*tp_getattr*/
+    (setattrfunc) NULL,             /*tp_setattr*/
+    0,				    /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,				    /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,             /*tp_flags*/
+    NULL,                           /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    0,                              /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    0,                              /* tp_init */
+};
 
 PyTypeObject pysqlstmt_Type = {
-	PyObject_HEAD_INIT(NULL)
-	0,
-	"Statement",
-	sizeof(pysqlstmt),
-	0,
-	(destructor) _stmt_dealloc,
-	0,
-	(getattrfunc) _stmt_get_attr,
-	(setattrfunc) NULL,
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,                              /*ob_size*/
+    "Statement",                    /*tp_name*/
+    sizeof(pysqlstmt),              /*tp_basicsize*/
+    0,                              /*tp_itemsize*/
+    (destructor) _stmt_dealloc,     /*tp_dealloc*/
+    0,                              /*tp_print*/
+    (getattrfunc) _stmt_get_attr,   /*tp_getattr*/
+    (setattrfunc) NULL,             /*tp_setattr*/
+    0,				    /*tp_compare*/
+    0,                              /*tp_repr*/
+    0,                              /*tp_as_number*/
+    0,                              /*tp_as_sequence*/
+    0,                              /*tp_as_mapping*/
+    0,                              /*tp_hash */
+    0,				    /*tp_call*/
+    0,                              /*tp_str*/
+    0,                              /*tp_getattro*/
+    0,                              /*tp_setattro*/
+    0,                              /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,/*tp_flags*/
+    NULL,                           /* tp_doc */
+    0,                              /* tp_traverse */
+    0,                              /* tp_clear */
+    0,                              /* tp_richcompare */
+    0,                              /* tp_weaklistoffset */
+    0,                              /* tp_iter */
+    0,                              /* tp_iternext */
+    0,                              /* tp_methods */
+    0,                              /* tp_members */
+    0,                              /* tp_getset */
+    0,                              /* tp_base */
+    0,                              /* tp_dict */
+    0,                              /* tp_descr_get */
+    0,                              /* tp_descr_set */
+    0,                              /* tp_dictoffset */
+    0,                              /* tp_init */
 };
 
 static void
@@ -1608,6 +1664,12 @@ static PyMethodDef _con_methods[] = {
 	{ NULL, NULL }
 };
 
+#define REGISTER_TYPE(name) \
+    if (PyType_Ready(&name ## _Type) < 0) \
+        return; \
+    Py_INCREF(&name ## _Type); \
+    PyModule_AddObject(module, #name, (PyObject *) &name ## _Type);
+
 PySQLite_MODINIT_FUNC(init_sqlite3)
 {
 	PyObject *module, *dict;
@@ -1617,6 +1679,9 @@ PySQLite_MODINIT_FUNC(init_sqlite3)
 	if (!(dict = PyModule_GetDict(module))) {
 		goto error;
 	}
+
+	REGISTER_TYPE(pysqlc);
+	REGISTER_TYPE(pysqlstmt);
 
 	/*** Initialize type codes */
 	tc_INTEGER = PyInt_FromLong(INTEGER);
