@@ -21,6 +21,7 @@ import kid
 import templates
 
 from repository.netrepos import netserver
+from repository.netclient import UserAlreadyExists, GroupAlreadyExists
 from web.webhandler import WebHandler
 from web.fields import strFields, intFields, listFields, boolFields
 from web.webauth import getAuth
@@ -320,9 +321,37 @@ class HttpHandler(WebHandler):
     @checkAuth(write = True, admin = True)
     def addGroupForm(self, auth):
         users = dict(self.repServer.auth.iterUsers())
-        self._write("add_group", users = users)
+        self._write("add_group", modify = False, userGroupName = None, userGroupId = None, users = users, members = [])
         return apache.OK
-   
+
+    @checkAuth(write = True, admin = True)
+    @strFields(userGroupName = None)
+    def manageGroupForm(self, auth, userGroupName):
+        users = dict(self.repServer.auth.iterUsers())
+        groupId = self.repServer.auth.getGroupIdByName(userGroupName)
+        members = list(self.repServer.auth.iterGroupMembers(groupId))
+
+        self._write("add_group", userGroupName = userGroupName, userGroupId = groupId, users = users, members = members, modify = True)
+        return apache.OK
+
+    @checkAuth(write = True, admin = True)
+    @strFields(userGroupName = None)
+    @intFields(userGroupId = None)
+    @listFields(int, initialUserIds = [])
+    def manageGroup(self, auth, userGroupId, userGroupName, initialUserIds):
+        try:
+            self.repServer.auth.renameGroup(userGroupId, userGroupName)
+        except GroupAlreadyExists:
+            self._write("error", shortError="Invalid Group Name",
+                    error = "The group name you have chosen is already in use.")
+            return apache.OK
+        self.repServer.auth.updateGroupMembers(userGroupId, initialUserIds)
+
+        users = dict(self.repServer.auth.iterUsers())
+        members = list(self.repServer.auth.iterGroupMembers(userGroupId))
+        self._write("add_group", userGroupName = userGroupName, userGroupId = userGroupId, users = users, members = members, modify = True)
+        return apache.OK
+
     @checkAuth(write = True, admin = True)
     @strFields(userGroupName = None)
     @listFields(int, initialUserIds = [])
@@ -331,6 +360,12 @@ class HttpHandler(WebHandler):
         for userId in initialUserIds:
             self.repServer.auth.addGroupMember(newGroupId, userId)
 
+        return self._redirect("userlist")
+
+    @checkAuth(write = True, admin = True)
+    @intFields(userGroupId = None)
+    def deleteGroup(self, auth, userGroupId):
+        self.repServer.auth.deleteGroupById(userGroupId)
         return self._redirect("userlist")
  
     @checkAuth(write = True, admin = True)
@@ -357,6 +392,13 @@ class HttpHandler(WebHandler):
     def addUser(self, auth, user, password, write, admin):
         self.repServer.addUser(auth, 0, user, password)
         self.repServer.addAcl(auth, 0, user, "", "", write, True, admin)
+
+        return self._redirect("userlist")
+
+    @checkAuth(write = True, admin = True)
+    @strFields(username = None)
+    def deleteUser(self, auth, username):
+        self.repServer.auth.deleteUserByName(username)
 
         return self._redirect("userlist")
 

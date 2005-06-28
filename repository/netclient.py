@@ -1160,6 +1160,9 @@ class UnknownException(repository.RepositoryError):
 class UserAlreadyExists(Exception):
     pass
 
+class GroupAlreadyExists(Exception):
+    pass
+
 class UserNotFound(Exception):
     def __init__(self, user = "user"):
         self.user = user

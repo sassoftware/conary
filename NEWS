@@ -1,6 +1,8 @@
 Changes in 0.60.13:
-  * Added repository interfaces for deleting users and groups.
-  * Added a repository iterator function to list the members of a group.
+  * New functionality for maintaining user groups: renaming and updating
+    members
+  * Added repository interfaces for deleting users and groups
+  * Added a repository iterator function to list the members of a group
   * The web interface to the Conary repository now has a repository
     contents browser, accessible either from the main page (if you are
     logged into the web interface), or from the /browse url. Example:

@@ -16,7 +16,7 @@
  full details.
 -->
 
-    ${html_header("Add Group")}
+    ${html_header("Group")}
     <body>
         <h1>Conary Repository</h1>
 
@@ -27,13 +27,14 @@
         <ul class="menu submenu"> </ul>
 
         <div id="content">
-            <h2>Add Group</h2>
+            <h2 py:content="modify and 'Edit Group' or 'Add Group'"></h2>
 
-            <form method="post" action="addGroup">
+            <form method="post" action="${modify and 'manageGroup' or 'addGroup'}">
+                <input py:if="modify" type="hidden" name="userGroupId" value="${userGroupId}" />
                 <table class="add-form">
                     <tr>
                         <td id="header">Group Name:</td>
-                        <td><input type="text" name="userGroupName"/></td>
+                        <td><input type="text" name="userGroupName" value="${userGroupName}"/></td>
                     </tr>
                     <tr>
                         <td id="header">Initial Users:</td>
@@ -41,12 +42,15 @@
                             <select name="initialUserIds" multiple="multiple" size="10"
                                     style="width: 100%;">
                                 <option py:for="userId, userName in users.items()"
-                                        py:content="userName" value="${userId}">${userName}</option>
+                                        value="${userId}" py:attrs="{'selected': (userName in members) and 'selected' or None}">${userName}</option>
                             </select>
                         </td>
                     </tr>
                 </table>
-                <p><input type="submit" value="Add Group" /></p>
+                <p>
+                    <input py:if="not modify" type="submit" value="Add Group" />
+                    <input py:if="modify" type="submit" value="Submit Group Changes" />
+                </p>
             </form>
 
             ${html_footer()}

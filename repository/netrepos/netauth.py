@@ -17,7 +17,7 @@ import re
 import sqlite3
 import sys
 
-from repository.netclient import UserAlreadyExists, UserNotFound
+from repository.netclient import UserAlreadyExists, GroupAlreadyExists, UserNotFound
 
 class NetworkAuthorization:
     def check(self, authToken, write = False, admin = False, label = None, trove = None):
@@ -182,13 +182,19 @@ class NetworkAuthorization:
             cu.execute("INSERT INTO UserGroups VALUES (NULL, ?)", user)
         except sqlite3.ProgrammingError, e:
             if str(e) == 'column userGroup is not unique':
-                raise UserAlreadyExists, 'user: %s' % user
+                raise GroupAlreadyExists, 'group: %s' % user
             raise
 
         userGroupId = cu.lastrowid
 
-        cu.execute("INSERT INTO Users VALUES (?, ?, ?, ?)",
-                   (userGroupId, user, salt, password))
+        try:
+            cu.execute("INSERT INTO Users VALUES (?, ?, ?, ?)",
+                       (userGroupId, user, salt, password))
+        except sqlite3.ProgrammingError, e:
+            if str(e) == 'column user is not unique':
+                raise UserAlreadyExists, 'user: %s' % user
+            raise
+
         userId = cu.lastrowid
         cu.execute("INSERT INTO UserGroupMembers VALUES (?, ?)", 
                    userGroupId, userGroupId)
@@ -335,12 +341,38 @@ class NetworkAuthorization:
         self.db.commit()
         return cu.lastrowid
 
-    def addGroupMember(self, userGroupId, userId):
+    def renameGroup(self, userGroupId, userGroupName):
+        cu = self.db.cursor()
+        try:
+            cu.execute("UPDATE UserGroups SET userGroup=? WHERE userGroupId=?", userGroupName, userGroupId)
+        except sqlite3.ProgrammingError, e:
+            self.db.rollback()
+            if str(e) == 'column userGroup is not unique':
+                raise GroupAlreadyExists, "group: %s" % userGroupName
+            raise
+
+        self.db.commit()
+
+    def updateGroupMembers(self, userGroupId, members):
+        #Do this in a transaction
+        cu = self.db.cursor()
+        
+        #First drop all the current members
+        cu.execute ("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
+
+        #now add the new members
+        for userId in members:
+            self.addGroupMember(userGroupId, userId, False)
+
+        self.db.commit()
+
+    def addGroupMember(self, userGroupId, userId, commit = True):
         cu = self.db.cursor()
 
         cu.execute("INSERT INTO UserGroupMembers VALUES(?, ?)",
                    userGroupId, userId)
-        self.db.commit()
+        if commit:
+            self.db.commit()
 
     def deleteGroup(self, userGroupName, commit = True):
         return self.deleteGroupById(self.getGroupIdByName(userGroupName), commit)
