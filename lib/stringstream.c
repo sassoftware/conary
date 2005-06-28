@@ -57,11 +57,11 @@ static int StringStream_Cmp(PyObject * self, PyObject * other) {
         return -1;
     }
 
-    if (!s->s && !o->s)
+    if ((s->s == Py_None) && (o->s == Py_None))
 	return 0;
-    else if (!s->s)
+    else if (s->s == Py_None)
 	return -1;
-    else if (!o->s)
+    else if (o->s == Py_None)
 	return 1;
 
     len_s = PyString_GET_SIZE(s->s);
@@ -85,9 +85,7 @@ static int StringStream_Cmp(PyObject * self, PyObject * other) {
 }
 
 static void StringStream_Dealloc(PyObject * self) {
-    if (((StringStreamObject *) self)->s) {
-	Py_DECREF(((StringStreamObject *) self)->s);
-    }
+    Py_DECREF(((StringStreamObject *) self)->s);
     self->ob_type->tp_free(self);
 }
 
@@ -149,9 +147,6 @@ static PyObject * StringStream_Freeze(StringStreamObject * self,
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &skipSet))
         return NULL;
 
-    /* just ignore the skipSet */
-    assert(self->s);
-
     Py_INCREF(self->s);
     return self->s;
 }
@@ -203,7 +198,7 @@ static PyObject * StringStream_Set(StringStreamObject * self,
     Py_INCREF(o);
     Py_DECREF(self->s);
     self->s = o;
-	
+
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -228,26 +223,32 @@ static PyObject * StringStream_Twm(StringStreamObject * self, PyObject * args) {
     int diffLen;
     StringStreamObject * other;
 
+    /* string streams don't implement a true diff.  A merge is a wholesale
+       replacement of the value, as long we don't conflict with the other
+       object that's participating in the twm.
+    */
     if (!PyArg_ParseTuple(args, "s#O", &diff, &diffLen, &other,
                           self->ob_type))
         return NULL;
 
+    /* if we are the same as the other object, we can reset our value
+       to what is coming in from the diff */
     if (!StringStream_Cmp((PyObject *) self, (PyObject *) other)) {
-	if (self->s) {
-	    Py_DECREF(self->s);
-	}
-
+	Py_DECREF(self->s);
 	self->s = PyString_FromStringAndSize(diff, diffLen);
 	Py_INCREF(Py_False);
 	return Py_False;
     }
 
-    if (!self->s || !(PyString_GET_SIZE(self->s) != diffLen) ||
+    /* otherwise, the only way that there is no conflict is if we are
+       already set to the value that is contained in the diff */
+    if (self->s == Py_None || (PyString_GET_SIZE(self->s) != diffLen) ||
 	memcmp(PyString_AS_STRING(self->s), diff, diffLen)) {
+	/* conflict */
 	Py_INCREF(Py_True);
 	return Py_True;
     }
-
+    /* we're already set to the value of the diff, no conflict */
     Py_INCREF(Py_False);
     return Py_False;
 }
