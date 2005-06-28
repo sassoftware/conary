@@ -32,63 +32,106 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self._message('')
 
     def _message(self, text):
-        if text and self.hunkInfo[1] > 1:
-            text = "Job %d of %d: %s%s" % (self.hunkInfo[0], self.hunkInfo[1],
-                                            text[0].lower(), text[1:])
         callbacks.LineOutput._message(self, text)
 
+    def update(self):
+        self.lock.acquire()
+        t = ""
+
+        if self.csText:
+            t = self.csText + ' '
+
+        if self.updateText:
+            t += self.updateText
+
+        self._message(t)
+        self.lock.release()
+
+    def updateMsg(self, text):
+        if text and self.csHunk is not None:
+            text = "Job %d: %s%s" % (self.csHunk[0], 
+                                           text[0].lower(), text[1:])
+        self.updateText = text
+        self.update()
+
+    def csMsg(self, text):
+        self.csText = text
+        self.update()
+
     def preparingChangeSet(self):
-        self._message("Preparing changeset...")
+        self.updateMsg("Preparing changeset")
 
     def resolvingDependencies(self):
-        self._message("Resolving dependencies...")
+        self.updateMsg("Resolving dependencies")
+
+    def updateDone(self):
+        self.updateText = None
 
     def downloadingChangeSet(self, got, need):
-        if need != 0:
-            self._message("Downloading changeset (%d%% of %dk)..." 
-                          % ((got * 100) / need , need / 1024))
-            
+        if got == need:
+            self.csText = None
+        elif need != 0:
+            if self.csHunk is None:
+                self.csMsg("Downloading (%d%% of %dk)" 
+                              % ((got * 100) / need , need / 1024))
+            else:
+                self.csMsg("Downloading %d of %d (%d%%)" 
+                              % (self.csHunk + 
+                                 (( (got * 100) / need), )))
+
+        self.update()
 
     def requestingChangeSet(self):
-        self._message("Requesting changeset...")
+        if self.csHunk is not None:
+            self.csMsg("Requesting changeset")
+        else:
+            self.csMsg("Requesting changeset %d of %d" % self.csHunk)
 
     def creatingRollback(self):
-        self._message("Creating rollback...")
+        self.updateMsg("Creating rollback")
 
     def preparingUpdate(self, troveNum, troveCount):
-        self._message("Preparing update (%d of %d)..." % 
+        self.updateMsg("Preparing update (%d of %d)" % 
 		      (troveNum, troveCount))
 
     def restoreFiles(self, size, totalSize):
         if totalSize != 0:
             self.restored += size
-            self._message("Writing %dk of %dk (%d%%)..." 
+            self.updateMsg("Writing %dk of %dk (%d%%)" 
                         % (self.restored / 1024 , totalSize / 1024,
                            (self.restored * 100) / totalSize))
 
     def removeFiles(self, fileNum, total):
         if total != 0:
-            self._message("Removing %d of %d (%d%%)..."
+            self.updateMsg("Removing %d of %d (%d%%)"
                         % (fileNum , total, (fileNum * 100) / total))
 
     def creatingDatabaseTransaction(self, troveNum, troveCount):
-        self._message("Creating database transaction (%d of %d)..." %
+        self.updateMsg("Creating database transaction (%d of %d)" %
 		      (troveNum, troveCount))
 
     def runningPreTagHandlers(self):
-        self._message("Running tag pre-scripts...")
+        self.updateMsg("Running tag pre-scripts")
 
     def runningPostTagHandlers(self):
-        self._message("Running tag post-scripts...")
+        self.updateMsg("Running tag post-scripts")
 
-    def setHunk(self, num, total):
+    def setChangesetHunk(self, num, total):
+        self.csHunk = (num, total)
+
+    def setCallbackHunk(self, num, total):
         self.restored = 0
-        self.hunkInfo = (num, total)
+        self.updateHunk = (num, total)
 
     def __init__(self):
         callbacks.LineOutput.__init__(self)
         self.restored = 0
-        self.hunkInfo = (0, 0)
+        self.csHunk = None
+        self.updateHunk = None
+        self.csText = None
+        self.updateText = None
+        import thread
+        self.lock = thread.allocate_lock()
 
 def displayUpdateInfo(updJob):
     totalJobs = len(updJob.getChangeSets())

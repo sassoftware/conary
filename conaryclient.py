@@ -1045,6 +1045,8 @@ class ConaryClient:
         else:
             uJob.addChangeSet(cs)
 
+        callback.updateDone()
+
         return (uJob, suggMap)
 
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
@@ -1110,13 +1112,24 @@ class ConaryClient:
 
             return rb
 
+        def _createAllCs(q, cs, uJob):
+            for i, theCs in enumerate(csSet):
+                callback.setChangesetHunk(i + 1, len(csSet))
+                newCs = _createCs(theCs, uJob)
+                q.put(newCs)
+
+            q.put(None)
+
+            thread.exit()
+
         rollback = self.db.createRollback()
         csSet = uJob.getChangeSets()
         if isinstance(csSet[0], changeset.ReadOnlyChangeSet):
             # this handles change sets which include change set files
             assert(len(csSet) == 1)
-            callback.setHunk(0, 0)
+            callback.setChangesetHunk(0, 0)
             newCs = _createCs(csSet[0], uJob, standalone = True)
+            callback.setUpdateHunk(0, 0)
             _applyCs(newCs, uJob, rollback)
         else:
             # build a set of everything which is being removed
@@ -1130,10 +1143,27 @@ class ConaryClient:
                 for info in theCs.getOldTroveList():
                     removeHints.add(info)
 
-            for i, theCs in enumerate(csSet):
-                callback.setHunk(i + 1, len(csSet))
-                newCs = _createCs(theCs, uJob)
-                _applyCs(newCs, uJob, rollback, removeHints = removeHints)
+            if False:
+                for i, theCs in enumerate(csSet):
+                    callback.setChangesetHunk(i + 1, len(csSet))
+                    newCs = _createCs(theCs, uJob)
+                    callback.setUpdateHunk(i + 1, len(csSet))
+                    _applyCs(newCs, uJob, rollback, removeHints = removeHints)
+            else:
+                from Queue import Queue
+                import thread
+
+                csQueue = Queue(5)
+                thread.start_new_thread(_createAllCs, (csQueue, csSet, uJob))
+
+                newCs = csQueue.get()
+                i = 1
+                while newCs is not None:
+                    callback.setUpdateHunk(i + 1, len(csSet))
+                    i += 1
+                    _applyCs(newCs, uJob, rollback, removeHints = removeHints)
+                    callback.updateDone()
+                    newCs = csQueue.get()
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):

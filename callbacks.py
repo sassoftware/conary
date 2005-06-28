@@ -26,6 +26,9 @@ class ChangesetCallback:
     def requestingChangeSet(self):
         pass
 
+    def setChangesetHunk(self, hunk, hunkCount):
+        pass
+
 class CookCallback:
 
     def sendingChangeset(self, sent, total):
@@ -60,7 +63,10 @@ class UpdateCallback(ChangesetCallback):
     def runningPostTagHandlers(self):
         pass
 
-    def setHunk(self, hunk, hunkCount):
+    def updateDone(self):
+        pass
+
+    def setUpdateHunk(self, hunk, hunkCount):
         pass
 
     def done(self):
