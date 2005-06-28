@@ -82,7 +82,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.update()
 
     def requestingChangeSet(self):
-        if self.csHunk is not None:
+        if self.csHunk is None:
             self.csMsg("Requesting changeset")
         else:
             self.csMsg("Requesting changeset %d of %d" % self.csHunk)
