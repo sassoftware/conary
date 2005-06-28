@@ -716,7 +716,7 @@ def annotate(repos, filename):
         version = line[1][0]
         tv = version.trailingRevision()
         name = line[1][1]
-        date = time.strftime('%x', time.localtime(tv.timeStamp))
+        date = time.strftime('%Y-%m-%d', time.localtime(tv.timeStamp))
         info = '(%-*s %s):' % (maxN, name, date) 
         versionStr = version.asString(defaultBranch=branch)
         # since the line is not necessary starting at a tabstop,
