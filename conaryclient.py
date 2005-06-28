@@ -41,6 +41,57 @@ class TroveNotFound(Exception):
 
 class UpdateError(ClientError):
     """Base class for update errors"""
+    def display(self):
+        return str(self)
+
+class DependencyFailure(UpdateError):
+    """ Base class for dependency failures """
+    pass
+
+class DepResolutionFailure(DependencyFailure):
+    """ Unable to resolve dependencies """
+    def __init__(self, failures):
+        self.failures = failures
+
+    def getFailures(self):
+        return self.failures
+
+    def __str__(self):
+        res = ["The following dependencies could not be resolved:"]
+        for (troveName, depSet) in self.failures:
+            res.append("    %s:\n\t%s" %  \
+                       (troveName, "\n\t".join(str(depSet).split("\n"))))
+        return '\n'.join(res)
+
+class EraseDepFailure(DepResolutionFailure):
+    """ Unable to resolve dependencies due to erase """
+    def getFailures(self):
+        return self.failures
+
+    def __str__(self):
+        res = []
+        res.append("Troves being removed create unresolved dependencies:")
+        for (troveName, depSet) in self.failures:
+            res.append("    %s:\n\t%s" %  \
+                        (troveName, "\n\t".join(str(depSet).split("\n"))))
+        return '\n'.join(res)
+
+class NeededTrovesFailure(DependencyFailure):
+    """ Dependencies needed and resolve wasn't used """
+    def __init__(self, suggMap):
+         self.suggMap = suggMap
+
+    def getSuggestions(self):
+        return self.suggMap
+
+    def __str__(self):
+        res = []
+        res.append("Additional troves are needed:")
+        for (req, suggList) in self.suggMap.iteritems():
+            res.append("    %s -> %s" % \
+              (req, " ".join(["%s(%s)" % 
+              (x[0], x[1].trailingRevision().asString()) for x in suggList])))
+        return '\n'.join(res)
 
 class VersionSuppliedError(UpdateError):
     def __str__(self):
@@ -952,6 +1003,12 @@ class ConaryClient:
                                       keepExisting = keepExisting, 
                                       depsRecurse = depsRecurse,
                                       split = split)
+        if depList:
+            raise DepResolutionFailure(depList)
+        elif suggMap and not self.cfg.autoResolve:
+            raise NeededTrovesFailure(suggMap)
+        elif cannotResolve:
+            raise EraseDepFailure(cannotResolve)
 
         if split:
             startNew = True
@@ -985,7 +1042,7 @@ class ConaryClient:
         else:
             uJob.addChangeSet(cs)
 
-        return (uJob, depList, suggMap, cannotResolve)
+        return (uJob, suggMap)
 
     def applyUpdate(self, uJob, replaceFiles = False, tagScript = None, 
                     test = False, justDatabase = False, journal = None, 

@@ -90,6 +90,62 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.restored = 0
         self.hunkInfo = (0, 0)
 
+def displayUpdateInfo(updJob):
+    totalJobs = len(updJob.getChangeSets())
+    for num, cs in enumerate(updJob.getChangeSets()):
+        if totalJobs > 1:
+            print 'Job %d of %d:' %(num + 1, totalJobs)
+            indent = '    '
+        else:
+            indent = '    '
+        new = []
+        for x in cs.iterNewTroveList():
+            oldVersion = x.getOldVersion()
+            newVersion = x.getNewVersion()
+            if oldVersion:
+                oldTVersion = oldVersion.trailingRevision()
+            else:
+                # if there is no oldVersion, this is a new trove
+                new.append(("%s (%s)" %
+                            (x.getName(),
+                             newVersion.trailingRevision().asString()),
+                            'N'))
+                continue
+
+            newTVersion = newVersion.trailingRevision()
+
+            if oldVersion.branch() != newVersion.branch():
+                kind = 'B'
+            elif oldTVersion.getVersion() != newTVersion.getVersion():
+                kind = 'V'
+            elif oldTVersion.getSourceCount() != \
+                                        newTVersion.getSourceCount():
+                kind = 'S'
+            else:
+                kind = 'B'
+
+            new.append(("%s (%s -> %s)" % 
+                            (x.getName(), oldTVersion.asString(),
+                             newTVersion.asString()), kind))
+
+        new.sort()
+        new = [ "%s %s" % (x[1], x[0]) for x in new ]
+
+        old = []
+        old += [ "D %s (%s deleted)" % (x[0], x[1].trailingRevision().asString()) 
+                 for x in cs.getOldTroveList() ]
+        old.sort()
+
+        if not new and not old:
+            print indent + "Nothing is affected by this update."
+
+        if new:
+            print indent + ("\n%s" %indent).join(new)
+
+        if old:
+            print indent + ("\n%s" %indent).join(old)
+    return
+
 def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None, 
                                   keepExisting = False, depCheck = True,
                                   depsRecurse = True, test = False,
@@ -98,8 +154,6 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                   callback = None):
     if not callback:
         callback = callbacks.UpdateCallback()
-
-    client = conaryclient.ConaryClient(cfg)
 
     applyList = []
 
@@ -122,123 +176,70 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
 
     # dedup
     applyList = set(applyList)
-
-    if not info:
-	client.checkWriteableRoot()
-
     try:
-        (updJob, depFailures, suggMap, brokenByErase) = \
-            client.updateChangeSet(applyList, depsRecurse = depsRecurse,
-                                   resolveDeps = depCheck,
-                                   keepExisting = keepExisting,
-                                   test = test, recurse = recurse,
-                                   updateByDefault = updateByDefault,
-                                   callback = callback, split = True)
-
-        if depFailures:
-            callback.done()
-            print "The following dependencies could not be resolved:"
-            for (troveName, depSet) in depFailures:
-                print "    %s:\n\t%s" %  \
-                        (troveName, "\n\t".join(str(depSet).split("\n")))
-            return
-        elif (not info and cfg.autoResolve) and (not cfg.autoResolve or brokenByErase) and suggMap:
-            callback.done()
-            print "Additional troves are needed:"
-            for (req, suggList) in suggMap.iteritems():
-                print "    %s -> %s" % \
-                  (req, " ".join(["%s(%s)" % 
-                  (x[0], x[1].trailingRevision().asString()) for x in suggList]))
-            return
-        elif suggMap:
-            callback.done()
-            print "Including extra troves to resolve dependencies:"
-            print "   ",
-            items = {}
-            for suggList in suggMap.itervalues():
-                # remove duplicates
-                items.update(dict.fromkeys([(x[0], x[1]) for x in suggList]))
-
-            items = items.keys()
-            items.sort()
-            print "%s" % (" ".join(["%s(%s)" % 
-                           (x[0], x[1].trailingRevision().asString())
-                           for x in items]))
-
-        if brokenByErase:
-            print "Troves being removed create unresolved dependencies:"
-            for (troveName, depSet) in brokenByErase:
-                print "    %s:\n\t%s" %  \
-                        (troveName, "\n\t".join(str(depSet).split("\n")))
-            return
-
+        updJob = _updateTroves(cfg, applyList, replaceFiles = replaceFiles, 
+                              tagScript = tagScript, 
+                              keepExisting = keepExisting, depCheck = depCheck,
+                              depsRecurse = depsRecurse, test = test,
+                              justDatabase = justDatabase, recurse = recurse,
+                              info = info, updateByDefault = updateByDefault,
+                              callback = callback)
         if info:
             callback.done()
-            totalJobs = len(updJob.getChangeSets())
-            for num, cs in enumerate(updJob.getChangeSets()):
-                if totalJobs > 1:
-                    print 'Job %d of %d:' %(num + 1, totalJobs)
-                    indent = '    '
-                else:
-                    indent = '    '
-                new = []
-                for x in cs.iterNewTroveList():
-                    oldVersion = x.getOldVersion()
-                    newVersion = x.getNewVersion()
-                    if oldVersion:
-                        oldTVersion = oldVersion.trailingRevision()
-                    else:
-                        # if there is no oldVersion, this is a new trove
-                        new.append(("%s (%s)" %
-                                    (x.getName(),
-                                     newVersion.trailingRevision().asString()),
-                                    'N'))
-                        continue
-
-                    newTVersion = newVersion.trailingRevision()
-
-                    if oldVersion.branch() != newVersion.branch():
-                        kind = 'B'
-                    elif oldTVersion.getVersion() != newTVersion.getVersion():
-                        kind = 'V'
-                    elif oldTVersion.getSourceCount() != \
-                                                newTVersion.getSourceCount():
-                        kind = 'S'
-                    else:
-                        kind = 'B'
-
-                    new.append(("%s (%s -> %s)" % 
-                                    (x.getName(), oldTVersion.asString(),
-                                     newTVersion.asString()), kind))
-
-                new.sort()
-                new = [ "%s %s" % (x[1], x[0]) for x in new ]
-
-                old = []
-                old += [ "D %s (%s deleted)" % (x[0], x[1].trailingRevision().asString()) 
-                         for x in cs.getOldTroveList() ]
-                old.sort()
-
-                if not new and not old:
-                    print indent + "Nothing is affected by this update."
-
-                if new:
-                    print indent + ("\n%s" %indent).join(new)
-
-                if old:
-                    print indent + ("\n%s" %indent).join(old)
-
+            displayUpdateInfo(updJob)
             return
-
-        keepExisting = False
-        client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
-                           justDatabase = justDatabase,
-                           localRollbacks = cfg.localRollbacks,
-                           callback = callback)
+    except conaryclient.DependencyFailure, e:
+        # XXX print dependency errors because the testsuite 
+        # prefers it
+        print e
     except conaryclient.UpdateError, e:
         log.error(e)
     except repository.CommitError, e:
         log.error(e)
+    except changeset.PathIdsConflictError, e:
+        log.error(e)
+
+def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None, 
+                                  keepExisting = False, depCheck = True,
+                                  depsRecurse = True, test = False,
+                                  justDatabase = False, recurse = True,
+                                  info = False, updateByDefault = True,
+                                  callback = None):
+    client = conaryclient.ConaryClient(cfg)
+
+    if not info:
+	client.checkWriteableRoot()
+
+    (updJob, suggMap) = \
+    client.updateChangeSet(applyList, depsRecurse = depsRecurse,
+                           resolveDeps = depCheck,
+                           keepExisting = keepExisting,
+                           test = test, recurse = recurse,
+                           updateByDefault = updateByDefault,
+                           callback = callback, split = True)
+
+    if suggMap:
+        callback.done()
+        print "Including extra troves to resolve dependencies:"
+        print "   ",
+        items = {}
+        for suggList in suggMap.itervalues():
+            # remove duplicates
+            items.update(dict.fromkeys([(x[0], x[1]) for x in suggList]))
+
+        items = items.keys()
+        items.sort()
+        print "%s" % (" ".join(["%s(%s)" % 
+                       (x[0], x[1].trailingRevision().asString())
+                       for x in items]))
+
+        keepExisting = False
+
+    client.applyUpdate(updJob, replaceFiles, tagScript, test = test, 
+                       justDatabase = justDatabase,
+                       localRollbacks = cfg.localRollbacks,
+                       callback = callback)
+
 
 def updateAll(cfg, info = False, depCheck = True):
     client = conaryclient.ConaryClient(cfg)
