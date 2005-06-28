@@ -48,9 +48,9 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.lock.release()
 
     def updateMsg(self, text):
-        if text and self.csHunk is not None:
-            text = "Job %d: %s%s" % (self.csHunk[0], 
-                                           text[0].lower(), text[1:])
+        if text and self.updateHunk is not None:
+            text = "Job %d: %s%s" % (self.updateHunk[0], text[0].lower(),
+                                     text[1:])
         self.updateText = text
         self.update()
 
@@ -119,7 +119,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
     def setChangesetHunk(self, num, total):
         self.csHunk = (num, total)
 
-    def setCallbackHunk(self, num, total):
+    def setUpdateHunk(self, num, total):
         self.restored = 0
         self.updateHunk = (num, total)
 

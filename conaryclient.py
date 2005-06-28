@@ -1159,7 +1159,7 @@ class ConaryClient:
                 newCs = csQueue.get()
                 i = 1
                 while newCs is not None:
-                    callback.setUpdateHunk(i + 1, len(csSet))
+                    callback.setUpdateHunk(i, len(csSet))
                     i += 1
                     _applyCs(newCs, uJob, rollback, removeHints = removeHints)
                     callback.updateDone()
