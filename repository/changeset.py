@@ -629,7 +629,45 @@ class ChangeSetFromAbsoluteChangeSet(ChangeSet):
 	self.absCS = absCS
 	ChangeSet.__init__(self)
 
-class PathIdsConflictError(Exception): pass
+class PathIdsConflictError(Exception): 
+    def __init__(self, pathId, trove1=None, file1=None, 
+                               trove2=None, file2=None):
+        self.pathId = pathId
+        self.trove1 = trove1
+        self.file1 = file1
+        self.trove2 = trove2
+        self.file2 = file2
+        from lib import epdb
+        epdb.set_trace()
+
+    def getPathId(self):
+        return self.pathId
+
+    def getConflicts(self):
+        return (self.trove1, self.file1), (self.trove2, self.file2)
+
+    def getTroves(self):
+        return self.trove1, self.trove2
+    
+    def getPaths(self):
+        return self.file1[1], self.file2[1]
+
+    def __str__(self):
+        if self.trove1 is None:
+            return 'PathIdsConflict: %s' % self.pathID
+        else:
+            path1, path2 = self.getPaths()
+            trove1, trove2 = self.getTroves()
+            v1 = trove1.getNewVersion().trailingRevision().asString()
+            v2 = trove2.getNewVersion().trailingRevision().asString()
+            return (('PathIdConflictsError:\n'
+                     '  %s (%s %s)\n'
+                     '     conflicts with\n'
+                     '  %s (%s %s)') % (path1, trove1.getName(), v1,
+                                                 path2, trove2.getName(), v2))
+                                     
+                    
+
 
 class ReadOnlyChangeSet(ChangeSet):
 
@@ -644,7 +682,7 @@ class ReadOnlyChangeSet(ChangeSet):
         if a[0] < b[0]:
             return -1
         elif a[0] == b[0]:
-            raise PathIdsConflictError
+            raise PathIdsConflictError(a[0])
         else:
             return 1
 
@@ -936,9 +974,30 @@ class ReadOnlyChangeSet(ChangeSet):
 
             self.configCache.update(otherCs.configCache)
 
-            for entry in otherCs.fileQueue:
-                util.tupleListBsearchInsert(self.fileQueue, entry, 
-                                            self.fileQueueCmp)
+            try:
+                for entry in otherCs.fileQueue:
+                    util.tupleListBsearchInsert(self.fileQueue, entry, 
+                                                self.fileQueueCmp)
+            except PathIdsConflictError, err:
+                pathId = err.pathId
+                # look up the trove and file that caused the pathId 
+                # conflict.  
+                for myTrove in self.iterNewTroveList():
+                    conflict1 = [ x for x in \
+                                  myTrove.getNewFileList() if x[0] == pathId]
+                    if conflict1:
+                        conflict1 = conflict1[0]
+                        break
+                for otherTrove in otherCs.iterNewTroveList():
+                    conflict2 = [ x for x in \
+                                  otherTrove.getNewFileList() if x[0] == pathId]
+                    if conflict2:
+                        conflict2 = conflict2[0]
+                        break
+                assert(conflict1 and conflict2)
+                raise PathIdsConflictError(pathId, myTrove, conflict1,
+                                                   otherTrove, conflict2)
+
         else:
             assert(otherCs.__class__ ==  ChangeSet)
 
