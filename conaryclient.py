@@ -1280,7 +1280,8 @@ class ConaryClient:
 	return dupList
 
     def _createChangeSetList(self, csList, recurse = True, 
-                             skipNotByDefault = False, excludeList = []):
+                             skipNotByDefault = False, excludeList = [],
+                             callback = None):
         primaryList = []
         for (name, (oldVersion, oldFlavor), (newVersion, newFlavor), abstract) \
                                                             in csList:
@@ -1290,7 +1291,7 @@ class ConaryClient:
                 primaryList.append((name, oldVersion, oldFlavor))
 
         cs = self.repos.createChangeSet(csList, recurse = recurse, 
-                                        withFiles = False)
+                                        withFiles = False, callback = callback)
 
         # filter out non-defaults
         if skipNotByDefault:
@@ -1378,7 +1379,7 @@ class ConaryClient:
         """
         (fullCsList, primaryList) = self._createChangeSetList(csList, 
                 recurse = recurse, skipNotByDefault = skipNotByDefault, 
-                excludeList = excludeList)
+                excludeList = excludeList, callback = callback)
 
         return self.repos.createChangeSet(fullCsList, recurse = False,
                                        primaryTroveList = primaryList,
@@ -1412,7 +1413,7 @@ class ConaryClient:
 
         (fullCsList, primaryList) = self._createChangeSetList(csList, 
                 recurse = recurse, skipNotByDefault = skipNotByDefault, 
-                excludeList = excludeList)
+                excludeList = excludeList, callback = callback)
 
         self.repos.createChangeSetFile(fullCsList, path, recurse = False,
                                        primaryTroveList = primaryList,
