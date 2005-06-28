@@ -1012,13 +1012,16 @@ class ConaryClient:
 
         if split:
             startNew = True
+            threshold = 10
             for job in splitJob:
                 if startNew:
                     newCs = changeset.ChangeSet()
                     startNew = False
+                    count = 0
 
                 foundCollection = False
 
+                count += len(job)
                 for (name, (oldVersion, oldFlavor),
                            (newVersion, newFlavor), absolute) in job:
                     if newVersion is not None and ':' not in name:
@@ -1033,7 +1036,7 @@ class ConaryClient:
                         assert(trvCs.getOldFlavor() == oldFlavor)
                         newCs.newTrove(trvCs)
 
-                if foundCollection:
+                if foundCollection or count >= threshold:
                     uJob.addChangeSet(newCs)
                     startNew = True
 
