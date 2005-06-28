@@ -1,0 +1,193 @@
+#!/usr/bin/python2.4
+# -*- mode: python -*-
+#
+# Copyright (c) 2005 rpath, Inc.
+#
+# This program is distributed under the terms of the Common Public License,
+# version 1.0. A copy of this license should have been distributed with this
+# source file in a file called LICENSE. If it is not present, the license
+# is always available at http://www.opensource.org/licenses/cpl.php.
+#
+# This program is distributed in the hope that it will be useful, but
+# without any waranty; without even the implied warranty of merchantability
+# or fitness for a particular purpose. See the Common Public License for
+# full details.
+#
+
+"""
+recreatedb attempts to reconstruct a database from a list of
+(name, version, flavor) tuples.  It's useful when a database
+has become damaged, but the list of installed troves is still
+retrievable.
+"""
+
+import os
+import sys
+if os.path.dirname(sys.argv[0]) != ".":
+    if sys.argv[0][0] == "/":
+	fullPath = os.path.dirname(sys.argv[0])
+    else:
+	fullPath = os.getcwd() + "/" + os.path.dirname(sys.argv[0])
+else:
+    fullPath = os.getcwd()
+
+sys.path.append(os.path.dirname(fullPath))
+
+import conary
+
+from deps import deps
+from lib import util, sha1helper
+from repository import netclient, changeset
+import callbacks
+import conarycfg
+import conaryclient
+import files
+import sqlite3
+import updatecmd
+import versions
+
+def usage():
+    print 'usage: %s conarydb newroot' %sys.argv[0]
+
+def collectTroves(db):
+    """
+    Collect (name, version, flavor) tuples from a database.  The
+    minimal SQL possible is used to increase the chance of success
+    on a damaged database
+
+    @param db: an open sqlite3 connection to the database
+    @type db: sqlite3.Connection
+    @return: iterator that yields (name, version, flavor) tuples
+    @rtype: iterator
+    """
+    troveList = []
+    cu = db.cursor()
+    cu.execute('SELECT trovename, version, flavor from '
+               '       DBInstances, Versions, DBFlavors '
+               '   WHERE '
+               '           DBInstances.versionid=Versions.versionid '
+               '       AND DBInstances.flavorid=DBFlavors.flavorid '
+               '       AND DBInstances.isPresent = 1')
+    for name, versionStr, flavorStr in cu:
+        flavor = deps.ThawDependencySet(flavorStr)
+        version = versions.VersionFromString(versionStr)
+        if not version.isOnLocalHost():
+            yield (name, version, flavor)
+        else:
+            print >> sys.stderr, ('warning: %s is cooked locally, '
+                                  'cannot be restored' %name)
+
+def buildCsList(client, troveList):
+    """
+    verify that (name, version, flavor) tuples exist in the repository
+    and create a changeset request list
+
+    @param client: the ConaryClient instance for accessing the repository
+    @type client: conrayclient.ConaryClient
+    @param troveList: a sequence of (name, version, flavor) tuples
+    @type troveList: sequence
+    @return: list of changeset requests
+    @rtype: list
+    """
+    request = {}
+    for numTroves, (name, version, flavor) in enumerate(troveList):
+        versionDict = request.setdefault(name, {})
+        flavorList = versionDict.setdefault(version, [])
+        flavorList.append(flavor)
+    print >> sys.stderr, ('requesting trove information for %d troves.'
+                          %numTroves)
+    reposTroves = client.repos.getTroveVersionFlavors(request)
+
+    # verify everything actually exists, build up the applyList
+    csList = []
+    for name, version, flavor in troveList:
+        if not reposTroves.has_key(name):
+            print >> sys.stderr, 'repository has no trove named', name
+            continue
+        if not reposTroves[name].has_key(version):
+            print >> sys.stderr, ('repository has no trove named %s '
+                                  'with version' %(name, version.asString()))
+            continue
+        if not flavor in reposTroves[name][version]:
+            print >> sys.stderr, ('repository has no trove named %s '
+                                  'with version %s and flavor %s'
+                                  %(name, version.asString(), flavor))
+            continue
+
+        csList.append((name, (None, None), (version, flavor), 0))
+    return csList
+
+def addConfigFileContents(client, cs):
+    """
+    add file contents for config files to a changeset object
+
+    @param client: the ConaryClient instance for accessing the repository
+    @type client: conrayclient.ConaryClient
+    @param cs: the changeset that needs config file contents added
+    @type cs: repository.changeset.ChangeSet
+    @return: None
+    """
+    needed = []
+    # collect info on all the needed config file contents
+    for trove in cs.iterNewTroveList():
+        for (pathid, path, fileid, version) in trove.getNewFileList():
+            filediff = cs.getFileChange(None, fileid)
+            fileobj = files.ThawFile(filediff, pathid)
+            if fileobj.flags.isConfig():
+                needed.append(((fileid, version), (path, pathid)))
+
+    # build up the repository request
+    neededContents = [x[0] for x in needed]
+    print >> sys.stderr, '\ndownloading config file contents...',
+    contents = client.repos.getFileContents(neededContents)
+    print >> sys.stderr, 'done.'
+    # add the contents to the changeset
+    for cont, ((fileid, version), (path, pathid)) in zip(contents, needed):
+        #print >> sys.stderr, ('adding contents for %s (%s)'
+        #                      %(path, sha1helper.md5ToString(pathid))
+        # all the contents here are config files, so the isConfig parameter
+        # is always true
+        cs.addFileContents(pathid, changeset.ChangedFileTypes.file, cont, True)
+
+def main(argv):
+    sys.excepthook = util.genExcepthook()
+
+    if len(sys.argv) != 3:
+        usage()
+        sys.exit(1)
+
+    cfg = conarycfg.ConaryConfiguration()
+    cfg.root = sys.argv[2]
+    client = conaryclient.ConaryClient(cfg)
+    callback = updatecmd.UpdateCallback()
+
+    # get a list of (name, version, flavor) from the old db
+    olddb = sqlite3.connect(sys.argv[1])
+    troves = list(collectTroves(olddb))
+
+    # double check that everything installed in the old db really exists
+    # and build up a changeset request
+    csList = buildCsList(client, troves)
+
+    # create a changeset without any file contents
+    cs = client.createChangeSet(csList, withFiles = True,
+                                withFileContents = False,
+                                callback = callback,
+                                recurse = False)
+    del csList
+
+    # add the config file contents
+    addConfigFileContents(client, cs)
+
+    # retarget the changeset for the database, this shouldn't do much
+    # except give us an updJob to apply
+    updJob = client.updateChangeSet([cs], resolveDeps = False, recurse = False,
+                                    callback = callback, split = 1)[0]
+    # apply the update
+    client.applyUpdate(updJob, justDatabase = True, callback = callback)
+
+    # success!
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))
