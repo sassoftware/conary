@@ -1089,12 +1089,12 @@ class ConaryClient:
                                                   item[1][1])
                         cs.merge(newCs)
 
-            newCs = self.repos.createChangeSet(changedTroves.keys(), 
-                                               recurse = False,
-                                               callback = callback)
-            cs.merge(newCs)
-
-            return newCs
+            if changedTroves:
+                newCs = self.repos.createChangeSet(changedTroves.keys(), 
+                                                   recurse = False,
+                                                   callback = callback)
+                cs.merge(newCs)
+            return cs
 
 
         def _applyCs(cs, uJob, rollback, removeHints = {}):
