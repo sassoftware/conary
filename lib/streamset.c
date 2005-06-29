@@ -626,6 +626,20 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
     return Py_None;
 }
 
+static long StreamSet_Hash(PyObject * self) {
+    PyObject *frozen, *args, *kwargs;
+    long rc;
+
+    args = PyTuple_New(0);
+    kwargs = PyDict_New();
+    frozen = StreamSet_Freeze((StreamSetObject *) self, args, kwargs);
+    rc = PyObject_Hash(frozen);
+    Py_DECREF(args);
+    Py_DECREF(kwargs);
+    Py_DECREF(frozen);
+    return rc;
+}
+
 /* ------------------------------------- */
 /* LargeStreamSet Implementation         */
 
@@ -706,7 +720,7 @@ PyTypeObject StreamSetType = {
     0,                              /*tp_as_number*/
     0,                              /*tp_as_sequence*/
     0,                              /*tp_as_mapping*/
-    0,                              /*tp_hash */
+    StreamSet_Hash,                 /*tp_hash */
     0,				    /*tp_call*/
     0,                              /*tp_str*/
     0,                              /*tp_getattro*/
@@ -747,12 +761,12 @@ PyTypeObject LargeStreamSetType = {
     0,                              /*tp_print*/
     0,                              /*tp_getattr*/
     0,                              /*tp_setattr*/
-    0,				    /*tp_compare*/
+    StreamSet_Cmp,		    /*tp_compare*/
     0,                              /*tp_repr*/
     0,                              /*tp_as_number*/
     0,                              /*tp_as_sequence*/
     0,                              /*tp_as_mapping*/
-    0,                              /*tp_hash */
+    StreamSet_Hash,                 /*tp_hash */
     0,				    /*tp_call*/
     0,                              /*tp_str*/
     0,                              /*tp_getattro*/
