@@ -22,7 +22,7 @@ Changes in 0.60.13:
   * Database migration removes stale versions
   * --replace-files marks the replaced versions of the files as no longer
     present
-  * Troves store information about Install Bins - not used yet.
+  * Troves store information about Install Buckets - not used yet.
     By specifying a component's install bin, which is a set of key-value 
     pairs, you can describe whether two versions of a component are 
     installable side-by-side.  If two versions of the component share the
@@ -32,6 +32,7 @@ Changes in 0.60.13:
   * Build Requirements are stored with the trove 
   * Add isCollection() to TroveInfo
   * Changesets download while instals are going on
+  * StreamSet.twm() respects ignoreUnknown now
 
 Changes in 0.60.12:
   * Previously, if you ran "conary update foo", and foo requires a new

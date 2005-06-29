@@ -599,7 +599,20 @@ static PyObject * StreamSet_Twm(StreamSetObject * self, PyObject * args,
 
 	for (i = 0; i < ssd->tagCount; i++)
 	    if (ssd->tags[i].tag == streamId) break;
+
 	if (i == ssd->tagCount) {
+	    PyObject * obj;
+	    int ignoreUnknown = 0;
+
+	    obj = PyDict_GetItemString(self->ob_type->tp_dict, 
+				       "ignoreUnknown");
+
+	    if (obj != NULL) 
+		ignoreUnknown = PyInt_AsLong(obj);
+
+	    if (ignoreUnknown == 1)
+		continue;
+
 	    PyErr_SetString(PyExc_ValueError, "unknown tag for merge");
 	    return NULL;
 	}
