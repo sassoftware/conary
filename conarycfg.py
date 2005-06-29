@@ -309,6 +309,7 @@ class ConaryConfiguration(ConfigFile):
 	'root'			: '/',
 	'sourceSearchDir'	: '.',
 	'tmpDir'		: '/var/tmp/',
+        'threaded'              : [ BOOL, True ],
         'useDirs'                : [ STRINGPATH, ('/etc/conary/use', 
                                                   '/etc/conary/distro/use',
                                                   '~/.conary/use')],

@@ -1116,7 +1116,7 @@ class ConaryClient:
 	    # reopen the local database so we don't share a sqlite object
 	    # with the main thread
 	    db = database.Database(self.cfg.root, self.cfg.dbPath)
-	    repos = NetworkRepositoryClient(cfg.repositoryMap,
+	    repos = NetworkRepositoryClient(self.cfg.repositoryMap,
 					    localRepository = db)
 
             for i, theCs in enumerate(csSet):
@@ -1149,7 +1149,7 @@ class ConaryClient:
                 for info in theCs.getOldTroveList():
                     removeHints.add(info)
 
-            if False:
+            if not self.cfg.threaded:
                 for i, theCs in enumerate(csSet):
                     callback.setChangesetHunk(i + 1, len(csSet))
                     newCs = _createCs(self.repos, theCs, uJob)
