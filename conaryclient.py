@@ -1115,9 +1115,9 @@ class ConaryClient:
         def _createAllCs(q, cs, uJob):
 	    # reopen the local database so we don't share a sqlite object
 	    # with the main thread
-	    #db = database.Database(self.cfg.root, self.cfg.dbPath)
-	    #repos = NetworkRepositoryClient(cfg.repositoryMap,
-					    #localRepository = db)
+	    db = database.Database(self.cfg.root, self.cfg.dbPath)
+	    repos = NetworkRepositoryClient(cfg.repositoryMap,
+					    localRepository = db)
 
             for i, theCs in enumerate(csSet):
                 callback.setChangesetHunk(i + 1, len(csSet))
