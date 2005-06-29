@@ -499,11 +499,11 @@ class PackageSpec(_filterSpec):
 	# that the initial tree is built
         recipe.autopkg.walk(self.macros['destdir'])
 
-class InstallBin(policy.Policy):
+class InstallBucket(policy.Policy):
     """
         Set key/value pairs that determine whether conary assumes that two 
         versions of a component can be installed side-by-side:
-        C{r.InstallBin('foo:runtime', key1='value1', key2='value2')}
+        C{r.InstallBucket('foo:runtime', key1='value1', key2='value2')}
 
         If two versions of a component share the same install keys, but
         differ on a value for some key, the two troves are assumed to be
@@ -514,20 +514,20 @@ class InstallBin(policy.Policy):
 
     def __init__(self, *args, **keywords):
         policy.Policy.__init__(self, *args, **keywords)
-        self.installBinSpecs = {}
+        self.installBucketSpecs = {}
 
     def updateArgs(self, *args, **keywords):
         # keep a list of packages filtered for in PackageSpec in the recipe
         if args:
             if len(args) > 1:
                 raise RuntimeError, ('Cannot specify multiple components'
-                                     ' for InstallBin, got '
+                                     ' for InstallBucket, got '
                                      ' %s' % ', '.join(args) )
             name = args[0]
             if ':' not in name:
                 raise RuntimeError, ('Packages can not have an install bin -'
                                      ' they must be component specific')
-            self.installBinSpecs[args[0]] = keywords
+            self.installBucketSpecs[args[0]] = keywords
 
 
     def do(self):
@@ -539,12 +539,12 @@ class InstallBin(policy.Policy):
         for compName, binKeys in self.defaultCompKeys.iteritems():
             for component in self.recipe.autopkg.getComponents():
                 if component.name.split(':')[1] == compName:
-                    component.setInstallBin(_expandBinKeys(binKeys))
+                    component.setInstallBucket(_expandBinKeys(binKeys))
 
         # override or fill in binKeys from user specified bin keys
         for component in self.recipe.autopkg.getComponents():
-            binKeys = self.installBinSpecs.get(component.name, {})
-            component.setInstallBin(_expandBinKeys(binKeys))
+            binKeys = self.installBucketSpecs.get(component.name, {})
+            component.setInstallBucket(_expandBinKeys(binKeys))
 
 
 def _markConfig(policy, filename, fullpath):
@@ -1882,7 +1882,7 @@ def DefaultPolicy(recipe):
 	CheckDestDir(recipe),
 	ComponentSpec(recipe),
 	PackageSpec(recipe),
-        InstallBin(recipe),
+        InstallBucket(recipe),
 	EtcConfig(recipe),
 	Config(recipe),
 	InitialContents(recipe),

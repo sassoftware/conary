@@ -877,7 +877,7 @@ def _createPackageChangeSet(repos, bldList, recipeObj, sourceVersion,
         p.setSourceName(sourceName)
         p.setBuildTime(buildTime)
         p.setConaryVersion(constants.version)
-        p.setInstallBin(buildPkg.getInstallBin())
+        p.setInstallBucket(buildPkg.getInstallBucket())
         p.setIsCollection(False)
 	
 	byDefault = comp not in recipeObj.getUnpackagedComponentNames()
