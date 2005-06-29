@@ -507,6 +507,9 @@ class Trove(streams.LargeStreamSet):
                 # it doesn't overlap with the secondary job set
                 continue
 
+            removeSecondary = False
+            removePrimary = False
+
             assert(oldOverlap != newOverlap)
             # This assumes any other overlap is bad. It's not entirely
             # clear that it's true, but I don't see any obvious
@@ -520,16 +523,27 @@ class Trove(streams.LargeStreamSet):
                 #   conary update foo=3
                 # have foo:runtime=3 installed.
                 if job[2] == (None, None):
+                    assert(newOverlap is None)
+                    removeSecondary = True
+                else:
+                    removePrimary = True
+            else:
+                assert(newOverlap is not None)
+                removeSecondary = True
+
+            if removePrimary:
+                primaryRemoveList.append(job)
+
+            if removeSecondary:
+                if oldOverlap is not None:
                     del secondaryIndex[(oldOverlap[0], oldOverlap[1])]
                     del secondaryIndex[(oldOverlap[0], oldOverlap[2])]
                     secondaryJob.remove(oldOverlap)
-                else:
-                    primaryRemoveList.append(job)
-            else:
-                assert(newOverlap is not None)
-                del secondaryIndex[(newOverlap[0], newOverlap[1])]
-                del secondaryIndex[(newOverlap[0], newOverlap[2])]
-                secondaryJob.remove(newOverlap)
+
+                if newOverlap is not None:
+                    del secondaryIndex[(newOverlap[0], newOverlap[1])]
+                    del secondaryIndex[(newOverlap[0], newOverlap[2])]
+                    secondaryJob.remove(newOverlap)
 
         for job in primaryRemoveList:
             primaryJob.remove(job)
