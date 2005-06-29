@@ -511,25 +511,34 @@ class Trove(streams.LargeStreamSet):
             removePrimary = False
 
             assert(oldOverlap != newOverlap)
-            # This assumes any other overlap is bad. It's not entirely
-            # clear that it's true, but I don't see any obvious
-            # exceptions
-            if oldOverlap is not None:
-                # We keep the new trove from the secondaryJob when they
-                # both diverge from the same place (though a primary erase
-                # beats a secondary change). This lets:
-                #   conary update foo=1
-                #   conary update foo:runtime=2
-                #   conary update foo=3
-                # have foo:runtime=3 installed.
-                if job[2] == (None, None):
-                    assert(newOverlap is None)
-                    removeSecondary = True
-                else:
-                    removePrimary = True
-            else:
+
+            if oldOverlap is None:
+                # They diverge from different places and end up at the same
+                # place. It doesn't matter all that much which one we take.
                 assert(newOverlap is not None)
                 removeSecondary = True
+            else:
+                # Both troves started from the same place, and diverged to
+                # different troves. Here are the rules:
+                #   1. If the trove was removed from the primary, leave
+                #      it removed.
+                #   2. If the new troves are on the same branch, take the
+                #      newer one.
+                #   3. Otherwise, take the trove from the primary.
+                assert(newOverlap is None)
+                import lib
+                lib.epdb.st('f')
+                if job[2] == (None, None):
+                    removeSecondary = True
+                elif job[2][0].branch() == oldOverlap[2][0].branch():
+                    if job[2][0].isAfter(oldOverlap[2][0]):
+                        removeSecondary = True
+                    else:
+                        removePrimary = True
+                else:
+                    removePrimary = True
+
+            assert(removePrimary or removeSecondary)
 
             if removePrimary:
                 primaryRemoveList.append(job)
