@@ -156,7 +156,7 @@ class ServerCache:
                 raise InvalidServerVersion, \
                    ("Invalid server version.  Server accepts client "
                     "versions %s, but this client only supports versions %s"
-                    " - download a valid client from www.specifix.com") % \
+                    " - download a valid client from wiki.conary.com") % \
                     (",".join([str(x) for x in serverVersions]),
                      ",".join([str(x) for x in CLIENT_VERSIONS]))
 

@@ -198,16 +198,16 @@ Updates the current source directory to the latest version, or to
 .SH EXAMPLES
 .TP 4
 .B Branching
-cvc branch conary.example.com@spx:example-foo foo:source=conary.specifix.com@spx:devel
+cvc branch conary.example.com@rpl:example-foo foo:source=conary.rpath.com@rpl:devel
 .br
 This creates a branch in the conary.example.com repository of the
-foo:source trove, based on the version of foo in the main specifix repository.
+foo:source trove, based on the version of foo in the main rpath repository.
 You can now check out this branch and work on it:
 .br
-cvc checkout --build-label conary.example.com@spx:example-foo foo
+cvc checkout --build-label conary.example.com@rpl:example-foo foo
 .br
 Committing changes to that copy of foo:source will go into the
-conary.example.com repository on the spx:example-foo branch.
+conary.example.com repository on the rpl:example-foo branch.
 .P
 More examples coming soon to a man page near you!
 .\"
@@ -215,7 +215,7 @@ More examples coming soon to a man page near you!
 .\"
 .SH BUGS
 There are no bugs, only undocumented features.  You can report
-undocumented features at http://bugs.specifix.com/
+undocumented features at http://bugs.rpath.com/
 .\"
 .\"
 .\"

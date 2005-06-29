@@ -376,9 +376,9 @@ def loadSuperClass(troveSpec, label=None):
     If not specified, the labels listed in the version in the including 
     recipe will be used as the c{labelPath} to search.
     For example, if called from recipe with version
-    C{/conary.specifix.com@spx:devel//shadow/1.0-1-1},
+    C{/conary.rpath.com@rpl:devel//shadow/1.0-1-1},
     the default C{labelPath} that would be constructed would be:
-    C{[conary.specifix.com@spx:shadow, conary.specifix.com@spx:devel]}
+    C{[conary.rpath.com@rpl:shadow, conary.rpath.com@rpl:devel]}
     """
     callerGlobals = inspect.stack()[1][0].f_globals
     ignoreInstalled = True
@@ -407,9 +407,9 @@ def loadInstalled(troveSpec, label=None):
     If not specified, the labels listed in the version in the including 
     recipe will be used as the c{labelPath} to search.
     For example, if called from recipe with version
-    C{/conary.specifix.com@spx:devel//shadow/1.0-1-1},
+    C{/conary.rpath.com@rpl:devel//shadow/1.0-1-1},
     the default C{labelPath} that would be constructed would be:
-    C{[conary.specifix.com@spx:shadow, conary.specifix.com@spx:devel]}
+    C{[conary.rpath.com@rpl:shadow, conary.rpath.com@rpl:devel]}
     """
 
     callerGlobals = inspect.stack()[1][0].f_globals
