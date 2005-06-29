@@ -1053,7 +1053,7 @@ class ConaryClient:
                     test = False, justDatabase = False, journal = None, 
                     localRollbacks = False, callback = UpdateCallback()):
 
-        def _createCs(theCs, uJob, standalone = False):
+        def _createCs(repos, theCs, uJob, standalone = False):
             assert(not standalone or 
                    isinstance(theCs, changeset.ReadOnlyChangeSet))
             cs = changeset.ReadOnlyChangeSet()
@@ -1090,12 +1090,12 @@ class ConaryClient:
                         cs.merge(newCs)
 
             if changedTroves:
-                newCs = self.repos.createChangeSet(changedTroves.keys(), 
+                newCs = repos.createChangeSet(changedTroves.keys(), 
                                                    recurse = False,
                                                    callback = callback)
                 cs.merge(newCs)
-            return cs
 
+            return cs
 
         def _applyCs(cs, uJob, rollback, removeHints = {}):
             try:
@@ -1113,9 +1113,15 @@ class ConaryClient:
             return rb
 
         def _createAllCs(q, cs, uJob):
+	    # reopen the local database so we don't share a sqlite object
+	    # with the main thread
+	    #db = database.Database(self.cfg.root, self.cfg.dbPath)
+	    #repos = NetworkRepositoryClient(cfg.repositoryMap,
+					    #localRepository = db)
+
             for i, theCs in enumerate(csSet):
                 callback.setChangesetHunk(i + 1, len(csSet))
-                newCs = _createCs(theCs, uJob)
+                newCs = _createCs(self.repos, theCs, uJob)
                 q.put(newCs)
 
             q.put(None)
@@ -1128,7 +1134,7 @@ class ConaryClient:
             # this handles change sets which include change set files
             assert(len(csSet) == 1)
             callback.setChangesetHunk(0, 0)
-            newCs = _createCs(csSet[0], uJob, standalone = True)
+            newCs = _createCs(self.repos, csSet[0], uJob, standalone = True)
             callback.setUpdateHunk(0, 0)
             _applyCs(newCs, uJob, rollback)
         else:
@@ -1146,7 +1152,7 @@ class ConaryClient:
             if False:
                 for i, theCs in enumerate(csSet):
                     callback.setChangesetHunk(i + 1, len(csSet))
-                    newCs = _createCs(theCs, uJob)
+                    newCs = _createCs(self.repos, theCs, uJob)
                     callback.setUpdateHunk(i + 1, len(csSet))
                     _applyCs(newCs, uJob, rollback, removeHints = removeHints)
             else:

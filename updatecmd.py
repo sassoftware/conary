@@ -22,6 +22,7 @@ from repository.filecontainer import BadContainer
 import conaryclient
 import os
 import sys
+import thread
 
 # FIXME client should instantiated once per execution of the command line 
 # conary client
@@ -42,15 +43,26 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
             t = self.csText + ' '
 
         if self.updateText:
+	    if self.updateHunk is not None and self.updateHunk[1] != 1:
+		if self.csText is None:
+		    ofText = " of %d" % self.updateHunk[1]
+		else:
+		    ofText = ""
+
+		job = "Job %d%s: %s%s" % (self.updateHunk[0], 
+					  ofText,
+					  self.updateText[0].lower(),
+					  self.updateText[1:])
+
             t += self.updateText
+
+	if len(t) < 76:
+	    t += '...'
 
         self._message(t)
         self.lock.release()
 
     def updateMsg(self, text):
-        if text and self.updateHunk is not None:
-            text = "Job %d: %s%s" % (self.updateHunk[0], text[0].lower(),
-                                     text[1:])
         self.updateText = text
         self.update()
 
@@ -71,7 +83,8 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         if got == need:
             self.csText = None
         elif need != 0:
-            if self.csHunk is None:
+            if self.csHunk is None or self.csHunk[1] == 1 or \
+		    not self.updateText:
                 self.csMsg("Downloading (%d%% of %dk)" 
                               % ((got * 100) / need , need / 1024))
             else:
@@ -130,7 +143,6 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
         self.updateHunk = None
         self.csText = None
         self.updateText = None
-        import thread
         self.lock = thread.allocate_lock()
 
 def displayUpdateInfo(updJob):
