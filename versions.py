@@ -1153,7 +1153,6 @@ def _VersionFromString(ver, defaultBranch = None, frozen = False,
 
             staticLabelClass = staticLabelTable.get(lastBranch.asString(), None)
             if staticLabelClass is not None:
-                lastBranch = None
                 vList.append(staticLabelClass())
             else:
                 vList.append(lastBranch)
@@ -1177,7 +1176,6 @@ def _VersionFromString(ver, defaultBranch = None, frozen = False,
                 raise ParseError, "too many shadow serial numbers in '%s'" \
                         % part
             vList.append(lastVersion)
-            parts = parts[2:]
 
     if isinstance(vList[-1], AbstractRevision):
         ver = Version(vList)
