@@ -1121,7 +1121,7 @@ class ConaryClient:
 
             for i, theCs in enumerate(csSet):
                 callback.setChangesetHunk(i + 1, len(csSet))
-                newCs = _createCs(self.repos, theCs, uJob)
+                newCs = _createCs(repos, theCs, uJob)
                 q.put(newCs)
 
             q.put(None)
