@@ -92,9 +92,7 @@ import time
 
             <div py:omit="True" py:if="troves[0].getName().endswith(':source')">
                 ${sourceTroveInfo(troves[0])}
-                <p><a href="files?t=${troveName};
-                            v=${quote(troves[0].getVersion().freeze())};
-                            f=${quote(troves[0].getFlavor().freeze())}">Show Files</a></p>
+                <p><a href="files?t=${troveName};v=${quote(troves[0].getVersion().freeze())};f=${quote(troves[0].getFlavor().freeze())}">Show Files</a></p>
             </div>
             <div py:omit="True" py:if="not trove.getName().endswith(':source')"
                  py:for="trove in troves">
