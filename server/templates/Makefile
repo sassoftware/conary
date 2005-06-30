@@ -34,7 +34,8 @@ python_files = __init__.py
 
 dist_files = $(python_files) $(extra_dist) $(kid_files)
 
-all: default-all
+all:
+	kidc --strip-dest-dir= $(kid_files)
 
 install: pyfiles-install kidfiles-install
 
