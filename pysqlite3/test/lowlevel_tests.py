@@ -42,6 +42,8 @@ class lowlevelTestCases(unittest.TestCase, testsupport.TestSupport):
             self.fail("Could set attribute. Connection object should be read-only.")
         except TypeError:
             pass
+        except AttributeError:
+            pass
 
     def CheckSQLiteExec(self):
         # removed sqlite_exec interface
