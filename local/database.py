@@ -398,10 +398,8 @@ class Database(SqlDbRepository):
 	    fsTroveDict[(fsTrove.getName(), fsTrove.getVersion())] = fsTrove
 
 	if not isRollback:
-            if localRollbacks:
-                reposRollback = cs.makeRollback(self, configFiles = 1)
-            else:
-                reposRollback = cs.rollbackRecord()
+            reposRollback = cs.makeRollback(self, configFiles = True,
+                               redirectionRollbacks = (not localRollbacks))
             flags |= update.MERGE
 
 	fsJob = update.FilesystemJob(self, cs, fsTroveDict, self.root, 

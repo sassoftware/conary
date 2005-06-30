@@ -33,6 +33,7 @@ Changes in 0.60.13:
   * Add isCollection() to TroveInfo
   * Changesets download while instals are going on
   * StreamSet.twm() respects ignoreUnknown now
+  * Rollbacks of locally cooked and emerged troves works
 
 Changes in 0.60.12:
   * Previously, if you ran "conary update foo", and foo requires a new

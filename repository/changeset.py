@@ -303,32 +303,10 @@ class ChangeSet(streams.LargeStreamSet):
 	    os.unlink(outFileName)
 	    raise
 
-    def rollbackRecord(self):
-        rollback = ChangeSet()
-        for troveCs in self.iterNewTroveList():
-            if troveCs.getOldVersion():
-                newTrove = trove.Trove(troveCs.getName(), 
-                                       troveCs.getNewVersion(),
-                                       troveCs.getNewFlavor(), None)
-                oldTrove = trove.Trove(troveCs.getName(), 
-                                       troveCs.getOldVersion(),
-                                       troveCs.getOldFlavor(), None,
-                                       isRedirect = True)
-                rollback.newTrove(oldTrove.diff(newTrove)[0])
-            else:
-                rollback.oldTrove(troveCs.getName(), troveCs.getNewVersion(),
-                                  troveCs.getNewFlavor())
-
-        for (name, version, flavor) in self.getOldTroveList():
-            oldTrove = trove.Trove(name, version, flavor, None, 
-                                   isRedirect = True)
-            rollback.newTrove(oldTrove.diff(None)[0])
-
-        return rollback
-
     # if availableFiles is set, this includes the contents that it can
     # find, but doesn't worry about files which it can't find
-    def makeRollback(self, db, configFiles = 0):
+    def makeRollback(self, db, configFiles = False, 
+                     redirectionRollbacks = True):
 	assert(not self.absolute)
 
         rollback = ChangeSet()
@@ -340,6 +318,22 @@ class ChangeSet(streams.LargeStreamSet):
 		rollback.oldTrove(troveCs.getName(), troveCs.getNewVersion(), 
 				    troveCs.getNewFlavor())
 		continue
+
+            # if redirectionRollbacks are requested, create one for troves
+            # which are not on the local branch (ones which exist in the
+            # repository)
+            if not troveCs.getOldVersion().isOnLocalHost() and \
+               not troveCs.getNewVersion().isOnLocalHost() and \
+               redirectionRollbacks:
+                newTrove = trove.Trove(troveCs.getName(), 
+                                       troveCs.getNewVersion(),
+                                       troveCs.getNewFlavor(), None)
+                oldTrove = trove.Trove(troveCs.getName(), 
+                                       troveCs.getOldVersion(),
+                                       troveCs.getOldFlavor(), None,
+                                       isRedirect = True)
+                rollback.newTrove(oldTrove.diff(newTrove)[0])
+                continue
 
 	    trv = db.getTrove(troveCs.getName(), troveCs.getOldVersion(),
                                 troveCs.getOldFlavor())
@@ -505,6 +499,12 @@ class ChangeSet(streams.LargeStreamSet):
 	    rollback.newTrove(invertedTrove)
 
 	for (name, version, flavor) in self.getOldTroveList():
+            if not version.isOnLocalHost() and redirectionRollbacks:
+                oldTrove = trove.Trove(name, version, flavor, None, 
+                                       isRedirect = True)
+                rollback.newTrove(oldTrove.diff(None)[0])
+                continue
+
 	    trv = db.getTrove(name, version, flavor)
 	    troveDiff = trv.diff(None)[0]
 	    rollback.newTrove(troveDiff)
@@ -663,9 +663,6 @@ class PathIdsConflictError(Exception):
                      '     conflicts with\n'
                      '  %s (%s %s)') % (path1, trove1.getName(), v1,
                                                  path2, trove2.getName(), v2))
-                                     
-                    
-
 
 class ReadOnlyChangeSet(ChangeSet):
 
