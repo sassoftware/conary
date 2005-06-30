@@ -47,10 +47,10 @@ import time
         <tr class="even"><td>Build time:</td><td>${time.ctime(trove.getBuildTime())} using Conary ${trove.getConaryVersion()}</td></tr>
         <tr class="odd"><td>Provides:</td>
             <td class="top">
-                <span py:for="dep in str(trove.provides.deps).split('\n')">${dep}</span>
-                <span py:if="not trove.provides.deps">
+                <div py:for="dep in str(trove.provides.deps).split('\n')">${dep}</div>
+                <div py:if="not trove.provides.deps">
                     Trove satisfies no dependencies.
-                </span>
+                </div>
             </td>
         </tr>
         <tr class="even"><td>Requires:</td>
