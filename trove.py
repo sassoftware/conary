@@ -507,8 +507,8 @@ class Trove(streams.LargeStreamSet):
                 # it doesn't overlap with the secondary job set
                 continue
 
-            removeSecondary = False
-            removePrimary = False
+            keepSecondary = True
+            keepPrimary = True
 
             assert(oldOverlap != newOverlap)
 
@@ -516,7 +516,7 @@ class Trove(streams.LargeStreamSet):
                 # They diverge from different places and end up at the same
                 # place. It doesn't matter all that much which one we take.
                 assert(newOverlap is not None)
-                removeSecondary = True
+                keepSecondary = False
             else:
                 # Both troves started from the same place, and diverged to
                 # different troves. Here are the rules:
@@ -529,31 +529,35 @@ class Trove(streams.LargeStreamSet):
                 #   4. Otherwise, take the trove from the primary.
                 assert(newOverlap is None)
                 if job[2] == (None, None):
-                    removeSecondary = True
+                    keepSecondary = False
                 elif oldOverlap[2][0] is None:
-                    removeSecondary = True
+                    keepSecondary = False
                 elif job[2][0].branch() == oldOverlap[2][0].branch():
                     if job[2][0].isAfter(oldOverlap[2][0]):
-                        removeSecondary = True
+                        keepSecondary = False
                     else:
-                        removePrimary = True
+                        keepPrimary = False
                 else:
-                    removePrimary = True
+                    keepPrimary = False
 
-            assert(removePrimary or removeSecondary)
+            assert(not keepPrimary or not keepSecondary)
 
-            if removePrimary:
+            if not keepPrimary:
                 primaryRemoveList.append(job)
 
-            if removeSecondary:
+            if not keepSecondary:
                 if oldOverlap is not None:
-                    del secondaryIndex[(oldOverlap[0], oldOverlap[1])]
-                    del secondaryIndex[(oldOverlap[0], oldOverlap[2])]
+                    if oldOverlap[1][0] is not None:
+                        del secondaryIndex[(oldOverlap[0], oldOverlap[1])]
+                    if oldOverlap[2][0] is not None:
+                        del secondaryIndex[(oldOverlap[0], oldOverlap[2])]
                     secondaryJob.remove(oldOverlap)
 
                 if newOverlap is not None:
-                    del secondaryIndex[(newOverlap[0], newOverlap[1])]
-                    del secondaryIndex[(newOverlap[0], newOverlap[2])]
+                    if newOverlap[1][0] is not None:
+                        del secondaryIndex[(newOverlap[0], newOverlap[1])]
+                    if newOverlap[2][0] is not None:
+                        del secondaryIndex[(newOverlap[0], newOverlap[2])]
                     secondaryJob.remove(newOverlap)
 
         for job in primaryRemoveList:
