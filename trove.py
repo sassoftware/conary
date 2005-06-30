@@ -522,13 +522,15 @@ class Trove(streams.LargeStreamSet):
                 # different troves. Here are the rules:
                 #   1. If the trove was removed from the primary, leave
                 #      it removed.
-                #   2. If the new troves are on the same branch, take the
+                #   2. If the trove was removed from the secondary, it needs
+                #      to be removed
+                #   3. If the new troves are on the same branch, take the
                 #      newer one.
-                #   3. Otherwise, take the trove from the primary.
+                #   4. Otherwise, take the trove from the primary.
                 assert(newOverlap is None)
-                import lib
-                lib.epdb.st('f')
                 if job[2] == (None, None):
+                    removeSecondary = True
+                elif oldOverlap[2][0] is None:
                     removeSecondary = True
                 elif job[2][0].branch() == oldOverlap[2][0].branch():
                     if job[2][0].isAfter(oldOverlap[2][0]):
