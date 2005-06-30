@@ -56,7 +56,7 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
 
             t += self.updateText
 
-	if len(t) < 76:
+	if t and len(t) < 76:
 	    t += '...'
 
         self._message(t)
