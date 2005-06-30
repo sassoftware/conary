@@ -725,7 +725,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
             remoteTrovesNeeded = []
             indices = []
             for i, (trove, req) in enumerate(zip(troves, allTrovesNeeded)):
-                if trove is None:
+                # don't ask for local troves from a remote server
+                if trove is None and not req[1].isOnLocalHost():
                     remoteTrovesNeeded.append(req)
                     indices.append(i)
 
