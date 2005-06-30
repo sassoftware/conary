@@ -76,6 +76,31 @@ class Rollback:
             self.stored = False
             self.count = 0
 
+class UpdateJob:
+
+    def addChangeSet(self, cs):
+        self.csList.append(cs)
+
+    def getChangeSets(self):
+        return self.csList
+
+    def addLockMapping(self, name, lockedVersion, neededVersion):
+        self.lockMapping.add((name, lockedVersion, neededVersion))
+    
+    def getLockMaps(self):
+        return self.lockMapping
+
+    def getRollback(self):
+        return self.rollback
+
+    def setRollback(self, rollback):
+        self.rollback = rollback
+
+    def __init__(self):
+        self.csList = []
+        self.lockMapping = set()
+        self.rollback = None
+
 class SqlDbRepository(datastore.DataStoreRepository,
 		      repository.AbstractRepository):
 
@@ -343,12 +368,12 @@ class Database(SqlDbRepository):
     # local changes includes the A->A.local portion of a rollback; if it
     # doesn't exist we need to compute that and save a rollback for this
     # transaction
-    def commitChangeSet(self, cs, lockMap,
+    def commitChangeSet(self, cs, uJob,
                         isRollback = False, toStash = True,
                         replaceFiles = False, tagScript = None,
 			test = False, justDatabase = False, journal = None,
                         localRollbacks = False, callback = UpdateCallback(),
-                        rollback = None, removeHints = {}):
+                        removeHints = {}):
 	assert(not cs.isAbsolute())
         flags = 0
         if replaceFiles:
@@ -447,6 +472,10 @@ class Database(SqlDbRepository):
 	# which is a bit unfortunate since this rollback isn't actually
 	# valid until a bit later
 	if not isRollback and not test:
+            rollback = uJob.getRollback()
+            if rollback is None:
+                rollback = self.createRollback()
+                uJob.setRollback(rollback)
             rollback.addRollback(reposRollback, localRollback)
 	    del rollback
 
@@ -464,7 +493,7 @@ class Database(SqlDbRepository):
             # isn't committed until the self.commit below
             # an object for historical reasons
             localrep.LocalRepositoryChangeSetJob(self, cs, callback)
-            self.db.mapLockedTroves(lockMap)
+            self.db.mapLockedTroves(uJob.getLockMaps())
 
         errList = fsJob.getErrorList()
         if errList:
@@ -618,10 +647,10 @@ class Database(SqlDbRepository):
                 reposCs.merge(newCs)
 
                 try:
-                    self.commitChangeSet(reposCs, set(),
+                    self.commitChangeSet(reposCs, UpdateJob(),
                                          isRollback = True,
                                          replaceFiles = replaceFiles)
-                    self.commitChangeSet(localCs, set(),
+                    self.commitChangeSet(localCs, UpdateJob(),
                                          isRollback = True,
                                          toStash = False,
                                          replaceFiles = replaceFiles)

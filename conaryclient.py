@@ -102,24 +102,6 @@ class NoNewTrovesError(UpdateError):
     def __str__(self):
         return "no new troves were found"
 
-class UpdateJob:
-
-    def addChangeSet(self, cs):
-        self.csList.append(cs)
-
-    def getChangeSets(self):
-        return self.csList
-
-    def addLockMapping(self, name, lockedVersion, neededVersion):
-        self.lockMapping.add((name, lockedVersion, neededVersion))
-    
-    def getLockMaps(self):
-        return self.lockMapping
-
-    def __init__(self):
-        self.csList = []
-        self.lockMapping = set()
-
 class UpdateChangeSet(changeset.ReadOnlyChangeSet):
 
     _streamDict = changeset.ReadOnlyChangeSet._streamDict
@@ -977,7 +959,7 @@ class ConaryClient:
         """
         callback.preparingChangeSet()
 
-        uJob = UpdateJob()
+        uJob = database.UpdateJob()
 
         finalCs, splittable = self._updateChangeSet(itemList, uJob,
                                         keepExisting = keepExisting,
@@ -1097,15 +1079,14 @@ class ConaryClient:
 
             return cs
 
-        def _applyCs(cs, uJob, rollback, removeHints = {}):
+        def _applyCs(cs, uJob, removeHints = {}):
             try:
-                rb = self.db.commitChangeSet(cs, uJob.getLockMaps(),
+                rb = self.db.commitChangeSet(cs, uJob,
                                     replaceFiles = replaceFiles,
                                     tagScript = tagScript, test = test, 
                                     justDatabase = justDatabase,
                                     journal = journal, callback = callback,
                                     localRollbacks = localRollbacks,
-                                    rollback = rollback,
                                     removeHints = removeHints)
             except database.CommitError, e:
                 raise UpdateError, "changeset cannot be applied"
@@ -1128,7 +1109,6 @@ class ConaryClient:
 
             thread.exit()
 
-        rollback = self.db.createRollback()
         csSet = uJob.getChangeSets()
         if isinstance(csSet[0], changeset.ReadOnlyChangeSet):
             # this handles change sets which include change set files
@@ -1136,7 +1116,7 @@ class ConaryClient:
             callback.setChangesetHunk(0, 0)
             newCs = _createCs(self.repos, csSet[0], uJob, standalone = True)
             callback.setUpdateHunk(0, 0)
-            _applyCs(newCs, uJob, rollback)
+            _applyCs(newCs, uJob)
         else:
             # build a set of everything which is being removed
             removeHints = set()
@@ -1154,7 +1134,7 @@ class ConaryClient:
                     callback.setChangesetHunk(i + 1, len(csSet))
                     newCs = _createCs(self.repos, theCs, uJob)
                     callback.setUpdateHunk(i + 1, len(csSet))
-                    _applyCs(newCs, uJob, rollback, removeHints = removeHints)
+                    _applyCs(newCs, uJob, removeHints = removeHints)
             else:
                 from Queue import Queue
                 import thread
@@ -1167,7 +1147,7 @@ class ConaryClient:
                 while newCs is not None:
                     callback.setUpdateHunk(i, len(csSet))
                     i += 1
-                    _applyCs(newCs, uJob, rollback, removeHints = removeHints)
+                    _applyCs(newCs, uJob, removeHints = removeHints)
                     callback.updateDone()
                     newCs = csQueue.get()
 
