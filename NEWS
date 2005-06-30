@@ -1,4 +1,4 @@
-Changes in 0.60.13:
+Changes in 0.61.0:
   * New functionality for maintaining user groups: renaming and updating
     members
   * Added repository interfaces for deleting users and groups
