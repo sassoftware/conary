@@ -866,10 +866,13 @@ class ConaryClient:
                 else:
                     affinityDb = self.db
 
-                l = self.repos.findTrove(self.cfg.installLabelPath, 
-                                          (troveName, versionStr, flavor),
-                                          self.cfg.flavor, 
-                                          affinityDatabase = affinityDb)
+                try:
+                    l = self.repos.findTrove(self.cfg.installLabelPath, 
+                                             (troveName, versionStr, flavor),
+                                             self.cfg.flavor, 
+                                             affinityDatabase = affinityDb)
+                except repository.TroveNotFound, e:
+                    raise NoNewTrovesError
                 newItems += l
                 # XXX where does this go now?                    
                 # updating locally cooked troves needs a label override
