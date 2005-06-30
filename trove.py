@@ -531,7 +531,7 @@ class Trove(streams.LargeStreamSet):
                 if job[2] == (None, None):
                     keepSecondary = False
                 elif oldOverlap[2][0] is None:
-                    keepSecondary = False
+                    keepPrimary = False
                 elif job[2][0].branch() == oldOverlap[2][0].branch():
                     if job[2][0].isAfter(oldOverlap[2][0]):
                         keepSecondary = False
