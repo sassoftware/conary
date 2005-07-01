@@ -332,7 +332,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
     return
 
     try:
-        callback = callbacks.UpdateCallback()
+        callback = UpdateCallback()
         _updateTroves(cfg, items, replaceFiles = replaceFiles, 
                       depCheck = depCheck, depsRecurse = depsRecurse, 
                       test = test, recurse = recurse, info = info, 
