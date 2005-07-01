@@ -443,10 +443,11 @@ _registerDepClass(UseDependency)
 
 class DependencySet(object):
 
-    __slots__ = ( 'members' )
+    __slots__ = ( 'members', 'hash' )
 
     def addDep(self, depClass, dep):
 	assert(isinstance(dep, Dependency))
+        self.hash = None
 
 	tag = depClass.tag
         c = self.members.setdefault(tag, depClass())
@@ -456,6 +457,7 @@ class DependencySet(object):
         """ adds an empty dependency class, which for flavors has 
             different semantics when merging than not having a dependency 
             class.  See mergeFlavors """
+        self.hash = None
 	tag = depClass.tag
         assert(tag not in self.members)
         self.members[tag] = depClass()
@@ -502,6 +504,8 @@ class DependencySet(object):
         if not other:
             return
 
+        self.hash = None
+
 	for tag in other.members:
 	    if self.members.has_key(tag):
 		self.members[tag].union(other.members[tag],
@@ -542,10 +546,12 @@ class DependencySet(object):
         return not self == other
 
     def __hash__(self):
-	h = 0
-	for member in self.members.itervalues():
-	    h ^= hash(member)
-	return h
+        if self.hash is None:
+            self.hash = 0
+            for member in self.members.itervalues():
+                self.hash ^= hash(member)
+
+	return self.hash
 
     def __nonzero__(self):
 	return not(not(self.members))
@@ -564,6 +570,7 @@ class DependencySet(object):
 
     def __init__(self):
 	self.members = {}
+        self.hash = None
 
 def ThawDependencySet(frz):
     depSet = DependencySet()
