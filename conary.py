@@ -69,6 +69,7 @@ def usage(rc = 1):
     print "       conary showcs       <changeset> <trove>[=<version>]*"
     print "       conary unlock       <pkgname>[=<version>][[flavor]]*"
     print "       conary update       <pkgname>[=<version>][[flavor]]* <changeset>*"
+    print "       conary updateall"
     print "       conary usage"
     print "       conary verify       <pkgname>[=<version>][[flavor]]*"
     print "       conary --version"
@@ -126,6 +127,14 @@ def usage(rc = 1):
     print "                 --replace-files"
     print "                 --resolve"
     print "                 --test"
+    print "updateall flags:"
+    print "                 --exclude-troves <patterns>"
+    print "                 --info"
+    print "                 --no-deps"
+    print "                 --no-deps-recurse"
+    print "                 --no-resolve"
+    print "                 --replace-files"
+    print "                 --resolve"
     return rc
 
 def openRepository(repMap):
@@ -529,6 +538,18 @@ def realMain(cfg, argv=sys.argv):
 	if argSet.has_key('no-deps'):
 	    kwargs['depCheck'] = False
 	    del argSet['no-deps']
+
+	if argSet.has_key('replace-files'):
+	    kwargs['replaceFiles'] = True
+	    del argSet['replace-files']
+
+	if argSet.has_key('no-deps-recurse'):
+	    kwargs['depsRecurse'] = False
+	    del argSet['no-deps-recurse']
+
+	if argSet.has_key('no-resolve'):
+            cfg.autoResolve = False
+	    del argSet['no-resolve']
 
 	if argSet: return usage()
 

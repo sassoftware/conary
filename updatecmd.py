@@ -299,7 +299,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
 
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
-              depsRecurse = True, recurse = True, test = False):
+              depsRecurse = True, test = False):
     client = conaryclient.ConaryClient(cfg)
     items = client.db.findUnreferencedTroves()
 
@@ -330,27 +330,24 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 
 	updateItems.append((name, branch, flavor - commonFlavor))
 
-    for n, v, f in updateItems:
-        if not v:
-            v = ''
-        else:
-            v = v.asString()
+    #for n, v, f in updateItems:
+    #    if not v:
+    #        v = ''
+    #    else:
+    #        v = v.asString()
 
-        if not f:
-            f = ''
-        else:
-            f = deps.formatFlavor(f)
+    #    if not f:
+    #        f = ''
+    #    else:
+    #        f = deps.formatFlavor(f)
 
-        print (n,v,f)
-
-    return
+    #    print (n,v,f)
 
     try:
         callback = UpdateCallback()
         _updateTroves(cfg, updateItems, replaceFiles = replaceFiles, 
                       depCheck = depCheck, depsRecurse = depsRecurse, 
-                      test = test, recurse = recurse, info = info, 
-                      callback = callback)
+                      test = test, info = info, callback = callback)
     except conaryclient.DependencyFailure, e:
         log.error(e)
     except conaryclient.UpdateError, e:
