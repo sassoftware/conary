@@ -1104,12 +1104,8 @@ class ConaryClient:
 					    localRepository = db)
 
             for i, theCs in enumerate(csSet):
-                print "creating cs"
                 callback.setChangesetHunk(i + 1, len(csSet))
-                from lib import epdb
-                epdb.st()
                 newCs = _createCs(repos, theCs, uJob)
-                print "done"
                 q.put(newCs)
 
             q.put(None)
