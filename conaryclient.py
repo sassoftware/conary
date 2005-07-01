@@ -1096,7 +1096,7 @@ class ConaryClient:
 
             return rb
 
-        def _createAllCs(q, cs, uJob):
+        def _createAllCs(q, cs, uJob, lock):
 	    # reopen the local database so we don't share a sqlite object
 	    # with the main thread
 	    db = database.Database(self.cfg.root, self.cfg.dbPath)
@@ -1104,12 +1104,17 @@ class ConaryClient:
 					    localRepository = db)
 
             for i, theCs in enumerate(csSet):
+                print "creating cs"
                 callback.setChangesetHunk(i + 1, len(csSet))
+                from lib import epdb
+                epdb.st()
                 newCs = _createCs(repos, theCs, uJob)
+                print "done"
                 q.put(newCs)
 
             q.put(None)
 
+            lock.acquire()
             thread.exit()
 
         csSet = uJob.getChangeSets()
@@ -1143,7 +1148,13 @@ class ConaryClient:
                 import thread
 
                 csQueue = Queue(5)
-                thread.start_new_thread(_createAllCs, (csQueue, csSet, uJob))
+                # allocate a lock that's used to prevent the changeset
+                # creating thread from exiting until we're done applying
+                # changesets
+                lock = thread.allocate_lock()
+                lock.acquire()
+                thread.start_new_thread(_createAllCs,
+                                        (csQueue, csSet, uJob, lock))
 
                 newCs = csQueue.get()
                 i = 1
@@ -1153,6 +1164,8 @@ class ConaryClient:
                     _applyCs(newCs, uJob, removeHints = removeHints)
                     callback.updateDone()
                     newCs = csQueue.get()
+                # tell the changeset creating thread that it can exit
+                lock.release()
 
     def getMetadata(self, troveList, label, cacheFile = None,
                     cacheOnly = False, saveOnly = False):
