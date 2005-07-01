@@ -269,16 +269,16 @@ class Revision(AbstractRevision):
     def __hash__(self):
 	return hash(self.version) ^ hash(self.sourceCount) ^ hash(self.buildCount)
 
-    def incrementSourceCount(self, shadowLength):
+    def _incrementSourceCount(self, shadowLength):
 	"""
 	Incremements the release number.
 	"""
 	self.sourceCount.increment(shadowLength)
 	self.timeStamp = time.time()
 
-    def setBuildCount(self, buildCount):
+    def _setBuildCount(self, buildCount):
 	"""
-	Incremements the build count
+	Sets the build count
 	"""
 	self.buildCount = buildCount
 
@@ -506,7 +506,7 @@ class AbstractVersion(object):
 
 class VersionSequence(AbstractVersion):
 
-    __slots__ = ( "versions" )
+    __slots__ = ( "versions", "hash" )
 
     """
     Abstract class representing a fully qualified version, branch, or
@@ -543,11 +543,12 @@ class VersionSequence(AbstractVersion):
         return not self == other
 
     def __hash__(self):
-	i = 0
-	for ver in self.versions:
-	    i ^= hash(ver)
+        if self.hash is None:
+            self.hash = 0
+            for ver in self.versions:
+                self.hash ^= hash(ver)
 
-	return i
+	return self.hash
 	    
     def asString(self, defaultBranch = None, frozen = False):
 	"""
@@ -639,6 +640,7 @@ class VersionSequence(AbstractVersion):
         AbstractRevision objects.
         """
 	self.versions = versionList
+        self.hash = None
 
 class NewVersion(AbstractVersion):
 
@@ -802,7 +804,8 @@ class Version(VersionSequence):
 	The release number for the final element in the version is
 	incremented by one and the time stamp is reset.
 	"""
-	self.versions[-1].incrementSourceCount(self.shadowLength())
+        self.hash = None
+	self.versions[-1]._incrementSourceCount(self.shadowLength())
 
     def incrementBuildCount(self):
 	"""
@@ -813,6 +816,7 @@ class Version(VersionSequence):
         # it). if the source count is too short, make the build count
         # the right length for this shadow
         shadowLength = self.shadowLength()
+        self.hash = None
 
         sourceCount = self.versions[-1].getSourceCount()
         buildCount = self.versions[-1].getBuildCount()
@@ -822,14 +826,14 @@ class Version(VersionSequence):
                 buildCount.increment(buildCount.shadowCount())
             else:
                 buildCount = SerialNumber('1')
-                self.versions[-1].setBuildCount(buildCount)
+                self.versions[-1]._setBuildCount(buildCount)
         else:
             if buildCount:
                 buildCount.increment(shadowLength)
             else:
                 buildCount = SerialNumber(
                             ".".join([ '0' ] * shadowLength + [ '1' ] ))
-                self.versions[-1].setBuildCount(buildCount)
+                self.versions[-1]._setBuildCount(buildCount)
 
         self.versions[-1].resetTimeStamp()
 

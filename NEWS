@@ -2,7 +2,7 @@ Changes in 0.61.1:
   * Cleaned up error message which results from Conary not being able to
     determine which trove to remove when a new one is installed
   * Switched dependency object to use slots
-  * Cache hash values for DependencySet
+  * Cache hash values for DependencySet, Version, and Branch objects
 
 Changes in 0.61.0:
   * New functionality for maintaining user groups: renaming and updating
