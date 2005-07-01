@@ -843,9 +843,10 @@ class ConaryClient:
                 # skip ahead to the next itemList
                 continue                    
 
-            if isinstance(versionStr, versions.Version) or \
-               isinstance(versionStr, versions.Branch):
+            if isinstance(versionStr, versions.Version):
                 assert(isinstance(flavor, deps.DependencySet))
+                newItems.append((troveName, versionStr, flavor))
+            elif isinstance(versionStr, versions.Branch):
                 newItems.append((troveName, versionStr, flavor))
             elif (versionStr and versionStr[0] == '/'):
                 # fully qualified versions don't need branch affinity
