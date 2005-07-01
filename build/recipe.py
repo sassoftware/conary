@@ -846,7 +846,7 @@ class PackageRecipe(Recipe):
 
 
     def disableParallelMake(self):
-        self.macros.parallelmflags = ''
+        self.macros._override('parallelmflags', '')
 
     def populateLcache(self):
         """
