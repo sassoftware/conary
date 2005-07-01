@@ -551,6 +551,10 @@ def realMain(cfg, argv=sys.argv):
             cfg.autoResolve = False
 	    del argSet['no-resolve']
 
+	if argSet.has_key('resolve'):
+            cfg.autoResolve = True
+	    del argSet['resolve']
+
 	if argSet: return usage()
 
 	if len(otherArgs) == 2:
