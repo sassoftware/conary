@@ -167,13 +167,18 @@ class Dependency(BaseDependency):
                 intFlags[flag] = sense
         return Dependency(self.name, intFlags)
 
+    def __and__(self, other):
+        return self.intersection(other)
+
     def difference(self, other):
         diffFlags = self.flags.copy()
-        for flag in other.flags:
-            if flag in self.flags:
+        for flag, value in other.flags.iteritems():
+            if flag in diffFlags and value == diffFlags[flag]:
                 del diffFlags[flag]
         return Dependency(self.name, diffFlags)
 
+    def __sub__(self, other):
+        return self.difference(other)
 
     def mergeFlags(self, other, mergeType = DEP_MERGE_TYPE_NORMAL):
 	"""
@@ -302,6 +307,9 @@ class DependencyClass(object):
 	    # calling this for duplicates is a noop
 	    self.addDep(otherdep, mergeType = mergeType)
 
+    def __and__(self, other):
+        return self.intersection(other)
+
     def intersection(self, other):
         newDepClass = self.__class__()
 	for tag, dep in self.members.iteritems():
@@ -317,6 +325,9 @@ class DependencyClass(object):
             else:
                 newDepClass.addDep(dep)
         return newDepClass
+
+    def __sub__(self, other):
+        return self.difference(other)
 
     def getDeps(self):
         l = self.members.items()
@@ -520,6 +531,9 @@ class DependencySet(object):
                 newDep.members[depClass.tag] = depClass.intersection(other.members[tag])
         return newDep
 
+    def __and__(self, other):
+        return self.intersection(other)
+
     def difference(self, other):
         newDep = DependencySet()
         for tag, depClass in self.members.iteritems():
@@ -528,6 +542,9 @@ class DependencySet(object):
             else:
                 newDep.members[tag] = copy.deepcopy(depClass)
         return newDep
+
+    def __sub__(self, other):
+        return self.difference(other)
 
     def __eq__(self, other):
         if other is None:
@@ -766,10 +783,10 @@ def flavorDifferences(flavors):
     # the intersection of all the flavors will provide the largest common
     # flavor that is shared between all the flavors given
     for flavor in flavors[1:]:
-        base = base.intersection(flavor)
+        base = base & flavor
     # remove the common flavor bits
     for flavor in flavors:
-        diffs[flavor] = flavor.difference(base)
+        diffs[flavor] = flavor - base
     return diffs
 
 
