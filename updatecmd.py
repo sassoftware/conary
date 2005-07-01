@@ -330,7 +330,19 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 
 	updateItems.append((name, branch, flavor - commonFlavor))
 
-    print "\n".join([str((x[0], x[1].asString(), deps.formatFlavor(x[2]))) for x in updateItems ])
+    for n, v, f in updateItems:
+        if not v:
+            v = ''
+        else:
+            v = v.asString()
+
+        if not f:
+            f = ''
+        else:
+            f = deps.formatFlavor(f)
+
+        print (n,v,f)
+
     return
 
     try:
