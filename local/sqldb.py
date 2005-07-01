@@ -1352,6 +1352,31 @@ class Database:
 
         return result
 
+    def findUnreferencedTroves(self):
+        cu = self.db.cursor()
+        cu.execute("""
+                SELECT troveName, version, flavor FROM DBInstances 
+                    LEFT OUTER JOIN TroveTroves ON 
+                        DBInstances.instanceId = TroveTroves.includedId 
+                    JOIN Versions ON 
+                        DBInstances.versionId = Versions.versionId 
+                    JOIN DBFlavors ON
+                        DBInstances.flavorId = DBFlavors.flavorId
+                    WHERE 
+                        includedid IS NULL AND 
+                        version NOT LIKE "%/local@LOCAL:%"
+        """)
+
+        l = []
+        for (name, version, flavorStr) in cu:
+            if flavorStr is None:
+                flavorStr = deps.DependencySet()
+            else:
+                flavorStr = deps.deps.ThawDependencySet(flavorStr)
+
+            l.append((name, versions.VersionFromString(version), flavorStr))
+                    
+        return l
 
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)

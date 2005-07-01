@@ -298,12 +298,25 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                        callback = callback)
 
 
-def updateAll(cfg, info = False, depCheck = True):
+def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
+              depsRecurse = True, recurse = True, test = False):
     client = conaryclient.ConaryClient(cfg)
-    cu = client.db.db.db.cursor()    
-    cu.execute('select trovename from dbinstances left outer join trovetroves on dbinstances.instanceid=trovetroves.includedid join versions on dbinstances.versionid = versions.versionid where includedid is null and version not like "%local%";')
-    names = [ x[0] for x in cu ]
-    return doUpdate(cfg, names, info = info, depCheck = depCheck)
+    items = client.db.findUnreferencedTroves()
+    callback = callbacks.UpdateCallback()
+
+    try:
+        _updateTroves(cfg, items, replaceFiles = replaceFiles, 
+                      depCheck = depCheck, depsRecurse = depsRecurse, 
+                      test = test, recurse = recurse, info = info, 
+                      callback = callback)
+    except conaryclient.DependencyFailure, e:
+        log.error(e)
+    except conaryclient.UpdateError, e:
+        log.error(e)
+    except repository.CommitError, e:
+        log.error(e)
+    except changeset.PathIdsConflictError, e:
+        log.error(e)
 
 def changeLocks(cfg, troveStrList, lock = True):
     client = conaryclient.ConaryClient(cfg)

@@ -231,6 +231,9 @@ class SqlDbRepository(datastore.DataStoreRepository,
     def getFileVersions(self, l):
 	return self.db.iterFiles(l)
 
+    def findUnreferencedTroves(self):
+        return self.db.findUnreferencedTroves()
+
     def iterFilesInTrove(self, troveName, version, flavor,
                          sortByPath = False, withFiles = False,
 			 pristine = False):
