@@ -50,7 +50,10 @@ def _registerDepClass(classObj):
     global dependencyClasses
     dependencyClasses[classObj.tag] = classObj
 
-class BaseDependency:
+class BaseDependency(object):
+
+    __slots__ = ( '__weakref__' )
+
     """
     Implements a single dependency. This is relative to a DependencyClass,
     which is part of a DependencySet. Dependency Sets can be frozen and
@@ -88,6 +91,8 @@ class BaseDependency:
         raise NotImplementedError
 
 class Dependency(BaseDependency):
+
+    __slots__ = ( 'name', 'flags' )
 
     def __hash__(self):
 	val = hash(self.name)
@@ -243,7 +248,9 @@ class Dependency(BaseDependency):
 	    for (flag, sense) in flags:
 		self.flags[flag] = sense
 
-class DependencyClass:
+class DependencyClass(object):
+
+    __slots__ = ( 'tag', 'members' )
 
     def addDep(self, dep, mergeType = DEP_MERGE_TYPE_NORMAL):
         assert(dep.__class__ == self.depClass)
@@ -434,7 +441,9 @@ class UseDependency(DependencyClass):
     depClass = Dependency
 _registerDepClass(UseDependency)
 
-class DependencySet:
+class DependencySet(object):
+
+    __slots__ = ( 'members' )
 
     def addDep(self, depClass, dep):
 	assert(isinstance(dep, Dependency))
@@ -452,7 +461,9 @@ class DependencySet:
         self.members[tag] = depClass()
 
     def copy(self):
-        return copy.deepcopy(self)
+        new = DependencySet()
+        new.members = copy.deepcopy(self.members)
+        return new
 
     def toStrongFlavor(self):
         newDep = DependencySet()
