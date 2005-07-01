@@ -314,15 +314,13 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
     updateItems = []
 
     for name, version, flavor in items:
-        if len(installedDict[name]) == 1:
-            updateItems.append((name, None, None))
-            continue
-
         branch = version.branch()
-
 	verInfo = installedDict[name][branch]
 
-	if len(verInfo) == 1:
+        if len(installedDict[name]) == 1 and len(verInfo) == 1:
+            updateItems.append((name, None, None))
+            continue
+        elif len(verInfo) == 1:
 	    updateItems.append((name, branch, None))
 	    continue
 
@@ -332,7 +330,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 
 	updateItems.append((name, branch, flavor - commonFlavor))
 
-    print updateItems
+    print "\n".join([str((x[0], x[1].asString(), deps.formatFlavor(x[2]))) for x in updateItems ])
     return
 
     try:
