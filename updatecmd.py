@@ -302,9 +302,37 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
               depsRecurse = True, recurse = True, test = False):
     client = conaryclient.ConaryClient(cfg)
     items = client.db.findUnreferencedTroves()
-    callback = callbacks.UpdateCallback()
+
+    itemDict = {}
+    for (name, version, release) in items:
+        branchDict = itemDict.setdefault(name, {})
+        l = branchDict.setdefault(version.branch(), [])
+        l.append((version, release))
+
+    items = []
+
+    for name, branchDict in itemDict.iteritems():
+        if len(branchDict) == 1:
+            items.append((name, None, None))
+            continue
+
+        for branch, verInfo in branchDict.iteritems():
+            if len(verInfo) == 1:
+                items.append((name, branch, None))
+                continue
+
+            commonFlavor = verInfo[0].intersect(verInfo[1])
+            for version, flavor in verInfo[2:]:
+                commonFlavor = commonFlavor.intersect(flavor)
+
+            for version, flavor in verInfo[2:]:
+                items.append((name, branch, flavor.difference(commonFlavor)))
+
+    print items
+    return
 
     try:
+        callback = callbacks.UpdateCallback()
         _updateTroves(cfg, items, replaceFiles = replaceFiles, 
                       depCheck = depCheck, depsRecurse = depsRecurse, 
                       test = test, recurse = recurse, info = info, 
