@@ -303,37 +303,40 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
     client = conaryclient.ConaryClient(cfg)
     items = client.db.findUnreferencedTroves()
 
-    itemDict = {}
-    for (name, version, release) in items:
-        branchDict = itemDict.setdefault(name, {})
+    installed = client.db.findByNames([ x[0] for x in items ])
+
+    installedDict = {}
+    for (name, version, release) in installed:
+        branchDict = installedDict.setdefault(name, {})
         l = branchDict.setdefault(version.branch(), [])
         l.append((version, release))
 
-    items = []
+    updateItems = []
 
-    for name, branchDict in itemDict.iteritems():
-        if len(branchDict) == 1:
-            items.append((name, None, None))
+    for name, version, flavor in items:
+        if len(installedDict[name]) == 1:
+            updateItems.append((name, None, None))
             continue
 
-        for branch, verInfo in branchDict.iteritems():
+        branch = version.branch()
+
+        for verInfo in installedDict[name][branch]:
             if len(verInfo) == 1:
-                items.append((name, branch, None))
+                updateItems.append((name, branch, None))
                 continue
 
-            commonFlavor = verInfo[0].intersect(verInfo[1])
-            for version, flavor in verInfo[2:]:
-                commonFlavor = commonFlavor.intersect(flavor)
+            commonFlavor = verInfo[0][1] & verInfo[1][1]
+            for instVersion, instFlavor in verInfo[2:]:
+                commonFlavor = commonFlavor & instFlavor
 
-            for version, flavor in verInfo[2:]:
-                items.append((name, branch, flavor.difference(commonFlavor)))
+            updateItems.append((name, branch, flavor - commonFlavor))
 
-    print items
+    print updateItems
     return
 
     try:
         callback = UpdateCallback()
-        _updateTroves(cfg, items, replaceFiles = replaceFiles, 
+        _updateTroves(cfg, updateItems, replaceFiles = replaceFiles, 
                       depCheck = depCheck, depsRecurse = depsRecurse, 
                       test = test, recurse = recurse, info = info, 
                       callback = callback)
