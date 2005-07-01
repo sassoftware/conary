@@ -1387,6 +1387,7 @@ class Database:
                             JOIN DBFlavors ON
                                 DBInstances.flavorId = DBFlavors.flavorId
                             WHERE
+                                isPresent = 1 AND
                                 troveName IN (%s)""" %
                     ",".join(["'%s'" % x for x in nameList]))
 
