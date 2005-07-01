@@ -320,16 +320,17 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 
         branch = version.branch()
 
-        for verInfo in installedDict[name][branch]:
-            if len(verInfo) == 1:
-                updateItems.append((name, branch, None))
-                continue
+	verInfo = installedDict[name][branch]
 
-            commonFlavor = verInfo[0][1] & verInfo[1][1]
-            for instVersion, instFlavor in verInfo[2:]:
-                commonFlavor = commonFlavor & instFlavor
+	if len(verInfo) == 1:
+	    updateItems.append((name, branch, None))
+	    continue
 
-            updateItems.append((name, branch, flavor - commonFlavor))
+	commonFlavor = verInfo[0][1] & verInfo[1][1]
+	for instVersion, instFlavor in verInfo[2:]:
+	    commonFlavor = commonFlavor & instFlavor
+
+	updateItems.append((name, branch, flavor - commonFlavor))
 
     print updateItems
     return
