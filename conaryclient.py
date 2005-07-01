@@ -843,7 +843,8 @@ class ConaryClient:
                 # skip ahead to the next itemList
                 continue                    
 
-            if isinstance(versionStr, versions.Version):
+            if isinstance(versionStr, versions.Version) or \
+               isinstance(versionStr, versions.Branch):
                 assert(isinstance(flavor, deps.DependencySet))
                 newItems.append((troveName, versionStr, flavor))
             elif (versionStr and versionStr[0] == '/'):
