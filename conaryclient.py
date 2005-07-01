@@ -847,7 +847,16 @@ class ConaryClient:
                 assert(isinstance(flavor, deps.DependencySet))
                 newItems.append((troveName, versionStr, flavor))
             elif isinstance(versionStr, versions.Branch):
-                newItems.append((troveName, versionStr, flavor))
+                try:
+                    l = self.repos.findTrove(None, 
+                                              (troveName, 
+                                               versionStr.asString(), 
+                                               flavor),
+                                              self.cfg.flavor, 
+                                              affinityDatabase=self.db)
+                except repository.TroveNotFound, e:
+                    raise NoNewTrovesError
+                newItems += l
             elif (versionStr and versionStr[0] == '/'):
                 # fully qualified versions don't need branch affinity
                 # but they do use flavor affinity
