@@ -1370,7 +1370,7 @@ class Database:
         l = []
         for (name, version, flavorStr) in cu:
             if flavorStr is None:
-                flavorStr = deps.DependencySet()
+                flavorStr = deps.deps.DependencySet()
             else:
                 flavorStr = deps.deps.ThawDependencySet(flavorStr)
 
