@@ -652,7 +652,7 @@ class PathIdsConflictError(Exception):
 
     def __str__(self):
         if self.trove1 is None:
-            return 'PathIdsConflict: %s' % self.pathID
+            return 'PathIdsConflict: %s' % self.pathId
         else:
             path1, path2 = self.getPaths()
             trove1, trove2 = self.getTroves()
