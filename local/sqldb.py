@@ -1378,6 +1378,21 @@ class Database:
                     
         return l
 
+    def findByNames(self, nameList):
+        cu = self.db.cursor()
+
+        cu.execute("""SELECT troveName, version, flavor FROM
+                            DBInstances JOIN Versions ON
+                                DBInstances.versionId = Versions.versionId
+                            JOIN DBFlavors ON
+                                DBInstances.flavorId = DBFlavors.flavorId
+                            WHERE
+                                troveName IN (%s)""" %
+                    ",".join(["'%s'" % x for x in nameList]))
+
+        return [ (n, versions.VersionFromString(v),
+                  deps.deps.ThawDependencySet(f)) for (n, v, f) in cu ]
+
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)
 

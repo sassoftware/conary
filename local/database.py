@@ -107,6 +107,9 @@ class SqlDbRepository(datastore.DataStoreRepository,
     def iterAllTroveNames(self):
 	return self.db.iterAllTroveNames()
 
+    def findByNames(self, nameList):
+        return self.db.nameList
+
     def getTroveContainers(self, l):
         return self.db.getTroveContainers(l)
 
