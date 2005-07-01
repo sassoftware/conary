@@ -991,7 +991,10 @@ class Trove(streams.LargeStreamSet):
 		    else:
 			# Here's the fit of pique. This shouldn't happen
 			# except for the most ill-formed of groups.
-			raise IOError, "ick. yuck. blech. ptooey."
+                        raise IOError, "Cannot determine what trove is " \
+                            "being replaced for %s=%s[%s]" %  \
+                                (name, newVersion.asString(), 
+                                 deps.formatFlavor(newFlavor))
 
 	    # remove old versions which didn't get matches
 	    for oldVersion in oldVersionList:
