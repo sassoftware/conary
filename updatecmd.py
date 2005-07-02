@@ -324,8 +324,15 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 	    updateItems.append((name, branch, None))
 	    continue
 
-        flavor.union(cfg.flavor[0], deps.DEP_MERGE_TYPE_OVERRIDE)
-	updateItems.append((name, branch, flavor - commonFlavor))
+        score = 0
+        for instFlavor in cfg.flavor:
+            newScore = instFlavor.score(flavor) 
+            if newScore > score:
+                score = newScore
+                finalFlavor = instFlavor
+
+        flavor.union(finalFlavor, deps.DEP_MERGE_TYPE_OVERRIDE)
+	updateItems.append((name, branch, flavor))
 
     try:
         callback = UpdateCallback()
