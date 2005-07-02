@@ -324,24 +324,8 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
 	    updateItems.append((name, branch, None))
 	    continue
 
-	commonFlavor = verInfo[0][1] & verInfo[1][1]
-	for instVersion, instFlavor in verInfo[2:]:
-	    commonFlavor = commonFlavor & instFlavor
-
+        flavor.union(cfg.flavor[0], deps.DEP_MERGE_TYPE_OVERRIDE)
 	updateItems.append((name, branch, flavor - commonFlavor))
-
-    #for n, v, f in updateItems:
-    #    if not v:
-    #        v = ''
-    #    else:
-    #        v = v.asString()
-
-    #    if not f:
-    #        f = ''
-    #    else:
-    #        f = deps.formatFlavor(f)
-
-    #    print (n,v,f)
 
     try:
         callback = UpdateCallback()
