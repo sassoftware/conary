@@ -919,7 +919,10 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
                 sha1 = item[2].contents.sha1()
                 if self.localRep._hasFileContents(sha1):
-                    contents[i] = self.localRep.getFileContents([item])[0]
+                    # retrieve the contents from the database now so that
+                    # the changeset can be shared between threads
+                    c = self.localRep.getFileContents([item])[0].get().read()
+                    contents[i] = filecontents.FromString(c)
 
         byServer = {}
 
