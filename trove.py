@@ -514,9 +514,9 @@ class Trove(streams.LargeStreamSet):
 
             if oldOverlap is None:
                 # They diverge from different places and end up at the same
-                # place. It doesn't matter all that much which one we take.
-                assert(newOverlap is not None)
-                keepSecondary = False
+                # place. This can't happen since both diffs are from the
+                # same trove (self).
+                assert(0)
             else:
                 # Both troves started from the same place, and diverged to
                 # different troves. Here are the rules:
@@ -538,7 +538,7 @@ class Trove(streams.LargeStreamSet):
                     else:
                         keepPrimary = False
                 else:
-                    keepPrimary = False
+                    keepSecondary = False
 
             assert(not keepPrimary or not keepSecondary)
 
@@ -553,12 +553,7 @@ class Trove(streams.LargeStreamSet):
                         del secondaryIndex[(oldOverlap[0], oldOverlap[2])]
                     secondaryJob.remove(oldOverlap)
 
-                if newOverlap is not None:
-                    if newOverlap[1][0] is not None:
-                        del secondaryIndex[(newOverlap[0], newOverlap[1])]
-                    if newOverlap[2][0] is not None:
-                        del secondaryIndex[(newOverlap[0], newOverlap[2])]
-                    secondaryJob.remove(newOverlap)
+                assert(newOverlap is None)
 
         for job in primaryRemoveList:
             primaryJob.remove(job)
