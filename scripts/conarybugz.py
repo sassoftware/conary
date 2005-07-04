@@ -204,8 +204,11 @@ class bugzMine:
                 # original committer is more likely to be the responsible party
                 personMap[firstPerson] += 4
 
-            sourceOwner[sourceNick] = sorted(
-                personMap.items(), key=lambda x: x[1])[-1][0]
+            candidate = sorted(personMap.items(), key=lambda x: x[1])[-1][0]
+            if not candidate:
+                print "No best owner recognized for %s" %sourceNick
+                continue
+            sourceOwner[sourceNick] = candidate
             print " Best owner for source %s is %s" %(
                     sourceNick, sourceOwner[sourceNick])
 
