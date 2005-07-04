@@ -167,6 +167,7 @@ def realMain(cfg, argv=sys.argv):
     argDef["ids"] = NO_PARAM
     argDef["info"] = NO_PARAM
     argDef["install-label"] = MULT_PARAM
+    argDef["items"] = NO_PARAM
     argDef["just-db"] = NO_PARAM
     argDef["keep-existing"] = NO_PARAM
     argDef["no-deps"] = NO_PARAM
@@ -534,6 +535,10 @@ def realMain(cfg, argv=sys.argv):
 	if argSet.has_key('info'):
 	    kwargs['info'] = True
 	    del argSet['info']
+
+	if argSet.has_key('items'):
+	    kwargs['showItems'] = True
+	    del argSet['items']
 
 	if argSet.has_key('no-deps'):
 	    kwargs['depCheck'] = False

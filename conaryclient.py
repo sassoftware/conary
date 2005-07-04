@@ -937,6 +937,41 @@ class ConaryClient:
 
         return finalCs, splittable
 
+    def fullUpdateItemList(self):
+        items = self.db.findUnreferencedTroves()
+        installed = self.db.findByNames([ x[0] for x in items ])
+
+        installedDict = {}
+        for (name, version, release) in installed:
+            branchDict = installedDict.setdefault(name, {})
+            l = branchDict.setdefault(version.branch(), [])
+            l.append((version, release))
+
+        updateItems = []
+
+        for name, version, flavor in items:
+            branch = version.branch()
+            verInfo = installedDict[name][branch]
+
+            if len(installedDict[name]) == 1 and len(verInfo) == 1:
+                updateItems.append((name, None, None))
+                continue
+            elif len(verInfo) == 1:
+                updateItems.append((name, branch, None))
+                continue
+
+            score = 0
+            for instFlavor in cfg.flavor:
+                newScore = instFlavor.score(flavor) 
+                if newScore > score:
+                    score = newScore
+                    finalFlavor = instFlavor
+
+            flavor.union(finalFlavor, deps.DEP_MERGE_TYPE_OVERRIDE)
+            updateItems.append((name, branch, flavor))
+
+        return updateItems
+
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         depsRecurse = True, resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),

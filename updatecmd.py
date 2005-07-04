@@ -299,40 +299,21 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
 
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
-              depsRecurse = True, test = False):
+              depsRecurse = True, test = False, showItems = False):
     client = conaryclient.ConaryClient(cfg)
-    items = client.db.findUnreferencedTroves()
+    updateItems = client.fullUpdateItemList()
 
-    installed = client.db.findByNames([ x[0] for x in items ])
-
-    installedDict = {}
-    for (name, version, release) in installed:
-        branchDict = installedDict.setdefault(name, {})
-        l = branchDict.setdefault(version.branch(), [])
-        l.append((version, release))
-
-    updateItems = []
-
-    for name, version, flavor in items:
-        branch = version.branch()
-	verInfo = installedDict[name][branch]
-
-        if len(installedDict[name]) == 1 and len(verInfo) == 1:
-            updateItems.append((name, None, None))
-            continue
-        elif len(verInfo) == 1:
-	    updateItems.append((name, branch, None))
-	    continue
-
-        score = 0
-        for instFlavor in cfg.flavor:
-            newScore = instFlavor.score(flavor) 
-            if newScore > score:
-                score = newScore
-                finalFlavor = instFlavor
-
-        flavor.union(finalFlavor, deps.DEP_MERGE_TYPE_OVERRIDE)
-	updateItems.append((name, branch, flavor))
+    if showItems:
+        for (name, version, flavor) in updateItems:
+            if flavor:
+                print "%s=%s[%s]" % (name, version.asString(),
+                                     flavors.formatFlavor(flavor))
+            elif version:
+                print "%s=%s" % (name, version.asString())
+            else:
+                print name
+            
+        return
 
     try:
         callback = UpdateCallback()
