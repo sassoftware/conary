@@ -18,7 +18,6 @@ python_files = database.py	\
 		localrep.py	\
 		sqldb.py	\
 		troveinfo.py	\
-		trovetroves.py	\
 		update.py	\
 		versiontable.py \
 		idtable.py
