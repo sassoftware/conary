@@ -7,6 +7,7 @@ Changes in 0.61.1:
     longer cause the buildpackage code to traceback.  The ownerships
     from the filesystem were never used anyway, so it's safe to assume
     that all files are owned by root:root
+  * Implemented proper updateall
 
 Changes in 0.61.0:
   * New functionality for maintaining user groups: renaming and updating
