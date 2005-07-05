@@ -518,22 +518,27 @@ class RegularFile(File):
     def __init__(self, *args, **kargs):
 	File.__init__(self, *args, **kargs)
 
-def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False):
+def FileFromFilesystem(path, pathId, possibleMatch = None, inodeInfo = False,
+                       assumeRoot = False):
     s = os.lstat(path)
 
     global userCache, groupCache
 
-    try:
-	owner = userCache.lookupId('/', s.st_uid)
-    except KeyError, msg:
-	raise FilesError(
-	    "Error mapping uid %d to user name for file %s: %s" %(s.st_uid, path, msg))
+    if assumeRoot:
+        owner = 'root'
+        group = 'root'
+    else:
+        try:
+            owner = userCache.lookupId('/', s.st_uid)
+        except KeyError, msg:
+            raise FilesError("Error mapping uid %d to user name for "
+                             "file %s: %s" %(s.st_uid, path, msg))
 
-    try:
-	group = groupCache.lookupId('/', s.st_gid)
-    except KeyError, msg:
-	raise FilesError(
-	    "Error mapping gid %d to group name for file %s: %s" %(s.st_gid, path, msg))
+        try:
+            group = groupCache.lookupId('/', s.st_gid)
+        except KeyError, msg:
+            raise FilesError("Error mapping gid %d to group name for "
+                             "file %s: %s" %(s.st_gid, path, msg))
 
     needsSha1 = 0
     inode = InodeStream(s.st_mode & 07777, s.st_mtime, owner, group)

@@ -67,8 +67,10 @@ class BuildComponent(dict):
         used to obtain the contents of the file when creating a changeset
         to commit to the repository
         """
+        # skip uid/gid lookups because packagepolicy will change the
+        # ownerships according to Ownership settings anyway
 	(f, linkCount, inode) = files.FileFromFilesystem(realPath, None, 
-                                        inodeInfo = True)
+                                        inodeInfo = True, assumeRoot = True)
 	f.inode.perms.set(f.inode.perms() & 01777)
 	self[path] = (realPath, f)
 
