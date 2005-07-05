@@ -304,10 +304,10 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
     updateItems = client.fullUpdateItemList()
 
     if showItems:
-        for (name, version, flavor) in updateItems:
+        for (name, version, flavor) in sorted(updateItems, key=lambda x:x[0]):
             if flavor:
                 print "%s=%s[%s]" % (name, version.asString(),
-                                     flavors.formatFlavor(flavor))
+                                     deps.formatFlavor(flavor))
             elif version:
                 print "%s=%s" % (name, version.asString())
             else:

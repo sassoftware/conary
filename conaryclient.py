@@ -961,7 +961,7 @@ class ConaryClient:
                 continue
 
             score = 0
-            for instFlavor in cfg.flavor:
+            for instFlavor in self.cfg.flavor:
                 newScore = instFlavor.score(flavor) 
                 if newScore > score:
                     score = newScore
