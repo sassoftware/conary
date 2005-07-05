@@ -134,9 +134,11 @@ class HttpHandler(WebHandler):
         self._write("main_page")
         return apache.OK
 
-    def browse(self, auth):
+    @strFields(letter = 'A')
+    def browse(self, auth, letter):
         troves = self.client.getAllTroveLeaves(self.serverName, {None: [None]})
-        
+        troves = (x for x in troves if x[0].upper() == letter)
+       
         packages = []
         components = {}
         for trove in troves:
@@ -154,7 +156,7 @@ class HttpHandler(WebHandler):
             for component in components[x]:
                 packages.append(x + ":" + component)
 
-        self._write("browse", packages = sorted(packages), components = components)
+        self._write("browse", packages = sorted(packages), components = components, letter = letter)
         return apache.OK
 
     @strFields(t = None, v = "")
@@ -199,6 +201,34 @@ class HttpHandler(WebHandler):
         self._write("files", 
             troveName = t,
             fileIters = itertools.chain(*fileIters))
+        return apache.OK
+
+    @strFields(path = None, pathId = None, fileId = None, fileV = None)
+    def getFile(self, auth, path, pathId, fileId, fileV):
+        from mimetypes import guess_type
+        from lib import sha1helper
+        
+        pathId = sha1helper.md5FromString(pathId)
+        fileId = sha1helper.sha1FromString(fileId)
+        ver = versions.VersionFromString(fileV)
+      
+        fileObj = self.client.getFileVersion(pathId, fileId, ver)
+        contents = self.client.getFileContents([(fileId, ver)])[0]
+
+        if fileObj.flags.isConfig():
+            self.req.content_type = "text/plain"
+        else:
+            typeGuess = guess_type(path)
+        
+            self.req.headers_out["Content-Disposition"] = "attachment; filename=%s;" % path 
+            if typeGuess[0]:
+                self.req.content_type = typeGuess[0]
+            else:
+                self.req.content_type = "application/octet-stream"
+            
+        self.req.headers_out["Content-Length"] = fileObj.sizeString()
+        
+        self.req.write(contents.get().read())
         return apache.OK
 
     @checkAuth(write = True)

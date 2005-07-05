@@ -17,6 +17,7 @@
 -->
     ${html_header("Main Menu")}
     <body>
+    <?python import string ?>
         <h1>Repository Browser</h1>
         <ul class="menu"><li class="highlighted">Main Menu</li></ul>
         <ul class="menu submenu"> </ul>
@@ -24,6 +25,12 @@
         <div id="content">
             <h2>Repository Browser</h2>
 
+            <span py:for="l in string.uppercase">
+                <a py:if="l != letter" href="browse?letter=${l}">${l}</a>
+                <span py:if="l == letter">${l}</span> | 
+            </span>
+
+            <h3>Troves beginning with '${letter}'</h3>
             <ul>
                 <li py:for="package in packages">
                     <a href="troveInfo?t=${package}">${package}</a> <span py:if="package in components">[+]</span>

@@ -19,12 +19,22 @@
     <div id="fileList" py:def="fileList(files)">
         <table style="width: 100%;">
             <tr py:for="pathId, path, fileId, version, fObj in files">
+                <?python #
+                    from lib import sha1helper
+                    import os
+                    from urllib import quote
+
+                    url = "getFile?path=%s;pathId=%s;fileId=%s;fileV=%s" % (os.path.basename(path),
+                                                                                sha1helper.md5ToString(pathId),
+                                                                                sha1helper.sha1ToString(fileId),
+                                                                                quote(version.asString()))
+                ?>
                 <td>${fObj.modeString()}</td>
                 <td>${fObj.inode.owner()}</td>
                 <td>${fObj.inode.group()}</td>
                 <td>${fObj.sizeString()}</td>
                 <td>${fObj.timeString()}</td>
-                <td>${path}</td>
+                <td><a href="${url}">${path}</a></td>
             </tr>
         </table>
     </div>
