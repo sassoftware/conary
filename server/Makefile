@@ -14,7 +14,8 @@
 
 SUBDIRS=templates
 
-python_files = apachehooks.py \
+python_files = __init__.py    \
+	       apachehooks.py \
 	       server.py      \
                http.py 
 
