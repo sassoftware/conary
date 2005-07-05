@@ -960,15 +960,19 @@ class ConaryClient:
                 updateItems.append((name, branch, None))
                 continue
 
-            score = 0
+            score = None
             for instFlavor in self.cfg.flavor:
                 newScore = instFlavor.score(flavor) 
-                if newScore > score:
+                if score is None or newScore > score:
                     score = newScore
                     finalFlavor = instFlavor
 
             flavor.union(finalFlavor, deps.DEP_MERGE_TYPE_OVERRIDE)
-            updateItems.append((name, branch, flavor))
+
+            if len(installedDict[name]) == 1:
+                updateItems.append((name, None, flavor))
+            else:
+                updateItems.append((name, branch, flavor))
 
         return updateItems
 
