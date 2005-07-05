@@ -15,7 +15,7 @@
 
 import sys
 
-sys.path.append("/usr/share/conary")
+import conary
 import sqlite3
 
 def rename(cu, old, new):
