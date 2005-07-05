@@ -910,7 +910,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         return url, sizes, newChgSetList, allFilesNeeded
 
     def getDepSuggestions(self, authToken, clientVersion, label, requiresList):
-	if not self.auth.check(authToken, write = False):
+	if not self.auth.check(authToken, write = False, 
+			       label = self.toLabel(label)):
 	    raise InsufficientPermission
 
 	requires = {}
