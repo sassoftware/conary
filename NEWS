@@ -1,3 +1,6 @@
+Changes in 0.61.2:
+  * Dependency resolution didn't enforce label acls
+
 Changes in 0.61.1:
   * Cleaned up error message which results from Conary not being able to
     determine which trove to remove when a new one is installed
