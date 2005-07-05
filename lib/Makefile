@@ -42,12 +42,12 @@ elfmodule.so: $(elfmodule_objs)
 	$(CC) -shared -o $@ $< -lelf
 
 miscmodule.so: $(miscmodule_objs)
-	$(CC) -shared -o $@ $< -lelf
+	$(CC) -shared -o $@ $<
 
 $(cstreamsmodule_objs): cstreams.h
 
 cstreamsmodule.so: $(cstreamsmodule_objs)
-	$(CC) -shared -o $@ $^ -lelf
+	$(CC) -shared -o $@ $^
 
 filename_wrapper.so: filename_wrapper.c
 	$(CC) -fPIC -rdynamic -c filename_wrapper.c
