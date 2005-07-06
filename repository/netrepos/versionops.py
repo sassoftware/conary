@@ -89,10 +89,46 @@ class LabelTable(idtable.IdTable):
     def __init__(self, db):
         idtable.IdTable.__init__(self, db, 'Labels', 'labelId', 'label')
 
-class LatestTable(idtable.IdTripletMapping):
+class LatestTable:
     def __init__(self, db):
-	idtable.IdTripletMapping.__init__(self, db, 'Latest',
-                               'itemId', 'branchId', 'flavorId', 'versionId')
+        self.db = db
+        
+        cu = self.db.cursor()
+        cu.execute("SELECT tbl_name FROM sqlite_master WHERE type='table'")
+        tables = [ x[0] for x in cu ]
+        if 'Latest' not in tables:
+            cu.execute("CREATE TABLE Latest(itemId integer, "
+				       "branchId integer, "
+				       "flavorId integer, "
+				       "versionId integer)")
+
+    def __setitem__(self, key, val):
+	(first, second, third) = key
+
+        cu = self.db.cursor()
+        cu.execute("INSERT INTO Latest VALUES (?, ?, ?, ?)",
+                   (first, second, third, val))
+
+    def get(self, key, defValue):
+	(first, second, third) = key
+
+        cu = self.db.cursor()
+	
+        cu.execute("SELECT versionId FROM Latest WHERE itemId=? AND branchId=?"
+                            "AND flavorId=?",
+		   (first, second, third))
+	item = cu.fetchone()	
+	if not item:
+	    return defValue
+	return item[0]
+	    
+    def __delitem__(self, key):
+	(first, second, third) = key
+
+        cu = self.db.cursor()
+	
+        cu.execute("DELETE FROM Latest WHERE branchId=? AND flavorId=? "
+                        "AND versionId=?", (first, second, third))
 
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
