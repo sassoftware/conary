@@ -158,7 +158,7 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
                         ', '.join(flavor.split(',')))
                 print
 
-        sendMail(tmpfile, fromaddr, argSet['email'])
+        sendMail(tmpfile, subject, fromaddr, argSet['email'])
         os.dup2(oldStdOut, 1)
 
     return 0
