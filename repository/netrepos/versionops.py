@@ -101,12 +101,14 @@ class LatestTable:
 				       "branchId integer, "
 				       "flavorId integer, "
 				       "versionId integer)")
+            cu.execute("CREATE UNIQUE INDEX LatestIdx ON "
+                       "Latest(itemId, branchId, flavorId)")
 
     def __setitem__(self, key, val):
 	(first, second, third) = key
 
         cu = self.db.cursor()
-        cu.execute("INSERT INTO Latest VALUES (?, ?, ?, ?)",
+        cu.execute("INSERT OR REPLACE INTO Latest VALUES (?, ?, ?, ?)",
                    (first, second, third, val))
 
     def get(self, key, defValue):
@@ -122,14 +124,6 @@ class LatestTable:
 	    return defValue
 	return item[0]
 	    
-    def __delitem__(self, key):
-	(first, second, third) = key
-
-        cu = self.db.cursor()
-	
-        cu.execute("DELETE FROM Latest WHERE branchId=? AND flavorId=? "
-                        "AND versionId=?", (first, second, third))
-
 class LabelMap(idtable.IdPairSet):
     def __init__(self, db):
 	idtable.IdPairMapping.__init__(self, db, 'LabelMap',
@@ -260,7 +254,6 @@ class SqlVersioning:
 	    else:
 		currVer = self.versionTable.getId(latestId, itemId)
 		if not currVer.isAfter(version):
-		    del self.latest[(itemId, branchId, flavorId)]
 		    self.latest[(itemId, branchId, flavorId)] = versionId
 
 	nodeId = self.nodes.addRow(itemId, branchId, versionId, 
