@@ -28,8 +28,8 @@ def usage(exitcode=1):
     sys.stderr.write("\n".join((
      "Usage: commitaction [commitaction args] ",
      "         --module '/path/to/changemail [--sourceuser <user>]",
-     "         [--binaryuser <user>] [--user <user>] ",
-     "         [--email] <email> [[--email] <email>...]'",
+     "         [--from <fromaddress>] [--binaryuser <user>] ",
+     "         [--user <user>] [--email <email>]*'",
      ""
     )))
     return exitcode
@@ -43,6 +43,7 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
         'user': options.ONE_PARAM,
         'sourceuser': options.ONE_PARAM,
         'binaryuser': options.ONE_PARAM,
+        'from': options.ONE_PARAM,
         'email': options.MULT_PARAM,
     }
 
@@ -65,6 +66,7 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
 
     sourceuser = None
     binaryuser = None
+    fromaddr = None
     if 'sourceuser' in argSet:
         sourceuser = argSet['sourceuser']
     if 'binaryuser' in argSet:
@@ -73,6 +75,8 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
         sourceuser = argSet['user']
     if not binaryuser and 'user' in argSet:
         binaryuser = argSet['user']
+    if 'from' in argSet:
+        fromaddr = argSet['from']
 
     tmpfd, tmppath = tempfile.mkstemp('', 'changemail-')
     os.unlink(tmppath)
@@ -110,7 +114,7 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
         if sourceuser:
             print 'Committed by: %s' %sourceuser
 
-        sendMail(tmpfile, subject, argSet['email'])
+        sendMail(tmpfile, subject, fromaddr, argSet['email'])
 
     if pkgMap or grpMap:
         # stdout is the tmpfile
@@ -154,17 +158,21 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
                         ', '.join(flavor.split(',')))
                 print
 
-        sendMail(tmpfile, subject, argSet['email'])
+        sendMail(tmpfile, fromaddr, argSet['email'])
         os.dup2(oldStdOut, 1)
 
     return 0
 
-def sendMail(tmpfile, subject, addresses):
+def sendMail(tmpfile, subject, fromaddr, addresses):
     # stdout is the tmpfile, so make sure it has been flushed!
     sys.stdout.flush()
+    if fromaddr:
+        fromarg = "-r '%s'" %fromaddr
+    else:
+        fromarg = ''
     for address in addresses:
         tmpfile.seek(0)
-        mail = util.popen("""mail -s '%s' %s""" %(subject, address), "w")
+        mail = util.popen("""mail -s '%s' %s '%s'""" %(subject, fromarg, address), "w")
         mail.writelines(tmpfile.readlines())
         mail.close()
 
