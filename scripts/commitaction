@@ -21,6 +21,7 @@ from lib import options, util
 from repository.netclient import NetworkRepositoryClient
 import os
 import sys
+import shlex
 import imp
 
 def usage(exitcode=1):
@@ -89,7 +90,7 @@ def main(argv):
 
     ret = 0
     for module in argSet['module']:
-        argv = module.split()
+        argv = shlex.split(module)
         path = argv[0]
         name = os.path.basename(path)
         if name.endswith('.py'):
