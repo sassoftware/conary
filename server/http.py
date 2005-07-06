@@ -14,6 +14,7 @@
 import itertools
 import metadata
 import os
+import string
 import sys
 import traceback
 
@@ -134,11 +135,16 @@ class HttpHandler(WebHandler):
         self._write("main_page")
         return apache.OK
 
-    @strFields(letter = 'A')
-    def browse(self, auth, letter):
+    @strFields(char = 'A')
+    def browse(self, auth, char):
         troves = self.client.getAllTroveLeaves(self.serverName, {None: [None]})
-        troves = (x for x in troves if x[0].upper() == letter)
-       
+        
+        if char in string.digits:
+            char = '0'
+            troves = (x for x in troves if x[0] in string.digits)
+        else:
+            troves = (x for x in troves if x[0].upper() == char)
+      
         packages = []
         components = {}
         for trove in troves:
@@ -156,7 +162,7 @@ class HttpHandler(WebHandler):
             for component in components[x]:
                 packages.append(x + ":" + component)
 
-        self._write("browse", packages = sorted(packages), components = components, letter = letter)
+        self._write("browse", packages = sorted(packages), components = components, char = char)
         return apache.OK
 
     @strFields(t = None, v = "")

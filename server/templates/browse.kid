@@ -26,11 +26,21 @@
             <h2>Repository Browser</h2>
 
             <span py:for="l in string.uppercase">
-                <a py:if="l != letter" href="browse?letter=${l}">${l}</a>
-                <span py:if="l == letter">${l}</span> | 
+                <a py:if="l != char" href="browse?char=${l}">${l}</a>
+                <span py:if="l == char">${l}</span> | 
+            </span>
+            <span>
+                <a py:if="l not in string.digits" href="browse?char=0" >0-9</a>
+                <span py:if="l in string.digits">0-9</span>
             </span>
 
-            <h3>Troves beginning with '${letter}'</h3>
+            <?python
+                if char in string.digits:
+                    char = "a digit"
+                else:
+                    char = "'%c'" % char
+            ?>
+            <h3>Troves beginning with ${char}</h3>
             <ul>
                 <li py:for="package in packages">
                     <a href="troveInfo?t=${package}">${package}</a> <span py:if="package in components">[+]</span>
