@@ -410,7 +410,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                         Instances.flavorId = Latest.flavorId
             """
         else:
-            instanceClause = """INNER JOIN Instances ON 
+            instanceClause = """INNER JOIN Latest ON
+                        Latest.itemId = Items.itemId
+                    INNER JOIN Instances ON 
                         Instances.itemId = Items.itemId
             """
 
@@ -777,18 +779,15 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def getTroveLatestVersion(self, authToken, clientVersion, pkgName, 
                               branchStr):
-	branch = self.toBranch(branchStr)
-
-	if not self.auth.check(authToken, write = False, trove = pkgName,
-			       label = branch.label()):
-	    raise InsufficientPermission
-
-        try:
-            return self.freezeVersion(
-			self.troveStore.troveLatestVersion(pkgName, 
-						     self.toBranch(branchStr)))
-        except KeyError:
+        r = self.getTroveLeavesByBranch(authToken, clientVersion, 
+                                { pkgName : { branchStr : None } },
+                                True)
+        if pkgName not in r:
             return 0
+        elif len(r[pkgName]) != 1:
+            return 0
+
+        return r[pkgName].keys()[0]
 
     def getChangeSet(self, authToken, clientVersion, chgSetList, recurse, 
                      withFiles, withFileContents, excludeAutoSource):
