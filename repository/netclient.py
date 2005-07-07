@@ -1167,6 +1167,9 @@ class UserAlreadyExists(Exception):
 class GroupAlreadyExists(Exception):
     pass
 
+class PermissionAlreadyExists(Exception):
+    pass
+
 class UserNotFound(Exception):
     def __init__(self, user = "user"):
         self.user = user

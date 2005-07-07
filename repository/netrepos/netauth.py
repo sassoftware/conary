@@ -17,7 +17,7 @@ import re
 import sqlite3
 import sys
 
-from repository.netclient import UserAlreadyExists, GroupAlreadyExists, UserNotFound
+from repository.netclient import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists, UserNotFound
 
 class NetworkAuthorization:
     def check(self, authToken, write = False, admin = False, label = None, trove = None):
@@ -140,7 +140,7 @@ class NetworkAuthorization:
                 cu.execute("INSERT INTO Items VALUES(NULL, ?)", trovePattern)
                 itemId = cu.lastrowid
         else:
-            itemId = None
+            itemId = ''
 
         if label:
             cu.execute("SELECT * FROM Labels WHERE label=?", label)
@@ -151,14 +151,20 @@ class NetworkAuthorization:
                 cu.execute("INSERT INTO Labels VALUES(NULL, ?)", label)
                 labelId = cu.lastrowid
         else:
-            labelId = None
+            labelId = ''
 
 
-        cu.execute("""INSERT INTO Permissions
-                        SELECT userGroupId, ?, ?, ?, ?, ? FROM
-                            (SELECT userGroupId FROM userGroups WHERE
+        try:
+            cu.execute("""INSERT INTO Permissions
+                            SELECT userGroupId, ?, ?, ?, ?, ? FROM
+                                (SELECT userGroupId FROM userGroups WHERE
                                 userGroup=?)
                         """, labelId, itemId, write, capped, admin, userGroup)
+        except sqlite3.ProgrammingError, e:
+            if str(e) == 'columns userGroupId, labelId, itemId are not unique':
+                self.db.rollback()
+                raise PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
+            raise
 
         self.db.commit()
                             
@@ -451,8 +457,9 @@ class NetworkAuthorization:
                                                     write INTEGER,
                                                     capped INTEGER,
                                                     admin INTEGER)""")
-            cu.execute("""CREATE INDEX PermissionsIdx
+            cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
                           ON Permissions(userGroupId, labelId, itemId)""")
+
             commit = True
 
         if "UserPermissions" not in tables:

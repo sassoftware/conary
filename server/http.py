@@ -22,7 +22,7 @@ import kid
 import templates
 
 from repository.netrepos import netserver
-from repository.netclient import UserAlreadyExists, GroupAlreadyExists
+from repository.netclient import UserAlreadyExists, GroupAlreadyExists, PermissionAlreadyExists
 from web.webhandler import WebHandler
 from web.fields import strFields, intFields, listFields, boolFields
 from web.webauth import getAuth
@@ -347,8 +347,13 @@ class HttpHandler(WebHandler):
         capped = (capped == "on")
         admin = (admin == "on")
        
-        self.repServer.auth.addAcl(group, trove, label,
-                                   write, capped, admin)
+        try:
+            self.repServer.auth.addAcl(group, trove, label,
+               write, capped, admin)
+        except PermissionAlreadyExists, e:
+            self._write("error", shortError="Duplicate Permission",
+                    error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
+            return apache.OK
         self._write("notice", message = "Permission successfully added.",
                                  link = "User Administration",
                                  url = "userlist")
