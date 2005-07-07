@@ -42,6 +42,7 @@ def usage(rc = 1):
     print "       cvc branch <newbranch> <trove>[=<version>][[flavor]]"
     print "       cvc checkout [--dir <dir>] <trove>[=<version>]"
     print "       cvc commit [--message <message>]"
+    print "       cvc config"
     print '       cvc cook [--prep] [--debug-exceptions] [--macros file] '
     print '                [--flavor  "<flavor>"] '
     print '                [--macro "<macro> <value>"]+ '
@@ -195,7 +196,7 @@ def sourceCommand(cfg, args, argSet, profile=False):
         log.setVerbosity(level)
     elif (args[0] == "config"):
 	if argSet: return usage()
-	if (len(args) > 2):
+	if (len(args) >= 2):
 	    return usage()
 	else:
 	    cfg.display()
