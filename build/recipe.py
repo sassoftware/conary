@@ -159,6 +159,7 @@ def setupRecipeDict(d, filename):
                                     'CPackageRecipe',
                                     'AutoPackageRecipe',
                                     'loadSuperClass', 'loadInstalled',
+                                    'clearBuildReqs',
                                     # XXX when all recipes have been migrated
                                     # we can get rid of loadRecipe
                                     ('loadSuperClass', 'loadRecipe')))
@@ -563,6 +564,31 @@ class _sourceHelper:
 	self.recipe = recipe
     def __call__(self, *args, **keywords):
         self.recipe._sources.append(self.theclass(self.recipe, *args, **keywords))
+
+def clearBuildReqs(*buildReqs):
+    """ Clears inherited build requirement lists of a given set of packages,
+        or all packages if none listed. 
+    """
+    def _removePackages(class_, pkgs):
+        if not pkgs:
+            class_.buildRequires = []
+        else:
+            for pkg in pkgs:
+                if pkg in class_.buildRequires:
+                    class_.buildRequires.remove(pkg)
+
+    callerGlobals = inspect.stack()[1][0].f_globals
+    classes = []
+    for value in callerGlobals.itervalues():
+        if inspect.isclass(value) and issubclass(value, PackageRecipe):
+            classes.append(value)
+
+    for class_ in classes:
+        _removePackages(class_, buildReqs)
+
+        for base in inspect.getmro(class_):
+            if issubclass(base, PackageRecipe):
+                _removePackages(base, buildReqs)
 
 class _recipeHelper:
     def __init__(self, list, recipe, theclass):
