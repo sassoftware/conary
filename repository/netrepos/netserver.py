@@ -40,7 +40,7 @@ from datastore import IntegrityError
 
 # a list of the protocols we understand
 SERVER_VERSIONS = [ 32, 33 ]
-CACHE_SCHEMA_VERSION = 13
+CACHE_SCHEMA_VERSION = 14
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 

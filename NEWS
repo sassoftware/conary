@@ -6,6 +6,8 @@ Changes in 0.61.2:
     argument.
   * added clearBuildReqs() - will clear all or some of superclass buildreqs
     when cooking
+  * The pickled version of Dependency objects changed, therefore the
+    schema version of the changeset cache has been incremented
 
 Changes in 0.61.1:
   * Cleaned up error message which results from Conary not being able to
