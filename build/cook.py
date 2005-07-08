@@ -992,7 +992,7 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
     them, instead, increase the appropriate count.  
     @type alwaysBumpCount: bool
     """
-    if not isinstance(troveNames, (list, tuple)):
+    if not isinstance(troveNames, (list, tuple, set)):
         troveNames = [troveNames]
 
     # strip off any components and remove duplicates
