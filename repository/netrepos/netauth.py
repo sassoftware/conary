@@ -140,7 +140,7 @@ class NetworkAuthorization:
                 cu.execute("INSERT INTO Items VALUES(NULL, ?)", trovePattern)
                 itemId = cu.lastrowid
         else:
-            itemId = ''
+            itemId = None
 
         if label:
             cu.execute("SELECT * FROM Labels WHERE label=?", label)
@@ -151,7 +151,7 @@ class NetworkAuthorization:
                 cu.execute("INSERT INTO Labels VALUES(NULL, ?)", label)
                 labelId = cu.lastrowid
         else:
-            labelId = ''
+            labelId = None
 
 
         try:
