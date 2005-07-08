@@ -899,6 +899,14 @@ class ConaryClient:
                 #    
                 #    pass
 
+        # items which are already installed shouldn't be installed again
+        present = self.db.hasTroves(newItems)
+        newItems = [ item for item, present 
+                            in itertools.izip(newItems, present) 
+                            if not present ]
+        # newItems should also be a unique list
+        newItems = list(set(newItems))
+
         if keepExisting:
             for (name, version, flavor) in newItems:
                 changeSetList.append((name, (None, None), (version, flavor), 0))
