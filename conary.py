@@ -589,37 +589,37 @@ def main(argv=sys.argv):
         # reset the excepthook (using cfg values for exception settings)
         sys.excepthook = util.genExcepthook(cfg.dumpStackOnError)
 	realMain(cfg, argv)
-    #except conarycfg.ConaryCfgError, e:
-    #    log.error(str(e))
-    #    sys.exit(1)
-    #except xmlrpclib.ProtocolError, e:
-#	if e.errcode == 403:
-#	    print >> sys.stderr, \
-#		"remote server denied permission for the requested operation"
-#	else:
-#	    raise
-    #except netclient.UnknownException, e:
-#	print >> sys.stderr, \
-#	    "An unknown exception occured on the repository server:"
-#	print >> sys.stderr, "\t%s" % str(e)
-    #except repository.repository.TroveMissing, e:
-#	print >> sys.stderr, str(e)
-    #except database.OpenError, e:
-#	print >> sys.stderr, str(e)
-    #except repository.repository.OpenError, e:
-#	print >> sys.stderr, str(e)
-    #except repository.repository.DuplicateBranch, e:
-#	print >> sys.stderr, str(e)
-    #except repository.repository.TroveNotFound, e:
-#	print >> sys.stderr, str(e)
-    #except updatecmd.TroveSpecError, e:
-#	print >> sys.stderr, str(e)
-    #except repository.netclient.InvalidServerVersion, e:
-#	print >> sys.stderr, str(e)
-    #except database.OldDatabaseSchema, e:
-#	print >> sys.stderr, str(e)
-    #except conaryclient.UpdateError, e:
-    #    print >> sys.stderr, str(e)
+    except conarycfg.ConaryCfgError, e:
+       log.error(str(e))
+       sys.exit(1)
+    except xmlrpclib.ProtocolError, e:
+	if e.errcode == 403:
+	    print >> sys.stderr, \
+		"remote server denied permission for the requested operation"
+	else:
+	    raise
+    except netclient.UnknownException, e:
+	print >> sys.stderr, \
+	    "An unknown exception occured on the repository server:"
+	print >> sys.stderr, "\t%s" % str(e)
+    except repository.repository.TroveMissing, e:
+	print >> sys.stderr, str(e)
+    except database.OpenError, e:
+	print >> sys.stderr, str(e)
+    except repository.repository.OpenError, e:
+	print >> sys.stderr, str(e)
+    except repository.repository.DuplicateBranch, e:
+	print >> sys.stderr, str(e)
+    except repository.repository.TroveNotFound, e:
+	print >> sys.stderr, str(e)
+    except updatecmd.TroveSpecError, e:
+	print >> sys.stderr, str(e)
+    except repository.netclient.InvalidServerVersion, e:
+	print >> sys.stderr, str(e)
+    except database.OldDatabaseSchema, e:
+	print >> sys.stderr, str(e)
+    except conaryclient.UpdateError, e:
+       print >> sys.stderr, str(e)
     except:
         raise
 
