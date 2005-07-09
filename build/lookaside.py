@@ -174,7 +174,7 @@ def fetchURL(cfg, name, location):
         except IOError, msg:
             # only retry for server busy.
             ftp_error = msg.args[1]
-            if isisntance(ftp_error, EOFError):
+            if isinstance(ftp_error, EOFError):
                 # server just hung and gave no response
                 _createNegativeCacheEntry(cfg, name, location)
                 return None
