@@ -1,13 +1,16 @@
 Changes in 0.61.2:
-  * Dependency resolution didn't enforce label acls
+  * Dependency resolution didn't enforce label acls.
   * Module arguments to commitaction are parsed according to shell
-    quoting rules
+    quoting rules.
   * The changemail commitaction module now takes an optional '--from'
     argument.
   * added clearBuildReqs() - will clear all or some of superclass buildreqs
-    when cooking
+    when cooking.
   * The pickled version of Dependency objects changed, therefore the
-    schema version of the changeset cache has been incremented
+    schema version of the changeset cache has been incremented.
+  * When Configure() detects a failure and input or output is not a
+    tty, all config.log files will be included in the output in order
+    to ease debugging from captured log files.
 
 Changes in 0.61.1:
   * Cleaned up error message which results from Conary not being able to

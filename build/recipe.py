@@ -917,6 +917,11 @@ class PackageRecipe(Recipe):
                     self.laReposCache.addFileHash(srcName, srcVersion, pathId,
                         path, fileId, version, fileObj.contents.sha1())
 
+    def isatty(self, value=None):
+        if value is not None:
+            self._tty = value
+        return self._tty
+
     def __getattr__(self, name):
 	"""
 	Allows us to dynamically suck in namespace of other modules

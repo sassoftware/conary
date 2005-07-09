@@ -146,8 +146,7 @@ def genExcepthook(self):
                 log.info("** NOTE ** Extended traceback written to %s\n" % path)
             except Exception, msg:
                 log.warning("Could not write extended traceback: %s" % msg)
-        if cfg.debugRecipeExceptions and sys.stdout.isatty() \
-                                     and sys.stdin.isatty():
+        if cfg.debugRecipeExceptions and self.recipe.isatty():
             epdb.post_mortem(tb, type, exc_msg)
         else:
             sys.exit(1)

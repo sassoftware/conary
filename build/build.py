@@ -258,7 +258,7 @@ class Configure(BuildCommand):
         try:
             util.execute(self.command %macros)
         except RuntimeError, info:
-            if not sys.stdout.isatty():
+            if not self.recipe.isatty():
                 # When conary is being scripted, logs might be
                 # redirected to a file, and it might be easier to
                 # see config.log output in that logfile than by
