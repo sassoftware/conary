@@ -29,7 +29,6 @@ import time
                 ?>
                 <div><i>${timestamp}</i> by <i>${cl.getName()} (${cl.getContact()})</i></div>
                 <p><code>${cl.getMessage()}</code></p>
-                <p><a href="changelogs?t=${trove.getName()};v=${quote(trove.getVersion().freeze())}">Show History</a></p>
             </td>
         </tr>
     </table>
