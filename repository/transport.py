@@ -76,7 +76,7 @@ class XMLOpener(urllib.FancyURLopener):
             h.putrequest('POST', fullUrl)
             h.putheader('Content-type', 'text/xml')
             h.putheader('Content-length', '%d' % len(data))
-            h.putheader('Accept-encoding', 'zlib')
+            h.putheader('Accept-encoding', 'deflate')
         else:
             h.putrequest('GET', fullUrl)
         if auth: h.putheader('Authorization', 'Basic %s' % auth)

@@ -78,7 +78,12 @@ def post(port, isSecure, repos, req):
         resp = xmlrpclib.dumps((result,), methodresponse=1)
         req.content_type = "text/xml"
         encoding = req.headers_in.get('Accept-encoding', '')
-        if len(resp) > 200 and 'zlib' in encoding:
+        if len(resp) > 200 and 'deflate' in encoding:
+            req.headers_out['Content-encoding'] = 'deflate'
+            resp = zlib.compress(resp, 5)
+        # FIXME: 'zlib' is not RFC 2616 (HTTP 1.1) compliant
+        # and should be removed after a deprecation period
+        elif len(resp) > 200 and 'zlib' in encoding:
             req.headers_out['Content-encoding'] = 'zlib'
             resp = zlib.compress(resp, 5)
         req.write(resp)

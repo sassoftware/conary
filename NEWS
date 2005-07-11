@@ -1,5 +1,5 @@
 Changes in 0.61.2:
-  * Dependency resolution didn't enforce label acls.
+  * Dependency resolution enforces label ACLs.
   * Module arguments to commitaction are parsed according to shell
     quoting rules.
   * The changemail commitaction module now takes an optional '--from'
@@ -20,6 +20,9 @@ Changes in 0.61.2:
     their own transaction; when it does, the Ownership(), UtilizeUser(),
     and UtilizeGroup() policies will create dependencies on the
     appropriate info-* packages.
+  * The networked repository server and client code has been changed
+    to use the 'deflate' Content-encoding type instead of 'zlib',
+    which makes the code RFC 2616 (HTTP 1.1) compliant.
 
 Changes in 0.61.1:
   * Cleaned up error message which results from Conary not being able to
