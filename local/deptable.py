@@ -566,9 +566,28 @@ class DependencyTables:
             order.append(nodeIdx)
 
         def _orderComponents(compGraph):
-            # returns a topological sort of compGraph
+	    # Returns a topological sort of compGraph. It's biased to
+	    # putting info-*: first in the list.
             order = []
             seen = [ False ] * len(compGraph)
+            nextIndex = 0
+
+            while (nextIndex < len(compGraph)):
+                if not seen[nextIndex]:
+		    # if any item in this component is an info- trove, go
+		    # ahead and process this component now
+		    for component in compGraph[nextIndex][0]:
+			if type(component) == tuple:
+			    name = component[0]
+			else:
+			    name = component.getName()
+
+			if name.startswith("info-"):
+			    _orderDFS(compGraph, nextIndex, seen, order)
+			    break
+
+		nextIndex += 1
+
             nextIndex = 0
             while (nextIndex < len(compGraph)):
                 if not seen[nextIndex]:
