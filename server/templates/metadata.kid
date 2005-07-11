@@ -1,6 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<?python from fmtroves import TroveCategories, LicenseCategories ?>
-<html xmlns="http://www.w3.org/1999/xhtml" 
+<html xmlns:html="http://www.w3.org/1999/xhtml" 
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
@@ -17,6 +16,7 @@
  full details.
 -->
     <?python
+    from fmtroves import TroveCategories, LicenseCategories
     source = metadata.getSource()
     if metadata.getVersion():
         # the only number that matters in the metadata version is the source revision
@@ -29,7 +29,7 @@
     ?>
 
     <!-- function to generate a selection, an input box, and add/remove button pair
-         to manage a list of items in a selection.-->
+         to manage a list of items in a selection. -->
     <div py:def="selectionEditor(itemName, items, ddItems = [])">
         <?python
         selectionName = "sel" + itemName
@@ -41,9 +41,7 @@
                     py:content="item" value="${item}"/>
         </select>
         <div style="padding: 4px 0px 4px 0px;">
-            <!-- if ddItems == [], show a text entry -->
             <input py:if="not ddItems" style="width: 75%;" type="text" name="${fieldName}" id="${fieldName}" />
-            <!-- otherwise show a dropdown containing ddItems -->
             <select py:if="ddItems" style="width: 75%;" id="${fieldName}">
                 <option py:for="item in ddItems"
                         py:content="item" value="${item}"/>
@@ -62,16 +60,10 @@
         <option py:if="source != 'freshmeat'" value="freshmeat" py:content="'freshmeat'" />
     </select>
 
-    ${html_header("Metadata")}
+    <head/>
     <body>
-        <h1>Conary Repository</h1>
-
-        <ul class="menu"><li class="highlighted">Metadata</li></ul>
-        <ul class="menu submenu"> </ul>
-
-        <div id="content">
-
-            <h4>Branch: ${branch.asString().split("/")[-1]}</h4>
+        <div id="inner">
+            <h4>${troveName}=${branch.asString().split("/")[-1]}</h4>
             <h4>Metadata revision: ${versionStr}</h4>
 
             <form method="post" action="updateMetadata">
@@ -103,22 +95,18 @@
                 <input type="hidden" name="troveName" value="${troveName}" />
             </form>
 
-            <!-- fetch from freshmeat -->
             <form method="post" action="getMetadata">
                 <input type="hidden" name="branch" value="${branch.freeze()}" />
                 <input type="hidden" name="troveName" value="${troveName}" />
                 <input type="hidden" name="source" value="freshmeat" />
                 <p><input type="submit" value="Fetch from Freshmeat" /></p>
                 <p>Freshmeat project name: <input type="text" name="freshmeatName" value="${troveName[:-7]}" /></p>
-            </form>
+            </form> 
 
-            <!-- cancel -->
             <form method="post" action="metadata">
-                <input type="hidden" name="troveName" value="%s" />
+                <input type="hidden" name="troveName" value="${troveName}" />
                 <p><input type="submit" value="Cancel" /></p>
             </form>
-
-            ${html_footer()}
-        </div>
+        </div> 
     </body>
 </html>

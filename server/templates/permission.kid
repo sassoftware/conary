@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml"
+<html xmlns:html="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
@@ -24,17 +24,9 @@
                 py:content="value" value="${value}"/>
     </select>
 
-    ${html_header("Add Permission")}
+    <head/>
     <body>
-        <h1>Conary Repository</h1>
-
-        <ul class="menu">
-            <li><a href="userlist">User List</a></li>
-            <li class="highlighted">Add Permission</li>
-        </ul>
-        <ul class="menu submenu"> </ul>
-
-        <div id="content">
+        <div id="inner">
             <h2>Add Permission</h2>
             <form method="post" action="addPerm">
                 <table class="add-form">
@@ -64,8 +56,6 @@
                 </table>
                 <p><input type="submit" value="Add"/></p>
             </form>
-
-            ${html_footer()}
         </div>
     </body>
 </html>

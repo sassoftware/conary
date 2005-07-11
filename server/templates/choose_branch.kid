@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml"
+<html xmlns:html="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
@@ -15,11 +15,9 @@
  or fitness for a particular purpose. See the Common Public License for
  full details.
 -->
-    ${html_header("Choose Branch")}
+    <head/>
     <body>
-        <h1>Conary Repository</h1>
-        
-        <div id="content">
+        <div id="inner">
             <h2>Choose Branch</h2>
             <form method="post" action="getMetadata">
                 <input type="hidden" name="troveName" value="${troveName}" />
@@ -34,8 +32,6 @@
                 <input py:if="source" type="hidden" name="source" value="${source}" />
                 <input type="submit" />
             </form>
-
-            ${html_footer()}
         </div>
     </body>
 </html>

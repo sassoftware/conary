@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml"
+<html xmlns:html="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
@@ -15,18 +15,9 @@
  or fitness for a particular purpose. See the Common Public License for
  full details.
 -->
-
-    ${html_header("Group")}
+    <head/>
     <body>
-        <h1>Conary Repository</h1>
-
-        <ul class="menu">
-            <li><a href="userlist">User List</a></li>
-            <li class="highlighted">Add Permission</li>
-        </ul>
-        <ul class="menu submenu"> </ul>
-
-        <div id="content">
+        <div id="inner">
             <h2 py:content="modify and 'Edit Group' or 'Add Group'"></h2>
 
             <form method="post" action="${modify and 'manageGroup' or 'addGroup'}">
@@ -52,8 +43,6 @@
                     <input py:if="modify" type="submit" value="Submit Group Changes" />
                 </p>
             </form>
-
-            ${html_footer()}
         </div>
     </body>
 </html>

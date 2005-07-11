@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml"
+<html xmlns:html="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
@@ -53,14 +53,9 @@
         </tbody>
     </table>
 
-    ${html_header("User List")}
+    <head/>
     <body>
-        <h1>Conary Repository</h1>
-
-        <ul class="menu"><li class="highlighted">User List</li></ul>
-        <ul class="menu submenu"> </ul>
-
-        <div id="content">
+        <div id="inner">
             <h2>Users</h2>
             <table class="user-admin" id="users">
                 <thead>
@@ -107,8 +102,6 @@
                 <a href="addPermForm">Add Permission</a><br />
                 <a href="addGroupForm">Add Group</a>
             </p>
-
-            ${html_footer()}
         </div>
     </body>
 </html>

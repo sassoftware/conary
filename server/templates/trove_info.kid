@@ -3,7 +3,7 @@
 from urllib import quote
 import time
 ?>
-<html xmlns="http://www.w3.org/1999/xhtml"
+<html xmlns:html="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
@@ -19,8 +19,6 @@ import time
  or fitness for a particular purpose. See the Common Public License for
  full details.
 -->
-    ${html_header("Main Menu")}
-    
     <table py:def="sourceTroveInfo(trove)" class="vheader">
         <tr class="even"><td>Trove name:</td><td>${trove.getName()}</td></tr>
         <tr class="odd"><td>Change log:</td>
@@ -31,6 +29,7 @@ import time
                 ?>
                 <div><i>${timestamp}</i> by <i>${cl.getName()} (${cl.getContact()})</i></div>
                 <p><code>${cl.getMessage()}</code></p>
+                <p><a href="changelogs?t=${trove.getName()};v=${quote(trove.getVersion().freeze())}">Show History</a></p>
             </td>
         </tr>
     </table>
@@ -63,12 +62,9 @@ import time
         </tr>
     </table>
 
+    <head/>
     <body>
-        <h1>Trove Information</h1>
-        <ul class="menu"><li class="highlighted">Main Menu</li></ul>
-        <ul class="menu submenu"> </ul>
-
-        <div id="content">
+        <div id="inner">
             <h3>Trove Information:</h3>
 
             <table py:if="metadata">
@@ -111,7 +107,6 @@ import time
                     </li>
                 </ul>
             </div>
-            ${html_footer()}
         </div>
     </body>
 </html>

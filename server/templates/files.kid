@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml"
+<html xmlns:html="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
@@ -39,18 +39,12 @@
         </table>
     </div>
 
-    ${html_header("Main Menu")}
+    <head/>
     <body>
-        <h1>Conary Repository</h1>
-        <ul class="menu"><li class="highlighted">Main Menu</li></ul>
-        <ul class="menu submenu"> </ul>
-
-        <div id="content">
+        <div id="inner">
             <h2>Files in <a href="troveInfo?t=${troveName}">${troveName}</a></h2>
 
             ${fileList(fileIters)}
-        
-            ${html_footer()}
         </div>
     </body>
 </html>

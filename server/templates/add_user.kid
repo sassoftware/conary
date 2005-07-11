@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml"
+<html xmlns:html="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
 <!--
@@ -15,16 +15,9 @@
  or fitness for a particular purpose. See the Common Public License for
  full details.
 -->
-    ${html_header("Add User")}
+    <head/>
     <body>
-        <h1>Conary Repository</h1>
-
-        <ul class="menu">
-            <li class="highlighted">Add User</li>
-        </ul>
-        <ul class="menu submenu"> </ul>
-
-        <div id="content">
+        <div id="inner">
             <h2>Add User</h2>
 
             <form method="post" action="addUser">
@@ -34,8 +27,6 @@
                 </table>
                 <p><input type="submit"/></p>
             </form>
-
-            ${html_footer()}
         </div>
     </body>
 </html>

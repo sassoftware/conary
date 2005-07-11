@@ -1,7 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml"
+<html xmlns:html="http://www.w3.org/1999/xhtml"
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
+<?python # foo
+title="Browse Repository"
+import string
+?>
 <!--
  Copyright (c) 2005 rpath, Inc.
 
@@ -15,14 +19,9 @@
  or fitness for a particular purpose. See the Common Public License for
  full details.
 -->
-    ${html_header("Main Menu")}
+    <head/>
     <body>
-    <?python import string ?>
-        <h1>Repository Browser</h1>
-        <ul class="menu"><li class="highlighted">Main Menu</li></ul>
-        <ul class="menu submenu"> </ul>
-
-        <div id="content">
+        <div id="inner">
             <h2>Repository Browser</h2>
 
             <span py:for="l in string.uppercase">
@@ -51,7 +50,6 @@
                     </ul>
                 </li>
             </ul>
-            ${html_footer()}
         </div>
     </body>
 </html>
