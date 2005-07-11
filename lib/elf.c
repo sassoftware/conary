@@ -22,22 +22,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-
-static PyObject * inspect(PyObject *self, PyObject *args);
-static PyObject * stripped(PyObject *self, PyObject *args);
-static PyObject * hasDebug(PyObject *self, PyObject *args);
+#include <dlfcn.h>
+#include <sys/wait.h>
 
 static PyObject * ElfError;
-
-static PyMethodDef ElfMethods[] = {
-    { "inspect", inspect, METH_VARARGS, 
-	"inspect an ELF file for dependency information" },
-    { "stripped", stripped, METH_VARARGS, 
-	"returns whether or not an ELF file has been stripped" },
-    { "hasDebug", hasDebug, METH_VARARGS, 
-	"returns whether or not an ELF file has debugging info" },
-    { NULL, NULL, 0, NULL }
-};
 
 static int doInspect(int fd, Elf * elf, PyObject * reqList,
 		     PyObject * provList) {
@@ -467,6 +455,82 @@ static PyObject * hasDebug(PyObject *self, PyObject *args) {
     Py_INCREF(Py_False);
     return Py_False;
 }
+
+static PyObject * hasUnresolvedSymbols(PyObject *self, PyObject *args) {
+    char *fileName;
+    void *handle;
+    int p[2], child, status;
+    PyObject *rc;
+
+    if (!PyArg_ParseTuple(args, "s", &fileName))
+	return NULL;
+
+    /* set up a pipe to get any error string out of the child */
+    if (-1 == pipe(p)) {
+	PyErr_SetFromErrno(PyExc_IOError);
+	return NULL;
+    }
+    /* we want to do the dlopen in a child process.  This isolates
+       the caller from any nasty side effects like running ini/fini code
+       from the dynamic library that's being loaded */
+    child = fork();
+    if (0 == child) {
+	/* close the read side of the pipe */
+	close(p[0]);
+
+	/* use RTLD_NOW to discover any unresolved symbols */
+	handle = dlopen(fileName, RTLD_NOW);
+	if ((void *) 0 == handle) {
+	    /* error, write the length of the error and the text
+	       to the write side of the pipe */
+	    const char *err = dlerror();
+	    int len = strlen(err);
+	    write(p[1], (void *) &len, sizeof(len));
+	    write(p[1], err, strlen(err));
+	    close(p[1]);
+	    _exit(1);
+	}
+	dlclose(handle);
+	close(p[1]);
+	_exit(0);
+    }
+    /* wait for the child to exit, and collect the status */
+    waitpid(child, &status, 0);
+    close(p[1]);
+
+    /* child exited with a non-0 status, so there are unresolved symbols */
+    if (0 != WEXITSTATUS(status)) {
+	/* there's an error, read it from the pipe */
+	char *err;
+	int len;
+	read(p[0], (void *) &len, sizeof(len));
+	err = malloc(len);
+	if (NULL == err)
+	    return PyErr_NoMemory();
+	read(p[0], err, len);
+	rc = PyString_FromStringAndSize(err, len);
+	free(err);
+    } else {
+	/* child exited with a 0 return code, no unresolved symbols */
+	Py_INCREF(Py_False);
+	rc = Py_False;
+    }
+    /* close the read side and return */
+    close(p[0]);
+    return rc;
+}
+
+static PyMethodDef ElfMethods[] = {
+    { "inspect", inspect, METH_VARARGS, 
+	"inspect an ELF file for dependency information" },
+    { "stripped", stripped, METH_VARARGS, 
+	"returns whether or not an ELF file has been stripped" },
+    { "hasDebug", hasDebug, METH_VARARGS, 
+	"returns whether or not an ELF file has debugging info" },
+    { "hasUnresolvedSymbols", hasUnresolvedSymbols, METH_VARARGS,
+	"returns whether or not an ELF file has unresolved symbols" },
+    { NULL, NULL, 0, NULL }
+};
 
 PyMODINIT_FUNC
 initelf(void)
