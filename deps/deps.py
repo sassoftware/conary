@@ -23,6 +23,8 @@ DEP_CLASS_FILES		= 3
 DEP_CLASS_TROVES	= 4
 DEP_CLASS_USE		= 5
 DEP_CLASS_SONAME	= 6
+DEP_CLASS_USERINFO      = 7
+DEP_CLASS_GROUPINFO     = 8
 
 FLAG_SENSE_UNSPECIFIED  = 0         # used FlavorScore indices
 FLAG_SENSE_REQUIRED     = 1
@@ -419,6 +421,22 @@ class SonameDependencies(DependencyClass):
     justOne = False
     depClass = Dependency
 _registerDepClass(SonameDependencies)
+
+class UserInfoDependencies(DependencyClass):
+
+    tag = DEP_CLASS_USERINFO
+    tagName = "userinfo"
+    justOne = False
+    depClass = Dependency
+_registerDepClass(UserInfoDependencies)
+
+class GroupInfoDependencies(DependencyClass):
+
+    tag = DEP_CLASS_GROUPINFO
+    tagName = "groupinfo"
+    justOne = False
+    depClass = Dependency
+_registerDepClass(GroupInfoDependencies)
 
 class FileDependencies(DependencyClass):
 

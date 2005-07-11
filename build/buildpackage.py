@@ -99,6 +99,7 @@ class BuildComponent(dict):
                 if not isinstance(f, files.Directory):
                     # no hardlinks allowed for special files other than dirs
                     self.badhardlinks.append(path)
+        return f
 
     def getDepsFromElf(self, elfinfo, abi):
         """
@@ -107,7 +108,7 @@ class BuildComponent(dict):
         @param elfinfo: List provided by C{lib.elf.inspect()}
         @param abi: tuple of abi information to blend into soname dependencies
         """
-	set = deps.DependencySet()
+	depSet = deps.DependencySet()
 	for (depClass, main, flags) in elfinfo:
             flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
 	    if depClass == 'soname':
@@ -128,8 +129,8 @@ class BuildComponent(dict):
 	    else:
 		assert(0)
 
-	    set.addDep(curClass, dep)
-        return set
+	    depSet.addDep(curClass, dep)
+        return depSet
 
     def addDevice(self, path, devtype, major, minor,
                   owner='root', group='root', perms=0660):
@@ -140,6 +141,7 @@ class BuildComponent(dict):
         """
         f = BuildDeviceFile(devtype, major, minor, owner, group, perms)
 	self[path] = (None, f)
+        return f
 
     def getFile(self, path):
         return self[path][1]
@@ -280,8 +282,7 @@ class AutoBuildPackage:
         @rtype: None
         """
         pkg = self.findComponent(path)
-        pkg.addFile(path, realPath)
-	self.pathMap[path] = pkg.getFile(path)
+        self.pathMap[path] = pkg.addFile(path, realPath)
 
     def delFile(self, path):
         """
@@ -302,8 +303,8 @@ class AutoBuildPackage:
         the file name against the package and component filters
         """
         pkg = self.findComponent(path)
-        pkg.addDevice(path, devtype, major, minor, owner, group, perms)
-	self.pathMap[path] = pkg.getFile(path)
+        f = pkg.addDevice(path, devtype, major, minor, owner, group, perms)
+	self.pathMap[path] = f
 	self.componentMap[path] = pkg
 
     def getComponents(self):

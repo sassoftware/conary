@@ -31,6 +31,7 @@ import types
 #conary
 import build
 import buildpackage
+import usergroup
 import cook
 from deps import deps
 import destdirpolicy
@@ -80,6 +81,8 @@ baseMacros = {
     'thistestdir'	: '%(testdir)s/%(name)s-%(version)s',
     'debuglibdir'       : '/usr/lib/debug', # no %(prefix)s or %(lib)s!
     'debugsrcdir'       : '/usr/src/debug', # no %(prefix)s!
+    'userinfodir'       : '%(sysconfdir)s/conary/userinfo',
+    'groupinfodir'      : '%(sysconfdir)s/conary/groupinfo',
     'buildlogpath'      : '%(debugsrcdir)s/buildlogs/%(name)s-%(version)s-log.bz2',
     # special component prefixes that the whole system needs to share
     'krbprefix'		: '%(exec_prefix)s/kerberos',
@@ -158,6 +161,8 @@ def setupRecipeDict(d, filename):
                                     'BuildPackageRecipe',
                                     'CPackageRecipe',
                                     'AutoPackageRecipe',
+                                    'UserInfoRecipe',
+                                    'GroupInfoRecipe',
                                     'loadSuperClass', 'loadInstalled',
                                     'clearBuildReqs',
                                     # XXX when all recipes have been migrated
@@ -235,10 +240,11 @@ class RecipeLoader:
                 continue
             recipename = getattr(obj, 'name', '')
             # make sure the class is derived from Recipe
-            if (issubclass(obj, PackageRecipe) 
-                        and obj is not PackageRecipe) or \
-               (issubclass(obj, RedirectRecipe) 
-                        and obj is not RedirectRecipe):
+            if ((issubclass(obj, PackageRecipe)
+                 and obj is not PackageRecipe
+                 and not issubclass(obj, UserGroupInfoRecipe)) or
+                (issubclass(obj, RedirectRecipe) 
+                 and obj is not RedirectRecipe)):
                 if recipename[0] not in string.ascii_letters + string.digits:
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name must start '
@@ -251,6 +257,10 @@ class RecipeLoader:
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name cannot '
                         'begin with "fileset-"' %basename)
+                if recipename.startswith('info-'):
+                    raise RecipeFileError(
+                        'Error in recipe file "%s": package name cannot '
+                        'begin with "info-"' %basename)
 	    elif issubclass(obj, GroupRecipe) and obj is not GroupRecipe:
                 if recipename and not recipename.startswith('group-'):
                     raise RecipeFileError(
@@ -261,6 +271,11 @@ class RecipeLoader:
                     raise RecipeFileError(
                         'Error in recipe file "%s": fileset name must '
                         'begin with "fileset-"' %basename)
+	    elif issubclass(obj, UserGroupInfoRecipe) and obj is not UserGroupInfoRecipe:
+                if recipename and not recipename.startswith('info-'):
+                    raise RecipeFileError(
+                        'Error in recipe file "%s": info name must '
+                        'begin with "info-"' %basename)
             else:
                 continue
             self.recipes[name] = obj
@@ -1019,6 +1034,49 @@ class PackageRecipe(Recipe):
 	self.mainDir(self.nameVer(), explicit=False)
         self.sourcePathMap = {}
         self.pathConflicts = {}
+
+
+class UserGroupInfoRecipe(PackageRecipe):
+    # abstract base class
+    ignore = 1
+
+    def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}):
+        PackageRecipe.__init__(self, cfg, laReposCache, srcdirs, extraMacros)
+        self.destdirPolicy = []
+        self.packagePolicy = []
+        self.infofilename = None
+        self.realfilename = None
+
+    def getPackages(self):
+        comp = buildpackage.BuildComponent(
+            'info-%s:%s' %(self.infoname, self.type), self)
+        f = comp.addFile(self.infofilename, self.realfilename)
+        depSet = deps.DependencySet()
+        depSet.addDep(self.depclass, deps.Dependency(self.infoname, []))
+        f.provides.set(depSet)
+        comp.provides.union(f.provides())
+        return [comp]
+
+    def __getattr__(self, name):
+        if not name.startswith('_'):
+	    if name in usergroup.__dict__:
+		return _recipeHelper(self._build, self,
+                                     usergroup.__dict__[name])
+        if name in self.__dict__:
+            return self.__dict__[name]
+        raise AttributeError, name
+
+class UserInfoRecipe(UserGroupInfoRecipe):
+    type = 'user'
+    depclass = deps.UserInfoDependencies
+    # abstract base class
+    ignore = 1
+
+class GroupInfoRecipe(UserGroupInfoRecipe):
+    type = 'group'
+    depclass = deps.GroupInfoDependencies
+    # abstract base class
+    ignore = 1
 
 
 # XXX the next four classes will probably migrate to the repository

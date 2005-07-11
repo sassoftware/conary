@@ -1194,91 +1194,73 @@ class IgnoredSetuid(policy.Policy):
                       type, file, mode&06777)
 
 
+class LinkCount(policy.Policy):
+    """
+    Only regular, non-config files may have hardlinks; no exceptions.
+    """
+    def do(self):
+        for component in self.recipe.autopkg.getComponents():
+            for path in component.hardlinks:
+                if self.recipe.autopkg.pathMap[path].flags.isConfig():
+                    self.error("Config file %s has illegal hard links", path)
+            for path in component.badhardlinks:
+                self.error("Special file %s has illegal hard links", path)
 
-class _userData(policy.Policy):
-    def __init__(self, *args, **keywords):
-	policy.Policy.__init__(self, *args, **keywords)
-        self._create()
+
+class User(policy.Policy):
+    """
+    Stub for older recipes
+    """
+    def updateArgs(self, *args, **keywords):
+        self.warn('User policy is deprecated, create a separate UserInfoRecipe instead')
+
     def test(self):
-        # Ownership, UtilizeUser, and UtilizeGroup do all the per-file
-        # work for subclasses of _userData
         return False
 
 
-class User(_userData):
+class SupplementalGroup(policy.Policy):
     """
-    Provides information to use if Conary needs to create a user:
-    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}')}
-
-    The defaults are::
-      - C{group}: same name as the user
-      - C{groupid}: same id as the user
-      - C{homedir}: None
-      - C{comment}: None
-      - C{shell}: C{'/sbin/nologin'}
-    Warning: troves do not yet store this information; this is not
-    yet a fully-implemented feature.
+    Stub for older recipes
     """
     def updateArgs(self, *args, **keywords):
-        assert(len(args) == 2)
-        name, uid = args
+        self.warn('SupplementalGroup policy is deprecated, create a separate GroupInfoRecipe instead')
 
-        name = name % self.recipe.macros
-
-        # interpolate macros into the keywords...
-        for key in ('group', 'homedir', 'comment', 'shell'):
-            if key in keywords:
-                keywords[key] = keywords[key] % self.recipe.macros
-
-        group = keywords.get('group', name)
-        groupid = keywords.get('groupid', uid)
-        homedir = keywords.get('homedir', None)
-        comment = keywords.get('comment', None)
-        shell = keywords.get('shell', '/sbin/nologin')
-        self.recipe.usermap[name] = (uid, group, groupid, homedir, comment, shell)
-        self.recipe.usergrpmap[group] = name
-    def _create(self):
-        self.recipe.usermap={}
-        self.recipe.usergrpmap={}
+    def test(self):
+        return False
 
 
-class SupplementalGroup(_userData):
+class Group(policy.Policy):
     """
-    Requests the Conary ensure that a user have a supplemental group::
-    C{r.SupplementalGroup('I{user}', 'I{group}', I{preferred_gid})}
-    Warning: troves do not yet store this information; this is not
-    yet a fully-implemented feature.
+    Stub for older recipes
     """
     def updateArgs(self, *args, **keywords):
-        assert(len(args) == 3)
-        user, group, groupid = args
-        user = user % self.recipe.macros
-        group = group % self.recipe.macros
+        self.warn('Group policy is deprecated, create a separate GroupInfoRecipe instead')
 
-        self.recipe.suppmap[user] = (group, groupid)
-    def _create(self):
-        self.recipe.suppmap={}
+    def test(self):
+        return False
 
 
-class Group(_userData):
+class _UserGroup:
     """
-    Provides information to use if Conary needs to create a group:
-    C{r.Group('I{group}', I{preferred_gid})}
-    This is used only for groups that exist independently, never
-    for a main group created by C{r.User()}
-    Warning: troves do not yet store this information; this is not
-    yet a fully-implemented feature.
+    Abstract base class that implements marking owner/group dependencies.
     """
-    def updateArgs(self, *args, **keywords):
-        assert(len(args) == 2)
-        group, groupid = args
-        group = group % self.recipe.macros
-        self.recipe.grpmap[group] = groupid
-    def _create(self):
-        self.recipe.grpmap={}
+    # All classes that descend from _UserGroup must run before the
+    # Requires policy, as they implicitly depend on it to set the
+    # file requirements and union the requirements up to the package.
+    def setUserGroupDep(self, path, info, depClass):
+	componentMap = self.recipe.autopkg.componentMap
+	if path not in componentMap:
+	    return
+	pkg = componentMap[path]
+	f = pkg.getFile(path)
+        if path not in pkg.requiresMap:
+            # BuildPackage only fills in requiresMap for ELF files; we may
+            # need to create a few more DependencySets.
+            pkg.requiresMap[path] = deps.DependencySet()
+        pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, []))
 
 
-class Ownership(policy.Policy):
+class Ownership(policy.Policy, _UserGroup):
     """
     Sets user and group ownership of files when the default of
     root:root is not appropriate:
@@ -1331,33 +1313,48 @@ class Ownership(policy.Policy):
 	pkgfile = self.recipe.autopkg.pathMap[filename]
 	if owner:
 	    pkgfile.inode.owner.set(owner)
-            if owner in self.recipe.usermap:
-                # XXX fill this in when there is something to do with it
-                self.warn('User "%s" definition ignored for file %s, not yet implemented',
-                          owner, filename)
-            elif owner not in self.systemusers:
-                self.warn('User "%s" missing definition for file %s',
-                          owner, filename)
-            if owner in self.recipe.suppmap:
-                # XXX fill this in when there is something to do with it
-                self.warn('SupplementalGroup "%s" definition ignored for file %s, not yet implemented',
-                          self.recipe.suppmap[owner][0], filename)
+            # XXX -- uncomment
+            #self.setUserGroupDep(filename, owner, deps.UserInfoDependencies)
 	if group:
 	    pkgfile.inode.group.set(group)
-            if group in self.recipe.grpmap:
-                # XXX fill this in when there is something to do with it
-                self.warn('Group "%s" definition ignored for file %s, not yet implemented',
-                          group, filename)
-            elif group in self.recipe.usergrpmap:
-                # maingroup for user
-                self.warn('Group "%s" definition ignored for file %s, not yet implemented',
-                          group, filename)
-            elif group not in self.systemgroups:
-                self.warn('Group "%s" missing definition for file %s',
-                          group, filename)
+            # XXX -- uncomment
+            #self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
 
 
-class _Utilize(policy.Policy):
+class ExcludeDirectories(policy.Policy):
+    """
+    Causes directories to be excluded from the package by default; set
+    exceptions to this policy with
+    C{ExcludeDirectories(exceptions=I{filterexp})} and the directories
+    matching the regular expression will be included in the package.
+
+    There are only two reasons to package a directory: the directory needs
+    permissions other than 0755, or it must exist even if it is empty.
+
+    It should generally not be necessary to invoke this policy directly,
+    because the most common reason to include a directory in a package
+    is that it needs permissions other than 0755, so simply call
+    C{r.SetMode(I{path(s)}, I{mode})} where C{I{mode}} is not C{0755},
+    and the directory will automatically included.
+
+    Packages do not need to explicitly include a directory just to ensure
+    that there is a place to put a file; Conary will appropriately create
+    the directory, and delete it later if the directory becomes empty.
+    """
+    invariantinclusions = [ ('.*', stat.S_IFDIR) ]
+
+    def doFile(self, path):
+	fullpath = self.recipe.macros.destdir + os.sep + path
+	s = os.lstat(fullpath)
+	mode = s[stat.ST_MODE]
+	if mode & 0777 != 0755:
+            self.dbg('excluding directory %s with mode %o', path, mode&0777)
+	elif not os.listdir(fullpath):
+            self.dbg('excluding empty directory %s', path)
+	self.recipe.autopkg.delFile(path)
+
+
+class _Utilize(policy.Policy, _UserGroup):
     """
     Pure virtual base class for C{UtilizeUser} and C{UtilizeGroup}
     """
@@ -1402,10 +1399,11 @@ class UtilizeUser(_Utilize):
     This is particularily useful for daemons that are setuid root
     but change their user id to a user id with no filesystem permissions
     after they start.
-    Warning: this is not yet implemented, only stubbed out.
     """
     def _markItem(self, path, user):
-        pass
+        # XXX -- remove return
+        return
+        self.setUserGroupDep(path, user, deps.UserInfoDependencies)
 
 
 class UtilizeGroup(_Utilize):
@@ -1416,56 +1414,11 @@ class UtilizeGroup(_Utilize):
     This is particularily useful for daemons that are setuid root
     but change their group id to a group id with no filesystem permissions
     after they start.
-    Warning: this is not yet implemented, only stubbed out.
     """
     def _markItem(self, path, group):
-        pass
-
-
-class ExcludeDirectories(policy.Policy):
-    """
-    Causes directories to be excluded from the package by default; set
-    exceptions to this policy with
-    C{ExcludeDirectories(exceptions=I{filterexp})} and the directories
-    matching the regular expression will be included in the package.
-
-    There are only two reasons to package a directory: the directory needs
-    permissions other than 0755, or it must exist even if it is empty.
-
-    It should generally not be necessary to invoke this policy directly,
-    because the most common reason to include a directory in a package
-    is that it needs permissions other than 0755, so simply call
-    C{r.SetMode(I{path(s)}, I{mode})} where C{I{mode}} is not C{0755},
-    and the directory will automatically included.
-
-    Packages do not need to explicitly include a directory just to ensure
-    that there is a place to put a file; Conary will appropriately create
-    the directory, and delete it later if the directory becomes empty.
-    """
-    invariantinclusions = [ ('.*', stat.S_IFDIR) ]
-
-    def doFile(self, path):
-	fullpath = self.recipe.macros.destdir + os.sep + path
-	s = os.lstat(fullpath)
-	mode = s[stat.ST_MODE]
-	if mode & 0777 != 0755:
-            self.dbg('excluding directory %s with mode %o', path, mode&0777)
-	elif not os.listdir(fullpath):
-            self.dbg('excluding empty directory %s', path)
-	self.recipe.autopkg.delFile(path)
-
-
-class LinkCount(policy.Policy):
-    """
-    Only regular, non-config files may have hardlinks; no exceptions.
-    """
-    def do(self):
-        for component in self.recipe.autopkg.getComponents():
-            for path in component.hardlinks:
-                if self.recipe.autopkg.pathMap[path].flags.isConfig():
-                    self.error("Config file %s has illegal hard links", path)
-            for path in component.badhardlinks:
-                self.error("Special file %s has illegal hard links", path)
+        # XXX -- remove return
+        return
+        self.setUserGroupDep(path, user, deps.GroupInfoDependencies)
 
 
 class ComponentRequires(policy.Policy):
@@ -1900,14 +1853,14 @@ def DefaultPolicy(recipe):
 	FilesForDirectories(recipe),
 	ObsoletePaths(recipe),
 	IgnoredSetuid(recipe),
+	LinkCount(recipe),
         User(recipe),
         SupplementalGroup(recipe),
         Group(recipe),
 	Ownership(recipe),
+	ExcludeDirectories(recipe),
         UtilizeUser(recipe),
         UtilizeGroup(recipe),
-	ExcludeDirectories(recipe),
-	LinkCount(recipe),
 	ComponentRequires(recipe),
         ComponentProvides(recipe),
 	Requires(recipe),

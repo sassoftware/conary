@@ -28,7 +28,8 @@ python_files = __init__.py	\
 	recipe.py		\
 	source.py		\
 	tags.py			\
-	use.py
+	use.py                  \
+        usergroup.py
 
 extra_dist = Makefile
 
