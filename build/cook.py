@@ -1001,7 +1001,8 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
 
     # search for all the packages that are being created by this cook - 
     # we take the max of all of these versions as our latest.
-    query = dict.fromkeys(troveNames, {sourceVersion.branch() : None })
+    query = dict.fromkeys(troveNames, 
+                          {sourceVersion.getBinaryVersion().branch() : None })
     
     d = repos.getTroveVersionsByBranch(query)
     latest = None
