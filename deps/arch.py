@@ -80,5 +80,5 @@ def initializeArch():
     del localNamespace
 
 baseArch = os.uname()[4]
-currentArch = [ deps.Dependency(baseArch) ]
+currentArch = [[ deps.Dependency(baseArch) ]]
 initializeArch()
