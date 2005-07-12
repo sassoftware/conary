@@ -13,6 +13,15 @@
 #
 import netclient
 
+# this returns the same server for any server name or label
+# requested; because a shim can only refer to one server.
+class FakeServerCache:
+    def __init__(self, server):
+        self._server = server
+
+    def __getitem__(self, item):
+        return self._server
+
 class ShimNetClient(netclient.NetworkRepositoryClient):
     """
     A subclass of NetworkRepositoryClient which can take a NetworkRepositoryServer
@@ -21,7 +30,8 @@ class ShimNetClient(netclient.NetworkRepositoryClient):
     """
     def __init__(self, server, protocol, port, authToken, repMap):
         netclient.NetworkRepositoryClient.__init__(self, repMap)
-        self.server = ShimServerProxy(server, protocol, port, authToken)
+        proxy = ShimServerProxy(server, protocol, port, authToken)
+        self.c = FakeServerCache(proxy)
 
 class _ShimMethod(netclient._Method):
     def __init__(self, server, protocol, port, authToken, name):
@@ -35,6 +45,7 @@ class _ShimMethod(netclient._Method):
         return "<server._ShimMethod(%r)>" % (self._ShimMethod__name)
 
     def __call__(self, *args):
+        args = [netclient.CLIENT_VERSIONS[-1]] + list(args)
         isException, result = self._server.callWrapper(
             self._protocol, self._port,
             self._name, self._authToken, args)
