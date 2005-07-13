@@ -335,26 +335,64 @@ class HttpHandler(WebHandler):
         labels = (x[1] for x in self.repServer.auth.iterLabels())
         troves = (x[1] for x in self.repServer.auth.iterItems())
     
-        self._write("permission", groups=groups, labels=labels, troves=troves)
+        self._write("permission", operation='Add', group=None, trove=None, 
+                label=None, groups=groups, labels=labels, troves=troves,
+                writeperm=None, capped=None, admin=None)
+        return apache.OK
+
+    @checkAuth(write = True, admin = True)
+    @strFields(group = None, label = "", trove = "")
+    @intFields(writeperm = None, capped = None, admin = None)
+    def editPermForm(self, auth, group, label, trove, writeperm, capped, admin):
+        groups = (x[1] for x in self.repServer.auth.iterGroups())
+        labels = (x[1] for x in self.repServer.auth.iterLabels())
+        troves = (x[1] for x in self.repServer.auth.iterItems())
+
+        self._write("permission", operation='Edit', group=group, label=label, 
+                trove=trove, groups=groups, labels=labels, troves=troves,
+                writeperm=writeperm, capped=capped, admin=admin)
         return apache.OK
 
     @checkAuth(write = True, admin = True)
     @strFields(group = None, label = "", trove = "",
-               write = "off", capped = "off", admin = "off")
+               writeperm = "off", capped = "off", admin = "off")
     def addPerm(self, auth, group, label, trove,
-                write, capped, admin):
-        write = (write == "on")
+                writeperm, capped, admin):
+        writeperm = (writeperm == "on")
         capped = (capped == "on")
         admin = (admin == "on")
        
         try:
-            self.repServer.auth.addAcl(group, trove, label,
-               write, capped, admin)
+            self.repServer.addAcl(auth, 0, group, trove, label,
+               writeperm, capped, admin)
         except PermissionAlreadyExists, e:
             self._write("error", shortError="Duplicate Permission",
                     error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
             return apache.OK
         self._write("notice", message = "Permission successfully added.",
+                                 link = "User Administration",
+                                 url = "userlist")
+        return apache.OK
+
+    @checkAuth(write = True, admin = True)
+    @strFields(group = None, label = "", trove = "",
+               oldlabel = "", oldtrove = "",
+               writeperm = "off", capped = "off", admin = "off")
+    def editPerm(self, auth, group, label, trove, oldlabel, oldtrove,
+                writeperm, capped, admin):
+        writeperm = (writeperm == "on")
+        capped = (capped == "on")
+        admin = (admin == "on")
+
+        try:
+            self.repServer.editAcl(auth, 0, group, oldtrove, oldlabel, trove, 
+               label, writeperm, capped, admin)
+        except PermissionAlreadyExists, e:
+            self._write("error", shortError="Duplicate Permission",
+                    error = "Permissions have already been set for %s, please go back and select a different User, Label or Trove." % str(e))
+            return apache.OK
+
+        self._write("notice", message = "Permission successfully modified.",
                                  link = "User Administration",
                                  url = "userlist")
         return apache.OK

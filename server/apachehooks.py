@@ -222,12 +222,12 @@ def handler(req):
     method = req.method.upper()
 
     if method == "POST":
-	return post(port, secure, repos, req)
+        return post(port, secure, repos, req)
     elif method == "GET":
-	return get(port, secure, repos, req)
+        return get(port, secure, repos, req)
     elif method == "PUT":
-	return putFile(port, secure, repos, req)
+        return putFile(port, secure, repos, req)
     else:
-	return apache.HTTP_METHOD_NOT_ALLOWED
+        return apache.HTTP_METHOD_NOT_ALLOWED
 
 repositories = {}

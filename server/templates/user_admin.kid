@@ -16,15 +16,16 @@
  full details.
 -->
     <!-- table of permissions -->
-    <table class="user-admin" id="permissions" py:def="permTable(groupId, rows)">
+    <table class="user-admin" id="permissions" py:def="permTable(groupId, group, rows)">
         <thead>
             <tr>
                 <td style="width: 55%;">Label</td>
-                <td>Item</td>
+                <td>Trove</td>
                 <td>Write</td>
                 <td>Capped</td>
                 <td>Admin</td>
                 <td>X</td>
+                <td>E</td>
             </tr>
         </thead>
         <tbody>
@@ -45,7 +46,8 @@
                 <td py:content="row[4] and 'yes' or 'no'"/>
                 <td py:content="row[5] and 'yes' or 'no'"/>
                 <td py:content="row[6] and 'yes' or 'no'"/>
-                <td><a href="deletePerm?groupId=${groupId}&amp;labelId=${row[0]}&amp;itemId=${row[2]}" title="Delete Permission">X</a></td>
+                <td><a href="deletePerm?groupId=${groupId};labelId=${row[1]}&amp;itemId=${row[2]}" title="Delete Permission">X</a></td>
+                <td><a href="editPermForm?group=${group};label=${label};trove=${item};writeperm=${row[4]};capped=${row[5]};admin=${row[6]}" title="Edit Permission">E</a></td>
             </tr>
             <tr py:if="not rows">
                 <td>Group has no permissions.</td>
@@ -92,7 +94,7 @@
                     rows = list(enumerate(netAuth.iterPermsByGroupId(group[0])))
                     ?>
                         <td><b>${group[1]}</b></td>
-                        <td py:if="rows" py:content="permTable(group[0], rows)"/>
+                        <td py:if="rows" py:content="permTable(group[0], group[1], rows)"/>
                         <td py:if="not rows" style="font-size: 80%;">Group has no permissions</td>
                         <td><a href="deleteGroup?userGroupId=${group[0]}">Delete</a> | <a href="manageGroupForm?userGroupName=${group[1]}">Manage</a></td>
                     </tr>

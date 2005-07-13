@@ -109,12 +109,11 @@ class TroveStore:
             pass
         del self.db
 
+    def getLabelId(self, label):
+        self.versionOps.labels.getOrAddId(label)
+        
     def getItemId(self, item):
-	theId = self.items.get(item, None)
-	if theId == None:
-	    theId = self.items.addId(item)
-
-	return theId
+        return self.items.getOrAddId(item)
 
     def getInstanceId(self, itemId, versionId, flavorId, isRedirect,
                       isPresent = True):

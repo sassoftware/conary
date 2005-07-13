@@ -32,12 +32,19 @@ class IdTable:
 
     def initTable(self):
 	pass
-    
+
+    def getOrAddId(self, item):
+        id = self.get(item, None)
+        if id == None:
+            id = self.addId(item)
+
+        return id
+
     def addId(self, item):
         cu = self.db.cursor()
         cu.execute("INSERT INTO %s VALUES (NULL, ?)"
                    %(self.tableName, ), (item,))
-	return cu.lastrowid
+        return cu.lastrowid
 
     def delId(self, theId):
         assert(type(theId) is int)

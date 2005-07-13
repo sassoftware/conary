@@ -44,7 +44,7 @@ CACHE_SCHEMA_VERSION = 14
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
-    schemaVersion = 1
+    schemaVersion = 2
 
     # lets the following exceptions pass:
     #
@@ -72,7 +72,6 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     _GET_TROVE_ALLOWED_FLAVOR   = 4     # all flavors which are legal
 
     def callWrapper(self, protocol, port, methodname, authToken, args):
-
         def condRollback():
             if self.db.inTransaction:
                 self.db.rollback()
@@ -141,7 +140,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # adds a new user, with no acls. for now it requires full admin
         # rights
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise InsufficientPermissions
+            raise InsufficientPermission
 
         self.auth.addUser(user, newPassword)
 
@@ -151,7 +150,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         # adds a new user, with no acls. for now it requires full admin
         # rights
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise InsufficientPermissions
+            raise InsufficientPermission
 
         #Base64 decode salt
         self.auth.addUserByMD5(user, base64.decodestring(salt), newPassword)
@@ -159,14 +158,14 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
     def deleteUserByName(self, authToken, clientVersion, user):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise InsufficientPermissions
+            raise InsufficientPermission
 
         self.auth.deleteUserByName(user)
         return True
 
     def deleteUserById(self, authToken, clientVersion, userId):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise InsufficientPermissions
+            raise InsufficientPermission
 
         error = self.auth.deleteUserById(userId)
         if error:
@@ -179,7 +178,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
     def addAcl(self, authToken, clientVersion, userGroup, trovePattern,
                label, write, capped, admin):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
-            raise InsufficientPermissions
+            raise InsufficientPermission
 
         if trovePattern == "":
             trovePattern = None
@@ -191,11 +190,34 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                          admin)
 
         return True
+
+    def editAcl(self, authToken, clientVersion, userGroup, oldTrovePattern,
+                oldLabel, trovePattern, label, write, capped, admin):
+        if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]):
+            raise InsufficientPermission
+
+        if trovePattern == "":
+            trovePattern = "ALL"
+
+        if label == "":
+            label = "ALL"
+
+        #Get the Ids
+        troveId = self.troveStore.getItemId(trovePattern)
+        oldTroveId = self.troveStore.items.get(oldTrovePattern, None)
+
+        labelId = idtable.IdTable.get(self.troveStore.versionOps.labels, label, None)
+        oldLabelId = idtable.IdTable.get(self.troveStore.versionOps.labels, oldLabel, None)
+
+        self.auth.editAcl(userGroup, oldTroveId, oldLabelId, troveId, labelId,
+            write, capped, admin)
+
+        return True
     
     def changePassword(self, authToken, clientVersion, user, newPassword):
         if not self.auth.checkIsFullAdmin(authToken[0], authToken[1]) and\
             user != authToken[0]:
-            raise InsufficientPermissions
+            raise InsufficientPermission
 
         self.auth.changePassword(user, newPassword)
         
@@ -310,7 +332,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             singleVersionSpec = troveSpecs[None].keys()[0]
         else:
             dropTroveTable = True
-            cu.execute("""CREATE TEMPORARY TABLE gtvlTbl(item STRING,
+            #cu.execute("""CREATE TEMPORARY TABLE gtvlTbl(item STRING,
+            cu.execute("""CREATE TABLE gtvlTbl(item STRING,
                                                        versionSpec STRING,
                                                        flavorId INT)""",
                        start_transaction = False)
@@ -487,7 +510,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     LEFT OUTER JOIN UserPermissions ON
                         UserPermissions.permittedLabelId = NodeLabelMap.labelId 
                       OR
-                        UserPermissions.permittedLabelId is NULL
+                        UserPermissions.permittedLabelId=0
                     %s
                     %s
                     %s
@@ -1106,6 +1129,33 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                        self.schemaVersion, start_transaction = False)
         else:
             version = cu.execute("SELECT * FROM DatabaseVersion").next()[0]
+            if version == 1:
+                #This is the update from using Null as the wildcard for 
+                #Items/Troves and Labels to using 0/ALL
+
+                ## First insert the new Item and Label keys
+                cu.execute("INSERT INTO Items VALUES(0, 'ALL')")
+                cu.execute("INSERT INTO Labels VALUES(0, 'ALL')")
+
+                ## Now replace all Nulls in the following tables with '0'
+                itemTables =   ('Permissions', 'Instances', 'Latest', 
+                                'Metadata', 'Nodes', 'LabelMap')
+                labelTables =  ('Permissions', 'LabelMap')
+                for table in itemTables:
+                    cu.execute('UPDATE %s SET itemId=0 WHERE itemId IS NULL' % 
+                        table)
+                for table in labelTables:
+                    cu.execute('UPDATE %s SET labelId=0 WHERE labelId IS NULL' %
+                        table)
+
+                ## Finally fix the index
+                cu.execute("DROP INDEX PermissionsIdx")
+                cu.execute("""CREATE UNIQUE INDEX PermissionsIdx ON 
+                    Permissions(userGroupId, labelId, itemId)""")
+                cu.execute("UPDATE DatabaseVersion SET version=?", 2)
+                self.db.commit()
+                version = 2
+
             if version != self.schemaVersion:
                 return False
 

@@ -17,44 +17,48 @@
 -->
     <!-- creates a selection dropdown based on a list, optionally adding an ALL
          option at the top of the list. -->
-    <select py:def="makeSelect(elementName, items, all = False)"
+    <select py:def="makeSelect(elementName, items, selected = None, all = False)"
             name="${elementName}">
-        <option py:if="all" value="">ALL</option>
         <option py:for="value in sorted(items)"
-                py:content="value" value="${value}"/>
+                py:content="value" value="${value}" py:attrs="{'selected': (selected == value) and 'selected' or None}" />
     </select>
 
     <head/>
+    <!-- Change the rowspan on the Options: label to 3 when the capped 
+         setting is enabled -->
     <body>
         <div id="inner">
-            <h2>Add Permission</h2>
-            <form method="post" action="addPerm">
+            <h2>${operation} Permission</h2>
+            <form method="post" action="${(operation == 'Edit') and 'editPerm' or 'addPerm'}">
+                <input py:if="operation=='Edit'" name="oldlabel" value="${label}" type="hidden" />
+                <input py:if="operation=='Edit'" name="oldtrove" value="${trove}" type="hidden" />
                 <table class="add-form">
                     <tr>
                         <td id="header">Group:</td>
-                        <td py:content="makeSelect('group', groups)"/>
+                        <td py:if="operation!='Edit'" py:content="makeSelect('group', groups, group, False)"/>
+                        <td py:if="operation=='Edit'"><input name="group" value="${group}" readonly="readonly" type="text" /></td>
                     </tr>
                     <tr>
                         <td id="header">Label:</td>
-                        <td py:content="makeSelect('label', labels, all = True)"/>
+                        <td py:content="makeSelect('label', labels, label, all = True)"/>
                     </tr>
                     <tr>
                         <td id="header">Trove:</td>
-                        <td py:content="makeSelect('trove', troves, all = True)"/>
+                        <td py:content="makeSelect('trove', troves, trove, all = True)"/>
                     </tr>
                     <tr>
-                        <td id="header" rowspan="3">Options</td>
-                        <td><input type="checkbox" name="write" /> Write access</td>
+                        <td id="header" rowspan="2">Options:</td>
+                        <td><input type="checkbox" name="writeperm" py:attrs="{'checked': (writeperm) and 'checked' or None}" /> Write access</td>
                     </tr>
                     <tr style="display: none;">
-                        <td><input type="checkbox" name="capped" /> Capped</td>
+                        <td><input type="checkbox" name="capped" py:attrs="{'checked': (capped) and 'checked' or None}" /> Capped</td>
                     </tr>
                     <tr>
-                        <td><input type="checkbox" name="admin" /> Admin access</td>
+                        <td><input type="checkbox" name="admin" py:attrs="{'checked': (admin) and 'checked' or None}" /> Admin access</td>
                     </tr>
 
                 </table>
-                <p><input type="submit" value="Add"/></p>
+                <p><input type="submit" value="${operation}"/></p>
             </form>
         </div>
     </body>

@@ -1,4 +1,10 @@
 Changes in 0.61.2:
+  * Fix a bunch of typos in the authentication checking server side
+  * Add permission editing capabilities to the server component and hooks
+    in the netclient
+  * Overhaul of ACL system so that uniqueness constraints on Troves and 
+    Labels can be enforced: we now use a special Trove and Label "0 | ALL"
+    instead of Null
   * Dependency resolution enforces label ACLs.
   * Module arguments to commitaction are parsed according to shell
     quoting rules.

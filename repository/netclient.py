@@ -257,15 +257,35 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
     def addAcl(self, reposLabel, userGroup, trovePattern, label, write,
                capped, admin):
         if not label:
-            label = ""
+            label = "ALL"
         else:
             label = self.fromLabel(label)
 
         if not trovePattern:
-            trovePattern = ""
+            trovePattern = "ALL"
 
         self.c[reposLabel].addAcl(userGroup, trovePattern, label, write,
                                   capped, admin)
+
+    def editAcl(self, reposLabel, userGroup, oldTrovePattern, oldLabel,
+                trovePattern, label, write, capped, admin):
+        if not label:
+            label = "ALL"
+        else:
+            label = self.fromLabel(label)
+
+        if not oldLabel:
+            oldLabel = "ALL"
+        else:
+            oldLabel = self.fromLabel(oldLabel)
+
+        if not trovePattern:
+            trovePattern = "ALL"
+
+        self.c[reposLabel].editAcl(userGroup, oldTrovePattern, oldLabel,
+                                   trovePattern, label, write, capped, admin)
+
+        return True
 
     def changePassword(self, label, user, newPassword):
         self.c[label].changePassword(user, newPassword)

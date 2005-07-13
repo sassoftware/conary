@@ -43,7 +43,7 @@ class NetworkAuthorization:
         where = []
         if label:
             where.append(" labelId=(SELECT labelId FROM Labels WHERE " \
-                            "label=?) OR labelId is Null")
+                            "label=?) OR labelId=0")
             params.append(label.asString())
 
         if write:
@@ -59,7 +59,7 @@ class NetworkAuthorization:
         cu.execute(stmt, params)
 
         for (troveName, salt, password) in cu:
-            if not troveName or not trove:
+            if troveName=='ALL' or not trove:
                 regExp = None
             else:
                 regExp = self.reCache.get(troveName, None)
@@ -77,7 +77,7 @@ class NetworkAuthorization:
         return False
         
     def checkTrove(self, pattern, trove):
-        if not pattern:
+        if pattern=='ALL':
             return True
 
         regExp = self.reCache.get(pattern, None)
@@ -131,6 +131,8 @@ class NetworkAuthorization:
     def addAcl(self, userGroup, trovePattern, label, write, capped, admin):
         cu = self.db.cursor()
 
+        # XXX This functionality is available in the TroveStore class
+        #     refactor so that the code is not in two places
         if trovePattern:
             cu.execute("SELECT * FROM Items WHERE item=?", trovePattern)
             itemId = cu.fetchone()
@@ -140,7 +142,7 @@ class NetworkAuthorization:
                 cu.execute("INSERT INTO Items VALUES(NULL, ?)", trovePattern)
                 itemId = cu.lastrowid
         else:
-            itemId = None
+            itemId = 0
 
         if label:
             cu.execute("SELECT * FROM Labels WHERE label=?", label)
@@ -151,7 +153,7 @@ class NetworkAuthorization:
                 cu.execute("INSERT INTO Labels VALUES(NULL, ?)", label)
                 labelId = cu.lastrowid
         else:
-            labelId = None
+            labelId = 0
 
 
         try:
@@ -167,7 +169,34 @@ class NetworkAuthorization:
             raise
 
         self.db.commit()
-                            
+
+    def editAcl(self, userGroup, oldTroveId, oldLabelId, troveId, labelId,
+            write, capped, admin):
+  
+        cu = self.db.cursor()
+
+        userGroupId = self.getGroupIdByName(userGroup)
+
+        try:
+            cu.execute("""UPDATE Permissions SET 
+                              labelId = ?,
+                              itemId = ?,
+                              write = ?,
+                              capped = ?,
+                              admin = ?
+                            WHERE userGroupId=? AND
+                                labelId=? AND itemId=?
+                        """, labelId, troveId, write, capped, admin, 
+                        userGroupId, oldLabelId, oldTroveId)
+        except sqlite3.ProgrammingError, e:
+            if str(e) == 'columns userGroupId, labelId, itemId are not unique':
+                self.db.rollback()
+                raise PermissionAlreadyExists, "labelId: '%s', itemId: '%s'" % (labelId, itemId)
+            raise
+
+        self.db.commit()
+
+
     def addUser(self, user, password):
         salt = os.urandom(4)
         
@@ -452,13 +481,18 @@ class NetworkAuthorization:
 
         if "Permissions" not in tables:
             cu.execute("""CREATE TABLE Permissions (userGroupId INTEGER,
-                                                    labelId INTEGER,
-                                                    itemId INTEGER,
+                                                    labelId INTEGER NOT NULL,
+                                                    itemId INTEGER NOT NULL,
                                                     write INTEGER,
                                                     capped INTEGER,
                                                     admin INTEGER)""")
             cu.execute("""CREATE UNIQUE INDEX PermissionsIdx
                           ON Permissions(userGroupId, labelId, itemId)""")
+
+            if "Items" in tables:
+                cu.execute("""INSERT INTO Items VALUES(0, 'ALL')""")
+            if "Labels" in tables:
+                cu.execute("""INSERT INTO Labels VALUES (0, 'ALL')""")
 
             commit = True
 
