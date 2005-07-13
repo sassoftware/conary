@@ -900,13 +900,14 @@ class ReadOnlyChangeSet(ChangeSet):
 	    for x in filesNeeded:
                 (pathId, oldFileId, oldVersion, newFileId, newVersion) = x
                 filecs = self.getFileChange(None, newFileId)
-		fileObj = files.ThawFile(filecs, pathId)
-		
-		oldFile = None
-		if oldVersion:
-		    (oldFile, oldCont) = db.getFileVersion(pathId, 
-                                    oldFileId, oldVersion, withContents = 1)
 
+		if not oldVersion:
+		    newFiles.append((oldFileId, newFileId, filecs))
+		    continue
+		
+		fileObj = files.ThawFile(filecs, pathId)
+		(oldFile, oldCont) = db.getFileVersion(pathId, 
+				oldFileId, oldVersion, withContents = 1)
 		(filecs, hash) = fileChangeSet(pathId, oldFile, fileObj)
 
 		newFiles.append((oldFileId, newFileId, filecs))
