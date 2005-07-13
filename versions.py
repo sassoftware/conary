@@ -506,7 +506,7 @@ class AbstractVersion(object):
 
 class VersionSequence(AbstractVersion):
 
-    __slots__ = ( "versions", "hash" )
+    __slots__ = ( "versions", "hash", "strRep" )
 
     """
     Abstract class representing a fully qualified version, branch, or
@@ -559,6 +559,9 @@ class VersionSequence(AbstractVersion):
 	@type defaultBranch: Version
 	@rtype: str
 	"""
+	if self.strRep is not None and not defaultBranch and not frozen:
+	    return self.strRep
+
 	l = self.versions
         # this creates a leading /
         strL = [ '' ]
@@ -590,6 +593,10 @@ class VersionSequence(AbstractVersion):
                 lastVersion = verPart
                 expectLabel = True
                 
+	if not defaultBranch and not frozen:
+	    self.strRep = "/".join(strL)
+	    return self.strRep
+
 	return "/".join(strL)
 
     def __repr__(self):
@@ -641,6 +648,7 @@ class VersionSequence(AbstractVersion):
         """
 	self.versions = versionList
         self.hash = None
+        self.strRep = None
 
 class NewVersion(AbstractVersion):
 
@@ -805,6 +813,7 @@ class Version(VersionSequence):
 	incremented by one and the time stamp is reset.
 	"""
         self.hash = None
+        self.strRep = None
 	self.versions[-1]._incrementSourceCount(self.shadowLength())
 
     def incrementBuildCount(self):
@@ -817,6 +826,7 @@ class Version(VersionSequence):
         # the right length for this shadow
         shadowLength = self.shadowLength()
         self.hash = None
+        self.strRep = None
 
         sourceCount = self.versions[-1].getSourceCount()
         buildCount = self.versions[-1].getBuildCount()
