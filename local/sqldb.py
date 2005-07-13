@@ -846,7 +846,7 @@ class Database:
 	if fileObj:
 	    self.troveFiles.addItem(cu, fileObj.pathId(), 
                                     versionId, path, 
-                                    fileObj.fileId(), troveInstanceId, 
+                                    fileId, troveInstanceId, 
                                     fileObj.freeze(), fileObj.tags,
                                     addItemStmt = addFileStmt)
 	else:
