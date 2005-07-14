@@ -32,10 +32,18 @@ import conarycfg
 import constants
 import flavorcfg
 import repository
+import updatecmd
 import versions
 import xmlrpclib
 
 sys.excepthook = util.genExcepthook()
+
+# mix UpdateCallback and CookCallback, since we use both.
+class CheckinCallback(updatecmd.UpdateCallback, cook.CookCallback):
+    def __init__(self):
+        updatecmd.UpdateCallback.__init__(self)
+        cook.CookCallback.__init__(self)
+
 def usage(rc = 1):
     print "usage: cvc add <file> [<file2> <file3> ...]"
     print "       cvc annotate <file>"
@@ -148,7 +156,10 @@ def realMain(cfg, argv=sys.argv):
     else:
         sourceCommand(cfg, otherArgs[1:], argSet)
 
-def sourceCommand(cfg, args, argSet, profile=False):
+def sourceCommand(cfg, args, argSet, profile=False, callback = None):
+    if not callback:
+        callback = CheckinCallback()
+
     if not args:
 	return usage()
     elif (args[0] == "add"):
@@ -164,7 +175,7 @@ def sourceCommand(cfg, args, argSet, profile=False):
 	if argSet or (len(args) != 2): return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
-	args = [repos, cfg, dir] + args[1:]
+	args = [repos, cfg, dir, args[1], callback]
 	checkin.checkout(*args)
     elif (args[0] == "branch" or args[0] == "shadow"):
         extraArgs = { 'makeShadow' : (args[0] == "shadow") }
@@ -172,13 +183,13 @@ def sourceCommand(cfg, args, argSet, profile=False):
         extraArgs['sourceTroves'] = argSet.has_key('sources')
         if extraArgs['sourceTroves']:
             del argSet['sources']
-            
+
         if argSet: return usage()
         if len(args) != 3: return usage()
 
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
-        args = [repos, cfg, ] + args[1:]
+        args = [repos, cfg, ] + args[1:1] 
         branch.branch(*args, **extraArgs)
     elif (args[0] == "commit"):
         level = log.getVerbosity()
@@ -192,7 +203,7 @@ def sourceCommand(cfg, args, argSet, profile=False):
 	if argSet or len(args) != 1: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
-	checkin.commit(repos, cfg, message)
+	checkin.commit(repos, cfg, message, callback=callback)
         log.setVerbosity(level)
     elif (args[0] == "config"):
 	if argSet: return usage()
@@ -249,7 +260,8 @@ def sourceCommand(cfg, args, argSet, profile=False):
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
 	args[0] = repos
-	checkin.updateSrc(*args)
+        kwargs = {'callback': callback}
+	checkin.updateSrc(*args, **kwargs)
     elif (args[0] == "cook"):
         level = log.getVerbosity()
         log.setVerbosity(log.DEBUG)

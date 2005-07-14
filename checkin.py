@@ -18,6 +18,7 @@ and diffs; creating new packages; adding, removing, and renaming files;
 and committing changes back to the repository.
 """
 
+import callbacks
 import copy
 import difflib
 from build import recipe, lookaside
@@ -35,8 +36,15 @@ from lib import sha1helper
 import sys
 import time
 import trove
+import updatecmd
 from lib import util
 import versions
+
+# mix UpdateCallback and CookCallback, since we use both.
+class CheckinCallback(callbacks.UpdateCallback, callbacks.CookCallback):
+    def __init__(self):
+        callbacks.UpdateCallback.__init__(self)
+        callbacks.CookCallback.__init__(self)
 
 # makePathId() returns 16 random bytes, for use as a pathId
 makePathId = lambda: os.urandom(16)
@@ -256,7 +264,10 @@ def _getRecipeLoader(cfg, repos, recipeFile):
     return loader
 
 
-def checkout(repos, cfg, workDir, name):
+def checkout(repos, cfg, workDir, name, callback=None):
+    if not callback:
+        callback = CheckinCallback()
+
     # We have to be careful with labels
     parts = name.split('=', 1) 
     if len(parts) == 1:
@@ -292,7 +303,9 @@ def checkout(repos, cfg, workDir, name):
     cs = repos.createChangeSet([(trvInfo[0],
                                 (None, None), 
                                 (trvInfo[1], trvInfo[2]),
-			        True)], excludeAutoSource = True)
+			        True)],
+                               excludeAutoSource = True,
+                               callback=callback)
 
     troveCs = cs.iterNewTroveList().next()
 
@@ -328,7 +341,10 @@ def checkout(repos, cfg, workDir, name):
 
     state.write(workDir + "/CONARY")
 
-def commit(repos, cfg, message):
+def commit(repos, cfg, message, callback=None):
+    if not callback:
+        callback = CheckinCallback
+
     if cfg.name is None or cfg.contact is None:
 	log.error("name and contact information must be set for commits")
 	return
@@ -516,14 +532,14 @@ def commit(repos, cfg, message):
                 fileObj.flags.isAutoSource(set = True)
 
             fileMap[pathId] = (fileObj, fullPath, path)
-            
+
         changeSet = changeset.CreateFromFilesystem([ (newState, fileMap) ])
         troveCs = changeSet.iterNewTroveList().next()
 
     # this replaces the TroveChangeSet update.buildLocalChanges put in
     # the changeset
     changeSet.newTrove(troveCs)
-    repos.commitChangeSet(changeSet)
+    repos.commitChangeSet(changeSet, callback = callback)
 
     # committing to the repository changes the version timestamp; get the
     # right timestamp to put in the CONARY file
@@ -896,7 +912,9 @@ def _showChangeSet(repos, changeSet, oldTrove, newTrove):
 	path = oldTrove.getFile(pathId)[0]
 	print "%s: removed" % path
 	
-def updateSrc(repos, versionStr = None):
+def updateSrc(repos, versionStr = None, callback = None):
+    if not callback:
+        callback = CheckinCallback()
     state = SourceStateFromFile("CONARY")
     pkgName = state.getName()
     baseVersion = state.getVersion()
@@ -931,7 +949,8 @@ def updateSrc(repos, versionStr = None):
                                 (baseVersion, deps.deps.DependencySet()), 
                                 (headVersion, deps.deps.DependencySet()), 
                                 0)],
-                                      excludeAutoSource = True)
+                                      excludeAutoSource = True,
+                                      callback = callback)
 
     troveChanges = changeSet.iterNewTroveList()
     troveCs = troveChanges.next()
@@ -955,13 +974,16 @@ def updateSrc(repos, versionStr = None):
 
     newState.write("CONARY")
 
-def merge(repos):
+def merge(repos, callback=None):
     # merges the head of the current shadow with the head of the branch
     # it shadowed from
     try:
         state = SourceStateFromFile("CONARY")
     except OSError:
         return
+
+    if not callback:
+        callback = CheckinCallback()
 
     troveName = state.getName()
 
@@ -979,7 +1001,7 @@ def merge(repos):
     changeSet = repos.createChangeSet([(troveName, 
                             (parentRootVersion, deps.deps.DependencySet()), 
                             (parentHeadVersion, deps.deps.DependencySet()), 
-                            0)], excludeAutoSource = True)
+                            0)], excludeAutoSource = True, callback = callback)
 
     # make sure there are changes to apply
     troveChanges = changeSet.iterNewTroveList()
