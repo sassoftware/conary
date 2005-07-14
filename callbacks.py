@@ -29,9 +29,15 @@ class ChangesetCallback:
     def setChangesetHunk(self, hunk, hunkCount):
         pass
 
+    def __init__(self):
+        pass
+
 class CookCallback:
 
     def sendingChangeset(self, sent, total):
+        pass
+
+    def __init__(self):
         pass
 
 class UpdateCallback(ChangesetCallback):
@@ -70,6 +76,9 @@ class UpdateCallback(ChangesetCallback):
         pass
 
     def done(self):
+        pass
+
+    def __init__(self):
         pass
 
 class LineOutput:
