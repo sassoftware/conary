@@ -91,6 +91,8 @@ class XMLOpener(urllib.FancyURLopener):
             encoding = headers.get('Content-encoding', None)
             if encoding == 'zlib':
                 fp = StringIO(zlib.decompress(fp.read()))
+            elif encoding == 'deflate':
+                fp = StringIO(zlib.decompress(fp.read()))
             return urllib.addinfourl(fp, headers, fullUrl)
         else:
 	    raise xmlrpclib.ProtocolError(url, errcode, errmsg, headers)
