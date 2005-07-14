@@ -20,10 +20,16 @@ class Callback:
 
 class ChangesetCallback:
 
+    def requestingChangeSet(self):
+        pass
+
     def downloadingChangeSet(self, got, need):
         pass
 
-    def requestingChangeSet(self):
+    def requestingFileContents(self):
+        pass
+
+    def downloadingFileContents(self, got, need):
         pass
 
     def setChangesetHunk(self, hunk, hunkCount):

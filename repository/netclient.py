@@ -834,7 +834,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 
             contentList = self.getFileContents(contentsNeeded, 
                                                tmpFile = outFile,
-                                               lookInLocal = True)
+                                               lookInLocal = True,
+                                               callback = callback)
 
             i = 0
             for item in fileJob:
@@ -930,7 +931,8 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
 				   self.fromPathId(pathId), 
 				   self.fromFileId(fileId)))
 
-    def getFileContents(self, fileList, tmpFile = None, lookInLocal = False):
+    def getFileContents(self, fileList, tmpFile = None, lookInLocal = False,
+                        callback = None):
         contents = [ None ] * len(fileList)
 
         if self.localRep and lookInLocal:
@@ -961,10 +963,18 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         for server, itemList in byServer.iteritems():
             fileList = [ (self.fromFileId(x[1][0]), 
                           self.fromVersion(x[1][1])) for x in itemList ]
+            if callback:
+                callback.requestingFileContents()
             (url, sizes) = self.c[server].getFileContents(fileList)
             assert(len(sizes) == len(fileList))
 
             inF = urllib.urlopen(url)
+
+            if callback:
+                callback.downloadingFileContents(0, sum(sizes))
+                copyCallback = lambda x: callback.downloadingFileContents(x, sum(sizes))
+            else:
+                copyCallback = None
 
             if tmpFile:
 		# make sure we append to the end (creating the gzip file
@@ -979,7 +989,7 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                 outF = os.fdopen(fd, "r+")
                 start = 0
 
-            totalSize = util.copyfileobj(inF, outF)
+            totalSize = util.copyfileobj(inF, outF, callback = copyCallback)
             del inF
 
             for (i, item), size in itertools.izip(itemList, sizes):

@@ -79,20 +79,31 @@ class UpdateCallback(callbacks.LineOutput, callbacks.UpdateCallback):
     def updateDone(self):
         self.updateText = None
 
-    def downloadingChangeSet(self, got, need):
+    def _downloading(self, msg, got, need):
         if got == need:
             self.csText = None
         elif need != 0:
             if self.csHunk is None or self.csHunk[1] == 1 or \
 		    not self.updateText:
-                self.csMsg("Downloading (%d%% of %dk)" 
-                              % ((got * 100) / need , need / 1024))
+                self.csMsg("%s (%d%% of %dk)"
+                           % (msg, (got * 100) / need, need / 1024))
             else:
-                self.csMsg("Downloading %d of %d (%d%%)" 
-                              % (self.csHunk + 
-                                 (( (got * 100) / need), )))
+                self.csMsg("%s %d of %d (%d%%)"
+                           % ((msg,) + self.csHunk + (((got * 100) / need),)))
 
         self.update()
+
+    def downloadingFileContents(self, got, need):
+        self._downloading('Downloading files for changeset', got, need)
+
+    def downloadingChangeSet(self, got, need):
+        self._downloading('Downloading', got, need)
+
+    def requestingFileContents(self):
+        if self.csHunk is None:
+            self.csMsg("Requesting file contents")
+        else:
+            self.csMsg("Requesting file contents for changeset %d of %d" % self.csHunk)
 
     def requestingChangeSet(self):
         if self.csHunk is None:

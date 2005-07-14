@@ -34,7 +34,11 @@ Changes in 0.61.2:
     policy that checks to make sure that shared libraries do not have
     unresolved symbols.  Additional code could be written to check
     binaries too.
-  * cvc checkout, update, and commit now show some progress
+  * cvc checkout, update, and commit now show progress when communicating
+    with the repository server
+  * Progress is now displayed while downloading file contents from a
+    repository (such as when assembling a changeset that is distributed
+    across multiple repositories)
 
 Changes in 0.61.1:
   * Cleaned up error message which results from Conary not being able to
