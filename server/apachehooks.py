@@ -86,6 +86,7 @@ def post(port, isSecure, repos, req):
         elif len(resp) > 200 and 'zlib' in encoding:
             req.headers_out['Content-encoding'] = 'zlib'
             resp = zlib.compress(resp, 5)
+        req.headers_out['Content-length'] = '%d' % len(resp)
         req.write(resp)
         return apache.OK
     else:
