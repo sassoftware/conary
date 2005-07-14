@@ -117,19 +117,23 @@ class BuildCommand(BuildAction, action.ShellCommand):
 class Run(BuildCommand):
     """
     Run a shell command with simple macro substitution: C{r.Run('echo foo')}
-
-    @keyword dir: directory in which to run the command.  Relative dirs
-                  are relative to the build dir, absolute dirs are relative
-                  to the destdir.
-    @keyword filewrap: Defaults to False; if True, causes a
-                  C{LD_PRELOAD} wrapper that looks in %(destdir)s for
-                  some common file operations.  Occasionally useful
-                  to avoid the need to modify programs that need to
-                  be run after the build and assume that they are not
-                  run until after installation.
     """
     keywords = {'dir': '', 'filewrap': False}
     template = "%%(envcmd)s%%(cdcmd)s%(args)s"
+
+    def __init__(self, *args, **kwargs):
+        """
+        @keyword dir: directory in which to run the command.  Relative dirs
+                are relative to the build dir, absolute dirs are relative
+                to the destdir.
+        @keyword filewrap: Defaults to False; if True, causes a
+                C{LD_PRELOAD} wrapper that looks in %(destdir)s for
+                some common file operations.  Occasionally useful
+                to avoid the need to modify programs that need to
+                be run after the build and assume that they are not
+                run until after installation.
+        """
+        BuildCommand.__init__(self, *args, **kwargs)
 
     def do(self, macros):
 	macros = macros.copy()

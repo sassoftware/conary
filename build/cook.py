@@ -178,8 +178,6 @@ def cookObject(repos, cfg, recipeClass, sourceVersion,
     @type cfg: conarycfg.ConaryConfiguration
     @param recipeClass: class which will be instantiated into a recipe
     @type recipeClass: class descended from recipe.Recipe
-    @param changeSetFile: if set, the changeset is stored in this file
-    instead of committed to a repository
     @type sourceVersion: the full conary verison of the recipeClass we are 
     cooking.  This source trove version should exist.  If you know what you
     are doing, you can create troves with non-existant source versions 
@@ -983,7 +981,7 @@ def nextVersion(repos, troveNames, sourceVersion, troveFlavor,
     @param repos: repository proxy
     @type repos: NetworkRepositoryClient
     @param troveNames: name(s) of the trove(s) being built
-    @type troveName: str
+    @type troveNames: str
     @param sourceVersion: the source version that we are incrementing
     @type sourceVersion: Version
     @param troveFlavor: flavor of the trove being built
