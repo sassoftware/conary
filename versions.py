@@ -518,6 +518,8 @@ class VersionSequence(AbstractVersion):
 
     def __setstate__(self, val):
         self.versions = val
+        self.hash = None
+        self.strRep = None
 
     def __cmp__(self, other):
         if self.isAfter(other):
@@ -559,7 +561,7 @@ class VersionSequence(AbstractVersion):
 	@type defaultBranch: Version
 	@rtype: str
 	"""
-	if self.strRep is not None and not defaultBranch and not frozen:
+        if self.strRep is not None and not defaultBranch and not frozen:
 	    return self.strRep
 
 	l = self.versions
@@ -592,7 +594,7 @@ class VersionSequence(AbstractVersion):
                 strL.append(verPart.asString(lastVersion, frozen = frozen))
                 lastVersion = verPart
                 expectLabel = True
-                
+
 	if not defaultBranch and not frozen:
 	    self.strRep = "/".join(strL)
 	    return self.strRep
