@@ -336,8 +336,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
             singleVersionSpec = troveSpecs[None].keys()[0]
         else:
             dropTroveTable = True
-            #cu.execute("""CREATE TEMPORARY TABLE gtvlTbl(item STRING,
-            cu.execute("""CREATE TABLE gtvlTbl(item STRING,
+            cu.execute("""CREATE TEMPORARY TABLE gtvlTbl(item STRING,
                                                        versionSpec STRING,
                                                        flavorId INT)""",
                        start_transaction = False)
@@ -1156,7 +1155,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                 cu.execute("DROP INDEX PermissionsIdx")
                 cu.execute("""CREATE UNIQUE INDEX PermissionsIdx ON 
                     Permissions(userGroupId, labelId, itemId)""")
-                cu.execute("UPDATE DatabaseVersion SET version=?", 2)
+                cu.execute("UPDATE DatabaseVersion SET version=2")
                 self.db.commit()
                 version = 2
 
