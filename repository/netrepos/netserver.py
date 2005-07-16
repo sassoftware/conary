@@ -33,7 +33,7 @@ from repository import repository
 from local import idtable
 from local import sqldb
 from local import versiontable
-from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExists, UserNotFound
+from netauth import InsufficientPermission, NetworkAuthorization, UserAlreadyExists, GroupAlreadyExists, UserNotFound
 import trovestore
 import versions
 from datastore import IntegrityError
@@ -109,6 +109,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	except repository.DuplicateBranch, e:
             condRollback()
 	    return (True, ("DuplicateBranch", str(e)))
+	except GroupAlreadyExists, e:
+            condRollback()
+	    return (True, ("GroupAlreadyExists", str(e)))
 	except UserAlreadyExists, e:
             condRollback()
 	    return (True, ("UserAlreadyExists", str(e)))
@@ -118,8 +121,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	except IntegrityError, e:
             condRollback()
 	    return (True, ("IntegrityError", str(e)))
-	#except Exception, e:
-        #    condRollback()
+	except Exception, e:
+            condRollback()
+            raise e
 	#    return (True, ("Unknown Exception", str(e)))
 	#except Exception:
 	#    import traceback, sys, string

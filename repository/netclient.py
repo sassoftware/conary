@@ -88,6 +88,9 @@ class _Method(xmlrpclib._Method):
         elif exceptionName == "UserAlreadyExists":
             import netrepos
 	    raise UserAlreadyExists(exceptionArgs[0])
+        elif exceptionName == "GroupAlreadyExists":
+            import netrepos
+	    raise GroupAlreadyExists(exceptionArgs[0])
         elif exceptionName == "UserNotFound":
             raise UserNotFound(exceptionArgs[0])
 	else:
