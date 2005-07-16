@@ -1,3 +1,8 @@
+Changes in 0.61.3:
+  * Corrected a bug that snuck in 0.61.2 that caused a temporary SQL table
+    to not be temporary, which makes multiple httpd processes fail with
+    'database schema changed' errors.
+
 Changes in 0.61.2:
   * Fix a bunch of typos in the authentication checking server side
   * Add permission editing capabilities to the server component and hooks
