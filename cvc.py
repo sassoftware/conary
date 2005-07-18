@@ -59,7 +59,7 @@ def usage(rc = 1):
     print '       cvc describe <xml file>'
     print "       cvc diff"
     print "       cvc log [<branch>]"
-    print "       cvc newpkg <name>"
+    print "       cvc newpkg [--dir <dir>] <name>"
     print "       cvc merge"
     print "       cvc rdiff <name> <oldver> <newver>"
     print "       cvc remove <file> [<file2> <file3> ...]"
@@ -250,14 +250,20 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	if len(args) != 3: return usage()
 	checkin.renameFile(args[1], args[2])
     elif (args[0] == "newpkg"):
-	if len(args) != 2: return usage()
+	if argSet.has_key("dir"):
+	    dir = argSet['dir']
+	    del argSet['dir']
+	else:
+	    dir = None
+
+	if len(args) != 2 or argSet: return usage()
 	
 	try:
 	    repos = NetworkRepositoryClient(cfg.repositoryMap)
 	except repository.repository.OpenError:
 	    repos = None
 
-	checkin.newTrove(repos, cfg, args[1])
+	checkin.newTrove(repos, cfg, args[1], dir = dir)
     elif (args[0] == "merge"):
 	if argSet or not args or len(args) > 1: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
