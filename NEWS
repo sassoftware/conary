@@ -1,6 +1,8 @@
 Changes in 0.61.4:
   * %(datadir)s/.../lib/ files will no longer show up in :lib - presumption
     being that anything under %(datadir)s really is arch independenct
+  * Creating branches and shadows had a command line parsing bug
+
 Changes in 0.61.3:
   * Corrected a bug that snuck in 0.61.2 that caused a temporary SQL table
     to not be temporary, which makes multiple httpd processes fail with
