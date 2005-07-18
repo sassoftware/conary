@@ -410,14 +410,14 @@ class ComponentSpec(_filterSpec):
 		       '%(includedir)s/',
 		       '%(datadir)s/aclocal/',
 		       '%(bindir)s/..*-config')),
-        # Anything in {,/usr}/lib{,64} is architecture-specific
-	('lib',       (r'.*/(%(lib)s|lib)/')),
 	('locale',    ('%(datadir)s/locale/',
 		       '%(datadir)s/gnome/help/.*/')),
 	('emacs',     ('%(datadir)s/emacs/site-lisp/',)),
         # Anything else in /usr/share should be architecture-independent
         # data files (thus the "datadir" name)
         ('data',      ('%(datadir)s/',)),
+        # Anything in {,/usr}/lib{,64} is architecture-specific
+        ('lib',       (r'.*/(%(lib)s|lib)/')),
     )
     keywords = { 'catchall': 'runtime' }
 
