@@ -49,6 +49,7 @@ def usage(rc = 1):
     print "       cvc annotate <file>"
     print "       cvc branch <newbranch> <trove>[=<version>][[flavor]]"
     print "       cvc checkout [--dir <dir>] <trove>[=<version>]"
+    print "       cvc clone <target-branch> <trove>[=<version>]"
     print "       cvc commit [--message <message>]"
     print "       cvc config"
     print '       cvc cook [--prep] [--debug-exceptions] [--macros file] '
@@ -189,7 +190,7 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
 
-        args = [repos, cfg, ] + args[1:1] 
+        args = [repos, cfg, ] + args[1:] 
         branch.branch(*args, **extraArgs)
     elif (args[0] == "commit"):
         level = log.getVerbosity()
@@ -211,6 +212,13 @@ def sourceCommand(cfg, args, argSet, profile=False, callback = None):
 	    return usage()
 	else:
 	    cfg.display()
+    elif (args[0] == "clone"):
+        if argSet: return usage()
+        if len(args) != 3:
+            return usage()
+
+        import clone
+        clone.CloneTrove(cfg, args[1], args[2])
     elif (args[0] == "diff"):
 	if argSet or not args or len(args) > 2: return usage()
 	repos = NetworkRepositoryClient(cfg.repositoryMap)
