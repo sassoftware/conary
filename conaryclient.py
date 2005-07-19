@@ -464,14 +464,27 @@ class ConaryClient:
 
             return rmvd
 
-        def _removeObsoleteErasures(cs, obsoletes):
+	def _replaceErasures(cs, newJob, newErasures):
+	    oldErasures = set([ x for x in newJob if x[2][1] is None ])
+	    obsoletes = oldErasures - newErasures
+	    newJob.difference_update(oldErasures)
+
             for (name, (oldVersion, oldFlavor), 
                        (newVersion, newFlavor), absolute) in obsoletes:
                 if not newVersion:
                     cs.delOldTrove(name, oldVersion, oldFlavor)
 
+	    newJob.update(eraseSet)
+
 	def _findErasures(primaryErases, newJob, referencedTroves, 
                           recurse):
+	    # each node is a ((name, version, flavor), state, edgeList
+	    #		       fromUpdate)
+	    # state is ERASE, KEEP, or UNKNOWN
+	    # fromUpdate is True if erasing this node was suggested by
+	    # a trvCs in the newJob (an update, not an erase). We need
+	    # to track this to know what's being removed, but we don't
+	    # need to cause them to be removed.
 	    nodeList = []
 	    nodeIdx = {}
 	    ERASE = 1
@@ -594,8 +607,8 @@ class ConaryClient:
             # anything which isn't to KEEP is to erase, but skip those which
             # are already being removed by a trvCs
             eraseList = [ (x[0][0], (x[0][1], x[0][2]), (None, None), False)
-                                for x in nodeList if x[1] != KEEP and
-                                                     not x[3] ]
+                                for x in nodeList if x[1] != KEEP 
+						    and not x[3]]
             
             return set(eraseList)
 
@@ -730,10 +743,10 @@ class ConaryClient:
         # _findErasures from stubbing it's toe on trvCs entries which don't
         # matter
         removedTroves = _removeObsoleteUpdates(cs, origJob - newJob)
-        newJob.update(_findErasures(erasePrimaryList, newJob,
-                                    referencedTroves, recurse))
-        # now get rid of obsolete erases
-        _removeObsoleteErasures(cs, origJob - newJob)
+	eraseSet = _findErasures(erasePrimaryList, newJob, referencedTroves, 
+				 recurse)
+        # _findErasures picks what gets erased; nothing else gets to vote
+	_replaceErasures(cs, newJob, eraseSet)
         neededJob = newJob - origJob
 
         if keepExisting:
@@ -991,31 +1004,32 @@ class ConaryClient:
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations.
-        @param itemList: A list of 3-length tuples: (troveName, version, flavor).
-                         If updateByDefault is True, trove names in itemList
-                         prefixed by a '-' will be erased. If updateByDefault is
-                         False, troves without a prefix will be erased, but
-                         troves prefixed by a '+' will be updated.
+	@param itemList: A list of 3-length tuples: (troveName, version,
+	flavor).  If updateByDefault is True, trove names in itemList prefixed
+	by a '-' will be erased. If updateByDefault is False, troves without a
+	prefix will be erased, but troves prefixed by a '+' will be updated.
         @type itemList: [(troveName, version, flavor), ...]
-        @param keepExisting: If True, troves updated not erase older
-                             versions of the same trove, as long as there
-                             are no conflicting files in either trove.
+	@param keepExisting: If True, troves updated not erase older versions
+	of the same trove, as long as there are no conflicting files in either
+	trove.
         @type keepExisting: bool
-        @param recurse: Apply updates/erases to container troves. [FIXME: accurate?]
+        @param recurse: Apply updates/erases to troves referenced by containers.
         @type recurse: bool
-        @param depsRecurse: Resolve dependencies recursively. [FIXME: accurate?]
+        @param depsRecurse: Resolve the dependencies the troves needed to
+	resolove dependencies.
         @type depsRecurse: bool
-        @param resolveDeps: Resolve dependencies. [FIXME: describe this and the previous better]
+        @param resolveDeps: Install troves needed to resolve dependencies.
         @type resolveDeps: bool
-        @param test: If True, the operations will be attempted but the filesystem and database
-                     will not be updated.
+        @param test: If True, the operations will be attempted but the 
+	filesystem and database will not be updated.
         @type test: bool
-        @param updateByDefault: If True, troves passed to L{itemList} without a '-' or '+' prefix will
-                                be updated. If False, troves without a prefix will be erased.
+	@param updateByDefault: If True, troves passed to L{itemList} without a
+	'-' or '+' prefix will be updated. If False, troves without a prefix 
+	will be erased.
         @type updateByDefault: bool
         @param callback: L{callbacks.UpdateCallback} object.
         @type L{callbacks.UpdateCallback}
-        @param split: Split large update operations into separate jobs. [FIXME: accurate?]
+        @param split: Split large update operations into separate jobs.
         @type split: bool
         """
         callback.preparingChangeSet()
