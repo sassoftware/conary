@@ -31,7 +31,6 @@ import types
 #conary
 import build
 import buildpackage
-import usergroup
 import cook
 from deps import deps
 import destdirpolicy
@@ -81,8 +80,6 @@ baseMacros = {
     'thistestdir'	: '%(testdir)s/%(name)s-%(version)s',
     'debuglibdir'       : '/usr/lib/debug', # no %(prefix)s or %(lib)s!
     'debugsrcdir'       : '/usr/src/debug', # no %(prefix)s!
-    'userinfodir'       : '%(sysconfdir)s/conary/userinfo',
-    'groupinfodir'      : '%(sysconfdir)s/conary/groupinfo',
     'buildlogpath'      : '%(debugsrcdir)s/buildlogs/%(name)s-%(version)s-log.bz2',
     # special component prefixes that the whole system needs to share
     'krbprefix'		: '%(exec_prefix)s/kerberos',
@@ -161,8 +158,6 @@ def setupRecipeDict(d, filename):
                                     'BuildPackageRecipe',
                                     'CPackageRecipe',
                                     'AutoPackageRecipe',
-                                    'UserInfoRecipe',
-                                    'GroupInfoRecipe',
                                     'loadSuperClass', 'loadInstalled',
                                     'clearBuildReqs',
                                     # XXX when all recipes have been migrated
@@ -240,11 +235,10 @@ class RecipeLoader:
                 continue
             recipename = getattr(obj, 'name', '')
             # make sure the class is derived from Recipe
-            if ((issubclass(obj, PackageRecipe)
-                 and obj is not PackageRecipe
-                 and not issubclass(obj, UserGroupInfoRecipe)) or
-                (issubclass(obj, RedirectRecipe) 
-                 and obj is not RedirectRecipe)):
+            if (issubclass(obj, PackageRecipe) 
+                        and obj is not PackageRecipe) or \
+               (issubclass(obj, RedirectRecipe) 
+                        and obj is not RedirectRecipe):
                 if recipename[0] not in string.ascii_letters + string.digits:
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name must start '
@@ -257,10 +251,6 @@ class RecipeLoader:
                     raise RecipeFileError(
                         'Error in recipe file "%s": package name cannot '
                         'begin with "fileset-"' %basename)
-                if recipename.startswith('info-'):
-                    raise RecipeFileError(
-                        'Error in recipe file "%s": package name cannot '
-                        'begin with "info-"' %basename)
 	    elif issubclass(obj, GroupRecipe) and obj is not GroupRecipe:
                 if recipename and not recipename.startswith('group-'):
                     raise RecipeFileError(
@@ -271,11 +261,6 @@ class RecipeLoader:
                     raise RecipeFileError(
                         'Error in recipe file "%s": fileset name must '
                         'begin with "fileset-"' %basename)
-	    elif issubclass(obj, UserGroupInfoRecipe) and obj is not UserGroupInfoRecipe:
-                if recipename and not recipename.startswith('info-'):
-                    raise RecipeFileError(
-                        'Error in recipe file "%s": info name must '
-                        'begin with "info-"' %basename)
             else:
                 continue
             self.recipes[name] = obj
@@ -1036,49 +1021,6 @@ class PackageRecipe(Recipe):
         self.pathConflicts = {}
 
 
-class UserGroupInfoRecipe(PackageRecipe):
-    # abstract base class
-    ignore = 1
-
-    def __init__(self, cfg, laReposCache, srcdirs, extraMacros={}):
-        PackageRecipe.__init__(self, cfg, laReposCache, srcdirs, extraMacros)
-        self.destdirPolicy = []
-        self.packagePolicy = []
-        self.infofilename = None
-        self.realfilename = None
-
-    def getPackages(self):
-        comp = buildpackage.BuildComponent(
-            'info-%s:%s' %(self.infoname, self.type), self)
-        f = comp.addFile(self.infofilename, self.realfilename)
-        depSet = deps.DependencySet()
-        depSet.addDep(self.depclass, deps.Dependency(self.infoname, []))
-        f.provides.set(depSet)
-        comp.provides.union(f.provides())
-        return [comp]
-
-    def __getattr__(self, name):
-        if not name.startswith('_'):
-	    if name in usergroup.__dict__:
-		return _recipeHelper(self._build, self,
-                                     usergroup.__dict__[name])
-        if name in self.__dict__:
-            return self.__dict__[name]
-        raise AttributeError, name
-
-class UserInfoRecipe(UserGroupInfoRecipe):
-    type = 'user'
-    depclass = deps.UserInfoDependencies
-    # abstract base class
-    ignore = 1
-
-class GroupInfoRecipe(UserGroupInfoRecipe):
-    type = 'group'
-    depclass = deps.GroupInfoDependencies
-    # abstract base class
-    ignore = 1
-
-
 # XXX the next four classes will probably migrate to the repository
 # somehow, but not until we have figured out how to do this without
 # requiring that every recipe have a loadSuperClass line in it.
@@ -1197,7 +1139,7 @@ class AutoPackageRecipe(CPackageRecipe):
 class SingleGroup:
 
     def addTrove(self, name, versionStr = None, flavor = None, source = None,
-                 byDefault = True, reference = None):
+                 byDefault = True):
         assert(flavor is None or isinstance(flavor, str))
 
         if flavor is not None:
@@ -1208,7 +1150,7 @@ class SingleGroup:
             flavorObj = None
 
         self.addTroveList.append((name, versionStr, flavorObj, source, 
-				  byDefault, reference))
+				  byDefault))
 
     def addNewGroup(self, name, byDefault):
 	self.newGroupList.append([ name, byDefault ])
@@ -1220,11 +1162,14 @@ class SingleGroup:
         troveList = []
         flavorMap = {}
         findTroveList = []
-        for (name, versionStr, flavor, source, byDefault, ref) in self.addTroveList:
-            findTroveList.append((name, versionStr, flavor))
+        for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
+            desFlavor = cfg.buildFlavor.copy()
+            if flavor is not None:
+                desFlavor = deps.overrideFlavor(desFlavor, flavor)
+            findTroveList.append((name, versionStr, desFlavor))
+            flavorMap[flavor] = desFlavor
         try:
-            results = repos.findTroves(labelPath, 
-                                       findTroveList, cfg.buildFlavor)
+            results = repos.findTroves(labelPath, findTroveList)
         except repository.TroveNotFound, e:
             raise RecipeFileError, str(e)
         for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
@@ -1307,7 +1252,7 @@ class GroupRecipe(Recipe):
         self.groups[groupName].Requires(requirement)
 
     def addTrove(self, name, versionStr = None, flavor = None, source = None,
-                 byDefault = True, groupName = None, reference=None):
+                 byDefault = True, groupName = None):
         if groupName is None:
             groupName = [self.name]
         elif not isinstance(groupName, (list, tuple)):
@@ -1317,11 +1262,7 @@ class GroupRecipe(Recipe):
             self.groups[thisGroupName].addTrove(name, versionStr = versionStr,
                                                 flavor = flavor,
                                                 source = source,
-                                                byDefault = byDefault,
-                                                reference = reference)
-
-    def getReferenceTrove(self, name, versionStr = None, flavor = None):
-        return trovesource.TroveSpecTroveSource((name, versionStr, flavor))
+                                                byDefault = byDefault)
 
     def addNewGroup(self, name, groupName = None, byDefault = True):
 	if groupName is None:
