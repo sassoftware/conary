@@ -1527,3 +1527,125 @@ class XInetdService(_FileAction):
             subsequent_indent = "#              ",
             break_long_words  = False)
         self.description_text = ' \\\n'.join(w.wrap(self.description))
+
+
+
+class XMLCatalogEntry(BuildCommand):
+    """ Adds an entry to the XML catalog file specified in the 
+        action. If the catalog directory(defaults to /etc/xml) is 
+        nonexistant, it is created.  If the catalog is nonexistant,
+        it is created.
+
+        C{r.AddXMLCatalogEntry(I{catalogFile}, I{type}, I{orig}, 
+                               I{replace})}
+
+        @keyword catalogDir: the directory where the catalog file 
+                            is located.
+    """
+    
+    template = (
+        '%%(createcmd)s'
+        ' xmlcatalog --noout --add '
+        ' "%(type)s"'
+        ' "%(orig)s"'
+        ' "%(replace)s"'
+        ' "%%(destdir)s/%(catalogDir)s/%(catalogFile)s"'
+    )
+
+    keywords = {
+        'catalogDir' : '%(sysconfdir)s/xml'
+    }
+
+    def __init__(self, recipe, *args, **keywords):
+        assert(len(args)==4)
+        self.catalogFile = args[0]
+        self.type        = args[1]
+        self.orig        = args[2]
+        self.replace     = args[3]
+
+        BuildCommand.__init__(self, recipe, *args, **keywords)
+        
+    def do(self, macros):
+        if 'libxml2:runtime' not in self.recipe.buildRequires:
+            self.recipe.reportErrors(
+                "Must add 'libxml2:runtime' to buildRequires")
+        macros = macros.copy()
+
+        catalogDirectory = "%%(destdir)s/%s" % self.catalogDir
+        catalogDirectory = catalogDirectory % macros
+        if not os.path.exists(catalogDirectory):
+            os.makedirs(catalogDirectory)
+
+        catalogFile = "%%(destdir)s/%s/%s" % (self.catalogDir, self.catalogFile)
+        catalogFile = catalogFile % macros
+        if not os.path.isfile(catalogFile):
+            macros.createcmd = 'xmlcatalog --noout --create %s &&' % catalogFile
+        else:
+            macros.createcmd = ''
+
+        util.execute(self.command % macros)
+        
+
+class SGMLCatalogEntry(BuildCommand):
+    """ Adds an entry to the SGML catalog file specified in the 
+        action. If the catalog directory(defaults to /etc/sgml) is 
+        nonexistant, it is created.  If the catalog is nonexistant,
+        it is created.
+
+        C{r.AddSGMLCatalogEntry(I{catalogFile}, I{catalogReference})}
+
+        @keyword catalogDir: the directory where the catalog file 
+                            is located.
+    """
+
+    template = (
+        'xmlcatalog --sgml --add'
+        ' %%(tempFileName)s'
+        ' %(catalogReference)s > '
+        ' %%(destdir)s/%(catalogDir)s/%(catalogFile)s'
+    )
+    
+    keywords = {
+        'catalogDir' : '%(sysconfdir)s/sgml'
+    }
+
+
+    def __init__(self, recipe, *args, **keywords):
+        assert(len(args)==2)
+        self.catalogFile = args[0]
+        self.catalogReference = args[1]
+        
+        BuildCommand.__init__(self, recipe, *args, **keywords)
+    
+
+    def do(self, macros):
+        if 'libxml2:runtime' not in self.recipe.buildRequires:
+            self.recipe.reportErrors(
+                "Must add 'libxml2:runtime' to buildRequires")
+
+        macros = macros.copy()
+        
+        catalogDirectory = "%%(destdir)s/%s" % self.catalogDir
+        catalogDirectory = catalogDirectory % macros
+        if not os.path.exists(catalogDirectory):
+            os.makedirs(catalogDirectory)
+       
+        cleanTemp = False
+        catalogName = '%%(destdir)s/%s/%s' % (self.catalogDir, 
+                                              self.catalogFile)
+        catalogName = catalogName % macros
+        if os.path.exists(catalogName) and util.isregular(catalogName):
+            fd, tempPath = tempfile.mkstemp(suffix='cat', 
+                                prefix=os.path.basename(catalogName),
+                                dir=os.path.dirname(catalogName))
+            os.close(fd)
+            util.copyfile(catalogName, tempPath)
+            macros.tempFileName = tempPath
+            cleanTemp = True
+        else:
+            macros.tempFileName = catalogName
+   
+        util.execute(self.command % macros)
+
+        if cleanTemp:
+            os.remove(tempPath)
