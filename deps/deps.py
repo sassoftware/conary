@@ -625,13 +625,20 @@ def overrideFlavor(oldFlavor, newFlavor, mergeType=DEP_MERGE_TYPE_OVERRIDE):
     """ 
     Performs overrides of flavors as expected when the new flavor is 
     specified by a user -- the user's flavor overrides use flags, and 
-    if the user specifies an instruction set, it completely replaces the 
-    existing instruction set
+    if the user specifies any instruction sets, only those instruction
+    sets will be in the final flavor.  Flags for the specified instruction
+    sets are merged with the old flavor.
     """
     flavor = oldFlavor.copy()
     if (DEP_CLASS_IS in flavor.getDepClasses() 
         and DEP_CLASS_IS in newFlavor.getDepClasses()):
-        del flavor.members[DEP_CLASS_IS]
+        oldArchDeps = flavor.members[DEP_CLASS_IS]
+        newArchDeps = newFlavor.members[DEP_CLASS_IS]
+
+        for majArch in oldArchDeps.members.keys():
+            if majArch not in newArchDeps.members:
+                del flavor.members[DEP_CLASS_IS].members[majArch]
+
     flavor.union(newFlavor, mergeType=mergeType)
     return flavor
 

@@ -4,6 +4,8 @@ Changes in 0.61.4:
   * Creating branches and shadows had a command line parsing bug
   * "cvc newpkg" takes --dir and now complains for unexpected arguments
     (which is used to just ignore)
+  * when using flavor affinity for installed troves, merge subarchitecture 
+    flags
 
 Changes in 0.61.3:
   * Corrected a bug that snuck in 0.61.2 that caused a temporary SQL table
