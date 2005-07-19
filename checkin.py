@@ -1076,7 +1076,7 @@ def removeFile(file):
 
     state.write("CONARY")
 
-def newTrove(repos, cfg, name):
+def newTrove(repos, cfg, name, dir = None):
     parts = name.split('=', 1) 
     if len(parts) == 1:
         label = cfg.buildLabel
@@ -1101,7 +1101,9 @@ def newTrove(repos, cfg, name):
 	log.error("package %s already exists" % name)
 	return
 
-    dir = name.split(":")[0]
+    if dir is None:
+        dir = name.split(":")[0]
+
     if not os.path.isdir(dir):
 	try:
 	    os.mkdir(dir)
