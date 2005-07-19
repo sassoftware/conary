@@ -156,9 +156,9 @@ class Archive(_Source):
 	@keyword sourcename: The name of the archive
 	@keyword rpm: If specified, causes Archive to look in the URL or
 	    file specified by C{rpm} for an RPM containing C{sourcename}
-	@keyword dir: If specified, the subdirectory in which to unpack
-	    the sources, relative to C{%(builddir)s}; defaults to
-	    C{%(maindir)s}  
+        @keyword dir: The directory to change to unpack the sources.
+            Relative dirs are relative to C{%(builddir)s}.  Absolute dirs
+            are relative to C{%(destdir)s}.
 	@keyword keyid: The 8-digit GPG key ID (no leading C{0x}) for the
 	    signature.  Indicates that a signature should be sought and
 	    checked.
