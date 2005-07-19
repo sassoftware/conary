@@ -1197,7 +1197,7 @@ class AutoPackageRecipe(CPackageRecipe):
 class SingleGroup:
 
     def addTrove(self, name, versionStr = None, flavor = None, source = None,
-                 byDefault = True):
+                 byDefault = True, reference = None):
         assert(flavor is None or isinstance(flavor, str))
 
         if flavor is not None:
@@ -1208,7 +1208,7 @@ class SingleGroup:
             flavorObj = None
 
         self.addTroveList.append((name, versionStr, flavorObj, source, 
-				  byDefault))
+				  byDefault, reference))
 
     def addNewGroup(self, name, byDefault):
 	self.newGroupList.append([ name, byDefault ])
@@ -1220,14 +1220,11 @@ class SingleGroup:
         troveList = []
         flavorMap = {}
         findTroveList = []
-        for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
-            desFlavor = cfg.buildFlavor.copy()
-            if flavor is not None:
-                desFlavor = deps.overrideFlavor(desFlavor, flavor)
-            findTroveList.append((name, versionStr, desFlavor))
-            flavorMap[flavor] = desFlavor
+        for (name, versionStr, flavor, source, byDefault, ref) in self.addTroveList:
+            findTroveList.append((name, versionStr, flavor))
         try:
-            results = repos.findTroves(labelPath, findTroveList)
+            results = repos.findTroves(labelPath, 
+                                       findTroveList, cfg.buildFlavor)
         except repository.TroveNotFound, e:
             raise RecipeFileError, str(e)
         for (name, versionStr, flavor, source, byDefault) in self.addTroveList:
@@ -1310,7 +1307,7 @@ class GroupRecipe(Recipe):
         self.groups[groupName].Requires(requirement)
 
     def addTrove(self, name, versionStr = None, flavor = None, source = None,
-                 byDefault = True, groupName = None):
+                 byDefault = True, groupName = None, reference=None):
         if groupName is None:
             groupName = [self.name]
         elif not isinstance(groupName, (list, tuple)):
@@ -1320,7 +1317,11 @@ class GroupRecipe(Recipe):
             self.groups[thisGroupName].addTrove(name, versionStr = versionStr,
                                                 flavor = flavor,
                                                 source = source,
-                                                byDefault = byDefault)
+                                                byDefault = byDefault,
+                                                reference = reference)
+
+    def getReferenceTrove(self, name, versionStr = None, flavor = None):
+        return trovesource.TroveSpecTroveSource((name, versionStr, flavor))
 
     def addNewGroup(self, name, groupName = None, byDefault = True):
 	if groupName is None:
