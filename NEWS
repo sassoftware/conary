@@ -6,6 +6,8 @@ Changes in 0.61.4:
     (which is used to just ignore)
   * when using flavor affinity for installed troves, merge subarchitecture 
     flags
+  * group handling didn't always preserve troves which were needed by a
+    newly installed trove properly
 
 Changes in 0.61.3:
   * Corrected a bug that snuck in 0.61.2 that caused a temporary SQL table
