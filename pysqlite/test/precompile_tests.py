@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2004 Specifix, Inc.
+# Copyright (c) 2004 rpath, Inc.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted, provided
