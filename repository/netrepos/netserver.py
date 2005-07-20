@@ -1099,6 +1099,34 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         return ids
 
+    def getTrovesBySource(self, authToken, clientVersion, sourceName, 
+                          sourceVersion):
+	if not self.auth.check(authToken, write = False, trove = sourceName,
+                   label = self.toVersion(sourceVersion).branch().label()):
+	    raise InsufficientPermission
+
+        versionMatch = sourceVersion + '-%'
+
+        cu = self.db.cursor()
+        cu.execute("""SELECT item, version, flavor FROM 
+                        TroveInfo JOIN Instances ON
+                            TroveInfo.instanceId = Instances.instanceId
+                        JOIN Items ON
+                            Instances.itemId = Items.itemId
+                        JOIN Versions ON
+                            Instances.versionId = Versions.versionId
+                        JOIN Flavors ON
+                            Instances.flavorId = Flavors.flavorId
+                        WHERE
+                            TroveInfo.infoType = 1 AND
+                            TroveInfo.data = ? AND
+                            Versions.version LIKE ?
+                    """, sourceName, versionMatch)
+
+        matches = [ tuple(x) for x in cu ]
+
+        return matches
+
     def checkVersion(self, authToken, clientVersion):
 	if not self.auth.check(authToken, write = False):
 	    raise InsufficientPermission
