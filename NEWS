@@ -1,3 +1,7 @@
+Changes in 0.61.5:
+  * added basic clone capability (which only works cloning to parents
+    branches and shadows, and on a single host)
+
 Changes in 0.61.4:
   * %(datadir)s/.../lib/ files will no longer show up in :lib - presumption
     being that anything under %(datadir)s really is arch independenct
