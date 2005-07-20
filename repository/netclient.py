@@ -1030,7 +1030,16 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
         else:
             return dict((self.toPath(x[0]), (self.toPathId(x[1]), None, None))
                         for x in ids.iteritems())
-            
+
+    def getTrovesBySource(self, sourceName, sourceVersion):
+        """
+        Returns (troveName, version, flavor) lists of all of the troves on the
+        server built from sourceVersion.
+        """
+        l = self.c[sourceVersion].getTrovesBySource(sourceName,
+                                            self.fromVersion(sourceVersion))
+        return [ (x[0], self.toVersion(x[1]), self.toFlavor(x[2]))
+                            for x in l ]
                     
     def commitChangeSetFile(self, fName):
         cs = changeset.ChangeSetFromFile(fName)
