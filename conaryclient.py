@@ -464,17 +464,19 @@ class ConaryClient:
 
             return rmvd
 
-	def _replaceErasures(cs, newJob, newErasures):
-	    oldErasures = set([ x for x in newJob if x[2][1] is None ])
-	    obsoletes = oldErasures - newErasures
-	    newJob.difference_update(oldErasures)
+	def _replaceErasures(cs, oldJob, newJob, newErasures):
+	    # replace all erasures in newJob with things from newErasures
+	    newJobErasures = set([ x for x in newJob if x[2][1] is None ])
+	    newJob.difference_update(newJobErasures)
+	    newJob.update(newErasures)
+
+	    oldJobErasures = set([ x for x in oldJob if x[2][1] is None ])
+	    obsoletes = oldJob - newErasures
 
             for (name, (oldVersion, oldFlavor), 
                        (newVersion, newFlavor), absolute) in obsoletes:
                 if not newVersion:
                     cs.delOldTrove(name, oldVersion, oldFlavor)
-
-	    newJob.update(eraseSet)
 
 	def _findErasures(primaryErases, newJob, referencedTroves, 
                           recurse):
@@ -746,7 +748,7 @@ class ConaryClient:
 	eraseSet = _findErasures(erasePrimaryList, newJob, referencedTroves, 
 				 recurse)
         # _findErasures picks what gets erased; nothing else gets to vote
-	_replaceErasures(cs, newJob, eraseSet)
+	_replaceErasures(cs, origJob, newJob, eraseSet)
         neededJob = newJob - origJob
 
         if keepExisting:
