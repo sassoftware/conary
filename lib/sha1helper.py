@@ -15,10 +15,20 @@
 import sha
 import md5
 import os
+import stat
 import struct
 
 def sha1FileBin(path):
+    oldmode = None
+    mode = os.lstat(path)[stat.ST_MODE]
+    if (mode & 0400) != 0400:
+        oldmode = mode
+        os.chmod(path, mode | 0400)
+
     fd = os.open(path, os.O_RDONLY)
+    if oldmode is not None:
+        os.chmod(path, oldmode)
+
     m = sha.new()
     buf = os.read(fd, 40960)
     while len(buf):

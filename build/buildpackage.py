@@ -73,6 +73,10 @@ class BuildComponent(dict):
                                         inodeInfo = True, assumeRoot = True)
 	f.inode.perms.set(f.inode.perms() & 01777)
 	self[path] = (realPath, f)
+        if (f.inode.perms() & 0400) != 0400:
+            # we can safely change the permissions now, the original
+            # permissions have been recorded
+            os.chmod(realPath, f.inode.perms() | 0400)
 
         if f.hasContents and isinstance(f, files.RegularFile):
             results = lib.elf.inspect(realPath)

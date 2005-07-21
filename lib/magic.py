@@ -15,6 +15,7 @@
 import elf
 import os
 import re
+import stat
 import string
 import util
 
@@ -107,7 +108,16 @@ def magic(path, basedir=''):
     if not util.isregular(n):
 	return None
 
+    oldmode = None
+    mode = os.lstat(n)[stat.ST_MODE]
+    if (mode & 0400) != 0400:
+        oldmode = mode
+        os.chmod(n, mode | 0400)
+
     f = file(n)
+    if oldmode is not None:
+        os.chmod(n, oldmode)
+
     b = f.read(4096)
     f.close()
     if len(b) > 4 and b[0] == '\x7f' and b[1:4] == "ELF":
