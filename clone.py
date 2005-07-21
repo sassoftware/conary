@@ -117,6 +117,8 @@ def CloneTrove(cfg, targetBranch, troveSpec):
     uphillCache = {}
 
     for trv in allTroves:
+        trv.troveInfo.clonedFrom.set(trv.getVersion())
+
         oldVersion = trv.getVersion()
         if oldVersion == srcTroveVersion:
             newVersion = newSourceVersion

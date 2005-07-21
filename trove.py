@@ -25,6 +25,7 @@ import versions
 from deps import deps
 from changelog import ChangeLog
 from streams import FrozenVersionStream
+from streams import StringVersionStream
 from streams import DependenciesStream
 from streams import ByteStream
 
@@ -93,6 +94,7 @@ _TROVEINFO_TAG_BUILDDEPS      = 4
 _TROVEINFO_TAG_LOADEDTROVES   = 5
 _TROVEINFO_TAG_INSTALLBUCKET  = 6
 _TROVEINFO_TAG_ISCOLLECTION   = 7
+_TROVEINFO_TAG_CLONEDFROM     = 8
 
 class TroveInfo(streams.StreamSet):
     ignoreUnknown = True
@@ -105,6 +107,7 @@ class TroveInfo(streams.StreamSet):
         _TROVEINFO_TAG_LOADEDTROVES  : ( LoadedTroves,         'loadedTroves' ),
         _TROVEINFO_TAG_INSTALLBUCKET : ( InstallBucket,        'installBucket'),
         _TROVEINFO_TAG_ISCOLLECTION  : ( streams.ShortStream,  'isCollection' ),
+        _TROVEINFO_TAG_CLONEDFROM    : ( StringVersionStream,  'clonedFrom' ),
     }
     _streamDict = streams.StreamSetDef(streamDict)
 
