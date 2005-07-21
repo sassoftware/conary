@@ -66,10 +66,10 @@ def CloneTrove(cfg, targetBranch, troveSpec):
         versionSpec = parts[1]
 
     if troveName.startswith("fileset"):
-        print "File sets can not be clone."
+        print "File sets cannot be cloned."
         sys.exit(1)
     elif troveName.startswith("group"):
-        print "Groups can not be cloned."
+        print "Groups cannot be cloned."
         sys.exit(1)
     elif not troveName.endswith(":source"):
         print "Source components are required for cloning."
