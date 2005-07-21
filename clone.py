@@ -36,12 +36,12 @@ def CloneTrove(cfg, targetBranch, troveSpec):
             if possibleVersion.trailingRevision().getVersion() == upstream:
                 match = possibleVersion
 
-        if match:
-            match.incrementSourceCount()
-        else:
+        if not match:
             match = targetBranchVersionList[0].branch().createVersion(
-                        versions.Revision("%s-1" % 
+                        versions.Revision("%s-0" % 
                             sourceVersion.trailingRevision().getVersion()))
+
+        match.incrementSourceCount()
                              
         return match
 
