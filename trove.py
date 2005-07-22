@@ -868,38 +868,26 @@ class Trove(streams.LargeStreamSet):
 		    # this isn't going to match anything well
 		    continue
 
-		match = None
-
+                oldFlavor = None
 		# first check for matches which are a superset of the old
 		# flavor, then for ones which are a subset of the old flavor
-		for oldFlavor in removed[name]:
-		    if not oldFlavor:
-			continue
+                scores = ((newFlavor.score(x), x) for x in removed[name] if x)
+                scores = [ x for x in scores if x[0] is not False]
+                if scores:
+                    oldFlavor = max(scores)[1]
+                else:
+                    scores = ((x.score(newFlavor), x) \
+                                            for x in removed[name] if x)
+                    scores = [ x for x in scores if x[0] is not False]
+                    if scores:
+                        oldFlavor = max(scores)[1]
 
-		    if newFlavor.satisfies(oldFlavor):
-			match = removed[name][oldFlavor]
-			del removed[name][oldFlavor]
-			break
-
-		if match:
+		if oldFlavor is not None:
 		    changePair.append((name, added[name][newFlavor], newFlavor, 
-				       match, oldFlavor))
+				       removed[name][oldFlavor], oldFlavor))
 		    del added[name][newFlavor]
+                    del removed[name][oldFlavor]
 		    continue
-
-		for oldFlavor in removed[name].keys():
-		    if not oldFlavor:
-			continue
-
-		    if oldFlavor.satisfies(newFlavor):
-			match = removed[name][oldFlavor]
-			del removed[name][oldFlavor]
-			break
-
-		if match:
-		    changePair.append((name, added[name][newFlavor], newFlavor, 
-				       match, oldFlavor))
-		    del added[name][newFlavor]
 
 	    if not added[name]:
 		del added[name]
