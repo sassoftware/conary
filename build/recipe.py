@@ -204,6 +204,7 @@ class RecipeLoader:
         self.module.__dict__['name'] = pkgname
         self.module.__dict__['ignoreInstalled'] = ignoreInstalled
         self.module.__dict__['loadedTroves'] = []
+        self.module.__dict__['loadSpecs'] = {}
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -305,6 +306,7 @@ class RecipeLoader:
             # classes.  Also inherit the list of recipes classes needed to load
             # this recipe.
             self.recipe._loadedTroves = self.module.__dict__['loadedTroves']
+            self.recipe._loadSpecs = self.module.__dict__['loadSpecs']
 
             if self.recipe._trackedFlags is not None:
                 use.setUsed(self.recipe._trackedFlags)
@@ -558,7 +560,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                           usedFlavor)
             callerGlobals['loadedTroves'].extend(recipe._loadedTroves)
             callerGlobals['loadedTroves'].append(troveTuple)
-
+            callerGlobals['loadSpecs'][troveSpec] = troveTuple
     if flavor:
         cfg.buildFlavor = oldBuildFlavor
         # must set this flavor back after the above use.createFlavor()
