@@ -217,7 +217,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                   depsRecurse = True, test = False,
                                   justDatabase = False, recurse = True,
                                   info = False, updateByDefault = True,
-                                  callback = None):
+                                  callback = None, split = True):
     if not callback:
         callback = callbacks.UpdateCallback()
 
@@ -249,7 +249,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                       depsRecurse = depsRecurse, test = test,
                       justDatabase = justDatabase, recurse = recurse,
                       info = info, updateByDefault = updateByDefault,
-                      callback = callback)
+                      callback = callback, split = split)
     except conaryclient.DependencyFailure, e:
         # XXX print dependency errors because the testsuite 
         # prefers it
@@ -266,7 +266,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   depsRecurse = True, test = False,
                                   justDatabase = False, recurse = True,
                                   info = False, updateByDefault = True,
-                                  callback = None):
+                                  callback = None, split=True):
     client = conaryclient.ConaryClient(cfg)
 
     if not info:
@@ -279,7 +279,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                            keepExisting = keepExisting,
                            test = test, recurse = recurse,
                            updateByDefault = updateByDefault,
-                           callback = callback, split = True)
+                           callback = callback, split = split)
 
     if info:
         callback.done()
