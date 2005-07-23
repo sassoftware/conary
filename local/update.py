@@ -336,7 +336,15 @@ class FilesystemJob:
 	    f.close()
 	    log.warning(msg)
 
-	if self.tagUpdates.has_key('shlib'):
+        if 'user-info' in self.tagUpdates and not _checkHandler('user-info', self.root):
+            userAction(self.root, self.tagUpdates['user-info'])
+	    del self.tagUpdates['user-info']
+
+        if 'group-info' in self.tagUpdates and not _checkHandler('group-info', self.root):
+            groupAction(self.root, self.tagUpdates['group-info'])
+	    del self.tagUpdates['group-info']
+
+	if 'shlib' in self.tagUpdates:
 	    shlibAction(self.root, self.tagUpdates['shlib'],
                         tagScript = tagScript)
 	    del self.tagUpdates['shlib']
@@ -1380,6 +1388,145 @@ def shlibAction(root, shlibList, tagScript = None):
 	(id, status) = os.waitpid(pid, 0)
 	if not os.WIFEXITED(status) or os.WEXITSTATUS(status):
 	    log.error("ldconfig failed")
+
+
+def _checkHandler(root, tag):
+    return os.access('/'.join(
+        (root, '/usr/libexec/conary/tags', tag)), os.X_OK)
+
+class _infoFile(dict):
+    """
+    Simple object for bootstrapping editing /etc/passwd and /etc/group
+    This object is only used before the user-info and group-info tag
+    handlers are installed, and before any shadowing information has
+    been added to the filesystem.
+    """
+    def __init__(self, root, path, keyfield, idfield, listfield, defaultList):
+        self._modified = False
+        self._lines = []
+        self._idmap = {}
+        self._root = root
+        self._path = path
+        self._keyfield = keyfield
+        self._idfield = idfield
+        self._listfield = listfield
+        try:
+            f = file('/'.join((root, path)))
+            self._lines = [ x.strip().split(':') for x in f.readlines() ]
+            f.close()
+        except:
+            self._modified = True
+        for line in self._lines:
+            self[line[keyfield]] = line
+            self._idmap[line[idfield]] = line
+        if not self._lines:
+            self._lines.append(defaultList)
+            self._modified = True
+
+    def addLine(self, lineItems):
+        self._lines.append(lineItems)
+        self[lineItems[self._keyfield]] = lineItems
+        self._idmap[lineItems[self._idfield]] = lineItems
+        self._modified = True
+
+    def hasId(self, id):
+        return id in self._idmap
+
+    def newId(self):
+        id = 1
+        while self.hasId(id):
+            id += 1
+        return id
+    
+    def Id(self, name):
+        return self[name][self._idfield]
+
+    def getList(self, name):
+        assert(self._listfield)
+        return self[name][self._listfield].split(',')
+
+    def extendList(self, name, item):
+        assert(self._listfield)
+        l = self.getList(name)
+        if l[0]:
+            l.append(item)
+        else:
+            # don't leave an empty list item
+            l = [item]
+        self[name][self._listfield] = ','.join(l)
+
+    def write(self):
+        if self._modified:
+            # this is only a bootstrap for when the taghandler isn't
+            # there yet, so we don't need to worry about races for
+            # security or anything else...
+            fileName = '/'.join((self._root, self._path))
+            f = file(fileName, 'w+')
+            os.chmod(fileName, 0644)
+            f.writelines(['%s\n' %(':'.join(x)) for x in self._lines])
+            f.close()
+
+
+class _keyVal(dict):
+    def __init__(self, path):
+        f = file(path)
+        for line in f.readlines():
+            key, val = line.split('=', 1)
+            self[key] = val.split('\n')[0]
+        f.close()
+
+
+def userAction(root, userFileList):
+    passwd = _infoFile(root, '/etc/passwd', 0, 2, None,
+                       ['root', '*', '0', '0', 'root', '/root', '/bin/bash'])
+    group = _infoFile(root, '/etc/group', 0, 2, 3,
+                      ['root', '*', '0', 'root' ])
+    for path in userFileList:
+        f = _keyVal(path)
+        f.setdefault('USER', os.path.basename(path))
+        f.setdefault('PREFERRED_UID', '1')
+        if passwd.hasId(f['PREFERRED_UID']):
+            f['PREFERRED_UID'] = passwd.newId()
+        f.setdefault('GROUP', f['USER'])
+        if f['GROUP'] in group:
+            f['GROUPID'] = group.Id(f['GROUP'])
+            if f['USER'] not in group.getList(f['GROUP']):
+                group.extendList(f['GROUP'], f['USER'])
+        else:
+            f.setdefault('GROUPID', f['PREFERRED_UID'])
+            if group.hasId(f['GROUPID']):
+                f['GROUPID'] = group.newId()
+            group.addLine([f['GROUP'], '*', f['GROUPID'], f['USER']])
+        f.setdefault('COMMENT', '')
+        f.setdefault('HOMEDIR', '')
+        f.setdefault('SHELL', '/sbin/nologin')
+        if f['USER'] not in passwd:
+            passwd.addLine([
+                f['USER'],
+                '*',
+                f['PREFERRED_UID'],
+                f['GROUPID'],
+                f['COMMENT'],
+                f['HOMEDIR'],
+                f['SHELL'],
+            ])
+    passwd.write()
+    group.write()
+        
+
+def groupAction(root, groupFileList):
+    group = _infoFile(root, '/etc/group', 0, 2, 3,
+                      ['root', '*', '0', 'root' ])
+    for path in groupFileList:
+        f = _keyVal(path)
+        f.setdefault('GROUP', os.path.basename(path))
+        if f['GROUP'] not in group:
+            group.addLine([f['GROUP'], '*', f['PREFERRED_GID'], ''])
+        if 'USER' in f:
+            # add user to group
+            if f['USER'] not in group.getList(f['GROUP']):
+                group.extendList(f['GROUP'], f['USER'])
+    group.write()
 
 
 class handlerInfo:

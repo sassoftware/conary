@@ -1270,12 +1270,8 @@ class Ownership(policy.Policy, _UserGroup):
     """
     def __init__(self, *args, **keywords):
 	self.filespecs = []
-        self.systemusers = ('root', 'bin', 'daemon', 'adm', 'lp',
-            'sync', 'shutdown', 'halt', 'mail', 'news', 'uucp',
-            'operator', 'games')
-        self.systemgroups = ('root', 'bin', 'daemon', 'sys', 'adm',
-            'tty', 'disk', 'lp', 'mem', 'kmem', 'wheel', 'mail',
-            'news', 'floppy', 'games')
+        self.systemusers = ('root',)
+        self.systemgroups = ('root',)
 	policy.Policy.__init__(self, *args, **keywords)
 
     def updateArgs(self, *args, **keywords):
@@ -1314,11 +1310,13 @@ class Ownership(policy.Policy, _UserGroup):
 	if owner:
 	    pkgfile.inode.owner.set(owner)
             # XXX -- uncomment
-            #self.setUserGroupDep(filename, owner, deps.UserInfoDependencies)
+            #if owner not in self.systemusers:
+            #    self.setUserGroupDep(filename, owner, deps.UserInfoDependencies)
 	if group:
 	    pkgfile.inode.group.set(group)
             # XXX -- uncomment
-            #self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
+            #if group not in self.systemgroups:
+            #    self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
 
 
 class ExcludeDirectories(policy.Policy):

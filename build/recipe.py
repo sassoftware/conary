@@ -1046,6 +1046,7 @@ class UserGroupInfoRecipe(PackageRecipe):
         PackageRecipe.__init__(self, cfg, laReposCache, srcdirs, extraMacros)
         self.destdirPolicy = []
         self.packagePolicy = []
+        self.requiresuser = None
         self.infofilename = None
         self.realfilename = None
 
@@ -1053,11 +1054,17 @@ class UserGroupInfoRecipe(PackageRecipe):
         comp = buildpackage.BuildComponent(
             'info-%s:%s' %(self.infoname, self.type), self)
         f = comp.addFile(self.infofilename, self.realfilename)
-        depSet = deps.DependencySet()
-        depSet.addDep(self.depclass, deps.Dependency(self.infoname, []))
-        f.provides.set(depSet)
+        f.tags.set("%s-info" %self.type)
+        self.addDependencies(f)
         comp.provides.union(f.provides())
+        comp.requires.union(f.requires())
         return [comp]
+
+    def addDependencies(self, f):
+        pass
+
+    def requiresUser(self, user):
+        self.requiresuser = user
 
     def __getattr__(self, name):
         if not name.startswith('_'):
@@ -1070,15 +1077,32 @@ class UserGroupInfoRecipe(PackageRecipe):
 
 class UserInfoRecipe(UserGroupInfoRecipe):
     type = 'user'
-    depclass = deps.UserInfoDependencies
     # abstract base class
     ignore = 1
 
+    def addDependencies(self, f):
+        depSet = deps.DependencySet()
+        depSet.addDep(deps.UserInfoDependencies,
+                      deps.Dependency(self.infoname, []))
+        depSet.addDep(deps.GroupInfoDependencies,
+                      deps.Dependency(self.groupname, []))
+        f.provides.set(depSet)
+
 class GroupInfoRecipe(UserGroupInfoRecipe):
     type = 'group'
-    depclass = deps.GroupInfoDependencies
     # abstract base class
     ignore = 1
+
+    def addDependencies(self, f):
+        depSet = deps.DependencySet()
+        depSet.addDep(deps.GroupInfoDependencies,
+                      deps.Dependency(self.infoname, []))
+        f.provides.set(depSet)
+        if self.requiresuser:
+            depSet = deps.DependencySet()
+            depSet.addDep(deps.UserInfoDependencies,
+                          deps.Dependency(self.requiresuser, []))
+            f.requires.set(depSet)
 
 
 # XXX the next four classes will probably migrate to the repository

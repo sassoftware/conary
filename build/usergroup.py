@@ -56,6 +56,9 @@ class User(build.BuildAction):
         if self.group:
             self.group = self.group %macros
             f.write('GROUP=%s\n' %self.group)
+            self.recipe.groupname = self.group
+        else:
+            self.recipe.groupname = self.infoname
         if self.groupid:
             f.write('GROUPID=%d\n' %self.groupid)
         if self.homedir:
@@ -96,6 +99,7 @@ class SupplementalGroup(build.BuildAction):
         f = file(self.recipe.realfilename, 'w')
         f.write('PREFERRED_GID=%d\n' %self.preferred_gid)
         self.user = self.user %macros
+        self.recipe.requiresUser(self.user)
         f.write('USER=%s\n' %self.user)
         f.close()
 

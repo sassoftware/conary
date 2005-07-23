@@ -4,6 +4,13 @@ Changes in 0.61.5:
   * Now handles degenerate case of packaging unreadable files.
   * A bug that caused conary to ask for the wrong fileId when constructing
     a changeset from multiple repositores has been fixed.
+  * Conary now can add users and groups automatically at install time.  If
+    there is no taghandler to add a user or a group, conary will add it
+    internally as a bootstrapping measure; if there is a taghandler,
+    conary will call that instead.  In order to ease transition, Conary
+    does not yet create the dependencies on the info- packages; a future
+    version of Conary will add those dependencies after the system user
+    info- packages have been created.
 
 Changes in 0.61.4:
   * %(datadir)s/.../lib/ files will no longer show up in :lib - presumption
