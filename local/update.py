@@ -1499,7 +1499,7 @@ def userAction(root, userFileList):
                 f['GROUPID'] = group.newId()
             group.addLine([f['GROUP'], '*', f['GROUPID'], f['USER']])
         f.setdefault('COMMENT', '')
-        f.setdefault('HOMEDIR', '')
+        f.setdefault('HOMEDIR', '/')
         f.setdefault('SHELL', '/sbin/nologin')
         if f['USER'] not in passwd:
             passwd.addLine([
