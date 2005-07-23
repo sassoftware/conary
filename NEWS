@@ -11,6 +11,8 @@ Changes in 0.61.5:
     does not yet create the dependencies on the info- packages; a future
     version of Conary will add those dependencies after the system user
     info- packages have been created.
+  * rpm2cpio now handles rpm archives that use bzip2 to compress the
+    cpio payload
 
 Changes in 0.61.4:
   * %(datadir)s/.../lib/ files will no longer show up in :lib - presumption

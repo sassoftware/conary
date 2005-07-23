@@ -20,11 +20,12 @@ import sys
 
 import conary
 import rpmhelper
+from lib import util
 
 def usage():
     print "Usage: rpm2cpio <rpmpackage> | cpio -ivumd"
     return 1
-
+            
 def main(argv):
     if len(argv) > 2 or len(argv) < 2:
         return usage()
@@ -33,10 +34,34 @@ def main(argv):
     except:
         return usage()
 
+    # check to make sure that this is a cpio archive (though most rpms
+    # are cpio).  If the tag does not exist, assume it's cpio
+    h = rpmhelper.readHeader(r)
+    if h.has_key(rpmhelper.PAYLOADFORMAT):
+        if h[rpmhelper.PAYLOADFORMAT] != 'cpio':
+            print >> sys.stderr, 'payload is not in cpio format'
+            sys.exit(1)
+
+    # check to see how the payload is compressed.  Again, if the tag
+    # does not exist, assume that it's gzip.
+    if h.has_key(rpmhelper.PAYLOADCOMPRESSOR):
+        compression = h[rpmhelper.PAYLOADCOMPRESSOR]
+        if compression == 'gzip':
+            decompressor = lambda fobj: gzip.GzipFile(fileobj=fobj)
+        elif compression == 'bzip2':
+            decompressor = lambda fobj: util.BZ2File(fobj)
+        else:
+            print >> sys.stderr, 'compression type', compression, 'unknown'
+            sys.exit(1)
+    else:
+        decompressor = lambda fobj: gzip.GzipFile(fileobj=fobj)
+
+    # rewind the file to let seekToData do its job
+    r.seek(0)
     rpmhelper.seekToData(r)
-    gz = gzip.GzipFile(fileobj=r)
+    uncompressed = decompressor(r)
     while 1:
-	buf = gz.read(4096)
+	buf = uncompressed.read(4096)
 	if not buf:
 	    break
 	sys.stdout.write(buf)

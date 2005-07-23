@@ -14,6 +14,7 @@
 
 import bdb
 from build import fixedglob
+import bz2
 import epdb
 import errno
 import log
@@ -471,3 +472,32 @@ class SeekableNestedFile(NestedFile):
 
     def tell(self):
         return self.pos
+
+class BZ2File:
+    def __init__(self, fobj):
+        self.decomp = bz2.BZ2Decompressor()
+        self.fobj = fobj
+        self.leftover = ''
+
+    def read(self, bytes):
+        while 1:
+            buf = self.fobj.read(2048)
+            if not buf:
+                # ran out of compressed input
+                if self.leftover:
+                    # we have some uncompressed stuff left, return
+                    # it
+                    rc = self.leftover[:]
+                    self.leftover = None
+                    return rc
+                # done returning all data, return None as the EOF
+                return None
+            # decompressed the newly read compressed data
+            self.leftover += self.decomp.decompress(buf)
+            # if we have at least what the caller asked for, return it
+            if len(self.leftover) > bytes:
+                rc = self.leftover[:bytes]
+                self.leftover = self.leftover[bytes:]
+                return rc
+            # read some more data and try to get enough uncompressed
+            # data to return
