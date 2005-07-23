@@ -1391,8 +1391,9 @@ def shlibAction(root, shlibList, tagScript = None):
 
 
 def _checkHandler(root, tag):
-    return os.access('/'.join(
-        (root, '/usr/libexec/conary/tags', tag)), os.X_OK)
+    # the tag description and handler are installed together, but
+    # the handler (at least in rpath linux) is multitag
+    return os.access('/'.join((root, '/etc/conary/tags', tag)), os.R_OK)
 
 class _infoFile(dict):
     """
