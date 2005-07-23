@@ -136,7 +136,10 @@ def magic(path, basedir=''):
             '# If it is, it will not operate correctly.') > 0:
             return ltwrapper(path, basedir, b)
         return script(path, basedir, _line(b))
-    elif len(b) > 130 and b[128:130] == "PE":
+    elif (len(b) > 130
+          and b[0:2] == 'MZ'
+          and b[78:117] == "This program cannot be run in DOS mode."
+          and b[128:130] == "PE"):
         return CIL(path, basedir, b)
 
     return None
