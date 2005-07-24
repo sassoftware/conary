@@ -1524,6 +1524,22 @@ class ComponentProvides(policy.Policy):
                 deps.Dependency(component.name, flags))
 
 
+
+def _getmonodis(macros, recipe, path):
+    # For bootstrapping purposes, prefer the just-built version if
+    # it exists
+    if os.access('%(destdir)s/%(monodis)s' %macros, os.X_OK):
+        return ('MONO_PATH=%(destdir)s%(libdir)s'
+                ' LD_LIBRARY_PATH=%(destdir)s%(libdir)s'
+                ' %(destdir)s/%(monodis)s' %macros)
+    elif os.access('%(monodis)s' %macros, os.X_OK):
+        return '%(monodis)s' %macros
+    else:
+        recipe.error('%s not available for dependency discovery'
+                     ' for path %s' %(macros.monodis, path))
+    return None
+
+
 class Requires(_addInfo):
     """
     Drives requirement mechanism: to avoid adding requirements for a file,
@@ -1537,6 +1553,8 @@ class Requires(_addInfo):
     invariantexceptions = (
 	'%(docdir)s/',
     )
+    monodisPath = None
+
     def runInfo(self, path):
 	componentMap = self.recipe.autopkg.componentMap
 	if path not in componentMap:
@@ -1546,6 +1564,7 @@ class Requires(_addInfo):
         if not (f.hasContents and isinstance(f, files.RegularFile)) and \
            not isinstance(f, files.SymbolicLink):
             return
+        macros = self.recipe.macros
 
         # now go through explicit requirements
 	for info in self.included:
@@ -1554,14 +1573,15 @@ class Requires(_addInfo):
                     self._markManualRequirement(info, path, pkg)
 
         # now check for automatic dependencies besides ELF
+        m = self.recipe.magic[path]
+
         if f.inode.perms() & 0111:
-            m = self.recipe.magic[path]
             if m and m.name == 'script':
                 interp = m.contents['interpreter']
                 if len(interp.strip()) and self._checkInclusion(interp, path):
                     # no interpreter string warning is in BadInterpreterPaths
                     if not (os.path.exists(interp) or
-                            os.path.exists(self.recipe.macros.destdir+interp)):
+                            os.path.exists(macros.destdir+interp)):
                         # this interpreter not on system, warn
                         # cannot be an error to prevent buildReq loops
                         self.warn('interpreter "%s" (referenced in %s) missing',
@@ -1570,7 +1590,26 @@ class Requires(_addInfo):
                         # if there has been an exception to
                         # NormalizeInterpreterPaths, then it is a
                         # real dependency on the env binary
-                    self._addRequirement(path, interp, pkg, deps.FileDependencies)
+                    self._addRequirement(path, interp, [], pkg,
+                                         deps.FileDependencies)
+
+        if m and m.name == 'CIL':
+            fullpath = macros.destdir + path
+            if not self.monodisPath:
+                self.monodisPath = _getmonodis(macros, self, path)
+                if not self.monodisPath:
+                    return
+            p = util.popen('%s --assemblyref %s' %(
+                           self.monodisPath, fullpath))
+            for line in [ x.strip() for x in p.readlines() ]:
+                if ': Version=' in line:
+                    ver = line.split('=')[1]
+                elif 'Name=' in line:
+                    name = line.split('=')[1]
+                    self._addRequirement(path, name, [ver], pkg,
+                                         deps.CILDependencies)
+            p.close()
+
 
         # finally, package the dependencies up
         if path not in pkg.requiresMap:
@@ -1593,7 +1632,7 @@ class Requires(_addInfo):
                     self.error('package dependency %s not allowed', info)
                     return
                 depClass = deps.TroveDependencies
-            self._addRequirement(path, info, pkg, depClass)
+            self._addRequirement(path, info, [], pkg, depClass)
 
     def _checkInclusion(self, info, path):
         if info in self.excluded:
@@ -1606,17 +1645,18 @@ class Requires(_addInfo):
                     return False
         return True
 
-    def _addRequirement(self, path, info, pkg, depClass):
+    def _addRequirement(self, path, info, flags, pkg, depClass):
         if path not in pkg.requiresMap:
             # BuildPackage only fills in requiresMap for ELF files; we may
             # need to create a few more DependencySets.
             pkg.requiresMap[path] = deps.DependencySet()
-        flags = []
+        # in some cases, we get literal "(flags)" from the recipe
         if '(' in info:
             flagindex = info.index('(')
             flags = set(info[flagindex+1:-1].split())
-            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
             info = info.split('(')[0]
+        if flags:
+            flags = [ (x, deps.FLAG_SENSE_REQUIRED) for x in flags ]
         pkg.requiresMap[path].addDep(depClass, deps.Dependency(info, flags))
 
 
@@ -1636,6 +1676,7 @@ class Provides(policy.Policy):
     invariantexceptions = (
 	'%(docdir)s/',
     )
+    monodisPath = None
 
     def __init__(self, *args, **keywords):
 	self.provisions = []
@@ -1663,8 +1704,9 @@ class Provides(policy.Policy):
 	    return
 	pkg = componentMap[path]
 	f = pkg.getFile(path)
+        macros = self.recipe.macros
 
-        fullpath = self.recipe.macros.destdir + path
+        fullpath = macros.destdir + path
         mode = os.lstat(fullpath)[stat.ST_MODE]
         m = self.recipe.magic[path]
         if path in pkg.providesMap and m and m.name == 'ELF' and \
@@ -1673,6 +1715,25 @@ class Provides(policy.Policy):
             # libraries must be executable for ldconfig to work --
             # see ExecutableLibraries policy
             del pkg.providesMap[path]
+
+        if m and m.name == 'CIL':
+            fullpath = macros.destdir + path
+            if not self.monodisPath:
+                self.monodisPath = _getmonodis(macros, self, path)
+                if not self.monodisPath:
+                    return
+            p = util.popen('%s --assembly %s' %(
+                           self.monodisPath, fullpath))
+            for line in [ x.strip() for x in p.readlines() ]:
+                if 'Name:' in line:
+                    name = line.split()[1]
+                elif 'Version:' in line:
+                    ver = line.split()[1]
+            p.close()
+            if path not in pkg.providesMap:
+                pkg.providesMap[path] = deps.DependencySet()
+            pkg.providesMap[path].addDep(deps.CILDependencies,
+                    deps.Dependency(name, [(ver, deps.FLAG_SENSE_REQUIRED)]))
 
         for (filter, provision) in self.fileFilters:
             if filter.match(path):

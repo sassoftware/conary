@@ -13,6 +13,9 @@ Changes in 0.61.5:
     info- packages have been created.
   * rpm2cpio now handles rpm archives that use bzip2 to compress the
     cpio payload
+  * Conary now creates dependencies (provides and requires) for CIL
+    files, if mono's monodis is installed on the system or being built
+    in the current package.
 
 Changes in 0.61.4:
   * %(datadir)s/.../lib/ files will no longer show up in :lib - presumption

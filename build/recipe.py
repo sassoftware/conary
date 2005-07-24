@@ -87,7 +87,7 @@ baseMacros = {
     # special component prefixes that the whole system needs to share
     'krbprefix'		: '%(exec_prefix)s/kerberos',
     'x11prefix'		: '%(exec_prefix)s/X11R6',
-    # arguments/flags (empty ones are for documentation; non-existant = empty)
+    # programs/options (empty ones are for documentation)
     'cc'		: 'gcc',
     'cxx'		: 'g++',
     'cxxflags'          : '',    # cxx specific flags
@@ -104,6 +104,8 @@ baseMacros = {
     'debugedit'         : 'debugedit',
     'strip'             : 'eu-strip', # eu-strip for debuginfo, "strip -g" else
     'strip-archive'     : 'strip -g', # eu-strip segfaults on ar
+    'monodis'           : '%(bindir)s/monodis',
+    # filled in at cook time
     'buildbranch'       : '',
     'buildlabel'        : '',
 }

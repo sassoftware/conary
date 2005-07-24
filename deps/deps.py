@@ -25,6 +25,8 @@ DEP_CLASS_USE		= 5
 DEP_CLASS_SONAME	= 6
 DEP_CLASS_USERINFO      = 7
 DEP_CLASS_GROUPINFO     = 8
+DEP_CLASS_CIL           = 9
+DEP_CLASS_JAVA          = 10
 
 FLAG_SENSE_UNSPECIFIED  = 0         # used FlavorScore indices
 FLAG_SENSE_REQUIRED     = 1
@@ -437,6 +439,22 @@ class GroupInfoDependencies(DependencyClass):
     justOne = False
     depClass = Dependency
 _registerDepClass(GroupInfoDependencies)
+
+class CILDependencies(DependencyClass):
+
+    tag = DEP_CLASS_CIL
+    tagName = "CIL"
+    justOne = False
+    depClass = Dependency
+_registerDepClass(CILDependencies)
+
+class JavaDependencies(DependencyClass):
+
+    tag = DEP_CLASS_JAVA
+    tagName = "java"
+    justOne = False
+    depClass = Dependency
+_registerDepClass(JavaDependencies)
 
 class FileDependencies(DependencyClass):
 
