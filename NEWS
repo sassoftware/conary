@@ -16,6 +16,8 @@ Changes in 0.61.5:
   * Conary now creates dependencies (provides and requires) for CIL
     files, if mono's monodis is installed on the system or being built
     in the current package.
+  * Troves moving between troves could cause conary to attempt double
+    erasures
 
 Changes in 0.61.4:
   * %(datadir)s/.../lib/ files will no longer show up in :lib - presumption

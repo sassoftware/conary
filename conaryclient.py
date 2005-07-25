@@ -515,6 +515,16 @@ class ConaryClient:
                                 if isPresent ]
 
             for info, fromUpdate, state in oldTroves:
+                if info in nodeIdx:
+                    # the node is marked to erase multiple times in
+                    # newJob! 
+                    idx = nodeIdx[info]
+                    otherState = nodeList[idx][3]
+                    assert(state is UNKNOWN or otherState is UNKNOWN)
+                    if otherState is UNKNOWN:
+                        nodeList[idx] = [ (info, state, [], fromUpdate) ]
+                    continue
+
                 nodeIdx[info] = len(nodeList)
                 nodeList.append([ info, state, [], fromUpdate ])
 
