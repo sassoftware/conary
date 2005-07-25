@@ -42,7 +42,7 @@ class _ShimMethod(netclient._Method):
         self._port = port
 
     def __repr__(self):
-        return "<server._ShimMethod(%r)>" % (self._ShimMethod__name)
+        return "<server._ShimMethod(%r)>" % (self._name)
 
     def __call__(self, *args):
         args = [netclient.CLIENT_VERSIONS[-1]] + list(args)
