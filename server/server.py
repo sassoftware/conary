@@ -16,6 +16,7 @@
 
 import base64
 import cgi
+import errno
 import os
 import posixpath
 import select
@@ -227,8 +228,12 @@ class ResetableNetworkRepositoryServer(NetworkRepositoryServer):
     def reset(self, authToken, clientVersion):
         import shutil
         from repository.netrepos import fsrepos
-	shutil.rmtree(self.repPath + '/contents')
-	os.mkdir(self.repPath + '/contents')
+        try:
+            shutil.rmtree(self.repPath + '/contents')
+        except OSError, e:
+            if e.errno != errno.ENOENT:
+                raise
+        os.mkdir(self.repPath + '/contents')
 
         # cheap trick. sqlite3 doesn't mind zero byte files; just replace
         # the file with a zero byte one (to change the inode) and reopen
