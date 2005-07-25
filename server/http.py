@@ -88,7 +88,7 @@ class HttpHandler(WebHandler):
         if type(auth) is int:
             return auth
 
-        self.client = shimclient.ShimNetClient(
+        self.repos = shimclient.ShimNetClient(
             self.repServer, self._protocol, self._port, auth, self.repServer.map)
         self.serverName = self.repServer.name
 
@@ -117,7 +117,7 @@ class HttpHandler(WebHandler):
             # if password is invalid, request a new one
             return self._requestAuth()
         except:
-            self._write("error", error = traceback.format_exc())
+            self._write("error", shortError = "Error", error = traceback.format_exc())
             return apache.OK
 
     def _requestAuth(self):
@@ -137,7 +137,7 @@ class HttpHandler(WebHandler):
 
     @strFields(char = 'A')
     def browse(self, auth, char):
-        troves = self.client.getAllTroveLeaves(self.serverName, {None: [None]})
+        troves = self.repos.getAllTroveLeaves(self.serverName, {None: [None]})
         
         if char in string.digits:
             char = '0'
@@ -167,7 +167,7 @@ class HttpHandler(WebHandler):
 
     @strFields(t = None, v = "")
     def troveInfo(self, auth, t, v):
-        leaves = self.client.getTroveVersionList(self.serverName, {t: [None]}) 
+        leaves = self.repos.getTroveVersionList(self.serverName, {t: [None]}) 
         versionList = sorted(leaves[t].keys(), reverse = True)
 
         if not v:
@@ -176,8 +176,8 @@ class HttpHandler(WebHandler):
             reqVer = versions.ThawVersion(v)
             
         query = [(t, reqVer, x) for x in leaves[t][reqVer]]
-        troves = self.client.getTroves(query, withFiles = False)
-        metadata = self.client.getMetadata([t, reqVer.branch()], reqVer.branch().label())
+        troves = self.repos.getTroves(query, withFiles = False)
+        metadata = self.repos.getMetadata([t, reqVer.branch()], reqVer.branch().label())
         if t in metadata:
             metadata = metadata[t]
             
@@ -193,10 +193,10 @@ class HttpHandler(WebHandler):
         v = versions.ThawVersion(v)
         f = deps.ThawDependencySet(f)
        
-        parentTrove = self.client.getTrove(t, v, f, withFiles = False)
+        parentTrove = self.repos.getTrove(t, v, f, withFiles = False)
         fileIters = []
-        for trove in self.client.walkTroveSet(parentTrove):
-            files = self.client.iterFilesInTrove(
+        for trove in self.repos.walkTroveSet(parentTrove):
+            files = self.repos.iterFilesInTrove(
                 trove.getName(),
                 trove.getVersion(),
                 trove.getFlavor(),
@@ -218,8 +218,8 @@ class HttpHandler(WebHandler):
         fileId = sha1helper.sha1FromString(fileId)
         ver = versions.VersionFromString(fileV)
       
-        fileObj = self.client.getFileVersion(pathId, fileId, ver)
-        contents = self.client.getFileContents([(fileId, ver)])[0]
+        fileObj = self.repos.getFileVersion(pathId, fileId, ver)
+        contents = self.repos.getFileContents([(fileId, ver)])[0]
 
         if fileObj.flags.isConfig():
             self.req.content_type = "text/plain"
