@@ -317,7 +317,7 @@ class Database(SqlDbRepository):
     def iterTrovesByPath(self, path):
 	return [ x for x in self.db.iterFindByPath(path) ]
 
-    def outdatedTroves(self, l):
+    def outdatedTroves(self, l, inelligble = set()):
         """
         For a (troveName, troveVersion, troveFlavor) list return a dict indexed
         by elements in that list. Each item in the dict is the (troveName,
@@ -325,7 +325,8 @@ class Database(SqlDbRepository):
         installing that item doesn't cause a removal, otherwise it is which
         needs to be removed as part of the update. a (None, None) tuple means
         the item is new and nothing should be removed while no entry means that
-        the item is already installed.
+        the item is already installed. (name, version, flavor) tuples in
+        the inelligble set will not be outdated.
         """
 
         names = {}
@@ -347,8 +348,9 @@ class Database(SqlDbRepository):
         # a match gets removed. got that? 
         instGroup = trove.Trove("@update", versions.NewVersion(), 
                                 deps.DependencySet(), None)
-        for (name, version, flavor) in instList:
-            instGroup.addTrove(name, version, flavor)
+        for info in instList:
+            if info not in inelligble:
+                instGroup.addTrove(*info)
 
         newGroup = trove.Trove("@update", versions.NewVersion(), 
                                 deps.DependencySet(), None)
