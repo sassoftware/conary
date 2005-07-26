@@ -1062,8 +1062,9 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         ids = {}
         for (pathId, path) in cu:
-            if not ids.has_key(path):
-                ids[self.fromPath(path)] = self.fromPathId(pathId)
+            encodedPath = self.fromPath(path)
+            if encodedPath not in ids:
+                ids[encodedPath] = self.fromPathId(pathId)
 
         return ids
 
@@ -1104,11 +1105,11 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         ids = {}
         for (pathId, path, version, fileId) in cu:
-            if not ids.has_key(path):
-                ids[self.fromPath(path)] = (self.fromPathId(pathId),
-                                            version,
-                                            self.fromFileId(fileId))
-
+            encodedPath = self.fromPath(path)
+            if not encodedPath in ids:
+                ids[encodedPath] = (self.fromPathId(pathId),
+                                   version,
+                                   self.fromFileId(fileId))
         return ids
 
     def getTrovesBySource(self, authToken, clientVersion, sourceName, 
