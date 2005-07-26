@@ -18,6 +18,9 @@ Changes in 0.61.5:
     in the current package.
   * Troves moving between troves could cause conary to attempt double
     erasures
+  * The networked repository handles cases where contents are not
+    found in the contents store.  The exception is passed back to
+    the network client.
 
 Changes in 0.61.4:
   * %(datadir)s/.../lib/ files will no longer show up in :lib - presumption

@@ -42,7 +42,7 @@ shims = xmlshims.NetworkConvertors()
 
 CLIENT_VERSIONS = [ 32, 33 ]
 
-class _Method(xmlrpclib._Method):
+class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
 
     def __repr__(self):
         return "<netclient._Method(%s, %r)>" % (self._Method__send, self._Method__name) 
@@ -93,6 +93,9 @@ class _Method(xmlrpclib._Method):
 	    raise GroupAlreadyExists(exceptionArgs[0])
         elif exceptionName == "UserNotFound":
             raise UserNotFound(exceptionArgs[0])
+        elif exceptionName == 'FileContentsNotFound':
+            raise FileContentsNotFound((self.toFileId(exceptionArgs[0]),
+                                        self.toVersion(exceptionArgs[1])))
 	else:
 	    raise UnknownException(exceptionName, exceptionArgs)
 
@@ -1221,3 +1224,8 @@ class UserNotFound(Exception):
 
 class InvalidServerVersion(Exception):
     pass
+
+class FileContentsNotFound(Exception):
+    def __init__(self, val):
+        Exception.__init__(self)
+        self.val = val

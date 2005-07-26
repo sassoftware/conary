@@ -121,6 +121,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 	except IntegrityError, e:
             condRollback()
 	    return (True, ("IntegrityError", str(e)))
+        except FileContentsNotFound, e:
+            condRollback()
+            return (True, ('FileContentsNotFound', self.fromFileId(e.val[0]),
+                           self.fromVersion(e.val[1])))
 	except Exception, e:
             condRollback()
             raise e
@@ -774,34 +778,36 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                                           self._GET_TROVE_ALL_VERSIONS)
 
     def getFileContents(self, authToken, clientVersion, fileList):
-        (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
-                                      suffix = '.cf-out')
+        try:
+            (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
+                                          suffix = '.cf-out')
 
-        sizeList = []
+            sizeList = []
 
-        for fileId, fileVersion in fileList:
-            fileVersion = self.toVersion(fileVersion)
-            fileLabel = fileVersion.branch().label()
-            fileId = self.toFileId(fileId)
+            for fileId, fileVersion in fileList:
+                fileVersion = self.toVersion(fileVersion)
+                fileLabel = fileVersion.branch().label()
+                fileId = self.toFileId(fileId)
 
-            if not self.auth.check(authToken, write = False, 
-                                         label = fileLabel):
-                raise InsufficientPermission
+                if not self.auth.check(authToken, write = False, 
+                                       label = fileLabel):
+                    raise InsufficientPermission
 
-            fileObj = self.troveStore.findFileVersion(fileId)
+                fileObj = self.troveStore.findFileVersion(fileId)
 
-            filePath = self.repos.contentsStore.hashToPath(
-                            sha1helper.sha1ToString(fileObj.contents.sha1()))
-            size = os.stat(filePath).st_size
-            sizeList.append(size)
-
-            os.write(fd, "%s %d\n" % (filePath, size))
-
-        os.close(fd)
-
-        url = os.path.join(self.urlBase(), 
-                           "changeset?%s" % os.path.basename(path)[:-4])
-        return url, sizeList
+                filePath = self.repos.contentsStore.hashToPath(
+                    sha1helper.sha1ToString(fileObj.contents.sha1()))
+                try:
+                    size = os.stat(filePath).st_size
+                except OSError, e:
+                    raise FileContentsNotFound((fileId, fileVersion))
+                sizeList.append(size)
+                os.write(fd, "%s %d\n" % (filePath, size))
+            url = os.path.join(self.urlBase(), 
+                               "changeset?%s" % os.path.basename(path)[:-4])
+            return url, sizeList
+        finally:
+            os.close(fd)
 
     def getTroveLatestVersion(self, authToken, clientVersion, pkgName, 
                               branchStr):
@@ -1436,3 +1442,8 @@ class InvalidClientVersion(Exception):
 
 class SchemaVersion(Exception):
     pass
+
+class FileContentsNotFound(Exception):
+    def __init__(self, val):
+        Exception.__init__(self)
+        self.val = val
