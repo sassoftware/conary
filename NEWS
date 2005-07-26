@@ -20,7 +20,10 @@ Changes in 0.61.5:
     erasures
   * The networked repository handles cases where contents are not
     found in the contents store.  The exception is passed back to
-    the network client.
+    the client.
+  * The networked repository handles cases where a file stream is not
+    found when the client asks for file contents.  The exception is
+    passwd back to the client.
 
 Changes in 0.61.4:
   * %(datadir)s/.../lib/ files will no longer show up in :lib - presumption

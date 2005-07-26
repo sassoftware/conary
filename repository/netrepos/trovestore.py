@@ -613,11 +613,16 @@ class TroveStore:
 
     def findFileVersion(self, fileId):
         cu = self.db.cursor()
-        cu.execute("""
-                SELECT stream FROM FileStreams WHERE fileId = ?
-            """, fileId)
-                            
+        cu.execute("SELECT stream FROM FileStreams WHERE fileId=?", (fileId,))
+
         for (stream,) in cu:
+            # if stream is None, it means that this is just a reference
+            # to a stream that actually lives in another repository.
+            # there is a (unlikely) chance that there is another
+            # row inthe table that matches this fileId, since there
+            # isn't a unique constraint on fileId.
+            if stream is None:
+                continue
             return files.ThawFile(stream, fileId)
 
         return None

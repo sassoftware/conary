@@ -89,8 +89,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
         try:
             # the first argument is a version number
-	    r = method(authToken, *args)
-	    return (False, r)
+            r = method(authToken, *args)
+            return (False, r)
 	except repository.TroveMissing, e:
             condRollback()
 	    if not e.troveName:
@@ -124,6 +124,10 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
         except FileContentsNotFound, e:
             condRollback()
             return (True, ('FileContentsNotFound', self.fromFileId(e.val[0]),
+                           self.fromVersion(e.val[1])))
+        except FileStreamNotFound, e:
+            condRollback()
+            return (True, ('FileStreamNotFound', self.fromFileId(e.val[0]),
                            self.fromVersion(e.val[1])))
 	except Exception, e:
             condRollback()
@@ -794,6 +798,8 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                     raise InsufficientPermission
 
                 fileObj = self.troveStore.findFileVersion(fileId)
+                if fileObj is None:
+                    raise FileStreamNotFound((fileId, fileVersion))
 
                 filePath = self.repos.contentsStore.hashToPath(
                     sha1helper.sha1ToString(fileObj.contents.sha1()))
@@ -1443,7 +1449,15 @@ class InvalidClientVersion(Exception):
 class SchemaVersion(Exception):
     pass
 
-class FileContentsNotFound(Exception):
+class GetFileContentsError(Exception):
     def __init__(self, val):
         Exception.__init__(self)
         self.val = val
+
+class FileContentsNotFound(GetFileContentsError):
+    def __init__(self, val):
+        GetFileContentsError.__init__(self, val)
+
+class FileStreamNotFound(GetFileContentsError):
+    def __init__(self, val):
+        GetFileContentsError.__init__(self, val)

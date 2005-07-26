@@ -96,6 +96,9 @@ class _Method(xmlrpclib._Method, xmlshims.NetworkConvertors):
         elif exceptionName == 'FileContentsNotFound':
             raise FileContentsNotFound((self.toFileId(exceptionArgs[0]),
                                         self.toVersion(exceptionArgs[1])))
+        elif exceptionName == 'FileStreamNotFound':
+            raise FileStreamNotFound((self.toFileId(exceptionArgs[0]),
+                                      self.toVersion(exceptionArgs[1])))
 	else:
 	    raise UnknownException(exceptionName, exceptionArgs)
 
@@ -1225,7 +1228,15 @@ class UserNotFound(Exception):
 class InvalidServerVersion(Exception):
     pass
 
-class FileContentsNotFound(Exception):
+class GetFileContentsError(Exception):
     def __init__(self, val):
         Exception.__init__(self)
         self.val = val
+
+class FileContentsNotFound(GetFileContentsError):
+    def __init__(self, val):
+        GetFileContentsError.__init__(self, val)
+
+class FileStreamNotFound(GetFileContentsError):
+    def __init__(self, val):
+        GetFileContentsError.__init__(self, val)
