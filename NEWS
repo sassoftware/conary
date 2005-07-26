@@ -26,6 +26,8 @@ Changes in 0.61.5:
     passwd back to the client.
   * An error that caused getPackageBranchPathIds() to return the
     oldest fileIds instead of the youngest fileIds has been corrected.
+  * Reworked finding old versions of troves to avoid a single trove
+    being removed multiple times
 
 Changes in 0.61.4:
   * %(datadir)s/.../lib/ files will no longer show up in :lib - presumption

@@ -409,21 +409,6 @@ class ConaryClient:
             for info in delList:
                 localTrv.delTrove(*(info + (False,)))
 
-            # now look for other versions of these troves (which are the
-            # versions we'd like to replace; keep-existing is handled
-            # elsewhere)
-            outdated, toErase = self.db.outdatedTroves([ x for x in 
-                                                localTrv.iterTroveList() ])
-
-            for info in localTrv.iterTroveList():
-                # we don't worry about duplicates here; _alreadyInstalled
-                # will handle that for us a bit later
-                (odName, odVersion, odFlavor) = outdated.get(info, 
-                                                         (None, None, None))
-                if odVersion is None: continue
-                assert(odName == info[0])
-                oldTrv.addTrove(odName, odVersion, odFlavor)
-
             return (oldTrv, pristineTrv, localTrv)
 
         def _alreadyInstalled(trv):
@@ -702,7 +687,7 @@ class ConaryClient:
                 (oldTrv, pristineTrv, localTrv) = _newBase(newPristine)
                 newTrv = pristineTrv.copy()
                 newTrv.mergeCollections(localTrv, newPristine)
-                finalCs, fileList, neededTroveList = newTrv.diff(oldTrv)
+                finalTrvCs, fileList, neededTroveList = newTrv.diff(oldTrv)
             else:
                 oldTrv = self.db.getTrove(trvName, oldVersion, oldFlavor,
                                        pristine = True)
@@ -716,10 +701,12 @@ class ConaryClient:
                 newTrv = oldTrv.copy()
 
                 newTrv.mergeCollections(localTrv, newPristine)
-                finalCs, fileList, neededTroveList = newTrv.diff(localTrv)
+                finalTrvCs, fileList, neededTroveList = newTrv.diff(localTrv)
                 del oldTrv
                 assert(not fileList)
                 alreadyInstalled = []
+
+            del finalTrvCs
 
             referencedTroves += [ x for x in newTrv.iterTroveList() ]
 
@@ -748,6 +735,36 @@ class ConaryClient:
             if (name, version, flavor) in primaries:
 		erasePrimaryList.append((name, version, flavor))
                 newJob.add(job)
+
+        if not keepExisting:
+            # try and match up everything absolute with something already
+            # installed. respecting locks is important.
+            removeSet = set([(x[0], x[1][0], x[1][1]) 
+                                    for x in newJob if x[1][0] is not None ])
+
+            absJob = [ x for x in newJob if x[1][0] is None ]
+            outdated, eraseList = self.db.outdatedTroves(
+                                [ (x[0], x[2][0], x[2][1]) for x in absJob ],
+                                inelligble = removeSet)
+            newJob = newJob - set(absJob)
+
+            outdatedItems = outdated.items()
+
+            newTroves = [ x[0] for x in outdatedItems if x[1][1] is None ]
+            replacedTroves = [ (x[0], x[1]) for x in outdatedItems 
+                                                      if x[1][1] is not None ]
+
+            for info in newTroves:
+                newJob.add((info[0], (None, None), (info[1], info[2]), 0))
+
+            replacedAreLocked = self.db.trovesAreLocked(
+                                    [ x[1] for x in replacedTroves ] )
+
+            for (newInfo, oldInfo), oldIsLocked in zip(replacedTroves, 
+                                                       replacedAreLocked):
+                if not oldIsLocked:
+                    newJob.add((newInfo[0], (oldInfo[1], oldInfo[2]),
+                                      (newInfo[1], newInfo[2]), 0))
 
         origJob = set(origJob)
 
@@ -1043,6 +1060,7 @@ class ConaryClient:
         @type L{callbacks.UpdateCallback}
         @param split: Split large update operations into separate jobs.
         @type split: bool
+        @rtype: tuple
         """
         callback.preparingChangeSet()
 
