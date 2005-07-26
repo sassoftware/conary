@@ -75,6 +75,8 @@ class HttpHandler(WebHandler):
             method = self.__getattribute__(cmd)
         except AttributeError:
             method = self._404
+        if not callable(method):
+            method = self._404
         return method
 
     def _getAuth(self):
