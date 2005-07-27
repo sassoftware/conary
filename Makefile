@@ -31,6 +31,7 @@ python_files = __init__.py	\
 	callbacks.py		\
 	changelog.py		\
 	checkin.py		\
+	clone.py		\
 	commit.py		\
 	conary.py		\
 	conarycfg.py		\
