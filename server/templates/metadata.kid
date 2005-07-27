@@ -2,30 +2,29 @@
 <html xmlns:html="http://www.w3.org/1999/xhtml" 
       xmlns:py="http://purl.org/kid/ns#"
       py:extends="'library.kid'">
-<!--
- Copyright (c) 2005 rpath, Inc.
-
- This program is distributed under the terms of the Common Public License,
- version 1.0. A copy of this license should have been distributed with this
- source file in a file called LICENSE. If it is not present, the license
- is always available at http://www.opensource.org/licenses/cpl.php.
-
- This program is distributed in the hope that it will be useful, but
- without any waranty; without even the implied warranty of merchantability
- or fitness for a particular purpose. See the Common Public License for
- full details.
--->
     <?python
-    from fmtroves import TroveCategories, LicenseCategories
-    source = metadata.getSource()
-    if metadata.getVersion():
-        # the only number that matters in the metadata version is the source revision
-        versionStr = metadata.getVersion().split("-")[-1]
-    else:
-        versionStr = "Initial %s version" % source
+        # Copyright (c) 2005 rpath, Inc.
+        #
+        # This program is distributed under the terms of the Common Public License,
+        # version 1.0. A copy of this license should have been distributed with this
+        # source file in a file called LICENSE. If it is not present, the license
+        # is always available at http://www.opensource.org/licenses/cpl.php.
+        #
+        # This program is distributed in the hope that it will be useful, but
+        # without any waranty; without even the implied warranty of merchantability
+        # or fitness for a particular purpose. See the Common Public License for
+        # full details.
+        
+        from fmtroves import TroveCategories, LicenseCategories
+        source = metadata.getSource()
+        if metadata.getVersion():
+            # the only number that matters in the metadata version is the source revision
+            versionStr = metadata.getVersion().split("-")[-1]
+        else:
+            versionStr = "Initial %s version" % source
 
-    licenses = sorted(x for x in LicenseCategories.values() if "::" in x)
-    categories = sorted(x for x in TroveCategories.values() if x.startswith('Topic') and '::' in x)
+        licenses = sorted(x for x in LicenseCategories.values() if "::" in x)
+        categories = sorted(x for x in TroveCategories.values() if x.startswith('Topic') and '::' in x)
     ?>
 
     <!-- function to generate a selection, an input box, and add/remove button pair
