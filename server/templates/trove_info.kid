@@ -84,24 +84,24 @@ import time
 
             <hr />
 
-            <div py:omit="True" py:if="troves[0].getName().endswith(':source')">
+            <div py:strip="True" py:if="troves[0].getName().endswith(':source')">
                 ${sourceTroveInfo(troves[0])}
                 <p><a href="files?t=${troveName};v=${quote(troves[0].getVersion().freeze())};f=${quote(troves[0].getFlavor().freeze())}">Show Files</a></p>
             </div>
-            <div py:omit="True" py:if="not trove.getName().endswith(':source')"
+            <div py:strip="True" py:if="not trove.getName().endswith(':source')"
                  py:for="trove in troves">
                 ${binaryTroveInfo(trove)}
                 <p><a href="files?t=${troveName};v=${quote(trove.getVersion().freeze())};f=${quote(trove.getFlavor().freeze())}">Show Files</a></p>
             </div>
     
 
-            <div py:omit="True" py:if="len(versionList) > 1">
+            <div py:strip="True" py:if="len(versionList) > 1">
                 <h3>All Versions:</h3>
                 <ul>
                     <li py:for="ver in versionList">
                         <a href="troveInfo?t=${quote(troveName)};v=${quote(ver.freeze())}"
                            py:if="ver != reqVer">${ver.asString()}</a>
-                        <span py:omit="True" py:if="ver == reqVer"><b>${ver.asString()}</b> (selected)</span>
+                        <span py:strip="True" py:if="ver == reqVer"><b>${ver.asString()}</b> (selected)</span>
                     </li>
                 </ul>
             </div>
