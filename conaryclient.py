@@ -745,7 +745,7 @@ class ConaryClient:
             absJob = [ x for x in newJob if x[1][0] is None ]
             outdated, eraseList = self.db.outdatedTroves(
                                 [ (x[0], x[2][0], x[2][1]) for x in absJob ],
-                                inelligble = removeSet)
+                                ineligible = removeSet)
             newJob = newJob - set(absJob)
 
             outdatedItems = outdated.items()
