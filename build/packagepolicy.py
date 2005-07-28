@@ -610,6 +610,10 @@ class InitialContents(policy.Policy):
     keywords = policy.Policy.keywords.copy()
     keywords['inclusions'] = []
 
+    def updateArgs(self, *args, **keywords):
+	policy.Policy.updateArgs(self, *args, **keywords)
+        self.recipe.EtcConfig(exceptions=args)
+
     def doFile(self, filename):
 	fullpath = self.macros.destdir + filename
         recipe = self.recipe
