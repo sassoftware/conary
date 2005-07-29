@@ -7,6 +7,8 @@ Changes in 0.61.6:
     which provides a list of supplemental groups to which to add
     the user.  (SupplementalGroup() is for groups not associated
     with a user.)
+  * The showcs command can now handle components that are referenced
+    but not included in a changeset.
 
 Changes in 0.61.5:
   * Added basic clone capability (which only works cloning to parents

@@ -60,9 +60,10 @@ def displayChangeSet(db, repos, cs, troveList, cfg, ls = False, tags = False,
             displayTroveHeader(cs, troveName, newVer, newFla, oldVer, oldFla, 
                                indent, displayC, fullVersions)
             if newVer and deps:
-                trove = cs.getNewTroveVersion(troveName, newVer, newFla)
-                depformat('Requires', trove.getRequires())
-                depformat('Provides', trove.getProvides())
+                if cs.hasNewTrove(troveName, newVer, newFla):
+                    trove = cs.getNewTroveVersion(troveName, newVer, newFla)
+                    depformat('Requires', trove.getRequires())
+                    depformat('Provides', trove.getProvides())
     else:
         troves = includeChildTroves(cs, troves)
         displayC = createDisplayCache(cs, troves, fullVersions)
