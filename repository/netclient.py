@@ -831,7 +831,11 @@ class NetworkRepositoryClient(xmlshims.NetworkConvertors,
                     needItems = []
 
                     if changeset.fileContentsUseDiff(oldFileObj, newFileObj):
-                        fetchItems.append( (oldFileId, oldFileVersion, 
+                        #fetchItems.append( (oldFileId, oldFileVersion, 
+                        #import lib
+                        #lib.epdb.st()
+                        #assert(oldFileId == fileId)
+                        fetchItems.append( (fileId, oldFileVersion, 
                                             oldFileObj) ) 
                         needItems.append( (pathId, oldFileObj) ) 
 

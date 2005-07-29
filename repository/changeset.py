@@ -35,7 +35,9 @@ import versions
 
 from StringIO import StringIO
 
-ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff", "ptr")
+# refr being the same length as file matters
+ChangedFileTypes = enum.EnumeratedType("cft", "file", "diff", "ptr",
+                                       "refr")
 
 _STREAM_CS_PRIMARY  = 1
 _STREAM_CS_TROVES     = 2
@@ -262,10 +264,12 @@ class ChangeSet(streams.LargeStreamSet):
             if newFileId == fileId:
                 return oldFileId, self.files[(oldFileId, newFileId)]
 
-    def writeContents(self, csf, contents, early):
+    def writeContents(self, csf, contents, early, withReferences):
 	# these are kept sorted so we know which one comes next
 	idList = contents.keys()
 	idList.sort()
+
+        sizeCorrection = 0
 
 	if early:
 	    tag = "1 "
@@ -283,22 +287,40 @@ class ChangeSet(streams.LargeStreamSet):
 	for hash in idList:
 	    (contType, f, compressed) = contents[hash]
             if contType != ChangedFileTypes.diff:
-                csf.addFile(hash, f, tag + contType[4:],
-                            precompressed = compressed)
+                if withReferences and \
+                       (isinstance(f, filecontents.FromDataStore) or \
+                        isinstance(f, filecontents.CompressedFromDataStore)):
+                    path = f.path()
+                    realSize = os.stat(path).st_size
+                    sizeCorrection += (realSize - len(path))
+                    csf.addFile(hash, 
+                                filecontents.FromString(f.path()),
+                                tag + ChangedFileTypes.refr[4:],
+                                precompressed = True)
+                else:
+                    csf.addFile(hash, f, tag + contType[4:],
+                                precompressed = compressed)
 
-    def writeAllContents(self, csf):
-	self.writeContents(csf, self.configCache, True)
-	self.writeContents(csf, self.fileContents, False)
+        return sizeCorrection
 
-    def writeToFile(self, outFileName):
+    def writeAllContents(self, csf, withReferences):
+        one = self.writeContents(csf, self.configCache, True, withReferences)
+	two = self.writeContents(csf, self.fileContents, False, withReferences)
+
+        return one + two
+
+    def writeToFile(self, outFileName, withReferences = False):
 	try:
 	    outFile = open(outFileName, "w+")
 	    csf = filecontainer.FileContainer(outFile)
 
 	    str = self.freeze()
 	    csf.addFile("CONARYCHANGESET", filecontents.FromString(str), "")
-	    self.writeAllContents(csf)
+	    correction = self.writeAllContents(csf, 
+                                               withReferences = withReferences)
 	    csf.close()
+
+            return os.stat(outFileName).st_size + correction
 	except:
 	    os.unlink(outFileName)
 	    raise
@@ -933,9 +955,10 @@ class ReadOnlyChangeSet(ChangeSet):
 
         self.absolute = False
 
-    def writeAllContents(self, csf):
+    def writeAllContents(self, csf, withReferences = False):
         # diffs go out, then we write out whatever contents are left
         assert(not self.filesRead)
+        assert(not withReferences)
         self.filesRead = True
 
         idList = self.configCache.keys()
@@ -951,6 +974,8 @@ class ReadOnlyChangeSet(ChangeSet):
             csf.addFile(name, filecontents.FromFile(f), tagInfo,
                         precompressed = True)
             next = self._nextFile()
+
+        return 0
 
     def merge(self, otherCs):
         self.files.update(otherCs.files)

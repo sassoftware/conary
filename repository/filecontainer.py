@@ -139,6 +139,27 @@ class FileContainer:
 	name = self.file.read(nameLen)
 	tag = self.file.read(tagLen)
 	return (name, tag, size)
+
+    def dump(self, dumpString, dumpFile):
+        def sizeCallback(dumpString, name, tag, size):
+            hdr = struct.pack("!HHIH%ds%ds" % (len(name), len(tag)),
+                        SUBFILE_MAGIC, len(name), size, len(tag), name, tag)
+            dumpString(hdr)
+
+	assert(not self.mutable)
+        pos = self.file.seek(SEEK_SET, 0)
+
+        fileHeader = self.file.read(8)
+        dumpString(fileHeader)
+
+        next = self.getNextFile()
+        while next is not None:
+            (name, tag, fcf) = next
+            size = fcf.size
+            dumpFile(name, tag, size, fcf,
+                     lambda size, newTag: 
+                        sizeCallback(dumpString, name, newTag, size))
+            next = self.getNextFile()
 	
     def __del__(self):
 	if self.file:
@@ -174,7 +195,7 @@ class FileContainer:
 		self.file = None
 		raise
 	    self.mutable = False
-	
+
 class BadContainer(Exception):
 
     pass

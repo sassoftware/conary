@@ -40,7 +40,7 @@ from datastore import IntegrityError
 
 # a list of the protocols we understand
 SERVER_VERSIONS = [ 32, 33 ]
-CACHE_SCHEMA_VERSION = 14
+CACHE_SCHEMA_VERSION = 15
 
 class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
@@ -131,7 +131,7 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
                            self.fromVersion(e.val[1])))
 	except Exception, e:
             condRollback()
-            raise e
+            raise 
 	#    return (True, ("Unknown Exception", str(e)))
 	#except Exception:
 	#    import traceback, sys, string
@@ -914,34 +914,29 @@ class NetworkRepositoryServer(xmlshims.NetworkConvertors):
 
                 (cs, trovesNeeded, filesNeeded) = ret
 
-                path = self.cache.addEntry(l, recurse, withFiles, 
-                                           withFileContents, excludeAutoSource,
-                                           returnVal = (trovesNeeded, 
-                                                        filesNeeded))
-
-                cs.writeToFile(path)
+                (key, path) = self.cache.addEntry(l, recurse, withFiles, 
+                                                  withFileContents, 
+                                                  excludeAutoSource,
+                                                  returnVal = (trovesNeeded, 
+                                                               filesNeeded))
+                size = cs.writeToFile(path, withReferences = True)
+                self.cache.setEntrySize(key, size)
             else:
-                path, (trovesNeeded, filesNeeded) = cacheEntry
+                path, (trovesNeeded, filesNeeded), size = cacheEntry
 
             newChgSetList += _cvtTroveList(trovesNeeded)
             allFilesNeeded += _cvtFileList(filesNeeded)
 
-            pathList.append(path)
-
-        if len(pathList) == 1:
-            url = os.path.join(self.urlBase(), 
-                       "changeset?%s" % os.path.basename(pathList[0])[:-4])
-            size = os.stat(os.path.join(self.tmpPath, pathList[0])).st_size
-            return url, [ size ], newChgSetList, allFilesNeeded
+            pathList.append((path, size))
 
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath, suffix = '.cf-out')
         url = os.path.join(self.urlBase(), 
                            "changeset?%s" % os.path.basename(path[:-4]))
         f = os.fdopen(fd, 'w')
         sizes = []
-        for path in pathList:
-            sizes.append(os.stat(path).st_size)
-            f.write("%s %d\n" % (path, sizes[-1]))
+        for path, size in pathList:
+            sizes.append(size)
+            f.write("%s %d\n" % (path, size))
         f.close()
 
         return url, sizes, newChgSetList, allFilesNeeded
@@ -1285,7 +1280,10 @@ class NullCacheSet:
         (fd, path) = tempfile.mkstemp(dir = self.tmpPath, 
                                       suffix = '.ccs-out')
         os.close(fd)
-        return path
+        return None, path
+
+    def setEntrySize(self, row, size):
+        pass
 
     def __init__(self, tmpPath):
         self.tmpPath = tmpPath
@@ -1324,7 +1322,7 @@ class CacheSet:
 
         cu = self.db.cursor()
         cu.execute("""
-            SELECT row, returnValue FROM CacheContents WHERE
+            SELECT row, returnValue, size FROM CacheContents WHERE
                 troveName=? AND
                 oldFlavorId=? AND oldVersionId=? AND
                 newFlavorId=? AND newVersionId=? AND
@@ -1335,12 +1333,12 @@ class CacheSet:
             excludeAutoSource)
 
         row = None
-        for (row, returnVal) in cu:
+        for (row, returnVal, size) in cu:
             path = self.filePattern % (self.tmpDir, row)
             try:
                 fd = os.open(path, os.O_RDONLY)
                 os.close(fd)
-                return (path, cPickle.loads(returnVal))
+                return (path, cPickle.loads(returnVal), size)
             except OSError:
                 cu.execute("DELETE FROM CacheContents WHERE row=?", row)
                 self.db.commit()
@@ -1378,7 +1376,7 @@ class CacheSet:
         cu = self.db.cursor()
         cu.execute("""
             INSERT INTO CacheContents VALUES(NULL, ?, ?, ?, ?, ?, ?, 
-                                             ?, ?, ?, ?, ?)
+                                             ?, ?, ?, ?, ?, NULL)
         """, name, oldFlavorId, oldVersionId, newFlavorId, newVersionId, 
              absolute, recurse, withFiles, withFileContents, 
              excludeAutoSource, cPickle.dumps(returnVal, protocol = -1))
@@ -1388,7 +1386,11 @@ class CacheSet:
 
         self.db.commit()
 
-        return path
+        return (row, path)
+
+    def setEntrySize(self, row, size):
+        cu = self.db.cursor()
+        cu.execute("UPDATE CacheContents SET size=? WHERE row=?", size, row)
         
     def createSchema(self, dbpath, schemaVersion):
 	self.db = sqlite3.connect(dbpath, timeout = 30000)
@@ -1424,7 +1426,8 @@ class CacheSet:
                     withFiles BOOLEAN,
                     withFileContents BOOLEAN,
                     excludeAutoSource BOOLEAN,
-                    returnValue BINARY)
+                    returnValue BINARY,
+                    size INTEGER)
             """)
             cu.execute("""
                 CREATE INDEX CacheContentsIdx ON 

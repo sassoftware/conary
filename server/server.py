@@ -41,7 +41,9 @@ sys.path.append(mainPath)
 
 from repository.netrepos import netserver
 from repository.netrepos import netauth
+from repository import changeset
 from repository.netrepos.netserver import NetworkRepositoryServer
+from repository.filecontainer import FileContainer
 from conarycfg import ConfigFile
 from conarycfg import STRINGDICT
 from lib import options
@@ -79,6 +81,16 @@ class HttpRequests(SimpleHTTPRequestHandler):
         return path
 
     def do_GET(self):
+        def _writeNestedFile(outF, name, tag, size, f, sizeCb):
+            if changeset.ChangedFileTypes.refr[4:] == tag[2:]:
+                path = f.read()
+                size = os.stat(path).st_size
+                f = open(path)
+                tag = tag[0:2] + changeset.ChangedFileTypes.file[4:]
+
+            sizeCb(size, tag)
+            bytes = util.copyfileobj(f, outF)
+
         if self.path.endswith('/'):
             self.path = self.path[:-1]
         base = os.path.basename(self.path)
@@ -119,9 +131,18 @@ class HttpRequests(SimpleHTTPRequestHandler):
             self.end_headers()
 
             for path, size in items:
-                f = open(path, "r")
-                util.copyfileobj(f, self.wfile)
-                del f
+                if path.endswith('.ccs-out'):
+                    cs = FileContainer(open(path))
+                    cs.dump(self.wfile.write, 
+                            lambda name, tag, size, f, sizeCb: 
+                                _writeNestedFile(self.wfile, name, tag, size, f,
+                                                 sizeCb))
+
+                    del cs
+                else:
+                    f = open(path)
+                    util.copyfileobj(f, self.wfile)
+
                 if path.startswith(FILE_PATH):
                     os.unlink(path)
         else:

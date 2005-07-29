@@ -44,6 +44,9 @@ class FromDataStore(FileContents):
     def get(self):
 	return self.store.openFile(sha1helper.sha1ToString(self.sha1))
 
+    def path(self):
+        return self.store.hashToPath(sha1helper.sha1ToString(self.sha1))
+
     def __init__(self, store, sha1):
 	self.store = store
 	self.sha1 = sha1
@@ -60,6 +63,9 @@ class CompressedFromDataStore(FileContents):
 
     def get(self):
 	return self.store.openRawFile(sha1helper.sha1ToString(self.sha1))
+
+    def path(self):
+        return self.store.hashToPath(sha1helper.sha1ToString(self.sha1))
 
     def __init__(self, store, sha1):
 	self.store = store
