@@ -19,7 +19,7 @@ from lib import util
 class User(build.BuildAction):
     """
     Provides information to use if Conary needs to create a user:
-    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}')}
+    C{r.User('I{name}', I{preferred_uid}, group='I{maingroupname}', groupid=I{preferred_gid}, homedir='I{/home/dir}', comment='I{comment}', shell='I{/path/to/shell}', supplemental=[I{group}, ...])}
 
     The defaults are::
       - C{group}: same name as the user
@@ -27,14 +27,16 @@ class User(build.BuildAction):
       - C{homedir}: None
       - C{comment}: None
       - C{shell}: C{'/sbin/nologin'}
+      - C{supplemental}: None (list of supplemental groups for this user)
     """
     def __init__(self, recipe, *args, **keywords):
         if recipe.type != 'user':
             raise UserGroupError, 'User() allowed only in UserInfoRecipe'
         args=list(args)
-        args.extend([None] * (7 - len(args)))
+        args.extend([None] * (8 - len(args)))
 	(self.infoname, self.preferred_uid, self.group,
-         self.groupid, self.homedir, self.comment, self.shell) = args
+         self.groupid, self.homedir, self.comment, self.shell,
+         self.supplemental) = args
         if self.shell is None: self.shell = '/sbin/nologin'
 	build.BuildAction.__init__(self, recipe, [], **keywords)
 
@@ -70,12 +72,18 @@ class User(build.BuildAction):
         if self.shell:
             self.shell = self.shell %macros
             f.write('SHELL=%s\n' %self.shell)
+        if self.supplemental:
+            self.supplemental = [ x %macros for x in self.supplemental ]
+            f.write('SUPPLEMENTAL=%s\n' %(','.join(self.supplemental)))
+            for group in self.supplemental:
+                self.recipe.requiresGroup(group)
         f.close()
 
 
 class SupplementalGroup(build.BuildAction):
     """
-    Requests the Conary ensure that a user have a supplemental group::
+    Requests the Conary ensure that a user be associated with a
+    supplemental group that is not associated with any user::
     C{r.SupplementalGroup('I{user}', 'I{group}', I{preferred_gid})}
     """
     def __init__(self, recipe, *args, **keywords):

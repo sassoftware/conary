@@ -1449,6 +1449,8 @@ class _infoFile(dict):
     def extendList(self, name, item):
         assert(self._listfield)
         l = self.getList(name)
+        if item in l:
+            return
         if l[0]:
             l.append(item)
         else:
@@ -1491,8 +1493,7 @@ def userAction(root, userFileList):
         f.setdefault('GROUP', f['USER'])
         if f['GROUP'] in group:
             f['GROUPID'] = group.Id(f['GROUP'])
-            if f['USER'] not in group.getList(f['GROUP']):
-                group.extendList(f['GROUP'], f['USER'])
+            group.extendList(f['GROUP'], f['USER'])
         else:
             f.setdefault('GROUPID', f['PREFERRED_UID'])
             if group.hasId(f['GROUPID']):
@@ -1511,6 +1512,9 @@ def userAction(root, userFileList):
                 f['HOMEDIR'],
                 f['SHELL'],
             ])
+        f.setdefault('SUPPLEMENTAL', '')
+        for groupName in [ x for x in f['SUPPLEMENTAL'].split(',') if x ]:
+            group.extendList(groupName, f['USER'])
     passwd.write()
     group.write()
         
@@ -1525,8 +1529,7 @@ def groupAction(root, groupFileList):
             group.addLine([f['GROUP'], '*', f['PREFERRED_GID'], ''])
         if 'USER' in f:
             # add user to group
-            if f['USER'] not in group.getList(f['GROUP']):
-                group.extendList(f['GROUP'], f['USER'])
+            group.extendList(f['GROUP'], f['USER'])
     group.write()
 
 

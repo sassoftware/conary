@@ -2,7 +2,11 @@ Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both
     a config file and an InitialContents file.
   * Reworked repository change sets to directly reference files from the
-    contents store
+    contents store.
+  * The User() command now takes an optional supplemental= option,
+    which provides a list of supplemental groups to which to add
+    the user.  (SupplementalGroup() is for groups not associated
+    with a user.)
 
 Changes in 0.61.5:
   * Added basic clone capability (which only works cloning to parents
