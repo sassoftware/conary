@@ -611,7 +611,7 @@ class TroveFinder:
 
     def addQuery(self, troveTup):
         (name, versionStr, flavor) = troveTup
-        if not self.labelPath and versionStr[0] != "/":
+        if not self.labelPath and (not versionStr or versionStr[0] != "/"):
             raise repository.TroveNotFound, \
                 "fully qualified version or label " + \
                 "expected instead of %s" % versionStr
