@@ -206,7 +206,7 @@ class RecipeLoader:
         self.module.__dict__['name'] = pkgname
         self.module.__dict__['ignoreInstalled'] = ignoreInstalled
         self.module.__dict__['loadedTroves'] = []
-        self.module.__dict__['loadSpecs'] = {}
+        self.module.__dict__['loadedSpecs'] = {}
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -308,7 +308,7 @@ class RecipeLoader:
             # classes.  Also inherit the list of recipes classes needed to load
             # this recipe.
             self.recipe._loadedTroves = self.module.__dict__['loadedTroves']
-            self.recipe._loadSpecs = self.module.__dict__['loadSpecs']
+            self.recipe._loadedSpecs = self.module.__dict__['loadedSpecs']
 
             if self.recipe._trackedFlags is not None:
                 use.setUsed(self.recipe._trackedFlags)
@@ -562,7 +562,7 @@ def _loadRecipe(troveSpec, label, callerGlobals, findInstalled):
                           usedFlavor)
             callerGlobals['loadedTroves'].extend(recipe._loadedTroves)
             callerGlobals['loadedTroves'].append(troveTuple)
-            callerGlobals['loadSpecs'][troveSpec] = troveTuple
+            callerGlobals['loadedSpecs'][troveSpec] = (troveTuple, recipe)
     if flavor:
         cfg.buildFlavor = oldBuildFlavor
         # must set this flavor back after the above use.createFlavor()
@@ -628,12 +628,18 @@ class Recipe:
     _trove = None
     _trackedFlags = None
     _loadedTroves = []
+    _loadedSpecs = {}
 
     def __init__(self):
         assert(self.__class__ is not Recipe)
 
-    def getLoadedTroves(self):
-        return self._loadedTroves
+    @classmethod
+    def getLoadedTroves(class_):
+        return class_._loadedTroves
+
+    @classmethod
+    def getLoadedSpecs(class_):
+        return class_._loadedSpecs
 
     def __repr__(self):
         return "<%s Object>" % self.__class__
