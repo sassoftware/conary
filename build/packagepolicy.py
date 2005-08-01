@@ -1539,8 +1539,8 @@ def _getmonodis(macros, recipe, path):
     elif os.access('%(monodis)s' %macros, os.X_OK):
         return '%(monodis)s' %macros
     else:
-        recipe.error('%s not available for dependency discovery'
-                     ' for path %s' %(macros.monodis, path))
+        recipe.warn('%s not available for dependency discovery'
+                    ' for path %s' %(macros.monodis, path))
     return None
 
 
