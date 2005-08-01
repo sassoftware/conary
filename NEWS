@@ -9,6 +9,8 @@ Changes in 0.61.6:
     with a user.)
   * The showcs command can now handle components that are referenced
     but not included in a changeset.
+  * InfoUserRecipe and InfoGroupRecipe can now be built with buildlogging
+    turned on.
 
 Changes in 0.61.5:
   * Added basic clone capability (which only works cloning to parents

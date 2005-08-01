@@ -739,9 +739,11 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         grpName = recipeClass.name
 
         bldList = recipeObj.getPackages()
+        if  (logBuild and len(bldList) == 1 and not
+             bldList[0].keys()[0].startswith('/usr/src/debug/buildlogs/')):
+            logBuild = False
         if not bldList or (logBuild and len(bldList) == 1):
-            # no components in packages
-            # if logBuild, then an otherwise-empty package has the buildlog
+            # no components in packages, or no files in components
             log.error('No files were found to add to package %s'
                       %recipeClass.name)
             return
