@@ -1435,9 +1435,9 @@ class _infoFile(dict):
 
     def newId(self):
         id = 1
-        while self.hasId(id):
+        while self.hasId(str(id)):
             id += 1
-        return id
+        return str(id)
     
     def Id(self, name):
         return self[name][self._idfield]
