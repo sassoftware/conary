@@ -742,7 +742,7 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         if not bldList or (logBuild and len(bldList) == 1):
             # no components in packages
             # if logBuild, then an otherwise-empty package has the buildlog
-            log.warning('Cowardly refusing to create empty package %s'
+            log.warning('Cowardlily refusing to create empty package %s'
                         %recipeClass.name)
             return
 
