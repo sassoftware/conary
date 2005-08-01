@@ -621,6 +621,18 @@ class DependencySet(object):
                 rc.append('%d#%s' %(tag, dep.freeze()))
         return '|'.join(rc)
 
+    def isFlavor(self):
+        for key in self.getDepClasses().iterkeys():
+            if key not in (DEP_CLASS_IS, DEP_CLASS_USE):
+                return False
+        return True
+
+    def __repr__(self):
+        if self.isFlavor():
+            return "deps.parseFlavor('%s')" % formatFlavor(self)
+        else:
+            return "deps.ThawDependencySet('%s')" % self.freeze()
+
     def __init__(self):
 	self.members = {}
         self.hash = None
