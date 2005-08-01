@@ -742,8 +742,8 @@ def _cookPackageObject(repos, cfg, recipeClass, sourceVersion, prep=True,
         if not bldList or (logBuild and len(bldList) == 1):
             # no components in packages
             # if logBuild, then an otherwise-empty package has the buildlog
-            log.warning('Cowardlily refusing to create empty package %s'
-                        %recipeClass.name)
+            log.error('No files were found to add to package %s'
+                      %recipeClass.name)
             return
 
     except Exception, msg:
