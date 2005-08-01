@@ -137,11 +137,12 @@ def magic(path, basedir=''):
             return ltwrapper(path, basedir, b)
         return script(path, basedir, _line(b))
     elif (len(b) > 130
-          # FIXME - this is not sufficient to detect a CIL file
-          # this will match all PE executables
           and b[0:2] == 'MZ'
           and b[78:117] == "This program cannot be run in DOS mode."
           and b[128:130] == "PE"):
+        # FIXME - this is not sufficient to detect a CIL file this
+        # will match all PE executables.  See ECMA-335, partition ii,
+        # section 25
         return CIL(path, basedir, b)
 
     return None
