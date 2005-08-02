@@ -1728,12 +1728,17 @@ class Provides(policy.Policy):
                     return
             p = util.popen('%s --assembly %s' %(
                            self.monodisPath, fullpath))
+            name = None
+            ver = None
             for line in [ x.strip() for x in p.readlines() ]:
                 if 'Name:' in line:
                     name = line.split()[1]
                 elif 'Version:' in line:
                     ver = line.split()[1]
             p.close()
+            # monodis did not give us any info
+            if not name or not ver:
+                return
             if path not in pkg.providesMap:
                 pkg.providesMap[path] = deps.DependencySet()
             pkg.providesMap[path].addDep(deps.CILDependencies,
