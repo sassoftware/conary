@@ -582,7 +582,7 @@ class Environment(BuildAction):
 
 class SetModes(_FileAction):
     """
-    Sets modes on files in the %(destdir)s:
+    Sets modes on files in the %(destdir)s or %(builddir):
     C{r.SetModes(I{file}[, I{file} ...], I{mode})}
 
     In order for a file to be setuid in the repository, it needs to
@@ -593,7 +593,8 @@ class SetModes(_FileAction):
     The SetModes class provides the mechanism for that.
 
     In addition, of course, it can be used to change arbitrary
-    file modes in the destdir.
+    file modes in the destdir or builddir.  Relative paths are 
+    relative to the builddir.
     """
     
     def __init__(self, recipe, *args, **keywords):
