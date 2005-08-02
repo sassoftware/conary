@@ -1493,12 +1493,11 @@ def userAction(root, userFileList):
         f.setdefault('GROUP', f['USER'])
         if f['GROUP'] in group:
             f['GROUPID'] = group.Id(f['GROUP'])
-            group.extendList(f['GROUP'], f['USER'])
         else:
             f.setdefault('GROUPID', f['PREFERRED_UID'])
             if group.hasId(f['GROUPID']):
                 f['GROUPID'] = group.newId()
-            group.addLine([f['GROUP'], '*', f['GROUPID'], f['USER']])
+            group.addLine([f['GROUP'], '*', f['GROUPID'], ''])
         f.setdefault('COMMENT', '')
         f.setdefault('HOMEDIR', '/')
         f.setdefault('SHELL', '/sbin/nologin')
@@ -1514,6 +1513,7 @@ def userAction(root, userFileList):
             ])
         f.setdefault('SUPPLEMENTAL', '')
         for groupName in [ x for x in f['SUPPLEMENTAL'].split(',') if x ]:
+            # dependencies ensure that groupName already exists
             group.extendList(groupName, f['USER'])
     passwd.write()
     group.write()
