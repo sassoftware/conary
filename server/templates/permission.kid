@@ -15,11 +15,16 @@
 # or fitness for a particular purpose. See the Common Public License for
 # full details.
 ?>
-    <!-- creates a selection dropdown based on a list, optionally adding an ALL
-         option at the top of the list. -->
-    <select py:def="makeSelect(elementName, items, selected = None, all = False)"
+    <!-- creates a selection dropdown based on a list -->
+    <select py:def="makeSelect(elementName, items, selected = None)"
             name="${elementName}">
-        <option py:for="value in sorted(items)"
+        <?python
+            items = sorted(items)
+            if 'ALL' in items:
+                items.remove('ALL')
+                items.insert(0, 'ALL')
+        ?>
+        <option py:for="value in items"
                 py:content="value" value="${value}" py:attrs="{'selected': (selected == value) and 'selected' or None}" />
     </select>
 
@@ -35,16 +40,16 @@
                 <table class="add-form">
                     <tr>
                         <td id="header">Group:</td>
-                        <td py:if="operation!='Edit'" py:content="makeSelect('group', groups, group, False)"/>
+                        <td py:if="operation!='Edit'" py:content="makeSelect('group', groups, group)"/>
                         <td py:if="operation=='Edit'"><input name="group" value="${group}" readonly="readonly" type="text" /></td>
                     </tr>
                     <tr>
                         <td id="header">Label:</td>
-                        <td py:content="makeSelect('label', labels, label, all = True)"/>
+                        <td py:content="makeSelect('label', labels, label)"/>
                     </tr>
                     <tr>
                         <td id="header">Trove:</td>
-                        <td py:content="makeSelect('trove', troves, trove, all = True)"/>
+                        <td py:content="makeSelect('trove', troves, trove)"/>
                     </tr>
                     <tr>
                         <td id="header" rowspan="2">Options:</td>
