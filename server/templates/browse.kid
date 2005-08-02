@@ -16,6 +16,7 @@
 # full details.
 
 import string
+from urllib import quote
 ?>
     <head/>
     <body>
@@ -40,10 +41,10 @@ import string
             <h3>Troves beginning with ${char}</h3>
             <ul>
                 <li py:for="package in packages">
-                    <a href="troveInfo?t=${package}">${package}</a> <span py:if="package in components">[+]</span>
+                    <a href="troveInfo?t=${quote(package)}">${package}</a> <span py:if="package in components">[+]</span>
                     <ul id="components" py:if="package in components">
                         <li py:for="component in components[package]">
-                            <a href="troveInfo?t=${package}:${component}">${component}</a>
+                            <a href="troveInfo?t=${quote(package)}:${quote(component)}">${component}</a>
                         </li>
                     </ul>
                 </li>
