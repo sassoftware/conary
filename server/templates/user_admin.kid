@@ -86,7 +86,7 @@
 
             <h2>Groups</h2>
             <table class="user-admin" id="groups">
-                <thead><tr><td style="width: 25%;">Group Name</td><td>Permissions</td><td>Options</td></tr></thead>
+                <thead><tr><td style="width: 25%;">Group Name</td><td>Permissions</td><td style="text-align: right;">Options</td></tr></thead>
                 <tbody>
                     <tr py:for="i, group in enumerate(netAuth.iterGroups())"
                         class="${i % 2 and 'even' or 'odd'}">
@@ -96,12 +96,15 @@
                         <td><b>${group[1]}</b></td>
                         <td py:if="rows" py:content="permTable(group[0], group[1], rows)"/>
                         <td py:if="not rows" style="font-size: 80%;">Group has no permissions</td>
-                        <td><a href="deleteGroup?userGroupId=${group[0]}">Delete</a> | <a href="manageGroupForm?userGroupName=${group[1]}">Manage</a></td>
+                        <td style="text-align: right;">
+                            <a href="addPermForm?userGroupName=${group[1]}">Add Permission</a><br />
+                            <a href="deleteGroup?userGroupId=${group[0]}">Delete</a> | 
+                            <a href="manageGroupForm?userGroupName=${group[1]}">Manage</a>
+                        </td>
                     </tr>
                 </tbody>
             </table>
             <p>
-                <a href="addPermForm">Add Permission</a><br />
                 <a href="addGroupForm">Add Group</a>
             </p>
         </div>

@@ -332,12 +332,13 @@ class HttpHandler(WebHandler):
         return apache.OK
 
     @checkAuth(write = True, admin = True)
-    def addPermForm(self, auth):
+    @strFields(userGroupName = "")
+    def addPermForm(self, auth, userGroupName):
         groups = (x[1] for x in self.repServer.auth.iterGroups())
         labels = (x[1] for x in self.repServer.auth.iterLabels())
         troves = (x[1] for x in self.repServer.auth.iterItems())
     
-        self._write("permission", operation='Add', group=None, trove=None, 
+        self._write("permission", operation='Add', group=userGroupName, trove=None, 
                 label=None, groups=groups, labels=labels, troves=troves,
                 writeperm=None, capped=None, admin=None)
         return apache.OK
