@@ -1526,6 +1526,8 @@ def groupAction(root, groupFileList):
         f = _keyVal(path)
         f.setdefault('GROUP', os.path.basename(path))
         if f['GROUP'] not in group:
+            if group.hasId(f['PREFERRED_GID']):
+                f['PREFERRED_GID'] = group.newId()
             group.addLine([f['GROUP'], '*', f['PREFERRED_GID'], ''])
         if 'USER' in f:
             # add user to group
