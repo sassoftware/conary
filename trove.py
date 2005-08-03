@@ -979,7 +979,7 @@ class Trove(streams.LargeStreamSet):
 			# except for the most ill-formed of groups.
                         raise IOError, "Cannot determine what trove is " \
                             "being replaced for %s=%s[%s]" %  \
-                                (name, newVersion.asString(), 
+                                (name, version.asString(), 
                                  deps.formatFlavor(newFlavor))
 
 	    # remove old versions which didn't get matches
