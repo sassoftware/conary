@@ -977,7 +977,7 @@ class Trove(streams.LargeStreamSet):
 		    else:
 			# Here's the fit of pique. This shouldn't happen
 			# except for the most ill-formed of groups.
-                        raise IOError, "Cannot determine what trove is " \
+                        raise TroveDiffError, "Cannot determine what trove is " \
                             "being replaced for %s=%s[%s]" %  \
                                 (name, version.asString(), 
                                  deps.formatFlavor(newFlavor))
@@ -1579,3 +1579,10 @@ class PatchError(TroveError):
 
     pass
 
+class TroveDiffError(TroveError):
+
+    """
+    Indicates that an error occurred calculating differences between troves.
+    """
+    
+    pass
