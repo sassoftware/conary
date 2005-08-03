@@ -1391,7 +1391,8 @@ class CacheSet:
     def setEntrySize(self, row, size):
         cu = self.db.cursor()
         cu.execute("UPDATE CacheContents SET size=? WHERE row=?", size, row)
-        
+        self.db.commit()
+
     def createSchema(self, dbpath, schemaVersion):
 	self.db = sqlite3.connect(dbpath, timeout = 30000)
         cu = self.db.cursor()
