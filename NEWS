@@ -13,6 +13,7 @@ Changes in 0.61.6:
     turned on.
   * Conary's internal handling for dyanamically finding new IDs for
     users and groups has been fixed.
+  * "conary updateall" now accepts the --test flag.
 
 Changes in 0.61.5:
   * Added basic clone capability (which only works cloning to parents

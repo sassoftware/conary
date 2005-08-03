@@ -560,6 +560,10 @@ def realMain(cfg, argv=sys.argv):
             cfg.autoResolve = True
 	    del argSet['resolve']
 
+	if argSet.has_key('test'):
+	    kwargs['test'] = argSet['test']
+	    del argSet['test']
+
 	if argSet: return usage()
 
 	if len(otherArgs) == 2:
