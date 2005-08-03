@@ -169,6 +169,9 @@ class Dependency(BaseDependency):
         for (flag, sense) in other.flags.iteritems():
             if flag in self.flags and self.flags[flag] == sense:
                 intFlags[flag] = sense
+        if not intFlags:
+            if self.flags != other.flags:
+                return None
         return Dependency(self.name, intFlags)
 
     def __and__(self, other):
@@ -179,7 +182,10 @@ class Dependency(BaseDependency):
         for flag, value in other.flags.iteritems():
             if flag in diffFlags and value == diffFlags[flag]:
                 del diffFlags[flag]
-        return Dependency(self.name, diffFlags)
+        if not diffFlags:
+            return None
+        else:
+            return Dependency(self.name, diffFlags)
 
     def __sub__(self, other):
         return self.difference(other)
@@ -262,7 +268,7 @@ class DependencyClass(object):
     __slots__ = ( 'tag', 'members' )
 
     def addDep(self, dep, mergeType = DEP_MERGE_TYPE_NORMAL):
-        assert(dep.__class__ == self.depClass)
+        assert(dep.__class__.__name__ == self.depClass.__name__)
 
 	if self.members.has_key(dep.name):
 	    # this is a little faster then doing all of the work when
@@ -316,19 +322,34 @@ class DependencyClass(object):
 
     def intersection(self, other):
         newDepClass = self.__class__()
+        found = False
 	for tag, dep in self.members.iteritems():
             if tag in other.members:
-                newDepClass.addDep(dep.intersection(other.members[tag]))
-        return newDepClass
+                dep = dep.intersection(other.members[tag])
+                if dep is None:
+                    continue
+                newDepClass.addDep(dep)
+                found = True
+        if found:
+            return newDepClass
+        return None
 
     def difference(self, other):
         newDepClass = self.__class__()
+        found = False
 	for tag, dep in self.members.iteritems():
             if tag in other.members:
-                newDepClass.addDep(dep.difference(other.members[tag]))
+                diff = dep.difference(other.members[tag])
+                if diff is None:
+                    continue
+                newDepClass.addDep(diff)
             else:
                 newDepClass.addDep(dep)
-        return newDepClass
+            found = True
+        if found:
+            return newDepClass
+        else:
+            return None
 
     def __sub__(self, other):
         return self.difference(other)
@@ -564,7 +585,10 @@ class DependencySet(object):
         newDep = DependencySet()
         for tag, depClass in self.members.iteritems():
             if tag in other.members:
-                newDep.members[depClass.tag] = depClass.intersection(other.members[tag])
+                dep = depClass.intersection(other.members[tag])
+                if dep is None:
+                    continue
+                newDep.members[depClass.tag] = dep
         return newDep
 
     def __and__(self, other):
@@ -574,7 +598,9 @@ class DependencySet(object):
         newDep = DependencySet()
         for tag, depClass in self.members.iteritems():
             if tag in other.members:
-                newDep.members[tag] = depClass.difference(other.members[tag])
+                dep = depClass.difference(other.members[tag])
+                if dep is not None:
+                    newDep.members[tag] = dep
             else:
                 newDep.members[tag] = copy.deepcopy(depClass)
         return newDep
