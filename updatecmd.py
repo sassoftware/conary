@@ -254,6 +254,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
         # XXX print dependency errors because the testsuite 
         # prefers it
         print e
+    except repository.TroveNotFound, e:
+        log.error(e)
     except conaryclient.UpdateError, e:
         log.error(e)
     except repository.CommitError, e:

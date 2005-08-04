@@ -333,7 +333,7 @@ class QueryByLabelPath(Query):
     def missingMsg(self, name):
         # collapse all the labels searched in the queries to a unique list
         labelPath = set(x.keys()[0] for x in self.query[name])
-        return "%s was not on found on path %s" \
+        return "%s was not found on path %s" \
                 % (name, ', '.join(x.asString() for x in labelPath))
 
 class QueryByBranch(Query):
@@ -471,7 +471,7 @@ class QueryByBranch(Query):
             branches = self.queryNoFlavor[name].keys()
         else:
             branches = self.query[0][name].keys()
-        return "%s was not on found on branches %s" \
+        return "%s was not found on branches %s" \
                 % (name, ', '.join(x.asString() for x in branches))
 
 class QueryRevisionByBranch(QueryByBranch):

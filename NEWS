@@ -5,6 +5,8 @@ Changes in 0.61.7:
   * "conary emerge" as root (or as a user than can apply the changeset
     produced by the build) did not install anything but the toplevel
     package.  This bug has been fixed.
+  * No longer hide descriptive TroveNotFound errors behind a generic 
+    NoNewTroves wrapper
 
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both

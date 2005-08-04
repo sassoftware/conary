@@ -889,26 +889,20 @@ class ConaryClient:
                 assert(isinstance(flavor, deps.DependencySet))
                 newItems.append((troveName, versionStr, flavor))
             elif isinstance(versionStr, versions.Branch):
-                try:
-                    l = self.repos.findTrove(None, 
-                                              (troveName, 
-                                               versionStr.asString(), 
-                                               flavor),
-                                              self.cfg.flavor, 
-                                              affinityDatabase=self.db)
-                except repository.TroveNotFound, e:
-                    raise NoNewTrovesError
+                l = self.repos.findTrove(None, 
+                                          (troveName, 
+                                           versionStr.asString(), 
+                                           flavor),
+                                          self.cfg.flavor, 
+                                          affinityDatabase=self.db)
                 newItems += l
             elif (versionStr and versionStr[0] == '/'):
                 # fully qualified versions don't need branch affinity
                 # but they do use flavor affinity
-                try:
-                    l = self.repos.findTrove(None, 
-                                              (troveName, versionStr, flavor), 
-                                              self.cfg.flavor, 
-                                              affinityDatabase=self.db)
-                except repository.TroveNotFound, e:
-                    raise NoNewTrovesError
+                l = self.repos.findTrove(None, 
+                                          (troveName, versionStr, flavor), 
+                                          self.cfg.flavor, 
+                                          affinityDatabase=self.db)
                 newItems += l
             else:
                 if keepExisting:
@@ -925,7 +919,7 @@ class ConaryClient:
                                              self.cfg.flavor, 
                                              affinityDatabase = affinityDb)
                 except repository.TroveNotFound, e:
-                    raise NoNewTrovesError
+                    raise
                 newItems += l
                 # XXX where does this go now?                    
                 # updating locally cooked troves needs a label override
