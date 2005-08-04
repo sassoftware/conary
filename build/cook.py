@@ -1174,7 +1174,7 @@ def cookItem(repos, cfg, item, prep=0, macros={},
         try:
             changeSet = changeset.ChangeSetFromFile(changeSetFile)
             (updJob, suggMap) = \
-                client.updateChangeSet([changeSet], recurse=False, resolveDeps=False)
+                client.updateChangeSet([changeSet], recurse=True, resolveDeps=False)
             client.applyUpdate(updJob)
 
         except (conaryclient.UpdateError, repository.CommitError), e:
