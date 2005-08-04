@@ -140,16 +140,21 @@ class HttpHandler(WebHandler):
     @strFields(char = 'A')
     def browse(self, auth, char):
         troves = self.repos.getAllTroveLeaves(self.serverName, {None: [None]})
-        
+        # keep a running total of each letter we see so that the display
+        # code can skip letters that have no troves
+        totals = dict.fromkeys(list(string.digits) + list(string.uppercase), 0)
         if char in string.digits:
             char = '0'
-            troves = (x for x in troves if x[0] in string.digits)
+            filter = lambda x: x[0] in string.digits
         else:
-            troves = (x for x in troves if x[0].upper() == char)
-      
+            filter = lambda x, char=char: x[0].upper() == char
+
         packages = []
         components = {}
         for trove in troves:
+            totals[trove[0].upper()] += 1
+            if not filter(trove):
+                continue
             if ":" not in trove:
                 packages.append(trove)
             else:
@@ -164,7 +169,7 @@ class HttpHandler(WebHandler):
             for component in components[x]:
                 packages.append(x + ":" + component)
 
-        self._write("browse", packages = sorted(packages), components = components, char = char)
+        self._write("browse", packages = sorted(packages), components = components, char = char, totals = totals)
         return apache.OK
 
     @strFields(t = None, v = "")
