@@ -835,59 +835,108 @@ class Trove(streams.LargeStreamSet):
 		for newFlavor in added[name]:
 		    for version in added[name][newFlavor]:
 			trvList.append((name, None, version, None, newFlavor))
-
 		del added[name]
 
 	changePair = []
-	# we know everything added now has a matching name in removed; let's
-	# try and match up the flavors. first of all we'll look for exact
-	# matches
-	for name in added.keys():
-	    for newFlavor in added[name].keys():
-		if removed[name].has_key(newFlavor):
-		    # we have a name/flavor match
-		    changePair.append((name, added[name][newFlavor], newFlavor,
-				       removed[name][newFlavor], newFlavor))
-		    del added[name][newFlavor]
-		    del removed[name][newFlavor]
-
-	    if not added[name]:
-		del added[name]
-	    if not removed[name]:
-		del removed[name]
-
-	# for things that are left, see if we can match flavors based on
-	# the architecture
+	# for things that are left, see if we can match flavors 
 	for name in added.keys():
             if not removed.has_key(name):
                 # nothing to match up against
                 continue
 
-	    for newFlavor in added[name].keys():
-		if not newFlavor:
-		    # this isn't going to match anything well
-		    continue
+            # try to match flavors by branch first - take bad matches
+            # that are on the same branch over perfect matches that are
+            # not.
 
-                oldFlavor = None
-		# first check for matches which are a superset of the old
-		# flavor, then for ones which are a subset of the old flavor
-                scores = ((newFlavor.score(x), x) for x in removed[name] if x)
-                scores = [ x for x in scores if x[0] is not False]
-                if scores:
-                    oldFlavor = max(scores)[1]
-                else:
-                    scores = ((x.score(newFlavor), x) \
-                                            for x in removed[name] if x)
-                    scores = [ x for x in scores if x[0] is not False]
-                    if scores:
-                        oldFlavor = max(scores)[1]
+            # To that end, sort flavors by branch.  Search over
+            # the flavors on a particular branch first.  If those flavors
+            # match, remove from the main added/removed list
+            addedByBranch = {}
+            removedByBranch = {}
+            for flavor, versionList in added[name].iteritems():
+                for version in versionList:
+                    d = addedByBranch.setdefault(version.branch(), {})
+                    d.setdefault(flavor, []).append(version)
 
-		if oldFlavor is not None:
-		    changePair.append((name, added[name][newFlavor], newFlavor, 
-				       removed[name][oldFlavor], oldFlavor))
-		    del added[name][newFlavor]
-                    del removed[name][oldFlavor]
-		    continue
+            for flavor, versionList in removed[name].iteritems():
+                for version in versionList:
+                    d = removedByBranch.setdefault(version.branch(), {})
+                    d.setdefault(flavor, []).append(version)
+
+            searchOrder = []
+            for branch, addedFlavors in addedByBranch.iteritems():
+                removedFlavors = removedByBranch.get(branch, False)
+                if removedFlavors:
+                    searchOrder.append((addedFlavors, removedFlavors))
+
+            # after we've found all the matches we could while staying
+            # with branch affinity, try to match up all added/removed
+            # troves with this name that remain
+            searchOrder.append((added[name], removed[name]))
+
+            scoreCache = {}
+            NEG_INF = -99999
+
+            for addedSource, removedSource in searchOrder:
+                found = True
+                used = set()
+
+                while found:
+                    found = False
+                    maxScore = None
+                    # score every new flavor against every old flavor 
+                    # to find the best match.  Doing anything less
+                    # may result in incorrect flavor lineups
+                    for newFlavor in addedSource.keys():
+                        if not newFlavor or newFlavor in used:
+                            continue
+                        for oldFlavor in removedSource.keys():
+                            if not oldFlavor or oldFlavor in used:
+                                continue
+                            myMax = scoreCache.get((newFlavor, 
+                                                     oldFlavor), None)
+                            if myMax is None:
+                                # check for superset matching and subset
+                                # matching.  Currently we don't consider 
+                                # a superset flavor match "better" than 
+                                # a subset - if we want to change that, 
+                                # a initial parameter for maxScore that 
+                                # ordered scores by type would work.
+                                # If we do that, we should consider adding
+                                # heuristic to prefer strongly satisfied
+                                # flavors most of all. 
+                                scores = (newFlavor.score(oldFlavor),
+                                          oldFlavor.score(newFlavor))
+                                scores = [x for x in scores if x is not False]
+                                if scores:
+                                    myMax = max(scores)
+                                else:
+                                    myMax = NEG_INF
+                                scoreCache[newFlavor, oldFlavor] = myMax
+                            if not maxScore or myMax > maxScore[0]:
+                                maxScore = (myMax, newFlavor, oldFlavor)
+                    if maxScore and maxScore[0] > NEG_INF:
+                        found = True
+                        newFlavor, oldFlavor = maxScore[1:]
+                        used.update((newFlavor, oldFlavor))
+                    if found:
+                        changePair.append((name, addedSource[newFlavor][:], 
+                                           newFlavor, 
+                                           removedSource[oldFlavor][:],
+                                           oldFlavor))
+                        lst = added[name][newFlavor]
+                        # remove these versions from the final "added"
+                        # list.
+                        for version in addedSource[newFlavor][:]:
+                            lst.remove(version)
+                        if not lst:
+                            del added[name][newFlavor]
+
+                        lst = removed[name][oldFlavor]
+                        for version in removedSource[oldFlavor][:]:
+                            lst.remove(version)
+                        if not lst:
+                            del removed[name][oldFlavor]
 
 	    if not added[name]:
 		del added[name]

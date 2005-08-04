@@ -1,3 +1,8 @@
+Changes in 0.61.7:
+  * Two bugs in determining which trove to remove when updating two troves of 
+    the same name has been fixed - conary now respects branch affinity, and 
+    it also always removes the old version that is closest in flavor.
+
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both
     a config file and an InitialContents file.
