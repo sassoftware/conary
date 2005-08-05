@@ -22,6 +22,7 @@ from fnmatch import fnmatchcase
 import imp
 import inspect
 from itertools import izip
+import new
 import os
 import string
 import sys
@@ -32,6 +33,7 @@ import types
 import build
 import buildpackage
 import usergroup
+import conaryclient
 import cook
 from deps import deps
 import destdirpolicy
@@ -47,7 +49,6 @@ import source
 import use
 import updatecmd
 import versions
-import conaryclient
 
 
 baseMacros = {
@@ -177,6 +178,35 @@ def setupRecipeDict(d, filename):
     d['filename'] = filename
 
 class RecipeLoader:
+    _recipesToCopy = []
+
+    @classmethod
+    def addRecipeToCopy(class_, recipeClass):
+        class_._recipesToCopy.append(recipeClass)
+
+    def _copyReusedRecipes(self, moduleDict):
+        # XXX HACK - get rid of this when we move the
+        # recipe classes to the repository.
+        # makes copies of some of the superclass recipes that are 
+        # created in this trove.  (specifically, the ones with buildreqs)
+        for recipeClass in self._recipesToCopy:
+            name = recipeClass.__name__
+            # when we create a new class object, it needs its superclasses.
+            # get the original superclass list and substitute in any 
+            # copies
+            mro = list(inspect.getmro(recipeClass)[1:])
+            newMro = []
+            for superClass in mro:
+                superName = superClass.__name__
+                newMro.append(moduleDict.get(superName, superClass))
+
+            recipeCopy = new.classobj(name, tuple(newMro),
+                                     recipeClass.__dict__.copy())
+            recipeCopy.buildRequires = recipeCopy.buildRequires[:]
+            moduleDict[name] = recipeCopy
+
+
+
     def __init__(self, filename, cfg=None, repos=None, component=None,
                  branch=None, ignoreInstalled=False):
         self.recipes = {}
@@ -207,6 +237,8 @@ class RecipeLoader:
         self.module.__dict__['ignoreInstalled'] = ignoreInstalled
         self.module.__dict__['loadedTroves'] = []
         self.module.__dict__['loadedSpecs'] = {}
+
+        self._copyReusedRecipes(self.module.__dict__)
 
         # create the recipe class by executing the code in the recipe
         try:
@@ -1156,6 +1188,8 @@ class DistroPackageRecipe(PackageRecipe):
     # abstract base class
     ignore = 1
 
+RecipeLoader.addRecipeToCopy(DistroPackageRecipe)
+
 class BuildPackageRecipe(DistroPackageRecipe):
     """
     Packages that need to be built with the make utility and basic standard
@@ -1180,6 +1214,7 @@ class BuildPackageRecipe(DistroPackageRecipe):
     Flags = use.LocalFlags
     # abstract base class
     ignore = 1
+RecipeLoader.addRecipeToCopy(BuildPackageRecipe)
 
 class CPackageRecipe(BuildPackageRecipe):
     """
@@ -1204,6 +1239,7 @@ class CPackageRecipe(BuildPackageRecipe):
     Flags = use.LocalFlags
     # abstract base class
     ignore = 1
+RecipeLoader.addRecipeToCopy(CPackageRecipe)
 
 class AutoPackageRecipe(CPackageRecipe):
     """
@@ -1237,6 +1273,7 @@ class AutoPackageRecipe(CPackageRecipe):
         r.MakeInstall()
     def policy(r):
         pass
+RecipeLoader.addRecipeToCopy(AutoPackageRecipe)
 
 
 class SingleGroup:
