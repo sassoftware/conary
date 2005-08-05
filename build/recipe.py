@@ -1336,8 +1336,11 @@ class SingleGroup:
             cfg.setValue('root', ':memory:')
             oldInstallLabelPath = cfg.installLabelPath
             if not self.autoResolveLabelPath:
-                self.autoResolveLabelPath = labelPath
-            cfg.installLabelPath = self.autoResolveLabelPath
+                resolveLabelPath = labelPath
+            else:
+                resolveLabelPath = [versions.Label(x)
+                                    for x in self.autoResolveLabelPath]
+            cfg.installLabelPath = resolveLabelPath
             oldAutoResolve = cfg.autoResolve
             cfg.autoResolve = True
             # set up a conaryclient to do the dep solving
