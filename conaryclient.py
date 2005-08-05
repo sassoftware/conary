@@ -355,7 +355,8 @@ class ConaryClient:
 
         return redirectHack
 
-    def _mergeGroupChanges(self, cs, uJob, redirectHack, keepExisting, recurse):
+    def _mergeGroupChanges(self, cs, uJob, redirectHack, keepExisting, recurse,
+                           ineligible):
 
         def _newBase(newTrv):
             """
@@ -745,7 +746,7 @@ class ConaryClient:
             absJob = [ x for x in newJob if x[1][0] is None ]
             outdated, eraseList = self.db.outdatedTroves(
                                 [ (x[0], x[2][0], x[2][1]) for x in absJob ],
-                                ineligible = removeSet)
+                                ineligible = removeSet | ineligible)
             newJob = newJob - set(absJob)
 
             outdatedItems = outdated.items()
@@ -937,11 +938,21 @@ class ConaryClient:
 
         # items which are already installed shouldn't be installed again
         present = self.db.hasTroves(newItems)
-        newItems = [ item for item, present 
+
+        # we keep track of items that are considered for update but
+        # are already installed so they don't get removed as a part
+        # of some other update/install
+        oldItems = [ item for item, isPresent 
                             in itertools.izip(newItems, present) 
-                            if not present ]
-        # newItems should also be a unique list
+                            if isPresent ]
+
+        newItems = [ item for item, isPresent 
+                            in itertools.izip(newItems, present) 
+                            if not isPresent ]
+
+        # newItems should be unique 
         newItems = list(set(newItems))
+        oldItems = set(oldItems)
 
         if keepExisting:
             for (name, version, flavor) in newItems:
@@ -950,7 +961,7 @@ class ConaryClient:
         else:
             # everything which needs to be installed is in this list; if 
             # it's not here, it's a duplicate
-            outdated, eraseList = self.db.outdatedTroves(newItems)
+            outdated, eraseList = self.db.outdatedTroves(newItems, oldItems)
             for (name, newVersion, newFlavor), \
                   (oldName, oldVersion, oldFlavor) in outdated.iteritems():
                 changeSetList.append((name, (oldVersion, oldFlavor),
@@ -972,7 +983,8 @@ class ConaryClient:
         redirectHack = self._processRedirects(finalCs, recurse) 
 
         mergeItemList = self._mergeGroupChanges(finalCs, uJob, redirectHack, 
-                                                keepExisting, recurse)
+                                                keepExisting, recurse,
+                                                oldItems)
         if mergeItemList:
             cs = self.repos.createChangeSet(mergeItemList, withFiles = False,
                                             primaryTroveList = [], 

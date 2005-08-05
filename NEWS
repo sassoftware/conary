@@ -12,6 +12,9 @@ Changes in 0.61.7:
     troves to a group add "autoResolve = True" to the recipe class.
     Optionally "autoResolveLabelPath" can be set to a list of labels
     to use during dependency resolution.
+  * Another bug related to updating two troves with the same name has been 
+    fixed, fixing the situation when you were updating two troves of the
+    same name and one of them had already been installed
 
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both
