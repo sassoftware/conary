@@ -1,7 +1,7 @@
 Changes in 0.61.7:
-  * Two bugs in determining which trove to remove when updating two troves of 
-    the same name has been fixed - conary now respects branch affinity, and 
-    it also always removes the old version that is closest in flavor.
+  * Several bugs related to updating two troves with the same name have been 
+    fixed - including branch affinity, flavor affinity, correct handling of 
+    already updated troves, and correct handling of empty flavors.
   * "conary emerge" as root (or as a user than can apply the changeset
     produced by the build) did not install anything but the toplevel
     package.  This bug has been fixed.
@@ -12,9 +12,6 @@ Changes in 0.61.7:
     troves to a group add "autoResolve = True" to the recipe class.
     Optionally "autoResolveLabelPath" can be set to a list of labels
     to use during dependency resolution.
-  * Another bug related to updating two troves with the same name has been 
-    fixed, fixing the situation when you were updating two troves of the
-    same name and one of them had already been installed
 
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both

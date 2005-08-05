@@ -888,8 +888,15 @@ class Trove(streams.LargeStreamSet):
                     # to find the best match.  Doing anything less
                     # may result in incorrect flavor lineups
                     for newFlavor in addedSource.keys():
-                        if not newFlavor or newFlavor in used:
+                        if newFlavor in used:
                             continue
+                        if not newFlavor:
+                            if newFlavor in removedSource:
+                                # match up empty flavors immediately
+                                maxScore = (9999, newFlavor, newFlavor)
+                                break
+                            else:
+                                continue
                         for oldFlavor in removedSource.keys():
                             if not oldFlavor or oldFlavor in used:
                                 continue
