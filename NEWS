@@ -7,6 +7,11 @@ Changes in 0.61.7:
     package.  This bug has been fixed.
   * No longer hide descriptive TroveNotFound errors behind a generic 
     NoNewTroves wrapper
+  * Group recipes can now request that dependencies be resolved and
+    added to the group at cook time.  To automatically add required
+    troves to a group add "autoResolve = True" to the recipe class.
+    Optionally "autoResolveLabelPath" can be set to a list of labels
+    to use during dependency resolution.
 
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both
