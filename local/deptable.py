@@ -1012,7 +1012,7 @@ class DependencyTables:
 
         for depId, troveSet in enumerate(depSolutions):
             if not troveSet: continue
-            depNum = depList[depId][0]
+            depNum = depList[-depId][0]
             depSet = depSetList[depNum]
             result[depSet] = \
                 [ [ (x[0][0], 
