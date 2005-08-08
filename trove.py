@@ -43,7 +43,7 @@ class TroveTuple(streams.StreamSet):
     _streamDict = streams.StreamSetDef(streamDict)
 
     def __hash__(self):
-        return hash((x.name(), x.version(), x.flavor()))
+        return hash((self.name(), self.version(), self.flavor()))
 
 class TroveTupleList(streams.StreamCollection):
     streamDict = { 1 : TroveTuple }
