@@ -12,6 +12,10 @@ Changes in 0.61.7:
     troves to a group add "autoResolve = True" to the recipe class.
     Optionally "autoResolveLabelPath" can be set to a list of labels
     to use during dependency resolution.
+  * Locally stored rollbacks couldn't handle files changing types. As
+    part of the fix, the generic file diff code is now used when creating
+    changesets instead of having a special-case wrapper around it
+    (fileChangeSet())
 
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both

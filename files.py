@@ -261,9 +261,8 @@ class File(streams.StreamSet):
         return ThawFile(self.freeze(), self.thePathId)
 
     def diff(self, other):
-	if self.lsTag != other.lsTag:
-	    d = self.freeze()
-	    return struct.pack(self.headerFormat, 0, len(d)) + d
+	if other is None or self.lsTag != other.lsTag:
+	    return self.freeze()
 
 	rc = [ "\x01", self.lsTag ]
         rc.append(streams.StreamSet.diff(self, other))

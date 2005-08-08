@@ -1114,17 +1114,14 @@ class ChangeSetFromFile(ReadOnlyChangeSet):
 def fileChangeSet(pathId, old, new):
     contentsHash = None
 
+    diff = new.diff(old)
+
     if old and old.__class__ == new.__class__:
-	diff = new.diff(old)
 	if isinstance(new, files.RegularFile) and      \
 		  isinstance(old, files.RegularFile)   \
 		  and new.contents.sha1() != old.contents.sha1():
 	    contentsHash = new.contents.sha1()
-    else:
-	# different classes; these are always written as absolute changes
-	old = None
-	diff = new.freeze()
-	if isinstance(new, files.RegularFile):
+    elif isinstance(new, files.RegularFile):
 	    contentsHash = new.contents.sha1()
 
     return (diff, contentsHash)
