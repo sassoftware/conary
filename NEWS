@@ -16,6 +16,10 @@ Changes in 0.61.7:
     part of the fix, the generic file diff code is now used when creating
     changesets instead of having a special-case wrapper around it
     (fileChangeSet())
+  * The commitaction script and the changemail module did not necessarily
+    show the full trailing version for branches and shadows.  (For example,
+    /conary.rpath.com@rpl:devel/4.1.25-18/db41/19 showed up as "19"
+    instead of "4.1.25-19".)
 
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both
