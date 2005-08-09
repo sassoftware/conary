@@ -19,6 +19,7 @@ import conary
 import conarycfg
 from lib import options, util
 from repository.netclient import NetworkRepositoryClient
+import versions
 import os
 import sys
 import shlex
@@ -74,9 +75,12 @@ def main(argv):
 
     for name, version, flavor in commitList:
         if name[-7:] == ':source':
+            # get full trailing version
+            trailingVersion = versions.VersionFromString(
+                version).trailingRevision().asString()
             # sources are not flavored
             l = srcMap.setdefault(name, [])
-            l.append((version, version.split('/')[-1]))
+            l.append((version, trailingVersion))
         elif ':' in name:
             package, component = name.split(':')
             d = pkgMap.setdefault(package, {})
