@@ -252,9 +252,7 @@ class SqlDbRepository(datastore.DataStoreRepository,
 	self.db.addFile(troveId, pathId, fileObj, path, fileId, version)
 
     def addTrove(self, oldTroveSpec, trove):
-	res = self.db.addTrove(oldTroveSpec, trove)
-        self.commit()
-        return res
+	return self.db.addTrove(oldTroveSpec, trove)
 
     def addTroveDone(self, troveInfo):
 	pass
