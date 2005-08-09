@@ -252,7 +252,9 @@ class SqlDbRepository(datastore.DataStoreRepository,
 	self.db.addFile(troveId, pathId, fileObj, path, fileId, version)
 
     def addTrove(self, oldTroveSpec, trove):
-	return self.db.addTrove(oldTroveSpec, trove)
+	res = self.db.addTrove(oldTroveSpec, trove)
+        self.commit()
+        return res
 
     def addTroveDone(self, troveInfo):
 	pass
@@ -672,6 +674,12 @@ class Database(SqlDbRepository):
 
     def iterFindPathReferences(self, path):
         return self.db.iterFindPathReferences(path)
+
+    def getTrovesWithProvides(self, depSetList):
+        """Returns a dict { depSet : [troveTup, troveTup] } of local 
+           troves that provide each dependency set listed.
+        """
+        return self.db.getTrovesWithProvides(depSetList)
     
     def findTrove(self, labelPath, troveName, reqFlavor=None, 
                                               versionStr = None):

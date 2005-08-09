@@ -1023,6 +1023,59 @@ class DependencyTables:
 
         return result
 
+    def getLocalProvides(self, depSetList):
+        cu = self.db.cursor()
+
+	cu.execute("BEGIN")
+
+        self._createTmpTable(cu, "DepCheck")
+        createDepTable(cu, 'TmpDependencies', isTemp = True)
+        createRequiresTable(cu, 'TmpRequires', isTemp = True)
+
+        depList = [ None ]
+	stmt = cu.compile("INSERT INTO DepCheck VALUES(?, ?, ?, ?, ?, ?, ?)")
+        for i, depSet in enumerate(depSetList):
+            self._populateTmpTable(cu, stmt, depList, -i - 1, 
+                                   depSet, None, multiplier = -1)
+
+
+        self._mergeTmpTable(cu, "DepCheck", "TmpDependencies", "TmpRequires",
+                            None, ("Dependencies", "TmpDependencies"), 
+                            multiplier = -1)
+
+        full = """SELECT depNum, troveName, Versions.version, 
+                         timeStamps, DBFlavors.flavor FROM 
+                        (%s)
+                      INNER JOIN DBInstances ON
+                        provInstanceId == DBInstances.instanceId
+                      INNER JOIN Versions USING(versionId)
+                      INNER JOIN DBFlavors 
+                            ON (DBInstances.flavorId == DBFlavors.flavorId)
+                    """ % self._resolveStmt( "TmpRequires", 
+                                ("Provides",), ("Dependencies",))
+
+        cu.execute(full,start_transaction = False)
+
+        depSolutions = [ [] for x in xrange(len(depList)) ]
+
+        for (depId, troveName, versionStr, timeStamps, flavorStr) in cu:
+            depId = -depId
+            # remember the first version for each troveName/flavorStr pair
+            ts = [ float(x) for x in timeStamps.split(":") ]
+            v = versions.VersionFromString(versionStr, timeStamps=ts)
+            f = deps.ThawDependencySet(flavorStr)
+            depSolutions[depId].append((troveName, v, f))
+
+        result = {}
+
+        for depId, troveSet in enumerate(depSolutions):
+            if not troveSet: continue
+            depNum = depList[-depId][0]
+            depSet = depSetList[depNum]
+            result[depSet] = troveSet
+        self.db.rollback()
+        return result
+
     def __init__(self, db):
         self.db = db
         DepTable(db, "Dependencies")

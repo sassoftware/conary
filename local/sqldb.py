@@ -1397,6 +1397,9 @@ class Database:
     def iterFilesWithTag(self, tag):
 	return self.troveFiles.iterFilesWithTag(tag)
 
+    def getTrovesWithProvides(self, depSetList):
+        return self.depTables.getLocalProvides(depSetList)
+
     def close(self):
 	self.db.close()
 
