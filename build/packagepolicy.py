@@ -1431,10 +1431,10 @@ class ComponentRequires(policy.Policy):
     C{r.ComponentRequires({I{componentname}: I{requiringComponentSet}})}
     and top-level package-specific changes with:
     C{r.ComponentRequires({I{packagename}: {I{componentname}: I{requiringComponentSet}}})}
-    (i.e.  C{r.ComponentRequires({'data', set(('lib',))})} means that in
+    (i.e.  C{r.ComponentRequires({'data': set(('lib',))})} means that in
     all top-level packages (normally just one), only C{:lib} requires
     C{:data}, whereas by default both C{:lib} and C{:runtime} require C{:lib};
-    and C{r.ComponentRequires({'foo', {'data', set(('lib',))}})} makes that
+    and C{r.ComponentRequires({'foo': {'data': set(('lib',))}})} makes that
     same change, but only for the C{foo} package).  C{ComponentRequires} cannot
     require capability flags; use C{Requires} if you need to specify a
     requirement including a capability flag.
