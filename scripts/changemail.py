@@ -102,7 +102,7 @@ def process(repos, cfg, commitList, srcMap, pkgMap, grpMap, argv, otherArgs):
                 old, oldV = checkin.findRelativeVersion(repos, sourceName,
                                                         1, newV)
                 if old:
-                    old = ' (previous: %s)'%oldV.asString().split('/')[-1]
+                    old = ' (previous: %s)'%oldV.trailingRevision().asString()
                 else:
                     old = ''
                 print '================================'
