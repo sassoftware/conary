@@ -216,15 +216,26 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                     for l in lines:
                         print "    " + l
         elif showDeps:
-            for name, dep in (('Provides', trove.provides.deps),
-                              ('Requires', trove.requires.deps)):
-                print '%s:' %name
-                if not dep:
-                    print '     None'
-                else:
-                    lines = str(dep).split('\n')
-                    for l in lines:
-                        print '    ', l
+            troveList = [trove]
+            while troveList:
+                trove = troveList[0]
+                troveList = troveList[1:]
+                if trove.isCollection():
+                    newTroves = sorted(
+                                [ x for x in repos.walkTroveSet(trove)][1:], 
+                                key=lambda y: y.getName())
+                    troveList = newTroves + troveList
+                print trove.getName()
+                for name, dep in (('Provides', trove.provides.deps),
+                                  ('Requires', trove.requires.deps)):
+                    print '  %s:' %name
+                    if not dep:
+                        print '     None'
+                    else:
+                        lines = str(dep).split('\n')
+                        for l in lines:
+                            print '    ', l
+                print
 	else:
 	    if fullVersions or len(troveList) > 1:
 		print _troveFormat % (trove.getName(), troveVersion.asString())

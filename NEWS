@@ -20,6 +20,8 @@ Changes in 0.61.7:
     show the full trailing version for branches and shadows.  (For example,
     /conary.rpath.com@rpl:devel/4.1.25-18/db41/19 showed up as "19"
     instead of "4.1.25-19".)
+  * Add a --deps option for conary q.  Make that and conary rq --deps
+    recurse over collections.
 
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both

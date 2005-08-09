@@ -88,11 +88,12 @@ def usage(rc = 1):
     print '                 --install-label <label>'
     print "                 --root <root>"
     print ""
-    print "query flags:     --full-versions"
+    print "query flags:     --deps"
+    print "                 --full-versions"
     print "                 --ids"
     print "                 --info"
-    print "                 --path <file>"
     print "                 --ls"
+    print "                 --path <file>"
     print "                 --sha1s"
     print "                 --tags"
     print ""
@@ -323,6 +324,8 @@ def realMain(cfg, argv=sys.argv):
 	ls = argSet.has_key('ls')
 	if ls: del argSet['ls']
 
+	deps = argSet.pop('deps', False)
+
 	ids = argSet.has_key('ids')
 	if ids: del argSet['ids']
 
@@ -339,7 +342,7 @@ def realMain(cfg, argv=sys.argv):
 	if len(otherArgs) >= 2:
 	    try:
                 display.displayTroves(db, otherArgs[2:], paths, ls, ids, sha1s,
-                                      fullVersions, tags, info=info)
+                                      fullVersions, tags, info=info, deps=deps)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
 		return 1

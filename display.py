@@ -179,7 +179,7 @@ def _printOneTroveName(db, troveName, troveDict, fullVersions, info):
 
 def displayTroves(db, troveNameList = [], pathList = [], ls = False, 
                   ids = False, sha1s = False, fullVersions = False, 
-                  tags = False, info=False):
+                  tags = False, info=False, deps=False):
     (troveNames, hasVersions, hasFlavors) = \
         parseTroveStrings(troveNameList)
 
@@ -190,7 +190,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
 	troveNames.sort()
 
     if not hasVersions and not hasFlavors and not ls and not ids and \
-                                              not sha1s and not tags:
+                                          not sha1s and not tags and not deps:
         
         troveDict = {}
         for path in pathList:
@@ -219,7 +219,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
     for path in pathList:
         for trove in db.iterTrovesByPath(path):
 	    _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags, 
-                                                                info)
+                                                                info, deps)
 
     for (troveName, versionStr, flavor) in troveNames:
         try:
@@ -227,7 +227,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
                 # db.getTrove returns the pristine trove by default
                 trove = db.getTrove(*trove)
                 _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, 
-                                  tags, info)
+                                  tags, info, deps)
         except repository.TroveNotFound:
             if versionStr:
                 log.error("version %s of trove %s is not installed",
@@ -235,7 +235,8 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
             else:
                 log.error("trove %s is not installed", troveName)
         
-def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags, info):
+def _displayTroveInfo(db, trove, ls, ids, sha1s, 
+                      fullVersions, tags, info, showDeps):
 
     version = trove.getVersion()
     flavor = trove.getFlavor()
@@ -297,6 +298,26 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags, info):
                               trove.getVersion(), trove.getFlavor()) ])[0])))
         print "Flavor    : %s" % deps.formatFlavor(trove.getFlavor())
         print "Requires  : %s" % trove.getRequires()
+    elif showDeps:
+        troveList = [trove]
+        while troveList:
+            trove = troveList[0]
+            troveList = troveList[1:]
+            newTroves = sorted([ x for x in db.walkTroveSet(trove)][1:], 
+                                key=lambda y: y.getName())
+            troveList = newTroves + troveList
+
+            print trove.getName()
+            for name, dep in (('Provides', trove.getProvides()),
+                              ('Requires', trove.getRequires())):
+                print '  %s:' %name
+                if not dep:
+                    print '     None'
+                else:
+                    lines = str(dep).split('\n')
+                    for l in lines:
+                        print '    ', l
+            print 
     else:
         if fullVersions:
             print _troveFormat % (trove.getName(), version.asString())
