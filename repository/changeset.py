@@ -546,7 +546,7 @@ class ChangeSet(streams.LargeStreamSet):
 		    else:
 			fsFile = None
 
-		    if fsFile and \
+		    if fsFile and fsFile.hasContents and \
 			    fsFile.contents.sha1() == fileObj.contents.sha1():
 			# the contents in the file system are right
 			cont = filecontents.FromFilesystem(fullPath)
