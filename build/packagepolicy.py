@@ -1543,7 +1543,7 @@ def _getmonodis(macros, recipe, path):
     # For bootstrapping purposes, prefer the just-built version if
     # it exists
     if os.access('%(destdir)s/%(monodis)s' %macros, os.X_OK):
-        return ('MONO_PATH=%(destdir)s%(libdir)s'
+        return ('MONO_PATH=%(destdir)s%(prefix)s/lib'
                 ' LD_LIBRARY_PATH=%(destdir)s%(libdir)s'
                 ' %(destdir)s/%(monodis)s' %macros)
     elif os.access('%(monodis)s' %macros, os.X_OK):
