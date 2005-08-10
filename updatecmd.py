@@ -217,9 +217,12 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                   depsRecurse = True, test = False,
                                   justDatabase = False, recurse = True,
                                   info = False, updateByDefault = True,
-                                  callback = None, split = True):
+                                  callback = None, split = True,
+                                  updateThreshold = None):
     if not callback:
         callback = callbacks.UpdateCallback()
+    if updateThreshold is None:
+        updateThreshold = cfg.updateThreshold
 
     applyList = []
 
@@ -249,7 +252,8 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                       depsRecurse = depsRecurse, test = test,
                       justDatabase = justDatabase, recurse = recurse,
                       info = info, updateByDefault = updateByDefault,
-                      callback = callback, split = split)
+                      callback = callback, split = split,
+                      updateThreshold = updateThreshold)
     except conaryclient.DependencyFailure, e:
         # XXX print dependency errors because the testsuite 
         # prefers it
@@ -268,7 +272,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   depsRecurse = True, test = False,
                                   justDatabase = False, recurse = True,
                                   info = False, updateByDefault = True,
-                                  callback = None, split=True):
+                                  callback = None, split=True,
+                                  updateThreshold = 10):
     client = conaryclient.ConaryClient(cfg)
 
     if not info:
@@ -281,7 +286,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                            keepExisting = keepExisting,
                            test = test, recurse = recurse,
                            updateByDefault = updateByDefault,
-                           callback = callback, split = split)
+                           callback = callback, split = split,
+                           updateThreshold = updateThreshold)
 
     if info:
         callback.done()

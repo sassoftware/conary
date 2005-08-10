@@ -26,6 +26,7 @@ Changes in 0.61.7:
     and for TagSpecs applied via tag description files.
   * A bug in updating groups that switch the byDefault setting of troves
     has been fixed
+  * add an updateThreshold config option
 
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both

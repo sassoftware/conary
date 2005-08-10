@@ -305,6 +305,7 @@ class ConaryConfiguration(ConfigFile):
         'localRollbacks'        : [ BOOL, False ],
 	'lookaside'		: '/var/cache/conary',
 	'name'			: None,
+	'updateThreshold'       : [ INT, 10],
 	'repositoryMap'	        : [ STRINGDICT, {} ],
 	'root'			: '/',
 	'sourceSearchDir'	: '.',
