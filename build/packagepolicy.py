@@ -1921,7 +1921,8 @@ class EnforceSonameBuildRequirements(policy.Policy):
                 # in case things do not look so obvious...
                 pathList = []
                 for path in pathMap:
-                    if pathMap[path].requires() & dep:
+                    pkgfile = pathMap[path]
+                    if pkgfile.hasContents and (pkgfile.requires() & dep):
                         pathList.append(path)
                         l = pathReqMap.setdefault(path, [])
                         l.append(dep)
