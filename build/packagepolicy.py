@@ -829,13 +829,13 @@ class TagSpec(_addInfo):
             self.dbg('%s: %s', name, path)
             tags.set(tag)
             if tagFile:
-                for trove in self.db.iterTrovesByPath(tagFile.file):
+                for trove in self.db.iterTrovesByPath(tagFile.tagFile):
                     troveName = trove.getName()
                     if troveName not in self.recipe.buildRequires:
                         # XXX should be error, change after bootstrap
                         self.warn("%s assigned by %s to file %s, so add '%s'"
                                    ' to buildRequires or call r.TagSpec()'
-                                   %(tag, tagFile.file, path, troveName))
+                                   %(tag, tagFile.tagFile, path, troveName))
 
     def runInfo(self, path):
         for tag in self.included:
