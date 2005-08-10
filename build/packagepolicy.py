@@ -834,7 +834,7 @@ class TagSpec(_addInfo):
                     if troveName not in self.recipe.buildRequires:
                         # XXX should be error, change after bootstrap
                         self.warn("%s assigned by %s to file %s, so add '%s'"
-                                   ' to buildRequires'
+                                   ' to buildRequires or call r.TagSpec()'
                                    %(tag, tagFile.file, path, troveName))
 
     def runInfo(self, path):
