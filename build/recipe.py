@@ -1233,6 +1233,7 @@ class CPackageRecipe(BuildPackageRecipe):
         'glibc:runtime',
         'glibc:lib',
         'glibc:devellib',
+        'glibc:devel',
         'debugedit:runtime',
     ]
     buildRequires.extend(BuildPackageRecipe.buildRequires)

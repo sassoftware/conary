@@ -22,6 +22,8 @@ Changes in 0.61.7:
     instead of "4.1.25-19".)
   * Add a --deps option for conary q.  Make that and conary rq --deps
     recurse over collections.
+  * Warn about missing buildRequires entries both for soname dependencies
+    and for TagSpecs applied via tag description files.
 
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both

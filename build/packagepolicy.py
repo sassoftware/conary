@@ -27,6 +27,7 @@ import re
 import stat
 
 import buildpackage
+from local import database
 from deps import deps
 import destdirpolicy
 import files
@@ -810,9 +811,10 @@ class TagSpec(_addInfo):
 		for filename in os.listdir(directory):
 		    path = util.joinPaths(directory, filename)
 		    self.tagList.append(tags.TagFile(path, recipe.macros, True))
+        self.db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
         _addInfo.doProcess(self, recipe)
 
-    def markTag(self, name, tag, path):
+    def markTag(self, name, tag, path, tagFile=None):
         # commonly, a tagdescription will nominate a file to be
         # tagged, but it will also be set explicitly in the recipe,
         # and therefore markTag will be called twice.
@@ -826,6 +828,14 @@ class TagSpec(_addInfo):
         if tag not in tags:
             self.dbg('%s: %s', name, path)
             tags.set(tag)
+            if tagFile:
+                for trove in self.db.iterTrovesByPath(tagFile.file):
+                    troveName = trove.getName()
+                    if troveName not in self.recipe.buildRequires:
+                        # XXX should be error, change after bootstrap
+                        self.warn("%s assigned by %s to file %s, so add '%s'"
+                                   ' to buildRequires'
+                                   %(tag, tagFile.file, path, troveName))
 
     def runInfo(self, path):
         for tag in self.included:
@@ -858,7 +868,7 @@ class TagSpec(_addInfo):
                             isExcluded = True
 			    break
                 if not isExcluded:
-		    self.markTag(name, tag.tag, path)
+		    self.markTag(name, tag.tag, path, tag)
 
 
 class ParseManifest(policy.Policy):
@@ -1861,6 +1871,84 @@ class Flavor(policy.Policy):
 
 
 
+class EnforceSonameBuildRequirements(policy.Policy):
+    """
+    Test to make sure that each requires dependency in the package
+    is matched by a suitable element in the C{buildRequires} list.
+    """
+    # XXX implement exceptions?  if so, regexps for str(dep) form
+    def do(self):
+        missingBuildRequires = []
+
+	components = self.recipe.autopkg.components
+        pathMap = self.recipe.autopkg.pathMap
+        pathReqMap = {}
+
+        reqDepSet = deps.DependencySet()
+        provDepSet = deps.DependencySet()
+        for pkg in components.values():
+            reqDepSet.union(pkg.requires)
+            provDepSet.union(pkg.provides)
+        depSet = deps.DependencySet()
+        depSet.union(reqDepSet - provDepSet)
+
+        sonameDeps = depSet.getDepClasses().get(deps.DEP_CLASS_SONAME, None)
+        if not sonameDeps:
+            return
+
+        depSetList = [ ]
+        for dep in sonameDeps.getDeps():
+            depSet = deps.DependencySet()
+            depSet.addDep(deps.SonameDependencies, dep)
+            depSetList.append(depSet)
+
+        db = database.Database(self.recipe.cfg.root, self.recipe.cfg.dbPath)
+        localProvides = db.getTrovesWithProvides(depSetList)
+
+        for dep in localProvides:
+            develCandidates = [
+                x[0].replace(':lib', ':devel')
+                for x in localProvides[dep] if x[0].endswith(':lib') ]
+            if [ x for x in develCandidates
+                 if x not in self.recipe.buildRequires ] :
+                # We have at least one file that uses a library that
+                # is not reflected in the buildRequires list.  Add all
+                # the candidates to the summary message that will be
+                # printed last (it's normally all you need)
+                missingBuildRequires.extend(develCandidates)
+
+                # Now give lots of specific information to help the packager
+                # in case things do not look so obvious...
+                pathList = []
+                for path in pathMap:
+                    if pathMap[path].requires() & dep:
+                        pathList.append(path)
+                        l = pathReqMap.setdefault(path, [])
+                        l.append(dep)
+                if pathList:
+                    self.warn('buildRequires %s needed to satisfy "%s"'
+                              ' for files: %s'
+                              %(str(develCandidates), str(dep),
+                                ', '.join(sorted(pathList))))
+
+        if pathReqMap:
+            for path in pathReqMap:
+                self.warn('file %s has unsatisfied build requirements "%s"'
+                          %(path, '", "'.join([
+                             str(x) for x in sorted(
+                                list(set(pathReqMap[path])))])))
+
+        if missingBuildRequires:
+            # XXX this needs to be self.error, but we need to do a
+            # bootstrap pass first to clean up buildRequires so that
+            # compiles do not instantly grind to a halt...
+            self.warn('add to buildRequires: %s'
+                       %str(sorted(list(set(missingBuildRequires)))))
+            # one special case:
+            if missingBuildRequires == [ 'glibc:devel' ]:
+                self.warn('consider CPackageRecipe or AutoPackageRecipe')
+
+
 class reportErrors(policy.Policy):
     """
     This class is used to pull together all package errors in the
@@ -1934,6 +2022,7 @@ def DefaultPolicy(recipe):
 	Requires(recipe),
 	Provides(recipe),
 	Flavor(recipe),
+        EnforceSonameBuildRequirements(recipe),
 	reportErrors(recipe),
     ]
 
