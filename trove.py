@@ -460,9 +460,9 @@ class Trove(streams.LargeStreamSet):
 
             for (name, changeList) in trvCs.iterChangedTroves():
                 for (changeType, version, flavor, byDef) in changeList:
-                    # XXX we need to do something smarter here
-                    assert(changeType != '~')
-
+                    if changeType == '~':
+                        job.append((name, (version, flavor),
+                                          (version, flavor), byDef))
             return set(job)
 
         def applyJob(jobSet, skipNotByDefault = False):
@@ -494,8 +494,8 @@ class Trove(streams.LargeStreamSet):
         secondaryIndex = {}
         for job in secondaryJob:
             (name, oldInfo, newInfo, byDefault) = job
-            assert((name, oldInfo[0], oldInfo[1]) not in secondaryIndex)
-            assert((name, newInfo[0], newInfo[1]) not in secondaryIndex)
+            assert((name, (oldInfo[0], oldInfo[1])) not in secondaryIndex)
+            assert((name, (newInfo[0], newInfo[1])) not in secondaryIndex)
             if oldInfo[0]:
                 secondaryIndex[(name, oldInfo)] = job
             if newInfo[0]:
@@ -515,9 +515,20 @@ class Trove(streams.LargeStreamSet):
             keepSecondary = True
             keepPrimary = True
 
-            assert(oldOverlap != newOverlap)
-
-            if oldOverlap is None:
+            if oldOverlap == newOverlap:
+                # both primary and secondary jobs are updating from the same 
+                # trove and updating to the same trove.  They also both 
+                # started out with the same byDefault value.
+                # The primary and secondary job must differ by their 
+                # byDefault value.  Keep whichever update twiddles the by
+                # default bit.
+                origByDefault = self.includeTroveByDefault(name, 
+                                                     oldInfo[0], oldInfo[1])
+                if byDefault == origByDefault:
+                    keepPrimary = False
+                else:
+                    keepSecondary = False
+            elif oldOverlap is None:
                 # They diverge from different places and end up at the same
                 # place. This can't happen since both diffs are from the
                 # same trove (self).
@@ -557,8 +568,6 @@ class Trove(streams.LargeStreamSet):
                     if oldOverlap[2][0] is not None:
                         del secondaryIndex[(oldOverlap[0], oldOverlap[2])]
                     secondaryJob.remove(oldOverlap)
-
-                assert(newOverlap is None)
 
         for job in primaryRemoveList:
             primaryJob.remove(job)
