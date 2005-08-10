@@ -24,6 +24,8 @@ Changes in 0.61.7:
     recurse over collections.
   * Warn about missing buildRequires entries both for soname dependencies
     and for TagSpecs applied via tag description files.
+  * A bug in updating groups that switch the byDefault setting of troves
+    has been fixed
 
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both
