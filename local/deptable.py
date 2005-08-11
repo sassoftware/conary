@@ -772,33 +772,32 @@ class DependencyTables:
         # in the repository, but that something is being explicitly removed
         # and adding it back would be a bit rude!)
         cu.execute("""
-                SELECT depId, depNum, RemovedTroveIds.troveId, RemovedTroveIds.nodeId,
-                       provInstanceId
+                SELECT depId, depNum, reqInstanceId, Required.nodeId,
+                       provInstanceId, Provided.nodeId
 		    FROM
 			(%s) 
-                    LEFT OUTER JOIN RemovedTroveIds ON
-                        provInstanceId == RemovedTroveIds.troveId
-                    LEFT OUTER JOIN RemovedTroveIds AS Removed ON
-                        reqInstanceId == Removed.troveId
-                    WHERE 
-                        Removed.troveId IS NULL
+                    LEFT OUTER JOIN RemovedTroveIds AS Required ON
+                        reqInstanceId == Required.troveId
+                    LEFT OUTER JOIN RemovedTroveIds AS Provided ON
+                        provInstanceId == Provided.troveId
                 """ % self._resolveStmt("TmpRequires",
                                         ("Provides", "TmpProvides"),
                                         ("Dependencies", "TmpDependencies")))
-
+	result = [ x for x in cu ]
 	# XXX there's no real need to instantiate this; we're just doing
 	# it for convienence while this code gets reworked
-	result = [ x for x in cu ]
         cu2 = self.db.cursor()
-        for (depId, depNum, removedInstanceId, removedNodeIdx, provInstId) \
-                        in result:
+        for (depId, depNum, reqInstId, reqNodeIdx, 
+             provInstId, provNodeIdx) in result:
 	    if depNum < 0:
                 assert(depList[-depNum][0] < 0)
                 fromNodeId = -depList[-depNum][0]
 
-		if removedInstanceId is not None:
+		if provNodeIdx is not None:
 		    # new trove depends on something old
-                    toNodeId = removedNodeIdx
+                    toNodeId = provNodeIdx
+                    if fromNodeId == toNodeId:
+                        continue
                     newOldEdges.add((fromNodeId, toNodeId, depId))
 		elif provInstId > 0:
 		    # new trove depends on something already installed
@@ -807,33 +806,39 @@ class DependencyTables:
 		else:
 		    # new trove depends on something new
                     toNodeId = -provInstId
+                    if fromNodeId == toNodeId:
+                        continue
                     newNewEdges.add((fromNodeId, toNodeId, depId))
-	    else:
-                # XXX this should probably get batched 
-                # Turn the depNum into a list of things being erased which
-                # require that item
-                cu2.execute("SELECT DISTINCT instanceId FROM Requires WHERE "
-                            "Requires.depNum = ?", depNum)
-                fromNodeIds = [ x[0] for x in cu2 ]
-
-                edgeSet = None
-		if removedInstanceId is not None:
-		    # old trove depends on something old
-                    toNodeId = removedNodeIdx
-                    edgeSet = oldOldEdges
-		elif provInstId > 0:
-		    # old trove depends on something already installed
-		    # which is not being removed. not interesting.
-		    pass
-		else:
-		    # old trove depends on something new
-                    toNodeId = -(provInstId + 1)
-                    edgeSet = oldNewEdges
-
-                if edgeSet:
-                    for fromNodeId in fromNodeIds:
-                        edgeSet.add((fromNodeId, toNodeId, depId))
-
+	    else: # dependency was provided by something before this 
+                  # update occurred
+                if reqNodeIdx is not None:
+                    fromNodeId = reqNodeIdx
+                    # requirement is old
+                    if provNodeIdx is not None:
+                        # provider is old
+                        toNodeId = provNodeIdx
+                        if fromNodeId == toNodeId:
+                            continue
+                        oldOldEdges.add((fromNodeId, toNodeId, depId))
+                    else:
+                        # provider is new
+                        toNodeId = -provInstId
+                        if fromNodeId == toNodeId:
+                            continue
+                        oldNewEdges.add((fromNodeId, toNodeId, depId))
+                else:
+                    # trove with the requirement is not being removed.
+                    if provNodeIdx is None: 
+                        # the trove that provides this requirement is being
+                        # installed.  We probably don't care.
+                        continue
+                    else:
+                        # the trove that provides this requirement is being
+                        # removed.  We probably care -- if this dep is
+                        # being provided by some other package, we need
+                        # to connect these two packages
+                        # XXX fix this
+                        continue
         changeSetList = []
         if findOrdering:
             # Remove nodes which cancel each other
@@ -902,9 +907,13 @@ class DependencyTables:
         brokenByErase = {}
         unresolveable = [ None ] * (len(depList) + 1)
         satisfied = []
-        for (depId, depNum, removedInstanceId, removedNodeIdx, provInstId) \
-                        in result:
-            if removedInstanceId is not None:
+        for (depId, depNum, reqInstanceId, 
+             reqNodeIdx, provInstId, provNodeIdx) in result:
+            if provNodeIdx is not None:
+                if reqNodeIdx is not None:
+                    # this is an old dependency and an old provide.  
+                    # ignore it
+                    continue
                 if depNum < 0:
                     # the dependency would have been resolved, but this
                     # change set removes what would have resolved it
