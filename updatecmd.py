@@ -318,9 +318,12 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
 
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
-              depsRecurse = True, test = False, showItems = False):
+              depsRecurse = True, test = False, showItems = False,
+              updateThreshold = None):
     client = conaryclient.ConaryClient(cfg)
     updateItems = client.fullUpdateItemList()
+    if updateThreshold is None:
+        updateThreshold = cfg.updateThreshold
 
     if showItems:
         for (name, version, flavor) in sorted(updateItems, key=lambda x:x[0]):
@@ -340,7 +343,8 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
         callback = UpdateCallback()
         _updateTroves(cfg, updateItems, replaceFiles = replaceFiles, 
                       depCheck = depCheck, depsRecurse = depsRecurse, 
-                      test = test, info = info, callback = callback)
+                      test = test, info = info, callback = callback,
+                      updateThreshold = updateThreshold)
     except conaryclient.DependencyFailure, e:
         log.error(e)
     except conaryclient.UpdateError, e:
