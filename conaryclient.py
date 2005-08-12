@@ -505,7 +505,7 @@ class ConaryClient:
                     # the node is marked to erase multiple times in
                     # newJob! 
                     idx = nodeIdx[info]
-                    otherState = nodeList[idx][3]
+                    otherState = nodeList[idx][1]
                     assert(state is UNKNOWN or otherState is UNKNOWN)
                     if otherState is UNKNOWN:
                         nodeList[idx] = [ (info, state, [], fromUpdate) ]
