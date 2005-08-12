@@ -1035,7 +1035,7 @@ class ConaryClient:
     def updateChangeSet(self, itemList, keepExisting = False, recurse = True,
                         depsRecurse = True, resolveDeps = True, test = False,
                         updateByDefault = True, callback = UpdateCallback(),
-                        split = False, updateThreshold=10):
+                        split = False):
         """
         Creates a changeset to update the system based on a set of trove update
         and erase operations.
@@ -1066,10 +1066,6 @@ class ConaryClient:
         @type L{callbacks.UpdateCallback}
         @param split: Split large update operations into separate jobs.
         @type split: bool
-        @param updateThreshold: batch update jobs together until there is
-        either a natural break by package, or this updateThreshold limit
-        is reached.  0 means only split at packages. 
-        @type updateThreshold: int
         @rtype: tuple
         """
         callback.preparingChangeSet()
@@ -1082,6 +1078,7 @@ class ConaryClient:
                                         updateMode = updateByDefault)
 
         split = split and splittable
+        updateThreshold = self.cfg.updateThreshold
 
         # When keep existing is provided none of the changesets should
         # be relative (since relative change sets, by definition, cause
@@ -1132,7 +1129,8 @@ class ConaryClient:
                         assert(trvCs.getOldFlavor() == oldFlavor)
                         newCs.newTrove(trvCs)
 
-                if foundCollection or (updateThreshold and (count >= updateThreshold)): 
+                if (foundCollection or 
+                    (updateThreshold and (count >= updateThreshold))): 
                     uJob.addChangeSet(newCs)
                     startNew = True
 

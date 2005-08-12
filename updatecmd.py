@@ -217,12 +217,9 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                                   depsRecurse = True, test = False,
                                   justDatabase = False, recurse = True,
                                   info = False, updateByDefault = True,
-                                  callback = None, split = True,
-                                  updateThreshold = None):
+                                  callback = None, split = True):
     if not callback:
         callback = callbacks.UpdateCallback()
-    if updateThreshold is None:
-        updateThreshold = cfg.updateThreshold
 
     applyList = []
 
@@ -252,8 +249,7 @@ def doUpdate(cfg, pkgList, replaceFiles = False, tagScript = None,
                       depsRecurse = depsRecurse, test = test,
                       justDatabase = justDatabase, recurse = recurse,
                       info = info, updateByDefault = updateByDefault,
-                      callback = callback, split = split,
-                      updateThreshold = updateThreshold)
+                      callback = callback, split = split)
     except conaryclient.DependencyFailure, e:
         # XXX print dependency errors because the testsuite 
         # prefers it
@@ -272,8 +268,8 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                                   depsRecurse = True, test = False,
                                   justDatabase = False, recurse = True,
                                   info = False, updateByDefault = True,
-                                  callback = None, split=True,
-                                  updateThreshold = 10):
+                                  callback = None, split=True):
+
     client = conaryclient.ConaryClient(cfg)
 
     if not info:
@@ -286,8 +282,7 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
                            keepExisting = keepExisting,
                            test = test, recurse = recurse,
                            updateByDefault = updateByDefault,
-                           callback = callback, split = split,
-                           updateThreshold = updateThreshold)
+                           callback = callback, split = split)
 
     if info:
         callback.done()
@@ -318,12 +313,9 @@ def _updateTroves(cfg, applyList, replaceFiles = False, tagScript = None,
 
 
 def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
-              depsRecurse = True, test = False, showItems = False,
-              updateThreshold = None):
+              depsRecurse = True, test = False, showItems = False):
     client = conaryclient.ConaryClient(cfg)
     updateItems = client.fullUpdateItemList()
-    if updateThreshold is None:
-        updateThreshold = cfg.updateThreshold
 
     if showItems:
         for (name, version, flavor) in sorted(updateItems, key=lambda x:x[0]):
@@ -343,8 +335,7 @@ def updateAll(cfg, info = False, depCheck = True, replaceFiles = False,
         callback = UpdateCallback()
         _updateTroves(cfg, updateItems, replaceFiles = replaceFiles, 
                       depCheck = depCheck, depsRecurse = depsRecurse, 
-                      test = test, info = info, callback = callback,
-                      updateThreshold = updateThreshold)
+                      test = test, info = info, callback = callback)
     except conaryclient.DependencyFailure, e:
         log.error(e)
     except conaryclient.UpdateError, e:
