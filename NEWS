@@ -1,3 +1,7 @@
+Changes in 0.61.8:
+  * Fix a bug introduced in 0.61.7 that occurred when, in the repository,
+    either the Users table or Groups table was empty when creating a new group.
+
 Changes in 0.61.7:
   * Several bugs related to updating two troves with the same name have been 
     fixed - including branch affinity, flavor affinity, correct handling of 

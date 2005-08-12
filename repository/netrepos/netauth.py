@@ -216,8 +216,10 @@ class NetworkAuthorization:
 
         try:
             cu.execute("""INSERT INTO UserGroups 
-    SELECT MAX(MAX(u.userId), MAX(g.userGroupId))+1, ? 
-    FROM Users u, UserGroups g""", user)
+    SELECT MAX(
+        (SELECT IFNULL(MAX(userId),0) FROM Users),
+        (SELECT IFNULL(MAX(userGroupId),0) FROM UserGroups)
+    )+1, ? """, user)
         except sqlite3.ProgrammingError, e:
             if str(e) == 'column userGroup is not unique':
                 raise GroupAlreadyExists, 'group: %s' % user
