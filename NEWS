@@ -1,4 +1,6 @@
 Changes in 0.61.7:
+  * Fixed a bug that occurred when groups tied to a user were deleted
+    without deleting the associated user, and subsequently adding a user.
   * Several bugs related to updating two troves with the same name have been 
     fixed - including branch affinity, flavor affinity, correct handling of 
     already updated troves, and correct handling of empty flavors.

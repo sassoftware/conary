@@ -207,14 +207,17 @@ class NetworkAuthorization:
 
     def addUserByMD5(self, user, salt, password):
 
-        # insert into userGroups first; since every entry in users is
-        # also in userGroups, the uniqueness constraint on the 
-        # userGroups table ensures uniqueness in both, and lets us use
-        # the userGroupId as the userId as well
+        #Insert the UserGroup first, but since usergroups can be added 
+        #and deleted at will, and sqlite uses a MAX(id)+1 approach to 
+        #sequencing, use max(userId, userGroupId)+1 so that userId and
+        #userGroupId can be in sync.  This will leave lots of holes, and
+        #will probably need to be changed if conary moves to another db.
         cu = self.db.cursor()
 
         try:
-            cu.execute("INSERT INTO UserGroups VALUES (NULL, ?)", user)
+            cu.execute("""INSERT INTO UserGroups 
+    SELECT MAX(MAX(u.userId), MAX(g.userGroupId))+1, ? 
+    FROM Users u, UserGroups g""", user)
         except sqlite3.ProgrammingError, e:
             if str(e) == 'column userGroup is not unique':
                 raise GroupAlreadyExists, 'group: %s' % user
@@ -416,6 +419,11 @@ class NetworkAuthorization:
         cu.execute("DELETE FROM Permissions WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM UserGroupMembers WHERE userGroupId=?", userGroupId)
         cu.execute("DELETE FROM UserGroups WHERE userGroupId=?", userGroupId)
+
+        #Note, there could be a user left behind with no associated group 
+        #if the group being deleted was created with a user.  This user is not
+        #deleted because it is possible for this user to be a member of
+        #another group.
         if commit:
             self.db.commit()
 
