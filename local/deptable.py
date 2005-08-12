@@ -382,25 +382,26 @@ class DependencyTables:
 		dependency failures caused by removal of existing
 		packages
 	"""
-        def _depItemsToSet(depInfoList):
+        def _depItemsToSet(idxList, depInfoList):
             failedSets = [ (x, None, None) for x in troveNames]
 
-            for depInfo in depInfoList:
-                if depInfo is not None:
-                    (troveIndex, classId, dep) = depInfo
+            for idx in idxList:
+                depInfo = depInfoList[-idx]
 
-                    if classId in [ deps.DEP_CLASS_ABI ]:
-                        continue
+                (troveIndex, classId, dep) = depInfo
 
-                    missingDeps = True
-                    troveIndex = -(troveIndex + 1)
+                if classId in [ deps.DEP_CLASS_ABI ]:
+                    continue
 
-                    if failedSets[troveIndex][2] is None:
-                        failedSets[troveIndex] = (failedSets[troveIndex][0],
-                                                  failedSets[troveIndex][1],
-                                                  deps.DependencySet())
-                    failedSets[troveIndex][2].addDep(
-                                    deps.dependencyClasses[classId], dep)
+                missingDeps = True
+                troveIndex = -(troveIndex + 1)
+
+                if failedSets[troveIndex][2] is None:
+                    failedSets[troveIndex] = (failedSets[troveIndex][0],
+                                              failedSets[troveIndex][1],
+                                              deps.DependencySet())
+                failedSets[troveIndex][2].addDep(
+                                deps.dependencyClasses[classId], dep)
 
             failedList = []
             for (name, classId, depSet) in failedSets:
@@ -409,13 +410,13 @@ class DependencyTables:
 
             return failedList
 
-        def _brokenItemsToSet(cu, depIdList):
+        def _brokenItemsToSet(cu, depIdSet):
             # this only works for databases (not repositories)
-            if not depIdList: return []
+            if not depIdSet: return []
 
             cu.execute("CREATE TEMPORARY TABLE BrokenDeps (depNum INTEGER)",
                        start_transaction = False)
-            for depNum in depIdList:
+            for depNum in depIdSet:
                 cu.execute("INSERT INTO BrokenDeps VALUES (?)", depNum,
                            start_transaction = False)
 
@@ -445,6 +446,67 @@ class DependencyTables:
             cu.execute("DROP TABLE BrokenDeps", start_transaction = False)
 
             return failedSets.items()
+
+        def _createEdges(result, depList):
+            oldNewEdges = set()
+            oldOldEdges = set()
+            newNewEdges = set()
+            newOldEdges = set()
+
+            for (depId, depNum, reqInstId, reqNodeIdx, 
+                 provInstId, provNodeIdx) in result:
+                if depNum < 0:
+                    fromNodeId = -depList[-depNum][0]
+                    assert(fromNodeId > 0)
+
+                    if provNodeIdx is not None:
+                        # new trove depends on something old
+                        toNodeId = provNodeIdx
+                        if fromNodeId == toNodeId:
+                            continue
+                        newOldEdges.add((fromNodeId, toNodeId, depId))
+                    elif provInstId > 0:
+                        # new trove depends on something already installed
+                        # which is not being removed. not interesting.
+                        pass
+                    else:
+                        # new trove depends on something new
+                        toNodeId = -provInstId
+                        if fromNodeId == toNodeId:
+                            continue
+                        newNewEdges.add((fromNodeId, toNodeId, depId))
+                else: # dependency was provided by something before this 
+                      # update occurred
+                    if reqNodeIdx is not None:
+                        fromNodeId = reqNodeIdx
+                        # requirement is old
+                        if provNodeIdx is not None:
+                            # provider is old
+                            toNodeId = provNodeIdx
+                            if fromNodeId == toNodeId:
+                                continue
+                            oldOldEdges.add((fromNodeId, toNodeId, depId))
+                        else:
+                            # provider is new
+                            toNodeId = -provInstId
+                            if fromNodeId == toNodeId:
+                                continue
+                            oldNewEdges.add((fromNodeId, toNodeId, depId))
+                    else:
+                        # trove with the requirement is not being removed.
+                        if provNodeIdx is None: 
+                            # the trove that provides this requirement is being
+                            # installed.  We probably don't care.
+                            continue
+                        else:
+                            # the trove that provides this requirement is being
+                            # removed.  We probably care -- if this dep is
+                            # being provided by some other package, we need
+                            # to connect these two packages
+                            # XXX fix this
+                            continue
+
+            return oldNewEdges, oldOldEdges, newNewEdges, newOldEdges
 
         def _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges):
             # these edges cancel each other out -- for example, if Foo
@@ -634,18 +696,11 @@ class DependencyTables:
         # operations should occur after this nodes (the two lists form
         # the ordering graph and it's transpose)
         nodes = [ None ]
-        # there are four kinds of edges -- old needs old, old needs new,
-        # new needs new, and new needs old. Each edge carries a depId
-        # to aid in cancelling them out. Our initial edge representation
-        # is a simple dict of edges.
-        oldNewEdges = set()
-        oldOldEdges = set()
-        newNewEdges = set()
-        newOldEdges = set()
+
         troveInfo = {}
 
 	# This sets up negative depNum entries for the requirements we're
-	# checking (multiplier = -1 makse them negative), with (-1 * depNum) 
+	# checking (multiplier = -1 makes them negative), with (-1 * depNum) 
 	# indexing depList. depList is a list of (troveNum, depClass, dep) 
 	# tuples. Like for depNum, negative troveNum values mean the
 	# dependency was part of a new trove.
@@ -672,18 +727,6 @@ class DependencyTables:
 		oldInfo = None
 
             nodes.append((trvCs, set(), set()))
-
-        # Create dependencies from collections to the things they include.
-        # This forces collections to be installed after all of their
-        # elements
-        for i, trvCs in enumerate(changeSet.iterNewTroveList()):
-            for (name, changeList) in trvCs.iterChangedTroves():
-                for (changeType, version, flavor, byDef) in changeList:
-                    if changeType == '+':
-                        targetTrove = troveInfo.get((name, version, flavor), -1)
-                        if targetTrove >= 0:
-                            newNewEdges.add((i + 1, targetTrove, None))
-        del troveInfo
 
         # create the index for DepCheck
         self._createTmpTable(cu, "DepCheck", makeTable = False)
@@ -786,60 +829,74 @@ class DependencyTables:
 	result = [ x for x in cu ]
 	# XXX there's no real need to instantiate this; we're just doing
 	# it for convienence while this code gets reworked
-        cu2 = self.db.cursor()
-        for (depId, depNum, reqInstId, reqNodeIdx, 
-             provInstId, provNodeIdx) in result:
-	    if depNum < 0:
-                assert(depList[-depNum][0] < 0)
-                fromNodeId = -depList[-depNum][0]
 
-		if provNodeIdx is not None:
-		    # new trove depends on something old
-                    toNodeId = provNodeIdx
-                    if fromNodeId == toNodeId:
-                        continue
-                    newOldEdges.add((fromNodeId, toNodeId, depId))
-		elif provInstId > 0:
-		    # new trove depends on something already installed
-		    # which is not being removed. not interesting.
-		    pass
-		else:
-		    # new trove depends on something new
-                    toNodeId = -provInstId
-                    if fromNodeId == toNodeId:
-                        continue
-                    newNewEdges.add((fromNodeId, toNodeId, depId))
-	    else: # dependency was provided by something before this 
-                  # update occurred
-                if reqNodeIdx is not None:
-                    fromNodeId = reqNodeIdx
-                    # requirement is old
-                    if provNodeIdx is not None:
-                        # provider is old
-                        toNodeId = provNodeIdx
-                        if fromNodeId == toNodeId:
-                            continue
-                        oldOldEdges.add((fromNodeId, toNodeId, depId))
-                    else:
-                        # provider is new
-                        toNodeId = -provInstId
-                        if fromNodeId == toNodeId:
-                            continue
-                        oldNewEdges.add((fromNodeId, toNodeId, depId))
-                else:
-                    # trove with the requirement is not being removed.
-                    if provNodeIdx is None: 
-                        # the trove that provides this requirement is being
-                        # installed.  We probably don't care.
-                        continue
-                    else:
-                        # the trove that provides this requirement is being
-                        # removed.  We probably care -- if this dep is
-                        # being provided by some other package, we need
-                        # to connect these two packages
-                        # XXX fix this
-                        continue
         changeSetList = []
+        if findOrdering:
+            # there are four kinds of edges -- old needs old, old needs new,
+            # new needs new, and new needs old. Each edge carries a depId
+            # to aid in cancelling them out. Our initial edge representation
+            # is a simple set of edges.
+            oldNewEdges, oldOldEdges, newNewEdges, newOldEdges = \
+                        _createEdges(result, depList)
+
+            # Create dependencies from collections to the things they include.
+            # This forces collections to be installed after all of their
+            # elements
+            for i, trvCs in enumerate(changeSet.iterNewTroveList()):
+                for (name, changeList) in trvCs.iterChangedTroves():
+                    for (changeType, version, flavor, byDef) in changeList:
+                        if changeType == '+':
+                            targetTrove = troveInfo.get(
+                                                (name, version, flavor), -1)
+                            if targetTrove >= 0:
+                                newNewEdges.add((i + 1, targetTrove, None))
+        del troveInfo
+
+        # None in depList means the dependency got resolved; we track
+        # would have been resolved by something which has been removed as
+        # well
+
+        # depNum is the dependency number
+        #    negative ones are for dependencies being added (and they index
+        #    depList); positive ones are for dependencies broken by an
+        #    erase (and need to be looked up in the Requires table in the 
+        #    database to get a nice description)
+        # removedInstanceId != None means that the dependency was resolved by 
+        #    something which is being removed. If it is None, the dependency
+        #    was resolved by something which isn't disappearing. It could
+        #    occur multiple times for the same dependency with both None
+        #    and !None, in which case the None wins (as long as one item
+        #    resolves it, it's resolved)
+        brokenByErase = set()
+        unresolveable = set()
+        satisfied = set([0])
+        for (depId, depNum, reqInstanceId, 
+             reqNodeIdx, provInstId, provNodeIdx) in result:
+            if provNodeIdx is not None:
+                if reqNodeIdx is not None:
+                    # this is an old dependency and an old provide.  
+                    # ignore it
+                    continue
+                if depNum < 0:
+                    # the dependency would have been resolved, but this
+                    # change set removes what would have resolved it
+                    unresolveable.add(depNum)
+                else:
+                    # this change set removes something which is needed
+                    # by something else on the system (if might provide
+		    # a replacement; we handle that later)
+                    brokenByErase.add(depNum)
+            else:
+                # if we get here, the dependency is resolved; mark it as
+                # resolved by clearing it's entry in depList
+                if depNum < 0:
+                    satisfied.add(depNum)
+                else:
+                    # if depNum > 0, this was a dependency which was checked
+                    # because of something which is being removed, but it
+                    # remains satisfied
+                    satisfied.add(depNum)
+
         if findOrdering:
             # Remove nodes which cancel each other
             _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
@@ -882,87 +939,33 @@ class DependencyTables:
                                          item.getNewFlavor()),
                                         item.isAbsolute()) )
                 changeSetList.append(oneList)
-        else:
-            del nodes
-            del oldOldEdges
-            del oldNewEdges
-            del newOldEdges
-            del newNewEdges
-
-        # None in depList means the dependency got resolved; we track
-        # would have been resolved by something which has been removed as
-        # well
-
-        # depNum is the dependency number
-        #    negative ones are for dependencies being added (and they index
-        #    depList); positive ones are for dependencies broken by an
-        #    erase (and need to be looked up in the Requires table in the 
-        #    database to get a nice description)
-        # removedInstanceId != None means that the dependency was resolved by 
-        #    something which is being removed. If it is None, the dependency
-        #    was resolved by something which isn't disappearing. It could
-        #    occur multiple times for the same dependency with both None
-        #    and !None, in which case the None wins (as long as one item
-        #    resolves it, it's resolved)
-        brokenByErase = {}
-        unresolveable = [ None ] * (len(depList) + 1)
-        satisfied = []
-        for (depId, depNum, reqInstanceId, 
-             reqNodeIdx, provInstId, provNodeIdx) in result:
-            if provNodeIdx is not None:
-                if reqNodeIdx is not None:
-                    # this is an old dependency and an old provide.  
-                    # ignore it
-                    continue
-                if depNum < 0:
-                    # the dependency would have been resolved, but this
-                    # change set removes what would have resolved it
-                    unresolveable[-depNum] = True
-                else:
-                    # this change set removes something which is needed
-                    # by something else on the system (if might provide
-		    # a replacement; we handle that later)
-                    brokenByErase[depNum] = True
-            else:
-                # if we get here, the dependency is resolved; mark it as
-                # resolved by clearing it's entry in depList
-                if depNum < 0:
-                    depList[-depNum] = None
-                else:
-                    # if depNum > 0, this was a dependency which was checked
-                    # because of something which is being removed, but it
-                    # remains satisfied
-                    satisfied.append(depNum)
 
         # things which are listed in satisfied should be removed from
         # brokenByErase; they are dependencies that were broken, but are
         # resolved by something else
-        for depNum in satisfied:
-            if brokenByErase.has_key(depNum):
-                del brokenByErase[depNum]
+        brokenByErase.difference_update(satisfied)
 
         # sort things out of unresolveable which were resolved by something
-        # else
-        for depNum in range(len(unresolveable)):
-            if unresolveable[depNum] is None:
-                pass
-            elif depList[depNum] is None:
-                unresolveable[depNum] = None
-            else:
-                unresolveable[depNum] = depList[depNum]
-                # we handle this as unresolveable; we don't need it in
-                # depList any more
-                depList[depNum] = None
+        # else. 
+        unresolveable.difference_update(satisfied)
 
-        failedList = _depItemsToSet(depList)
-        unresolveableList = _depItemsToSet(unresolveable)
-        unresolveableList += _brokenItemsToSet(cu, brokenByErase.keys())
+        # build a list of all of the depnums which need to be satisfied
+        # (which is -1 * each index into depList), and subtract out the
+        # dependencies which were satistied. what's left are the depNum's
+        # (negative) of the dependencies which failed
+        unsatisfied = set([ -1 * x for x in range(len(depList)) ]) - satisfied
+        # don't report things as both unsatisfied and unresolveable
+        unsatisfied = unsatisfied - unresolveable
+
+        unsatisfiedList = _depItemsToSet(unsatisfied, depList)
+        unresolveableList = _depItemsToSet(unresolveable, depList)
+        unresolveableList += _brokenItemsToSet(cu, brokenByErase)
 
         # no need to drop our temporary tables since we're rolling this whole
         # transaction back anyway
 	self.db.rollback()
 
-        return (failedList, unresolveableList, changeSetList)
+        return (unsatisfiedList, unresolveableList, changeSetList)
 
     def resolve(self, label, depSetList):
         cu = self.db.cursor()
