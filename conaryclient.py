@@ -842,6 +842,52 @@ class ConaryClient:
         update, a (name, versionString, flavor) tuple, or a 
         @type itemList: list
         """
+
+        def _removeDuplicateErasures(cs):
+            # We don't have to worry about the erase list in the changeset;
+            # _mergeGroupChanges will take care of that. This needs to make
+            # sure we don't have two troves trying to outdate the same target
+            # XXX doing it here is a hack -- it causes extra calls to
+            # getChangeSet. 
+            outdated = {}
+            for trvCs in cs.iterNewTroveList():
+                old = (trvCs.getName(), trvCs.getOldVersion(), 
+                       trvCs.getOldFlavor())
+                if old[1] is None:
+                    continue
+                new = (trvCs.getName(), trvCs.getNewVersion(), 
+                       trvCs.getNewFlavor())
+
+                l = outdated.setdefault(old, [])
+                l.append(new)
+
+            inelligible = []
+            newItems = []
+            for old, l in outdated.iteritems():
+                if len(l) == 1: 
+                    inelligible.append(old)
+                else:
+                    newItems += l
+
+            if not newItems:
+                return
+
+            # Everything left in outdated conflicts with itself. we'll
+            # let outdated sort things out.
+            outdated, eraseList = self.db.outdatedTroves(newItems, inelligible)
+            needed = []
+            for newInfo, oldInfo in outdated.iteritems():
+                trvCs = cs.getNewTroveVersion(*newInfo)
+                if trvCs.getOldVersion() != oldInfo[1] or \
+                   trvCs.getOldFlavor() != oldInfo[2]:
+                    cs.delNewTrove(*newInfo)
+                    needed.append((newInfo[0], (oldInfo[1], oldInfo[2]),
+                                               (newInfo[1], newInfo[2]), False))
+            
+            newCs = self.repos.createChangeSet(needed, recurse = False, 
+                                               withFiles = False)
+            cs.merge(newCs)
+
         changeSetList = []
         newItems = []
         finalCs = UpdateChangeSet()
@@ -981,6 +1027,10 @@ class ConaryClient:
             finalCs.merge(cs, (self.repos.createChangeSet, changeSetList))
 
         redirectHack = self._processRedirects(finalCs, recurse) 
+
+        # while we've been careful to avoid duplicate erasures, some can
+        # crop in due to the recursive nature of primaries
+        _removeDuplicateErasures(finalCs)
 
         mergeItemList = self._mergeGroupChanges(finalCs, uJob, redirectHack, 
                                                 keepExisting, recurse,
