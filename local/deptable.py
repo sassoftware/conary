@@ -512,16 +512,6 @@ class DependencyTables:
             # these edges cancel each other out -- for example, if Foo
             # requires both the old and new versions of Bar the order between
             # Foo and Bar is irrelevant
-            #for edge in oldOldEdges.keys():
-            #    if oldNewEdges.has_key(edge):
-            #        del oldOldEdges[edge]
-            #        del oldNewEdges[edge]
-
-            #for edge in newOldEdges.keys():
-            #    if newNewEdges.has_key(edge):
-            #        del newOldEdges[edge]
-            #        del newNewEdges[edge]
-
             oldOldEdges.difference_update(oldNewEdges)
             newNewEdges.difference_update(newOldEdges)
 
@@ -831,6 +821,57 @@ class DependencyTables:
 	# it for convienence while this code gets reworked
 
         changeSetList = []
+
+        # None in depList means the dependency got resolved; we track
+        # would have been resolved by something which has been removed as
+        # well
+
+        # depNum is the dependency number
+        #    negative ones are for dependencies being added (and they index
+        #    depList); positive ones are for dependencies broken by an
+        #    erase (and need to be looked up in the Requires table in the 
+        #    database to get a nice description)
+        # removedInstanceId != None means that the dependency was resolved by 
+        #    something which is being removed. If it is None, the dependency
+        #    was resolved by something which isn't disappearing. It could
+        #    occur multiple times for the same dependency with both None
+        #    and !None, in which case the None wins (as long as one item
+        #    resolves it, it's resolved)
+        unresolveable = set()
+
+        # these track the nodes which satisfy each depId. brokenByErase
+        # tracks what used to provide something but is being removed, while
+        # satisfied tracks what now provides it
+        brokenByErase = {}
+        satisfied = { 0 : 0 }
+
+        for (depId, depNum, reqInstanceId, 
+             reqNodeIdx, provInstId, provNodeIdx) in result:
+            if provNodeIdx is not None:
+                if reqNodeIdx is not None:
+                    # this is an old dependency and an old provide.  
+                    # ignore it
+                    continue
+                if depNum < 0:
+                    # the dependency would have been resolved, but this
+                    # change set removes what would have resolved it
+                    unresolveable.add(depNum)
+                else:
+                    # this change set removes something which is needed
+                    # by something else on the system (if might provide
+		    # a replacement; we handle that later)
+                    brokenByErase[depNum] = provNodeIdx
+            else:
+                # if we get here, the dependency is resolved; mark it as
+                # resolved by clearing it's entry in depList
+                if depNum < 0:
+                    satisfied[depNum] = provInstId
+                else:
+                    # if depNum > 0, this was a dependency which was checked
+                    # because of something which is being removed, but it
+                    # remains satisfied
+                    satisfied[depNum] = provInstId
+
         if findOrdering:
             # there are four kinds of edges -- old needs old, old needs new,
             # new needs new, and new needs old. Each edge carries a depId
@@ -850,54 +891,26 @@ class DependencyTables:
                                                 (name, version, flavor), -1)
                             if targetTrove >= 0:
                                 newNewEdges.add((i + 1, targetTrove, None))
-        del troveInfo
 
-        # None in depList means the dependency got resolved; we track
-        # would have been resolved by something which has been removed as
-        # well
+            resatisfied = set(brokenByErase) & set(satisfied)
+            if resatisfied:
+                # These dependencies are ones where the same dependency
+                # is being both removed and added, and which is required
+                # by something already installed on the system. To ensure
+                # dependency closure, these two operations must happen
+                # simultaneously. Create a loop between the nodes.
+                for depId in resatisfied:
+                    oldNodeId = brokenByErase[depId]
+                    newNodeId = -satisfied[depId]
+                    if oldNodeId != newNodeId and newNodeId > 0:
+                        # if newNodeId < 0, the dependency remains satisfied
+                        # by something on the system and we don't need
+                        # to do anything special. Creating the loop
+                        # this way is a bit abusive of the edge types since
+                        # they aren't really descriptive in this case
+                        oldOldEdges.add((oldNodeId, newNodeId, depId))
+                        newNewEdges.add((oldNodeId, newNodeId, depId))
 
-        # depNum is the dependency number
-        #    negative ones are for dependencies being added (and they index
-        #    depList); positive ones are for dependencies broken by an
-        #    erase (and need to be looked up in the Requires table in the 
-        #    database to get a nice description)
-        # removedInstanceId != None means that the dependency was resolved by 
-        #    something which is being removed. If it is None, the dependency
-        #    was resolved by something which isn't disappearing. It could
-        #    occur multiple times for the same dependency with both None
-        #    and !None, in which case the None wins (as long as one item
-        #    resolves it, it's resolved)
-        brokenByErase = set()
-        unresolveable = set()
-        satisfied = set([0])
-        for (depId, depNum, reqInstanceId, 
-             reqNodeIdx, provInstId, provNodeIdx) in result:
-            if provNodeIdx is not None:
-                if reqNodeIdx is not None:
-                    # this is an old dependency and an old provide.  
-                    # ignore it
-                    continue
-                if depNum < 0:
-                    # the dependency would have been resolved, but this
-                    # change set removes what would have resolved it
-                    unresolveable.add(depNum)
-                else:
-                    # this change set removes something which is needed
-                    # by something else on the system (if might provide
-		    # a replacement; we handle that later)
-                    brokenByErase.add(depNum)
-            else:
-                # if we get here, the dependency is resolved; mark it as
-                # resolved by clearing it's entry in depList
-                if depNum < 0:
-                    satisfied.add(depNum)
-                else:
-                    # if depNum > 0, this was a dependency which was checked
-                    # because of something which is being removed, but it
-                    # remains satisfied
-                    satisfied.add(depNum)
-
-        if findOrdering:
             # Remove nodes which cancel each other
             _collapseEdges(oldOldEdges, oldNewEdges, newOldEdges, newNewEdges)
 
@@ -939,6 +952,11 @@ class DependencyTables:
                                          item.getNewFlavor()),
                                         item.isAbsolute()) )
                 changeSetList.append(oneList)
+
+        del troveInfo
+
+        satisfied = set(satisfied)
+        brokenByErase = set(brokenByErase)
 
         # things which are listed in satisfied should be removed from
         # brokenByErase; they are dependencies that were broken, but are
