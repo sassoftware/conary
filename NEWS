@@ -28,7 +28,10 @@ Changes in 0.61.7:
     has been fixed
   * add an updateThreshold config option to control the number of troves to
     include in a download
-  * A major bug affecting update order for synchronous libraries has been fixed.
+  * A major bug affecting update order for synchronous libraries has been
+    fixed.
+  * The r.Ownership(), r.UtilizeUser(), and r.UtilizeGroup() now generate
+    appropriate dependencies on info-* packages.
 
 Changes in 0.61.6:
   * InitialContents turns off EtcConfig, since a file cannot be both

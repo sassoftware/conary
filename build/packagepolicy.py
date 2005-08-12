@@ -1323,14 +1323,12 @@ class Ownership(policy.Policy, _UserGroup):
 	pkgfile = self.recipe.autopkg.pathMap[filename]
 	if owner:
 	    pkgfile.inode.owner.set(owner)
-            # XXX -- uncomment
-            #if owner not in self.systemusers:
-            #    self.setUserGroupDep(filename, owner, deps.UserInfoDependencies)
+            if owner not in self.systemusers:
+                self.setUserGroupDep(filename, owner, deps.UserInfoDependencies)
 	if group:
 	    pkgfile.inode.group.set(group)
-            # XXX -- uncomment
-            #if group not in self.systemgroups:
-            #    self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
+            if group not in self.systemgroups:
+                self.setUserGroupDep(filename, group, deps.GroupInfoDependencies)
 
 
 class ExcludeDirectories(policy.Policy):
@@ -1413,8 +1411,6 @@ class UtilizeUser(_Utilize):
     after they start.
     """
     def _markItem(self, path, user):
-        # XXX -- remove return
-        return
         self.setUserGroupDep(path, user, deps.UserInfoDependencies)
 
 
@@ -1428,8 +1424,6 @@ class UtilizeGroup(_Utilize):
     after they start.
     """
     def _markItem(self, path, group):
-        # XXX -- remove return
-        return
         self.setUserGroupDep(path, user, deps.GroupInfoDependencies)
 
 
