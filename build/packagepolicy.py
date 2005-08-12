@@ -1940,7 +1940,7 @@ class EnforceSonameBuildRequirements(policy.Policy):
             self.warn('add to buildRequires: %s'
                        %str(sorted(list(set(missingBuildRequires)))))
             # one special case:
-            if missingBuildRequires == [ 'glibc:devel' ]:
+            if list(missingBuildRequires) == [ 'glibc:devel' ]:
                 self.warn('consider CPackageRecipe or AutoPackageRecipe')
 
 
