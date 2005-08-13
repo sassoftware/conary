@@ -49,37 +49,41 @@ def _createCacheEntry(cfg, name, location, infile):
     cachedname = createCacheName(cfg, name, location)
     f = open(cachedname, "w+")
    
-    BLOCKSIZE = 1024 * 4
-   
-    got = 0
-    last = 0
-    if infile.info().has_key('content-length'):
-        need = int(infile.info()['content-length'])
-    else:
-        need = 0
-    
-    while 1:
-        buf = infile.read(BLOCKSIZE)
-        if not buf:
-            break
-        f.write(buf)
+    try:
+        BLOCKSIZE = 1024 * 4
+       
+        got = 0
+        last = 0
+        if infile.info().has_key('content-length'):
+            need = int(infile.info()['content-length'])
+        else:
+            need = 0
+        
+        while 1:
+            buf = infile.read(BLOCKSIZE)
+            if not buf:
+                break
+            f.write(buf)
 
-        got += len(buf)
-        if not cfg.quiet and need != 0:
-            msg = "info: Downloading source (%d%% of %dk)..." \
-                  % ((got * 100) / need , need / 1024)
-            sys.stderr.write("\r")
-            sys.stderr.write(msg)
-            if len(msg) < last:
-                i = last - len(msg)
-                sys.stderr.write(" " * i + "\b" * i)
-            sys.stderr.flush()
-            last = len(msg)
-    
-    if not cfg.quiet:
-        sys.stderr.write("\n")
-    f.close()
-    infile.close()
+            got += len(buf)
+            if not cfg.quiet and need != 0:
+                msg = "info: Downloading source (%d%% of %dk)..." \
+                      % ((got * 100) / need , need / 1024)
+                sys.stderr.write("\r")
+                sys.stderr.write(msg)
+                if len(msg) < last:
+                    i = last - len(msg)
+                    sys.stderr.write(" " * i + "\b" * i)
+                sys.stderr.flush()
+                last = len(msg)
+        
+        if not cfg.quiet:
+            sys.stderr.write("\n")
+        f.close()
+        infile.close()
+    except:
+        os.unlink(cachedname)
+        raise
 
     # work around FTP bug (msw had a better way?)
     if name.startswith("ftp://"):
