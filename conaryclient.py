@@ -832,8 +832,7 @@ class ConaryClient:
         return neededJob
             
     def _updateChangeSet(self, itemList, uJob, keepExisting = None, 
-                         recurse = True, updateMode = True, 
-                         allowMissing=False):
+                         recurse = True, updateMode = True):
         """
         Updates a trove on the local system to the latest version 
         in the respository that the trove was initially installed from.
@@ -842,8 +841,6 @@ class ConaryClient:
         in the list must be a ChangeSetFromFile, the name of a trove to
         update, a (name, versionString, flavor) tuple, or a 
         @type itemList: list
-        @param allowMissing: If true, only warn if the troves listed 
-        are missing on update.
         """
 
         def _removeDuplicateErasures(cs):
