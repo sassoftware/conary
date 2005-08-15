@@ -88,7 +88,9 @@ def usage(rc = 1):
     print '                 --install-label <label>'
     print "                 --root <root>"
     print ""
-    print "query flags:     --deps"
+    print "query flags:     --buildreqs"
+    print "                 --deps"
+    print "                 --flavors"
     print "                 --full-versions"
     print "                 --ids"
     print "                 --info"
@@ -98,8 +100,10 @@ def usage(rc = 1):
     print "                 --tags"
     print ""
     print "repquery flags:  --all"
+    print "                 --buildreqs"    
     print "                 --deps"    
     print "                 --full-versions"
+    print "                 --flavors"
     print "                 --ids"
     print "                 --info"
     print "                 --leaves"
@@ -160,10 +164,12 @@ def realMain(cfg, argv=sys.argv):
     (OPT_PARAM, MULT_PARAM) = (options.OPT_PARAM, options.MULT_PARAM)
 
     argDef["all"] = NO_PARAM
+    argDef["buildreqs"] = NO_PARAM
     argDef["config"] = MULT_PARAM
     argDef["config-file"] = ONE_PARAM
     argDef["debug"] = NO_PARAM
     argDef["deps"] = NO_PARAM
+    argDef["flavors"] = NO_PARAM
     argDef["full-versions"] = NO_PARAM
     argDef["ids"] = NO_PARAM
     argDef["info"] = NO_PARAM
@@ -309,31 +315,16 @@ def realMain(cfg, argv=sys.argv):
 
         updatecmd.changeLocks(cfg, otherArgs[2:], lock = otherArgs[1] == "lock")
     elif (otherArgs[1] == "query") or (otherArgs[1] == "q"):
-	if argSet.has_key('path'):
-	    paths = argSet['path']
-	    del argSet['path']
-	else:
-	    paths = []
-
-	tags = argSet.has_key('tags')
-	if tags: del argSet['tags']
-
-	info = argSet.has_key('info')
-	if info: del argSet['info']
-	
-	ls = argSet.has_key('ls')
-	if ls: del argSet['ls']
-
+        paths = argSet.pop('path', [])
+	tags = argSet.pop('tags', False)
+        info = argSet.pop('info', False)
+	ls = argSet.pop('ls', False)
 	deps = argSet.pop('deps', False)
-
-	ids = argSet.has_key('ids')
-	if ids: del argSet['ids']
-
-	sha1s = argSet.has_key('sha1s')
-	if sha1s: del argSet['sha1s']
-
-	fullVersions = argSet.has_key('full-versions')
-	if fullVersions: del argSet['full-versions']
+	ids = argSet.pop('ids', False)
+	sha1s = argSet.pop('sha1s', False)
+	fullVersions = argSet.pop('full-versions', False)
+	showFlavors = argSet.pop('flavors', False)
+	showBuildReqs = argSet.pop('buildreqs', False)
 
 	db = openDatabase(cfg.root, cfg.dbPath)
 
@@ -342,39 +333,26 @@ def realMain(cfg, argv=sys.argv):
 	if len(otherArgs) >= 2:
 	    try:
                 display.displayTroves(db, otherArgs[2:], paths, ls, ids, sha1s,
-                                      fullVersions, tags, info=info, deps=deps)
+                                      fullVersions, tags, info=info, deps=deps,
+                                      showBuildReqs=showBuildReqs, 
+                                      showFlavors=showFlavors)
 	    except IOError, msg:
 		sys.stderr.write(msg.strerror + '\n')
 		return 1
 	else:
 	    return usage()
     elif (otherArgs[1] == "repquery") or (otherArgs[1] == "rq"):
-	all = argSet.has_key('all')
-	if all: del argSet['all']
-
-	ls = argSet.has_key('ls')
-	if ls: del argSet['ls']
-
-	fullVersions = argSet.has_key('full-versions')
-	if fullVersions: del argSet['full-versions']
-
-	ids = argSet.has_key('ids')
-	if ids: del argSet['ids']
-
-	info = argSet.has_key('info')
-	if info: del argSet['info']
-
-	tags = argSet.has_key('tags')
-	if tags: del argSet['tags']
-
-	sha1s = argSet.has_key('sha1s')
-	if sha1s: del argSet['sha1s']
-
-	leaves = argSet.has_key('leaves')
-	if leaves: del argSet['leaves']
-
-	showDeps = argSet.has_key('deps')
-	if showDeps: del argSet['deps']
+	all = argSet.pop('all', False)
+	ls = argSet.pop('ls', False)
+	fullVersions = argSet.pop('full-versions', False)
+	ids = argSet.pop('ids', False)
+	info = argSet.pop('info', False)
+	tags = argSet.pop('tags', False)
+	sha1s = argSet.pop('sha1s', False)
+	leaves = argSet.pop('leaves', False)
+	showDeps = argSet.pop('deps', False)
+	showBuildReqs = argSet.pop('buildreqs', False)
+	showFlavors = argSet.pop('flavors', False)
 
 	repos = openRepository(cfg.repositoryMap)
 
@@ -382,7 +360,8 @@ def realMain(cfg, argv=sys.argv):
 
 	if len(otherArgs) >= 2:
 	    args = [repos, cfg, otherArgs[2:], all, ls, ids, sha1s, leaves, 
-                    fullVersions, info, tags, showDeps] 
+                    fullVersions, info, tags, showDeps, showBuildReqs,
+                    showFlavors]
 	    try:
 		queryrep.displayTroves(*args)
 	    except IOError, msg:

@@ -27,6 +27,8 @@ import versions
 from lib.sha1helper import sha1ToString
 
 _troveFormat  = display._troveFormat
+_formatFlavor  = display._formatFlavor
+_displayOneTrove  = display._displayOneTrove
 _troveFormatWithFlavor = display._troveFormatWithFlavor
 _fileFormat = display._fileFormat
 _grpFormat  = display._grpFormat
@@ -34,7 +36,7 @@ _grpFormat  = display._grpFormat
 def displayTroves(repos, cfg, troveList = [], all = False, ls = False, 
                   ids = False, sha1s = False, leaves = False, 
                   fullVersions = False, info = False, tags = False,
-                  deps = False):
+                  deps = False, showBuildReqs = False, showFlavors = False):
     hasVersions = False
     hasFlavors = False
 
@@ -50,14 +52,16 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
             troves += [ (x, None, None) for x in repos.troveNames(label) ]
             troves.sort()
 
-    if hasVersions or hasFlavors or ls or ids or sha1s or info or tags or deps:
+    if True in (hasVersions, hasFlavors, ls, ids, sha1s, info, tags, deps,
+                showBuildReqs):
 	if all:
 	    log.error("--all cannot be used with queries which display file "
 		      "lists")
 	    return
 	for troveName, versionStr, flavor in troves:
 	    _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-			      info, tags, deps, fullVersions, flavor)
+			      info, tags, deps, fullVersions, flavor, 
+                              showBuildReqs, showFlavors)
 	    continue
     else:
 	if all or leaves:
@@ -115,7 +119,7 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
             
 	    for version in reversed(versionList):
 		for flavor in flavors[troveName][version]:
-		    if all or len(flavors[troveName][version]) > 1:
+		    if all or len(flavors[troveName][version]) > 1 or showFlavors:
 			print _troveFormatWithFlavor %(
                             troveName, displayc[troveName, version],
                             display._formatFlavor(flavor))
@@ -132,8 +136,10 @@ def displayTroves(repos, cfg, troveList = [], all = False, ls = False,
 					      displayc[troveName, version])
             displayc.clearCache(troveName)
 
+
 def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
-		      info, tags, showDeps, fullVersions, flavor):
+		      info, tags, showDeps, fullVersions, flavor, 
+                      showBuildReqs, showFlavors):
     withFiles = ids
 
     try:
@@ -149,7 +155,6 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
     for (troveName, troveVersion, troveFlavor) in troveList:
         trove = repos.getTrove(troveName, troveVersion, troveFlavor, 
                                withFiles = withFiles)
-        
         sourceName = trove.getSourceName()
         if sourceName:
             try:
@@ -215,6 +220,9 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                     lines = cl.getMessage().split("\n")[:-1]
                     for l in lines:
                         print "    " + l
+	elif showBuildReqs:
+            for (n,v,f) in sorted(trove.getBuildRequirements()):
+                _displayOneTrove(n,v,f, fullVersions, showFlavors)
         elif showDeps:
             troveList = [trove]
             while troveList:
@@ -237,18 +245,14 @@ def _displayTroveInfo(repos, cfg, troveName, versionStr, ls, ids, sha1s,
                             print '    ', l
                 print
 	else:
-	    if fullVersions or len(troveList) > 1:
-		print _troveFormat % (trove.getName(), troveVersion.asString())
-	    else:
-		print _troveFormat % (trove.getName(), 
-                                  troveVersion.trailingRevision().asString())
-
+            _displayOneTrove(trove.getName(),trove.getVersion(),
+                             trove.getFlavor(), 
+                             fullVersions or len(troveList) > 1, 
+                             showFlavors)
 	    for (name, ver, flavor) in sorted(trove.iterTroveList()):
-		if fullVersions or ver.branch() != troveVersion.branch():
-		    print _grpFormat % (name, ver.asString())
-		else:
-		    print _grpFormat % (name, 
-					ver.trailingRevision().asString())
+                _displayOneTrove(name, ver, flavor,
+                        fullVersions or ver.branch() != troveVersion.branch(),
+                        showFlavors, format=_grpFormat)
 
 	    iter = repos.iterFilesInTrove(troveName, troveVersion, troveFlavor,
                                           sortByPath = True, withFiles = False)

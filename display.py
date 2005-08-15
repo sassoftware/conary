@@ -30,7 +30,6 @@ _troveFormat  = "%-39s %s"
 _troveFormatWithFlavor  = "%-39s %s%s"
 _fileFormat = "    %-35s %s"
 _grpFormat  = "  %-37s %s"
-_grpFormat  = "  %-37s %s"
 _grpFormatWithFlavor  = "  %-37s %s%s"
 
 class DisplayCache:
@@ -162,6 +161,17 @@ def _formatFlavor(flavor):
     else:
         return '\n   None'
 
+def _displayOneTrove(n,v,f, fullVersions, showFlavor, format=_troveFormat):
+    params = [n]
+    if fullVersions:
+        params.append(v.asString())
+    else:
+        params.append(v.trailingRevision().asString())
+
+    if showFlavor:
+        params.append(_formatFlavor(f))
+        format = format + '%s'
+    print format % tuple(params)
 
 def _printOneTroveName(db, troveName, troveDict, fullVersions, info):
     displayC = DisplayCache()
@@ -179,7 +189,8 @@ def _printOneTroveName(db, troveName, troveDict, fullVersions, info):
 
 def displayTroves(db, troveNameList = [], pathList = [], ls = False, 
                   ids = False, sha1s = False, fullVersions = False, 
-                  tags = False, info=False, deps=False):
+                  tags = False, info=False, deps=False, showBuildReqs = False,
+                  showFlavors = False):
     (troveNames, hasVersions, hasFlavors) = \
         parseTroveStrings(troveNameList)
 
@@ -189,9 +200,8 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
 	troveNames = [ (x, None, None) for x in db.iterAllTroveNames() ]
 	troveNames.sort()
 
-    if not hasVersions and not hasFlavors and not ls and not ids and \
-                                          not sha1s and not tags and not deps:
-        
+    if True not in (hasVersions, hasFlavors, ls, ids, sha1s, tags, deps, 
+                    showBuildReqs, info):
         troveDict = {}
         for path in pathList:
             for trove in db.iterTrovesByPath(path):
@@ -214,12 +224,12 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
             if not flavors[troveName]: 
                 log.error("%s is not installed", troveName)
             _printOneTroveName(db, troveName, flavors, fullVersions, 
-                                                       info=info)
+                                                       info=info or showFlavors)
         return
     for path in pathList:
         for trove in db.iterTrovesByPath(path):
 	    _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, tags, 
-                                                                info, deps)
+                              info, deps, showBuildReqs, showFlavors)
 
     for (troveName, versionStr, flavor) in troveNames:
         try:
@@ -227,7 +237,7 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
                 # db.getTrove returns the pristine trove by default
                 trove = db.getTrove(*trove)
                 _displayTroveInfo(db, trove, ls, ids, sha1s, fullVersions, 
-                                  tags, info, deps)
+                                  tags, info, deps, showBuildReqs, showFlavors)
         except repository.TroveNotFound:
             if versionStr:
                 log.error("version %s of trove %s is not installed",
@@ -236,7 +246,8 @@ def displayTroves(db, troveNameList = [], pathList = [], ls = False,
                 log.error("trove %s is not installed", troveName)
         
 def _displayTroveInfo(db, trove, ls, ids, sha1s, 
-                      fullVersions, tags, info, showDeps):
+                      fullVersions, tags, info, showDeps, showBuildReqs,
+                      showFlavors):
 
     version = trove.getVersion()
     flavor = trove.getFlavor()
@@ -298,6 +309,19 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s,
                               trove.getVersion(), trove.getFlavor()) ])[0])))
         print "Flavor    : %s" % deps.formatFlavor(trove.getFlavor())
         print "Requires  : %s" % trove.getRequires()
+    elif showBuildReqs:
+        for (n,v,f) in sorted(trove.getBuildRequirements()):
+            params = [n]
+            if fullVersions:
+                params.append(v.asString())
+            else:
+                params.append(v.trailingRevision().asString())
+            if showFlavors:
+                params.append(_formatFlavor(f))
+                format = _troveFormatWithFlavor
+            else:
+                format = _troveFormat
+            print format % tuple(params)
     elif showDeps:
         troveList = [trove]
         while troveList:
@@ -319,27 +343,14 @@ def _displayTroveInfo(db, trove, ls, ids, sha1s,
                         print '    ', l
             print 
     else:
-        if fullVersions:
-            print _troveFormat % (trove.getName(), version.asString())
-        else:
-            print _troveFormat % (trove.getName(), 
-                                  version.trailingRevision().asString())
+        _displayOneTrove(trove.getName(), trove.getVersion(),
+                         trove.getFlavor(), fullVersions,
+                         showFlavors)
+        for (troveName, ver, fla) in sorted(trove.iterTroveList()):
 
-        for (troveName, ver, fla) in trove.iterTroveList():
-            if fullVersions:
-                if info:
-                    print _grpFormatWithFlavor % (troveName, ver.asString(),
-                                                  _formatFlavor(fla))
-                else:
-                    print _grpFormat % (troveName, ver.asString())
-            else:
-                if info:
-                    print _grpFormatWithFlavor % (troveName, ver.asString(),
-                                                  _formatFlavor(fla))
-                else:
-                    print _grpFormat % (troveName, 
-                                        ver.trailingRevision().asString())
-
+            _displayOneTrove(troveName, ver, fla,
+                             fullVersions or ver.branch() != version.branch(),
+                             showFlavors, format=_grpFormat)
         fileL = [ (x[1], x[0], x[2], x[3]) for x in trove.iterFileList() ]
         fileL.sort()
         for (path, pathId, fileId, version) in fileL:
